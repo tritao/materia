@@ -71,6 +71,12 @@ The core API follows the invariant:
 truth snapshot -> sensor model -> sensor sample
 ```
 
+`SensorRuntime` is the thin orchestration layer above the individual models.
+It owns registration and scheduling, orders due ticks by capture time, and
+dispatches backend-provided producers into a typed measurement batch. Producers
+can close over an immutable SimKit or SceneKit snapshot, while runtime remains
+independent of those backends and of publishing or transport.
+
 For a stationary IMU, for example, a world-frame kinematic acceleration of
 zero and gravity of `(0, 0, -9.81)` produce a measured specific force of
 `(0, 0, 9.81)` before noise and post-processing.

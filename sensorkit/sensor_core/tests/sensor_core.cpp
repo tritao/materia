@@ -118,6 +118,50 @@ void manager_preserves_sensor_insertion_order() {
     assert(!manager.remove(20));
 }
 
+void runtime_dispatches_measurements_in_capture_order() {
+    SensorConfig late_config;
+    late_config.id = 23;
+    late_config.timing.update_rate_hz = 10.0;
+    late_config.timing.phase_offset = 0.05;
+    auto late = std::make_shared<Sensor>(late_config);
+
+    SensorConfig early_config;
+    early_config.id = 22;
+    early_config.timing.update_rate_hz = 10.0;
+    early_config.timing.phase_offset = 0.0;
+    auto early = std::make_shared<Sensor>(early_config);
+
+    const auto producer = [](const SensorTick &tick) -> std::optional<SensorMeasurement> {
+        ImuSample sample;
+        sample.header = tick.header;
+        return SensorMeasurement{sample};
+    };
+
+    SensorRuntime runtime;
+    assert(runtime.add(late, producer));
+    assert(runtime.add(early, producer));
+    assert(!runtime.add(early, producer));
+    assert(runtime.size() == 2);
+
+    const auto measurements = runtime.poll(0.1);
+    assert(measurements.size() == 3);
+    assert(std::get<ImuSample>(measurements[0]).header.sensor == 22);
+    assert(std::get<ImuSample>(measurements[1]).header.sensor == 23);
+    assert(std::get<ImuSample>(measurements[2]).header.sensor == 22);
+    assert(close(std::get<ImuSample>(measurements[0]).header.capture_time, 0.0));
+    assert(close(std::get<ImuSample>(measurements[1]).header.capture_time, 0.05));
+    assert(close(std::get<ImuSample>(measurements[2]).header.capture_time, 0.1));
+
+    runtime.reset(2.0);
+    const auto replay = runtime.poll(2.0);
+    assert(replay.size() == 2);
+    assert(close(std::get<ImuSample>(replay[0]).header.capture_time, 2.0));
+    assert(close(std::get<ImuSample>(replay[1]).header.capture_time, 2.0));
+    assert(runtime.remove(22));
+    assert(runtime.size() == 1);
+    assert(!runtime.remove(22));
+}
+
 void lidar_generates_rays_and_models_returns() {
     SensorConfig sensor_config;
     sensor_config.id = 30;
@@ -286,6 +330,7 @@ int main() {
     imu_converts_specific_force_and_applies_postprocessing();
     identical_seeds_replay_identical_measurements();
     manager_preserves_sensor_insertion_order();
+    runtime_dispatches_measurements_in_capture_order();
     lidar_generates_rays_and_models_returns();
     camera_packages_backend_pixels();
     camera_cpu_post_process_is_deterministic();

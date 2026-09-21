@@ -2,11 +2,13 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <random>
 #include <span>
+#include <variant>
 #include <vector>
 
 #if defined(_WIN32)
@@ -499,6 +501,46 @@ public:
 
 private:
     SegmentationConfig segmentation_;
+};
+
+using SensorMeasurement =
+    std::variant<ImuSample, LidarScan, CameraFrame, DepthFrame, SegmentationFrame>;
+
+/**
+ * Backend-neutral sensor scheduling and measurement dispatch.
+ *
+ * A producer is the narrow backend binding: it receives one scheduled tick,
+ * reads whatever immutable snapshot it has captured, invokes the appropriate
+ * sensor adapter/model, and returns one typed measurement. SensorRuntime owns
+ * no simulation, rendering, transport, or snapshot state.
+ */
+class NKSENSOR_API SensorRuntime {
+public:
+    using Producer = std::function<std::optional<SensorMeasurement>(const SensorTick &)>;
+
+    bool add(const std::shared_ptr<Sensor> &sensor, Producer producer);
+    bool remove(SensorId id);
+    std::shared_ptr<Sensor> find(SensorId id) const;
+
+    /**
+     * Poll all registered sensors and dispatch due ticks in capture-time order.
+     * A producer may return no value for dropped ticks or unavailable truth.
+     */
+    std::vector<SensorMeasurement> poll(double simulation_time);
+
+    /** Reset the scheduling phase of every registered sensor. */
+    void reset(double next_capture_time = 0.0) noexcept;
+
+    std::size_t size() const noexcept { return bindings_.size(); }
+
+private:
+    struct Binding {
+        std::shared_ptr<Sensor> sensor;
+        Producer producer;
+    };
+
+    SensorManager manager_;
+    std::vector<Binding> bindings_;
 };
 
 } // namespace nksensor

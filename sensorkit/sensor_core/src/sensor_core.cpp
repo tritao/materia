@@ -217,6 +217,57 @@ std::vector<SensorTick> SensorManager::poll(double simulation_time) {
     return ticks;
 }
 
+bool SensorRuntime::add(const std::shared_ptr<Sensor> &sensor, Producer producer) {
+    if (!sensor || !producer || !manager_.add(sensor))
+        return false;
+    bindings_.push_back({sensor, std::move(producer)});
+    return true;
+}
+
+bool SensorRuntime::remove(SensorId id) {
+    if (!manager_.remove(id))
+        return false;
+    const auto found = std::remove_if(bindings_.begin(), bindings_.end(),
+                                      [id](const Binding &binding) {
+                                          return binding.sensor && binding.sensor->id() == id;
+                                      });
+    bindings_.erase(found, bindings_.end());
+    return true;
+}
+
+std::shared_ptr<Sensor> SensorRuntime::find(SensorId id) const {
+    return manager_.find(id);
+}
+
+std::vector<SensorMeasurement> SensorRuntime::poll(double simulation_time) {
+    auto ticks = manager_.poll(simulation_time);
+    std::stable_sort(ticks.begin(), ticks.end(), [](const SensorTick &lhs, const SensorTick &rhs) {
+        if (lhs.header.capture_time != rhs.header.capture_time)
+            return lhs.header.capture_time < rhs.header.capture_time;
+        return lhs.header.sensor < rhs.header.sensor;
+    });
+
+    std::vector<SensorMeasurement> measurements;
+    for (const auto &tick : ticks) {
+        const auto found = std::find_if(bindings_.begin(), bindings_.end(),
+                                        [&tick](const Binding &binding) {
+                                            return binding.sensor &&
+                                                   binding.sensor->id() == tick.header.sensor;
+                                        });
+        if (found == bindings_.end())
+            continue;
+        if (auto measurement = found->producer(tick))
+            measurements.push_back(std::move(*measurement));
+    }
+    return measurements;
+}
+
+void SensorRuntime::reset(double next_capture_time) noexcept {
+    for (const auto &binding : bindings_)
+        if (binding.sensor)
+            binding.sensor->reset(next_capture_time);
+}
+
 ImuSensor::ImuSensor(SensorConfig config, ImuNoiseConfig noise)
     : Sensor(std::move(config)), noise_(noise) {}
 
