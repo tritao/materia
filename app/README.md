@@ -30,6 +30,15 @@ Run the editor with:
 Use `--snapshot` after `--` for the headless workspace JSON path, or
 `--reset-workspace` to discard the persisted panel arrangement before startup.
 
+To connect the editor to a running headless robot process, pass its TCP
+endpoint. The editor keeps its own NativeKit event loop and uses RobotKit's
+typed client over loopback:
+
+```sh
+../haxeon/scripts/haxeon run --project haxeon.json -- \
+  --robot=127.0.0.1:17890
+```
+
 For a deterministic diagnostic run, render a bounded number of frames and
 capture the visual, structural, application, event, and performance state:
 

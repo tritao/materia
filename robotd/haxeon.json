@@ -1,18 +1,17 @@
 {
 	"version": 1,
-	"package": { "name": "app" },
-	"entry": "app.Main",
+	"package": { "name": "robotd" },
+	"entry": "robotd.Main",
 	"sourceRoots": ["src"],
 	"dependencies": {
 		"nativekit": { "path": "../nativekit" },
-		"uikit": { "path": "../uikit" },
 		"robotkit": { "path": "../robotkit" }
 	},
 	"native": {
 		"cmake": {
 			"source": "native",
-			"target": "haxeon_app_native",
-			"inputs": ["native/CMakeLists.txt", "../nativekit", "../uikit", "../robotkit"]
+			"target": "robotd_native",
+			"inputs": ["native/CMakeLists.txt", "../nativekit", "../robotkit"]
 		}
 	},
 	"target": "host",

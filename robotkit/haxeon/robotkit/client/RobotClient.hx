@@ -1,0 +1,309 @@
+package robotkit.client;
+
+import NativeKit;
+import NativeKit.EventKind;
+import NativeKitEventValue;
+import NativeKitEvents;
+import NativeKitEvents.NativeKitEventSubscription;
+import NativeKitRuntime;
+import haxe.Int64;
+import robotkit.protocol.Fault;
+import robotkit.protocol.Hello;
+import robotkit.protocol.JointTarget;
+import robotkit.protocol.RobotCapabilities;
+import robotkit.protocol.RobotDescription;
+import robotkit.protocol.RobotFrame;
+import robotkit.protocol.RobotFrame.RobotFrameStream;
+import robotkit.protocol.RobotMessageType;
+import robotkit.protocol.RobotProtocol;
+import robotkit.protocol.RobotStateMsg;
+import robotkit.protocol.Stop;
+import robotkit.transport.NativeTransport;
+
+/**
+ * Typed editor/CLI client for the RobotKit process boundary.
+ *
+ * The client owns only transport and protocol state. Runtime state remains
+ * authoritative in robotd and is delivered as immutable message values.
+ */
+class RobotClient {
+  public final clientName:String;
+  public var welcome:Null<robotkit.protocol.Welcome> = null;
+  public var description:Null<RobotDescription> = null;
+  public var capabilities:Null<RobotCapabilities> = null;
+  public var latestState:Null<RobotStateMsg> = null;
+  public var lastFault:Null<Fault> = null;
+  public var stateListener:Null<RobotStateMsg->Void> = null;
+  public var faultListener:Null<Fault->Void> = null;
+
+  var nativeRuntime:Null<NativeKitRuntime> = null;
+  var eventPump:Null<NativeKitEvents> = null;
+  var owned:Null<NativeKit.OwnedTransportHandle> = null;
+  var transport:Null<NativeKit.TransportHandle> = null;
+  var subscription:Null<NativeKitEventSubscription> = null;
+  var stream = new RobotFrameStream();
+  var sessionId:Int64 = Int64.ofInt(0);
+  var commandSequence:Int64 = Int64.ofInt(0);
+  var lastStateSequence:Int64 = Int64.ofInt(0);
+  var hasState:Bool = false;
+  var connected:Bool = false;
+  var failure:Null<String> = null;
+  var closed:Bool = false;
+
+  public function new(?clientName:String = "materia") {
+    this.clientName = clientName;
+  }
+
+  /** Connects to robotd and starts the NativeKit event subscription. */
+  public function connect(host:String, port:Int):Void {
+    if (subscription != null || nativeRuntime != null || owned != null)
+      throw "RobotKit client is already connected";
+    closed = false;
+    failure = null;
+    stream = new RobotFrameStream();
+    sessionId = Int64.ofInt(0);
+    commandSequence = Int64.ofInt(0);
+    lastStateSequence = Int64.ofInt(0);
+    hasState = false;
+    welcome = null;
+    description = null;
+    capabilities = null;
+    latestState = null;
+    lastFault = null;
+    var runtime = NativeKitRuntime.start();
+    var connection:Null<NativeKit.OwnedTransportHandle> = null;
+    try {
+      var connectedTransport = NativeTransport.connect(host, port);
+      connection = connectedTransport;
+      nativeRuntime = runtime;
+      eventPump = runtime.events;
+      owned = connectedTransport;
+      transport = connectedTransport.borrow();
+      subscription = runtime.events.listen(onEvent);
+    } catch (error:Dynamic) {
+      if (connection != null)
+        connection.close();
+      nativeRuntime = null;
+      eventPump = null;
+      owned = null;
+      transport = null;
+      subscription = null;
+      runtime.dispose();
+      throw error;
+    }
+  }
+
+  /**
+   * Connects using an event pump owned by an embedding application.
+   *
+   * This keeps the editor's single NativeKit initialization and event loop
+   * authoritative while retaining the same typed client API.
+   */
+  public function connectWithEvents(host:String, port:Int, events:NativeKitEvents):Void {
+    if (events == null)
+      throw "RobotKit client requires a NativeKit event pump";
+    if (subscription != null || nativeRuntime != null || owned != null)
+      throw "RobotKit client is already connected";
+    closed = false;
+    failure = null;
+    stream = new RobotFrameStream();
+    sessionId = Int64.ofInt(0);
+    commandSequence = Int64.ofInt(0);
+    lastStateSequence = Int64.ofInt(0);
+    hasState = false;
+    welcome = null;
+    description = null;
+    capabilities = null;
+    latestState = null;
+    lastFault = null;
+    var connection:Null<NativeKit.OwnedTransportHandle> = null;
+    try {
+      var connectedTransport = NativeTransport.connect(host, port);
+      connection = connectedTransport;
+      eventPump = events;
+      owned = connectedTransport;
+      transport = connectedTransport.borrow();
+      subscription = events.listen(onEvent);
+    } catch (error:Dynamic) {
+      if (connection != null)
+        connection.close();
+      eventPump = null;
+      owned = null;
+      transport = null;
+      subscription = null;
+      throw error;
+    }
+  }
+
+  /** Pumps all currently queued NativeKit events and reports whether any ran. */
+  public function poll():Bool {
+    var events = eventPump;
+    if (events == null)
+      throw "RobotKit client is not connected";
+    var hadEvent = false;
+    while (events.poll())
+      hadEvent = true;
+    raiseFailure();
+    return hadEvent;
+  }
+
+  /** Waits for transport activity; call poll() afterwards to dispatch it. */
+  public function wait(timeoutSeconds:Float):Void {
+    var events = eventPump;
+    if (events == null)
+      throw "RobotKit client is not connected";
+    events.wait(timeoutSeconds);
+  }
+
+  public function isConnected():Bool
+    return connected && !closed;
+
+  public function isReady():Bool
+    return isConnected() && Int64.compare(sessionId, Int64.ofInt(0)) != 0;
+
+  /** Sends one position/velocity/effort-independent joint target. */
+  public function sendJointTarget(joint:Int, mode:Int, target:Float,
+      ?expiryNs:Int64):Int64 {
+    ensureReady();
+    var sequence = nextCommandSequence();
+    var value = new JointTarget(robotId(), joint, mode, target,
+      sequence, expiryNs == null ? Int64.ofInt(0) : expiryNs);
+    send(RobotProtocol.jointTarget(value, sessionId, sequence,
+      NativeKit.nk_time_now_ns()));
+    return sequence;
+  }
+
+  public function stop(?reason:String = "client stop", ?emergency:Bool = false):Int64 {
+    ensureReady();
+    var sequence = nextCommandSequence();
+    var value = new Stop(robotId(), reason, emergency);
+    send(RobotProtocol.stop(value, sessionId, sequence,
+      NativeKit.nk_time_now_ns()));
+    return sequence;
+  }
+
+  public function close():Void {
+    if (closed)
+      return;
+    closed = true;
+    connected = false;
+    var currentSubscription = subscription;
+    subscription = null;
+    if (currentSubscription != null)
+      currentSubscription.dispose();
+    var currentOwned = owned;
+    owned = null;
+    transport = null;
+    if (currentOwned != null)
+      currentOwned.close();
+    var runtime = nativeRuntime;
+    nativeRuntime = null;
+    eventPump = null;
+    if (runtime != null)
+      runtime.dispose();
+  }
+
+  function onEvent(value:NativeKitEventValue):Void switch value {
+    case Raw(kind, source, _, _, _, _, _):
+      var currentTransport = transport;
+      if (currentTransport == null || source.rawValue() != currentTransport.rawValue())
+        return;
+      if (kind == EventKind.TransportConnected) {
+        connected = true;
+        send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1")));
+      } else if (kind == EventKind.TransportData) {
+        receive(currentTransport);
+      } else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {
+        connected = false;
+        failure = "robotd closed the TCP connection";
+      }
+    case _:
+  }
+
+  function receive(currentTransport:NativeKit.TransportHandle):Void {
+    while (true) {
+      var data = NativeTransport.receive(currentTransport);
+      if (data.length == 0)
+        return;
+      for (frame in stream.push(data))
+        handleFrame(frame);
+    }
+  }
+
+  function handleFrame(frame:RobotFrame):Void switch frame.messageType {
+    case RobotMessageType.Welcome:
+      var value = RobotProtocol.decodeWelcome(frame);
+      if (Int64.compare(frame.sessionId, value.sessionId) != 0) {
+        failure = "RobotKit Welcome session mismatch";
+        return;
+      }
+      welcome = value;
+      sessionId = value.sessionId;
+    case RobotMessageType.RobotDescription:
+      if (!validSession(frame))
+        return;
+      description = RobotProtocol.decodeDescription(frame);
+    case RobotMessageType.RobotCapabilities:
+      if (!validSession(frame))
+        return;
+      capabilities = RobotProtocol.decodeCapabilities(frame);
+    case RobotMessageType.RobotState:
+      var value = RobotProtocol.decodeState(frame);
+      if (Int64.compare(frame.sessionId, sessionId) != 0)
+        return;
+      if (hasState && Int64.compare(value.sequence, lastStateSequence) <= 0)
+        return;
+      hasState = true;
+      lastStateSequence = value.sequence;
+      latestState = value;
+      var listener = stateListener;
+      if (listener != null)
+        listener(value);
+    case RobotMessageType.Fault:
+      if (!validSession(frame))
+        return;
+      var value = RobotProtocol.decodeFault(frame);
+      lastFault = value;
+      var listener = faultListener;
+      if (listener != null)
+        listener(value);
+      if (value.fatal)
+        failure = value.message;
+    case _:
+  }
+
+  function nextCommandSequence():Int64 {
+    commandSequence = Int64.add(commandSequence, Int64.ofInt(1));
+    return commandSequence;
+  }
+
+  function robotId():Int64 {
+    var value = welcome;
+    if (value == null)
+      throw "RobotKit client has not received Welcome";
+    return value.robotId;
+  }
+
+  function validSession(frame:RobotFrame):Bool
+    return Int64.compare(frame.sessionId, sessionId) == 0
+      && Int64.compare(sessionId, Int64.ofInt(0)) != 0;
+
+  function ensureReady():Void {
+    if (!isReady())
+      throw "RobotKit client is not ready; wait for Welcome first";
+    raiseFailure();
+  }
+
+  function raiseFailure():Void {
+    var value = failure;
+    if (value != null)
+      throw value;
+  }
+
+  function send(frame:RobotFrame):Void {
+    var currentTransport = transport;
+    if (currentTransport == null)
+      throw "RobotKit client is not connected";
+    NativeTransport.send(currentTransport, frame.encode());
+  }
+}

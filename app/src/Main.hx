@@ -117,9 +117,11 @@ class Main {
     for (arg in args)
       if (arg != "--reset-workspace" && arg != "--snapshot" &&
           arg != "--lab" && arg != "--dark" && arg.indexOf("--story=") != 0 &&
-          arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0) {
+          arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
+          arg.indexOf("--robot=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot] " +
-          "[--lab] [--dark] [--story=ID] [--capture-dir=PATH] [--frames=N]");
+          "[--lab] [--dark] [--story=ID] [--capture-dir=PATH] [--frames=N] " +
+          "[--robot=HOST:PORT]");
         return 2;
       }
 
@@ -142,15 +144,20 @@ private class ReferenceEditorDiagnostics {
   public final componentLab:Bool;
   public final storyId:Null<String>;
   public final darkTheme:Bool;
+  public final robotHost:Null<String>;
+  public final robotPort:Int;
   public final events:Array<String> = [];
 
   public function new(captureDirectory:Null<String>, frameLimit:Int,
-      componentLab:Bool, storyId:Null<String>, darkTheme:Bool) {
+      componentLab:Bool, storyId:Null<String>, darkTheme:Bool,
+      robotHost:Null<String>, robotPort:Int) {
     this.captureDirectory = captureDirectory;
     this.frameLimit = frameLimit;
     this.componentLab = componentLab;
     this.storyId = storyId;
     this.darkTheme = darkTheme;
+    this.robotHost = robotHost;
+    this.robotPort = robotPort;
   }
 
   public static function fromArgs(args:Array<String>):Null<ReferenceEditorDiagnostics> {
@@ -158,6 +165,7 @@ private class ReferenceEditorDiagnostics {
     var frames = 0;
     var lab = args.indexOf("--lab") >= 0;
     var story:Null<String> = null;
+    var robotEndpoint:Null<String> = null;
     for (arg in args) {
       if (arg.indexOf("--capture-dir=") == 0)
         directory = arg.substr(14);
@@ -171,6 +179,8 @@ private class ReferenceEditorDiagnostics {
       } else if (arg.indexOf("--story=") == 0) {
         story = arg.substr(8);
         lab = true;
+      } else if (arg.indexOf("--robot=") == 0) {
+        robotEndpoint = arg.substr(8);
       }
     }
     if (directory != null && directory.length == 0) {
@@ -182,8 +192,24 @@ private class ReferenceEditorDiagnostics {
       Sys.println("materia: --story requires an ID");
       return null;
     }
+    var robotHost:Null<String> = null;
+    var robotPort = 0;
+    if (robotEndpoint != null) {
+      var separator = robotEndpoint.lastIndexOf(":");
+      if (separator <= 0 || separator == robotEndpoint.length - 1) {
+        Sys.println("materia: --robot requires HOST:PORT");
+        return null;
+      }
+      robotHost = robotEndpoint.substr(0, separator);
+      var parsedPort = Std.parseInt(robotEndpoint.substr(separator + 1));
+      if (parsedPort == null || parsedPort <= 0 || parsedPort > 65535) {
+        Sys.println("materia: --robot port must be an integer from 1 to 65535");
+        return null;
+      }
+      robotPort = parsedPort;
+    }
     return new ReferenceEditorDiagnostics(directory, frames, lab, story,
-      args.indexOf("--dark") >= 0);
+      args.indexOf("--dark") >= 0, robotHost, robotPort);
   }
 
   public function record(event:NativeKitEventValue):Void {
@@ -231,6 +257,7 @@ private class ReferenceEditorHost {
     var fonts:Null<FontCollection> = null;
     var renderer:Null<Renderer> = null;
     var editor:Null<ReferenceEditorApp> = null;
+    var robotConnection:Null<RobotConnection> = null;
     var result = 0;
 
     try {
@@ -275,7 +302,14 @@ private class ReferenceEditorHost {
       renderer = Renderer.create();
       var activeTheme = Theme.light();
       if (diagnostics.darkTheme) activeTheme = Theme.dark();
-      editor = new ReferenceEditorApp(fonts, null, activeTheme);
+      var pump = new NativeKitEvents();
+      events = pump;
+      var robotHost = diagnostics.robotHost;
+      if (robotHost != null) {
+        robotConnection = new RobotConnection(pump);
+        robotConnection.connect(robotHost, diagnostics.robotPort);
+      }
+      editor = new ReferenceEditorApp(fonts, null, activeTheme, robotConnection);
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       if (resetWorkspace) editor.resetWorkspace();
 
@@ -283,8 +317,6 @@ private class ReferenceEditorHost {
       var layoutFrame = new LayoutFrame(INITIAL_WIDTH, INITIAL_HEIGHT);
       var frameInfo = new FrameInfo(INITIAL_WIDTH, INITIAL_HEIGHT, INITIAL_WIDTH, INITIAL_HEIGHT, 1.0);
       var previousTime = Sys.time();
-      var pump = new NativeKitEvents();
-      events = pump;
       var borrowedSurface = NativeKitSurface.borrowNativeHandle(surface);
       nativeSurface = borrowedSurface;
       editor.ui.attachPlatformSurface(borrowedSurface);
@@ -379,6 +411,7 @@ private class ReferenceEditorHost {
 
     if (input != null) input.detach();
     if (frameSubscription != null) frameSubscription.dispose();
+    if (robotConnection != null) robotConnection.close();
     if (editor != null) editor.dispose();
     if (renderer != null) renderer.dispose();
     if (fonts != null) fonts.dispose();
@@ -461,6 +494,7 @@ class ReferenceEditorApp {
   public final commands:CommandRegistry;
   public final workspace:DockWorkspaceModel;
   public final workspacePath:String;
+  public final robotConnection:Null<RobotConnection>;
 
   final storage:FileDockWorkspacePersistence;
   final treeModel:ReferenceSceneTreeModel;
@@ -480,9 +514,11 @@ class ReferenceEditorApp {
   var contextMenuY:Float;
   var componentLab:Null<ComponentLab>;
 
-  public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme) {
+  public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
+      ?robotConnection:RobotConnection) {
     ui = new UiContext(null, fonts, theme == null ? Theme.light() : theme);
     commands = ui.commands;
+    this.robotConnection = robotConnection;
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
     treeModel = new ReferenceSceneTreeModel();
@@ -578,6 +614,7 @@ class ReferenceEditorApp {
       panY: viewportCamera.panY,
       zoom: viewportCamera.zoom
     },
+    robot: robotDiagnosticState(),
     panels: workspace.panelIds(),
     workspace: Json.parse(workspace.snapshotJson()),
     recentLog: logLines.copy()
@@ -593,6 +630,35 @@ class ReferenceEditorApp {
     commands.refresh();
   }
 
+  function robotDiagnosticState():Dynamic {
+    var connection = robotConnection;
+    if (connection == null)
+      return null;
+    var state = connection.state();
+    var fault = connection.fault();
+    return {
+      host: connection.host,
+      port: connection.port,
+      status: connection.status(),
+      state: state == null ? null : {
+        robotId: Std.string(state.robotId),
+        sequence: Std.string(state.sequence),
+        timestampNs: Std.string(state.timestampNs),
+        q: state.q.copy(),
+        dq: state.dq.copy(),
+        effort: state.effort.copy(),
+        mode: state.mode,
+        fault: state.fault
+      },
+      fault: fault == null ? null : {
+        robotId: Std.string(fault.robotId),
+        code: fault.code,
+        message: fault.message,
+        fatal: fault.fatal
+      }
+    };
+  }
+
   function topBar():View {
     var barStyle = fillStyle();
     barStyle.height = LayoutAxis.fixed(48.0);
@@ -605,7 +671,10 @@ class ReferenceEditorApp {
     titleStyle.width = LayoutAxis.fixed(190.0);
     var hintStyle = new LayoutStyle();
     hintStyle.width = LayoutAxis.grow();
-    var hint = new Text("Reference Editor  ·  Ctrl+K command palette", hintStyle, Color.rgba(0.32, 0.38, 0.47, 1.0));
+    var robotLabel = robotConnection == null ? "Robot: offline"
+      : "Robot: " + robotConnection.status();
+    var hint = new Text("Reference Editor  ·  Ctrl+K command palette  ·  " + robotLabel,
+      hintStyle, Color.rgba(0.32, 0.38, 0.47, 1.0));
     return new Row(
       "editor-toolbar-row",
       [

@@ -20,6 +20,8 @@ start.
 | [`scenekit/`](scenekit/) | Retained scene data, rendering, picking, and interaction |
 | [`simkit/`](simkit/) | Deterministic simulation orchestration and physics integration |
 | [`sensorkit/`](sensorkit/) | Backend-independent sensor scheduling and measurement models |
+| [`robotkit/`](robotkit/) | Runtime contracts, native kernels, endpoints, and protocol |
+| [`robotd/`](robotd/) | Headless Haxeon robotics host |
 | [`cadkit/`](cadkit/) | Headless CAD core and C ABI above Open CASCADE |
 
 The native components are kept as sibling projects so they can be built and

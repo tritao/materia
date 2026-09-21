@@ -1,0 +1,20 @@
+{
+	"version": 1,
+	"package": { "name": "robotkit" },
+	"sourceRoots": ["haxeon"],
+	"scopeSourceRoots": false,
+	"dependencies": {
+		"nativekit": { "path": "../nativekit" }
+	},
+	"ffi": {
+		"interfaces": [
+			"runtime/bindings/robotkit-runtime.hxi",
+			"runtime/bindings/robotkit-simkit.hxi"
+		],
+		"projections": [
+			"runtime/bindings/robotkit-runtime.hxmap",
+			"runtime/bindings/robotkit-simkit.hxmap"
+		]
+	},
+	"target": "host"
+}
