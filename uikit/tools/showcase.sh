@@ -2,8 +2,9 @@
 set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-repo_dir=$(cd "$module_dir/../.." && pwd)
-haxeon_dir=${HAXEON_DIR:-"$(dirname "$repo_dir")/realtime-haxe"}
+materia_dir=$(dirname "$module_dir")
+repo_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 build_dir=${NATIVEKIT_BUILD_DIR:-"$repo_dir/build-ui"}
 artifact="$build_dir/nativekit_ui_showcase.hl"
 build_only=false
@@ -19,7 +20,7 @@ done
 
 if [[ ! -x "$haxeon_dir/.tools/haxe/haxe" ]]; then
     echo "showcase: Haxeon toolchain not found at $haxeon_dir" >&2
-    echo "showcase: set HAXEON_DIR to the realtime-haxe checkout" >&2
+    echo "showcase: set HAXEON_DIR to the Haxeon checkout" >&2
     exit 1
 fi
 
@@ -83,11 +84,11 @@ fi
 
 font_path=${NKUI_TEST_FONT_PATH:-"$repo_dir/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"}
 emoji_path=${NKUI_COLOR_FONT_PATH:-"$repo_dir/vendor/skribidi/example/data/NotoColorEmoji-Regular.ttf"}
-runtime_library_path="$build_dir/modules/ui:$build_dir/modules/gpu:$build_dir:$haxeon_dir/out:$haxeon_dir/vendor/hashlink"
+runtime_library_path="$build_dir:$build_dir/nativekit/modules/gpu:$build_dir/nativekit:$haxeon_dir/out:$haxeon_dir/vendor/hashlink"
 hashlink_runtime="$haxeon_dir/vendor/hashlink/hl"
 if [[ -x "$haxeon_dir/.tools/hashlink/hl" ]]; then
     hashlink_runtime="$haxeon_dir/.tools/hashlink/hl"
-    runtime_library_path="$build_dir/modules/ui:$build_dir/modules/gpu:$build_dir:$haxeon_dir/out:$haxeon_dir/.tools/hashlink"
+    runtime_library_path="$build_dir:$build_dir/nativekit/modules/gpu:$build_dir/nativekit:$haxeon_dir/out:$haxeon_dir/.tools/hashlink"
 fi
 if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
     runtime_library_path="$runtime_library_path:$LD_LIBRARY_PATH"

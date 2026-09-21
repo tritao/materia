@@ -2,8 +2,9 @@
 set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-repo_dir=$(cd "$module_dir/../.." && pwd)
-haxeon_dir=${HAXEON_DIR:-"$(dirname "$repo_dir")/realtime-haxe"}
+materia_dir=$(dirname "$module_dir")
+repo_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 build_dir=${NATIVEKIT_BUILD_DIR:-"$repo_dir/build-ui"}
 artifact="$build_dir/haxeon-ui-framework.hl"
 
@@ -44,7 +45,7 @@ fi
 	"$module_dir/haxe/nativekit/ui/widgets/"*.hx \
 	"$module_dir/bindings/haxe/"*.hx)
 
-runtime_library_path="$build_dir/modules/ui:$build_dir:$haxeon_dir/out:$haxeon_dir/.tools/hashlink:$haxeon_dir/vendor/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+runtime_library_path="$build_dir:$build_dir/nativekit/modules/gpu:$build_dir/nativekit:$haxeon_dir/out:$haxeon_dir/.tools/hashlink:$haxeon_dir/vendor/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 if command -v xvfb-run >/dev/null; then
 	(cd "$haxeon_dir/out" && \
 		NKUI_TEST_FONT_PATH="${NKUI_TEST_FONT_PATH:-$repo_dir/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf}" \

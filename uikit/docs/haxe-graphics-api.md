@@ -20,7 +20,7 @@ without copying the backing storage. Core declarations are supplied through
 Regenerate and verify the UI interface with:
 
 ```sh
-modules/ui/tools/check-hxi.sh
+tools/check-hxi.sh
 ```
 
 That command compares Linux, MinGW, Intel macOS, and ARM macOS Clang targets
@@ -30,5 +30,5 @@ transforms, clipping, layers, retained display lists, resizing, display scale,
 zero-length submission, and stale-resource rejection:
 
 ```sh
-modules/ui/tools/test-haxeon.sh
+tools/test-haxeon.sh
 ```

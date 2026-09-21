@@ -2,8 +2,9 @@
 set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-repo_dir=$(cd "$module_dir/../.." && pwd)
-haxeon_dir=${HAXEON_DIR:-"$(dirname "$repo_dir")/realtime-haxe"}
+materia_dir=$(dirname "$module_dir")
+repo_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 build_dir=${NATIVEKIT_BUILD_DIR:-"$repo_dir/build-ui"}
 
 cmake --build "$build_dir" --target nativekit_ui
@@ -44,7 +45,7 @@ fi
 
 (cd "$haxeon_dir/out" && \
     NKUI_TEST_FONT_PATH="$repo_dir/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf" \
-    LD_LIBRARY_PATH="$build_dir/modules/ui:$build_dir:$haxeon_dir/out:$haxeon_dir/.tools/hashlink:$haxeon_dir/vendor/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    LD_LIBRARY_PATH="$build_dir:$build_dir/nativekit/modules/gpu:$build_dir/nativekit:$haxeon_dir/out:$haxeon_dir/.tools/hashlink:$haxeon_dir/vendor/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
     xvfb-run -a "$hashlink_runtime" "$build_dir/haxeon-ui-transaction.hl")
 
 echo "PASS: Haxeon rendered a validated Canvas transaction through NativeKit UI and NativeKit GPU"

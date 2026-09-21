@@ -2,8 +2,9 @@
 set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-repo_dir=$(cd "$module_dir/../.." && pwd)
-haxeon_dir=${HAXEON_DIR:-"$(dirname "$repo_dir")/realtime-haxe"}
+materia_dir=$(dirname "$module_dir")
+repo_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 output=${1:-"$module_dir/bindings/nativekit-ui.hxi"}
 
 "$haxeon_dir/scripts/haxeon-ffi-audit" \
@@ -21,7 +22,7 @@ output=${1:-"$module_dir/bindings/nativekit-ui.hxi"}
     --include="$repo_dir/include" \
     --exclude-header="$repo_dir/include/nativekit.h" \
     --exclude-header="$repo_dir/include/nativekit_graphics.h" \
-    --source-label=modules/ui/bindings/nativekit_ui_import.h \
+    --source-label=bindings/nativekit_ui_import.h \
     --output="$output" \
     "$module_dir/bindings/nativekit_ui_import.h"
 

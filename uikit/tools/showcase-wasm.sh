@@ -2,8 +2,9 @@
 set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-repo_dir=$(cd "$module_dir/../.." && pwd)
-haxeon_dir=${HAXEON_DIR:-"$(dirname "$repo_dir")/realtime-haxe"}
+materia_dir=$(dirname "$module_dir")
+repo_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 compiler_module=${NATIVEKIT_HAXEON_COMPILER_MODULE:-"$haxeon_dir/bootstrap/compiler.hl"}
 haxe_bin=${NATIVEKIT_HAXE_BIN:-"$haxeon_dir/.tools/haxe/haxe"}
 build_dir=${NATIVEKIT_WASM_BUILD_DIR:-"$repo_dir/build-wasm"}
@@ -16,7 +17,7 @@ memory_contract=${NATIVEKIT_HAXEON_MEMORY_CONTRACT:-"$build_dir/nativekit_haxeon
 exception_mode=${NATIVEKIT_HAXEON_EXCEPTION_MODE:-legacy}
 
 if [[ $# -ne 0 ]]; then
-    echo "usage: modules/ui/tools/showcase-wasm.sh" >&2
+    echo "usage: tools/showcase-wasm.sh" >&2
     exit 2
 fi
 if [[ $wasm_target != wasm32 && $wasm_target != wasm-gc ]]; then

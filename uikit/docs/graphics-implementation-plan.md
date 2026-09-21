@@ -96,7 +96,7 @@ Ownership rules:
 Introduce the following private implementation areas incrementally:
 
 ```text
-modules/ui/src/
+src/
     display_list/
         arena.*
         display_list.*

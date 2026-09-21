@@ -2,8 +2,9 @@
 set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-repo_dir=$(cd "$module_dir/../.." && pwd)
-haxeon_dir=${HAXEON_DIR:-"$(dirname "$repo_dir")/realtime-haxe"}
+materia_dir=$(dirname "$module_dir")
+repo_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 output="$module_dir/bindings/nativekit-ui-wasm.hxi"
 destination=$output
 
@@ -11,7 +12,7 @@ if [[ ${1:-} == "--check" ]]; then
     destination=$(mktemp)
     trap 'rm -f -- "$destination"' EXIT
 elif [[ $# -ne 0 ]]; then
-    echo "usage: modules/ui/tools/update-haxeon-wasm-hxi.sh [--check]" >&2
+    echo "usage: tools/update-haxeon-wasm-hxi.sh [--check]" >&2
     exit 2
 fi
 
@@ -28,12 +29,12 @@ HAXEON_DIR="$haxeon_dir" "$haxeon_dir/scripts/haxeon-ffi-audit" \
     --include="$repo_dir/include" \
     --exclude-header="$repo_dir/include/nativekit.h" \
     --exclude-header="$repo_dir/include/nativekit_graphics.h" \
-    --source-label=modules/ui/bindings/nativekit_ui_import.h \
+    --source-label=bindings/nativekit_ui_import.h \
     --output="$destination" \
     "$module_dir/bindings/nativekit_ui_import.h"
 
 if [[ ${1:-} == "--check" ]] && ! cmp -s "$output" "$destination"; then
-    echo "Haxeon wasm UI binding is stale; run modules/ui/tools/update-haxeon-wasm-hxi.sh" >&2
+    echo "Haxeon wasm UI binding is stale; run tools/update-haxeon-wasm-hxi.sh" >&2
     diff -u "$output" "$destination" || true
     exit 1
 fi

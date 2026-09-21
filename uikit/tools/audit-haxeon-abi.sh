@@ -2,8 +2,9 @@
 set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-repo_dir=$(cd "$module_dir/../.." && pwd)
-haxeon_dir=${HAXEON_DIR:-"$(dirname "$repo_dir")/realtime-haxe"}
+materia_dir=$(dirname "$module_dir")
+repo_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 
 cd "$repo_dir"
 
@@ -21,6 +22,6 @@ cd "$repo_dir"
     --include="$module_dir/bindings" \
     --include="$repo_dir/include" \
     --exclude-header="$repo_dir/include/nativekit.h" \
-    --source-label=modules/ui/bindings/nativekit_ui_import.h \
+    --source-label=bindings/nativekit_ui_import.h \
     "$@" \
     "$module_dir/bindings/nativekit_ui_import.h"

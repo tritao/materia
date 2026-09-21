@@ -1,3 +1,27 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(materia-ui VERSION 0.1.0 LANGUAGES C CXX)
+
+include(GNUInstallDirs)
+include(CTest)
+
+set(NKUI_NATIVEKIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../nativekit" CACHE PATH
+    "Path to the NativeKit source checkout")
+
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(NK_BUILD_GPU ON CACHE BOOL "Build NativeKit GPU for UIKit" FORCE)
+    add_subdirectory("${NKUI_NATIVEKIT_DIR}" "${CMAKE_BINARY_DIR}/nativekit")
+endif()
+
+if(NOT TARGET NativeKit::nativekit OR NOT TARGET NativeKit::gpu)
+    message(FATAL_ERROR "UIKit requires NativeKit::nativekit and NativeKit::gpu")
+endif()
+
+set(NK_LIBRARY_TYPE STATIC)
+if(NK_BUILD_SHARED AND NOT EMSCRIPTEN)
+    set(NK_LIBRARY_TYPE SHARED)
+endif()
+
 if(NOT DEFINED NK_VENDOR_DIR)
     set(NK_VENDOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor")
 endif()
@@ -43,13 +67,13 @@ endif()
 target_include_directories(nativekit_ui
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${NKUI_NATIVEKIT_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE src)
 target_include_directories(nativekit_ui PRIVATE "${NK_VENDOR_DIR}/clay")
 target_include_directories(nativekit_ui PRIVATE "${NK_VENDOR_DIR}/nanovg/src")
-target_include_directories(nativekit_ui PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_include_directories(nativekit_ui PRIVATE "${PROJECT_SOURCE_DIR}/modules/gpu/src")
+target_include_directories(nativekit_ui PRIVATE "${NKUI_NATIVEKIT_DIR}/src")
+target_include_directories(nativekit_ui PRIVATE "${NKUI_NATIVEKIT_DIR}/modules/gpu/src")
 target_link_libraries(nativekit_ui PUBLIC NativeKit::gpu
     PRIVATE nkui_skribidi nkui_nanovg_core)
 if(UNIX AND NOT APPLE AND NOT ANDROID AND NOT EMSCRIPTEN)
@@ -60,7 +84,9 @@ if(UNIX AND NOT APPLE AND NOT ANDROID AND NOT EMSCRIPTEN)
     if(TARGET PkgConfig::FONTCONFIG)
         target_link_libraries(nativekit_ui PRIVATE PkgConfig::FONTCONFIG)
         target_compile_definitions(nativekit_ui PRIVATE NKUI_HAS_FONTCONFIG=1)
-        set(NKUI_HAS_FONTCONFIG ON PARENT_SCOPE)
+        if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+            set(NKUI_HAS_FONTCONFIG ON PARENT_SCOPE)
+        endif()
     endif()
 elseif(APPLE)
     target_link_libraries(nativekit_ui PRIVATE "-framework CoreText" "-framework CoreFoundation")
@@ -109,7 +135,7 @@ if(NK_BUILD_TESTS)
             tests/backend_renderer_smoke.cpp)
         target_compile_definitions(nativekit_ui_backend_smoke_test PRIVATE NKGPU_TESTING=1)
         target_include_directories(nativekit_ui_backend_smoke_test PRIVATE
-            "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/modules/gpu/src")
+            "${NKUI_NATIVEKIT_DIR}/src" "${NKUI_NATIVEKIT_DIR}/modules/gpu/src")
         target_link_libraries(nativekit_ui_backend_smoke_test PRIVATE
             NativeKit::ui NativeKit::gpu NativeKit::nativekit)
         set(NKUI_BACKEND_SMOKE_REGISTERED OFF)
@@ -184,7 +210,7 @@ if(NK_BUILD_TESTS)
         src/prepare/nanovg_path.cpp
         src/render/frame_resources.cpp)
     target_include_directories(nativekit_ui_frame_resources_test PRIVATE
-        src "${PROJECT_SOURCE_DIR}/include")
+        src "${NKUI_NATIVEKIT_DIR}/include")
     target_link_libraries(nativekit_ui_frame_resources_test PRIVATE
         nkui_nanovg_core NativeKit::nativekit)
     add_test(NAME nativekit_ui_frame_resources COMMAND nativekit_ui_frame_resources_test)
@@ -238,7 +264,7 @@ if(NK_BUILD_TESTS)
     src/compositor/compositor.cpp
     src/compositor/render_plan.cpp)
     target_include_directories(nativekit_ui_layout_render_compiler_test PRIVATE
-        src "${PROJECT_SOURCE_DIR}/include" "${NK_VENDOR_DIR}/clay")
+        src "${NKUI_NATIVEKIT_DIR}/include" "${NK_VENDOR_DIR}/clay")
     target_compile_definitions(nativekit_ui_layout_render_compiler_test PRIVATE
         NKUI_TEST_FONT_PATH="${NK_VENDOR_DIR}/skribidi/example/data/IBMPlexSans-Regular.ttf")
     target_link_libraries(nativekit_ui_layout_render_compiler_test PRIVATE
@@ -390,7 +416,7 @@ if(NK_BUILD_EXAMPLES)
     set(NKUI_HAXEON_DIR "$ENV{HAXEON_DIR}" CACHE PATH
         "Haxeon checkout used to compile the NativeKit UI sources")
     if(NOT NKUI_HAXEON_DIR)
-        set(NKUI_HAXEON_DIR "${PROJECT_SOURCE_DIR}/../realtime-haxe" CACHE PATH
+        set(NKUI_HAXEON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../haxeon" CACHE PATH
             "Haxeon checkout used to compile the NativeKit UI sources" FORCE)
     endif()
     set(NKUI_HAXEON_HAXE_BIN "$ENV{NATIVEKIT_HAXE_BIN}")
@@ -407,7 +433,7 @@ if(NK_BUILD_EXAMPLES)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tools/showcase.sh" --build-only
             DEPENDS nativekit_ui
                 "${CMAKE_CURRENT_SOURCE_DIR}/bindings/nativekit-ui-showcase.hxmap"
-            WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+            WORKING_DIRECTORY "${NKUI_NATIVEKIT_DIR}"
             USES_TERMINAL)
 
         if(NK_BUILD_TESTS)
@@ -482,7 +508,7 @@ if(NK_BUILD_EXAMPLES)
                 "${CMAKE_CURRENT_SOURCE_DIR}/examples/ui_showcase/*.hx"
                 "${CMAKE_CURRENT_SOURCE_DIR}/haxe/nativekit/ui/*.hx"
                 "${CMAKE_CURRENT_SOURCE_DIR}/bindings/haxe/*.hx"
-                "${PROJECT_SOURCE_DIR}/bindings/haxe/*.hx")
+                "${NKUI_NATIVEKIT_DIR}/bindings/haxe/*.hx")
             set(NKUI_HAXEON_MEMORY_CONTRACT_VERSION 1)
             set(NKUI_HAXEON_WASM_PAGE_SIZE 65536)
             set(NKUI_HAXEON_HOST_HEAP_BASE 0)
@@ -528,12 +554,12 @@ if(NK_BUILD_EXAMPLES)
                     "${CMAKE_CURRENT_SOURCE_DIR}/bindings/nativekit-ui-wasm.hxi"
                     "${CMAKE_CURRENT_SOURCE_DIR}/bindings/nativekit-ui-showcase-wasm.hxi"
                     "${CMAKE_CURRENT_SOURCE_DIR}/bindings/nativekit-ui-showcase.hxmap"
-                    "${PROJECT_SOURCE_DIR}/bindings/haxe/nativekit-wasm.hxi"
+                    "${NKUI_NATIVEKIT_DIR}/bindings/haxe/nativekit-wasm.hxi"
                     "${CMAKE_CURRENT_SOURCE_DIR}/bindings/nativekit-ui.hxmap"
-                    "${PROJECT_SOURCE_DIR}/bindings/haxe/nativekit.hxmap"
+                    "${NKUI_NATIVEKIT_DIR}/bindings/haxe/nativekit.hxmap"
                     ${NKUI_HAXEON_GUEST_HX_DEPS}
                     ${NKUI_HAXEON_DEPS}
-                WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+                WORKING_DIRECTORY "${NKUI_NATIVEKIT_DIR}"
                 USES_TERMINAL)
             add_custom_target(nativekit_ui_haxeon_guest
                 DEPENDS "${NKUI_HAXEON_GUEST_WASM}")

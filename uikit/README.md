@@ -71,8 +71,8 @@ into one ordered render plan. `UiRenderer` owns UI-specific drawing vocabulary
 such as paths, glyphs, images, and image composition, while NativeKit GPU owns
 passes, resources, GPU state, and backend submission.
 
-Configure with `-DNK_BUILD_UI=ON`; this also builds the GPU dependency. The
-public CMake targets are `NativeKit::nativekit`, `NativeKit::gpu`, and
+Configure UIKit directly; its standalone build adds the sibling NativeKit
+checkout and enables the GPU dependency. The public CMake targets are `NativeKit::nativekit`, `NativeKit::gpu`, and
 `NativeKit::ui`. Sokol headers, configuration, runtime ownership, and resource
 handles stay inside `modules/gpu`. The canonical UI shaders are split by family
 under `shaders/`; their GLSL, HLSL5, and MSL source variants are checked in as
@@ -80,37 +80,37 @@ under `shaders/`; their GLSL, HLSL5, and MSL source variants are checked in as
 `sokol-shdc`. The generator is the standalone [Sokol shader compiler](https://github.com/floooh/sokol-tools/blob/master/docs/sokol-shdc.md).
 
 After editing a shader, regenerate the header with
-`SOKOL_SHDC=/path/to/sokol-shdc modules/ui/tools/generate-shaders.sh`. Run
-`SOKOL_SHDC=/path/to/sokol-shdc modules/ui/tools/check-shaders.sh` to verify the
+`SOKOL_SHDC=/path/to/sokol-shdc tools/generate-shaders.sh`. Run
+`SOKOL_SHDC=/path/to/sokol-shdc tools/check-shaders.sh` to verify the
 generated header is current.
 
 ```sh
-cmake -S . -B build-ui -GNinja -DNK_BUILD_UI=ON
+cmake -S . -B build-ui -GNinja
 cmake --build build-ui
 ctest --test-dir build-ui --output-on-failure
 ```
 
 The `nativekit_ui_layout_invariants` test runs 2,000 deterministic randomized
 trees by default. Increase coverage for sanitizer jobs with, for example,
-`NKUI_LAYOUT_FUZZ_CASES=100000 build-ui/modules/ui/nativekit_ui_layout_invariants_test`.
+`NKUI_LAYOUT_FUZZ_CASES=100000 build-ui/nativekit_ui_layout_invariants_test`.
 
 With examples enabled, run the C API showcase with:
 
 ```sh
-./build-ui/modules/ui/nativekit_ui_c_api
+./build-ui/nativekit_ui_c_api
 ```
 
 It supports `--smoke-test` for a bounded rendering run. The Haxe framework
-showcase and framework tests live under `modules/ui/examples/ui_haxeon` and
-`modules/ui/tests/haxeon`; generated bindings are checked with
-`modules/ui/tools/check-hxi.sh`.
+showcase and framework tests live under `examples/ui_haxeon` and
+`tests/haxeon`; generated bindings are checked with
+`tools/check-hxi.sh`.
 
 The virtualization paths can be measured independently with:
 
 ```sh
-HAXEON_DIR=/path/to/realtime-haxe \
+HAXEON_DIR=/path/to/haxeon \
 NATIVEKIT_BUILD_DIR=/path/to/build-ui \
-modules/ui/tools/benchmark-haxeon-virtual-list.sh
+tools/benchmark-haxeon-virtual-list.sh
 ```
 
 This runs 10,000- and 100,000-item fixed, model-backed, and tree collections,
@@ -319,10 +319,10 @@ The browser backend uses Emscripten and WebGL2 through NativeKit core and GPU.
 Set up Emscripten, then build and test with:
 
 ```sh
-./tools/setup-web.sh
+../nativekit/tools/setup-web.sh
 ./tools/build-web.sh
 ./tools/test-web.sh
-python3 -m http.server --directory build-web/modules/ui 8080
+python3 -m http.server --directory build-web 8080
 ```
 
 The Haxeon showcase fetches five compact, separately generated TTF assets by

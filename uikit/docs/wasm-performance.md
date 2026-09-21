@@ -118,7 +118,7 @@ separate instrumented artifact and run a short profile sample:
 
 ```sh
 ./tools/build-web-haxeon-benchmark.sh
-NATIVEKIT_WEB_ARTIFACT_DIR=build-web-haxeon-profile/modules/ui \
+NATIVEKIT_WEB_ARTIFACT_DIR=build-web-haxeon-profile \
 NATIVEKIT_WEB_BENCHMARK_MODE=core \
 NATIVEKIT_WEB_BENCHMARK_PROFILE=1 \
 NATIVEKIT_WEB_BENCHMARK_SCENARIO=editing \
