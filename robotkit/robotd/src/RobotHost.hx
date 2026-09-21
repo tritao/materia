@@ -3,10 +3,9 @@ package robotd;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
-import robotkit.model.Robot;
+import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.runtime.RobotRuntimeLayout;
 import robotkit.runtime.Simulation;
 import robotkit.behavior.RobotBehavior;
 import robotd.behaviors.OscillateBehavior;
@@ -27,19 +26,19 @@ class RobotHost {
     var port = parsePort();
     var robotId = parseRobotId();
     var behavior = parseBehavior();
-    var robot = new Robot("demo-arm");
+    var robot = new RobotModel("demo-arm");
     var base = robot.addLink(new Link("base"));
     var tool = robot.addLink(new Link("tool"));
     var shoulder = robot.addJoint(new Joint("shoulder", JointType.Revolute, base, tool));
     shoulder.limits.lower = -3.14;
     shoulder.limits.upper = 3.14;
     shoulder.limits.effort = 100.0;
-    var compiled = RobotRuntimeCompiler.compile(robot);
+    var blueprint = RobotRuntimeCompiler.compile(robot);
     if (args.indexOf("--server") >= 0) {
       var serverSimulation = new Simulation();
       try {
-        var serverRuntime = serverSimulation.addRobot(RobotRuntimeCompiler.blueprint(compiled));
-        var server = new RobotServer(robot, compiled, serverRuntime, serverSimulation,
+        var serverRuntime = serverSimulation.addRobot(blueprint);
+        var server = new RobotServer(robot, blueprint, serverRuntime, serverSimulation,
           port, robotId, behavior);
         server.run(args.indexOf("--once") >= 0);
       } catch (error:Dynamic) {
@@ -52,8 +51,8 @@ class RobotHost {
     var inMemory = args.indexOf("--in-memory") >= 0;
     var simulation:Null<Simulation> = inMemory ? null : new Simulation();
     var runtime = inMemory
-      ? RobotRuntime.create(new RobotRuntimeLayout(compiled.revision, compiled.jointCount, compiled.source.links.length))
-      : simulation.addRobot(RobotRuntimeCompiler.blueprint(compiled));
+      ? RobotRuntime.create(blueprint)
+      : simulation.addRobot(blueprint);
     runtime.submitPositions([0.5], 1);
     if (simulation == null) {
       runtime.start();
@@ -64,8 +63,8 @@ class RobotHost {
     }
     var snapshot = runtime.snapshot();
     var endpoint = args.indexOf("--in-memory") >= 0 ? "in-memory" : "simkit";
-    Sys.println('robotd: compiled ${compiled.source.name} with ${compiled.jointCount} joints via $endpoint; '
-      + 'native position=${snapshot.positions[0]}');
+    Sys.println('robotd: compiled ${robot.name} with ${blueprint.jointCount} joints via $endpoint; '
+      + 'native position=${snapshot.q.get(0)}');
     runtime.dispose();
     if (simulation != null)
       simulation.dispose();

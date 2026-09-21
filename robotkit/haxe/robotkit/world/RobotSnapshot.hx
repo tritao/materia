@@ -6,30 +6,43 @@ import haxe.Int64;
 class RobotSnapshot {
   public final id:RobotId;
   public final sourceSequence:Int64;
-  public final timestampNs:Int64;
-  public final positions:Array<Float>;
-  public final velocities:Array<Float>;
-  public final efforts:Array<Float>;
+  public final sourceTimestampNs:Int64;
+  public final receivedTimestampNs:Int64;
+  public final positions:ImmutableFloatArray;
+  public final velocities:ImmutableFloatArray;
+  public final efforts:ImmutableFloatArray;
+  public final sensors:ImmutableSensorArray;
   public final mode:Int;
   public final faultCode:Int;
+
+  /** Compatibility alias; new code should name the clock explicitly. */
+  public var timestampNs(get, never):Int64;
 
   public function new(
     id:RobotId,
     sourceSequence:Int64,
-    timestampNs:Int64,
+    sourceTimestampNs:Int64,
     positions:Array<Float>,
     velocities:Array<Float>,
     efforts:Array<Float>,
     mode:Int,
-    faultCode:Int
+    faultCode:Int,
+    ?receivedTimestampNs:Int64,
+    ?sensors:Array<SensorFrame>
   ) {
     this.id = id;
     this.sourceSequence = sourceSequence;
-    this.timestampNs = timestampNs;
-    this.positions = positions == null ?[] : positions.copy();
-    this.velocities = velocities == null ?[] : velocities.copy();
-    this.efforts = efforts == null ?[] : efforts.copy();
+    this.sourceTimestampNs = sourceTimestampNs;
+    this.receivedTimestampNs = receivedTimestampNs == null
+      ? sourceTimestampNs
+      : receivedTimestampNs;
+    this.positions = new ImmutableFloatArray(positions);
+    this.velocities = new ImmutableFloatArray(velocities);
+    this.efforts = new ImmutableFloatArray(efforts);
+    this.sensors = new ImmutableSensorArray(sensors);
     this.mode = mode;
     this.faultCode = faultCode;
   }
+
+  inline function get_timestampNs():Int64 return sourceTimestampNs;
 }

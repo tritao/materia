@@ -210,6 +210,7 @@ struct Body {
     nksim_body_desc desc{};
     std::uint64_t backend_body = 0;
     nksim_body_state state{};
+    nksim_body_state initial_state{};
 };
 
 struct Joint {
@@ -245,6 +246,9 @@ public:
     nksim_result create_body(const nksim_body_desc &desc, nksim_body *out_body);
     nksim_result destroy_body(nksim_body body);
     nksim_result get_body_state(nksim_body body, nksim_body_state *out_state) const;
+    nksim_result set_body_state(nksim_body body, const nksim_body_state &state);
+    nksim_result reset_body(nksim_body body);
+    nksim_result reset();
     nksim_result create_joint(const nksim_joint_desc &desc, nksim_joint *out_joint);
     nksim_result destroy_joint(nksim_joint joint);
     nksim_result get_joint_state(nksim_joint joint, nksim_joint_state *out_state) const;

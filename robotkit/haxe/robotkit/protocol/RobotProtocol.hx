@@ -35,6 +35,12 @@ class RobotProtocol {
     return message(RobotMessageType.Stop, MessagePack.encode(value), sessionId,
       sequence, timestampNs);
 
+  public static function sensorFrame(value:SensorFrameMsg,
+      ?sessionId:haxe.Int64 = null, ?sequence:haxe.Int64 = null,
+      ?timestampNs:haxe.Int64 = null):RobotFrame
+    return message(RobotMessageType.SensorFrame, MessagePack.encode(value),
+      sessionId, sequence, timestampNs);
+
   public static function decodeHello(frame:RobotFrame):Hello
     return decodeHelloPayload(frame);
 
@@ -46,6 +52,9 @@ class RobotProtocol {
 
   public static function decodeStop(frame:RobotFrame):Stop
     return decodeStopPayload(frame);
+
+  public static function decodeSensorFrame(frame:RobotFrame):SensorFrameMsg
+    return decodeSensorFramePayload(frame);
 
   public static function decodeState(frame:RobotFrame):RobotStateMsg
     return decodeStatePayload(frame);
@@ -76,6 +85,11 @@ class RobotProtocol {
 
   static function decodeStopPayload(frame:RobotFrame):Stop {
     expect(frame, RobotMessageType.Stop);
+    return MessagePack.decode(frame.payload);
+  }
+
+  static function decodeSensorFramePayload(frame:RobotFrame):SensorFrameMsg {
+    expect(frame, RobotMessageType.SensorFrame);
     return MessagePack.decode(frame.payload);
   }
 

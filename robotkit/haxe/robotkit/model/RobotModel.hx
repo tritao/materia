@@ -1,6 +1,7 @@
 package robotkit.model;
 
-class Robot {
+/** Editable static definition of a robot's links, joints, and sensors. */
+class RobotModel {
   public final name:String;
   public final links:Array<Link> = [];
   public final joints:Array<Joint> = [];

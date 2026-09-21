@@ -3,22 +3,22 @@ package robotkit.world;
 import RobotKitRuntime;
 import haxe.Int64;
 import robotkit.runtime.RobotRuntime;
-import robotkit.runtime.RobotRuntimeSnapshot;
 
 /**
- * RobotInstance adapter over a runtime belonging to an externally owned
+ * Robot adapter over a runtime belonging to an externally owned
  * Simulation. Closing this adapter never stops or disposes that Simulation;
  * the embedding application controls the shared clock and shutdown order.
  */
-class SimulatedRobot implements RobotInstance {
+class SimulatedRobot implements Robot {
   public final logicalId:RobotId;
 
   final runtime:RobotRuntime;
   final robotDescription:RobotDescription;
   final robotCapabilities:RobotCapabilities;
-  var changeListener:Null < Void -> Void > = null;
+  var changeListener:Null < RobotId -> Void > = null;
   var commandSequence:Int = 0;
-  var observedSequence:Int = -1;
+  var observedSequence:Int64 = Int64.ofInt(-1);
+  var currentSensors:Array<SensorFrame> = [];
   var closed:Bool = false;
 
   public function new(id:RobotId, runtime:RobotRuntime, name:String,
@@ -54,19 +54,21 @@ class SimulatedRobot implements RobotInstance {
 
   public function capabilities():RobotCapabilities return robotCapabilities;
 
-  public function snapshot():RobotSnapshot {
+  public function snapshot():robotkit.world.RobotSnapshot {
     ensureOpen();
     var value = runtime.snapshot();
     observe(value);
-    return new RobotSnapshot(
+    return new robotkit.world.RobotSnapshot(
       logicalId,
-      Int64.ofInt(value.sequence),
-      value.timestampNs,
-      value.positions,
-      value.velocities,
-      value.efforts,
+      value.sequence,
+      value.sourceTimestampNs,
+      value.q.toArray(),
+      value.dq.toArray(),
+      value.effort.toArray(),
       value.mode,
-      value.faultCode
+      value.faultCode,
+      value.receivedTimestampNs,
+      currentSensors
     );
   }
 
@@ -94,7 +96,16 @@ class SimulatedRobot implements RobotInstance {
     runtime.submitStop(commandSequence, mode == StopMode.Emergency);
   }
 
-  public function setChangeListener(listener:Null < Void -> Void >):Void {
+  public function sensors():Array<SensorFrame> {
+    var result:Array<SensorFrame> = [];
+    for (frame in currentSensors)
+      result.push(new SensorFrame(frame.sensorId, frame.kind, frame.frameId,
+        frame.sequence, frame.sourceTimestampNs, frame.values.toArray(),
+        frame.receivedTimestampNs));
+    return result;
+  }
+
+  public function setChangeListener(listener:Null < RobotId -> Void >):Void {
     changeListener = listener;
   }
 
@@ -104,13 +115,24 @@ class SimulatedRobot implements RobotInstance {
     changeListener = null;
   }
 
-  function observe(value:RobotRuntimeSnapshot):Void {
+  function observe(value:robotkit.runtime.RobotSnapshot):Void {
     if (value.sequence == observedSequence)
       return;
     observedSequence = value.sequence;
+    currentSensors = [
+      new SensorFrame("imu", "imu", "base_link", value.sequence,
+        value.sourceTimestampNs,
+        [value.q.length > 0 ? value.q.get(0) : 0.0,
+         value.dq.length > 0 ? value.dq.get(0) : 0.0,
+         0.0, 0.0, 0.0, 9.81],
+        value.receivedTimestampNs),
+      new SensorFrame("lidar", "lidar", "base_link", value.sequence,
+        value.sourceTimestampNs,
+        [for (_ in 0...8) 10.0], value.receivedTimestampNs)
+    ];
     var listener = changeListener;
     if (listener != null)
-      listener();
+      listener(logicalId);
   }
 
   function ensureOpen():Void {

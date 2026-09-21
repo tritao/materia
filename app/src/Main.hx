@@ -641,7 +641,7 @@ class ReferenceEditorApp {
     var snapshot = currentWorld.snapshot();
     var robots:Array<Dynamic> = [];
     for (id in snapshot.robotIds()) {
-      var instance = currentWorld.robots.get(id);
+      var instance = currentWorld.robot(id);
       var state = snapshot.robot(id);
       var fault = instance == null ? null : instance.fault();
       robots.push({
@@ -651,9 +651,9 @@ class ReferenceEditorApp {
           robotId: state.id,
           sequence: Std.string(state.sourceSequence),
           timestampNs: Std.string(state.timestampNs),
-          q: state.positions.copy(),
-          dq: state.velocities.copy(),
-          effort: state.efforts.copy(),
+          q: state.positions.toArray(),
+          dq: state.velocities.toArray(),
+          effort: state.efforts.toArray(),
           mode: state.mode,
           fault: state.faultCode
         },

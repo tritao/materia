@@ -221,6 +221,12 @@ NKSIM_API nksim_result NKSIM_CALL nksim_body_create(
 NKSIM_API void NKSIM_CALL nksim_body_destroy(nksim_world world, nksim_body body);
 NKSIM_API nksim_result NKSIM_CALL nksim_body_get_state(
     nksim_world world, nksim_body body, nksim_body_state *out_state NK_INOUT);
+/** Replaces a body's pose and velocities on the world owner thread. */
+NKSIM_API nksim_result NKSIM_CALL nksim_body_set_state(
+    nksim_world world, nksim_body body, const nksim_body_state *state);
+NKSIM_API nksim_result NKSIM_CALL nksim_body_reset(nksim_world world, nksim_body body);
+/** Restores body state and the fixed-step clock to their initial values. */
+NKSIM_API nksim_result NKSIM_CALL nksim_world_reset(nksim_world world);
 
 NKSIM_API nksim_result NKSIM_CALL nksim_joint_create(
     nksim_world world, const nksim_joint_desc *desc, nksim_joint *out_joint NK_OUT);

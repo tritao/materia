@@ -30,6 +30,9 @@ extern "C" {
 /** Opaque handle for one shared simulation universe and clock. */
 typedef uint32_t rk_simulation RK_HANDLE RK_HANDLE_DESTROY(rk_simulation_destroy);
 #define RK_INVALID_SIMULATION ((rk_simulation)0)
+/** Opaque ID for an environment object owned by a Simulation. */
+typedef uint32_t rk_simulation_object;
+#define RK_INVALID_SIMULATION_OBJECT ((rk_simulation_object)0)
 
 /**
  * Construction parameters for one shared Simulation owner.
@@ -59,6 +62,24 @@ typedef struct rk_simulation_clock {
     double simulation_time;
     uint64_t reserved[2];
 } rk_simulation_clock;
+
+/** Editable-scene description for one simulation-owned environment object. */
+typedef struct rk_simulation_object_desc {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t motion_type; /**< 0 static, 1 kinematic, 2 dynamic. */
+    double position[3];
+    double rotation[4]; /**< Quaternion in x, y, z, w order. */
+    double half_extents[3]; /**< Box dimensions used by the default object shape. */
+    double mass;
+    uint64_t reserved[2];
+} rk_simulation_object_desc;
+
+typedef struct rk_simulation_pose {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t reserved0;
+    double position[3];
+    double rotation[4];
+} rk_simulation_pose;
 
 /**
  * Creates one shared simulated universe and its fixed-step clock.
@@ -137,6 +158,26 @@ RK_API rk_result RK_CALL rk_simulation_stop(rk_simulation simulation);
  */
 RK_API rk_result RK_CALL rk_simulation_get_clock(
     rk_simulation simulation, rk_simulation_clock *out_clock RK_INOUT);
+/** Stops the owner, restores all bodies, and resets the shared fixed-step clock. */
+RK_API rk_result RK_CALL rk_simulation_reset(rk_simulation simulation);
+/** Restores one attached robot's bodies and clears its runtime state. */
+RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
+                                                    uint32_t robot_index);
+/** Teleports one attached robot's base while the simulation is stopped. */
+RK_API rk_result RK_CALL rk_simulation_teleport_robot(
+    rk_simulation simulation, uint32_t robot_index,
+    const rk_simulation_pose *pose);
+/** Adds one environment body from the editable scene while stopped. */
+RK_API rk_result RK_CALL rk_simulation_spawn_object(
+    rk_simulation simulation, const rk_simulation_object_desc *desc,
+    rk_simulation_object *out_object RK_OUT);
+/** Removes one environment body while stopped. */
+RK_API rk_result RK_CALL rk_simulation_remove_object(
+    rk_simulation simulation, rk_simulation_object object);
+/** Teleports one environment body while stopped. */
+RK_API rk_result RK_CALL rk_simulation_teleport_object(
+    rk_simulation simulation, rk_simulation_object object,
+    const rk_simulation_pose *pose);
 
 #ifdef __cplusplus
 }

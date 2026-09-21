@@ -5,9 +5,9 @@ import RobotKitRuntime;
 /**
  * Per-robot realtime execution boundary.
  *
- * A `RobotRuntime` owns one command mailbox and one immutable native state
- * stream. Standalone runtimes may be stepped directly; runtimes created by a
- * `Simulation` are externally driven and must be advanced through that shared
+ * A `RobotRuntime` owns one command mailbox and one immutable state stream.
+ * Standalone runtimes own a worker lifecycle; runtimes created by a
+ * `Simulation` are externally driven and advance only through that shared
  * simulation so all robots observe one physics tick.
  */
 class RobotRuntime {
@@ -20,8 +20,8 @@ class RobotRuntime {
   }
 
   /** Creates a standalone in-memory runtime with its own worker lifecycle. */
-  public static function create(layout:RobotRuntimeLayout):RobotRuntime {
-    var result = RobotKitRuntime.rk_robot_runtime_create(layout.nativeValue());
+  public static function create(blueprint:RobotRuntimeBlueprint):RobotRuntime {
+    var result = RobotKitRuntime.rk_robot_runtime_create(blueprint.nativeValue());
     check(result.status, "runtime.create");
     return new RobotRuntime(result.out_runtime);
   }
@@ -102,14 +102,27 @@ class RobotRuntime {
       "runtime.submitStop");
   }
 
+  /** Clears a latched safety stop only after the application has acknowledged it. */
+  public function resetSafety(sequence:Int):Void {
+    ensureLive();
+    var command = new rk_robot_command();
+    command.set_struct_size(rk_robot_command.size());
+    command.set_sequence(haxe.Int64.ofInt(sequence));
+    command.set_timestamp_ns(haxe.Int64.ofInt(0));
+    command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_RESET_SAFETY);
+    command.set_target_count(0);
+    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+      "runtime.resetSafety");
+  }
+
   /** Reads the latest published native state without advancing time. */
-  public function snapshot():RobotRuntimeSnapshot {
+  public function snapshot():RobotSnapshot {
     ensureLive();
     var value = new rk_robot_snapshot();
     value.set_struct_size(rk_robot_snapshot.size());
     check(RobotKitRuntime.rk_robot_runtime_snapshot_full(owner.borrow(), value).status,
       "runtime.snapshot");
-    return RobotRuntimeSnapshot.fromNative(value);
+    return RobotSnapshot.fromNative(value);
   }
 
   public function dispose():Void {

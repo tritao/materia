@@ -28,11 +28,13 @@ class WorldTcpIntegration {
       world.submit(LOGICAL_ID, RobotCommand.JointPosition(0, 0.5, null));
       waitUntil(runtime, function() {
         var state = world.snapshot().robot(LOGICAL_ID);
-        return state != null && state.id == LOGICAL_ID && state.positions.length > 0 && state.positions[0] == 0.5;
+        return state != null && state.id == LOGICAL_ID && state.positions.length > 0 && state.positions.get(0) == 0.5;
       }, "translated world command did not update robotd state");
 
       var state = world.snapshot().robot(LOGICAL_ID);
-      var position = state == null ? 0.0 : state.positions[0];
+      var position = state == null ? 0.0 : state.positions.get(0);
+      if (state == null || state.sensors.length != 2)
+        throw "robotd did not transport the simulated IMU and LiDAR frames";
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();

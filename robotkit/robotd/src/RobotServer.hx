@@ -9,8 +9,8 @@ import NativeKitRuntime;
 import haxe.Int64;
 import haxe.io.Bytes;
 import haxeon.wire.MessagePack;
-import robotkit.model.Robot;
-import robotkit.runtime.CompiledRobot;
+import robotkit.model.RobotModel;
+import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotSnapshot;
 import robotkit.runtime.RobotSnapshotMailbox;
 import robotkit.runtime.RobotRuntime;
@@ -28,12 +28,13 @@ import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.RobotProtocol;
 import robotkit.protocol.RobotStateMsg;
 import robotkit.protocol.Stop;
+import robotkit.protocol.SensorFrameMsg;
 import robotkit.transport.NativeTransport;
 
 /** Authoritative robot process boundary. RobotRuntime ownership stays off the network path. */
 class RobotServer {
-  final robot:Robot;
-  final compiled:CompiledRobot;
+  final robot:RobotModel;
+  final blueprint:RobotRuntimeBlueprint;
   final runtime:RobotRuntime;
   final simulation:Simulation;
   final nativeRuntime:NativeKitRuntime;
@@ -43,9 +44,15 @@ class RobotServer {
   final subscription:NativeKitEventSubscription;
   final behaviorRunner:Null<RobotBehaviorRunner>;
   var client:Null<NativeKit.TransportHandle>;
+  final observers:Array<NativeKit.TransportHandle> = [];
+  final observerStreams:Map<Int, RobotFrameStream> = new Map<Int, RobotFrameStream>();
+  final observerSessions:Map<Int, haxe.Int64> = new Map<Int, haxe.Int64>();
+  final observerHello:Map<Int, Bool> = new Map<Int, Bool>();
   var stream:RobotFrameStream;
   final snapshots = new RobotSnapshotMailbox();
-  var sessionId:haxe.Int64 = haxe.Int64.ofInt(1);
+  var sessionId:haxe.Int64 = haxe.Int64.ofInt(0);
+  var nextSessionId:haxe.Int64 = haxe.Int64.ofInt(1);
+  var controllerGranted:Bool = true;
   var lastRequestSequence:haxe.Int64 = haxe.Int64.ofInt(0);
   var lastSentSnapshotSequence:haxe.Int64 = haxe.Int64.ofInt(-1);
   var helloComplete:Bool = false;
@@ -56,10 +63,10 @@ class RobotServer {
   var behaviorStopped:Bool = false;
   var disposed:Bool = false;
 
-  public function new(robot:Robot, compiled:CompiledRobot, runtime:RobotRuntime,
+  public function new(robot:RobotModel, blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
       simulation:Simulation, port:Int, robotId:Int, ?behavior:RobotBehavior) {
     this.robot = robot;
-    this.compiled = compiled;
+    this.blueprint = blueprint;
     this.runtime = runtime;
     this.simulation = simulation;
     this.port = port;
@@ -72,7 +79,7 @@ class RobotServer {
       stream = new RobotFrameStream();
       subscription = nativeRuntime.events.listen(onEvent);
     } catch (error:Dynamic) {
-      try simulation.stop() catch (_:Dynamic) {}
+      try { simulation.stop(); } catch (_:Dynamic) {}
       nativeRuntime.dispose();
       throw error;
     }
@@ -90,7 +97,7 @@ class RobotServer {
           hadEvent = true;
         if (!hadEvent)
           nativeRuntime.events.wait(0.01);
-        if (onceMode && servedState && client == null)
+        if (onceMode && servedState && client == null && observers.length == 0)
           stopped = true;
       }
     } catch (error:Dynamic) {
@@ -117,8 +124,16 @@ class RobotServer {
     var currentClient = client;
     client = null;
     helloComplete = false;
-    if (currentClient != null)
-      try NativeTransport.close(currentClient) catch (_:Dynamic) {}
+    if (currentClient != null) {
+      try { NativeTransport.close(currentClient); } catch (_:Dynamic) {}
+    }
+    for (observer in observers) {
+      try { NativeTransport.close(observer); } catch (_:Dynamic) {}
+    }
+    observers.resize(0);
+    observerStreams.clear();
+    observerSessions.clear();
+    observerHello.clear();
     listener.close();
     simulation.stop();
     nativeRuntime.dispose();
@@ -135,9 +150,17 @@ class RobotServer {
           source.rawValue() == currentClient.rawValue()) {
         receive(currentClient);
       }
+      else if (kind == EventKind.TransportData) {
+        var observer = findObserver(cast source);
+        if (observer != null) receiveObserver(observer);
+      }
       else if ((kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) &&
           currentClient != null && source.rawValue() == currentClient.rawValue()) {
         closeClient(currentClient);
+      }
+      else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {
+        var observer = findObserver(cast source);
+        if (observer != null) closeObserver(observer);
       }
     case _:
   }
@@ -147,13 +170,23 @@ class RobotServer {
     var accepted = new NativeKit.TransportHandle(NativeKitEventBytes.readU32(data, 4));
     if (!accepted.isValid())
       return;
-    if (client != null)
-      closeClient(client);
-    client = accepted;
-    stream = new RobotFrameStream();
-    servedState = false;
-    helloComplete = false;
-    lastSentSnapshotSequence = haxe.Int64.ofInt(-1);
+    if (client == null) {
+      client = accepted;
+      stream = new RobotFrameStream();
+      servedState = false;
+      helloComplete = false;
+      controllerGranted = true;
+      sessionId = nextSessionId;
+      nextSessionId = haxe.Int64.add(nextSessionId, haxe.Int64.ofInt(1));
+      lastRequestSequence = haxe.Int64.ofInt(0);
+      lastSentSnapshotSequence = haxe.Int64.ofInt(-1);
+    } else {
+      observers.push(accepted);
+      observerStreams.set(accepted.rawValue(), new RobotFrameStream());
+      observerSessions.set(accepted.rawValue(), nextSessionId);
+      observerHello.set(accepted.rawValue(), false);
+      nextSessionId = haxe.Int64.add(nextSessionId, haxe.Int64.ofInt(1));
+    }
   }
 
   function receive(transport:NativeKit.TransportHandle):Void {
@@ -166,6 +199,17 @@ class RobotServer {
     }
   }
 
+  function receiveObserver(transport:NativeKit.TransportHandle):Void {
+    var observerStream = observerStreams.get(transport.rawValue());
+    if (observerStream == null) return;
+    while (true) {
+      var bytes = NativeTransport.receive(transport);
+      if (bytes.length == 0) return;
+      var frames = observerStream.push(bytes);
+      for (frame in frames) handleObserverFrame(transport, frame);
+    }
+  }
+
   function handleFrame(frame:RobotFrame):Void switch frame.messageType {
     case RobotMessageType.Hello:
       handleHello(RobotProtocol.decodeHello(frame));
@@ -173,15 +217,45 @@ class RobotServer {
       handleJointTarget(frame, RobotProtocol.decodeJointTarget(frame));
     case RobotMessageType.Stop:
       var value:Stop = RobotProtocol.decodeStop(frame);
-      if (!sameRobot(value.robotId) || !validSession(frame)
+      if (!controllerGranted || !sameRobot(value.robotId) || !validSession(frame)
           || !validCommandSequence(frame.sequence)) {
         sendFault(400, "invalid stop session", false);
       } else {
-        runtime.submitStop(Int64.toInt(frame.sequence), value.emergency);
-        lastRequestSequence = frame.sequence;
+        try {
+          runtime.submitStop(Int64.toInt(frame.sequence), value.emergency);
+          lastRequestSequence = frame.sequence;
+        } catch (error:Dynamic) {
+          sendFault(422, 'stop rejected: $error', false);
+        }
       }
     case _:
       sendFault(404, "unsupported RobotKit message", false);
+  }
+
+  function handleObserverFrame(transport:NativeKit.TransportHandle, frame:RobotFrame):Void {
+    var observerSession = observerSessions.get(transport.rawValue());
+    if (observerSession == null) return;
+    if (frame.messageType != RobotMessageType.Hello) {
+      sendTo(transport, observerSession,
+        new RobotFrame(RobotMessageType.Fault,
+          MessagePack.encode(new Fault(Int64.ofInt(robotId), 403,
+            "observer is read-only", false)), 0, null,
+          observerSession));
+      return;
+    }
+    var value = RobotProtocol.decodeHello(frame);
+    if (value.protocolVersion != 1) return;
+    sendTo(transport, observerSession, RobotProtocol.welcome(
+      new robotkit.protocol.Welcome(1, "robotd", observerSession,
+        Int64.ofInt(robotId), false, Int64.ofInt(0)), observerSession));
+    sendTo(transport, observerSession, RobotProtocol.description(new RobotDescription(
+      Int64.ofInt(robotId), robot.name, [for (link in robot.links) link.name],
+      [for (joint in robot.joints) joint.name]), observerSession));
+    sendTo(transport, observerSession, RobotProtocol.capabilities(new RobotCapabilities(
+      Int64.ofInt(robotId), blueprint.jointCount, true, false, false, false), observerSession));
+    observerHello.set(transport.rawValue(), true);
+    var latest = runtime.snapshot().withRobotId(Int64.ofInt(robotId));
+    sendStateTo(transport, observerSession, latest);
   }
 
   function handleHello(value:Hello):Void {
@@ -189,18 +263,24 @@ class RobotServer {
       sendFault(426, "unsupported RobotKit protocol version", true);
       return;
     }
+    controllerGranted = value.requestedRole != "observer";
     send(RobotProtocol.welcome(new robotkit.protocol.Welcome(1, "robotd",
-      sessionId, Int64.ofInt(robotId)), sessionId));
+      sessionId, Int64.ofInt(robotId), controllerGranted,
+      controllerGranted ? sessionId : Int64.ofInt(0)), sessionId));
     send(RobotProtocol.description(new RobotDescription(Int64.ofInt(robotId),
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
     send(RobotProtocol.capabilities(new RobotCapabilities(Int64.ofInt(robotId),
-      compiled.jointCount, true, false, false, false), sessionId));
+      blueprint.jointCount, true, false, false, false), sessionId));
     helloComplete = true;
     publishSnapshot(true);
   }
 
   function handleJointTarget(frame:RobotFrame, value:JointTarget):Void {
+    if (!controllerGranted) {
+      sendFault(403, "control lease not granted", false);
+      return;
+    }
     if (!validSession(frame) || !sameRobot(value.robotId)
         || Int64.compare(frame.sequence, value.sequence) != 0) {
       sendFault(400, "invalid RobotKit session or robot", false);
@@ -219,9 +299,13 @@ class RobotServer {
       sendFault(422, "demo endpoint accepts position target joint 0 only", false);
       return;
     }
-    lastRequestSequence = value.sequence;
-    runtime.submitPositions([value.target], Int64.toInt(value.sequence));
-    servedState = true;
+    try {
+      runtime.submitPositions([value.target], Int64.toInt(value.sequence));
+      lastRequestSequence = value.sequence;
+      servedState = true;
+    } catch (error:Dynamic) {
+      sendFault(422, 'command rejected: $error', false);
+    }
   }
 
   function validSession(frame:RobotFrame):Bool
@@ -235,7 +319,7 @@ class RobotServer {
     return Int64.compare(value, Int64.ofInt(robotId)) == 0;
 
   function publishSnapshot(forceSend:Bool):Void {
-    var snapshot = RobotSnapshot.fromRuntime(Int64.ofInt(robotId), runtime.snapshot());
+    var snapshot = runtime.snapshot().withRobotId(Int64.ofInt(robotId));
     snapshots.publish(snapshot);
     var latest = snapshots.latest();
     if (latest == null)
@@ -247,6 +331,12 @@ class RobotServer {
       return;
     lastSentSnapshotSequence = latest.sequence;
     sendState(latest);
+    for (observer in observers) {
+      var key = observer.rawValue();
+      var observerSession = observerSessions.get(key);
+      if (observerHello.get(key) == true && observerSession != null)
+        sendStateTo(observer, observerSession, latest);
+    }
   }
 
   function applyBehavior(snapshot:RobotSnapshot):Void {
@@ -258,24 +348,24 @@ class RobotServer {
       stopBehavior();
       return;
     }
-    if (intent.joint < 0 || intent.joint >= compiled.jointCount || intent.mode != 1) {
+    if (intent.joint < 0 || intent.joint >= blueprint.jointCount || intent.mode != 1) {
       stopBehavior();
       return;
     }
     var positions:Array<Float>;
     if (behaviorPositions == null) {
-      positions = snapshot.q.copy();
+      positions = snapshot.q.toArray();
       behaviorPositions = positions;
     } else {
       positions = behaviorPositions;
     }
     for (index in 0...positions.length) {
       if (index != intent.joint && index < snapshot.q.length)
-        positions[index] = snapshot.q[index];
+        positions[index] = snapshot.q.get(index);
     }
     positions[intent.joint] = intent.target;
     behaviorSequence++;
-    runtime.submitPositions(positions, behaviorSequence, snapshot.timestampNs);
+    runtime.submitPositions(positions, behaviorSequence, snapshot.sourceTimestampNs);
     behaviorStopped = false;
   }
 
@@ -288,11 +378,29 @@ class RobotServer {
   }
 
   function sendState(snapshot:RobotSnapshot):Void {
+    sendStateTo(client, sessionId, snapshot);
+  }
+
+  function sendStateTo(target:Null<NativeKit.TransportHandle>, targetSession:haxe.Int64,
+      snapshot:RobotSnapshot):Void {
+    if (target == null) return;
     var message = new RobotStateMsg(snapshot.robotId, snapshot.sequence,
-      snapshot.timestampNs, snapshot.q.copy(), snapshot.dq.copy(), snapshot.effort.copy(),
-      snapshot.mode, snapshot.faultCode);
-    send(RobotProtocol.state(message, sessionId, snapshot.sequence,
-      snapshot.timestampNs));
+      snapshot.sourceTimestampNs, snapshot.q.toArray(), snapshot.dq.toArray(), snapshot.effort.toArray(),
+      snapshot.mode, snapshot.faultCode, snapshot.receivedTimestampNs);
+    sendTo(target, targetSession, RobotProtocol.state(message, targetSession, snapshot.sequence,
+      snapshot.sourceTimestampNs));
+    sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
+      snapshot.robotId, "imu", "imu", "base_link", snapshot.sequence,
+      snapshot.sourceTimestampNs, snapshot.receivedTimestampNs,
+      [snapshot.q.length > 0 ? snapshot.q.get(0) : 0.0,
+       snapshot.dq.length > 0 ? snapshot.dq.get(0) : 0.0,
+      0.0, 0.0, 0.0, 9.81]), targetSession, snapshot.sequence,
+      snapshot.sourceTimestampNs));
+    sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
+      snapshot.robotId, "lidar", "lidar", "base_link", snapshot.sequence,
+      snapshot.sourceTimestampNs, snapshot.receivedTimestampNs,
+      [for (_ in 0...8) 10.0]), targetSession, snapshot.sequence,
+      snapshot.sourceTimestampNs));
   }
 
   function sendFault(code:Int, message:String, fatal:Bool):Void {
@@ -305,10 +413,18 @@ class RobotServer {
     var currentClient = client;
     if (currentClient == null)
       return;
+    sendTo(currentClient, sessionId, frame);
+  }
+
+  function sendTo(target:Null<NativeKit.TransportHandle>, targetSession:haxe.Int64,
+      frame:RobotFrame):Void {
+    if (target == null) return;
     try {
-      NativeTransport.send(currentClient, frame.encode());
+      NativeTransport.send(target, frame.encode());
     } catch (_:Dynamic) {
-      closeClient(currentClient);
+      if (client != null && client.rawValue() == target.rawValue())
+        closeClient(target);
+      else closeObserver(target);
     }
   }
 
@@ -317,6 +433,26 @@ class RobotServer {
       client = null;
       helloComplete = false;
     }
-    try NativeTransport.close(currentClient) catch (_:Dynamic) {}
+    try { NativeTransport.close(currentClient); } catch (_:Dynamic) {}
+  }
+
+  function findObserver(value:NativeKit.TransportHandle):Null<NativeKit.TransportHandle> {
+    for (observer in observers)
+      if (observer.rawValue() == value.rawValue()) return observer;
+    return null;
+  }
+
+  function closeObserver(value:NativeKit.TransportHandle):Void {
+    var index = -1;
+    var candidateIndex = 0;
+    for (candidate in observers) {
+      if (candidate.rawValue() == value.rawValue()) { index = candidateIndex; break; }
+      candidateIndex++;
+    }
+    if (index >= 0) observers.splice(index, 1);
+    observerStreams.remove(value.rawValue());
+    observerSessions.remove(value.rawValue());
+    observerHello.remove(value.rawValue());
+    try { NativeTransport.close(value); } catch (_:Dynamic) {}
   }
 }

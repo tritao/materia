@@ -1,18 +1,21 @@
 package robotkit.world;
 
+import NativeKit;
 import NativeKitEvents;
 import haxe.Int64;
 import robotkit.client.RobotClient;
 import robotkit.protocol.RobotStateMsg;
+import robotkit.protocol.SensorFrameMsg;
 
-/** RobotInstance adapter for a robot reached through RobotClient/RobotProtocol. */
-class RemoteRobot implements RobotInstance {
+/** Live robot adapter reached through RobotClient/RobotProtocol. */
+class RemoteRobot implements Robot {
   public final logicalId:RobotId;
 
   final client:RobotClient;
   var currentSnapshot:RobotSnapshot;
   var currentFault:Null<RobotFault> = null;
-  var changeListener:Null < Void -> Void > = null;
+  var currentSensors:Array<SensorFrame> = [];
+  var changeListener:Null < RobotId -> Void > = null;
 
   public function new(id:RobotId) {
     if (id == null || id.length == 0) throw "RemoteRobot requires a non-empty logical ID";
@@ -22,6 +25,7 @@ class RemoteRobot implements RobotInstance {
     client.stateListener = onState;
     client.faultListener = onFault;
     client.statusListener = onStatus;
+    client.sensorListener = onSensor;
   }
 
   public function id():RobotId return logicalId;
@@ -68,7 +72,27 @@ class RemoteRobot implements RobotInstance {
     );
   }
 
-  public function snapshot():RobotSnapshot return currentSnapshot;
+  public function snapshot():RobotSnapshot return new RobotSnapshot(
+    currentSnapshot.id,
+    currentSnapshot.sourceSequence,
+    currentSnapshot.sourceTimestampNs,
+    currentSnapshot.positions.toArray(),
+    currentSnapshot.velocities.toArray(),
+    currentSnapshot.efforts.toArray(),
+    currentSnapshot.mode,
+    currentSnapshot.faultCode,
+    currentSnapshot.receivedTimestampNs,
+    currentSensors
+  );
+
+  public function sensors():Array<SensorFrame> {
+    var result:Array<SensorFrame> = [];
+    for (frame in currentSensors)
+      result.push(new SensorFrame(frame.sensorId, frame.kind, frame.frameId,
+        frame.sequence, frame.sourceTimestampNs, frame.values.toArray(),
+        frame.receivedTimestampNs));
+    return result;
+  }
 
   public function fault():Null < RobotFault > return currentFault;
 
@@ -81,7 +105,7 @@ class RemoteRobot implements RobotInstance {
     client.stop("world stop", mode == StopMode.Emergency);
   }
 
-  public function setChangeListener(listener:Null < Void -> Void >):Void {
+  public function setChangeListener(listener:Null < RobotId -> Void >):Void {
     changeListener = listener;
   }
 
@@ -91,18 +115,38 @@ class RemoteRobot implements RobotInstance {
     currentSnapshot = new RobotSnapshot(
       logicalId,
       value.sequence,
-      value.timestampNs,
+      value.sourceTimestampNs,
       value.q,
       value.dq,
       value.effort,
       value.mode,
-      value.fault
+      value.fault,
+      NativeKit.nk_time_now_ns()
     );
     notifyChanged();
   }
 
   function onFault(value:robotkit.protocol.Fault):Void {
     currentFault = new RobotFault(logicalId, value.code, value.message, value.fatal);
+    notifyChanged();
+  }
+
+  function onSensor(value:SensorFrameMsg):Void {
+    var welcome = client.welcome;
+    if (welcome != null && Int64.compare(value.robotId, welcome.robotId) != 0)
+      return;
+    var frame = new SensorFrame(value.sensorId, value.kind, value.frameId,
+      value.sequence, value.sourceTimestampNs, value.values,
+      NativeKit.nk_time_now_ns());
+    var replaced = false;
+    for (index in 0...currentSensors.length) {
+      if (currentSensors[index].sensorId == frame.sensorId) {
+        currentSensors[index] = frame;
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced) currentSensors.push(frame);
     notifyChanged();
   }
 
@@ -113,6 +157,6 @@ class RemoteRobot implements RobotInstance {
 
   function notifyChanged():Void {
     var listener = changeListener;
-    if (listener != null) listener();
+    if (listener != null) listener(logicalId);
   }
 }

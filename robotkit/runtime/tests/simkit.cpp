@@ -68,8 +68,10 @@ void shared_world_steps_once() {
     const auto second_state = snapshot(second);
     assert(first_state.sequence == 1);
     assert(second_state.sequence == 1);
-    assert(first_state.timestamp_ns == 1000);
-    assert(second_state.timestamp_ns == 1000);
+    assert(first_state.source_timestamp_ns == 10000000);
+    assert(second_state.source_timestamp_ns == 10000000);
+    assert(first_state.received_timestamp_ns == 1000);
+    assert(second_state.received_timestamp_ns == 1000);
     assert(std::abs(first_state.position[0] - 0.4) < 1e-12);
     assert(std::abs(second_state.position[0] + 0.3) < 1e-12);
 
@@ -82,6 +84,29 @@ void shared_world_steps_once() {
     assert(clock.step_index == 2);
     assert(snapshot(first).sequence == 2);
     assert(snapshot(second).sequence == 2);
+
+    assert(rk_simulation_stop(simulation) == RK_OK);
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    pose.rotation[3] = 1.0;
+    pose.position[0] = 4.0;
+    assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
+    assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
+    assert(snapshot(first).sequence == 0);
+    rk_simulation_object_desc object_desc{};
+    object_desc.struct_size = sizeof(object_desc);
+    object_desc.motion_type = 0;
+    object_desc.half_extents[0] = object_desc.half_extents[1] = object_desc.half_extents[2] = 0.25;
+    object_desc.rotation[3] = 1.0;
+    rk_simulation_object object = RK_INVALID_SIMULATION_OBJECT;
+    assert(rk_simulation_spawn_object(simulation, &object_desc, &object) == RK_OK);
+    assert(object != RK_INVALID_SIMULATION_OBJECT);
+    pose.position[2] = 2.0;
+    assert(rk_simulation_teleport_object(simulation, object, &pose) == RK_OK);
+    assert(rk_simulation_remove_object(simulation, object) == RK_OK);
+    assert(rk_simulation_reset(simulation) == RK_OK);
+    assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
+    assert(clock.step_index == 0);
 
     rk_simulation_destroy(simulation);
     rk_robot_state destroyed{};

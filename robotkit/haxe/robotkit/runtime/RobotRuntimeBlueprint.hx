@@ -5,7 +5,7 @@ import RobotKitRuntime;
 /**
  * Immutable-at-execution compiled robot description consumed by RobotRuntime.
  *
- * Keeping this boundary separate from the editable `robotkit.model.Robot`
+ * Keeping this boundary separate from the editable `robotkit.model.RobotModel`
  * model makes validation and native handle creation deterministic.
  */
 class RobotRuntimeBlueprint {
@@ -46,4 +46,5 @@ class RobotRuntimeBlueprint {
       value.set_joints(index, joints[index].nativeValue());
     return value;
   }
+
 }

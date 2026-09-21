@@ -101,7 +101,7 @@ private:
  */
 class RK_API RobotRuntime final {
 public:
-    RobotRuntime(const rk_robot_runtime_layout &layout, std::shared_ptr<RobotEndpoint> endpoint,
+    RobotRuntime(const rk_robot_runtime_blueprint &blueprint, std::shared_ptr<RobotEndpoint> endpoint,
             std::chrono::nanoseconds period = std::chrono::milliseconds(10));
     ~RobotRuntime();
 
@@ -125,13 +125,14 @@ public:
     rk_result apply_pending_commands();
     rk_result publish_sample(uint64_t timestamp_ns);
     void discard_pending_commands() noexcept;
+    void reset_state() noexcept;
     void set_externally_driven(bool value) noexcept;
 
 private:
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
 
-    rk_robot_runtime_layout layout_{};
+    rk_robot_runtime_blueprint blueprint_{};
     std::shared_ptr<RobotEndpoint> endpoint_;
     std::chrono::nanoseconds period_;
     mutable std::mutex state_mutex_;
@@ -143,6 +144,7 @@ private:
     bool running_ = false;
     bool stopping_ = false;
     bool externally_driven_ = false;
+    uint64_t last_command_sequence_ = 0;
 };
 
 } // namespace robotkit

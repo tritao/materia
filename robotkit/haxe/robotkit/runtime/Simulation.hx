@@ -9,7 +9,7 @@ import haxe.Int64;
  * The object creates RobotRuntime handles but remains their simulation owner:
  * callers should submit through those handles and advance this object once per
  * tick. It is intentionally separate from SimulatedRobot, which is only a
- * RobotInstance adapter for RobotWorld.
+ * live Robot adapter for RobotWorld.
  */
 class Simulation {
   final owner:Ownedrk_simulation;
@@ -53,6 +53,76 @@ class Simulation {
     if (!disposed) check(RobotKitSimKit.rk_simulation_stop(owner.borrow()), "simulation.stop");
   }
 
+  /** Restores every body and the fixed-step clock to the editable-scene state. */
+  public function reset():Void {
+    ensureLive();
+    stop();
+    check(RobotKitSimKit.rk_simulation_reset(owner.borrow()), "simulation.reset");
+  }
+
+  /** Restores one robot's initial body pose and runtime state. */
+  public function resetRobot(robotIndex:Int):Void {
+    ensureLive();
+    stop();
+    check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
+      "simulation.resetRobot");
+  }
+
+  /** Teleports one robot base while leaving the shared clock untouched. */
+  public function teleportRobot(robotIndex:Int, position:Array<Float>,
+      ?rotation:Array<Float>):Void {
+    ensureLive();
+    if (position == null || position.length != 3)
+      throw "Simulation.teleportRobot requires a three-component position";
+    var pose = makePose(position, rotation);
+    stop();
+    check(RobotKitSimKit.rk_simulation_teleport_robot(owner.borrow(), robotIndex, pose),
+      "simulation.teleportRobot");
+  }
+
+  /** Adds a box to the shared physics world and returns its owned object ID. */
+  public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
+      ?dynamicBody:Bool = false, ?mass:Float = 1.0):Int {
+    ensureLive();
+    if (position == null || position.length != 3 || halfExtents == null || halfExtents.length != 3)
+      throw "Simulation.spawnBox requires three-component position and extents";
+    var desc = new rk_simulation_object_desc();
+    desc.set_struct_size(rk_simulation_object_desc.size());
+    desc.set_motion_type(dynamicBody ? 2 : 0);
+    for (index in 0...3) {
+      desc.set_position(index, position[index]);
+      desc.set_half_extents(index, halfExtents[index]);
+    }
+    var chosenMass = dynamicBody ? mass : 0.0;
+    desc.set_mass(chosenMass);
+    var rotation = [0.0, 0.0, 0.0, 1.0];
+    for (index in 0...4) desc.set_rotation(index, rotation[index]);
+    stop();
+    var result = RobotKitSimKit.rk_simulation_spawn_object(owner.borrow(), desc);
+    check(result.status, "simulation.spawnBox");
+    return result.out_object;
+  }
+
+  /** Removes an environment object from the shared scene and physics world. */
+  public function removeObject(objectId:Int):Void {
+    ensureLive();
+    stop();
+    check(RobotKitSimKit.rk_simulation_remove_object(owner.borrow(), objectId),
+      "simulation.removeObject");
+  }
+
+  /** Teleports an environment object and clears its velocity. */
+  public function teleportObject(objectId:Int, position:Array<Float>,
+      ?rotation:Array<Float>):Void {
+    ensureLive();
+    if (position == null || position.length != 3)
+      throw "Simulation.teleportObject requires a three-component position";
+    var pose = makePose(position, rotation);
+    stop();
+    check(RobotKitSimKit.rk_simulation_teleport_object(owner.borrow(), objectId, pose),
+      "simulation.teleportObject");
+  }
+
   public function stepIndex():Int64 {
     var value = readClock();
     return value.get_step_index();
@@ -83,6 +153,17 @@ class Simulation {
 
   function ensureLive():Void {
     if (disposed) throw "RobotKit simulation has been disposed";
+  }
+
+  function makePose(position:Array<Float>, ?rotation:Array<Float>):rk_simulation_pose {
+    var pose = new rk_simulation_pose();
+    pose.set_struct_size(rk_simulation_pose.size());
+    for (index in 0...3) pose.set_position(index, position[index]);
+    var chosen = rotation == null ? [0.0, 0.0, 0.0, 1.0] : rotation;
+    if (chosen.length != 4)
+      throw "Simulation pose rotation requires four components";
+    for (index in 0...4) pose.set_rotation(index, chosen[index]);
+    return pose;
   }
 
   static function check(status:Int, operation:String):Void {

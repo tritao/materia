@@ -16,6 +16,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Reads the shared simulation clock.
 	 */
 	extern fn rk_simulation_get_clock(simulation: rk_simulation, out_clock: ptr<rk_simulation_clock> @inout) -> rk_result;
+	extern fn rk_simulation_remove_object(simulation: rk_simulation, object: rk_simulation_object) -> rk_result;
+	extern fn rk_simulation_reset(simulation: rk_simulation) -> rk_result;
+	extern fn rk_simulation_reset_robot(simulation: rk_simulation, robot_index: u32) -> rk_result;
+	extern fn rk_simulation_spawn_object(simulation: rk_simulation, desc: ptr<const<rk_simulation_object_desc>>, out_object: ptr<rk_simulation_object> @out) -> rk_result;
 	/**
 	 * Starts the simulation's realtime owner thread.
 	 */
@@ -28,6 +32,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Stops the realtime owner thread without destroying the simulation.
 	 */
 	extern fn rk_simulation_stop(simulation: rk_simulation) -> rk_result;
+	extern fn rk_simulation_teleport_object(simulation: rk_simulation, object: rk_simulation_object, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
+	extern fn rk_simulation_teleport_robot(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
 	struct rk_simulation_clock @layout(40, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		step_index: u64 @offset(8);
@@ -41,5 +47,21 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		reserved0: u32 @offset(20);
 		reserved: array<u64, 4> @offset(24);
 	}
+	struct rk_simulation_object_desc @layout(112, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		motion_type: u32 @offset(4);
+		position: array<f64, 3> @offset(8);
+		rotation: array<f64, 4> @offset(32);
+		half_extents: array<f64, 3> @offset(64);
+		mass: f64 @offset(88);
+		reserved: array<u64, 2> @offset(96);
+	}
+	struct rk_simulation_pose @layout(64, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		reserved0: u32 @offset(4);
+		position: array<f64, 3> @offset(8);
+		rotation: array<f64, 4> @offset(32);
+	}
 	handle rk_simulation : u32 @destroy("rk_simulation_destroy");
+	type rk_simulation_object = u32;
 }
