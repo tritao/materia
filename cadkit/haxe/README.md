@@ -1,0 +1,88 @@
+# CadKit Haxeon integration
+
+This directory contains the Haxeon projection of CadKit's C ABI. It is not a
+generic Haxe binding and does not add a dependency from `cadkit-core` to
+Haxeon.
+
+The checked-in `abi/CadKit.hxi` is generated for
+`x86_64-linux-gnu`. Regenerate it for another Haxeon target with:
+
+```sh
+HAXEON_TARGET=arm64-apple-darwin ./scripts/generate-haxeon-hxi
+```
+
+The projection uses Haxeon value types for `cad_vec3`, `cad_bounds`, and
+`cad_mesh_options`, and closeable owned handles for `cad_shape` and `cad_mesh`.
+`cadkit.Shape` and `cadkit.Geometry` are the first small semantic façade above
+the generated `CadKit` module. `Shape.faces()`, `Shape.edges()`, and
+`Shape.vertices()` provide lazy indexed collections of typed `Face`, `Edge`,
+and `Vertex` wrappers. These wrappers expose selector-ready surface/curve
+metadata without making one native call per collection construction.
+Each collection also exposes a typed query builder: face queries can filter by
+surface, parallel normal, area, and center; edge queries by curve, length,
+parallel tangent, and endpoint; vertex queries by position. Terminal query
+operations (`all`, `first`, `unique`, and `count`) consume the query and close
+the temporary owner; an unused query can be released with `close()`. Returned
+topology wrappers are caller-owned and must be closed. `unique` throws
+`SelectionError` with `Empty`, `Ambiguous`, or `Invalid` kind rather than
+silently choosing a topology element.
+
+`Shape.tessellate()` returns immutable bulk vertex, normal, and index streams
+plus `MeshFaceRange` entries. A range uses the same face index as
+`Shape.faces().at(index)`, so `mesh.rangeFor(face)` identifies the index
+subrange belonging to that CAD face. Tessellation results are cached per
+immutable shape and exact deflection options; closing the shape releases the
+cache while already returned mesh values remain valid.
+
+Modeling methods with an `Operation` suffix retain OCCT result history:
+`Operation.resultShape()` returns the new shape, while `Operation.history()`
+indexes generated, modified, and deleted topology entries.
+`Shape.extrude()` and `Shape.revolve()` sweep a face or wire profile; their
+`extrudeOperation()` and `revolveOperation()` variants preserve the same
+history information. Revolve axes use an origin, a direction, and a radian
+angle.
+`Shape.fillet()` and `Shape.chamfer()` apply constant finishing operations to
+all edges of a solid in the initial API; their operation variants retain
+history in the same way. Selected-edge finishing will be added as a bulk API
+once its handle-list boundary is defined.
+
+The Haxeon-only `cadkit.parametric` package owns the first document layer:
+`Document` manages a dependency DAG of box, cylinder, face, transform,
+extrude, revolve, fillet, chamfer, and boolean features. `FaceFeature` extracts
+an indexed face profile from a source shape, captures its fingerprint after
+the first evaluation, and uses that fingerprint for subsequent remapping;
+old documents without a fingerprint still use their stored index initially.
+Extrude and revolve features consume that profile (or any custom feature
+evaluating to a face or wire). Recompute stages dirty feature results before
+replacing committed shapes, and `Transaction` groups
+parameter edits for undo/redo. A
+`TopologyReference` can own a selected face, edge, or vertex and remap it
+after recompute: operation history is preferred, with a geometric fingerprint
+fallback. Ambiguous fingerprint matches remain explicitly `Ambiguous` instead
+of being guessed. `DocumentCodec` persists the feature graph and topology
+fingerprints as versioned JSON and reconstructs a fresh document by
+recomputing it; native handles are never serialized. NativeKit is not involved
+in this layer. `ReferenceState` distinguishes initially `Resolved` references,
+history/fingerprint `Remapped` references, `Deleted` topology, unresolved
+references, and ambiguous matches. `Document.lastRemapReport` aggregates those
+outcomes for each recompute.
+
+`Shape.importStep(path)` and `Shape.exportStep(path)` provide the first
+headless STEP file boundary. M14 transfers one OCCT shape and intentionally
+does not preserve STEP application metadata, assemblies, or parametric
+documents; those belong in later layers.
+
+`examples/nativekit/MeshUpload.hx` is intentionally outside the CadKit package
+boundary. It shows an application importing both packages and uploading the
+three CadKit mesh byte streams through NativeKit GPU buffers.
+
+After configuring CadKit with its default shared-library build, run the
+compile-and-runtime smoke test with:
+
+```sh
+./scripts/test-haxeon
+```
+
+Set `HAXEON_ROOT` when Haxeon is not in the sibling directory
+`../realtime-haxe`, or `CADKIT_BUILD_ROOT` when the native build is not
+`build/min`.

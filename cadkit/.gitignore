@@ -1,0 +1,9 @@
+# CMake and local build products
+/build/
+/cmake-build-*/
+
+# Editor and OS files
+.cache/
+.clangd/
+.DS_Store
+

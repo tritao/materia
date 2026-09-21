@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+haxeon_root="${HAXEON_ROOT:-$repo_root/../realtime-haxe}"
+target="${HAXEON_TARGET:-x86_64-linux-gnu}"
+
+"$haxeon_root/scripts/haxeon-ffi-import" \
+	"--target=$target" \
+	--library=cadkit-core \
+	--interface=CadKit \
+	--source-label=core/include/cadkit.h \
+	"--output=$repo_root/haxe/abi/CadKit.hxi" \
+	"$repo_root/core/include/cadkit.h"

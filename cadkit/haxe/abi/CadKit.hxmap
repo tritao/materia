@@ -1,0 +1,69 @@
+{
+  "interface": "CadKit",
+  "typePrefix": "cad_",
+  "functionPrefix": "cad_",
+  "functionCase": "camel",
+  "fieldCase": "camel",
+  "enumValuePrefixes": ["CAD_"],
+  "typeNames": {
+    "cad_result": "Result",
+    "cad_shape_kind": "ShapeKind",
+    "cad_surface_kind": "SurfaceKind",
+    "cad_curve_kind": "CurveKind",
+    "cad_history_relation": "HistoryRelation",
+    "cad_shape": "ShapeHandle",
+    "cad_mesh": "MeshHandle",
+    "cad_operation": "OperationHandle",
+    "cad_vec3": "Vec3",
+    "cad_bounds": "Bounds",
+    "cad_mesh_options": "MeshOptions",
+    "cad_mesh_face_range": "MeshFaceRange"
+  },
+  "enumValueNames": {
+    "cad_shape_kind": {
+      "CAD_SHAPE_UNKNOWN": "Unknown",
+      "CAD_SHAPE_COMPOUND": "Compound",
+      "CAD_SHAPE_COMPSOLID": "CompSolid",
+      "CAD_SHAPE_SOLID": "Solid",
+      "CAD_SHAPE_SHELL": "Shell",
+      "CAD_SHAPE_FACE": "Face",
+      "CAD_SHAPE_WIRE": "Wire",
+      "CAD_SHAPE_EDGE": "Edge",
+      "CAD_SHAPE_VERTEX": "Vertex"
+    },
+    "cad_surface_kind": {
+      "CAD_SURFACE_UNKNOWN": "Unknown",
+      "CAD_SURFACE_PLANE": "Plane",
+      "CAD_SURFACE_CYLINDER": "Cylinder",
+      "CAD_SURFACE_CONE": "Cone",
+      "CAD_SURFACE_SPHERE": "Sphere",
+      "CAD_SURFACE_TORUS": "Torus",
+      "CAD_SURFACE_BEZIER": "Bezier",
+      "CAD_SURFACE_BSPLINE": "BSpline"
+    },
+    "cad_curve_kind": {
+      "CAD_CURVE_UNKNOWN": "Unknown",
+      "CAD_CURVE_LINE": "Line",
+      "CAD_CURVE_CIRCLE": "Circle",
+      "CAD_CURVE_ELLIPSE": "Ellipse",
+      "CAD_CURVE_HYPERBOLA": "Hyperbola",
+      "CAD_CURVE_PARABOLA": "Parabola",
+      "CAD_CURVE_BEZIER": "Bezier",
+      "CAD_CURVE_BSPLINE": "BSpline",
+      "CAD_CURVE_OFFSET": "Offset"
+    },
+    "cad_history_relation": {
+      "CAD_HISTORY_GENERATED": "Generated",
+      "CAD_HISTORY_MODIFIED": "Modified",
+      "CAD_HISTORY_DELETED": "Deleted"
+    }
+  },
+  "resultPolicies": {
+    "cad_result": {
+      "successValue": "CAD_OK",
+      "diagnosticFunction": "cad_last_error",
+      "errorType": "cadkit.CadKitError",
+      "checkedSuffix": "Checked"
+    }
+  }
+}
