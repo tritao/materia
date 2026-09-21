@@ -106,6 +106,40 @@ void captures_emissive_triangle() {
     assert(center);
     assert(center[0] > 200 && center[1] < 20 && center[2] < 20 && center[3] > 200);
 
+    SensorConfig runtime_sensor_config = sensor_config;
+    runtime_sensor_config.id = 55;
+    runtime_sensor_config.frame = 15;
+    runtime_sensor_config.timing.update_rate_hz = 10.0;
+    auto runtime_camera = std::make_shared<CameraSensor>(runtime_sensor_config, camera_config);
+    SensorRuntime runtime;
+    assert(runtime.add(
+        runtime_camera,
+        [runtime_camera, scene, &adapter](const SensorTick &runtime_tick)
+            -> std::optional<SensorMeasurement> {
+            std::optional<CameraFrame> runtime_frame;
+            if (adapter.capture(*runtime_camera, runtime_tick, scene->snapshot(), {},
+                                runtime_frame) != NKGPU_OK ||
+                !runtime_frame)
+                return std::nullopt;
+            return SensorMeasurement{*runtime_frame};
+        }));
+
+    auto runtime_measurements = runtime.poll(0.0);
+    assert(runtime_measurements.size() == 1);
+    const auto &runtime_frame = std::get<CameraFrame>(runtime_measurements.front());
+    assert(runtime_frame.header.sensor == 55);
+    assert(runtime_frame.header.sequence == 0);
+    assert(runtime_frame.header.capture_time == 0.0);
+    const auto *runtime_center = runtime_frame.pixel(8, 8);
+    assert(runtime_center);
+    assert(runtime_center[0] > 200 && runtime_center[1] < 20 && runtime_center[2] < 20);
+
+    runtime_measurements = runtime.poll(0.1);
+    assert(runtime_measurements.size() == 1);
+    const auto &second_runtime_frame = std::get<CameraFrame>(runtime_measurements.front());
+    assert(second_runtime_frame.header.sequence == 1);
+    assert(second_runtime_frame.header.capture_time == 0.1);
+
     SensorConfig processed_sensor_config;
     processed_sensor_config.id = 53;
     processed_sensor_config.frame = 14;
