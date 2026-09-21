@@ -45,7 +45,7 @@ fi
 	"$module_dir/haxe/nativekit/ui/widgets/"*.hx \
 	"$module_dir/bindings/haxe/"*.hx)
 
-font_path=${NKUI_TEST_FONT_PATH:-"$repo_dir/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"}
+font_path=${NKUI_TEST_FONT_PATH:-"$module_dir/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"}
 runtime_library_path="$build_dir:$build_dir/nativekit/modules/gpu:$build_dir/nativekit:$haxeon_dir/out:$haxeon_dir/.tools/hashlink:$haxeon_dir/vendor/hashlink"
 if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
 	runtime_library_path="$runtime_library_path:$LD_LIBRARY_PATH"

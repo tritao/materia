@@ -49,7 +49,7 @@ target_include_directories(nativekit_sim_mujoco
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/modules/sim_core/src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/../sim_core/src)
 target_link_libraries(nativekit_sim_mujoco
     PUBLIC NativeKit::sim_core
     PRIVATE ${NK_MUJOCO_TARGET})

@@ -18,6 +18,7 @@ import nativekit.ui.semantics.AccessibilityOrientation;
 import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.AccessibilityState;
 import nativekit.ui.semantics.Semantics;
+import nativekit.ui.widgets.Spacer;
 
 /**
  * Model-backed variable-extent list that materializes only its viewport

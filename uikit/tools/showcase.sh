@@ -82,8 +82,8 @@ if [[ "$build_only" == true ]]; then
     exit 0
 fi
 
-font_path=${NKUI_TEST_FONT_PATH:-"$repo_dir/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"}
-emoji_path=${NKUI_COLOR_FONT_PATH:-"$repo_dir/vendor/skribidi/example/data/NotoColorEmoji-Regular.ttf"}
+font_path=${NKUI_TEST_FONT_PATH:-"$module_dir/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"}
+emoji_path=${NKUI_COLOR_FONT_PATH:-"$module_dir/vendor/skribidi/example/data/NotoColorEmoji-Regular.ttf"}
 runtime_library_path="$build_dir:$build_dir/nativekit/modules/gpu:$build_dir/nativekit:$haxeon_dir/out:$haxeon_dir/vendor/hashlink"
 hashlink_runtime="$haxeon_dir/vendor/hashlink/hl"
 if [[ -x "$haxeon_dir/.tools/hashlink/hl" ]]; then

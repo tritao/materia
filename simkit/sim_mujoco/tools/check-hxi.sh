@@ -2,16 +2,11 @@
 set -euo pipefail
 
 module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-repo_dir=$(cd "$module_dir/../.." && pwd)
-if [[ -n "${HAXEON_DIR:-}" ]]; then
-    haxeon_dir=$HAXEON_DIR
-else
-    haxeon_dir="$(dirname "$repo_dir")/realtime-haxe"
-    if [[ ! -x "$haxeon_dir/scripts/haxeon-ffi-audit" &&
-        -x "$repo_dir/../../realtime-haxe/scripts/haxeon-ffi-audit" ]]; then
-        haxeon_dir="$repo_dir/../../realtime-haxe"
-    fi
-fi
+simkit_dir=$(dirname "$module_dir")
+materia_dir=$(dirname "$simkit_dir")
+scenekit_dir=${SCENEKIT_DIR:-"$materia_dir/scenekit"}
+nativekit_dir=${NATIVEKIT_DIR:-"$materia_dir/nativekit"}
+haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 output=${1:-"$module_dir/bindings/nativekit-sim-mujoco.hxi"}
 
 "$haxeon_dir/scripts/haxeon-ffi-audit" \
@@ -23,17 +18,17 @@ output=${1:-"$module_dir/bindings/nativekit-sim-mujoco.hxi"}
     --library=nativekit_sim_mujoco \
     --interface=NativeKitSimMujoco \
     --depends=NativeKitSim \
-    --dependency-hxi="$repo_dir/modules/scene/bindings/nativekit-scene.hxi" \
-    --dependency-hxi="$repo_dir/bindings/haxe/nativekit.hxi" \
-    --dependency-hxi="$repo_dir/modules/sim_core/bindings/nativekit-sim.hxi" \
+    --dependency-hxi="$scenekit_dir/scene/bindings/nativekit-scene.hxi" \
+    --dependency-hxi="$nativekit_dir/bindings/haxe/nativekit.hxi" \
+    --dependency-hxi="$simkit_dir/sim_core/bindings/nativekit-sim.hxi" \
     --include="$module_dir/include" \
-    --include="$repo_dir/modules/sim_core/include" \
-    --include="$repo_dir/modules/scene/include" \
-    --include="$repo_dir/include" \
-    --exclude-header="$repo_dir/modules/sim_core/include/nativekit_sim.h" \
-    --exclude-header="$repo_dir/modules/scene/include/nativekit_scene.h" \
-    --exclude-header="$repo_dir/include/nativekit.h" \
-    --source-label=modules/sim_mujoco/bindings/nativekit_sim_mujoco_import.h \
+    --include="$simkit_dir/sim_core/include" \
+    --include="$scenekit_dir/scene/include" \
+    --include="$nativekit_dir/include" \
+    --exclude-header="$simkit_dir/sim_core/include/nativekit_sim.h" \
+    --exclude-header="$scenekit_dir/scene/include/nativekit_scene.h" \
+    --exclude-header="$nativekit_dir/include/nativekit.h" \
+    --source-label=sim_mujoco/bindings/nativekit_sim_mujoco_import.h \
     --output="$output" \
     "$module_dir/bindings/nativekit_sim_mujoco_import.h"
 

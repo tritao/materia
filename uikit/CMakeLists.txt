@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(materia-ui VERSION 0.1.0 LANGUAGES C CXX)
+project(UIKit VERSION 0.1.0 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 include(CTest)
@@ -291,7 +291,7 @@ if(NK_BUILD_TESTS)
         target_compile_definitions(nativekit_ui_public_renderer_smoke_test PRIVATE
             NKGPU_TESTING=1)
         target_include_directories(nativekit_ui_public_renderer_smoke_test PRIVATE
-            "${CMAKE_SOURCE_DIR}/modules/gpu/src")
+            "${NKUI_NATIVEKIT_DIR}/modules/gpu/src")
         target_compile_definitions(nativekit_ui_public_renderer_smoke_test PRIVATE
             NKUI_TEST_FONT_PATH="${NK_VENDOR_DIR}/skribidi/example/data/IBMPlexSans-Regular.ttf")
         target_link_libraries(nativekit_ui_public_renderer_smoke_test PRIVATE
@@ -308,7 +308,7 @@ if(NK_BUILD_TESTS)
         target_compile_definitions(nativekit_ui_session_render_smoke_test PRIVATE
             NKGPU_TESTING=1)
         target_include_directories(nativekit_ui_session_render_smoke_test PRIVATE
-            "${CMAKE_SOURCE_DIR}/modules/gpu/src")
+            "${NKUI_NATIVEKIT_DIR}/modules/gpu/src")
         target_compile_definitions(nativekit_ui_session_render_smoke_test PRIVATE
             NKUI_TEST_FONT_PATH="${NK_VENDOR_DIR}/skribidi/example/data/IBMPlexSans-Regular.ttf")
         target_link_libraries(nativekit_ui_session_render_smoke_test PRIVATE

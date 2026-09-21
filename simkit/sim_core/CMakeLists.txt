@@ -23,7 +23,7 @@ endif()
 target_include_directories(nativekit_sim_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/modules/scene/include>
+        $<BUILD_INTERFACE:${NKSIM_SCENEKIT_DIR}/scene/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE src)
 target_link_libraries(nativekit_sim_core PUBLIC NativeKit::scene)

@@ -35,6 +35,6 @@ fi
 	"$module_dir/bindings/haxe/"*.hx)
 
 (cd "$haxeon_dir/out" && \
-	NKUI_TEST_FONT_PATH="$repo_dir/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf" \
+	NKUI_TEST_FONT_PATH="$module_dir/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf" \
 	LD_LIBRARY_PATH="$build_dir:$build_dir/nativekit/modules/gpu:$build_dir/nativekit${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
 	"$haxeon_dir/vendor/hashlink/hl" "$build_dir/haxeon-ui-layout-session.hl")

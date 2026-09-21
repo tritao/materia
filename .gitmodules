@@ -26,3 +26,6 @@
 [submodule "uikit/vendor/budouxc"]
 	path = uikit/vendor/budouxc
 	url = https://github.com/memononen/budouxc.git
+[submodule "simkit/vendor/mujoco"]
+	path = simkit/vendor/mujoco
+	url = https://github.com/google-deepmind/mujoco.git

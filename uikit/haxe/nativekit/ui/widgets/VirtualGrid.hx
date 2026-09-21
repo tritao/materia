@@ -15,6 +15,7 @@ import nativekit.ui.semantics.AccessibilityAction;
 import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.AccessibilityState;
 import nativekit.ui.semantics.Semantics;
+import nativekit.ui.widgets.Spacer;
 import nativekit.ui.widgets.VirtualExtentViewport;
 
 /** Fixed-row virtual grid with optional variable-width columns. */
