@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-haxeon_root="${HAXEON_ROOT:-$repo_root/../realtime-haxe}"
-build_root="${CADKIT_BUILD_ROOT:-$repo_root/build/min}"
+haxeon_root="${HAXEON_ROOT:-$repo_root/../haxeon}"
+build_root="${CADKIT_BUILD_ROOT:-$repo_root/build/debug}"
 
 haxe="$haxeon_root/.tools/haxe/haxe"
 hashlink="$haxeon_root/.tools/hashlink/hl"

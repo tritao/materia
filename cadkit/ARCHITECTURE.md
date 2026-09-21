@@ -77,7 +77,7 @@ parametric document semantics.
 
 ## OCCT policy
 
-OCCT is tracked as a submodule at released version `V8_0_1`, commit
-`b8f597c677811d1f9f4d8a97f5ae2825c0353a42`. Updating OCCT is an explicit
-maintenance change that must update the submodule pointer and the documented
-version together; builds must never silently follow an OCCT branch.
+OCCT is vendored under `third_party/occt` from released version `V8_0_1`,
+commit `b8f597c677811d1f9f4d8a97f5ae2825c0353a42`. Updating OCCT is an explicit
+maintenance change that must replace the vendored source and update the
+documented version together; builds must never silently follow an OCCT branch.

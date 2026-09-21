@@ -83,6 +83,5 @@ compile-and-runtime smoke test with:
 ./scripts/test-haxeon
 ```
 
-Set `HAXEON_ROOT` when Haxeon is not in the sibling directory
-`../realtime-haxe`, or `CADKIT_BUILD_ROOT` when the native build is not
-`build/min`.
+Set `HAXEON_ROOT` when Haxeon is not in the sibling directory `../haxeon`, or
+`CADKIT_BUILD_ROOT` when the native build is not `build/debug`.

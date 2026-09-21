@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-haxeon_root="${HAXEON_ROOT:-$repo_root/../realtime-haxe}"
+haxeon_root="${HAXEON_ROOT:-$repo_root/../haxeon}"
 target="${HAXEON_TARGET:-x86_64-linux-gnu}"
 
 "$haxeon_root/scripts/haxeon-ffi-import" \

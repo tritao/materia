@@ -11,8 +11,8 @@ cmake --build build/debug --parallel
 ctest --test-dir build/debug --output-on-failure
 ```
 
-The first configure builds the pinned OCCT submodule with the foundation and
-modeling modules needed by the initial primitive, bounds, transform, and
+The first configure builds the pinned vendored OCCT source with the foundation
+and modeling modules needed by the initial primitive, bounds, transform, and
 tessellation/topology/boolean API. OCCT is currently pinned to stable release
 `V8_0_1`.
 

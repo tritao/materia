@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(CADKIT_BUILD_TESTS "Build CadKit tests" ON)
-option(CADKIT_BUILD_OCCT "Build the pinned OCCT submodule" ON)
+option(CADKIT_BUILD_OCCT "Build the pinned vendored OCCT source" ON)
 option(CADKIT_BUILD_SHARED "Build the CadKit core as a shared library" ON)
 
 if(CADKIT_BUILD_OCCT)
@@ -38,7 +38,7 @@ if(CADKIT_BUILD_OCCT)
     # own binary directory, while its public targets use the top-level
     # generated include directory when OCCT is embedded as a subdirectory.
     # Mirror that one generated header into the include tree used by OCCT's
-    # targets. This keeps the submodule unmodified.
+    # targets. This keeps the vendored source unmodified.
     set(CADKIT_OCCT_VERSION_HEADER
         "${CMAKE_CURRENT_BINARY_DIR}/third_party/occt/include/opencascade/Standard_Version.hxx")
     if(EXISTS "${CADKIT_OCCT_VERSION_HEADER}")
