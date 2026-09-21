@@ -57,6 +57,17 @@ int main() {
     assert(state.source_timestamp_ns == 1234);
     assert(state.received_timestamp_ns == 5678);
     assert(state.position[0] == 0.25);
+    assert(::write(sockets[1], &state_packet, sizeof(state_packet)) == sizeof(state_packet));
+    assert(endpoint->sample(5678, state) == RK_ERROR_STALE_STATE);
     ::close(sockets[1]);
     assert(endpoint->sample(5679, state) == RK_ERROR_BACKEND);
+
+    int replacement[2]{};
+    assert(::socketpair(AF_UNIX, SOCK_STREAM, 0, replacement) == 0);
+    assert(endpoint->reconnect(replacement[0]) == RK_OK);
+    state_packet.source_timestamp_ns = 1;
+    assert(::write(replacement[1], &state_packet, sizeof(state_packet)) == sizeof(state_packet));
+    assert(endpoint->sample(5680, state) == RK_OK);
+    assert(state.source_timestamp_ns == 1);
+    ::close(replacement[1]);
 }

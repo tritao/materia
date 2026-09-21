@@ -15,6 +15,11 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         pending_targets_.clear();
         return RK_OK;
     }
+    if (command.kind == RK_COMMAND_RESET_SAFETY) {
+        stopped_ = false;
+        pending_targets_.clear();
+        return RK_OK;
+    }
     if (stopped_)
         return RK_ERROR_SAFETY_STOPPED;
     if (command.kind == RK_COMMAND_NONE)

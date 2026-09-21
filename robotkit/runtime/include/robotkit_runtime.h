@@ -84,7 +84,8 @@ enum {
     RK_ERROR_OUT_OF_MEMORY = -7, /**< Native allocation failed. */
     RK_ERROR_BACKEND = -8, /**< The underlying endpoint or physics backend failed. */
     RK_ERROR_STALE_COMMAND = -9, /**< Command sequence is not newer than the last accepted command. */
-    RK_ERROR_LIMIT = -10 /**< Command violates a compiled joint or actuator limit. */
+    RK_ERROR_LIMIT = -10, /**< Command violates a compiled joint or actuator limit. */
+    RK_ERROR_STALE_STATE = -11 /**< The endpoint only supplied an old observation. */
 };
 
 /* ------------------------------------------------------------------------- */

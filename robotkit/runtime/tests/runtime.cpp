@@ -7,6 +7,29 @@
 
 namespace {
 
+class FaultEndpoint final : public robotkit::RobotEndpoint {
+public:
+    bool fail_apply = false;
+    bool fail_sample = false;
+    int discard_count = 0;
+
+    rk_result apply(const rk_robot_command &) override {
+        return fail_apply ? RK_ERROR_BACKEND : RK_OK;
+    }
+
+    rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override {
+        if (fail_sample)
+            return RK_ERROR_STALE_STATE;
+        state.struct_size = sizeof(state);
+        state.source_timestamp_ns = timestamp_ns;
+        state.received_timestamp_ns = timestamp_ns;
+        state.joint_count = 2;
+        return RK_OK;
+    }
+
+    void discard_pending() noexcept override { ++discard_count; }
+};
+
 void wait_for_sequence(robotkit::RobotRuntime &runtime, uint64_t sequence) {
     for (int attempt = 0; attempt != 100; ++attempt) {
         rk_robot_state state{};
@@ -37,7 +60,7 @@ int main() {
     command.sequence = 1;
     command.kind = RK_COMMAND_JOINT_TARGETS;
     command.target_count = 1;
-    command.targets[0] = {0, RK_TARGET_POSITION, 1.0, 0.0, 0.0};
+    command.targets[0] = {0, RK_TARGET_POSITION, 1.0, 1.0, 0.0};
     assert(runtime.submit(command) == RK_OK);
     assert(runtime.submit(command) == RK_ERROR_STALE_COMMAND);
     assert(runtime.start() == RK_OK);
@@ -49,7 +72,7 @@ int main() {
     assert(state.sequence == 1);
     assert(state.mode == RK_ROBOT_MODE_TRACKING);
     assert(state.safety == RK_SAFETY_READY);
-    assert(state.position[0] > 0.0 && state.position[0] < 1.0);
+    assert(state.position[0] > 0.0 && state.position[0] < 0.1);
 
     command.sequence = 2;
     command.kind = RK_COMMAND_EMERGENCY_STOP;
@@ -69,7 +92,7 @@ int main() {
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
     assert(runtime.stop() == RK_OK);
     assert(runtime.snapshot(state) == RK_OK);
-    assert(state.safety == RK_SAFETY_FAULT);
+    assert(state.safety == RK_SAFETY_EMERGENCY_STOP);
 
     command.sequence = 4;
     command.kind = RK_COMMAND_RESET_SAFETY;
@@ -99,5 +122,27 @@ int main() {
     assert(threaded.running());
     assert(threaded.stop() == RK_OK);
     assert(!threaded.running());
+
+    auto apply_failure_endpoint = std::make_shared<FaultEndpoint>();
+    apply_failure_endpoint->fail_apply = true;
+    robotkit::RobotRuntime apply_failure(blueprint, apply_failure_endpoint);
+    command.sequence = 1;
+    command.kind = RK_COMMAND_JOINT_TARGETS;
+    command.target_count = 1;
+    command.targets[0] = {0, RK_TARGET_POSITION, 0.25, 0.0, 0.0};
+    assert(apply_failure.submit(command) == RK_OK);
+    assert(apply_failure.apply_pending_commands() == RK_ERROR_BACKEND);
+    assert(apply_failure_endpoint->discard_count == 0);
+    apply_failure.discard_pending_commands();
+    assert(apply_failure_endpoint->discard_count == 1);
+    assert(apply_failure.snapshot(state) == RK_OK);
+    assert(state.safety == RK_SAFETY_FAULT);
+
+    auto sample_failure_endpoint = std::make_shared<FaultEndpoint>();
+    sample_failure_endpoint->fail_sample = true;
+    robotkit::RobotRuntime sample_failure(blueprint, sample_failure_endpoint);
+    assert(sample_failure.publish_sample(100) == RK_ERROR_STALE_STATE);
+    assert(sample_failure.snapshot(state) == RK_OK);
+    assert(state.safety == RK_SAFETY_FAULT);
     return 0;
 }

@@ -105,6 +105,22 @@ SerialRobotEndpoint::~SerialRobotEndpoint() {
         ::close(descriptor_);
 }
 
+rk_result SerialRobotEndpoint::reconnect(int descriptor, bool take_ownership) noexcept {
+    if (descriptor < 0)
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (owns_descriptor_ && descriptor_ >= 0)
+        ::close(descriptor_);
+    descriptor_ = descriptor;
+    owns_descriptor_ = take_ownership;
+    input_.clear();
+    last_source_timestamp_ns_ = 0;
+    has_source_timestamp_ = false;
+    const int flags = fcntl(descriptor_, F_GETFL, 0);
+    if (flags >= 0 && fcntl(descriptor_, F_SETFL, flags | O_NONBLOCK) != 0)
+        return RK_ERROR_BACKEND;
+    return RK_OK;
+}
+
 rk_result SerialRobotEndpoint::apply(const rk_robot_command &command) {
     if (descriptor_ < 0)
         return RK_ERROR_BACKEND;
@@ -135,6 +151,7 @@ rk_result SerialRobotEndpoint::sample(uint64_t timestamp_ns, rk_robot_state &sta
         if (result == 0) return RK_ERROR_BACKEND;
         return RK_ERROR_BACKEND;
     }
+    bool saw_stale = false;
     while (input_.size() >= state_bytes) {
         if (!std::equal(state_magic.begin(), state_magic.end(), input_.begin())) {
             input_.erase(input_.begin());
@@ -145,6 +162,10 @@ rk_result SerialRobotEndpoint::sample(uint64_t timestamp_ns, rk_robot_state &sta
         input_.erase(input_.begin(), input_.begin() + sizeof(packet));
         if (packet.joint_count > RK_MAX_JOINTS)
             return RK_ERROR_BACKEND;
+        if (has_source_timestamp_ && packet.source_timestamp_ns <= last_source_timestamp_ns_) {
+            saw_stale = true;
+            continue;
+        }
         state.struct_size = sizeof(state);
         state.source_timestamp_ns = packet.source_timestamp_ns;
         state.received_timestamp_ns = timestamp_ns;
@@ -156,9 +177,11 @@ rk_result SerialRobotEndpoint::sample(uint64_t timestamp_ns, rk_robot_state &sta
             state.effort[index] = packet.effort[index];
         }
         state.safety = RK_SAFETY_READY;
+        last_source_timestamp_ns_ = packet.source_timestamp_ns;
+        has_source_timestamp_ = true;
         return RK_OK;
     }
-    return RK_ERROR_INVALID_STATE;
+    return saw_stale ? RK_ERROR_STALE_STATE : RK_ERROR_INVALID_STATE;
 }
 
 } // namespace robotkit

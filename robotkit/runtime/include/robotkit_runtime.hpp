@@ -145,6 +145,8 @@ private:
     bool stopping_ = false;
     bool externally_driven_ = false;
     uint64_t last_command_sequence_ = 0;
+    rk_robot_state state_backup_{};
+    bool state_backup_valid_ = false;
 };
 
 } // namespace robotkit
