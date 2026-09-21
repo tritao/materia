@@ -9,8 +9,8 @@ import NativeKitRuntime;
 import haxe.Int64;
 import haxe.io.Bytes;
 import haxeon.wire.MessagePack;
-import robotkit.model.Robot;
-import robotkit.runtime.CompiledRobot;
+import robotkit.model.RobotModel;
+import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotSnapshot;
 import robotkit.runtime.RobotSnapshotMailbox;
 import robotkit.runtime.RobotRuntime;
@@ -32,8 +32,8 @@ import robotkit.transport.NativeTransport;
 
 /** Authoritative robot process boundary. RobotRuntime ownership stays off the network path. */
 class RobotServer {
-  final robot:Robot;
-  final compiled:CompiledRobot;
+  final robot:RobotModel;
+  final blueprint:RobotRuntimeBlueprint;
   final runtime:RobotRuntime;
   final simulation:Simulation;
   final nativeRuntime:NativeKitRuntime;
@@ -56,10 +56,10 @@ class RobotServer {
   var behaviorStopped:Bool = false;
   var disposed:Bool = false;
 
-  public function new(robot:Robot, compiled:CompiledRobot, runtime:RobotRuntime,
+  public function new(robot:RobotModel, blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
       simulation:Simulation, port:Int, robotId:Int, ?behavior:RobotBehavior) {
     this.robot = robot;
-    this.compiled = compiled;
+    this.blueprint = blueprint;
     this.runtime = runtime;
     this.simulation = simulation;
     this.port = port;
@@ -195,7 +195,7 @@ class RobotServer {
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
     send(RobotProtocol.capabilities(new RobotCapabilities(Int64.ofInt(robotId),
-      compiled.jointCount, true, false, false, false), sessionId));
+      blueprint.jointCount, true, false, false, false), sessionId));
     helloComplete = true;
     publishSnapshot(true);
   }
@@ -235,7 +235,7 @@ class RobotServer {
     return Int64.compare(value, Int64.ofInt(robotId)) == 0;
 
   function publishSnapshot(forceSend:Bool):Void {
-    var snapshot = RobotSnapshot.fromRuntime(Int64.ofInt(robotId), runtime.snapshot());
+    var snapshot = runtime.snapshot().withRobotId(Int64.ofInt(robotId));
     snapshots.publish(snapshot);
     var latest = snapshots.latest();
     if (latest == null)
@@ -258,7 +258,7 @@ class RobotServer {
       stopBehavior();
       return;
     }
-    if (intent.joint < 0 || intent.joint >= compiled.jointCount || intent.mode != 1) {
+    if (intent.joint < 0 || intent.joint >= blueprint.jointCount || intent.mode != 1) {
       stopBehavior();
       return;
     }

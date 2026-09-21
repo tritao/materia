@@ -3,14 +3,13 @@ package robotkit.world;
 import RobotKitRuntime;
 import haxe.Int64;
 import robotkit.runtime.RobotRuntime;
-import robotkit.runtime.RobotRuntimeSnapshot;
 
 /**
- * RobotInstance adapter over a runtime belonging to an externally owned
+ * Robot adapter over a runtime belonging to an externally owned
  * Simulation. Closing this adapter never stops or disposes that Simulation;
  * the embedding application controls the shared clock and shutdown order.
  */
-class SimulatedRobot implements RobotInstance {
+class SimulatedRobot implements Robot {
   public final logicalId:RobotId;
 
   final runtime:RobotRuntime;
@@ -18,7 +17,7 @@ class SimulatedRobot implements RobotInstance {
   final robotCapabilities:RobotCapabilities;
   var changeListener:Null < Void -> Void > = null;
   var commandSequence:Int = 0;
-  var observedSequence:Int = -1;
+  var observedSequence:Int64 = Int64.ofInt(-1);
   var closed:Bool = false;
 
   public function new(id:RobotId, runtime:RobotRuntime, name:String,
@@ -54,17 +53,17 @@ class SimulatedRobot implements RobotInstance {
 
   public function capabilities():RobotCapabilities return robotCapabilities;
 
-  public function snapshot():RobotSnapshot {
+  public function snapshot():robotkit.world.RobotSnapshot {
     ensureOpen();
     var value = runtime.snapshot();
     observe(value);
-    return new RobotSnapshot(
+    return new robotkit.world.RobotSnapshot(
       logicalId,
-      Int64.ofInt(value.sequence),
+      value.sequence,
       value.timestampNs,
-      value.positions,
-      value.velocities,
-      value.efforts,
+      value.q,
+      value.dq,
+      value.effort,
       value.mode,
       value.faultCode
     );
@@ -104,7 +103,7 @@ class SimulatedRobot implements RobotInstance {
     changeListener = null;
   }
 
-  function observe(value:RobotRuntimeSnapshot):Void {
+  function observe(value:robotkit.runtime.RobotSnapshot):Void {
     if (value.sequence == observedSequence)
       return;
     observedSequence = value.sequence;

@@ -2,14 +2,20 @@ package tests;
 
 import haxe.Int64;
 import robotkit.runtime.RobotRuntimeBlueprint;
+import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.RobotRuntimeJointBlueprint;
+import robotkit.runtime.RobotCompileException;
 import robotkit.runtime.Simulation;
+import robotkit.model.Joint;
+import robotkit.model.JointType;
+import robotkit.model.Link;
+import robotkit.model.RobotModel;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotDescription;
 import robotkit.world.RobotFault;
 import robotkit.world.RobotId;
-import robotkit.world.RobotInstance;
+import robotkit.world.Robot;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.RobotStatus;
 import robotkit.world.RemoteRobot;
@@ -26,18 +32,76 @@ class RobotWorldTests {
     testImmutableSnapshots();
     testForwardingAndLifecycle();
     testMixedSimulatedAndRemoteWorld();
+    testCompilerDiagnosticsAndTopology();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
+  }
+
+  static function testCompilerDiagnosticsAndTopology():Void {
+    var model = new RobotModel("diagnostic-arm");
+    var base = model.addLink(new Link("base"));
+    var tool = model.addLink(new Link("tool"));
+    var shoulder = model.addJoint(new Joint("shoulder", JointType.Revolute, base, tool));
+    shoulder.limits.lower = -1.0;
+    shoulder.limits.upper = 1.0;
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    equal(blueprint.jointCount, 1, "compiler lowers a valid topology");
+    equal(blueprint.linkCount, 2, "compiler preserves link count");
+
+    var invalid = new RobotModel("invalid-arm");
+    var root = invalid.addLink(new Link("root"));
+    var branch = invalid.addLink(new Link("branch"));
+    invalid.addLink(new Link("branch"));
+    var cycle = invalid.addJoint(new Joint("cycle", JointType.Revolute, root, branch));
+    cycle.limits.lower = 2.0;
+    cycle.limits.upper = -2.0;
+    invalid.addJoint(new Joint("cycle", JointType.Floating, branch, root));
+    var diagnostics = RobotRuntimeCompiler.validate(invalid);
+    check(hasDiagnostic(diagnostics, "RK_LINK_DUPLICATE"),
+      "compiler reports duplicate link names");
+    check(hasDiagnostic(diagnostics, "RK_JOINT_DUPLICATE"),
+      "compiler reports duplicate joint names");
+    check(hasDiagnostic(diagnostics, "RK_LIMITS"),
+      "compiler reports invalid joint limits");
+    check(hasDiagnostic(diagnostics, "RK_JOINT_UNSUPPORTED"),
+      "compiler reports unsupported joint types");
+    check(hasDiagnostic(diagnostics, "RK_TOPOLOGY_CYCLE"),
+      "compiler reports topology cycles");
+    check(hasDiagnostic(diagnostics, "RK_TOPOLOGY_DISCONNECTED"),
+      "compiler reports links disconnected from the root");
+    var forest = new RobotModel("forest");
+    forest.addLink(new Link("left"));
+    forest.addLink(new Link("right"));
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(forest), "RK_TOPOLOGY_ROOT"),
+      "compiler requires exactly one topology root");
+    var threw = false;
+    try {
+      RobotRuntimeCompiler.compile(invalid);
+    } catch (error:RobotCompileException) {
+      threw = true;
+      check(error.diagnostics.length >= 5,
+        "compile exception retains all structured diagnostics");
+      check(error.diagnostics[0].path != null && error.diagnostics[0].code != null,
+        "compile diagnostics expose paths and stable codes");
+    }
+    check(threw, "invalid topology refuses native lowering");
+  }
+
+  static function hasDiagnostic(diagnostics:Array<robotkit.runtime.RobotCompileDiagnostic>,
+      code:String):Bool {
+    for (diagnostic in diagnostics)
+      if (diagnostic.code == code) return true;
+    return false;
   }
 
   static function testAttachDetachAndIdentity():Void {
     var world = new RobotWorld();
     var robot = new FakeRobot("warehouse/forklift-17");
     world.attach(robot);
-    equal(world.robots.get("warehouse/forklift-17"), robot, "attach registers logical ID");
+    equal(world.robot("warehouse/forklift-17"), robot, "attach registers logical ID");
     equal(world.snapshot().robotIds()[0], "warehouse/forklift-17", "snapshot keeps logical ID");
     equal(world.detach("missing"), null, "missing detach is harmless");
     equal(world.detach(robot.id()), robot, "detach returns ownership");
-    equal(world.robots.get(robot.id()), null, "detach unregisters robot");
+    equal(world.robot(robot.id()), null, "detach unregisters robot");
     check(!robot.closed, "detach does not close returned robot");
     robot.emitChange();
     equal(world.snapshot().sequence, 2, "detached robot no longer changes world");
@@ -79,7 +143,7 @@ class RobotWorldTests {
     var secondRobot = second.robot("arm");
     check(firstRobot != null && firstRobot.positions[0] == 1.0, "old snapshot owns copied arrays");
     check(secondRobot != null && secondRobot.positions[0] == 9.0, "new snapshot observes new state");
-    first.robots.remove("arm");
+    first.robots().resize(0);
     check(second.robot("arm") != null, "snapshot maps are independent");
     world.close();
   }
@@ -184,7 +248,7 @@ class RobotWorldTests {
   }
 }
 
-private class FakeRobot implements RobotInstance {
+private class FakeRobot implements Robot {
   final logicalId:RobotId;
   public var positions:Array<Float> = [0.0];
   public var listener:Null < Void -> Void > = null;

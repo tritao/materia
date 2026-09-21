@@ -9,7 +9,7 @@ hardware-in-the-loop adapter.
 
 ```text
 RobotWorld
-└── RobotInstance[]
+└── Robot[]
     ├── RemoteRobot
     │   └── RobotClient ── RobotProtocol ── robotd / physical process
     └── SimulatedRobot
@@ -18,7 +18,7 @@ RobotWorld
                         Simulation
 ```
 
-`RobotWorld` owns the logical `RobotInstance` map. It does not know whether a
+`RobotWorld` owns the logical `Robot` collection. It does not know whether a
 robot is remote or simulated. It routes `RobotCommand`, collects
 `RobotSnapshot`, tracks lifecycle changes, and builds `WorldSnapshot` values.
 
@@ -29,10 +29,19 @@ steps, stops, or disposes that simulation.
 ## Runtime versus simulation
 
 `RobotRuntime` is the command mailbox and state publication boundary for one
-robot. `RobotRuntimeBlueprint` is the compiled execution description produced
-from the editable robot model. `RobotRuntimeLayout` and
-`RobotRuntimeSnapshot` describe the native execution ABI and are deliberately
-kept below the `RobotInstance` API.
+robot. `RobotRuntimeCompiler` turns the editable `RobotModel` directly into a
+`RobotRuntimeBlueprint`. Native layout details remain internal to runtime
+creation, and `RobotRuntime.snapshot()` returns the runtime snapshot value
+directly.
+
+Compilation has two deliberate entry points. `RobotRuntimeCompiler.validate()`
+returns every `RobotCompileDiagnostic` with a stable code, field path, and
+human-readable message. `compile()` uses that same validation pass and throws a
+`RobotCompileException` carrying the complete list, so an editor or import
+pipeline can present all model errors in one report. Validation includes link
+and joint identity, backend-supported joint kinds, limits and actuator values,
+sensor metadata, and the link topology (one root, one parent per child, no
+cycles, and no disconnected links).
 
 `Simulation` is the shared ownership boundary for local physics. It owns the
 SceneKit scene, SimKit world and host, physics resources, simulation clock,

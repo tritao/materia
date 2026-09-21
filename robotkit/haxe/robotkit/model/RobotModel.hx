@@ -1,6 +1,7 @@
 package robotkit.model;
 
-class Robot {
+/** Editable static definition of a robot's links, joints, and sensors. */
+class RobotModel {
   public final name:String;
   public final links:Array<Link> = [];
   public final joints:Array<Joint> = [];
@@ -25,6 +26,13 @@ class Robot {
     return sensor;
   }
 
+  /**
+   * Performs the lightweight model checks used by editors.
+   *
+   * Runtime creation must use `RobotRuntimeCompiler.validate()` or `compile()`;
+   * that pass also checks backend support and graph topology and returns
+   * structured diagnostics.
+   */
   public function validate():Array<String> {
     var errors:Array<String> = [];
     if (name.length == 0) errors.push("robot name is empty");

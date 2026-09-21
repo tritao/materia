@@ -9,7 +9,7 @@ import haxe.Int64;
  * The object creates RobotRuntime handles but remains their simulation owner:
  * callers should submit through those handles and advance this object once per
  * tick. It is intentionally separate from SimulatedRobot, which is only a
- * RobotInstance adapter for RobotWorld.
+ * live Robot adapter for RobotWorld.
  */
 class Simulation {
   final owner:Ownedrk_simulation;

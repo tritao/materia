@@ -3,31 +3,31 @@ package robotkit.world;
 /**
  * Owns the logical robot composition for one Materia world.
  *
- * The world deliberately stores only the `RobotInstance` boundary. A remote
+ * The world deliberately stores only the `Robot` boundary. A remote
  * robot and a simulated robot therefore participate in the same snapshots,
  * command routing, lifecycle, and change notifications without the world
  * knowing which transport or physics backend supplies them.
  */
 class RobotWorld {
-  public final robots:Map<RobotId, RobotInstance>;
+  final robotMap:Map<RobotId, Robot>;
 
   var sequence:Int = 0;
   var topologyRevision:Int = 0;
   var closed:Bool = false;
 
   public function new() {
-    robots = new Map<RobotId, RobotInstance>();
+    robotMap = new Map<RobotId, Robot>();
   }
 
-  /** Takes ownership of the instance until detach() or close(). */
-  public function attach(robot:RobotInstance):Void {
+  /** Takes ownership of the robot until detach() or close(). */
+  public function attach(robot:Robot):Void {
     ensureOpen();
     if (robot == null) throw "RobotWorld cannot attach a null robot";
     robot.setChangeListener(onRobotChanged);
     try {
-      if (robots.exists(robot.id()))
+      if (robotMap.exists(robot.id()))
         throw 'RobotWorld already contains "${robot.id()}"';
-      robots.set(robot.id(), robot);
+      robotMap.set(robot.id(), robot);
     } catch (error:Dynamic) {
       robot.setChangeListener(null);
       throw error;
@@ -36,11 +36,26 @@ class RobotWorld {
     sequence++;
   }
 
-  public function detach(id:RobotId):Null < RobotInstance > {
+  /** Returns the robot currently attached under an ID, without transferring ownership. */
+  public function robot(id:RobotId):Null<Robot> return robotMap.get(id);
+
+  /** Returns attached IDs in deterministic lexical order. */
+  public function robotIds():Array<RobotId> {
+    var result:Array<RobotId> = [];
+    for (id in robotMap.keys()) result.push(id);
+    result.sort(function(left, right) return Reflect.compare(left, right));
+    return result;
+  }
+
+  /** Returns a copy of the attached robot collection. */
+  public function robots():Array<Robot> return allRobots();
+
+  /** Detaches and returns a robot without closing it. */
+  public function detach(id:RobotId):Null<Robot> {
     ensureOpen();
-    var robot = robots.get(id);
+    var robot = robotMap.get(id);
     if (robot == null) return null;
-    robots.remove(id);
+    robotMap.remove(id);
     robot.setChangeListener(null);
     topologyRevision++;
     sequence++;
@@ -73,7 +88,7 @@ class RobotWorld {
   }
 
   public function status():RobotStatus {
-    if (robots.keys().hasNext() == false) return Disconnected;
+    if (robotMap.keys().hasNext() == false) return Disconnected;
     var hasConnecting = false;
     for (robot in allRobots()) {
       var robotStatus = robot.status();
@@ -98,7 +113,7 @@ class RobotWorld {
       robot.setChangeListener(null);
       robot.close();
     }
-    for (id in robotIds()) robots.remove(id);
+    for (id in robotIds()) robotMap.remove(id);
   }
 
   function onRobotChanged():Void {
@@ -109,22 +124,15 @@ class RobotWorld {
     if (closed) throw "RobotWorld has been closed";
   }
 
-  function requireRobot(id:RobotId):RobotInstance {
-    var robot = robots.get(id);
+  function requireRobot(id:RobotId):Robot {
+    var robot = robotMap.get(id);
     if (robot == null) throw 'RobotWorld does not contain "$id"';
     return robot;
   }
 
-  function robotIds():Array<RobotId> {
-    var result:Array<RobotId> = [];
-    for (id in robots.keys()) result.push(id);
-    result.sort(function(left, right) return Reflect.compare(left, right));
-    return result;
-  }
-
-  function allRobots():Array<RobotInstance> {
-    var result:Array<RobotInstance> = [];
-    for (id in robotIds()) result.push(robots.get(id));
+  function allRobots():Array<Robot> {
+    var result:Array<Robot> = [];
+    for (id in robotIds()) result.push(robotMap.get(id));
     return result;
   }
 }

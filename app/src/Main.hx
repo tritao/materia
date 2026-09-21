@@ -641,7 +641,7 @@ class ReferenceEditorApp {
     var snapshot = currentWorld.snapshot();
     var robots:Array<Dynamic> = [];
     for (id in snapshot.robotIds()) {
-      var instance = currentWorld.robots.get(id);
+      var instance = currentWorld.robot(id);
       var state = snapshot.robot(id);
       var fault = instance == null ? null : instance.fault();
       robots.push({

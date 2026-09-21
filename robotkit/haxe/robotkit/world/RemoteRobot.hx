@@ -5,8 +5,8 @@ import haxe.Int64;
 import robotkit.client.RobotClient;
 import robotkit.protocol.RobotStateMsg;
 
-/** RobotInstance adapter for a robot reached through RobotClient/RobotProtocol. */
-class RemoteRobot implements RobotInstance {
+/** Live robot adapter reached through RobotClient/RobotProtocol. */
+class RemoteRobot implements Robot {
   public final logicalId:RobotId;
 
   final client:RobotClient;

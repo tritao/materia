@@ -1,5 +1,6 @@
 package robotkit.runtime;
 
+import RobotKitRuntime;
 import haxe.Int64;
 
 /**
@@ -36,8 +37,25 @@ class RobotSnapshot {
     this.effort = effort == null ? [] : effort.copy();
   }
 
-  public static function fromRuntime(robotId:Int64, value:RobotRuntimeSnapshot):RobotSnapshot
-    return new RobotSnapshot(robotId, Int64.ofInt(value.sequence), value.timestampNs,
-      value.mode, value.safety, value.endpoint, value.faultCode,
-      value.positions, value.velocities, value.efforts);
+  /** Converts the native ABI value while leaving the semantic robot ID unset. */
+  @:allow(RobotRuntime)
+  static function fromNative(value:rk_robot_snapshot):RobotSnapshot {
+    var positions:Array<Float> = [];
+    var velocities:Array<Float> = [];
+    var efforts:Array<Float> = [];
+    var count = value.get_joint_count();
+    for (index in 0...count) {
+      positions.push(value.get_position(index));
+      velocities.push(value.get_velocity(index));
+      efforts.push(value.get_effort(index));
+    }
+    return new RobotSnapshot(Int64.ofInt(0), value.get_sequence(), value.get_timestamp_ns(),
+      value.get_mode(), value.get_safety(), value.get_endpoint(), value.get_fault_code(),
+      positions, velocities, efforts);
+  }
+
+  /** Returns an immutable copy associated with a caller-provided robot ID. */
+  public function withRobotId(value:Int64):RobotSnapshot
+    return new RobotSnapshot(value, sequence, timestampNs, mode, safety, endpoint, faultCode,
+      q, dq, effort);
 }

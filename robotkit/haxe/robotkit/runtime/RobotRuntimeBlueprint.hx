@@ -5,7 +5,7 @@ import RobotKitRuntime;
 /**
  * Immutable-at-execution compiled robot description consumed by RobotRuntime.
  *
- * Keeping this boundary separate from the editable `robotkit.model.Robot`
+ * Keeping this boundary separate from the editable `robotkit.model.RobotModel`
  * model makes validation and native handle creation deterministic.
  */
 class RobotRuntimeBlueprint {
@@ -44,6 +44,18 @@ class RobotRuntimeBlueprint {
     value.set_frame_count(frameCount);
     for (index in 0...joints.length)
       value.set_joints(index, joints[index].nativeValue());
+    return value;
+  }
+
+  /** Builds the low-level layout needed only by standalone native creation. */
+  @:allow(RobotRuntime)
+  function nativeLayout():rk_robot_runtime_layout {
+    var value = new rk_robot_runtime_layout();
+    value.set_struct_size(rk_robot_runtime_layout.size());
+    value.set_revision(haxe.Int64.ofInt(revision));
+    value.set_joint_count(jointCount);
+    value.set_link_count(linkCount);
+    value.set_frame_count(frameCount);
     return value;
   }
 }

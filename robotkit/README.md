@@ -50,7 +50,7 @@ Participating runtimes cannot be stepped individually; applications must call
 `Simulation.step()` so the shared-world boundary remains explicit.
 
 `robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
-`RobotInstance` interface used by `RemoteRobot`. It does not own or dispose the
+`Robot` interface used by `RemoteRobot`. It does not own or dispose the
 shared simulation, allowing one `RobotWorld` to contain local simulated robots
 and remote physical robots without backend-specific orchestration.
 
