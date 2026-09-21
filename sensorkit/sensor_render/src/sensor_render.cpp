@@ -106,6 +106,11 @@ Matrix4 depth_projection(const DepthConfig &depth) noexcept {
                              depth.far_plane);
 }
 
+Matrix4 segmentation_projection(const SegmentationConfig &segmentation) noexcept {
+    return camera_projection(segmentation.width, segmentation.height, segmentation.fov_y,
+                             segmentation.near_plane, segmentation.far_plane);
+}
+
 float metric_depth(float normalized_depth, const DepthConfig &depth) noexcept {
     if (!std::isfinite(normalized_depth))
         return depth.far_plane;
@@ -170,6 +175,44 @@ nkgpu_result SceneCameraAdapter::capture_depth(
     for (const auto value : normalized_depth)
         meters.push_back(metric_depth(value, depth));
     out_frame = sensor.sample(tick, meters);
+    return out_frame.has_value() ? NKGPU_OK : NKGPU_ERROR_INVALID_ARGUMENT;
+}
+
+nkgpu_result SceneCameraAdapter::capture_segmentation(
+    SegmentationSensor &sensor, const SensorTick &tick,
+    const nkscene::SceneSnapshot &snapshot, const Pose &camera_pose,
+    std::optional<SegmentationFrame> &out_frame) {
+    out_frame.reset();
+    if (tick.dropped)
+        return NKGPU_OK;
+
+    nkscene::SceneView view;
+    view.camera.enabled = true;
+    view.camera.view_projection =
+        multiply(segmentation_projection(sensor.segmentation_config()), camera_view(camera_pose));
+    const auto plan = nkscene::compile(snapshot, view);
+
+    std::vector<std::uint32_t> pick_ids;
+    const auto &segmentation = sensor.segmentation_config();
+    const auto result = executor_.capture_pick_ids(plan, snapshot, segmentation.width,
+                                                   segmentation.height, pick_ids);
+    if (result != NKGPU_OK)
+        return result;
+
+    std::vector<std::uint64_t> labels(pick_ids.size(), segmentation.background_label);
+    for (std::size_t index = 0; index < pick_ids.size(); ++index) {
+        const auto pick_id = pick_ids[index];
+        if (pick_id == 0 || pick_id > plan.items().size())
+            continue;
+        const auto &item = plan.items()[pick_id - 1];
+        const auto *occurrence = snapshot.find(item.occurrence);
+        if (!occurrence)
+            continue;
+        labels[index] = occurrence->source.valid() ? occurrence->source.value
+                                                   : occurrence->occurrence.value;
+    }
+
+    out_frame = sensor.sample(tick, labels);
     return out_frame.has_value() ? NKGPU_OK : NKGPU_ERROR_INVALID_ARGUMENT;
 }
 

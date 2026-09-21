@@ -436,4 +436,42 @@ private:
     DepthConfig depth_;
 };
 
+struct SegmentationConfig {
+    std::uint32_t width = 640;
+    std::uint32_t height = 480;
+    float fov_y = 1.04719755f;
+    float near_plane = 0.01f;
+    float far_plane = 1000.0f;
+    std::uint64_t background_label = 0;
+};
+
+struct SegmentationFrame {
+    SensorSampleHeader header;
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    /** Tightly packed top-to-bottom semantic labels; zero is the default background. */
+    std::vector<std::uint64_t> labels;
+
+    const std::uint64_t *pixel(std::uint32_t x, std::uint32_t y) const noexcept {
+        if (x >= width || y >= height)
+            return nullptr;
+        return labels.data() + static_cast<std::size_t>(y) * width + x;
+    }
+};
+
+/** Semantic segmentation measurement model independent of any render backend. */
+class NKSENSOR_API SegmentationSensor final : public Sensor {
+public:
+    explicit SegmentationSensor(SensorConfig config, SegmentationConfig segmentation = {});
+
+    const SegmentationConfig &segmentation_config() const noexcept { return segmentation_; }
+
+    /** Package backend-produced semantic labels as a segmentation sample. */
+    std::optional<SegmentationFrame> sample(const SensorTick &tick,
+                                             std::span<const std::uint64_t> labels);
+
+private:
+    SegmentationConfig segmentation_;
+};
+
 } // namespace nksensor

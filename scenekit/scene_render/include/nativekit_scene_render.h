@@ -742,6 +742,9 @@ class NKSRENDER_API NativeKitGpuExecutor {
     /** Renders a depth-tested plan and reads normalized device depth values back. */
     nkgpu_result capture_depth(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
                                std::uint32_t height, std::vector<float> &out_depth);
+    /** Renders a depth-tested plan and reads encoded occurrence IDs back. */
+    nkgpu_result capture_pick_ids(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
+                                  std::uint32_t height, std::vector<std::uint32_t> &out_ids);
     /** Renders an ID-only pass and resolves one pixel to scene ownership. */
     nkgpu_result pick_pixel(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
                             std::uint32_t height, std::uint32_t x, std::uint32_t y,

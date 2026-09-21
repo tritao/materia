@@ -60,6 +60,7 @@ std::shared_ptr<Scene> make_colored_scene() {
     Transaction configure(scene);
     configure.add_geometry(occurrence, geometry);
     configure.add_material(occurrence, material);
+    configure.add_source_entity(occurrence, EntityId{101});
     assert(scene->commit(configure, changes) == NKS_OK);
     configure.close();
     return scene;
@@ -124,6 +125,27 @@ void captures_emissive_triangle() {
     assert(depth_frame->header.capture_time == 1.25);
     assert(std::abs(*depth_frame->pixel(8, 8) - 2.0f) < 0.05f);
     assert(std::abs(*depth_frame->pixel(0, 0) - 10.0f) < 0.01f);
+
+    SensorConfig segmentation_sensor_config;
+    segmentation_sensor_config.id = 52;
+    segmentation_sensor_config.frame = 13;
+    SegmentationConfig segmentation_config;
+    segmentation_config.width = 16;
+    segmentation_config.height = 16;
+    segmentation_config.fov_y = 1.5707963267948966f;
+    segmentation_config.near_plane = 0.1f;
+    segmentation_config.far_plane = 10.0f;
+    segmentation_config.background_label = 999;
+    SegmentationSensor segmentation(segmentation_sensor_config, segmentation_config);
+    const auto segmentation_tick = segmentation.trigger(1.25);
+    assert(segmentation_tick.has_value());
+    std::optional<SegmentationFrame> segmentation_frame;
+    assert(adapter.capture_segmentation(segmentation, *segmentation_tick, scene->snapshot(), {},
+                                        segmentation_frame) == NKGPU_OK);
+    assert(segmentation_frame.has_value());
+    assert(segmentation_frame->header.capture_time == 1.25);
+    assert(*segmentation_frame->pixel(8, 8) == 101);
+    assert(*segmentation_frame->pixel(0, 0) == 999);
 
     assert(nkgpu_renderer_destroy(renderer) == NKGPU_OK);
     assert(nkgpu_surface_destroy(surface) == NKGPU_OK);

@@ -2014,6 +2014,174 @@ nkgpu_result NativeKitGpuExecutor::capture_depth(const RenderPlan &plan,
     return result;
 }
 
+nkgpu_result NativeKitGpuExecutor::capture_pick_ids(const RenderPlan &plan,
+                                                    const SceneSnapshot &snapshot,
+                                                    std::uint32_t width, std::uint32_t height,
+                                                    std::vector<std::uint32_t> &out_ids) {
+    out_ids.clear();
+    if (!width || !height) {
+        state_->last_result = NKGPU_ERROR_INVALID_ARGUMENT;
+        return state_->last_result;
+    }
+    if (!state_->renderer.id) {
+        state_->last_result = NKGPU_ERROR_INVALID_HANDLE;
+        return state_->last_result;
+    }
+
+    GpuExecutionStats stats;
+    if (!synchronize(plan, snapshot, stats))
+        return state_->last_result;
+    if (!ensure_pick_targets(*state_, width, height, stats))
+        return state_->last_result;
+    for (const auto &batch : state_->batches) {
+        const auto geometry = state_->geometry_resources.find(batch.key.geometry);
+        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+            continue;
+        const auto element_count =
+            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
+        if (element_count && !ensure_pick_pipeline(*state_, stats, geometry->second.indexed))
+            return state_->last_result;
+    }
+
+    auto result = nkgpu_frame_begin(state_->renderer);
+    if (result != NKGPU_OK) {
+        state_->last_result = result;
+        return result;
+    }
+    bool pass_active = false;
+    auto fail_frame = [&](nkgpu_result failure) {
+        if (pass_active)
+            (void)nkgpu_end_pass(state_->renderer);
+        (void)nkgpu_end_frame(state_->renderer);
+        state_->last_result = failure;
+        return failure;
+    };
+
+    nkgpu_render_pass_desc pass{};
+    pass.struct_size = sizeof(pass);
+    pass.color_count = 3;
+    pass.colors[0].image = state_->pick_color;
+    pass.colors[0].action.load_action = NKGPU_LOADACTION_CLEAR;
+    pass.colors[0].action.store_action = NKGPU_STOREACTION_STORE;
+    pass.colors[0].action.clear_color = {0.0f, 0.0f, 0.0f, 0.0f};
+    pass.colors[1].image = state_->pick_subelement;
+    pass.colors[1].action.load_action = NKGPU_LOADACTION_CLEAR;
+    pass.colors[1].action.store_action = NKGPU_STOREACTION_STORE;
+    pass.colors[1].action.clear_color = {0.0f, 0.0f, 0.0f, 0.0f};
+    pass.colors[2].image = state_->pick_depth_value;
+    pass.colors[2].action.load_action = NKGPU_LOADACTION_CLEAR;
+    pass.colors[2].action.store_action = NKGPU_STOREACTION_STORE;
+    pass.colors[2].action.clear_color = {1.0f, 0.0f, 0.0f, 0.0f};
+    pass.depth_stencil = state_->pick_depth;
+    pass.depth_stencil_action.load_action = NKGPU_LOADACTION_CLEAR;
+    pass.depth_stencil_action.store_action = NKGPU_STOREACTION_STORE;
+    pass.depth_stencil_action.clear_depth = 1.0f;
+    result = nkgpu_begin_render_pass(state_->renderer, &pass);
+    if (result != NKGPU_OK)
+        return fail_frame(result);
+    pass_active = true;
+
+    if ((result = nkgpu_apply_viewport(state_->renderer, 0, 0, static_cast<std::int32_t>(width),
+                                       static_cast<std::int32_t>(height))) != NKGPU_OK)
+        return fail_frame(result);
+
+    const auto clip_data = clip_uniform_data(plan);
+    for (const auto &batch : state_->batches) {
+        const auto geometry = state_->geometry_resources.find(batch.key.geometry);
+        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+            continue;
+        const auto element_count =
+            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
+        if (!element_count)
+            continue;
+        const auto &pipeline =
+            geometry->second.indexed ? state_->pick_indexed_pipeline : state_->pick_pipeline;
+        if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(
+                 state_->renderer, 1,
+                 reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
+                 sizeof(float) * 16)) != NKGPU_OK ||
+            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, geometry->second.buffer, 0)) !=
+                NKGPU_OK ||
+            (geometry->second.indexed &&
+             (result = nkgpu_apply_index_buffer(state_->renderer, geometry->second.index_buffer,
+                                                0)) != NKGPU_OK) ||
+            (result = nkgpu_apply_vertex_buffer(state_->renderer, 1, batch.buffer, 0)) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(state_->renderer, 2,
+                                               reinterpret_cast<const std::uint8_t *>(&clip_data),
+                                               sizeof(clip_data))) != NKGPU_OK ||
+            (result = nkgpu_draw(state_->renderer, 0, element_count,
+                                 static_cast<std::uint32_t>(batch.instances.size()))) != NKGPU_OK)
+            return fail_frame(result);
+    }
+    if ((result = nkgpu_end_pass(state_->renderer)) != NKGPU_OK) {
+        pass_active = false;
+        (void)nkgpu_end_frame(state_->renderer);
+        state_->last_result = result;
+        return result;
+    }
+    pass_active = false;
+    if ((result = nkgpu_end_frame(state_->renderer)) != NKGPU_OK) {
+        state_->last_result = result;
+        return result;
+    }
+
+    const auto pixel_count = static_cast<std::size_t>(width) * height;
+    if (pixel_count > std::numeric_limits<std::uint32_t>::max() / 4u) {
+        state_->last_result = NKGPU_ERROR_INVALID_ARGUMENT;
+        return state_->last_result;
+    }
+    nkgpu_image_readback_desc readback_desc{};
+    readback_desc.struct_size = sizeof(readback_desc);
+    readback_desc.image = state_->pick_color;
+    readback_desc.width = width;
+    readback_desc.height = height;
+    nkgpu_readback readback{};
+    result = nkgpu_readback_begin_image(state_->renderer, &readback_desc, &readback);
+    if (result != NKGPU_OK) {
+        state_->last_result = result;
+        return result;
+    }
+
+    nkgpu_readback_info info{};
+    info.struct_size = sizeof(info);
+    for (int attempt = 0; attempt < 100; ++attempt) {
+        result = nkgpu_readback_query(state_->renderer, readback, &info);
+        if (result != NKGPU_OK || info.state != NKGPU_READBACK_PENDING)
+            break;
+        std::this_thread::yield();
+    }
+    const auto expected_size = pixel_count * 4u;
+    std::vector<std::uint8_t> pixels;
+    if (result == NKGPU_OK && info.state == NKGPU_READBACK_READY &&
+        info.size == expected_size) {
+        pixels.resize(expected_size);
+        std::uint32_t read_size = 0;
+        result = nkgpu_readback_read(state_->renderer, readback, pixels.data(), info.size,
+                                     &read_size);
+        if (result == NKGPU_OK && read_size != info.size)
+            result = NKGPU_ERROR_UNKNOWN;
+    } else if (result == NKGPU_OK) {
+        result = info.state == NKGPU_READBACK_PENDING ? NKGPU_ERROR_WRONG_STATE
+                                                       : NKGPU_ERROR_UNKNOWN;
+    }
+    (void)nkgpu_readback_destroy(state_->renderer, readback);
+    if (result == NKGPU_OK) {
+        out_ids.resize(pixel_count);
+        for (std::size_t index = 0; index < pixel_count; ++index) {
+            const std::array<std::uint8_t, 4> pixel{
+                pixels[index * 4], pixels[index * 4 + 1], pixels[index * 4 + 2],
+                pixels[index * 4 + 3]};
+            out_ids[index] = decode_pick_id(pixel);
+        }
+    } else {
+        out_ids.clear();
+    }
+    state_->last_result = result;
+    return result;
+}
+
 std::uint32_t NativeKitGpuExecutor::poll_pick_pixel(GpuPickRequest &request,
                                                     const RenderPlan &current_plan,
                                                     const SceneSnapshot &current_snapshot,

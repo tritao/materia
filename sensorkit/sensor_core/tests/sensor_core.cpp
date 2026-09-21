@@ -201,6 +201,26 @@ void depth_packages_metric_pixels() {
     assert(frame->pixel(2, 0) == nullptr);
 }
 
+void segmentation_packages_labels() {
+    SensorConfig sensor_config;
+    sensor_config.id = 42;
+    SegmentationConfig segmentation_config;
+    segmentation_config.width = 2;
+    segmentation_config.height = 1;
+    segmentation_config.background_label = 99;
+    SegmentationSensor segmentation(sensor_config, segmentation_config);
+    const auto tick = segmentation.trigger(5.0);
+    assert(tick.has_value());
+
+    const std::uint64_t labels[] = {99, 1234};
+    const auto frame = segmentation.sample(*tick, labels);
+    assert(frame.has_value());
+    assert(frame->header.capture_time == 5.0);
+    assert(*frame->pixel(0, 0) == 99);
+    assert(*frame->pixel(1, 0) == 1234);
+    assert(frame->pixel(2, 0) == nullptr);
+}
+
 } // namespace
 
 int main() {
@@ -212,5 +232,6 @@ int main() {
     lidar_generates_rays_and_models_returns();
     camera_packages_backend_pixels();
     depth_packages_metric_pixels();
+    segmentation_packages_labels();
     return 0;
 }

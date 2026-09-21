@@ -386,4 +386,38 @@ std::optional<DepthFrame> DepthSensor::sample(const SensorTick &tick,
     return frame;
 }
 
+SegmentationSensor::SegmentationSensor(SensorConfig config, SegmentationConfig segmentation)
+    : Sensor(std::move(config)), segmentation_(segmentation) {
+    segmentation_.width = std::max<std::uint32_t>(1, segmentation_.width);
+    segmentation_.height = std::max<std::uint32_t>(1, segmentation_.height);
+    if (!std::isfinite(segmentation_.fov_y))
+        segmentation_.fov_y = 1.04719755f;
+    segmentation_.fov_y =
+        std::clamp(segmentation_.fov_y, 1.0e-4f, 3.1415925f - 1.0e-4f);
+    if (!std::isfinite(segmentation_.near_plane))
+        segmentation_.near_plane = 0.01f;
+    segmentation_.near_plane = std::max(1.0e-5f, segmentation_.near_plane);
+    if (!std::isfinite(segmentation_.far_plane))
+        segmentation_.far_plane = 1000.0f;
+    segmentation_.far_plane =
+        std::max(segmentation_.near_plane + 1.0e-5f, segmentation_.far_plane);
+}
+
+std::optional<SegmentationFrame> SegmentationSensor::sample(
+    const SensorTick &tick, std::span<const std::uint64_t> labels) {
+    if (tick.dropped)
+        return std::nullopt;
+
+    const auto pixel_count =
+        static_cast<std::size_t>(segmentation_.width) * segmentation_.height;
+    if (labels.size() != pixel_count)
+        return std::nullopt;
+    SegmentationFrame frame;
+    frame.header = tick.header;
+    frame.width = segmentation_.width;
+    frame.height = segmentation_.height;
+    frame.labels.assign(labels.begin(), labels.end());
+    return frame;
+}
+
 } // namespace nksensor

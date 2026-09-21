@@ -48,6 +48,12 @@ public:
                                const nkscene::SceneSnapshot &snapshot, const Pose &camera_pose,
                                std::optional<DepthFrame> &out_frame);
 
+    /** Render semantic labels in the supplied world pose. */
+    nkgpu_result capture_segmentation(
+        SegmentationSensor &sensor, const SensorTick &tick,
+        const nkscene::SceneSnapshot &snapshot, const Pose &camera_pose,
+        std::optional<SegmentationFrame> &out_frame);
+
 private:
     nkscene::NativeKitGpuExecutor executor_;
 };
