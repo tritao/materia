@@ -30,11 +30,14 @@ namespace nksensor::wire {
 constexpr std::uint8_t current_frame_version = 1;
 constexpr std::size_t frame_header_size = 10;
 constexpr std::size_t default_max_messagepack_bytes = 16 * 1024 * 1024;
+constexpr std::size_t imu_packed_value_count = 24;
+constexpr std::size_t imu_packed_data_size = imu_packed_value_count * sizeof(double);
 
 enum class MessageType : std::uint8_t {
     camera_frame = 1,
     depth_frame = 2,
     segmentation_frame = 3,
+    imu_sample = 4,
 };
 
 enum class PixelFormat : std::uint8_t {
@@ -64,6 +67,13 @@ struct PackedFrame {
     std::uint32_t stride = 0;
     PixelFormat format = PixelFormat::rgba8;
     std::vector<std::uint8_t> data;
+};
+
+/** A non-owning packed IMU payload view into an encoded HMPK message. */
+struct ImuSampleView {
+    SensorSampleHeader header;
+    /** 24 little-endian IEEE-754 binary64 values; see encode_imu_sample. */
+    std::span<const std::uint8_t> data;
 };
 
 /**
@@ -127,6 +137,30 @@ NKSENSOR_WIRE_API std::optional<std::vector<std::uint8_t>> encode_segmentation_f
 /** Decode a packed little-endian U64 segmentation frame into owned labels. */
 NKSENSOR_WIRE_API std::optional<SegmentationFrame> decode_segmentation_frame(
     std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/**
+ * Encode an IMU sample as 24 little-endian IEEE-754 binary64 values:
+ * angular velocity xyz, linear acceleration xyz, angular-velocity covariance
+ * row-major, and linear-acceleration covariance row-major.
+ */
+NKSENSOR_WIRE_API std::optional<std::vector<std::uint8_t>> encode_imu_sample(
+    const ImuSample &sample, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Validate and inspect an IMU packet without copying its packed payload. */
+NKSENSOR_WIRE_API std::optional<ImuSampleView> view_imu_sample(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Decode an IMU packet into the core fixed-size measurement type. */
+NKSENSOR_WIRE_API std::optional<ImuSample> decode_imu_sample(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Encode any currently supported runtime measurement for external transport. */
+NKSENSOR_WIRE_API std::optional<std::vector<std::uint8_t>> encode_sensor_measurement(
+    const SensorMeasurement &measurement, std::string *error = nullptr,
     std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
 
 } // namespace nksensor::wire

@@ -42,6 +42,13 @@ little-endian R32U or U64 segmentation labels. Payloads are tightly packed
 with no row padding; the stride is still carried explicitly so a future
 version can add padded or tiled representations without changing the framing.
 
+IMU samples use the same HMPK envelope and shared header field IDs. Their
+binary field contains 24 little-endian binary64 values: angular velocity,
+linear acceleration, and both row-major 3x3 covariance matrices. The C++ API
+provides a zero-copy `ImuSampleView`, an owning `ImuSample` decoder, and a
+variant adapter for measurements returned by `SensorRuntime`. The matching
+Haxeon record is `sensor_wire/haxe/materia/sensor/wire/ImuSampleMessage.hx`.
+
 `sensor_sim::ImuTruthAdapter` consumes an immutable `nksim_snapshot` and
 derives linear acceleration from consecutive body velocities. It never reads
 the mutable simulation world. The first sample after construction or reset has

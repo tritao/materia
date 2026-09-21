@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,26 @@ CameraFrame make_frame() {
     frame.height = 1;
     frame.rgba8 = {255, 0, 0, 255, 0, 255, 0, 255};
     return frame;
+}
+
+ImuSample make_imu_sample() {
+    ImuSample sample;
+    sample.header.sensor = 61;
+    sample.header.sequence = 14;
+    sample.header.capture_time = 8.0;
+    sample.header.delivery_time = 8.04;
+    sample.header.frame = 17;
+    sample.angular_velocity = {1.0, -2.5, 3.25};
+    sample.linear_acceleration = {-4.0, 5.5, -6.75};
+    sample.angular_velocity_covariance.values = {
+        0.1, 0.2, 0.3,
+        0.4, 0.5, 0.6,
+        0.7, 0.8, 0.9};
+    sample.linear_acceleration_covariance.values = {
+        1.1, 1.2, 1.3,
+        1.4, 1.5, 1.6,
+        1.7, 1.8, 1.9};
+    return sample;
 }
 
 void encodes_haxeon_hmpk_and_messagepack_binary() {
@@ -196,6 +217,83 @@ void typed_segmentation_codec_preserves_little_endian_u64_labels() {
     assert(decoded->labels == source.labels);
 }
 
+void imu_codec_is_packed_zero_copy_and_lossless() {
+    const auto source = make_imu_sample();
+    std::string error;
+    const auto encoded = encode_imu_sample(source, &error);
+    assert(encoded.has_value());
+    assert(error.empty());
+    assert((*encoded)[frame_header_size] == 0x88); // fixmap(8)
+
+    const auto view = view_imu_sample(*encoded, &error);
+    assert(view.has_value());
+    assert(error.empty());
+    assert(view->header.sensor == source.header.sensor);
+    assert(view->header.sequence == source.header.sequence);
+    assert(view->header.capture_time == source.header.capture_time);
+    assert(view->header.delivery_time == source.header.delivery_time);
+    assert(view->header.frame == source.header.frame);
+    assert(view->data.size() == imu_packed_data_size);
+    assert(view->data.data() >= encoded->data());
+    assert(view->data.data() < encoded->data() + encoded->size());
+
+    /* 1.0 and -2.5 prove the payload is little-endian binary64, not a
+     * platform-native struct dump or a sequence of MessagePack scalars. */
+    const std::vector<std::uint8_t> expected_prefix{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0xc0};
+    assert(std::equal(expected_prefix.begin(), expected_prefix.end(), view->data.begin()));
+
+    const auto decoded = decode_imu_sample(*encoded, &error);
+    assert(decoded.has_value());
+    assert(decoded->header.sensor == source.header.sensor);
+    assert(decoded->angular_velocity == source.angular_velocity);
+    assert(decoded->linear_acceleration == source.linear_acceleration);
+    assert(decoded->angular_velocity_covariance.values ==
+           source.angular_velocity_covariance.values);
+    assert(decoded->linear_acceleration_covariance.values ==
+           source.linear_acceleration_covariance.values);
+
+    auto non_finite = source;
+    non_finite.linear_acceleration.z = std::numeric_limits<double>::quiet_NaN();
+    assert(!encode_imu_sample(non_finite, &error).has_value());
+    assert(error.find("finite") != std::string::npos);
+}
+
+void runtime_measurements_have_wire_adapter() {
+    SensorConfig config;
+    config.id = 62;
+    config.frame = 18;
+    config.timing.update_rate_hz = 100.0;
+    auto sensor = std::make_shared<ImuSensor>(config);
+
+    ImuTruth truth;
+    truth.linear_acceleration = {0.0, 0.0, 9.81};
+    truth.gravity = {0.0, 0.0, -9.81};
+
+    SensorRuntime runtime;
+    assert(runtime.add(sensor, [sensor, truth](const SensorTick &tick)
+                       -> std::optional<SensorMeasurement> {
+        const auto sample = sensor->sample(truth, tick);
+        if (!sample.has_value())
+            return std::nullopt;
+        return SensorMeasurement{*sample};
+    }));
+
+    const auto measurements = runtime.poll(0.0);
+    assert(measurements.size() == 1);
+    std::string error;
+    const auto encoded = encode_sensor_measurement(measurements.front(), &error);
+    assert(encoded.has_value());
+    assert(error.empty());
+    assert(decode_imu_sample(*encoded, &error).has_value());
+
+    LidarScan unsupported;
+    const SensorMeasurement lidar_measurement{unsupported};
+    assert(!encode_sensor_measurement(lidar_measurement, &error).has_value());
+    assert(error.find("LiDAR") != std::string::npos);
+}
+
 void rejects_bad_framing_and_invalid_camera_payloads() {
     const auto encoded = encode_camera_frame(make_frame());
     assert(encoded.has_value());
@@ -234,6 +332,8 @@ int main() {
     generic_packed_codec_supports_depth_and_segmentation_formats();
     typed_depth_codec_preserves_little_endian_r32f_values();
     typed_segmentation_codec_preserves_little_endian_u64_labels();
+    imu_codec_is_packed_zero_copy_and_lossless();
+    runtime_measurements_have_wire_adapter();
     rejects_bad_framing_and_invalid_camera_payloads();
     enforces_messagepack_size_limit();
     return 0;

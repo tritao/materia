@@ -2,10 +2,12 @@
 #include "msgpack.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <limits>
 #include <string_view>
+#include <type_traits>
 
 namespace nksensor::wire {
 namespace {
@@ -15,6 +17,7 @@ using detail::MessagePackWriter;
 
 constexpr std::uint8_t hmpk_magic[] = {'H', 'M', 'P', 'K'};
 constexpr std::size_t packed_frame_field_count = 12;
+constexpr std::size_t imu_sample_field_count = 8;
 constexpr std::uint64_t signed_int64_max =
     static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
 
@@ -65,6 +68,56 @@ bool read_le64(std::span<const std::uint8_t> bytes, std::size_t offset,
     if (!read_le32(bytes, offset, low) || !read_le32(bytes, offset + 4, high))
         return false;
     value = (static_cast<std::uint64_t>(high) << 32) | low;
+    return true;
+}
+
+void append_le_double(std::vector<std::uint8_t> &bytes, double value) {
+    std::uint64_t bits = 0;
+    static_assert(sizeof(bits) == sizeof(value));
+    std::memcpy(&bits, &value, sizeof(bits));
+    append_le64(bytes, bits);
+}
+
+bool read_le_double(std::span<const std::uint8_t> bytes, std::size_t offset,
+                    double &value) {
+    std::uint64_t bits = 0;
+    if (!read_le64(bytes, offset, bits))
+        return false;
+    static_assert(sizeof(bits) == sizeof(value));
+    std::memcpy(&value, &bits, sizeof(value));
+    return true;
+}
+
+bool validate_sensor_header(const SensorSampleHeader &header, std::string *error,
+                           std::string_view name) {
+    if (header.sensor > signed_int64_max || header.sequence > signed_int64_max ||
+        header.frame > signed_int64_max) {
+        set_error(error, std::string(name) + " identifiers must fit Haxe Int64");
+        return false;
+    }
+    if (!std::isfinite(header.capture_time) || !std::isfinite(header.delivery_time)) {
+        set_error(error, std::string(name) + " timestamps must be finite");
+        return false;
+    }
+    return true;
+}
+
+bool validate_imu_data(std::span<const std::uint8_t> data, std::string *error) {
+    if (data.size() != imu_packed_data_size) {
+        set_error(error, "IMU packed payload must contain exactly 24 binary64 values");
+        return false;
+    }
+    for (std::size_t index = 0; index < imu_packed_value_count; ++index) {
+        double value = 0.0;
+        if (!read_le_double(data, index * sizeof(double), value)) {
+            set_error(error, "IMU packed payload is truncated");
+            return false;
+        }
+        if (!std::isfinite(value)) {
+            set_error(error, "IMU packed values must be finite");
+            return false;
+        }
+    }
     return true;
 }
 
@@ -201,17 +254,36 @@ std::optional<std::span<const std::uint8_t>> messagepack_payload(
     return encoded.subspan(frame_header_size, payload_size);
 }
 
+std::optional<std::vector<std::uint8_t>> encode_hmpk_payload(
+    const MessagePackWriter &payload, std::string *error, std::size_t max_messagepack_bytes) {
+    if (payload.bytes().size() > max_messagepack_bytes ||
+        payload.bytes().size() > std::numeric_limits<std::uint32_t>::max()) {
+        set_error(error, "MessagePack payload exceeds configured limit");
+        return std::nullopt;
+    }
+
+    std::vector<std::uint8_t> encoded(frame_header_size + payload.bytes().size());
+    std::copy(std::begin(hmpk_magic), std::end(hmpk_magic), encoded.begin());
+    encoded[4] = current_frame_version;
+    encoded[5] = 0;
+    const auto payload_size = static_cast<std::uint32_t>(payload.bytes().size());
+    encoded[6] = static_cast<std::uint8_t>(payload_size >> 24);
+    encoded[7] = static_cast<std::uint8_t>(payload_size >> 16);
+    encoded[8] = static_cast<std::uint8_t>(payload_size >> 8);
+    encoded[9] = static_cast<std::uint8_t>(payload_size);
+    std::copy(payload.bytes().begin(), payload.bytes().end(),
+              encoded.begin() + frame_header_size);
+    return encoded;
+}
+
 } // namespace
 
 std::optional<std::vector<std::uint8_t>> encode_packed_frame(
     const PackedFrameView &frame, std::string *error, std::size_t max_messagepack_bytes) {
     if (!validate_packed_frame(frame, max_messagepack_bytes, error))
         return std::nullopt;
-    if (frame.header.sensor > signed_int64_max || frame.header.sequence > signed_int64_max ||
-        frame.header.frame > signed_int64_max) {
-        set_error(error, "sensor identifiers must fit Haxe Int64");
+    if (!validate_sensor_header(frame.header, error, "packed frame"))
         return std::nullopt;
-    }
     if (frame.data.size() > std::numeric_limits<std::uint32_t>::max()) {
         set_error(error, "packed frame payload is too large for MessagePack binary");
         return std::nullopt;
@@ -246,24 +318,7 @@ std::optional<std::vector<std::uint8_t>> encode_packed_frame(
     payload.write_integer(12);
     payload.write_binary(frame.data);
 
-    if (payload.bytes().size() > max_messagepack_bytes ||
-        payload.bytes().size() > std::numeric_limits<std::uint32_t>::max()) {
-        set_error(error, "MessagePack payload exceeds configured limit");
-        return std::nullopt;
-    }
-
-    std::vector<std::uint8_t> encoded(frame_header_size + payload.bytes().size());
-    std::copy(std::begin(hmpk_magic), std::end(hmpk_magic), encoded.begin());
-    encoded[4] = current_frame_version;
-    encoded[5] = 0;
-    const auto payload_size = static_cast<std::uint32_t>(payload.bytes().size());
-    encoded[6] = static_cast<std::uint8_t>(payload_size >> 24);
-    encoded[7] = static_cast<std::uint8_t>(payload_size >> 16);
-    encoded[8] = static_cast<std::uint8_t>(payload_size >> 8);
-    encoded[9] = static_cast<std::uint8_t>(payload_size);
-    std::copy(payload.bytes().begin(), payload.bytes().end(),
-              encoded.begin() + frame_header_size);
-    return encoded;
+    return encode_hmpk_payload(payload, error, max_messagepack_bytes);
 }
 
 std::optional<std::vector<std::uint8_t>> encode_camera_frame(
@@ -625,6 +680,233 @@ std::optional<SegmentationFrame> decode_segmentation_frame(
         }
     }
     return frame;
+}
+
+std::optional<std::vector<std::uint8_t>> encode_imu_sample(
+    const ImuSample &sample, std::string *error, std::size_t max_messagepack_bytes) {
+    if (!validate_sensor_header(sample.header, error, "IMU sample"))
+        return std::nullopt;
+
+    /* Keep this layout explicit: it is the stable binary contract shared by
+     * C++, Haxe, and any other transport consumer. Matrix3 is row-major. */
+    const std::array<double, imu_packed_value_count> values{
+        sample.angular_velocity.x,
+        sample.angular_velocity.y,
+        sample.angular_velocity.z,
+        sample.linear_acceleration.x,
+        sample.linear_acceleration.y,
+        sample.linear_acceleration.z,
+        sample.angular_velocity_covariance.values[0],
+        sample.angular_velocity_covariance.values[1],
+        sample.angular_velocity_covariance.values[2],
+        sample.angular_velocity_covariance.values[3],
+        sample.angular_velocity_covariance.values[4],
+        sample.angular_velocity_covariance.values[5],
+        sample.angular_velocity_covariance.values[6],
+        sample.angular_velocity_covariance.values[7],
+        sample.angular_velocity_covariance.values[8],
+        sample.linear_acceleration_covariance.values[0],
+        sample.linear_acceleration_covariance.values[1],
+        sample.linear_acceleration_covariance.values[2],
+        sample.linear_acceleration_covariance.values[3],
+        sample.linear_acceleration_covariance.values[4],
+        sample.linear_acceleration_covariance.values[5],
+        sample.linear_acceleration_covariance.values[6],
+        sample.linear_acceleration_covariance.values[7],
+        sample.linear_acceleration_covariance.values[8]};
+
+    std::vector<std::uint8_t> data;
+    data.reserve(imu_packed_data_size);
+    for (const auto value : values) {
+        if (!std::isfinite(value)) {
+            set_error(error, "IMU sample values must be finite");
+            return std::nullopt;
+        }
+        append_le_double(data, value);
+    }
+
+    MessagePackWriter payload;
+    payload.write_map_header(imu_sample_field_count);
+
+    /* Fields 1-7 deliberately match PackedFrame's shared sample header. */
+    payload.write_integer(1);
+    payload.write_integer(current_frame_version);
+    payload.write_integer(2);
+    payload.write_integer(static_cast<std::uint8_t>(MessageType::imu_sample));
+    payload.write_integer(3);
+    payload.write_integer(sample.header.sensor);
+    payload.write_integer(4);
+    payload.write_integer(sample.header.sequence);
+    payload.write_integer(5);
+    payload.write_float64(sample.header.capture_time);
+    payload.write_integer(6);
+    payload.write_float64(sample.header.delivery_time);
+    payload.write_integer(7);
+    payload.write_integer(sample.header.frame);
+    payload.write_integer(8);
+    payload.write_binary(data);
+
+    return encode_hmpk_payload(payload, error, max_messagepack_bytes);
+}
+
+std::optional<ImuSampleView> view_imu_sample(
+    std::span<const std::uint8_t> encoded, std::string *error,
+    std::size_t max_messagepack_bytes) {
+    const auto payload = messagepack_payload(encoded, max_messagepack_bytes, error);
+    if (!payload.has_value())
+        return std::nullopt;
+
+    MessagePackReader reader(*payload);
+    std::uint32_t field_count = 0;
+    if (!reader.read_map_size(field_count)) {
+        set_error(error, "IMU sample is not a MessagePack map");
+        return std::nullopt;
+    }
+
+    ImuSampleView sample;
+    bool has_version = false;
+    bool has_type = false;
+    bool has_sensor = false;
+    bool has_sequence = false;
+    bool has_capture = false;
+    bool has_delivery = false;
+    bool has_frame = false;
+    bool has_data = false;
+
+    for (std::uint32_t index = 0; index < field_count; ++index) {
+        std::uint64_t key = 0;
+        if (!reader.read_nonnegative(key)) {
+            set_error(error, "IMU sample field key is not a non-negative integer");
+            return std::nullopt;
+        }
+        switch (key) {
+        case 1: {
+            std::uint32_t version = 0;
+            if (!read_field_u32(reader, version, error, "schema version") || version != 1) {
+                if (version != 1)
+                    set_error(error, "unsupported IMU sample schema version");
+                return std::nullopt;
+            }
+            has_version = true;
+            break;
+        }
+        case 2: {
+            std::uint32_t type = 0;
+            if (!read_field_u32(reader, type, error, "message type"))
+                return std::nullopt;
+            if (type != static_cast<std::uint8_t>(MessageType::imu_sample)) {
+                set_error(error, "MessagePack value is not an IMU sample");
+                return std::nullopt;
+            }
+            has_type = true;
+            break;
+        }
+        case 3:
+            if (!read_field_i64(reader, sample.header.sensor, error, "sensor"))
+                return std::nullopt;
+            has_sensor = true;
+            break;
+        case 4:
+            if (!read_field_i64(reader, sample.header.sequence, error, "sequence"))
+                return std::nullopt;
+            has_sequence = true;
+            break;
+        case 5:
+            if (!reader.read_float(sample.header.capture_time)) {
+                set_error(error, "capture time is not a float");
+                return std::nullopt;
+            }
+            has_capture = true;
+            break;
+        case 6:
+            if (!reader.read_float(sample.header.delivery_time)) {
+                set_error(error, "delivery time is not a float");
+                return std::nullopt;
+            }
+            has_delivery = true;
+            break;
+        case 7:
+            if (!read_field_i64(reader, sample.header.frame, error, "frame"))
+                return std::nullopt;
+            has_frame = true;
+            break;
+        case 8:
+            if (!reader.read_binary_view(sample.data)) {
+                set_error(error, "IMU sample data is not MessagePack binary");
+                return std::nullopt;
+            }
+            has_data = true;
+            break;
+        default:
+            if (!reader.skip()) {
+                set_error(error, "IMU sample contains an invalid unknown field");
+                return std::nullopt;
+            }
+            break;
+        }
+    }
+
+    if (!reader.at_end()) {
+        set_error(error, "IMU sample MessagePack value has trailing bytes");
+        return std::nullopt;
+    }
+    if (!has_version || !has_type || !has_sensor || !has_sequence || !has_capture ||
+        !has_delivery || !has_frame || !has_data) {
+        set_error(error, "IMU sample is missing a required field");
+        return std::nullopt;
+    }
+    if (!validate_sensor_header(sample.header, error, "IMU sample") ||
+        !validate_imu_data(sample.data, error))
+        return std::nullopt;
+    return sample;
+}
+
+std::optional<ImuSample> decode_imu_sample(
+    std::span<const std::uint8_t> encoded, std::string *error,
+    std::size_t max_messagepack_bytes) {
+    const auto view = view_imu_sample(encoded, error, max_messagepack_bytes);
+    if (!view.has_value())
+        return std::nullopt;
+
+    std::array<double, imu_packed_value_count> values{};
+    for (std::size_t index = 0; index < values.size(); ++index) {
+        if (!read_le_double(view->data, index * sizeof(double), values[index])) {
+            set_error(error, "IMU packed payload is truncated");
+            return std::nullopt;
+        }
+    }
+
+    ImuSample sample;
+    sample.header = view->header;
+    sample.angular_velocity = {values[0], values[1], values[2]};
+    sample.linear_acceleration = {values[3], values[4], values[5]};
+    std::copy(values.begin() + 6, values.begin() + 15,
+              sample.angular_velocity_covariance.values.begin());
+    std::copy(values.begin() + 15, values.end(),
+              sample.linear_acceleration_covariance.values.begin());
+    return sample;
+}
+
+std::optional<std::vector<std::uint8_t>> encode_sensor_measurement(
+    const SensorMeasurement &measurement, std::string *error,
+    std::size_t max_messagepack_bytes) {
+    return std::visit(
+        [&](const auto &value) -> std::optional<std::vector<std::uint8_t>> {
+            using Value = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<Value, ImuSample>)
+                return encode_imu_sample(value, error, max_messagepack_bytes);
+            else if constexpr (std::is_same_v<Value, CameraFrame>)
+                return encode_camera_frame(value, error, max_messagepack_bytes);
+            else if constexpr (std::is_same_v<Value, DepthFrame>)
+                return encode_depth_frame(value, error, max_messagepack_bytes);
+            else if constexpr (std::is_same_v<Value, SegmentationFrame>)
+                return encode_segmentation_frame(value, error, max_messagepack_bytes);
+            else {
+                set_error(error, "LiDAR wire encoding is not implemented yet");
+                return std::nullopt;
+            }
+        },
+        measurement);
 }
 
 } // namespace nksensor::wire
