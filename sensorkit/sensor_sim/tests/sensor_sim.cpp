@@ -306,6 +306,78 @@ void scene_lidar_adapter_batch_raycast_returns_local_scan() {
     nkscene_scene_destroy(scene);
 }
 
+void runtime_dispatches_real_snapshot_adapters() {
+    auto fixture = make_fixture();
+
+    nkscene_snapshot scene_snapshot_handle = 0;
+    assert(nkscene_scene_snapshot(fixture.scene, &scene_snapshot_handle) == NKS_OK);
+    SceneLidarAdapter lidar_adapter;
+    assert(lidar_adapter.build(scene_snapshot_handle) == NKS_OK);
+    nkscene_snapshot_destroy(scene_snapshot_handle);
+
+    ImuTruthAdapter imu_truth(fixture.body, {0.0, 0.0, -9.81});
+
+    SensorConfig imu_config;
+    imu_config.id = 60;
+    imu_config.timing.update_rate_hz = 100.0;
+    auto imu = std::make_shared<ImuSensor>(imu_config);
+
+    SensorConfig lidar_config_sensor;
+    lidar_config_sensor.id = 61;
+    lidar_config_sensor.timing.update_rate_hz = 100.0;
+    LidarConfig lidar_config;
+    lidar_config.horizontal_count = 1;
+    lidar_config.vertical_count = 1;
+    lidar_config.horizontal_angle_min = 0.0;
+    lidar_config.horizontal_angle_max = 0.0;
+    lidar_config.range_max = 25.0;
+    auto lidar = std::make_shared<LidarSensor>(lidar_config_sensor, lidar_config);
+
+    nksim_snapshot current_snapshot = snapshot(fixture.world);
+    SensorRuntime runtime;
+    assert(runtime.add(imu, [&](const SensorTick &tick) -> std::optional<SensorMeasurement> {
+        const auto truth = imu_truth.read(current_snapshot);
+        if (!truth)
+            return std::nullopt;
+        const auto sample = imu->sample(*truth, tick);
+        if (!sample)
+            return std::nullopt;
+        return SensorMeasurement{*sample};
+    }));
+    assert(runtime.add(lidar, [&](const SensorTick &tick) -> std::optional<SensorMeasurement> {
+        std::optional<LidarScan> scan;
+        if (lidar_adapter.scan(*lidar, tick, {}, scan) != NKS_OK || !scan)
+            return std::nullopt;
+        return SensorMeasurement{*scan};
+    }));
+
+    const auto first_batch = runtime.poll(0.0);
+    assert(first_batch.size() == 2);
+    assert(std::get<ImuSample>(first_batch[0]).header.sensor == 60);
+    assert(std::get<LidarScan>(first_batch[1]).header.sensor == 61);
+    assert(std::get<LidarScan>(first_batch[1]).returns.size() == 1);
+    assert(!std::get<LidarScan>(first_batch[1]).returns[0].hit);
+
+    nksim_step_result step{};
+    step.struct_size = sizeof(step);
+    assert(nksim_world_step(fixture.world, &step) == NKSIM_OK);
+    nkscene_change_set_destroy(step.scene_changes);
+    const auto next_snapshot = snapshot(fixture.world);
+    nksim_snapshot_destroy(current_snapshot);
+    current_snapshot = next_snapshot;
+
+    const auto second_batch = runtime.poll(0.01);
+    assert(second_batch.size() == 2);
+    const auto &second_imu = std::get<ImuSample>(second_batch[0]);
+    assert(second_imu.header.sequence == 1);
+    /* The free-falling body follows gravity, so the IMU measures near-zero
+       specific force after the truth adapter and sensor model are composed. */
+    assert(std::abs(second_imu.linear_acceleration.z) < 1e-10);
+    assert(std::get<LidarScan>(second_batch[1]).header.sequence == 1);
+
+    nksim_snapshot_destroy(current_snapshot);
+}
+
 } // namespace
 
 int main() {
@@ -313,5 +385,6 @@ int main() {
     invalid_and_nonmatching_snapshots_do_not_mutate_history();
     reset_discards_derivative_history();
     scene_lidar_adapter_batch_raycast_returns_local_scan();
+    runtime_dispatches_real_snapshot_adapters();
     return 0;
 }
