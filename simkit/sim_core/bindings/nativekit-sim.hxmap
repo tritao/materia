@@ -1,0 +1,8 @@
+{
+  "interface": "NativeKitSim",
+  "typeNames": {
+    "nkscene_change_set": "NativeKitScene.nkscene_change_set",
+    "nkscene_occurrence_id": "NativeKitScene.nkscene_occurrence_id",
+    "nkscene_scene": "NativeKitScene.nkscene_scene"
+  }
+}
