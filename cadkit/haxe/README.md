@@ -43,8 +43,10 @@ history information. Revolve axes use an origin, a direction, and a radian
 angle.
 `Shape.fillet()` and `Shape.chamfer()` apply constant finishing operations to
 all edges of a solid in the initial API; their operation variants retain
-history in the same way. Selected-edge finishing will be added as a bulk API
-once its handle-list boundary is defined.
+history in the same way. `Shape.filletEdges()` and `Shape.chamferEdges()` take
+an explicit array of selected `Edge` wrappers; their operation variants retain
+the same history information and reject edges that do not belong to the source
+shape.
 
 The Haxeon-only `cadkit.parametric` package owns the first document layer:
 `Document` manages a dependency DAG of box, cylinder, face, transform,
@@ -65,7 +67,11 @@ recomputing it; native handles are never serialized. NativeKit is not involved
 in this layer. `ReferenceState` distinguishes initially `Resolved` references,
 history/fingerprint `Remapped` references, `Deleted` topology, unresolved
 references, and ambiguous matches. `Document.lastRemapReport` aggregates those
-outcomes for each recompute.
+outcomes for each recompute, including selected-edge failures during staged
+evaluation; `RecomputeError.referenceState` identifies a deleted or ambiguous
+selection. `FilletFeature` and `ChamferFeature` optionally
+own persistent edge references; those references remap against their source
+feature while the finishing feature evaluates against staged source shapes.
 
 `Shape.importStep(path)` and `Shape.exportStep(path)` provide the first
 headless STEP file boundary. M14 transfers one OCCT shape and intentionally

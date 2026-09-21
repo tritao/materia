@@ -421,6 +421,7 @@ int main() {
     assert(cad_shape_fillet(shape, 1.0, &filleted) == CAD_OK);
     assert(cad_shape_volume(filleted, &volume) == CAD_OK);
     assert(volume > 0.0 && volume < 6000.0);
+    const double all_fillet_volume = volume;
     cad_operation fillet_operation = 0;
     assert(cad_shape_fillet_operation(shape, 1.0, &fillet_operation) == CAD_OK);
     cad_shape fillet_result = 0;
@@ -449,6 +450,74 @@ int main() {
     assert(cad_shape_volume(chamfer_result, &volume) == CAD_OK);
     assert(volume > 0.0 && volume < 6000.0);
 
+    cad_shape selected_edge = 0;
+    assert(cad_shape_subshape_at(shape, CAD_SHAPE_EDGE, 0, &selected_edge) == CAD_OK);
+    const cad_shape_ref selected_edges[] = {{selected_edge}};
+    cad_shape selected_filleted = 0;
+    assert(cad_shape_fillet_edges(
+               shape, selected_edges, 1, 1.0, &selected_filleted) == CAD_OK);
+    double selected_fillet_volume = 0.0;
+    assert(cad_shape_volume(selected_filleted, &selected_fillet_volume) == CAD_OK);
+    assert(selected_fillet_volume > all_fillet_volume);
+    assert(selected_fillet_volume < 6000.0);
+
+    cad_operation selected_fillet_operation = 0;
+    assert(cad_shape_fillet_edges_operation(
+               shape,
+               selected_edges,
+               1,
+               1.0,
+               &selected_fillet_operation) == CAD_OK);
+    cad_shape selected_fillet_result = 0;
+    assert(cad_operation_result_shape(
+               selected_fillet_operation, &selected_fillet_result) == CAD_OK);
+    assert(cad_shape_volume(selected_fillet_result, &selected_fillet_volume) == CAD_OK);
+    assert(selected_fillet_volume > all_fillet_volume);
+    assert(cad_operation_history_count(
+               selected_fillet_operation,
+               CAD_HISTORY_GENERATED,
+               &generated_count) == CAD_OK);
+    assert(cad_operation_history_count(
+               selected_fillet_operation,
+               CAD_HISTORY_MODIFIED,
+               &modified_count) == CAD_OK);
+    assert(cad_operation_history_count(
+               selected_fillet_operation,
+               CAD_HISTORY_DELETED,
+               &deleted_count) == CAD_OK);
+    assert(generated_count + modified_count + deleted_count > 0);
+
+    cad_shape selected_chamfered = 0;
+    assert(cad_shape_chamfer_edges(
+               shape, selected_edges, 1, 1.0, &selected_chamfered) == CAD_OK);
+    assert(cad_shape_volume(selected_chamfered, &volume) == CAD_OK);
+    assert(volume > 0.0 && volume < 6000.0);
+    cad_operation selected_chamfer_operation = 0;
+    assert(cad_shape_chamfer_edges_operation(
+               shape,
+               selected_edges,
+               1,
+               1.0,
+               &selected_chamfer_operation) == CAD_OK);
+    cad_shape selected_chamfer_result = 0;
+    assert(cad_operation_result_shape(
+               selected_chamfer_operation, &selected_chamfer_result) == CAD_OK);
+    assert(cad_shape_volume(selected_chamfer_result, &volume) == CAD_OK);
+    assert(volume > 0.0 && volume < 6000.0);
+    assert(cad_operation_history_count(
+               selected_chamfer_operation,
+               CAD_HISTORY_GENERATED,
+               &generated_count) == CAD_OK);
+    assert(cad_operation_history_count(
+               selected_chamfer_operation,
+               CAD_HISTORY_MODIFIED,
+               &modified_count) == CAD_OK);
+    assert(cad_operation_history_count(
+               selected_chamfer_operation,
+               CAD_HISTORY_DELETED,
+               &deleted_count) == CAD_OK);
+    assert(generated_count + modified_count + deleted_count > 0);
+
     cad_shape rotated = 0;
     constexpr double pi = 3.14159265358979323846;
     assert(cad_shape_rotate(shape, {0.0, 0.0, 1.0}, pi / 2.0, &rotated) == CAD_OK);
@@ -472,6 +541,34 @@ int main() {
            CAD_ERROR_INVALID_ARGUMENT);
     assert(cad_shape_fillet(shape, 0.0, &filleted) == CAD_ERROR_INVALID_ARGUMENT);
     assert(cad_shape_chamfer(shape, 0.0, &chamfered) == CAD_ERROR_INVALID_ARGUMENT);
+    cad_shape invalid_selected_result = 0;
+    assert(cad_shape_fillet_edges(
+               shape, nullptr, 0, 1.0, &invalid_selected_result) ==
+           CAD_ERROR_INVALID_ARGUMENT);
+    const cad_shape_ref invalid_selected_edges[] = {{shape}};
+    assert(cad_shape_chamfer_edges(
+               shape,
+               invalid_selected_edges,
+               1,
+               1.0,
+               &invalid_selected_result) == CAD_ERROR_INVALID_ARGUMENT);
+    const cad_shape_ref duplicate_selected_edges[] = {{selected_edge}, {selected_edge}};
+    assert(cad_shape_fillet_edges(
+               shape,
+               duplicate_selected_edges,
+               2,
+               1.0,
+               &invalid_selected_result) == CAD_ERROR_INVALID_ARGUMENT);
+    cad_shape foreign_edge = 0;
+    assert(cad_shape_subshape_at(boolean_base, CAD_SHAPE_EDGE, 0, &foreign_edge) == CAD_OK);
+    const cad_shape_ref foreign_selected_edges[] = {{foreign_edge}};
+    assert(cad_shape_fillet_edges(
+               shape,
+               foreign_selected_edges,
+               1,
+               1.0,
+               &invalid_selected_result) == CAD_ERROR_INVALID_ARGUMENT);
+    cad_shape_destroy(foreign_edge);
 
     cad_shape_destroy(extruded);
     cad_shape_destroy(extrude_result);
@@ -481,6 +578,11 @@ int main() {
     cad_shape_destroy(fillet_result);
     cad_shape_destroy(chamfered);
     cad_shape_destroy(chamfer_result);
+    cad_shape_destroy(selected_edge);
+    cad_shape_destroy(selected_filleted);
+    cad_shape_destroy(selected_fillet_result);
+    cad_shape_destroy(selected_chamfered);
+    cad_shape_destroy(selected_chamfer_result);
     cad_shape_destroy(profile);
     cad_shape_destroy(cylinder);
     cad_shape_destroy(sphere);
@@ -499,6 +601,8 @@ int main() {
     cad_operation_destroy(revolve_operation);
     cad_operation_destroy(fillet_operation);
     cad_operation_destroy(chamfer_operation);
+    cad_operation_destroy(selected_fillet_operation);
+    cad_operation_destroy(selected_chamfer_operation);
     assert(cad_shape_bounds(shape, &bounds) == CAD_ERROR_INVALID_HANDLE);
     assert(cad_mesh_vertex_count(mesh, &vertex_count) == CAD_ERROR_INVALID_HANDLE);
     assert(cad_operation_history_count(

@@ -76,13 +76,19 @@ class DocumentCodec {
 						numberField(record, "axisZ"),
 						numberField(record, "angle")));
 				} else if (featureType == "fillet") {
+					var filletSource = requiredFeature(document, intField(record, "source"));
 					feature = document.add(new FilletFeature(
-						requiredFeature(document, intField(record, "source")),
-						numberField(record, "radius")));
+						filletSource,
+						numberField(record, "radius"),
+						null,
+						optionalEdgeFingerprints(record)));
 				} else if (featureType == "chamfer") {
+					var chamferSource = requiredFeature(document, intField(record, "source"));
 					feature = document.add(new ChamferFeature(
-						requiredFeature(document, intField(record, "source")),
-						numberField(record, "distance")));
+						chamferSource,
+						numberField(record, "distance"),
+						null,
+						optionalEdgeFingerprints(record)));
 				} else if (featureType == "transform") {
 					feature = document.add(new TransformFeature(
 						requiredFeature(document, intField(record, "source")),
@@ -124,14 +130,23 @@ class DocumentCodec {
 	}
 
 	private static function encodeFeature(feature:Feature):Dynamic {
+		var featureType = feature.serializationType();
+		var excluded:Array<TopologyReference> = [];
+		if (featureType == "fillet") {
+			var selectedFillet:FilletFeature = cast feature;
+			excluded = selectedFillet.edgeReferences;
+		} else if (featureType == "chamfer") {
+			var selectedChamfer:ChamferFeature = cast feature;
+			excluded = selectedChamfer.edgeReferences;
+		}
+
 		var references:Array<Dynamic> = [];
 		for (index in 0...feature.topologyReferenceCount()) {
 			var reference = feature.topologyReferenceAt(index);
-			if (reference.state != ReferenceState.Closed)
+			if (reference.state != ReferenceState.Closed && !containsReference(excluded, reference))
 				references.push(encodeReference(reference));
 		}
 
-		var featureType = feature.serializationType();
 		if (featureType == "box") {
 			var box:BoxFeature = cast feature;
 			return {
@@ -189,22 +204,28 @@ class DocumentCodec {
 			};
 		} else if (featureType == "fillet") {
 			var fillet:FilletFeature = cast feature;
-			return {
+			var filletRecord:Dynamic = {
 				id: feature.id.toInt(),
 				type: featureType,
 				source: fillet.source.id.toInt(),
 				radius: fillet.radius.value,
-				references: references
+				references: references,
+				edges: null
 			};
+			appendEdgeFingerprints(filletRecord, fillet.edgeReferences);
+			return filletRecord;
 		} else if (featureType == "chamfer") {
 			var chamfer:ChamferFeature = cast feature;
-			return {
+			var chamferRecord:Dynamic = {
 				id: feature.id.toInt(),
 				type: featureType,
 				source: chamfer.source.id.toInt(),
 				distance: chamfer.distance.value,
-				references: references
+				references: references,
+				edges: null
 			};
+			appendEdgeFingerprints(chamferRecord, chamfer.edgeReferences);
+			return chamferRecord;
 		} else if (featureType == "transform") {
 			var transform:TransformFeature = cast feature;
 			return {
@@ -237,6 +258,26 @@ class DocumentCodec {
 		};
 	}
 
+	private static function containsReference(
+		references:Array<TopologyReference>,
+		candidate:TopologyReference):Bool {
+		for (reference in references)
+			if (reference == candidate)
+				return true;
+		return false;
+	}
+
+	private static function appendEdgeFingerprints(
+		record:Dynamic,
+		references:Array<TopologyReference>):Void {
+		if (references.length == 0)
+			return;
+		var encoded:Array<Dynamic> = [];
+		for (reference in references)
+			encoded.push(encodeFingerprint(reference.fingerprintData()));
+		Reflect.setField(record, "edges", encoded);
+	}
+
 	private static function decodeReference(feature:Feature, record:Dynamic):Void {
 		var fingerprintRecord:Dynamic = requiredField(record, "fingerprint");
 		var kind = shapeKind(stringField(record, "kind"));
@@ -249,6 +290,20 @@ class DocumentCodec {
 		if (value == null)
 			return null;
 		return decodeFingerprint(value, CadKit.ShapeKind.Face);
+	}
+
+	private static function optionalEdgeFingerprints(
+		record:Dynamic):Null<Array<TopologyFingerprint>> {
+		var value:Dynamic = Reflect.field(record, "edges");
+		if (value == null)
+			return null;
+		var records:Array<Dynamic> = cast value;
+		if (records.length == 0)
+			throw new ParametricError("document edge selection must not be empty");
+		var result:Array<TopologyFingerprint> = [];
+		for (fingerprint in records)
+			result.push(decodeFingerprint(fingerprint, CadKit.ShapeKind.Edge));
+		return result;
 	}
 
 	private static function encodeFingerprint(

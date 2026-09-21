@@ -1,4 +1,5 @@
 import CadKit;
+import cadkit.Edge;
 import cadkit.Geometry;
 import cadkit.Operation;
 import cadkit.Shape;
@@ -7,6 +8,7 @@ import cadkit.SelectionErrorKind;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ReferenceState;
+import cadkit.parametric.RecomputeError;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
 import cadkit.parametric.features.BoxFeature;
@@ -189,6 +191,18 @@ class HaxeonSmoke {
 		var filletShape = box.fillet(1.0);
 		if (filletShape.volume() <= 0.0 || filletShape.volume() >= box.volume())
 			return 72;
+		var selectedEdge = box.edges().at(0);
+		var selectedFilletShape = box.filletEdges([selectedEdge], 1.0);
+		if (selectedFilletShape.volume() <= filletShape.volume() ||
+			selectedFilletShape.volume() >= box.volume())
+			return 76;
+		var selectedFilletOperation = box.filletEdgesOperation([selectedEdge], 1.0);
+		var selectedFilletResult = selectedFilletOperation.resultShape();
+		if (selectedFilletResult.volume() <= filletShape.volume() ||
+			selectedFilletOperation.historyCount(CadKit.HistoryRelation.Generated) +
+				selectedFilletOperation.historyCount(CadKit.HistoryRelation.Modified) +
+				selectedFilletOperation.historyCount(CadKit.HistoryRelation.Deleted) <= 0)
+			return 77;
 		var filletOperation = box.filletOperation(1.0);
 		var filletResult = filletOperation.resultShape();
 		if (filletResult.volume() <= 0.0 ||
@@ -199,6 +213,16 @@ class HaxeonSmoke {
 		var chamferShape = box.chamfer(1.0);
 		if (chamferShape.volume() <= 0.0 || chamferShape.volume() >= box.volume())
 			return 74;
+		var selectedChamferShape = box.chamferEdges([selectedEdge], 1.0);
+		if (selectedChamferShape.volume() <= 0.0 || selectedChamferShape.volume() >= box.volume())
+			return 78;
+		var selectedChamferOperation = box.chamferEdgesOperation([selectedEdge], 1.0);
+		var selectedChamferResult = selectedChamferOperation.resultShape();
+		if (selectedChamferResult.volume() <= 0.0 ||
+			selectedChamferOperation.historyCount(CadKit.HistoryRelation.Generated) +
+				selectedChamferOperation.historyCount(CadKit.HistoryRelation.Modified) +
+				selectedChamferOperation.historyCount(CadKit.HistoryRelation.Deleted) <= 0)
+			return 79;
 		var chamferOperation = box.chamferOperation(1.0);
 		var chamferResult = chamferOperation.resultShape();
 		if (chamferResult.volume() <= 0.0 ||
@@ -207,9 +231,16 @@ class HaxeonSmoke {
 				chamferOperation.historyCount(CadKit.HistoryRelation.Deleted) <= 0)
 			return 75;
 		filletShape.close();
+		selectedEdge.close();
+		selectedFilletShape.close();
+		selectedFilletResult.close();
+		selectedFilletOperation.close();
 		filletResult.close();
 		filletOperation.close();
 		chamferShape.close();
+		selectedChamferShape.close();
+		selectedChamferResult.close();
+		selectedChamferOperation.close();
 		chamferResult.close();
 		chamferOperation.close();
 
@@ -496,6 +527,157 @@ class HaxeonSmoke {
 			return 78;
 		loadedSweep.close();
 		sweepDocument.close();
+
+		var selectedDocument = new Document();
+		var selectedBase = selectedDocument.add(new BoxFeature(10.0, 20.0, 30.0));
+		selectedDocument.recompute();
+		var selectedBaseShape = selectedBase.currentShape();
+		if (selectedBaseShape == null)
+			return 81;
+		var selectedParametricEdge = selectedBaseShape.edges().at(0);
+		var selectedFilletFeature = selectedDocument.add(new FilletFeature(
+			selectedBase, 1.0, [selectedParametricEdge]));
+		var selectedChamferFeature = selectedDocument.add(new ChamferFeature(
+			selectedBase, 1.0, [selectedParametricEdge]));
+		selectedParametricEdge.close();
+		selectedDocument.recompute();
+		if (selectedFilletFeature.edgeReferences.length != 1 ||
+			selectedChamferFeature.edgeReferences.length != 1 ||
+			!selectedFilletFeature.edgeReferences[0].isResolved() ||
+			!selectedChamferFeature.edgeReferences[0].isResolved() ||
+			selectedFilletFeature.currentShape() == null ||
+			selectedFilletFeature.currentShape().volume() <= 0.0 ||
+			selectedChamferFeature.currentShape() == null ||
+			selectedChamferFeature.currentShape().volume() <= 0.0)
+			return 82;
+
+		var selectedTransaction = selectedDocument.beginTransaction();
+		selectedBase.width.set(12.0);
+		selectedTransaction.commit();
+		selectedDocument.recompute();
+		if (!selectedFilletFeature.edgeReferences[0].isResolved() ||
+			!selectedChamferFeature.edgeReferences[0].isResolved() ||
+			selectedDocument.lastRemapReport.remapped < 2)
+			return 83;
+
+		var selectedSerialized = DocumentCodec.encode(selectedDocument);
+		if (selectedSerialized.indexOf("\"edges\"") < 0)
+			return 84;
+		var loadedSelected = DocumentCodec.decode(selectedSerialized);
+		if (loadedSelected.featureCount() != 3)
+			return 85;
+		var loadedSelectedFillet:FilletFeature = cast loadedSelected.featureAt(1);
+		var loadedSelectedChamfer:ChamferFeature = cast loadedSelected.featureAt(2);
+		if (loadedSelectedFillet.edgeReferences.length != 1 ||
+			loadedSelectedChamfer.edgeReferences.length != 1 ||
+			!loadedSelectedFillet.edgeReferences[0].isResolved() ||
+			!loadedSelectedChamfer.edgeReferences[0].isResolved() ||
+			loadedSelectedFillet.currentShape() == null ||
+			loadedSelectedFillet.currentShape().volume() <= 0.0 ||
+			loadedSelectedChamfer.currentShape() == null ||
+			loadedSelectedChamfer.currentShape().volume() <= 0.0)
+			return 86;
+		loadedSelected.close();
+		selectedDocument.close();
+
+		var deletedDocument = new Document();
+		var deletedBase = deletedDocument.add(new BoxFeature(10.0, 20.0, 30.0));
+		var deletedCylinder = deletedDocument.add(new CylinderFeature(2.0, 30.0));
+		var deletedTool = deletedDocument.add(
+			new TransformFeature(deletedCylinder, 5.0, 10.0, 0.0));
+		var deletedSource = deletedDocument.add(
+			new BooleanFeature(deletedBase, deletedTool, BooleanOperation.Cut));
+		deletedDocument.recompute();
+		var deletedSourceShape = deletedSource.currentShape();
+		if (deletedSourceShape == null)
+			return 87;
+		var deletedEdge:Null<Edge> = null;
+		for (index in 0...deletedSourceShape.edges().count()) {
+			var candidate = deletedSourceShape.edges().at(index);
+			if (deletedEdge == null && candidate.curveKind() == CadKit.CurveKind.Circle)
+				deletedEdge = candidate;
+			else
+				candidate.close();
+		}
+		if (deletedEdge == null)
+			return 88;
+		var deletedFillet = deletedDocument.add(new FilletFeature(
+			deletedSource, 1.0, [deletedEdge]));
+		deletedEdge.close();
+		deletedDocument.recompute();
+		var deletedTransaction = deletedDocument.beginTransaction();
+		deletedTool.x.set(20.0);
+		deletedTransaction.commit();
+		var deletedFailure:Null<RecomputeError> = null;
+		try {
+			deletedDocument.recompute();
+		} catch (error:Dynamic) {
+			var recomputeError:RecomputeError = cast error;
+			deletedFailure = recomputeError;
+		}
+		if (deletedFailure == null ||
+			deletedFillet.edgeReferences[0].state != ReferenceState.Deleted ||
+			deletedDocument.lastRemapReport.deleted != 1 ||
+			deletedFailure.referenceState != ReferenceState.Deleted)
+			return 89;
+		deletedFailure = null;
+		try {
+			deletedDocument.recompute();
+		} catch (error:Dynamic) {
+			var recomputeError:RecomputeError = cast error;
+			deletedFailure = recomputeError;
+		}
+		if (deletedFailure == null || deletedDocument.lastRemapReport.deleted != 1)
+			return 95;
+		if (!deletedDocument.undo())
+			return 91;
+		deletedDocument.recompute();
+		if (!deletedFillet.edgeReferences[0].isResolved() ||
+			deletedDocument.lastRemapReport.remapped != 1)
+			return 92;
+		if (!deletedDocument.redo())
+			return 93;
+		deletedFailure = null;
+		try {
+			deletedDocument.recompute();
+		} catch (error:Dynamic) {
+			var recomputeError:RecomputeError = cast error;
+			deletedFailure = recomputeError;
+		}
+		if (deletedFailure == null ||
+			deletedFillet.edgeReferences[0].state != ReferenceState.Deleted ||
+			deletedDocument.lastRemapReport.deleted != 1 ||
+			deletedFailure.referenceState != ReferenceState.Deleted)
+			return 94;
+		deletedDocument.close();
+
+		var ambiguousDocument = new Document();
+		var ambiguousBase = ambiguousDocument.add(new BoxFeature(10.0, 20.0, 30.0));
+		ambiguousDocument.recompute();
+		var ambiguousFillet = ambiguousDocument.add(new FilletFeature(
+			ambiguousBase,
+			1.0,
+			null,
+			[TopologyFingerprint.fromData(
+				CadKit.ShapeKind.Edge,
+				CadKit.SurfaceKind.Unknown,
+				CadKit.CurveKind.Line,
+				0.0, 10.0, 15.0,
+				1.0, 0.0, 0.0,
+				10.0)]));
+		var ambiguousFailure:Null<RecomputeError> = null;
+		try {
+			ambiguousDocument.recompute();
+		} catch (error:Dynamic) {
+			var recomputeError:RecomputeError = cast error;
+			ambiguousFailure = recomputeError;
+		}
+		if (ambiguousFailure == null ||
+			ambiguousFillet.edgeReferences[0].state != ReferenceState.Ambiguous ||
+			ambiguousDocument.lastRemapReport.ambiguous != 1 ||
+			ambiguousFailure.referenceState != ReferenceState.Ambiguous)
+			return 90;
+		ambiguousDocument.close();
 
 		cut.close();
 		hole.close();

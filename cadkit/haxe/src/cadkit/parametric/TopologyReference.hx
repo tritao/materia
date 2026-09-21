@@ -3,6 +3,7 @@ package cadkit.parametric;
 import CadKit;
 import cadkit.Edge;
 import cadkit.Face;
+import cadkit.Operation;
 import cadkit.Shape;
 import cadkit.Vertex;
 import cadkit.parametric.Feature;
@@ -17,16 +18,20 @@ class TopologyReference {
 	public final kind:CadKit.ShapeKind;
 	public var state(default, null):ReferenceState;
 
+	private final remapFeature:Feature;
 	private var current:Null<Shape>;
 	private final fingerprint:TopologyFingerprint;
 	private var fallbackAmbiguous:Bool;
+	private var stateGenerationValue:Int;
 
 	public function new(
 		feature:Feature,
 		topology:Null<Shape>,
 		?savedKind:CadKit.ShapeKind,
-		?savedFingerprint:TopologyFingerprint) {
+		?savedFingerprint:TopologyFingerprint,
+		?remapFeature:Feature) {
 		this.feature = feature;
+		this.remapFeature = remapFeature == null ? feature : remapFeature;
 		if (topology == null) {
 			if (savedKind == null || savedFingerprint == null)
 				throw new ParametricError("unresolved topology references need fingerprint data");
@@ -44,31 +49,53 @@ class TopologyReference {
 			throw new ParametricError("topology references require faces, edges, or vertices");
 		this.state = current == null ? ReferenceState.Unresolved : ReferenceState.Resolved;
 		this.fallbackAmbiguous = false;
+		this.stateGenerationValue = 0;
 		feature.registerTopologyReference(this);
 	}
 
 	public static function fromFingerprint(
 		feature:Feature,
 		kind:CadKit.ShapeKind,
-		fingerprint:TopologyFingerprint):TopologyReference {
-		return new TopologyReference(feature, null, kind, fingerprint);
+		fingerprint:TopologyFingerprint,
+		?remapFeature:Feature):TopologyReference {
+		return new TopologyReference(feature, null, kind, fingerprint, remapFeature);
 	}
 
-	public static function fromFace(feature:Feature, face:Face):TopologyReference {
-		return new TopologyReference(feature, face.cloneShape());
+	public static function fromShape(
+		feature:Feature,
+		topology:Shape,
+		?remapFeature:Feature):TopologyReference {
+		return new TopologyReference(feature, topology, null, null, remapFeature);
 	}
 
-	public static function fromEdge(feature:Feature, edge:Edge):TopologyReference {
-		return new TopologyReference(feature, edge.cloneShape());
+	public static function fromFace(
+		feature:Feature,
+		face:Face,
+		?remapFeature:Feature):TopologyReference {
+		return new TopologyReference(feature, face.cloneShape(), null, null, remapFeature);
 	}
 
-	public static function fromVertex(feature:Feature, vertex:Vertex):TopologyReference {
-		return new TopologyReference(feature, vertex.cloneShape());
+	public static function fromEdge(
+		feature:Feature,
+		edge:Edge,
+		?remapFeature:Feature):TopologyReference {
+		return new TopologyReference(feature, edge.cloneShape(), null, null, remapFeature);
+	}
+
+	public static function fromVertex(
+		feature:Feature,
+		vertex:Vertex,
+		?remapFeature:Feature):TopologyReference {
+		return new TopologyReference(feature, vertex.cloneShape(), null, null, remapFeature);
 	}
 
 	public function isResolved():Bool {
 		return (state == ReferenceState.Resolved || state == ReferenceState.Remapped) &&
 			current != null;
+	}
+
+	public function stateGeneration():Int {
+		return stateGenerationValue;
 	}
 
 	/** The reference owns the returned shape; callers must not close it directly. */
@@ -80,11 +107,56 @@ class TopologyReference {
 		return fingerprint;
 	}
 
+	/** Resolve against a staged or committed shape, recording failure state. */
+	public function resolveFor(result:Shape, ?operation:Operation):Shape {
+		if (state == ReferenceState.Closed)
+			throw new ParametricError("closed topology references cannot be resolved");
+
+		if (operation != null && current != null) {
+			var historyResult = new TopologyHistoryMap(operation).remap(current, kind);
+			switch historyResult.state {
+				case ReferenceState.Remapped:
+					if (historyResult.shape != null)
+						return historyResult.shape;
+				case ReferenceState.Deleted:
+					markDeleted();
+					throw new ParametricError(
+						"topology reference is Deleted", ReferenceState.Deleted);
+				case ReferenceState.Ambiguous:
+					markAmbiguous();
+					throw new ParametricError(
+						"topology reference is Ambiguous", ReferenceState.Ambiguous);
+				case ReferenceState.Resolved, ReferenceState.Unresolved, ReferenceState.Closed:
+			}
+		}
+
+		var resolved = findFallback(result);
+		if (resolved != null)
+			return resolved;
+		if (fallbackAmbiguous) {
+			markAmbiguous();
+			throw new ParametricError(
+				"topology reference is Ambiguous", ReferenceState.Ambiguous);
+		}
+		if (current != null) {
+			markDeleted();
+			throw new ParametricError(
+				"topology reference is Deleted", ReferenceState.Deleted);
+		}
+		if (state == ReferenceState.Deleted)
+			throw new ParametricError("topology reference is Deleted", ReferenceState.Deleted);
+		if (state == ReferenceState.Ambiguous)
+			throw new ParametricError("topology reference is Ambiguous", ReferenceState.Ambiguous);
+		markUnresolved();
+		throw new ParametricError(
+			"topology reference is Unresolved", ReferenceState.Unresolved);
+	}
+
 	public function remap():ReferenceState {
 		if (state == ReferenceState.Closed)
 			return state;
 
-		var operation = feature.provenance;
+		var operation = remapFeature.provenance;
 		if (operation != null && current != null) {
 			var historyResult = new TopologyHistoryMap(operation).remap(current, kind);
 			switch historyResult.state {
@@ -103,7 +175,7 @@ class TopologyReference {
 			}
 		}
 
-		var result = feature.currentShape();
+		var result = remapFeature.currentShape();
 		if (result == null) {
 			markUnresolved();
 			return state;
@@ -115,6 +187,9 @@ class TopologyReference {
 			return state;
 		} else if (fallbackAmbiguous) {
 			markAmbiguous();
+			return state;
+		} else if (current != null) {
+			markDeleted();
 			return state;
 		} else {
 			markUnresolved();
@@ -174,27 +249,33 @@ class TopologyReference {
 		if (current != null)
 			current.close();
 		current = next;
-		state = nextState;
+		setState(nextState);
 	}
 
 	private function markUnresolved():Void {
 		if (current != null)
 			current.close();
 		current = null;
-		state = ReferenceState.Unresolved;
+		setState(ReferenceState.Unresolved);
 	}
 
 	private function markAmbiguous():Void {
 		if (current != null)
 			current.close();
 		current = null;
-		state = ReferenceState.Ambiguous;
+		setState(ReferenceState.Ambiguous);
 	}
 
 	private function markDeleted():Void {
 		if (current != null)
 			current.close();
 		current = null;
-		state = ReferenceState.Deleted;
+		setState(ReferenceState.Deleted);
+	}
+
+	private function setState(next:ReferenceState):Void {
+		if (state != next)
+			stateGenerationValue++;
+		state = next;
 	}
 }

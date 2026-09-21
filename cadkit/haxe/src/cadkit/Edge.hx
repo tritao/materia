@@ -33,6 +33,11 @@ class Edge {
 		return shape.cloneShape();
 	}
 
+	/** Borrow the native handle for a synchronous bulk ABI call. */
+	public function borrowHandle():CadKit.ShapeHandle {
+		return shape.borrowHandle();
+	}
+
 	public function sameAs(other:Edge):Bool {
 		return shape.sameAs(other.shape);
 	}

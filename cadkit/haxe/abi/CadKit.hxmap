@@ -14,6 +14,7 @@
     "cad_shape": "ShapeHandle",
     "cad_mesh": "MeshHandle",
     "cad_operation": "OperationHandle",
+    "cad_shape_ref": "ShapeRef",
     "cad_vec3": "Vec3",
     "cad_bounds": "Bounds",
     "cad_mesh_options": "MeshOptions",

@@ -41,6 +41,11 @@ class Shape {
 		return new Shape(CadKit.shapeCloneChecked(native.borrow()));
 	}
 
+	/** Borrow the native handle for a synchronous bulk ABI call. */
+	public function borrowHandle():CadKit.ShapeHandle {
+		return native.borrow();
+	}
+
 	public function bounds():CadKit.Bounds {
 		return CadKit.shapeBoundsChecked(native.borrow());
 	}
@@ -178,6 +183,26 @@ class Shape {
 		return new Operation(CadKit.shapeChamferOperationChecked(native.borrow(), distance));
 	}
 
+	public function filletEdges(edges:Array<Edge>, radius:Float):Shape {
+		return new Shape(CadKit.shapeFilletEdgesChecked(
+			native.borrow(), edgeRefs(edges), radius));
+	}
+
+	public function filletEdgesOperation(edges:Array<Edge>, radius:Float):Operation {
+		return new Operation(CadKit.shapeFilletEdgesOperationChecked(
+			native.borrow(), edgeRefs(edges), radius));
+	}
+
+	public function chamferEdges(edges:Array<Edge>, distance:Float):Shape {
+		return new Shape(CadKit.shapeChamferEdgesChecked(
+			native.borrow(), edgeRefs(edges), distance));
+	}
+
+	public function chamferEdgesOperation(edges:Array<Edge>, distance:Float):Operation {
+		return new Operation(CadKit.shapeChamferEdgesOperationChecked(
+			native.borrow(), edgeRefs(edges), distance));
+	}
+
 	public function rotateOperation(axis:CadKit.Vec3, angle:Float):Operation {
 		return new Operation(CadKit.shapeRotateOperationChecked(native.borrow(), axis, angle));
 	}
@@ -213,5 +238,24 @@ class Shape {
 
 	public function isClosed():Bool {
 		return native.isClosed();
+	}
+
+	private static function edgeRefs(edges:Array<Edge>):Array<CadKit.ShapeRef> {
+		if (edges == null || edges.length == 0)
+			throw new SelectionError(
+				SelectionErrorKind.Empty,
+				"edge finishing requires at least one selected edge");
+
+		var refs:Array<CadKit.ShapeRef> = [];
+		for (edge in edges) {
+			if (edge == null)
+				throw new SelectionError(
+					SelectionErrorKind.Invalid,
+					"edge finishing does not accept null edges");
+			var reference = new CadKit.ShapeRef();
+			reference.set_shape(edge.borrowHandle());
+			refs.push(reference);
+		}
+		return refs;
 	}
 }

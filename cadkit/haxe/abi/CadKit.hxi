@@ -81,12 +81,16 @@ interface CadKit @target("x86_64-linux-gnu") @library("cadkit-core") {
 	extern fn cad_shape_area(shape: cad_shape, out_area: ptr<f64> @out) -> cad_result;
 	extern fn cad_shape_bounds(shape: cad_shape, out_bounds: ptr<cad_bounds> @out) -> cad_result;
 	extern fn cad_shape_chamfer(shape: cad_shape, distance: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_shape_chamfer_edges(shape: cad_shape, edges: ptr<const<cad_shape_ref>> @in_array("edge_count"), edge_count: u32, distance: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_shape_chamfer_edges_operation(shape: cad_shape, edges: ptr<const<cad_shape_ref>> @in_array("edge_count"), edge_count: u32, distance: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_chamfer_operation(shape: cad_shape, distance: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_clone(shape: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_destroy(shape: cad_shape) -> void;
 	extern fn cad_shape_extrude(profile: cad_shape, delta: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_extrude_operation(profile: cad_shape, delta: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_fillet(shape: cad_shape, radius: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_shape_fillet_edges(shape: cad_shape, edges: ptr<const<cad_shape_ref>> @in_array("edge_count"), edge_count: u32, radius: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_shape_fillet_edges_operation(shape: cad_shape, edges: ptr<const<cad_shape_ref>> @in_array("edge_count"), edge_count: u32, radius: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_fillet_operation(shape: cad_shape, radius: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_is_same(first: cad_shape, second: cad_shape, out_same: ptr<u8> @out) -> cad_result;
 	extern fn cad_shape_kind_get(shape: cad_shape, out_kind: ptr<cad_shape_kind> @out) -> cad_result;
@@ -117,6 +121,9 @@ interface CadKit @target("x86_64-linux-gnu") @library("cadkit-core") {
 	struct cad_mesh_options @layout(16, 8) {
 		linear_deflection: f64 @offset(0);
 		angular_deflection: f64 @offset(8);
+	}
+	struct cad_shape_ref @layout(4, 4) {
+		shape: cad_shape @offset(0);
 	}
 	struct cad_vec3 @layout(24, 8) {
 		x: f64 @offset(0);

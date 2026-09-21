@@ -56,7 +56,11 @@ class Feature {
 		ownerToken = documentToken;
 		id = featureId;
 		dirty = true;
+		onAttached();
 	}
+
+	/** Hook for features that materialize document-owned references on attach. */
+	public function onAttached():Void {}
 
 	public function parameterChanged(parameter:Parameter, oldValue:Float):Void {
 		if (document != null)
@@ -87,6 +91,18 @@ class Feature {
 		return report;
 	}
 
+	/** Reports reference states changed while a staged evaluation was attempted. */
+	public function topologyReferenceReport(
+		previous:Array<Int>):TopologyRemapReport {
+		var report = new TopologyRemapReport();
+		for (index in 0...topologyReferences.length) {
+			var reference = topologyReferences[index];
+			if (previous[index] != reference.stateGeneration())
+				report.add(reference.state);
+		}
+		return report;
+	}
+
 	public function topologyReferenceCount():Int {
 		return topologyReferences.length;
 	}
@@ -108,6 +124,7 @@ class Feature {
 	}
 
 	public function close():Void {
+		onClose();
 		for (reference in topologyReferences)
 			reference.close();
 		topologyReferences.resize(0);
@@ -118,4 +135,7 @@ class Feature {
 		shape = null;
 		provenance = null;
 	}
+
+	/** Hook for features that own construction-time resources. */
+	public function onClose():Void {}
 }

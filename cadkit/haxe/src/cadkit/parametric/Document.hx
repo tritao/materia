@@ -75,6 +75,15 @@ class Document {
 		var stagedFeatures:Array<Feature> = [];
 		var stagedResults:Array<EvaluationResult> = [];
 		var current:Null<Feature> = null;
+		var previousStates:Map<Int, Array<Int>> = new Map();
+		for (feature in features) {
+			var generations:Array<Int> = [];
+			for (index in 0...feature.topologyReferenceCount()) {
+				var reference = feature.topologyReferenceAt(index);
+				generations.push(reference.stateGeneration());
+			}
+			previousStates.set(feature.id.toInt(), generations);
+		}
 
 		try {
 			for (feature in order) {
@@ -85,7 +94,7 @@ class Document {
 				var result:EvaluationResult = feature.evaluate(context);
 				stagedFeatures.push(feature);
 				stagedResults.push(result);
-				context.stage(feature, result.getShape());
+				context.stage(feature, result);
 			}
 
 			for (index in 0...stagedFeatures.length)
@@ -94,12 +103,26 @@ class Document {
 			for (feature in stagedFeatures)
 				lastRemapReport.merge(feature.remapTopologyReferences());
 		} catch (error:Dynamic) {
+			lastRemapReport = new TopologyRemapReport();
+			var recomputeError:Null<RecomputeError> = null;
+			if (current != null) {
+				recomputeError = new RecomputeError(current.id, error);
+				if (recomputeError.referenceState != null)
+					lastRemapReport.add(recomputeError.referenceState);
+			}
+			if (recomputeError == null || recomputeError.referenceState == null) {
+				for (feature in features) {
+					var generations = previousStates.get(feature.id.toInt());
+					if (generations != null)
+						lastRemapReport.merge(feature.topologyReferenceReport(generations));
+				}
+			}
 			for (index in 0...stagedResults.length) {
 				var reverse = stagedResults.length - index - 1;
 				stagedResults[reverse].dispose();
 			}
-			if (current != null)
-				throw new RecomputeError(current.id, error);
+			if (recomputeError != null)
+				throw recomputeError;
 			throw error;
 		}
 	}

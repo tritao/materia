@@ -6,13 +6,20 @@ import cadkit.parametric.FeatureId;
 class RecomputeError {
 	public final feature:FeatureId;
 	public final cause:Dynamic;
+	public final referenceState:Null<ReferenceState>;
 
 	public function new(feature:FeatureId, cause:Dynamic) {
 		this.feature = feature;
 		this.cause = cause;
+		if (Std.isOfType(cause, ParametricError)) {
+			var parametric:ParametricError = cast cause;
+			referenceState = parametric.referenceState;
+		} else
+			referenceState = null;
 	}
 
 	public function toString():String {
-		return "feature " + feature.toInt() + " failed: " + Std.string(cause);
+		var stateSuffix = referenceState == null ? "" : " [" + Std.string(referenceState) + "]";
+		return "feature " + feature.toInt() + " failed" + stateSuffix + ": " + Std.string(cause);
 	}
 }

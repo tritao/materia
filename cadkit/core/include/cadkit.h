@@ -10,6 +10,7 @@
 #  define CADKIT_HXI_HANDLE_DESTROY(symbol) __attribute__((annotate("hxi:handle_destroy")))
 #  define CADKIT_HXI_OUT __attribute__((annotate("hxi:out")))
 #  define CADKIT_HXI_OUT_ARRAY(count) __attribute__((annotate("hxi:out_array")))
+#  define CADKIT_HXI_IN_ARRAY(count) __attribute__((annotate("hxi:in_array")))
 #  define CADKIT_HXI_OUT_BUFFER(size) __attribute__((annotate("hxi:out_buffer=" #size)))
 #  define CADKIT_HXI_INOUT __attribute__((annotate("hxi:inout")))
 #  define CADKIT_HXI_OWNED __attribute__((annotate("hxi:owned")))
@@ -21,6 +22,7 @@
 #  define CADKIT_HXI_HANDLE_DESTROY(symbol)
 #  define CADKIT_HXI_OUT
 #  define CADKIT_HXI_OUT_ARRAY(count)
+#  define CADKIT_HXI_IN_ARRAY(count)
 #  define CADKIT_HXI_OUT_BUFFER(size)
 #  define CADKIT_HXI_INOUT
 #  define CADKIT_HXI_OWNED
@@ -66,6 +68,13 @@ typedef struct cad_bounds {
 typedef uint32_t cad_shape CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_shape_destroy);
 typedef uint32_t cad_mesh CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_mesh_destroy);
 typedef uint32_t cad_operation CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_operation_destroy);
+
+/* Haxeon projects counted input arrays of fixed-layout structures. Keeping
+ * the handle in a one-field record preserves a bulk edge-list ABI while
+ * making the list available to generated language bindings. */
+typedef struct cad_shape_ref {
+    cad_shape shape;
+} cad_shape_ref;
 
 typedef enum cad_shape_kind {
     CAD_SHAPE_UNKNOWN = 0,
@@ -191,6 +200,22 @@ CADKIT_API cad_result cad_shape_chamfer(
     double distance,
     cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
+/* Apply a constant fillet or chamfer only to the listed edges. Every edge
+ * handle must be a distinct edge belonging to shape. */
+CADKIT_API cad_result cad_shape_fillet_edges(
+    cad_shape shape,
+    const cad_shape_ref* edges CADKIT_HXI_IN_ARRAY(edge_count),
+    uint32_t edge_count,
+    double radius,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
+CADKIT_API cad_result cad_shape_chamfer_edges(
+    cad_shape shape,
+    const cad_shape_ref* edges CADKIT_HXI_IN_ARRAY(edge_count),
+    uint32_t edge_count,
+    double distance,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
 /* Operation variants retain OCCT's topology history alongside the result. */
 CADKIT_API cad_result cad_shape_translate_operation(
     cad_shape shape,
@@ -222,6 +247,20 @@ CADKIT_API cad_result cad_shape_fillet_operation(
 
 CADKIT_API cad_result cad_shape_chamfer_operation(
     cad_shape shape,
+    double distance,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
+CADKIT_API cad_result cad_shape_fillet_edges_operation(
+    cad_shape shape,
+    const cad_shape_ref* edges CADKIT_HXI_IN_ARRAY(edge_count),
+    uint32_t edge_count,
+    double radius,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
+CADKIT_API cad_result cad_shape_chamfer_edges_operation(
+    cad_shape shape,
+    const cad_shape_ref* edges CADKIT_HXI_IN_ARRAY(edge_count),
+    uint32_t edge_count,
     double distance,
     cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 

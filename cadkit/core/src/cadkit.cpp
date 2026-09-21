@@ -650,6 +650,80 @@ cad_result configure_all_edge_finish(
     return CAD_OK;
 }
 
+cad_result collect_selected_edges(
+    const TopoDS_Shape& source,
+    const cad_shape_ref* edge_handles,
+    std::uint32_t edge_count,
+    std::vector<TopoDS_Shape>& out_edges) {
+    if (edge_handles == nullptr || edge_count == 0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "selected edge list must not be empty");
+    }
+
+    std::vector<TopoDS_Shape> source_edges;
+    for (TopExp_Explorer explorer(source, TopAbs_EDGE); explorer.More(); explorer.Next()) {
+        source_edges.push_back(explorer.Current());
+    }
+    if (source_edges.empty()) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "edge finish requires at least one edge");
+    }
+
+    out_edges.reserve(edge_count);
+    for (std::uint32_t index = 0; index < edge_count; ++index) {
+        TopoDS_Shape selected;
+        const auto copy_result = copy_shape(edge_handles[index].shape, selected);
+        if (copy_result != CAD_OK) {
+            return copy_result;
+        }
+        if (selected.IsNull() || selected.ShapeType() != TopAbs_EDGE) {
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "selected edge handle is not an edge");
+        }
+
+        bool belongs_to_source = false;
+        for (const auto& source_edge : source_edges) {
+            if (selected.IsSame(source_edge)) {
+                belongs_to_source = true;
+                break;
+            }
+        }
+        if (!belongs_to_source) {
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "selected edge does not belong to shape");
+        }
+
+        for (const auto& previous : out_edges) {
+            if (selected.IsSame(previous)) {
+                return fail(CAD_ERROR_INVALID_ARGUMENT, "selected edge list contains duplicates");
+            }
+        }
+        out_edges.push_back(std::move(selected));
+    }
+    return CAD_OK;
+}
+
+template <typename Builder>
+cad_result configure_selected_edge_finish(
+    Builder& operation,
+    const TopoDS_Shape& source,
+    const cad_shape_ref* edge_handles,
+    std::uint32_t edge_count,
+    double amount,
+    const char* operation_name) {
+    std::vector<TopoDS_Shape> selected_edges;
+    const auto collect_result = collect_selected_edges(
+        source, edge_handles, edge_count, selected_edges);
+    if (collect_result != CAD_OK) {
+        return collect_result;
+    }
+
+    for (const auto& selected_edge : selected_edges) {
+        operation.Add(amount, TopoDS::Edge(selected_edge));
+    }
+    operation.Build();
+    if (!operation.IsDone() || operation.Shape().IsNull()) {
+        return fail(CAD_ERROR_OPERATION_FAILED, operation_name);
+    }
+    return CAD_OK;
+}
+
 template <typename Builder>
 cad_result make_edge_finish_shape(
     cad_shape handle,
@@ -707,6 +781,99 @@ cad_result make_edge_finish_operation(
         Builder operation(source);
         const auto configure_result = configure_all_edge_finish(
             operation, source, amount, operation_name);
+        if (configure_result != CAD_OK) {
+            return configure_result;
+        }
+
+        OperationData data;
+        data.result = operation.Shape();
+        const auto history_result = collect_operation_history(operation, source, nullptr, data);
+        if (history_result != CAD_OK) {
+            return history_result;
+        }
+        return insert_operation(std::move(data), out_operation);
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown edge finish exception");
+    }
+}
+
+template <typename Builder>
+cad_result make_selected_edge_finish_shape(
+    cad_shape handle,
+    const cad_shape_ref* edge_handles,
+    std::uint32_t edge_count,
+    double amount,
+    cad_shape* out_shape,
+    const char* operation_name) {
+    if (out_shape == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    }
+    *out_shape = 0;
+
+    TopoDS_Shape source;
+    const auto copy_result = copy_shape(handle, source);
+    if (copy_result != CAD_OK) {
+        return copy_result;
+    }
+
+    try {
+        Builder operation(source);
+        const auto configure_result = configure_selected_edge_finish(
+            operation,
+            source,
+            edge_handles,
+            edge_count,
+            amount,
+            operation_name);
+        if (configure_result != CAD_OK) {
+            return configure_result;
+        }
+        return insert_shape(operation.Shape(), out_shape);
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown edge finish exception");
+    }
+}
+
+template <typename Builder>
+cad_result make_selected_edge_finish_operation(
+    cad_shape handle,
+    const cad_shape_ref* edge_handles,
+    std::uint32_t edge_count,
+    double amount,
+    cad_operation* out_operation,
+    const char* operation_name) {
+    if (out_operation == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_operation must not be null");
+    }
+    *out_operation = 0;
+
+    TopoDS_Shape source;
+    const auto copy_result = copy_shape(handle, source);
+    if (copy_result != CAD_OK) {
+        return copy_result;
+    }
+
+    try {
+        Builder operation(source);
+        const auto configure_result = configure_selected_edge_finish(
+            operation,
+            source,
+            edge_handles,
+            edge_count,
+            amount,
+            operation_name);
         if (configure_result != CAD_OK) {
             return configure_result;
         }
@@ -1510,6 +1677,44 @@ extern "C" CADKIT_API cad_result cad_shape_chamfer(
         shape, distance, out_shape, "chamfer produced no shape");
 }
 
+extern "C" CADKIT_API cad_result cad_shape_fillet_edges(
+    cad_shape shape,
+    const cad_shape_ref* edges,
+    std::uint32_t edge_count,
+    double radius,
+    cad_shape* out_shape) {
+    clear_error();
+    if (!std::isfinite(radius) || radius <= 0.0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "fillet radius must be finite and positive");
+    }
+    return make_selected_edge_finish_shape<BRepFilletAPI_MakeFillet>(
+        shape,
+        edges,
+        edge_count,
+        radius,
+        out_shape,
+        "fillet produced no shape");
+}
+
+extern "C" CADKIT_API cad_result cad_shape_chamfer_edges(
+    cad_shape shape,
+    const cad_shape_ref* edges,
+    std::uint32_t edge_count,
+    double distance,
+    cad_shape* out_shape) {
+    clear_error();
+    if (!std::isfinite(distance) || distance <= 0.0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "chamfer distance must be finite and positive");
+    }
+    return make_selected_edge_finish_shape<BRepFilletAPI_MakeChamfer>(
+        shape,
+        edges,
+        edge_count,
+        distance,
+        out_shape,
+        "chamfer produced no shape");
+}
+
 extern "C" CADKIT_API cad_result cad_shape_translate_operation(
     cad_shape shape,
     cad_vec3 delta,
@@ -1635,6 +1840,44 @@ extern "C" CADKIT_API cad_result cad_shape_chamfer_operation(
     }
     return make_edge_finish_operation<BRepFilletAPI_MakeChamfer>(
         shape, distance, out_operation, "chamfer produced no shape");
+}
+
+extern "C" CADKIT_API cad_result cad_shape_fillet_edges_operation(
+    cad_shape shape,
+    const cad_shape_ref* edges,
+    std::uint32_t edge_count,
+    double radius,
+    cad_operation* out_operation) {
+    clear_error();
+    if (!std::isfinite(radius) || radius <= 0.0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "fillet radius must be finite and positive");
+    }
+    return make_selected_edge_finish_operation<BRepFilletAPI_MakeFillet>(
+        shape,
+        edges,
+        edge_count,
+        radius,
+        out_operation,
+        "fillet produced no shape");
+}
+
+extern "C" CADKIT_API cad_result cad_shape_chamfer_edges_operation(
+    cad_shape shape,
+    const cad_shape_ref* edges,
+    std::uint32_t edge_count,
+    double distance,
+    cad_operation* out_operation) {
+    clear_error();
+    if (!std::isfinite(distance) || distance <= 0.0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "chamfer distance must be finite and positive");
+    }
+    return make_selected_edge_finish_operation<BRepFilletAPI_MakeChamfer>(
+        shape,
+        edges,
+        edge_count,
+        distance,
+        out_operation,
+        "chamfer produced no shape");
 }
 
 extern "C" CADKIT_API cad_result cad_fuse(
