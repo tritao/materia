@@ -7,6 +7,7 @@ import robotkit.model.Robot;
 import robotkit.runtime.Runtime;
 import robotkit.runtime.RuntimeCompiler;
 import robotkit.runtime.RuntimeLayout;
+import robotkit.runtime.Simulation;
 import robotkit.behavior.RobotBehavior;
 import robotd.behaviors.OscillateBehavior;
 
@@ -35,23 +36,35 @@ class RobotHost {
     shoulder.limits.effort = 100.0;
     var compiled = RuntimeCompiler.compile(robot);
     if (args.indexOf("--server") >= 0) {
-      var serverRuntime = Runtime.createSim(RuntimeCompiler.blueprint(compiled));
-      var server = new RobotServer(robot, compiled, serverRuntime, port, robotId, behavior);
-      server.run(args.indexOf("--once") >= 0);
+      var serverSimulation = new Simulation();
+      try {
+        var serverRuntime = serverSimulation.addRobot(RuntimeCompiler.blueprint(compiled));
+        var server = new RobotServer(robot, compiled, serverRuntime, port, robotId, behavior);
+        server.run(args.indexOf("--once") >= 0);
+      } catch (error:Dynamic) {
+        serverSimulation.dispose();
+        throw error;
+      }
+      serverSimulation.dispose();
       return;
     }
-    var runtime = if (args.indexOf("--in-memory") >= 0) {
-      Runtime.create(new RuntimeLayout(compiled.revision, compiled.jointCount, compiled.source.links.length));
-    } else {
-      Runtime.createSim(RuntimeCompiler.blueprint(compiled));
-    };
+    var inMemory = args.indexOf("--in-memory") >= 0;
+    var simulation:Null<Simulation> = inMemory ? null : new Simulation();
+    var runtime = inMemory
+      ? Runtime.create(new RuntimeLayout(compiled.revision, compiled.jointCount, compiled.source.links.length))
+      : simulation.addRobot(RuntimeCompiler.blueprint(compiled));
     runtime.submitPositions([0.5], 1);
-    runtime.step(haxe.Int64.ofInt(1));
+    if (simulation == null)
+      runtime.step(haxe.Int64.ofInt(1));
+    else
+      simulation.step(haxe.Int64.ofInt(1));
     var snapshot = runtime.snapshot();
     var endpoint = args.indexOf("--in-memory") >= 0 ? "in-memory" : "simkit";
     Sys.println('robotd: compiled ${compiled.source.name} with ${compiled.jointCount} joints via $endpoint; '
       + 'native position=${snapshot.positions[0]}');
     runtime.dispose();
+    if (simulation != null)
+      simulation.dispose();
   }
 
   function parsePort():Int {

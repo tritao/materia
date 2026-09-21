@@ -1,6 +1,9 @@
 package tests;
 
 import haxe.Int64;
+import robotkit.runtime.RuntimeBlueprint;
+import robotkit.runtime.RuntimeJointBlueprint;
+import robotkit.runtime.Simulation;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotDescription;
@@ -9,21 +12,20 @@ import robotkit.world.RobotId;
 import robotkit.world.RobotInstance;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.RobotStatus;
+import robotkit.world.RemoteRobot;
+import robotkit.world.SimulatedRobot;
 import robotkit.world.StopMode;
 import robotkit.world.WorldHost;
 
 class WorldHostTests {
   static var assertions = 0;
 
-  // Keeps the optional native simulation façade in the package compile surface.
-  static function simulationTypeCheck(value:robotkit.runtime.Simulation):robotkit.runtime.Simulation
-    return value;
-
   public static function main():Void {
     testAttachDetachAndIdentity();
     testSequenceAndTopology();
     testImmutableSnapshots();
     testForwardingAndLifecycle();
+    testMixedSimulatedAndRemoteWorld();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
   }
 
@@ -98,6 +100,71 @@ class WorldHostTests {
     world.close();
     equal(robot.closeCount, 1, "world close is idempotent");
     throws(function() world.submit("arm", command), "closed world rejects commands");
+  }
+
+  static function testMixedSimulatedAndRemoteWorld():Void {
+    var blueprint = new RuntimeBlueprint(1, 1, 2);
+    blueprint.addJoint(new RuntimeJointBlueprint(
+      0,
+      RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE,
+      0,
+      1,
+      -3.14,
+      3.14,
+      100.0
+    ));
+    var simulation = new Simulation();
+    var first = new SimulatedRobot(
+      "sim-a",
+      simulation.addRobot(blueprint),
+      "simulated A",
+      ["base", "tool"],
+      ["shoulder"]
+    );
+    var second = new SimulatedRobot(
+      "sim-b",
+      simulation.addRobot(blueprint),
+      "simulated B",
+      ["base", "tool"],
+      ["shoulder"]
+    );
+    var remote = new RemoteRobot("remote-c");
+    var world = new WorldHost();
+    world.attach(first);
+    world.attach(second);
+    world.attach(remote);
+
+    world.submit("sim-a", RobotCommand.JointPosition(0, 0.4, null));
+    world.submit("sim-b", RobotCommand.JointPosition(0, -0.3, null));
+    simulation.step(Int64.ofInt(1000));
+
+    var value = world.snapshot();
+    var firstState = value.robot("sim-a");
+    var secondState = value.robot("sim-b");
+    var remoteState = value.robot("remote-c");
+    check(firstState != null, "mixed world contains first simulated robot");
+    check(secondState != null, "mixed world contains second simulated robot");
+    check(remoteState != null, "mixed world contains remote robot");
+    var firstValue:RobotSnapshot = cast firstState;
+    var secondValue:RobotSnapshot = cast secondState;
+    var remoteValue:RobotSnapshot = cast remoteState;
+    check(Math.abs(firstValue.positions[0] - 0.4) < 0.000000001,
+      "first simulated command routed independently");
+    check(Math.abs(secondValue.positions[0] + 0.3) < 0.000000001,
+      "second simulated command routed independently");
+    equal(firstValue.timestampNs, Int64.ofInt(1000), "shared simulation timestamp reaches first robot");
+    equal(secondValue.timestampNs, Int64.ofInt(1000), "shared simulation timestamp reaches second robot");
+    equal(remoteValue.sourceSequence, Int64.ofInt(0), "remote state remains independently sourced");
+    var remoteStatus = remote.status();
+    check(switch remoteStatus {
+      case RobotStatus.Disconnected: true;
+      case _: false;
+    }, "unconnected remote remains disconnected");
+
+    world.close();
+    simulation.step(Int64.ofInt(2000));
+    equal(simulation.stepIndex(), Int64.ofInt(2), "WorldHost does not own shared simulation");
+    simulation.dispose();
   }
 
   static function check(value:Bool, message:String):Void {

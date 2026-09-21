@@ -1,7 +1,6 @@
 package robotkit.runtime;
 
 import RobotKitRuntime;
-import RobotKitSimKit;
 
 /** Coarse-grained Haxeon façade over the native RobotKit runtime. */
 class Runtime {
@@ -16,12 +15,6 @@ class Runtime {
   public static function create(layout:RuntimeLayout):Runtime {
     var result = RobotKitRuntime.rk_runtime_create(layout.nativeValue());
     check(result.status, "runtime.create");
-    return new Runtime(result.out_runtime);
-  }
-
-  public static function createSim(blueprint:RuntimeBlueprint):Runtime {
-    var result = RobotKitSimKit.rk_runtime_create_sim(blueprint.nativeValue());
-    check(result.status, "runtime.createSim");
     return new Runtime(result.out_runtime);
   }
 
@@ -59,6 +52,29 @@ class Runtime {
     }
     check(RobotKitRuntime.rk_runtime_submit(owner.borrow(), command),
       "runtime.submitPositions");
+  }
+
+  /** Submits one position target without implying ownership of a simulation tick. */
+  public function submitPosition(joint:Int, targetValue:Float, sequence:Int,
+      ?timestampNs:haxe.Int64):Void {
+    ensureLive();
+    if (joint < 0 || joint >= RobotKitRuntimeConstants.RK_MAX_JOINTS)
+      throw "Invalid RobotKit joint target";
+    var command = new rk_robot_command();
+    command.set_struct_size(rk_robot_command.size());
+    command.set_sequence(haxe.Int64.ofInt(sequence));
+    command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
+    command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_JOINT_TARGETS);
+    command.set_target_count(1);
+    var target = new rk_joint_target();
+    target.set_joint(joint);
+    target.set_mode(RobotKitRuntimeConstants.RK_TARGET_POSITION);
+    target.set_target(targetValue);
+    target.set_max_rate(0.0);
+    target.set_max_effort(0.0);
+    command.set_targets(0, target);
+    check(RobotKitRuntime.rk_runtime_submit(owner.borrow(), command),
+      "runtime.submitPosition");
   }
 
   /** Submits a stop to the owner thread; it never steps synchronously. */

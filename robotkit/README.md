@@ -46,6 +46,13 @@ coordinator drains every robot's commands, advances the shared world once, and
 publishes every robot state from the resulting snapshot. The Haxe
 `robotkit.runtime.Simulation` façade exposes the same lifecycle while behavior
 code continues to depend on robot-scoped submit/snapshot APIs.
+Participating runtimes cannot be stepped individually; applications must call
+`Simulation.step()` so the shared-world boundary remains explicit.
+
+`robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
+`RobotInstance` interface used by `RemoteRobot`. It does not own or dispose the
+shared simulation, allowing one `WorldHost` to contain local simulated robots
+and remote physical robots without backend-specific orchestration.
 
 Behavior hosting builds on that same boundary. `RobotBehaviorRunner` receives a
 `RobotSnapshot`, gives a behavior a read-only `RobotContext`, and publishes the

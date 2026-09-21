@@ -38,11 +38,6 @@ RK_API rk_result RK_CALL rk_simulation_stop(rk_simulation simulation);
 RK_API rk_result RK_CALL rk_simulation_get_clock(
     rk_simulation simulation, rk_simulation_clock *out_clock RK_INOUT);
 
-/** Compatibility helper creating an implicit one-robot simulation. */
-RK_API rk_result RK_CALL rk_runtime_create_sim(
-    const rk_runtime_blueprint *blueprint,
-    rk_runtime *out_runtime RK_OUT RK_OWNED);
-
 #ifdef __cplusplus
 }
 #endif

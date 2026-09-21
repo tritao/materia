@@ -35,21 +35,6 @@ rk_robot_state snapshot(rk_runtime runtime) {
     return value;
 }
 
-void single_robot_compatibility() {
-    const auto model = blueprint(7);
-    rk_runtime runtime = RK_INVALID_RUNTIME;
-    assert(rk_runtime_create_sim(&model, &runtime) == RK_OK);
-    const auto command = target(0.5, 1);
-    assert(rk_runtime_submit(runtime, &command) == RK_OK);
-    assert(rk_runtime_step(runtime, 100) == RK_OK);
-    const auto state = snapshot(runtime);
-    assert(state.joint_count == 1);
-    assert(state.sequence == 1);
-    assert(state.timestamp_ns == 100);
-    assert(std::abs(state.position[0] - 0.5) < 1e-12);
-    rk_runtime_destroy(runtime);
-}
-
 void shared_world_steps_once() {
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
@@ -70,8 +55,9 @@ void shared_world_steps_once() {
     assert(rk_runtime_submit(first, &first_command) == RK_OK);
     assert(rk_runtime_submit(second, &second_command) == RK_OK);
 
-    // Stepping either simulated runtime delegates to their common coordinator.
-    assert(rk_runtime_step(first, 1000) == RK_OK);
+    // Participating runtimes cannot pretend to advance shared simulation time.
+    assert(rk_runtime_step(first, 1000) == RK_ERROR_INVALID_STATE);
+    assert(rk_simulation_step(simulation, 1000) == RK_OK);
     rk_simulation_clock clock{};
     clock.struct_size = sizeof(clock);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
@@ -91,7 +77,8 @@ void shared_world_steps_once() {
     assert(rk_simulation_add_robot(simulation, &first_model, &late) ==
            RK_ERROR_INVALID_STATE);
 
-    assert(rk_runtime_step(second, 2000) == RK_OK);
+    assert(rk_runtime_step(second, 2000) == RK_ERROR_INVALID_STATE);
+    assert(rk_simulation_step(simulation, 2000) == RK_OK);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
     assert(clock.step_index == 2);
     assert(snapshot(first).sequence == 2);
@@ -145,7 +132,6 @@ void failed_command_phase_does_not_advance() {
 } // namespace
 
 int main() {
-    single_robot_compatibility();
     shared_world_steps_once();
     failed_command_phase_does_not_advance();
     return 0;

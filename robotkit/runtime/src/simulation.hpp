@@ -22,7 +22,7 @@ public:
     rk_result add_robot(const rk_runtime_blueprint &blueprint, rk_runtime &out_runtime);
     rk_result start() override;
     rk_result stop() override;
-    rk_result step(uint64_t timestamp_ns) override;
+    rk_result step(uint64_t timestamp_ns);
     uint64_t step_index() const;
     double simulation_time() const;
 

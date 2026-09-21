@@ -93,22 +93,4 @@ rk_result RK_CALL rk_simulation_get_clock(rk_simulation simulation,
     return RK_OK;
 }
 
-rk_result RK_CALL rk_runtime_create_sim(const rk_runtime_blueprint *blueprint,
-                                        rk_runtime *out_runtime) {
-    if (!out_runtime || rk_runtime_blueprint_validate(blueprint) != RK_OK)
-        return RK_ERROR_INVALID_ARGUMENT;
-    *out_runtime = RK_INVALID_RUNTIME;
-    try {
-        auto simulation = std::make_shared<robotkit::Simulation>(0.01, 1);
-        const auto result = simulation->add_robot(*blueprint, *out_runtime);
-        if (result == RK_OK)
-            robotkit::internal::attach_runtime_owner(*out_runtime, simulation);
-        return result;
-    } catch (const std::bad_alloc &) {
-        return RK_ERROR_OUT_OF_MEMORY;
-    } catch (...) {
-        return RK_ERROR_BACKEND;
-    }
-}
-
 } // extern "C"
