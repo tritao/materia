@@ -804,6 +804,25 @@ bool ensure_postprocess_target(StateT &state, std::uint32_t width, std::uint32_t
 }
 
 template <class StateT>
+void destroy_postprocess_pipeline_resources(StateT &state) noexcept {
+    /* Pipeline construction is multi-step. If one step fails, discard every
+     * resource created by the attempt so a later CPU fallback or retry does
+     * not inherit a half-initialized GPU state. */
+    if (state.renderer.id && state.postprocess_sampler.id)
+        (void)nkgpu_sampler_destroy(state.renderer, state.postprocess_sampler);
+    if (state.renderer.id && state.postprocess_pipeline.id)
+        (void)nkgpu_pipeline_destroy(state.renderer, state.postprocess_pipeline);
+    if (state.renderer.id && state.postprocess_shader.id)
+        (void)nkgpu_shader_destroy(state.renderer, state.postprocess_shader);
+    if (state.renderer.id && state.postprocess_vertex_buffer.id)
+        (void)nkgpu_buffer_destroy(state.renderer, state.postprocess_vertex_buffer);
+    state.postprocess_sampler = {};
+    state.postprocess_pipeline = {};
+    state.postprocess_shader = {};
+    state.postprocess_vertex_buffer = {};
+}
+
+template <class StateT>
 bool ensure_postprocess_pipeline(StateT &state, GpuExecutionStats &stats) {
     if (state.postprocess_pipeline.id)
         return true;
@@ -812,6 +831,11 @@ bool ensure_postprocess_pipeline(StateT &state, GpuExecutionStats &stats) {
         nkgpu_query_backend(state.renderer));
     if (!sources.vertex || !sources.fragment)
         return set_failure(state, stats, NKGPU_ERROR_UNSUPPORTED);
+
+    const auto fail_setup = [&](nkgpu_result failure) {
+        destroy_postprocess_pipeline_resources(state);
+        return set_failure(state, stats, failure);
+    };
 
     nkgpu_result result = NKGPU_OK;
     if (!state.postprocess_vertex_buffer.id) {
@@ -823,14 +847,14 @@ bool ensure_postprocess_pipeline(StateT &state, GpuExecutionStats &stats) {
             state.renderer, reinterpret_cast<const std::uint8_t *>(fullscreen_triangle),
             sizeof(fullscreen_triangle), &state.postprocess_vertex_buffer);
         if (result != NKGPU_OK)
-            return set_failure(state, stats, result);
+            return fail_setup(result);
     }
     if (!state.postprocess_shader.id) {
         nkgpu_shader_builder shader_builder{};
         result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex,
                                     sources.fragment, &shader_builder);
         if (result != NKGPU_OK)
-            return set_failure(state, stats, result);
+            return fail_setup(result);
         if ((result = nkgpu_shader_uniform_block(
                  shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                  sizeof(PostProcessUniformData))) != NKGPU_OK ||
@@ -843,14 +867,14 @@ bool ensure_postprocess_pipeline(StateT &state, GpuExecutionStats &stats) {
             (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                            "source_image")) != NKGPU_OK ||
             (result = nkgpu_shader_end(shader_builder, &state.postprocess_shader)) != NKGPU_OK)
-            return set_failure(state, stats, result);
+            return fail_setup(result);
     }
 
     nkgpu_pipeline_builder pipeline_builder{};
     if ((result = nkgpu_pipeline_begin(state.renderer, state.postprocess_shader,
                                        sizeof(float) * 2,
                                        &pipeline_builder)) != NKGPU_OK)
-        return set_failure(state, stats, result);
+        return fail_setup(result);
     if ((result = nkgpu_pipeline_attribute(pipeline_builder, 0, 0, 0,
                                            NKGPU_VERTEXFORMAT_FLOAT2)) != NKGPU_OK ||
         (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 0, sizeof(float) * 2,
@@ -861,13 +885,14 @@ bool ensure_postprocess_pipeline(StateT &state, GpuExecutionStats &stats) {
         (result = nkgpu_pipeline_color_target(pipeline_builder, 0, NKGPU_IMAGEFORMAT_RGBA8,
                                               NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
         (result = nkgpu_pipeline_end(pipeline_builder, &state.postprocess_pipeline)) != NKGPU_OK)
-        return set_failure(state, stats, result);
+        return fail_setup(result);
 
-    result = nkgpu_sampler_create(state.renderer, NKGPU_FILTER_LINEAR, NKGPU_FILTER_LINEAR,
+    /* Match the CPU reference's nearest-neighbour distortion lookup. */
+    result = nkgpu_sampler_create(state.renderer, NKGPU_FILTER_NEAREST, NKGPU_FILTER_NEAREST,
                                   NKGPU_WRAP_CLAMP_TO_EDGE, NKGPU_WRAP_CLAMP_TO_EDGE,
                                   &state.postprocess_sampler);
     if (result != NKGPU_OK)
-        return set_failure(state, stats, result);
+        return fail_setup(result);
     return true;
 }
 

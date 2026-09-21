@@ -209,6 +209,34 @@ void camera_cpu_post_process_is_deterministic() {
     auto replay = source;
     camera.apply_post_process_cpu(replay, tick->header.sequence);
     assert(pixels == replay);
+
+    CameraConfig dropout_config = camera_config;
+    dropout_config.post_process.gain = 1.0f;
+    dropout_config.post_process.dropout_probability = 1.0f;
+    CameraSensor dropout_camera(sensor_config, dropout_config);
+    auto dropout_pixels = source;
+    dropout_camera.apply_post_process_cpu(dropout_pixels, tick->header.sequence);
+    for (std::size_t index = 0; index < dropout_pixels.size(); index += 4) {
+        assert(dropout_pixels[index + 0] == 0);
+        assert(dropout_pixels[index + 1] == 0);
+        assert(dropout_pixels[index + 2] == 0);
+        assert(dropout_pixels[index + 3] == 255);
+    }
+
+    CameraConfig distortion_config = camera_config;
+    distortion_config.post_process.gain = 1.0f;
+    distortion_config.post_process.distortion_k1 = 100.0f;
+    distortion_config.width = 2;
+    distortion_config.height = 2;
+    CameraSensor distortion_camera(sensor_config, distortion_config);
+    auto distortion_pixels = std::vector<std::uint8_t>(16, 127);
+    distortion_camera.apply_post_process_cpu(distortion_pixels, tick->header.sequence);
+    for (std::size_t index = 0; index < distortion_pixels.size(); index += 4) {
+        assert(distortion_pixels[index + 0] == 0);
+        assert(distortion_pixels[index + 1] == 0);
+        assert(distortion_pixels[index + 2] == 0);
+        assert(distortion_pixels[index + 3] == 255);
+    }
 }
 
 void depth_packages_metric_pixels() {

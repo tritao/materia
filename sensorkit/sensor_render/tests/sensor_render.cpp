@@ -111,6 +111,7 @@ void captures_emissive_triangle() {
     processed_sensor_config.frame = 14;
     CameraConfig processed_camera_config = camera_config;
     processed_camera_config.post_process.gain = 0.5f;
+    processed_camera_config.post_process.quantization = 0.25f;
     CameraSensor processed_camera(processed_sensor_config, processed_camera_config);
     const auto processed_tick = processed_camera.trigger(1.25);
     assert(processed_tick.has_value());
@@ -120,8 +121,30 @@ void captures_emissive_triangle() {
     assert(processed_frame.has_value());
     const auto *processed_center = processed_frame->pixel(8, 8);
     assert(processed_center);
+    auto expected_processed_pixels = frame->rgba8;
+    processed_camera.apply_post_process_cpu(expected_processed_pixels,
+                                             processed_tick->header.sequence);
+    const auto *expected_processed_center =
+        expected_processed_pixels.data() + (8u * 16u + 8u) * 4u;
+    assert(std::abs(static_cast<int>(processed_center[0]) - expected_processed_center[0]) <= 1);
     assert(processed_center[0] > 90 && processed_center[0] < 160);
     assert(processed_center[1] < 20 && processed_center[2] < 20 && processed_center[3] > 200);
+
+    SensorConfig dropout_sensor_config = processed_sensor_config;
+    dropout_sensor_config.id = 54;
+    CameraConfig dropout_camera_config = camera_config;
+    dropout_camera_config.post_process.dropout_probability = 1.0f;
+    CameraSensor dropout_camera(dropout_sensor_config, dropout_camera_config);
+    const auto dropout_tick = dropout_camera.trigger(1.25);
+    assert(dropout_tick.has_value());
+    std::optional<CameraFrame> dropout_frame;
+    assert(adapter.capture(dropout_camera, *dropout_tick, scene->snapshot(), {}, dropout_frame) ==
+           NKGPU_OK);
+    assert(dropout_frame.has_value());
+    const auto *dropout_center = dropout_frame->pixel(8, 8);
+    assert(dropout_center);
+    assert(dropout_center[0] == 0 && dropout_center[1] == 0 && dropout_center[2] == 0 &&
+           dropout_center[3] == 255);
 
     SensorConfig depth_sensor_config;
     depth_sensor_config.id = 51;

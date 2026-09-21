@@ -158,13 +158,25 @@ nkgpu_result SceneCameraAdapter::capture(CameraSensor &sensor, const SensorTick 
                                             backend == NKGPU_BACKEND_GLES3;
     const bool use_gpu_post_process = camera.post_process.enabled() &&
                                       gpu_post_process_supported;
-    const auto result = executor_.capture_rgba8(
+    auto result = executor_.capture_rgba8(
         plan, snapshot, camera.width, camera.height, camera.clear_color, pixels,
         use_gpu_post_process ? gpu_post_process : nkscene::RgbaPostProcess{});
-    if (result != NKGPU_OK)
-        return result;
-    if (camera.post_process.enabled() && !use_gpu_post_process)
+
+    /* A backend may advertise a path but reject a particular shader or image
+     * format at runtime. In that case retry the raw capture and preserve the
+     * sensor contract with the portable CPU model. Other failures still
+     * propagate because hiding device or frame errors would be dangerous. */
+    if (result == NKGPU_ERROR_UNSUPPORTED && use_gpu_post_process) {
+        result = executor_.capture_rgba8(plan, snapshot, camera.width, camera.height,
+                                         camera.clear_color, pixels);
+        if (result != NKGPU_OK)
+            return result;
         sensor.apply_post_process_cpu(pixels, tick.header.sequence);
+    } else if (result != NKGPU_OK) {
+        return result;
+    } else if (camera.post_process.enabled() && !use_gpu_post_process) {
+        sensor.apply_post_process_cpu(pixels, tick.header.sequence);
+    }
     out_frame = sensor.sample(tick, pixels);
     return out_frame.has_value() ? NKGPU_OK : NKGPU_ERROR_INVALID_ARGUMENT;
 }

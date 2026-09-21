@@ -42,6 +42,14 @@ dropout. Other backends use the same deterministic CPU reference model. The
 raw scene pass and post-processing pass use separate images so a pass never
 samples from the image it is currently rendering to.
 
+The processing contract is intentionally small and fixed: each output pixel
+is inverse-mapped through radial distortion, independently dropped if selected,
+then processed in this order: exposure and gain, additive Gaussian noise,
+quantization, and final clamping. RGB values are normalized to `[0, 1]`; alpha
+is preserved unless a pixel is dropped, in which case the result is opaque
+black. Both implementations use nearest-neighbour lookup for distortion so
+the CPU fallback and GPU path have the same sampling semantics.
+
 The first camera slice intentionally covers perspective RGB capture only.
 Perspective metric depth capture is now also available through
 `SceneCameraAdapter::capture_depth`; it converts the renderer's nonlinear
