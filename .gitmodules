@@ -1,0 +1,28 @@
+[submodule "haxeon"]
+	path = haxeon
+	url = https://github.com/tritao/haxeon.git
+[submodule "nativekit"]
+	path = nativekit
+	url = https://github.com/tritao/nativekit.git
+[submodule "uikit/vendor/clay"]
+	path = uikit/vendor/clay
+	url = https://github.com/tritao/clay.git
+	branch = nativekit
+[submodule "uikit/vendor/nanovg"]
+	path = uikit/vendor/nanovg
+	url = https://github.com/tritao/nanovg.git
+[submodule "uikit/vendor/skribidi"]
+	path = uikit/vendor/skribidi
+	url = https://github.com/tritao/Skribidi.git
+[submodule "uikit/vendor/harfbuzz"]
+	path = uikit/vendor/harfbuzz
+	url = https://github.com/harfbuzz/harfbuzz.git
+[submodule "uikit/vendor/sheenbidi"]
+	path = uikit/vendor/sheenbidi
+	url = https://github.com/Tehreer/SheenBidi.git
+[submodule "uikit/vendor/libunibreak"]
+	path = uikit/vendor/libunibreak
+	url = https://github.com/adah1972/libunibreak.git
+[submodule "uikit/vendor/budouxc"]
+	path = uikit/vendor/budouxc
+	url = https://github.com/memononen/budouxc.git
