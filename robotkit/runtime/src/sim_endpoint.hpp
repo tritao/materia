@@ -1,7 +1,6 @@
 #ifndef ROBOTKIT_SIM_ENDPOINT_HPP
 #define ROBOTKIT_SIM_ENDPOINT_HPP
 
-#include "robotkit_core.h"
 #include "robotkit_runtime.hpp"
 
 #include "nativekit_sim.h"

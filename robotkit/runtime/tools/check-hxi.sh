@@ -16,7 +16,6 @@ output=${1:-"$module_dir/bindings/robotkit-runtime.hxi"}
     --library=robotkit_runtime \
     --interface=RobotKitRuntime \
     --include="$module_dir/include" \
-    --include="$robotkit_dir/core/include" \
     --source-label=runtime/bindings/robotkit_runtime_import.h \
     --output="$output" \
     "$module_dir/bindings/robotkit_runtime_import.h"

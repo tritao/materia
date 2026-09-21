@@ -4,10 +4,10 @@ RobotKit is the complete robotics layer for Materia. It owns robot models,
 commands, control, runtime ownership, endpoint adapters, world orchestration,
 and the protocol shared by `robotd` and editor clients.
 
-The first increment contains four deliberately small boundaries:
+The first increment contains deliberately small boundaries:
 
-- `core`: engine-neutral runtime values and validation;
-- `runtime`: an owner-thread runtime, command mailbox, and immutable snapshots;
+- `runtime`: engine-neutral values and validation, an owner-thread runtime,
+  command mailbox, and immutable snapshots;
 - `haxe/robotkit/protocol`: versioned framing independent of any particular transport;
 - `haxe`: Haxeon façades, protocol clients, and world orchestration;
 - `robotd`: one independently deployable logical robot host;
@@ -30,7 +30,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The canonical CMake targets are `RobotKit::core` and `RobotKit::runtime`.
+The canonical native CMake target is `RobotKit::runtime`.
 
 `robotd/native` enables the SimKit endpoint and builds the native dependency
 graph consumed by the Haxeon host. The Haxe façade and wire protocol are under

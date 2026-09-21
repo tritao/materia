@@ -1,7 +1,7 @@
 #ifndef ROBOTKIT_RUNTIME_HPP
 #define ROBOTKIT_RUNTIME_HPP
 
-#include "robotkit_core.h"
+#include "robotkit_runtime.h"
 
 #include <chrono>
 #include <condition_variable>
@@ -13,7 +13,7 @@
 
 namespace robotkit {
 
-class Endpoint {
+class RK_API Endpoint {
 public:
     virtual ~Endpoint() = default;
 
@@ -26,7 +26,7 @@ public:
  * bring-up. It is intentionally not a simulator; it only moves joints toward
  * the most recent position targets.
  */
-class InMemoryEndpoint final : public Endpoint {
+class RK_API InMemoryEndpoint final : public Endpoint {
 public:
     explicit InMemoryEndpoint(uint32_t joint_count);
 
@@ -40,7 +40,7 @@ private:
     bool stopped_ = false;
 };
 
-class Runtime final {
+class RK_API Runtime final {
 public:
     Runtime(const rk_runtime_layout &layout, std::unique_ptr<Endpoint> endpoint,
             std::chrono::nanoseconds period = std::chrono::milliseconds(10));

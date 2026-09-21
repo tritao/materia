@@ -18,7 +18,7 @@ output=${1:-"$module_dir/bindings/robotkit-simkit.hxi"}
     --depends=RobotKitRuntime \
     --dependency-hxi="$module_dir/bindings/robotkit-runtime.hxi" \
     --include="$module_dir/include" \
-    --include="$robotkit_dir/core/include" \
+    --exclude-header="$module_dir/include/robotkit_runtime.h" \
     --source-label=runtime/bindings/robotkit_simkit_import.h \
     --output="$output" \
     "$module_dir/bindings/robotkit_simkit_import.h"

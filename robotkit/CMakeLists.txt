@@ -14,7 +14,6 @@ if(RK_BUILD_SHARED AND NOT EMSCRIPTEN)
     set(RK_LIBRARY_TYPE SHARED)
 endif()
 
-add_subdirectory(core)
 add_subdirectory(runtime)
 
 if(RK_BUILD_SIMKIT_ENDPOINT)
