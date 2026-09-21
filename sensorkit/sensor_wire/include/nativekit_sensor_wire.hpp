@@ -1,0 +1,132 @@
+#pragma once
+
+#include "nativekit_sensor_core.hpp"
+
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <string>
+#include <vector>
+
+#if defined(_WIN32)
+#if defined(NKSENSOR_WIRE_STATIC)
+#define NKSENSOR_WIRE_API
+#elif defined(NKSENSOR_WIRE_BUILDING_LIBRARY)
+#define NKSENSOR_WIRE_API __declspec(dllexport)
+#else
+#define NKSENSOR_WIRE_API __declspec(dllimport)
+#endif
+#else
+#define NKSENSOR_WIRE_API __attribute__((visibility("default")))
+#endif
+
+namespace nksensor::wire {
+
+/**
+ * The MessagePack payload is framed with Haxeon's existing HMPK envelope:
+ * magic, version, flags, big-endian payload length, then exactly one value.
+ */
+constexpr std::uint8_t current_frame_version = 1;
+constexpr std::size_t frame_header_size = 10;
+constexpr std::size_t default_max_messagepack_bytes = 16 * 1024 * 1024;
+
+enum class MessageType : std::uint8_t {
+    camera_frame = 1,
+    depth_frame = 2,
+    segmentation_frame = 3,
+};
+
+enum class PixelFormat : std::uint8_t {
+    rgba8 = 1,
+    r32f_le = 2,
+    r32u_le = 3,
+    u64_le = 4,
+};
+
+/** A non-owning packed image-like payload view into an encoded HMPK message. */
+struct PackedFrameView {
+    SensorSampleHeader header;
+    MessageType type = MessageType::camera_frame;
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    std::uint32_t stride = 0;
+    PixelFormat format = PixelFormat::rgba8;
+    std::span<const std::uint8_t> data;
+};
+
+/** An owning packed-frame value detached from its encoded input buffer. */
+struct PackedFrame {
+    SensorSampleHeader header;
+    MessageType type = MessageType::camera_frame;
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    std::uint32_t stride = 0;
+    PixelFormat format = PixelFormat::rgba8;
+    std::vector<std::uint8_t> data;
+};
+
+/**
+ * Encode one tightly packed packed-frame payload.
+ *
+ * The MessagePack value is an integer-keyed map so it can be represented by a
+ * Haxeon `@:wire` record. The binary payload is field 12; it is never
+ * expanded into one MessagePack value per pixel.
+ */
+NKSENSOR_WIRE_API std::optional<std::vector<std::uint8_t>> encode_packed_frame(
+    const PackedFrameView &frame, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/**
+ * Validate and inspect one packed-frame message without copying its payload.
+ *
+ * The returned span remains valid only while `encoded` remains alive and
+ * unchanged.
+ */
+NKSENSOR_WIRE_API std::optional<PackedFrameView> view_packed_frame(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Decode one packed-frame message and own a copy of its binary payload. */
+NKSENSOR_WIRE_API std::optional<PackedFrame> decode_packed_frame(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Convenience wrapper for the packed RGBA8 camera representation. */
+NKSENSOR_WIRE_API std::optional<std::vector<std::uint8_t>> encode_camera_frame(
+    const CameraFrame &frame, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/**
+ * Convenience wrapper that requires a camera/RGBA8 packed-frame message.
+ */
+NKSENSOR_WIRE_API std::optional<PackedFrameView> view_camera_frame(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Decode one camera frame and copy its packed pixels into owned storage. */
+NKSENSOR_WIRE_API std::optional<CameraFrame> decode_camera_frame(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Encode metric depth as tightly packed little-endian R32F metres. */
+NKSENSOR_WIRE_API std::optional<std::vector<std::uint8_t>> encode_depth_frame(
+    const DepthFrame &frame, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Decode a packed little-endian R32F depth frame into owned metric values. */
+NKSENSOR_WIRE_API std::optional<DepthFrame> decode_depth_frame(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Encode segmentation labels losslessly as tightly packed little-endian U64. */
+NKSENSOR_WIRE_API std::optional<std::vector<std::uint8_t>> encode_segmentation_frame(
+    const SegmentationFrame &frame, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Decode a packed little-endian U64 segmentation frame into owned labels. */
+NKSENSOR_WIRE_API std::optional<SegmentationFrame> decode_segmentation_frame(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+} // namespace nksensor::wire

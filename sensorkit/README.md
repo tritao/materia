@@ -19,9 +19,28 @@ The current follow-up library is:
 
 ```text
 sensor_core    backend-independent scheduling, models, and data types
+sensor_wire    Haxeon-compatible MessagePack packed-frame packets
 sensor_sim     SimKit truth adapters
 sensor_render  SceneKit GPU rendering and RGBA8 camera capture
 ```
+
+`sensor_wire` is the first external transport slice. It reuses Haxeon's
+versioned `HMPK` envelope and encodes image-like sensor data as one
+integer-keyed MessagePack map whose payload is a packed binary field. Camera,
+depth, and segmentation share this `PackedFrame` wire shape; `messageType` and
+`pixelFormat` select the interpretation of the data. The integer field IDs are
+stable `@:wire` identities: schema version (1), message type (2), sensor (3),
+sequence (4), capture time (5), delivery time (6), frame (7), width (8), height
+(9), stride (10), pixel format (11), and image data (12). The C++ decoder
+provides a generic `PackedFrameView` whose data span points directly into the
+encoded message, an owning `PackedFrame`, and typed camera, depth, and
+segmentation wrappers. The matching Haxeon record is in
+`sensor_wire/haxe/materia/sensor/wire/PackedFrameMessage.hx`.
+
+The initial packed formats are RGBA8 camera data, little-endian R32F depth,
+little-endian R32U or U64 segmentation labels. Payloads are tightly packed
+with no row padding; the stride is still carried explicitly so a future
+version can add padded or tiled representations without changing the framing.
 
 `sensor_sim::ImuTruthAdapter` consumes an immutable `nksim_snapshot` and
 derives linear acceleration from consecutive body velocities. It never reads
