@@ -1,0 +1,26 @@
+{
+	"version": 1,
+	"package": { "name": "robotd" },
+	"entry": "robotd.Main",
+	"sourceRoots": ["src"],
+	"dependencies": {
+		"nativekit": { "path": "../../nativekit" },
+		"robotkit": { "path": ".." }
+	},
+	"native": {
+		"cmake": {
+			"source": "native",
+			"target": "robotd_native",
+			"inputs": [
+				"native/CMakeLists.txt",
+				"../CMakeLists.txt",
+				"../core/CMakeLists.txt",
+				"../runtime/CMakeLists.txt",
+				"../../nativekit/CMakeLists.txt",
+				"../../simkit/CMakeLists.txt"
+			]
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

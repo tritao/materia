@@ -4,6 +4,9 @@ add_library(RobotKit::protocol ALIAS robotkit_protocol)
 
 target_compile_features(robotkit_protocol PUBLIC cxx_std_20)
 target_compile_definitions(robotkit_protocol PRIVATE RK_BUILDING_LIBRARY)
+if(NOT RK_BUILD_SHARED OR EMSCRIPTEN)
+    target_compile_definitions(robotkit_protocol PUBLIC RK_STATIC)
+endif()
 target_include_directories(robotkit_protocol
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

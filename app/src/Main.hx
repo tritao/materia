@@ -100,6 +100,8 @@ import NativeKitSurface;
 import NativeKitSurface.NativeKitSurfaceFrameSubscription;
 import Renderer;
 import Surface;
+import robotkit.world.RemoteRobot;
+import robotkit.world.WorldHost;
 import nativekit.ui.core.NativeInputAdapter;
 import nativekit.ui.lab.ComponentLab;
 import nativekit.ui.theme.Theme;
@@ -257,7 +259,7 @@ private class ReferenceEditorHost {
     var fonts:Null<FontCollection> = null;
     var renderer:Null<Renderer> = null;
     var editor:Null<ReferenceEditorApp> = null;
-    var robotConnection:Null<RobotConnection> = null;
+    var world:Null<WorldHost> = null;
     var result = 0;
 
     try {
@@ -306,10 +308,12 @@ private class ReferenceEditorHost {
       events = pump;
       var robotHost = diagnostics.robotHost;
       if (robotHost != null) {
-        robotConnection = new RobotConnection(pump);
-        robotConnection.connect(robotHost, diagnostics.robotPort);
+        world = new WorldHost();
+        var remote = new RemoteRobot("warehouse/forklift-17");
+        world.attach(remote);
+        remote.connect(robotHost, diagnostics.robotPort, pump);
       }
-      editor = new ReferenceEditorApp(fonts, null, activeTheme, robotConnection);
+      editor = new ReferenceEditorApp(fonts, null, activeTheme, world);
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       if (resetWorkspace) editor.resetWorkspace();
 
@@ -411,7 +415,7 @@ private class ReferenceEditorHost {
 
     if (input != null) input.detach();
     if (frameSubscription != null) frameSubscription.dispose();
-    if (robotConnection != null) robotConnection.close();
+    if (world != null) world.close();
     if (editor != null) editor.dispose();
     if (renderer != null) renderer.dispose();
     if (fonts != null) fonts.dispose();
@@ -494,7 +498,7 @@ class ReferenceEditorApp {
   public final commands:CommandRegistry;
   public final workspace:DockWorkspaceModel;
   public final workspacePath:String;
-  public final robotConnection:Null<RobotConnection>;
+  public final world:Null<WorldHost>;
 
   final storage:FileDockWorkspacePersistence;
   final treeModel:ReferenceSceneTreeModel;
@@ -515,10 +519,10 @@ class ReferenceEditorApp {
   var componentLab:Null<ComponentLab>;
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
-      ?robotConnection:RobotConnection) {
+      ?world:WorldHost) {
     ui = new UiContext(null, fonts, theme == null ? Theme.light() : theme);
     commands = ui.commands;
-    this.robotConnection = robotConnection;
+    this.world = world;
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
     treeModel = new ReferenceSceneTreeModel();
@@ -631,31 +635,42 @@ class ReferenceEditorApp {
   }
 
   function robotDiagnosticState():Dynamic {
-    var connection = robotConnection;
-    if (connection == null)
+    var currentWorld = world;
+    if (currentWorld == null)
       return null;
-    var state = connection.state();
-    var fault = connection.fault();
+    var snapshot = currentWorld.snapshot();
+    var robots:Array<Dynamic> = [];
+    for (id in snapshot.robotIds()) {
+      var instance = currentWorld.robots.get(id);
+      var state = snapshot.robot(id);
+      var fault = instance == null ? null : instance.fault();
+      robots.push({
+        id: id,
+        status: instance == null ? "missing" : Std.string(instance.status()),
+        state: state == null ? null : {
+          robotId: state.id,
+          sequence: Std.string(state.sourceSequence),
+          timestampNs: Std.string(state.timestampNs),
+          q: state.positions.copy(),
+          dq: state.velocities.copy(),
+          effort: state.efforts.copy(),
+          mode: state.mode,
+          fault: state.faultCode
+        },
+        fault: fault == null ? null : {
+          robotId: fault.id,
+          code: fault.code,
+          message: fault.message,
+          fatal: fault.fatal
+        }
+      });
+    }
     return {
-      host: connection.host,
-      port: connection.port,
-      status: connection.status(),
-      state: state == null ? null : {
-        robotId: Std.string(state.robotId),
-        sequence: Std.string(state.sequence),
-        timestampNs: Std.string(state.timestampNs),
-        q: state.q.copy(),
-        dq: state.dq.copy(),
-        effort: state.effort.copy(),
-        mode: state.mode,
-        fault: state.fault
-      },
-      fault: fault == null ? null : {
-        robotId: Std.string(fault.robotId),
-        code: fault.code,
-        message: fault.message,
-        fatal: fault.fatal
-      }
+      status: Std.string(currentWorld.status()),
+      sequence: snapshot.sequence,
+      topologyRevision: snapshot.topologyRevision,
+      timestampNs: Std.string(snapshot.timestampNs),
+      robots: robots
     };
   }
 
@@ -671,8 +686,8 @@ class ReferenceEditorApp {
     titleStyle.width = LayoutAxis.fixed(190.0);
     var hintStyle = new LayoutStyle();
     hintStyle.width = LayoutAxis.grow();
-    var robotLabel = robotConnection == null ? "Robot: offline"
-      : "Robot: " + robotConnection.status();
+    var robotLabel = world == null ? "World: offline"
+      : "World: " + Std.string(world.status());
     var hint = new Text("Reference Editor  ·  Ctrl+K command palette  ·  " + robotLabel,
       hintStyle, Color.rgba(0.32, 0.38, 0.47, 1.0));
     return new Row(

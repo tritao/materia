@@ -12,18 +12,18 @@ process-boundary path is the NativeKit TCP server/client on loopback:
 Run the current skeleton with:
 
 ```sh
-../haxeon/scripts/haxeon run --project haxeon.json
+../../haxeon/scripts/haxeon run --project haxeon.json
 
 # Start the authoritative robot process
-../haxeon/scripts/haxeon run --project haxeon.json -- --server
+../../haxeon/scripts/haxeon run --project haxeon.json -- --server
 
 # Optionally host a Haxeon behavior inside robotd
-../haxeon/scripts/haxeon run --project haxeon.json -- \
+../../haxeon/scripts/haxeon run --project haxeon.json -- \
   --server --behavior=oscillate
 
 # In another terminal, exercise the protocol client
-../haxeon/scripts/haxeon run --project haxeon.json -- --client
+../../haxeon/scripts/haxeon run --project haxeon.json -- --client
 
 # Native-only runtime smoke test
-../haxeon/scripts/haxeon run --project haxeon.json -- --in-memory
+../../haxeon/scripts/haxeon run --project haxeon.json -- --in-memory
 ```

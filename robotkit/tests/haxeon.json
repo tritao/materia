@@ -1,0 +1,11 @@
+{
+	"version": 1,
+	"package": { "name": "robotkit-world-tests" },
+	"entry": "tests.WorldHostTests",
+	"sourceRoots": ["src"],
+	"dependencies": {
+		"robotkit": { "path": ".." }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

@@ -1,18 +1,21 @@
 # RobotKit
 
-RobotKit is the robotics layer for Materia. It owns robot models, commands,
-control, runtime ownership, endpoint adapters, and the protocol shared by
-`robotd` and editor clients.
+RobotKit is the complete robotics layer for Materia. It owns robot models,
+commands, control, runtime ownership, endpoint adapters, world orchestration,
+and the protocol shared by `robotd` and editor clients.
 
 The first increment contains four deliberately small boundaries:
 
 - `core`: engine-neutral runtime values and validation;
 - `runtime`: an owner-thread runtime, command mailbox, and immutable snapshots;
 - `protocol`: versioned framing independent of any particular transport;
+- `haxe`: Haxeon façades, protocol clients, and world orchestration;
+- `robotd`: one independently deployable logical robot host;
 - `sim endpoint`: a SimKit-backed endpoint that owns the live simulation model
   when enabled by the host application.
 
-The semantic robot/document model belongs to the Haxeon `robotd` application.
+The semantic robot/document model currently belongs to the Haxeon `robotd`
+application under this robotics root.
 RobotKit receives only compiled runtime blueprints and bulk data at execution
 boundaries. The runtime includes an in-memory endpoint for deterministic tests
 and an optional SimKit endpoint for live simulation. MuJoCo model loading,
@@ -27,11 +30,11 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The canonical CMake targets are `RobotKit::core`, `RobotKit::runtime`, and
-`RobotKit::protocol`.
+The canonical CMake targets are `RobotKit::core` and `RobotKit::runtime`.
 
 `robotd/native` enables the SimKit endpoint and builds the native dependency
-graph consumed by the Haxeon host. The Haxe façade is under `haxeon/robotkit`;
+graph consumed by the Haxeon host. The Haxe façade and wire protocol are under
+`haxe/robotkit`;
 its bindings deliberately submit one command batch and retrieve one snapshot
 per tick.
 

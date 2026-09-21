@@ -105,7 +105,7 @@ enum {
     RK_RUNTIME_JOINT_PRISMATIC = 3
 };
 
-/** Compiled runtime shape; semantic Robot models live in robotd/Haxeon. */
+/** Compiled runtime shape; semantic Robot models live in robotkit/robotd. */
 typedef struct rk_runtime_layout {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint64_t revision;

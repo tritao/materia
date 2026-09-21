@@ -1,7 +1,7 @@
 {
 	"version": 1,
 	"package": { "name": "robotkit" },
-	"sourceRoots": ["haxeon"],
+	"sourceRoots": ["haxe"],
 	"scopeSourceRoots": false,
 	"dependencies": {
 		"nativekit": { "path": "../nativekit" }

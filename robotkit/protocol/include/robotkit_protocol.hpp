@@ -6,6 +6,18 @@
 #include <span>
 #include <vector>
 
+#if defined(_WIN32)
+#if defined(RK_STATIC)
+#define RK_PROTOCOL_API
+#elif defined(RK_BUILDING_LIBRARY)
+#define RK_PROTOCOL_API __declspec(dllexport)
+#else
+#define RK_PROTOCOL_API __declspec(dllimport)
+#endif
+#else
+#define RK_PROTOCOL_API __attribute__((visibility("default")))
+#endif
+
 namespace robotkit::protocol {
 
 constexpr uint32_t kMagic = 0x314B4252; // "RBK1" in little-endian storage.
@@ -38,10 +50,10 @@ enum class DecodeStatus {
     Malformed
 };
 
-bool encode_frame(const Frame &frame, std::vector<uint8_t> &out);
-DecodeStatus decode_frame(std::span<const uint8_t> input, Frame &out,
-                          std::size_t &consumed,
-                          std::size_t max_payload = kDefaultMaxPayload);
+RK_PROTOCOL_API bool encode_frame(const Frame &frame, std::vector<uint8_t> &out);
+RK_PROTOCOL_API DecodeStatus decode_frame(std::span<const uint8_t> input, Frame &out,
+                                          std::size_t &consumed,
+                                          std::size_t max_payload = kDefaultMaxPayload);
 
 } // namespace robotkit::protocol
 

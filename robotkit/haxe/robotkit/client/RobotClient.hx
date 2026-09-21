@@ -35,6 +35,7 @@ class RobotClient {
   public var lastFault:Null<Fault> = null;
   public var stateListener:Null<RobotStateMsg->Void> = null;
   public var faultListener:Null<Fault->Void> = null;
+  public var statusListener:Null<Void->Void> = null;
 
   var nativeRuntime:Null<NativeKitRuntime> = null;
   var eventPump:Null<NativeKitEvents> = null;
@@ -187,6 +188,9 @@ class RobotClient {
       return;
     closed = true;
     connected = false;
+    var statusChanged = statusListener;
+    if (statusChanged != null)
+      statusChanged();
     var currentSubscription = subscription;
     subscription = null;
     if (currentSubscription != null)
@@ -210,12 +214,18 @@ class RobotClient {
         return;
       if (kind == EventKind.TransportConnected) {
         connected = true;
+        var statusChanged = statusListener;
+        if (statusChanged != null)
+          statusChanged();
         send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1")));
       } else if (kind == EventKind.TransportData) {
         receive(currentTransport);
       } else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {
         connected = false;
         failure = "robotd closed the TCP connection";
+        var statusChanged = statusListener;
+        if (statusChanged != null)
+          statusChanged();
       }
     case _:
   }

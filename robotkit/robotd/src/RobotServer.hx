@@ -31,14 +31,13 @@ import robotkit.transport.NativeTransport;
 
 /** Authoritative robot process boundary. Runtime ownership stays off the network path. */
 class RobotServer {
-  static inline final ROBOT_ID:Int = 1;
-
   final robot:Robot;
   final compiled:CompiledRobot;
   final runtime:Runtime;
   final nativeRuntime:NativeKitRuntime;
   final listener:NativeKit.OwnedListenerHandle;
   final port:Int;
+  final robotId:Int;
   final subscription:NativeKitEventSubscription;
   final behaviorRunner:Null<RobotBehaviorRunner>;
   var client:Null<NativeKit.TransportHandle>;
@@ -56,11 +55,12 @@ class RobotServer {
   var disposed:Bool = false;
 
   public function new(robot:Robot, compiled:CompiledRobot, runtime:Runtime,
-      port:Int, ?behavior:RobotBehavior) {
+      port:Int, robotId:Int, ?behavior:RobotBehavior) {
     this.robot = robot;
     this.compiled = compiled;
     this.runtime = runtime;
     this.port = port;
+    this.robotId = robotId;
     behaviorRunner = behavior == null ? null : new RobotBehaviorRunner(behavior);
     nativeRuntime = NativeKitRuntime.start();
     try {
@@ -187,11 +187,11 @@ class RobotServer {
       return;
     }
     send(RobotProtocol.welcome(new robotkit.protocol.Welcome(1, "robotd",
-      sessionId, Int64.ofInt(ROBOT_ID)), sessionId));
-    send(RobotProtocol.description(new RobotDescription(Int64.ofInt(ROBOT_ID),
+      sessionId, Int64.ofInt(robotId)), sessionId));
+    send(RobotProtocol.description(new RobotDescription(Int64.ofInt(robotId),
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
-    send(RobotProtocol.capabilities(new RobotCapabilities(Int64.ofInt(ROBOT_ID),
+    send(RobotProtocol.capabilities(new RobotCapabilities(Int64.ofInt(robotId),
       compiled.jointCount, true, false, false, false), sessionId));
     helloComplete = true;
     publishSnapshot(true);
@@ -229,10 +229,10 @@ class RobotServer {
       && Int64.compare(sequence, lastRequestSequence) > 0;
 
   function sameRobot(value:haxe.Int64):Bool
-    return Int64.compare(value, Int64.ofInt(ROBOT_ID)) == 0;
+    return Int64.compare(value, Int64.ofInt(robotId)) == 0;
 
   function publishSnapshot(forceSend:Bool):Void {
-    var snapshot = RobotSnapshot.fromRuntime(Int64.ofInt(ROBOT_ID), runtime.snapshot());
+    var snapshot = RobotSnapshot.fromRuntime(Int64.ofInt(robotId), runtime.snapshot());
     snapshots.publish(snapshot);
     var latest = snapshots.latest();
     if (latest == null)
@@ -293,7 +293,7 @@ class RobotServer {
   }
 
   function sendFault(code:Int, message:String, fatal:Bool):Void {
-    var fault = new Fault(Int64.ofInt(ROBOT_ID), code, message, fatal);
+    var fault = new Fault(Int64.ofInt(robotId), code, message, fatal);
     send(new RobotFrame(RobotMessageType.Fault, MessagePack.encode(fault),
       0, null, sessionId));
   }

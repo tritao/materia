@@ -21,12 +21,12 @@ set(NK_BUILD_TESTS OFF CACHE BOOL "Disable SimKit tests in robotd" FORCE)
 set(NK_BUILD_EXAMPLES OFF CACHE BOOL "Disable SimKit examples in robotd" FORCE)
 set(NKSIM_BUILD_MUJOCO OFF CACHE BOOL "Disable MuJoCo for the first robotd endpoint" FORCE)
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../simkit" simkit)
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../robotkit" robotkit)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../simkit" simkit)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../.." robotkit)
 
 foreach(target_name
         nativekit nativekit_scene nativekit_scene_render nativekit_scene_interaction
-        nativekit_sim_core robotkit_core robotkit_runtime robotkit_protocol)
+        nativekit_sim_core robotkit_core robotkit_runtime)
     if(TARGET "${target_name}")
         set_target_properties("${target_name}" PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
@@ -36,7 +36,7 @@ foreach(target_name
 endforeach()
 
 add_custom_target(robotd_native
-    DEPENDS robotkit_core robotkit_runtime robotkit_protocol
+    DEPENDS robotkit_core robotkit_runtime
     COMMAND "${CMAKE_COMMAND}" -E touch "${HAXEON_NATIVE_OUTPUT_DIR}/robotd.hdll"
     BYPRODUCTS "${HAXEON_NATIVE_OUTPUT_DIR}/robotd.hdll"
     COMMENT "Building RobotKit native dependencies for robotd")
