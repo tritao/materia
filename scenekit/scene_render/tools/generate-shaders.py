@@ -19,6 +19,8 @@ SHADERS = {
     "scene_fragment": ("scene_fragment.glsl", "FRAGMENT_PRECISION"),
     "pick_vertex": ("pick_vertex.glsl", "VERTEX_PRECISION"),
     "pick_fragment": ("pick_fragment.glsl", "FRAGMENT_PRECISION"),
+    "postprocess_vertex": ("postprocess_vertex.glsl", "VERTEX_PRECISION"),
+    "postprocess_fragment": ("postprocess_fragment.glsl", "FRAGMENT_PRECISION"),
 }
 
 

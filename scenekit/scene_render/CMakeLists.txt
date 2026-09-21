@@ -5,6 +5,8 @@ set(NKSCENE_RENDER_SHADER_INPUTS
     shaders/scene_fragment.glsl
     shaders/pick_vertex.glsl
     shaders/pick_fragment.glsl
+    shaders/postprocess_vertex.glsl
+    shaders/postprocess_fragment.glsl
     tools/generate-shaders.py)
 set(NKSCENE_RENDER_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(NKSCENE_RENDER_SHADER_HEADER

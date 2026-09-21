@@ -360,6 +360,28 @@ private:
     std::vector<LidarRay> rays_;
 };
 
+struct CameraPostProcess {
+    /** Multiplicative brightness adjustment expressed in powers of two. */
+    float exposure_stops = 0.0f;
+    /** Additional linear brightness multiplier. */
+    float gain = 1.0f;
+    /** Additive Gaussian standard deviation in normalized RGB units. */
+    float noise_stddev = 0.0f;
+    /** Normalized RGB step; zero leaves values unquantized. */
+    float quantization = 0.0f;
+    /** Radial lens coefficients in normalized image coordinates. */
+    float distortion_k1 = 0.0f;
+    float distortion_k2 = 0.0f;
+    /** Independent probability of replacing each pixel with black. */
+    float dropout_probability = 0.0f;
+
+    bool enabled() const noexcept {
+        return exposure_stops != 0.0f || gain != 1.0f || noise_stddev != 0.0f ||
+               quantization != 0.0f || distortion_k1 != 0.0f || distortion_k2 != 0.0f ||
+               dropout_probability != 0.0f;
+    }
+};
+
 struct CameraConfig {
     std::uint32_t width = 640;
     std::uint32_t height = 480;
@@ -367,6 +389,7 @@ struct CameraConfig {
     float near_plane = 0.01f;
     float far_plane = 1000.0f;
     std::array<float, 4> clear_color{0.0f, 0.0f, 0.0f, 1.0f};
+    CameraPostProcess post_process;
 };
 
 struct CameraFrame {
@@ -394,6 +417,10 @@ public:
     /** Package one backend-rendered RGBA8 image as a camera sample. */
     std::optional<CameraFrame> sample(const SensorTick &tick,
                                       std::span<const std::uint8_t> rgba8);
+
+    /** Apply the same seeded image model on the CPU as a portable reference path. */
+    void apply_post_process_cpu(std::span<std::uint8_t> rgba8,
+                                std::uint64_t sequence) const;
 
 private:
     CameraConfig camera_;

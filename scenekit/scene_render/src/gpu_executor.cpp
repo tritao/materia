@@ -51,6 +51,14 @@ struct MaterialUniformData {
 
 static_assert(sizeof(MaterialUniformData) == sizeof(float) * 16);
 
+struct PostProcessUniformData {
+    std::array<float, 4> color_params{};
+    std::array<float, 4> distortion_params{};
+    std::array<std::int32_t, 4> random_params{};
+};
+
+static_assert(sizeof(PostProcessUniformData) == sizeof(float) * 8 + sizeof(std::int32_t) * 4);
+
 static_assert(sizeof(ClipUniformData) ==
               RenderPlan::max_clip_planes * sizeof(float) * 4 + sizeof(float) * 4);
 
@@ -279,8 +287,13 @@ struct NativeKitGpuExecutor::State {
     nkgpu_shader pick_shader{};
     nkgpu_pipeline pick_pipeline{};
     nkgpu_pipeline pick_indexed_pipeline{};
+    nkgpu_shader postprocess_shader{};
+    nkgpu_pipeline postprocess_pipeline{};
+    nkgpu_buffer postprocess_vertex_buffer{};
     nkgpu_image capture_color{};
     nkgpu_image capture_depth{};
+    nkgpu_image postprocess_color{};
+    nkgpu_sampler postprocess_sampler{};
     nkgpu_image pick_color{};
     nkgpu_image pick_subelement{};
     nkgpu_image pick_depth_value{};
@@ -289,6 +302,8 @@ struct NativeKitGpuExecutor::State {
     nkgpu_sampler default_sampler{};
     std::uint32_t capture_width = 0;
     std::uint32_t capture_height = 0;
+    std::uint32_t postprocess_width = 0;
+    std::uint32_t postprocess_height = 0;
     std::uint32_t pick_width = 0;
     std::uint32_t pick_height = 0;
     std::unordered_map<GeometryId, GeometryGpu> geometry_resources;
@@ -330,6 +345,10 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_image_destroy(renderer, capture_color);
         if (renderer.id && capture_depth.id)
             (void)nkgpu_image_destroy(renderer, capture_depth);
+        if (renderer.id && postprocess_color.id)
+            (void)nkgpu_image_destroy(renderer, postprocess_color);
+        if (renderer.id && postprocess_vertex_buffer.id)
+            (void)nkgpu_buffer_destroy(renderer, postprocess_vertex_buffer);
         if (renderer.id && pick_color.id)
             (void)nkgpu_image_destroy(renderer, pick_color);
         if (renderer.id && pick_subelement.id)
@@ -354,6 +373,12 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_pipeline_destroy(renderer, pick_indexed_pipeline);
         if (renderer.id && pick_shader.id)
             (void)nkgpu_shader_destroy(renderer, pick_shader);
+        if (renderer.id && postprocess_sampler.id)
+            (void)nkgpu_sampler_destroy(renderer, postprocess_sampler);
+        if (renderer.id && postprocess_pipeline.id)
+            (void)nkgpu_pipeline_destroy(renderer, postprocess_pipeline);
+        if (renderer.id && postprocess_shader.id)
+            (void)nkgpu_shader_destroy(renderer, postprocess_shader);
         geometry_resources.clear();
         material_revisions.clear();
         material_resources.clear();
@@ -372,8 +397,13 @@ struct NativeKitGpuExecutor::State {
         pick_pipeline = {};
         pick_indexed_pipeline = {};
         pick_shader = {};
+        postprocess_pipeline = {};
+        postprocess_shader = {};
+        postprocess_vertex_buffer = {};
         capture_color = {};
         capture_depth = {};
+        postprocess_color = {};
+        postprocess_sampler = {};
         pick_color = {};
         pick_subelement = {};
         pick_depth_value = {};
@@ -382,6 +412,8 @@ struct NativeKitGpuExecutor::State {
         default_sampler = {};
         capture_width = 0;
         capture_height = 0;
+        postprocess_width = 0;
+        postprocess_height = 0;
         pick_width = 0;
         pick_height = 0;
     }
@@ -714,7 +746,8 @@ bool ensure_capture_targets(StateT &state, std::uint32_t width, std::uint32_t he
     color.width = width;
     color.height = height;
     color.format = NKGPU_IMAGEFORMAT_RGBA8;
-    color.usage = NKGPU_IMAGE_RENDER_TARGET;
+    /* The first pass is also sampled by the optional post-processing pass. */
+    color.usage = NKGPU_IMAGE_RENDER_TARGET | NKGPU_IMAGE_SAMPLED;
     color.mip_count = 1;
     color.sample_count = 1;
     color.layer_count = 1;
@@ -739,6 +772,102 @@ bool ensure_capture_targets(StateT &state, std::uint32_t width, std::uint32_t he
     }
     state.capture_width = width;
     state.capture_height = height;
+    return true;
+}
+
+template <class StateT>
+bool ensure_postprocess_target(StateT &state, std::uint32_t width, std::uint32_t height,
+                               GpuExecutionStats &stats) {
+    if (state.postprocess_color.id && state.postprocess_width == width &&
+        state.postprocess_height == height)
+        return true;
+
+    if (state.postprocess_color.id)
+        (void)nkgpu_image_destroy(state.renderer, state.postprocess_color);
+    state.postprocess_color = {};
+
+    nkgpu_image_desc color{};
+    color.struct_size = sizeof(color);
+    color.width = width;
+    color.height = height;
+    color.format = NKGPU_IMAGEFORMAT_RGBA8;
+    color.usage = NKGPU_IMAGE_RENDER_TARGET;
+    color.mip_count = 1;
+    color.sample_count = 1;
+    color.layer_count = 1;
+    const auto result = nkgpu_image_create_desc(state.renderer, &color, &state.postprocess_color);
+    if (result != NKGPU_OK)
+        return set_failure(state, stats, result);
+    state.postprocess_width = width;
+    state.postprocess_height = height;
+    return true;
+}
+
+template <class StateT>
+bool ensure_postprocess_pipeline(StateT &state, GpuExecutionStats &stats) {
+    if (state.postprocess_pipeline.id)
+        return true;
+
+    const auto sources = render_internal::post_process_shader_sources(
+        nkgpu_query_backend(state.renderer));
+    if (!sources.vertex || !sources.fragment)
+        return set_failure(state, stats, NKGPU_ERROR_UNSUPPORTED);
+
+    nkgpu_result result = NKGPU_OK;
+    if (!state.postprocess_vertex_buffer.id) {
+        constexpr float fullscreen_triangle[] = {
+            -1.0f, -1.0f,
+            3.0f,  -1.0f,
+            -1.0f, 3.0f};
+        result = nkgpu_buffer_create(
+            state.renderer, reinterpret_cast<const std::uint8_t *>(fullscreen_triangle),
+            sizeof(fullscreen_triangle), &state.postprocess_vertex_buffer);
+        if (result != NKGPU_OK)
+            return set_failure(state, stats, result);
+    }
+    if (!state.postprocess_shader.id) {
+        nkgpu_shader_builder shader_builder{};
+        result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex,
+                                    sources.fragment, &shader_builder);
+        if (result != NKGPU_OK)
+            return set_failure(state, stats, result);
+        if ((result = nkgpu_shader_uniform_block(
+                 shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                 sizeof(PostProcessUniformData))) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "color_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 0, 1, "distortion_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 0, 2, "random_params",
+                                           NKGPU_UNIFORMTYPE_INT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                           "source_image")) != NKGPU_OK ||
+            (result = nkgpu_shader_end(shader_builder, &state.postprocess_shader)) != NKGPU_OK)
+            return set_failure(state, stats, result);
+    }
+
+    nkgpu_pipeline_builder pipeline_builder{};
+    if ((result = nkgpu_pipeline_begin(state.renderer, state.postprocess_shader,
+                                       sizeof(float) * 2,
+                                       &pipeline_builder)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    if ((result = nkgpu_pipeline_attribute(pipeline_builder, 0, 0, 0,
+                                           NKGPU_VERTEXFORMAT_FLOAT2)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 0, sizeof(float) * 2,
+                                               NKGPU_VERTEXSTEP_PER_VERTEX, 1)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_primitive_type(pipeline_builder,
+                                                NKGPU_PRIMITIVETYPE_TRIANGLES)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 0)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_color_target(pipeline_builder, 0, NKGPU_IMAGEFORMAT_RGBA8,
+                                              NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_end(pipeline_builder, &state.postprocess_pipeline)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+
+    result = nkgpu_sampler_create(state.renderer, NKGPU_FILTER_LINEAR, NKGPU_FILTER_LINEAR,
+                                  NKGPU_WRAP_CLAMP_TO_EDGE, NKGPU_WRAP_CLAMP_TO_EDGE,
+                                  &state.postprocess_sampler);
+    if (result != NKGPU_OK)
+        return set_failure(state, stats, result);
     return true;
 }
 
@@ -1688,7 +1817,8 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
                                                  const SceneSnapshot &snapshot,
                                                  std::uint32_t width, std::uint32_t height,
                                                  std::array<float, 4> clear_color,
-                                                 std::vector<std::uint8_t> &out_pixels) {
+                                                 std::vector<std::uint8_t> &out_pixels,
+                                                 RgbaPostProcess post_process) {
     out_pixels.clear();
     if (!width || !height) {
         state_->last_result = NKGPU_ERROR_INVALID_ARGUMENT;
@@ -1709,6 +1839,11 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     if (!synchronize(plan, snapshot, stats))
         return state_->last_result;
     if (!ensure_capture_targets(*state_, width, height, stats))
+        return state_->last_result;
+    const auto apply_post_process = post_process.enabled();
+    if (apply_post_process &&
+        (!ensure_postprocess_target(*state_, width, height, stats) ||
+         !ensure_postprocess_pipeline(*state_, stats)))
         return state_->last_result;
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
@@ -1815,6 +1950,58 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         return result;
     }
     pass_active = false;
+
+    if (apply_post_process) {
+        /* Keep the raw scene in capture_color and run image-space effects in
+         * a separate pass. Sampling and rendering to the same image in one
+         * pass is undefined on several graphics APIs. */
+        nkgpu_render_pass_desc post_pass{};
+        post_pass.struct_size = sizeof(post_pass);
+        post_pass.color_count = 1;
+        post_pass.colors[0].image = state_->postprocess_color;
+        post_pass.colors[0].action.load_action = NKGPU_LOADACTION_CLEAR;
+        post_pass.colors[0].action.store_action = NKGPU_STOREACTION_STORE;
+        post_pass.colors[0].action.clear_color = {0.0f, 0.0f, 0.0f, 1.0f};
+        if ((result = nkgpu_begin_render_pass(state_->renderer, &post_pass)) != NKGPU_OK)
+            return fail_frame(result);
+        pass_active = true;
+
+        if ((result = nkgpu_apply_viewport(state_->renderer, 0, 0,
+                                           static_cast<std::int32_t>(width),
+                                           static_cast<std::int32_t>(height))) != NKGPU_OK ||
+            (result = nkgpu_apply_pipeline(state_->renderer, state_->postprocess_pipeline)) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0,
+                                                state_->postprocess_vertex_buffer, 0)) != NKGPU_OK ||
+            (result = nkgpu_apply_image(state_->renderer, 0, state_->capture_color)) != NKGPU_OK ||
+            (result = nkgpu_apply_sampler(state_->renderer, 0,
+                                          state_->postprocess_sampler)) != NKGPU_OK)
+            return fail_frame(result);
+
+        PostProcessUniformData post_data;
+        post_data.color_params = {post_process.exposure_stops, post_process.gain,
+                                  post_process.noise_stddev, post_process.quantization};
+        post_data.distortion_params = {post_process.distortion_k1, post_process.distortion_k2,
+                                       post_process.dropout_probability, 0.0f};
+        post_data.random_params = {
+            static_cast<std::int32_t>(static_cast<std::uint32_t>(post_process.seed)),
+            static_cast<std::int32_t>(static_cast<std::uint32_t>(post_process.seed >> 32)),
+            static_cast<std::int32_t>(static_cast<std::uint32_t>(post_process.sequence)),
+            static_cast<std::int32_t>(static_cast<std::uint32_t>(post_process.sequence >> 32))};
+        if ((result = nkgpu_apply_uniform_data(
+                 state_->renderer, 0, reinterpret_cast<const std::uint8_t *>(&post_data),
+                 sizeof(post_data))) != NKGPU_OK ||
+            (result = nkgpu_draw(state_->renderer, 0, 3, 1)) != NKGPU_OK)
+            return fail_frame(result);
+
+        if ((result = nkgpu_end_pass(state_->renderer)) != NKGPU_OK) {
+            pass_active = false;
+            (void)nkgpu_end_frame(state_->renderer);
+            state_->last_result = result;
+            return result;
+        }
+        pass_active = false;
+    }
     if ((result = nkgpu_end_frame(state_->renderer)) != NKGPU_OK) {
         state_->last_result = result;
         return result;
@@ -1822,7 +2009,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
 
     nkgpu_image_readback_desc readback_desc{};
     readback_desc.struct_size = sizeof(readback_desc);
-    readback_desc.image = state_->capture_color;
+    readback_desc.image = apply_post_process ? state_->postprocess_color : state_->capture_color;
     readback_desc.width = width;
     readback_desc.height = height;
     nkgpu_readback readback{};

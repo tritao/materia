@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
+#include <vector>
 
 namespace nksensor {
 namespace {
@@ -67,6 +68,37 @@ Vec3 rotate_by_inverse(Quaternion orientation, Vec3 value) noexcept {
         value.x - w * tx + (y * tz - z * ty),
         value.y - w * ty + (z * tx - x * tz),
         value.z - w * tz + (x * ty - y * tx)};
+}
+
+std::uint32_t hash32(std::uint32_t value) noexcept {
+    /* A small integer mixer gives every pixel/channel event an independent,
+     * reproducible random value without keeping mutable RNG state per pixel. */
+    value ^= value >> 16;
+    value *= 0x7feb352dU;
+    value ^= value >> 15;
+    value *= 0x846ca68bU;
+    return value ^ (value >> 16);
+}
+
+float pixel_random(std::uint64_t seed, std::uint64_t sequence, std::uint32_t x,
+                   std::uint32_t y, std::uint32_t salt) noexcept {
+    /* Fold the sensor seed, frame sequence, pixel coordinate, and operation
+     * salt into one stream. The salt keeps dropout and noise independent. */
+    auto value = static_cast<std::uint32_t>(seed) ^ static_cast<std::uint32_t>(seed >> 32);
+    value ^= static_cast<std::uint32_t>(sequence);
+    value ^= static_cast<std::uint32_t>(sequence >> 32);
+    value ^= x * 0x9e3779b9U;
+    value ^= y * 0x85ebca6bU;
+    value ^= salt * 0xc2b2ae35U;
+    return static_cast<float>(hash32(value) & 0x00ffffffU) / 16777216.0f;
+}
+
+float pixel_gaussian(std::uint64_t seed, std::uint64_t sequence, std::uint32_t x,
+                     std::uint32_t y) noexcept {
+    /* Box-Muller converts two uniform values into one normal deviate. */
+    const auto first = std::max(1.0e-7f, pixel_random(seed, sequence, x, y, 0));
+    const auto second = pixel_random(seed, sequence, x, y, 1);
+    return std::sqrt(-2.0f * std::log(first)) * std::cos(6.283185307179586f * second);
 }
 
 } // namespace
@@ -334,6 +366,25 @@ CameraSensor::CameraSensor(SensorConfig config, CameraConfig camera)
             component = 0.0f;
         component = std::clamp(component, 0.0f, 1.0f);
     }
+    if (!std::isfinite(camera_.post_process.exposure_stops))
+        camera_.post_process.exposure_stops = 0.0f;
+    if (!std::isfinite(camera_.post_process.gain))
+        camera_.post_process.gain = 1.0f;
+    camera_.post_process.gain = std::max(0.0f, camera_.post_process.gain);
+    if (!std::isfinite(camera_.post_process.noise_stddev))
+        camera_.post_process.noise_stddev = 0.0f;
+    camera_.post_process.noise_stddev = std::max(0.0f, camera_.post_process.noise_stddev);
+    if (!std::isfinite(camera_.post_process.quantization))
+        camera_.post_process.quantization = 0.0f;
+    camera_.post_process.quantization = std::max(0.0f, camera_.post_process.quantization);
+    if (!std::isfinite(camera_.post_process.distortion_k1))
+        camera_.post_process.distortion_k1 = 0.0f;
+    if (!std::isfinite(camera_.post_process.distortion_k2))
+        camera_.post_process.distortion_k2 = 0.0f;
+    if (!std::isfinite(camera_.post_process.dropout_probability))
+        camera_.post_process.dropout_probability = 0.0f;
+    camera_.post_process.dropout_probability =
+        std::clamp(camera_.post_process.dropout_probability, 0.0f, 1.0f);
 }
 
 std::optional<CameraFrame> CameraSensor::sample(const SensorTick &tick,
@@ -353,6 +404,77 @@ std::optional<CameraFrame> CameraSensor::sample(const SensorTick &tick,
     frame.height = camera_.height;
     frame.rgba8.assign(rgba8.begin(), rgba8.end());
     return frame;
+}
+
+void CameraSensor::apply_post_process_cpu(std::span<std::uint8_t> rgba8,
+                                           std::uint64_t sequence) const {
+    const auto pixel_count = static_cast<std::size_t>(camera_.width) * camera_.height;
+    if (rgba8.size() != pixel_count * 4)
+        return;
+
+    const auto &post = camera_.post_process;
+    if (!post.enabled())
+        return;
+    /* Read from an immutable copy so distortion can remap pixels without
+     * feeding already-processed output back into later pixels. */
+    const auto source = std::vector<std::uint8_t>(rgba8.begin(), rgba8.end());
+    const auto scale = std::exp2(post.exposure_stops) * post.gain;
+    for (std::uint32_t y = 0; y < camera_.height; ++y) {
+        for (std::uint32_t x = 0; x < camera_.width; ++x) {
+            auto source_x = x;
+            auto source_y = y;
+            /* Inverse-map each output pixel into the source image. This is a
+             * deliberately simple nearest-neighbour reference implementation;
+             * the GPU path uses the same mapping with filtered sampling. */
+            if (post.distortion_k1 != 0.0f || post.distortion_k2 != 0.0f) {
+                const auto u = (static_cast<float>(x) + 0.5f) / camera_.width;
+                const auto v = (static_cast<float>(y) + 0.5f) / camera_.height;
+                const auto centered_x = u * 2.0f - 1.0f;
+                const auto centered_y = v * 2.0f - 1.0f;
+                const auto radius_squared = centered_x * centered_x + centered_y * centered_y;
+                const auto factor = 1.0f + post.distortion_k1 * radius_squared +
+                                    post.distortion_k2 * radius_squared * radius_squared;
+                const auto distorted_u = centered_x * factor * 0.5f + 0.5f;
+                const auto distorted_v = centered_y * factor * 0.5f + 0.5f;
+                if (distorted_u < 0.0f || distorted_u >= 1.0f || distorted_v < 0.0f ||
+                    distorted_v >= 1.0f) {
+                    source_x = camera_.width;
+                    source_y = camera_.height;
+                } else {
+                    source_x = static_cast<std::uint32_t>(distorted_u * camera_.width);
+                    source_y = static_cast<std::uint32_t>(distorted_v * camera_.height);
+                }
+            }
+
+            const auto output_index =
+                (static_cast<std::size_t>(y) * camera_.width + x) * static_cast<std::size_t>(4);
+            if (source_x >= camera_.width || source_y >= camera_.height ||
+                pixel_random(config().seed, sequence, x, y, 2) < post.dropout_probability) {
+                rgba8[output_index + 0] = 0;
+                rgba8[output_index + 1] = 0;
+                rgba8[output_index + 2] = 0;
+                rgba8[output_index + 3] = 255;
+                continue;
+            }
+
+            const auto source_index =
+                (static_cast<std::size_t>(source_y) * camera_.width + source_x) *
+                static_cast<std::size_t>(4);
+            for (std::size_t channel = 0; channel < 3; ++channel) {
+                /* Work in normalized linear values, apply exposure/gain,
+                 * additive Gaussian noise, optional quantization, then encode
+                 * back to the camera's 8-bit representation. */
+                auto value = static_cast<float>(source[source_index + channel]) / 255.0f;
+                value = value * scale + pixel_gaussian(config().seed, sequence, x, y) *
+                                              post.noise_stddev;
+                if (post.quantization > 0.0f)
+                    value = std::round(value / post.quantization) * post.quantization;
+                rgba8[output_index + channel] = static_cast<std::uint8_t>(std::lround(
+                    std::clamp(value, 0.0f, 1.0f) * 255.0f));
+            }
+            rgba8[output_index + 3] = source[source_index + 3];
+        }
+    }
 }
 
 DepthSensor::DepthSensor(SensorConfig config, DepthConfig depth)

@@ -182,6 +182,35 @@ void camera_packages_backend_pixels() {
     assert(frame->pixel(2, 0) == nullptr);
 }
 
+void camera_cpu_post_process_is_deterministic() {
+    SensorConfig sensor_config;
+    sensor_config.id = 43;
+    sensor_config.seed = 123;
+
+    CameraConfig camera_config;
+    camera_config.width = 2;
+    camera_config.height = 1;
+    camera_config.post_process.gain = 0.5f;
+    CameraSensor camera(sensor_config, camera_config);
+    const auto tick = camera.trigger(3.0);
+    assert(tick.has_value());
+
+    const std::vector<std::uint8_t> source{255, 100, 0, 255, 0, 255, 64, 255};
+    auto pixels = source;
+    camera.apply_post_process_cpu(pixels, tick->header.sequence);
+    assert(pixels[0] == 128);
+    assert(pixels[1] == 50);
+    assert(pixels[2] == 0);
+    assert(pixels[4] == 0);
+    assert(pixels[5] == 128);
+    assert(pixels[6] == 32);
+    assert(pixels[3] == 255 && pixels[7] == 255);
+
+    auto replay = source;
+    camera.apply_post_process_cpu(replay, tick->header.sequence);
+    assert(pixels == replay);
+}
+
 void depth_packages_metric_pixels() {
     SensorConfig sensor_config;
     sensor_config.id = 41;
@@ -231,6 +260,7 @@ int main() {
     manager_preserves_sensor_insertion_order();
     lidar_generates_rays_and_models_returns();
     camera_packages_backend_pixels();
+    camera_cpu_post_process_is_deterministic();
     depth_packages_metric_pixels();
     segmentation_packages_labels();
     return 0;

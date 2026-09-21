@@ -713,6 +713,31 @@ NKSRENDER_API RenderUpdate refresh(RenderPlan &plan, const SceneSnapshot &snapsh
 NKSRENDER_API PickResult pick(const RenderPlan &, const SceneSnapshot &, std::uint32_t primitive,
                               Vec3 world_position, float depth);
 
+/** Optional image-space processing applied by capture_rgba8 on supported GPU backends. */
+struct RgbaPostProcess {
+    /** Multiplicative brightness adjustment expressed in powers of two. */
+    float exposure_stops = 0.0f;
+    /** Additional linear brightness multiplier. */
+    float gain = 1.0f;
+    /** Additive Gaussian standard deviation in normalized RGB units. */
+    float noise_stddev = 0.0f;
+    /** Normalized RGB step; zero leaves values unquantized. */
+    float quantization = 0.0f;
+    /** Radial lens coefficients in normalized image coordinates. */
+    float distortion_k1 = 0.0f;
+    float distortion_k2 = 0.0f;
+    /** Independent probability of replacing each pixel with black. */
+    float dropout_probability = 0.0f;
+    std::uint64_t seed = 0;
+    std::uint64_t sequence = 0;
+
+    bool enabled() const noexcept {
+        return exposure_stops != 0.0f || gain != 1.0f || noise_stddev != 0.0f ||
+               quantization != 0.0f || distortion_k1 != 0.0f || distortion_k2 != 0.0f ||
+               dropout_probability != 0.0f;
+    }
+};
+
 /**
  * Executes the opaque triangle subset of a RenderPlan through NativeKit GPU.
  * Geometry payloads use GeometryPayload's object-local float3 vertices and
@@ -738,7 +763,8 @@ class NKSRENDER_API NativeKitGpuExecutor {
     /** Renders a plan into an off-screen RGBA8 image and reads it back. */
     nkgpu_result capture_rgba8(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
                                std::uint32_t height, std::array<float, 4> clear_color,
-                               std::vector<std::uint8_t> &out_pixels);
+                               std::vector<std::uint8_t> &out_pixels,
+                               RgbaPostProcess post_process = {});
     /** Renders a depth-tested plan and reads normalized device depth values back. */
     nkgpu_result capture_depth(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
                                std::uint32_t height, std::vector<float> &out_depth);

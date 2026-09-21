@@ -106,6 +106,23 @@ void captures_emissive_triangle() {
     assert(center);
     assert(center[0] > 200 && center[1] < 20 && center[2] < 20 && center[3] > 200);
 
+    SensorConfig processed_sensor_config;
+    processed_sensor_config.id = 53;
+    processed_sensor_config.frame = 14;
+    CameraConfig processed_camera_config = camera_config;
+    processed_camera_config.post_process.gain = 0.5f;
+    CameraSensor processed_camera(processed_sensor_config, processed_camera_config);
+    const auto processed_tick = processed_camera.trigger(1.25);
+    assert(processed_tick.has_value());
+    std::optional<CameraFrame> processed_frame;
+    assert(adapter.capture(processed_camera, *processed_tick, scene->snapshot(), {},
+                           processed_frame) == NKGPU_OK);
+    assert(processed_frame.has_value());
+    const auto *processed_center = processed_frame->pixel(8, 8);
+    assert(processed_center);
+    assert(processed_center[0] > 90 && processed_center[0] < 160);
+    assert(processed_center[1] < 20 && processed_center[2] < 20 && processed_center[3] > 200);
+
     SensorConfig depth_sensor_config;
     depth_sensor_config.id = 51;
     depth_sensor_config.frame = 12;

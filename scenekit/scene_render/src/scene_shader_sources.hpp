@@ -12,6 +12,8 @@ struct SceneShaderSources {
     nkgpu_shader_language language = 0;
 };
 
+using PostProcessShaderSources = SceneShaderSources;
+
 inline constexpr char scene_vertex_glsl[] = R"(
 #version 330
 layout(location = 0) in vec3 position;
@@ -476,6 +478,19 @@ inline SceneShaderSources scene_shader_sources(nkgpu_backend backend, bool picki
                                             NKGPU_SHADERLANGUAGE_MSL}
                        : SceneShaderSources{scene_vertex_msl, scene_fragment_msl,
                                             NKGPU_SHADERLANGUAGE_MSL};
+    default:
+        return {};
+    }
+}
+
+inline PostProcessShaderSources post_process_shader_sources(nkgpu_backend backend) {
+    switch (backend) {
+    case NKGPU_BACKEND_GLCORE:
+        return {shader_source::postprocess_vertex_gl, shader_source::postprocess_fragment_gl,
+                NKGPU_SHADERLANGUAGE_GLSL};
+    case NKGPU_BACKEND_GLES3:
+        return {shader_source::postprocess_vertex_gles, shader_source::postprocess_fragment_gles,
+                NKGPU_SHADERLANGUAGE_GLSL};
     default:
         return {};
     }

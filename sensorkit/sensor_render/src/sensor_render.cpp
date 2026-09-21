@@ -142,10 +142,29 @@ nkgpu_result SceneCameraAdapter::capture(CameraSensor &sensor, const SensorTick 
 
     std::vector<std::uint8_t> pixels;
     const auto &camera = sensor.camera_config();
-    const auto result = executor_.capture_rgba8(plan, snapshot, camera.width, camera.height,
-                                                camera.clear_color, pixels);
+    nkscene::RgbaPostProcess gpu_post_process;
+    gpu_post_process.exposure_stops = camera.post_process.exposure_stops;
+    gpu_post_process.gain = camera.post_process.gain;
+    gpu_post_process.noise_stddev = camera.post_process.noise_stddev;
+    gpu_post_process.quantization = camera.post_process.quantization;
+    gpu_post_process.distortion_k1 = camera.post_process.distortion_k1;
+    gpu_post_process.distortion_k2 = camera.post_process.distortion_k2;
+    gpu_post_process.dropout_probability = camera.post_process.dropout_probability;
+    gpu_post_process.seed = sensor.config().seed;
+    gpu_post_process.sequence = tick.header.sequence;
+
+    const auto backend = nkgpu_query_backend(executor_.renderer());
+    const bool gpu_post_process_supported = backend == NKGPU_BACKEND_GLCORE ||
+                                            backend == NKGPU_BACKEND_GLES3;
+    const bool use_gpu_post_process = camera.post_process.enabled() &&
+                                      gpu_post_process_supported;
+    const auto result = executor_.capture_rgba8(
+        plan, snapshot, camera.width, camera.height, camera.clear_color, pixels,
+        use_gpu_post_process ? gpu_post_process : nkscene::RgbaPostProcess{});
     if (result != NKGPU_OK)
         return result;
+    if (camera.post_process.enabled() && !use_gpu_post_process)
+        sensor.apply_post_process_cpu(pixels, tick.header.sequence);
     out_frame = sensor.sample(tick, pixels);
     return out_frame.has_value() ? NKGPU_OK : NKGPU_ERROR_INVALID_ARGUMENT;
 }
