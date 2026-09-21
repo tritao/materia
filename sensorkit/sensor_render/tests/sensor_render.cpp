@@ -105,6 +105,26 @@ void captures_emissive_triangle() {
     assert(center);
     assert(center[0] > 200 && center[1] < 20 && center[2] < 20 && center[3] > 200);
 
+    SensorConfig depth_sensor_config;
+    depth_sensor_config.id = 51;
+    depth_sensor_config.frame = 12;
+    DepthConfig depth_config;
+    depth_config.width = 16;
+    depth_config.height = 16;
+    depth_config.fov_y = 1.5707963267948966f;
+    depth_config.near_plane = 0.1f;
+    depth_config.far_plane = 10.0f;
+    DepthSensor depth(depth_sensor_config, depth_config);
+    const auto depth_tick = depth.trigger(1.25);
+    assert(depth_tick.has_value());
+    std::optional<DepthFrame> depth_frame;
+    assert(adapter.capture_depth(depth, *depth_tick, scene->snapshot(), {}, depth_frame) ==
+           NKGPU_OK);
+    assert(depth_frame.has_value());
+    assert(depth_frame->header.capture_time == 1.25);
+    assert(std::abs(*depth_frame->pixel(8, 8) - 2.0f) < 0.05f);
+    assert(std::abs(*depth_frame->pixel(0, 0) - 10.0f) < 0.01f);
+
     assert(nkgpu_renderer_destroy(renderer) == NKGPU_OK);
     assert(nkgpu_surface_destroy(surface) == NKGPU_OK);
     assert(nk_window_destroy(window) == NK_OK);

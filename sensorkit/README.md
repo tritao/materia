@@ -36,8 +36,11 @@ publishing, ROS2, recording, and application callbacks outside the sensor
 model.
 
 The first camera slice intentionally covers perspective RGB capture only.
-Depth, segmentation, distortion, exposure, and camera noise can reuse the
-same off-screen render path without changing the core sensor boundary.
+Perspective metric depth capture is now also available through
+`SceneCameraAdapter::capture_depth`; it converts the renderer's nonlinear
+depth-buffer value into camera-forward distance in metres. Segmentation,
+distortion, exposure, and camera noise can reuse the same off-screen render
+path without changing the core sensor boundary.
 
 The core API follows the invariant:
 

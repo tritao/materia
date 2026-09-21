@@ -399,4 +399,41 @@ private:
     CameraConfig camera_;
 };
 
+struct DepthConfig {
+    std::uint32_t width = 640;
+    std::uint32_t height = 480;
+    float fov_y = 1.04719755f;
+    float near_plane = 0.01f;
+    float far_plane = 1000.0f;
+};
+
+struct DepthFrame {
+    SensorSampleHeader header;
+    std::uint32_t width = 0;
+    std::uint32_t height = 0;
+    /** Tightly packed top-to-bottom camera-forward distances in metres. */
+    std::vector<float> meters;
+
+    const float *pixel(std::uint32_t x, std::uint32_t y) const noexcept {
+        if (x >= width || y >= height)
+            return nullptr;
+        return meters.data() + static_cast<std::size_t>(y) * width + x;
+    }
+};
+
+/** Metric depth measurement model independent of any rendering backend. */
+class NKSENSOR_API DepthSensor final : public Sensor {
+public:
+    explicit DepthSensor(SensorConfig config, DepthConfig depth = {});
+
+    const DepthConfig &depth_config() const noexcept { return depth_; }
+
+    /** Package backend-produced camera-forward distances as a depth sample. */
+    std::optional<DepthFrame> sample(const SensorTick &tick,
+                                     std::span<const float> meters);
+
+private:
+    DepthConfig depth_;
+};
+
 } // namespace nksensor

@@ -182,6 +182,25 @@ void camera_packages_backend_pixels() {
     assert(frame->pixel(2, 0) == nullptr);
 }
 
+void depth_packages_metric_pixels() {
+    SensorConfig sensor_config;
+    sensor_config.id = 41;
+    DepthConfig depth_config;
+    depth_config.width = 2;
+    depth_config.height = 1;
+    DepthSensor depth(sensor_config, depth_config);
+    const auto tick = depth.trigger(4.0);
+    assert(tick.has_value());
+
+    const float meters[] = {2.0f, 10.0f};
+    const auto frame = depth.sample(*tick, meters);
+    assert(frame.has_value());
+    assert(frame->header.capture_time == 4.0);
+    assert(frame->meters.size() == 2);
+    assert(*frame->pixel(0, 0) == 2.0f);
+    assert(frame->pixel(2, 0) == nullptr);
+}
+
 } // namespace
 
 int main() {
@@ -192,5 +211,6 @@ int main() {
     manager_preserves_sensor_insertion_order();
     lidar_generates_rays_and_models_returns();
     camera_packages_backend_pixels();
+    depth_packages_metric_pixels();
     return 0;
 }

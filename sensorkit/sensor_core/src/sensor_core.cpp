@@ -355,4 +355,35 @@ std::optional<CameraFrame> CameraSensor::sample(const SensorTick &tick,
     return frame;
 }
 
+DepthSensor::DepthSensor(SensorConfig config, DepthConfig depth)
+    : Sensor(std::move(config)), depth_(depth) {
+    depth_.width = std::max<std::uint32_t>(1, depth_.width);
+    depth_.height = std::max<std::uint32_t>(1, depth_.height);
+    if (!std::isfinite(depth_.fov_y))
+        depth_.fov_y = 1.04719755f;
+    depth_.fov_y = std::clamp(depth_.fov_y, 1.0e-4f, 3.1415925f - 1.0e-4f);
+    if (!std::isfinite(depth_.near_plane))
+        depth_.near_plane = 0.01f;
+    depth_.near_plane = std::max(1.0e-5f, depth_.near_plane);
+    if (!std::isfinite(depth_.far_plane))
+        depth_.far_plane = 1000.0f;
+    depth_.far_plane = std::max(depth_.near_plane + 1.0e-5f, depth_.far_plane);
+}
+
+std::optional<DepthFrame> DepthSensor::sample(const SensorTick &tick,
+                                              std::span<const float> meters) {
+    if (tick.dropped)
+        return std::nullopt;
+
+    const auto pixel_count = static_cast<std::size_t>(depth_.width) * depth_.height;
+    if (meters.size() != pixel_count)
+        return std::nullopt;
+    DepthFrame frame;
+    frame.header = tick.header;
+    frame.width = depth_.width;
+    frame.height = depth_.height;
+    frame.meters.assign(meters.begin(), meters.end());
+    return frame;
+}
+
 } // namespace nksensor

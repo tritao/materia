@@ -1,5 +1,6 @@
 #include "nativekit_sensor_render.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -82,18 +83,40 @@ Matrix4 camera_view(const Pose &pose) noexcept {
             1.0f};
 }
 
-Matrix4 camera_projection(const CameraConfig &camera) noexcept {
-    const auto aspect = static_cast<float>(camera.width) / static_cast<float>(camera.height);
-    const auto focal = 1.0f / std::tan(camera.fov_y * 0.5f);
+Matrix4 camera_projection(std::uint32_t width, std::uint32_t height, float fov_y,
+                          float near_plane, float far_plane) noexcept {
+    const auto aspect = static_cast<float>(width) / static_cast<float>(height);
+    const auto focal = 1.0f / std::tan(fov_y * 0.5f);
     Matrix4 result{};
     result[0] = focal / aspect;
     result[5] = focal;
-    result[10] = (camera.far_plane + camera.near_plane) /
-                 (camera.far_plane - camera.near_plane);
+    result[10] = (far_plane + near_plane) / (far_plane - near_plane);
     result[11] = 1.0f;
-    result[14] = -(2.0f * camera.far_plane * camera.near_plane) /
-                 (camera.far_plane - camera.near_plane);
+    result[14] = -(2.0f * far_plane * near_plane) / (far_plane - near_plane);
     return result;
+}
+
+Matrix4 camera_projection(const CameraConfig &camera) noexcept {
+    return camera_projection(camera.width, camera.height, camera.fov_y, camera.near_plane,
+                             camera.far_plane);
+}
+
+Matrix4 depth_projection(const DepthConfig &depth) noexcept {
+    return camera_projection(depth.width, depth.height, depth.fov_y, depth.near_plane,
+                             depth.far_plane);
+}
+
+float metric_depth(float normalized_depth, const DepthConfig &depth) noexcept {
+    if (!std::isfinite(normalized_depth))
+        return depth.far_plane;
+    const auto depth_buffer = std::clamp(normalized_depth, 0.0f, 1.0f);
+    const auto ndc_depth = depth_buffer * 2.0f - 1.0f;
+    const auto denominator = depth.far_plane + depth.near_plane -
+                             ndc_depth * (depth.far_plane - depth.near_plane);
+    if (!(denominator > 0.0f) || !std::isfinite(denominator))
+        return depth.far_plane;
+    return std::clamp(2.0f * depth.far_plane * depth.near_plane / denominator,
+                      depth.near_plane, depth.far_plane);
 }
 
 } // namespace
@@ -119,6 +142,34 @@ nkgpu_result SceneCameraAdapter::capture(CameraSensor &sensor, const SensorTick 
     if (result != NKGPU_OK)
         return result;
     out_frame = sensor.sample(tick, pixels);
+    return out_frame.has_value() ? NKGPU_OK : NKGPU_ERROR_INVALID_ARGUMENT;
+}
+
+nkgpu_result SceneCameraAdapter::capture_depth(
+    DepthSensor &sensor, const SensorTick &tick, const nkscene::SceneSnapshot &snapshot,
+    const Pose &camera_pose, std::optional<DepthFrame> &out_frame) {
+    out_frame.reset();
+    if (tick.dropped)
+        return NKGPU_OK;
+
+    nkscene::SceneView view;
+    view.camera.enabled = true;
+    view.camera.view_projection =
+        multiply(depth_projection(sensor.depth_config()), camera_view(camera_pose));
+    const auto plan = nkscene::compile(snapshot, view);
+
+    std::vector<float> normalized_depth;
+    const auto &depth = sensor.depth_config();
+    const auto result = executor_.capture_depth(plan, snapshot, depth.width, depth.height,
+                                                normalized_depth);
+    if (result != NKGPU_OK)
+        return result;
+
+    std::vector<float> meters;
+    meters.reserve(normalized_depth.size());
+    for (const auto value : normalized_depth)
+        meters.push_back(metric_depth(value, depth));
+    out_frame = sensor.sample(tick, meters);
     return out_frame.has_value() ? NKGPU_OK : NKGPU_ERROR_INVALID_ARGUMENT;
 }
 

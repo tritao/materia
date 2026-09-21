@@ -43,6 +43,11 @@ public:
                          const nkscene::SceneSnapshot &snapshot, const Pose &camera_pose,
                          std::optional<CameraFrame> &out_frame);
 
+    /** Render metric camera-forward depth in the supplied world pose. */
+    nkgpu_result capture_depth(DepthSensor &sensor, const SensorTick &tick,
+                               const nkscene::SceneSnapshot &snapshot, const Pose &camera_pose,
+                               std::optional<DepthFrame> &out_frame);
+
 private:
     nkscene::NativeKitGpuExecutor executor_;
 };
