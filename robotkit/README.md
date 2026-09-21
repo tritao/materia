@@ -8,7 +8,7 @@ The first increment contains four deliberately small boundaries:
 
 - `core`: engine-neutral runtime values and validation;
 - `runtime`: an owner-thread runtime, command mailbox, and immutable snapshots;
-- `protocol`: versioned framing independent of any particular transport;
+- `haxe/robotkit/protocol`: versioned framing independent of any particular transport;
 - `haxe`: Haxeon façades, protocol clients, and world orchestration;
 - `robotd`: one independently deployable logical robot host;
 - `sim endpoint`: a SimKit-backed endpoint that owns the live simulation model

@@ -16,7 +16,6 @@ endif()
 
 add_subdirectory(core)
 add_subdirectory(runtime)
-add_subdirectory(protocol)
 
 if(RK_BUILD_SIMKIT_ENDPOINT)
     if(NOT TARGET NativeKit::sim_core)
