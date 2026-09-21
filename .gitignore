@@ -1,3 +1,4 @@
 # Materia application build output and deterministic capture artifacts.
 /app/build/
 /app/app/
+/app/*.dump
