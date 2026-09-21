@@ -30,6 +30,7 @@ import robotkit.protocol.RobotStateMsg;
 import robotkit.protocol.Stop;
 import robotkit.protocol.SensorFrameMsg;
 import robotkit.transport.NativeTransport;
+import robotkit.world.RobotSensorFrames;
 
 /** Authoritative robot process boundary. RobotRuntime ownership stays off the network path. */
 class RobotServer {
@@ -274,6 +275,29 @@ class RobotServer {
       blueprint.jointCount, true, false, false, false), sessionId));
     helloComplete = true;
     publishSnapshot(true);
+    if (value.requestedRole == "observer")
+      moveCurrentClientToObserver();
+  }
+
+  /**
+   * The first accepted socket is provisionally the controller slot so the
+   * server can read its Hello. If it asks for observation, move that same
+   * session into the observer set and leave the controller slot available for
+   * the next connection.
+   */
+  function moveCurrentClientToObserver():Void {
+    var current = client;
+    if (current == null) return;
+    observers.push(current);
+    observerStreams.set(current.rawValue(), stream);
+    observerSessions.set(current.rawValue(), sessionId);
+    observerHello.set(current.rawValue(), true);
+    client = null;
+    helloComplete = false;
+    controllerGranted = true;
+    sessionId = Int64.ofInt(0);
+    lastRequestSequence = Int64.ofInt(0);
+    lastSentSnapshotSequence = Int64.ofInt(-1);
   }
 
   function handleJointTarget(frame:RobotFrame, value:JointTarget):Void {
@@ -389,18 +413,11 @@ class RobotServer {
       snapshot.mode, snapshot.faultCode, snapshot.receivedTimestampNs);
     sendTo(target, targetSession, RobotProtocol.state(message, targetSession, snapshot.sequence,
       snapshot.sourceTimestampNs));
-    sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
-      snapshot.robotId, "imu", "imu", "base_link", snapshot.sequence,
-      snapshot.sourceTimestampNs, snapshot.receivedTimestampNs,
-      [snapshot.q.length > 0 ? snapshot.q.get(0) : 0.0,
-       snapshot.dq.length > 0 ? snapshot.dq.get(0) : 0.0,
-      0.0, 0.0, 0.0, 9.81]), targetSession, snapshot.sequence,
-      snapshot.sourceTimestampNs));
-    sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
-      snapshot.robotId, "lidar", "lidar", "base_link", snapshot.sequence,
-      snapshot.sourceTimestampNs, snapshot.receivedTimestampNs,
-      [for (_ in 0...8) 10.0]), targetSession, snapshot.sequence,
-      snapshot.sourceTimestampNs));
+    for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot))
+      sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
+        snapshot.robotId, sensor.sensorId, sensor.kind, sensor.frameId, sensor.sequence,
+        sensor.sourceTimestampNs, sensor.receivedTimestampNs, sensor.values.toArray()),
+        targetSession, sensor.sequence, sensor.sourceTimestampNs));
   }
 
   function sendFault(code:Int, message:String, fatal:Bool):Void {

@@ -119,17 +119,7 @@ class SimulatedRobot implements Robot {
     if (value.sequence == observedSequence)
       return;
     observedSequence = value.sequence;
-    currentSensors = [
-      new SensorFrame("imu", "imu", "base_link", value.sequence,
-        value.sourceTimestampNs,
-        [value.q.length > 0 ? value.q.get(0) : 0.0,
-         value.dq.length > 0 ? value.dq.get(0) : 0.0,
-         0.0, 0.0, 0.0, 9.81],
-        value.receivedTimestampNs),
-      new SensorFrame("lidar", "lidar", "base_link", value.sequence,
-        value.sourceTimestampNs,
-        [for (_ in 0...8) 10.0], value.receivedTimestampNs)
-    ];
+    currentSensors = RobotSensorFrames.fromRuntimeSnapshot(value);
     var listener = changeListener;
     if (listener != null)
       listener(logicalId);

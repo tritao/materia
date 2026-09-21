@@ -54,9 +54,9 @@ Participating runtimes cannot be stepped individually; applications must call
 reset, robot teleport, environment-object spawn/remove/teleport, and one
 shared simulation clock. These edits are accepted while stopped. Once running,
 physics is authoritative and editable-scene changes must go through the
-simulation owner. Each simulated robot publishes transport-neutral IMU and
-LiDAR frames with the same source clock, frame IDs, and sequences used by the
-remote path.
+simulation owner. Each simulated robot publishes transport-neutral joint
+encoder, IMU, and LiDAR frames with the same source clock, frame IDs, and
+sequences used by the remote path.
 
 `robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
 `Robot` interface used by `RemoteRobot`. It does not own or dispose the
@@ -66,11 +66,12 @@ and remote physical robots without backend-specific orchestration.
 The complete ownership and tick model is documented in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-`RobotWorld` is a single-owner composition object. Adapter callbacks only
-enqueue `RobotWorldEvent` values; the owner applies them with `pump()` while
-building a snapshot. `WorldSnapshot` and `RobotSnapshot` own copied arrays and
-sensor frames, expose no mutable maps, and distinguish backend/source time from
-the time the world received an observation.
+`RobotWorld` is a single-owner composition object. Its owner thread is checked
+at the boundary; adapter callbacks only enqueue `RobotWorldEvent` values, and
+the owner applies them with `pump()` while building a snapshot.
+`WorldSnapshot` and `RobotSnapshot` own copied arrays and sensor frames, expose
+no mutable maps, and distinguish backend/source time from the time the world
+received an observation.
 
 The ownership rule is intentionally simple:
 

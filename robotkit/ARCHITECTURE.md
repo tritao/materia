@@ -21,11 +21,12 @@ RobotWorld
 `RobotWorld` owns the logical `Robot` collection. It does not know whether a
 robot is remote or simulated. It routes `RobotCommand`, collects
 `RobotSnapshot`, tracks lifecycle changes, and builds `WorldSnapshot` values.
-The world has one application owner. Adapter callbacks never mutate its maps
-or sequence directly: they enqueue `RobotWorldEvent` values, and the owner
-applies them during `pump()`/snapshot construction. The event queue is the
-cross-thread boundary; attach, detach, submit, stop, and snapshot are owner
-operations.
+The world has one application owner, recorded as a native thread token.
+Non-owner calls that would touch its maps, adapters, or observers are rejected.
+Adapter callbacks never mutate its maps or sequence directly: they enqueue
+`RobotWorldEvent` values, and the owner applies them during `pump()`/snapshot
+construction. The event queue is the cross-thread boundary; attach, detach,
+submit, stop, and snapshot are owner operations.
 
 Snapshots own their data. Robot and world maps are private, arrays are copied
 into read-only views, and sensor frames are copied as well. Every observation
@@ -111,9 +112,11 @@ While stopped, the simulation owner can reset the whole world, reset one robot,
 teleport a robot, and spawn/remove/teleport environment objects. The editable
 scene is therefore the source of initial/configuration state. After a running
 host starts, physics owns the live state and runtime commands are the only
-normal way to change robot motion. Simulated IMU and LiDAR frames are emitted
-after each shared tick; their identity, frame ID, sequence, and two-clock
-timestamps match the remote sensor transport.
+normal way to change robot motion. Simulated joint-encoder, IMU, and LiDAR
+frames are emitted after each shared tick through one canonical projection;
+their identity, frame ID, sequence, and two-clock timestamps match the remote
+sensor transport. Native SensorKit models can replace that projection without
+changing the RobotWorld or RobotClient boundary.
 
 ## Deployment boundary
 
@@ -129,6 +132,11 @@ public boundary, so behavior code can be exercised against simulated, remote,
 or recorded state without backend conditionals. `worldd` is only a headless
 composition of `RobotWorld` plus `Simulation`; it does not create a parallel
 domain model.
+
+World-level behaviors leave command deadlines unset unless the application
+provides an endpoint-clock deadline. Each concrete adapter is responsible for
+translating a default deadline into its own clock; source timestamps are never
+silently reused as receive or command time.
 
 ## Ownership and shutdown
 

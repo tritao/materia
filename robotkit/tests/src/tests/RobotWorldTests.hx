@@ -1,6 +1,8 @@
 package tests;
 
 import haxe.Int64;
+import sys.thread.Mutex;
+import sys.thread.Thread;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.RobotRuntimeJointBlueprint;
@@ -22,9 +24,11 @@ import robotkit.world.RemoteRobot;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.StopMode;
 import robotkit.world.RobotWorld;
+import robotkit.world.RobotWorldEvent;
 import robotkit.world.SensorFrame;
 import robotkit.world.ReplayRobot;
 import robotkit.world.RobotRecording;
+import robotkit.world.RobotRecordingEvent;
 import robotkit.behavior.HoldJointBehavior;
 import robotkit.behavior.WorldBehaviorRunner;
 import robotkit.worldd.WorldHost;
@@ -35,7 +39,9 @@ class RobotWorldTests {
   public static function main():Void {
     testAttachDetachAndIdentity();
     testSequenceAndTopology();
+    testCrossThreadEventQueue();
     testImmutableSnapshots();
+    testRecordingEventLog();
     testForwardingAndLifecycle();
     testMixedSimulatedAndRemoteWorld();
     testWorldHostComposition();
@@ -167,6 +173,38 @@ class RobotWorldTests {
     world.close();
   }
 
+  static function testCrossThreadEventQueue():Void {
+    var world = new RobotWorld();
+    var doneMutex = new Mutex();
+    var done = false;
+    var rejected = false;
+    Thread.create(function() {
+      try {
+        world.robotIds();
+      } catch (_:Dynamic) {
+        rejected = true;
+      }
+      world.enqueue(RobotWorldEvent.RobotChanged("owner-test"));
+      doneMutex.acquire();
+      done = true;
+      doneMutex.release();
+    });
+    var completed = false;
+    for (_ in 0...500) {
+      doneMutex.acquire();
+      completed = done;
+      doneMutex.release();
+      if (completed) break;
+      Sys.sleep(0.01);
+    }
+    check(completed, "worker thread completes owner-boundary probe");
+    check(rejected, "RobotWorld rejects direct non-owner map access");
+    equal(world.pendingEventCount(), 1, "worker thread feeds changes through the event queue");
+    world.pump();
+    equal(world.pendingEventCount(), 0, "owner applies queued cross-thread events");
+    world.close();
+  }
+
   static function testForwardingAndLifecycle():Void {
     var world = new RobotWorld();
     var robot = new FakeRobot("arm");
@@ -183,6 +221,42 @@ class RobotWorldTests {
     world.close();
     equal(robot.closeCount, 1, "world close is idempotent");
     throws(function() world.submit("arm", command), "closed world rejects commands");
+  }
+
+  static function testRecordingEventLog():Void {
+    var world = new RobotWorld();
+    var recording = new RobotRecording();
+    var subscription = recording.attach(world);
+    var robot = new FakeRobot("recorded-arm");
+    world.attach(robot);
+    equal(recording.events.length, 0,
+      "recording observes world events only on the owner pump");
+    world.pump();
+    equal(recording.events.length, 1, "recording captures attachment events");
+    switch recording.events[0] {
+      case WorldEvent(RobotAttached(id)):
+        equal(id, "recorded-arm", "recording preserves attached robot identity");
+      case _:
+        check(false, "recording first event is attachment");
+    }
+    robot.emitChange();
+    world.pump();
+    equal(recording.events.length, 2, "recording captures queued adapter changes");
+    var snapshot = world.snapshot().robot("recorded-arm");
+    check(snapshot != null, "recording test has a robot snapshot");
+    recording.recordCommand(RobotCommand.JointPosition(0, 0.5, null));
+    recording.recordSnapshot(cast snapshot);
+    recording.recordFault(new RobotFault("fault-1", 7, "test fault", false));
+    recording.recordWorld(world.snapshot());
+    equal(recording.events.length, 6, "recording keeps one ordered typed event stream");
+    check(recording.commands.length == 1 && recording.snapshots.length == 1 &&
+      recording.faults.length == 1 && recording.worlds.length == 1,
+      "recording retains typed indexes alongside the event stream");
+    subscription.dispose();
+    world.detach(robot.id());
+    world.pump();
+    equal(recording.events.length, 6, "disposed recording stops receiving world events");
+    world.close();
   }
 
   static function testMixedSimulatedAndRemoteWorld():Void {
@@ -239,7 +313,8 @@ class RobotWorldTests {
     equal(secondValue.sourceTimestampNs, Int64.ofInt(10000000), "simulation clock reaches second robot");
     equal(firstValue.receivedTimestampNs, Int64.ofInt(1000), "world receive timestamp reaches first robot");
     equal(secondValue.receivedTimestampNs, Int64.ofInt(1000), "world receive timestamp reaches second robot");
-    equal(firstValue.sensors.length, 2, "simulated robot publishes IMU and LiDAR frames");
+    equal(firstValue.sensors.length, 3,
+      "simulated robot publishes encoders, IMU, and LiDAR frames");
     equal(firstValue.sensors.get(0).sourceTimestampNs, Int64.ofInt(10000000),
       "sensor source clock matches robot source clock");
     equal(firstValue.sensors.get(1).frameId, "base_link",
@@ -259,7 +334,7 @@ class RobotWorldTests {
     check(replay.advance(), "replay advances through the same snapshot boundary");
     var replayNext = replayWorld.snapshot().robot("replay-sim-a");
     var replayNextValue:RobotSnapshot = cast replayNext;
-    check(replayNextValue != null && replayNextValue.sensors.length == 2,
+    check(replayNextValue != null && replayNextValue.sensors.length == 3,
       "replay preserves sensor frames");
     var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25));
     equal(behavior.update(first), 1, "world behavior emits a transport-neutral command");

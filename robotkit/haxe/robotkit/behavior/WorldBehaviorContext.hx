@@ -7,7 +7,6 @@ import robotkit.world.SensorFrame;
 
 /** Read-only application input plus bounded command output for one robot. */
 class WorldBehaviorContext {
-  public static inline final DEFAULT_COMMAND_LIFETIME_NS:Int = 50_000_000;
   public final snapshot:RobotSnapshot;
   public final sensors:Array<SensorFrame>;
   final commands:Array<RobotCommand>;
@@ -20,9 +19,9 @@ class WorldBehaviorContext {
   }
 
   public function jointPosition(joint:Int, target:Float, ?expiryNs:Int64):Void {
-    var expiry = expiryNs == null
-      ? Int64.add(snapshot.sourceTimestampNs, Int64.ofInt(DEFAULT_COMMAND_LIFETIME_NS))
-      : expiryNs;
-    commands.push(RobotCommand.JointPosition(joint, target, expiry));
+    // A world behavior cannot assume that source and endpoint clocks share an
+    // epoch. A concrete adapter assigns its local default deadline; callers
+    // may still provide an explicit endpoint-clock deadline.
+    commands.push(RobotCommand.JointPosition(joint, target, expiryNs));
   }
 }

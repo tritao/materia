@@ -11,6 +11,7 @@ import sys.thread.Mutex;
  * knowing which transport or physics backend supplies them.
  */
 class RobotWorld {
+  final ownerThread:RobotThreadToken;
   final robotMap:Map<RobotId, Robot>;
   final pendingEvents:Array<RobotWorldEvent> = [];
   final eventMutex = new Mutex();
@@ -22,12 +23,14 @@ class RobotWorld {
   var closed:Bool = false;
 
   public function new() {
+    ownerThread = RobotThreadToken.current();
     robotMap = new Map<RobotId, Robot>();
   }
 
   /** Takes ownership of the robot until detach() or close(). */
   public function attach(robot:Robot):Void {
     ensureOpen();
+    ensureOwner();
     if (robot == null) throw "RobotWorld cannot attach a null robot";
     robot.setChangeListener(onRobotChanged);
     try {
@@ -44,10 +47,14 @@ class RobotWorld {
   }
 
   /** Returns the robot currently attached under an ID, without transferring ownership. */
-  public function robot(id:RobotId):Null<Robot> return robotMap.get(id);
+  public function robot(id:RobotId):Null<Robot> {
+    ensureOwner();
+    return robotMap.get(id);
+  }
 
   /** Returns attached IDs in deterministic lexical order. */
   public function robotIds():Array<RobotId> {
+    ensureOwner();
     var result:Array<RobotId> = [];
     for (id in robotMap.keys()) result.push(id);
     result.sort(function(left, right) return Reflect.compare(left, right));
@@ -55,11 +62,15 @@ class RobotWorld {
   }
 
   /** Returns a copy of the attached robot collection. */
-  public function robots():Array<Robot> return allRobots();
+  public function robots():Array<Robot> {
+    ensureOwner();
+    return allRobots();
+  }
 
   /** Detaches and returns a robot without closing it. */
   public function detach(id:RobotId):Null<Robot> {
     ensureOpen();
+    ensureOwner();
     var robot = robotMap.get(id);
     if (robot == null) return null;
     robotMap.remove(id);
@@ -73,6 +84,7 @@ class RobotWorld {
   /** Observes lifecycle and adapter changes; callbacks run during pump(). */
   public function subscribe(listener:RobotWorldEvent->Void):RobotWorldSubscription {
     ensureOpen();
+    ensureOwner();
     if (listener == null) throw "RobotWorld subscription requires a listener";
     observers.push(listener);
     return new RobotWorldSubscription(function() {
@@ -84,6 +96,7 @@ class RobotWorld {
   /** Returns descriptions in deterministic logical-ID order. */
   public function discover():Array<RobotDescription> {
     ensureOpen();
+    ensureOwner();
     var result:Array<RobotDescription> = [];
     for (robot in allRobots()) result.push(robot.description());
     return result;
@@ -91,6 +104,7 @@ class RobotWorld {
 
   public function health():RobotHealthSummary {
     ensureOpen();
+    ensureOwner();
     var ready = 0;
     var connecting = 0;
     var disconnected = 0;
@@ -109,6 +123,7 @@ class RobotWorld {
   /** Copies all robot observations into one deterministic world snapshot. */
   public function snapshot():WorldSnapshot {
     ensureOpen();
+    ensureOwner();
     pump();
     var source = new Map<RobotId, RobotSnapshot>();
     var sourceTimestampNs = haxe.Int64.ofInt(0);
@@ -142,6 +157,7 @@ class RobotWorld {
   /** Applies queued adapter events on the world owner's event-loop turn. */
   public function pump():Int {
     ensureOpen();
+    ensureOwner();
     var applied = 0;
     while (true) {
       eventMutex.acquire();
@@ -173,16 +189,19 @@ class RobotWorld {
   /** Routes one command to the selected robot adapter. */
   public function submit(id:RobotId, command:RobotCommand):Void {
     ensureOpen();
+    ensureOwner();
     requireRobot(id).submit(command);
   }
 
   /** Routes a normal or emergency stop to the selected robot adapter. */
   public function stop(id:RobotId, mode:StopMode):Void {
     ensureOpen();
+    ensureOwner();
     requireRobot(id).stop(mode);
   }
 
   public function status():RobotStatus {
+    ensureOwner();
     if (robotMap.keys().hasNext() == false) return Disconnected;
     var hasConnecting = false;
     for (robot in allRobots()) {
@@ -202,6 +221,7 @@ class RobotWorld {
 
   /** Closes adapters while leaving externally owned Simulation objects alive. */
   public function close():Void {
+    ensureOwner();
     if (closed) return;
     closed = true;
     for (robot in allRobots()) {
@@ -222,6 +242,11 @@ class RobotWorld {
 
   function ensureOpen():Void {
     if (closed) throw "RobotWorld has been closed";
+  }
+
+  function ensureOwner():Void {
+    if (RobotThreadToken.current() != ownerThread)
+      throw "RobotWorld is single-owner; enqueue an event for the owner thread";
   }
 
   function requireRobot(id:RobotId):Robot {
