@@ -284,8 +284,9 @@ class ShowcaseDesktop {
                         if (frameSubscription == null)
                             frameSubscription = frameSurface.onFrame(function(width, height) {
                                 try {
-                                    renderFrame(width, height);
-                                    if (frameState.running &&
+                                    if (!uiWindowChromeTest)
+                                        renderFrame(width, height);
+                                    if (!uiWindowChromeTest && frameState.running &&
                                             NativeKit.nk_surface_request_frame(surface) != Result.Ok)
                                         throw "surface frame request failed";
                                 } catch (error:Dynamic) {
