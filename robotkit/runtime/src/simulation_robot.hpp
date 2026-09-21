@@ -12,7 +12,7 @@ namespace robotkit {
 class Simulation;
 
 /** Internal mapping between one RobotRuntime and the shared Simulation. */
-class SimulationRobot final : public Endpoint {
+class SimulationRobot final : public RobotEndpoint {
 public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;

@@ -53,8 +53,8 @@ rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_layout *layout,
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     try {
-        std::shared_ptr<robotkit::Endpoint> endpoint =
-            std::make_shared<robotkit::InMemoryEndpoint>(layout->joint_count);
+        std::shared_ptr<robotkit::RobotEndpoint> endpoint =
+            std::make_shared<robotkit::InMemoryRobot>(layout->joint_count);
         auto runtime = std::make_shared<robotkit::RobotRuntime>(*layout, endpoint);
         const auto handle = robotkit::internal::register_runtime(std::move(runtime));
         *out_runtime = handle;

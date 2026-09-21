@@ -16,10 +16,10 @@ uint64_t monotonic_now_ns() {
 
 } // namespace
 
-InMemoryEndpoint::InMemoryEndpoint(uint32_t joint_count)
+InMemoryRobot::InMemoryRobot(uint32_t joint_count)
     : joint_count_(std::min(joint_count, static_cast<uint32_t>(RK_MAX_JOINTS))) {}
 
-rk_result InMemoryEndpoint::apply(const rk_robot_command &command) {
+rk_result InMemoryRobot::apply(const rk_robot_command &command) {
     if (stopped_ && command.kind != RK_COMMAND_STOP)
         return RK_ERROR_SAFETY_STOPPED;
 
@@ -46,7 +46,7 @@ rk_result InMemoryEndpoint::apply(const rk_robot_command &command) {
     return RK_OK;
 }
 
-rk_result InMemoryEndpoint::sample(uint64_t timestamp_ns, rk_robot_state &state) {
+rk_result InMemoryRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
     state.struct_size = sizeof(state);
     state.timestamp_ns = timestamp_ns;
     state.joint_count = joint_count_;
@@ -60,7 +60,8 @@ rk_result InMemoryEndpoint::sample(uint64_t timestamp_ns, rk_robot_state &state)
     return RK_OK;
 }
 
-RobotRuntime::RobotRuntime(const rk_robot_runtime_layout &layout, std::shared_ptr<Endpoint> endpoint,
+RobotRuntime::RobotRuntime(const rk_robot_runtime_layout &layout,
+                           std::shared_ptr<RobotEndpoint> endpoint,
                  std::chrono::nanoseconds period)
     : layout_(layout), endpoint_(std::move(endpoint)), period_(period) {
     state_.struct_size = sizeof(state_);

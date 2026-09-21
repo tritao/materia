@@ -26,7 +26,7 @@ int main() {
     layout.revision = 1;
     layout.joint_count = 2;
 
-    auto endpoint = std::make_shared<robotkit::InMemoryEndpoint>(layout.joint_count);
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(layout.joint_count);
     robotkit::RobotRuntime runtime(layout, std::move(endpoint));
 
     rk_robot_command command{};
@@ -67,7 +67,7 @@ int main() {
     assert(runtime.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
 
-    auto threaded_endpoint = std::make_shared<robotkit::InMemoryEndpoint>(layout.joint_count);
+    auto threaded_endpoint = std::make_shared<robotkit::InMemoryRobot>(layout.joint_count);
     robotkit::RobotRuntime threaded(layout, std::move(threaded_endpoint),
                                std::chrono::milliseconds(1));
     assert(threaded.start() == RK_OK);

@@ -16,10 +16,10 @@ namespace robotkit {
 /**
  * Backend adapter used by one RobotRuntime.
  *
- * Endpoint is the native boundary between RobotRuntime's command mailbox and
+ * RobotEndpoint is the native boundary between RobotRuntime's command mailbox and
  * the state-producing mechanism behind it. Implementations may represent a
  * physical driver, a shared Simulation binding, a replay source, or a small
- * test double. Endpoint does not own the RobotRuntime, its public handle, or
+ * test double. RobotEndpoint does not own the RobotRuntime, its public handle, or
  * a simulation clock.
  *
  * RobotRuntime invokes the methods on its owner thread. For a shared
@@ -28,9 +28,9 @@ namespace robotkit {
  * every endpoint is sampled afterward. Implementations should therefore stage
  * command effects in apply() and publish only observed state from sample().
  */
-class RK_API Endpoint {
+class RK_API RobotEndpoint {
 public:
-    virtual ~Endpoint() = default;
+    virtual ~RobotEndpoint() = default;
 
     /**
      * Applies one validated command batch to the backend.
@@ -70,16 +70,16 @@ public:
 };
 
 /**
- * Small loopback endpoint used by runtime tests and initial host bring-up.
+ * Small loopback robot adapter used by runtime tests and initial host bring-up.
  *
  * It is intentionally not a simulator and does not model bodies, contacts,
  * or a physics clock. It only moves joints toward the most recent position
  * targets, making it useful for checking mailbox and snapshot plumbing before
  * a real physical or simulated endpoint is available.
  */
-class RK_API InMemoryEndpoint final : public Endpoint {
+class RK_API InMemoryRobot final : public RobotEndpoint {
 public:
-    explicit InMemoryEndpoint(uint32_t joint_count);
+    explicit InMemoryRobot(uint32_t joint_count);
 
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
@@ -101,7 +101,7 @@ private:
  */
 class RK_API RobotRuntime final {
 public:
-    RobotRuntime(const rk_robot_runtime_layout &layout, std::shared_ptr<Endpoint> endpoint,
+    RobotRuntime(const rk_robot_runtime_layout &layout, std::shared_ptr<RobotEndpoint> endpoint,
             std::chrono::nanoseconds period = std::chrono::milliseconds(10));
     ~RobotRuntime();
 
@@ -132,7 +132,7 @@ private:
     rk_result step_owner(uint64_t timestamp_ns);
 
     rk_robot_runtime_layout layout_{};
-    std::shared_ptr<Endpoint> endpoint_;
+    std::shared_ptr<RobotEndpoint> endpoint_;
     std::chrono::nanoseconds period_;
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};

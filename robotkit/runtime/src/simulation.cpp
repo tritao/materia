@@ -139,7 +139,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         layout.link_count = blueprint.link_count;
         layout.frame_count = blueprint.frame_count;
         auto runtime = std::make_shared<RobotRuntime>(
-            layout, std::static_pointer_cast<Endpoint>(binding));
+            layout, std::static_pointer_cast<RobotEndpoint>(binding));
         runtime->set_externally_driven(true);
         const auto handle = internal::register_runtime(runtime);
         runtimes_.push_back(std::move(runtime));
