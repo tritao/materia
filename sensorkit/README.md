@@ -20,6 +20,7 @@ The current follow-up library is:
 ```text
 sensor_core    backend-independent scheduling, models, and data types
 sensor_wire    Haxeon-compatible MessagePack packed-frame packets
+sensor_stream  transport-neutral packet fanout and deterministic buffer replay
 sensor_sim     SimKit truth adapters
 sensor_render  SceneKit GPU rendering and RGBA8 camera capture
 ```
@@ -56,6 +57,13 @@ then horizontal. The first transport version intentionally omits backend hit
 points and normals; the C++ API provides zero-copy `LidarScanView`, owning
 decode, and runtime variant dispatch. The matching Haxeon record is
 `sensor_wire/haxe/materia/sensor/wire/LidarScanMessage.hx`.
+
+`sensor_stream` sits above the codec. `make_sensor_packet` encodes one core
+measurement and stores its bytes in shared immutable storage. `PacketFanout`
+delivers that same packet to live transports, recorders, UI callbacks, or
+tests. `PacketBuffer` is a small deterministic in-memory recorder/replay source
+that preserves packet order and exact HMPK bytes; it intentionally does not
+choose a file format or transport implementation.
 
 `sensor_sim::ImuTruthAdapter` consumes an immutable `nksim_snapshot` and
 derives linear acceleration from consecutive body velocities. It never reads

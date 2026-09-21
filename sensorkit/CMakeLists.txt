@@ -21,6 +21,7 @@ endif()
 
 add_subdirectory(sensor_core)
 add_subdirectory(sensor_wire)
+add_subdirectory(sensor_stream)
 
 if(NKSENSOR_BUILD_SIM)
     set(NKSENSOR_PARENT_BUILD_TESTS ${NK_BUILD_TESTS})
