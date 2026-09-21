@@ -15,6 +15,10 @@ import robotkit.world.WorldHost;
 class WorldHostTests {
   static var assertions = 0;
 
+  // Keeps the optional native simulation façade in the package compile surface.
+  static function simulationTypeCheck(value:robotkit.runtime.Simulation):robotkit.runtime.Simulation
+    return value;
+
   public static function main():Void {
     testAttachDetachAndIdentity();
     testSequenceAndTopology();

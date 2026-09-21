@@ -27,7 +27,7 @@ class RuntimeBlueprint {
     joints.push(value);
   }
 
-  @:allow(Runtime)
+  @:allow(Runtime, Simulation)
   function nativeValue():rk_runtime_blueprint {
     if (joints.length != jointCount)
       throw "RobotKit runtime blueprint is missing joints";

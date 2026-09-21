@@ -11,8 +11,8 @@ The first increment contains deliberately small boundaries:
 - `haxe/robotkit/protocol`: versioned framing independent of any particular transport;
 - `haxe`: Haxeon façades, protocol clients, and world orchestration;
 - `robotd`: one independently deployable logical robot host;
-- `sim endpoint`: a SimKit-backed endpoint that owns the live simulation model
-  when enabled by the host application.
+- `sim endpoint`: a per-robot SimKit adapter attached to a shared simulation
+  world when enabled by the host application.
 
 The semantic robot model and native-runtime compiler are reusable Haxe APIs
 under `haxe/robotkit`; `robotd` supplies only process hosting and deployment
@@ -38,6 +38,14 @@ graph consumed by the Haxeon host. The Haxe façade and wire protocol are under
 `haxe/robotkit`;
 its bindings deliberately submit one command batch and retrieve one snapshot
 per tick.
+
+Multi-robot simulation is coordinated by `rk_simulation`. One simulation owns
+the SceneKit scene, SimKit world, host, and clock. Robot runtimes remain the
+command/snapshot boundary, but they do not advance physics independently: the
+coordinator drains every robot's commands, advances the shared world once, and
+publishes every robot state from the resulting snapshot. The Haxe
+`robotkit.runtime.Simulation` façade exposes the same lifecycle while behavior
+code continues to depend on robot-scoped submit/snapshot APIs.
 
 Behavior hosting builds on that same boundary. `RobotBehaviorRunner` receives a
 `RobotSnapshot`, gives a behavior a read-only `RobotContext`, and publishes the

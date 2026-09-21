@@ -46,7 +46,7 @@ rk_result InMemoryEndpoint::apply(const rk_robot_command &command) {
     return RK_OK;
 }
 
-rk_result InMemoryEndpoint::step(uint64_t timestamp_ns, rk_robot_state &state) {
+rk_result InMemoryEndpoint::sample(uint64_t timestamp_ns, rk_robot_state &state) {
     state.struct_size = sizeof(state);
     state.timestamp_ns = timestamp_ns;
     state.joint_count = joint_count_;
@@ -75,7 +75,7 @@ Runtime::~Runtime() {
 
 rk_result Runtime::start() {
     std::lock_guard lock(queue_mutex_);
-    if (running_ || stopping_ || endpoint_ == nullptr ||
+    if (externally_driven_ || running_ || stopping_ || endpoint_ == nullptr ||
         rk_runtime_layout_validate(&layout_) != RK_OK)
         return RK_ERROR_INVALID_STATE;
     running_ = true;
@@ -113,7 +113,7 @@ rk_result Runtime::submit(const rk_robot_command &command) {
 rk_result Runtime::step_once(uint64_t timestamp_ns) {
     {
         std::lock_guard lock(queue_mutex_);
-        if (running_ || stopping_ || endpoint_ == nullptr ||
+        if (externally_driven_ || running_ || stopping_ || endpoint_ == nullptr ||
             rk_runtime_layout_validate(&layout_) != RK_OK)
             return RK_ERROR_INVALID_STATE;
     }
@@ -170,6 +170,13 @@ void Runtime::run() {
 }
 
 rk_result Runtime::step_owner(uint64_t timestamp_ns) {
+    const auto apply_result = apply_pending_commands();
+    if (apply_result != RK_OK)
+        return apply_result;
+    return publish_sample(timestamp_ns);
+}
+
+rk_result Runtime::apply_pending_commands() {
     std::deque<rk_robot_command> commands;
     {
         std::lock_guard queue_lock(queue_mutex_);
@@ -196,12 +203,16 @@ rk_result Runtime::step_owner(uint64_t timestamp_ns) {
         }
     }
 
+    return RK_OK;
+}
+
+rk_result Runtime::publish_sample(uint64_t timestamp_ns) {
     rk_robot_state next;
     {
         std::lock_guard state_lock(state_mutex_);
         next = state_;
     }
-    const auto result = endpoint_->step(timestamp_ns, next);
+    const auto result = endpoint_->sample(timestamp_ns, next);
     if (result != RK_OK)
         return result;
     {
@@ -212,6 +223,15 @@ rk_result Runtime::step_owner(uint64_t timestamp_ns) {
         state_ = next;
     }
     return RK_OK;
+}
+
+void Runtime::set_externally_driven(bool value) noexcept {
+    std::lock_guard lock(queue_mutex_);
+    externally_driven_ = value;
+}
+
+void Runtime::discard_pending_commands() noexcept {
+    endpoint_->discard_pending();
 }
 
 } // namespace robotkit

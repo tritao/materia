@@ -10,6 +10,8 @@ namespace {
 
 std::mutex registry_mutex;
 std::unordered_map<rk_runtime, std::shared_ptr<robotkit::Runtime>> runtimes;
+std::unordered_map<rk_runtime, std::weak_ptr<robotkit::internal::RuntimeCoordinator>> coordinators;
+std::unordered_map<rk_runtime, std::shared_ptr<void>> runtime_owners;
 rk_runtime next_runtime = 1;
 
 } // namespace
@@ -22,17 +24,27 @@ std::shared_ptr<Runtime> resolve_runtime(rk_runtime handle) {
     return found == runtimes.end() ? nullptr : found->second;
 }
 
-rk_runtime register_runtime(std::shared_ptr<Runtime> runtime) {
+std::shared_ptr<RuntimeCoordinator> resolve_runtime_coordinator(rk_runtime handle) {
+    std::lock_guard lock(registry_mutex);
+    const auto found = coordinators.find(handle);
+    return found == coordinators.end() ? nullptr : found->second.lock();
+}
+
+rk_runtime register_runtime(std::shared_ptr<Runtime> runtime,
+                            std::shared_ptr<RuntimeCoordinator> coordinator) {
     std::lock_guard lock(registry_mutex);
     while (next_runtime == RK_INVALID_RUNTIME || runtimes.count(next_runtime) != 0)
         ++next_runtime;
     const auto handle = next_runtime++;
     runtimes.emplace(handle, std::move(runtime));
+    if (coordinator)
+        coordinators.emplace(handle, coordinator);
     return handle;
 }
 
 void destroy_runtime(rk_runtime handle) {
     std::shared_ptr<Runtime> released;
+    std::shared_ptr<void> owner;
     {
         std::lock_guard lock(registry_mutex);
         const auto found = runtimes.find(handle);
@@ -40,7 +52,19 @@ void destroy_runtime(rk_runtime handle) {
             return;
         released = std::move(found->second);
         runtimes.erase(found);
+        coordinators.erase(handle);
+        const auto owner_found = runtime_owners.find(handle);
+        if (owner_found != runtime_owners.end()) {
+            owner = std::move(owner_found->second);
+            runtime_owners.erase(owner_found);
+        }
     }
+}
+
+void attach_runtime_owner(rk_runtime handle, std::shared_ptr<void> owner) {
+    std::lock_guard lock(registry_mutex);
+    if (runtimes.count(handle) != 0)
+        runtime_owners[handle] = std::move(owner);
 }
 
 } // namespace robotkit::internal
@@ -68,11 +92,15 @@ void RK_CALL rk_runtime_destroy(rk_runtime runtime) {
 }
 
 rk_result RK_CALL rk_runtime_start(rk_runtime runtime) {
+    if (const auto coordinator = robotkit::internal::resolve_runtime_coordinator(runtime))
+        return coordinator->start();
     const auto value = robotkit::internal::resolve_runtime(runtime);
     return value ? value->start() : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_runtime_stop(rk_runtime runtime) {
+    if (const auto coordinator = robotkit::internal::resolve_runtime_coordinator(runtime))
+        return coordinator->stop();
     const auto value = robotkit::internal::resolve_runtime(runtime);
     return value ? value->stop() : RK_ERROR_INVALID_HANDLE;
 }
@@ -85,6 +113,8 @@ rk_result RK_CALL rk_runtime_submit(rk_runtime runtime, const rk_robot_command *
 }
 
 rk_result RK_CALL rk_runtime_step(rk_runtime runtime, uint64_t timestamp_ns) {
+    if (const auto coordinator = robotkit::internal::resolve_runtime_coordinator(runtime))
+        return coordinator->step(timestamp_ns);
     const auto value = robotkit::internal::resolve_runtime(runtime);
     return value ? value->step_once(timestamp_ns) : RK_ERROR_INVALID_HANDLE;
 }

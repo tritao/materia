@@ -23,6 +23,7 @@ if(RK_BUILD_SIMKIT_ENDPOINT)
     endif()
     target_sources(robotkit_runtime PRIVATE
         runtime/src/sim_endpoint.cpp
+        runtime/src/simulation.cpp
         runtime/src/sim_endpoint_c_api.cpp)
     target_compile_definitions(robotkit_runtime PRIVATE RK_HAS_SIMKIT_ENDPOINT=1)
     target_link_libraries(robotkit_runtime PUBLIC NativeKit::sim_core)

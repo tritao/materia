@@ -1,11 +1,97 @@
 #include "robotkit_simkit.h"
-
-#include "runtime_registry.hpp"
-#include "sim_endpoint.hpp"
+#include "simulation.hpp"
 
 #include <memory>
+#include <mutex>
+#include <unordered_map>
+
+namespace {
+std::mutex simulations_mutex;
+std::unordered_map<rk_simulation, std::shared_ptr<robotkit::Simulation>> simulations;
+rk_simulation next_simulation = 1;
+
+std::shared_ptr<robotkit::Simulation> resolve(rk_simulation handle) {
+    std::lock_guard lock(simulations_mutex);
+    const auto found = simulations.find(handle);
+    return found == simulations.end() ? nullptr : found->second;
+}
+
+rk_simulation store(std::shared_ptr<robotkit::Simulation> simulation) {
+    std::lock_guard lock(simulations_mutex);
+    while (next_simulation == RK_INVALID_SIMULATION ||
+           simulations.count(next_simulation) != 0)
+        ++next_simulation;
+    const auto handle = next_simulation++;
+    simulations.emplace(handle, std::move(simulation));
+    return handle;
+}
+} // namespace
 
 extern "C" {
+
+rk_result RK_CALL rk_simulation_create(const rk_simulation_desc *desc,
+                                       rk_simulation *out_simulation) {
+    if (!desc || desc->struct_size < sizeof(*desc) || !out_simulation ||
+        desc->fixed_timestep <= 0.0 || desc->physics_substeps == 0)
+        return RK_ERROR_INVALID_ARGUMENT;
+    *out_simulation = RK_INVALID_SIMULATION;
+    try {
+        *out_simulation = store(std::make_shared<robotkit::Simulation>(
+            desc->fixed_timestep, desc->physics_substeps));
+        return RK_OK;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
+void RK_CALL rk_simulation_destroy(rk_simulation simulation) {
+    std::shared_ptr<robotkit::Simulation> released;
+    {
+        std::lock_guard lock(simulations_mutex);
+        const auto found = simulations.find(simulation);
+        if (found == simulations.end())
+            return;
+        released = std::move(found->second);
+        simulations.erase(found);
+    }
+}
+
+rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
+                                          const rk_runtime_blueprint *blueprint,
+                                          rk_runtime *out_runtime) {
+    if (!out_runtime || rk_runtime_blueprint_validate(blueprint) != RK_OK)
+        return RK_ERROR_INVALID_ARGUMENT;
+    *out_runtime = RK_INVALID_RUNTIME;
+    const auto value = resolve(simulation);
+    return value ? value->add_robot(*blueprint, *out_runtime) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_step(rk_simulation simulation, uint64_t timestamp_ns) {
+    const auto value = resolve(simulation);
+    return value ? value->step(timestamp_ns) : RK_ERROR_INVALID_HANDLE;
+}
+rk_result RK_CALL rk_simulation_start(rk_simulation simulation) {
+    const auto value = resolve(simulation);
+    return value ? value->start() : RK_ERROR_INVALID_HANDLE;
+}
+rk_result RK_CALL rk_simulation_stop(rk_simulation simulation) {
+    const auto value = resolve(simulation);
+    return value ? value->stop() : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_get_clock(rk_simulation simulation,
+                                          rk_simulation_clock *out_clock) {
+    if (!out_clock || out_clock->struct_size < sizeof(*out_clock))
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    if (!value)
+        return RK_ERROR_INVALID_HANDLE;
+    out_clock->step_index = value->step_index();
+    out_clock->simulation_time = value->simulation_time();
+    return RK_OK;
+}
 
 rk_result RK_CALL rk_runtime_create_sim(const rk_runtime_blueprint *blueprint,
                                         rk_runtime *out_runtime) {
@@ -13,17 +99,13 @@ rk_result RK_CALL rk_runtime_create_sim(const rk_runtime_blueprint *blueprint,
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_RUNTIME;
     try {
-        rk_runtime_layout layout{};
-        layout.struct_size = sizeof(layout);
-        layout.revision = blueprint->revision;
-        layout.joint_count = blueprint->joint_count;
-        layout.link_count = blueprint->link_count;
-        layout.frame_count = blueprint->frame_count;
-        auto endpoint = std::make_unique<robotkit::SimEndpoint>(*blueprint);
-        auto runtime = std::make_shared<robotkit::Runtime>(layout,
-                                                            std::move(endpoint));
-        *out_runtime = robotkit::internal::register_runtime(std::move(runtime));
-        return RK_OK;
+        auto simulation = std::make_shared<robotkit::Simulation>(0.01, 1);
+        const auto result = simulation->add_robot(*blueprint, *out_runtime);
+        if (result == RK_OK)
+            robotkit::internal::attach_runtime_owner(*out_runtime, simulation);
+        return result;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
     } catch (...) {
         return RK_ERROR_BACKEND;
     }

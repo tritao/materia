@@ -8,6 +8,7 @@ class Runtime {
   final owner:Ownedrk_runtime;
   var disposed:Bool = false;
 
+  @:allow(robotkit.runtime.Simulation)
   private function new(owner:Ownedrk_runtime) {
     this.owner = owner;
   }

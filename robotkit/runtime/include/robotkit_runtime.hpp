@@ -18,7 +18,10 @@ public:
     virtual ~Endpoint() = default;
 
     virtual rk_result apply(const rk_robot_command &command) = 0;
-    virtual rk_result step(uint64_t timestamp_ns, rk_robot_state &state) = 0;
+    /** Read the endpoint's latest state. Sampling does not advance shared time. */
+    virtual rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) = 0;
+    /** Discard commands staged during a coordinator tick that will not advance. */
+    virtual void discard_pending() noexcept {}
 };
 
 /**
@@ -31,7 +34,7 @@ public:
     explicit InMemoryEndpoint(uint32_t joint_count);
 
     rk_result apply(const rk_robot_command &command) override;
-    rk_result step(uint64_t timestamp_ns, rk_robot_state &state) override;
+    rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
 
 private:
     uint32_t joint_count_ = 0;
@@ -59,6 +62,12 @@ public:
 
     bool running() const;
 
+    /** Coordinator-facing phases used to advance a group of runtimes atomically. */
+    rk_result apply_pending_commands();
+    rk_result publish_sample(uint64_t timestamp_ns);
+    void discard_pending_commands() noexcept;
+    void set_externally_driven(bool value) noexcept;
+
 private:
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
@@ -74,6 +83,7 @@ private:
     std::thread worker_;
     bool running_ = false;
     bool stopping_ = false;
+    bool externally_driven_ = false;
 };
 
 } // namespace robotkit
