@@ -4,11 +4,11 @@
 #include <cmath>
 
 int main() {
-    rk_runtime_layout layout{};
+    rk_robot_runtime_layout layout{};
     layout.struct_size = sizeof(layout);
     layout.revision = 7;
     layout.joint_count = 2;
-    assert(rk_runtime_layout_validate(&layout) == RK_OK);
+    assert(rk_robot_runtime_layout_validate(&layout) == RK_OK);
 
     rk_robot_command command{};
     command.struct_size = sizeof(command);

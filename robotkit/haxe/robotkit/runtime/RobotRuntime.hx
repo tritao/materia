@@ -2,31 +2,41 @@ package robotkit.runtime;
 
 import RobotKitRuntime;
 
-/** Coarse-grained Haxeon façade over the native RobotKit runtime. */
-class Runtime {
-  final owner:Ownedrk_runtime;
+/**
+ * Per-robot realtime execution boundary.
+ *
+ * A `RobotRuntime` owns one command mailbox and one immutable native state
+ * stream. Standalone runtimes may be stepped directly; runtimes created by a
+ * `Simulation` are externally driven and must be advanced through that shared
+ * simulation so all robots observe one physics tick.
+ */
+class RobotRuntime {
+  final owner:Ownedrk_robot_runtime;
   var disposed:Bool = false;
 
   @:allow(robotkit.runtime.Simulation)
-  private function new(owner:Ownedrk_runtime) {
+  private function new(owner:Ownedrk_robot_runtime) {
     this.owner = owner;
   }
 
-  public static function create(layout:RuntimeLayout):Runtime {
-    var result = RobotKitRuntime.rk_runtime_create(layout.nativeValue());
+  /** Creates a standalone in-memory runtime with its own worker lifecycle. */
+  public static function create(layout:RobotRuntimeLayout):RobotRuntime {
+    var result = RobotKitRuntime.rk_robot_runtime_create(layout.nativeValue());
     check(result.status, "runtime.create");
-    return new Runtime(result.out_runtime);
+    return new RobotRuntime(result.out_runtime);
   }
 
+  /** Starts a standalone runtime worker; Simulation-owned runtimes reject this. */
   public function start():Void {
     ensureLive();
-    check(RobotKitRuntime.rk_runtime_start(owner.borrow()), "runtime.start");
+    check(RobotKitRuntime.rk_robot_runtime_start(owner.borrow()), "runtime.start");
   }
 
+  /** Stops a standalone worker; it never advances a shared Simulation. */
   public function stop():Void {
     if (disposed)
       return;
-    check(RobotKitRuntime.rk_runtime_stop(owner.borrow()), "runtime.stop");
+    check(RobotKitRuntime.rk_robot_runtime_stop(owner.borrow()), "runtime.stop");
   }
 
   /** Submits all position targets in one native call. */
@@ -50,7 +60,7 @@ class Runtime {
       target.set_max_effort(0.0);
       command.set_targets(index, target);
     }
-    check(RobotKitRuntime.rk_runtime_submit(owner.borrow(), command),
+    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.submitPositions");
   }
 
@@ -73,7 +83,7 @@ class Runtime {
     target.set_max_rate(0.0);
     target.set_max_effort(0.0);
     command.set_targets(0, target);
-    check(RobotKitRuntime.rk_runtime_submit(owner.borrow(), command),
+    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.submitPosition");
   }
 
@@ -88,22 +98,18 @@ class Runtime {
       ? RobotKitRuntimeConstants.RK_COMMAND_EMERGENCY_STOP
       : RobotKitRuntimeConstants.RK_COMMAND_STOP);
     command.set_target_count(0);
-    check(RobotKitRuntime.rk_runtime_submit(owner.borrow(), command),
+    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.submitStop");
   }
 
-  public function step(timestampNs:haxe.Int64):Void {
-    ensureLive();
-    check(RobotKitRuntime.rk_runtime_step(owner.borrow(), timestampNs), "runtime.step");
-  }
-
-  public function snapshot():RuntimeSnapshot {
+  /** Reads the latest published native state without advancing time. */
+  public function snapshot():RobotRuntimeSnapshot {
     ensureLive();
     var value = new rk_robot_snapshot();
     value.set_struct_size(rk_robot_snapshot.size());
-    check(RobotKitRuntime.rk_runtime_snapshot_full(owner.borrow(), value).status,
+    check(RobotKitRuntime.rk_robot_runtime_snapshot_full(owner.borrow(), value).status,
       "runtime.snapshot");
-    return RuntimeSnapshot.fromNative(value);
+    return RobotRuntimeSnapshot.fromNative(value);
   }
 
   public function dispose():Void {

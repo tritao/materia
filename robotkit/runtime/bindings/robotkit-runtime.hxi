@@ -34,35 +34,39 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	const RK_TARGET_VELOCITY = 2;
 	extern fn rk_robot_capabilities_validate(capabilities: ptr<const<rk_robot_capabilities>>) -> rk_result;
 	extern fn rk_robot_command_validate(command: ptr<const<rk_robot_command>>) -> rk_result;
-	extern fn rk_robot_command_validate_for_layout(command: ptr<const<rk_robot_command>>, layout: ptr<const<rk_runtime_layout>>) -> rk_result;
-	extern fn rk_robot_snapshot_validate(snapshot: ptr<const<rk_robot_snapshot>>) -> rk_result;
-	extern fn rk_robot_state_validate(state: ptr<const<rk_robot_state>>) -> rk_result;
-	extern fn rk_runtime_blueprint_validate(blueprint: ptr<const<rk_runtime_blueprint>>) -> rk_result;
-	extern fn rk_runtime_capabilities(runtime: rk_runtime, out_capabilities: ptr<rk_robot_capabilities> @inout) -> rk_result;
+	extern fn rk_robot_command_validate_for_layout(command: ptr<const<rk_robot_command>>, layout: ptr<const<rk_robot_runtime_layout>>) -> rk_result;
+	extern fn rk_robot_runtime_blueprint_validate(blueprint: ptr<const<rk_robot_runtime_blueprint>>) -> rk_result;
+	extern fn rk_robot_runtime_capabilities(runtime: rk_robot_runtime, out_capabilities: ptr<rk_robot_capabilities> @inout) -> rk_result;
 	/**
-	 * Creates the initial deterministic in-memory runtime endpoint.
+	 * Creates a standalone in-memory RobotRuntime.
+	 *
+	 * The returned runtime owns its endpoint worker lifecycle. For shared physics,
+	 * use rk_simulation_add_robot instead so Simulation remains the one clock
+	 * owner. Standalone callers advance through start/stop; there is no public
+	 * per-runtime tick operation.
 	 */
-	extern fn rk_runtime_create(layout: ptr<const<rk_runtime_layout>>, out_runtime: ptr<rk_runtime> @out @owned) -> rk_result;
-	extern fn rk_runtime_destroy(runtime: rk_runtime) -> void;
-	extern fn rk_runtime_layout_validate(layout: ptr<const<rk_runtime_layout>>) -> rk_result;
+	extern fn rk_robot_runtime_create(layout: ptr<const<rk_robot_runtime_layout>>, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
+	extern fn rk_robot_runtime_destroy(runtime: rk_robot_runtime) -> void;
+	extern fn rk_robot_runtime_layout_validate(layout: ptr<const<rk_robot_runtime_layout>>) -> rk_result;
 	/**
 	 * Copies the latest immutable state into the caller-provided value.
 	 */
-	extern fn rk_runtime_snapshot(runtime: rk_runtime, out_state: ptr<rk_robot_state> @inout) -> rk_result;
+	extern fn rk_robot_runtime_snapshot(runtime: rk_robot_runtime, out_state: ptr<rk_robot_state> @inout) -> rk_result;
 	/**
 	 * Copies the latest immutable published snapshot, including endpoint metadata.
 	 */
-	extern fn rk_runtime_snapshot_full(runtime: rk_runtime, out_snapshot: ptr<rk_robot_snapshot> @inout) -> rk_result;
-	extern fn rk_runtime_start(runtime: rk_runtime) -> rk_result;
-	/**
-	 * Advances a stopped runtime by one deterministic owner-thread tick.
-	 */
-	extern fn rk_runtime_step(runtime: rk_runtime, timestamp_ns: u64) -> rk_result;
-	extern fn rk_runtime_stop(runtime: rk_runtime) -> rk_result;
+	extern fn rk_robot_runtime_snapshot_full(runtime: rk_robot_runtime, out_snapshot: ptr<rk_robot_snapshot> @inout) -> rk_result;
+	extern fn rk_robot_runtime_start(runtime: rk_robot_runtime) -> rk_result;
+	extern fn rk_robot_runtime_stop(runtime: rk_robot_runtime) -> rk_result;
 	/**
 	 * Submits one complete command batch to the runtime mailbox.
 	 */
-	extern fn rk_runtime_submit(runtime: rk_runtime, command: ptr<const<rk_robot_command>>) -> rk_result;
+	extern fn rk_robot_runtime_submit(runtime: rk_robot_runtime, command: ptr<const<rk_robot_command>>) -> rk_result;
+	extern fn rk_robot_snapshot_validate(snapshot: ptr<const<rk_robot_snapshot>>) -> rk_result;
+	extern fn rk_robot_state_validate(state: ptr<const<rk_robot_state>>) -> rk_result;
+	/**
+	 * One requested joint target inside a RobotCommand batch.
+	 */
 	struct rk_joint_target @layout(32, 8) {
 		joint: rk_joint_id @offset(0);
 		mode: rk_joint_target_mode @offset(4);
@@ -70,6 +74,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		max_rate: f64 @offset(16);
 		max_effort: f64 @offset(24);
 	}
+	/**
+	 * Static control capabilities reported by a RobotRuntime endpoint.
+	 */
 	struct rk_robot_capabilities @layout(36, 4) {
 		struct_size: u32 @offset(0) @struct_size;
 		joint_count: u32 @offset(4);
@@ -79,6 +86,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		supports_prediction: u32 @offset(20);
 		reserved: array<u32, 3> @offset(24);
 	}
+	/**
+	 * Complete command batch submitted atomically to one RobotRuntime mailbox.
+	 */
 	struct rk_robot_command @layout(2080, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		sequence: u64 @offset(8);
@@ -86,6 +96,51 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		kind: rk_command_kind @offset(24);
 		target_count: u32 @offset(28);
 		targets: array<rk_joint_target, 64> @offset(32);
+	}
+	/**
+	 * Bulk compiled robot description consumed when a RobotRuntime is created.
+	 *
+	 * Keeping this value separate from commands makes topology immutable while
+	 * realtime code is running and lets Simulation build several runtimes before
+	 * its first shared tick.
+	 */
+	struct rk_robot_runtime_blueprint @layout(2608, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		revision: u64 @offset(8);
+		joint_count: u32 @offset(16);
+		link_count: u32 @offset(20);
+		frame_count: u32 @offset(24);
+		reserved0: u32 @offset(28);
+		reserved: array<u64, 2> @offset(32);
+		joints: array<rk_robot_runtime_joint, 64> @offset(48);
+	}
+	/**
+	 * One compiled joint and its limits in a RobotRuntimeBlueprint.
+	 */
+	struct rk_robot_runtime_joint @layout(40, 8) {
+		joint: rk_joint_id @offset(0);
+		type: rk_robot_runtime_joint_type @offset(4);
+		parent_link: rk_link_id @offset(8);
+		child_link: rk_link_id @offset(12);
+		lower_limit: f64 @offset(16);
+		upper_limit: f64 @offset(24);
+		max_effort: f64 @offset(32);
+	}
+	/**
+	 * Native execution shape for one RobotRuntime.
+	 *
+	 * This is the compact ABI description used after a semantic Haxe robot model
+	 * has been compiled. It contains counts and revision metadata, not ownership
+	 * of any native resources.
+	 */
+	struct rk_robot_runtime_layout @layout(48, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		revision: u64 @offset(8);
+		joint_count: u32 @offset(16);
+		link_count: u32 @offset(20);
+		frame_count: u32 @offset(24);
+		reserved0: u32 @offset(28);
+		reserved: array<u64, 2> @offset(32);
 	}
 	/**
 	 * Immutable published runtime snapshot; native handles never enter this ABI.
@@ -110,6 +165,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		reserved0: u32 @offset(1692);
 		reserved: array<u64, 2> @offset(1696);
 	}
+	/**
+	 * Mutable native state used internally while a runtime publishes a snapshot.
+	 */
 	struct rk_robot_state @layout(1576, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		sequence: u64 @offset(8);
@@ -122,40 +180,6 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		velocity: array<f64, 64> @offset(552);
 		effort: array<f64, 64> @offset(1064);
 	}
-	/**
-	 * Bulk compiled robot description consumed once when a runtime is created.
-	 */
-	struct rk_runtime_blueprint @layout(2608, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		revision: u64 @offset(8);
-		joint_count: u32 @offset(16);
-		link_count: u32 @offset(20);
-		frame_count: u32 @offset(24);
-		reserved0: u32 @offset(28);
-		reserved: array<u64, 2> @offset(32);
-		joints: array<rk_runtime_joint, 64> @offset(48);
-	}
-	struct rk_runtime_joint @layout(40, 8) {
-		joint: rk_joint_id @offset(0);
-		type: rk_runtime_joint_type @offset(4);
-		parent_link: rk_link_id @offset(8);
-		child_link: rk_link_id @offset(12);
-		lower_limit: f64 @offset(16);
-		upper_limit: f64 @offset(24);
-		max_effort: f64 @offset(32);
-	}
-	/**
-	 * Compiled runtime shape; semantic Robot models live in robotkit/robotd.
-	 */
-	struct rk_runtime_layout @layout(48, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		revision: u64 @offset(8);
-		joint_count: u32 @offset(16);
-		link_count: u32 @offset(20);
-		frame_count: u32 @offset(24);
-		reserved0: u32 @offset(28);
-		reserved: array<u64, 2> @offset(32);
-	}
 	type rk_command_kind = u32;
 	type rk_endpoint_state = u32;
 	type rk_frame_id = u32;
@@ -164,7 +188,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	type rk_link_id = u32;
 	type rk_result = i32;
 	type rk_robot_mode = u32;
-	handle rk_runtime : u32 @destroy("rk_runtime_destroy");
-	type rk_runtime_joint_type = u32;
+	handle rk_robot_runtime : u32 @destroy("rk_robot_runtime_destroy");
+	type rk_robot_runtime_joint_type = u32;
 	type rk_safety_state = u32;
 }

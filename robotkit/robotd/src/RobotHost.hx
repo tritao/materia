@@ -4,9 +4,9 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.Robot;
-import robotkit.runtime.Runtime;
-import robotkit.runtime.RuntimeCompiler;
-import robotkit.runtime.RuntimeLayout;
+import robotkit.runtime.RobotRuntime;
+import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.runtime.RobotRuntimeLayout;
 import robotkit.runtime.Simulation;
 import robotkit.behavior.RobotBehavior;
 import robotd.behaviors.OscillateBehavior;
@@ -34,12 +34,13 @@ class RobotHost {
     shoulder.limits.lower = -3.14;
     shoulder.limits.upper = 3.14;
     shoulder.limits.effort = 100.0;
-    var compiled = RuntimeCompiler.compile(robot);
+    var compiled = RobotRuntimeCompiler.compile(robot);
     if (args.indexOf("--server") >= 0) {
       var serverSimulation = new Simulation();
       try {
-        var serverRuntime = serverSimulation.addRobot(RuntimeCompiler.blueprint(compiled));
-        var server = new RobotServer(robot, compiled, serverRuntime, port, robotId, behavior);
+        var serverRuntime = serverSimulation.addRobot(RobotRuntimeCompiler.blueprint(compiled));
+        var server = new RobotServer(robot, compiled, serverRuntime, serverSimulation,
+          port, robotId, behavior);
         server.run(args.indexOf("--once") >= 0);
       } catch (error:Dynamic) {
         serverSimulation.dispose();
@@ -51,13 +52,16 @@ class RobotHost {
     var inMemory = args.indexOf("--in-memory") >= 0;
     var simulation:Null<Simulation> = inMemory ? null : new Simulation();
     var runtime = inMemory
-      ? Runtime.create(new RuntimeLayout(compiled.revision, compiled.jointCount, compiled.source.links.length))
-      : simulation.addRobot(RuntimeCompiler.blueprint(compiled));
+      ? RobotRuntime.create(new RobotRuntimeLayout(compiled.revision, compiled.jointCount, compiled.source.links.length))
+      : simulation.addRobot(RobotRuntimeCompiler.blueprint(compiled));
     runtime.submitPositions([0.5], 1);
-    if (simulation == null)
-      runtime.step(haxe.Int64.ofInt(1));
-    else
+    if (simulation == null) {
+      runtime.start();
+      Sys.sleep(0.02);
+      runtime.stop();
+    } else {
       simulation.step(haxe.Int64.ofInt(1));
+    }
     var snapshot = runtime.snapshot();
     var endpoint = args.indexOf("--in-memory") >= 0 ? "in-memory" : "simkit";
     Sys.println('robotd: compiled ${compiled.source.name} with ${compiled.jointCount} joints via $endpoint; '

@@ -14,8 +14,8 @@ file(MAKE_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}")
 set(RK_BUILD_SHARED ON CACHE BOOL "Build RobotKit libraries as shared libraries" FORCE)
 set(RK_BUILD_TESTS ${ROBOTD_BUILD_TESTS} CACHE BOOL
     "Build RobotKit tests in robotd" FORCE)
-set(RK_BUILD_SIMKIT_ENDPOINT ON CACHE BOOL
-    "Build the SimKit-backed RobotKit endpoint" FORCE)
+set(RK_BUILD_SIMKIT ON CACHE BOOL
+    "Build the SimKit-backed RobotKit simulation" FORCE)
 set(NK_BUILD_SHARED ON CACHE BOOL "Build SimKit dependencies as shared libraries" FORCE)
 set(NK_BUILD_TESTS OFF CACHE BOOL "Disable SimKit tests in robotd" FORCE)
 set(NK_BUILD_EXAMPLES OFF CACHE BOOL "Disable SimKit examples in robotd" FORCE)

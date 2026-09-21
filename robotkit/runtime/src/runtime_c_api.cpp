@@ -9,40 +9,30 @@
 namespace {
 
 std::mutex registry_mutex;
-std::unordered_map<rk_runtime, std::shared_ptr<robotkit::Runtime>> runtimes;
-std::unordered_map<rk_runtime, std::weak_ptr<robotkit::internal::RuntimeCoordinator>> coordinators;
-rk_runtime next_runtime = 1;
+std::unordered_map<rk_robot_runtime, std::shared_ptr<robotkit::RobotRuntime>> runtimes;
+rk_robot_runtime next_runtime = 1;
 
 } // namespace
 
 namespace robotkit::internal {
 
-std::shared_ptr<Runtime> resolve_runtime(rk_runtime handle) {
+std::shared_ptr<RobotRuntime> resolve_runtime(rk_robot_runtime handle) {
     std::lock_guard lock(registry_mutex);
     const auto found = runtimes.find(handle);
     return found == runtimes.end() ? nullptr : found->second;
 }
 
-std::shared_ptr<RuntimeCoordinator> resolve_runtime_coordinator(rk_runtime handle) {
+rk_robot_runtime register_runtime(std::shared_ptr<RobotRuntime> runtime) {
     std::lock_guard lock(registry_mutex);
-    const auto found = coordinators.find(handle);
-    return found == coordinators.end() ? nullptr : found->second.lock();
-}
-
-rk_runtime register_runtime(std::shared_ptr<Runtime> runtime,
-                            std::shared_ptr<RuntimeCoordinator> coordinator) {
-    std::lock_guard lock(registry_mutex);
-    while (next_runtime == RK_INVALID_RUNTIME || runtimes.count(next_runtime) != 0)
+    while (next_runtime == RK_INVALID_ROBOT_RUNTIME || runtimes.count(next_runtime) != 0)
         ++next_runtime;
     const auto handle = next_runtime++;
     runtimes.emplace(handle, std::move(runtime));
-    if (coordinator)
-        coordinators.emplace(handle, coordinator);
     return handle;
 }
 
-void destroy_runtime(rk_runtime handle) {
-    std::shared_ptr<Runtime> released;
+void destroy_runtime(rk_robot_runtime handle) {
+    std::shared_ptr<RobotRuntime> released;
     {
         std::lock_guard lock(registry_mutex);
         const auto found = runtimes.find(handle);
@@ -50,7 +40,6 @@ void destroy_runtime(rk_runtime handle) {
             return;
         released = std::move(found->second);
         runtimes.erase(found);
-        coordinators.erase(handle);
     }
 }
 
@@ -58,14 +47,15 @@ void destroy_runtime(rk_runtime handle) {
 
 extern "C" {
 
-rk_result RK_CALL rk_runtime_create(const rk_runtime_layout *layout,
-                                    rk_runtime *out_runtime) {
-    if (!out_runtime || rk_runtime_layout_validate(layout) != RK_OK)
+rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_layout *layout,
+                                    rk_robot_runtime *out_runtime) {
+    if (!out_runtime || rk_robot_runtime_layout_validate(layout) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
-    *out_runtime = RK_INVALID_RUNTIME;
+    *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     try {
-        auto endpoint = std::make_unique<robotkit::InMemoryEndpoint>(layout->joint_count);
-        auto runtime = std::make_shared<robotkit::Runtime>(*layout, std::move(endpoint));
+        std::shared_ptr<robotkit::Endpoint> endpoint =
+            std::make_shared<robotkit::InMemoryEndpoint>(layout->joint_count);
+        auto runtime = std::make_shared<robotkit::RobotRuntime>(*layout, endpoint);
         const auto handle = robotkit::internal::register_runtime(std::move(runtime));
         *out_runtime = handle;
         return RK_OK;
@@ -74,44 +64,35 @@ rk_result RK_CALL rk_runtime_create(const rk_runtime_layout *layout,
     }
 }
 
-void RK_CALL rk_runtime_destroy(rk_runtime runtime) {
+void RK_CALL rk_robot_runtime_destroy(rk_robot_runtime runtime) {
     robotkit::internal::destroy_runtime(runtime);
 }
 
-rk_result RK_CALL rk_runtime_start(rk_runtime runtime) {
-    if (const auto coordinator = robotkit::internal::resolve_runtime_coordinator(runtime))
-        return coordinator->start();
+rk_result RK_CALL rk_robot_runtime_start(rk_robot_runtime runtime) {
     const auto value = robotkit::internal::resolve_runtime(runtime);
     return value ? value->start() : RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_runtime_stop(rk_runtime runtime) {
-    if (const auto coordinator = robotkit::internal::resolve_runtime_coordinator(runtime))
-        return coordinator->stop();
+rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime) {
     const auto value = robotkit::internal::resolve_runtime(runtime);
     return value ? value->stop() : RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_runtime_submit(rk_runtime runtime, const rk_robot_command *command) {
+rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime, const rk_robot_command *command) {
     if (!command)
         return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);
     return value ? value->submit(*command) : RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_runtime_step(rk_runtime runtime, uint64_t timestamp_ns) {
-    const auto value = robotkit::internal::resolve_runtime(runtime);
-    return value ? value->step_once(timestamp_ns) : RK_ERROR_INVALID_HANDLE;
-}
-
-rk_result RK_CALL rk_runtime_snapshot(rk_runtime runtime, rk_robot_state *out_state) {
+rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime, rk_robot_state *out_state) {
     if (!out_state || out_state->struct_size < sizeof(*out_state))
         return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);
     return value ? value->snapshot(*out_state) : RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_runtime_snapshot_full(rk_runtime runtime,
+rk_result RK_CALL rk_robot_runtime_snapshot_full(rk_robot_runtime runtime,
                                            rk_robot_snapshot *out_snapshot) {
     if (!out_snapshot || out_snapshot->struct_size < sizeof(*out_snapshot))
         return RK_ERROR_INVALID_ARGUMENT;
@@ -119,7 +100,7 @@ rk_result RK_CALL rk_runtime_snapshot_full(rk_runtime runtime,
     return value ? value->snapshot_full(*out_snapshot) : RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_runtime_capabilities(rk_runtime runtime,
+rk_result RK_CALL rk_robot_runtime_capabilities(rk_robot_runtime runtime,
                                            rk_robot_capabilities *out_capabilities) {
     if (!out_capabilities || out_capabilities->struct_size < sizeof(*out_capabilities))
         return RK_ERROR_INVALID_ARGUMENT;

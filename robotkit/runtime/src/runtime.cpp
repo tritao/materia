@@ -60,7 +60,7 @@ rk_result InMemoryEndpoint::sample(uint64_t timestamp_ns, rk_robot_state &state)
     return RK_OK;
 }
 
-Runtime::Runtime(const rk_runtime_layout &layout, std::unique_ptr<Endpoint> endpoint,
+RobotRuntime::RobotRuntime(const rk_robot_runtime_layout &layout, std::shared_ptr<Endpoint> endpoint,
                  std::chrono::nanoseconds period)
     : layout_(layout), endpoint_(std::move(endpoint)), period_(period) {
     state_.struct_size = sizeof(state_);
@@ -69,21 +69,21 @@ Runtime::Runtime(const rk_runtime_layout &layout, std::unique_ptr<Endpoint> endp
     state_.safety = RK_SAFETY_READY;
 }
 
-Runtime::~Runtime() {
+RobotRuntime::~RobotRuntime() {
     stop();
 }
 
-rk_result Runtime::start() {
+rk_result RobotRuntime::start() {
     std::lock_guard lock(queue_mutex_);
     if (externally_driven_ || running_ || stopping_ || endpoint_ == nullptr ||
-        rk_runtime_layout_validate(&layout_) != RK_OK)
+        rk_robot_runtime_layout_validate(&layout_) != RK_OK)
         return RK_ERROR_INVALID_STATE;
     running_ = true;
     worker_ = std::thread([this] { run(); });
     return RK_OK;
 }
 
-rk_result Runtime::stop() {
+rk_result RobotRuntime::stop() {
     {
         std::lock_guard lock(queue_mutex_);
         if (!running_ && !worker_.joinable())
@@ -99,7 +99,7 @@ rk_result Runtime::stop() {
     return RK_OK;
 }
 
-rk_result Runtime::submit(const rk_robot_command &command) {
+rk_result RobotRuntime::submit(const rk_robot_command &command) {
     if (rk_robot_command_validate_for_layout(&command, &layout_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
     std::lock_guard lock(queue_mutex_);
@@ -110,23 +110,13 @@ rk_result Runtime::submit(const rk_robot_command &command) {
     return RK_OK;
 }
 
-rk_result Runtime::step_once(uint64_t timestamp_ns) {
-    {
-        std::lock_guard lock(queue_mutex_);
-        if (externally_driven_ || running_ || stopping_ || endpoint_ == nullptr ||
-            rk_runtime_layout_validate(&layout_) != RK_OK)
-            return RK_ERROR_INVALID_STATE;
-    }
-    return step_owner(timestamp_ns);
-}
-
-rk_result Runtime::snapshot(rk_robot_state &out_state) const {
+rk_result RobotRuntime::snapshot(rk_robot_state &out_state) const {
     std::lock_guard lock(state_mutex_);
     out_state = state_;
     return RK_OK;
 }
 
-rk_result Runtime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
+rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     std::lock_guard lock(state_mutex_);
     out_snapshot = {};
     out_snapshot.struct_size = sizeof(out_snapshot);
@@ -147,12 +137,12 @@ rk_result Runtime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     return RK_OK;
 }
 
-bool Runtime::running() const {
+bool RobotRuntime::running() const {
     std::lock_guard lock(queue_mutex_);
     return running_;
 }
 
-void Runtime::run() {
+void RobotRuntime::run() {
     auto next_tick = std::chrono::steady_clock::now();
     for (;;) {
         {
@@ -169,14 +159,14 @@ void Runtime::run() {
     }
 }
 
-rk_result Runtime::step_owner(uint64_t timestamp_ns) {
+rk_result RobotRuntime::step_owner(uint64_t timestamp_ns) {
     const auto apply_result = apply_pending_commands();
     if (apply_result != RK_OK)
         return apply_result;
     return publish_sample(timestamp_ns);
 }
 
-rk_result Runtime::apply_pending_commands() {
+rk_result RobotRuntime::apply_pending_commands() {
     std::deque<rk_robot_command> commands;
     {
         std::lock_guard queue_lock(queue_mutex_);
@@ -206,7 +196,7 @@ rk_result Runtime::apply_pending_commands() {
     return RK_OK;
 }
 
-rk_result Runtime::publish_sample(uint64_t timestamp_ns) {
+rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     rk_robot_state next;
     {
         std::lock_guard state_lock(state_mutex_);
@@ -225,12 +215,12 @@ rk_result Runtime::publish_sample(uint64_t timestamp_ns) {
     return RK_OK;
 }
 
-void Runtime::set_externally_driven(bool value) noexcept {
+void RobotRuntime::set_externally_driven(bool value) noexcept {
     std::lock_guard lock(queue_mutex_);
     externally_driven_ = value;
 }
 
-void Runtime::discard_pending_commands() noexcept {
+void RobotRuntime::discard_pending_commands() noexcept {
     endpoint_->discard_pending();
 }
 

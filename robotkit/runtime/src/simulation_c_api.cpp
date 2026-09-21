@@ -59,11 +59,11 @@ void RK_CALL rk_simulation_destroy(rk_simulation simulation) {
 }
 
 rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
-                                          const rk_runtime_blueprint *blueprint,
-                                          rk_runtime *out_runtime) {
-    if (!out_runtime || rk_runtime_blueprint_validate(blueprint) != RK_OK)
+                                          const rk_robot_runtime_blueprint *blueprint,
+                                          rk_robot_runtime *out_runtime) {
+    if (!out_runtime || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
-    *out_runtime = RK_INVALID_RUNTIME;
+    *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     const auto value = resolve(simulation);
     return value ? value->add_robot(*blueprint, *out_runtime) : RK_ERROR_INVALID_HANDLE;
 }

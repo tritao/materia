@@ -2,14 +2,18 @@ package robotkit.world;
 
 import RobotKitRuntime;
 import haxe.Int64;
-import robotkit.runtime.Runtime;
-import robotkit.runtime.RuntimeSnapshot;
+import robotkit.runtime.RobotRuntime;
+import robotkit.runtime.RobotRuntimeSnapshot;
 
-/** RobotInstance adapter over a runtime belonging to an externally owned Simulation. */
+/**
+ * RobotInstance adapter over a runtime belonging to an externally owned
+ * Simulation. Closing this adapter never stops or disposes that Simulation;
+ * the embedding application controls the shared clock and shutdown order.
+ */
 class SimulatedRobot implements RobotInstance {
   public final logicalId:RobotId;
 
-  final runtime:Runtime;
+  final runtime:RobotRuntime;
   final robotDescription:RobotDescription;
   final robotCapabilities:RobotCapabilities;
   var changeListener:Null < Void -> Void > = null;
@@ -17,7 +21,7 @@ class SimulatedRobot implements RobotInstance {
   var observedSequence:Int = -1;
   var closed:Bool = false;
 
-  public function new(id:RobotId, runtime:Runtime, name:String,
+  public function new(id:RobotId, runtime:RobotRuntime, name:String,
       links:Array<String>, joints:Array<String>) {
     if (id == null || id.length == 0)
       throw "SimulatedRobot requires a non-empty logical ID";
@@ -100,7 +104,7 @@ class SimulatedRobot implements RobotInstance {
     changeListener = null;
   }
 
-  function observe(value:RuntimeSnapshot):Void {
+  function observe(value:RobotRuntimeSnapshot):Void {
     if (value.sequence == observedSequence)
       return;
     observedSequence = value.sequence;

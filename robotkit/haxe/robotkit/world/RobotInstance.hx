@@ -1,6 +1,11 @@
 package robotkit.world;
 
-/** Common world-facing boundary for physical and simulated robots. */
+/**
+ * Common world-facing boundary for physical and simulated robots.
+ *
+ * RobotWorld depends only on this contract, so behavior code can be reused
+ * with a RemoteRobot, SimulatedRobot, replay adapter, or hardware endpoint.
+ */
 interface RobotInstance {
   function id():RobotId;
 

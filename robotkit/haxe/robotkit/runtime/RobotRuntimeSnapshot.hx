@@ -2,8 +2,12 @@ package robotkit.runtime;
 
 import RobotKitRuntime;
 
-/** Immutable copy of one native runtime state batch. */
-class RuntimeSnapshot {
+/**
+ * Immutable native execution snapshot kept below the RobotInstance API.
+ * SimulatedRobot adapts it into the transport-neutral RobotSnapshot type so
+ * world consumers do not depend on native handles or backend metadata.
+ */
+class RobotRuntimeSnapshot {
   public final sequence:Int;
   public final timestampNs:haxe.Int64;
   public final mode:Int;
@@ -32,7 +36,7 @@ class RuntimeSnapshot {
     }
   }
 
-  @:allow(Runtime)
-  static function fromNative(value:rk_robot_snapshot):RuntimeSnapshot
-    return new RuntimeSnapshot(value);
+  @:allow(RobotRuntime)
+  static function fromNative(value:rk_robot_snapshot):RobotRuntimeSnapshot
+    return new RobotRuntimeSnapshot(value);
 }

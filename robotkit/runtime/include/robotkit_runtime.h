@@ -118,7 +118,7 @@ enum {
     RK_TARGET_EFFORT = 3
 };
 
-typedef uint32_t rk_runtime_joint_type;
+typedef uint32_t rk_robot_runtime_joint_type;
 enum {
     RK_RUNTIME_JOINT_FIXED = 1,
     RK_RUNTIME_JOINT_REVOLUTE = 2,
@@ -126,11 +126,17 @@ enum {
 };
 
 /* ------------------------------------------------------------------------- */
-/* Runtime descriptions                                                      */
+/* RobotRuntime descriptions                                                 */
 /* ------------------------------------------------------------------------- */
 
-/** Compiled runtime shape; semantic Robot models live in robotkit/robotd. */
-typedef struct rk_runtime_layout {
+/**
+ * Native execution shape for one RobotRuntime.
+ *
+ * This is the compact ABI description used after a semantic Haxe robot model
+ * has been compiled. It contains counts and revision metadata, not ownership
+ * of any native resources.
+ */
+typedef struct rk_robot_runtime_layout {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint64_t revision;
     uint32_t joint_count;
@@ -138,20 +144,27 @@ typedef struct rk_runtime_layout {
     uint32_t frame_count;
     uint32_t reserved0;
     uint64_t reserved[2];
-} rk_runtime_layout;
+} rk_robot_runtime_layout;
 
-typedef struct rk_runtime_joint {
+/** One compiled joint and its limits in a RobotRuntimeBlueprint. */
+typedef struct rk_robot_runtime_joint {
     rk_joint_id joint;
-    rk_runtime_joint_type type;
+    rk_robot_runtime_joint_type type;
     rk_link_id parent_link;
     rk_link_id child_link;
     double lower_limit;
     double upper_limit;
     double max_effort;
-} rk_runtime_joint;
+} rk_robot_runtime_joint;
 
-/** Bulk compiled robot description consumed once when a runtime is created. */
-typedef struct rk_runtime_blueprint {
+/**
+ * Bulk compiled robot description consumed when a RobotRuntime is created.
+ *
+ * Keeping this value separate from commands makes topology immutable while
+ * realtime code is running and lets Simulation build several runtimes before
+ * its first shared tick.
+ */
+typedef struct rk_robot_runtime_blueprint {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint64_t revision;
     uint32_t joint_count;
@@ -159,13 +172,14 @@ typedef struct rk_runtime_blueprint {
     uint32_t frame_count;
     uint32_t reserved0;
     uint64_t reserved[2];
-    rk_runtime_joint joints[RK_MAX_JOINTS];
-} rk_runtime_blueprint;
+    rk_robot_runtime_joint joints[RK_MAX_JOINTS];
+} rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
 /* Commands and observations                                                 */
 /* ------------------------------------------------------------------------- */
 
+/** One requested joint target inside a RobotCommand batch. */
 typedef struct rk_joint_target {
     rk_joint_id joint;
     rk_joint_target_mode mode;
@@ -174,6 +188,7 @@ typedef struct rk_joint_target {
     double max_effort;
 } rk_joint_target;
 
+/** Complete command batch submitted atomically to one RobotRuntime mailbox. */
 typedef struct rk_robot_command {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint64_t sequence;
@@ -183,6 +198,7 @@ typedef struct rk_robot_command {
     rk_joint_target targets[RK_MAX_JOINTS];
 } rk_robot_command;
 
+/** Mutable native state used internally while a runtime publishes a snapshot. */
 typedef struct rk_robot_state {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint64_t sequence;
@@ -218,6 +234,7 @@ typedef struct rk_robot_snapshot {
     uint64_t reserved[2];
 } rk_robot_snapshot;
 
+/** Static control capabilities reported by a RobotRuntime endpoint. */
 typedef struct rk_robot_capabilities {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint32_t joint_count;
@@ -232,47 +249,55 @@ typedef struct rk_robot_capabilities {
 /* Value validation                                                          */
 /* ------------------------------------------------------------------------- */
 
-RK_API rk_result RK_CALL rk_runtime_layout_validate(const rk_runtime_layout *layout);
-RK_API rk_result RK_CALL rk_runtime_blueprint_validate(
-    const rk_runtime_blueprint *blueprint);
+RK_API rk_result RK_CALL rk_robot_runtime_layout_validate(const rk_robot_runtime_layout *layout);
+RK_API rk_result RK_CALL rk_robot_runtime_blueprint_validate(
+    const rk_robot_runtime_blueprint *blueprint);
 RK_API rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command);
 RK_API rk_result RK_CALL rk_robot_command_validate_for_layout(
-    const rk_robot_command *command, const rk_runtime_layout *layout);
+    const rk_robot_command *command, const rk_robot_runtime_layout *layout);
 RK_API rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state);
 RK_API rk_result RK_CALL rk_robot_snapshot_validate(const rk_robot_snapshot *snapshot);
 RK_API rk_result RK_CALL rk_robot_capabilities_validate(
     const rk_robot_capabilities *capabilities);
 
 /* ------------------------------------------------------------------------- */
-/* Runtime lifecycle and data flow                                           */
+/* RobotRuntime lifecycle and data flow                                      */
 /* ------------------------------------------------------------------------- */
 
-typedef uint32_t rk_runtime RK_HANDLE RK_HANDLE_DESTROY(rk_runtime_destroy);
+typedef uint32_t rk_robot_runtime RK_HANDLE RK_HANDLE_DESTROY(rk_robot_runtime_destroy);
 
-#define RK_INVALID_RUNTIME ((rk_runtime)0)
+#define RK_INVALID_ROBOT_RUNTIME ((rk_robot_runtime)0)
 
-/** Creates the initial deterministic in-memory runtime endpoint. */
-RK_API rk_result RK_CALL rk_runtime_create(const rk_runtime_layout *layout,
-                                           rk_runtime *out_runtime RK_OUT RK_OWNED);
-RK_API void RK_CALL rk_runtime_destroy(rk_runtime runtime);
-RK_API rk_result RK_CALL rk_runtime_start(rk_runtime runtime);
-RK_API rk_result RK_CALL rk_runtime_stop(rk_runtime runtime);
+/**
+ * Creates a standalone in-memory RobotRuntime.
+ *
+ * The returned runtime owns its endpoint worker lifecycle. For shared physics,
+ * use rk_simulation_add_robot instead so Simulation remains the one clock
+ * owner. Standalone callers advance through start/stop; there is no public
+ * per-runtime tick operation.
+ */
+RK_API rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_layout *layout,
+                                           rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
+/** Stops and releases a standalone runtime handle. */
+RK_API void RK_CALL rk_robot_runtime_destroy(rk_robot_runtime runtime);
+/** Starts a standalone runtime's owner worker. */
+RK_API rk_result RK_CALL rk_robot_runtime_start(rk_robot_runtime runtime);
+/** Stops a standalone runtime's owner worker. */
+RK_API rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime);
 
 /** Submits one complete command batch to the runtime mailbox. */
-RK_API rk_result RK_CALL rk_runtime_submit(rk_runtime runtime,
+RK_API rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime,
                                            const rk_robot_command *command);
 
-/** Advances a stopped runtime by one deterministic owner-thread tick. */
-RK_API rk_result RK_CALL rk_runtime_step(rk_runtime runtime, uint64_t timestamp_ns);
-
 /** Copies the latest immutable state into the caller-provided value. */
-RK_API rk_result RK_CALL rk_runtime_snapshot(rk_runtime runtime,
+RK_API rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime,
                                              rk_robot_state *out_state RK_INOUT);
 /** Copies the latest immutable published snapshot, including endpoint metadata. */
-RK_API rk_result RK_CALL rk_runtime_snapshot_full(
-    rk_runtime runtime, rk_robot_snapshot *out_snapshot RK_INOUT);
-RK_API rk_result RK_CALL rk_runtime_capabilities(
-    rk_runtime runtime, rk_robot_capabilities *out_capabilities RK_INOUT);
+RK_API rk_result RK_CALL rk_robot_runtime_snapshot_full(
+    rk_robot_runtime runtime, rk_robot_snapshot *out_snapshot RK_INOUT);
+/** Copies the endpoint's static control capabilities. */
+RK_API rk_result RK_CALL rk_robot_runtime_capabilities(
+    rk_robot_runtime runtime, rk_robot_capabilities *out_capabilities RK_INOUT);
 
 #ifdef __cplusplus
 }

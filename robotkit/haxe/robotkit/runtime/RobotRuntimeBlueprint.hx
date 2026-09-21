@@ -2,13 +2,18 @@ package robotkit.runtime;
 
 import RobotKitRuntime;
 
-/** Bulk native execution description emitted from the Haxeon robot model. */
-class RuntimeBlueprint {
+/**
+ * Immutable-at-execution compiled robot description consumed by RobotRuntime.
+ *
+ * Keeping this boundary separate from the editable `robotkit.model.Robot`
+ * model makes validation and native handle creation deterministic.
+ */
+class RobotRuntimeBlueprint {
   public final revision:Int;
   public final jointCount:Int;
   public final linkCount:Int;
   public final frameCount:Int;
-  public final joints:Array<RuntimeJointBlueprint> = [];
+  public final joints:Array<RobotRuntimeJointBlueprint> = [];
 
   public function new(revision:Int, jointCount:Int, linkCount:Int,
       ?frameCount:Int = 0) {
@@ -21,18 +26,18 @@ class RuntimeBlueprint {
     this.frameCount = frameCount;
   }
 
-  public function addJoint(value:RuntimeJointBlueprint):Void {
+  public function addJoint(value:RobotRuntimeJointBlueprint):Void {
     if (joints.length >= jointCount)
       throw "RobotKit runtime blueprint has too many joints";
     joints.push(value);
   }
 
-  @:allow(Runtime, Simulation)
-  function nativeValue():rk_runtime_blueprint {
+  @:allow(RobotRuntime, Simulation)
+  function nativeValue():rk_robot_runtime_blueprint {
     if (joints.length != jointCount)
       throw "RobotKit runtime blueprint is missing joints";
-    var value = new rk_runtime_blueprint();
-    value.set_struct_size(rk_runtime_blueprint.size());
+    var value = new rk_robot_runtime_blueprint();
+    value.set_struct_size(rk_robot_runtime_blueprint.size());
     value.set_revision(haxe.Int64.ofInt(revision));
     value.set_joint_count(jointCount);
     value.set_link_count(linkCount);

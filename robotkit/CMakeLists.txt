@@ -7,7 +7,7 @@ include(CTest)
 
 option(RK_BUILD_SHARED "Build RobotKit libraries as shared libraries" ON)
 option(RK_BUILD_TESTS "Build RobotKit tests" ${BUILD_TESTING})
-option(RK_BUILD_SIMKIT_ENDPOINT "Build the SimKit-backed RobotKit endpoint" OFF)
+option(RK_BUILD_SIMKIT "Build the SimKit-backed RobotKit simulation" OFF)
 
 set(RK_LIBRARY_TYPE STATIC)
 if(RK_BUILD_SHARED AND NOT EMSCRIPTEN)
@@ -16,16 +16,16 @@ endif()
 
 add_subdirectory(runtime)
 
-if(RK_BUILD_SIMKIT_ENDPOINT)
+if(RK_BUILD_SIMKIT)
     if(NOT TARGET NativeKit::sim_core)
         message(FATAL_ERROR
-            "RK_BUILD_SIMKIT_ENDPOINT requires SimKit's NativeKit::sim_core target")
+            "RK_BUILD_SIMKIT requires SimKit's NativeKit::sim_core target")
     endif()
     target_sources(robotkit_runtime PRIVATE
-        runtime/src/sim_endpoint.cpp
         runtime/src/simulation.cpp
-        runtime/src/sim_endpoint_c_api.cpp)
-    target_compile_definitions(robotkit_runtime PRIVATE RK_HAS_SIMKIT_ENDPOINT=1)
+        runtime/src/simulation_robot.cpp
+        runtime/src/simulation_c_api.cpp)
+    target_compile_definitions(robotkit_runtime PRIVATE RK_HAS_SIMKIT=1)
     target_link_libraries(robotkit_runtime PUBLIC NativeKit::sim_core)
 
     if(RK_BUILD_TESTS)

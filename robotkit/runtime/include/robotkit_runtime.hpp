@@ -18,9 +18,12 @@ public:
     virtual ~Endpoint() = default;
 
     virtual rk_result apply(const rk_robot_command &command) = 0;
-    /** Read the endpoint's latest state. Sampling does not advance shared time. */
+    /**
+     * Read the endpoint's latest state. A shared Simulation calls this after
+     * its one world step; the endpoint itself never owns shared time.
+     */
     virtual rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) = 0;
-    /** Discard commands staged during a coordinator tick that will not advance. */
+    /** Discard commands staged during a simulation tick that will not advance. */
     virtual void discard_pending() noexcept {}
 };
 
@@ -43,26 +46,37 @@ private:
     bool stopped_ = false;
 };
 
-class RK_API Runtime final {
+/**
+ * One robot's command mailbox, endpoint adapter, and published state.
+ *
+ * RobotRuntime deliberately does not own a simulation clock. A standalone
+ * instance may run its endpoint worker with start()/stop(); a runtime created
+ * by Simulation is marked externally driven and is advanced only during the
+ * simulation's shared tick.
+ */
+class RK_API RobotRuntime final {
 public:
-    Runtime(const rk_runtime_layout &layout, std::unique_ptr<Endpoint> endpoint,
+    RobotRuntime(const rk_robot_runtime_layout &layout, std::shared_ptr<Endpoint> endpoint,
             std::chrono::nanoseconds period = std::chrono::milliseconds(10));
-    ~Runtime();
+    ~RobotRuntime();
 
-    Runtime(const Runtime &) = delete;
-    Runtime &operator=(const Runtime &) = delete;
+    RobotRuntime(const RobotRuntime &) = delete;
+    RobotRuntime &operator=(const RobotRuntime &) = delete;
 
+    /** Starts the private endpoint worker; invalid for externally driven runtimes. */
     rk_result start();
+    /** Stops the private endpoint worker, if one is running. */
     rk_result stop();
+    /** Queues one complete command batch for the next owner-thread phase. */
     rk_result submit(const rk_robot_command &command);
-    /** Run one owner-thread tick. The realtime worker must be stopped. */
-    rk_result step_once(uint64_t timestamp_ns);
+    /** Copies the latest robot state without advancing endpoint time. */
     rk_result snapshot(rk_robot_state &out_state) const;
+    /** Copies the latest state plus revision, endpoint, and fault metadata. */
     rk_result snapshot_full(rk_robot_snapshot &out_snapshot) const;
 
     bool running() const;
 
-    /** Coordinator-facing phases used to advance a group of runtimes atomically. */
+    /** Internal phases used by Simulation to coordinate multiple runtimes. */
     rk_result apply_pending_commands();
     rk_result publish_sample(uint64_t timestamp_ns);
     void discard_pending_commands() noexcept;
@@ -72,8 +86,8 @@ private:
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
 
-    rk_runtime_layout layout_{};
-    std::unique_ptr<Endpoint> endpoint_;
+    rk_robot_runtime_layout layout_{};
+    std::shared_ptr<Endpoint> endpoint_;
     std::chrono::nanoseconds period_;
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};

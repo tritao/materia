@@ -2,8 +2,12 @@ package robotkit.runtime;
 
 import RobotKitRuntime;
 
-/** Native execution shape compiled from a Haxeon robot document. */
-class RuntimeLayout {
+/** Native execution shape used to create a standalone RobotRuntime.
+ *
+ * This low-level value is intentionally separate from the editable model;
+ * callers that use Simulation normally never construct it directly.
+ */
+class RobotRuntimeLayout {
   public final revision:Int;
   public final jointCount:Int;
   public final linkCount:Int;
@@ -19,10 +23,10 @@ class RuntimeLayout {
     this.frameCount = frameCount;
   }
 
-  @:allow(Runtime)
-  function nativeValue():rk_runtime_layout {
-    var value = new rk_runtime_layout();
-    value.set_struct_size(rk_runtime_layout.size());
+  @:allow(RobotRuntime)
+  function nativeValue():rk_robot_runtime_layout {
+    var value = new rk_robot_runtime_layout();
+    value.set_struct_size(rk_robot_runtime_layout.size());
     value.set_revision(haxe.Int64.ofInt(revision));
     value.set_joint_count(jointCount);
     value.set_link_count(linkCount);

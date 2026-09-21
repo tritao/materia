@@ -101,7 +101,7 @@ import NativeKitSurface.NativeKitSurfaceFrameSubscription;
 import Renderer;
 import Surface;
 import robotkit.world.RemoteRobot;
-import robotkit.world.WorldHost;
+import robotkit.world.RobotWorld;
 import nativekit.ui.core.NativeInputAdapter;
 import nativekit.ui.lab.ComponentLab;
 import nativekit.ui.theme.Theme;
@@ -259,7 +259,7 @@ private class ReferenceEditorHost {
     var fonts:Null<FontCollection> = null;
     var renderer:Null<Renderer> = null;
     var editor:Null<ReferenceEditorApp> = null;
-    var world:Null<WorldHost> = null;
+    var world:Null<RobotWorld> = null;
     var result = 0;
 
     try {
@@ -308,7 +308,7 @@ private class ReferenceEditorHost {
       events = pump;
       var robotHost = diagnostics.robotHost;
       if (robotHost != null) {
-        world = new WorldHost();
+        world = new RobotWorld();
         var remote = new RemoteRobot("warehouse/forklift-17");
         world.attach(remote);
         remote.connect(robotHost, diagnostics.robotPort, pump);
@@ -498,7 +498,7 @@ class ReferenceEditorApp {
   public final commands:CommandRegistry;
   public final workspace:DockWorkspaceModel;
   public final workspacePath:String;
-  public final world:Null<WorldHost>;
+  public final world:Null<RobotWorld>;
 
   final storage:FileDockWorkspacePersistence;
   final treeModel:ReferenceSceneTreeModel;
@@ -519,7 +519,7 @@ class ReferenceEditorApp {
   var componentLab:Null<ComponentLab>;
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
-      ?world:WorldHost) {
+      ?world:RobotWorld) {
     ui = new UiContext(null, fonts, theme == null ? Theme.light() : theme);
     commands = ui.commands;
     this.world = world;

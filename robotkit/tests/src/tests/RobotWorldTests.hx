@@ -1,8 +1,8 @@
 package tests;
 
 import haxe.Int64;
-import robotkit.runtime.RuntimeBlueprint;
-import robotkit.runtime.RuntimeJointBlueprint;
+import robotkit.runtime.RobotRuntimeBlueprint;
+import robotkit.runtime.RobotRuntimeJointBlueprint;
 import robotkit.runtime.Simulation;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotCommand;
@@ -15,9 +15,9 @@ import robotkit.world.RobotStatus;
 import robotkit.world.RemoteRobot;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.StopMode;
-import robotkit.world.WorldHost;
+import robotkit.world.RobotWorld;
 
-class WorldHostTests {
+class RobotWorldTests {
   static var assertions = 0;
 
   public static function main():Void {
@@ -30,7 +30,7 @@ class WorldHostTests {
   }
 
   static function testAttachDetachAndIdentity():Void {
-    var world = new WorldHost();
+    var world = new RobotWorld();
     var robot = new FakeRobot("warehouse/forklift-17");
     world.attach(robot);
     equal(world.robots.get("warehouse/forklift-17"), robot, "attach registers logical ID");
@@ -46,7 +46,7 @@ class WorldHostTests {
   }
 
   static function testSequenceAndTopology():Void {
-    var world = new WorldHost();
+    var world = new RobotWorld();
     var left = new FakeRobot("left");
     var right = new FakeRobot("right");
     equal(world.snapshot().sequence, 0, "new world sequence");
@@ -67,7 +67,7 @@ class WorldHostTests {
   }
 
   static function testImmutableSnapshots():Void {
-    var world = new WorldHost();
+    var world = new RobotWorld();
     var robot = new FakeRobot("arm");
     robot.positions = [1.0, 2.0];
     world.attach(robot);
@@ -85,7 +85,7 @@ class WorldHostTests {
   }
 
   static function testForwardingAndLifecycle():Void {
-    var world = new WorldHost();
+    var world = new RobotWorld();
     var robot = new FakeRobot("arm");
     world.attach(robot);
     var command = RobotCommand.JointPosition(3, 1.25, Int64.ofInt(99));
@@ -103,8 +103,8 @@ class WorldHostTests {
   }
 
   static function testMixedSimulatedAndRemoteWorld():Void {
-    var blueprint = new RuntimeBlueprint(1, 1, 2);
-    blueprint.addJoint(new RuntimeJointBlueprint(
+    var blueprint = new RobotRuntimeBlueprint(1, 1, 2);
+    blueprint.addJoint(new RobotRuntimeJointBlueprint(
       0,
       RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE,
       0,
@@ -129,7 +129,7 @@ class WorldHostTests {
       ["shoulder"]
     );
     var remote = new RemoteRobot("remote-c");
-    var world = new WorldHost();
+    var world = new RobotWorld();
     world.attach(first);
     world.attach(second);
     world.attach(remote);
@@ -163,7 +163,7 @@ class WorldHostTests {
 
     world.close();
     simulation.step(Int64.ofInt(2000));
-    equal(simulation.stepIndex(), Int64.ofInt(2), "WorldHost does not own shared simulation");
+    equal(simulation.stepIndex(), Int64.ofInt(2), "RobotWorld does not own shared simulation");
     simulation.dispose();
   }
 

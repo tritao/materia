@@ -5,7 +5,7 @@ import haxe.Int64;
 import robotkit.world.RemoteRobot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotStatus;
-import robotkit.world.WorldHost;
+import robotkit.world.RobotWorld;
 
 /** End-to-end assertion of the world adapter against a real robotd TCP peer. */
 class WorldTcpIntegration {
@@ -13,7 +13,7 @@ class WorldTcpIntegration {
 
   public static function run(host:String, port:Int):Void {
     var runtime = NativeKitRuntime.start();
-    var world = new WorldHost();
+    var world = new RobotWorld();
     var remote = new RemoteRobot(LOGICAL_ID);
     world.attach(remote);
     var failure:Dynamic = null;

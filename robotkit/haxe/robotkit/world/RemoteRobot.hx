@@ -5,7 +5,7 @@ import haxe.Int64;
 import robotkit.client.RobotClient;
 import robotkit.protocol.RobotStateMsg;
 
-/** Remote adapter translating world values to and from RobotKit protocol. */
+/** RobotInstance adapter for a robot reached through RobotClient/RobotProtocol. */
 class RemoteRobot implements RobotInstance {
   public final logicalId:RobotId;
 

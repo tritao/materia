@@ -4,7 +4,9 @@ import robotkit.model.Robot;
 import robotkit.model.JointType;
 import RobotKitRuntime;
 
-class RuntimeCompiler {
+/** Compiles the editable semantic robot model into an execution blueprint. */
+class RobotRuntimeCompiler {
+  /** Validates a model and captures its immutable source/revision boundary. */
   public static function compile(robot:Robot, ?revision:Int = 1):CompiledRobot {
     var errors = robot.validate();
     if (errors.length > 0)
@@ -13,9 +15,9 @@ class RuntimeCompiler {
   }
 
   /** Converts the semantic Haxeon model into one bulk native description. */
-  public static function blueprint(compiled:CompiledRobot):RuntimeBlueprint {
+  public static function blueprint(compiled:CompiledRobot):RobotRuntimeBlueprint {
     var robot = compiled.source;
-    var result = new RuntimeBlueprint(compiled.revision, compiled.jointCount,
+    var result = new RobotRuntimeBlueprint(compiled.revision, compiled.jointCount,
       robot.links.length);
     for (index in 0...robot.joints.length) {
       var joint = robot.joints[index];
@@ -36,7 +38,7 @@ class RuntimeCompiler {
       var maxEffort = joint.drive == null
         ? joint.limits.effort
         : joint.drive.maxEffort;
-      result.addJoint(new RuntimeJointBlueprint(index, nativeType, parent, child,
+      result.addJoint(new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
         joint.limits.lower, joint.limits.upper, maxEffort));
     }
     return result;

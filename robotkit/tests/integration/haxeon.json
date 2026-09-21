@@ -15,6 +15,8 @@
 				"../../robotd/native/CMakeLists.txt",
 				"../../CMakeLists.txt",
 				"../../runtime/CMakeLists.txt",
+				"../../runtime/include/robotkit_runtime.h",
+				"../../runtime/include/robotkit_simkit.h",
 				"../../../nativekit/CMakeLists.txt",
 				"../../../simkit/CMakeLists.txt"
 			]

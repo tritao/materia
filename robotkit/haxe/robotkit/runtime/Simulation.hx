@@ -3,10 +3,17 @@ package robotkit.runtime;
 import RobotKitSimKit;
 import haxe.Int64;
 
-/** Shared simulation coordinator: all robot commands are applied before one tick. */
+/**
+ * Owns one shared simulated universe and its fixed-step clock.
+ *
+ * The object creates RobotRuntime handles but remains their simulation owner:
+ * callers should submit through those handles and advance this object once per
+ * tick. It is intentionally separate from SimulatedRobot, which is only a
+ * RobotInstance adapter for RobotWorld.
+ */
 class Simulation {
   final owner:Ownedrk_simulation;
-  final robots:Array<Runtime> = [];
+  final robots:Array<RobotRuntime> = [];
   var disposed:Bool = false;
 
   public function new(? fixedTimestep:Float = 0.01, ? physicsSubsteps:Int = 1) {
@@ -20,25 +27,28 @@ class Simulation {
   }
 
   /** Adds topology before the first start or step. */
-  public function addRobot(blueprint:RuntimeBlueprint):Runtime {
+  public function addRobot(blueprint:RobotRuntimeBlueprint):RobotRuntime {
     ensureLive();
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue());
     check(result.status, "simulation.addRobot");
-    var runtime = new Runtime(result.out_runtime);
+    var runtime = new RobotRuntime(result.out_runtime);
     robots.push(runtime);
     return runtime;
   }
 
+  /** Applies every attached runtime command and advances the world once. */
   public function step(timestampNs:Int64):Void {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_step(owner.borrow(), timestampNs), "simulation.step");
   }
 
+  /** Starts the shared realtime clock after topology construction is complete. */
   public function start():Void {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_start(owner.borrow()), "simulation.start");
   }
 
+  /** Stops realtime stepping but leaves the simulation available for disposal. */
   public function stop():Void {
     if (!disposed) check(RobotKitSimKit.rk_simulation_stop(owner.borrow()), "simulation.stop");
   }

@@ -36,7 +36,7 @@ class RobotSnapshot {
     this.effort = effort == null ? [] : effort.copy();
   }
 
-  public static function fromRuntime(robotId:Int64, value:RuntimeSnapshot):RobotSnapshot
+  public static function fromRuntime(robotId:Int64, value:RobotRuntimeSnapshot):RobotSnapshot
     return new RobotSnapshot(robotId, Int64.ofInt(value.sequence), value.timestampNs,
       value.mode, value.safety, value.endpoint, value.faultCode,
       value.positions, value.velocities, value.efforts);

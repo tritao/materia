@@ -2,7 +2,8 @@ package robotkit.runtime;
 
 import RobotKitRuntime;
 
-class RuntimeJointBlueprint {
+/** Immutable native joint description embedded in a RobotRuntimeBlueprint. */
+class RobotRuntimeJointBlueprint {
   public final joint:Int;
   public final type:Int;
   public final parentLink:Int;
@@ -22,9 +23,9 @@ class RuntimeJointBlueprint {
     this.maxEffort = maxEffort;
   }
 
-  @:allow(RuntimeBlueprint)
-  function nativeValue():rk_runtime_joint {
-    var value = new rk_runtime_joint();
+  @:allow(RobotRuntimeBlueprint)
+  function nativeValue():rk_robot_runtime_joint {
+    var value = new rk_robot_runtime_joint();
     value.set_joint(joint);
     value.set_type(type);
     value.set_parent_link(parentLink);

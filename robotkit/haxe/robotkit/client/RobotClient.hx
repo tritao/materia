@@ -23,7 +23,7 @@ import robotkit.transport.NativeTransport;
 /**
  * Typed editor/CLI client for the RobotKit process boundary.
  *
- * The client owns only transport and protocol state. Runtime state remains
+ * The client owns only transport and protocol state. RobotRuntime state remains
  * authoritative in robotd and is delivered as immutable message values.
  */
 class RobotClient {

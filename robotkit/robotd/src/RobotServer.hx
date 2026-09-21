@@ -13,7 +13,8 @@ import robotkit.model.Robot;
 import robotkit.runtime.CompiledRobot;
 import robotkit.runtime.RobotSnapshot;
 import robotkit.runtime.RobotSnapshotMailbox;
-import robotkit.runtime.Runtime;
+import robotkit.runtime.RobotRuntime;
+import robotkit.runtime.Simulation;
 import robotkit.behavior.RobotBehavior;
 import robotkit.behavior.RobotBehaviorRunner;
 import robotkit.protocol.Fault;
@@ -29,11 +30,12 @@ import robotkit.protocol.RobotStateMsg;
 import robotkit.protocol.Stop;
 import robotkit.transport.NativeTransport;
 
-/** Authoritative robot process boundary. Runtime ownership stays off the network path. */
+/** Authoritative robot process boundary. RobotRuntime ownership stays off the network path. */
 class RobotServer {
   final robot:Robot;
   final compiled:CompiledRobot;
-  final runtime:Runtime;
+  final runtime:RobotRuntime;
+  final simulation:Simulation;
   final nativeRuntime:NativeKitRuntime;
   final listener:NativeKit.OwnedListenerHandle;
   final port:Int;
@@ -54,22 +56,23 @@ class RobotServer {
   var behaviorStopped:Bool = false;
   var disposed:Bool = false;
 
-  public function new(robot:Robot, compiled:CompiledRobot, runtime:Runtime,
-      port:Int, robotId:Int, ?behavior:RobotBehavior) {
+  public function new(robot:Robot, compiled:CompiledRobot, runtime:RobotRuntime,
+      simulation:Simulation, port:Int, robotId:Int, ?behavior:RobotBehavior) {
     this.robot = robot;
     this.compiled = compiled;
     this.runtime = runtime;
+    this.simulation = simulation;
     this.port = port;
     this.robotId = robotId;
     behaviorRunner = behavior == null ? null : new RobotBehaviorRunner(behavior);
     nativeRuntime = NativeKitRuntime.start();
     try {
-      runtime.start();
+      simulation.start();
       listener = NativeTransport.listen(port);
       stream = new RobotFrameStream();
       subscription = nativeRuntime.events.listen(onEvent);
     } catch (error:Dynamic) {
-      try runtime.dispose() catch (_:Dynamic) {}
+      try simulation.stop() catch (_:Dynamic) {}
       nativeRuntime.dispose();
       throw error;
     }
@@ -117,7 +120,7 @@ class RobotServer {
     if (currentClient != null)
       try NativeTransport.close(currentClient) catch (_:Dynamic) {}
     listener.close();
-    runtime.dispose();
+    simulation.stop();
     nativeRuntime.dispose();
   }
 
