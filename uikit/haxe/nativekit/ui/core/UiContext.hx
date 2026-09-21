@@ -319,7 +319,6 @@ class UiContext {
 			throw "Native layout did not return geometry for every render node";
 		}
 		syncWindowDecorations(next);
-		stateStore.endFrame();
 		diagnosticStage = 9;
 		var previousFocus = focus.focusedId;
 		focus.rebuild(next);
@@ -345,6 +344,10 @@ class UiContext {
 		updateCursor();
 		if (nextFocus != null && (previousFocus == null || !previousFocus.equals(nextFocus)))
 			events.focusEvent(nextFocus, UiEventKind.Focus);
+		// Reconcile focus before releasing resources owned by unmounted widgets.
+		// Blur is the old tree's final lifecycle event, so its handlers must still
+		// be able to access widget state while that event is being dispatched.
+		stateStore.endFrame();
 		submittedStateRevision = resolvedStateRevision;
 		submittedInteractionRevision = interactionStates.revision;
 		submittedStyleRevision = buildContext.styleRevision;

@@ -8,6 +8,16 @@ lists, `RenderPlan`, and `UiRenderer`, which submits UI work through
 `nkgpu_*`. The Haxe framework owns `View`, `RenderNode`, state, focus, events,
 gestures, semantics, animation, and widgets.
 
+## Component Lab
+
+The Haxe package `nativekit.ui.lab` provides a reusable isolated-component
+browser. `ComponentStory` describes one stable view case,
+`ComponentStoryRegistry` collects application and library stories, and
+`ComponentLab` renders the catalog surface using ordinary UIKit
+views. The same story IDs can be selected by interactive desktop hosts or
+deterministic screenshot runners, keeping component development and visual
+regression coverage on one definition.
+
 Clay, Skribidi, and NanoVG remain private implementation dependencies. Clay's
 custom render command carries the custom node identity and participates in its
 normal ordering. Haxe paint callbacks record one retained display list per

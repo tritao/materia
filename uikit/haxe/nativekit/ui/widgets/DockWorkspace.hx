@@ -54,12 +54,14 @@ class DockWorkspace implements View {
 		}
 		invalidate = function() context.commands.refresh();
 		interaction.beginFrame();
-		var content = buildNode(model.root, context, [], "layout");
+		var content = buildNode(model.root, context, [], "layout",
+			context.viewportWidth, context.viewportHeight);
 		var layout = new SizedBox("layout", content, LayoutAxis.grow(), LayoutAxis.grow());
 		return new Column(key, [new KeyedView("content", layout)], style).build(context);
 	}
 
-	function buildNode(node:DockNode, context:BuildContext, path:Array<Int>, nodeKey:String):View {
+	function buildNode(node:DockNode, context:BuildContext, path:Array<Int>, nodeKey:String,
+		availableWidth:Float, availableHeight:Float):View {
 		if (node == null)
 			return new Text("No dock layout");
 		switch (node) {
@@ -71,7 +73,8 @@ class DockWorkspace implements View {
 				return targetPanelId == null ? buildTabs(panelIds, activePanelId, context, nodeKey) :
 					targetView(targetPanelId, buildTabs(panelIds, activePanelId, context, nodeKey));
 			case DockNode.Split(axis, ratio, first, second):
-				return buildSplit(axis, ratio, first, second, context, path, nodeKey);
+				return buildSplit(axis, ratio, first, second, context, path, nodeKey,
+					availableWidth, availableHeight);
 		}
 	}
 
@@ -122,13 +125,14 @@ class DockWorkspace implements View {
 	}
 
 	function buildSplit(axis:DockSplitAxis, ratio:Float, first:DockNode, second:DockNode,
-		context:BuildContext, path:Array<Int>, nodeKey:String):View {
+		context:BuildContext, path:Array<Int>, nodeKey:String,
+		availableWidth:Float, availableHeight:Float):View {
 		var firstPath = path.copy();
 		firstPath.push(0);
 		var secondPath = path.copy();
 		secondPath.push(1);
 		var horizontal = axis == DockSplitAxis.Horizontal;
-		var available = horizontal ? context.viewportWidth : context.viewportHeight;
+		var available = horizontal ? availableWidth : availableHeight;
 		if (available <= 0.0)
 			available = 1000.0;
 		var minimum = 120.0;
@@ -146,8 +150,15 @@ class DockWorkspace implements View {
 		options.onResize = function(next) {
 			model.setSplitRatio(path, next / available);
 		};
-		return new SplitView(nodeKey, buildNode(first, context, firstPath, nodeKey + ":first"),
-			buildNode(second, context, secondPath, nodeKey + ":second"), options);
+		var remaining = Math.max(0.0, available - options.extent - divider);
+		var firstWidth = horizontal ? options.extent : availableWidth;
+		var firstHeight = horizontal ? availableHeight : options.extent;
+		var secondWidth = horizontal ? remaining : availableWidth;
+		var secondHeight = horizontal ? availableHeight : remaining;
+		return new SplitView(nodeKey,
+			buildNode(first, context, firstPath, nodeKey + ":first", firstWidth, firstHeight),
+			buildNode(second, context, secondPath, nodeKey + ":second", secondWidth, secondHeight),
+			options);
 	}
 
 	function panelView(panelId:String):View {

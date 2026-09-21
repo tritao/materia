@@ -20,6 +20,7 @@ import nativekit.ui.semantics.AccessibilityAction;
 import nativekit.ui.semantics.AccessibilityActionData;
 import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.Semantics;
+import nativekit.ui.style.StyleTarget;
 
 /**
 	Two-pane composition with a controlled, draggable leading or trailing
@@ -93,8 +94,17 @@ class SplitView implements View {
 			root.add(leadingPane);
 
 			if (dividerExtent > 0.0) {
-				var divider = new RenderNode(context.id("divider"), LayoutVisualKind.Box,
+				var dividerId = context.id("divider");
+				var dividerStates = context.interactionStates.get(dividerId);
+				var dividerComputed = context.resolveStyle(new StyleTarget("split-divider",
+					key.value, key.value + ":divider", null, ["split-divider"], dividerStates),
 					dividerLayoutStyle(horizontal));
+				var divider = new RenderNode(dividerId, LayoutVisualKind.Box,
+					dividerComputed.toLayoutStyle());
+				divider.setStyleIdentity("split-divider", key.value, key.value + ":divider",
+					null, ["split-divider"]);
+				divider.states = dividerStates;
+				divider.computedStyle = dividerComputed;
 				divider.focusable = true;
 				divider.cursor = horizontal ? CursorShape.HorizontalResize : CursorShape.VerticalResize;
 				var sideName = resizableSide == SplitSide.Leading ? "Leading" : "Trailing";
@@ -257,9 +267,7 @@ class SplitView implements View {
 	}
 
 	static function defaultDividerStyle():LayoutStyle {
-		var result = new LayoutStyle();
-		result.background = Color.rgba(0.0, 0.0, 0.0, 0.12);
-		return result;
+		return new LayoutStyle();
 	}
 
 	static inline function clamp(value:Float, minimum:Float, maximum:Float):Float

@@ -154,12 +154,18 @@ class Tabs implements View {
 			if (selectedItem != null) {
 				var item:TabItem = cast selectedItem;
 				var panel = context.withScope(new Key("panel:" + item.key), function() {
-					var node = new RenderNode(context.id("tab-panel"), LayoutVisualKind.Box);
+					var panelStyle = new LayoutStyle();
+					panelStyle.width = LayoutAxis.grow();
+					panelStyle.height = LayoutAxis.grow();
+					var node = new RenderNode(context.id("tab-panel"), LayoutVisualKind.Box,
+						panelStyle);
 					node.semantics = new Semantics(AccessibilityRole.TabPanel, item.label);
-					node.add(context.withStyleParent(rootComputed, function() {
-					return context.withScope(new Key("content"),
-						function() return item.content.build(context));
-				}));
+					var content = context.withStyleParent(rootComputed, function() {
+						return context.withScope(new Key("content"),
+							function() return item.content.build(context));
+					});
+					content.layout.style.width = LayoutAxis.stretch();
+					node.add(content);
 					return node;
 				});
 				root.add(panel);

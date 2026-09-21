@@ -1,0 +1,19 @@
+{
+	"version": 1,
+	"package": { "name": "app" },
+	"entry": "app.Main",
+	"sourceRoots": ["src"],
+	"dependencies": {
+		"nativekit": { "path": "../nativekit" },
+		"uikit": { "path": "../uikit" }
+	},
+	"native": {
+		"cmake": {
+			"source": "native",
+			"target": "haxeon_app_native",
+			"inputs": ["native/CMakeLists.txt", "../nativekit", "../uikit"]
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

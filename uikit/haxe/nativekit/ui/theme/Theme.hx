@@ -63,6 +63,54 @@ class Theme {
 		refreshStyles();
 	}
 
+	/** Creates the canonical light palette used by UIKit applications. */
+	public static function light():Theme return palette(true);
+
+	/** Creates the canonical dark palette used by UIKit applications. */
+	public static function dark():Theme return palette(false);
+
+	static function palette(light:Bool):Theme {
+		var tokens = new ThemeTokens();
+		tokens.accent = light ? rgba(0.12, 0.37, 0.72) : rgba(0.25, 0.61, 0.89);
+		tokens.text = light ? rgba(0.10, 0.14, 0.21) : rgba(0.91, 0.94, 0.98);
+		tokens.mutedText = light ? rgba(0.32, 0.38, 0.47) : rgba(0.62, 0.68, 0.77);
+		tokens.disabledText = light ? rgba(0.48, 0.51, 0.57) : rgba(0.53, 0.55, 0.59);
+		tokens.buttonText = rgba(1.0, 1.0, 1.0);
+		tokens.disabledButtonText = light ? rgba(0.28, 0.31, 0.36) : rgba(0.62, 0.65, 0.70);
+		tokens.buttonBackground = light ? rgba(0.18, 0.39, 0.70) : rgba(0.16, 0.38, 0.70);
+		tokens.buttonHover = light ? rgba(0.16, 0.38, 0.69) : rgba(0.22, 0.48, 0.82);
+		tokens.buttonPressed = light ? rgba(0.11, 0.29, 0.54) : rgba(0.13, 0.34, 0.67);
+		tokens.buttonFocused = light ? rgba(0.22, 0.43, 0.73) : rgba(0.27, 0.52, 0.91);
+		tokens.buttonSelected = light ? rgba(0.16, 0.36, 0.65) : rgba(0.17, 0.37, 0.68);
+		tokens.buttonDisabled = light ? rgba(0.82, 0.84, 0.88) : rgba(0.22, 0.24, 0.28);
+		tokens.controlSelected = tokens.accent;
+		tokens.controlUnselected = light ? rgba(0.78, 0.81, 0.86) : rgba(0.16, 0.18, 0.22);
+		tokens.controlDisabled = light ? rgba(0.82, 0.84, 0.88) : rgba(0.20, 0.21, 0.24);
+		tokens.progressTrack = light ? rgba(0.78, 0.84, 0.92) : rgba(0.20, 0.25, 0.33);
+		tokens.progressFill = tokens.accent;
+		tokens.selectionField = light ? rgba(0.98, 0.99, 1.0) : rgba(0.12, 0.15, 0.20);
+		tokens.selectionHover = light ? rgba(0.91, 0.94, 0.98) : rgba(0.18, 0.23, 0.31);
+		tokens.selectionPressed = light ? rgba(0.85, 0.90, 0.97) : rgba(0.15, 0.20, 0.28);
+		tokens.selectionHighlight = light ? rgba(0.82, 0.89, 0.98) : rgba(0.16, 0.29, 0.50);
+		tokens.selectionBorder = light ? rgba(0.67, 0.72, 0.80) : rgba(0.32, 0.38, 0.48);
+		tokens.selectionPopupShadow = rgba(0.0, 0.0, 0.0, light ? 0.20 : 0.42);
+		tokens.panelBackground = light ? rgba(0.98, 0.98, 1.0) : rgba(0.14, 0.16, 0.20);
+		tokens.overlayBackdrop = rgba(0.0, 0.0, 0.0, 0.54);
+		tokens.tooltipBackground = light ? rgba(0.13, 0.17, 0.23) : rgba(0.08, 0.09, 0.11);
+		tokens.navigationBackground = light ? rgba(0.87, 0.90, 0.95) : rgba(0.075, 0.10, 0.16);
+		tokens.navigationHover = light ? rgba(0.79, 0.85, 0.94) : rgba(0.12, 0.18, 0.28);
+		tokens.navigationPressed = light ? rgba(0.72, 0.81, 0.92) : rgba(0.15, 0.23, 0.36);
+		tokens.navigationFocused = light ? rgba(0.76, 0.84, 0.94) : rgba(0.14, 0.25, 0.41);
+		tokens.navigationSelected = light ? rgba(0.74, 0.83, 0.95) : rgba(0.16, 0.29, 0.50);
+		tokens.navigationDisabled = light ? rgba(0.89, 0.90, 0.92) : rgba(0.10, 0.12, 0.16);
+		var theme = new Theme(tokens);
+		theme.textCaret = tokens.text;
+		return theme;
+	}
+
+	static inline function rgba(red:Float, green:Float, blue:Float,
+			alpha:Float = 1.0):Color return Color.rgba(red, green, blue, alpha);
+
 	/** Rebuilds built-in rules after callers change a compatibility token. */
 	public function refreshStyles():Void {
 		styles.clear();
@@ -190,6 +238,14 @@ class Theme {
 			StyleValue.sliderFillColor(controlDisabled),
 			StyleValue.sliderThumbColor(disabledText)
 		]);
+		styles.rule(StyleSelector.widget("split-divider"),
+			[StyleValue.background(tokens.selectionBorder)]);
+		styles.rule(StyleSelector.widget("split-divider").state(StyleState.Hovered),
+			[StyleValue.background(tokens.controlSelected)]);
+		styles.rule(StyleSelector.widget("split-divider").state(StyleState.Pressed),
+			[StyleValue.background(tokens.buttonPressed)]);
+		styles.rule(StyleSelector.widget("split-divider").state(StyleState.Focused),
+			[StyleValue.background(tokens.buttonFocused)]);
 		styles.rule(StyleSelector.widget("progress-bar"), [
 			StyleValue.progressTrackColor(tokens.progressTrack),
 			StyleValue.progressFillColor(tokens.progressFill)

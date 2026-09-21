@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"package": { "name": "uikit" },
+	"sourceRoots": ["haxe", "bindings/haxe"],
+	"scopeSourceRoots": false,
+	"dependencies": {
+		"nativekit": { "path": "../nativekit" }
+	},
+	"ffi": {
+		"interfaces": ["bindings/nativekit-ui.hxi"],
+		"projections": ["bindings/nativekit-ui.hxmap"]
+	},
+	"target": "host"
+}
