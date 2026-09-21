@@ -49,6 +49,14 @@ provides a zero-copy `ImuSampleView`, an owning `ImuSample` decoder, and a
 variant adapter for measurements returned by `SensorRuntime`. The matching
 Haxeon record is `sensor_wire/haxe/materia/sensor/wire/ImuSampleMessage.hx`.
 
+LiDAR scans use the same envelope and carry dimensions plus one packed 12-byte
+record per ray: little-endian float32 range, little-endian float32 intensity,
+one hit flag, and three reserved bytes. Records are ordered vertical-major,
+then horizontal. The first transport version intentionally omits backend hit
+points and normals; the C++ API provides zero-copy `LidarScanView`, owning
+decode, and runtime variant dispatch. The matching Haxeon record is
+`sensor_wire/haxe/materia/sensor/wire/LidarScanMessage.hx`.
+
 `sensor_sim::ImuTruthAdapter` consumes an immutable `nksim_snapshot` and
 derives linear acceleration from consecutive body velocities. It never reads
 the mutable simulation world. The first sample after construction or reset has

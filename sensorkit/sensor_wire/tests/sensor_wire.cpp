@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <string>
@@ -43,6 +44,28 @@ ImuSample make_imu_sample() {
         1.4, 1.5, 1.6,
         1.7, 1.8, 1.9};
     return sample;
+}
+
+LidarScan make_lidar_scan() {
+    LidarScan scan;
+    scan.header.sensor = 63;
+    scan.header.sequence = 15;
+    scan.header.capture_time = 9.0;
+    scan.header.delivery_time = 9.05;
+    scan.header.frame = 19;
+    scan.horizontal_count = 3;
+    scan.vertical_count = 1;
+    scan.returns.resize(3);
+    scan.returns[0].hit = true;
+    scan.returns[0].range = 2.5;
+    scan.returns[0].intensity = 0.75;
+    scan.returns[1].hit = false;
+    scan.returns[1].range = 100.0;
+    scan.returns[1].intensity = 0.0;
+    scan.returns[2].hit = true;
+    scan.returns[2].range = 12.0;
+    scan.returns[2].intensity = 4.5;
+    return scan;
 }
 
 void encodes_haxeon_hmpk_and_messagepack_binary() {
@@ -260,6 +283,56 @@ void imu_codec_is_packed_zero_copy_and_lossless() {
     assert(error.find("finite") != std::string::npos);
 }
 
+void lidar_codec_is_packed_zero_copy_and_round_trips() {
+    const auto source = make_lidar_scan();
+    std::string error;
+    const auto encoded = encode_lidar_scan(source, &error);
+    assert(encoded.has_value());
+    assert(error.empty());
+    assert((*encoded)[frame_header_size] == 0x8b); // fixmap(11)
+
+    const auto view = view_lidar_scan(*encoded, &error);
+    assert(view.has_value());
+    assert(error.empty());
+    assert(view->header.sensor == source.header.sensor);
+    assert(view->horizontal_count == 3 && view->vertical_count == 1);
+    assert(view->return_stride == lidar_packed_return_size);
+    assert(view->data.size() == 3 * lidar_packed_return_size);
+    assert(view->data.data() >= encoded->data());
+    assert(view->data.data() < encoded->data() + encoded->size());
+
+    /* 2.5f, 0.75f, and hit=true in the first fixed-size return. */
+    const std::vector<std::uint8_t> expected_prefix{
+        0x00, 0x00, 0x20, 0x40,
+        0x00, 0x00, 0x40, 0x3f,
+        0x01, 0x00, 0x00, 0x00};
+    assert(std::equal(expected_prefix.begin(), expected_prefix.end(), view->data.begin()));
+
+    const auto decoded = decode_lidar_scan(*encoded, &error);
+    assert(decoded.has_value());
+    assert(decoded->header.sensor == source.header.sensor);
+    assert(decoded->horizontal_count == source.horizontal_count);
+    assert(decoded->vertical_count == source.vertical_count);
+    assert(decoded->returns.size() == source.returns.size());
+    for (std::size_t index = 0; index < source.returns.size(); ++index) {
+        assert(decoded->returns[index].hit == source.returns[index].hit);
+        assert(std::abs(decoded->returns[index].range - source.returns[index].range) < 1e-6);
+        assert(std::abs(decoded->returns[index].intensity - source.returns[index].intensity) <
+               1e-6);
+    }
+
+    auto invalid_flag = *encoded;
+    const auto data_offset = static_cast<std::size_t>(view->data.data() - encoded->data());
+    invalid_flag[data_offset + 8] = 2;
+    assert(!view_lidar_scan(invalid_flag, &error).has_value());
+    assert(error.find("hit flag") != std::string::npos);
+
+    auto invalid_count = source;
+    invalid_count.returns.pop_back();
+    assert(!encode_lidar_scan(invalid_count, &error).has_value());
+    assert(error.find("return count") != std::string::npos);
+}
+
 void runtime_measurements_have_wire_adapter() {
     SensorConfig config;
     config.id = 62;
@@ -288,10 +361,10 @@ void runtime_measurements_have_wire_adapter() {
     assert(error.empty());
     assert(decode_imu_sample(*encoded, &error).has_value());
 
-    LidarScan unsupported;
-    const SensorMeasurement lidar_measurement{unsupported};
-    assert(!encode_sensor_measurement(lidar_measurement, &error).has_value());
-    assert(error.find("LiDAR") != std::string::npos);
+    const SensorMeasurement lidar_measurement{make_lidar_scan()};
+    const auto encoded_lidar = encode_sensor_measurement(lidar_measurement, &error);
+    assert(encoded_lidar.has_value());
+    assert(decode_lidar_scan(*encoded_lidar, &error).has_value());
 }
 
 void rejects_bad_framing_and_invalid_camera_payloads() {
@@ -333,6 +406,7 @@ int main() {
     typed_depth_codec_preserves_little_endian_r32f_values();
     typed_segmentation_codec_preserves_little_endian_u64_labels();
     imu_codec_is_packed_zero_copy_and_lossless();
+    lidar_codec_is_packed_zero_copy_and_round_trips();
     runtime_measurements_have_wire_adapter();
     rejects_bad_framing_and_invalid_camera_payloads();
     enforces_messagepack_size_limit();

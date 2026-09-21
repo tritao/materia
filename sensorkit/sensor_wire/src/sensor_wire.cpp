@@ -18,6 +18,7 @@ using detail::MessagePackWriter;
 constexpr std::uint8_t hmpk_magic[] = {'H', 'M', 'P', 'K'};
 constexpr std::size_t packed_frame_field_count = 12;
 constexpr std::size_t imu_sample_field_count = 8;
+constexpr std::size_t lidar_scan_field_count = 11;
 constexpr std::uint64_t signed_int64_max =
     static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
 
@@ -88,6 +89,23 @@ bool read_le_double(std::span<const std::uint8_t> bytes, std::size_t offset,
     return true;
 }
 
+void append_le_float(std::vector<std::uint8_t> &bytes, float value) {
+    std::uint32_t bits = 0;
+    static_assert(sizeof(bits) == sizeof(value));
+    std::memcpy(&bits, &value, sizeof(bits));
+    append_le32(bytes, bits);
+}
+
+bool read_le_float(std::span<const std::uint8_t> bytes, std::size_t offset,
+                   float &value) {
+    std::uint32_t bits = 0;
+    if (!read_le32(bytes, offset, bits))
+        return false;
+    static_assert(sizeof(bits) == sizeof(value));
+    std::memcpy(&value, &bits, sizeof(value));
+    return true;
+}
+
 bool validate_sensor_header(const SensorSampleHeader &header, std::string *error,
                            std::string_view name) {
     if (header.sensor > signed_int64_max || header.sequence > signed_int64_max ||
@@ -115,6 +133,51 @@ bool validate_imu_data(std::span<const std::uint8_t> data, std::string *error) {
         }
         if (!std::isfinite(value)) {
             set_error(error, "IMU packed values must be finite");
+            return false;
+        }
+    }
+    return true;
+}
+
+bool validate_lidar_data(std::span<const std::uint8_t> data,
+                         std::uint32_t horizontal_count,
+                         std::uint32_t vertical_count,
+                         std::uint32_t return_stride,
+                         std::size_t max_bytes,
+                         std::string *error) {
+    if (return_stride != lidar_packed_return_size) {
+        set_error(error, "LiDAR return stride is not the supported packed format");
+        return false;
+    }
+
+    std::size_t count = 0;
+    if (!element_count(horizontal_count, vertical_count, count, error, "LiDAR"))
+        return false;
+    if (count > std::numeric_limits<std::size_t>::max() / lidar_packed_return_size) {
+        set_error(error, "LiDAR dimensions overflow its packed payload size");
+        return false;
+    }
+    const auto expected = count * lidar_packed_return_size;
+    if (expected > max_bytes || data.size() != expected) {
+        set_error(error, "LiDAR packed payload size does not match dimensions");
+        return false;
+    }
+
+    for (std::size_t index = 0; index < count; ++index) {
+        const auto offset = index * lidar_packed_return_size;
+        float range = 0.0f;
+        float intensity = 0.0f;
+        if (!read_le_float(data, offset, range) ||
+            !read_le_float(data, offset + sizeof(float), intensity)) {
+            set_error(error, "LiDAR packed payload is truncated");
+            return false;
+        }
+        if (!std::isfinite(range) || !std::isfinite(intensity)) {
+            set_error(error, "LiDAR range and intensity values must be finite");
+            return false;
+        }
+        if (data[offset + 8] > 1) {
+            set_error(error, "LiDAR hit flag is invalid");
             return false;
         }
     }
@@ -887,6 +950,239 @@ std::optional<ImuSample> decode_imu_sample(
     return sample;
 }
 
+std::optional<std::vector<std::uint8_t>> encode_lidar_scan(
+    const LidarScan &scan, std::string *error, std::size_t max_messagepack_bytes) {
+    if (!validate_sensor_header(scan.header, error, "LiDAR scan"))
+        return std::nullopt;
+
+    std::size_t count = 0;
+    if (!element_count(scan.horizontal_count, scan.vertical_count, count, error, "LiDAR"))
+        return std::nullopt;
+    if (scan.returns.size() != count) {
+        set_error(error, "LiDAR return count does not match scan dimensions");
+        return std::nullopt;
+    }
+    if (count > std::numeric_limits<std::size_t>::max() / lidar_packed_return_size) {
+        set_error(error, "LiDAR payload size overflows packed return storage");
+        return std::nullopt;
+    }
+    if (count > max_messagepack_bytes / lidar_packed_return_size) {
+        set_error(error, "LiDAR payload exceeds configured limit");
+        return std::nullopt;
+    }
+
+    std::vector<std::uint8_t> data;
+    data.reserve(count * lidar_packed_return_size);
+    for (const auto &value : scan.returns) {
+        const auto range = static_cast<float>(value.range);
+        const auto intensity = static_cast<float>(value.intensity);
+        if (!std::isfinite(range) || !std::isfinite(intensity)) {
+            set_error(error, "LiDAR range and intensity values must be finite");
+            return std::nullopt;
+        }
+        append_le_float(data, range);
+        append_le_float(data, intensity);
+        data.push_back(value.hit ? 1 : 0);
+        data.push_back(0);
+        data.push_back(0);
+        data.push_back(0);
+    }
+
+    MessagePackWriter payload;
+    payload.write_map_header(lidar_scan_field_count);
+
+    /* Fields 1-7 deliberately match the other SensorWire measurements. */
+    payload.write_integer(1);
+    payload.write_integer(current_frame_version);
+    payload.write_integer(2);
+    payload.write_integer(static_cast<std::uint8_t>(MessageType::lidar_scan));
+    payload.write_integer(3);
+    payload.write_integer(scan.header.sensor);
+    payload.write_integer(4);
+    payload.write_integer(scan.header.sequence);
+    payload.write_integer(5);
+    payload.write_float64(scan.header.capture_time);
+    payload.write_integer(6);
+    payload.write_float64(scan.header.delivery_time);
+    payload.write_integer(7);
+    payload.write_integer(scan.header.frame);
+    payload.write_integer(8);
+    payload.write_integer(scan.horizontal_count);
+    payload.write_integer(9);
+    payload.write_integer(scan.vertical_count);
+    payload.write_integer(10);
+    payload.write_integer(lidar_packed_return_size);
+    payload.write_integer(11);
+    payload.write_binary(data);
+
+    return encode_hmpk_payload(payload, error, max_messagepack_bytes);
+}
+
+std::optional<LidarScanView> view_lidar_scan(
+    std::span<const std::uint8_t> encoded, std::string *error,
+    std::size_t max_messagepack_bytes) {
+    const auto payload = messagepack_payload(encoded, max_messagepack_bytes, error);
+    if (!payload.has_value())
+        return std::nullopt;
+
+    MessagePackReader reader(*payload);
+    std::uint32_t field_count = 0;
+    if (!reader.read_map_size(field_count)) {
+        set_error(error, "LiDAR scan is not a MessagePack map");
+        return std::nullopt;
+    }
+
+    LidarScanView scan;
+    bool has_version = false;
+    bool has_type = false;
+    bool has_sensor = false;
+    bool has_sequence = false;
+    bool has_capture = false;
+    bool has_delivery = false;
+    bool has_frame = false;
+    bool has_horizontal = false;
+    bool has_vertical = false;
+    bool has_stride = false;
+    bool has_data = false;
+
+    for (std::uint32_t index = 0; index < field_count; ++index) {
+        std::uint64_t key = 0;
+        if (!reader.read_nonnegative(key)) {
+            set_error(error, "LiDAR scan field key is not a non-negative integer");
+            return std::nullopt;
+        }
+        switch (key) {
+        case 1: {
+            std::uint32_t version = 0;
+            if (!read_field_u32(reader, version, error, "schema version") || version != 1) {
+                if (version != 1)
+                    set_error(error, "unsupported LiDAR scan schema version");
+                return std::nullopt;
+            }
+            has_version = true;
+            break;
+        }
+        case 2: {
+            std::uint32_t type = 0;
+            if (!read_field_u32(reader, type, error, "message type"))
+                return std::nullopt;
+            if (type != static_cast<std::uint8_t>(MessageType::lidar_scan)) {
+                set_error(error, "MessagePack value is not a LiDAR scan");
+                return std::nullopt;
+            }
+            has_type = true;
+            break;
+        }
+        case 3:
+            if (!read_field_i64(reader, scan.header.sensor, error, "sensor"))
+                return std::nullopt;
+            has_sensor = true;
+            break;
+        case 4:
+            if (!read_field_i64(reader, scan.header.sequence, error, "sequence"))
+                return std::nullopt;
+            has_sequence = true;
+            break;
+        case 5:
+            if (!reader.read_float(scan.header.capture_time)) {
+                set_error(error, "capture time is not a float");
+                return std::nullopt;
+            }
+            has_capture = true;
+            break;
+        case 6:
+            if (!reader.read_float(scan.header.delivery_time)) {
+                set_error(error, "delivery time is not a float");
+                return std::nullopt;
+            }
+            has_delivery = true;
+            break;
+        case 7:
+            if (!read_field_i64(reader, scan.header.frame, error, "frame"))
+                return std::nullopt;
+            has_frame = true;
+            break;
+        case 8:
+            if (!read_field_u32(reader, scan.horizontal_count, error, "horizontal count"))
+                return std::nullopt;
+            has_horizontal = true;
+            break;
+        case 9:
+            if (!read_field_u32(reader, scan.vertical_count, error, "vertical count"))
+                return std::nullopt;
+            has_vertical = true;
+            break;
+        case 10:
+            if (!read_field_u32(reader, scan.return_stride, error, "return stride"))
+                return std::nullopt;
+            has_stride = true;
+            break;
+        case 11:
+            if (!reader.read_binary_view(scan.data)) {
+                set_error(error, "LiDAR scan data is not MessagePack binary");
+                return std::nullopt;
+            }
+            has_data = true;
+            break;
+        default:
+            if (!reader.skip()) {
+                set_error(error, "LiDAR scan contains an invalid unknown field");
+                return std::nullopt;
+            }
+            break;
+        }
+    }
+
+    if (!reader.at_end()) {
+        set_error(error, "LiDAR scan MessagePack value has trailing bytes");
+        return std::nullopt;
+    }
+    if (!has_version || !has_type || !has_sensor || !has_sequence || !has_capture ||
+        !has_delivery || !has_frame || !has_horizontal || !has_vertical || !has_stride ||
+        !has_data) {
+        set_error(error, "LiDAR scan is missing a required field");
+        return std::nullopt;
+    }
+    if (!validate_sensor_header(scan.header, error, "LiDAR scan") ||
+        !validate_lidar_data(scan.data, scan.horizontal_count, scan.vertical_count,
+                             scan.return_stride, max_messagepack_bytes, error))
+        return std::nullopt;
+    return scan;
+}
+
+std::optional<LidarScan> decode_lidar_scan(
+    std::span<const std::uint8_t> encoded, std::string *error,
+    std::size_t max_messagepack_bytes) {
+    const auto view = view_lidar_scan(encoded, error, max_messagepack_bytes);
+    if (!view.has_value())
+        return std::nullopt;
+
+    std::size_t count = 0;
+    if (!element_count(view->horizontal_count, view->vertical_count, count, error, "LiDAR"))
+        return std::nullopt;
+
+    LidarScan scan;
+    scan.header = view->header;
+    scan.horizontal_count = view->horizontal_count;
+    scan.vertical_count = view->vertical_count;
+    scan.returns.resize(count);
+    for (std::size_t index = 0; index < count; ++index) {
+        const auto offset = index * lidar_packed_return_size;
+        float range = 0.0f;
+        float intensity = 0.0f;
+        if (!read_le_float(view->data, offset, range) ||
+            !read_le_float(view->data, offset + sizeof(float), intensity)) {
+            set_error(error, "LiDAR packed payload is truncated");
+            return std::nullopt;
+        }
+        auto &value = scan.returns[index];
+        value.hit = view->data[offset + 8] != 0;
+        value.range = static_cast<double>(range);
+        value.intensity = static_cast<double>(intensity);
+    }
+    return scan;
+}
+
 std::optional<std::vector<std::uint8_t>> encode_sensor_measurement(
     const SensorMeasurement &measurement, std::string *error,
     std::size_t max_messagepack_bytes) {
@@ -901,8 +1197,10 @@ std::optional<std::vector<std::uint8_t>> encode_sensor_measurement(
                 return encode_depth_frame(value, error, max_messagepack_bytes);
             else if constexpr (std::is_same_v<Value, SegmentationFrame>)
                 return encode_segmentation_frame(value, error, max_messagepack_bytes);
+            else if constexpr (std::is_same_v<Value, LidarScan>)
+                return encode_lidar_scan(value, error, max_messagepack_bytes);
             else {
-                set_error(error, "LiDAR wire encoding is not implemented yet");
+                set_error(error, "sensor measurement wire encoding is not implemented");
                 return std::nullopt;
             }
         },

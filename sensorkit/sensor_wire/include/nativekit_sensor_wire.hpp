@@ -32,12 +32,14 @@ constexpr std::size_t frame_header_size = 10;
 constexpr std::size_t default_max_messagepack_bytes = 16 * 1024 * 1024;
 constexpr std::size_t imu_packed_value_count = 24;
 constexpr std::size_t imu_packed_data_size = imu_packed_value_count * sizeof(double);
+constexpr std::size_t lidar_packed_return_size = 12;
 
 enum class MessageType : std::uint8_t {
     camera_frame = 1,
     depth_frame = 2,
     segmentation_frame = 3,
     imu_sample = 4,
+    lidar_scan = 5,
 };
 
 enum class PixelFormat : std::uint8_t {
@@ -73,6 +75,19 @@ struct PackedFrame {
 struct ImuSampleView {
     SensorSampleHeader header;
     /** 24 little-endian IEEE-754 binary64 values; see encode_imu_sample. */
+    std::span<const std::uint8_t> data;
+};
+
+/**
+ * A non-owning packed LiDAR payload view. Each return is 12 bytes:
+ * little-endian float32 range, little-endian float32 intensity, one hit flag,
+ * and three reserved bytes.
+ */
+struct LidarScanView {
+    SensorSampleHeader header;
+    std::uint32_t horizontal_count = 0;
+    std::uint32_t vertical_count = 0;
+    std::uint32_t return_stride = static_cast<std::uint32_t>(lidar_packed_return_size);
     std::span<const std::uint8_t> data;
 };
 
@@ -155,6 +170,21 @@ NKSENSOR_WIRE_API std::optional<ImuSampleView> view_imu_sample(
 
 /** Decode an IMU packet into the core fixed-size measurement type. */
 NKSENSOR_WIRE_API std::optional<ImuSample> decode_imu_sample(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Encode LiDAR ranges and intensities as compact little-endian float32 data. */
+NKSENSOR_WIRE_API std::optional<std::vector<std::uint8_t>> encode_lidar_scan(
+    const LidarScan &scan, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Validate and inspect a LiDAR packet without copying its packed payload. */
+NKSENSOR_WIRE_API std::optional<LidarScanView> view_lidar_scan(
+    std::span<const std::uint8_t> encoded, std::string *error = nullptr,
+    std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
+
+/** Decode a LiDAR packet into the core scan type. */
+NKSENSOR_WIRE_API std::optional<LidarScan> decode_lidar_scan(
     std::span<const std::uint8_t> encoded, std::string *error = nullptr,
     std::size_t max_messagepack_bytes = default_max_messagepack_bytes);
 
