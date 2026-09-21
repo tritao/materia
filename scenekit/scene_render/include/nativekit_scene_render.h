@@ -190,6 +190,11 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_get_occurrenc
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray(
     nkscene_render_spatial_index index, const nkscene_render_ray *ray,
     nkscene_render_pick_result *out_result NK_OUT);
+/** Performs nearest-hit picking for a batch of rays against one immutable snapshot. */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_rays(
+    nkscene_render_spatial_index index,
+    const nkscene_render_ray *rays NK_IN_ARRAY(ray_count), uint64_t ray_count,
+    nkscene_render_pick_result *out_results NK_OUT_BUFFER(ray_count));
 /**
  * Creates an executor bound to a GPU renderer. Pass a zero renderer for the
  * headless resource and command path. The renderer must outlive the executor.
@@ -535,6 +540,7 @@ class NKSRENDER_API SceneSpatialIndex {
     std::size_t query_result_count() const noexcept;
     OccurrenceId query_result(std::size_t index) const noexcept;
     PickResult pick_ray(const Ray &) const;
+    std::vector<PickResult> pick_rays(std::span<const Ray>) const;
 
   private:
     struct State;
@@ -729,6 +735,10 @@ class NKSRENDER_API NativeKitGpuExecutor {
     nkgpu_result last_result() const noexcept;
 
     GpuExecutionStats execute(const RenderPlan &, const SceneSnapshot &);
+    /** Renders a plan into an off-screen RGBA8 image and reads it back. */
+    nkgpu_result capture_rgba8(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
+                               std::uint32_t height, std::array<float, 4> clear_color,
+                               std::vector<std::uint8_t> &out_pixels);
     /** Renders an ID-only pass and resolves one pixel to scene ownership. */
     nkgpu_result pick_pixel(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
                             std::uint32_t height, std::uint32_t x, std::uint32_t y,

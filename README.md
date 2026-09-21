@@ -19,6 +19,7 @@ start.
 | [`uikit/`](uikit/) | Retained UI layout, text, rendering, styles, and Haxe widgets |
 | [`scenekit/`](scenekit/) | Retained scene data, rendering, picking, and interaction |
 | [`simkit/`](simkit/) | Deterministic simulation orchestration and physics integration |
+| [`sensorkit/`](sensorkit/) | Backend-independent sensor scheduling and measurement models |
 | [`cadkit/`](cadkit/) | Headless CAD core and C ABI above Open CASCADE |
 
 The native components are kept as sibling projects so they can be built and

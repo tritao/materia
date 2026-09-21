@@ -385,4 +385,12 @@ PickResult SceneSpatialIndex::pick_ray(const Ray &ray) const {
     return result;
 }
 
+std::vector<PickResult> SceneSpatialIndex::pick_rays(std::span<const Ray> rays) const {
+    std::vector<PickResult> results;
+    results.reserve(rays.size());
+    for (const auto &ray : rays)
+        results.push_back(pick_ray(ray));
+    return results;
+}
+
 } // namespace nkscene
