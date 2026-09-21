@@ -13,24 +13,69 @@
 
 namespace robotkit {
 
+/**
+ * Backend adapter used by one RobotRuntime.
+ *
+ * Endpoint is the native boundary between RobotRuntime's command mailbox and
+ * the state-producing mechanism behind it. Implementations may represent a
+ * physical driver, a shared Simulation binding, a replay source, or a small
+ * test double. Endpoint does not own the RobotRuntime, its public handle, or
+ * a simulation clock.
+ *
+ * RobotRuntime invokes the methods on its owner thread. For a shared
+ * Simulation, the simulation invokes the same phases for every endpoint in a
+ * single tick: all commands are applied first, the world advances once, and
+ * every endpoint is sampled afterward. Implementations should therefore stage
+ * command effects in apply() and publish only observed state from sample().
+ */
 class RK_API Endpoint {
 public:
     virtual ~Endpoint() = default;
 
-    virtual rk_result apply(const rk_robot_command &command) = 0;
     /**
-     * Read the endpoint's latest state. A shared Simulation calls this after
-     * its one world step; the endpoint itself never owns shared time.
+     * Applies one validated command batch to the backend.
+     *
+     * The endpoint should not advance shared time here. A simulation can call
+     * discard_pending() if a different robot rejects its command, so staged
+     * changes must remain rollback-safe until the world tick is committed.
+     *
+     * @param command Complete command batch removed from the runtime mailbox.
+     * @return RK_OK when accepted, or a backend/safety/argument error.
+     */
+    virtual rk_result apply(const rk_robot_command &command) = 0;
+
+    /**
+     * Samples the backend's latest state into a caller-owned value.
+     *
+     * A shared Simulation calls this after its one world step; the endpoint
+     * itself never owns shared time. timestamp_ns labels the observation and
+     * is not a request to advance the backend.
+     *
+     * @param timestamp_ns Observation timestamp chosen by the owner.
+     * @param state Destination state, including arrays sized by the runtime
+     * layout.
+     * @return RK_OK when a complete state was copied, or a backend error.
      */
     virtual rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) = 0;
-    /** Discard commands staged during a simulation tick that will not advance. */
+
+    /**
+     * Rolls back command effects staged during a failed simulation tick.
+     *
+     * The default implementation is appropriate for endpoints whose apply()
+     * operation is already transactional or has no deferred backend state.
+     * This method is noexcept because it is used while unwinding a rejected
+     * multi-robot tick.
+     */
     virtual void discard_pending() noexcept {}
 };
 
 /**
- * Small deterministic endpoint used by the runtime tests and initial host
- * bring-up. It is intentionally not a simulator; it only moves joints toward
- * the most recent position targets.
+ * Small loopback endpoint used by runtime tests and initial host bring-up.
+ *
+ * It is intentionally not a simulator and does not model bodies, contacts,
+ * or a physics clock. It only moves joints toward the most recent position
+ * targets, making it useful for checking mailbox and snapshot plumbing before
+ * a real physical or simulated endpoint is available.
  */
 class RK_API InMemoryEndpoint final : public Endpoint {
 public:
