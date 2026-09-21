@@ -29,6 +29,12 @@ the mutable simulation world. The first sample after construction or reset has
 zero estimated acceleration; this is deliberate and makes seek/replay
 boundaries explicit.
 
+`sensor_sim::SceneLidarAdapter` builds a read-only spatial index from one
+SceneKit snapshot, transforms each configured ray by the sensor pose, and
+batch-raycasts the rays before handing the results to `LidarSensor`. LiDAR range
+is distance along the unit ray; a ray at 45 degrees can therefore have a
+different local-X projection. Dropped ticks short-circuit before scene queries.
+
 `sensor_render::SceneCameraAdapter` compiles a camera view against an immutable
 SceneKit snapshot, renders it into an off-screen RGBA8 target, and packages the
 readback as a `CameraFrame`. The adapter borrows the GPU renderer and keeps

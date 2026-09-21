@@ -147,6 +147,10 @@ nkscene_result SceneLidarAdapter::scan(LidarSensor &sensor, const SensorTick &ti
                                         const Pose &sensor_pose,
                                         std::optional<LidarScan> &out_scan) const {
     out_scan.reset();
+    /* A dropped sensor tick produces no measurement and must not spend time
+     * traversing the scene. This also matches the camera adapters. */
+    if (tick.dropped)
+        return NKS_OK;
     if (!ready())
         return NKS_ERROR_INVALID_STATE;
 

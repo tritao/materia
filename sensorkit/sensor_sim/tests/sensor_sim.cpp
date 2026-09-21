@@ -173,21 +173,24 @@ void scene_lidar_adapter_batch_raycast_returns_local_scan() {
     assert(nkscene_material_create(scene, &material) == NKS_OK);
 
     const nkscene_geometry_vertex vertices[] = {
-        {{5.0f, -1.0f, -1.0f}},
-        {{5.0f, 1.0f, -1.0f}},
-        {{5.0f, 0.0f, 1.0f}},
+        {{5.0f, -10.0f, -10.0f}},
+        {{5.0f, 10.0f, -10.0f}},
+        {{5.0f, 10.0f, 10.0f}},
+        {{5.0f, -10.0f, -10.0f}},
+        {{5.0f, 10.0f, 10.0f}},
+        {{5.0f, -10.0f, 10.0f}},
     };
     nkscene_geometry_data geometry_data{};
     geometry_data.struct_size = sizeof(geometry_data);
     geometry_data.vertices = vertices;
-    geometry_data.vertex_count = 3;
+    geometry_data.vertex_count = 6;
     geometry_data.bounds.valid = 1;
     geometry_data.bounds.minimum[0] = 5.0f;
-    geometry_data.bounds.minimum[1] = -1.0f;
-    geometry_data.bounds.minimum[2] = -1.0f;
+    geometry_data.bounds.minimum[1] = -10.0f;
+    geometry_data.bounds.minimum[2] = -10.0f;
     geometry_data.bounds.maximum[0] = 5.0f;
-    geometry_data.bounds.maximum[1] = 1.0f;
-    geometry_data.bounds.maximum[2] = 1.0f;
+    geometry_data.bounds.maximum[1] = 10.0f;
+    geometry_data.bounds.maximum[2] = 10.0f;
     assert(nkscene_geometry_set_data(scene, geometry, &geometry_data) == NKS_OK);
 
     nkscene_material_data material_data{};
@@ -216,7 +219,7 @@ void scene_lidar_adapter_batch_raycast_returns_local_scan() {
     SensorConfig sensor_config;
     sensor_config.id = 31;
     LidarConfig lidar_config;
-    lidar_config.horizontal_count = 2;
+    lidar_config.horizontal_count = 3;
     lidar_config.vertical_count = 1;
     lidar_config.horizontal_angle_min = 0.0;
     lidar_config.horizontal_angle_max = 1.5707963267948966;
@@ -230,12 +233,27 @@ void scene_lidar_adapter_batch_raycast_returns_local_scan() {
     std::optional<LidarScan> scan;
     assert(adapter.scan(lidar, *tick, {}, scan) == NKS_OK);
     assert(scan.has_value());
-    assert(scan->returns.size() == 2);
+    assert(scan->returns.size() == 3);
     assert(scan->returns[0].hit);
     assert(std::abs(scan->returns[0].range - 5.0) < 1e-6);
     assert(std::abs(scan->returns[0].point.x - 5.0) < 1e-6);
-    assert(!scan->returns[1].hit);
-    assert(std::abs(scan->returns[1].range - 20.0) < 1e-6);
+    assert(scan->returns[1].hit);
+    /* The 45-degree return reaches x=5 after travelling sqrt(50), not 5.
+       The reported point is nevertheless (5, 5, 0) in the sensor frame. */
+    assert(std::abs(scan->returns[1].range - 5.0 * std::sqrt(2.0)) < 1e-6);
+    assert(std::abs(scan->returns[1].point.x - 5.0) < 1e-6);
+    assert(std::abs(scan->returns[1].point.y - 5.0) < 1e-6);
+    assert(!scan->returns[2].hit);
+    assert(std::abs(scan->returns[2].range - 20.0) < 1e-6);
+
+    Pose translated_pose;
+    translated_pose.position = {1.0, 0.0, 0.0};
+    std::optional<LidarScan> translated_scan;
+    assert(adapter.scan(lidar, *tick, translated_pose, translated_scan) == NKS_OK);
+    assert(translated_scan.has_value());
+    assert(translated_scan->returns[0].hit);
+    assert(std::abs(translated_scan->returns[0].range - 4.0) < 1e-6);
+    assert(std::abs(translated_scan->returns[0].point.x - 4.0) < 1e-6);
 
     /* A -90 degree sensor yaw maps local +Y to world +X. The same scene
        should therefore be hit by the second ray, with the point reported
@@ -248,9 +266,39 @@ void scene_lidar_adapter_batch_raycast_returns_local_scan() {
     assert(rotated_scan.has_value());
     assert(!rotated_scan->returns[0].hit);
     assert(rotated_scan->returns[1].hit);
-    assert(std::abs(rotated_scan->returns[1].range - 5.0) < 1e-6);
-    assert(std::abs(rotated_scan->returns[1].point.x) < 1e-6);
+    assert(std::abs(rotated_scan->returns[1].range - 5.0 * std::sqrt(2.0)) < 1e-6);
+    assert(std::abs(rotated_scan->returns[1].point.x - 5.0) < 1e-6);
     assert(std::abs(rotated_scan->returns[1].point.y - 5.0) < 1e-6);
+    assert(rotated_scan->returns[2].hit);
+    assert(std::abs(rotated_scan->returns[2].range - 5.0) < 1e-6);
+    assert(std::abs(rotated_scan->returns[2].point.x) < 1e-6);
+    assert(std::abs(rotated_scan->returns[2].point.y - 5.0) < 1e-6);
+
+    SensorConfig noisy_sensor_config = sensor_config;
+    noisy_sensor_config.seed = 91;
+    LidarNoiseConfig noise;
+    noise.range_stddev = 0.1;
+    LidarSensor first_noisy(noisy_sensor_config, lidar_config, noise);
+    LidarSensor second_noisy(noisy_sensor_config, lidar_config, noise);
+    const auto first_noisy_tick = first_noisy.trigger(0.0);
+    const auto second_noisy_tick = second_noisy.trigger(0.0);
+    assert(first_noisy_tick.has_value() && second_noisy_tick.has_value());
+    std::optional<LidarScan> first_noisy_scan;
+    std::optional<LidarScan> second_noisy_scan;
+    assert(adapter.scan(first_noisy, *first_noisy_tick, {}, first_noisy_scan) == NKS_OK);
+    assert(adapter.scan(second_noisy, *second_noisy_tick, {}, second_noisy_scan) == NKS_OK);
+    assert(first_noisy_scan.has_value() && second_noisy_scan.has_value());
+    for (std::size_t index = 0; index < first_noisy_scan->returns.size(); ++index)
+        assert(first_noisy_scan->returns[index].range == second_noisy_scan->returns[index].range);
+
+    SensorConfig dropped_sensor_config = sensor_config;
+    dropped_sensor_config.timing.dropout_probability = 1.0;
+    LidarSensor dropped_lidar(dropped_sensor_config, lidar_config);
+    const auto dropped_tick = dropped_lidar.trigger(0.0);
+    assert(dropped_tick.has_value() && dropped_tick->dropped);
+    std::optional<LidarScan> dropped_scan;
+    assert(adapter.scan(dropped_lidar, *dropped_tick, {}, dropped_scan) == NKS_OK);
+    assert(!dropped_scan.has_value());
 
     adapter.reset();
     nkscene_geometry_destroy(scene, geometry);
