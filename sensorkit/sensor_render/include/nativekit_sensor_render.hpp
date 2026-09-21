@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nativekit_scene_render.h"
+#include "nativekit_scene_render.hpp"
 #include "nativekit_sensor_core.hpp"
 
 #include <optional>

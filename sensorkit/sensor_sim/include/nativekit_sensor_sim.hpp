@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nativekit_sensor_core.hpp"
-#include "nativekit_scene_render.h"
+#include "nativekit_scene_render.hpp"
 #include "nativekit_sim.h"
 
 #include <optional>

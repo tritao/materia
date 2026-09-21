@@ -1,5 +1,5 @@
 #include "nativekit.h"
-#include "nativekit_scene_interaction.h"
+#include "nativekit_scene_interaction.hpp"
 #include "nativekit_window.h"
 
 #include "scene_internal.hpp"

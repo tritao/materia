@@ -1,4 +1,4 @@
-#include "nativekit_scene_interaction.h"
+#include "nativekit_scene_interaction.hpp"
 
 #include <algorithm>
 #include <cstdint>
