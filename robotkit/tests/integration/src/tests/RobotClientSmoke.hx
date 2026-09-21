@@ -1,4 +1,4 @@
-package robotd;
+package tests;
 
 import haxe.io.Bytes;
 import robotkit.client.RobotClient;

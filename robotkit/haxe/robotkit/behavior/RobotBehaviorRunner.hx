@@ -1,7 +1,7 @@
 package robotkit.behavior;
 
 import haxe.Int64;
-import robotkit.RobotSnapshot;
+import robotkit.runtime.RobotSnapshot;
 
 /** Runs one behavior against each new snapshot and returns its live intent. */
 class RobotBehaviorRunner {

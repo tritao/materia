@@ -1,15 +1,14 @@
 package robotd;
 
-import robot.model.Joint;
-import robot.model.JointType;
-import robot.model.Link;
-import robot.model.Robot;
-import robot.runtime.RuntimeCompiler;
-import robotkit.Runtime;
-import robotkit.RuntimeLayout;
+import robotkit.model.Joint;
+import robotkit.model.JointType;
+import robotkit.model.Link;
+import robotkit.model.Robot;
+import robotkit.runtime.Runtime;
+import robotkit.runtime.RuntimeCompiler;
+import robotkit.runtime.RuntimeLayout;
 import robotkit.behavior.RobotBehavior;
 import robotd.behaviors.OscillateBehavior;
-import robotd.WorldTcpIntegration;
 
 class RobotHost {
   final args:Array<String>;
@@ -20,21 +19,13 @@ class RobotHost {
 
   public function run():Void {
     if (args.indexOf("--help") >= 0) {
-      Sys.println("Usage: robotd [--server [--once]] [--client] [--port=N] "
-        + "[--world-client] [--robot-id=N] [--behavior=oscillate] [--in-memory] [--help]");
+      Sys.println("Usage: robotd [--server [--once]] [--port=N] "
+        + "[--robot-id=N] [--behavior=oscillate] [--in-memory] [--help]");
       return;
     }
     var port = parsePort();
     var robotId = parseRobotId();
     var behavior = parseBehavior();
-    if (args.indexOf("--world-client") >= 0) {
-      WorldTcpIntegration.run("127.0.0.1", port);
-      return;
-    }
-    if (args.indexOf("--client") >= 0) {
-      RobotClientSmoke.run("127.0.0.1", port);
-      return;
-    }
     var robot = new Robot("demo-arm");
     var base = robot.addLink(new Link("base"));
     var tool = robot.addLink(new Link("tool"));

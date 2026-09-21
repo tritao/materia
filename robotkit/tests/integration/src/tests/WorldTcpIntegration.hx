@@ -1,4 +1,4 @@
-package robotd;
+package tests;
 
 import NativeKitRuntime;
 import haxe.Int64;

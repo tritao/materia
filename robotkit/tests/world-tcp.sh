@@ -2,14 +2,15 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-project="$repo_dir/robotkit/robotd/haxeon.json"
+server_project="$repo_dir/robotkit/robotd/haxeon.json"
+client_project="$repo_dir/robotkit/tests/integration/haxeon.json"
 port="${ROBOTKIT_TEST_PORT:-17942}"
 log_dir="$repo_dir/robotkit/tests/build"
 server_log="$log_dir/world-tcp-server.log"
 mkdir -p "$log_dir"
 
-"$repo_dir/haxeon/scripts/haxeon" build --project "$project"
-"$repo_dir/haxeon/scripts/haxeon" run --project "$project" -- \
+"$repo_dir/haxeon/scripts/haxeon" build --project "$server_project"
+"$repo_dir/haxeon/scripts/haxeon" run --project "$server_project" -- \
   --server --once --robot-id=42 --port="$port" >"$server_log" 2>&1 &
 server_pid=$!
 cleanup() {
@@ -32,7 +33,7 @@ for _ in $(seq 1 100); do
 done
 
 grep -q "robotd: listening" "$server_log"
-"$repo_dir/haxeon/scripts/haxeon" run --project "$project" -- \
-  --world-client --port="$port"
+"$repo_dir/haxeon/scripts/haxeon" run --project "$client_project" -- \
+  --port="$port"
 wait "$server_pid"
 trap - EXIT

@@ -1,6 +1,6 @@
-package robot.runtime;
+package robotkit.runtime;
 
-import robot.model.Robot;
+import robotkit.model.Robot;
 
 class CompiledRobot {
   public final source:Robot;

@@ -1,9 +1,7 @@
-package robot.runtime;
+package robotkit.runtime;
 
-import robot.model.Robot;
-import robot.model.JointType;
-import robotkit.RuntimeBlueprint;
-import robotkit.RuntimeJointBlueprint;
+import robotkit.model.Robot;
+import robotkit.model.JointType;
 import RobotKitRuntime;
 
 class RuntimeCompiler {

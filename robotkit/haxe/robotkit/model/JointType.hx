@@ -1,4 +1,4 @@
-package robot.model;
+package robotkit.model;
 
 enum abstract JointType(String) from String to String {
   var Fixed = "fixed";

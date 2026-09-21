@@ -14,8 +14,9 @@ The first increment contains deliberately small boundaries:
 - `sim endpoint`: a SimKit-backed endpoint that owns the live simulation model
   when enabled by the host application.
 
-The semantic robot/document model currently belongs to the Haxeon `robotd`
-application under this robotics root.
+The semantic robot model and native-runtime compiler are reusable Haxe APIs
+under `haxe/robotkit`; `robotd` supplies only process hosting and deployment
+policy.
 RobotKit receives only compiled runtime blueprints and bulk data at execution
 boundaries. The runtime includes an in-memory endpoint for deterministic tests
 and an optional SimKit endpoint for live simulation. MuJoCo model loading,

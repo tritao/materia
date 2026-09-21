@@ -1,4 +1,4 @@
-package robotkit;
+package robotkit.runtime;
 
 import haxe.Int64;
 

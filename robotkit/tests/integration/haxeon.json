@@ -1,0 +1,25 @@
+{
+	"version": 1,
+	"package": { "name": "robotkit-integration-tests" },
+	"entry": "tests.IntegrationMain",
+	"sourceRoots": ["src"],
+	"dependencies": {
+		"nativekit": { "path": "../../../nativekit" },
+		"robotkit": { "path": "../.." }
+	},
+	"native": {
+		"cmake": {
+			"source": "../../robotd/native",
+			"target": "robotd_native",
+			"inputs": [
+				"../../robotd/native/CMakeLists.txt",
+				"../../CMakeLists.txt",
+				"../../runtime/CMakeLists.txt",
+				"../../../nativekit/CMakeLists.txt",
+				"../../../simkit/CMakeLists.txt"
+			]
+		}
+	},
+	"target": "host",
+	"outputDir": "../build/integration"
+}

@@ -21,9 +21,9 @@ Run the current skeleton with:
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
   --server --behavior=oscillate
 
-# In another terminal, exercise the protocol client
-../../haxeon/scripts/haxeon run --project haxeon.json -- --client
-
 # Native-only runtime smoke test
 ../../haxeon/scripts/haxeon run --project haxeon.json -- --in-memory
 ```
+
+The protocol and world TCP clients are integration tests rather than robotd
+runtime modes. Run them through `../tests/world-tcp.sh`.

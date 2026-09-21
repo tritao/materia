@@ -1,4 +1,4 @@
-package robotkit;
+package robotkit.runtime;
 
 /**
  * Bounded latest-value publication for runtime observations.

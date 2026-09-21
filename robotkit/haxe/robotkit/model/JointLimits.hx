@@ -1,4 +1,4 @@
-package robot.model;
+package robotkit.model;
 
 class JointLimits {
   public var lower:Float;

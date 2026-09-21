@@ -1,4 +1,4 @@
-package robot.model;
+package robotkit.model;
 
 class Robot {
   public final name:String;
