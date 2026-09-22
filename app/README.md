@@ -111,6 +111,17 @@ Run the editor with:
 
 Use `--snapshot` after `--` for the headless workspace JSON path, or
 `--reset-workspace` to discard the persisted panel arrangement before startup.
+Use `--perspective` to activate the GPU perspective tab at launch, including for
+deterministic frame captures.
+
+Perspective diagnostics report capture dimensions, RGBA transfer size, coloured
+and selection-highlight pixel counts, and capture latency in `app-state.json`.
+The current readback-to-UIKit-image path transfers four bytes per pixel; the
+interactive camera will use left-drag orbit, middle-drag pan, and wheel zoom.
+Frame selected will fit the selected rectangle (or the whole scene when selection
+is empty), while Reset view restores the documented default camera. Direct GPU
+texture composition remains the preferred path if continuous captures consume a
+material portion of the frame budget.
 
 To connect the editor to a running headless robot process, pass its TCP
 endpoint. The editor keeps its own NativeKit event loop and uses RobotKit's

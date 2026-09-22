@@ -100,11 +100,12 @@ class Main {
     var args = Sys.args();
     for (arg in args)
       if (arg != "--reset-workspace" && arg != "--snapshot" &&
-          arg != "--lab" && arg != "--dark" && arg.indexOf("--story=") != 0 &&
+          arg != "--lab" && arg != "--dark" && arg != "--perspective" &&
+          arg.indexOf("--story=") != 0 &&
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
           arg.indexOf("--robot=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot] " +
-          "[--lab] [--dark] [--story=ID] [--capture-dir=PATH] [--frames=N] " +
+          "[--lab] [--dark] [--perspective] [--story=ID] [--capture-dir=PATH] [--frames=N] " +
           "[--robot=HOST:PORT]");
         return 2;
       }
@@ -138,6 +139,7 @@ class Main {
       var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context);
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
+      if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
       return editor;
     });
   }
@@ -280,7 +282,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     viewportContent = new EditorSceneViewport(scene);
     if (hostContext != null) {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
-        hostContext.surface);
+        hostContext);
     }
     telemetry = makeTelemetry();
     logLines = ["Scene ready: two editable objects", "Select a box; edit position or visibility", "Middle-drag to pan; scroll to zoom"];
@@ -384,6 +386,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     gridSpacing: gridSpacing,
     paletteVisible: paletteVisible,
     contextMenuVisible: contextMenuVisible,
+    perspective: perspectiveViewport == null ? null : perspectiveViewport.diagnosticState(),
     camera: {
       panX: viewportCamera.panX,
       panY: viewportCamera.panY,
@@ -915,7 +918,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       viewportContent.setGridStep(gridSpacing);
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :
-        new EditorPerspectiveViewport("scene-perspective", scene, hostContext.surface);
+        new EditorPerspectiveViewport("scene-perspective", scene, hostContext);
       sceneViewport = null;
       sceneInspector = null;
       inspectorSelectionRevision = -1;

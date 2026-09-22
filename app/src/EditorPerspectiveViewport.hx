@@ -12,12 +12,11 @@ import ResolvedLayoutItem;
 import nativekit.scene.SceneRenderer;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
-import nativekit.ffi.NativeKitGpu;
-import nativekit.ffi.NativeKitTypes;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.View;
+import nativekit.ui.host.DesktopUiHostContext;
 import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.Semantics;
 
@@ -25,19 +24,23 @@ import nativekit.ui.semantics.Semantics;
 class EditorPerspectiveViewport implements View {
   public final key:String;
   final scene:EditorScene;
-  final surface:SurfaceHandle;
+  final host:DesktopUiHostContext;
   var renderer:Null<SceneRenderer> = null;
-  var gpu:Null<nkgpu_renderer> = null;
   final style:LayoutStyle;
   var image:Null<Image> = null;
   var renderedRevision:Int = -1;
   var renderedWidth:Int = 0;
   var renderedHeight:Int = 0;
+  var captureCount:Int = 0;
+  var lastCaptureSeconds:Float = 0.0;
+  var totalCaptureSeconds:Float = 0.0;
+  var colouredPixels:Int = 0;
+  var highlightPixels:Int = 0;
 
-  public function new(key:String, scene:EditorScene, surface:SurfaceHandle, ?style:LayoutStyle) {
+  public function new(key:String, scene:EditorScene, host:DesktopUiHostContext, ?style:LayoutStyle) {
     this.key = key;
     this.scene = scene;
-    this.surface = surface;
+    this.host = host;
     this.style = style == null ? defaultStyle() : style.copy();
   }
 
@@ -56,43 +59,56 @@ class EditorPerspectiveViewport implements View {
     ensureRenderer();
     var width = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.width))));
     var height = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.height))));
-    if (image == null || renderedRevision != scene.revision ||
-        width != renderedWidth || height != renderedHeight) {
+    if (renderer != null && (image == null || renderedRevision != scene.revision ||
+        width != renderedWidth || height != renderedHeight)) {
+      var started = Sys.time();
       var view = scene.configureRenderView(new SceneView(), fixedViewProjection(width / height));
       var pixels = renderer.captureRgba8(scene.renderSnapshot(), view, width, height);
       var next = Image.create(width, height, ImageFormat.RGBA8, pixels);
+      colouredPixels = 0;
+      highlightPixels = 0;
+      var offset = 0;
+      while (offset + 3 < pixels.length) {
+        var red = pixels.get(offset), green = pixels.get(offset + 1), blue = pixels.get(offset + 2);
+        if (red != 6 || green != 9 || blue != 14) colouredPixels++;
+        if (red > 80 && green > 70 && blue < 80) highlightPixels++;
+        offset += 4;
+      }
       if (image != null) image.dispose();
       image = next;
       renderedRevision = scene.revision;
       renderedWidth = width;
       renderedHeight = height;
+      lastCaptureSeconds = Sys.time() - started;
+      totalCaptureSeconds += lastCaptureSeconds;
+      captureCount++;
     }
     canvas.fillRect(new Rect(0, 0, geometry.width, geometry.height),
       Color.rgba(0.025, 0.035, 0.055, 1.0));
     if (image != null) canvas.drawImage(image, new Rect(0, 0, geometry.width, geometry.height));
   }
 
+  public function diagnosticState():Dynamic return {
+    width: renderedWidth,
+    height: renderedHeight,
+    captures: captureCount,
+    rgbaBytes: renderedWidth * renderedHeight * 4,
+    colouredPixels: colouredPixels,
+    highlightPixels: highlightPixels,
+    lastCaptureMilliseconds: lastCaptureSeconds * 1000.0,
+    averageCaptureMilliseconds: captureCount == 0 ? 0.0 : totalCaptureSeconds * 1000.0 / captureCount
+  };
+
   public function dispose():Void {
     if (image != null) image.dispose();
     image = null;
     if (renderer != null) renderer.dispose();
     renderer = null;
-    if (gpu != null) checkGpu(NativeKitGpu.nkgpu_renderer_destroy(gpu),
-      "perspective.renderer.destroy");
-    gpu = null;
   }
 
   function ensureRenderer():Void {
-    if (renderer != null) return;
-    var made = NativeKitGpu.nkgpu_renderer_create(surface);
-    checkGpu(made.status, "perspective.renderer.create");
-    gpu = made.out_renderer;
-    renderer = SceneRenderer.createBorrowed(made.out_renderer);
-  }
-
-  static function checkGpu(status:Int, operation:String):Void {
-    if (status != 0)
-      throw '$operation failed with NativeKit GPU status $status: ${NativeKitGpu.nkgpu_last_error()}';
+    if (renderer != null || host.gpuRendererId == 0) return;
+    renderer = SceneRenderer.createBorrowedId(host.gpuRendererId);
   }
 
   static function fixedViewProjection(aspect:Float):Transform {
