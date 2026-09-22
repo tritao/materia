@@ -81,6 +81,15 @@ class Simulation {
       "simulation.teleportRobot");
   }
 
+  /** Reads one robot base pose without mutating physics or the editable model. */
+  public function robotPose(robotIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
+    ensureLive();var pose=new rk_simulation_pose();pose.set_struct_size(rk_simulation_pose.size());
+    var result=RobotKitSimKit.rk_simulation_get_robot_pose(owner.borrow(),robotIndex,pose);
+    check(result.status,"simulation.getRobotPose");
+    return {position:[for(index in 0...3)pose.get_position(index)],
+      rotation:[for(index in 0...4)pose.get_rotation(index)]};
+  }
+
   /** Adds a box to the shared physics world and returns its owned object ID. */
   public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
       ?dynamicBody:Bool = false, ?mass:Float = 1.0):Int {

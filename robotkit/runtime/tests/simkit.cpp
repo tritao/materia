@@ -98,6 +98,10 @@ void shared_world_steps_once() {
     pose.rotation[3] = 1.0;
     pose.position[0] = 4.0;
     assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
+    rk_simulation_pose observed_pose{};
+    observed_pose.struct_size = sizeof(observed_pose);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &observed_pose) == RK_OK);
+    assert(observed_pose.position[0] == 4.0);
     assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
     assert(snapshot(first).sequence == 0);
     rk_simulation_object_desc object_desc{};

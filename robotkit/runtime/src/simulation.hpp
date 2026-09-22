@@ -41,6 +41,7 @@ public:
     rk_result reset();
     rk_result reset_robot(uint32_t robot_index);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
+    rk_result get_robot_pose(uint32_t robot_index, rk_simulation_pose &out_pose) const;
     rk_result spawn_object(const rk_simulation_object_desc &desc,
                            rk_simulation_object &out_object);
     rk_result remove_object(rk_simulation_object object);
@@ -75,6 +76,7 @@ private:
     std::vector<std::shared_ptr<RobotRuntime>> runtimes_;
     std::vector<rk_robot_runtime> handles_;
     std::vector<nksim_body> robot_base_bodies_;
+    std::vector<rk_simulation_pose> robot_initial_poses_;
     struct EnvironmentObject {
         nkscene_occurrence_id occurrence{};
         nksim_shape shape = 0;

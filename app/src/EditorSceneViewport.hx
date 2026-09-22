@@ -18,11 +18,13 @@ class EditorSceneViewport implements ViewportContent {
   public var gridStep(default, null):Float = GRID_STEP;
   public var viewportWidth:Float = 640.0;
   public var viewportHeight:Float = 520.0;
+  var runtimeRevision:Int=0;
 
   public function new(scene:EditorScene) this.scene = scene;
   public function width():Float return 960.0;
   public function height():Float return 640.0;
-  public function revision():Int return scene.revision;
+  public function revision():Int return scene.revision+runtimeRevision*1000003;
+  public function setRuntimeRevision(value:Int):Void runtimeRevision=value;
 
   public function pick(camera:ViewportCamera, x:Float, y:Float):String {
     var point = scenePoint(camera, x, y);

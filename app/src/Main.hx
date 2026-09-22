@@ -8,6 +8,8 @@ import LayoutFrame;
 import LayoutStyle;
 import Insets;
 import Rect;
+import PathBuilder;
+import Point;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.Json;
@@ -266,10 +268,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ui = new UiContext(null, fonts, theme == null ? Theme.light() : theme);
     commands = ui.commands;
     this.world = world == null ? new RobotWorld() : world;
-    simulation = new ApplicationSimulation(this.world);
+    simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
     session = new SceneDocumentSession();
+    session.beforeReplace=simulation.clear;
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);
     documents = new SceneDocumentController(session, function(save, path, complete) {
       var chooser = files;
@@ -579,12 +582,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
         commands.refresh();
       },"sensor-reset"))
     ]);
+    var backendActions=new Row("sensor-backend-actions",[
+      new KeyedView("deterministic",new Button("Deterministic",null,function(){
+        simulation.setBackend(ApplicationSimulation.DETERMINISTIC);commands.refresh();
+      },"sensor-backend-deterministic")),
+      new KeyedView("mujoco",new Button("MuJoCo",null,function(){
+        simulation.setBackend(ApplicationSimulation.MUJOCO);commands.refresh();
+      },"sensor-backend-mujoco"))]);
     var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
       new KeyedView("apply-state",new Text(simulation.pending(sensors,scene)
         ? "Pending edits · rebuild resets simulated robots and environment"
         : "Applied configuration · physics is authoritative")),
       new KeyedView("robots",new Column("sensor-robots",robotRows)),
-      new KeyedView("actions",actions),new KeyedView("runtime-actions",runtimeActions),
+      new KeyedView("backend",new Text("Physics: "+simulation.backendName())),
+      new KeyedView("backend-actions",backendActions),new KeyedView("actions",actions),
+      new KeyedView("runtime-actions",runtimeActions),
       new KeyedView("list",new Column("sensor-list",rows))];
     var selected=sensors.selected();
     if(!sensors.isEditable())content.push(new KeyedView("read-only",new Text("Remote robot configuration is read-only")));
@@ -631,6 +643,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function viewportPanel():View {
+    viewportContent.setRuntimeRevision(simulation.visualRevision());
     if (sceneViewport != null) {
       sceneViewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0),
         Color.rgba(0.16, 0.24, 0.36, 0.75), viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
@@ -646,9 +659,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "Scene XY view: drag objects, middle-drag to pan, scroll to zoom"
     );
     viewport.panButton = 2; // NativeKit middle button.
-    viewport.setOverlay(function(_, geometry) {
+    viewport.setOverlay(function(canvas, geometry) {
       viewportContent.viewportWidth = geometry.width;
       viewportContent.viewportHeight = geometry.height;
+      paintSimulationOverlay(canvas);
     });
     viewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0), Color.rgba(0.16, 0.24, 0.36, 0.75),
       viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
@@ -708,6 +722,42 @@ class ReferenceEditorApp implements DesktopUiApplication {
     sceneViewport = viewport;
     return viewport;
   }
+
+  function paintSimulationOverlay(canvas:Canvas):Void {
+    for(robot in simulation.visualState()) {
+      var base=simulationPoint(robot.position[0],robot.position[1]);
+      canvas.fillRect(new Rect(base.x-5,base.y-5,10,10),Color.rgba(0.3,1.0,0.65,0.95));
+      for(sensor in robot.sensors) {
+        var offset=rotateVector(robot.rotation,sensor.mountPosition.toArray());
+        var origin=[robot.position[0]+offset[0],robot.position[1]+offset[1],robot.position[2]+offset[2]];
+        var mount=simulationPoint(origin[0],origin[1]);
+        canvas.fillRect(new Rect(mount.x-3,mount.y-3,6,6),Color.rgba(1.0,0.75,0.2,0.95));
+        if(sensor.kind!="lidar"||sensor.values.length==0)continue;
+        var rotation=multiplyQuaternion(robot.rotation,sensor.mountRotation.toArray());
+        var rays=new PathBuilder();var values=sensor.values.toArray();
+        for(index in 0...values.length){
+          var angle=index*6.283185307179586/values.length;
+          var direction=rotateVector(rotation,[Math.cos(angle),Math.sin(angle),0.0]);
+          var hit=simulationPoint(origin[0]+direction[0]*values[index],origin[1]+direction[1]*values[index]);
+          rays.moveTo(mount.x,mount.y).lineTo(hit.x,hit.y);
+        }
+        canvas.strokeTransient(rays.build(),Color.rgba(0.25,0.8,1.0,0.55),1.0);
+      }
+    }
+  }
+  function simulationPoint(x:Float,y:Float):Point return viewportCamera.worldToViewport(
+    EditorSceneViewport.ORIGIN_X+x*EditorSceneViewport.SCALE,
+    EditorSceneViewport.ORIGIN_Y-y*EditorSceneViewport.SCALE);
+  static function rotateVector(q:Array<Float>,v:Array<Float>):Array<Float> {
+    var x=q[0],y=q[1],z=q[2],w=q[3];
+    var tx=2*(y*v[2]-z*v[1]),ty=2*(z*v[0]-x*v[2]),tz=2*(x*v[1]-y*v[0]);
+    return [v[0]+w*tx+y*tz-z*ty,v[1]+w*ty+z*tx-x*tz,v[2]+w*tz+x*ty-y*tx];
+  }
+  static function multiplyQuaternion(a:Array<Float>,b:Array<Float>):Array<Float> return [
+    a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],
+    a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
+    a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
+    a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];
 
   function perspectivePanel():View {
     if (perspectiveViewport != null)
@@ -924,6 +974,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function documentChanged():Void {
     cancelActiveDrag();
     if (sceneGeneration != session.generation) {
+      log("Document replaced; active simulation stopped and detached");
       sceneGeneration = session.generation;
       treeModel = new EditorSceneTree(scene);
       viewportContent = new EditorSceneViewport(scene);

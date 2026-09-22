@@ -83,6 +83,14 @@ limits, optional actuator, frames, sensors, and explicit world pose. Pending
 state covers both robot edits and scene-content or document replacement;
 selection alone does not require a physics rebuild.
 
+Scene rectangles persist an extrusion depth plus independent collision-enabled,
+dynamic-body, and mass settings. Visibility affects rendering only. Application
+runs default to the bundled MuJoCo backend, while the sensor panel can select
+the deterministic backend used by tests; changing backend remains pending until
+Rebuild. The XY viewport overlays read-only runtime robot poses, sensor mounts,
+and LiDAR rays. New/Open stops and detaches the previous document's simulated
+robots but leaves independently attached remote robots untouched.
+
 Scene files are UTF-8 JSON with `format: "materia.scene"`, `version: 1`, and an
 `objects` array plus an optional `sensors` robot configuration. Each rectangle stores its stable string `id`, `label`, `type`,
 `x/y/z`, `width/height`, `red/green/blue`, and `visible` fields. Selection, camera,

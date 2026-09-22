@@ -10,6 +10,8 @@ class SceneDocumentSession {
   public var sensors(default, null):SensorConfiguration;
   public var path(default, null):Null<String> = null;
   public var generation(default, null):Int = 0;
+  /** Application-owned runtime cleanup invoked only after replacement data validates. */
+  public var beforeReplace:Null<Void->Void> = null;
 
   public function new() { scene = new EditorScene(); sensors = new SensorConfiguration(); }
 
@@ -45,6 +47,8 @@ class SceneDocumentSession {
   public function isDirty():Bool return scene.document.isDirty || sensors.document.isDirty;
 
   function replace(next:EditorScene, nextSensors:SensorConfiguration, file:Null<String>):Void {
+    try {if(beforeReplace!=null)beforeReplace();}
+    catch(failure:Dynamic){next.dispose();nextSensors.dispose();throw failure;}
     var previous = scene;
     var previousSensors = sensors;
     scene = next;

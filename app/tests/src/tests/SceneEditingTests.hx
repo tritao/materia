@@ -129,7 +129,7 @@ class SceneEditingTests {
     check(viewport.revision() > revision && viewport.pick(camera,
       EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y) == originalId,
       "viewport observes created geometry");
-    check(empty.properties().length == 7, "inspector observes all created-object properties");
+    check(empty.properties().length == 11, "inspector exposes rendering and collision properties");
 
     var name = new PropertyBinding(empty.properties()[3], empty.context());
     check(name.apply(PropertyValue.Text("Hidden panel")) == PropertyEditResult.Applied,
@@ -142,6 +142,12 @@ class SceneEditingTests {
       == PropertyEditResult.Applied, "height edit succeeds");
     check(new PropertyBinding(empty.properties()[6], empty.context()).apply(PropertyValue.Text("#336699"))
       == PropertyEditResult.Applied, "colour edit succeeds");
+    check(new PropertyBinding(empty.properties()[7], empty.context()).apply(PropertyValue.Float(0.6))
+      == PropertyEditResult.Applied, "collision depth edit succeeds");
+    check(new PropertyBinding(empty.properties()[9], empty.context()).apply(PropertyValue.Bool(true))
+      == PropertyEditResult.Applied, "dynamic collision mode edit succeeds");
+    check(new PropertyBinding(empty.properties()[10], empty.context()).apply(PropertyValue.Float(4.0))
+      == PropertyEditResult.Applied, "collision mass edit succeeds");
     var visible = new PropertyBinding(empty.properties()[2], empty.context());
     check(visible.apply(PropertyValue.Bool(false)) == PropertyEditResult.Applied,
       "visibility edit succeeds through inspector binding");
@@ -156,8 +162,9 @@ class SceneEditingTests {
     var duplicateState = empty.items()[1];
     check(!empty.info(duplicateId).visible() && tree.childKeyAt("scene", 0) == originalId
       && tree.childKeyAt("scene", 1) == duplicateId, "hidden state and hierarchy order duplicate together");
-    check(duplicateState.width == 2.4 && duplicateState.height == 0.8 && nearValue(duplicateState.red, 0.2),
-      "dimensions and colour duplicate together");
+    check(duplicateState.width == 2.4 && duplicateState.height == 0.8 && duplicateState.depth == 0.6 &&
+      duplicateState.dynamicBody && duplicateState.mass == 4.0 && duplicateState.collisionEnabled &&
+      nearValue(duplicateState.red, 0.2), "rendering and collision settings duplicate together");
     check(empty.deleteSelected(), "duplicate deletes");
     check(empty.object(duplicateId) == null && empty.selectedId == originalId,
       "delete removes selection and selects its neighbour");
@@ -184,8 +191,9 @@ class SceneEditingTests {
       check(session.scene.items()[0].label == "Hidden panel" && !session.scene.info(originalId).visible(),
         "reopen preserves rename and hidden state");
       var reopened = session.scene.items()[0];
-      check(reopened.width == 2.4 && reopened.height == 0.8 && nearValue(reopened.blue, 0.6),
-        "reopen preserves dimensions and colour");
+      check(reopened.width == 2.4 && reopened.height == 0.8 && reopened.depth == 0.6 &&
+        reopened.dynamicBody && reopened.mass == 4.0 && reopened.collisionEnabled && nearValue(reopened.blue, 0.6),
+        "reopen preserves dimensions, colour, and collision settings");
       check(!session.scene.document.isDirty && !session.scene.document.canUndo,
         "reopened document starts clean with fresh history");
     } catch (error:Dynamic) {
@@ -424,6 +432,19 @@ class SceneEditingTests {
     check(observation!=null&&observation.sensors.length>0,
       "applied sensor configuration produces simulated measurements");
     simulation.dispose();world.close();scene.dispose();sensors.dispose();
+
+    var lifecycleSession = new SceneDocumentSession(), lifecycleWorld = new RobotWorld();
+    var lifecycleSimulation = new ApplicationSimulation(lifecycleWorld);
+    var lifecycleRemote = new ReplayRobot("remote/lifecycle", new RobotRecording());
+    lifecycleWorld.attach(lifecycleRemote);
+    check(lifecycleSimulation.rebuild(lifecycleSession.sensors,lifecycleSession.scene),
+      "lifecycle fixture builds a simulation");
+    lifecycleSession.beforeReplace = lifecycleSimulation.clear;
+    lifecycleSession.newDocument();
+    check(lifecycleSimulation.simulatedRobotIds().length == 0 && !lifecycleSimulation.isRunning() &&
+      lifecycleWorld.robot("materia/robot") == null && lifecycleWorld.robot("remote/lifecycle") == lifecycleRemote,
+      "new document stops owned physics while preserving remote adapters");
+    lifecycleSimulation.dispose(); lifecycleWorld.close(); lifecycleSession.dispose();
   }
 
   static function sensorWorkflow():Void {
@@ -466,10 +487,17 @@ class SceneEditingTests {
     check(restoredFrame != null && session.sensors.model.sensors[0].updateRate == 20.0 &&
       restoredFrame.position[0] == 0.25,
       "sensor settings survive document save and reload");
+    session.scene.setVisible("tower",false);
+    var hiddenObstacle=[for(item in session.scene.records())if(item.id=="tower")item][0];
+    check(!hiddenObstacle.visible&&hiddenObstacle.collisionEnabled&&hiddenObstacle.depth==0.2,
+      "render visibility is independent from persisted collision geometry");
     var world=new RobotWorld();
     var simulation=new ApplicationSimulation(world);
     var monitor=new ReplayRobot("monitor/remote",new RobotRecording());world.attach(monitor);
     check(simulation.rebuild(session.sensors,session.scene), "reloaded robots build one shared simulation");
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.pending(session.sensors,session.scene),"backend selection requires an explicit rebuild");
+    simulation.setBackend(ApplicationSimulation.DETERMINISTIC);
     check(world.robot("monitor/remote")==monitor,"shared rebuild leaves unrelated remote adapters attached");
     var appliedRevision=simulation.appliedRevision;
     session.sensors.selectRobot("remote/readonly");
@@ -498,6 +526,9 @@ class SceneEditingTests {
     for(frame in firstRobot.sensors.toArray())if(frame.kind=="lidar")
       for(value in frame.values.toArray())if(value<session.sensors.model.sensors[0].maxRange)sawObstacle=true;
     check(sawObstacle,"LiDAR observes geometry populated from the Materia scene");
+    var visual=simulation.visualState();
+    check(visual.length==2&&visual[1].position[1]==3.0&&visual[0].sensors.length>0,
+      "runtime visualization exposes robot poses and sensor mounts without editing the document");
     var writer = new McapRobotRecording(recordingPath);
     for(robotId in observation.robotIds()) {
       var robot=observation.robot(robotId);
@@ -516,7 +547,30 @@ class SceneEditingTests {
       "record/replay preserves configured sensor identity");
     check(replayed[0].mountPosition.get(0) == 0.25 && replayed[0].values.length > 0,
       "record/replay preserves sensor mount and measurements");
-    replay.close(); simulation.dispose(); world.close(); session.dispose();
+    replay.close(); simulation.dispose(); world.close();
+
+    var mujocoWorld=new RobotWorld();
+    var mujocoSimulation=new ApplicationSimulation(mujocoWorld,ApplicationSimulation.MUJOCO);
+    if(mujocoSimulation.rebuild(session.sensors,session.scene)) {
+      var mujocoObservation=mujocoSimulation.step();
+      for(index in 0...8)mujocoObservation=mujocoSimulation.step();
+      var mujocoRobot=mujocoObservation.robot("materia/robot");
+      if(mujocoRobot==null)throw "MuJoCo world lost the configured robot";
+      check(mujocoRobot.sensors.length>0&&mujocoSimulation.visualState().length==2,
+        "MuJoCo backend publishes the same observable multi-robot contract");
+      check(mujocoSimulation.reset(),"MuJoCo simulation resets through the shared lifecycle");
+      check(mujocoSimulation.visualState()[1].position[1]==3.0,
+        "MuJoCo reset restores the persisted robot pose");
+      var mujocoPath=recordingPath+".mujoco",mujocoWriter=new McapRobotRecording(mujocoPath);
+      for(frame in mujocoRobot.sensors.toArray())mujocoWriter.recordSensor("materia/robot",frame);
+      mujocoWriter.close();var mujocoReplay=new ReplayRobot("materia/robot",McapRecordingReader.load(mujocoPath));
+      check(mujocoReplay.sensors().length>0,"MuJoCo observations survive MCAP replay");
+      mujocoReplay.close();FileSystem.deleteFile(mujocoPath);
+      var mujocoStatus=mujocoPath+".incomplete.status";
+      if(FileSystem.exists(mujocoStatus))FileSystem.deleteFile(mujocoStatus);
+    } else check(Std.string(mujocoSimulation.error).indexOf("status -4")>=0,
+      "MuJoCo is either exercised or explicitly reported unavailable");
+    mujocoSimulation.dispose();mujocoWorld.close();session.dispose();
     FileSystem.deleteFile(recordingPath);
     var statusPath = recordingPath + ".incomplete.status";
     if (FileSystem.exists(statusPath)) FileSystem.deleteFile(statusPath);

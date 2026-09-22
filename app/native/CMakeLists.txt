@@ -34,13 +34,21 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../scenekit/scene_render" scene
 set(RK_BUILD_SHARED ON CACHE BOOL "Build RobotKit as a shared library" FORCE)
 set(RK_BUILD_TESTS OFF CACHE BOOL "Disable RobotKit tests in the app build" FORCE)
 set(RK_BUILD_SIMKIT ON CACHE BOOL "Enable the SimKit-backed RobotKit runtime" FORCE)
-set(NKSIM_BUILD_MUJOCO OFF CACHE BOOL "Keep the editor test runtime deterministic" FORCE)
+set(MATERIA_ENABLE_MUJOCO ON CACHE BOOL "Build the MuJoCo backend for application simulation" FORCE)
+set(NKSIM_BUILD_MUJOCO ${MATERIA_ENABLE_MUJOCO} CACHE BOOL "Build selectable MuJoCo backend" FORCE)
+set(NK_SIM_MUJOCO_USE_VENDORED ON CACHE BOOL "Use SimKit's pinned MuJoCo" FORCE)
+set(NK_MUJOCO_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../simkit/vendor/mujoco" CACHE PATH
+    "Path to the pinned MuJoCo checkout" FORCE)
+set(MUJOCO_ENABLE_LTO OFF CACHE BOOL "Keep MuJoCo compatible with the application linker" FORCE)
 set(NK_LIBRARY_TYPE SHARED)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../simkit/sim_core" sim_core)
+if(MATERIA_ENABLE_MUJOCO)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../simkit/sim_mujoco" sim_mujoco)
+endif()
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../robotkit" robotkit)
 
 foreach(target_name nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render
-        nativekit_sim_core robotkit_runtime)
+        nativekit_sim_core nativekit_sim_mujoco robotkit_runtime)
     if(TARGET "${target_name}")
         set_target_properties("${target_name}" PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"

@@ -49,11 +49,12 @@ class EditorScene {
     objects = [];
     try {
       if (data == null) {
-        addObject("box", "Blue box", -1.5, 0.0, 0.0, 1.6, 1.2, 0.22, 0.52, 0.85);
-        addObject("tower", "Orange tower", 1.1, 0.0, 0.1, 1.2, 1.8, 0.92, 0.48, 0.22);
+        addObject("box", "Blue box", -1.5, 0.0, 0.0, 1.6, 1.2, 0.1, 0.22, 0.52, 0.85);
+        addObject("tower", "Orange tower", 1.1, 0.0, 0.1, 1.2, 1.8, 0.2, 0.92, 0.48, 0.22);
       } else {
         for (item in data) addObject(item.id, item.label, item.x, item.y, item.z,
-          item.width, item.height, item.red, item.green, item.blue, item.visible);
+          item.width, item.height, item.depth, item.red, item.green, item.blue, item.visible,
+          item.collisionEnabled,item.dynamicBody,item.mass);
         selectedId = data.length == 0 ? "scene" : data[0].id;
       }
       selectionMaterial = scene.createMaterial();
@@ -65,7 +66,8 @@ class EditorScene {
   }
 
   function addObject(id:String, label:String, x:Float, y:Float, z:Float,
-      width:Float, height:Float, red:Float, green:Float, blue:Float, visible:Bool = true):Void {
+      width:Float, height:Float, depth:Float, red:Float, green:Float, blue:Float,
+      visible:Bool = true,collisionEnabled:Bool=true,dynamicBody:Bool=false,mass:Float=1.0):Void {
     var geometry = scene.createGeometry();
     scene.setGeometryData(geometry, rectangleGeometry(width, height));
     var material = scene.createMaterial();
@@ -79,7 +81,8 @@ class EditorScene {
       transaction.setMaterial(occurrence, material);
       transaction.setTransform(occurrence, Transform.identity().translated(x, y, z));
       transaction.commit();
-      objects.push(new EditorSceneObject(id, label, occurrence, width, height, red, green, blue));
+      objects.push(new EditorSceneObject(id, label, occurrence, width, height, depth,
+        collisionEnabled,dynamicBody,mass,red,green,blue));
     } catch (error:Dynamic) {
       transaction.dispose();
       throw error;
@@ -103,7 +106,8 @@ class EditorScene {
     var data = records();
     var id = allocateId();
     data.push({id: id, label: "Rectangle", type: "rectangle", x: 0.0, y: 0.0, z: 0.0,
-      width: 1.6, height: 1.2, red: 0.22, green: 0.52, blue: 0.85, visible: true});
+      width: 1.6, height: 1.2, depth:0.1,collisionEnabled:true,dynamicBody:false,mass:1.0,
+      red: 0.22, green: 0.52, blue: 0.85, visible: true});
     return changeObjects("Create rectangle", data, id);
   }
 
@@ -116,7 +120,8 @@ class EditorScene {
     data.push({id: id, label: source.label + " copy", type: source.type,
       x: Math.min(1000000, source.x + 0.25), y: Math.min(1000000, source.y + 0.25), z: source.z,
       width: source.width, height: source.height, red: source.red, green: source.green,
-      blue: source.blue, visible: source.visible});
+      blue: source.blue, visible: source.visible,depth:source.depth,
+      collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass});
     return changeObjects("Duplicate object", data, id);
   }
 
@@ -290,12 +295,13 @@ class EditorScene {
     publish();
   }
 
-  public function setDimensions(id:String, width:Float, height:Float):Void {
-    if (!validDimension(width) || !validDimension(height))
+  public function setDimensions(id:String, width:Float, height:Float,?depth:Float):Void {
+    var chosenDepth=depth==null?requiredObject(id).depth:depth;
+    if (!validDimension(width) || !validDimension(height)||!validDimension(chosenDepth))
       throw "Rectangle dimensions must be finite and positive";
     if (object(id) == null) throw "Unknown scene object: " + id;
     var data = records();
-    for (item in data) if (item.id == id) { item.width = width; item.height = height; }
+    for (item in data) if (item.id == id) { item.width=width;item.height=height;item.depth=chosenDepth; }
     replaceObjects(data, selectedId);
   }
 
@@ -358,8 +364,8 @@ class EditorScene {
           default: throw "Name requires text";
         }
       }, name));
-    result.push(dimensionProperty(id, true, prefix));
-    result.push(dimensionProperty(id, false, prefix));
+    result.push(dimensionProperty(id, 0, prefix));
+    result.push(dimensionProperty(id, 1, prefix));
     var colour = new PropertyDescriptorOptions();
     colour.category = "Rendering";
     colour.validator = function(_, value) return switch (value) {
@@ -390,10 +396,17 @@ class EditorScene {
           default: throw "Colour requires #RRGGBB";
         }
       }, colour));
+    result.push(dimensionProperty(id, 2, prefix));
+    result.push(boolProperty(id,"collision","Collision enabled",function(item)return item.collisionEnabled,
+      "Physics",prefix));
+    result.push(boolProperty(id,"dynamic","Dynamic body",function(item)return item.dynamicBody,
+      "Physics",prefix));
+    result.push(numberProperty(id,"mass","Mass",function(item)return item.mass,
+      0.000001,1000000.0,"kg","Physics",prefix));
     return result;
   }
 
-  function dimensionProperty(id:String, width:Bool, prefix:String):PropertyDescriptor {
+  function dimensionProperty(id:String, axis:Int, prefix:String):PropertyDescriptor {
     var settings = new PropertyDescriptorOptions();
     settings.category = "Geometry";
     settings.unit = "m";
@@ -408,10 +421,11 @@ class EditorScene {
       };
       return number == null || !validDimension(number) ? "Dimension must be finite and positive" : null;
     };
-    return new PropertyDescriptor(prefix + (width ? "width" : "height"), width ? "Width" : "Height",
+    var key=["width","height","depth"][axis],label=["Width","Height","Depth"][axis];
+    return new PropertyDescriptor(prefix + key, label,
       PropertyType.Float, function(_) {
         var item = requiredObject(id);
-        return PropertyValue.Float(width ? item.width : item.height);
+        return PropertyValue.Float(axis==0?item.width:axis==1?item.height:item.depth);
       }, function(_, value) {
         var item = requiredObject(id);
         var number:Float = switch (value) {
@@ -419,8 +433,33 @@ class EditorScene {
           case PropertyValue.Int(next): next;
           default: throw "Dimension requires a number";
         };
-        setDimensions(id, width ? number : item.width, width ? item.height : number);
+        setDimensions(id,axis==0?number:item.width,axis==1?number:item.height,axis==2?number:item.depth);
       }, settings);
+  }
+
+  function boolProperty(id:String,key:String,label:String,read:EditorSceneObject->Bool,
+      category:String,prefix:String):PropertyDescriptor {
+    var options=new PropertyDescriptorOptions();options.category=category;
+    return new PropertyDescriptor(prefix+key,label,PropertyType.Bool,
+      function(_)return PropertyValue.Bool(read(requiredObject(id))),function(_,value)switch value {
+        case Bool(next):
+          var data=records();for(item in data)if(item.id==id)Reflect.setField(item,key=="collision"?"collisionEnabled":"dynamicBody",next);
+          replaceObjects(data,selectedId);
+        default:throw label+" requires a boolean";
+      },options);
+  }
+  function numberProperty(id:String,key:String,label:String,read:EditorSceneObject->Float,
+      min:Float,max:Float,unit:String,category:String,
+      prefix:String):PropertyDescriptor {
+    var options=new PropertyDescriptorOptions();options.category=category;options.minimum=min;
+    options.maximum=max;options.unit=unit;options.step=0.1;
+    return new PropertyDescriptor(prefix+key,label,PropertyType.Float,
+      function(_)return PropertyValue.Float(read(requiredObject(id))),function(_,value){
+        var next:Float=switch value{case Float(v):v;case Int(v):v;default:throw label+" requires a number";};
+        if(!Math.isFinite(next)||next<min||next>max)throw label+" is out of range";
+        var data=records();for(item in data)if(item.id==id)item.mass=next;
+        replaceObjects(data,selectedId);
+      },options);
   }
 
   function requiredObject(id:String):EditorSceneObject {
@@ -491,7 +530,8 @@ class EditorScene {
       var transform = state.localTransform();
       result.push({id: item.id, label: item.label, type: "rectangle",
         x: transform.element(12), y: transform.element(13), z: transform.element(14),
-        width: item.width, height: item.height, red: item.red, green: item.green, blue: item.blue,
+        width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
+        dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
         visible: state.visible()});
     }
     return result;
@@ -523,13 +563,18 @@ class EditorSceneObject {
   public final occurrence:Occurrence;
   public final width:Float;
   public final height:Float;
+  public final depth:Float;
+  public final collisionEnabled:Bool;
+  public final dynamicBody:Bool;
+  public final mass:Float;
   public final red:Float;
   public final green:Float;
   public final blue:Float;
-  public function new(id:String, label:String, occurrence:Occurrence, width:Float, height:Float,
-      red:Float, green:Float, blue:Float) {
+  public function new(id:String,label:String,occurrence:Occurrence,width:Float,height:Float,depth:Float,
+      collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float) {
     this.id = id; this.label = label; this.occurrence = occurrence;
-    this.width = width; this.height = height;
+    this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;
+    this.dynamicBody=dynamicBody;this.mass=mass;
     this.red = red; this.green = green; this.blue = blue;
   }
 }

@@ -43,6 +43,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * timestamp supplied by the caller.
 	 */
 	extern fn rk_simulation_get_clock(simulation: rk_simulation, out_clock: ptr<rk_simulation_clock> @inout) -> rk_result;
+	/** Reads one robot base pose from the latest physics state. */
+	extern fn rk_simulation_get_robot_pose(simulation: rk_simulation, robot_index: u32, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
 	/**
 	 * Removes one environment body while stopped.
 	 */

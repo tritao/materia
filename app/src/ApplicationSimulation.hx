@@ -7,23 +7,43 @@ import robotkit.world.Robot;
 import robotkit.world.RobotWorld;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.WorldSnapshot;
+import robotkit.world.SensorFrame;
+
+typedef SimulationRobotVisual={
+  var id:String;
+  var position:Array<Float>;
+  var rotation:Array<Float>;
+  var sensors:Array<SensorFrame>;
+}
 
 /** Owns the one shared editable-scene simulation attached to the application world. */
 class ApplicationSimulation {
+  public static inline var DETERMINISTIC:Int=0;
+  public static inline var MUJOCO:Int=1;
   public final world:RobotWorld;
   public var appliedRevision(default, null):Int = 0;
   public var appliedDocumentRevision(default, null):Int = -1;
   public var appliedEnvironmentRevision(default, null):Int = -1;
+  public var backend(default,null):Int;
+  public var appliedBackend(default,null):Int=-1;
   public var error(default, null):Null<String> = null;
   var simulation:Null<Simulation> = null;
   var simulatedIds:Array<String> = [];
   var running:Bool = false;
 
-  public function new(world:RobotWorld) this.world = world;
+  public function new(world:RobotWorld,?backend:Int=DETERMINISTIC) {
+    this.world=world;this.backend=DETERMINISTIC;setBackend(backend);
+  }
+
+  public function setBackend(value:Int):Bool {
+    if(value!=DETERMINISTIC&&value!=MUJOCO)throw "Unsupported simulation backend";
+    if(backend==value)return false;backend=value;return true;
+  }
+  public function backendName():String return backend==MUJOCO?"MuJoCo":"Deterministic";
 
   public function pending(configuration:SensorConfiguration, scene:EditorScene):Bool
     return appliedDocumentRevision != configuration.revision() ||
-      appliedEnvironmentRevision != scene.environmentRevision;
+      appliedEnvironmentRevision != scene.environmentRevision||appliedBackend!=backend;
 
   /** Builds the complete candidate before changing any live world adapter. */
   public function rebuild(configuration:SensorConfiguration, scene:EditorScene):Bool {
@@ -38,7 +58,7 @@ class ApplicationSimulation {
         if (existing != null && simulatedIds.indexOf(id) < 0)
           throw 'Robot "$id" is remote and read-only';
       }
-      candidate = new Simulation();
+      candidate = new Simulation(0.01,1,backend);
       for (index in 0...models.length) {
         var editable=models[index];
         var blueprint = RobotRuntimeCompiler.compile(editable.model, appliedRevision + 1);
@@ -48,9 +68,9 @@ class ApplicationSimulation {
           [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
         candidate.teleportRobot(index, editable.position, editable.rotation);
       }
-      for (object in scene.records()) if (object.visible)
+      for (object in scene.records()) if (object.collisionEnabled)
         candidate.spawnBox([object.x, object.y, object.z],
-          [object.width / 2.0, object.height / 2.0, 0.05]);
+          [object.width/2.0,object.height/2.0,object.depth/2.0],object.dynamicBody,object.mass);
       if (running) candidate.start();
 
       var previousSimulation = simulation;
@@ -73,6 +93,7 @@ class ApplicationSimulation {
       appliedRevision++;
       appliedDocumentRevision = configuration.revision();
       appliedEnvironmentRevision = scene.environmentRevision;
+      appliedBackend=backend;
       error = null;
       if (previousSimulation != null) previousSimulation.dispose();
       for (robot in previousRobots) robot.close();
@@ -101,9 +122,24 @@ class ApplicationSimulation {
   }
   public function isRunning():Bool return running;
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
-  public function dispose():Void {
+  public function visualRevision():Int return simulation==null?0:Int64.toInt(simulation.stepIndex());
+  /** Read-only runtime state for overlays; never mutates the editable document. */
+  public function visualState():Array<SimulationRobotVisual> {
+    if(simulation==null)return [];
+    var snapshot=world.snapshot();var result:Array<SimulationRobotVisual> = [];
+    for(index in 0...simulatedIds.length){
+      var id=simulatedIds[index],robot=snapshot.robot(id),pose=simulation.robotPose(index);
+      result.push({id:id,position:pose.position,rotation:pose.rotation,
+        sensors:robot==null?[]:robot.sensors.toArray()});
+    }
+    return result;
+  }
+  public function clear():Void {
+    stop();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     if (simulation != null) simulation.dispose(); simulation = null;
+    appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;
   }
+  public function dispose():Void clear();
 }

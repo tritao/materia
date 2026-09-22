@@ -153,6 +153,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         bindings_.push_back(binding);
         binding->base_body_ = binding->bodies_[root];
         robot_base_bodies_.push_back(binding->base_body_);
+        rk_simulation_pose initial_pose{};initial_pose.struct_size=sizeof(initial_pose);
+        initial_pose.rotation[3]=1.0;robot_initial_poses_.push_back(initial_pose);
         for (uint32_t i = 0; i < (blueprint.sensor_count ? blueprint.sensor_count : 3); ++i) {
             SimulationRobot::SensorState sensor;
             if (blueprint.sensor_count) sensor.config = blueprint.sensors[i];
@@ -182,6 +184,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     }
 }
 
+namespace { rk_result set_body_pose(nksim_world,nksim_body,const double[3],const double[4]); }
+
 rk_result Simulation::reset() {
     std::lock_guard tick_lock(tick_mutex_);
     {
@@ -199,6 +203,8 @@ rk_result Simulation::reset() {
     step_index_ = 0;
     simulation_time_ = 0.0;
     for (std::size_t index = 0; index < runtimes_.size(); ++index) {
+        if(set_body_pose(world_,robot_base_bodies_[index],robot_initial_poses_[index].position,
+            robot_initial_poses_[index].rotation)!=RK_OK)return RK_ERROR_BACKEND;
         if (auto binding = bindings_[index].lock()) binding->reset();
         runtimes_[index]->reset_state();
     }
@@ -215,6 +221,8 @@ rk_result Simulation::reset_robot(uint32_t robot_index) {
     for (auto body : binding->bodies_)
         if (nksim_body_reset(world_, body) != NKSIM_OK)
             return RK_ERROR_BACKEND;
+    if(set_body_pose(world_,robot_base_bodies_[robot_index],robot_initial_poses_[robot_index].position,
+        robot_initial_poses_[robot_index].rotation)!=RK_OK)return RK_ERROR_BACKEND;
     binding->reset();
     runtimes_[robot_index]->reset_state();
     return RK_OK;
@@ -260,8 +268,33 @@ rk_result Simulation::teleport_robot(uint32_t robot_index, const rk_simulation_p
     if (pose.struct_size < sizeof(pose)) return RK_ERROR_INVALID_ARGUMENT;
     const auto result = set_body_pose(world_, robot_base_bodies_[robot_index], pose.position, pose.rotation);
     if (result == RK_OK)
-        if (auto binding = bindings_[robot_index].lock()) binding->reset_sensors();
+        if (auto binding = bindings_[robot_index].lock()) {
+            binding->reset_sensors();robot_initial_poses_[robot_index]=pose;
+        }
     return result;
+}
+
+rk_result Simulation::get_robot_pose(uint32_t robot_index,rk_simulation_pose &out_pose) const {
+    std::lock_guard tick_lock(tick_mutex_);
+    if(out_pose.struct_size<sizeof(out_pose)||robot_index>=robot_base_bodies_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    nksim_body_state state{};state.struct_size=sizeof(state);
+    bool found=false;
+    if(snapshot_!=0){
+        uint64_t count=0;
+        if(nksim_snapshot_get_body_count(snapshot_,&count)==NKSIM_OK)for(uint64_t index=0;index<count;++index){
+            nksim_body_state candidate{};candidate.struct_size=sizeof(candidate);
+            if(nksim_snapshot_get_body(snapshot_,index,&candidate)!=NKSIM_OK)break;
+            if(candidate.body==robot_base_bodies_[robot_index]){state=candidate;found=true;break;}
+        }
+    } else if(nksim_body_get_state(world_,robot_base_bodies_[robot_index],&state)==NKSIM_OK)found=true;
+    if(!found){
+        std::copy_n(robot_initial_poses_[robot_index].position,3,state.position);
+        std::copy_n(robot_initial_poses_[robot_index].rotation,4,state.rotation);
+    }
+    std::copy_n(state.position,3,out_pose.position);
+    std::copy_n(state.rotation,4,out_pose.rotation);
+    return RK_OK;
 }
 
 rk_result Simulation::spawn_object(const rk_simulation_object_desc &desc,

@@ -117,6 +117,13 @@ rk_result RK_CALL rk_simulation_teleport_robot(rk_simulation simulation, uint32_
                  : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_get_robot_pose(rk_simulation simulation,uint32_t robot_index,
+                                                rk_simulation_pose *out_pose) {
+    if(!out_pose)return RK_ERROR_INVALID_ARGUMENT;
+    const auto value=resolve(simulation);
+    return value?value->get_robot_pose(robot_index,*out_pose):RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_spawn_object(rk_simulation simulation,
                                              const rk_simulation_object_desc *desc,
                                              rk_simulation_object *out_object) {

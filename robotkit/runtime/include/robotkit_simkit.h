@@ -168,6 +168,10 @@ RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
 RK_API rk_result RK_CALL rk_simulation_teleport_robot(
     rk_simulation simulation, uint32_t robot_index,
     const rk_simulation_pose *pose);
+/** Reads one robot base pose from the latest physics state. */
+RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
+    rk_simulation simulation, uint32_t robot_index,
+    rk_simulation_pose *out_pose RK_INOUT);
 /** Adds one environment body from the editable scene while stopped. */
 RK_API rk_result RK_CALL rk_simulation_spawn_object(
     rk_simulation simulation, const rk_simulation_object_desc *desc,

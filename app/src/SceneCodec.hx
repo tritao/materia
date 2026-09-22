@@ -12,6 +12,10 @@ typedef SceneObjectData = {
   var z:Float;
   var width:Float;
   var height:Float;
+  var depth:Float;
+  var collisionEnabled:Bool;
+  var dynamicBody:Bool;
+  var mass:Float;
   var red:Float;
   var green:Float;
   var blue:Float;
@@ -52,11 +56,16 @@ class SceneCodec {
       if (kind != "rectangle") throw "Unsupported scene object type: " + kind;
       var visible:Dynamic = field(value, "visible");
       if (!Std.isOfType(visible, Bool)) throw "Object visibility must be a boolean";
+      var collisionEnabled=optionalBool(value,"collisionEnabled",cast visible);
+      var dynamicBody=optionalBool(value,"dynamicBody",false);
       result.push({id: id, label: stringField(value, "label"), type: kind,
         x: bounded(value, "x", -1000000, 1000000), y: bounded(value, "y", -1000000, 1000000),
         z: bounded(value, "z", -1000000, 1000000),
         width: bounded(value, "width", 0.000001, 1000000),
         height: bounded(value, "height", 0.000001, 1000000),
+        depth: optionalBounded(value,"depth",0.000001,1000000,0.1),
+        collisionEnabled:collisionEnabled,dynamicBody:dynamicBody,
+        mass:optionalBounded(value,"mass",0.000001,1000000,1.0),
         red: bounded(value, "red", 0, 1), green: bounded(value, "green", 0, 1),
         blue: bounded(value, "blue", 0, 1), visible: cast visible});
     }
@@ -90,5 +99,13 @@ class SceneCodec {
     var result = numberField(value, name);
     if (result < minimum || result > maximum) throw "Scene field is out of range: " + name;
     return result;
+  }
+  static function optionalBounded(value:Dynamic,name:String,minimum:Float,maximum:Float,
+      fallback:Float):Float return Reflect.hasField(value,name)
+    ? bounded(value,name,minimum,maximum) : fallback;
+  static function optionalBool(value:Dynamic,name:String,fallback:Bool):Bool {
+    if(!Reflect.hasField(value,name))return fallback;
+    var result=Reflect.field(value,name);if(!Std.isOfType(result,Bool))throw 'Scene field must be boolean: $name';
+    return cast result;
   }
 }
