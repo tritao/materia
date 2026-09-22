@@ -208,6 +208,14 @@ class RobotWorldTests {
     var unsupported = haxe.io.Bytes.ofString('{"version":2,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
     throws(function() RobotRecordingCodec.decode(unsupported), "unsupported recording schema rejected");
     throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString("{")), "malformed recording payload rejected");
+    var invalidMount:Dynamic = haxe.Json.parse(RobotRecordingCodec.encode(loaded.entries[2]).toString());
+    Reflect.setField(Reflect.field(invalidMount, "payload"), "mountPosition", [0.0, 0.0]);
+    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(invalidMount))),
+      "recording rejects malformed sensor mount shapes");
+    var invalidNumber:Dynamic = haxe.Json.parse(RobotRecordingCodec.encode(loaded.entries[0]).toString());
+    Reflect.setField(Reflect.field(invalidNumber, "payload"), "target", 1e400);
+    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(invalidNumber))),
+      "recording rejects non-finite numeric payloads");
   }
 
   static function testConfiguredSensors():Void {

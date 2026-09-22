@@ -126,8 +126,9 @@ cover commands, robot snapshots, individual sensor frames, faults, world
 snapshots, and world lifecycle events. Recorded commands are history only;
 loading a file never forwards them to a live adapter.
 
-Recording timestamps are captured separately from event ordinals and stored as
-MCAP log time; the ordinal is stored as MCAP publish time. The reader validates
+Recording timestamps are captured separately from event ordinals and stored in
+both MCAP time fields; the ordinal remains a full-width decimal string in the
+payload instead of masquerading as a timestamp. The reader validates
 the exact channel schema, channel/event type agreement, envelope ordinal and
 timestamp, and payload contract. `McapRecordingReader.next()` is an incremental
 cursor; the convenience `load()` method is the explicitly retaining variant.

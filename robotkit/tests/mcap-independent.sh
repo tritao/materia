@@ -28,6 +28,6 @@ for schema, channel, message in messages:
     payload = json.loads(message.data)
     assert payload["version"] == 1
     assert int(payload["recordingTimestampNs"]) == message.log_time
-    assert int(payload["ordinal"]) == message.publish_time
+    assert message.publish_time == message.log_time
 print(f"independent MCAP reader validated {len(messages)} typed messages")
 PY

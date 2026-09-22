@@ -6,6 +6,7 @@
 #include "robotkit_runtime.h"
 
 #include <algorithm>
+#include <charconv>
 #include <condition_variable>
 #include <cstring>
 #include <deque>
@@ -66,6 +67,21 @@ bool validSchemaData(const mcap::ByteArray& data) {
   const auto size = std::strlen(Schema);
   return data.size() == size && std::memcmp(data.data(), Schema, size) == 0;
 }
+bool payloadOrdinal(const std::byte* data, size_t size, uint64_t& ordinal) {
+  const std::string_view text(reinterpret_cast<const char*>(data), size);
+  const auto key = text.find("\"ordinal\"");
+  if (key == std::string_view::npos) return false;
+  auto cursor = text.find(':', key + 9);
+  if (cursor == std::string_view::npos) return false;
+  ++cursor;
+  while (cursor < text.size() && (text[cursor] == ' ' || text[cursor] == '\t' ||
+      text[cursor] == '\r' || text[cursor] == '\n')) ++cursor;
+  if (cursor == text.size() || text[cursor++] != '"') return false;
+  const auto end = text.find('"', cursor);
+  if (end == std::string_view::npos || end == cursor) return false;
+  const auto result = std::from_chars(text.data() + cursor, text.data() + end, ordinal);
+  return result.ec == std::errc() && result.ptr == text.data() + end;
+}
 void fail(const std::shared_ptr<Writer>& writer, const std::string& message) {
   std::lock_guard lock(writer->mutex);
   if (writer->error.empty()) writer->error = message;
@@ -110,7 +126,9 @@ void writerMain(const std::shared_ptr<Writer>& writer, const std::string& path) 
     message.channelId = channels[item.kind];
     message.sequence = static_cast<uint32_t>(item.ordinal);
     message.logTime = item.timestamp;
-    message.publishTime = item.ordinal;
+    // MCAP time fields remain times. The full-width deterministic ordinal lives
+    // in the versioned payload and is recovered by the reader.
+    message.publishTime = item.timestamp;
     message.data = item.data.data();
     message.dataSize = item.data.size();
     result = output.write(message);
@@ -140,7 +158,8 @@ rk_result validateAndCache(const std::shared_ptr<Reader>& reader) {
     return RK_ERROR_UNSUPPORTED;
   Item item;
   item.kind = kind;
-  item.ordinal = view.message.publishTime;
+  if (!payloadOrdinal(view.message.data, view.message.dataSize, item.ordinal))
+    return RK_ERROR_INVALID_ARGUMENT;
   item.timestamp = view.message.logTime;
   item.data.assign(view.message.data, view.message.data + view.message.dataSize);
   reader->current = std::move(item);
@@ -169,7 +188,9 @@ rk_result rk_recording_writer_enqueue(rk_recording_writer_handle handle, rk_reco
   std::lock_guard lock(writer->mutex);
   if (writer->state != RK_RECORDING_OPEN) return RK_ERROR_INVALID_STATE;
   if (size > writer->capacityBytes || writer->queuedBytes > writer->capacityBytes - size) {
-    ++writer->dropped; writeStatus(writer); return RK_ERROR_QUEUE_FULL;
+    // The control-loop-facing enqueue path never performs file I/O. Drop state
+    // is observable immediately and persisted by finish/destroy.
+    ++writer->dropped; return RK_ERROR_QUEUE_FULL;
   }
   Item item{kind, version, ordinal, timestamp, {}};
   item.data.resize(size);
