@@ -114,13 +114,17 @@ void encodes_haxeon_hmpk_and_messagepack_binary() {
     assert(*encoded == sensor_wire_vector("PackedFrameMessage"));
 }
 
-void generated_codec_validates_constants_and_skips_unknown_fields() {
+void generated_codec_validates_constants_and_field_id_semantics() {
     std::string error;
     auto bad_version = encode_camera_frame(make_frame());
     assert(bad_version.has_value());
     (*bad_version)[frame_header_size + 2] = 2;
     assert(!view_packed_frame(*bad_version, &error).has_value());
     assert(error.find("schema version") != std::string::npos);
+
+    const auto missing_version = sensor_wire_vector("PackedFrameMessage.invalid.missing_schema_version");
+    assert(!view_packed_frame(missing_version, &error).has_value());
+    assert(error.find("missing a required field") != std::string::npos);
 
     auto bad_type = encode_imu_sample(make_imu_sample());
     assert(bad_type.has_value());
@@ -141,20 +145,22 @@ void generated_codec_validates_constants_and_skips_unknown_fields() {
     assert(!view_packed_frame(*missing_data, &error).has_value());
     assert(error.find("missing a required field") != std::string::npos);
 
-    auto extended = encode_camera_frame(make_frame());
-    assert(extended.has_value());
-    assert((*extended)[frame_header_size] == 0x8c);
-    (*extended)[frame_header_size] = 0x8d; // one extra integer-keyed field
-    extended->push_back(13);              // reserved and therefore unknown
-    extended->push_back(0xc0);            // nil value
-    const auto payload_size = static_cast<std::uint32_t>(extended->size() - frame_header_size);
-    (*extended)[6] = static_cast<std::uint8_t>(payload_size >> 24);
-    (*extended)[7] = static_cast<std::uint8_t>(payload_size >> 16);
-    (*extended)[8] = static_cast<std::uint8_t>(payload_size >> 8);
-    (*extended)[9] = static_cast<std::uint8_t>(payload_size);
-    const auto view = view_camera_frame(*extended, &error);
+    const auto reserved = sensor_wire_vector("PackedFrameMessage.reserved");
+    assert(!view_camera_frame(reserved, &error).has_value());
+    assert(error.find("reserved field ID") != std::string::npos);
+
+    const auto extended = sensor_wire_vector("PackedFrameMessage.extension");
+    const auto view = view_camera_frame(extended, &error);
     assert(view.has_value());
     assert(view->data.size() == make_frame().rgba8.size());
+
+    const auto bad_width = sensor_wire_vector("PackedFrameMessage.invalid.width_range");
+    assert(!view_packed_frame(bad_width, &error).has_value());
+    assert(error.find("width is out of range") != std::string::npos);
+
+    const auto negative_identifier = sensor_wire_vector("ImuSampleMessage.invalid.sensor");
+    assert(!view_imu_sample(negative_identifier, &error).has_value());
+    assert(error.find("sensor is out of range") != std::string::npos);
 }
 
 void view_decoder_is_zero_copy_and_owned_decoder_copies() {
@@ -449,7 +455,7 @@ void enforces_messagepack_size_limit() {
 
 int main() {
     encodes_haxeon_hmpk_and_messagepack_binary();
-    generated_codec_validates_constants_and_skips_unknown_fields();
+    generated_codec_validates_constants_and_field_id_semantics();
     view_decoder_is_zero_copy_and_owned_decoder_copies();
     generic_packed_codec_supports_depth_and_segmentation_formats();
     typed_depth_codec_preserves_little_endian_r32f_values();

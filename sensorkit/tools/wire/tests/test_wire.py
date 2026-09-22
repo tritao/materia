@@ -38,12 +38,22 @@ class SensorWireSchemaTests(unittest.TestCase):
             normalized(schema)
 
     def test_reserved_ids_cannot_be_reused(self) -> None:
-        schema = Parser("message Sample { 1 first : u8 reserved 2..4; 3 third : u8 }").parse()
+        schema = Parser(
+            "message Sample { 1 first : u8 reserved 2..4; 3 third : u8 extension 8..10; }"
+        ).parse()
         with self.assertRaisesRegex(ValidationError, "duplicate or reserved field ID"):
             normalized(schema)
+        allocated = Parser("message Sample { 1 first : u8 8 later : u8 extension 8..10; }").parse()
+        with self.assertRaisesRegex(ValidationError, "still declared as an extension"):
+            normalized(allocated)
         overlapping = Parser("message Sample { 1 first : u8 reserved 3..6; reserved 6..8; }").parse()
         with self.assertRaisesRegex(ValidationError, "overlapping reserved ranges"):
             normalized(overlapping)
+        reserved_extension_overlap = Parser(
+            "message Sample { 1 first : u8 reserved 3..6; extension 6..8; }"
+        ).parse()
+        with self.assertRaisesRegex(ValidationError, "overlapping reserved and extension"):
+            normalized(reserved_extension_overlap)
 
     def test_invalid_constant_default_and_unknown_type_are_rejected(self) -> None:
         bad_default = Parser("message Sample { 1 value : u8 constant = 256 }").parse()
@@ -55,6 +65,18 @@ class SensorWireSchemaTests(unittest.TestCase):
         bad_message_type = Parser("message Sample { 1 message_type : u8 constant = 1 }").parse()
         with self.assertRaisesRegex(ValidationError, "must use MessageType"):
             normalized(bad_message_type)
+
+    def test_integer_ranges_match_haxe_and_nonnegative_constraints(self) -> None:
+        bad_unsigned_64 = Parser("message Sample { 1 value : u64 }").parse()
+        with self.assertRaisesRegex(ValidationError, "use i64 nonnegative"):
+            normalized(bad_unsigned_64)
+        negative = Parser("message Sample { 1 value : i64 nonnegative constant = -1 }").parse()
+        with self.assertRaisesRegex(ValidationError, "must be non-negative"):
+            normalized(negative)
+        valid = Parser("message Sample { 1 value : i64 nonnegative 2 count : u32 }").parse()
+        fields = normalized(valid)["messages"]["Sample"]["fields"]
+        self.assertTrue(fields[0]["nonnegative"])
+        self.assertEqual(fields[1]["type"], "u32")
 
     def test_packed_struct_requires_endianness_and_fixed_size_is_computed(self) -> None:
         with self.assertRaises(ParseError):
@@ -69,13 +91,24 @@ class SensorWireSchemaTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "changed field"):
             validate_evolution(after, before)
 
-    def test_schema_evolution_rejects_added_required_fields(self) -> None:
+    def test_schema_evolution_allows_field_allocation_from_extension_range(self) -> None:
         before = normalized(self.schema)
         after = copy.deepcopy(before)
         after["messages"]["ImuSampleMessage"]["fields"].append(
-            {"id": 9, "name": "new_value", "type": "u32", "constant": False, "value": None}
+            {"id": 32, "name": "new_value", "type": "u32", "constant": False, "value": None,
+             "nonnegative": False}
         )
-        with self.assertRaisesRegex(ValidationError, "added required fields"):
+        after["messages"]["ImuSampleMessage"]["extension"] = [[33, 63]]
+        validate_evolution(after, before)
+
+    def test_schema_evolution_rejects_field_allocation_outside_extension(self) -> None:
+        before = normalized(self.schema)
+        after = copy.deepcopy(before)
+        after["messages"]["ImuSampleMessage"]["fields"].append(
+            {"id": 64, "name": "new_value", "type": "u32", "constant": False, "value": None,
+             "nonnegative": False}
+        )
+        with self.assertRaisesRegex(ValidationError, "outside an extension range"):
             validate_evolution(after, before)
 
     def test_schema_evolution_allows_new_enum_values_and_messages(self) -> None:

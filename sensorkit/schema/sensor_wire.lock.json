@@ -25,11 +25,18 @@
   },
   "messages": {
     "ImuSampleMessage": {
+      "extension": [
+        [
+          32,
+          63
+        ]
+      ],
       "fields": [
         {
           "constant": true,
           "id": 1,
           "name": "schema_version",
+          "nonnegative": false,
           "type": "u8",
           "value": 1
         },
@@ -37,6 +44,7 @@
           "constant": true,
           "id": 2,
           "name": "message_type",
+          "nonnegative": false,
           "type": "MessageType",
           "value": 4
         },
@@ -44,20 +52,23 @@
           "constant": false,
           "id": 3,
           "name": "sensor",
-          "type": "u64",
+          "nonnegative": true,
+          "type": "i64",
           "value": null
         },
         {
           "constant": false,
           "id": 4,
           "name": "sequence",
-          "type": "u64",
+          "nonnegative": true,
+          "type": "i64",
           "value": null
         },
         {
           "constant": false,
           "id": 5,
           "name": "capture_time",
+          "nonnegative": false,
           "type": "f64",
           "value": null
         },
@@ -65,6 +76,7 @@
           "constant": false,
           "id": 6,
           "name": "delivery_time",
+          "nonnegative": false,
           "type": "f64",
           "value": null
         },
@@ -72,13 +84,15 @@
           "constant": false,
           "id": 7,
           "name": "frame",
-          "type": "u64",
+          "nonnegative": true,
+          "type": "i64",
           "value": null
         },
         {
           "constant": false,
           "id": 8,
           "name": "data",
+          "nonnegative": false,
           "type": "bytes",
           "value": null
         }
@@ -91,11 +105,18 @@
       ]
     },
     "LidarScanMessage": {
+      "extension": [
+        [
+          32,
+          63
+        ]
+      ],
       "fields": [
         {
           "constant": true,
           "id": 1,
           "name": "schema_version",
+          "nonnegative": false,
           "type": "u8",
           "value": 1
         },
@@ -103,6 +124,7 @@
           "constant": true,
           "id": 2,
           "name": "message_type",
+          "nonnegative": false,
           "type": "MessageType",
           "value": 5
         },
@@ -110,20 +132,23 @@
           "constant": false,
           "id": 3,
           "name": "sensor",
-          "type": "u64",
+          "nonnegative": true,
+          "type": "i64",
           "value": null
         },
         {
           "constant": false,
           "id": 4,
           "name": "sequence",
-          "type": "u64",
+          "nonnegative": true,
+          "type": "i64",
           "value": null
         },
         {
           "constant": false,
           "id": 5,
           "name": "capture_time",
+          "nonnegative": false,
           "type": "f64",
           "value": null
         },
@@ -131,6 +156,7 @@
           "constant": false,
           "id": 6,
           "name": "delivery_time",
+          "nonnegative": false,
           "type": "f64",
           "value": null
         },
@@ -138,13 +164,15 @@
           "constant": false,
           "id": 7,
           "name": "frame",
-          "type": "u64",
+          "nonnegative": true,
+          "type": "i64",
           "value": null
         },
         {
           "constant": false,
           "id": 8,
           "name": "horizontal_count",
+          "nonnegative": false,
           "type": "u32",
           "value": null
         },
@@ -152,6 +180,7 @@
           "constant": false,
           "id": 9,
           "name": "vertical_count",
+          "nonnegative": false,
           "type": "u32",
           "value": null
         },
@@ -159,6 +188,7 @@
           "constant": true,
           "id": 10,
           "name": "return_stride",
+          "nonnegative": false,
           "type": "u32",
           "value": 12
         },
@@ -166,6 +196,7 @@
           "constant": false,
           "id": 11,
           "name": "data",
+          "nonnegative": false,
           "type": "bytes",
           "value": null
         }
@@ -178,11 +209,18 @@
       ]
     },
     "PackedFrameMessage": {
+      "extension": [
+        [
+          32,
+          63
+        ]
+      ],
       "fields": [
         {
           "constant": true,
           "id": 1,
           "name": "schema_version",
+          "nonnegative": false,
           "type": "u8",
           "value": 1
         },
@@ -190,6 +228,7 @@
           "constant": false,
           "id": 2,
           "name": "message_type",
+          "nonnegative": false,
           "type": "MessageType",
           "value": null
         },
@@ -197,20 +236,23 @@
           "constant": false,
           "id": 3,
           "name": "sensor",
-          "type": "u64",
+          "nonnegative": true,
+          "type": "i64",
           "value": null
         },
         {
           "constant": false,
           "id": 4,
           "name": "sequence",
-          "type": "u64",
+          "nonnegative": true,
+          "type": "i64",
           "value": null
         },
         {
           "constant": false,
           "id": 5,
           "name": "capture_time",
+          "nonnegative": false,
           "type": "f64",
           "value": null
         },
@@ -218,6 +260,7 @@
           "constant": false,
           "id": 6,
           "name": "delivery_time",
+          "nonnegative": false,
           "type": "f64",
           "value": null
         },
@@ -225,13 +268,15 @@
           "constant": false,
           "id": 7,
           "name": "frame",
-          "type": "u64",
+          "nonnegative": true,
+          "type": "i64",
           "value": null
         },
         {
           "constant": false,
           "id": 8,
           "name": "width",
+          "nonnegative": false,
           "type": "u32",
           "value": null
         },
@@ -239,6 +284,7 @@
           "constant": false,
           "id": 9,
           "name": "height",
+          "nonnegative": false,
           "type": "u32",
           "value": null
         },
@@ -246,6 +292,7 @@
           "constant": false,
           "id": 10,
           "name": "stride",
+          "nonnegative": false,
           "type": "u32",
           "value": null
         },
@@ -253,6 +300,7 @@
           "constant": false,
           "id": 11,
           "name": "pixel_format",
+          "nonnegative": false,
           "type": "PixelFormat",
           "value": null
         },
@@ -260,6 +308,7 @@
           "constant": false,
           "id": 12,
           "name": "data",
+          "nonnegative": false,
           "type": "bytes",
           "value": null
         }

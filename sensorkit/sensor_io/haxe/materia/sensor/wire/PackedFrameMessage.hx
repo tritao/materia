@@ -7,7 +7,7 @@ import haxe.io.Bytes;
 @:wire
 class PackedFrameMessage {
 	@:id(1)
-	public var schemaVersion:Int = 1;
+	public var schemaVersion:Int;
 	@:id(2)
 	public var messageType:Int;
 	@:id(3)
@@ -21,11 +21,11 @@ class PackedFrameMessage {
 	@:id(7)
 	public var frame:Int64;
 	@:id(8)
-	public var width:Int;
+	public var width:Int64;
 	@:id(9)
-	public var height:Int;
+	public var height:Int64;
 	@:id(10)
-	public var stride:Int;
+	public var stride:Int64;
 	@:id(11)
 	public var pixelFormat:Int;
 	@:id(12)

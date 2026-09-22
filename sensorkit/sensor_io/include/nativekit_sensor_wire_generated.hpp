@@ -48,11 +48,11 @@ struct LidarReturn {
 struct PackedFrameMessage {
     std::uint8_t schema_version = 1;
     MessageType message_type = {};
-    std::uint64_t sensor = {};
-    std::uint64_t sequence = {};
+    std::int64_t sensor = {};
+    std::int64_t sequence = {};
     double capture_time = {};
     double delivery_time = {};
-    std::uint64_t frame = {};
+    std::int64_t frame = {};
     std::uint32_t width = {};
     std::uint32_t height = {};
     std::uint32_t stride = {};
@@ -63,22 +63,22 @@ struct PackedFrameMessage {
 struct ImuSampleMessage {
     std::uint8_t schema_version = 1;
     MessageType message_type = static_cast<MessageType>(4);
-    std::uint64_t sensor = {};
-    std::uint64_t sequence = {};
+    std::int64_t sensor = {};
+    std::int64_t sequence = {};
     double capture_time = {};
     double delivery_time = {};
-    std::uint64_t frame = {};
+    std::int64_t frame = {};
     std::span<const std::uint8_t> data = {};
 };
 
 struct LidarScanMessage {
     std::uint8_t schema_version = 1;
     MessageType message_type = static_cast<MessageType>(5);
-    std::uint64_t sensor = {};
-    std::uint64_t sequence = {};
+    std::int64_t sensor = {};
+    std::int64_t sequence = {};
     double capture_time = {};
     double delivery_time = {};
-    std::uint64_t frame = {};
+    std::int64_t frame = {};
     std::uint32_t horizontal_count = {};
     std::uint32_t vertical_count = {};
     std::uint32_t return_stride = 12;

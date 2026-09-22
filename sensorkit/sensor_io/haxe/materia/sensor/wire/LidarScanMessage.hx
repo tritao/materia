@@ -7,9 +7,9 @@ import haxe.io.Bytes;
 @:wire
 class LidarScanMessage {
 	@:id(1)
-	public var schemaVersion:Int = 1;
+	public var schemaVersion:Int;
 	@:id(2)
-	public var messageType:Int = 5;
+	public var messageType:Int;
 	@:id(3)
 	public var sensor:Int64;
 	@:id(4)
@@ -21,11 +21,11 @@ class LidarScanMessage {
 	@:id(7)
 	public var frame:Int64;
 	@:id(8)
-	public var horizontalCount:Int;
+	public var horizontalCount:Int64;
 	@:id(9)
-	public var verticalCount:Int;
+	public var verticalCount:Int64;
 	@:id(10)
-	public var returnStride:Int = 12;
+	public var returnStride:Int64;
 	@:id(11)
 	public var data:Bytes;
 }
