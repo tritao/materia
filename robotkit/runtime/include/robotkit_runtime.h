@@ -68,7 +68,9 @@ extern "C" {
 /** API-wide limits and version identifiers. */
 enum {
     RK_MAX_JOINTS = 64, /**< Maximum joints carried by one fixed-size ABI value. */
-    RK_API_VERSION = 2 /**< Version of the RobotKit C data contract (sensor payloads). */
+    RK_MAX_SENSORS = 8,
+    RK_MAX_SENSOR_VALUES = 64,
+    RK_API_VERSION = 3 /**< Version of the RobotKit C data contract (configured sensors). */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -166,6 +168,30 @@ typedef struct rk_robot_runtime_joint {
     double max_effort; /**< Maximum supported effort, in SI units. */
 } rk_robot_runtime_joint;
 
+enum { RK_SENSOR_ENCODER = 1, RK_SENSOR_IMU = 2, RK_SENSOR_LIDAR = 3 };
+
+/** Compiled sensor slot. Semantic IDs live in the immutable host mapping. */
+typedef struct rk_sensor_config {
+    uint32_t kind;
+    rk_link_id link;
+    double position[3]; /**< link_T_sensor translation in meters. */
+    double rotation[4]; /**< link_T_sensor unit quaternion xyzw. */
+    double update_rate; /**< Hz; zero means every shared tick. */
+    uint32_t ray_count; /**< LiDAR resolution, 1..RK_MAX_SENSOR_VALUES. */
+    uint32_t noise_seed; /**< Deterministic per-sensor PRNG seed. */
+    double max_range; /**< LiDAR maximum range in meters. */
+    double noise_stddev; /**< Independent Gaussian noise, SI units. Zero disables it. */
+} rk_sensor_config;
+
+/** Latest acquisition for one compiled sensor slot; zero sequence means absent. */
+typedef struct rk_sensor_sample {
+    uint64_t sequence;
+    uint64_t source_timestamp_ns;
+    uint64_t received_timestamp_ns;
+    uint32_t value_count;
+    double values[RK_MAX_SENSOR_VALUES];
+} rk_sensor_sample;
+
 /**
  * Bulk compiled robot description consumed when a RobotRuntime is created.
  *
@@ -182,6 +208,8 @@ typedef struct rk_robot_runtime_blueprint {
     uint32_t reserved0;
     uint64_t reserved[2];
     rk_robot_runtime_joint joints[RK_MAX_JOINTS];
+    uint32_t sensor_count; /**< Zero selects the default base-mounted simulation sensors. */
+    rk_sensor_config sensors[RK_MAX_SENSORS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
@@ -220,9 +248,8 @@ typedef struct rk_robot_state {
     double velocity[RK_MAX_JOINTS];
     double effort[RK_MAX_JOINTS];
     uint64_t received_timestamp_ns; /**< Monotonic timestamp when Runtime accepted the sample. */
-    uint32_t sensor_flags; /**< Bit 0: IMU valid; bit 1: planar LiDAR valid. */
-    double imu[6]; /**< Base-frame angular velocity xyz, specific force xyz (SI). */
-    double lidar[8]; /**< Base-frame XY rays, +X then counterclockwise, max range 10 m. */
+    uint32_t sensor_count;
+    rk_sensor_sample sensors[RK_MAX_SENSORS];
 } rk_robot_state;
 
 /** Immutable published runtime snapshot; native handles never enter this ABI. */
@@ -246,9 +273,8 @@ typedef struct rk_robot_snapshot {
     uint32_t reserved0;
     uint64_t reserved[2];
     uint64_t received_timestamp_ns; /**< Runtime receive timestamp in nanoseconds. */
-    uint32_t sensor_flags; /**< Bit 0: IMU valid; bit 1: planar LiDAR valid. */
-    double imu[6]; /**< Base-frame angular velocity xyz, specific force xyz (SI). */
-    double lidar[8]; /**< Base-frame XY rays, +X then counterclockwise, max range 10 m. */
+    uint32_t sensor_count;
+    rk_sensor_sample sensors[RK_MAX_SENSORS];
 } rk_robot_snapshot;
 
 /** Static control capabilities reported by a RobotRuntime endpoint. */

@@ -51,7 +51,70 @@ class RobotWorldTests {
     testStableModelIdentity();
     testSensorAndClockContracts();
     testSensorResetPublication();
+    testConfiguredSensors();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
+  }
+
+  static function testConfiguredSensors():Void {
+    var model = new RobotModel("configured");
+    var base = model.addLink(new Link("base", "link/stable"));
+    var mount = model.addFrame(new robotkit.model.Frame("mount", base, "frame/stable"));
+    mount.position = [0.5, 0.0, 0.0];
+    mount.rotation = [0.0, 0.0, 0.7071067811865476, 0.7071067811865476];
+    var scan = model.addSensor(new robotkit.model.Sensor("scan", "lidar", 10, "sensor/scan"));
+    scan.frame = mount;
+    scan.rayCount = 16;
+    scan.maxRange = 3.0;
+    var noisy = model.addSensor(new robotkit.model.Sensor("noisy", "lidar", 10, "sensor/noisy"));
+    noisy.frame = mount; noisy.rayCount = 16; noisy.maxRange = 3.0;
+    noisy.noiseStddev = 0.01; noisy.noiseSeed = 42;
+    var imu = model.addSensor(new robotkit.model.Sensor("imu", "imu", 0, "sensor/imu"));
+    imu.frame = mount;
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    mount.position[0] = 100.0;
+    mount.name = "renamed";
+    scan.name = "renamed scan";
+    model.sensors.reverse();
+    var simulation = new Simulation();
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("configured", runtime, "configured", ["base"], []);
+    simulation.spawnBox([0.5, 2.0, 0.0], [0.25, 0.25, 0.25]);
+    simulation.step(Int64.ofInt(1));
+    var first = robot.snapshot();
+    var firstScan = first.sensors.get(0);
+    equal(firstScan.sensorId, "sensor/scan", "compiled sensor identity survives model rename and reorder");
+    equal(firstScan.frameId, "frame/stable", "configured frame identity reaches measurement");
+    equal(firstScan.linkId, "link/stable", "mount link identity reaches measurement");
+    equal(firstScan.mountPosition.get(0), 0.5, "mount detached from editable model");
+    equal(firstScan.values.length, 16, "configured resolution reaches native scanner");
+    check(Math.abs(firstScan.values.get(0) - 1.75) < 0.000001, "mounted scanner rotates and translates rays");
+    equal(firstScan.values.get(8), 3.0, "configured maximum range reaches native scanner");
+    var noisyValue = first.sensors.get(1).values.get(0);
+    check(noisyValue != firstScan.values.get(0), "configured noise changes measurement");
+    simulation.step(Int64.ofInt(2));
+    var second = robot.snapshot();
+    equal(second.sensors.get(0).sequence, firstScan.sequence, "slow sensor sequence held between acquisitions");
+    equal(second.sensors.get(0).receivedTimestampNs, firstScan.receivedTimestampNs, "cached sensor receipt does not become fresh");
+    equal(second.sensors.get(0).sourceTimestampNs, firstScan.sourceTimestampNs, "cached sensor source time preserved");
+    equal(second.sensors.get(2).values.get(5), 9.81, "configured mounted IMU is measured");
+    for (_ in 0...8) simulation.step(Int64.ofInt(3));
+    equal(robot.snapshot().sensors.get(0).sequence, Int64.ofInt(2), "10 Hz scan updates on source-clock schedule");
+    var recording = new RobotRecording();
+    recording.recordSnapshot(second);
+    var replay = new ReplayRobot("recorded", recording);
+    equal(replay.snapshot().sensors.get(0).frameId, "frame/stable", "recording retains frame identity");
+    equal(replay.snapshot().sensors.get(0).mountPosition.get(0), 0.5, "recording retains mount metadata");
+    simulation.reset();
+    simulation.step(Int64.ofInt(1));
+    equal(robot.snapshot().sensors.get(1).values.get(0), noisyValue, "reset repeats seeded noise deterministically");
+    robot.close(); simulation.dispose(); replay.close();
+    scan.rayCount = 65;
+    mount.rotation = [0.0, 0.0, 0.0, 0.0];
+    noisy.updateRate = -1.0;
+    var diagnostics = RobotRuntimeCompiler.validate(model);
+    check(hasDiagnostic(diagnostics, "RK_SENSOR_SCAN"), "oversized scans rejected before native lowering");
+    check(hasDiagnostic(diagnostics, "RK_FRAME_POSE"), "non-unit mount rotations rejected");
+    check(hasDiagnostic(diagnostics, "RK_SENSOR_RATE"), "negative sample rates rejected");
   }
 
   static function testSensorResetPublication():Void {
@@ -84,10 +147,14 @@ class RobotWorldTests {
 
   static function testSensorAndClockContracts():Void {
     var input = [0.0, 0.0, 0.0, 0.0, 0.0, 9.81];
+    var sourceFrames = [
+      new SensorFrame("enc", "joint_encoder", "base", Int64.ofInt(2), Int64.ofInt(3), [], Int64.ofInt(4)),
+      new SensorFrame("imu", "imu", "base", Int64.ofInt(2), Int64.ofInt(3), input, Int64.ofInt(4)),
+      new SensorFrame("lidar", "lidar", "base", Int64.ofInt(2), Int64.ofInt(3), [for (_ in 0...8) 2.0], Int64.ofInt(4))];
     var snapshot = new robotkit.runtime.RobotSnapshot(Int64.ofInt(1), Int64.ofInt(2),
-      Int64.ofInt(3), 0, 0, 1, 0, [], [], [], Int64.ofInt(4), input, [for (_ in 0...8) 2.0]);
+      Int64.ofInt(3), 0, 0, 1, 0, [], [], [], Int64.ofInt(4), sourceFrames);
     input[5] = -1.0;
-    equal(snapshot.imu.get(5), 9.81, "runtime sensor payload owns a copy");
+    equal(snapshot.sensors.get(1).values.get(5), 9.81, "runtime sensor payload owns a copy");
     var copy = snapshot.withRobotId(Int64.ofInt(5));
     var frames = robotkit.world.RobotSensorFrames.fromRuntimeSnapshot(copy);
     equal(frames.length, 3, "runtime projection preserves valid measurements");
@@ -98,7 +165,7 @@ class RobotWorldTests {
     var absent = new robotkit.runtime.RobotSnapshot(Int64.ofInt(1), Int64.ofInt(0),
       Int64.ofInt(999), 0, 0, 1, 0, [], [], []);
     equal(absent.receivedTimestampNs, Int64.ofInt(0), "unknown receipt is not source time");
-    equal(robotkit.world.RobotSensorFrames.fromRuntimeSnapshot(absent).length, 1,
+    equal(robotkit.world.RobotSensorFrames.fromRuntimeSnapshot(absent).length, 0,
       "endpoints without sensors do not fabricate IMU or LiDAR");
     var intents = new robotkit.behavior.IntentBuffer();
     intents.publish(new robotkit.behavior.JointTargetIntent(0, 1, 0.5, Int64.ofInt(100)));

@@ -11,9 +11,13 @@ class SensorFrame {
   public final sourceTimestampNs:Int64;
   public final receivedTimestampNs:Int64;
   public final values:ImmutableFloatArray;
+  public final linkId:String;
+  public final mountPosition:ImmutableFloatArray;
+  public final mountRotation:ImmutableFloatArray;
 
   public function new(sensorId:String, kind:String, frameId:String, sequence:Int64,
-      sourceTimestampNs:Int64, values:Array<Float>, ?receivedTimestampNs:Int64) {
+      sourceTimestampNs:Int64, values:Array<Float>, ?receivedTimestampNs:Int64,
+      ?linkId:String = "", ?mountPosition:Array<Float>, ?mountRotation:Array<Float>) {
     this.sensorId = sensorId;
     this.kind = kind;
     this.frameId = frameId;
@@ -22,5 +26,11 @@ class SensorFrame {
     this.receivedTimestampNs = receivedTimestampNs == null
       ? Int64.ofInt(0) : receivedTimestampNs;
     this.values = new ImmutableFloatArray(values);
+    this.linkId = linkId;
+    this.mountPosition = new ImmutableFloatArray(mountPosition == null ? [0.0, 0.0, 0.0] : mountPosition);
+    this.mountRotation = new ImmutableFloatArray(mountRotation == null ? [0.0, 0.0, 0.0, 1.0] : mountRotation);
   }
+
+  public function copy():SensorFrame return new SensorFrame(sensorId, kind, frameId, sequence,
+    sourceTimestampNs, values.toArray(), receivedTimestampNs, linkId, mountPosition.toArray(), mountRotation.toArray());
 }

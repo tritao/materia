@@ -81,44 +81,80 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
     if (nksim_snapshot_get_body_count(simulation_.snapshot_, &body_count) != NKSIM_OK)
         return RK_ERROR_BACKEND;
     std::vector<nksim_body_state> bodies(body_count);
-    const nksim_body_state *base = nullptr;
     for (uint64_t index = 0; index < body_count; ++index) {
         bodies[index].struct_size = sizeof(nksim_body_state);
         if (nksim_snapshot_get_body(simulation_.snapshot_, index, &bodies[index]) != NKSIM_OK)
             return RK_ERROR_BACKEND;
-        if (bodies[index].body == base_body_) base = &bodies[index];
     }
-    if (!base) return RK_ERROR_BACKEND;
     const double now = simulation_.simulation_time_;
-    // A first sample primes the derivative. Do not fabricate acceleration.
-    state.sensor_flags = 2;
-    if (previous_time_ >= 0.0 && now > previous_time_) {
-        double acceleration[3];
-        for (int i = 0; i < 3; ++i)
-            acceleration[i] = (base->linear_velocity[i] - previous_velocity_[i]) / (now - previous_time_);
-        sensors::imu(base->rotation, base->angular_velocity, acceleration,
-                     simulation_.gravity_, state.imu);
-        state.sensor_flags |= 1;
-    }
-    previous_time_ = now;
-    std::copy_n(base->linear_velocity, 3, previous_velocity_);
-    for (int ray = 0; ray < 8; ++ray) {
-        const double angle = ray * 0.7853981633974483;
-        const double local[3] = {std::cos(angle), std::sin(angle), 0.0};
-        double direction[3];
-        sensors::rotate(base->rotation, local, direction);
-        double range = 10.0;
-        for (const auto &body : bodies) {
-            // Exclude every link of this robot, but observe other robots.
-            if (std::find(bodies_.begin(), bodies_.end(), body.body) != bodies_.end()) continue;
-            const double robot_extents[3] = {0.05, 0.05, 0.05};
-            const double *extents = robot_extents;
-            for (const auto &object : simulation_.objects_)
-                if (object.active && object.body == body.body) { extents = object.half_extents; break; }
-            range = sensors::ray_box(base->position, direction, body.position,
-                                     body.rotation, extents, range);
+    state.sensor_count = static_cast<uint32_t>(sensors_.size());
+    for (uint32_t slot = 0; slot < sensors_.size(); ++slot) {
+        auto &sensor = sensors_[slot];
+        const auto &config = sensor.config;
+        const nksim_body_state *base = nullptr;
+        for (const auto &body : bodies)
+            if (body.body == bodies_[config.link]) { base = &body; break; }
+        if (!base) return RK_ERROR_BACKEND;
+        double offset[3], origin[3], rotation[4], velocity[3];
+        sensors::rotate(base->rotation, config.position, offset);
+        sensors::multiply(base->rotation, config.rotation, rotation);
+        for (int i = 0; i < 3; ++i) {
+            origin[i] = base->position[i] + offset[i];
+            const int j = (i+1)%3, k = (i+2)%3;
+            velocity[i] = base->linear_velocity[i] + base->angular_velocity[j]*offset[k]
+                - base->angular_velocity[k]*offset[j];
         }
-        state.lidar[ray] = range;
+        double acceleration[3];
+        const bool derivative_valid = sensor.previous_time >= 0.0 && now > sensor.previous_time;
+        if (derivative_valid)
+            for (int i = 0; i < 3; ++i)
+                acceleration[i] = (velocity[i] - sensor.previous_velocity[i]) / (now - sensor.previous_time);
+        sensor.previous_time = now;
+        std::copy_n(velocity, 3, sensor.previous_velocity);
+        const bool due = now + 1e-12 >= sensor.next_due;
+        if (due && (config.kind != RK_SENSOR_IMU || derivative_valid)) {
+            auto &sample = sensor.sample;
+            ++sample.sequence;
+            sample.source_timestamp_ns = state.source_timestamp_ns;
+            if (config.kind == RK_SENSOR_ENCODER) {
+                sample.value_count = state.joint_count;
+                std::copy_n(state.position, state.joint_count, sample.values);
+            } else if (config.kind == RK_SENSOR_IMU) {
+                sample.value_count = 6;
+                sensors::imu(rotation, base->angular_velocity, acceleration, simulation_.gravity_, sample.values);
+            } else {
+                sample.value_count = config.ray_count;
+                for (uint32_t ray = 0; ray < config.ray_count; ++ray) {
+                    const double angle = ray * 6.283185307179586 / config.ray_count;
+                    const double local[3] = {std::cos(angle), std::sin(angle), 0.0};
+                    double direction[3];
+                    sensors::rotate(rotation, local, direction);
+                    double range = config.max_range;
+                    for (const auto &body : bodies) {
+                        if (std::find(bodies_.begin(), bodies_.end(), body.body) != bodies_.end()) continue;
+                        const double robot_extents[3] = {0.05, 0.05, 0.05};
+                        const double *extents = robot_extents;
+                        for (const auto &object : simulation_.objects_)
+                            if (object.active && object.body == body.body) { extents = object.half_extents; break; }
+                        range = sensors::ray_box(origin, direction, body.position, body.rotation, extents, range);
+                    }
+                    sample.values[ray] = range;
+                }
+            }
+            for (uint32_t i = 0; i < sample.value_count; ++i) {
+                if (config.noise_stddev > 0.0)
+                    sample.values[i] += config.noise_stddev * sensors::gaussian(sensor.random);
+                if (config.kind == RK_SENSOR_LIDAR)
+                    sample.values[i] = std::clamp(sample.values[i], 0.0, config.max_range);
+            }
+            if (config.update_rate > 0.0) {
+                // Acquisition cannot outpace physics. Capping also prevents
+                // overflow for finite but excessively high requested rates.
+                const double rate = std::min(config.update_rate, 1.0 / simulation_.fixed_timestep_);
+                sensor.next_due = (std::floor(now * rate + 1e-9) + 1.0) / rate;
+            }
+        }
+        state.sensors[slot] = sensor.sample;
     }
     return RK_OK;
 }

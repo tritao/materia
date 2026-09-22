@@ -24,7 +24,7 @@ class SimulationRobot;
 class Simulation final {
 public:
     /** Creates an empty shared universe; robots must be added before stepping. */
-    Simulation(double fixed_timestep, uint32_t physics_substeps);
+    Simulation(double fixed_timestep, uint32_t physics_substeps, uint32_t backend = 0);
     ~Simulation();
 
     Simulation(const Simulation &) = delete;

@@ -182,9 +182,8 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     }
     out_snapshot.fault_code = state_.safety == RK_SAFETY_FAULT ? 1 : 0;
     out_snapshot.received_timestamp_ns = state_.received_timestamp_ns;
-    out_snapshot.sensor_flags = state_.sensor_flags;
-    std::copy_n(state_.imu, 6, out_snapshot.imu);
-    std::copy_n(state_.lidar, 8, out_snapshot.lidar);
+    out_snapshot.sensor_count = state_.sensor_count;
+    std::copy_n(state_.sensors, state_.sensor_count, out_snapshot.sensors);
     return RK_OK;
 }
 
@@ -384,7 +383,7 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     const auto runtime_safety = next.safety;
     next.source_timestamp_ns = 0;
     next.received_timestamp_ns = 0;
-    next.sensor_flags = 0;
+    next.sensor_count = 0;
     const auto result = endpoint_->sample(timestamp_ns, next);
     next.mode = runtime_mode;
     next.safety = runtime_safety;
@@ -409,6 +408,14 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
         // Source epoch zero is valid. Receipt is always the local monotonic
         // acceptance clock, never the caller's simulation/source tick.
         next.received_timestamp_ns = monotonic_now_ns();
+        for (uint32_t i = 0; i < next.sensor_count; ++i) {
+            auto &sample = next.sensors[i];
+            if (!sample.sequence) continue;
+            const auto &old = state_.sensors[i];
+            sample.received_timestamp_ns = i < state_.sensor_count && old.sequence == sample.sequence
+                && old.source_timestamp_ns == sample.source_timestamp_ns
+                ? old.received_timestamp_ns : next.received_timestamp_ns;
+        }
         next.struct_size = sizeof(next);
         state_ = next;
         state_backup_valid_ = false;

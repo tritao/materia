@@ -57,12 +57,14 @@ Compilation rejects empty or duplicate IDs and attaches a copied
 `RobotRuntimeIdentity` mapping to the blueprint. Native indices remain local
 to that compiled revision. Sensor indices in this mapping identify model
 slots, not SensorKit registrations. Manually constructed native blueprints
-may omit the mapping. Frames currently coincide with their owning link origin;
-compilation preserves frame IDs and semantic link attachments across reordering.
-Arbitrary mount transforms and carrying editable-model IDs into world
-descriptions, wire messages, and recordings remain subsequent work. Built-in
-runtime sensors retain their existing IDs (`imu`, `lidar`, `joint_encoders`)
-and base-frame ID (`base_link`), scoped to the robot.
+may omit the mapping. A `Frame` stores editable `link_T_frame` translation and
+unit quaternion; a `Sensor.frame` references a frame in the same model. The
+compiler freezes IDs, attachments, mounts, and sensor configuration into the
+blueprint. Runtime samples map native sensor slots back to semantic IDs. Wire
+messages and recordings retain sensor/frame/link IDs and mount transforms.
+An unmounted sensor uses the root link's origin and ID. Models without sensor
+declarations get the compatibility encoder/IMU/LiDAR set; manually constructed
+blueprints without metadata retain the `base_link` fallback frame name.
 
 ### Frames and units
 
@@ -218,21 +220,40 @@ teleport a robot, and spawn/remove/teleport environment objects. The editable
 scene is therefore the source of initial/configuration state. After a running
 host starts, physics owns the live state and runtime commands are the only
 normal way to change robot motion. Sensor measurements use the same physics
-snapshot as joint encoders. Base-frame IMU values are angular velocity followed
+snapshot as joint encoders. Sensor-frame IMU values are angular velocity followed
 by specific force, `R^-1 * (dv/dt - gravity)`; gravity is `(0, 0, -9.81)`.
+The mount-point velocity includes `omega × offset`, so an offset rotating IMU
+measures tangential and centripetal acceleration rather than only link-origin
+acceleration. Mount orientation rotates both IMU vectors and LiDAR rays.
 The first sample after creation, reset, or teleport primes the derivative and
-does not publish IMU. LiDAR casts eight planar rays counterclockwise from +X,
-with a 10 m maximum, against oriented boxes at their physics poses. It excludes
-all own links and includes other robots and environment objects. This matches
-the current box-only simulation geometry; mesh queries, sensor mount offsets,
-configurable scan resolution/rates, and noise models are not implemented.
+does not publish IMU. LiDAR casts 1–64 planar rays counterclockwise from +X,
+with a configurable positive maximum range, against oriented boxes at their
+physics poses. It excludes all own links and includes other robots and
+environment objects. Mesh queries are not implemented. Defaults are 8 rays,
+10 m, every shared tick, and no noise. `updateRate` is Hz (zero = every tick),
+quantized to available physics ticks without interpolating invented samples.
+Each sensor has its own sequence and source/receive timestamps, held unchanged
+between acquisitions. Seeded Gaussian noise is optional per sensor; LiDAR
+clips noisy distances to `[0, maxRange]`. Reset restarts the schedule and PRNG.
 
-Native ABI version 2 carries bounded IMU/LiDAR payloads with validity flags.
+Native ABI version 3 carries up to 8 sensor configurations and bounded sample
+payloads of up to 64 values each; a zero sample sequence means no acquisition.
 Both `SimulatedRobot` and robotd project only valid measurements through the
 same immutable sensor frames; endpoints without those measurements do not
-invent them. Rebuild native consumers for the extended structs. Tests run the
-SimKit test backend, not MuJoCo; articulated body dynamics remain limited by
-that backend. The free-fall specific-force equation is also tested separately.
+invent them. Rebuild native consumers for the extended structs.
+
+The default backend is still the deterministic SimKit test backend. Build with
+`-DNKSIM_BUILD_MUJOCO=ON` and select `rk_simulation_desc.backend = 1` (Haxe
+`new Simulation(dt, substeps, 1)`) for MuJoCo; requesting it in an unconfigured
+build returns `RK_ERROR_UNSUPPORTED`, never a silent fallback. MuJoCo tests
+exercise articulated IMU/offset acceleration, moving-object LiDAR occlusion,
+collision response, angular limits in radians, world-oriented body velocities,
+and deterministic replay. Rebuilds preserve articulated rest transforms;
+reset clears native joint state and targets. Unsupported independent teleports
+of constrained links fail without replacing the cached body state.
+Adjacent joint-connected bodies are excluded from
+self contact, including static-root pairs. The robot geometry remains the
+current simple box representation, not an imported CAD collision model.
 
 ## Deployment boundary
 

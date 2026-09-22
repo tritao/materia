@@ -16,11 +16,12 @@ class Simulation {
   final robots:Array<RobotRuntime> = [];
   var disposed:Bool = false;
 
-  public function new(? fixedTimestep:Float = 0.01, ? physicsSubsteps:Int = 1) {
+  public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1, ?backend:Int = 0) {
     var desc = new rk_simulation_desc();
     desc.set_struct_size(rk_simulation_desc.size());
     desc.set_fixed_timestep(fixedTimestep);
     desc.set_physics_substeps(physicsSubsteps);
+    desc.set_backend(backend);
     var result = RobotKitSimKit.rk_simulation_create(desc);
     check(result.status, "simulation.create");
     owner = result.out_simulation;

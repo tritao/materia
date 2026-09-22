@@ -15,6 +15,7 @@ class RemoteRobot implements Robot {
   var currentSnapshot:RobotSnapshot;
   var currentFault:Null<RobotFault> = null;
   var currentSensors:Array<SensorFrame> = [];
+  final sensorSourceReceipts:Map<String, Int64> = [];
   var changeListener:Null < RobotId -> Void > = null;
 
   public function new(id:RobotId) {
@@ -88,9 +89,7 @@ class RemoteRobot implements Robot {
   public function sensors():Array<SensorFrame> {
     var result:Array<SensorFrame> = [];
     for (frame in currentSensors)
-      result.push(new SensorFrame(frame.sensorId, frame.kind, frame.frameId,
-        frame.sequence, frame.sourceTimestampNs, frame.values.toArray(),
-        frame.receivedTimestampNs));
+      result.push(frame.copy());
     return result;
   }
 
@@ -137,16 +136,20 @@ class RemoteRobot implements Robot {
       return;
     var frame = new SensorFrame(value.sensorId, value.kind, value.frameId,
       value.sequence, value.sourceTimestampNs, value.values,
-      NativeKit.nk_time_now_ns());
+      NativeKit.nk_time_now_ns(), value.linkId, value.mountPosition, value.mountRotation);
     var replaced = false;
     for (index in 0...currentSensors.length) {
       if (currentSensors[index].sensorId == frame.sensorId) {
+        var old = currentSensors[index];
+        if (old.sequence == frame.sequence && old.sourceTimestampNs == frame.sourceTimestampNs
+            && sensorSourceReceipts.get(frame.sensorId) == value.receivedTimestampNs) return;
         currentSensors[index] = frame;
         replaced = true;
         break;
       }
     }
     if (!replaced) currentSensors.push(frame);
+    sensorSourceReceipts.set(frame.sensorId, value.receivedTimestampNs);
     notifyChanged();
   }
 

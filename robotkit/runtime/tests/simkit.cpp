@@ -73,10 +73,10 @@ void shared_world_steps_once() {
     assert(second_state.source_timestamp_ns == 10000000);
     assert(first_state.received_timestamp_ns > 1000);
     assert(second_state.received_timestamp_ns >= first_state.received_timestamp_ns);
-    assert(first_state.sensor_flags == 2); // IMU derivative needs two samples.
-    assert(std::abs(first_state.lidar[0] - 0.95) < 1e-9);
-    assert(std::abs(second_state.lidar[4] - 0.95) < 1e-9);
-    assert(first_state.lidar[4] == 10.0); // Own geometry excluded.
+    assert(first_state.sensors[1].sequence == 0); // IMU derivative needs two samples.
+    assert(std::abs(first_state.sensors[2].values[0] - 0.95) < 1e-9);
+    assert(std::abs(second_state.sensors[2].values[4] - 0.95) < 1e-9);
+    assert(first_state.sensors[2].values[4] == 10.0); // Own geometry excluded.
     assert(std::abs(first_state.position[0] - 0.4) < 1e-12);
     assert(std::abs(second_state.position[0] + 0.3) < 1e-12);
 
@@ -89,8 +89,8 @@ void shared_world_steps_once() {
     assert(clock.step_index == 2);
     assert(snapshot(first).sequence == 2);
     assert(snapshot(second).sequence == 2);
-    assert(snapshot(first).sensor_flags == 3);
-    assert(std::abs(snapshot(first).imu[5] - 9.81) < 1e-9);
+    assert(snapshot(first).sensors[1].sequence == 1);
+    assert(std::abs(snapshot(first).sensors[1].values[5] - 9.81) < 1e-9);
 
     assert(rk_simulation_stop(simulation) == RK_OK);
     rk_simulation_pose pose{};
@@ -193,18 +193,18 @@ void sensor_geometry_and_reset() {
     assert(rk_simulation_spawn_object(simulation, &box, &object) == RK_OK);
     assert(rk_simulation_step(simulation, 100) == RK_OK);
     const auto before = snapshot(robot);
-    assert(std::abs(before.lidar[0] - 1.75) < 1e-6);
-    assert(before.lidar[2] == 10.0);
+    assert(std::abs(before.sensors[2].values[0] - 1.75) < 1e-6);
+    assert(before.sensors[2].values[2] == 10.0);
     assert(rk_simulation_step(simulation, 200) == RK_OK);
-    assert(snapshot(robot).sensor_flags == 3);
-    assert(std::abs(snapshot(robot).imu[5] - 9.81) < 1e-9);
-    assert(before.sensor_flags == 2); // Old observation remains unchanged.
+    assert(snapshot(robot).sensors[1].sequence == 1);
+    assert(std::abs(snapshot(robot).sensors[1].values[5] - 9.81) < 1e-9);
+    assert(before.sensors[1].sequence == 0); // Old observation remains unchanged.
     assert(rk_simulation_stop(simulation) == RK_OK);
     assert(rk_simulation_reset(simulation) == RK_OK);
-    assert(snapshot(robot).sensor_flags == 0);
+    assert(snapshot(robot).sensor_count == 0);
     assert(rk_simulation_step(simulation, 300) == RK_OK);
-    assert(snapshot(robot).sensor_flags == 2);
-    assert(std::abs(snapshot(robot).lidar[0] - 1.75) < 1e-6);
+    assert(snapshot(robot).sensors[1].sequence == 0);
+    assert(std::abs(snapshot(robot).sensors[2].values[0] - 1.75) < 1e-6);
     assert(rk_simulation_stop(simulation) == RK_OK);
     rk_simulation_pose pose{};
     pose.struct_size = sizeof(pose);
@@ -212,17 +212,17 @@ void sensor_geometry_and_reset() {
     pose.rotation[3] = std::sqrt(0.5);
     assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
     assert(rk_simulation_step(simulation, 400) == RK_OK);
-    assert(snapshot(robot).sensor_flags == 2); // Teleport primes derivative.
+    assert(snapshot(robot).sensors[1].sequence == 0); // Teleport primes derivative.
     assert(rk_simulation_step(simulation, 500) == RK_OK);
-    assert(std::abs(snapshot(robot).imu[3] + 9.81) < 1e-9);
-    assert(std::abs(snapshot(robot).imu[5]) < 1e-9);
+    assert(std::abs(snapshot(robot).sensors[1].values[3] + 9.81) < 1e-9);
+    assert(std::abs(snapshot(robot).sensors[1].values[5]) < 1e-9);
     assert(rk_simulation_stop(simulation) == RK_OK);
     pose.rotation[1] = 0.0;
     pose.rotation[3] = 1.0;
     assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
     assert(rk_simulation_remove_object(simulation, object) == RK_OK);
     assert(rk_simulation_step(simulation, 600) == RK_OK);
-    assert(snapshot(robot).lidar[0] == 10.0);
+    assert(snapshot(robot).sensors[2].values[0] == 10.0);
     rk_simulation_destroy(simulation);
 
     // Free fall: accelerometer measures specific force, not gravity itself.

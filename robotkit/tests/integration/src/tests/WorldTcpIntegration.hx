@@ -47,6 +47,9 @@ class WorldTcpIntegration {
       if (state == null || state.sensors.length != 3)
         throw "robotd did not transport simulated encoder, IMU, and LiDAR frames";
       for (sensor in state.sensors.toArray()) {
+        if (sensor.sensorId != 'demo/${sensor.kind}' || sensor.frameId != "demo/sensor-mount"
+            || sensor.linkId != "base" || sensor.mountPosition.get(0) != 0.2)
+          throw "transport lost configured sensor identity or mount";
         if (sensor.kind == "imu" && (sensor.values.length != 6 || Math.abs(sensor.values.get(5) - 9.81) > 1e-9))
           throw "transport changed the stationary IMU specific force";
         if (sensor.kind == "lidar")

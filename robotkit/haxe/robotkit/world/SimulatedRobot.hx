@@ -102,9 +102,7 @@ class SimulatedRobot implements Robot {
   public function sensors():Array<SensorFrame> {
     var result:Array<SensorFrame> = [];
     for (frame in currentSensors)
-      result.push(new SensorFrame(frame.sensorId, frame.kind, frame.frameId,
-        frame.sequence, frame.sourceTimestampNs, frame.values.toArray(),
-        frame.receivedTimestampNs));
+      result.push(frame.copy());
     return result;
   }
 

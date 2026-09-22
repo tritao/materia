@@ -3,8 +3,25 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace robotkit::sensors {
+
+inline void multiply(const double a[4], const double b[4], double out[4]) {
+    out[0] = a[3]*b[0] + a[0]*b[3] + a[1]*b[2] - a[2]*b[1];
+    out[1] = a[3]*b[1] - a[0]*b[2] + a[1]*b[3] + a[2]*b[0];
+    out[2] = a[3]*b[2] + a[0]*b[1] - a[1]*b[0] + a[2]*b[3];
+    out[3] = a[3]*b[3] - a[0]*b[0] - a[1]*b[1] - a[2]*b[2];
+}
+
+inline double gaussian(uint32_t &seed) {
+    auto uniform = [&]() {
+        seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+        return (static_cast<double>(seed) + 0.5) / 4294967296.0;
+    };
+    const double u = uniform(), v = uniform();
+    return std::sqrt(-2.0 * std::log(u)) * std::cos(6.283185307179586 * v);
+}
 
 // Unit xyzw quaternion. Inverse rotates world vectors into the sensor frame.
 inline void rotate(const double q[4], const double v[3], double out[3], bool inverse = false) {

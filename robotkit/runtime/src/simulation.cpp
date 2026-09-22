@@ -2,6 +2,9 @@
 #include "simulation_robot.hpp"
 #include "runtime_registry.hpp"
 #include "sensor_math.hpp"
+#ifdef RK_HAS_MUJOCO
+#include "nativekit_sim_mujoco.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -36,7 +39,7 @@ uint64_t monotonic_now_ns() {
 
 } // namespace
 
-Simulation::Simulation(double fixed_timestep, uint32_t physics_substeps)
+Simulation::Simulation(double fixed_timestep, uint32_t physics_substeps, uint32_t backend)
     : fixed_timestep_(fixed_timestep), physics_substeps_(physics_substeps),
       period_(static_cast<int64_t>(fixed_timestep * 1'000'000'000.0)) {
     if (fixed_timestep <= 0.0 || physics_substeps == 0)
@@ -49,7 +52,13 @@ Simulation::Simulation(double fixed_timestep, uint32_t physics_substeps)
         desc.fixed_timestep = fixed_timestep_;
         desc.physics_substeps = physics_substeps_;
         std::copy_n(gravity_, 3, desc.gravity);
-        require_sim(nksim_world_create(&desc, &world_), "nksim_world_create");
+        if (backend == 0)
+            require_sim(nksim_world_create(&desc, &world_), "nksim_world_create");
+#ifdef RK_HAS_MUJOCO
+        else if (backend == 1)
+            require_sim(nksim_mujoco_world_create(&desc, &world_), "nksim_mujoco_world_create");
+#endif
+        else throw std::invalid_argument("simulation backend unavailable");
         const double half_extents[] = {0.05, 0.05, 0.05};
         require_sim(nksim_shape_create_box(world_, half_extents, &shape_),
                     "nksim_shape_create_box");
@@ -144,6 +153,19 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         bindings_.push_back(binding);
         binding->base_body_ = binding->bodies_[root];
         robot_base_bodies_.push_back(binding->base_body_);
+        for (uint32_t i = 0; i < (blueprint.sensor_count ? blueprint.sensor_count : 3); ++i) {
+            SimulationRobot::SensorState sensor;
+            if (blueprint.sensor_count) sensor.config = blueprint.sensors[i];
+            else {
+                sensor.config.kind = i + 1;
+                sensor.config.link = root;
+                sensor.config.rotation[3] = 1.0;
+                sensor.config.ray_count = 8;
+                sensor.config.max_range = 10.0;
+            }
+            binding->sensors_.push_back(sensor);
+        }
+        binding->reset_sensors();
 
         auto runtime = std::make_shared<RobotRuntime>(
             blueprint, std::static_pointer_cast<RobotEndpoint>(binding), period_);
@@ -238,7 +260,7 @@ rk_result Simulation::teleport_robot(uint32_t robot_index, const rk_simulation_p
     if (pose.struct_size < sizeof(pose)) return RK_ERROR_INVALID_ARGUMENT;
     const auto result = set_body_pose(world_, robot_base_bodies_[robot_index], pose.position, pose.rotation);
     if (result == RK_OK)
-        if (auto binding = bindings_[robot_index].lock()) binding->previous_time_ = -1.0;
+        if (auto binding = bindings_[robot_index].lock()) binding->reset_sensors();
     return result;
 }
 

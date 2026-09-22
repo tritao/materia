@@ -13,12 +13,14 @@ import RobotKitRuntime;
 class RobotRuntime {
   final owner:Ownedrk_robot_runtime;
   final defaultMaxRates:Array<Float>;
+  final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
   var disposed:Bool = false;
 
   @:allow(robotkit.runtime.Simulation)
   private function new(owner:Ownedrk_robot_runtime, blueprint:RobotRuntimeBlueprint) {
     this.owner = owner;
     defaultMaxRates = [for (joint in blueprint.joints) joint.maxRate];
+    sensorLayout = blueprint.sensorLayout();
   }
 
   /** Creates a standalone in-memory runtime with its own worker lifecycle. */
@@ -125,7 +127,7 @@ class RobotRuntime {
     value.set_struct_size(rk_robot_snapshot.size());
     check(RobotKitRuntime.rk_robot_runtime_snapshot_full(owner.borrow(), value).status,
       "runtime.snapshot");
-    return RobotSnapshot.fromNative(value);
+    return RobotSnapshot.fromNative(value, sensorLayout);
   }
 
   public function dispose():Void {

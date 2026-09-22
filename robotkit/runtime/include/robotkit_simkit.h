@@ -45,7 +45,7 @@ typedef struct rk_simulation_desc {
     uint32_t struct_size RK_STRUCT_SIZE;
     double fixed_timestep;
     uint32_t physics_substeps;
-    uint32_t reserved0;
+    uint32_t backend; /**< 0: deterministic test backend; 1: MuJoCo (must be built). */
     uint64_t reserved[4];
 } rk_simulation_desc;
 

@@ -19,12 +19,13 @@ bool valid_target_mode(rk_joint_target_mode mode) {
 }
 
 template <typename T> bool valid_sensors(const T &value) {
-    if (value.sensor_flags & ~3u) return false;
-    if (value.sensor_flags & 1u)
-        for (double sample : value.imu) if (!is_finite(sample)) return false;
-    if (value.sensor_flags & 2u)
-        for (double sample : value.lidar)
-            if (!is_finite(sample) || sample < 0.0 || sample > 10.0) return false;
+    if (value.sensor_count > RK_MAX_SENSORS) return false;
+    for (uint32_t i = 0; i < value.sensor_count; ++i) {
+        const auto &sample = value.sensors[i];
+        if (sample.value_count > RK_MAX_SENSOR_VALUES || (!sample.sequence && sample.value_count)) return false;
+        for (uint32_t j = 0; j < sample.value_count; ++j)
+            if (!is_finite(sample.values[j])) return false;
+    }
     return true;
 }
 
@@ -34,8 +35,21 @@ extern "C" {
 
 rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blueprint *blueprint) {
     if (!has_full_struct(blueprint) || blueprint->joint_count > RK_MAX_JOINTS ||
-        blueprint->link_count == 0)
+        blueprint->link_count == 0 || blueprint->sensor_count > RK_MAX_SENSORS)
         return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < blueprint->sensor_count; ++i) {
+        const auto &sensor = blueprint->sensors[i];
+        if (sensor.kind < RK_SENSOR_ENCODER || sensor.kind > RK_SENSOR_LIDAR ||
+            sensor.link >= blueprint->link_count || !is_finite(sensor.update_rate) || sensor.update_rate < 0.0 ||
+            !is_finite(sensor.noise_stddev) || sensor.noise_stddev < 0.0)
+            return RK_ERROR_INVALID_ARGUMENT;
+        double norm = 0.0;
+        for (double v : sensor.position) if (!is_finite(v)) return RK_ERROR_INVALID_ARGUMENT;
+        for (double v : sensor.rotation) { if (!is_finite(v)) return RK_ERROR_INVALID_ARGUMENT; norm += v*v; }
+        if (std::abs(norm - 1.0) > 1e-6) return RK_ERROR_INVALID_ARGUMENT;
+        if (sensor.kind == RK_SENSOR_LIDAR && (!sensor.ray_count || sensor.ray_count > RK_MAX_SENSOR_VALUES ||
+            !is_finite(sensor.max_range) || sensor.max_range <= 0.0)) return RK_ERROR_INVALID_ARGUMENT;
+    }
     for (uint32_t index = 0; index < blueprint->joint_count; ++index) {
         const auto &joint = blueprint->joints[index];
         if (joint.joint != index || joint.type < RK_RUNTIME_JOINT_FIXED ||

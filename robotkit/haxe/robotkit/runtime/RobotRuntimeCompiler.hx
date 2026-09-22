@@ -20,7 +20,7 @@ class RobotRuntimeCompiler {
       robot.links.length, robot.frames.length, new RobotRuntimeIdentity(
         [for (link in robot.links) link.id],
         [for (joint in robot.joints) joint.id],
-        [for (sensor in robot.sensors) sensor.id],
+        robot.sensors.length == 0 ? ["joint_encoders", "imu", "lidar"] : [for (sensor in robot.sensors) sensor.id],
         [for (frame in robot.frames) frame.id],
         [for (frame in robot.frames) frame.link.id]));
     for (index in 0...robot.joints.length) {
@@ -49,6 +49,21 @@ class RobotRuntimeCompiler {
       }
       result.addJoint(new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
         joint.limits.lower, joint.limits.upper, maxEffort, maxRate));
+    }
+    var children = [for (joint in robot.joints) joint.child];
+    var root = robot.links[0];
+    for (link in robot.links) if (children.indexOf(link) < 0) { root = link; break; }
+    if (robot.sensors.length == 0) {
+      for (sensor in RobotRuntimeSensorBlueprint.defaults(robot.links.indexOf(root), root.id))
+        result.sensors.push(sensor);
+    } else for (sensor in robot.sensors) {
+      var frame = sensor.frame;
+      var link = frame == null ? root : frame.link;
+      result.sensors.push(new RobotRuntimeSensorBlueprint(sensor.id, sensor.kind,
+        frame == null ? link.id : frame.id, link.id, robot.links.indexOf(link),
+        frame == null ? [0.0, 0.0, 0.0] : frame.position,
+        frame == null ? [0.0, 0.0, 0.0, 1.0] : frame.rotation,
+        sensor.updateRate, sensor.rayCount, sensor.maxRange, sensor.noiseStddev, sensor.noiseSeed));
     }
     return result;
   }
@@ -208,10 +223,14 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_NAME", '$path.name', "frame name is empty"));
       if (frame.link == null || robot.links.indexOf(frame.link) < 0)
         diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_LINK", '$path.link', "frame link does not belong to this robot"));
+      if (!validVector(frame.position, 3) || !validRotation(frame.rotation))
+        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_POSE", path, "mount requires finite translation and unit xyzw quaternion"));
     }
 
     var sensorIds = new Map<String, Bool>();
     var sensorNames = new Map<String, Bool>();
+    if (robot.sensors.length > RobotKitRuntimeConstants.RK_MAX_SENSORS)
+      diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_LIMIT", "sensors", "too many sensors"));
     for (index in 0...robot.sensors.length) {
       var sensor = robot.sensors[index];
       var path = 'sensors[$index]';
@@ -239,7 +258,16 @@ class RobotRuntimeCompiler {
       if (sensor.kind == null || sensor.kind.length == 0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_KIND", '$path.kind',
           "sensor kind is empty"));
-      if (sensor.updateRate < 0.0)
+      if (sensor.kind != "imu" && sensor.kind != "lidar" && sensor.kind != "joint_encoder")
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_UNSUPPORTED", '$path.kind', "unsupported sensor kind"));
+      if (sensor.frame != null && robot.frames.indexOf(sensor.frame) < 0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_FRAME", '$path.frame', "sensor frame does not belong to model"));
+      if (!Math.isFinite(sensor.noiseStddev) || sensor.noiseStddev < 0.0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_NOISE", path, "invalid noise standard deviation"));
+      if (sensor.kind == "lidar" && (sensor.rayCount < 1 || sensor.rayCount > RobotKitRuntimeConstants.RK_MAX_SENSOR_VALUES
+          || !Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0))
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_SCAN", path, "invalid LiDAR resolution or range"));
+      if (!Math.isFinite(sensor.updateRate) || sensor.updateRate < 0.0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RATE", '$path.updateRate',
           "sensor update rate must be non-negative"));
     }
@@ -289,5 +317,18 @@ class RobotRuntimeCompiler {
             "link is not reachable from the robot root"));
     }
     return diagnostics;
+  }
+
+  static function validVector(value:Array<Float>, count:Int):Bool {
+    if (value == null || value.length != count) return false;
+    for (v in value) if (!Math.isFinite(v)) return false;
+    return true;
+  }
+
+  static function validRotation(value:Array<Float>):Bool {
+    if (!validVector(value, 4)) return false;
+    var norm = 0.0;
+    for (v in value) norm += v*v;
+    return Math.abs(norm - 1.0) < 0.000001;
   }
 }

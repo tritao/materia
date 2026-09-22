@@ -13,11 +13,15 @@ class SensorFrameMsg {
   @:id(6) public var sourceTimestampNs:Int64;
   @:id(7) public var receivedTimestampNs:Int64;
   @:id(8) public var values:Array<Float>;
+  @:id(9) public var linkId:String;
+  @:id(10) public var mountPosition:Array<Float>;
+  @:id(11) public var mountRotation:Array<Float>;
 
   public function new(?robotId:Int64 = null, ?sensorId:String = "",
       ?kind:String = "", ?frameId:String = "", ?sequence:Int64 = null,
       ?sourceTimestampNs:Int64 = null, ?receivedTimestampNs:Int64 = null,
-      ?values:Array<Float> = null) {
+      ?values:Array<Float> = null, ?linkId:String = "",
+      ?mountPosition:Array<Float> = null, ?mountRotation:Array<Float> = null) {
     this.robotId = robotId == null ? Int64.ofInt(0) : robotId;
     this.sensorId = sensorId;
     this.kind = kind;
@@ -25,7 +29,10 @@ class SensorFrameMsg {
     this.sequence = sequence == null ? Int64.ofInt(0) : sequence;
     this.sourceTimestampNs = sourceTimestampNs == null ? Int64.ofInt(0) : sourceTimestampNs;
     this.receivedTimestampNs = receivedTimestampNs == null
-      ? this.sourceTimestampNs : receivedTimestampNs;
+      ? Int64.ofInt(0) : receivedTimestampNs;
     this.values = values == null ? [] : values.copy();
+    this.linkId = linkId;
+    this.mountPosition = mountPosition == null ? [0.0, 0.0, 0.0] : mountPosition.copy();
+    this.mountRotation = mountRotation == null ? [0.0, 0.0, 0.0, 1.0] : mountRotation.copy();
   }
 }

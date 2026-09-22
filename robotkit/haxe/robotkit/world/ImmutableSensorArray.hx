@@ -9,9 +9,7 @@ class ImmutableSensorArray {
     values = [];
     if (source != null) {
       for (frame in source)
-        values.push(new SensorFrame(frame.sensorId, frame.kind, frame.frameId,
-          frame.sequence, frame.sourceTimestampNs, frame.values.toArray(),
-          frame.receivedTimestampNs));
+        values.push(frame.copy());
     }
   }
 
@@ -19,9 +17,7 @@ class ImmutableSensorArray {
   public function toArray():Array<SensorFrame> {
     var result:Array<SensorFrame> = [];
     for (frame in values)
-      result.push(new SensorFrame(frame.sensorId, frame.kind, frame.frameId,
-        frame.sequence, frame.sourceTimestampNs, frame.values.toArray(),
-        frame.receivedTimestampNs));
+      result.push(frame.copy());
     return result;
   }
 

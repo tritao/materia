@@ -121,7 +121,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		struct_size: u32 @offset(0) @struct_size;
 		fixed_timestep: f64 @offset(8);
 		physics_substeps: u32 @offset(16);
-		reserved0: u32 @offset(20);
+		/**
+		 * < 0: deterministic test backend; 1: MuJoCo (must be built).
+		 */
+		backend: u32 @offset(20);
 		reserved: array<u64, 4> @offset(24);
 	}
 	/**

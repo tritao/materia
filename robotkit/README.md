@@ -58,14 +58,25 @@ simulation owner. Each simulated robot publishes transport-neutral joint
 encoder, IMU, and LiDAR frames with the same source clock, frame IDs, and
 sequences used by the remote path.
 
-IMU measures base-frame angular velocity and specific force from physics body
-state; its first sample after reset/teleport primes the derivative. LiDAR uses
-eight planar rays against the current box geometry, excluding own links.
-These measurements use SimKit's test backend; MuJoCo dynamics, arbitrary sensor
-mounts, and configurable scan patterns remain future work. Runtime receipt
+IMU measures mounted sensor-frame angular velocity and specific force from
+physics body state; its first sample after reset/teleport primes the derivative.
+Frames define mount translation/orientation; IDs and mounts survive compilation,
+wire transport, and recording. Sensors configure Hz, LiDAR ray count (1–64),
+range, and deterministic seeded Gaussian noise. LiDAR queries box geometry and
+excludes own links. Runtime receipt
 timestamps use the actual local monotonic clock, not the simulation tick hint.
 Absolute world-command deadlines are rejected until clock negotiation and
 runtime enforcement are available.
+
+MuJoCo is opt-in and tested through the same runtime/sensor implementation:
+
+```sh
+cmake -S robotkit/robotd/native -B /tmp/materia-mujoco -DROBOTD_BUILD_TESTS=ON -DNKSIM_BUILD_MUJOCO=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build /tmp/materia-mujoco -j 6
+ctest --test-dir /tmp/materia-mujoco --output-on-failure
+```
+
+Select it with `new Simulation(0.01, 2, 1)`; backend `0` remains the test backend.
 
 `robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
 `Robot` interface used by `RemoteRobot`. It does not own or dispose the

@@ -16,6 +16,15 @@ class RobotRuntimeBlueprint {
   public final linkCount:Int;
   public final frameCount:Int;
   public final joints:Array<RobotRuntimeJointBlueprint> = [];
+  public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
+
+  public function sensorLayout():Array<RobotRuntimeSensorBlueprint> {
+    if (sensors.length > 0) return sensors.copy();
+    var children = [for (joint in joints) joint.childLink];
+    var root = 0;
+    for (i in 0...linkCount) if (children.indexOf(i) < 0) { root = i; break; }
+    return RobotRuntimeSensorBlueprint.defaults(root, "base_link");
+  }
 
   public function new(revision:Int, jointCount:Int, linkCount:Int,
       ?frameCount:Int = 0, ?identity:RobotRuntimeIdentity) {
@@ -45,6 +54,10 @@ class RobotRuntimeBlueprint {
     value.set_joint_count(jointCount);
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);
+    var layout = sensorLayout();
+    if (layout.length > RobotKitRuntimeConstants.RK_MAX_SENSORS) throw "Too many sensors";
+    value.set_sensor_count(layout.length);
+    for (i in 0...layout.length) value.set_sensors(i, layout[i].nativeValue());
     for (index in 0...joints.length)
       value.set_joints(index, joints[index].nativeValue());
     return value;

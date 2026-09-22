@@ -2,6 +2,7 @@
 #include "simulation.hpp"
 
 #include <memory>
+#include <cmath>
 #include <mutex>
 #include <unordered_map>
 
@@ -32,12 +33,16 @@ extern "C" {
 rk_result RK_CALL rk_simulation_create(const rk_simulation_desc *desc,
                                        rk_simulation *out_simulation) {
     if (!desc || desc->struct_size < sizeof(*desc) || !out_simulation ||
-        desc->fixed_timestep <= 0.0 || desc->physics_substeps == 0)
+        !std::isfinite(desc->fixed_timestep) || desc->fixed_timestep <= 0.0 ||
+        desc->physics_substeps == 0 || desc->backend > 1)
         return RK_ERROR_INVALID_ARGUMENT;
     *out_simulation = RK_INVALID_SIMULATION;
+#ifndef RK_HAS_MUJOCO
+    if (desc->backend == 1) return RK_ERROR_UNSUPPORTED;
+#endif
     try {
         *out_simulation = store(std::make_shared<robotkit::Simulation>(
-            desc->fixed_timestep, desc->physics_substeps));
+            desc->fixed_timestep, desc->physics_substeps, desc->backend));
         return RK_OK;
     } catch (const std::bad_alloc &) {
         return RK_ERROR_OUT_OF_MEMORY;

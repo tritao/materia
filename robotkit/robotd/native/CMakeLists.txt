@@ -19,7 +19,7 @@ set(RK_BUILD_SIMKIT ON CACHE BOOL
 set(NK_BUILD_SHARED ON CACHE BOOL "Build SimKit dependencies as shared libraries" FORCE)
 set(NK_BUILD_TESTS OFF CACHE BOOL "Disable SimKit tests in robotd" FORCE)
 set(NK_BUILD_EXAMPLES OFF CACHE BOOL "Disable SimKit examples in robotd" FORCE)
-set(NKSIM_BUILD_MUJOCO OFF CACHE BOOL "Disable MuJoCo for the first robotd endpoint" FORCE)
+option(NKSIM_BUILD_MUJOCO "Build the optional MuJoCo simulation backend" OFF)
 
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../simkit" simkit)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../.." robotkit)

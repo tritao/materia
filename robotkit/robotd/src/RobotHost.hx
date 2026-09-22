@@ -33,6 +33,12 @@ class RobotHost {
     shoulder.limits.lower = -3.14;
     shoulder.limits.upper = 3.14;
     shoulder.limits.effort = 100.0;
+    var mount = robot.addFrame(new robotkit.model.Frame("sensor mount", base, "demo/sensor-mount"));
+    mount.position = [0.2, 0.0, 0.0];
+    for (kind in ["joint_encoder", "imu", "lidar"]) {
+      var sensor = robot.addSensor(new robotkit.model.Sensor(kind, kind, 0, 'demo/$kind'));
+      sensor.frame = mount;
+    }
     var blueprint = RobotRuntimeCompiler.compile(robot);
     if (args.indexOf("--server") >= 0) {
       var serverSimulation = new Simulation();

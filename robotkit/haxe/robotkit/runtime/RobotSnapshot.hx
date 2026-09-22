@@ -3,6 +3,8 @@ package robotkit.runtime;
 import RobotKitRuntime;
 import haxe.Int64;
 import robotkit.world.ImmutableFloatArray;
+import robotkit.world.ImmutableSensorArray;
+import robotkit.world.SensorFrame;
 
 /**
  * Immutable-by-ownership copy of one robot runtime observation.
@@ -23,8 +25,7 @@ class RobotSnapshot {
   public final q:ImmutableFloatArray;
   public final dq:ImmutableFloatArray;
   public final effort:ImmutableFloatArray;
-  public final imu:ImmutableFloatArray;
-  public final lidar:ImmutableFloatArray;
+  public final sensors:ImmutableSensorArray;
 
   /** Compatibility alias; source time is the runtime's primary observation clock. */
   public var timestampNs(get, never):Int64;
@@ -32,7 +33,7 @@ class RobotSnapshot {
   public function new(robotId:Int64, sequence:Int64, sourceTimestampNs:Int64,
       mode:Int, safety:Int, endpoint:Int, faultCode:Int,
       q:Array<Float>, dq:Array<Float>, effort:Array<Float>,
-      ?receivedTimestampNs:Int64, ?imu:Array<Float>, ?lidar:Array<Float>) {
+      ?receivedTimestampNs:Int64, ?sensors:Array<SensorFrame>) {
     this.robotId = robotId;
     this.sequence = sequence;
     this.sourceTimestampNs = sourceTimestampNs;
@@ -46,13 +47,12 @@ class RobotSnapshot {
     this.q = new ImmutableFloatArray(q);
     this.dq = new ImmutableFloatArray(dq);
     this.effort = new ImmutableFloatArray(effort);
-    this.imu = new ImmutableFloatArray(imu == null ? [] : imu);
-    this.lidar = new ImmutableFloatArray(lidar == null ? [] : lidar);
+    this.sensors = new ImmutableSensorArray(sensors);
   }
 
   /** Converts the native ABI value while leaving the semantic robot ID unset. */
   @:allow(RobotRuntime)
-  static function fromNative(value:rk_robot_snapshot):RobotSnapshot {
+  static function fromNative(value:rk_robot_snapshot, layout:Array<RobotRuntimeSensorBlueprint>):RobotSnapshot {
     var positions:Array<Float> = [];
     var velocities:Array<Float> = [];
     var efforts:Array<Float> = [];
@@ -62,17 +62,32 @@ class RobotSnapshot {
       velocities.push(value.get_velocity(index));
       efforts.push(value.get_effort(index));
     }
+    var frames:Array<SensorFrame> = [];
+    for (i in 0...value.get_sensor_count()) {
+      var sample = value.get_sensors(i);
+      if (sample.get_sequence() == Int64.ofInt(0)) continue;
+      var config = layout[i];
+      frames.push(new SensorFrame(config.id, config.kind, config.frameId,
+        sample.get_sequence(), sample.get_source_timestamp_ns(),
+        [for (j in 0...sample.get_value_count()) sample.get_values(j)], sample.get_received_timestamp_ns(),
+        config.linkId, config.position.toArray(), config.rotation.toArray()));
+    }
+    // Standalone endpoints may only report joint state; expose configured
+    // encoders from that actual state, never synthesize other sensor kinds.
+    if (value.get_sensor_count() == 0 && value.get_sequence() != Int64.ofInt(0))
+      for (config in layout) if (config.kind == "joint_encoder")
+        frames.push(new SensorFrame(config.id, config.kind, config.frameId,
+          value.get_sequence(), value.get_source_timestamp_ns(), positions, value.get_received_timestamp_ns(),
+          config.linkId, config.position.toArray(), config.rotation.toArray()));
     return new RobotSnapshot(Int64.ofInt(0), value.get_sequence(), value.get_source_timestamp_ns(),
       value.get_mode(), value.get_safety(), value.get_endpoint(), value.get_fault_code(),
-      positions, velocities, efforts, value.get_received_timestamp_ns(),
-      (value.get_sensor_flags() & 1) != 0 ? [for (i in 0...6) value.get_imu(i)] : [],
-      (value.get_sensor_flags() & 2) != 0 ? [for (i in 0...8) value.get_lidar(i)] : []);
+      positions, velocities, efforts, value.get_received_timestamp_ns(), frames);
   }
 
   /** Returns an immutable copy associated with a caller-provided robot ID. */
   public function withRobotId(value:Int64):RobotSnapshot
     return new RobotSnapshot(value, sequence, sourceTimestampNs, mode, safety, endpoint, faultCode,
-      q.toArray(), dq.toArray(), effort.toArray(), receivedTimestampNs, imu.toArray(), lidar.toArray());
+      q.toArray(), dq.toArray(), effort.toArray(), receivedTimestampNs, sensors.toArray());
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;
 }

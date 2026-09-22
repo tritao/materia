@@ -415,7 +415,8 @@ class RobotServer {
     for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot))
       sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
         snapshot.robotId, sensor.sensorId, sensor.kind, sensor.frameId, sensor.sequence,
-        sensor.sourceTimestampNs, sensor.receivedTimestampNs, sensor.values.toArray()),
+        sensor.sourceTimestampNs, sensor.receivedTimestampNs, sensor.values.toArray(),
+        sensor.linkId, sensor.mountPosition.toArray(), sensor.mountRotation.toArray()),
         targetSession, sensor.sequence, sensor.sourceTimestampNs));
   }
 
