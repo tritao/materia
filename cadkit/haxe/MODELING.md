@@ -118,7 +118,8 @@ uses width as radius. Each feature has an immutable workplane. Compose with
 existing `BooleanFeature`, `TransformFeature`, `ExtrudeFeature`,
 `RevolveFeature`, and finishing features. `DocumentCodec` persists the profile,
 parameters, and plane; recompute recreates geometry. Transactions support
-parameter undo/redo. Document persistence uses the version-2 format.
+parameter undo/redo. Persistence writes version 2 and reads version 1 for
+element-registry migration.
 
 This adapter is optional: immediate modeling does not create a feature graph.
 Immediate builders do not silently create feature graphs. Use the explicit

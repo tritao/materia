@@ -141,6 +141,7 @@ Documents also own persistent `DocumentId` and `ElementId` values. An element
 records a name and one output feature, and several elements can expose separate
 committed shapes from the same feature graph. Element creation, removal,
 renaming, duplication, and output reassignment use document undo/redo without
-deleting features. Format version 2 persists this registry and rejects other
-format versions. These IDs describe document-level objects and do not replace
-topology remapping for faces or edges.
+deleting features. Format version 2 persists this registry. Version 1 input is
+migrated by exposing its effective output as a `Model` element. These IDs
+describe document-level objects and do not replace topology remapping for faces
+or edges.

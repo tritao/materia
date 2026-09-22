@@ -84,11 +84,12 @@ class DocumentCodec {
 			var root:Dynamic = Json.parse(text);
 			if (stringField(root, "format") != FORMAT)
 				throw new ParametricError("unsupported document format");
-			if (intField(root, "version") != VERSION)
+			var version = intField(root, "version");
+			if (version != 1 && version != VERSION)
 				throw new ParametricError("unsupported document version");
 
 			var records:Array<Dynamic> = cast requiredField(root, "features");
-			document = clone ? new Document() : new Document(new DocumentId(stringField(root, "documentId")));
+			document = version == 1 || clone ? new Document() : new Document(new DocumentId(stringField(root, "documentId")));
 			var pendingReferences:Array<Dynamic> = [];
 			for (record in records) {
 				var featureId = intField(record, "id");
@@ -167,10 +168,16 @@ class DocumentCodec {
 					decodeReference(pendingFeature, reference);
 			}
 
-			var parameterRecords:Array<Dynamic> = cast requiredField(root, "parameters");
-			for (record in parameterRecords)
-				document.defineTypedParameter(stringField(record, "name"), numberField(record, "value"),
-					stringField(record, "kind"), stringField(record, "unit"));
+			var rawParameterRecords:Dynamic = Reflect.field(root, "parameters");
+			var parameterRecords:Array<Dynamic> = rawParameterRecords == null ? [] : cast rawParameterRecords;
+			for (record in parameterRecords) {
+				var rawKind:Dynamic = Reflect.field(record, "kind");
+				if (rawKind == null)
+					document.defineParameter(stringField(record, "name"), numberField(record, "value"));
+				else
+					document.defineTypedParameter(stringField(record, "name"), numberField(record, "value"),
+						stringField(record, "kind"), stringField(record, "unit"));
+			}
 			for (record in parameterRecords) {
 				var rawExpression:Dynamic = Reflect.field(record, "expression");
 				if (rawExpression != null) {
@@ -187,12 +194,19 @@ class DocumentCodec {
 					named.bind(feature.parameter(stringField(binding, "parameter")));
 				}
 			}
-			document.setOutput(requiredFeature(document, intField(root, "output")));
-			var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
-			for (elementRecord in elementRecords)
-				document.installElement(stringField(elementRecord, "name"),
-					requiredFeature(document, intField(elementRecord, "output")),
-					new ElementId(stringField(elementRecord, "id")));
+			var rawOutput:Dynamic = Reflect.field(root, "output");
+			if (rawOutput != null)
+				document.setOutput(requiredFeature(document, integerValue(rawOutput, "output")));
+			var effectiveOutput = document.outputFeature();
+			if (version == 1) {
+				document.installElement("Model", effectiveOutput, new ElementId());
+			} else {
+				var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
+				for (elementRecord in elementRecords)
+					document.installElement(stringField(elementRecord, "name"),
+						requiredFeature(document, intField(elementRecord, "output")),
+						new ElementId(stringField(elementRecord, "id")));
+			}
 
 			document.recompute();
 			return document;

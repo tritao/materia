@@ -94,6 +94,14 @@ class ElementSmoke {
 		failed = false;
 		try DocumentCodec.decode(Json.stringify(unsupportedVersion)) catch (error:Dynamic) failed = true;
 		check(failed, "unsupported document versions are rejected");
+		var implicitOutput:Dynamic = Json.parse(encoded);
+		Reflect.setField(implicitOutput, "version", 1);
+		Reflect.setField(implicitOutput, "output", null);
+		Reflect.setField(implicitOutput, "elements", null);
+		var migrated = DocumentCodec.decode(Json.stringify(implicitOutput));
+		check(migrated.elementCount() == 1 && migrated.elementAt(0).name == "Model"
+			&& migrated.elementAt(0).output == migrated.outputFeature(),
+			"implicit version-one output migrates into the element registry");
 
 		var duplicateIds:Dynamic = Json.parse(encoded);
 		var duplicateRecords:Array<Dynamic> = cast Reflect.field(duplicateIds, "elements");
@@ -108,6 +116,7 @@ class ElementSmoke {
 		try DocumentCodec.decode(Json.stringify(dangling)) catch (error:Dynamic) failed = true;
 		check(failed, "dangling persisted element outputs are rejected");
 
+		migrated.close();
 		cloned.close();
 		opened.close();
 		persisted.close();
