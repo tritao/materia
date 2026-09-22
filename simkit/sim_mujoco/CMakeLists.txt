@@ -22,6 +22,8 @@ if(NK_SIM_MUJOCO_USE_VENDORED)
         "Build with OpenUSD")
     set(MUJOCO_USE_FILAMENT OFF CACHE BOOL
         "Use filament rendering")
+    set(MUJOCO_BUILD_SHARED OFF CACHE BOOL
+        "Embed a PIC static MuJoCo runtime in the NativeKit backend" FORCE)
 
     add_subdirectory("${NK_MUJOCO_SOURCE_DIR}"
         "${CMAKE_BINARY_DIR}/vendor/mujoco")
@@ -54,12 +56,19 @@ target_link_libraries(nativekit_sim_mujoco
     PUBLIC NativeKit::sim_core
     PRIVATE ${NK_MUJOCO_TARGET})
 if(UNIX AND NOT APPLE)
-    # Some Linux toolchains enable --as-needed by default. Keep MuJoCo's
-    # DT_NEEDED entry even when the plugin is linked as a shared module, and
-    # fail the build instead of shipping a plugin with unresolved mj_* APIs.
+    # The vendored MuJoCo archive is implementation detail of this plugin.
+    # Localize its public C API and reject unresolved backend dependencies.
     target_link_options(nativekit_sim_mujoco PRIVATE
-        "LINKER:--no-as-needed"
+        "LINKER:--exclude-libs,ALL"
         "LINKER:-z,defs")
+    if(NK_SIM_MUJOCO_USE_VENDORED AND CMAKE_READELF)
+        add_custom_command(TARGET nativekit_sim_mujoco POST_BUILD
+            COMMAND "${CMAKE_COMMAND}"
+                "-DPLUGIN=$<TARGET_FILE:nativekit_sim_mujoco>"
+                "-DREADELF=${CMAKE_READELF}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/verify_embedded_mujoco.cmake"
+            VERBATIM)
+    endif()
 endif()
 set_target_properties(nativekit_sim_mujoco PROPERTIES
     EXPORT_NAME sim_mujoco
