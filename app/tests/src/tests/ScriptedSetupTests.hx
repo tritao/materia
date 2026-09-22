@@ -10,6 +10,11 @@ import app.SetupScriptRegistry;
 import app.examples.TwoRobotSetupScript;
 import haxe.Json;
 import robotkit.world.RobotWorld;
+import robotkit.world.McapRobotRecording;
+import robotkit.world.McapRecordingReader;
+import robotkit.world.ReplayRobot;
+import robotkit.behavior.HoldJointBehavior;
+import robotkit.behavior.WorldBehaviorRunner;
 import robotkit.model.Sensor;
 import sys.FileSystem;
 import sys.io.File;
@@ -116,6 +121,9 @@ class ScriptedSetupTests {
       && reopenedLidar.noiseStddev == 0.125 && reopened.scene.records()[0].width == 1.0,
       "typed script overrides survive reopen"
     );
+    check(reopenedLidar.frame != null && reopenedLidar.frame.link.id == "arm"
+      && reopenedLidar.frame.position[0] == 0.6 && reopenedLidar.rayCount == 17,
+      "scripted sensor identity, link mount, and ray count survive reopen");
 
     var legacy = '{"format":"materia.scene","version":1,"objects":[],"sensors":null,"script":{'
       + '"reference":"${TwoRobotSetupScript.REFERENCE}","version":1,"overridesEnabled":true,'
@@ -158,6 +166,51 @@ class ScriptedSetupTests {
       simulation.backend == ApplicationSimulation.MUJOCO && simulation.timestep == 0.01,
       "headless instantiation reproduces the script simulation settings"
     );
+    var recordingPath = directory + "/scripted.mcap";
+    var writer = new McapRobotRecording(recordingPath, 1024 * 1024, false);
+    var observed = simulation.step();
+    for (index in 0...8) observed = simulation.step();
+    for (robotId in ["materia/robot", "materia/robot-b"]) {
+      var robot = observed.robot(robotId);
+      check(robot != null && robot.sensors.length == 3, "scripted robots publish all configured sensors");
+      if (robot != null) {
+        writer.recordSnapshot(robot);
+        for (frame in robot.sensors.toArray()) writer.recordSensor(robotId, frame);
+      }
+    }
+    writer.close();
+    var loaded = McapRecordingReader.load(recordingPath);
+    for (robotId in ["materia/robot", "materia/robot-b"]) {
+      var original = observed.robot(robotId);
+      var replay = new ReplayRobot(robotId, loaded);
+      check(original != null && replay.snapshot().id == robotId,
+        "MCAP replay selects the scripted robot by stable ID");
+      if (original != null) {
+        var expected = original.sensors.toArray();
+        var actual = replay.sensors();
+        check(actual.length == expected.length, "MCAP replay preserves the scripted sensor count");
+        for (index in 0...expected.length) check(actual[index].sensorId == expected[index].sensorId
+          && actual[index].linkId == expected[index].linkId
+          && actual[index].mountPosition.get(0) == expected[index].mountPosition.get(0)
+          && haxe.Int64.compare(actual[index].sequence, expected[index].sequence) == 0
+          && haxe.Int64.compare(actual[index].sourceTimestampNs, expected[index].sourceTimestampNs) == 0
+          && actual[index].values.length == expected[index].values.length,
+          "MCAP replay preserves sensor IDs, owning links, mounts, and measurements");
+        for (index in 0...expected.length) for (sample in 0...expected[index].values.length)
+          check(actual[index].values.get(sample) == expected[index].values.get(sample),
+            "MCAP replay preserves each scripted sensor measurement");
+      }
+      var liveAdapter = world.robot(robotId);
+      check(liveAdapter != null && new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25)).update(liveAdapter) == 1,
+        "scripted behavior produces a command from live simulation observations");
+      check(new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25)).update(replay) == 1
+        && replay.generatedCommands.commands.length == 1 && loaded.commands.length == 0,
+        "the same behavior consumes replay observations without altering historical commands");
+      replay.close();
+    }
+    FileSystem.deleteFile(recordingPath);
+    var recordingStatusPath = recordingPath + ".incomplete.status";
+    if (FileSystem.exists(recordingStatusPath)) FileSystem.deleteFile(recordingStatusPath);
     simulation.start();
     var generation = session.generation;
     SetupScriptRegistry.register(TwoRobotSetupScript.REFERENCE, function() return new FailingReloadScript());

@@ -26,7 +26,7 @@ class ScriptOwnership {
   public var diagnostics(default, null):Array<String> = [];
   public var staleOverrides(default, null):Array<String> = [];
   var baseline:ScriptedSetup;
-  final overrides:Map<String, String> = new Map();
+  final overrides:Map<String, ScriptOverrideRecord> = new Map();
 
   public function new(reference:String, ? record:ScriptOwnershipRecord) {
     this.reference = reference;
@@ -37,7 +37,7 @@ class ScriptOwnership {
       var loaded:ScriptOwnershipRecord = record;
       overridesEnabled = loaded.overridesEnabled;
       savedVersion = loaded.version;
-      for (item in loaded.overrides) overrides.set(key(item.targetId, item.property), Json.stringify(item));
+      for (item in loaded.overrides) overrides.set(key(item.targetId, item.property), copyOverride(item));
     }
     baseline = new ScriptedSetup();
     var provider = SetupScriptRegistry.provider(reference);
@@ -84,7 +84,7 @@ class ScriptOwnership {
     var record:Dynamic = Json.parse(Json.stringify(source.records()));
     var sensors = new SensorConfiguration(record);
     try {
-      var objects:Array<SceneObjectData> = Json.parse(Json.stringify(baseline.objects));
+      var objects = cloneObjects();
       var settings:ScriptSettings = {backend: baseline.backend, timestep: baseline.timestep};
       applyOverrides(sensors, objects, settings);
       validateSensors(sensors);
@@ -119,11 +119,11 @@ class ScriptOwnership {
   );
   public function setOverride(targetId:String, property:String, kind:String, value:Dynamic):Bool {
     if (!overridesEnabled) throw "Enable overrides before changing script-owned values";
-    var next = overrideRecord(targetId, property, kind, value), nextText = Json.stringify(next);
+    var next = overrideRecord(targetId, property, kind, value);
     validateOverride(next);
     var k = key(targetId, property), had = overrides.exists(k), before = overrides.get(k);
-    if (had && before == nextText) return false;
-    overrides.set(k, nextText);
+    if (had && before != null && before.kind == next.kind && before.encodedValue == next.encodedValue) return false;
+    overrides.set(k, next);
     try validateCandidate(k) catch (error:Dynamic) {
       if (had) overrides.set(k, cast before);
       else overrides.remove(k);
@@ -132,7 +132,7 @@ class ScriptOwnership {
     }
     if (had) overrides.set(k, cast before);
     else overrides.remove(k);
-    document.apply(new EditOperation("Override " + property, function() overrides.set(k, nextText), function() {
+    document.apply(new EditOperation("Override " + property, function() overrides.set(k, next), function() {
       if (had) overrides.set(k, cast before);
       else overrides.remove(k);
     }
@@ -167,14 +167,14 @@ class ScriptOwnership {
   public function revertTarget(targetId:String):Bool {
     var removed:Array<ScriptOverrideRecord> = [];
     for (value in overrides) {
-      var item = decodeOverride(value);
+      var item = value;
       if (item.targetId == targetId) removed.push(item);
     }
     if (removed.length == 0) return false;
     document.apply(new EditOperation("Revert script overrides for " + targetId, function() {
       for (item in removed) overrides.remove(key(item.targetId, item.property));
     }, function() {
-      for (item in removed) overrides.set(key(item.targetId, item.property), Json.stringify(item));
+      for (item in removed) overrides.set(key(item.targetId, item.property), item);
     }
     ));
     refreshDiagnostics();
@@ -185,23 +185,23 @@ class ScriptOwnership {
     var removed:Array<ScriptOverrideRecord> = [];
     for (k in staleOverrides) {
       var item = overrides.get(k);
-      if (item != null) removed.push(decodeOverride(item));
+      if (item != null) removed.push(item);
     }
     document.apply(new EditOperation("Remove stale script overrides", function() {
       for (item in removed) overrides.remove(key(item.targetId, item.property));
     }, function() {
-      for (item in removed) overrides.set(key(item.targetId, item.property), Json.stringify(item));
+      for (item in removed) overrides.set(key(item.targetId, item.property), item);
     }
     ));
     refreshDiagnostics();
     return true;
   }
   public function backend():Int {
-    var text = overrides.get(key(SIMULATION_TARGET, "backend")), item = text == null ? null : decodeOverride(text);
+    var item = overrides.get(key(SIMULATION_TARGET, "backend"));
     return overridesEnabled && item != null ? cast overrideValue(item) : baseline.backend;
   }
   public function timestep():Float {
-    var text = overrides.get(key(SIMULATION_TARGET, "timestep")), item = text == null ? null : decodeOverride(text);
+    var item = overrides.get(key(SIMULATION_TARGET, "timestep"));
     return overridesEnabled && item != null ? cast overrideValue(item) : baseline.timestep;
   }
   public function markSaved():Void {
@@ -211,7 +211,7 @@ class ScriptOwnership {
   }
   public function record():ScriptOwnershipRecord {
     var values:Array<ScriptOverrideRecord> = [];
-    for (k in overrides.keys()) values.push(decodeOverride(overrides.get(k)));
+    for (k in overrides.keys()) values.push(copyOverride(overrides.get(k)));
     values.sort(function(a, b) return Reflect.compare(a.targetId + "/" + a.property, b.targetId + "/" + b.property));
     return {
       reference: reference,
@@ -225,14 +225,16 @@ class ScriptOwnership {
     var found = new Map<String, Bool>();
     var orderedKeys = [for (k in overrides.keys()) k];
     orderedKeys.sort(function(left, right) {
-      var leftItem = decodeOverride(overrides.get(left)), rightItem = decodeOverride(overrides.get(right));
+      var leftItem:ScriptOverrideRecord = cast overrides.get(left);
+      var rightItem:ScriptOverrideRecord = cast overrides.get(right);
       var leftPriority = leftItem.property == "mount.frameId" ? 0 : 1;
       var rightPriority = rightItem.property == "mount.frameId" ? 0 : 1;
       return leftPriority == rightPriority ? Reflect.compare(left, right) : leftPriority - rightPriority;
     }
     );
     for (k in orderedKeys) {
-      var item = decodeOverride(overrides.get(k)), applied = false;
+      var item:ScriptOverrideRecord = cast overrides.get(k);
+      var applied = false;
       if (item.targetId == SIMULATION_TARGET) applied = applySimulation(item, settings);
       if (!applied) for (robot in sensors.robotModels()) {
         if (item.targetId == robot.id) applied = applyRobot(item, robot.position, robot.rotation, sensors, robot.id);
@@ -261,7 +263,7 @@ class ScriptOwnership {
       var source:SensorConfiguration = baseline.sensors;
       var records:Dynamic = Json.parse(Json.stringify(source.records()));
       sensors = new SensorConfiguration(records);
-      var objects:Array<SceneObjectData> = Json.parse(Json.stringify(baseline.objects));
+      var objects = cloneObjects();
       var settings:ScriptSettings = {backend: baseline.backend, timestep: baseline.timestep};
       applyOverrides(sensors, objects, settings);
       validateSensors(sensors);
@@ -275,7 +277,7 @@ class ScriptOwnership {
     var records:Dynamic = Json.parse(Json.stringify(source.records()));
     var sensors = new SensorConfiguration(records);
     try {
-      var objects:Array<SceneObjectData> = Json.parse(Json.stringify(baseline.objects));
+      var objects = cloneObjects();
       var settings:ScriptSettings = {backend: baseline.backend, timestep: baseline.timestep};
       applyOverrides(sensors, objects, settings);
       validateSensors(sensors);
@@ -296,6 +298,11 @@ class ScriptOwnership {
     var issues = RobotRuntimeCompiler.validate(robot.model);
     if (issues.length > 0) throw issues[0].code + ": " + issues[0].message;
   }
+  function cloneObjects():Array<SceneObjectData> return SceneCodec.decode(Json.stringify({
+    format: SceneCodec.FORMAT,
+    version: SceneCodec.VERSION,
+    objects: baseline.objects
+  }));
   static function validateSetup(value:ScriptedSetup, expectedReference:String):Void {
     if (value.reference != expectedReference || StringTools.trim(value.reference).length == 0
       || value.version < 1 || value.sensors == null || value.objects == null
@@ -326,11 +333,11 @@ class ScriptOwnership {
   ):Bool switch item.property {
     case "position":
       if (item.kind != "vector") return false;
-      if (overridesEnabled) sensors.setRobotPose(robotId, cast overrideValue(item), sensors.robotRotation(robotId));
+      if (overridesEnabled) sensors.setRobotPose(robotId, vectorValue(item), sensors.robotRotation(robotId));
       return true;
     case "rotation":
       if (item.kind != "vector") return false;
-      if (overridesEnabled) sensors.setRobotPose(robotId, sensors.robotPosition(robotId), cast overrideValue(item));
+      if (overridesEnabled) sensors.setRobotPose(robotId, sensors.robotPosition(robotId), vectorValue(item));
       return true;
     default:
       return false;
@@ -355,10 +362,10 @@ class ScriptOwnership {
         if (overridesEnabled) sensor.noiseSeed = cast overrideValue(item);
       case "mount.position":
         if (item.kind != "vector" || frame == null) return false;
-        if (overridesEnabled) frame.position = cast overrideValue(item);
+        if (overridesEnabled) frame.position = vectorValue(item);
       case "mount.rotation":
         if (item.kind != "vector" || frame == null) return false;
-        if (overridesEnabled) frame.rotation = cast overrideValue(item);
+        if (overridesEnabled) frame.rotation = vectorValue(item);
       case "mount.frameId":
         if (item.kind != "text") return false;
         var next:Null<robotkit.model.Frame> = null;
@@ -375,13 +382,13 @@ class ScriptOwnership {
     switch item.property {
       case "position":
         if (item.kind != "vector") return false;
-        var value:Array<Float> = cast overrideValue(item);
+        var value = vectorValue(item);
         object.x = value[0];
         object.y = value[1];
         object.z = value[2];
       case "dimensions":
         if (item.kind != "vector") return false;
-        var value:Array<Float> = cast overrideValue(item);
+        var value = vectorValue(item);
         object.width = value[0];
         object.height = value[1];
         object.depth = value[2];
@@ -458,12 +465,12 @@ class ScriptOwnership {
         requireVector(item, 3);
       case "dimensions":
         requireVector(item, 3);
-        var dimensions:Array<Float> = overrideValue(item);
+        var dimensions = vectorValue(item);
         for (component in dimensions) if (component <= 0) throw "Object dimensions must be positive";
       case "rotation" | "mount.rotation":
         requireVector(item, 4);
         var norm = 0.0;
-        var rotation:Array<Float> = overrideValue(item);
+        var rotation = vectorValue(item);
         for (component in rotation) norm += component * component;
         if (Math.abs(norm - 1.0) > 0.000001) throw "Override rotation must be a unit quaternion";
       case "mount.position":
@@ -476,13 +483,29 @@ class ScriptOwnership {
     if (item.kind != "vector" || values.length != length) throw 'Override ${item.property} requires $length values';
   }
   static function numberValue(value:Dynamic):Float return value;
+  static function vectorValue(item:ScriptOverrideRecord):Array<Float> {
+    var values:Array<Dynamic> = overrideValue(item);
+    return [for (value in values) numberValue(value)];
+  }
   public static function overrideRecord(targetId:String,
     property:String, kind:String, value:Dynamic):ScriptOverrideRecord {
     return {targetId: targetId, property: property, kind: kind, encodedValue: Json.stringify(value)};
   }
-  static function overrideValue(item:ScriptOverrideRecord):Dynamic return Json.parse(item.encodedValue);
-  static function decodeOverride(value:String):ScriptOverrideRecord return Json.parse(value);
-  static function cloneValue(value:Dynamic):Dynamic return Json.parse(Json.stringify(value));
+  static function overrideValue(item:ScriptOverrideRecord):Dynamic {
+    try {
+      return Json.parse(item.encodedValue);
+    } catch (error:Dynamic) {
+      throw 'Invalid ${item.property} override value: ' + Std.string(error);
+    }
+  }
+  static function copyOverride(parsed:ScriptOverrideRecord):ScriptOverrideRecord {
+    return {
+      targetId: parsed.targetId,
+      property: parsed.property,
+      kind: parsed.kind,
+      encodedValue: parsed.encodedValue
+    };
+  }
   static inline function key(target:String, property:String):String return target + "|" + property;
   public function dispose():Void baseline.dispose();
 }
