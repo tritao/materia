@@ -71,6 +71,14 @@ configuration intact. Reset restores the applied physics state without copying
 unapplied editor values into it. Applying settings to physical hardware is
 never automatic.
 
+Sensor documents retain an independent model for every configured logical
+robot. One application-owned simulation compiles all of those models, imports
+visible scene rectangles as static obstacles, and attaches `SimulatedRobot`
+adapters to the shared `RobotWorld`. Attached robots not owned by that
+simulation are treated as remote and read-only. Rebuild replaces all simulated
+robots and environment bodies together; pending edits never mutate active
+physics, and any validation or construction failure preserves the active world.
+
 Scene files are UTF-8 JSON with `format: "materia.scene"`, `version: 1`, and an
 `objects` array plus an optional `sensors` robot configuration. Each rectangle stores its stable string `id`, `label`, `type`,
 `x/y/z`, `width/height`, `red/green/blue`, and `visible` fields. Selection, camera,

@@ -11,9 +11,12 @@ import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import app.SceneDocumentSession;
 import app.SensorConfiguration;
+import app.ApplicationSimulation;
+import robotkit.world.RobotWorld;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
 import robotkit.world.ReplayRobot;
+import robotkit.world.RobotRecording;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -278,10 +281,12 @@ class SceneEditingTests {
     var sensors=new SensorConfiguration();
     check(sensors.model.sensors.length==1&&sensors.model.sensors[sensors.selectedIndex].kind=="lidar",
       "sensor panel starts with an editable LiDAR");
+    var selectionRevision=sensors.document.revision;
     check(sensors.selectRobot("robot/selected")&&sensors.robotId=="robot/selected",
       "sensor configuration selects an explicit robot target");
-    check(sensors.document.undo()&&sensors.robotId=="materia/robot",
-      "robot selection participates in undo");
+    check(sensors.document.revision==selectionRevision,
+      "robot selection does not create a configuration edit");
+    sensors.selectRobot("materia/robot");
     var properties=sensors.properties();
     var rays=new PropertyBinding(properties[3],sensors.context());
     check(switch rays.apply(PropertyValue.Int(65)){case PropertyEditResult.Rejected(_):true;default:false;},
@@ -298,19 +303,23 @@ class SceneEditingTests {
     check(sensors.document.undo()&&sensors.model.sensors.length==2,
       "sensor add/remove operations participate in undo");
     check(sensors.diagnostics().length==0,"sensor UI produces a runtime-valid model");
-    check(sensors.apply(),"valid sensor edits build a simulation runtime: "+sensors.applyError);
-    var appliedRevision=sensors.appliedRevision;
+    var scene=new EditorScene();
+    var world=new RobotWorld();
+    var simulation=new ApplicationSimulation(world);
+    check(simulation.rebuild(sensors,scene),"valid sensor edits build a shared simulation: "+simulation.error);
+    var appliedRevision=simulation.appliedRevision;
     sensors.model.sensors[0].rayCount=0;
-    check(!sensors.apply()&&sensors.appliedRevision==appliedRevision,
+    check(!simulation.rebuild(sensors,scene)&&simulation.appliedRevision==appliedRevision,
       "failed sensor rebuild preserves the running configuration");
     sensors.model.sensors[0].rayCount=8;
-    var observation=sensors.step();
+    var observation=simulation.step().robot("materia/robot");
     check(observation!=null&&observation.sensors.length>0,
       "applied sensor configuration produces simulated measurements");
-    sensors.dispose();
+    simulation.dispose();world.close();scene.dispose();sensors.dispose();
   }
 
   static function sensorWorkflow():Void {
+    // Exercises the serialized multi-robot configuration boundary.
     var directory = "build/sensor-workflow-" + Std.random(100000000);
     FileSystem.createDirectory(directory);
     var documentPath = directory + "/robot.materia.json";
@@ -322,30 +331,63 @@ class SceneEditingTests {
       "sensor workflow edits acquisition rate");
     check(mountX.apply(PropertyValue.Float(0.25)) == PropertyEditResult.Applied,
       "sensor workflow edits mount position");
+    check(session.sensors.selectRobot("materia/robot-b"),"sensor workflow adds a second robot target");
+    new PropertyBinding(session.sensors.properties()[2],session.sensors.context()).apply(PropertyValue.Float(10.0));
     check(session.isDirty(), "sensor edits dirty the application document");
     session.save(documentPath);
     session.open(documentPath);
+    check(session.sensors.configuredRobotIds().length==2,"two robot configurations survive reload");
+    check(session.sensors.model.sensors[0].updateRate==10.0,
+      "selected second robot retains its independent sensor rate");
+    session.sensors.selectRobot("materia/robot");
     var restoredFrame = session.sensors.model.sensors[0].frame;
     check(restoredFrame != null && session.sensors.model.sensors[0].updateRate == 20.0 &&
       restoredFrame.position[0] == 0.25,
       "sensor settings survive document save and reload");
-    check(session.sensors.apply(), "reloaded sensor document builds a simulation");
-    var observation = session.sensors.step();
-    for (index in 0...8) observation = session.sensors.step();
-    check(observation != null && observation.sensors.length > 0,
-      "reloaded configuration produces sensor measurements");
-    if (observation == null) throw "Sensor workflow has no observation";
+    var world=new RobotWorld();
+    var simulation=new ApplicationSimulation(world);
+    check(simulation.rebuild(session.sensors,session.scene), "reloaded robots build one shared simulation");
+    var appliedRevision=simulation.appliedRevision;
+    session.sensors.selectRobot("remote/readonly");
+    world.attach(new ReplayRobot("remote/readonly",new RobotRecording()));
+    session.sensors.setReadOnlyRobots(["remote/readonly"]);
+    check(!session.sensors.isEditable()&&session.sensors.properties().length==0,
+      "remote robot sensor targets are read-only");
+    check(!simulation.rebuild(session.sensors,session.scene)&&simulation.appliedRevision==appliedRevision&&
+      world.robot("materia/robot")!=null,"remote target rejection preserves active simulated robots");
+    check(session.sensors.removeRobotConfiguration("remote/readonly"),
+      "unsupported remote configuration can be removed without touching the live world");
+    var remote=world.detach("remote/readonly");if(remote!=null)remote.close();
+    session.sensors.selectRobot("materia/robot");
+    session.sensors.setReadOnlyRobots(["remote/readonly"]);
+    var observation = simulation.step();
+    for (index in 0...8) observation = simulation.step();
+    check(observation.robotIds().length==2,"shared simulation publishes two independently configured robots");
+    var firstRobot=observation.robot("materia/robot");
+    if(firstRobot==null)throw "Shared simulation lost the first robot";
+    var sawObstacle=false;
+    for(frame in firstRobot.sensors.toArray())if(frame.kind=="lidar")
+      for(value in frame.values.toArray())if(value<session.sensors.model.sensors[0].maxRange)sawObstacle=true;
+    check(sawObstacle,"LiDAR observes geometry populated from the Materia scene");
     var writer = new McapRobotRecording(recordingPath);
-    for (frame in observation.sensors.toArray()) writer.recordSensor(session.sensors.robotId, frame);
+    for(robotId in observation.robotIds()) {
+      var robot=observation.robot(robotId);
+      if(robot==null)throw "Shared simulation snapshot lost a robot";
+      for(frame in robot.sensors.toArray())writer.recordSensor(robotId,frame);
+    }
     writer.close();
     var loaded = McapRecordingReader.load(recordingPath);
-    var replay = new ReplayRobot(session.sensors.robotId, loaded);
+    var recordedRobots=new Map<String,Bool>();
+    for(entry in loaded.entries)recordedRobots.set(entry.robotId,true);
+    check(recordedRobots.exists("materia/robot")&&recordedRobots.exists("materia/robot-b"),
+      "recording retains observations for both simulated robots");
+    var replay = new ReplayRobot("materia/robot", loaded);
     var replayed = replay.sensors();
     check(replayed.length > 0 && replayed[0].sensorId == session.sensors.model.sensors[0].id,
       "record/replay preserves configured sensor identity");
     check(replayed[0].mountPosition.get(0) == 0.25 && replayed[0].values.length > 0,
       "record/replay preserves sensor mount and measurements");
-    replay.close(); session.dispose();
+    replay.close(); simulation.dispose(); world.close(); session.dispose();
     FileSystem.deleteFile(recordingPath);
     var statusPath = recordingPath + ".incomplete.status";
     if (FileSystem.exists(statusPath)) FileSystem.deleteFile(statusPath);

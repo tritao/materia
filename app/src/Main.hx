@@ -224,7 +224,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public final commands:CommandRegistry;
   public final workspace:DockWorkspaceModel;
   public final workspacePath:String;
-  public final world:Null<RobotWorld>;
+  public final world:RobotWorld;
+  public final simulation:ApplicationSimulation;
 
   final storage:FileDockWorkspacePersistence;
   public final session:SceneDocumentSession;
@@ -262,7 +263,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     this.hostContext = hostContext;
     ui = new UiContext(null, fonts, theme == null ? Theme.light() : theme);
     commands = ui.commands;
-    this.world = world;
+    this.world = world == null ? new RobotWorld() : world;
+    simulation = new ApplicationSimulation(this.world);
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
     session = new SceneDocumentSession();
@@ -357,7 +359,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function context():UiContext return ui;
 
   public function dispose():Void {
-    if (world != null) world.close();
+    simulation.dispose();
+    world.close();
     if (files != null) files.dispose();
     if (perspectiveViewport != null) perspectiveViewport.dispose();
     session.dispose();
@@ -536,9 +539,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var style=fillStyle();style.padding=new Insets(8.0,8.0,8.0,8.0);
     style.background=Color.rgba(0.98,0.99,1.0,1.0);
     var robotRows:Array<KeyedView> = [];
-    if (world != null) for (id in world.snapshot().robotIds()) {
+    var attachedIds = world.robotIds();
+    var worldIds = attachedIds.copy();
+    for(id in sensors.configuredRobotIds())if(worldIds.indexOf(id)<0)worldIds.push(id);
+    worldIds.sort(Reflect.compare);
+    var simulatedIds = simulation.simulatedRobotIds();
+    sensors.setReadOnlyRobots([for(id in attachedIds) if(simulatedIds.indexOf(id)<0) id]);
+    for (id in worldIds) {
       var robotButton = new Button(id,null,function(){sensors.selectRobot(id);commands.refresh();},"sensor-robot:"+id);
       robotButton.selected = id == sensors.robotId;
+      robotButton.enabled = simulatedIds.indexOf(id)>=0 || sensors.configuredRobotIds().indexOf(id)>=0;
       robotRows.push(new KeyedView("robot:"+id,robotButton));
     }
     if (robotRows.length == 0) robotRows.push(new KeyedView("robot-id",new Text("Robot: "+sensors.robotId)));
@@ -556,20 +566,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var runtimeActions=new Row("sensor-runtime-actions",[
       new KeyedView("undo",new Button("Undo",null,function(){sensors.document.undo();commands.refresh();},"sensor-undo")),
       new KeyedView("redo",new Button("Redo",null,function(){sensors.document.redo();commands.refresh();},"sensor-redo")),
-      new KeyedView("apply",new Button(sensors.appliedRevision == 0 ? "Apply" : "Rebuild",null,function(){
-        log(sensors.apply() ? "Sensor simulation configuration applied" : "Sensor configuration rejected");
+      new KeyedView("apply",new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild",null,function(){
+        log(simulation.rebuild(sensors,scene) ? "Shared simulation configuration applied" : "Simulation rebuild rejected: "+simulation.error);
         commands.refresh();
       },"sensor-apply")),
       new KeyedView("reset",new Button("Reset",null,function(){
-        log(sensors.reset() ? "Sensor simulation reset" : "No sensor simulation to reset");
+        log(simulation.reset() ? "Shared simulation reset" : "No simulation to reset");
         commands.refresh();
       },"sensor-reset"))
     ]);
     var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
+      new KeyedView("apply-state",new Text(simulation.pending(sensors)
+        ? "Pending edits · rebuild resets simulated robots and environment"
+        : "Applied configuration · physics is authoritative")),
       new KeyedView("robots",new Column("sensor-robots",robotRows)),
       new KeyedView("actions",actions),new KeyedView("runtime-actions",runtimeActions),
       new KeyedView("list",new Column("sensor-list",rows))];
     var selected=sensors.selected();
+    if(!sensors.isEditable())content.push(new KeyedView("read-only",new Text("Remote robot configuration is read-only")));
     if(selected!=null)content.push(new KeyedView("properties",new PropertyInspector(
       "sensor-inspector:"+selected.id,sensors.properties(),null,null,null,null,"Sensor configuration")));
     var diagnostics=sensors.diagnostics();

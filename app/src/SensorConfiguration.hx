@@ -13,23 +13,19 @@ import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Sensor;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.runtime.RobotRuntime;
-import robotkit.runtime.RobotSnapshot;
-import robotkit.runtime.Simulation;
-import haxe.Int64;
 
 /** Editable RobotKit sensor model used by Materia's sensor panel. */
 class SensorConfiguration {
-  public final model:RobotModel;
+  public var model(default, null):RobotModel;
   public final document:EditorDocument;
   public var selectedIndex(default,null):Int = 0;
   public var robotId(default, null):String = "materia/robot";
-  public var appliedRevision(default, null):Int = 0;
-  public var applyError(default, null):Null<String> = null;
   var nextId:Int = 1;
-  var simulation:Null<Simulation> = null;
-  var runtime:Null<RobotRuntime> = null;
-  var running:Bool = false;
+  var configurationRevision:Int = 0;
+  final configurations:Map<String, Dynamic> = new Map();
+  final liveModels:Map<String, RobotModel> = new Map();
+  final selections:Map<String, Int> = new Map();
+  final readOnlyRobots:Map<String, Bool> = new Map();
 
   public function new(?data:Dynamic) {
     document = new EditorDocument("sensors");
@@ -38,9 +34,21 @@ class SensorConfiguration {
     model.addFrame(new Frame("Base sensor mount",base,"base/sensors"));
     if (data == null) {
       addDirect("lidar");
+    } else if (Reflect.hasField(data, "robots")) {
+      var selected = requiredString(data, "selectedRobotId");
+      for (record in requiredArray(data, "robots")) {
+        var id = requiredString(record, "robotId");
+        if (configurations.exists(id)) throw "Duplicate robot sensor configuration";
+        configurations.set(id, record);
+      }
+      var record = configurations.get(selected);
+      if (record == null) throw "Selected robot has no sensor configuration";
+      loadRobot(record);
     } else {
-      load(data);
+      loadRobot(data);
     }
+    configurations.set(robotId, singleRecord());
+    liveModels.set(robotId, model); selections.set(robotId, selectedIndex);
     document.markSaved();
   }
 
@@ -52,12 +60,40 @@ class SensorConfiguration {
   }
   public function selectRobot(id:String):Bool {
     if (id == null || StringTools.trim(id).length == 0 || id == robotId) return false;
-    var before = robotId;
-    document.apply(new EditOperation("Select robot", function() robotId = id,
-      function() robotId = before));
+    if (readOnlyRobots.exists(id) && !configurations.exists(id) && !liveModels.exists(id)) return false;
+    captureCurrent();
+    var nextRecord = configurations.get(id);
+    if (nextRecord == null) {
+      configurationRevision++; document.markExternallyDirty(); createDefault(id); return true;
+    }
+    activate(id,nextRecord);
     return true;
   }
+  public function configuredRobotIds():Array<String> {
+    captureCurrent(); var result=[for(id in configurations.keys()) id];
+    for(id in liveModels.keys())if(result.indexOf(id)<0)result.push(id);
+    result.sort(Reflect.compare); return result;
+  }
+  public function revision():Int return document.revision + configurationRevision * 1000000;
+  public function setReadOnlyRobots(ids:Array<String>):Void {
+    readOnlyRobots.clear(); for (id in ids) readOnlyRobots.set(id, true);
+  }
+  public function removeRobotConfiguration(id:String):Bool {
+    captureCurrent();
+    if(!configurations.exists(id)||configuredRobotIds().length<=1)return false;
+    var record=configurations.get(id),live=liveModels.get(id),selection=selections.get(id);
+    var fallback=[for(candidate in configuredRobotIds())if(candidate!=id)candidate][0];
+    document.apply(new EditOperation("Remove robot configuration",function(){
+      configurations.remove(id);liveModels.remove(id);selections.remove(id);
+      if(robotId==id)activate(fallback,configurations.get(fallback));
+    },function(){
+      configurations.set(id,record);if(live!=null)liveModels.set(id,live);if(selection!=null)selections.set(id,selection);
+    }));
+    return true;
+  }
+  public function isEditable():Bool return !readOnlyRobots.exists(robotId);
   public function add(kind:String):Sensor {
+    ensureEditable();
     var sensor = createSensor(kind);
     var previous = selectedIndex;
     document.apply(new EditOperation("Add " + kind + " sensor", function() {
@@ -70,6 +106,7 @@ class SensorConfiguration {
     return sensor;
   }
   public function removeSelected():Bool {
+    ensureEditable();
     if(model.sensors.length==0)return false;
     var index = selectedIndex;
     var sensor = model.sensors[index];
@@ -96,20 +133,56 @@ class SensorConfiguration {
     return sensor;
   }
 
-  public function records():Dynamic return {
-    robotId: robotId,
-    links: [for (link in model.links) {id:link.id, name:link.name}],
-    frames: [for (frame in model.frames) {id:frame.id, name:frame.name, linkId:frame.link.id,
+  public function records():Dynamic {
+    var values=robotRecords();
+    return {selectedRobotId:robotId, robots:values};
+  }
+  public function robotRecords():Array<Dynamic> {
+    captureCurrent();
+    for(id in liveModels.keys())configurations.set(id,singleRecordFor(id,liveModels.get(id)));
+    return [for(id in configuredRobotIds()) configurations.get(id)];
+  }
+  public function robotModels():Array<{id:String,model:RobotModel}> {
+    captureCurrent(); var selected=robotId; var result:Array<{id:String,model:RobotModel}> = [];
+    for(id in configuredRobotIds()) {
+      if(!liveModels.exists(id))loadRobot(configurations.get(id));
+      var live = liveModels.get(id);
+      if (live == null) throw 'Robot "$id" has no editable model';
+      result.push({id:id,model:live});
+    }
+    activate(selected,configurations.get(selected));
+    return result;
+  }
+  function singleRecord():Dynamic return singleRecordFor(robotId,model);
+  function singleRecordFor(id:String,value:RobotModel):Dynamic return {
+    robotId: id,
+    links: [for (link in value.links) {id:link.id, name:link.name}],
+    frames: [for (frame in value.frames) {id:frame.id, name:frame.name, linkId:frame.link.id,
       position:frame.position.copy(), rotation:frame.rotation.copy()}],
-    sensors: [for (sensor in model.sensors) {id:sensor.id, name:sensor.name, kind:sensor.kind,
+    sensors: [for (sensor in value.sensors) {id:sensor.id, name:sensor.name, kind:sensor.kind,
       updateRate:sensor.updateRate, frameId:sensor.frame == null ? null : sensor.frame.id,
       rayCount:sensor.rayCount, maxRange:sensor.maxRange, noiseStddev:sensor.noiseStddev,
       noiseSeed:sensor.noiseSeed}]
   };
 
-  function load(data:Dynamic):Void {
+  function captureCurrent():Void {
+    configurations.set(robotId, singleRecord()); liveModels.set(robotId,model);
+    selections.set(robotId,selectedIndex);
+  }
+  function activate(id:String,record:Dynamic):Void {
+    var live=liveModels.get(id);
+    if(live==null)loadRobot(record); else {robotId=id;model=live;var selected=selections.get(id);selectedIndex=selected==null?0:selected;}
+  }
+  function createDefault(id:String):Void {
+    robotId=id; model=new RobotModel("Materia robot");
+    var base=model.addLink(new Link("Base","base"));
+    model.addFrame(new Frame("Base sensor mount",base,"base/sensors"));
+    nextId=1; addDirect("lidar"); captureCurrent();
+  }
+
+  function loadRobot(data:Dynamic):Void {
     robotId = requiredString(data, "robotId");
-    model.links.resize(0); model.frames.resize(0); model.sensors.resize(0);
+    model = new RobotModel("Materia robot");
     var links = new Map<String, Link>();
     for (value in requiredArray(data, "links")) {
       var link = model.addLink(new Link(requiredString(value, "name"), requiredString(value, "id")));
@@ -146,7 +219,13 @@ class SensorConfiguration {
       if (suffix != null && suffix >= nextId) nextId = suffix + 1;
     }
     selectedIndex = model.sensors.length == 0 ? -1 : 0;
+    nextId = 1;
+    for (sensor in model.sensors) {
+      var slash = sensor.id.lastIndexOf("/"); var suffix=Std.parseInt(slash<0?sensor.id:sensor.id.substr(slash+1));
+      if (suffix != null && suffix >= nextId) nextId=suffix+1;
+    }
     if (diagnostics().length > 0) throw diagnostics()[0].message;
+    liveModels.set(robotId,model); selections.set(robotId,selectedIndex);
   }
 
   static function requiredArray(value:Dynamic, name:String):Array<Dynamic> {
@@ -164,56 +243,17 @@ class SensorConfiguration {
   }
   static function vector(value:Dynamic, name:String, count:Int):Array<Float> {
     var items = requiredArray(value, name); if (items.length != count) throw 'Invalid sensor document vector $name';
-    return [for (index in 0...count) finite({value:items[index]}, "value")];
-  }
-
-  public function isRunning():Bool return running;
-
-  /** Atomically replaces the runtime only after validation and native construction succeed. */
-  public function apply():Bool {
-    var issues = diagnostics();
-    if (issues.length > 0) { applyError = issues[0].code + ": " + issues[0].message; return false; }
-    var candidate:Null<Simulation> = null;
-    try {
-      var blueprint = RobotRuntimeCompiler.compile(model, appliedRevision + 1);
-      candidate = new Simulation();
-      var candidateRuntime = candidate.addRobot(blueprint);
-      if (running) candidate.start();
-      var previous = simulation;
-      simulation = candidate;
-      runtime = candidateRuntime;
-      appliedRevision++;
-      applyError = null;
-      if (previous != null) previous.dispose();
-      return true;
-    } catch (error:Dynamic) {
-      applyError = Std.string(error);
-      if (candidate != null) candidate.dispose();
-      return false;
+    var result:Array<Float> = [];
+    for(item in items) {
+      if(item==null||Std.isOfType(item,String)||Std.isOfType(item,Bool))throw 'Invalid sensor document vector $name';
+      var number=Std.parseFloat(Std.string(item));
+      if(!Math.isFinite(number))throw 'Non-finite sensor document vector $name';
+      result.push(number);
     }
+    return result;
   }
 
-  public function start():Bool {
-    if (simulation == null && !apply()) return false;
-    if (!running) simulation.start();
-    running = true;
-    return true;
-  }
-  public function stop():Void { if (simulation != null) simulation.stop(); running = false; }
-  public function reset():Bool {
-    if (simulation == null) return false;
-    simulation.reset();
-    running = false;
-    return true;
-  }
-  public function step(?timestampNs:Int64):Null<RobotSnapshot> {
-    if (simulation == null && !apply()) return null;
-    if (running) throw "Stop realtime simulation before deterministic stepping";
-    simulation.step(timestampNs == null ? Int64.ofInt(0) : timestampNs);
-    return runtime.snapshot();
-  }
-  public function snapshot():Null<RobotSnapshot> return runtime == null ? null : runtime.snapshot();
-  public function dispose():Void { if (simulation != null) simulation.dispose(); simulation = null; runtime = null; }
+  public function dispose():Void {}
   public function context():CommandContext {
     var sensor = selected();
     return new CommandContext(document, sensor == null ? [] : [sensor.id],
@@ -223,6 +263,7 @@ class SensorConfiguration {
     return RobotRuntimeCompiler.validate(model);
 
   public function properties():Array<PropertyDescriptor> {
+    if (!isEditable()) return [];
     var sensor=selected();if(sensor==null)return [];
     var result:Array<PropertyDescriptor> = [];
     result.push(text(sensor,"name","Name",function()return sensor.name,function(value)sensor.name=value));
@@ -299,6 +340,7 @@ class SensorConfiguration {
     var value=new PropertyDescriptorOptions();value.category=category;value.minimum=min;value.maximum=max;
     value.unit=unit;value.step=step;return value;
   }
+  function ensureEditable():Void if (!isEditable()) throw 'Remote robot "$robotId" is read-only';
   static function number(sensor:Sensor,id:String,label:String,read:Void->Float,write:Float->Void,
       min:Float,max:Float,unit:Null<String>,step:Float):PropertyDescriptor
     return new PropertyDescriptor(sensor.id+":"+id,label,PropertyType.Float,
