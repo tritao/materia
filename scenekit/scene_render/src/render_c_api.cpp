@@ -4,6 +4,7 @@
 #include "scene_internal.hpp"
 
 #include <cstddef>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -522,6 +523,33 @@ nkscene_result NKS_CALL nkscene_render_executor_get_last_result(
     if (!executor)
         return NKS_ERROR_INVALID_HANDLE;
     *out_result = executor->last_result();
+    return NKS_OK;
+}
+
+nkscene_result NKS_CALL nkscene_render_executor_capture_rgba8(
+    nkscene_render_executor executor_handle, nkscene_render_plan plan_handle,
+    nkscene_snapshot snapshot_handle, uint32_t width, uint32_t height, float clear_red,
+    float clear_green, float clear_blue, float clear_alpha, uint8_t *pixels,
+    uint64_t pixel_size) {
+    if (!width || !height || !pixels || pixel_size != static_cast<uint64_t>(width) * height * 4u)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    const auto snapshot = nkscene::resolve_snapshot_handle(snapshot_handle);
+    if (!snapshot)
+        return NKS_ERROR_INVALID_HANDLE;
+    auto &state = registry();
+    std::lock_guard lock(state.mutex);
+    const auto executor = state.executors.get(nkscene::unpack_handle(executor_handle));
+    const auto plan = state.plans.get(nkscene::unpack_handle(plan_handle));
+    if (!executor || !plan)
+        return NKS_ERROR_INVALID_HANDLE;
+    std::vector<std::uint8_t> captured;
+    const auto result = executor->capture_rgba8(*plan, *snapshot, width, height,
+        {clear_red, clear_green, clear_blue, clear_alpha}, captured);
+    if (result != NKGPU_OK)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    if (captured.size() != pixel_size)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    std::memcpy(pixels, captured.data(), captured.size());
     return NKS_OK;
 }
 

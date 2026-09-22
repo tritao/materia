@@ -7,6 +7,8 @@ import nativekit.ui.core.PropertyBinding;
 import nativekit.ui.core.PropertyValue;
 import nativekit.ui.core.PropertyEditResult;
 import nativekit.ui.core.ViewportCamera;
+import nativekit.scene.SceneView;
+import nativekit.scene.Transform;
 import app.SceneDocumentSession;
 import app.SensorConfiguration;
 import robotkit.world.McapRobotRecording;
@@ -345,6 +347,28 @@ class SceneEditingTests {
     if (FileSystem.exists(statusPath)) FileSystem.deleteFile(statusPath);
   }
 
+  static function renderingParity():Void {
+    var scene = new EditorScene();
+    try {
+      var view = scene.configureRenderView(new SceneView(), Transform.identity());
+      check(view.selectionOverrideCount() == 1,
+        "perspective view highlights the shared scene selection");
+      scene.select("scene");
+      view = scene.configureRenderView(new SceneView(), Transform.identity());
+      check(view.selectionOverrideCount() == 0,
+        "perspective view clears highlighting with the shared selection");
+      scene.select("tower");
+      scene.setVisible("tower", false);
+      check(!scene.info("tower").visible(),
+        "perspective snapshot observes shared visibility");
+      var tower = scene.items()[1];
+      check(nearValue(tower.red, 0.92) && nearValue(tower.green, 0.48) && nearValue(tower.blue, 0.22),
+        "perspective snapshot retains shared object colour");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
   }
 
   static function main():Int {
@@ -409,6 +433,7 @@ class SceneEditingTests {
       rectangleProperties();
       viewportDragging();
       editingLifecycle();
+      renderingParity();
       sensorConfiguration();
       sensorWorkflow();
       SceneDocumentTests.run();

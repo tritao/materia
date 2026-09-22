@@ -243,6 +243,11 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_execute(
     nkscene_render_execution_stats *out_stats NK_OUT);
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_get_last_result(
     nkscene_render_executor executor, nkgpu_result *out_result NK_OUT);
+/** Renders into an offscreen RGBA8 target and copies tightly packed pixels. */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_capture_rgba8(
+    nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,
+    uint32_t width, uint32_t height, float clear_red, float clear_green, float clear_blue,
+    float clear_alpha, uint8_t *pixels, uint64_t pixel_size);
 /** Runs the GPU ID pass and resolves one pixel to scene ownership. */
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_pick_pixel(
     nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,

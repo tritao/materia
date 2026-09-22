@@ -163,6 +163,20 @@ int main() {
         assert(stats.geometry_resources_created == 1);
         assert(stats.instance_buffers_created == 1);
         assert(stats.draw_calls == 1);
+        std::vector<std::uint8_t> color_pixels;
+        assert(executor.capture_rgba8(plan, scene->snapshot(), options.width, options.height,
+                   {0.0f, 0.0f, 0.0f, 1.0f}, color_pixels) == NKGPU_OK);
+        assert(color_pixels.size() ==
+               static_cast<std::size_t>(options.width * options.height * 4));
+        bool found_color = false;
+        for (std::size_t index = 0; index + 3 < color_pixels.size(); index += 4) {
+            if (color_pixels[index] != 0 || color_pixels[index + 1] != 0 ||
+                color_pixels[index + 2] != 0) {
+                found_color = true;
+                break;
+            }
+        }
+        assert(found_color);
 
         nkscene::PickResult picked;
         assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,

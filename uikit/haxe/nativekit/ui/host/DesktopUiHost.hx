@@ -87,7 +87,7 @@ class DesktopUiHost {
 				framePending = true;
 			};
 			session = new UiHostSession(function() active = false);
-			var hostContext = new DesktopUiHostContext(fonts, pump, window,
+			var hostContext = new DesktopUiHostContext(fonts, pump, window, surface,
 				function() session.stop(), scheduleFrame);
 			runtime = new UiHostRuntime(session, hostContext, window, surface,
 				options.width, options.height);

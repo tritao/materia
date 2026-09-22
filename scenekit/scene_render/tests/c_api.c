@@ -84,6 +84,15 @@ int main(void) {
     nkgpu_result last_result = NKGPU_ERROR_UNKNOWN;
     assert(nkscene_render_executor_get_last_result(executor, &last_result) == NKS_OK);
     assert(last_result == NKGPU_OK);
+    uint8_t capture_pixel[4] = {0};
+    assert(nkscene_render_executor_capture_rgba8(executor, plan, snapshot, 1, 1,
+               0.0f, 0.0f, 0.0f, 1.0f, NULL, sizeof(capture_pixel)) ==
+           NKS_ERROR_INVALID_ARGUMENT);
+    assert(nkscene_render_executor_capture_rgba8(executor, plan, snapshot, 1, 1,
+               0.0f, 0.0f, 0.0f, 1.0f, capture_pixel, sizeof(capture_pixel)) ==
+           NKS_ERROR_INVALID_ARGUMENT);
+    assert(nkscene_render_executor_get_last_result(executor, &last_result) == NKS_OK);
+    assert(last_result == NKGPU_ERROR_INVALID_HANDLE);
 
     nkscene_render_update refresh = {0};
     refresh.struct_size = sizeof(refresh);

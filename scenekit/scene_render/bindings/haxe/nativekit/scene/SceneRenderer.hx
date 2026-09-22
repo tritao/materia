@@ -4,21 +4,24 @@ import nativekit.ffi.NativeKitGpu;
 import NativeKitScene;
 import NativeKitSceneRender;
 import NativeKitSceneRenderConstants;
-import nativekit.gpu.GpuResult;
-import nativekit.gpu.Renderer;
+import haxe.io.Bytes;
+
+private typedef SceneGpuRenderer = {
+	var nativeHandle:Void->nkgpu_renderer;
+}
 
 /**
  * Keeps render-plan and NativeKit GPU synchronization behind one explicit
  * render boundary. Scene snapshots and change sets are owned by the caller.
  */
 class SceneRenderer {
-	final gpuOwner:Null<Renderer>;
+	final gpuOwner:Null<SceneGpuRenderer>;
 	var executor:Ownednkscene_render_executor;
 	var planOwner:Null<Ownednkscene_render_plan> = null;
 	var lastUpdateValue:Null<nkscene_render_update> = null;
 	var disposed:Bool = false;
 
-	private function new(gpuOwner:Null<Renderer>, renderer:nkgpu_renderer) {
+	private function new(gpuOwner:Null<SceneGpuRenderer>, renderer:nkgpu_renderer) {
 		this.gpuOwner = gpuOwner;
 		var made = NativeKitSceneRender.nkscene_render_executor_create(renderer);
 		checkScene(made.status, "sceneRenderer.create");
@@ -26,19 +29,54 @@ class SceneRenderer {
 	}
 
 	/** Creates a renderer attached to a live NativeKit GPU renderer. */
-	public static function create(renderer:Renderer):SceneRenderer
+	public static function create(renderer:SceneGpuRenderer):SceneRenderer
 		return new SceneRenderer(renderer, renderer.nativeHandle());
 
 	/** Creates the headless resource/command executor used by tests and tools. */
 	public static function createHeadless():SceneRenderer
 		return new SceneRenderer(null, new nkgpu_renderer());
 
+	/** Creates an executor around a caller-owned renderer handle. */
+	public static function createBorrowed(renderer:nkgpu_renderer):SceneRenderer
+		return new SceneRenderer(null, renderer);
+
 	/** Compiles, refreshes, or incrementally updates the plan, then executes it. */
 	public function render(snapshot:Snapshot, view:SceneView,
 			?changes:Null<ChangeSet>):nkscene_render_execution_stats {
 		ensureLive();
-		var snapshotValue = snapshot.nativeHandle(),
-			viewValue = view.nativeValue();
+		prepare(snapshot, view, changes);
+		var snapshotValue = snapshot.nativeHandle();
+
+		var executed = NativeKitSceneRender.nkscene_render_executor_execute(
+			executor.borrow(), planOwner.borrow(), snapshotValue);
+		checkScene(executed.status, "sceneRenderer.execute");
+		checkGpu(executed.out_stats.get_result(), "sceneRenderer.execute");
+		return executed.out_stats;
+	}
+
+	/** Renders through the GPU into tightly packed RGBA8 pixels. */
+	public function captureRgba8(snapshot:Snapshot, view:SceneView, width:Int, height:Int,
+			clearRed:Float = 0.025, clearGreen:Float = 0.035, clearBlue:Float = 0.055,
+			clearAlpha:Float = 1.0):Bytes {
+		ensureLive();
+		if (width <= 0 || height <= 0 || width > Std.int(536870911 / height))
+			throw "Scene capture dimensions are invalid";
+		prepare(snapshot, view, null);
+		var pixels = Bytes.alloc(width * height * 4);
+		var captured = NativeKitSceneRender.nkscene_render_executor_capture_rgba8(
+			executor.borrow(), planOwner.borrow(), snapshot.nativeHandle(), width, height,
+			clearRed, clearGreen, clearBlue, clearAlpha, pixels, pixels.length);
+		if (captured != 0) {
+			var last = NativeKitSceneRender.nkscene_render_executor_get_last_result(executor.borrow());
+			checkScene(last.status, "sceneRenderer.captureRgba8");
+			checkGpu(last.out_result, "sceneRenderer.captureRgba8");
+		}
+		checkScene(captured, "sceneRenderer.captureRgba8");
+		return pixels;
+	}
+
+	function prepare(snapshot:Snapshot, view:SceneView, changes:Null<ChangeSet>):Void {
+		var snapshotValue = snapshot.nativeHandle(), viewValue = view.nativeValue();
 		if (planOwner == null) {
 			var compiled = NativeKitSceneRender.nkscene_render_plan_compile(snapshotValue, viewValue);
 			checkScene(compiled.status, "sceneRenderer.compile");
@@ -61,11 +99,6 @@ class SceneRenderer {
 			lastUpdateValue = refreshResult.out_update;
 		}
 
-		var executed = NativeKitSceneRender.nkscene_render_executor_execute(
-			executor.borrow(), planOwner.borrow(), snapshotValue);
-		checkScene(executed.status, "sceneRenderer.execute");
-		GpuResult.check(executed.out_stats.get_result(), "sceneRenderer.execute");
-		return executed.out_stats;
 	}
 
 	/** Renders one owned frame, including its optional incremental change set. */
@@ -90,7 +123,7 @@ class SceneRenderer {
 		if (picked.status != 0) {
 			var last = NativeKitSceneRender.nkscene_render_executor_get_last_result(executor.borrow());
 			checkScene(last.status, "sceneRenderer.pickPixel");
-			GpuResult.check(last.out_result, "sceneRenderer.pickPixel");
+			checkGpu(last.out_result, "sceneRenderer.pickPixel");
 			throw "sceneRenderer.pickPixel failed";
 		}
 		return new PickResult(picked.out_result);
@@ -159,5 +192,10 @@ class SceneRenderer {
 	static function checkScene(status:Int, operation:String):Void {
 		if (status != 0)
 			throw '$operation failed with NativeKit scene status $status';
+	}
+
+	static function checkGpu(status:Int, operation:String):Void {
+		if (status != 0)
+			throw '$operation failed with NativeKit GPU status $status: ${NativeKitGpu.nkgpu_last_error()}';
 	}
 }

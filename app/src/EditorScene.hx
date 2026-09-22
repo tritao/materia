@@ -8,6 +8,9 @@ import nativekit.scene.Occurrence;
 import nativekit.scene.OccurrenceInfo;
 import nativekit.scene.GeometryData;
 import nativekit.scene.MaterialData;
+import nativekit.scene.Material;
+import nativekit.scene.SceneView;
+import nativekit.scene.SelectionSet;
 import nativekit.scene.Transform;
 import nativekit.ui.core.EditorDocument;
 import nativekit.ui.core.EditOperation;
@@ -27,6 +30,7 @@ class EditorScene {
   var nextObjectId:Int = 1;
   var snapshot:Snapshot;
   var spatial:SpatialIndex;
+  var selectionMaterial:Material;
   public var selectedId(default, null):String = "box";
   public var revision(default, null):Int;
   public var selectionRevision(default, null):Int = 1;
@@ -47,6 +51,8 @@ class EditorScene {
           item.width, item.height, item.red, item.green, item.blue, item.visible);
         selectedId = data.length == 0 ? "scene" : data[0].id;
       }
+      selectionMaterial = scene.createMaterial();
+      scene.setMaterialData(selectionMaterial, MaterialData.opaque(1.0, 0.88, 0.35));
       snapshot = scene.snapshot();
       try spatial = SpatialIndex.create(snapshot)
       catch (error:Dynamic) { snapshot.dispose(); throw error; }
@@ -134,13 +140,16 @@ class EditorScene {
     var oldScene = scene;
     var oldSnapshot = snapshot;
     var oldSpatial = spatial;
+    var oldSelectionMaterial = selectionMaterial;
     scene = next.scene;
     snapshot = next.snapshot;
     spatial = next.spatial;
     objects = next.objects;
+    selectionMaterial = next.selectionMaterial;
     next.scene = oldScene;
     next.snapshot = oldSnapshot;
     next.spatial = oldSpatial;
+    next.selectionMaterial = oldSelectionMaterial;
     next.dispose();
     selectedId = selection;
     selectionRevision++;
@@ -175,6 +184,17 @@ class EditorScene {
     var value = snapshot.find(item.occurrence);
     if (value == null) throw "Missing scene occurrence: " + id;
     return value;
+  }
+
+  public function renderSnapshot():Snapshot return snapshot;
+
+  public function configureRenderView(view:SceneView, viewProjection:Transform):SceneView {
+    view.setViewProjection(viewProjection);
+    var selected = object(selectedId);
+    var selection = new SelectionSet();
+    if (selected != null) selection.add(selected.occurrence);
+    view.applySelection(selection, selectionMaterial);
+    return view;
   }
 
   public function select(id:String):Bool {

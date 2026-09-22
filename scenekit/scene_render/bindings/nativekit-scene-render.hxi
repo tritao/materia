@@ -5,6 +5,10 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	const NKS_RENDER_PICK_READY = 2;
 	const NKS_RENDER_PICK_STALE = 3;
 	/**
+	 * Renders into an offscreen RGBA8 target and copies tightly packed pixels.
+	 */
+	extern fn nkscene_render_executor_capture_rgba8(executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, width: u32, height: u32, clear_red: f32, clear_green: f32, clear_blue: f32, clear_alpha: f32, pixels: ptr<u8>, pixel_size: u64) -> nkscene_result;
+	/**
 	 * Creates an executor bound to a GPU renderer. Pass a zero renderer for the
 	 * headless resource and command path. The renderer must outlive the executor.
 	 */

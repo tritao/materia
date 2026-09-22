@@ -3,7 +3,7 @@
 This is the app-side integration example for the shared Haxeon UI widgets and
 SceneKit. `src/Main.hx` composes:
 
-- a persisted `DockWorkspaceModel` with Hierarchy, Viewport, Inspector,
+- a persisted `DockWorkspaceModel` with Hierarchy, XY Viewport, Perspective, Inspector,
   Console, and Telemetry panels;
 - `TreeView`, `GpuViewport`, `PropertyInspector`, and `PlotView` panel content;
 - one `CommandRegistry` shared by the toolbar, context menu, and command
@@ -36,6 +36,9 @@ or the Scene root to clear object selection.
   keys nudge by 0.1 m; Shift+Arrow nudges by 1 m. Each nudge is independently undoable.
 - Positive finite dimension edits rebuild geometry and picking bounds together;
   framing, duplication, undo/redo, and scene persistence use the edited size and colour.
+- The Perspective tab renders the same SceneKit snapshot through the GPU with a
+  fixed perspective camera. Visibility, object colours, and the yellow selection
+  highlight stay synchronized with the XY view and inspector.
 - Middle-drag pans the view; the wheel zooms around the pointer.
 - Frame selected fits the selected object's bounds.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
@@ -52,8 +55,10 @@ UIKit `EditorDocument` history. `EditorSceneTree` and `EditorSceneViewport`
 consume that state. Inspector bindings retain object identity so undo works
 after changing selection. `SceneDocumentSession` owns the document path and
 atomic file publication; `SceneDocumentController` coordinates file commands
-and unsaved-change prompts. The viewport currently composes the planar meshes
-through UIKit's canvas; perspective GPU scene rendering is not integrated yet.
+and unsaved-change prompts. The XY viewport composes the planar meshes through
+UIKit's canvas, while `EditorPerspectiveViewport` captures SceneKit's GPU renderer
+into the Perspective tab. Camera interaction and perspective picking remain
+follow-up work.
 
 The Sensors workspace tab edits RobotKit sensor definitions without exposing
 runtime or hardware handles. It supports adding/removing LiDAR and IMU sensors,

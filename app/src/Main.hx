@@ -247,6 +247,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var contextMenuY:Float;
   var componentLab:Null<ComponentLab>;
   var sceneViewport:Null<GpuViewport> = null;
+  var perspectiveViewport:Null<EditorPerspectiveViewport> = null;
+  final hostContext:Null<DesktopUiHostContext>;
   var dragPointer:Null<Int> = null;
   var dragPointerX:Float = 0.0;
   var dragPointerY:Float = 0.0;
@@ -257,6 +259,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
       ?world:RobotWorld, ?hostContext:DesktopUiHostContext) {
+    this.hostContext = hostContext;
     ui = new UiContext(null, fonts, theme == null ? Theme.light() : theme);
     commands = ui.commands;
     this.world = world;
@@ -273,6 +276,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     treeModel = new EditorSceneTree(scene);
     viewportCamera = new ViewportCamera();
     viewportContent = new EditorSceneViewport(scene);
+    if (hostContext != null) {
+      perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
+        hostContext.surface);
+    }
     telemetry = makeTelemetry();
     logLines = ["Scene ready: two editable objects", "Select a box; edit position or visibility", "Middle-drag to pan; scroll to zoom"];
     gridVisible = true;
@@ -352,6 +359,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function dispose():Void {
     if (world != null) world.close();
     if (files != null) files.dispose();
+    if (perspectiveViewport != null) perspectiveViewport.dispose();
     session.dispose();
     ui.dispose();
   }
@@ -499,6 +507,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("viewport", "Viewport", function(_) {
       return viewportPanel();
     }, false));
+    result.register(new DockPanelDescriptor("perspective", "Perspective", function(_) {
+      return perspectivePanel();
+    }, false));
     result.register(new DockPanelDescriptor("inspector", "Inspector", function(_) {
       return inspectorPanel();
     }, false));
@@ -514,7 +525,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }
     ));
 
-    var centerTabs = DockNode.Tabs(["viewport", "console", "telemetry"], "viewport");
+    var centerTabs = DockNode.Tabs(["viewport", "perspective", "console", "telemetry"], "viewport");
     var editorArea = DockNode.Split(DockSplitAxis.Horizontal, 0.76, centerTabs, DockNode.Panel("inspector"));
     result.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.22,
       DockNode.Tabs(["hierarchy", "sensors"], "hierarchy"), editorArea));
@@ -524,7 +535,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function sensorPanel():View {
     var style=fillStyle();style.padding=new Insets(8.0,8.0,8.0,8.0);
     style.background=Color.rgba(0.98,0.99,1.0,1.0);
-    var rows:Array<KeyedView>=[];
+    var rows:Array<KeyedView> = [];
     for(index in 0...sensors.model.sensors.length) {
       var sensor=sensors.model.sensors[index];
       var button=new Button(sensor.name+" · "+sensor.kind,null,function(){sensors.select(index);commands.refresh();},"sensor:"+sensor.id);
@@ -672,6 +683,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return viewport;
   }
 
+  function perspectivePanel():View {
+    return perspectiveViewport == null
+      ? new Text("Perspective rendering requires the desktop GPU host.")
+      : perspectiveViewport;
+  }
+
   function inspectorPanel():View {
     var style = fillStyle();
     style.padding = new Insets(10.0, 10.0, 10.0, 10.0);
@@ -814,6 +831,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
       viewportContent.frameSelected(viewportCamera);
       log("Framed " + scene.selectedId);
     }, null, function() return !documents.blocked() && scene.object(scene.selectedId) != null));
+    commands.register(new Command("scene.show-perspective", "Show perspective view", function() {
+      workspace.open("perspective", "viewport");
+      commands.refresh();
+    }, null, function() return perspectiveViewport != null));
     commands.register(new Command("scene.toggle-grid", "Toggle grid", function() {
       gridVisible = !gridVisible;
       log(gridVisible ? "Grid enabled" : "Grid disabled");
@@ -870,6 +891,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       treeModel = new EditorSceneTree(scene);
       viewportContent = new EditorSceneViewport(scene);
       viewportContent.setGridStep(gridSpacing);
+      if (perspectiveViewport != null) perspectiveViewport.dispose();
+      perspectiveViewport = hostContext == null ? null :
+        new EditorPerspectiveViewport("scene-perspective", scene, hostContext.surface);
       sceneViewport = null;
       sceneInspector = null;
       inspectorSelectionRevision = -1;
