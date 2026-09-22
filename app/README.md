@@ -115,20 +115,32 @@ Open the bundled two-robot example with:
   --setup-script=materia.examples.two-robot
 ```
 
-The Sensors panel identifies script-origin values, reloads the registered
-script transactionally, and optionally records stable-ID overrides. Script
+The Sensors panel identifies each selected value as `script` or `override`, reloads the registered
+script transactionally, and optionally records stable-ID typed overrides. Overrides cover sensor
+acquisition and mounts, robot poses, environment physics/geometry, timestep, and backend. Script
 fields are otherwise read-only. Reload or validation failure leaves the active
 simulation untouched; successful evaluation becomes pending configuration and
 only Apply/Rebuild restarts physics. Undo/redo affects overrides, never script
 source. Script-owned scene files persist the script reference, configuration
-version, override mode, and overrides—not a competing copy of the evaluated
+version, override-contract version, override mode, and overrides—not a competing copy of the evaluated
 robots or environment. Renamed or removed IDs are reported as stale overrides.
+They can be removed explicitly, while all override changes and reversions remain undoable.
+Older numeric rate overrides migrate to the current typed contract when opened;
+unsupported future contracts are rejected before replacing the document.
 
 The same registry and validation/rebuild path has a headless entry point:
 
 ```sh
 ./haxeon/scripts/haxeon run --project app/scripted/haxeon.json -- \
   materia.examples.two-robot
+```
+
+CI should use the authoritative wrapper. Its project places native output in
+`app/build/scripted`, the shared ignored application build area, so jobs can cache that
+directory and reuse the native dependency build:
+
+```sh
+app/scripted/test.sh
 ```
 
 Scene files are UTF-8 JSON with `format: "materia.scene"`, `version: 1`, and an

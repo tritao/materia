@@ -615,10 +615,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ]);
     var backendActions=new Row("sensor-backend-actions",[
       new KeyedView("deterministic",new Button("Test backend",null,function(){
-        simulation.setBackend(ApplicationSimulation.DETERMINISTIC);commands.refresh();
+        if(ownership==null)simulation.setBackend(ApplicationSimulation.DETERMINISTIC);else try {
+          ownership.setOverride(ScriptOwnership.SIMULATION_TARGET,"backend","integer",ApplicationSimulation.DETERMINISTIC);
+          refreshScriptMaterialization("Physics backend override changed");
+        } catch(error:Dynamic)log("Override rejected: "+Std.string(error));commands.refresh();
       },"sensor-backend-deterministic")),
       new KeyedView("mujoco",new Button("MuJoCo",null,function(){
-        simulation.setBackend(ApplicationSimulation.MUJOCO);commands.refresh();
+        if(ownership==null)simulation.setBackend(ApplicationSimulation.MUJOCO);else try {
+          ownership.setOverride(ScriptOwnership.SIMULATION_TARGET,"backend","integer",ApplicationSimulation.MUJOCO);
+          refreshScriptMaterialization("Physics backend override changed");
+        } catch(error:Dynamic)log("Override rejected: "+Std.string(error));commands.refresh();
       },"sensor-backend-mujoco"))]);
     var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
       new KeyedView("apply-state",new Text(simulation.pending(sensors,scene)
@@ -644,15 +650,29 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new KeyedView("overrides",new Button(overrideLabel,null,function(){
           ownership.setOverridesEnabled(!ownership.overridesEnabled);
           refreshScriptMaterialization(ownership.overridesEnabled?"Overrides enabled":"Overrides disabled");
-        },"script-overrides"))
+        },"script-overrides")),
+        new KeyedView("revert-simulation",new Button("Revert simulation",null,function(){
+          if(ownership.revertTarget(ScriptOwnership.SIMULATION_TARGET))
+            refreshScriptMaterialization("Simulation settings reverted to script values");
+        },"script-revert-simulation")),
+        new KeyedView("remove-stale",new Button("Remove stale",null,function(){
+          if(ownership.removeStaleOverrides())refreshScriptMaterialization("Stale overrides removed");
+        },"script-remove-stale"))
       ])));
+      content.insert(5,new KeyedView("simulation-origins",new Text(
+        ownership.propertyOrigins(ScriptOwnership.SIMULATION_TARGET,["backend","timestep"]).join(" · "))));
+      content.insert(6,new KeyedView("robot-origins",new Text("Robot pose · "+
+        ownership.propertyOrigins(sensors.robotId,["position","rotation"]).join(" · "))));
     }
     var selected=sensors.selected();
     if(!sensors.isEditable())content.push(new KeyedView("read-only",new Text("Remote robot configuration is read-only")));
     if(selected!=null){
       if(ownership!=null){
-        content.push(new KeyedView("sensor-origin",new Text("Selected values: "+
-          ownership.sensorRateOrigin(sensors.robotId,selected.id))));
+        var sensorTarget=sensors.robotId+"/"+selected.id;
+        var sensorProperties=["updateRate","noiseStddev","noiseSeed","mount.frameId","mount.position","mount.rotation"];
+        if(selected.kind=="lidar"){sensorProperties.push("rayCount");sensorProperties.push("maxRange");}
+        content.push(new KeyedView("sensor-origin",new Text("Value origins · "+
+          ownership.propertyOrigins(sensorTarget,sensorProperties).join(" · "))));
         var decreaseRate=new Button("Rate -1 Hz",null,function(){
             try {ownership.setSensorRate(sensors.robotId,selected.id,Math.max(0,selected.updateRate-1));
               refreshScriptMaterialization("Sensor rate override changed");}
@@ -674,6 +694,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
           new KeyedView("decrease",decreaseRate),new KeyedView("increase",increaseRate),
           new KeyedView("revert",revertRate)]);
         content.push(new KeyedView("rate-actions",rateActions));
+        var revertSensor=new Button("Revert selected sensor",null,function(){
+          if(ownership.revertTarget(sensorTarget))refreshScriptMaterialization("Sensor overrides reverted");
+        },"script-sensor-revert-all");
+        revertSensor.enabled=ownership.overridesEnabled;
+        content.push(new KeyedView("sensor-revert",revertSensor));
       }
       var sensorInspector=new PropertyInspector("sensor-inspector:"+selected.id,
         sensors.properties(),null,null,null,null,"Sensor configuration");
@@ -872,17 +897,22 @@ class ReferenceEditorApp implements DesktopUiApplication {
       inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = sceneInspector;
-    inspector.enabled = !simulation.isActive() && !viewportContent.dragging() &&
+    var ownership=session.scriptOwnership;
+    inspector.enabled = ownership==null&&!simulation.isActive() && !viewportContent.dragging() &&
       (perspectiveViewport == null || !perspectiveViewport.dragging());
+    var rows:Array<KeyedView>=[new KeyedView("heading",sectionHeading(selected.label))];
+    if(ownership!=null) {
+      rows.push(new KeyedView("origin",new Text("Script-owned · "+
+        ownership.propertyOrigins(selected.id,["position","dimensions","mass","collisionEnabled",
+          "dynamicBody","visible"]).join(" · "))));
+      rows.push(new KeyedView("revert",new Button("Revert object overrides",null,function(){
+        if(ownership.revertTarget(selected.id))refreshScriptMaterialization("Object overrides reverted");
+      },"script-object-revert")));
+    }
+    rows.push(new KeyedView("properties",inspector));
     return new Column(
       "inspector-panel",
-      [
-        new KeyedView("heading", sectionHeading(selected.label)),
-        new KeyedView(
-          "properties",
-          inspector
-        )
-      ],
+      rows,
       style
     );
   }
@@ -1111,7 +1141,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.refresh();
   }
 
-  function canEditObjects():Bool return !documents.blocked() && !simulation.isActive() && !viewportContent.dragging() &&
+  function canEditObjects():Bool return session.scriptOwnership==null && !documents.blocked() && !simulation.isActive() && !viewportContent.dragging() &&
     (perspectiveViewport == null || !perspectiveViewport.dragging());
 
   function commitActiveDrag():Void {

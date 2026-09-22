@@ -6,5 +6,5 @@
   "scopeSourceRoots": false,
   "dependencies": { "app": { "path": ".." } },
   "target": "host",
-  "outputDir": "build"
+  "outputDir": "../build/scripted"
 }
