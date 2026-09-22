@@ -106,6 +106,14 @@ objects. It does not introduce a second world model. `ReplayRobot`, recording,
 and `WorldBehaviorRunner` use the same `Robot`/snapshot/command boundary for
 offline debugging and behavior reuse.
 
+`robotkit/tests/world-tcp.sh` exercises the same `HoldJointBehavior` against a
+local `SimulatedRobot` and a TCP-connected `RemoteRobot` hosted by `robotd`.
+Three successive targets check command counts, unchanged-snapshot suppression,
+settled joint positions, and encoder/IMU/LiDAR identities, mounts, and values.
+The fixture uses the deterministic simulation backend; independent clocks and
+sample sequences are deliberately not compared for equality. Run with
+`ROBOTKIT_TEST_SESSIONS=1` to check controller leases, observers, and reconnects.
+
 Behavior hosting builds on that same boundary. `RobotBehaviorRunner` receives a
 `RobotSnapshot`, gives a behavior a read-only `RobotContext`, and publishes the
 latest expiring intent through `IntentBuffer`. `robotd` turns supported intents

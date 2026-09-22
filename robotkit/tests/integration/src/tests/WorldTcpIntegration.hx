@@ -17,8 +17,28 @@ class WorldTcpIntegration {
     var world = new RobotWorld();
     var remote = new RemoteRobot(LOGICAL_ID);
     world.attach(remote);
+    var simulation = new robotkit.runtime.Simulation();
     var failure:Dynamic = null;
     try {
+      var model = new robotkit.model.RobotModel("demo-arm");
+      var base = model.addLink(new robotkit.model.Link("base"));
+      var tool = model.addLink(new robotkit.model.Link("tool"));
+      var joint = model.addJoint(new robotkit.model.Joint("shoulder",
+        robotkit.model.JointType.Revolute, base, tool));
+      joint.limits.lower = -3.14;
+      joint.limits.upper = 3.14;
+      joint.limits.effort = 100;
+      var mount = model.addFrame(new robotkit.model.Frame("sensor mount", base, "demo/sensor-mount"));
+      mount.position = [0.2, 0.0, 0.0];
+      for (kind in ["joint_encoder", "imu", "lidar"]) {
+        var sensor = model.addSensor(new robotkit.model.Sensor(kind, kind, 0, 'demo/$kind'));
+        sensor.frame = mount;
+      }
+      var local = new robotkit.world.SimulatedRobot("local", simulation.addRobot(
+        robotkit.runtime.RobotRuntimeCompiler.compile(model)), model.name, ["base", "tool"], ["shoulder"]);
+      world.attach(local);
+      simulation.step(Int64.ofInt(1));
+      simulation.step(Int64.ofInt(2));
       remote.connect(host, port, runtime.events);
       waitUntil(runtime, function() return remote.status() == RobotStatus.Ready, "RemoteRobot did not become ready");
       if (remote.id() != LOGICAL_ID) throw "world changed the logical robot ID";
@@ -58,9 +78,54 @@ class WorldTcpIntegration {
         if (Int64.compare(sensor.receivedTimestampNs, sensor.sourceTimestampNs) == 0)
           throw "sensor receipt reused simulation source time";
       }
+      // Same behavior instance, fresh runner per adapter. Compare settled values,
+      // not sequence numbers or timestamps from independently ticking clocks.
+      var tick = 3;
+      for (target in [-0.4, 0.75, 0.0]) {
+        var shared = new HoldJointBehavior(0, target);
+        var localRunner = new WorldBehaviorRunner(shared);
+        var remoteRunner = new WorldBehaviorRunner(shared);
+        if (localRunner.update(local) != 1 || remoteRunner.update(remote) != 1)
+          throw "shared behavior did not emit one command on each adapter";
+        if (localRunner.update(local) != 0 || remoteRunner.update(remote) != 0)
+          throw "runner emitted duplicate commands for an unchanged snapshot";
+        simulation.step(Int64.ofInt(tick++));
+        simulation.step(Int64.ofInt(tick++));
+        waitUntil(runtime, function() {
+          var value = remote.snapshot();
+          if (value.positions.length != 1 || value.positions.get(0) != target) return false;
+          for (sensor in value.sensors.toArray())
+            if (sensor.kind == "joint_encoder" && sensor.values.get(0) == target) return true;
+          return false;
+        }, "shared behavior failed to converge remotely");
+        var expected = local.snapshot();
+        var actual = remote.snapshot();
+        if (expected.positions.get(0) != target || actual.positions.get(0) != expected.positions.get(0)
+            || expected.faultCode != 0 || actual.faultCode != 0)
+          throw "local and remote behavior outcomes differ";
+        if (actual.sensors.length != expected.sensors.length) throw "sensor counts differ";
+        for (sensor in expected.sensors.toArray()) {
+          var found = false;
+          for (other in actual.sensors.toArray()) {
+            if (other.sensorId != sensor.sensorId) continue;
+            found = true;
+            if (other.kind != sensor.kind || other.frameId != sensor.frameId || other.linkId != sensor.linkId
+                || other.values.length != sensor.values.length) throw "sensor contracts differ";
+            for (i in 0...3)
+              if (other.mountPosition.get(i) != sensor.mountPosition.get(i)) throw "sensor mounts differ";
+            for (i in 0...4)
+              if (other.mountRotation.get(i) != sensor.mountRotation.get(i)) throw "sensor rotations differ";
+            for (i in 0...sensor.values.length)
+              if (Math.abs(other.values.get(i) - sensor.values.get(i)) > 1e-9) throw "sensor measurements differ";
+          }
+          if (!found) throw "remote sensor identity missing";
+        }
+      }
+      Sys.println("Shared behavior parity passed: three targets, local simulation and robotd TCP");
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();
+    simulation.dispose();
     runtime.dispose();
     if (failure != null) throw failure;
   }
