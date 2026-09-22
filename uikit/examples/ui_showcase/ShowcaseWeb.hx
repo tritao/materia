@@ -8,6 +8,23 @@ import NativeKitSurface;
 import haxe.io.Bytes;
 import nativekit.ui.core.NativeInputAdapter;
 import haxe.CallStack;
+import LayoutFrame;
+import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.UiContext;
+import nativekit.ui.host.BrowserUiHostOptions.BrowserUiFontAsset;
+import nativekit.ui.host.BrowserUiHost;
+import nativekit.ui.host.BrowserUiHostOptions;
+import nativekit.ui.host.BrowserUiHostSession;
+import nativekit.ui.host.UiApplication;
+import nativekit.ui.host.UiHostSession.UiHostLifecycle;
+
+private class ShowcaseExplorerApplication implements UiApplication {
+    final explorer:UiExplorer;
+    public function new(explorer:UiExplorer) this.explorer = explorer;
+    public function context():UiContext return explorer.hostContext();
+    public function submit(frame:LayoutFrame):RenderNode return explorer.submitHostFrame(frame);
+    public function dispose():Void explorer.dispose();
+}
 
 typedef ShowcaseWebFont = {
     var name:String;
@@ -47,6 +64,7 @@ class ShowcaseWeb {
     static var requestedUiVisualCase = -1;
     static var graphicsMode = false;
     static var openGraphicsRequested = false;
+    static var browserSession:Null<BrowserUiHostSession>;
 
     static function reportException(error:Dynamic, breadcrumbs:String):Void {
         var message = Std.string(error);
@@ -93,6 +111,8 @@ class ShowcaseWeb {
     }
 
     public static function main():Int {
+        if (requestedMode == 0)
+            return startReusableHost();
         try {
             var init = new InitOptions();
             init.set_api_version(NativeKit.nk_api_version());
@@ -149,6 +169,27 @@ class ShowcaseWeb {
 
     /** Called by the browser host once per requestAnimationFrame tick. */
     public static function frame(time:Float):Int {
+        if (browserSession != null) {
+            var activeSession:BrowserUiHostSession = cast browserSession;
+            if (openGraphicsRequested) {
+                openGraphicsRequested = false;
+                activeSession.dispose();
+                browserSession = null;
+                explorer = null;
+                initialized = false;
+                running = false;
+                requestedMode = 1;
+                graphicsMode = true;
+                return main() == 0 ? 1 : -result;
+            }
+            var advanced = activeSession.advance(time);
+            if (advanced > 0 && activeSession.state == UiHostLifecycle.Running) rendered++;
+            if (advanced < 0) {
+                result = 19;
+                failureStage = 2;
+            }
+            return advanced;
+        }
         if (!running)
             return result != 0 ? -result : 0;
         try {
@@ -226,6 +267,16 @@ class ShowcaseWeb {
         return graphics == null ? -1 : graphics.caretDirection();
 
     public static function shutdown():Void {
+        if (browserSession != null) {
+            var activeSession:BrowserUiHostSession = cast browserSession;
+            activeSession.dispose();
+            browserSession = null;
+            explorer = null;
+            initialized = false;
+            running = false;
+            ready = false;
+            return;
+        }
         running = false;
         ready = false;
         var eventPump = events;
@@ -263,6 +314,38 @@ class ShowcaseWeb {
             result = code;
         running = false;
         return result;
+    }
+
+    static function startReusableHost():Int {
+        try {
+            var options = new BrowserUiHostOptions();
+            options.title = "Haxeon UI Explorer";
+            options.width = requestedWidth;
+            options.height = requestedHeight;
+            options.eventQueueCapacity = 64;
+            options.fonts = [for (font in webFontSpecs())
+                new BrowserUiFontAsset(font.name, font.uri, font.bundledPath, font.family)];
+            var startedSession = BrowserUiHost.start(options, function(context) {
+                explorer = new UiExplorer(context.fonts, "WEBGL2 · WASM", function() {
+                    openGraphicsRequested = true;
+                }, false, null, null, null, false);
+                if (requestedUiVisualCase >= 0 && !explorer.setVisualCase(requestedUiVisualCase))
+                    throw "UI Explorer rejected the requested visual case";
+                return new ShowcaseExplorerApplication(explorer);
+            });
+            browserSession = startedSession;
+            initialized = true;
+            running = startedSession.isActive();
+            if (startedSession.state == UiHostLifecycle.Failed) {
+                result = 20;
+                return result;
+            }
+            return 0;
+        } catch (error:Dynamic) {
+            failureStage = 92;
+            reportException(error, "ShowcaseWeb.main > reusable-browser-host");
+            return fail(20);
+        }
     }
 
     static function createWebFonts():FontCollection {

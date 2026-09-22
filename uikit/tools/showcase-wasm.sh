@@ -10,9 +10,11 @@ haxe_bin=${NATIVEKIT_HAXE_BIN:-"$haxeon_dir/.tools/haxe/haxe"}
 build_dir=${NATIVEKIT_WASM_BUILD_DIR:-"$repo_dir/build-wasm"}
 wasm_target=${NATIVEKIT_HAXEON_TARGET:-wasm32}
 wasm_target_file=${wasm_target//-/_}
-entry=ShowcaseWeb
-[[ $wasm_target == wasm-gc ]] && entry=ShowcaseWebGcEntry
-artifact="$build_dir/nativekit_ui_showcase_${wasm_target_file}.wasm"
+entry=${NATIVEKIT_UI_WASM_ENTRY:-ShowcaseWeb}
+if [[ $wasm_target == wasm-gc ]]; then
+	entry=${NATIVEKIT_UI_WASM_GC_ENTRY:-ShowcaseWebGcEntry}
+fi
+artifact=${NATIVEKIT_UI_WASM_ARTIFACT:-"$build_dir/nativekit_ui_showcase_${wasm_target_file}.wasm"}
 memory_contract=${NATIVEKIT_HAXEON_MEMORY_CONTRACT:-"$build_dir/nativekit_haxeon_memory_contract.json"}
 exception_mode=${NATIVEKIT_HAXEON_EXCEPTION_MODE:-legacy}
 
@@ -100,18 +102,6 @@ compiler_args=(
 	--entry="$entry"
 	--wasm-import-memory
 	--wasm-memory-contract="$memory_contract"
-	--export=ShowcaseWeb.main
-	--export=ShowcaseWeb.configure
-	--export=ShowcaseWeb.configureMode
-	--export=ShowcaseWeb.configureUiVisual
-	--export=ShowcaseWeb.configureBenchmark
-	--export=ShowcaseWeb.frame
-	--export=ShowcaseWeb.status
-	--export=ShowcaseWeb.diagnostic
-	--export=ShowcaseWeb.caretOffset
-	--export=ShowcaseWeb.caretAffinity
-	--export=ShowcaseWeb.caretDirection
-	--export=ShowcaseWeb.shutdown
 	--root="$module_dir/examples/ui_showcase"
 	--root="$module_dir/haxe"
 	--root="$module_dir/bindings/haxe"
@@ -135,6 +125,7 @@ compiler_args=(
 	"$module_dir/haxe/nativekit/ui/debug/"*.hx
 	"$module_dir/haxe/nativekit/ui/gestures/"*.hx
 	"$module_dir/haxe/nativekit/ui/animation/"*.hx
+	"$module_dir/haxe/nativekit/ui/host/"*.hx
 	"$repo_dir/bindings/haxe/GraphicsImageRef.hx"
 	"$module_dir/bindings/haxe/"*.hx
 	"$repo_dir/bindings/haxe/NativeKitEvent.hx"
@@ -151,6 +142,22 @@ compiler_args=(
 	"$repo_dir/bindings/haxe/NativeKitWindow.hx"
 	"$repo_dir/bindings/haxe/NativeKitWebView.hx"
 )
+
+wasm_exports=${NATIVEKIT_UI_WASM_EXPORTS:-ShowcaseWeb.main,ShowcaseWeb.configure,ShowcaseWeb.configureMode,ShowcaseWeb.configureUiVisual,ShowcaseWeb.configureBenchmark,ShowcaseWeb.frame,ShowcaseWeb.status,ShowcaseWeb.diagnostic,ShowcaseWeb.caretOffset,ShowcaseWeb.caretAffinity,ShowcaseWeb.caretDirection,ShowcaseWeb.shutdown}
+IFS=',' read -r -a wasm_export_list <<< "$wasm_exports"
+for symbol in "${wasm_export_list[@]}"; do
+	[[ -n $symbol ]] && compiler_args+=("--export=$symbol")
+done
+
+# A reusable application can add its source root/files while retaining the
+# NativeKit/UI bindings and imported-memory contract configured above.
+if [[ -n ${NATIVEKIT_UI_WASM_APP_ROOT:-} ]]; then
+	compiler_args+=("--root=$NATIVEKIT_UI_WASM_APP_ROOT")
+fi
+if [[ -n ${NATIVEKIT_UI_WASM_APP_SOURCES:-} ]]; then
+	IFS=':' read -r -a wasm_app_sources <<< "$NATIVEKIT_UI_WASM_APP_SOURCES"
+	compiler_args+=("${wasm_app_sources[@]}")
+fi
 
 # Chrome currently ships the structured exception opcodes but gates the
 # standardized try_table/exnref lowering behind an experimental flag. Keep

@@ -97,6 +97,7 @@ class UiExplorer {
 	final state:ExplorerState;
 	final renderer:Renderer;
 	final fonts:FontCollection;
+	final ownsFonts:Bool;
 	final frame:LayoutFrame;
 	final frameInfo:FrameInfo;
 	final platformLabel:String;
@@ -135,10 +136,11 @@ class UiExplorer {
 
 	public function new(fonts:FontCollection, platformLabel:String,
 			onOpenGraphics:Void->Void, ?staticSubmitReuse:Bool, ?demoImagePath:String,
-			?onOpenWindowDemo:Void->Bool, ?onThemeChanged:Bool->Void) {
+			?onOpenWindowDemo:Void->Bool, ?onThemeChanged:Bool->Void, ?ownsFonts:Bool) {
 		if (fonts == null || fonts.isDisposed())
 			throw "UI Explorer requires a live font collection";
 		this.fonts = fonts;
+		this.ownsFonts = ownsFonts != false;
 		state = new ExplorerState();
 		this.platformLabel = platformLabel == null ? "NativeKit runtime" : platformLabel;
 		this.onOpenGraphics = onOpenGraphics == null ? function() {} : onOpenGraphics;
@@ -297,6 +299,27 @@ class UiExplorer {
 		diagnosticStage = 0;
 	}
 
+	/** Shared-host application hooks; rendering remains owned by UiHostRuntime. */
+	public function hostContext():UiContext return context;
+
+	public function submitHostFrame(hostFrame:LayoutFrame):nativekit.ui.core.RenderNode {
+		width = hostFrame.width;
+		height = hostFrame.height;
+		diagnosticStage = 3;
+		var root = buildRoot();
+		var submitted = staticSubmitReuse
+			? context.submitCached(function() return root, hostFrame, "showcase-static-controls")
+			: context.submit(root, hostFrame);
+		var metrics = context.frameMetrics;
+		if (metrics == null || !metrics.reusedSubmission) attachInspectorEvents();
+		ExplorerFocusSequence.applyAfterSubmit(this);
+		applySmokeSelectState();
+		syncWebView();
+		frames++;
+		diagnosticStage = 0;
+		return submitted;
+	}
+
 	public function dispose():Void {
 		if (webView != null) {
 			webView.dispose();
@@ -314,7 +337,7 @@ class UiExplorer {
 			nativeSurface.releaseBorrowed();
 			nativeSurface = null;
 		}
-		fonts.dispose();
+		if (ownsFonts) fonts.dispose();
 	}
 
 	function webViewAvailable():Bool
