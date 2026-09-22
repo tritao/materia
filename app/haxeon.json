@@ -13,7 +13,7 @@
 		"cmake": {
 			"source": "native",
 			"target": "haxeon_app_native",
-			"inputs": ["native/CMakeLists.txt", "../nativekit", "../uikit", "../robotkit", "../scenekit"]
+			"inputs": ["native/CMakeLists.txt"]
 		}
 	},
 	"target": "host",
