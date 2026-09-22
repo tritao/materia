@@ -37,6 +37,31 @@ Vec3 componentwise_quantize(Vec3 value, Vec3 step) noexcept {
     return {quantize(value.x, step.x), quantize(value.y, step.y), quantize(value.z, step.z)};
 }
 
+void sanitize(PinholeConfig &config) noexcept {
+    config.width = std::max<std::uint32_t>(1, config.width);
+    config.height = std::max<std::uint32_t>(1, config.height);
+    if (!std::isfinite(config.fov_y))
+        config.fov_y = 1.04719755f;
+    config.fov_y = std::clamp(config.fov_y, 1.0e-4f, 3.1415925f - 1.0e-4f);
+    if (!std::isfinite(config.near_plane))
+        config.near_plane = 0.01f;
+    config.near_plane = std::max(1.0e-5f, config.near_plane);
+    if (!std::isfinite(config.far_plane))
+        config.far_plane = 1000.0f;
+    config.far_plane = std::max(config.near_plane + 1.0e-5f, config.far_plane);
+}
+
+template <typename Frame, typename Value>
+Frame make_frame(const SensorTick &tick, const PinholeConfig &projection,
+                 std::span<const Value> values, std::vector<Value> Frame::*payload) {
+    Frame frame;
+    frame.header = tick.header;
+    frame.width = projection.width;
+    frame.height = projection.height;
+    (frame.*payload).assign(values.begin(), values.end());
+    return frame;
+}
+
 Vec3 gaussian_vec3(std::mt19937_64 &random, Vec3 standard_deviation) {
     std::normal_distribution<double> normal(0.0, 1.0);
     return {
@@ -180,83 +205,56 @@ void Sensor::reset(double next_capture_time) noexcept {
     sequence_ = 0;
 }
 
-bool SensorManager::add(const std::shared_ptr<Sensor> &sensor) {
-    if (!sensor || sensor->id() == invalid_sensor || find(sensor->id()))
-        return false;
-    sensors_.push_back(sensor);
-    return true;
-}
-
-bool SensorManager::remove(SensorId id) {
-    const auto found = std::remove_if(sensors_.begin(), sensors_.end(),
-                                      [id](const auto &sensor) {
-                                          return sensor && sensor->id() == id;
-                                      });
-    if (found == sensors_.end())
-        return false;
-    sensors_.erase(found, sensors_.end());
-    return true;
-}
-
-std::shared_ptr<Sensor> SensorManager::find(SensorId id) const {
-    const auto found = std::find_if(sensors_.begin(), sensors_.end(),
-                                    [id](const auto &sensor) {
-                                        return sensor && sensor->id() == id;
-                                    });
-    return found == sensors_.end() ? nullptr : *found;
-}
-
-std::vector<SensorTick> SensorManager::poll(double simulation_time) {
-    std::vector<SensorTick> ticks;
-    for (const auto &sensor : sensors_) {
-        if (!sensor)
-            continue;
-        auto sensor_ticks = sensor->poll(simulation_time);
-        ticks.insert(ticks.end(), sensor_ticks.begin(), sensor_ticks.end());
-    }
-    return ticks;
-}
-
 bool SensorRuntime::add(const std::shared_ptr<Sensor> &sensor, Producer producer) {
-    if (!sensor || !producer || !manager_.add(sensor))
+    if (!sensor || sensor->id() == invalid_sensor || !producer || find(sensor->id()))
         return false;
     bindings_.push_back({sensor, std::move(producer)});
     return true;
 }
 
 bool SensorRuntime::remove(SensorId id) {
-    if (!manager_.remove(id))
-        return false;
     const auto found = std::remove_if(bindings_.begin(), bindings_.end(),
                                       [id](const Binding &binding) {
                                           return binding.sensor && binding.sensor->id() == id;
                                       });
+    if (found == bindings_.end())
+        return false;
     bindings_.erase(found, bindings_.end());
     return true;
 }
 
 std::shared_ptr<Sensor> SensorRuntime::find(SensorId id) const {
-    return manager_.find(id);
+    const auto found = std::find_if(bindings_.begin(), bindings_.end(),
+                                    [id](const Binding &binding) {
+                                        return binding.sensor && binding.sensor->id() == id;
+                                    });
+    return found == bindings_.end() ? nullptr : found->sensor;
 }
 
 std::vector<SensorMeasurement> SensorRuntime::poll(double simulation_time) {
-    auto ticks = manager_.poll(simulation_time);
-    std::stable_sort(ticks.begin(), ticks.end(), [](const SensorTick &lhs, const SensorTick &rhs) {
-        if (lhs.header.capture_time != rhs.header.capture_time)
-            return lhs.header.capture_time < rhs.header.capture_time;
-        return lhs.header.sensor < rhs.header.sensor;
+    struct Due {
+        SensorTick tick;
+        Binding *binding = nullptr;
+    };
+
+    std::vector<Due> due;
+    for (auto &binding : bindings_) {
+        if (!binding.sensor)
+            continue;
+        for (auto &tick : binding.sensor->poll(simulation_time))
+            due.push_back({std::move(tick), &binding});
+    }
+    std::stable_sort(due.begin(), due.end(), [](const Due &lhs, const Due &rhs) {
+        if (lhs.tick.header.capture_time != rhs.tick.header.capture_time)
+            return lhs.tick.header.capture_time < rhs.tick.header.capture_time;
+        return lhs.tick.header.sensor < rhs.tick.header.sensor;
     });
 
     std::vector<SensorMeasurement> measurements;
-    for (const auto &tick : ticks) {
-        const auto found = std::find_if(bindings_.begin(), bindings_.end(),
-                                        [&tick](const Binding &binding) {
-                                            return binding.sensor &&
-                                                   binding.sensor->id() == tick.header.sensor;
-                                        });
-        if (found == bindings_.end())
+    for (auto &item : due) {
+        if (item.tick.dropped)
             continue;
-        if (auto measurement = found->producer(tick))
+        if (auto measurement = item.binding->producer(item.tick))
             measurements.push_back(std::move(*measurement));
     }
     return measurements;
@@ -401,17 +399,7 @@ std::optional<LidarScan> LidarSensor::sample(const SensorTick &tick,
 
 CameraSensor::CameraSensor(SensorConfig config, CameraConfig camera)
     : Sensor(std::move(config)), camera_(camera) {
-    camera_.width = std::max<std::uint32_t>(1, camera_.width);
-    camera_.height = std::max<std::uint32_t>(1, camera_.height);
-    if (!std::isfinite(camera_.fov_y))
-        camera_.fov_y = 1.04719755f;
-    camera_.fov_y = std::clamp(camera_.fov_y, 1.0e-4f, 3.1415925f - 1.0e-4f);
-    if (!std::isfinite(camera_.near_plane))
-        camera_.near_plane = 0.01f;
-    camera_.near_plane = std::max(1.0e-5f, camera_.near_plane);
-    if (!std::isfinite(camera_.far_plane))
-        camera_.far_plane = 1000.0f;
-    camera_.far_plane = std::max(camera_.near_plane + 1.0e-5f, camera_.far_plane);
+    sanitize(camera_.projection);
     for (auto &component : camera_.clear_color) {
         if (!std::isfinite(component))
             component = 0.0f;
@@ -443,23 +431,20 @@ std::optional<CameraFrame> CameraSensor::sample(const SensorTick &tick,
     if (tick.dropped)
         return std::nullopt;
 
-    const auto pixel_count = static_cast<std::size_t>(camera_.width) * camera_.height;
-    if ((camera_.width != 0 &&
+    const auto pixel_count = static_cast<std::size_t>(camera_.projection.width) *
+                             camera_.projection.height;
+    if ((camera_.projection.width != 0 &&
          pixel_count > std::numeric_limits<std::size_t>::max() / 4) ||
         rgba8.size() != pixel_count * 4)
         return std::nullopt;
 
-    CameraFrame frame;
-    frame.header = tick.header;
-    frame.width = camera_.width;
-    frame.height = camera_.height;
-    frame.rgba8.assign(rgba8.begin(), rgba8.end());
-    return frame;
+    return make_frame(tick, camera_.projection, rgba8, &CameraFrame::rgba8);
 }
 
 void CameraSensor::apply_post_process_cpu(std::span<std::uint8_t> rgba8,
                                            std::uint64_t sequence) const {
-    const auto pixel_count = static_cast<std::size_t>(camera_.width) * camera_.height;
+    const auto pixel_count = static_cast<std::size_t>(camera_.projection.width) *
+                             camera_.projection.height;
     if (rgba8.size() != pixel_count * 4)
         return;
 
@@ -470,16 +455,16 @@ void CameraSensor::apply_post_process_cpu(std::span<std::uint8_t> rgba8,
      * feeding already-processed output back into later pixels. */
     const auto source = std::vector<std::uint8_t>(rgba8.begin(), rgba8.end());
     const auto scale = std::exp2(post.exposure_stops) * post.gain;
-    for (std::uint32_t y = 0; y < camera_.height; ++y) {
-        for (std::uint32_t x = 0; x < camera_.width; ++x) {
+    for (std::uint32_t y = 0; y < camera_.projection.height; ++y) {
+        for (std::uint32_t x = 0; x < camera_.projection.width; ++x) {
             auto source_x = x;
             auto source_y = y;
             /* Inverse-map each output pixel into the source image. This is a
              * deliberately simple nearest-neighbour reference implementation;
              * the GPU path uses the same mapping with filtered sampling. */
             if (post.distortion_k1 != 0.0f || post.distortion_k2 != 0.0f) {
-                const auto u = (static_cast<float>(x) + 0.5f) / camera_.width;
-                const auto v = (static_cast<float>(y) + 0.5f) / camera_.height;
+                const auto u = (static_cast<float>(x) + 0.5f) / camera_.projection.width;
+                const auto v = (static_cast<float>(y) + 0.5f) / camera_.projection.height;
                 const auto centered_x = u * 2.0f - 1.0f;
                 const auto centered_y = v * 2.0f - 1.0f;
                 const auto radius_squared = centered_x * centered_x + centered_y * centered_y;
@@ -489,17 +474,18 @@ void CameraSensor::apply_post_process_cpu(std::span<std::uint8_t> rgba8,
                 const auto distorted_v = centered_y * factor * 0.5f + 0.5f;
                 if (distorted_u < 0.0f || distorted_u >= 1.0f || distorted_v < 0.0f ||
                     distorted_v >= 1.0f) {
-                    source_x = camera_.width;
-                    source_y = camera_.height;
+                    source_x = camera_.projection.width;
+                    source_y = camera_.projection.height;
                 } else {
-                    source_x = static_cast<std::uint32_t>(distorted_u * camera_.width);
-                    source_y = static_cast<std::uint32_t>(distorted_v * camera_.height);
+                    source_x = static_cast<std::uint32_t>(distorted_u * camera_.projection.width);
+                    source_y = static_cast<std::uint32_t>(distorted_v * camera_.projection.height);
                 }
             }
 
             const auto output_index =
-                (static_cast<std::size_t>(y) * camera_.width + x) * static_cast<std::size_t>(4);
-            if (source_x >= camera_.width || source_y >= camera_.height ||
+                (static_cast<std::size_t>(y) * camera_.projection.width + x) *
+                static_cast<std::size_t>(4);
+            if (source_x >= camera_.projection.width || source_y >= camera_.projection.height ||
                 pixel_random(config().seed, sequence, x, y, 2) < post.dropout_probability) {
                 rgba8[output_index + 0] = 0;
                 rgba8[output_index + 1] = 0;
@@ -509,7 +495,7 @@ void CameraSensor::apply_post_process_cpu(std::span<std::uint8_t> rgba8,
             }
 
             const auto source_index =
-                (static_cast<std::size_t>(source_y) * camera_.width + source_x) *
+                (static_cast<std::size_t>(source_y) * camera_.projection.width + source_x) *
                 static_cast<std::size_t>(4);
             for (std::size_t channel = 0; channel < 3; ++channel) {
                 /* Work in normalized linear values, apply exposure/gain,
@@ -530,17 +516,7 @@ void CameraSensor::apply_post_process_cpu(std::span<std::uint8_t> rgba8,
 
 DepthSensor::DepthSensor(SensorConfig config, DepthConfig depth)
     : Sensor(std::move(config)), depth_(depth) {
-    depth_.width = std::max<std::uint32_t>(1, depth_.width);
-    depth_.height = std::max<std::uint32_t>(1, depth_.height);
-    if (!std::isfinite(depth_.fov_y))
-        depth_.fov_y = 1.04719755f;
-    depth_.fov_y = std::clamp(depth_.fov_y, 1.0e-4f, 3.1415925f - 1.0e-4f);
-    if (!std::isfinite(depth_.near_plane))
-        depth_.near_plane = 0.01f;
-    depth_.near_plane = std::max(1.0e-5f, depth_.near_plane);
-    if (!std::isfinite(depth_.far_plane))
-        depth_.far_plane = 1000.0f;
-    depth_.far_plane = std::max(depth_.near_plane + 1.0e-5f, depth_.far_plane);
+    sanitize(depth_.projection);
 }
 
 std::optional<DepthFrame> DepthSensor::sample(const SensorTick &tick,
@@ -548,32 +524,16 @@ std::optional<DepthFrame> DepthSensor::sample(const SensorTick &tick,
     if (tick.dropped)
         return std::nullopt;
 
-    const auto pixel_count = static_cast<std::size_t>(depth_.width) * depth_.height;
+    const auto pixel_count = static_cast<std::size_t>(depth_.projection.width) *
+                             depth_.projection.height;
     if (meters.size() != pixel_count)
         return std::nullopt;
-    DepthFrame frame;
-    frame.header = tick.header;
-    frame.width = depth_.width;
-    frame.height = depth_.height;
-    frame.meters.assign(meters.begin(), meters.end());
-    return frame;
+    return make_frame(tick, depth_.projection, meters, &DepthFrame::meters);
 }
 
 SegmentationSensor::SegmentationSensor(SensorConfig config, SegmentationConfig segmentation)
     : Sensor(std::move(config)), segmentation_(segmentation) {
-    segmentation_.width = std::max<std::uint32_t>(1, segmentation_.width);
-    segmentation_.height = std::max<std::uint32_t>(1, segmentation_.height);
-    if (!std::isfinite(segmentation_.fov_y))
-        segmentation_.fov_y = 1.04719755f;
-    segmentation_.fov_y =
-        std::clamp(segmentation_.fov_y, 1.0e-4f, 3.1415925f - 1.0e-4f);
-    if (!std::isfinite(segmentation_.near_plane))
-        segmentation_.near_plane = 0.01f;
-    segmentation_.near_plane = std::max(1.0e-5f, segmentation_.near_plane);
-    if (!std::isfinite(segmentation_.far_plane))
-        segmentation_.far_plane = 1000.0f;
-    segmentation_.far_plane =
-        std::max(segmentation_.near_plane + 1.0e-5f, segmentation_.far_plane);
+    sanitize(segmentation_.projection);
 }
 
 std::optional<SegmentationFrame> SegmentationSensor::sample(
@@ -582,15 +542,11 @@ std::optional<SegmentationFrame> SegmentationSensor::sample(
         return std::nullopt;
 
     const auto pixel_count =
-        static_cast<std::size_t>(segmentation_.width) * segmentation_.height;
+        static_cast<std::size_t>(segmentation_.projection.width) *
+        segmentation_.projection.height;
     if (labels.size() != pixel_count)
         return std::nullopt;
-    SegmentationFrame frame;
-    frame.header = tick.header;
-    frame.width = segmentation_.width;
-    frame.height = segmentation_.height;
-    frame.labels.assign(labels.begin(), labels.end());
-    return frame;
+    return make_frame(tick, segmentation_.projection, labels, &SegmentationFrame::labels);
 }
 
 } // namespace nksensor

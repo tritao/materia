@@ -83,45 +83,32 @@ Matrix4 camera_view(const Pose &pose) noexcept {
             1.0f};
 }
 
-Matrix4 camera_projection(std::uint32_t width, std::uint32_t height, float fov_y,
-                          float near_plane, float far_plane) noexcept {
-    const auto aspect = static_cast<float>(width) / static_cast<float>(height);
-    const auto focal = 1.0f / std::tan(fov_y * 0.5f);
+Matrix4 camera_projection(const PinholeConfig &projection) noexcept {
+    const auto aspect = static_cast<float>(projection.width) /
+                        static_cast<float>(projection.height);
+    const auto focal = 1.0f / std::tan(projection.fov_y * 0.5f);
     Matrix4 result{};
     result[0] = focal / aspect;
     result[5] = focal;
-    result[10] = (far_plane + near_plane) / (far_plane - near_plane);
+    result[10] = (projection.far_plane + projection.near_plane) /
+                 (projection.far_plane - projection.near_plane);
     result[11] = 1.0f;
-    result[14] = -(2.0f * far_plane * near_plane) / (far_plane - near_plane);
+    result[14] = -(2.0f * projection.far_plane * projection.near_plane) /
+                 (projection.far_plane - projection.near_plane);
     return result;
 }
 
-Matrix4 camera_projection(const CameraConfig &camera) noexcept {
-    return camera_projection(camera.width, camera.height, camera.fov_y, camera.near_plane,
-                             camera.far_plane);
-}
-
-Matrix4 depth_projection(const DepthConfig &depth) noexcept {
-    return camera_projection(depth.width, depth.height, depth.fov_y, depth.near_plane,
-                             depth.far_plane);
-}
-
-Matrix4 segmentation_projection(const SegmentationConfig &segmentation) noexcept {
-    return camera_projection(segmentation.width, segmentation.height, segmentation.fov_y,
-                             segmentation.near_plane, segmentation.far_plane);
-}
-
-float metric_depth(float normalized_depth, const DepthConfig &depth) noexcept {
+float metric_depth(float normalized_depth, const PinholeConfig &projection) noexcept {
     if (!std::isfinite(normalized_depth))
-        return depth.far_plane;
+        return projection.far_plane;
     const auto depth_buffer = std::clamp(normalized_depth, 0.0f, 1.0f);
     const auto ndc_depth = depth_buffer * 2.0f - 1.0f;
-    const auto denominator = depth.far_plane + depth.near_plane -
-                             ndc_depth * (depth.far_plane - depth.near_plane);
+    const auto denominator = projection.far_plane + projection.near_plane -
+                             ndc_depth * (projection.far_plane - projection.near_plane);
     if (!(denominator > 0.0f) || !std::isfinite(denominator))
-        return depth.far_plane;
-    return std::clamp(2.0f * depth.far_plane * depth.near_plane / denominator,
-                      depth.near_plane, depth.far_plane);
+        return projection.far_plane;
+    return std::clamp(2.0f * projection.far_plane * projection.near_plane / denominator,
+                      projection.near_plane, projection.far_plane);
 }
 
 } // namespace
@@ -136,8 +123,8 @@ nkgpu_result SceneCameraAdapter::capture(CameraSensor &sensor, const SensorTick 
 
     nkscene::SceneView view;
     view.camera.enabled = true;
-    view.camera.view_projection = multiply(camera_projection(sensor.camera_config()),
-                                          camera_view(camera_pose));
+    view.camera.view_projection =
+        multiply(camera_projection(sensor.camera_config().projection), camera_view(camera_pose));
     const auto plan = nkscene::compile(snapshot, view);
 
     std::vector<std::uint8_t> pixels;
@@ -159,7 +146,8 @@ nkgpu_result SceneCameraAdapter::capture(CameraSensor &sensor, const SensorTick 
     const bool use_gpu_post_process = camera.post_process.enabled() &&
                                       gpu_post_process_supported;
     auto result = executor_.capture_rgba8(
-        plan, snapshot, camera.width, camera.height, camera.clear_color, pixels,
+        plan, snapshot, camera.projection.width, camera.projection.height,
+        camera.clear_color, pixels,
         use_gpu_post_process ? gpu_post_process : nkscene::RgbaPostProcess{});
 
     /* A backend may advertise a path but reject a particular shader or image
@@ -167,7 +155,8 @@ nkgpu_result SceneCameraAdapter::capture(CameraSensor &sensor, const SensorTick 
      * sensor contract with the portable CPU model. Other failures still
      * propagate because hiding device or frame errors would be dangerous. */
     if (result == NKGPU_ERROR_UNSUPPORTED && use_gpu_post_process) {
-        result = executor_.capture_rgba8(plan, snapshot, camera.width, camera.height,
+        result = executor_.capture_rgba8(plan, snapshot, camera.projection.width,
+                                         camera.projection.height,
                                          camera.clear_color, pixels);
         if (result != NKGPU_OK)
             return result;
@@ -190,21 +179,21 @@ nkgpu_result SceneCameraAdapter::capture_depth(
 
     nkscene::SceneView view;
     view.camera.enabled = true;
-    view.camera.view_projection =
-        multiply(depth_projection(sensor.depth_config()), camera_view(camera_pose));
+    view.camera.view_projection = multiply(
+        camera_projection(sensor.depth_config().projection), camera_view(camera_pose));
     const auto plan = nkscene::compile(snapshot, view);
 
     std::vector<float> normalized_depth;
     const auto &depth = sensor.depth_config();
-    const auto result = executor_.capture_depth(plan, snapshot, depth.width, depth.height,
-                                                normalized_depth);
+    const auto result = executor_.capture_depth(plan, snapshot, depth.projection.width,
+                                                depth.projection.height, normalized_depth);
     if (result != NKGPU_OK)
         return result;
 
     std::vector<float> meters;
     meters.reserve(normalized_depth.size());
     for (const auto value : normalized_depth)
-        meters.push_back(metric_depth(value, depth));
+        meters.push_back(metric_depth(value, depth.projection));
     out_frame = sensor.sample(tick, meters);
     return out_frame.has_value() ? NKGPU_OK : NKGPU_ERROR_INVALID_ARGUMENT;
 }
@@ -219,14 +208,14 @@ nkgpu_result SceneCameraAdapter::capture_segmentation(
 
     nkscene::SceneView view;
     view.camera.enabled = true;
-    view.camera.view_projection =
-        multiply(segmentation_projection(sensor.segmentation_config()), camera_view(camera_pose));
+    view.camera.view_projection = multiply(
+        camera_projection(sensor.segmentation_config().projection), camera_view(camera_pose));
     const auto plan = nkscene::compile(snapshot, view);
 
     std::vector<std::uint32_t> pick_ids;
     const auto &segmentation = sensor.segmentation_config();
-    const auto result = executor_.capture_pick_ids(plan, snapshot, segmentation.width,
-                                                   segmentation.height, pick_ids);
+    const auto result = executor_.capture_pick_ids(
+        plan, snapshot, segmentation.projection.width, segmentation.projection.height, pick_ids);
     if (result != NKGPU_OK)
         return result;
 

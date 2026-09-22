@@ -103,21 +103,6 @@ void identical_seeds_replay_identical_measurements() {
     assert(first_sample->linear_acceleration == second_sample->linear_acceleration);
 }
 
-void manager_preserves_sensor_insertion_order() {
-    auto first = std::make_shared<Sensor>(periodic_config(20));
-    auto second = std::make_shared<Sensor>(periodic_config(21));
-    SensorManager manager;
-    assert(manager.add(first));
-    assert(manager.add(second));
-    assert(!manager.add(first));
-    const auto ticks = manager.poll(0.02);
-    assert(ticks.size() == 2);
-    assert(ticks[0].header.sensor == 20);
-    assert(ticks[1].header.sensor == 21);
-    assert(manager.remove(20));
-    assert(!manager.remove(20));
-}
-
 void runtime_dispatches_measurements_in_capture_order() {
     SensorConfig late_config;
     late_config.id = 23;
@@ -141,6 +126,7 @@ void runtime_dispatches_measurements_in_capture_order() {
     assert(runtime.add(late, producer));
     assert(runtime.add(early, producer));
     assert(!runtime.add(early, producer));
+    assert(runtime.find(late->id()) == late);
     assert(runtime.size() == 2);
 
     const auto measurements = runtime.poll(0.1);
@@ -160,6 +146,7 @@ void runtime_dispatches_measurements_in_capture_order() {
     assert(runtime.remove(22));
     assert(runtime.size() == 1);
     assert(!runtime.remove(22));
+    assert(!runtime.find(22));
 }
 
 void lidar_generates_rays_and_models_returns() {
@@ -208,8 +195,8 @@ void camera_packages_backend_pixels() {
     sensor_config.frame = 9;
 
     CameraConfig camera_config;
-    camera_config.width = 2;
-    camera_config.height = 1;
+    camera_config.projection.width = 2;
+    camera_config.projection.height = 1;
     CameraSensor camera(sensor_config, camera_config);
     const auto tick = camera.trigger(3.0);
     assert(tick.has_value());
@@ -232,8 +219,8 @@ void camera_cpu_post_process_is_deterministic() {
     sensor_config.seed = 123;
 
     CameraConfig camera_config;
-    camera_config.width = 2;
-    camera_config.height = 1;
+    camera_config.projection.width = 2;
+    camera_config.projection.height = 1;
     camera_config.post_process.gain = 0.5f;
     CameraSensor camera(sensor_config, camera_config);
     const auto tick = camera.trigger(3.0);
@@ -270,8 +257,8 @@ void camera_cpu_post_process_is_deterministic() {
     CameraConfig distortion_config = camera_config;
     distortion_config.post_process.gain = 1.0f;
     distortion_config.post_process.distortion_k1 = 100.0f;
-    distortion_config.width = 2;
-    distortion_config.height = 2;
+    distortion_config.projection.width = 2;
+    distortion_config.projection.height = 2;
     CameraSensor distortion_camera(sensor_config, distortion_config);
     auto distortion_pixels = std::vector<std::uint8_t>(16, 127);
     distortion_camera.apply_post_process_cpu(distortion_pixels, tick->header.sequence);
@@ -287,8 +274,8 @@ void depth_packages_metric_pixels() {
     SensorConfig sensor_config;
     sensor_config.id = 41;
     DepthConfig depth_config;
-    depth_config.width = 2;
-    depth_config.height = 1;
+    depth_config.projection.width = 2;
+    depth_config.projection.height = 1;
     DepthSensor depth(sensor_config, depth_config);
     const auto tick = depth.trigger(4.0);
     assert(tick.has_value());
@@ -306,8 +293,8 @@ void segmentation_packages_labels() {
     SensorConfig sensor_config;
     sensor_config.id = 42;
     SegmentationConfig segmentation_config;
-    segmentation_config.width = 2;
-    segmentation_config.height = 1;
+    segmentation_config.projection.width = 2;
+    segmentation_config.projection.height = 1;
     segmentation_config.background_label = 99;
     SegmentationSensor segmentation(sensor_config, segmentation_config);
     const auto tick = segmentation.trigger(5.0);
@@ -329,7 +316,6 @@ int main() {
     dropout_and_manual_trigger_are_deterministic();
     imu_converts_specific_force_and_applies_postprocessing();
     identical_seeds_replay_identical_measurements();
-    manager_preserves_sensor_insertion_order();
     runtime_dispatches_measurements_in_capture_order();
     lidar_generates_rays_and_models_returns();
     camera_packages_backend_pixels();

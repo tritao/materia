@@ -20,8 +20,7 @@ if(NK_BUILD_SHARED AND NOT EMSCRIPTEN)
 endif()
 
 add_subdirectory(sensor_core)
-add_subdirectory(sensor_wire)
-add_subdirectory(sensor_stream)
+add_subdirectory(sensor_io)
 
 if(NKSENSOR_BUILD_SIM)
     set(NKSENSOR_PARENT_BUILD_TESTS ${NK_BUILD_TESTS})

@@ -13,19 +13,18 @@ engine, SceneKit, ROS2, SDF, or a transport. It currently provides:
 - separate capture and delivery timestamps;
 - latency, jitter, integration windows, and dropouts;
 - Gaussian noise, bias random walks, quantization, and clipping;
-- an insertion-ordered sensor manager.
+- an insertion-ordered runtime registry for scheduled sensors and producers.
 
 The current follow-up library is:
 
 ```text
 sensor_core    backend-independent scheduling, models, and data types
-sensor_wire    Haxeon-compatible MessagePack packed-frame packets
-sensor_stream  transport-neutral packet fanout and deterministic buffer replay
+sensor_io      Haxeon-compatible MessagePack packets, fanout, and buffer replay
 sensor_sim     SimKit truth adapters
 sensor_render  SceneKit GPU rendering and RGBA8 camera capture
 ```
 
-`sensor_wire` is the first external transport slice. It reuses Haxeon's
+`sensor_io` is the external packet slice. It reuses Haxeon's
 versioned `HMPK` envelope and encodes image-like sensor data as one
 integer-keyed MessagePack map whose payload is a packed binary field. Camera,
 depth, and segmentation share this `PackedFrame` wire shape; `messageType` and
@@ -36,7 +35,7 @@ sequence (4), capture time (5), delivery time (6), frame (7), width (8), height
 provides a generic `PackedFrameView` whose data span points directly into the
 encoded message, an owning `PackedFrame`, and typed camera, depth, and
 segmentation wrappers. The matching Haxeon record is in
-`sensor_wire/haxe/materia/sensor/wire/PackedFrameMessage.hx`.
+`sensor_io/haxe/materia/sensor/wire/PackedFrameMessage.hx`.
 
 The initial packed formats are RGBA8 camera data, little-endian R32F depth,
 little-endian R32U or U64 segmentation labels. Payloads are tightly packed
@@ -48,7 +47,7 @@ binary field contains 24 little-endian binary64 values: angular velocity,
 linear acceleration, and both row-major 3x3 covariance matrices. The C++ API
 provides a zero-copy `ImuSampleView`, an owning `ImuSample` decoder, and a
 variant adapter for measurements returned by `SensorRuntime`. The matching
-Haxeon record is `sensor_wire/haxe/materia/sensor/wire/ImuSampleMessage.hx`.
+Haxeon record is `sensor_io/haxe/materia/sensor/wire/ImuSampleMessage.hx`.
 
 LiDAR scans use the same envelope and carry dimensions plus one packed 12-byte
 record per ray: little-endian float32 range, little-endian float32 intensity,
@@ -56,14 +55,15 @@ one hit flag, and three reserved bytes. Records are ordered vertical-major,
 then horizontal. The first transport version intentionally omits backend hit
 points and normals; the C++ API provides zero-copy `LidarScanView`, owning
 decode, and runtime variant dispatch. The matching Haxeon record is
-`sensor_wire/haxe/materia/sensor/wire/LidarScanMessage.hx`.
+`sensor_io/haxe/materia/sensor/wire/LidarScanMessage.hx`.
 
-`sensor_stream` sits above the codec. `make_sensor_packet` encodes one core
-measurement and stores its bytes in shared immutable storage. `PacketFanout`
-delivers that same packet to live transports, recorders, UI callbacks, or
-tests. `PacketBuffer` is a small deterministic in-memory recorder/replay source
-that preserves packet order and exact HMPK bytes; it intentionally does not
-choose a file format or transport implementation.
+The `nksensor::stream` API is compiled into `sensor_io` alongside the codec.
+`make_sensor_packet` encodes one core measurement and stores its bytes in
+shared immutable storage. `PacketFanout` delivers that same packet to live
+transports, recorders, UI callbacks, or tests. `PacketBuffer` is a small
+deterministic in-memory recorder/replay source that preserves packet order and
+exact HMPK bytes; it intentionally does not choose a file format or transport
+implementation.
 
 `sensor_sim::ImuTruthAdapter` consumes an immutable `nksim_snapshot` and
 derives linear acceleration from consecutive body velocities. It never reads
@@ -114,10 +114,15 @@ truth snapshot -> sensor model -> sensor sample
 ```
 
 `SensorRuntime` is the thin orchestration layer above the individual models.
-It owns registration and scheduling, orders due ticks by capture time, and
-dispatches backend-provided producers into a typed measurement batch. Producers
-can close over an immutable SimKit or SceneKit snapshot, while runtime remains
-independent of those backends and of publishing or transport.
+Its single registry owns registration and scheduling, orders due ticks by
+capture time, skips dropped ticks, and dispatches backend-provided producers
+into a typed measurement batch. Producers can close over an immutable SimKit or
+SceneKit snapshot, while runtime remains independent of those backends and of
+publishing or transport.
+
+Camera, depth, and segmentation sensors share `PinholeConfig` through each
+model's `projection` field; RGB-specific clear color and post-processing and
+segmentation's background label remain on their respective configs.
 
 For a stationary IMU, for example, a world-frame kinematic acceleration of
 zero and gravity of `(0, 0, -9.81)` produce a measured specific force of

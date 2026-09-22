@@ -268,19 +268,6 @@ private:
     std::mt19937_64 random_;
 };
 
-/** A stable insertion-ordered collection of sensors. */
-class NKSENSOR_API SensorManager {
-public:
-    bool add(const std::shared_ptr<Sensor> &sensor);
-    bool remove(SensorId id);
-    std::shared_ptr<Sensor> find(SensorId id) const;
-    std::vector<SensorTick> poll(double simulation_time);
-    std::size_t size() const noexcept { return sensors_.size(); }
-
-private:
-    std::vector<std::shared_ptr<Sensor>> sensors_;
-};
-
 struct ImuNoiseConfig {
     Vec3 angular_velocity_stddev;
     Vec3 linear_acceleration_stddev;
@@ -384,12 +371,16 @@ struct CameraPostProcess {
     }
 };
 
-struct CameraConfig {
+struct PinholeConfig {
     std::uint32_t width = 640;
     std::uint32_t height = 480;
     float fov_y = 1.04719755f;
     float near_plane = 0.01f;
     float far_plane = 1000.0f;
+};
+
+struct CameraConfig {
+    PinholeConfig projection;
     std::array<float, 4> clear_color{0.0f, 0.0f, 0.0f, 1.0f};
     CameraPostProcess post_process;
 };
@@ -429,11 +420,7 @@ private:
 };
 
 struct DepthConfig {
-    std::uint32_t width = 640;
-    std::uint32_t height = 480;
-    float fov_y = 1.04719755f;
-    float near_plane = 0.01f;
-    float far_plane = 1000.0f;
+    PinholeConfig projection;
 };
 
 struct DepthFrame {
@@ -466,11 +453,7 @@ private:
 };
 
 struct SegmentationConfig {
-    std::uint32_t width = 640;
-    std::uint32_t height = 480;
-    float fov_y = 1.04719755f;
-    float near_plane = 0.01f;
-    float far_plane = 1000.0f;
+    PinholeConfig projection;
     std::uint64_t background_label = 0;
 };
 
@@ -512,7 +495,8 @@ using SensorMeasurement =
  * A producer is the narrow backend binding: it receives one scheduled tick,
  * reads whatever immutable snapshot it has captured, invokes the appropriate
  * sensor adapter/model, and returns one typed measurement. SensorRuntime owns
- * no simulation, rendering, transport, or snapshot state.
+ * one sensor registry and remains independent of simulation, rendering,
+ * transport, and snapshot state.
  */
 class NKSENSOR_API SensorRuntime {
 public:
@@ -524,7 +508,8 @@ public:
 
     /**
      * Poll all registered sensors and dispatch due ticks in capture-time order.
-     * A producer may return no value for dropped ticks or unavailable truth.
+     * Dropped ticks are skipped; producers may return no value when truth is
+     * unavailable.
      */
     std::vector<SensorMeasurement> poll(double simulation_time);
 
@@ -539,7 +524,6 @@ private:
         Producer producer;
     };
 
-    SensorManager manager_;
     std::vector<Binding> bindings_;
 };
 
