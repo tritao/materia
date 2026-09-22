@@ -1,5 +1,8 @@
 {
   "interface": "NativeKitSceneRender",
+  "dependencyModules": {
+    "NativeKitGpu": "nativekit.ffi.NativeKitGpu"
+  },
   "typeNames": {
     "nkscene_bounds": "NativeKitScene.nkscene_bounds",
     "nkscene_change_set": "NativeKitScene.nkscene_change_set",

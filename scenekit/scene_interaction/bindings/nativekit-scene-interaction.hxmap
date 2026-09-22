@@ -1,5 +1,8 @@
 {
   "interface": "NativeKitSceneInteraction",
+  "dependencyModules": {
+    "NativeKitGpu": "nativekit.ffi.NativeKitGpu"
+  },
   "typeNames": {
     "nkscene_occurrence_id": "NativeKitScene.nkscene_occurrence_id",
     "nkscene_render_executor": "NativeKitSceneRender.nkscene_render_executor",

@@ -4,8 +4,11 @@
 #include "scene_internal.hpp"
 
 #include <cstddef>
+#include <limits>
 #include <memory>
 #include <mutex>
+#include <new>
+#include <stdexcept>
 #include <vector>
 
 namespace {
@@ -413,28 +416,43 @@ nkscene_result NKS_CALL nkscene_render_spatial_index_pick_rays(
     uint64_t ray_count, nkscene_render_pick_result *out_results) {
     if ((ray_count != 0 && (!rays || !out_results)))
         return NKS_ERROR_INVALID_ARGUMENT;
+    if (ray_count >
+            std::numeric_limits<std::size_t>::max() / sizeof(nkscene_render_ray) ||
+        ray_count > std::numeric_limits<std::size_t>::max() /
+                        sizeof(nkscene_render_pick_result) ||
+        ray_count > std::numeric_limits<std::size_t>::max() / sizeof(nkscene::Ray) ||
+        ray_count > std::numeric_limits<std::size_t>::max() /
+                        sizeof(nkscene::PickResult))
+        return NKS_ERROR_INVALID_ARGUMENT;
     auto &state = registry();
     std::lock_guard lock(state.mutex);
     const auto index = state.spatial_indices.get(nkscene::unpack_handle(index_handle));
     if (!index)
         return NKS_ERROR_INVALID_HANDLE;
 
-    std::vector<nkscene::Ray> queries;
-    queries.reserve(ray_count);
-    for (uint64_t i = 0; i < ray_count; ++i)
-        queries.push_back({{rays[i].origin[0], rays[i].origin[1], rays[i].origin[2]},
-                           {rays[i].direction[0], rays[i].direction[1], rays[i].direction[2]}});
-    const auto results = index->pick_rays(queries);
-    for (uint64_t i = 0; i < ray_count; ++i) {
-        const auto &result = results[static_cast<std::size_t>(i)];
-        out_results[i] = {};
-        out_results[i].occurrence.value = result.occurrence.value;
-        out_results[i].source.value = result.source.value;
-        out_results[i].subelement = result.subelement.value;
-        out_results[i].world_position[0] = result.worldPosition.x;
-        out_results[i].world_position[1] = result.worldPosition.y;
-        out_results[i].world_position[2] = result.worldPosition.z;
-        out_results[i].depth = result.depth;
+    try {
+        std::vector<nkscene::Ray> queries;
+        queries.reserve(static_cast<std::size_t>(ray_count));
+        for (uint64_t i = 0; i < ray_count; ++i)
+            queries.push_back(
+                {{rays[i].origin[0], rays[i].origin[1], rays[i].origin[2]},
+                 {rays[i].direction[0], rays[i].direction[1], rays[i].direction[2]}});
+        const auto results = index->pick_rays(queries);
+        for (uint64_t i = 0; i < ray_count; ++i) {
+            const auto &result = results[static_cast<std::size_t>(i)];
+            out_results[i] = {};
+            out_results[i].occurrence.value = result.occurrence.value;
+            out_results[i].source.value = result.source.value;
+            out_results[i].subelement = result.subelement.value;
+            out_results[i].world_position[0] = result.worldPosition.x;
+            out_results[i].world_position[1] = result.worldPosition.y;
+            out_results[i].world_position[2] = result.worldPosition.z;
+            out_results[i].depth = result.depth;
+        }
+    } catch (const std::bad_alloc &) {
+        return NKS_ERROR_OUT_OF_MEMORY;
+    } catch (const std::length_error &) {
+        return NKS_ERROR_INVALID_ARGUMENT;
     }
     return NKS_OK;
 }

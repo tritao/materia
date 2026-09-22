@@ -218,11 +218,13 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_get_occurrenc
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray(
     nkscene_render_spatial_index index, const nkscene_render_ray *ray,
     nkscene_render_pick_result *out_result NK_OUT);
-/** Performs nearest-hit picking for a batch of rays against one immutable snapshot. */
+/** Performs nearest-hit picking for a batch of rays against one immutable snapshot.
+ * `rays` and `out_results` must each reference `ray_count` elements.
+ */
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_rays(
     nkscene_render_spatial_index index,
     const nkscene_render_ray *rays NK_IN_ARRAY(ray_count), uint64_t ray_count,
-    nkscene_render_pick_result *out_results NK_OUT_BUFFER(ray_count));
+    nkscene_render_pick_result *out_results NK_OUT_ARRAY(ray_count));
 
 /* ------------------------------------------------------------------------- */
 /* GPU executor                                                              */

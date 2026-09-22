@@ -127,6 +127,16 @@ int main(void) {
     assert(pick.occurrence.value == occurrence.value);
     assert(pick.subelement == 1);
     assert(pick.depth == 1.0f);
+    nkscene_render_ray rays[1] = {ray};
+    nkscene_render_pick_result picks[1] = {{0}};
+    assert(nkscene_render_spatial_index_pick_rays(spatial_index, rays, 1, picks) == NKS_OK);
+    assert(picks[0].occurrence.value == occurrence.value);
+    assert(picks[0].subelement == 1);
+    assert(picks[0].depth == 1.0f);
+    assert(nkscene_render_spatial_index_pick_rays(spatial_index, NULL, 0, NULL) == NKS_OK);
+    assert(nkscene_render_spatial_index_pick_rays(spatial_index, rays, UINT64_MAX,
+                                                   picks) ==
+           NKS_ERROR_INVALID_ARGUMENT);
     nkscene_render_spatial_index_destroy(spatial_index);
     assert(nkscene_render_spatial_index_get_revision(spatial_index, &revision) ==
            NKS_ERROR_INVALID_HANDLE);

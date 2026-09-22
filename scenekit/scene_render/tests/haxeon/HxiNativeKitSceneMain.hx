@@ -1,4 +1,3 @@
-import nativekit.ffi.NativeKitTypes;
 import compiler.Compiler;
 import compiler.hl.HlWriter;
 import compiler.runtime.CompilerIntrinsics;
@@ -42,6 +41,7 @@ import NativeKitSceneRender;
 import NativeKitSceneInteraction;
 import nativekit.ffi.NativeKitGpu;
 import nativekit.ffi.NativeKit;
+import nativekit.ffi.NativeKitTypes;
 import NativeKitEventValue;
 import NativeKitRuntime;
 import nativekit.scene.Scene;
@@ -187,6 +187,21 @@ class Main {
 			|| spatialPick.sourceValue() != haxe.Int64.ofInt(42)
 			|| spatialPick.subelement() != 42
 			|| Math.abs(spatialPick.depth() - 1.0) > 0.0001) return 25;
+		var ffiSpatialIndex = NativeKitSceneRender.nkscene_render_spatial_index_create(snapshot.nativeHandle());
+		if (ffiSpatialIndex.status != 0) return 25;
+		var batchRay = new nkscene_render_ray();
+		batchRay.set_origin(0, -0.65);
+		batchRay.set_origin(1, 0.0);
+		batchRay.set_origin(2, 1.0);
+		batchRay.set_direction(0, 0.0);
+		batchRay.set_direction(1, 0.0);
+		batchRay.set_direction(2, -1.0);
+		var batchPick = NativeKitSceneRender.nkscene_render_spatial_index_pick_rays(
+			ffiSpatialIndex.out_index.borrow(), [batchRay]);
+		ffiSpatialIndex.out_index.close();
+		if (batchPick.status != 0 || batchPick.out_results.length != 1
+			|| batchPick.out_results[0].get_subelement() != 42
+			|| Math.abs(batchPick.out_results[0].get_depth() - 1.0) > 0.0001) return 25;
 		var firstParent = firstInfo.parent(),
 			secondParent = secondInfo.parent();
 		if (children.length != 2
