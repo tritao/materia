@@ -39,6 +39,10 @@ class ElementSmoke {
 		var reference = new ElementReference(document.id, second.id);
 		document.removeElement(second.id);
 		check(reference.state(document) == ElementReference.UnresolvedElement, "removed element references are explicitly unresolved");
+		var failed = false;
+		try document.installElement("Reused identity", box, second.id) catch (error:Dynamic) failed = true;
+		check(failed && reference.state(document) == ElementReference.UnresolvedElement,
+			"removed element identities remain reserved");
 		check(document.undo() && reference.state(document) == ElementReference.Resolved
 			&& document.element(reference.elementId) == second, "removal undo restores the referenced identity");
 
@@ -52,7 +56,7 @@ class ElementSmoke {
 		var stableVolume = first.shape().volume();
 		var failing = document.add(new FailingElementFeature());
 		first.setOutput(failing);
-		var failed = false;
+		failed = false;
 		try document.recompute() catch (error:Dynamic) failed = true;
 		check(failed && first.shape().volume() == stableVolume, "failed recompute preserves committed element geometry");
 
@@ -85,11 +89,11 @@ class ElementSmoke {
 		check(cloned.id.value != persisted.id.value && cloned.elementAt(0).id.value == persistedElement.id.value,
 			"cloning assigns a document identity distinct from opening");
 
-		var legacy:Dynamic = Json.parse(encoded);
-		Reflect.setField(legacy, "version", 1);
-		var migrated = DocumentCodec.decode(Json.stringify(legacy));
-		check(migrated.elementCount() == 1 && migrated.elementAt(0).name == "Model",
-			"version-one documents migrate their selected output");
+		var unsupportedVersion:Dynamic = Json.parse(encoded);
+		Reflect.setField(unsupportedVersion, "version", 99);
+		failed = false;
+		try DocumentCodec.decode(Json.stringify(unsupportedVersion)) catch (error:Dynamic) failed = true;
+		check(failed, "unsupported document versions are rejected");
 
 		var duplicateIds:Dynamic = Json.parse(encoded);
 		var duplicateRecords:Array<Dynamic> = cast Reflect.field(duplicateIds, "elements");
@@ -104,7 +108,6 @@ class ElementSmoke {
 		try DocumentCodec.decode(Json.stringify(dangling)) catch (error:Dynamic) failed = true;
 		check(failed, "dangling persisted element outputs are rejected");
 
-		migrated.close();
 		cloned.close();
 		opened.close();
 		persisted.close();

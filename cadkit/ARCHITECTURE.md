@@ -69,7 +69,7 @@ so callers can inspect the failure and recover through undo/redo.
 fingerprints as versioned JSON; native handles and meshes never enter the
 document format. Profile extrusion and revolution are headless core
 operations; their Haxeon feature wrappers consume face or wire profiles.
-`FaceFeature` uses an index only for legacy/initial selection, then captures
+`FaceFeature` uses an index only for initial selection, then captures
 a geometric fingerprint and persists it for remapping across recompute.
 `FilletFeature` and `ChamferFeature` can own persistent selected-edge
 references while remapping those references against their source feature.
@@ -126,7 +126,7 @@ history; projection and grid assembly return shapes without history.
 shell/fillet/chamfer. It evaluates against each staged source and rejects missing
 or changed-cardinality selections, independently of persistent topological
 reference remapping. Both selection mechanisms are serialized by the codec;
-legacy documents without a recipe retain their original reference semantics.
+documents without a recipe retain their original reference semantics.
 The editable mounting-plate example exercises parameter edits, selection
 reevaluation, transactional failure recovery, persistence, and undo/redo.
 
@@ -134,14 +134,13 @@ reevaluation, transactional failure recovery, persistence, and undo/redo.
 through an explicit builder API. `NamedParameter` records one-to-many bindings
 to stable feature parameter names; edits route through a document transaction,
 so all bound slots undo together. The codec stores these bindings and the
-selected output feature as optional version-1 fields, preserving compatibility
-with documents written before recording support. Immediate modeling builders
-remain independent and never create hidden document state.
+selected output feature. Immediate modeling builders remain independent and
+never create hidden document state.
 
 Documents also own persistent `DocumentId` and `ElementId` values. An element
 records a name and one output feature, and several elements can expose separate
 committed shapes from the same feature graph. Element creation, removal,
 renaming, duplication, and output reassignment use document undo/redo without
-deleting features. Format version 2 persists this registry; version 1 documents
-migrate their selected output to a single `Model` element. These IDs describe
-document-level objects and do not replace topology remapping for faces or edges.
+deleting features. Format version 2 persists this registry and rejects other
+format versions. These IDs describe document-level objects and do not replace
+topology remapping for faces or edges.

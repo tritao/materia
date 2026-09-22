@@ -118,7 +118,7 @@ uses width as radius. Each feature has an immutable workplane. Compose with
 existing `BooleanFeature`, `TransformFeature`, `ExtrudeFeature`,
 `RevolveFeature`, and finishing features. `DocumentCodec` persists the profile,
 parameters, and plane; recompute recreates geometry. Transactions support
-parameter undo/redo. Existing version-1 documents remain readable.
+parameter undo/redo. Document persistence uses the version-2 format.
 
 This adapter is optional: immediate modeling does not create a feature graph.
 Immediate builders do not silently create feature graphs. Use the explicit
@@ -159,7 +159,7 @@ Named parameters may be declared as `length`, `angle`, `count`, `area`, or
 millimetres, and cubic millimetres. Explicit conversions support
 `mm/cm/m/in/ft`, `rad/deg`, and the corresponding squared and cubed length
 units. `valueIn(unit)` converts for display and `set(value, unit)` accepts an
-explicit input unit. Legacy `dimension()` values remain unitless scalars.
+explicit input unit. `dimension()` values remain unitless scalars.
 
 `Document.defineExpression` and `DocumentBuilder.expression` create read-only
 derived parameters. Expressions support named references, parentheses, unary
@@ -180,8 +180,7 @@ editable meaning is not represented must be rejected explicitly with
 direction. When no direction is supplied, sketch features use their workplane
 normal and other features use positive Z. Explicit directions may be arbitrary;
 reversed mode negates the direction, and symmetric mode centers the extrusion
-on the source profile. Legacy documents with editable XYZ extrusion components
-remain readable.
+on the source profile. Editable XYZ extrusion components remain supported.
 
 `LinearPatternFeature` generates a centered compound of independent instances
 along an arbitrary unit direction and, optionally, a second nonparallel axis.

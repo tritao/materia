@@ -84,14 +84,11 @@ class DocumentCodec {
 			var root:Dynamic = Json.parse(text);
 			if (stringField(root, "format") != FORMAT)
 				throw new ParametricError("unsupported document format");
-			var version = intField(root, "version");
-			if (version != 1 && version != VERSION)
+			if (intField(root, "version") != VERSION)
 				throw new ParametricError("unsupported document version");
 
 			var records:Array<Dynamic> = cast requiredField(root, "features");
-			document = version == 1 || clone
-				? new Document()
-				: new Document(new DocumentId(stringField(root, "documentId")));
+			document = clone ? new Document() : new Document(new DocumentId(stringField(root, "documentId")));
 			var pendingReferences:Array<Dynamic> = [];
 			for (record in records) {
 				var featureId = intField(record, "id");
@@ -170,47 +167,32 @@ class DocumentCodec {
 					decodeReference(pendingFeature, reference);
 			}
 
-			var parameterRecords:Dynamic = Reflect.field(root, "parameters");
-			if (parameterRecords != null) {
-				var records:Array<Dynamic> = cast parameterRecords;
-				for (record in records) {
-					var rawKind:Dynamic = Reflect.field(record, "kind");
-					var named = rawKind == null
-						? document.defineParameter(stringField(record, "name"), numberField(record, "value"))
-						: document.defineTypedParameter(stringField(record, "name"), numberField(record, "value"),
-							stringField(record, "kind"), stringField(record, "unit"));
-				}
-				for (record in records) {
-					var rawExpression:Dynamic = Reflect.field(record, "expression");
-					if (rawExpression != null) {
-						if (!Std.isOfType(rawExpression, String))
-							throw new ParametricError("document field is not a string: expression");
-						document.installExpression(stringField(record, "name"), cast rawExpression);
-					}
-				}
-				for (record in records) {
-					var named = document.parameter(stringField(record, "name"));
-					var bindings:Array<Dynamic> = cast requiredField(record, "bindings");
-					for (binding in bindings) {
-						var feature = requiredFeature(document, intField(binding, "feature"));
-						named.bind(feature.parameter(stringField(binding, "parameter")));
-					}
+			var parameterRecords:Array<Dynamic> = cast requiredField(root, "parameters");
+			for (record in parameterRecords)
+				document.defineTypedParameter(stringField(record, "name"), numberField(record, "value"),
+					stringField(record, "kind"), stringField(record, "unit"));
+			for (record in parameterRecords) {
+				var rawExpression:Dynamic = Reflect.field(record, "expression");
+				if (rawExpression != null) {
+					if (!Std.isOfType(rawExpression, String))
+						throw new ParametricError("document field is not a string: expression");
+					document.installExpression(stringField(record, "name"), cast rawExpression);
 				}
 			}
-			var output:Dynamic = Reflect.field(root, "output");
-			if (output != null) {
-				var selected = requiredFeature(document, integerValue(output, "output"));
-				document.setOutput(selected);
-				if (version == 1)
-					document.installElement("Model", selected);
+			for (record in parameterRecords) {
+				var named = document.parameter(stringField(record, "name"));
+				var bindings:Array<Dynamic> = cast requiredField(record, "bindings");
+				for (binding in bindings) {
+					var feature = requiredFeature(document, intField(binding, "feature"));
+					named.bind(feature.parameter(stringField(binding, "parameter")));
+				}
 			}
-			if (version >= 2) {
-				var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
-				for (elementRecord in elementRecords)
-					document.installElement(stringField(elementRecord, "name"),
-						requiredFeature(document, intField(elementRecord, "output")),
-						new ElementId(stringField(elementRecord, "id")));
-			}
+			document.setOutput(requiredFeature(document, intField(root, "output")));
+			var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
+			for (elementRecord in elementRecords)
+				document.installElement(stringField(elementRecord, "name"),
+					requiredFeature(document, intField(elementRecord, "output")),
+					new ElementId(stringField(elementRecord, "id")));
 
 			document.recompute();
 			return document;

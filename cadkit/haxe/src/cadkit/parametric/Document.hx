@@ -31,6 +31,7 @@ class Document {
 	public final id:DocumentId;
 	private final elements:Array<Element>;
 	private var elementsById:Map<String, Element>;
+	private var issuedElementIds:Map<String, Bool>;
 	private final dimensions:Array<NamedParameter>;
 	private var updatingNamedParameter:Bool;
 	private var selectedOutput:Null<Feature>;
@@ -52,6 +53,7 @@ class Document {
 		dimensions = [];
 		elements = [];
 		elementsById = new Map<String, Element>();
+		issuedElementIds = new Map<String, Bool>();
 		updatingNamedParameter = false;
 		selectedOutput = null;
 		closed = false;
@@ -63,23 +65,26 @@ class Document {
 		lastRemapReport = new TopologyRemapReport();
 	}
 
-	public function createElement(name:String, output:Feature, ?id:ElementId):Element {
-		var result = installElement(name, output, id);
+	public function createElement(name:String, output:Feature):Element {
+		var identity = new ElementId();
+		while (issuedElementIds.exists(identity.value))
+			identity = new ElementId();
+		var result = installElement(name, output, identity);
 		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
 		return result;
 	}
 
 	/** Codec path: installs a persisted record without creating undo history. */
-	public function installElement(name:String, output:Feature, ?id:ElementId):Element {
+	public function installElement(name:String, output:Feature, id:ElementId):Element {
 		ensureOpen();
 		validateElementName(name);
 		validateElementOutput(output);
-		var identity = id == null ? new ElementId() : id;
-		if (elementsById.exists(identity.value))
-			throw new ParametricError("duplicate element ID: " + identity.value);
-		var result = new Element(this, identity, name, output);
+		if (issuedElementIds.exists(id.value))
+			throw new ParametricError("duplicate or previously issued element ID: " + id.value);
+		var result = new Element(this, id, name, output);
 		elements.push(result);
-		elementsById.set(identity.value, result);
+		elementsById.set(id.value, result);
+		issuedElementIds.set(id.value, true);
 		return result;
 	}
 
@@ -298,7 +303,7 @@ class Document {
 		selectedOutput = feature;
 	}
 
-	/** Legacy documents use the last feature as output. */
+	/** Without an explicit selection, the last feature remains the primary output. */
 	public function outputFeature():Feature {
 		ensureOpen();
 		if (selectedOutput != null)
@@ -543,6 +548,7 @@ class Document {
 		dimensions.resize(0);
 		elements.resize(0);
 		elementsById = new Map<String, Element>();
+		issuedElementIds = new Map<String, Bool>();
 		undoStack.resize(0);
 		redoStack.resize(0);
 		selectedOutput = null;
