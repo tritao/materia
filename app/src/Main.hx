@@ -321,6 +321,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (contextMenuVisible) {
       var menu = new CommandMenu("scene-context-menu", [
         "scene.create",
+        "scene.create-plate",
         "scene.duplicate",
         "scene.delete",
         "scene.frame-selected",
@@ -642,6 +643,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new KeyedView("heading", sectionHeading("SCENE HIERARCHY")),
         new KeyedView("actions", new Column("scene-object-actions", [
           new KeyedView("create", new CommandButton("scene-create", "scene.create", commands)),
+          new KeyedView("create-plate", new CommandButton("scene-create-plate", "scene.create-plate", commands)),
           new KeyedView("duplicate", new CommandButton("scene-duplicate", "scene.duplicate", commands)),
           new KeyedView("delete", new CommandButton("scene-delete", "scene.delete", commands))
         ])),
@@ -885,6 +887,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspace.installCommands(commands, "workspace");
     commands.register(new Command("scene.create", "Add rectangle", function() {
       scene.createRectangle();
+      updateCommandContext();
+      commands.refresh();
+    }, null, function() return canEditObjects() && scene.canCreate()));
+    commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
+      scene.createMountingPlate();
       updateCommandContext();
       commands.refresh();
     }, null, function() return canEditObjects() && scene.canCreate()));

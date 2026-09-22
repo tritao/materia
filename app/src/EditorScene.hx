@@ -1,7 +1,6 @@
 package app;
 
 import nativekit.scene.Scene;
-import app.SceneCodec.SceneObjectData;
 import nativekit.scene.Snapshot;
 import nativekit.scene.SpatialIndex;
 import nativekit.scene.Occurrence;
@@ -54,7 +53,7 @@ class EditorScene {
       } else {
         for (item in data) addObject(item.id, item.label, item.x, item.y, item.z,
           item.width, item.height, item.depth, item.red, item.green, item.blue, item.visible,
-          item.collisionEnabled,item.dynamicBody,item.mass);
+          item.collisionEnabled,item.dynamicBody,item.mass,item.type);
         selectedId = data.length == 0 ? "scene" : data[0].id;
       }
       selectionMaterial = scene.createMaterial();
@@ -67,9 +66,13 @@ class EditorScene {
 
   function addObject(id:String, label:String, x:Float, y:Float, z:Float,
       width:Float, height:Float, depth:Float, red:Float, green:Float, blue:Float,
-      visible:Bool = true,collisionEnabled:Bool=true,dynamicBody:Bool=false,mass:Float=1.0):Void {
+      visible:Bool = true,collisionEnabled:Bool=true,dynamicBody:Bool=false,mass:Float=1.0,
+      kind:String="rectangle"):Void {
     var geometry = scene.createGeometry();
-    scene.setGeometryData(geometry, boxGeometry(width, height, depth));
+    var geometryData = kind == "cad-plate"
+      ? CadSceneGeometry.mountingPlate(width, height, depth, 0.012)
+      : boxGeometry(width, height, depth);
+    scene.setGeometryData(geometry, geometryData);
     var material = scene.createMaterial();
     scene.setMaterialData(material, MaterialData.opaque(red, green, blue));
     var transaction = scene.beginTransaction();
@@ -81,7 +84,7 @@ class EditorScene {
       transaction.setMaterial(occurrence, material);
       transaction.setTransform(occurrence, Transform.identity().translated(x, y, z));
       transaction.commit();
-      objects.push(new EditorSceneObject(id, label, occurrence, width, height, depth,
+      objects.push(new EditorSceneObject(id, label, kind, occurrence, width, height, depth,
         collisionEnabled,dynamicBody,mass,red,green,blue));
     } catch (error:Dynamic) {
       transaction.dispose();
@@ -91,11 +94,11 @@ class EditorScene {
 
   public function canCreate():Bool return objects.length < 10000;
 
-  function allocateId():String {
-    var id = "rectangle-" + nextObjectId;
+  function allocateId(prefix:String="rectangle"):String {
+    var id = prefix + "-" + nextObjectId;
     nextObjectId++;
     while (object(id) != null) {
-      id = "rectangle-" + nextObjectId;
+      id = prefix + "-" + nextObjectId;
       nextObjectId++;
     }
     return id;
@@ -109,6 +112,15 @@ class EditorScene {
       width: 1.6, height: 1.2, depth:0.1,collisionEnabled:true,dynamicBody:false,mass:1.0,
       red: 0.22, green: 0.52, blue: 0.85, visible: true});
     return changeObjects("Create rectangle", data, id);
+  }
+
+  public function createMountingPlate():Bool {
+    if (!canCreate()) return false;
+    var data = records(), id = allocateId("plate");
+    data.push({id:id, label:"Mounting plate", type:"cad-plate", x:0.0, y:0.0, z:0.0,
+      width:0.08, height:0.05, depth:0.006, collisionEnabled:false, dynamicBody:false, mass:1.0,
+      red:0.34, green:0.62, blue:0.78, visible:true});
+    return changeObjects("Create mounting plate", data, id);
   }
 
   public function duplicateSelected():Bool {
@@ -245,6 +257,13 @@ class EditorScene {
   public function pick(x:Float, y:Float):String {
     var hit = spatial.pickRay(x, y, 1000001.0, 0.0, 0.0, -1.0);
     for (item in objects) if (hit.occurrence().equals(item.occurrence)) return item.id;
+    return "scene";
+  }
+
+  public function pickRay(originX:Float,originY:Float,originZ:Float,
+      directionX:Float,directionY:Float,directionZ:Float):String {
+    var hit=spatial.pickRay(originX,originY,originZ,directionX,directionY,directionZ);
+    for(item in objects)if(hit.occurrence().equals(item.occurrence))return item.id;
     return "scene";
   }
 
@@ -552,7 +571,7 @@ class EditorScene {
     for (item in objects) {
       var state = info(item.id);
       var transform = state.localTransform();
-      result.push({id: item.id, label: item.label, type: "rectangle",
+      result.push({id: item.id, label: item.label, type: item.kind,
         x: transform.element(12), y: transform.element(13), z: transform.element(14),
         width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
@@ -584,6 +603,7 @@ class EditorScene {
 class EditorSceneObject {
   public final id:String;
   public var label:String;
+  public final kind:String;
   public final occurrence:Occurrence;
   public final width:Float;
   public final height:Float;
@@ -594,9 +614,9 @@ class EditorSceneObject {
   public final red:Float;
   public final green:Float;
   public final blue:Float;
-  public function new(id:String,label:String,occurrence:Occurrence,width:Float,height:Float,depth:Float,
+  public function new(id:String,label:String,kind:String,occurrence:Occurrence,width:Float,height:Float,depth:Float,
       collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float) {
-    this.id = id; this.label = label; this.occurrence = occurrence;
+    this.id = id; this.label = label; this.kind = kind; this.occurrence = occurrence;
     this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;
     this.dynamicBody=dynamicBody;this.mass=mass;
     this.red = red; this.green = green; this.blue = blue;

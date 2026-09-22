@@ -43,7 +43,7 @@ if(CADKIT_BUILD_OCCT)
         "${CMAKE_CURRENT_BINARY_DIR}/third_party/occt/include/opencascade/Standard_Version.hxx")
     if(EXISTS "${CADKIT_OCCT_VERSION_HEADER}")
         file(COPY "${CADKIT_OCCT_VERSION_HEADER}"
-             DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/include/opencascade")
+             DESTINATION "${CMAKE_BINARY_DIR}/include/opencascade")
     else()
         message(FATAL_ERROR "OCCT did not generate Standard_Version.hxx")
     endif()

@@ -3,12 +3,21 @@ set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 haxeon_root="${HAXEON_ROOT:-$repo_root/../haxeon}"
-target="${HAXEON_TARGET:-x86_64-linux-gnu}"
+import_target="${HAXEON_IMPORT_TARGET:-x86_64-linux-gnu}"
+abi_target="${HAXEON_TARGET:-portable-abi64}"
+temporary="$(mktemp)"
+trap 'rm -f -- "$temporary"' EXIT
 
 "$haxeon_root/scripts/haxeon-ffi-import" \
-	"--target=$target" \
+	"--target=$import_target" \
 	--library=cadkit-core \
 	--interface=CadKit \
 	--source-label=core/include/cadkit.h \
-	"--output=$repo_root/haxe/abi/CadKit.hxi" \
+	"--output=$temporary" \
 	"$repo_root/core/include/cadkit.h"
+
+# CadKit's public ABI uses only fixed-width scalars and explicitly generated
+# layouts, so publish it under the same portable ABI target as its consumers.
+sed -e "1s/for $import_target/for $abi_target/" \
+	-e "2s/@target(\"$import_target\")/@target(\"$abi_target\")/" \
+	"$temporary" > "$repo_root/haxe/abi/CadKit.hxi"

@@ -2,26 +2,6 @@ package app;
 
 import haxe.Json;
 
-/** Portable scene data. Native occurrence handles are deliberately not persisted. */
-typedef SceneObjectData = {
-  var id:String;
-  var label:String;
-  var type:String;
-  var x:Float;
-  var y:Float;
-  var z:Float;
-  var width:Float;
-  var height:Float;
-  var depth:Float;
-  var collisionEnabled:Bool;
-  var dynamicBody:Bool;
-  var mass:Float;
-  var red:Float;
-  var green:Float;
-  var blue:Float;
-  var visible:Bool;
-}
-
 class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
   public static inline var VERSION:Int = 1;
@@ -53,10 +33,12 @@ class SceneCodec {
       if (id == "scene" || ids.exists(id)) throw "Duplicate or reserved object ID: " + id;
       ids.set(id, true);
       var kind = stringField(value, "type");
-      if (kind != "rectangle") throw "Unsupported scene object type: " + kind;
+      if (kind != "rectangle" && kind != "cad-plate")
+        throw "Unsupported scene object type: " + kind;
       var visible:Dynamic = field(value, "visible");
       if (!Std.isOfType(visible, Bool)) throw "Object visibility must be a boolean";
-      var collisionEnabled=optionalBool(value,"collisionEnabled",cast visible);
+      var visibleValue:Bool=visible;
+      var collisionEnabled=optionalBool(value,"collisionEnabled",visibleValue);
       var dynamicBody=optionalBool(value,"dynamicBody",false);
       result.push({id: id, label: stringField(value, "label"), type: kind,
         x: bounded(value, "x", -1000000, 1000000), y: bounded(value, "y", -1000000, 1000000),

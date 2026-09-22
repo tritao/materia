@@ -5,6 +5,7 @@
 	"sourceRoots": ["src"],
 	"dependencies": {
 		"nativekit": { "path": "../nativekit" },
+		"cadkit": { "path": "../cadkit" },
 		"uikit": { "path": "../uikit" },
 		"robotkit": { "path": "../robotkit" },
 		"scenekit": { "path": "../scenekit" }
@@ -13,7 +14,7 @@
 		"cmake": {
 			"source": "native",
 			"target": "haxeon_app_native",
-			"inputs": ["native/CMakeLists.txt", "../robotkit/CMakeLists.txt", "../robotkit/runtime/CMakeLists.txt"]
+			"inputs": ["native/CMakeLists.txt", "../cadkit/CMakeLists.txt", "../cadkit/core/CMakeLists.txt", "../robotkit/CMakeLists.txt", "../robotkit/runtime/CMakeLists.txt"]
 		}
 	},
 	"target": "host",

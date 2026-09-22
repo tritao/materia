@@ -47,8 +47,19 @@ if(MATERIA_ENABLE_MUJOCO)
 endif()
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../robotkit" robotkit)
 
+# CadKit owns millimetre-based parametric geometry. Keep its pinned OCCT
+# toolkits shared, matching OCCT's supported LGPL distribution model.
+set(CADKIT_BUILD_TESTS OFF CACHE BOOL "Disable CadKit dependency tests" FORCE)
+set(CADKIT_BUILD_OCCT ON CACHE BOOL "Build CadKit's pinned OCCT" FORCE)
+set(CADKIT_BUILD_SHARED ON CACHE BOOL "Build the CadKit application library" FORCE)
+set(BUILD_LIBRARY_TYPE Shared CACHE STRING "Build OCCT as shared libraries" FORCE)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../cadkit" cadkit)
+if(UNIX AND NOT APPLE)
+    target_link_options(cadkit-core PRIVATE "LINKER:-z,defs")
+endif()
+
 foreach(target_name nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render
-        nativekit_sim_core nativekit_sim_mujoco robotkit_runtime)
+        nativekit_sim_core nativekit_sim_mujoco robotkit_runtime cadkit-core)
     if(TARGET "${target_name}")
         set_target_properties("${target_name}" PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
@@ -60,7 +71,7 @@ endforeach()
 # Haxeon's coarse CMake artifact is a build stamp.  The runtime libraries
 # loaded by the generated FFI calls are the libnativekit*.so files above.
 add_custom_target(haxeon_app_native
-    DEPENDS nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render robotkit_runtime
+    DEPENDS nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render robotkit_runtime cadkit-core
     COMMAND "${CMAKE_COMMAND}" -E touch "${HAXEON_NATIVE_OUTPUT_DIR}/app.hdll"
     BYPRODUCTS "${HAXEON_NATIVE_OUTPUT_DIR}/app.hdll"
     COMMENT "Building NativeKit, GPU, and UIKit native dependencies")

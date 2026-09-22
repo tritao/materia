@@ -188,46 +188,10 @@ class EditorPerspectiveViewport implements View {
   public static function pickScene(scene:EditorScene, camera:PerspectiveCamera,
       width:Float, height:Float, localX:Float, localY:Float):String {
     var ray = camera.screenRay(localX, localY, width, height);
-    var closest = 1000000000.0;
-    var result = "scene";
-    for (item in scene.items()) {
-      var state = scene.info(item.id);
-      if (!state.visible()) continue;
-      var transform = state.worldTransform();
-      var centerX = transform.element(12), centerY = transform.element(13);
-      var centerZ = transform.element(14);
-      var distance = rayBoxDistance(ray,transform,item.width,item.height,item.depth);
-      if (distance != null && distance < closest) {
-        closest = distance;
-        result = item.id;
-      }
-    }
-    return result;
+    return scene.pickRay(ray.originX,ray.originY,ray.originZ,
+      ray.directionX,ray.directionY,ray.directionZ);
   }
 
-  static function rayBoxDistance(ray:PerspectiveRay,transform:Transform,
-      width:Float,height:Float,depth:Float):Null<Float> {
-    var delta=[ray.originX-transform.element(12),ray.originY-transform.element(13),ray.originZ-transform.element(14)];
-    var origins=[for(column in 0...3)delta[0]*transform.element(column*4)+
-      delta[1]*transform.element(column*4+1)+delta[2]*transform.element(column*4+2)];
-    var directions=[for(column in 0...3)ray.directionX*transform.element(column*4)+
-      ray.directionY*transform.element(column*4+1)+ray.directionZ*transform.element(column*4+2)];
-    var minimums=[-width/2,-height/2,-depth/2],maximums=[width/2,height/2,depth/2];
-    var near = 0.0, far = 1000000000.0;
-    for (axis in 0...3) {
-      var direction = directions[axis], origin = origins[axis];
-      if (Math.abs(direction) < 0.000001) {
-        if (origin < minimums[axis] || origin > maximums[axis]) return null;
-      } else {
-        var first = (minimums[axis] - origin) / direction;
-        var second = (maximums[axis] - origin) / direction;
-        if (first > second) { var swap = first; first = second; second = swap; }
-        near = Math.max(near, first); far = Math.min(far, second);
-        if (near > far) return null;
-      }
-    }
-    return far < 0.0 ? null : near;
-  }
   static function transformedBounds(transform:Transform,width:Float,height:Float,depth:Float):Array<Float>{
     var result=[1e300,1e300,1e300,-1e300,-1e300,-1e300];
     for(x in [-width/2,width/2])for(y in [-height/2,height/2])for(z in [-depth/2,depth/2]){
