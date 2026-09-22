@@ -478,11 +478,14 @@ nksim_result World::set_body_state(nksim_body body, const nksim_body_state &stat
     auto *value = bodies.get(body);
     if (!value || state.body != body)
         return NKSIM_ERROR_INVALID_HANDLE;
+    const auto previous = value->state;
     value->state = state;
     value->state.struct_size = sizeof(value->state);
     value->state.body = body;
     value->state.occurrence = value->desc.occurrence;
-    return set_backend_body_state(*value);
+    const auto result = set_backend_body_state(*value);
+    if (result != NKSIM_OK) value->state = previous;
+    return result;
 }
 
 nksim_result World::reset_body(nksim_body body) {
@@ -491,8 +494,11 @@ nksim_result World::reset_body(nksim_body body) {
     auto *value = bodies.get(body);
     if (!value)
         return NKSIM_ERROR_INVALID_HANDLE;
+    const auto previous = value->state;
     value->state = value->initial_state;
-    return set_backend_body_state(*value);
+    const auto result = set_backend_body_state(*value);
+    if (result != NKSIM_OK) value->state = previous;
+    return result;
 }
 
 nksim_result World::reset() {

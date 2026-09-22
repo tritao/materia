@@ -115,6 +115,7 @@ public:
         spec = mj_makeSpec();
         if (!spec)
             return NKSIM_ERROR_OUT_OF_MEMORY;
+        spec->compiler.degree = 0; // SimKit joint limits are SI radians.
         spec->option.gravity[0] = desc.gravity[0];
         spec->option.gravity[1] = desc.gravity[1];
         spec->option.gravity[2] = desc.gravity[2];
@@ -167,17 +168,39 @@ public:
         const auto found = bodies.find(id);
         if (found == bodies.end())
             return NKSIM_ERROR_INVALID_HANDLE;
-        found->second.state = state;
-        found->second.state.backend_body = id;
-
         const auto body_id = model_body_id(id);
         if (body_id < 0)
             return NKSIM_ERROR_INVALID_HANDLE;
         const auto joint_id = model->body_jntadr[body_id];
-        if (joint_id < 0 || model->jnt_type[joint_id] != mjJNT_FREE)
-            return NKSIM_OK;
-
-        set_free_body_state(body_id, state);
+        if (joint_id >= 0 && model->jnt_type[joint_id] == mjJNT_FREE) {
+            set_free_body_state(body_id, state);
+        } else if (const auto incoming = parent_joint_id(id); incoming != 0) {
+            // A constrained link can be reset to its declared rest pose, but
+            // cannot be independently teleported away from its articulation.
+            const auto &desc = found->second.desc;
+            for (int i = 0; i < 3; ++i)
+                if (std::abs(state.position[i] - desc.position[i]) > 1e-9)
+                    return NKSIM_ERROR_UNSUPPORTED;
+            for (int i = 0; i < 4; ++i)
+                if (std::abs(state.rotation[i] - desc.rotation[i]) > 1e-9)
+                    return NKSIM_ERROR_UNSUPPORTED;
+            auto &joint = joints.at(incoming);
+            joint.state.position = joint.state.velocity = joint.state.effort = 0.0;
+            joint.target_mode = 0;
+            if (joint_id >= 0) {
+                data->qpos[model->jnt_qposadr[joint_id]] = 0.0;
+                data->qvel[model->jnt_dofadr[joint_id]] = 0.0;
+            }
+            apply_joint_targets();
+        } else {
+            // Static root pose is model state, not a free-joint qpos.
+            std::copy(state.position.begin(), state.position.end(), model->body_pos + 3*body_id);
+            const auto q = normalize(state.rotation);
+            model->body_quat[4*body_id] = q[3];
+            for (int i = 0; i < 3; ++i) model->body_quat[4*body_id+i+1] = q[i];
+        }
+        found->second.state = state;
+        found->second.state.backend_body = id;
         mj_forward(model, data);
         return NKSIM_OK;
     }
@@ -276,6 +299,9 @@ public:
             apply_joint_targets();
             mj_step(model, data);
         }
+        // mj_step integrates qpos/qvel after computing derived body quantities.
+        // Refresh them so snapshots contain pose and velocity at the same time.
+        mj_forward(model, data);
         std::fill(data->xfrc_applied, data->xfrc_applied + model->nbody * 6, 0.0);
         return NKSIM_OK;
     }
@@ -296,17 +322,12 @@ public:
                       state.position.begin());
             state.rotation = {data->xquat[body_id * 4 + 1], data->xquat[body_id * 4 + 2],
                               data->xquat[body_id * 4 + 3], data->xquat[body_id * 4 + 0]};
-            state.linear_velocity.fill(0.0);
-            state.angular_velocity.fill(0.0);
-            const auto joint_id = model->body_jntadr[body_id];
-            if (joint_id >= 0 && model->jnt_type[joint_id] == mjJNT_FREE) {
-                const auto qvel = model->jnt_dofadr[joint_id];
-                // MuJoCo orders free-joint qvel as linear(3), rotational(3).
-                std::copy(data->qvel + qvel, data->qvel + qvel + 3,
-                          state.linear_velocity.begin());
-                std::copy(data->qvel + qvel + 3, data->qvel + qvel + 6,
-                          state.angular_velocity.begin());
-            }
+            mjtNum velocity[6];
+            // World-oriented velocity at the body origin, including all
+            // ancestor joints. MuJoCo returns angular then linear components.
+            mj_objectVelocity(model, data, mjOBJ_XBODY, body_id, velocity, 0);
+            std::copy_n(velocity, 3, state.angular_velocity.begin());
+            std::copy_n(velocity + 3, 3, state.linear_velocity.begin());
             state.sleeping = 0;
             found->second.state = state;
         }
@@ -398,6 +419,13 @@ private:
         auto *world = mjs_findBody(spec, "world");
         if (!world)
             return NKSIM_ERROR_BACKEND;
+        // Adjacent articulated bodies must not fight their own joint through
+        // contact, including a child connected to a world-welded static root.
+        std::vector<mjsElement *> exclusions;
+        for (auto *element = mjs_firstElement(spec, mjOBJ_EXCLUDE); element;
+             element = mjs_nextElement(spec, element)) exclusions.push_back(element);
+        for (auto *element : exclusions)
+            if (mjs_delete(spec, element) != 0) return NKSIM_ERROR_BACKEND;
         std::vector<mjsElement *> elements;
         for (auto *element = mjs_firstElement(spec, mjOBJ_BODY); element;
              element = mjs_nextElement(spec, element)) {
@@ -432,6 +460,13 @@ private:
         }
         if (added.size() != bodies.size())
             return NKSIM_ERROR_INVALID_STATE;
+        for (const auto id : joint_order) {
+            const auto &joint = joints.at(id);
+            auto *exclude = mjs_addExclude(spec);
+            if (!exclude) return NKSIM_ERROR_OUT_OF_MEMORY;
+            mjs_setString(exclude->bodyname1, bodies.at(joint.desc.body_a).name.c_str());
+            mjs_setString(exclude->bodyname2, bodies.at(joint.desc.body_b).name.c_str());
+        }
         const auto actuator_result = add_joint_actuators();
         if (actuator_result != NKSIM_OK)
             return actuator_result;
@@ -518,15 +553,17 @@ private:
 
         const auto *incoming = parent_joint(id);
         const auto *parent_record = incoming ? &bodies.at(incoming->desc.body_a) : nullptr;
-        const auto world_position = found->second.state.position;
-        const auto world_rotation = normalize(found->second.state.rotation);
+        // Rebuild articulations from rest transforms. Using the live pose here
+        // and then restoring qpos applies joint displacement twice.
+        const auto world_position = incoming ? found->second.desc.position : found->second.state.position;
+        const auto world_rotation = normalize(incoming ? found->second.desc.rotation : found->second.state.rotation);
         Vec3 local_position = world_position;
         Quat local_rotation = world_rotation;
         if (parent_record) {
-            const auto parent_rotation = normalize(parent_record->state.rotation);
+            const auto parent_rotation = normalize(parent_record->desc.rotation);
             const auto inverse_parent = conjugate(parent_rotation);
             local_position = rotate(inverse_parent,
-                                    subtract(world_position, parent_record->state.position));
+                                    subtract(world_position, parent_record->desc.position));
             local_rotation = normalize(multiply(inverse_parent, world_rotation));
         }
         write_pose(local_position, local_rotation, *body);
@@ -571,7 +608,7 @@ private:
                 ? mjJNT_HINGE : mjJNT_SLIDE;
             std::copy(incoming->desc.anchor_b.begin(), incoming->desc.anchor_b.end(), joint->pos);
 
-            const auto parent_rotation = parent ? normalize(parent->state.rotation)
+            const auto parent_rotation = parent ? normalize(parent->desc.rotation)
                                                  : Quat{0.0, 0.0, 0.0, 1.0};
             const auto axis_world = rotate(parent_rotation,
                                            normalize(incoming->desc.axis_a));
@@ -671,7 +708,8 @@ private:
         data->qpos[qpos + 5] = rotation[1];
         data->qpos[qpos + 6] = rotation[2];
         std::copy(state.linear_velocity.begin(), state.linear_velocity.end(), data->qvel + qvel);
-        std::copy(state.angular_velocity.begin(), state.angular_velocity.end(), data->qvel + qvel + 3);
+        const auto local_angular = rotate(conjugate(rotation), state.angular_velocity);
+        std::copy(local_angular.begin(), local_angular.end(), data->qvel + qvel + 3);
     }
 
     void apply_joint_targets() {

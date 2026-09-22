@@ -119,8 +119,8 @@ void revolute_joint_is_owned_by_nativekit() {
     joint_desc.body_a = base;
     joint_desc.body_b = arm;
     joint_desc.axis_a[2] = 1.0;
-    joint_desc.lower_limit = -0.1;
-    joint_desc.upper_limit = 0.1;
+    joint_desc.lower_limit = -0.6;
+    joint_desc.upper_limit = 0.6;
     joint_desc.max_force = 20.0;
     nksim_joint joint = 0;
     assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
@@ -144,13 +144,37 @@ void revolute_joint_is_owned_by_nativekit() {
     nksim_joint_state joint_state{};
     joint_state.struct_size = sizeof(joint_state);
     assert(nksim_joint_get_state(world, joint, &joint_state) == NKSIM_OK);
-    assert(joint_state.position > 0.0);
-    assert(joint_state.position < 0.12);
+    assert(joint_state.position > 0.1); // Limits must be radians, not degrees.
+    assert(joint_state.position < 0.6);
 
     nksim_body_state body_state{};
     body_state.struct_size = sizeof(body_state);
     assert(nksim_body_get_state(world, arm, &body_state) == NKSIM_OK);
     assert(std::abs(body_state.position[0] - 1.0) < 1e-6);
+    assert(std::abs(body_state.angular_velocity[2] - joint_state.velocity) < 1e-9);
+    auto invalid_pose = body_state;
+    invalid_pose.position[0] += 10.0;
+    assert(nksim_body_set_state(world, arm, &invalid_pose) == NKSIM_ERROR_UNSUPPORTED);
+    nksim_body_state unchanged{};
+    unchanged.struct_size = sizeof(unchanged);
+    assert(nksim_body_get_state(world, arm, &unchanged) == NKSIM_OK);
+    assert(unchanged.position[0] == body_state.position[0]);
+    const auto extra_occurrence = make_occurrence(scene, 10.0);
+    const auto extra_body = make_body(world, extra_occurrence, NKSIM_MOTION_STATIC, 0.0);
+    step_world(world, 1);
+    assert(nksim_joint_get_state(world, joint, &joint_state) == NKSIM_OK);
+    assert(nksim_body_get_state(world, arm, &body_state) == NKSIM_OK);
+    assert(std::abs(body_state.rotation[2] - std::sin(joint_state.position * 0.5)) < 1e-9);
+    nksim_body_destroy(world, extra_body);
+    target.target = 2.0;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+    step_world(world, 100);
+    assert(nksim_joint_get_state(world, joint, &joint_state) == NKSIM_OK);
+    assert(joint_state.position > 0.5 && joint_state.position < 0.65);
+    assert(nksim_world_reset(world) == NKSIM_OK);
+    step_world(world, 1);
+    assert(nksim_joint_get_state(world, joint, &joint_state) == NKSIM_OK);
+    assert(std::abs(joint_state.position) < 1e-9);
 
     nksim_joint_destroy(world, joint);
     nksim_body_destroy(world, arm);
@@ -350,6 +374,34 @@ void mujoco_replay_is_deterministic() {
     assert(first == second);
 }
 
+void rotated_free_body_preserves_world_angular_velocity() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto occurrence = make_occurrence(scene, 0.0);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.001;
+    desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const auto shape = make_box(world);
+    const auto body = make_body(world, occurrence, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_body_get_state(world, body, &state) == NKSIM_OK);
+    state.rotation[2] = state.rotation[3] = std::sqrt(0.5);
+    state.angular_velocity[0] = 1.0;
+    assert(nksim_body_set_state(world, body, &state) == NKSIM_OK);
+    step_world(world, 1);
+    assert(nksim_body_get_state(world, body, &state) == NKSIM_OK);
+    assert(std::abs(state.angular_velocity[0] - 1.0) < 1e-9);
+    assert(std::abs(state.angular_velocity[1]) < 1e-9);
+    assert(std::abs(state.angular_velocity[2]) < 1e-9);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -359,5 +411,6 @@ int main() {
     kinematic_scene_state_drives_mujoco();
     plane_shape_stops_dynamic_body();
     mujoco_replay_is_deterministic();
+    rotated_free_body_preserves_world_angular_velocity();
     return 0;
 }
