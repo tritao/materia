@@ -73,7 +73,8 @@ operations; their Haxeon feature wrappers consume face or wire profiles.
 a geometric fingerprint and persists it for remapping across recompute.
 `FilletFeature` and `ChamferFeature` can own persistent selected-edge
 references while remapping those references against their source feature.
-Sketches and constraints remain later layers.
+Geometric sketches are supplied by the modeling layer described below;
+a sketch constraint solver remains a later layer.
 
 STEP file transfer is also a core boundary operation: `cad_step_import` and
 `cad_step_export` use OCCT's `TKDESTEP` provider without introducing a UI,
@@ -87,3 +88,26 @@ OCCT is vendored under `third_party/occt` from released version `V8_0_1`,
 commit `b8f597c677811d1f9f4d8a97f5ae2825c0353a42`. Updating OCCT is an explicit
 maintenance change that must replace the vendored source and update the
 documented version together; builds must never silently follow an OCCT branch.
+
+## Immediate modeling layer
+
+`cadkit.modeling` sits above the CadKit shape/operation façade. Immutable
+vectors, axes, workplanes, and placements provide coordinate semantics;
+Curve/Sketch/Part and explicit callback builders provide modeling semantics.
+Native line/arc/circle/spline, wire/face, compound, placement, loft, sweep,
+planar-wire offset, shell, and directional projection operations cross the
+same generation-checked C boundary. Profile constructors validate connectivity,
+planarity, containment, and resulting topology. TKOffset is a headless core
+dependency for the additional sweep/offset operations.
+
+Selections own deduplicated topology handles, support geometric sorting and
+nested selection, and preserve ambiguity at extrema. Modeling scopes and
+builders release owned intermediates on failures. Operation variants retain
+OCCT history for placement, loft, sweep, offset, and shell; projection and
+profile construction currently return shapes without history.
+
+The optional parametric `SketchFeature` adapter consumes the modeling layer
+and persists rectangle/circle/slot parameters and a workplane through
+`DocumentCodec`. The modeling layer does not depend on the document model.
+See `haxe/MODELING.md` for ownership rules and operation limits. Geometric
+sketch construction is available; a constraint solver remains a later layer.

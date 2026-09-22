@@ -1,6 +1,9 @@
 package cadkit.parametric;
 
 import CadKit;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
+import cadkit.parametric.features.SketchFeature;
 import haxe.Json;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
@@ -45,7 +48,17 @@ class DocumentCodec {
 				var featureId = intField(record, "id");
 				var featureType = stringField(record, "type");
 				var feature:Feature;
-				if (featureType == "box") {
+				if (featureType == "sketch") {
+					var planeRecord = requiredField(record, "plane");
+					feature = document.add(new SketchFeature(
+						stringField(record, "profile"),
+						numberField(record, "width"),
+						numberField(record, "height"),
+						new Plane(
+							decodeVector(requiredField(planeRecord, "origin")),
+							decodeVector(requiredField(planeRecord, "xDirection")),
+							decodeVector(requiredField(planeRecord, "normal")))));
+				} else if (featureType == "box") {
 					feature = document.add(new BoxFeature(
 						numberField(record, "width"),
 						numberField(record, "depth"),
@@ -147,7 +160,22 @@ class DocumentCodec {
 				references.push(encodeReference(reference));
 		}
 
-		if (featureType == "box") {
+		if (featureType == "sketch") {
+			var sketch:SketchFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				profile: sketch.profile,
+				width: sketch.width.value,
+				height: sketch.height.value,
+				plane: {
+					origin: encodeVector(sketch.plane.origin),
+					xDirection: encodeVector(sketch.plane.xDirection),
+					normal: encodeVector(sketch.plane.normal)
+				},
+				references: references
+			};
+		} else if (featureType == "box") {
 			var box:BoxFeature = cast feature;
 			return {
 				id: feature.id.toInt(),
@@ -337,6 +365,14 @@ class DocumentCodec {
 			numberField(record, "dy"),
 			numberField(record, "dz"),
 			numberField(record, "measure"));
+	}
+
+	private static function encodeVector(value:Vector):Dynamic {
+		return {x: value.x, y: value.y, z: value.z};
+	}
+
+	private static function decodeVector(value:Dynamic):Vector {
+		return new Vector(numberField(value, "x"), numberField(value, "y"), numberField(value, "z"));
 	}
 
 	private static function requiredFeature(document:Document, featureId:Int):Feature {

@@ -17,3 +17,7 @@ target_link_libraries(cadkit-core-smoke
 )
 
 add_test(NAME cadkit-core-smoke COMMAND cadkit-core-smoke)
+
+add_executable(cadkit-modeling-smoke modeling_smoke.cpp)
+target_link_libraries(cadkit-modeling-smoke PRIVATE cadkit::core)
+add_test(NAME cadkit-modeling-smoke COMMAND cadkit-modeling-smoke)

@@ -1,5 +1,24 @@
 #include "cadkit.h"
 
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepCheck_Analyzer.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
+#include <BRepOffsetAPI_ThruSections.hxx>
+#include <BRepOffsetAPI_MakePipe.hxx>
+#include <BRepOffsetAPI_MakeOffset.hxx>
+#include <BRepOffsetAPI_MakeThickSolid.hxx>
+#include <BRepProj_Projection.hxx>
+#include <BRep_Builder.hxx>
+#include <GC_MakeArcOfCircle.hxx>
+#include <GeomAPI_Interpolate.hxx>
+#include <NCollection_HArray1.hxx>
+#include <gp_Ax2.hxx>
+#include <gp_Circ.hxx>
+#include <TopoDS_Compound.hxx>
+#include <TopoDS_Wire.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
@@ -2791,4 +2810,303 @@ extern "C" CADKIT_API void cad_operation_destroy(cad_operation operation) {
 
 extern "C" CADKIT_API const char* cad_last_error(void) {
     return g_last_error.c_str();
+}
+
+
+namespace {
+struct ModelingFailure { cad_result code; std::string message; };
+void require_model(bool condition, const char* message) {
+    if (!condition) throw ModelingFailure{CAD_ERROR_INVALID_ARGUMENT, message};
+}
+TopoDS_Shape model_shape(cad_shape handle) {
+    TopoDS_Shape shape;
+    auto result = copy_shape(handle, shape);
+    if (result != CAD_OK) throw ModelingFailure{result, g_last_error};
+    return shape;
+}
+gp_Pnt model_point(cad_vec3 p) {
+    require_model(std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z),
+                  "coordinates must be finite");
+    return gp_Pnt(p.x, p.y, p.z);
+}
+gp_Dir model_direction(cad_vec3 p) {
+    auto point = model_point(p);
+    require_model(point.SquareDistance(gp_Pnt(0, 0, 0)) > 1e-24, "direction must be nonzero");
+    return gp_Dir(p.x, p.y, p.z);
+}
+TopoDS_Wire model_wire(cad_shape handle) {
+    auto shape = model_shape(handle);
+    require_model(shape.ShapeType() == TopAbs_WIRE, "expected a wire");
+    return TopoDS::Wire(shape);
+}
+template<class F> cad_result model_guard(F action) {
+    clear_error();
+    try { return action(); }
+    catch (const ModelingFailure& error) { return fail(error.code, error.message.c_str()); }
+    catch (const Standard_Failure& error) { return fail_occt(CAD_ERROR_OPERATION_FAILED, error); }
+    catch (const std::bad_alloc& error) { return fail(CAD_ERROR_OUT_OF_MEMORY, error); }
+    catch (const std::exception& error) { return fail(CAD_ERROR_OPERATION_FAILED, error); }
+    catch (...) { return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception"); }
+}
+template<class F> cad_result model_output(cad_shape* output, F action) {
+    if (output) *output = 0;
+    return model_guard([&]() {
+        require_model(output != nullptr, "out_shape must not be null");
+        TopoDS_Shape shape = action();
+        if (shape.IsNull() || !BRepCheck_Analyzer(shape).IsValid())
+            return fail(CAD_ERROR_OPERATION_FAILED, "modeling operation produced invalid topology");
+        return insert_shape(shape, output);
+    });
+}
+}
+
+namespace {
+template<class F> cad_result model_record(cad_shape* output, cad_operation* history, F action) {
+    if (output) *output = 0;
+    if (history) *history = 0;
+    return model_guard([&]() {
+        require_model(output != nullptr || history != nullptr, "result output must not be null");
+        OperationData data;
+        auto shape = action(history ? &data : nullptr);
+        if (shape.IsNull() || !BRepCheck_Analyzer(shape).IsValid())
+            return fail(CAD_ERROR_OPERATION_FAILED, "modeling operation produced invalid topology");
+        if (history) {
+            data.result = shape;
+            return insert_operation(std::move(data), history);
+        }
+        return insert_shape(shape, output);
+    });
+}
+}
+
+extern "C" CADKIT_API cad_result cad_line(cad_vec3 start, cad_vec3 end, cad_shape* output) {
+    return model_output(output, [&]() -> TopoDS_Shape {
+        auto a = model_point(start), b = model_point(end);
+        require_model(a.Distance(b) > 1e-7, "line endpoints must be distinct");
+        return BRepBuilderAPI_MakeEdge(a, b).Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_arc(cad_vec3 start, cad_vec3 middle, cad_vec3 end, cad_shape* output) {
+    return model_output(output, [&]() -> TopoDS_Shape {
+        GC_MakeArcOfCircle arc(model_point(start), model_point(middle), model_point(end));
+        require_model(arc.IsDone(), "arc requires three distinct non-collinear points");
+        return BRepBuilderAPI_MakeEdge(arc.Value()).Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_circle(cad_vec3 center, cad_vec3 normal, double radius, cad_shape* output) {
+    return model_output(output, [&]() -> TopoDS_Shape {
+        require_model(std::isfinite(radius) && radius > 1e-7, "circle radius must be positive");
+        return BRepBuilderAPI_MakeEdge(gp_Circ(gp_Ax2(model_point(center), model_direction(normal)), radius)).Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_spline(const cad_vec3* points, uint32_t count, cad_shape* output) {
+    return model_output(output, [&]() -> TopoDS_Shape {
+        require_model(points && count >= 2 && count <= INT32_MAX, "spline requires at least two points");
+        occ::handle<NCollection_HArray1<gp_Pnt>> values = new NCollection_HArray1<gp_Pnt>(1, static_cast<int>(count));
+        for (uint32_t i = 0; i < count; ++i) values->SetValue(i + 1, model_point(points[i]));
+        GeomAPI_Interpolate interpolation(values, false, 1e-7);
+        interpolation.Perform();
+        require_model(interpolation.IsDone(), "spline interpolation failed");
+        return BRepBuilderAPI_MakeEdge(interpolation.Curve()).Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_polyline(const cad_vec3* points, uint32_t count, uint8_t closed, cad_shape* output) {
+    return model_output(output, [&]() -> TopoDS_Shape {
+        require_model(points && count >= (closed ? 3u : 2u) && closed <= 1, "invalid polyline points or closed flag");
+        BRepBuilderAPI_MakePolygon polygon;
+        for (uint32_t i = 0; i < count; ++i) {
+            auto p = model_point(points[i]);
+            if (i) require_model(p.Distance(model_point(points[i-1])) > 1e-7, "duplicate consecutive points");
+            polygon.Add(p);
+        }
+        if (closed) {
+            require_model(model_point(points[0]).Distance(model_point(points[count-1])) > 1e-7,
+                          "closed polyline must not repeat its first point");
+            polygon.Close();
+        }
+        return polygon.Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_wire(const cad_shape_ref* edges, uint32_t count, cad_shape* output) {
+    return model_output(output, [&]() -> TopoDS_Shape {
+        require_model(edges && count > 0, "wire requires edges");
+        BRepBuilderAPI_MakeWire wire;
+        for (uint32_t i = 0; i < count; ++i) {
+            auto edge = model_shape(edges[i].shape);
+            require_model(edge.ShapeType() == TopAbs_EDGE, "wire input must be edges");
+            wire.Add(TopoDS::Edge(edge));
+            require_model(wire.IsDone(), "wire edges must connect in input order");
+        }
+        return wire.Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_planar_face(cad_shape outer, const cad_shape_ref* holes, uint32_t count, cad_shape* output) {
+    return model_output(output, [&]() -> TopoDS_Shape {
+        require_model(count == 0 || holes, "holes array is null");
+        auto boundary = model_wire(outer);
+        require_model(boundary.Closed(), "outer wire must be closed");
+        BRepBuilderAPI_MakeFace face(boundary, true);
+        require_model(face.IsDone(), "outer wire must be planar");
+        // Subtraction handles either winding and validates hole containment.
+        TopoDS_Shape result = face.Shape();
+        for (uint32_t i = 0; i < count; ++i) {
+            auto hole = model_wire(holes[i].shape);
+            require_model(hole.Closed(), "hole wire must be closed");
+            for (TopExp_Explorer explorer(result, TopAbs_WIRE); explorer.More(); explorer.Next()) {
+                BRepExtrema_DistShapeShape distance(hole, explorer.Current());
+                require_model(distance.IsDone() && distance.Value() > 1e-7,
+                              "holes must not touch each other or the outer boundary");
+            }
+            BRepBuilderAPI_MakeFace hole_face(hole, true);
+            require_model(hole_face.IsDone(), "hole must be planar");
+            // Measure the uncovered hole itself, rather than subtracting two
+            // large outer areas (which loses precision for small holes).
+            BRepAlgoAPI_Cut remainder(hole_face.Shape(), result);
+            remainder.Build();
+            require_model(remainder.IsDone() && !remainder.HasErrors(), "hole containment check failed");
+            GProp_GProps removed, uncovered;
+            BRepGProp::SurfaceProperties(hole_face.Shape(), removed);
+            BRepGProp::SurfaceProperties(remainder.Shape(), uncovered);
+            require_model(removed.Mass() > 0 && uncovered.Mass() <= removed.Mass() * 1e-7,
+                          "holes must be coplanar, inside the outer wire, and non-overlapping");
+            BRepAlgoAPI_Cut cut(result, hole_face.Shape());
+            cut.Build();
+            require_model(cut.IsDone() && !cut.HasErrors(), "hole subtraction failed");
+            result = cut.Shape();
+        }
+        NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> faces;
+        TopExp::MapShapes(result, TopAbs_FACE, faces);
+        require_model(faces.Extent() == 1, "boundaries must produce one face");
+        NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> boundaries;
+        TopExp::MapShapes(faces(1), TopAbs_WIRE, boundaries);
+        require_model(static_cast<uint64_t>(boundaries.Extent()) == static_cast<uint64_t>(count) + 1,
+                      "holes must not touch each other or the outer boundary");
+        return faces(1);
+    });
+}
+extern "C" CADKIT_API cad_result cad_compound(const cad_shape_ref* shapes, uint32_t count, cad_shape* output) {
+    return model_output(output, [&]() -> TopoDS_Shape {
+        require_model(count == 0 || shapes, "shapes array is null");
+        BRep_Builder builder;
+        TopoDS_Compound compound;
+        builder.MakeCompound(compound);
+        for (uint32_t i = 0; i < count; ++i) builder.Add(compound, model_shape(shapes[i].shape));
+        return compound;
+    });
+}
+static cad_result do_cad_shape_place(cad_shape handle, cad_vec3 origin, cad_vec3 x, cad_vec3 z, cad_shape* output, cad_operation* history) {
+    return model_record(output, history, [&](OperationData* record) -> TopoDS_Shape {
+        auto dx = model_direction(x), dz = model_direction(z);
+        require_model(std::abs(dx.Dot(dz)) < 1e-10, "placement axes must be perpendicular");
+        auto dy = dz.Crossed(dx);
+        auto p = model_point(origin);
+        gp_Trsf transform;
+        transform.SetValues(dx.X(),dy.X(),dz.X(),p.X(), dx.Y(),dy.Y(),dz.Y(),p.Y(), dx.Z(),dy.Z(),dz.Z(),p.Z());
+        auto source = model_shape(handle);
+        BRepBuilderAPI_Transform operation(source, transform, true);
+        if (record) collect_operation_history(operation, source, nullptr, *record);
+        return operation.Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_shape_place(cad_shape handle, cad_vec3 origin, cad_vec3 x, cad_vec3 z, cad_shape* output) {
+    return do_cad_shape_place(handle, origin, x, z, output, nullptr);
+}
+extern "C" CADKIT_API cad_result cad_shape_place_operation(cad_shape handle, cad_vec3 origin, cad_vec3 x, cad_vec3 z, cad_operation* output) {
+    return do_cad_shape_place(handle, origin, x, z, nullptr, output);
+}
+extern "C" CADKIT_API cad_result cad_shape_valid(cad_shape handle, uint8_t* output) {
+    if (output) *output = 0;
+    return model_guard([&]() {
+        require_model(output != nullptr, "out_valid must not be null");
+        *output = BRepCheck_Analyzer(model_shape(handle)).IsValid() ? 1 : 0;
+        return CAD_OK;
+    });
+}
+static cad_result do_cad_loft(const cad_shape_ref* wires, uint32_t count, uint8_t solid, uint8_t ruled, cad_shape* output, cad_operation* history) {
+    return model_record(output, history, [&](OperationData* record) -> TopoDS_Shape {
+        require_model(wires && count >= 2 && solid <= 1 && ruled <= 1, "loft requires two or more wires and boolean flags");
+        BRepOffsetAPI_ThruSections loft(solid != 0, ruled != 0);
+        std::vector<TopoDS_Shape> sources;
+        for (uint32_t i = 0; i < count; ++i) {
+            auto wire = model_wire(wires[i].shape);
+            require_model(!solid || wire.Closed(), "solid loft requires closed wires");
+            loft.AddWire(wire); sources.push_back(wire);
+        }
+        loft.Build();
+        if (record) for (const auto& source : sources) collect_operation_history(loft, source, nullptr, *record);
+        return loft.Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_loft(const cad_shape_ref* wires, uint32_t count, uint8_t solid, uint8_t ruled, cad_shape* output) {
+    return do_cad_loft(wires, count, solid, ruled, output, nullptr);
+}
+extern "C" CADKIT_API cad_result cad_loft_operation(const cad_shape_ref* wires, uint32_t count, uint8_t solid, uint8_t ruled, cad_operation* output) {
+    return do_cad_loft(wires, count, solid, ruled, nullptr, output);
+}
+static cad_result do_cad_sweep(cad_shape profile, cad_shape spine, cad_shape* output, cad_operation* history) {
+    return model_record(output, history, [&](OperationData* record) -> TopoDS_Shape {
+        auto section = model_shape(profile);
+        require_model(section.ShapeType() == TopAbs_FACE || section.ShapeType() == TopAbs_WIRE, "sweep profile must be a face or wire");
+        auto path = model_wire(spine);
+        BRepOffsetAPI_MakePipe pipe(path, section);
+        if (record) collect_operation_history(pipe, section, &path, *record);
+        return pipe.Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_sweep(cad_shape profile, cad_shape spine, cad_shape* output) {
+    return do_cad_sweep(profile, spine, output, nullptr);
+}
+extern "C" CADKIT_API cad_result cad_sweep_operation(cad_shape profile, cad_shape spine, cad_operation* output) {
+    return do_cad_sweep(profile, spine, nullptr, output);
+}
+static cad_result do_cad_wire_offset(cad_shape wire, double distance, cad_shape* output, cad_operation* history) {
+    return model_record(output, history, [&](OperationData* record) -> TopoDS_Shape {
+        require_model(std::isfinite(distance) && std::abs(distance) > 1e-7, "offset must be finite and nonzero");
+        auto source = model_wire(wire);
+        BRepOffsetAPI_MakeOffset offset(source, GeomAbs_Arc);
+        offset.Perform(distance);
+        if (record) collect_operation_history(offset, source, nullptr, *record);
+        return offset.Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_wire_offset(cad_shape wire, double distance, cad_shape* output) {
+    return do_cad_wire_offset(wire, distance, output, nullptr);
+}
+extern "C" CADKIT_API cad_result cad_wire_offset_operation(cad_shape wire, double distance, cad_operation* output) {
+    return do_cad_wire_offset(wire, distance, nullptr, output);
+}
+static cad_result do_cad_shell(cad_shape solid, const cad_shape_ref* faces, uint32_t count, double thickness, cad_shape* output, cad_operation* history) {
+    return model_record(output, history, [&](OperationData* record) -> TopoDS_Shape {
+        require_model(std::isfinite(thickness) && std::abs(thickness) > 1e-7 && faces && count > 0,
+                      "shell requires removed faces and finite nonzero thickness");
+        auto source = model_shape(solid);
+        require_model(source.ShapeType() == TopAbs_SOLID, "shell requires one solid");
+        NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> members;
+        TopExp::MapShapes(source, TopAbs_FACE, members);
+        NCollection_List<TopoDS_Shape> removed;
+        for (uint32_t i = 0; i < count; ++i) {
+            auto face = model_shape(faces[i].shape);
+            require_model(face.ShapeType() == TopAbs_FACE && members.Contains(face), "removed face must belong to solid");
+            removed.Append(face);
+        }
+        BRepOffsetAPI_MakeThickSolid shell;
+        shell.MakeThickSolidByJoin(source, removed, thickness, 1e-7);
+        if (record) collect_operation_history(shell, source, nullptr, *record);
+        return shell.Shape();
+    });
+}
+extern "C" CADKIT_API cad_result cad_shell(cad_shape solid, const cad_shape_ref* faces, uint32_t count, double thickness, cad_shape* output) {
+    return do_cad_shell(solid, faces, count, thickness, output, nullptr);
+}
+extern "C" CADKIT_API cad_result cad_shell_operation(cad_shape solid, const cad_shape_ref* faces, uint32_t count, double thickness, cad_operation* output) {
+    return do_cad_shell(solid, faces, count, thickness, nullptr, output);
+}
+extern "C" CADKIT_API cad_result cad_project(cad_shape curve, cad_shape target, cad_vec3 direction, cad_shape* output) {
+    return model_output(output, [&]() -> TopoDS_Shape {
+        auto source = model_shape(curve);
+        require_model(source.ShapeType() == TopAbs_EDGE || source.ShapeType() == TopAbs_WIRE, "projection requires an edge or wire");
+        BRepProj_Projection projection(source, model_shape(target), model_direction(direction));
+        require_model(projection.IsDone(), "projection did not intersect target");
+        return projection.Shape();
+    });
 }

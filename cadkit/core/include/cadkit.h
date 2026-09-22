@@ -131,6 +131,70 @@ typedef struct cad_mesh_face_range {
     uint32_t index_count;
 } cad_mesh_face_range;
 
+/* Modeling constructors. Points are world coordinates; angles use radians.
+ * Counted arrays are borrowed for the call. All shape outputs are owned.
+ * Failures zero the output handle. Wires must be connected; faces planar.
+ */
+CADKIT_API cad_result cad_line(cad_vec3 start, cad_vec3 end,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_arc(cad_vec3 start, cad_vec3 middle, cad_vec3 end,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_circle(cad_vec3 center, cad_vec3 normal, double radius,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_spline(
+    const cad_vec3* points CADKIT_HXI_IN_ARRAY(point_count), uint32_t point_count,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_polyline(
+    const cad_vec3* points CADKIT_HXI_IN_ARRAY(point_count), uint32_t point_count,
+    uint8_t closed, cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_wire(
+    const cad_shape_ref* edges CADKIT_HXI_IN_ARRAY(edge_count), uint32_t edge_count,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* Closed coplanar boundaries; hole orientation is normalized automatically. */
+CADKIT_API cad_result cad_planar_face(cad_shape outer,
+    const cad_shape_ref* holes CADKIT_HXI_IN_ARRAY(hole_count), uint32_t hole_count,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_compound(
+    const cad_shape_ref* shapes CADKIT_HXI_IN_ARRAY(shape_count), uint32_t shape_count,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* Rigid placement: x and z must be nonzero perpendicular directions. */
+CADKIT_API cad_result cad_shape_place(cad_shape shape, cad_vec3 origin,
+    cad_vec3 x_direction, cad_vec3 z_direction,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_shape_place_operation(cad_shape shape, cad_vec3 origin,
+    cad_vec3 x_direction, cad_vec3 z_direction,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_shape_valid(cad_shape shape,
+    uint8_t* out_valid CADKIT_HXI_OUT);
+CADKIT_API cad_result cad_loft(
+    const cad_shape_ref* wires CADKIT_HXI_IN_ARRAY(wire_count), uint32_t wire_count,
+    uint8_t solid, uint8_t ruled,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_loft_operation(
+    const cad_shape_ref* wires CADKIT_HXI_IN_ARRAY(wire_count), uint32_t wire_count,
+    uint8_t solid, uint8_t ruled,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* Profile is a face or wire; spine is a connected wire. */
+CADKIT_API cad_result cad_sweep(cad_shape profile, cad_shape spine,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_sweep_operation(cad_shape profile, cad_shape spine,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* Offset a planar wire with round joins. May return several wires. */
+CADKIT_API cad_result cad_wire_offset(cad_shape profile, double distance,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_wire_offset_operation(cad_shape profile, double distance,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* Remove selected faces and offset remaining skin. Negative thickness goes inward. */
+CADKIT_API cad_result cad_shell(cad_shape solid,
+    const cad_shape_ref* faces CADKIT_HXI_IN_ARRAY(face_count), uint32_t face_count,
+    double thickness, cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+CADKIT_API cad_result cad_shell_operation(cad_shape solid,
+    const cad_shape_ref* faces CADKIT_HXI_IN_ARRAY(face_count), uint32_t face_count,
+    double thickness, cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+/* Directional projection of an edge/wire onto a target shape. */
+CADKIT_API cad_result cad_project(cad_shape curve, cad_shape target, cad_vec3 direction,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
 CADKIT_API cad_result cad_box(
     double width,
     double depth,

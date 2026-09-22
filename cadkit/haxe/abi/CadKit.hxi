@@ -45,9 +45,12 @@ interface CadKit @target("x86_64-linux-gnu") @library("cadkit-core") {
 		CAD_SURFACE_BEZIER = 6;
 		CAD_SURFACE_BSPLINE = 7;
 	}
+	extern fn cad_arc(start: cad_vec3, middle: cad_vec3, end: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_box(width: f64, depth: f64, height: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_circle(center: cad_vec3, normal: cad_vec3, radius: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_common(first: cad_shape, second: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_common_operation(first: cad_shape, second: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
+	extern fn cad_compound(shapes: ptr<const<cad_shape_ref>> @in_array("shape_count"), shape_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_cut(first: cad_shape, second: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_cut_operation(first: cad_shape, second: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_cylinder(radius: f64, height: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -61,6 +64,9 @@ interface CadKit @target("x86_64-linux-gnu") @library("cadkit-core") {
 	extern fn cad_fuse(first: cad_shape, second: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_fuse_operation(first: cad_shape, second: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_last_error() -> utf8 @borrowed;
+	extern fn cad_line(start: cad_vec3, end: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_loft(wires: ptr<const<cad_shape_ref>> @in_array("wire_count"), wire_count: u32, solid: u8, ruled: u8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_loft_operation(wires: ptr<const<cad_shape_ref>> @in_array("wire_count"), wire_count: u32, solid: u8, ruled: u8, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_mesh_copy_face_ranges(mesh: cad_mesh, output: ptr<cad_mesh_face_range>, capacity: u32) -> cad_result;
 	extern fn cad_mesh_copy_indices(mesh: cad_mesh, output: ptr<u32>, capacity: u32) -> cad_result;
 	extern fn cad_mesh_copy_indices_bytes(mesh: cad_mesh, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
@@ -78,6 +84,9 @@ interface CadKit @target("x86_64-linux-gnu") @library("cadkit-core") {
 	extern fn cad_operation_history_source_at(operation: cad_operation, relation: cad_history_relation, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_operation_history_target_at(operation: cad_operation, relation: cad_history_relation, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_operation_result_shape(operation: cad_operation, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_planar_face(outer: cad_shape, holes: ptr<const<cad_shape_ref>> @in_array("hole_count"), hole_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_polyline(points: ptr<const<cad_vec3>> @in_array("point_count"), point_count: u32, closed: u8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_project(curve: cad_shape, target: cad_shape, direction: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_area(shape: cad_shape, out_area: ptr<f64> @out) -> cad_result;
 	extern fn cad_shape_bounds(shape: cad_shape, out_bounds: ptr<cad_bounds> @out) -> cad_result;
 	extern fn cad_shape_chamfer(shape: cad_shape, distance: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -94,6 +103,8 @@ interface CadKit @target("x86_64-linux-gnu") @library("cadkit-core") {
 	extern fn cad_shape_fillet_operation(shape: cad_shape, radius: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_is_same(first: cad_shape, second: cad_shape, out_same: ptr<u8> @out) -> cad_result;
 	extern fn cad_shape_kind_get(shape: cad_shape, out_kind: ptr<cad_shape_kind> @out) -> cad_result;
+	extern fn cad_shape_place(shape: cad_shape, origin: cad_vec3, x_direction: cad_vec3, z_direction: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_shape_place_operation(shape: cad_shape, origin: cad_vec3, x_direction: cad_vec3, z_direction: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_revolve(profile: cad_shape, axis_origin: cad_vec3, axis_direction: cad_vec3, angle: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_revolve_operation(profile: cad_shape, axis_origin: cad_vec3, axis_direction: cad_vec3, angle: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_rotate(shape: cad_shape, axis: cad_vec3, angle: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -104,11 +115,20 @@ interface CadKit @target("x86_64-linux-gnu") @library("cadkit-core") {
 	extern fn cad_shape_tessellate(shape: cad_shape, options: ptr<const<cad_mesh_options>>, out_mesh: ptr<cad_mesh> @out @owned) -> cad_result;
 	extern fn cad_shape_translate(shape: cad_shape, delta: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_translate_operation(shape: cad_shape, delta: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
+	extern fn cad_shape_valid(shape: cad_shape, out_valid: ptr<u8> @out) -> cad_result;
 	extern fn cad_shape_volume(shape: cad_shape, out_volume: ptr<f64> @out) -> cad_result;
+	extern fn cad_shell(solid: cad_shape, faces: ptr<const<cad_shape_ref>> @in_array("face_count"), face_count: u32, thickness: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_shell_operation(solid: cad_shape, faces: ptr<const<cad_shape_ref>> @in_array("face_count"), face_count: u32, thickness: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_sphere(radius: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_spline(points: ptr<const<cad_vec3>> @in_array("point_count"), point_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_step_export(shape: cad_shape, path: utf8) -> cad_result;
 	extern fn cad_step_import(path: utf8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_sweep(profile: cad_shape, spine: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_sweep_operation(profile: cad_shape, spine: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_vertex_position(vertex: cad_shape, out_position: ptr<cad_vec3> @out) -> cad_result;
+	extern fn cad_wire(edges: ptr<const<cad_shape_ref>> @in_array("edge_count"), edge_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_wire_offset(profile: cad_shape, distance: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_wire_offset_operation(profile: cad_shape, distance: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	struct cad_bounds @layout(48, 8) {
 		min: cad_vec3 @offset(0);
 		max: cad_vec3 @offset(24);

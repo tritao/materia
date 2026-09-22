@@ -20,6 +20,7 @@ mkdir -p "$(dirname -- "$output")"
 	--entry=HaxeonSmoke \
 	"--root=$repo_root/haxe/src" \
 	"--root=$repo_root/haxe/tests" \
+	"--root=$repo_root/examples/modeling" \
 	"--ffi-interface=$repo_root/haxe/abi/CadKit.hxi" \
 	"--ffi-projection=$repo_root/haxe/abi/CadKit.hxmap" \
 	"$repo_root/haxe/tests/HaxeonSmoke.hx"

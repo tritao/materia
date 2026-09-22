@@ -91,3 +91,11 @@ compile-and-runtime smoke test with:
 
 Set `HAXEON_ROOT` when Haxeon is not in the sibling directory `../haxeon`, or
 `CADKIT_BUILD_ROOT` when the native build is not `build/debug`.
+
+## Modeling layer
+
+`cadkit.modeling` adds workplanes, curves, sketches, parts, explicit builders,
+patterns, richer selectors, and resource scopes. See [MODELING.md](MODELING.md)
+and the [mounting plate example](../examples/modeling/MountingPlate.hx).
+`SketchFeature` connects rectangle, circle, and slot profiles to the existing
+parametric document and its JSON codec.
