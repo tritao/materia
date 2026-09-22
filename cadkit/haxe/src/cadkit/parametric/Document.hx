@@ -244,6 +244,10 @@ class Document {
 			return false;
 
 		var changes = undoStack.pop();
+		for (index in 0...changes.documentChanges.length) {
+			var reverse = changes.documentChanges.length - index - 1;
+			changes.documentChanges[reverse].undo();
+		}
 		for (index in 0...changes.changes.length) {
 			var reverse = changes.changes.length - index - 1;
 			changes.changes[reverse].parameter.restore(changes.changes[reverse].oldValue);
@@ -261,6 +265,8 @@ class Document {
 		var changes = redoStack.pop();
 		for (change in changes.changes)
 			change.parameter.restore(change.newValue);
+		for (change in changes.documentChanges)
+			change.redo();
 		undoStack.push(changes);
 		return true;
 	}
@@ -292,13 +298,22 @@ class Document {
 		redoStack.resize(0);
 	}
 
+	public function recordDocumentChange(change:DocumentChange):Void {
+		if (activeTransaction != null) {
+			activeTransaction.recordDocumentChange(change);
+			return;
+		}
+		undoStack.push(new ChangeSet([], [change]));
+		redoStack.resize(0);
+	}
+
 	public function commitTransaction(transaction:Transaction):Void {
 		if (activeTransaction == null || activeTransaction.identity != transaction.identity)
 			throw new ParametricError("transaction does not belong to this document");
 		activeTransaction = null;
-		if (transaction.changes.length == 0)
+		if (transaction.changes.length == 0 && transaction.documentChanges.length == 0)
 			return;
-		undoStack.push(new ChangeSet(transaction.changes.copy()));
+		undoStack.push(new ChangeSet(transaction.changes.copy(), transaction.documentChanges.copy()));
 		redoStack.resize(0);
 	}
 
@@ -310,6 +325,10 @@ class Document {
 			var reverse = transaction.changes.length - index - 1;
 			var change = transaction.changes[reverse];
 			change.parameter.restore(change.oldValue);
+		}
+		for (index in 0...transaction.documentChanges.length) {
+			var reverse = transaction.documentChanges.length - index - 1;
+			transaction.documentChanges[reverse].undo();
 		}
 	}
 

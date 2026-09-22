@@ -11,6 +11,7 @@ class Transaction {
 
 	public final identity:Int;
 	public final changes:Array<ParameterChange>;
+	public final documentChanges:Array<DocumentChange>;
 
 	private final document:Document;
 	private var finished:Bool;
@@ -20,6 +21,7 @@ class Transaction {
 		nextIdentity++;
 		this.document = document;
 		this.changes = [];
+		this.documentChanges = [];
 		this.finished = false;
 	}
 
@@ -45,5 +47,9 @@ class Transaction {
 			}
 		}
 		changes.push(new ParameterChange(parameter, oldValue, parameter.value));
+	}
+
+	public function recordDocumentChange(change:DocumentChange):Void {
+		documentChanges.push(change);
 	}
 }

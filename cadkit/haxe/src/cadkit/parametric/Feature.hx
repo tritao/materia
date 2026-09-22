@@ -40,6 +40,15 @@ class Feature {
 		scalarParameters.push(parameter);
 	}
 
+	public function unregisterParameter(parameter:Parameter):Void {
+		for (index in 0...scalarParameters.length) {
+			if (scalarParameters[index] == parameter) {
+				scalarParameters.splice(index, 1);
+				return;
+			}
+		}
+	}
+
 	public function parameter(name:String):Parameter {
 		for (value in scalarParameters)
 			if (value.name == name)
