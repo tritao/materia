@@ -101,7 +101,9 @@ void shared_world_steps_once() {
     rk_simulation_pose observed_pose{};
     observed_pose.struct_size = sizeof(observed_pose);
     assert(rk_simulation_get_robot_pose(simulation, 0, &observed_pose) == RK_OK);
-    assert(observed_pose.position[0] == 4.0);
+    assert(std::abs(observed_pose.position[0] - 4.0) < 1e-6);
+    assert(rk_simulation_get_link_pose(simulation, 0, 0, &observed_pose) == RK_OK);
+    assert(std::abs(observed_pose.position[0] - 4.0) < 1e-6);
     assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
     assert(snapshot(first).sequence == 0);
     rk_simulation_object_desc object_desc{};
@@ -114,6 +116,8 @@ void shared_world_steps_once() {
     assert(object != RK_INVALID_SIMULATION_OBJECT);
     pose.position[2] = 2.0;
     assert(rk_simulation_teleport_object(simulation, object, &pose) == RK_OK);
+    assert(rk_simulation_get_object_pose(simulation, object, &observed_pose) == RK_OK);
+    assert(std::abs(observed_pose.position[2] - 2.0) < 1e-6);
     assert(rk_simulation_remove_object(simulation, object) == RK_OK);
     assert(rk_simulation_reset(simulation) == RK_OK);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);

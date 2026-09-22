@@ -724,16 +724,22 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function paintSimulationOverlay(canvas:Canvas):Void {
+    for(object in simulation.environmentVisualState()) {
+      var center=simulationPoint(object.position[0],object.position[1]);
+      canvas.fillRect(new Rect(center.x-4,center.y-4,8,8),Color.rgba(0.95,0.35,0.3,0.9));
+    }
     for(robot in simulation.visualState()) {
       var base=simulationPoint(robot.position[0],robot.position[1]);
       canvas.fillRect(new Rect(base.x-5,base.y-5,10,10),Color.rgba(0.3,1.0,0.65,0.95));
       for(sensor in robot.sensors) {
-        var offset=rotateVector(robot.rotation,sensor.mountPosition.toArray());
-        var origin=[robot.position[0]+offset[0],robot.position[1]+offset[1],robot.position[2]+offset[2]];
+        var linkPosition=robot.position,linkRotation=robot.rotation;
+        for(link in robot.links)if(link.id==sensor.linkId){linkPosition=link.position;linkRotation=link.rotation;break;}
+        var offset=rotateVector(linkRotation,sensor.mountPosition.toArray());
+        var origin=[linkPosition[0]+offset[0],linkPosition[1]+offset[1],linkPosition[2]+offset[2]];
         var mount=simulationPoint(origin[0],origin[1]);
         canvas.fillRect(new Rect(mount.x-3,mount.y-3,6,6),Color.rgba(1.0,0.75,0.2,0.95));
         if(sensor.kind!="lidar"||sensor.values.length==0)continue;
-        var rotation=multiplyQuaternion(robot.rotation,sensor.mountRotation.toArray());
+        var rotation=multiplyQuaternion(linkRotation,sensor.mountRotation.toArray());
         var rays=new PathBuilder();var values=sensor.values.toArray();
         for(index in 0...values.length){
           var angle=index*6.283185307179586/values.length;

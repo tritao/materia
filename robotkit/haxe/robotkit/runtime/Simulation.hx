@@ -90,6 +90,28 @@ class Simulation {
       rotation:[for(index in 0...4)pose.get_rotation(index)]};
   }
 
+  /** Reads an articulated link pose without mutating the simulation. */
+  public function linkPose(robotIndex:Int, linkIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
+    ensureLive();
+    var pose = new rk_simulation_pose(); pose.set_struct_size(rk_simulation_pose.size());
+    var result = RobotKitSimKit.rk_simulation_get_link_pose(owner.borrow(), robotIndex, linkIndex, pose);
+    check(result.status, "simulation.getLinkPose");
+    return poseValue(pose);
+  }
+
+  /** Reads an environment body's latest physics pose. */
+  public function objectPose(objectId:Int):{position:Array<Float>,rotation:Array<Float>} {
+    ensureLive();
+    var pose = new rk_simulation_pose(); pose.set_struct_size(rk_simulation_pose.size());
+    var result = RobotKitSimKit.rk_simulation_get_object_pose(owner.borrow(), objectId, pose);
+    check(result.status, "simulation.getObjectPose");
+    return poseValue(pose);
+  }
+
+  static function poseValue(pose:rk_simulation_pose):{position:Array<Float>,rotation:Array<Float>}
+    return {position:[for(index in 0...3) pose.get_position(index)],
+      rotation:[for(index in 0...4) pose.get_rotation(index)]};
+
   /** Adds a box to the shared physics world and returns its owned object ID. */
   public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
       ?dynamicBody:Bool = false, ?mass:Float = 1.0):Int {

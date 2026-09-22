@@ -125,7 +125,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             nksim_body_desc desc{};
             desc.struct_size = sizeof(desc);
             desc.occurrence = binding->occurrences_[index];
-            desc.motion_type = index == root ? NKSIM_MOTION_STATIC : NKSIM_MOTION_DYNAMIC;
+            desc.motion_type = index == root ? NKSIM_MOTION_KINEMATIC : NKSIM_MOTION_DYNAMIC;
             desc.mass = 1.0;
             desc.shape = shape_;
             desc.collision_layer = desc.collision_mask = 1;
@@ -208,6 +208,10 @@ rk_result Simulation::reset() {
         if (auto binding = bindings_[index].lock()) binding->reset();
         runtimes_[index]->reset_state();
     }
+    for (auto &object : objects_)
+        if (object.active && set_body_pose(world_, object.body, object.initial_pose.position,
+                                          object.initial_pose.rotation) != RK_OK)
+            return RK_ERROR_BACKEND;
     return RK_OK;
 }
 
@@ -259,6 +263,34 @@ rk_result set_body_pose(nksim_world world, nksim_body body, const double positio
         ? RK_OK : RK_ERROR_BACKEND;
 }
 
+rk_result set_occurrence_pose(nkscene_scene scene, nkscene_occurrence_id occurrence,
+                              const double position[3], const double rotation[4]) {
+    nkscene_transform transform{};
+    for (int column = 0; column < 3; ++column) {
+        double axis[3]{};
+        axis[column] = 1.0;
+        double rotated[3];
+        sensors::rotate(rotation, axis, rotated);
+        for (int row = 0; row < 3; ++row)
+            transform.matrix[column * 4 + row] = static_cast<float>(rotated[row]);
+    }
+    transform.matrix[12] = static_cast<float>(position[0]);
+    transform.matrix[13] = static_cast<float>(position[1]);
+    transform.matrix[14] = static_cast<float>(position[2]);
+    transform.matrix[15] = 1.0f;
+    nkscene_transaction transaction = 0;
+    if (nkscene_transaction_begin(scene, &transaction) != NKS_OK) return RK_ERROR_BACKEND;
+    if (nkscene_tx_set_transform(transaction, occurrence, &transform) != NKS_OK) {
+        nkscene_transaction_cancel(transaction);
+        return RK_ERROR_BACKEND;
+    }
+    nkscene_change_set changes = 0;
+    if (nkscene_transaction_commit_with_changes(transaction, &changes) != NKS_OK)
+        return RK_ERROR_BACKEND;
+    if (changes != 0) nkscene_change_set_destroy(changes);
+    return RK_OK;
+}
+
 } // namespace
 
 rk_result Simulation::teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose) {
@@ -266,11 +298,21 @@ rk_result Simulation::teleport_robot(uint32_t robot_index, const rk_simulation_p
     if (running_ || stopping_ || host_ != 0 || robot_index >= robot_base_bodies_.size())
         return RK_ERROR_INVALID_STATE;
     if (pose.struct_size < sizeof(pose)) return RK_ERROR_INVALID_ARGUMENT;
-    const auto result = set_body_pose(world_, robot_base_bodies_[robot_index], pose.position, pose.rotation);
+    auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    const auto root = std::find(binding->bodies_.begin(), binding->bodies_.end(),
+                                robot_base_bodies_[robot_index]);
+    if (root == binding->bodies_.end()) return RK_ERROR_INVALID_HANDLE;
+    const auto root_index = static_cast<std::size_t>(root - binding->bodies_.begin());
+    auto result = set_occurrence_pose(scene_, binding->occurrences_[root_index],
+                                      pose.position, pose.rotation);
     if (result == RK_OK)
-        if (auto binding = bindings_[robot_index].lock()) {
-            binding->reset_sensors();robot_initial_poses_[robot_index]=pose;
-        }
+        result = set_body_pose(world_, robot_base_bodies_[robot_index], pose.position, pose.rotation);
+    if (result == RK_OK) {
+        binding->reset_sensors();
+        robot_initial_poses_[robot_index] = pose;
+        if (snapshot_ != 0) { nksim_snapshot_destroy(snapshot_); snapshot_ = 0; }
+    }
     return result;
 }
 
@@ -278,6 +320,21 @@ rk_result Simulation::get_robot_pose(uint32_t robot_index,rk_simulation_pose &ou
     std::lock_guard tick_lock(tick_mutex_);
     if(out_pose.struct_size<sizeof(out_pose)||robot_index>=robot_base_bodies_.size())
         return RK_ERROR_INVALID_ARGUMENT;
+    return read_body_pose(robot_base_bodies_[robot_index],out_pose);
+}
+
+rk_result Simulation::get_link_pose(uint32_t robot_index,uint32_t link_index,
+                                     rk_simulation_pose &out_pose) const {
+    std::lock_guard tick_lock(tick_mutex_);
+    if(out_pose.struct_size<sizeof(out_pose)||robot_index>=bindings_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto binding=bindings_[robot_index].lock();
+    if(!binding)return RK_ERROR_INVALID_HANDLE;
+    if(link_index>=binding->bodies_.size())return RK_ERROR_INVALID_ARGUMENT;
+    return read_body_pose(binding->bodies_[link_index],out_pose);
+}
+
+rk_result Simulation::read_body_pose(nksim_body body,rk_simulation_pose &out_pose) const {
     nksim_body_state state{};state.struct_size=sizeof(state);
     bool found=false;
     if(snapshot_!=0){
@@ -285,13 +342,10 @@ rk_result Simulation::get_robot_pose(uint32_t robot_index,rk_simulation_pose &ou
         if(nksim_snapshot_get_body_count(snapshot_,&count)==NKSIM_OK)for(uint64_t index=0;index<count;++index){
             nksim_body_state candidate{};candidate.struct_size=sizeof(candidate);
             if(nksim_snapshot_get_body(snapshot_,index,&candidate)!=NKSIM_OK)break;
-            if(candidate.body==robot_base_bodies_[robot_index]){state=candidate;found=true;break;}
+            if(candidate.body==body){state=candidate;found=true;break;}
         }
-    } else if(nksim_body_get_state(world_,robot_base_bodies_[robot_index],&state)==NKSIM_OK)found=true;
-    if(!found){
-        std::copy_n(robot_initial_poses_[robot_index].position,3,state.position);
-        std::copy_n(robot_initial_poses_[robot_index].rotation,4,state.rotation);
-    }
+    } else if(nksim_body_get_state(world_,body,&state)==NKSIM_OK)found=true;
+    if(!found)return RK_ERROR_BACKEND;
     std::copy_n(state.position,3,out_pose.position);
     std::copy_n(state.rotation,4,out_pose.rotation);
     return RK_OK;
@@ -314,6 +368,9 @@ rk_result Simulation::spawn_object(const rk_simulation_object_desc &desc,
         return RK_ERROR_BACKEND;
     EnvironmentObject object;
     std::copy_n(desc.half_extents, 3, object.half_extents);
+    object.initial_pose.struct_size = sizeof(object.initial_pose);
+    std::copy_n(desc.position, 3, object.initial_pose.position);
+    std::copy_n(desc.rotation, 4, object.initial_pose.rotation);
     nkscene_transform transform{};
     transform.matrix[0] = transform.matrix[5] = transform.matrix[10] = transform.matrix[15] = 1.0f;
     for (int column = 0; column < 3; ++column) {
@@ -387,8 +444,23 @@ rk_result Simulation::teleport_object(rk_simulation_object object,
         return RK_ERROR_INVALID_STATE;
     if (object == 0 || object > objects_.size() || !objects_[object - 1].active)
         return RK_ERROR_INVALID_HANDLE;
-    return pose.struct_size < sizeof(pose) ? RK_ERROR_INVALID_ARGUMENT
-        : set_body_pose(world_, objects_[object - 1].body, pose.position, pose.rotation);
+    if (pose.struct_size < sizeof(pose)) return RK_ERROR_INVALID_ARGUMENT;
+    const auto result = set_body_pose(world_, objects_[object - 1].body,
+                                      pose.position, pose.rotation);
+    if (result == RK_OK) {
+        objects_[object - 1].initial_pose = pose;
+        if (snapshot_ != 0) { nksim_snapshot_destroy(snapshot_); snapshot_ = 0; }
+    }
+    return result;
+}
+
+rk_result Simulation::get_object_pose(rk_simulation_object object,
+                                      rk_simulation_pose &out_pose) const {
+    std::lock_guard tick_lock(tick_mutex_);
+    if(out_pose.struct_size<sizeof(out_pose)||object==0||object>objects_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto &value=objects_[object-1];
+    return value.active?read_body_pose(value.body,out_pose):RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result Simulation::step(uint64_t timestamp_ns) {

@@ -124,6 +124,13 @@ rk_result RK_CALL rk_simulation_get_robot_pose(rk_simulation simulation,uint32_t
     return value?value->get_robot_pose(robot_index,*out_pose):RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_get_link_pose(rk_simulation simulation,uint32_t robot_index,
+                                               uint32_t link_index,rk_simulation_pose *out_pose) {
+    if(!out_pose)return RK_ERROR_INVALID_ARGUMENT;
+    const auto value=resolve(simulation);
+    return value?value->get_link_pose(robot_index,link_index,*out_pose):RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_spawn_object(rk_simulation simulation,
                                              const rk_simulation_object_desc *desc,
                                              rk_simulation_object *out_object) {
@@ -147,6 +154,14 @@ rk_result RK_CALL rk_simulation_teleport_object(rk_simulation simulation,
     const auto value = resolve(simulation);
     return value ? value->teleport_object(object, *pose)
                  : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_get_object_pose(rk_simulation simulation,
+                                                 rk_simulation_object object,
+                                                 rk_simulation_pose *out_pose) {
+    if(!out_pose)return RK_ERROR_INVALID_ARGUMENT;
+    const auto value=resolve(simulation);
+    return value?value->get_object_pose(object,*out_pose):RK_ERROR_INVALID_HANDLE;
 }
 
 } // extern "C"

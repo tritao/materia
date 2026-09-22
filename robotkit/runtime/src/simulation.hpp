@@ -42,10 +42,13 @@ public:
     rk_result reset_robot(uint32_t robot_index);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
     rk_result get_robot_pose(uint32_t robot_index, rk_simulation_pose &out_pose) const;
+    rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
+                            rk_simulation_pose &out_pose) const;
     rk_result spawn_object(const rk_simulation_object_desc &desc,
                            rk_simulation_object &out_object);
     rk_result remove_object(rk_simulation_object object);
     rk_result teleport_object(rk_simulation_object object, const rk_simulation_pose &pose);
+    rk_result get_object_pose(rk_simulation_object object, rk_simulation_pose &out_pose) const;
     /** Returns the number of completed shared physics steps. */
     uint64_t step_index() const;
     /** Returns the fixed-step simulation time in seconds. */
@@ -56,6 +59,7 @@ private:
     void cleanup() noexcept;
     rk_result ensure_host();
     rk_result advance(uint64_t timestamp_ns);
+    rk_result read_body_pose(nksim_body body, rk_simulation_pose &out_pose) const;
     void run();
 
     nkscene_scene scene_ = 0;
@@ -83,6 +87,7 @@ private:
         nksim_body body = 0;
         bool active = false;
         double half_extents[3]{};
+        rk_simulation_pose initial_pose{};
     };
     std::vector<EnvironmentObject> objects_;
     std::chrono::nanoseconds period_;

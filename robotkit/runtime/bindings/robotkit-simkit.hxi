@@ -45,6 +45,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	extern fn rk_simulation_get_clock(simulation: rk_simulation, out_clock: ptr<rk_simulation_clock> @inout) -> rk_result;
 	/** Reads one robot base pose from the latest physics state. */
 	extern fn rk_simulation_get_robot_pose(simulation: rk_simulation, robot_index: u32, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
+	extern fn rk_simulation_get_link_pose(simulation: rk_simulation, robot_index: u32, link_index: u32, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
 	/**
 	 * Removes one environment body while stopped.
 	 */
@@ -61,6 +62,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Adds one environment body from the editable scene while stopped.
 	 */
 	extern fn rk_simulation_spawn_object(simulation: rk_simulation, desc: ptr<const<rk_simulation_object_desc>>, out_object: ptr<rk_simulation_object> @out) -> rk_result;
+	/** Reads one environment object's pose from the latest physics state. */
+	extern fn rk_simulation_get_object_pose(simulation: rk_simulation, object: rk_simulation_object, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
 	/**
 	 * Starts the simulation's realtime owner thread.
 	 *

@@ -14,7 +14,9 @@ typedef SimulationRobotVisual={
   var position:Array<Float>;
   var rotation:Array<Float>;
   var sensors:Array<SensorFrame>;
+  var links:Array<SimulationPoseVisual>;
 }
+typedef SimulationPoseVisual={var id:String;var position:Array<Float>;var rotation:Array<Float>;}
 
 /** Owns the one shared editable-scene simulation attached to the application world. */
 class ApplicationSimulation {
@@ -29,6 +31,8 @@ class ApplicationSimulation {
   public var error(default, null):Null<String> = null;
   var simulation:Null<Simulation> = null;
   var simulatedIds:Array<String> = [];
+  var simulatedLinks:Array<Array<String>> = [];
+  var simulatedObjects:Array<{id:String,handle:Int}> = [];
   var running:Bool = false;
 
   public function new(world:RobotWorld,?backend:Int=DETERMINISTIC) {
@@ -49,6 +53,8 @@ class ApplicationSimulation {
   public function rebuild(configuration:SensorConfiguration, scene:EditorScene):Bool {
     var candidate:Null<Simulation> = null;
     var candidateRobots:Array<SimulatedRobot> = [];
+    var candidateLinks:Array<Array<String>> = [];
+    var candidateObjects:Array<{id:String,handle:Int}> = [];
     try {
       var models = configuration.robotModels();
       if (models.length == 0) throw "No simulated robot configurations";
@@ -66,11 +72,14 @@ class ApplicationSimulation {
         var id = editable.id;
         candidateRobots.push(new SimulatedRobot(id, runtime, editable.model.name,
           [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
+        candidateLinks.push([for (link in editable.model.links) link.id]);
         candidate.teleportRobot(index, editable.position, editable.rotation);
       }
-      for (object in scene.records()) if (object.collisionEnabled)
-        candidate.spawnBox([object.x, object.y, object.z],
+      for (object in scene.records()) if (object.collisionEnabled) {
+        var handle=candidate.spawnBox([object.x, object.y, object.z],
           [object.width/2.0,object.height/2.0,object.depth/2.0],object.dynamicBody,object.mass);
+        candidateObjects.push({id:object.id,handle:handle});
+      }
       if (running) candidate.start();
 
       var previousSimulation = simulation;
@@ -90,6 +99,8 @@ class ApplicationSimulation {
       }
       simulation = candidate;
       simulatedIds = [for (robot in candidateRobots) robot.id()];
+      simulatedLinks = candidateLinks;
+      simulatedObjects = candidateObjects;
       appliedRevision++;
       appliedDocumentRevision = configuration.revision();
       appliedEnvironmentRevision = scene.environmentRevision;
@@ -130,14 +141,25 @@ class ApplicationSimulation {
     for(index in 0...simulatedIds.length){
       var id=simulatedIds[index],robot=snapshot.robot(id),pose=simulation.robotPose(index);
       result.push({id:id,position:pose.position,rotation:pose.rotation,
-        sensors:robot==null?[]:robot.sensors.toArray()});
+        sensors:robot==null?[]:robot.sensors.toArray(),links:[for(linkIndex in 0...simulatedLinks[index].length) {
+          var linkPose=simulation.linkPose(index,linkIndex);
+          {id:simulatedLinks[index][linkIndex],position:linkPose.position,rotation:linkPose.rotation};
+        }]});
     }
     return result;
+  }
+  public function environmentVisualState():Array<SimulationPoseVisual> {
+    if(simulation==null)return [];
+    return [for(object in simulatedObjects){
+      var pose=simulation.objectPose(object.handle);
+      {id:object.id,position:pose.position,rotation:pose.rotation};
+    }];
   }
   public function clear():Void {
     stop();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
+    simulatedLinks.resize(0); simulatedObjects.resize(0);
     if (simulation != null) simulation.dispose(); simulation = null;
     appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;
   }

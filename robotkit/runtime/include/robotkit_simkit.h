@@ -172,6 +172,10 @@ RK_API rk_result RK_CALL rk_simulation_teleport_robot(
 RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
     rk_simulation simulation, uint32_t robot_index,
     rk_simulation_pose *out_pose RK_INOUT);
+/** Reads one robot link pose from the latest physics state. */
+RK_API rk_result RK_CALL rk_simulation_get_link_pose(
+    rk_simulation simulation, uint32_t robot_index, uint32_t link_index,
+    rk_simulation_pose *out_pose RK_INOUT);
 /** Adds one environment body from the editable scene while stopped. */
 RK_API rk_result RK_CALL rk_simulation_spawn_object(
     rk_simulation simulation, const rk_simulation_object_desc *desc,
@@ -183,6 +187,10 @@ RK_API rk_result RK_CALL rk_simulation_remove_object(
 RK_API rk_result RK_CALL rk_simulation_teleport_object(
     rk_simulation simulation, rk_simulation_object object,
     const rk_simulation_pose *pose);
+/** Reads one environment object's pose from the latest physics state. */
+RK_API rk_result RK_CALL rk_simulation_get_object_pose(
+    rk_simulation simulation, rk_simulation_object object,
+    rk_simulation_pose *out_pose RK_INOUT);
 
 #ifdef __cplusplus
 }

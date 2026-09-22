@@ -20,7 +20,9 @@ import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
 import robotkit.world.ReplayRobot;
 import robotkit.world.RobotRecording;
+import robotkit.world.RobotCommand;
 import robotkit.model.Actuator;
+import robotkit.model.Frame;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
@@ -484,6 +486,8 @@ class SceneEditingTests {
     var joint=new Joint("Arm joint",JointType.Revolute,session.sensors.model.links[0],arm,"joint/arm");
     joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=3.0;
     joint.drive=new Actuator("Arm drive",3.0,2.0);session.sensors.model.addJoint(joint);
+    var armMount=session.sensors.model.addFrame(new Frame("Arm LiDAR mount",arm,"arm/lidar"));
+    armMount.position=[0.4,0.0,0.0];session.sensors.model.sensors[0].frame=armMount;
     check(session.sensors.setRobotPose("materia/robot-b",[0.0,3.0,0.0],[0.0,0.0,0.0,1.0]),
       "sensor workflow stores an explicit robot pose");
     check(session.isDirty(), "sensor edits dirty the application document");
@@ -547,6 +551,8 @@ class SceneEditingTests {
     var visual=simulation.visualState();
     check(visual.length==2&&visual[1].position[1]==3.0&&visual[0].sensors.length>0,
       "runtime visualization exposes robot poses and sensor mounts without editing the document");
+    check(visual[1].links.length==2&&visual[1].sensors[0].linkId=="arm",
+      "articulated visualization exposes the link owning each sensor mount");
     var writer = new McapRobotRecording(recordingPath);
     for(robotId in observation.robotIds()) {
       var robot=observation.robot(robotId);
@@ -567,18 +573,47 @@ class SceneEditingTests {
       "record/replay preserves sensor mount and measurements");
     replay.close(); simulation.dispose(); world.close();
 
+    session.scene.setPositionXY("tower",1.0,3.0);
+    session.scene.select("tower");
+    check(new PropertyBinding(session.scene.properties()[9],session.scene.context())
+      .apply(PropertyValue.Bool(true))==PropertyEditResult.Applied,
+      "physics regression makes the observed obstacle dynamic");
+
     var mujocoWorld=new RobotWorld();
     var mujocoSimulation=new ApplicationSimulation(mujocoWorld,ApplicationSimulation.MUJOCO);
-    if(mujocoSimulation.rebuild(session.sensors,session.scene)) {
-      var mujocoObservation=mujocoSimulation.step();
-      for(index in 0...8)mujocoObservation=mujocoSimulation.step();
-      var mujocoRobot=mujocoObservation.robot("materia/robot");
-      if(mujocoRobot==null)throw "MuJoCo world lost the configured robot";
-      check(mujocoRobot.sensors.length>0&&mujocoSimulation.visualState().length==2,
-        "MuJoCo backend publishes the same observable multi-robot contract");
+    check(mujocoSimulation.rebuild(session.sensors,session.scene),
+      "MuJoCo-enabled tests require the MuJoCo backend to execute");
+    var mujocoObservation=mujocoSimulation.step();
+    var initialObjects=mujocoSimulation.environmentVisualState();
+    var initialVisual=mujocoSimulation.visualState()[1];
+    var initialArm=[for(link in initialVisual.links)if(link.id=="arm")link][0];
+    var initialObstacleZ=[for(object in initialObjects)if(object.id=="tower")object.position[2]][0];
+    var mountedRobot=mujocoObservation.robot("materia/robot-b");
+    if(mountedRobot==null)throw "MuJoCo world lost the articulated robot";
+    var mountedLidar=mountedRobot.sensors.get(0),initialHit=false;
+    for(value in mountedLidar.values.toArray())if(value<10.0)initialHit=true;
+    check(mountedLidar.linkId=="arm"&&initialHit,
+      "joint-mounted LiDAR observes the dynamic obstacle in MuJoCo");
+    mujocoWorld.submit("materia/robot-b",RobotCommand.JointPosition(0,0.6,null));
+    for(index in 0...8)mujocoObservation=mujocoSimulation.step();
+    var mujocoRobot=mujocoObservation.robot("materia/robot");
+    if(mujocoRobot==null)throw "MuJoCo world lost the configured robot";
+    check(mujocoRobot.sensors.length>0&&mujocoSimulation.visualState().length==2,
+      "MuJoCo backend publishes the same observable multi-robot contract");
+    var movedVisual=mujocoSimulation.visualState()[1];
+    var movedArm=[for(link in movedVisual.links)if(link.id=="arm")link][0];
+    var movedObstacleZ=[for(object in mujocoSimulation.environmentVisualState())
+      if(object.id=="tower")object.position[2]][0];
+    var armMoved=false;
+    for(index in 0...4)if(Math.abs(movedArm.rotation[index]-initialArm.rotation[index])>0.00001)armMoved=true;
+    check(movedObstacleZ<initialObstacleZ&&armMoved,
+      "runtime overlays follow the moving obstacle and articulated sensor link");
       check(mujocoSimulation.reset(),"MuJoCo simulation resets through the shared lifecycle");
       check(mujocoSimulation.visualState()[1].position[1]==3.0,
         "MuJoCo reset restores the persisted robot pose");
+      check(Math.abs([for(object in mujocoSimulation.environmentVisualState())
+        if(object.id=="tower")object.position[2]][0]-0.1)<0.00001,
+        "MuJoCo reset restores the moving obstacle pose");
       var mujocoPath=recordingPath+".mujoco",mujocoWriter=new McapRobotRecording(mujocoPath);
       for(frame in mujocoRobot.sensors.toArray())mujocoWriter.recordSensor("materia/robot",frame);
       mujocoWriter.close();var mujocoReplay=new ReplayRobot("materia/robot",McapRecordingReader.load(mujocoPath));
@@ -586,8 +621,6 @@ class SceneEditingTests {
       mujocoReplay.close();FileSystem.deleteFile(mujocoPath);
       var mujocoStatus=mujocoPath+".incomplete.status";
       if(FileSystem.exists(mujocoStatus))FileSystem.deleteFile(mujocoStatus);
-    } else check(Std.string(mujocoSimulation.error).indexOf("status -4")>=0,
-      "MuJoCo is either exercised or explicitly reported unavailable");
     mujocoSimulation.dispose();mujocoWorld.close();session.dispose();
     FileSystem.deleteFile(recordingPath);
     var statusPath = recordingPath + ".incomplete.status";
