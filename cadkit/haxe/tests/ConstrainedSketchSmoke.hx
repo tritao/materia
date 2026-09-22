@@ -16,10 +16,29 @@ import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.PocketFeature;
+import cadkit.parametric.features.BooleanFeature;
+import cadkit.parametric.features.BooleanOperation;
+import cadkit.parametric.features.TransformFeature;
 
 class ConstrainedSketchSmoke {
 	static function check(value:Bool, message:String):Void { if (!value) throw message; }
 	static function near(value:Float, expected:Float):Void { check(Math.abs(value - expected) < 1e-5, 'expected $expected, got $value'); }
+	static function fixedRectangle(width:Float, height:Float):ConstrainedSketch {
+		var sketch = new ConstrainedSketch();
+		var coordinates = [
+			[-width / 2, -height / 2], [width / 2, -height / 2],
+			[width / 2, height / 2], [-width / 2, height / 2]
+		];
+		for (index in 0...4) {
+			sketch.addPoint(new SketchPoint("rectangle.point" + index, coordinates[index][0], coordinates[index][1]));
+			sketch.addConstraint(SketchConstraint.fixed("rectangle.fixed" + index, "rectangle.point" + index));
+		}
+		for (index in 0...4)
+			sketch.addEntity(SketchEntity.line("rectangle.edge" + index, "rectangle.point" + index,
+				"rectangle.point" + ((index + 1) % 4)));
+		return sketch;
+	}
 
 	public static function run():Void {
 		var sketch = new ConstrainedSketch();
@@ -322,6 +341,80 @@ class ConstrainedSketchSmoke {
 		try ambiguousDocument.recompute() catch (error:Dynamic) failed = true;
 		check(failed, "ambiguous attached face selection is rejected");
 		ambiguousDocument.close();
+
+		var pocketDocument = new Document();
+		var pocketBox = pocketDocument.add(new BoxFeature(20, 30, 10));
+		var pocketProfile = pocketDocument.add(new ConstrainedSketchFeature(fixedRectangle(8, 6), pocketBox, topSelection, Vector.X()));
+		var blindPocket = pocketDocument.add(PocketFeature.blind(pocketBox, pocketProfile, 3));
+		var pocketDepth = pocketDocument.defineParameter("pocket.depth", 3);
+		pocketDepth.bind(blindPocket.depth);
+		pocketDocument.setOutput(blindPocket);
+		pocketDocument.recompute();
+		near(pocketDocument.result().volume(), 20 * 30 * 10 - 8 * 6 * 3);
+		pocketDepth.set(4);
+		pocketDocument.recompute();
+		near(pocketDocument.result().volume(), 20 * 30 * 10 - 8 * 6 * 4);
+		check(pocketDocument.undo(), "pocket depth undo");
+		pocketDocument.recompute();
+		near(pocketDocument.result().volume(), 20 * 30 * 10 - 8 * 6 * 3);
+		check(pocketDocument.redo(), "pocket depth redo");
+		pocketDocument.recompute();
+		near(pocketDocument.result().volume(), 20 * 30 * 10 - 8 * 6 * 4);
+		pocketBox.height.set(15);
+		pocketDocument.recompute();
+		near(pocketDocument.result().volume(), 20 * 30 * 15 - 8 * 6 * 4);
+		near(pocketProfile.currentShape().center().get_z(), 15);
+		var restoredPocket = DocumentCodec.decode(DocumentCodec.encode(pocketDocument));
+		near(restoredPocket.result().volume(), pocketDocument.result().volume());
+		check(restoredPocket.parameter("pocket.depth").value == 4, "pocket named depth reload");
+		restoredPocket.close();
+		pocketDocument.close();
+
+		var throughDocument = new Document();
+		var throughBox = throughDocument.add(new BoxFeature(20, 30, 10));
+		var throughProfile = throughDocument.add(new ConstrainedSketchFeature(fixedRectangle(8, 6), throughBox, topSelection, Vector.X()));
+		var throughPocket = throughDocument.add(PocketFeature.throughAll(throughBox, throughProfile));
+		throughDocument.setOutput(throughPocket);
+		throughDocument.recompute();
+		near(throughDocument.result().volume(), (20 * 30 - 8 * 6) * 10);
+		throughBox.height.set(15);
+		throughDocument.recompute();
+		near(throughDocument.result().volume(), (20 * 30 - 8 * 6) * 15);
+		var restoredThrough = DocumentCodec.decode(DocumentCodec.encode(throughDocument));
+		near(restoredThrough.result().volume(), throughDocument.result().volume());
+		restoredThrough.close();
+		throughDocument.close();
+
+		var enclosure = new AttachedPocketEnclosure();
+		var enclosureVolume = enclosure.finish.currentShape().volume();
+		check(enclosureVolume > 0, "attached pocket enclosure initial solid");
+		enclosure.resize(70, 50, 35);
+		check(enclosure.finish.currentShape().volume() > enclosureVolume, "attached pockets survive enclosure resize");
+		near(enclosure.topProfile.currentShape().center().get_z(), 35);
+		near(enclosure.sideProfile.currentShape().bounds().get_min().get_x(), 70);
+		near(enclosure.sideProfile.currentShape().bounds().get_max().get_x(), 70);
+		var restoredEnclosure = DocumentCodec.decode(DocumentCodec.encode(enclosure.document));
+		near(restoredEnclosure.result().volume(), enclosure.finish.currentShape().volume());
+		restoredEnclosure.close();
+		enclosure.close();
+
+		var selectionFailureDocument = new Document();
+		var selectionBase = selectionFailureDocument.add(new BoxFeature(20, 30, 10));
+		var selectionCutter = selectionFailureDocument.add(new BoxFeature(2, 30, 20));
+		var movingCutter = selectionFailureDocument.add(new TransformFeature(selectionCutter, 30, 0, 0));
+		var changingSupport = selectionFailureDocument.add(new BooleanFeature(selectionBase, movingCutter, BooleanOperation.Cut));
+		var failureProfile = selectionFailureDocument.add(new ConstrainedSketchFeature(fixedRectangle(4, 4), changingSupport,
+			topSelection, Vector.X()));
+		var failurePocket = selectionFailureDocument.add(PocketFeature.blind(changingSupport, failureProfile, 2));
+		selectionFailureDocument.setOutput(failurePocket);
+		selectionFailureDocument.recompute();
+		var committedPocket = selectionFailureDocument.result();
+		movingCutter.x.set(9);
+		failed = false;
+		try selectionFailureDocument.recompute() catch (error:Dynamic) failed = true;
+		check(failed && selectionFailureDocument.result() == committedPocket,
+			"failed attached face selection preserves committed pocket geometry");
+		selectionFailureDocument.close();
 
 		var plate=new ConstrainedMountingPlate();
 		var oldVolume=plate.finish.currentShape().volume();

@@ -202,6 +202,14 @@ offset. It is recomputed from the staged supporting shape, while authored point
 coordinates and dimensions remain local to the plane. See `ConstrainedMountingPlate.hx` and
 `ConstrainedSlottedBracket.hx` for complete editable examples.
 
+`PocketFeature` subtracts an attached planar profile along its face normal.
+Blind pockets expose a named positive depth. Through-all pockets derive their
+cut length from the target's current projected extent, so they continue through
+the solid after dimensional recompute. Both target and profile are document
+dependencies, and failed attachment or boolean evaluation leaves the previously
+committed result intact. `AttachedPocketEnclosure.hx` combines a blind recess on
+the top face with through-holes attached to a side face.
+
 ## Validation
 
 `ctest --test-dir build/debug --output-on-failure` exercises the C boundary,

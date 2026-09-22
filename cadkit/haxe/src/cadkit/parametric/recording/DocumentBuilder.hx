@@ -25,6 +25,7 @@ import cadkit.parametric.features.SweepFeature;
 import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.WireFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.parametric.features.PocketFeature;
 import cadkit.sketch.ConstrainedSketch;
 
 /** Explicit recorder for the serializable document feature set.
@@ -81,10 +82,11 @@ class DocumentBuilder {
 	/** Record a constrained sketch and bind dimension constraint IDs to named parameters. */
 	public function constrainedSketch(sketch:ConstrainedSketch, dimensions:Map<String, NamedParameter>):ConstrainedSketchFeature {
 		check();
-		var feature=document.add(new ConstrainedSketchFeature(sketch));
-		for(constraintId in dimensions.keys()) {
-			var dimension=dimensions.get(constraintId);
-			if(dimension==null||dimension.document!=document)throw new ParametricError("named parameter belongs to another builder");
+		var feature = document.add(new ConstrainedSketchFeature(sketch));
+		for (constraintId in dimensions.keys()) {
+			var dimension = dimensions.get(constraintId);
+			if (dimension == null || dimension.document != document)
+				throw new ParametricError("named parameter belongs to another builder");
 			dimension.bind(feature.dimension(constraintId));
 		}
 		return feature;
@@ -162,6 +164,18 @@ class DocumentBuilder {
 		var feature = document.add(ExtrudeFeature.along(source, amount.value, direction, reversed, symmetric));
 		bind(amount, feature, "extrude.amount");
 		return feature;
+	}
+
+	public function pocket(target:Feature, profile:Feature, depth:NamedParameter):PocketFeature {
+		check();
+		var feature = document.add(PocketFeature.blind(target, profile, depth.value));
+		bind(depth, feature, "pocket.depth");
+		return feature;
+	}
+
+	public function pocketThroughAll(target:Feature, profile:Feature):PocketFeature {
+		check();
+		return document.add(PocketFeature.throughAll(target, profile));
 	}
 
 	public function translate(source:Feature, x:Float, y:Float, z:Float):TransformFeature {

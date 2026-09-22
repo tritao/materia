@@ -24,6 +24,7 @@ import cadkit.parametric.features.BooleanOperation;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.ExtrudeFeature;
+import cadkit.parametric.features.PocketFeature;
 import cadkit.parametric.features.FaceFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.ChamferFeature;
@@ -105,6 +106,9 @@ class DocumentCodec {
 						: document.add(ExtrudeFeature.along(extrudeSource, finiteNumber(encodedAmount, "amount"),
 							new Vector(numberField(record, "x"), numberField(record, "y"), numberField(record, "z")),
 							optionalBool(record, "reversed", false), optionalBool(record, "symmetric", false)));
+				} else if (featureType == "pocket") {
+					feature = document.add(new PocketFeature(requiredFeature(document, intField(record, "target")),
+						requiredFeature(document, intField(record, "profile")), stringField(record, "mode"), numberField(record, "depth")));
 				} else if (featureType == "revolve") {
 					feature = document.add(new RevolveFeature(requiredFeature(document, intField(record, "source")), numberField(record, "originX"),
 						numberField(record, "originY"), numberField(record, "originZ"), numberField(record, "axisX"), numberField(record, "axisY"),
@@ -249,6 +253,17 @@ class DocumentCodec {
 				amount: extrude.amount == null ? null : extrude.amount.value,
 				reversed: extrude.reversed,
 				symmetric: extrude.symmetric,
+				references: references
+			};
+		} else if (featureType == "pocket") {
+			var pocket:PocketFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				target: pocket.target.id.toInt(),
+				profile: pocket.profile.id.toInt(),
+				mode: pocket.mode,
+				depth: pocket.depth.value,
 				references: references
 			};
 		} else if (featureType == "revolve") {
