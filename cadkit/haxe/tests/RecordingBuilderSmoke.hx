@@ -107,20 +107,22 @@ class RecordingBuilderSmoke {
 		}
 		check(rejected, "unbound dimension rejection");
 
+		var arbitraryDirection = DocumentBuilder.build(function(value) {
+			var amount = value.dimension("amount", 5);
+			var radius = value.dimension("radius", 2);
+			var circle = value.circle(radius);
+			value.extrude(circle, amount, new Vector(1, 0, 1));
+		});
+		near(arbitraryDirection.result().volume(), Math.PI * 4 * 5 / Math.pow(2, 0.5));
+		arbitraryDirection.close();
+
 		var failedBuilder:Null<DocumentBuilder> = null;
-		rejected = false;
 		try {
 			DocumentBuilder.build(function(value) {
 				failedBuilder = value;
-				var amount = value.dimension("amount", 5);
-				var radius = value.dimension("radius", 2);
-				var circle = value.circle(radius);
-				value.extrude(circle, amount, Vector.X());
+				value.unsupported("test operation");
 			});
-		} catch (error:Dynamic) {
-			rejected = true;
-		}
-		check(rejected, "unsupported recorded direction rejection");
+		} catch (error:Dynamic) {}
 		var closedRejected = false;
 		try {
 			var closedBuilder:DocumentBuilder = cast failedBuilder;

@@ -10,6 +10,10 @@ import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.sketch.SolverSettings;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
+import cadkit.parametric.features.SketchFeature;
+import cadkit.parametric.recording.DocumentBuilder;
 
 class ConstrainedSketchSmoke {
 	static function check(value:Bool, message:String):Void { if (!value) throw message; }
@@ -249,6 +253,42 @@ class ConstrainedSketchSmoke {
 		stagedDocument.recompute();
 		check(stagedSketch.solvedSketch() != committedSolution, "successful recompute commits staged solver state");
 		stagedDocument.close();
+
+		var workplaneDocument = DocumentBuilder.build(function(builder) {
+			var width = builder.dimension("workplane.width", 20);
+			var height = builder.dimension("workplane.height", 10);
+			var amount = builder.dimension("workplane.amount", 5);
+			var workplaneProfile = builder.rectangle(width, height, Plane.YZ());
+			builder.output(builder.extrude(workplaneProfile, amount));
+		});
+		near(workplaneDocument.result().volume(), 1000);
+		near(workplaneDocument.result().bounds().get_max().get_x(), 5);
+		var restoredWorkplane = DocumentCodec.decode(DocumentCodec.encode(workplaneDocument));
+		near(restoredWorkplane.result().volume(), 1000);
+		restoredWorkplane.close(); workplaneDocument.close();
+
+		var directionalDocument = new Document();
+		var directionalProfile = directionalDocument.add(new SketchFeature("rectangle", 20, 10));
+		var arbitrary = directionalDocument.add(ExtrudeFeature.along(directionalProfile, 5, new Vector(1, 0, 1)));
+		directionalDocument.setOutput(arbitrary); directionalDocument.recompute();
+		near(directionalDocument.result().volume(), 1000 / Math.pow(2, 0.5));
+		directionalDocument.close();
+
+		var reversedDocument = new Document();
+		var reversedProfile = reversedDocument.add(new SketchFeature("rectangle", 20, 10));
+		var reversedExtrude = reversedDocument.add(ExtrudeFeature.along(reversedProfile, 5, Vector.Z(), true));
+		reversedDocument.setOutput(reversedExtrude); reversedDocument.recompute();
+		near(reversedDocument.result().bounds().get_min().get_z(), -5);
+		near(reversedDocument.result().bounds().get_max().get_z(), 0);
+		reversedDocument.close();
+
+		var symmetricDocument = new Document();
+		var symmetricProfile = symmetricDocument.add(new SketchFeature("rectangle", 20, 10));
+		var symmetricExtrude = symmetricDocument.add(ExtrudeFeature.along(symmetricProfile, 5, Vector.Z(), false, true));
+		symmetricDocument.setOutput(symmetricExtrude); symmetricDocument.recompute();
+		near(symmetricDocument.result().bounds().get_min().get_z(), -2.5);
+		near(symmetricDocument.result().bounds().get_max().get_z(), 2.5);
+		symmetricDocument.close();
 
 		var plate=new ConstrainedMountingPlate();
 		var oldVolume=plate.finish.currentShape().volume();

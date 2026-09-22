@@ -158,8 +158,12 @@ The recorder covers rectangle/circle/slot/box primitives, constrained sketches, 
 grids, planar and solid booleans, positive-Z extrusion, translation, revolution,
 loft, sweep, offset, shell, projection, fillet, and chamfer. Operations whose
 editable meaning is not represented must be rejected explicitly with
-`unsupported(name)`. Named extrusion currently accepts positive Z only because
-one scalar dimension cannot independently bind multiple vector components.
+`unsupported(name)`. Recorded extrusion uses a scalar amount and a fixed unit
+direction. When no direction is supplied, sketch features use their workplane
+normal and other features use positive Z. Explicit directions may be arbitrary;
+reversed mode negates the direction, and symmetric mode centers the extrusion
+on the source profile. Legacy documents with editable XYZ extrusion components
+remain readable.
 
 ## Current operation limits
 

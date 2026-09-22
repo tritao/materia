@@ -98,8 +98,13 @@ class DocumentCodec {
 					feature = document.add(new FaceFeature(requiredFeature(document, intField(record, "source")), intField(record, "index"),
 						optionalFaceFingerprint(record)));
 				} else if (featureType == "extrude") {
-					feature = document.add(new ExtrudeFeature(requiredFeature(document, intField(record, "source")), numberField(record, "x"),
-						numberField(record, "y"), numberField(record, "z")));
+					var extrudeSource = requiredFeature(document, intField(record, "source"));
+					var encodedAmount:Dynamic = Reflect.field(record, "amount");
+					feature = encodedAmount == null
+						? document.add(new ExtrudeFeature(extrudeSource, numberField(record, "x"), numberField(record, "y"), numberField(record, "z")))
+						: document.add(ExtrudeFeature.along(extrudeSource, finiteNumber(encodedAmount, "amount"),
+							new Vector(numberField(record, "x"), numberField(record, "y"), numberField(record, "z")),
+							optionalBool(record, "reversed", false), optionalBool(record, "symmetric", false)));
 				} else if (featureType == "revolve") {
 					feature = document.add(new RevolveFeature(requiredFeature(document, intField(record, "source")), numberField(record, "originX"),
 						numberField(record, "originY"), numberField(record, "originZ"), numberField(record, "axisX"), numberField(record, "axisY"),
@@ -241,6 +246,9 @@ class DocumentCodec {
 				x: extrude.x.value,
 				y: extrude.y.value,
 				z: extrude.z.value,
+				amount: extrude.amount == null ? null : extrude.amount.value,
+				reversed: extrude.reversed,
+				symmetric: extrude.symmetric,
 				references: references
 			};
 		} else if (featureType == "revolve") {
@@ -502,6 +510,15 @@ class DocumentCodec {
 		return cast value;
 	}
 
+	private static function optionalBool(record:Dynamic, name:String, fallback:Bool):Bool {
+		var value:Dynamic = Reflect.field(record, name);
+		if (value == null)
+			return fallback;
+		if (!Std.isOfType(value, Bool))
+			throw new ParametricError("document field is not a boolean: " + name);
+		return cast value;
+	}
+
 	private static function encodeReference(reference:TopologyReference):Dynamic {
 		return {
 			kind: shapeKindName(reference.kind),
@@ -605,6 +622,13 @@ class DocumentCodec {
 
 	private static function numberField(value:Dynamic, name:String):Float {
 		var result:Float = cast requiredField(value, name);
+		if (!Math.isFinite(result))
+			throw new ParametricError("document field is not finite: " + name);
+		return result;
+	}
+
+	private static function finiteNumber(value:Dynamic, name:String):Float {
+		var result:Float = cast value;
 		if (!Math.isFinite(result))
 			throw new ParametricError("document field is not finite: " + name);
 		return result;

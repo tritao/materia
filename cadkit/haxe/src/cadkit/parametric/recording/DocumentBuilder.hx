@@ -132,16 +132,22 @@ class DocumentBuilder {
 		return document.add(new BooleanFeature(first, second, BooleanOperation.Common));
 	}
 
-	public function extrude(source:Feature, amount:NamedParameter, ?direction:Vector):ExtrudeFeature {
+	public function extrude(source:Feature, amount:NamedParameter, ?direction:Vector, reversed:Bool = false,
+		symmetric:Bool = false):ExtrudeFeature {
 		check();
-		if (direction == null)
-			direction = Vector.Z();
-		var unit = direction.normalized();
-		// One named scalar cannot represent several independently editable vector components.
-		if (Math.abs(unit.x) > 1e-12 || Math.abs(unit.y) > 1e-12 || Math.abs(unit.z - 1) > 1e-12)
-			throw new ParametricError("recorded named extrusion currently requires the positive Z direction");
-		var feature = document.add(new ExtrudeFeature(source, 0, 0, amount.value));
-		bind(amount, feature, "extrude.z");
+		if (direction == null) {
+			if (Std.isOfType(source, ConstrainedSketchFeature)) {
+				var constrained:ConstrainedSketchFeature = cast source;
+				direction = constrained.sketch().plane.normal;
+			} else if (Std.isOfType(source, SketchFeature)) {
+				var primitive:SketchFeature = cast source;
+				direction = primitive.plane.normal;
+			} else {
+				direction = Vector.Z();
+			}
+		}
+		var feature = document.add(ExtrudeFeature.along(source, amount.value, direction, reversed, symmetric));
+		bind(amount, feature, "extrude.amount");
 		return feature;
 	}
 
