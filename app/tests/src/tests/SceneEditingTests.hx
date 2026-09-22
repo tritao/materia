@@ -7,6 +7,9 @@ import nativekit.ui.core.PropertyBinding;
 import nativekit.ui.core.PropertyValue;
 import nativekit.ui.core.PropertyEditResult;
 import nativekit.ui.core.ViewportCamera;
+import app.SceneDocumentSession;
+import sys.FileSystem;
+import sys.io.File;
 
 class SceneEditingTests {
   static function check(value:Bool, message:String):Void {
@@ -14,6 +17,89 @@ class SceneEditingTests {
   }
   static function near(actual:Float, expected:Float, message:String):Void
     check(Math.abs(actual - expected) < 0.00001, message);
+
+  static function editingLifecycle():Void {
+    var directory = "build/editing-lifecycle-" + Std.random(100000000);
+    FileSystem.createDirectory(directory);
+    var file = directory + "/scene.materia.json";
+    File.saveContent(file, '{"format":"materia.scene","version":1,"objects":[]}');
+    var session = new SceneDocumentSession();
+    session.open(file);
+    var empty = session.scene;
+    var tree = new EditorSceneTree(empty);
+    var viewport = new EditorSceneViewport(empty);
+    var camera = new ViewportCamera();
+    check(empty.selectedId == "scene" && tree.childCount("scene") == 0,
+      "empty scene starts with synchronized root selection");
+    check(viewport.pick(camera, EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y) == "scene",
+      "empty viewport has no stale geometry");
+
+    var revision = empty.revision;
+    check(empty.createRectangle(), "rectangle creation succeeds");
+    var originalId = empty.selectedId;
+    check(originalId == "rectangle-1", "created object receives a stable ID");
+    check(tree.childCount("scene") == 1 && tree.childKeyAt("scene", 0) == originalId,
+      "hierarchy observes created object");
+    check(viewport.revision() > revision && viewport.pick(camera,
+      EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y) == originalId,
+      "viewport observes created geometry");
+    check(empty.properties().length == 4, "inspector observes created selection");
+
+    var name = new PropertyBinding(empty.properties()[3], empty.context());
+    check(name.apply(PropertyValue.Text("Hidden panel")) == PropertyEditResult.Applied,
+      "rename succeeds through inspector binding");
+    var renamed = empty.object(originalId);
+    check(renamed != null && renamed.label == "Hidden panel", "hierarchy model observes rename");
+    var visible = new PropertyBinding(empty.properties()[2], empty.context());
+    check(visible.apply(PropertyValue.Bool(false)) == PropertyEditResult.Applied,
+      "visibility edit succeeds through inspector binding");
+    check(viewport.pick(camera, EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y) == "scene",
+      "hidden object disappears from viewport picking");
+
+    check(empty.duplicateSelected(), "hidden object duplicates");
+    var duplicateId = empty.selectedId;
+    var duplicate = empty.object(duplicateId);
+    check(duplicateId != originalId && duplicate != null && duplicate.label == "Hidden panel copy",
+      "duplicate has a distinct stable ID and copied name");
+    check(!empty.info(duplicateId).visible() && tree.childKeyAt("scene", 0) == originalId
+      && tree.childKeyAt("scene", 1) == duplicateId, "hidden state and hierarchy order duplicate together");
+    check(empty.deleteSelected(), "duplicate deletes");
+    check(empty.object(duplicateId) == null && empty.selectedId == originalId,
+      "delete removes selection and selects its neighbour");
+    empty.document.undo();
+    check(empty.object(duplicateId) != null && empty.selectedId == duplicateId,
+      "undo restores duplicate identity and selection");
+    empty.document.redo();
+    check(empty.object(duplicateId) == null && empty.selectedId == originalId,
+      "redo deletes the same stable identity");
+
+    try {
+      session.save(file);
+      check(!empty.document.isDirty && session.label().indexOf("*") < 0,
+        "save marks the action result clean");
+      empty.document.undo();
+      check(empty.object(duplicateId) != null && empty.document.isDirty,
+        "undo across savepoint restores object and dirty state");
+      empty.document.redo();
+      check(empty.object(duplicateId) == null && !empty.document.isDirty,
+        "redo returns exactly to saved state");
+      session.open(file);
+      check(session.scene.items().length == 1 && session.scene.items()[0].id == originalId,
+        "reopen preserves surviving stable identity");
+      check(session.scene.items()[0].label == "Hidden panel" && !session.scene.info(originalId).visible(),
+        "reopen preserves rename and hidden state");
+      check(!session.scene.document.isDirty && !session.scene.document.canUndo,
+        "reopened document starts clean with fresh history");
+    } catch (error:Dynamic) {
+      session.dispose();
+      if (FileSystem.exists(file)) FileSystem.deleteFile(file);
+      if (FileSystem.exists(directory)) FileSystem.deleteDirectory(directory);
+      throw error;
+    }
+    session.dispose();
+    FileSystem.deleteFile(file);
+    FileSystem.deleteDirectory(directory);
+  }
 
   static function main():Int {
     var scene = new EditorScene();
@@ -74,6 +160,7 @@ class SceneEditingTests {
       check(scene.properties().length == 0 && !scene.context().hasSelection, "empty selection has no editable properties");
       scene.dispose();
       scene.dispose();
+      editingLifecycle();
       SceneDocumentTests.run();
       Sys.println("Scene editing tests passed");
       return 0;
