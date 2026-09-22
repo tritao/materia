@@ -11,6 +11,7 @@ import cadkit.parametric.features.ProjectFeature;
 import cadkit.parametric.features.GridFeature;
 import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.parametric.features.PolarPatternFeature;
+import cadkit.parametric.features.HoleFeature;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.SketchFeature;
@@ -472,6 +473,12 @@ class DocumentCodec {
 				numberField(record, "radius"), numberField(record, "angularSpan"), decodeVector(requiredField(record, "axisOrigin")),
 				decodeVector(requiredField(record, "axisDirection")), decodeVector(requiredField(record, "radialDirection")),
 				boolField(record, "orientInstances"), numberField(record, "startAngle"));
+		if (type == "hole")
+			return new HoleFeature(requiredFeature(document, intField(record, "target")),
+				decodeSelection(requiredField(record, "selection")), decodeVector(requiredField(record, "xDirection")),
+				stringField(record, "style"), stringField(record, "mode"), numberField(record, "x"), numberField(record, "y"),
+				numberField(record, "diameter"), numberField(record, "depth"), numberField(record, "recessDiameter"),
+				numberField(record, "recessDepth"), numberField(record, "offset"), boolField(record, "flipped"));
 		return null;
 	}
 
@@ -605,6 +612,28 @@ class DocumentCodec {
 				axisDirection: encodeVector(value.axisDirection),
 				radialDirection: encodeVector(value.radialDirection),
 				orientInstances: value.orientInstances
+			};
+		}
+		if (type == "hole") {
+			var value:HoleFeature = cast feature;
+
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				target: value.target.id.toInt(),
+				selection: encodeSelection(value.selection),
+				xDirection: encodeVector(value.xDirection),
+				offset: value.offset,
+				flipped: value.flipped,
+				style: value.style,
+				mode: value.mode,
+				x: value.x.value,
+				y: value.y.value,
+				diameter: value.diameter.value,
+				depth: value.depth.value,
+				recessDiameter: value.recessDiameter.value,
+				recessDepth: value.recessDepth.value
 			};
 		}
 		return null;

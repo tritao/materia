@@ -16,6 +16,7 @@ import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.GridFeature;
 import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.parametric.features.PolarPatternFeature;
+import cadkit.parametric.features.HoleFeature;
 import cadkit.parametric.features.LoftFeature;
 import cadkit.parametric.features.OffsetFeature;
 import cadkit.parametric.features.PolylineFeature;
@@ -171,6 +172,58 @@ class DocumentBuilder {
 		if (startAngle != null)
 			bind(startAngle, feature, "polar.startAngle");
 		return feature;
+	}
+
+	public function blindHole(target:Feature, selection:SelectionRecipe, xDirection:Vector,
+		x:NamedParameter, y:NamedParameter, diameter:NamedParameter, depth:NamedParameter,
+		offset:Float = 0, flipped:Bool = false):HoleFeature {
+		check();
+		var feature = document.add(HoleFeature.plain(target, selection, xDirection, "blind",
+			x.value, y.value, diameter.value, depth.value, offset, flipped));
+		bindHolePosition(feature, x, y, diameter);
+		bind(depth, feature, "hole.depth");
+		return feature;
+	}
+
+	public function throughHole(target:Feature, selection:SelectionRecipe, xDirection:Vector,
+		x:NamedParameter, y:NamedParameter, diameter:NamedParameter,
+		offset:Float = 0, flipped:Bool = false):HoleFeature {
+		check();
+		var feature = document.add(HoleFeature.plain(target, selection, xDirection, "through-all",
+			x.value, y.value, diameter.value, 1, offset, flipped));
+		bindHolePosition(feature, x, y, diameter);
+		return feature;
+	}
+
+	public function blindCounterbore(target:Feature, selection:SelectionRecipe, xDirection:Vector,
+		x:NamedParameter, y:NamedParameter, diameter:NamedParameter, depth:NamedParameter,
+		recessDiameter:NamedParameter, recessDepth:NamedParameter, offset:Float = 0, flipped:Bool = false):HoleFeature {
+		check();
+		var feature = document.add(HoleFeature.counterbore(target, selection, xDirection, "blind", x.value, y.value,
+			diameter.value, depth.value, recessDiameter.value, recessDepth.value, offset, flipped));
+		bindHolePosition(feature, x, y, diameter);
+		bind(depth, feature, "hole.depth");
+		bind(recessDiameter, feature, "hole.recessDiameter");
+		bind(recessDepth, feature, "hole.recessDepth");
+		return feature;
+	}
+
+	public function throughCounterbore(target:Feature, selection:SelectionRecipe, xDirection:Vector,
+		x:NamedParameter, y:NamedParameter, diameter:NamedParameter,
+		recessDiameter:NamedParameter, recessDepth:NamedParameter, offset:Float = 0, flipped:Bool = false):HoleFeature {
+		check();
+		var feature = document.add(HoleFeature.counterbore(target, selection, xDirection, "through-all", x.value, y.value,
+			diameter.value, 1, recessDiameter.value, recessDepth.value, offset, flipped));
+		bindHolePosition(feature, x, y, diameter);
+		bind(recessDiameter, feature, "hole.recessDiameter");
+		bind(recessDepth, feature, "hole.recessDepth");
+		return feature;
+	}
+
+	private function bindHolePosition(feature:HoleFeature, x:NamedParameter, y:NamedParameter, diameter:NamedParameter):Void {
+		bind(x, feature, "hole.x");
+		bind(y, feature, "hole.y");
+		bind(diameter, feature, "hole.diameter");
 	}
 
 	public function add(first:Feature, second:Feature):BooleanFeature {

@@ -225,6 +225,14 @@ dependencies, and failed attachment or boolean evaluation leaves the previously
 committed result intact. `AttachedPocketEnclosure.hx` combines a blind recess on
 the top face with through-holes attached to a side face.
 
+`HoleFeature` generates a face-attached cutting tool at editable local X/Y
+coordinates. Plain holes support blind depth and adaptive through-all modes.
+Counterbores add an explicit larger recess diameter and depth, and reject a
+recess no larger than the bore or a blind recess extending through the bore.
+The tool remains separate from its Boolean cut and may be passed through linear
+or polar pattern features first. `CounterboredEnclosureLid.hx` demonstrates a
+four-hole patterned cut that follows lid size and thickness changes.
+
 ## Validation
 
 `ctest --test-dir build/debug --output-on-failure` exercises the C boundary,
