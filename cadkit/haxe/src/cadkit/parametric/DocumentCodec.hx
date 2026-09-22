@@ -45,6 +45,7 @@ import cadkit.parametric.ElementReference;
 import cadkit.parametric.Placement;
 import cadkit.parametric.DefinitionId;
 import cadkit.parametric.DefinitionInput;
+import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.InstanceElement;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
@@ -139,12 +140,16 @@ class DocumentCodec {
 					unit: input.unit,
 					value: UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit)
 				});
+			var outputs:Array<Dynamic> = [];
+			for (output in definition.outputs())
+				outputs.push({name: output.name, purpose: output.purpose});
 			encodedDefinitions.push({
 				id: definition.id.value,
 				name: definition.name,
 				recipe: definition.recipe,
 				revision: definition.revision,
-				inputs: inputs
+				inputs: inputs,
+				outputs: outputs
 			});
 		}
 		return Json.stringify({
@@ -295,8 +300,12 @@ class DocumentCodec {
 					for (inputRecord in inputRecords)
 						inputs.push(new DefinitionInput(stringField(inputRecord, "name"), stringField(inputRecord, "kind"), stringField(inputRecord, "unit"),
 							numberField(inputRecord, "value")));
+					var outputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "outputs");
+					var outputs:Array<DefinitionOutput> = [];
+					for (outputRecord in outputRecords)
+						outputs.push(new DefinitionOutput(stringField(outputRecord, "name"), stringField(outputRecord, "purpose")));
 					var definition = document.installDefinition(new DefinitionId(stringField(definitionRecord, "id")), stringField(definitionRecord, "name"),
-						stringField(definitionRecord, "recipe"), inputs);
+						stringField(definitionRecord, "recipe"), inputs, outputs);
 					definition.restoreRevision(intField(definitionRecord, "revision"));
 				}
 				var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");

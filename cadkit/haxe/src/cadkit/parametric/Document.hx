@@ -34,6 +34,7 @@ import cadkit.parametric.PlacementChange;
 import cadkit.parametric.Definition;
 import cadkit.parametric.DefinitionId;
 import cadkit.parametric.DefinitionInput;
+import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.InstanceElement;
 import cadkit.parametric.DefinitionChanges.DefinitionDefaultChange;
 import cadkit.parametric.DefinitionChanges.InstanceOverrideChange;
@@ -101,15 +102,18 @@ class Document {
 			new DefinitionInput("height", ParameterKind.Length, "mm", height),
 			new DefinitionInput("frameThickness", ParameterKind.Length, "mm", frameThickness),
 			new DefinitionInput("depth", ParameterKind.Length, "mm", depth)
+		], [
+			new DefinitionOutput("body", DefinitionOutput.Geometry),
+			new DefinitionOutput("opening", DefinitionOutput.Tool)
 		]);
 		recordDocumentChange(new DefinitionCreateChange(this, result, definitions.length - 1));
 		return result;
 	}
 
-	public function installDefinition(id:DefinitionId, name:String, recipe:String, inputs:Array<DefinitionInput>):Definition {
+	public function installDefinition(id:DefinitionId, name:String, recipe:String, inputs:Array<DefinitionInput>, outputs:Array<DefinitionOutput>):Definition {
 		if (issuedDefinitionIds.exists(id.value))
 			throw new ParametricError("duplicate or previously issued definition ID: " + id.value);
-		var result = new Definition(this, id, name, recipe, inputs);
+		var result = new Definition(this, id, name, recipe, inputs, outputs);
 		definitions.push(result);
 		definitionsById.set(id.value, result);
 		issuedDefinitionIds.set(id.value, true);
@@ -171,25 +175,31 @@ class Document {
 		return result;
 	}
 
-	private function instanceKey(instance:InstanceElement):String {
+	private function instanceKey(instance:InstanceElement, output:String):String {
 		var definition = definition(instance.definitionId);
-		var parts = [definition.id.value, Std.string(definition.revision)];
+		definition.output(output);
+		var parts = [definition.id.value, Std.string(definition.revision), output];
 		for (input in definition.inputs())
 			parts.push(input.name + "=" + Std.string(instance.resolved(input.name)));
 		return parts.join("|");
 	}
 
 	private function resolveInstanceShape(instance:InstanceElement):Shape {
-		var key = instanceKey(instance);
+		return definitionOutput(instance, "body");
+	}
+
+	public function definitionOutput(instance:InstanceElement, output:String):Shape {
+		validateOwnedElement(instance);
+		var key = instanceKey(instance, output);
 		var known = definitionCache.get(key);
 		if (known != null)
 			return known;
-		var result = evaluateDefinition(definition(instance.definitionId), instance);
+		var result = evaluateDefinition(definition(instance.definitionId), instance, output);
 		definitionCache.set(key, result);
 		return result;
 	}
 
-	private function evaluateDefinition(definition:Definition, instance:InstanceElement):Shape {
+	private function evaluateDefinition(definition:Definition, instance:InstanceElement, output:String):Shape {
 		definitionEvaluationCount++;
 		if (definition.recipe != "window")
 			throw new ParametricError("unsupported definition recipe: " + definition.recipe);
@@ -199,6 +209,10 @@ class Document {
 			depth = instance.resolved("depth");
 		if (width <= 2 * frame || height <= 2 * frame || depth <= 0 || frame <= 0)
 			throw new ParametricError("window dimensions do not define a valid frame");
+		if (output == "opening")
+			return Shape.box(width, depth + 2, height).translate(Geometry.vec3(0, -1, 0));
+		if (output != "body")
+			throw new ParametricError("unsupported window output: " + output);
 		var outer = Shape.box(width, depth, height);
 		var inner = Shape.box(width - 2 * frame, depth + 2, height - 2 * frame).translate(Geometry.vec3(frame, -1, frame));
 		try {

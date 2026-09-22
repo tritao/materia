@@ -264,6 +264,10 @@ class ElementSmoke {
 
 		var windows = new RepeatedWindows();
 		check(windows.document.definitionEvaluationCount == 1, "identical instances share definition evaluation");
+		check(windows.definition.output("body").purpose == "geometry" && windows.definition.output("opening").purpose == "tool",
+			"definition outputs declare geometry and tool purposes");
+		check(windows.document.definitionOutput(windows.first, "opening").volume() > windows.first.shape().volume(),
+			"tool outputs are available explicitly and excluded from instance display");
 		var firstWindowId = windows.first.id.value;
 		var oldVolume = windows.first.shape().volume();
 		windows.definition.setDefault("frameThickness", 100);
@@ -290,6 +294,7 @@ class ElementSmoke {
 		var loadedWindows = DocumentCodec.decode(DocumentCodec.encode(windows.document));
 		check(loadedWindows.allDefinitions().length == 1 && loadedWindows.elementAt(2).id.value == firstWindowId,
 			"definition and instance identities survive reload");
+		check(loadedWindows.allDefinitions()[0].output("opening").purpose == "tool", "definition output purposes survive reload");
 		loadedWindows.close();
 		windows.close();
 		var definitionTransactionDocument = new Document();

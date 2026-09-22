@@ -9,8 +9,10 @@ class Definition {
 
 	private final inputsByName:Map<String, DefinitionInput>;
 	private final orderedInputs:Array<DefinitionInput>;
+	private final outputsByName:Map<String, DefinitionOutput>;
+	private final orderedOutputs:Array<DefinitionOutput>;
 
-	public function new(document:Document, id:DefinitionId, name:String, recipe:String, inputs:Array<DefinitionInput>) {
+	public function new(document:Document, id:DefinitionId, name:String, recipe:String, inputs:Array<DefinitionInput>, outputs:Array<DefinitionOutput>) {
 		if (name == null || StringTools.trim(name) == "")
 			throw new ParametricError("definition name must not be empty");
 		this.document = document;
@@ -20,11 +22,19 @@ class Definition {
 		revision = 1;
 		inputsByName = new Map();
 		orderedInputs = [];
+		outputsByName = new Map();
+		orderedOutputs = [];
 		for (input in inputs) {
 			if (inputsByName.exists(input.name))
 				throw new ParametricError("duplicate definition input: " + input.name);
 			inputsByName.set(input.name, input);
 			orderedInputs.push(input);
+		}
+		for (output in outputs) {
+			if (outputsByName.exists(output.name))
+				throw new ParametricError("duplicate definition output: " + output.name);
+			outputsByName.set(output.name, output);
+			orderedOutputs.push(output);
 		}
 	}
 
@@ -38,8 +48,15 @@ class Definition {
 	public function inputs():Array<DefinitionInput>
 		return orderedInputs.copy();
 
-	public function outputs():Array<String>
-		return ["frame"];
+	public function output(name:String):DefinitionOutput {
+		var result = outputsByName.get(name);
+		if (result == null)
+			throw new ParametricError("unknown definition output: " + name);
+		return result;
+	}
+
+	public function outputs():Array<DefinitionOutput>
+		return orderedOutputs.copy();
 
 	public function setDefault(name:String, value:Float, ?unit:String):Void
 		document.setDefinitionDefault(this, name, value, unit);
