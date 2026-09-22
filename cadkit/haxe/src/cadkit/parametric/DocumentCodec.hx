@@ -33,6 +33,7 @@ import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.RotationFeature;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
@@ -127,6 +128,9 @@ class DocumentCodec {
 				} else if (featureType == "transform") {
 					feature = document.add(new TransformFeature(requiredFeature(document, intField(record, "source")), numberField(record, "x"),
 						numberField(record, "y"), numberField(record, "z")));
+				} else if (featureType == "rotation") {
+					feature = document.add(new RotationFeature(requiredFeature(document, intField(record, "source")),
+						decodeVector(requiredField(record, "pivot")), decodeVector(requiredField(record, "axis")), numberField(record, "angle")));
 				} else if (featureType == "boolean") {
 					feature = document.add(new BooleanFeature(requiredFeature(document, intField(record, "first")),
 						requiredFeature(document, intField(record, "second")), booleanOperation(stringField(record, "operation"))));
@@ -319,6 +323,17 @@ class DocumentCodec {
 				x: transform.x.value,
 				y: transform.y.value,
 				z: transform.z.value,
+				references: references
+			};
+		} else if (featureType == "rotation") {
+			var rotation:RotationFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				source: rotation.source.id.toInt(),
+				pivot: encodeVector(rotation.pivot),
+				axis: encodeVector(rotation.axis),
+				angle: rotation.angle.value,
 				references: references
 			};
 		} else if (featureType == "boolean") {

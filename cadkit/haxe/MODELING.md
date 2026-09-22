@@ -180,6 +180,11 @@ rotate with the orbit or remain fixed. `ParametricFlange.hx` demonstrates a
 bolt-circle cut, while `VentilatedEnclosure.hx` patterns an attached profile
 before applying one through-all pocket operation.
 
+`RotationFeature` applies a rigid rotation around an explicit pivot and
+arbitrary axis. Its angle is an editable parameter and may be bound to a named
+dimension through `DocumentBuilder.rotate`. Rotation uses the placement
+operation, preserving generated/modified history where OCCT reports it.
+
 ## Current operation limits
 
 Splines interpolate nonperiodic point lists. Loft builds a solid through closed

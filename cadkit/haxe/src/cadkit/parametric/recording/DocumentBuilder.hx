@@ -26,6 +26,7 @@ import cadkit.parametric.features.ShellFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.SweepFeature;
 import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.WireFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.features.CylinderFeature;
@@ -300,6 +301,13 @@ class DocumentBuilder {
 	public function translate(source:Feature, x:Float, y:Float, z:Float):TransformFeature {
 		check();
 		return document.add(new TransformFeature(source, x, y, z));
+	}
+
+	public function rotate(source:Feature, pivot:Vector, axis:Vector, angle:NamedParameter):RotationFeature {
+		check();
+		var feature = document.add(new RotationFeature(source, pivot, axis, angle.value));
+		bind(angle, feature, "rotation.angle");
+		return feature;
 	}
 
 	public function revolve(source:Feature, origin:Vector, axis:Vector, angle:NamedParameter):RevolveFeature {

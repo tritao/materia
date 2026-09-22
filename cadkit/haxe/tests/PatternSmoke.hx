@@ -9,6 +9,7 @@ import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.parametric.features.PolarPatternFeature;
 import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.RotationFeature;
 
 class PatternSmoke {
 	static function check(value:Bool, message:String):Void {
@@ -147,5 +148,29 @@ class PatternSmoke {
 		check(failedResize && ventilationExample.finish.currentShape() == committedVentilation,
 			"failed patterned enclosure edit preserves committed geometry");
 		ventilationExample.close();
+
+		var rotationDocument = new Document();
+		var rotationSource = rotationDocument.add(new BoxFeature(2, 1, 1));
+		var rotation = rotationDocument.add(new RotationFeature(rotationSource, new Vector(1, 0, 0), Vector.Z(), Math.PI / 2));
+		var rotationAngle = rotationDocument.defineParameter("rotation.angle", Math.PI / 2);
+		rotationAngle.bind(rotation.angle);
+		rotationDocument.setOutput(rotation);
+		rotationDocument.recompute();
+		near(rotationDocument.result().bounds().get_min().get_x(), 0);
+		near(rotationDocument.result().bounds().get_max().get_x(), 1);
+		near(rotationDocument.result().bounds().get_min().get_y(), -1);
+		near(rotationDocument.result().bounds().get_max().get_y(), 1);
+		check(rotation.provenance != null, "rotation retains operation history");
+		rotationAngle.set(Math.PI);
+		rotationDocument.recompute();
+		near(rotationDocument.result().bounds().get_min().get_x(), 0);
+		near(rotationDocument.result().bounds().get_max().get_x(), 2);
+		check(rotationDocument.undo(), "rotation angle undo");
+		rotationDocument.recompute();
+		near(rotationDocument.result().bounds().get_max().get_y(), 1);
+		var restoredRotation = DocumentCodec.decode(DocumentCodec.encode(rotationDocument));
+		near(restoredRotation.result().bounds().get_max().get_y(), 1);
+		restoredRotation.close();
+		rotationDocument.close();
 	}
 }
