@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(materia_reference_editor_native LANGUAGES C CXX)
+project(materia_reference_editor_native VERSION 0.1.0 LANGUAGES C CXX)
 
 if(NOT DEFINED HAXEON_NATIVE_OUTPUT_DIR OR HAXEON_NATIVE_OUTPUT_DIR STREQUAL "")
     set(HAXEON_NATIVE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/native")
@@ -22,7 +22,13 @@ set(MATERIA_UIKIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../uikit")
 add_subdirectory("${MATERIA_NATIVEKIT_DIR}" nativekit)
 add_subdirectory("${MATERIA_UIKIT_DIR}" uikit)
 
-foreach(target_name nativekit nativekit_gpu nativekit_ui)
+# Build the scene model and spatial queries used by the editor document.
+set(NKSCENE_NATIVEKIT_DIR "${MATERIA_NATIVEKIT_DIR}")
+set(NK_LIBRARY_TYPE SHARED)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../scenekit/scene" scene)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../scenekit/scene_render" scene_render)
+
+foreach(target_name nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render)
     if(TARGET "${target_name}")
         set_target_properties("${target_name}" PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
@@ -34,7 +40,7 @@ endforeach()
 # Haxeon's coarse CMake artifact is a build stamp.  The runtime libraries
 # loaded by the generated FFI calls are the libnativekit*.so files above.
 add_custom_target(haxeon_app_native
-    DEPENDS nativekit nativekit_gpu nativekit_ui
+    DEPENDS nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render
     COMMAND "${CMAKE_COMMAND}" -E touch "${HAXEON_NATIVE_OUTPUT_DIR}/app.hdll"
     BYPRODUCTS "${HAXEON_NATIVE_OUTPUT_DIR}/app.hdll"
     COMMENT "Building NativeKit, GPU, and UIKit native dependencies")

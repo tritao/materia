@@ -1,7 +1,7 @@
 # Reference editor shell
 
-This is the smallest app-side integration example for the shared Haxeon UI
-widgets. `src/Main.hx` owns the editor state and composes:
+This is the app-side integration example for the shared Haxeon UI widgets and
+SceneKit. `src/Main.hx` composes:
 
 - a persisted `DockWorkspaceModel` with Hierarchy, Viewport, Inspector,
   Console, and Telemetry panels;
@@ -12,6 +12,30 @@ widgets. `src/Main.hx` owns the editor state and composes:
   palette, and workspace reset;
 - a file-backed docking snapshot under `build/reference-editor-workspace.json`
   (override it with `REFERENCE_EDITOR_WORKSPACE`).
+
+The editor starts with two planar SceneKit meshes in an orthographic XY view.
+Click an object in the viewport or hierarchy to select it; the yellow outline
+tracks selection. Edit Position X/Y (metres) or Visible in the inspector.
+Hidden objects remain selectable in the hierarchy. Click empty viewport space
+or the Scene root to clear object selection.
+
+- Middle-drag pans the view; the wheel zooms around the pointer.
+- Frame selected fits the selected object's bounds.
+- Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
+- Save workspace (`Ctrl+S`) persists docking only. Scene edits currently last
+  for the session; document save/open is a subsequent milestone.
+
+`EditorScene` owns the SceneKit scene, published snapshot, spatial index, and
+UIKit `EditorDocument` history. `EditorSceneTree` and `EditorSceneViewport`
+consume that state. Inspector bindings retain object identity so undo works
+after changing selection. The viewport currently composes the planar meshes
+through UIKit's canvas; perspective GPU scene rendering is not integrated yet.
+
+Run the scene editing regression checks from the repository root:
+
+```sh
+./haxeon/scripts/haxeon run --project app/tests/haxeon.json
+```
 
 `Main` is a complete desktop host. It initializes NativeKit, creates a resizable
 window and GPU surface, routes typed native input into the shared `UiContext`,

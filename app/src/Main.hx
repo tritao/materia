@@ -225,22 +225,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public final world:Null<RobotWorld>;
 
   final storage:FileDockWorkspacePersistence;
-  final treeModel:ReferenceSceneTreeModel;
+  public final scene:EditorScene;
+  final treeModel:EditorSceneTree;
   final viewportCamera:ViewportCamera;
-  final viewportContent:ReferenceViewportContent;
+  final viewportContent:EditorSceneViewport;
   final telemetry:PlotModel;
-  final properties:Array<PropertyDescriptor>;
   final logLines:Array<String>;
-  var selectedNode:String;
-  var nodeVisible:Bool;
-  var nodeMass:Float;
-  var nodeMode:String;
   var gridVisible:Bool;
   var paletteVisible:Bool;
   var contextMenuVisible:Bool;
   var contextMenuX:Float;
   var contextMenuY:Float;
   var componentLab:Null<ComponentLab>;
+  var sceneViewport:Null<GpuViewport> = null;
+  var sceneInspector:Null<PropertyInspector> = null;
+  var inspectorSelectionRevision:Int = -1;
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
       ?world:RobotWorld) {
@@ -249,15 +248,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
     this.world = world;
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
-    treeModel = new ReferenceSceneTreeModel();
+    scene = new EditorScene();
+    treeModel = new EditorSceneTree(scene);
     viewportCamera = new ViewportCamera();
-    viewportContent = new ReferenceViewportContent();
+    viewportContent = new EditorSceneViewport(scene);
     telemetry = makeTelemetry();
-    logLines = ["Console connected", "GPU viewport ready", "Workspace restored"];
-    selectedNode = "body";
-    nodeVisible = true;
-    nodeMass = 2.5;
-    nodeMode = "solid";
+    logLines = ["Scene ready: two editable objects", "Select a box; edit position or visibility", "Middle-drag to pan; scroll to zoom"];
     gridVisible = true;
     paletteVisible = false;
     contextMenuVisible = false;
@@ -266,7 +262,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     componentLab = null;
     updateCommandContext();
 
-    properties = makeProperties();
     workspace = makeWorkspace();
     workspace.restoreFromOrDefault(storage, WORKSPACE_KEY);
     workspace.listen(function() saveWorkspace());
@@ -290,7 +285,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var menu = new CommandMenu("scene-context-menu", [
         "scene.frame-selected",
         "scene.toggle-grid",
-        "context.delete-selection",
         "workspace.reset"
       ], contextMenuX, contextMenuY, commands, ui.commandContext, function() {
         contextMenuVisible = false;
@@ -324,6 +318,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   public function dispose():Void {
     if (world != null) world.close();
+    scene.dispose();
     ui.dispose();
   }
 
@@ -334,11 +329,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Machine-readable application state paired with diagnostic frame captures. */
   public function diagnosticState():Dynamic return componentLab == null ? {
-    selectedNode: selectedNode,
+    selectedNode: scene.selectedId,
+    scene: scene.diagnosticState(),
     selection: ui.commandContext.selection.copy(),
-    nodeVisible: nodeVisible,
-    nodeMass: nodeMass,
-    nodeMode: nodeMode,
     gridVisible: gridVisible,
     paletteVisible: paletteVisible,
     contextMenuVisible: contextMenuVisible,
@@ -440,6 +433,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
           new Toolbar(
             "editor-toolbar",
             [
+              "editor.undo",
+              "editor.redo",
               "editor.save",
               "scene.frame-selected",
               "editor.command-palette",
@@ -489,13 +484,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     treeStyle.background = Color.rgba(0.98, 0.99, 1.0, 1.0);
     var treeViewport = fillStyle();
     var tree = new TreeView("scene-hierarchy",
-      treeModel, treeViewport, null, 420.0, selectedNode, ["scene", "body"], function(id) {
-      selectedNode = id;
+      treeModel, treeViewport, null, 420.0, scene.selectedId, ["scene"], function(id) {
+      scene.select(id);
       log("Selected " + id);
       updateCommandContext();
       commands.refresh();
     }, function(id) {
-      selectedNode = id;
+      scene.select(id);
       log("Activated " + id);
       updateCommandContext();
     }, null, null);
@@ -513,6 +508,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function viewportPanel():View {
+    if (sceneViewport != null) {
+      sceneViewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0),
+        Color.rgba(0.16, 0.24, 0.36, 0.75), 32.0, gridVisible);
+      return sceneViewport;
+    }
     var viewportStyle = fillStyle();
     viewportStyle.background = Color.rgba(0.025, 0.035, 0.055, 1.0);
     var viewport = new GpuViewport(
@@ -520,11 +520,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
       viewportContent,
       viewportCamera,
       viewportStyle,
-      "Scene GPU viewport"
+      "Scene XY view: select objects, middle-drag to pan, scroll to zoom"
     );
+    viewport.panButton = 2; // NativeKit middle button.
+    viewport.setOverlay(function(_, geometry) {
+      viewportContent.viewportWidth = geometry.width;
+      viewportContent.viewportHeight = geometry.height;
+    });
     viewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0), Color.rgba(0.16, 0.24, 0.36, 0.75), 32.0, gridVisible);
     viewport.on(UiEventKind.PointerDown, function(event:UiEvent) {
-      if (event.button != 2) return;
+      if (event.button == 0) {
+        scene.select(viewportContent.pick(viewportCamera, event.localX, event.localY));
+        updateCommandContext();
+        commands.refresh();
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (event.button != 1) return; // NativeKit right button.
       contextMenuX = event.x;
       contextMenuY = event.y;
       contextMenuVisible = true;
@@ -533,6 +546,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.refresh();
     }
     );
+    sceneViewport = viewport;
     return viewport;
   }
 
@@ -540,37 +554,22 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var style = fillStyle();
     style.padding = new Insets(10.0, 10.0, 10.0, 10.0);
     style.background = Color.rgba(0.98, 0.99, 1.0, 1.0);
-    var inspector = new PropertyInspector(
-      "scene-inspector",
-      properties,
-      style,
-      null,
-      [
-        new PropertyInspectorSection(
-          "transform",
-          "Transform",
-          [
-            properties[0],
-            properties[1]
-          ]
-        ),
-        new PropertyInspectorSection(
-          "rendering",
-          "Rendering",
-          [
-            properties[2],
-            properties[3],
-            properties[4]
-          ]
-        )
-      ],
-      null,
-      "Scene inspector"
-    );
+    var selected = scene.object(scene.selectedId);
+    if (selected == null)
+      return new Column("inspector-empty", [
+        new KeyedView("heading", sectionHeading("INSPECTOR")),
+        new KeyedView("hint", new Text("Select an object to edit its properties."))
+      ], style);
+    if (sceneInspector == null || inspectorSelectionRevision != scene.selectionRevision) {
+      sceneInspector = new PropertyInspector("scene-inspector:" + scene.selectedId,
+        scene.properties(), style, null, null, null, "Selected object inspector");
+      inspectorSelectionRevision = scene.selectionRevision;
+    }
+    var inspector = sceneInspector;
     return new Column(
       "inspector-panel",
       [
-        new KeyedView("heading", sectionHeading("INSPECTOR")),
+        new KeyedView("heading", sectionHeading(selected.label)),
         new KeyedView(
           "properties",
           inspector
@@ -645,6 +644,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function installCommands():Void {
     workspace.installCommands(commands, "workspace");
+    commands.register(new Command("editor.undo", "Undo", function() {
+      scene.document.undo();
+      commands.refresh();
+    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return scene.document.canUndo));
+    commands.register(new Command("editor.redo", "Redo", function() {
+      scene.document.redo();
+      commands.refresh();
+    }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return scene.document.canRedo));
     commands.register(new Command("editor.save", "Save workspace", function() {
       saveWorkspace();
       log("Workspace saved");
@@ -655,114 +662,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.refresh();
     }, new Shortcut(UiKey.K, UiModifier.Control)));
     commands.register(new Command("scene.frame-selected", "Frame selected", function() {
-      viewportCamera.setPan(0.0, 0.0);
-      viewportCamera.setZoom(1.0);
-      log("Framed " + selectedNode);
-    }
-    ));
+      viewportContent.frameSelected(viewportCamera);
+      log("Framed " + scene.selectedId);
+    }, null, function() return scene.object(scene.selectedId) != null));
     commands.register(new Command("scene.toggle-grid", "Toggle grid", function() {
       gridVisible = !gridVisible;
       log(gridVisible ? "Grid enabled" : "Grid disabled");
     }, null, null, function() return gridVisible));
-    commands.register(Command.contextual("context.delete-selection", "Delete selected node", function(context) {
-      var id = context.selection.length == 0 ? selectedNode : context.selection[0];
-      log("Delete requested for " + id);
-      return CommandResult.executed();
-    }, null, function(context) return context.hasSelection && selectedNode != "scene"));
   }
 
   function updateCommandContext():Void {
-    ui.setCommandContext(new CommandContext(null, [selectedNode], "scene-viewport", null, "reference-editor"));
-  }
-
-  function makeProperties():Array < PropertyDescriptor > {
-    var xSettings = new PropertyDescriptorOptions();
-    xSettings.category = "Transform";
-    xSettings.unit = "m";
-    xSettings.step = 0.1;
-    var ySettings = new PropertyDescriptorOptions();
-    ySettings.category = "Transform";
-    ySettings.unit = "m";
-    ySettings.step = 0.1;
-    var visibleSettings = new PropertyDescriptorOptions();
-    visibleSettings.category = "Rendering";
-    var massSettings = new PropertyDescriptorOptions();
-    massSettings.category = "Physics";
-    massSettings.minimum = 0.0;
-    massSettings.maximum = 100.0;
-    massSettings.step = 0.1;
-    massSettings.unit = "kg";
-    var modeSettings = new PropertyDescriptorOptions();
-    modeSettings.category = "Rendering";
-    modeSettings.options = [
-      new nativekit.ui.core.PropertyOption("solid", "Solid"),
-      new nativekit.ui.core.PropertyOption(
-        "wire",
-        "Wire"
-      )
-    ];
-    return [new PropertyDescriptor("position-x",
-      "Position X", PropertyType.Float, function(_) return PropertyValue.Float(viewportCamera.panX), function(
-        _,
-        value
-      ) {
-      switch (value) {
-        case PropertyValue.Float(next):
-          viewportCamera.setPan(next, viewportCamera.panY);
-        case PropertyValue.Int(next):
-          viewportCamera.setPan(next, viewportCamera.panY);
-        default:
-          throw "Position X requires a number";
-      }
-    }, xSettings), new PropertyDescriptor("position-y",
-      "Position Y", PropertyType.Float, function(_) return PropertyValue.Float(viewportCamera.panY), function(
-        _,
-        value
-      ) {
-      switch (value) {
-        case PropertyValue.Float(next):
-          viewportCamera.setPan(viewportCamera.panX, next);
-        case PropertyValue.Int(next):
-          viewportCamera.setPan(viewportCamera.panX, next);
-        default:
-          throw "Position Y requires a number";
-      }
-    }, ySettings), new PropertyDescriptor("mass",
-      "Mass", PropertyType.Float, function(_) return PropertyValue.Float(nodeMass), function(
-        _,
-        value
-      ) {
-      switch (value) {
-        case PropertyValue.Float(next):
-          nodeMass = next;
-        case PropertyValue.Int(next):
-          nodeMass = next;
-        default:
-          throw "Mass requires a number";
-      }
-    }, massSettings), new PropertyDescriptor("visible",
-      "Visible", PropertyType.Bool, function(_) return PropertyValue.Bool(nodeVisible), function(
-        _,
-        value
-      ) {
-      switch (value) {
-        case PropertyValue.Bool(next):
-          nodeVisible = next;
-        default:
-          throw "Visible requires a boolean";
-      }
-    }, visibleSettings), new PropertyDescriptor("mode",
-      "Mode", PropertyType.Enum, function(_) return PropertyValue.Enum(nodeMode), function(
-        _,
-        value
-      ) {
-      switch (value) {
-        case PropertyValue.Enum(next):
-          nodeMode = next;
-        default:
-          throw "Mode requires an enum value";
-      }
-    }, modeSettings)];
+    ui.setCommandContext(scene.context());
   }
 
   function makeTelemetry():PlotModel {
@@ -799,83 +709,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
   static function defaultWorkspacePath():String {
     var configured = Sys.getEnv("REFERENCE_EDITOR_WORKSPACE");
     return configured == null || configured.length == 0 ? "build/reference-editor-workspace.json" : configured;
-  }
-}
-
-private class ReferenceSceneTreeModel implements TreeViewModel {
-  public function new() {
-  }
-
-  public function rootCount():Int return 1;
-
-  public function rootRange(start:Int, count:Int):Array < TreeRootMetadata > {
-    return start <= 0 && count > 0 ?[new TreeRootMetadata("scene", true)] :[];
-  }
-
-  public function rootKeyAt(index:Int):String return "scene";
-
-  public function childCount(parentKey:String):Int {
-    return switch (parentKey) {
-      case "scene":
-        3;
-      case "body":
-        2;
-      default:
-        0;
-    };
-  }
-
-  public function childKeyAt(parentKey:String, index:Int):String {
-    return switch (parentKey) {
-      case "scene":
-        ["camera", "body", "key-light"][index];
-      case "body":
-        ["mesh", "material"][index];
-      default:
-        parentKey + ":child:" + index;
-    };
-  }
-
-  public function initiallyExpanded(key:String):Bool return key == "scene" || key == "body";
-
-  public function estimatedExtent():Float return 28.0;
-
-  public function extentIsUniform():Bool return true;
-
-  public function extentAt(key:String):Float return 28.0;
-
-  public function buildItem(key:String):View {
-    var labels:Map<String, String> = [
-      "scene" = > "Scene",
-      "camera" = > "Camera",
-      "body" = > "Body",
-      "mesh" = > "Mesh",
-      "material" = > "Material",
-      "key-light" = > "Key Light"
-    ];
-    return new Text(labels.exists(key) ? labels.get(key) : key);
-  }
-
-  public function revision():Int return 1;
-}
-
-private class ReferenceViewportContent implements ViewportContent {
-  public function new() {
-  }
-
-  public function width():Float return 960.0;
-
-  public function height():Float return 640.0;
-
-  public function revision():Int return 1;
-
-  public function paint(canvas:Canvas, destination:Rect):Void {
-    canvas.fillRect(destination, Color.rgba(0.06, 0.09, 0.14, 1.0));
-    for (x in 0...16) canvas.fillRect(new Rect(x * 64.0, 0.0, 1.0, 640.0), Color.rgba(0.13, 0.19, 0.28, 0.55));
-    for (y in 0...11) canvas.fillRect(new Rect(0.0, y * 64.0, 960.0, 1.0), Color.rgba(0.13, 0.19, 0.28, 0.55));
-    canvas.fillRect(new Rect(284.0, 166.0, 392.0, 250.0), Color.rgba(0.18, 0.38, 0.58, 0.92));
-    canvas.fillRect(new Rect(316.0, 136.0, 328.0, 30.0), Color.rgba(0.28, 0.58, 0.84, 0.9));
-    canvas.fillRect(new Rect(340.0, 416.0, 280.0, 28.0), Color.rgba(0.12, 0.22, 0.34, 1.0));
   }
 }
 

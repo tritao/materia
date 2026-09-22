@@ -1,6 +1,7 @@
 package nativekit.scene;
 
 import NativeKitScene;
+import nativekit.scene.Image as SceneImage;
 
 /** Owns one mutable NativeKit scene and its explicitly created resources. */
 class Scene {
@@ -51,11 +52,11 @@ class Scene {
 		return new Material(this, made.out_material);
 	}
 
-	public function createImage():Image {
+	public function createImage():SceneImage {
 		ensureLive();
 		var made = NativeKitScene.nkscene_image_create(owner.borrow());
 		check(made.status, "scene.createImage");
-		return new Image(this, made.out_image);
+		return new SceneImage(this, made.out_image);
 	}
 
 	public function createTexture():Texture {
@@ -98,7 +99,7 @@ class Scene {
 			"scene.setMaterialData");
 	}
 
-	public function setImageData(image:Image, data:ImageData):Void
+	public function setImageData(image:SceneImage, data:ImageData):Void
 		image.setData(data);
 
 	public function setTextureData(texture:Texture, data:TextureData):Void

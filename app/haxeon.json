@@ -6,13 +6,14 @@
 	"dependencies": {
 		"nativekit": { "path": "../nativekit" },
 		"uikit": { "path": "../uikit" },
-		"robotkit": { "path": "../robotkit" }
+		"robotkit": { "path": "../robotkit" },
+		"scenekit": { "path": "../scenekit" }
 	},
 	"native": {
 		"cmake": {
 			"source": "native",
 			"target": "haxeon_app_native",
-			"inputs": ["native/CMakeLists.txt", "../nativekit", "../uikit", "../robotkit"]
+			"inputs": ["native/CMakeLists.txt", "../nativekit", "../uikit", "../robotkit", "../scenekit"]
 		}
 	},
 	"target": "host",

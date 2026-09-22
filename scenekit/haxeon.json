@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "package": {
+    "name": "scenekit"
+  },
+  "sourceRoots": [
+    "scene/bindings/haxe",
+    "scene_render/bindings/haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "nativekit": {
+      "path": "../nativekit"
+    }
+  },
+  "ffi": {
+    "interfaces": [
+      "scene/bindings/nativekit-scene.hxi",
+      "scene_render/bindings/nativekit-scene-render.hxi"
+    ],
+    "projections": [
+      "scene_render/bindings/nativekit-scene-render.hxmap"
+    ]
+  },
+  "target": "host"
+}

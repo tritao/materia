@@ -38,6 +38,8 @@ class GpuViewport implements View {
 	public var gridColor(default, null):Color;
 	public var gridSize(default, null):Float;
 	public var gridEnabled(default, null):Bool;
+	/** Native pointer button used to pan; defaults to the primary button. */
+	public var panButton:Int = 0;
 	public var enabled:Bool;
 	public var label:Null<String>;
 	public var overlay(default, null):Null<Canvas->ResolvedLayoutItem->Void>;
@@ -122,7 +124,7 @@ class GpuViewport implements View {
 				":appearance:" + appearanceKey() + ":overlay:" + overlayRevision;
 			node.onPaint(function(canvas, geometry) paint(canvas, geometry), cacheKey);
 			node.on(UiEventKind.PointerDown, function(event) {
-				if (!enabled || event.button != 0)
+				if (!enabled || event.button != panButton)
 					return;
 				draggingPointer = event.pointerId;
 				lastPointerX = event.localX;
