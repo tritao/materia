@@ -6,6 +6,8 @@ import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.Feature;
 import cadkit.parametric.features.BoxFeature;
 import haxe.Json;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
 
 private class FailingElementFeature extends Feature {
 	public function new() super();
@@ -79,12 +81,17 @@ class ElementSmoke {
 		var persistedElement = persisted.createElement("Persisted wall", persistedBox);
 		persisted.setOutput(persistedBox);
 		persisted.recompute();
+		var level=persisted.createLevel("Level 1",3000);
+		var plane=persisted.createReferencePlane("Grid A",new Plane(new Vector(0,0,0),Vector.X(),Vector.Z()));
+		level.setElevation(3.5,"m");
+		check(level.elevation==3500 && persisted.undo() && level.elevation==3000,"level edits are transactional");
 		var encoded = DocumentCodec.encode(persisted);
 		var opened = DocumentCodec.decode(encoded);
 		check(opened.id.value == persisted.id.value, "opening preserves document identity");
-		check(opened.elementCount() == 1 && opened.elementAt(0).id.value == persistedElement.id.value,
+		check(opened.elementCount() == 3 && opened.elementAt(0).id.value == persistedElement.id.value,
 			"opening preserves element identity");
 		check(opened.elementAt(0).shape().volume() == persistedElement.shape().volume(), "element output survives reload");
+		check(opened.elementAt(1).kind=="level" && opened.elementAt(2).id.value==plane.id.value,"geometry-free datums survive reload");
 		var cloned = DocumentCodec.decode(encoded, true);
 		check(cloned.id.value != persisted.id.value && cloned.elementAt(0).id.value == persistedElement.id.value,
 			"cloning assigns a document identity distinct from opening");

@@ -37,6 +37,8 @@ import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.DocumentId;
 import cadkit.parametric.ElementId;
+import cadkit.parametric.LevelElement;
+import cadkit.parametric.ReferencePlaneElement;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
@@ -65,8 +67,11 @@ class DocumentCodec {
 			});
 		}
 		var encodedElements:Array<Dynamic> = [];
-		for (element in document.allElements())
-			encodedElements.push({id: element.id.value, name: element.name, output: element.output.id.toInt()});
+		for (element in document.allElements()) {
+			if(element.kind=="geometry") { var geometry:Feature=cast element.output; encodedElements.push({id:element.id.value,name:element.name,kind:element.kind,output:geometry.id.toInt()}); }
+			else if(element.kind=="level") { var level:LevelElement=cast element; encodedElements.push({id:level.id.value,name:level.name,kind:level.kind,elevation:level.elevation,offset:level.offset}); }
+			else { var datum:ReferencePlaneElement=cast element; encodedElements.push({id:datum.id.value,name:datum.name,kind:datum.kind,plane:{origin:encodeVector(datum.plane.origin),xDirection:encodeVector(datum.plane.xDirection),normal:encodeVector(datum.plane.normal)}}); }
+		}
 		return Json.stringify({
 			format: FORMAT,
 			version: VERSION,
@@ -202,10 +207,13 @@ class DocumentCodec {
 				document.installElement("Model", effectiveOutput, new ElementId());
 			} else {
 				var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
-				for (elementRecord in elementRecords)
-					document.installElement(stringField(elementRecord, "name"),
-						requiredFeature(document, intField(elementRecord, "output")),
-						new ElementId(stringField(elementRecord, "id")));
+				for (elementRecord in elementRecords) {
+					var kind=stringField(elementRecord,"kind"); var eid=new ElementId(stringField(elementRecord,"id")); var ename=stringField(elementRecord,"name");
+					if(kind=="geometry") document.installElement(ename,requiredFeature(document,intField(elementRecord,"output")),eid);
+					else if(kind=="level") document.installLevel(ename,eid,numberField(elementRecord,"elevation"),numberField(elementRecord,"offset"));
+					else if(kind=="reference-plane") { var p=requiredField(elementRecord,"plane"); document.installReferencePlane(ename,eid,new Plane(decodeVector(requiredField(p,"origin")),decodeVector(requiredField(p,"xDirection")),decodeVector(requiredField(p,"normal")))); }
+					else throw new ParametricError("unsupported element kind: "+kind);
+				}
 			}
 
 			document.recompute();

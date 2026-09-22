@@ -10,19 +10,23 @@ import cadkit.parametric.ParametricError;
 class Element {
 	public final document:Document;
 	public final id:ElementId;
+	public final kind:String;
 	public var name(default, null):String;
-	public var output(default, null):Feature;
-	private var committedOutput:Feature;
+	public var output(default, null):Null<Feature>;
+	private var committedOutput:Null<Feature>;
 
-	public function new(document:Document, id:ElementId, name:String, output:Feature) {
+	public function new(document:Document, id:ElementId, name:String, kind:String, ?output:Feature) {
 		this.document = document;
 		this.id = id;
 		this.name = name;
+		this.kind = kind;
 		this.output = output;
 		committedOutput = output;
 	}
 
 	public function shape():Shape {
+		if (committedOutput == null)
+			throw new ParametricError("element has no geometry output: " + id.value);
 		var result = committedOutput.currentShape();
 		if (result == null)
 			throw new ParametricError("element output has not been evaluated: " + id.value);

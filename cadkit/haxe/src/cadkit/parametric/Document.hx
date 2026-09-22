@@ -18,10 +18,16 @@ import cadkit.parametric.UnitConversion;
 import cadkit.parametric.DocumentId;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
+import cadkit.parametric.LevelElement;
+import cadkit.parametric.ReferencePlaneElement;
+import cadkit.parametric.ElementReference;
 import cadkit.parametric.ElementChanges.ElementCreateChange;
 import cadkit.parametric.ElementChanges.ElementRemoveChange;
 import cadkit.parametric.ElementChanges.ElementNameChange;
 import cadkit.parametric.ElementChanges.ElementOutputChange;
+import cadkit.parametric.DatumChanges.LevelElevationChange;
+import cadkit.parametric.DatumChanges.ReferencePlaneChange;
+import cadkit.modeling.Plane;
 
 /** Haxeon-owned parametric feature document. */
 class Document {
@@ -81,16 +87,30 @@ class Document {
 		validateElementOutput(output);
 		if (issuedElementIds.exists(id.value))
 			throw new ParametricError("duplicate or previously issued element ID: " + id.value);
-		var result = new Element(this, id, name, output);
+		var result = new Element(this, id, name, "geometry", output);
 		elements.push(result);
 		elementsById.set(id.value, result);
 		issuedElementIds.set(id.value, true);
 		return result;
 	}
 
+	public function createLevel(name:String,elevation:Float,offset:Float=0,?relativeTo:ElementReference):LevelElement {
+		var id=newElementId(); var result=new LevelElement(this,id,name,elevation,offset,relativeTo); installRecord(result); recordDocumentChange(new ElementCreateChange(this,result,elements.length-1)); return result;
+	}
+	public function createReferencePlane(name:String,plane:Plane):ReferencePlaneElement {
+		var id=newElementId(); var result=new ReferencePlaneElement(this,id,name,plane); installRecord(result); recordDocumentChange(new ElementCreateChange(this,result,elements.length-1)); return result;
+	}
+	public function installLevel(name:String,id:ElementId,elevation:Float,offset:Float=0,?relativeTo:ElementReference):LevelElement { var result=new LevelElement(this,id,name,elevation,offset,relativeTo);installRecord(result);return result; }
+	public function installReferencePlane(name:String,id:ElementId,plane:Plane):ReferencePlaneElement { var result=new ReferencePlaneElement(this,id,name,plane);installRecord(result);return result; }
+	private function newElementId():ElementId { var value=new ElementId(); while(issuedElementIds.exists(value.value)) value=new ElementId(); return value; }
+	private function installRecord(result:Element):Void { validateElementName(result.name); if(issuedElementIds.exists(result.id.value)) throw new ParametricError("duplicate or previously issued element ID: "+result.id.value); elements.push(result);elementsById.set(result.id.value,result);issuedElementIds.set(result.id.value,true); }
+	public function setLevelElevation(level:LevelElement,value:Float):Void { validateOwnedElement(level);if(!Math.isFinite(value))throw new ParametricError("level elevation must be finite");var old=level.elevation;if(old==value)return;level.restoreElevation(value);recordDocumentChange(new LevelElevationChange(level,old,value)); }
+	public function setReferencePlane(datum:ReferencePlaneElement,value:Plane):Void { validateOwnedElement(datum);var old=datum.plane;datum.restorePlane(value);recordDocumentChange(new ReferencePlaneChange(datum,old,value)); }
+
 	public function duplicateElement(source:Element, ?name:String):Element {
 		validateOwnedElement(source);
-		return createElement(name == null ? source.name + " copy" : name, source.output);
+		if(source.output==null) throw new ParametricError("datum duplication requires its typed API");
+		return createElement(name == null ? source.name + " copy" : name, cast source.output);
 	}
 
 	public function removeElement(id:ElementId):Void {
