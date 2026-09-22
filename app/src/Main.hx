@@ -252,6 +252,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var dragPointerY:Float = 0.0;
   var sceneInspector:Null<PropertyInspector> = null;
   var inspectorSelectionRevision:Int = -1;
+  public final sensors:SensorConfiguration;
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
       ?world:RobotWorld, ?hostContext:DesktopUiHostContext) {
@@ -261,6 +262,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
     session = new SceneDocumentSession();
+    sensors = new SensorConfiguration();
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);
     documents = new SceneDocumentController(session, function(save, path, complete) {
       var chooser = files;
@@ -500,6 +502,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("inspector", "Inspector", function(_) {
       return inspectorPanel();
     }, false));
+    result.register(new DockPanelDescriptor("sensors", "Sensors", function(_) {
+      return sensorPanel();
+    }, false));
     result.register(new DockPanelDescriptor("console", "Console", function(_) {
       return consolePanel();
     }
@@ -511,8 +516,34 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
     var centerTabs = DockNode.Tabs(["viewport", "console", "telemetry"], "viewport");
     var editorArea = DockNode.Split(DockSplitAxis.Horizontal, 0.76, centerTabs, DockNode.Panel("inspector"));
-    result.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.22, DockNode.Panel("hierarchy"), editorArea));
+    result.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.22,
+      DockNode.Tabs(["hierarchy", "sensors"], "hierarchy"), editorArea));
     return result;
+  }
+
+  function sensorPanel():View {
+    var style=fillStyle();style.padding=new Insets(8.0,8.0,8.0,8.0);
+    style.background=Color.rgba(0.98,0.99,1.0,1.0);
+    var rows:Array<KeyedView>=[];
+    for(index in 0...sensors.model.sensors.length) {
+      var sensor=sensors.model.sensors[index];
+      var button=new Button(sensor.name+" · "+sensor.kind,null,function(){sensors.select(index);commands.refresh();},"sensor:"+sensor.id);
+      button.selected=index==sensors.selectedIndex;rows.push(new KeyedView("sensor:"+sensor.id,button));
+    }
+    var actions=new Row("sensor-actions",[
+      new KeyedView("add-lidar",new Button("+ LiDAR",null,function(){sensors.add("lidar");commands.refresh();},"sensor-add-lidar")),
+      new KeyedView("add-imu",new Button("+ IMU",null,function(){sensors.add("imu");commands.refresh();},"sensor-add-imu")),
+      new KeyedView("remove",new Button("Remove",null,function(){sensors.removeSelected();commands.refresh();},"sensor-remove"))
+    ]);
+    var content:Array<KeyedView>=[new KeyedView("heading",sectionHeading("SENSORS")),
+      new KeyedView("actions",actions),new KeyedView("list",new Column("sensor-list",rows))];
+    var selected=sensors.selected();
+    if(selected!=null)content.push(new KeyedView("properties",new PropertyInspector(
+      "sensor-inspector:"+selected.id,sensors.properties(),null,null,null,null,"Sensor configuration")));
+    var diagnostics=sensors.diagnostics();
+    if(diagnostics.length>0)content.push(new KeyedView("diagnostics",new Text(
+      diagnostics[0].code+": "+diagnostics[0].message)));
+    return new ScrollView("sensor-scroll",new Column("sensor-panel",content,style),style);
   }
 
   function hierarchyPanel():View {

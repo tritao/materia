@@ -8,6 +8,7 @@ import nativekit.ui.core.PropertyValue;
 import nativekit.ui.core.PropertyEditResult;
 import nativekit.ui.core.ViewportCamera;
 import app.SceneDocumentSession;
+import app.SensorConfiguration;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -268,6 +269,26 @@ class SceneEditingTests {
     scene.dispose();
   }
 
+  static function sensorConfiguration():Void {
+    var sensors=new SensorConfiguration();
+    check(sensors.model.sensors.length==1&&sensors.model.sensors[sensors.selectedIndex].kind=="lidar",
+      "sensor panel starts with an editable LiDAR");
+    var properties=sensors.properties();
+    var rays=new PropertyBinding(properties[3],sensors.context());
+    check(switch rays.apply(PropertyValue.Int(65)){case PropertyEditResult.Rejected(_):true;default:false;},
+      "sensor UI rejects ray counts above runtime capacity");
+    check(rays.apply(PropertyValue.Int(32))==PropertyEditResult.Applied,
+      "sensor UI edits LiDAR resolution");
+    check(sensors.model.sensors[sensors.selectedIndex].rayCount==32,"sensor model receives property edit");
+    sensors.add("imu");
+    check(sensors.model.sensors.length==2&&sensors.model.sensors[sensors.selectedIndex].kind=="imu",
+      "sensor UI adds and selects an IMU");
+    check(sensors.properties().length==12,"IMU hides LiDAR-only range and ray fields");
+    check(sensors.removeSelected()&&sensors.model.sensors.length==1,
+      "sensor UI removes the selected sensor");
+    check(sensors.diagnostics().length==0,"sensor UI produces a runtime-valid model");
+  }
+
   static function main():Int {
     var scene = new EditorScene();
     try {
@@ -330,6 +351,7 @@ class SceneEditingTests {
       rectangleProperties();
       viewportDragging();
       editingLifecycle();
+      sensorConfiguration();
       SceneDocumentTests.run();
       Sys.println("Scene editing tests passed");
       return 0;
