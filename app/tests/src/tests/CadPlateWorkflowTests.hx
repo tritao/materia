@@ -131,6 +131,11 @@ class CadPlateWorkflowTests {
       check(scene.pick(hitX, hitY) == id, "picked face location initially contains material");
       var originalGraph = object(scene, id).cadGraph;
       var undoCount = scene.document.history.undoCount;
+      var rejected = false;
+      try scene.addHoleOnSelectedFace(0.2) catch (_:Dynamic) rejected = true;
+      check(rejected && object(scene, id).cadGraph == originalGraph &&
+        scene.document.history.undoCount == undoCount && scene.canAddHoleOnSelectedFace(),
+        "invalid face hole preserves geometry, selection, and history");
       check(scene.addHoleOnSelectedFace(), "add through hole at selected face point");
       check(scene.document.history.undoCount == undoCount + 1,
         "face operation creates exactly one undo step");
