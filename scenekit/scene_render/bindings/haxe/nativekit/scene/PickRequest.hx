@@ -1,6 +1,6 @@
 package nativekit.scene;
 
-import NativeKitGpu;
+import nativekit.ffi.NativeKitGpu;
 import NativeKitSceneRender;
 
 /** Owns one asynchronous GPU ID-pass readback. */

@@ -1,19 +1,6 @@
-import NativeKit;
-import NativeKit.Key;
-import NativeKit.Handle;
-import NativeKit.NativeKitConstants;
-import NativeKit.GraphicsApi;
-import NativeKit.InputAction;
-import NativeKit.Key;
-import NativeKit.Result;
-import NativeKit.InitOptions;
-import NativeKit.WindowHandle;
-import NativeKit.WindowOptions;
-import NativeKit.WindowFlags;
-import NativeKit.WindowKind;
-import NativeKit.SurfaceHandle;
-import NativeKit.SurfaceOptions;
-import NativeKit.SurfaceFlags;
+import nativekit.ffi.NativeKitTypes;
+import nativekit.ffi.NativeKit;
+import nativekit.ffi.NativeKitConstants;
 import NativeKitEventValue;
 import NativeKitEvents;
 import NativeKitEvents.NativeKitEventSubscription;
@@ -320,7 +307,7 @@ class ShowcaseWeb {
         for (font in webFontSpecs()) {
             var resource = new Resource();
             resource.set_struct_size(Resource.size());
-            resource.set_flags(NativeKit.ResourceFlags.Readable);
+            resource.set_flags(ResourceFlags.Readable);
             resource.set_uri(font.uri);
             resource.set_mime_type("font/ttf");
             resource.set_display_name(font.name);
@@ -384,7 +371,7 @@ class ShowcaseWeb {
     static function handleEvent(value:NativeKitEventValue):Void {
         switch (value) {
             case Raw(kind, _, request, loadResult, _, _, data)
-                if (kind == NativeKit.EventKind.ResourceDataComplete):
+                if (kind == EventKind.ResourceDataComplete):
                 handleWebFontLoaded(request, loadResult, data);
             case WindowClose(source) if (source.rawValue() == window.rawValue()):
                 running = false;

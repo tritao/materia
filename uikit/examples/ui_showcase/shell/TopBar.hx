@@ -13,7 +13,6 @@ import nativekit.ui.core.View;
 import nativekit.ui.widgets.KeyedView;
 import nativekit.ui.widgets.Row;
 import nativekit.ui.widgets.WindowChrome;
-import NativeKit.WindowDecorationRegionKind;
 
 /** Top-level branding and global Explorer actions. */
 class TopBar {

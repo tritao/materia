@@ -1,5 +1,5 @@
 /** A host-owned native surface capability accepted by Renderer. */
-import NativeKit.SurfaceHandle;
+import nativekit.ffi.NativeKitTypes.SurfaceHandle;
 import NativeKitSurface;
 
 class Surface {

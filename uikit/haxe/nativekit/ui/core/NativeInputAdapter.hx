@@ -1,10 +1,7 @@
 package nativekit.ui.core;
+import nativekit.ffi.NativeKitTypes;
+import nativekit.ffi.NativeKit;
 
-import NativeKit.Handle;
-import NativeKit.InputAction;
-import NativeKit.TouchAction;
-import NativeKit.WindowStateFlags;
-import NativeKit.WindowHandle;
 import NativeKitEventValue;
 import NativeKitEvents;
 import NativeKitEvents.NativeKitEventSubscription;

@@ -1,11 +1,7 @@
-import NativeKit;
+import nativekit.ffi.NativeKitTypes;
+import nativekit.ffi.NativeKit;
 import NativeKitUI;
-import NativeKit.NativeKitConstants;
-import NativeKit.EventKind;
-import NativeKit.GraphicsApi;
-import NativeKit.InputAction;
-import NativeKit.Result;
-import NativeKit.SurfaceHandle;
+import nativekit.ffi.NativeKitConstants;
 import NativeKitEvent;
 import NativeKitEventValue;
 import haxe.io.Bytes;

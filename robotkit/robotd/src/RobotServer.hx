@@ -1,7 +1,7 @@
 package robotd;
+import nativekit.ffi.NativeKitTypes;
 
-import NativeKit;
-import NativeKit.EventKind;
+import nativekit.ffi.NativeKit;
 import NativeKitEventBytes;
 import NativeKitEventValue;
 import NativeKitEvents.NativeKitEventSubscription;
@@ -37,12 +37,12 @@ class RobotServer {
   final runtime:RobotRuntime;
   final simulation:Simulation;
   final nativeRuntime:NativeKitRuntime;
-  final listener:NativeKit.OwnedListenerHandle;
+  final listener:OwnedListenerHandle;
   final port:Int;
   final robotId:Int;
   final subscription:NativeKitEventSubscription;
   final behaviorRunner:Null<RobotBehaviorRunner>;
-  var client:Null<NativeKit.TransportHandle>;
+  var client:Null<TransportHandle>;
   var stream:RobotFrameStream;
   final snapshots = new RobotSnapshotMailbox();
   var sessionId:haxe.Int64 = haxe.Int64.ofInt(1);
@@ -144,7 +144,7 @@ class RobotServer {
 
   function accept(data:Bytes):Void {
     NativeKitEventBytes.requireMinimumSize(data, 32);
-    var accepted = new NativeKit.TransportHandle(NativeKitEventBytes.readU32(data, 4));
+    var accepted = new TransportHandle(NativeKitEventBytes.readU32(data, 4));
     if (!accepted.isValid())
       return;
     if (client != null)
@@ -156,7 +156,7 @@ class RobotServer {
     lastSentSnapshotSequence = haxe.Int64.ofInt(-1);
   }
 
-  function receive(transport:NativeKit.TransportHandle):Void {
+  function receive(transport:TransportHandle):Void {
     while (true) {
       var bytes = NativeTransport.receive(transport);
       if (bytes.length == 0)
@@ -312,7 +312,7 @@ class RobotServer {
     }
   }
 
-  function closeClient(currentClient:NativeKit.TransportHandle):Void {
+  function closeClient(currentClient:TransportHandle):Void {
     if (client != null && client.rawValue() == currentClient.rawValue()) {
       client = null;
       helloComplete = false;

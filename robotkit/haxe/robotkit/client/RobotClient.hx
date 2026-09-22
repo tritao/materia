@@ -1,7 +1,7 @@
 package robotkit.client;
+import nativekit.ffi.NativeKitTypes;
 
-import NativeKit;
-import NativeKit.EventKind;
+import nativekit.ffi.NativeKit;
 import NativeKitEventValue;
 import NativeKitEvents;
 import NativeKitEvents.NativeKitEventSubscription;
@@ -39,8 +39,8 @@ class RobotClient {
 
   var nativeRuntime:Null<NativeKitRuntime> = null;
   var eventPump:Null<NativeKitEvents> = null;
-  var owned:Null<NativeKit.OwnedTransportHandle> = null;
-  var transport:Null<NativeKit.TransportHandle> = null;
+  var owned:Null<OwnedTransportHandle> = null;
+  var transport:Null<TransportHandle> = null;
   var subscription:Null<NativeKitEventSubscription> = null;
   var stream = new RobotFrameStream();
   var sessionId:Int64 = Int64.ofInt(0);
@@ -72,7 +72,7 @@ class RobotClient {
     latestState = null;
     lastFault = null;
     var runtime = NativeKitRuntime.start();
-    var connection:Null<NativeKit.OwnedTransportHandle> = null;
+    var connection:Null<OwnedTransportHandle> = null;
     try {
       var connectedTransport = NativeTransport.connect(host, port);
       connection = connectedTransport;
@@ -117,7 +117,7 @@ class RobotClient {
     capabilities = null;
     latestState = null;
     lastFault = null;
-    var connection:Null<NativeKit.OwnedTransportHandle> = null;
+    var connection:Null<OwnedTransportHandle> = null;
     try {
       var connectedTransport = NativeTransport.connect(host, port);
       connection = connectedTransport;
@@ -230,7 +230,7 @@ class RobotClient {
     case _:
   }
 
-  function receive(currentTransport:NativeKit.TransportHandle):Void {
+  function receive(currentTransport:TransportHandle):Void {
     while (true) {
       var data = NativeTransport.receive(currentTransport);
       if (data.length == 0)

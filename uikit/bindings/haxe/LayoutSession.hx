@@ -1,4 +1,5 @@
-import NativeKit;
+import nativekit.ffi.NativeKitTypes;
+import nativekit.ffi.NativeKit;
 import NativeKitUI;
 import NativeKitUI.nkui_layout_measure_callbackCallback;
 import haxe.io.Bytes;

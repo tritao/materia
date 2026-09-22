@@ -1,3 +1,4 @@
+import nativekit.ffi.NativeKitTypes;
 import FontCollection;
 import FrameInfo;
 import Insets;
@@ -7,18 +8,8 @@ import LayoutDirection;
 import LayoutDistribution;
 import LayoutFrame;
 import LayoutStyle;
-import NativeKit;
-import NativeKit.GraphicsApi;
-import NativeKitGpu;
-import NativeKit.Handle;
-import NativeKit.WindowFlags;
-import NativeKit.WindowHandle;
-import NativeKit.WindowKind;
-import NativeKit.WindowOptions;
-import NativeKit.WindowSizeLimits;
-import NativeKit.SurfaceFlags;
-import NativeKit.SurfaceHandle;
-import NativeKit.SurfaceOptions;
+import nativekit.ffi.NativeKit;
+import nativekit.ffi.NativeKitGpu;
 import NativeKitEventValue;
 import NativeKitEvents;
 import NativeKitSurface;
@@ -38,7 +29,6 @@ import nativekit.ui.widgets.StackChild;
 import nativekit.ui.widgets.Text;
 import nativekit.ui.widgets.Button;
 import nativekit.ui.widgets.WindowChrome;
-import NativeKit.WindowDecorationRegionKind;
 
 /** Owns the second native window used by the custom window-chrome showcase. */
 class WindowChromeDemo {

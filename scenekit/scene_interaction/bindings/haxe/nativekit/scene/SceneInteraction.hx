@@ -1,6 +1,6 @@
 package nativekit.scene;
 
-import NativeKitGpu;
+import nativekit.ffi.NativeKitGpu;
 import NativeKitScene;
 import NativeKitSceneInteraction;
 

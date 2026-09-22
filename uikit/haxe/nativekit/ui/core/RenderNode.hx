@@ -1,5 +1,6 @@
 package nativekit.ui.core;
 
+import nativekit.ffi.NativeKitTypes.WindowDecorationRegionKind;
 import LayoutNode;
 import LayoutStyle;
 import LayoutVisualKind;
@@ -8,7 +9,6 @@ import CompositeMode;
 import ResolvedLayoutItem;
 import Point;
 import Rect;
-import NativeKit.WindowDecorationRegionKind;
 import nativekit.ui.style.ComputedStyle;
 import nativekit.ui.style.Decoration;
 import nativekit.ui.style.StyleProperty;

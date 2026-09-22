@@ -1,6 +1,6 @@
 package nativekit.scene;
 
-import NativeKitGpu;
+import nativekit.ffi.NativeKitGpu;
 
 /** Result of polling an asynchronous GPU pick request. */
 enum PickPollResult {

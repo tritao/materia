@@ -1,4 +1,5 @@
-import NativeKit;
+import nativekit.ffi.NativeKitTypes;
+import nativekit.ffi.NativeKit;
 import NativeKitUI;
 
 /** Typed renderer facade for retained UI display lists. */

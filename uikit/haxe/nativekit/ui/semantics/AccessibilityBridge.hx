@@ -1,6 +1,8 @@
 package nativekit.ui.semantics;
+import nativekit.ffi.NativeKitConstants;
+import nativekit.ffi.NativeKitTypes;
 
-import NativeKit;
+import nativekit.ffi.NativeKit;
 import NativeKitSurface;
 import Rect;
 import nativekit.ui.core.RenderNode;
@@ -30,7 +32,7 @@ class AccessibilityBridge {
 		var semanticRoot = findFocusTrap(root);
 		if (semanticRoot == null)
 			semanticRoot = root;
-		projectNode(semanticRoot, NativeKit.NativeKitConstants.NK_ACCESSIBILITY_ROOT,
+		projectNode(semanticRoot, NativeKitConstants.NK_ACCESSIBILITY_ROOT,
 			true, focused, result, childCounts);
 		return result;
 	}
@@ -42,7 +44,7 @@ class AccessibilityBridge {
 		var currentParents:Map<Int, Int> = new Map();
 		for (item in snapshot)
 			currentParents.set(item.id, item.parentId);
-		var requestedFocus = focused == null ? NativeKit.NativeKitConstants.NK_ACCESSIBILITY_ROOT : focused.value;
+		var requestedFocus = focused == null ? NativeKitConstants.NK_ACCESSIBILITY_ROOT : focused.value;
 		var batch = buildUpdate(snapshot, previousParents, requestedFocus);
 		NativeKit.nk_surface_accessibility_update_with_removed_ids_checked(surface.nativeHandle(),
 			batch.nativeUpdate, batch.removedNodeIds, batch.removedNodeIds.length);
@@ -60,15 +62,15 @@ class AccessibilityBridge {
 		for (id in previousParents.keys()) {
 			if (!currentIds.exists(id)) {
 				var parentId = previousParents.get(id);
-				if (parentId == NativeKit.NativeKitConstants.NK_ACCESSIBILITY_ROOT ||
+				if (parentId == NativeKitConstants.NK_ACCESSIBILITY_ROOT ||
 					currentIds.exists(parentId))
 					removed.push(id);
 			}
 		}
 
-		var update = new NativeKit.AccessibilityUpdate();
-		update.set_struct_size(NativeKit.AccessibilityUpdate.size());
-		update.set_flags(NativeKit.AccessibilityUpdateFlags.NkAccessibilityUpdateFocus);
+		var update = new AccessibilityUpdate();
+		update.set_struct_size(AccessibilityUpdate.size());
+		update.set_flags(AccessibilityUpdateFlags.NkAccessibilityUpdateFocus);
 		update.set_nodes(nodes);
 		update.set_node_count(nodes.length);
 		var removedBytes = haxe.io.Bytes.alloc(removed.length * 4);
@@ -81,7 +83,7 @@ class AccessibilityBridge {
 			removedBytes.set(offset + 3, (id >>> 24) & 0xff);
 		}
 		update.set_removed_node_count(0);
-		var focusTarget = NativeKit.NativeKitConstants.NK_ACCESSIBILITY_ROOT;
+		var focusTarget = NativeKitConstants.NK_ACCESSIBILITY_ROOT;
 		for (item in snapshot)
 			if (item.id == focus && (item.states & AccessibilityState.Disabled) == 0) {
 				focusTarget = item.id;
@@ -93,8 +95,8 @@ class AccessibilityBridge {
 	}
 
 	/** Serializes every record in a semantic snapshot into native ABI structures. */
-	public static function buildNodes(snapshot:Array<AccessibilitySnapshotNode>):Array<NativeKit.AccessibilityNode> {
-		var result:Array<NativeKit.AccessibilityNode> = [];
+	public static function buildNodes(snapshot:Array<AccessibilitySnapshotNode>):Array<AccessibilityNode> {
+		var result:Array<AccessibilityNode> = [];
 		for (item in snapshot)
 			result.push(toNativeNode(item));
 		return result;
@@ -110,16 +112,16 @@ class AccessibilityBridge {
 		previousParents = new Map();
 	}
 
-	static function toNativeNode(item:AccessibilitySnapshotNode):NativeKit.AccessibilityNode {
+	static function toNativeNode(item:AccessibilitySnapshotNode):AccessibilityNode {
 		var value = item.semantics;
-		var node = new NativeKit.AccessibilityNode();
-		node.set_struct_size(NativeKit.AccessibilityNode.size());
+		var node = new AccessibilityNode();
+		node.set_struct_size(AccessibilityNode.size());
 		node.set_id(item.id);
 		node.set_parent_id(item.parentId);
 		node.set_child_index(item.childIndex);
-		node.set_role(cast(item.role, NativeKit.AccessibilityRole));
-		node.set_states(cast(item.states, NativeKit.AccessibilityStates));
-		node.set_actions(cast(item.actions, NativeKit.AccessibilityActions));
+		node.set_role(cast(item.role, AccessibilityRole));
+		node.set_states(cast(item.states, AccessibilityStates));
+		node.set_actions(cast(item.actions, AccessibilityActions));
 		node.set_reserved0(0);
 		node.set_x(item.bounds.x);
 		node.set_y(item.bounds.y);
@@ -143,7 +145,7 @@ class AccessibilityBridge {
 		node.set_row_span(item.rowSpan);
 		node.set_column_span(item.columnSpan);
 		node.set_hierarchy_level(item.hierarchyLevel);
-		node.set_orientation(cast(item.orientation, NativeKit.AccessibilityOrientation));
+		node.set_orientation(cast(item.orientation, AccessibilityOrientation));
 		return node;
 	}
 

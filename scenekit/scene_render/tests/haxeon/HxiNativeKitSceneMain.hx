@@ -1,3 +1,4 @@
+import nativekit.ffi.NativeKitTypes;
 import compiler.Compiler;
 import compiler.hl.HlWriter;
 import compiler.runtime.CompilerIntrinsics;
@@ -39,11 +40,8 @@ class HxiNativeKitSceneMain {
 import NativeKitScene;
 import NativeKitSceneRender;
 import NativeKitSceneInteraction;
-import NativeKitGpu;
-import NativeKit;
-import NativeKit.WindowFlags;
-import NativeKit.WindowKind;
-import NativeKit.WindowOptions;
+import nativekit.ffi.NativeKitGpu;
+import nativekit.ffi.NativeKit;
 import NativeKitEventValue;
 import NativeKitRuntime;
 import nativekit.scene.Scene;
@@ -437,7 +435,7 @@ class Main {
 		windowOptions.set_height(64);
 		windowOptions.set_title("Haxeon: NativeKit scene renderer");
 		windowOptions.set_flags(WindowFlags.Resizable);
-		windowOptions.set_owner(NativeKit.WindowHandle.invalid());
+		windowOptions.set_owner(WindowHandle.invalid());
 		windowOptions.set_kind(WindowKind.Normal);
 		var window = realRuntime.createWindow(windowOptions),
 			surface = Surface.create(window, 64, 64),

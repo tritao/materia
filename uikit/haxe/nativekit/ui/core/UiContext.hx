@@ -1,4 +1,5 @@
 package nativekit.ui.core;
+import nativekit.ffi.NativeKitTypes;
 
 import LayoutFrame;
 import LayoutSession;
@@ -12,11 +13,7 @@ import Rect;
 import ResolvedLayoutItem;
 import FontCollection;
 import NativeKitSurface;
-import NativeKit;
-import NativeKit.Capabilities;
-import NativeKit.WindowDecorationRegion;
-import NativeKit.WindowDecorationRegionKind;
-import NativeKit.WindowHandle;
+import nativekit.ffi.NativeKit;
 import nativekit.ui.core.CursorShape as UiCursorShape;
 import nativekit.ui.semantics.AccessibilityBridge;
 import nativekit.ui.semantics.AccessibilityActionData;
@@ -960,17 +957,17 @@ class UiContext {
 
 	static function nativeCursorShape(shape:UiCursorShape):Int {
 		return cast switch shape {
-			case UiCursorShape.Arrow: NativeKit.CursorShape.Arrow;
-			case UiCursorShape.Text: NativeKit.CursorShape.Ibeam;
-			case UiCursorShape.Crosshair: NativeKit.CursorShape.Crosshair;
-			case UiCursorShape.Hand: NativeKit.CursorShape.Hand;
-			case UiCursorShape.HorizontalResize: NativeKit.CursorShape.HorizontalResize;
-			case UiCursorShape.VerticalResize: NativeKit.CursorShape.VerticalResize;
-			case UiCursorShape.DiagonalResize: NativeKit.CursorShape.NwseResize;
-			case UiCursorShape.DiagonalResizeNesw: NativeKit.CursorShape.NeswResize;
-			case UiCursorShape.Move: NativeKit.CursorShape.Move;
-			case UiCursorShape.NotAllowed: NativeKit.CursorShape.NotAllowed;
-			case _: NativeKit.CursorShape.Arrow;
+			case UiCursorShape.Arrow: CursorShape.Arrow;
+			case UiCursorShape.Text: CursorShape.Ibeam;
+			case UiCursorShape.Crosshair: CursorShape.Crosshair;
+			case UiCursorShape.Hand: CursorShape.Hand;
+			case UiCursorShape.HorizontalResize: CursorShape.HorizontalResize;
+			case UiCursorShape.VerticalResize: CursorShape.VerticalResize;
+			case UiCursorShape.DiagonalResize: CursorShape.NwseResize;
+			case UiCursorShape.DiagonalResizeNesw: CursorShape.NeswResize;
+			case UiCursorShape.Move: CursorShape.Move;
+			case UiCursorShape.NotAllowed: CursorShape.NotAllowed;
+			case _: CursorShape.Arrow;
 		};
 	}
 

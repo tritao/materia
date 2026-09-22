@@ -1,6 +1,6 @@
 package nativekit.scene;
 
-import NativeKitGpu;
+import nativekit.ffi.NativeKitGpu;
 
 /** Result of polling the NativeKit interaction hover request. */
 enum InteractionHoverResult {

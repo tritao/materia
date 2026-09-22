@@ -1,3 +1,5 @@
+import nativekit.ffi.NativeKit;
+import nativekit.ffi.NativeKitTypes;
 import Color;
 import Canvas;
 import DisplayList;
@@ -30,15 +32,6 @@ import TextLayout;
 import TextDirection;
 import TextStyle;
 import TextWrap;
-import NativeKit.InputAction;
-import NativeKit.InitOptions;
-import NativeKit.WindowDecorationRegionKind;
-import NativeKit.WindowFlags;
-import NativeKit.WindowKind;
-import NativeKit.WindowOptions;
-import NativeKit.TouchAction;
-import NativeKit.TouchTool;
-import NativeKit.TextEditAction;
 import NativeKitEventValue;
 import NativeKitEventValue.NativeKitTextEdit;
 import NativeKitEvents;
@@ -1070,7 +1063,7 @@ class FrameworkSmoke {
 		buttonNode.on(UiEventKind.TextEdit, function(event) {
 			editSeen = event.data != null && event.text == "compose";
 		});
-		var source = new NativeKit.Handle(17);
+		var source = new Handle(17);
 		var input = new NativeInputAdapter(context, source);
 		var eventRuntime = NativeKitRuntime.start();
 		var eventPump = eventRuntime.events;
@@ -1099,11 +1092,11 @@ class FrameworkSmoke {
 		context.clipboard.trackRead(clipboardRequest, function(text) {
 			pastedText = text;
 		});
-		if (!input.consume(ClipboardText(clipboardRequest, NativeKit.Result.Ok, "from clipboard")) ||
+		if (!input.consume(ClipboardText(clipboardRequest, Result.Ok, "from clipboard")) ||
 			pastedText != "from clipboard" ||
-			input.consume(ClipboardText(clipboardRequest, NativeKit.Result.Ok, "duplicate")))
+			input.consume(ClipboardText(clipboardRequest, Result.Ok, "duplicate")))
 			return 39;
-		if (input.consume(PointerMove(new NativeKit.Handle(18), 4.0, 4.0)))
+		if (input.consume(PointerMove(new Handle(18), 4.0, 4.0)))
 			return 12;
 		if (!input.consume(PointerMove(source, 4.0, 4.0)) || hoverEnters != 0 ||
 			!input.consume(PointerScroll(source, 1.5, -24.0)) || scrollEvents != 1)
@@ -3094,7 +3087,7 @@ class FrameworkSmoke {
 			windowOptions.set_height(192);
 			windowOptions.set_title("NativeKit UI chrome smoke");
 			windowOptions.set_flags(WindowFlags.Hidden | WindowFlags.Borderless);
-			windowOptions.set_owner(NativeKit.WindowHandle.invalid());
+			windowOptions.set_owner(WindowHandle.invalid());
 			windowOptions.set_kind(WindowKind.Normal);
 			var window = runtime.createWindow(windowOptions);
 			context.attachPlatformWindow(window.nativeHandle());

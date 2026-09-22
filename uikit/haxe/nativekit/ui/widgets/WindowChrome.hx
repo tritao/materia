@@ -1,6 +1,6 @@
 package nativekit.ui.widgets;
 
-import NativeKit.WindowDecorationRegionKind;
+import nativekit.ffi.NativeKitTypes.WindowDecorationRegionKind;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.CursorShape;
 import nativekit.ui.core.RenderNode;

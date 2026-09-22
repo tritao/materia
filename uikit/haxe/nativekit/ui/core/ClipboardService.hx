@@ -1,7 +1,7 @@
 package nativekit.ui.core;
+import nativekit.ffi.NativeKitTypes;
 
-import NativeKit;
-import NativeKit.Result;
+import nativekit.ffi.NativeKit;
 import NativeKitEventValue;
 
 /** UI-thread clipboard bridge with asynchronous paste completion routing. */

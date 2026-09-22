@@ -1,7 +1,7 @@
 package nativekit.ui.core;
 
+import nativekit.ffi.NativeKitTypes.Result;
 import NativeKitSurface;
-import NativeKit.Result;
 import NativeKitTextInput;
 import Rect;
 

@@ -1,7 +1,7 @@
 package nativekit.ui.widgets;
 
+import nativekit.ffi.NativeKitTypes.TextEditAction;
 import FontCollection;
-import NativeKit.TextEditAction;
 import NativeKitEventValue.NativeKitTextEdit;
 import ParagraphStyle;
 import Rect;

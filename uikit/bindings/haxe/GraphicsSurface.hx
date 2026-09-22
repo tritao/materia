@@ -1,5 +1,5 @@
-import NativeKit;
-import NativeKit.GraphicsImage;
+import nativekit.ffi.NativeKitTypes;
+import nativekit.ffi.NativeKit;
 import NativeKitUI;
 import GraphicsImageRef;
 
@@ -9,12 +9,12 @@ class GraphicsSurface extends NativeKitUIResource {
 	private function new(value:nkui_resource)
 		super(value);
 
-	/** Imports a sampled image/target produced by NativeKit.Graphics. */
+	/** Imports a sampled image/target produced by Graphics. */
 	public static function fromGraphicsImage(image:GraphicsImage):GraphicsSurface {
 		return fromHandle(image);
 	}
 
-	/** Imports a retained backend-neutral image produced by NativeKit.Graphics. */
+	/** Imports a retained backend-neutral image produced by Graphics. */
 	public static function fromImage(image:GraphicsImageRef):GraphicsSurface {
 		if (image == null)
 			throw "graphicsSurface.fromImage requires an image";

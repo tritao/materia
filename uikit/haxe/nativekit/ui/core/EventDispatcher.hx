@@ -1,6 +1,7 @@
 package nativekit.ui.core;
+import nativekit.ffi.NativeKitTypes;
 
-import NativeKit;
+import nativekit.ffi.NativeKit;
 import nativekit.ui.core.CursorShape as UiCursorShape;
 import nativekit.ui.style.StyleState;
 import nativekit.ui.style.StyleStateUtil;

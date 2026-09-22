@@ -1,11 +1,7 @@
 package nativekit.ui.core;
+import nativekit.ffi.NativeKitTypes;
 
-import NativeKit;
-import NativeKit.Capabilities;
-import NativeKit.CursorHandle;
-import NativeKit.Handle;
-import NativeKit.OwnedCursorHandle;
-import NativeKit.WindowHandle;
+import nativekit.ffi.NativeKit;
 import nativekit.ui.core.CursorShape as UiCursorShape;
 
 /** Applies UI cursor intent to one NativeKit window with lazy native resources. */
@@ -90,18 +86,18 @@ class NativeCursorController {
 		}
 	}
 
-	static function nativeShape(shape:UiCursorShape):NativeKit.CursorShape {
+	static function nativeShape(shape:UiCursorShape):CursorShape {
 		return cast switch shape {
-			case UiCursorShape.Text: NativeKit.CursorShape.Ibeam;
-			case UiCursorShape.Crosshair: NativeKit.CursorShape.Crosshair;
-			case UiCursorShape.Hand: NativeKit.CursorShape.Hand;
-			case UiCursorShape.HorizontalResize: NativeKit.CursorShape.HorizontalResize;
-			case UiCursorShape.VerticalResize: NativeKit.CursorShape.VerticalResize;
-			case UiCursorShape.DiagonalResize: NativeKit.CursorShape.NwseResize;
-			case UiCursorShape.DiagonalResizeNesw: NativeKit.CursorShape.NeswResize;
-			case UiCursorShape.Move: NativeKit.CursorShape.Move;
-			case UiCursorShape.NotAllowed: NativeKit.CursorShape.NotAllowed;
-			case _: NativeKit.CursorShape.Arrow;
+			case UiCursorShape.Text: CursorShape.Ibeam;
+			case UiCursorShape.Crosshair: CursorShape.Crosshair;
+			case UiCursorShape.Hand: CursorShape.Hand;
+			case UiCursorShape.HorizontalResize: CursorShape.HorizontalResize;
+			case UiCursorShape.VerticalResize: CursorShape.VerticalResize;
+			case UiCursorShape.DiagonalResize: CursorShape.NwseResize;
+			case UiCursorShape.DiagonalResizeNesw: CursorShape.NeswResize;
+			case UiCursorShape.Move: CursorShape.Move;
+			case UiCursorShape.NotAllowed: CursorShape.NotAllowed;
+			case _: CursorShape.Arrow;
 		};
 	}
 }

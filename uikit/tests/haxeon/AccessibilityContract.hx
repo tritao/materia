@@ -1,3 +1,5 @@
+import nativekit.ffi.NativeKitConstants;
+import nativekit.ffi.NativeKitTypes;
 import FontCollection;
 import LayoutAxis;
 import LayoutDirection;
@@ -80,14 +82,14 @@ class AccessibilityContract {
 		for (item in tabsSnapshot)
 			parents.set(item.id, item.parentId);
 		var atomic = AccessibilityBridge.buildUpdate(tabsSnapshot, new Map(), secondTabNode.id.value);
-		if (atomic.nativeUpdate.get_struct_size() != NativeKit.AccessibilityUpdate.size() ||
+		if (atomic.nativeUpdate.get_struct_size() != AccessibilityUpdate.size() ||
 			atomic.nativeUpdate.get_node_count() != tabsSnapshot.length || atomic.removedNodeCount != 0 ||
 			atomic.nativeUpdate.get_focus() != secondTabNode.id.value ||
 			(atomic.nativeUpdate.get_flags() &
-			NativeKit.AccessibilityUpdateFlags.NkAccessibilityUpdateFocus) == 0)
+			AccessibilityUpdateFlags.NkAccessibilityUpdateFocus) == 0)
 			return 4;
 		var allRemoved = AccessibilityBridge.buildUpdate([], parents,
-			NativeKit.NativeKitConstants.NK_ACCESSIBILITY_ROOT);
+			NativeKitConstants.NK_ACCESSIBILITY_ROOT);
 		var removedId = tabsSnapshot[0].id;
 		if (allRemoved.nativeUpdate.get_node_count() != 0 || allRemoved.removedNodeCount != 1 ||
 			allRemoved.removedNodeIds.length != 4 ||
@@ -95,12 +97,12 @@ class AccessibilityContract {
 			allRemoved.removedNodeIds.get(1) != ((removedId >>> 8) & 0xff) ||
 			allRemoved.removedNodeIds.get(2) != ((removedId >>> 16) & 0xff) ||
 			allRemoved.removedNodeIds.get(3) != ((removedId >>> 24) & 0xff) ||
-			allRemoved.nativeUpdate.get_focus() != NativeKit.NativeKitConstants.NK_ACCESSIBILITY_ROOT)
+			allRemoved.nativeUpdate.get_focus() != NativeKitConstants.NK_ACCESSIBILITY_ROOT)
 			return 5;
 		var nativeNodes = AccessibilityBridge.buildNodes(tabsSnapshot);
 		var firstNativeRole:Int = cast nativeNodes[0].get_role();
 		if (nativeNodes.length != tabsSnapshot.length ||
-			nativeNodes[0].get_struct_size() != NativeKit.AccessibilityNode.size() ||
+			nativeNodes[0].get_struct_size() != AccessibilityNode.size() ||
 			firstNativeRole != AccessibilityRole.TabList)
 			return 6;
 
@@ -293,9 +295,9 @@ class AccessibilityContract {
 			AccessibilityState.Focused) != 0)
 			return 13;
 		var metadataNative = AccessibilityBridge.buildNodes(metadataSnapshot);
-		var nativeCell:Null<NativeKit.AccessibilityNode> = null;
-		var nativeGrid:Null<NativeKit.AccessibilityNode> = null;
-		var nativeRow:Null<NativeKit.AccessibilityNode> = null;
+		var nativeCell:Null<AccessibilityNode> = null;
+		var nativeGrid:Null<AccessibilityNode> = null;
+		var nativeRow:Null<AccessibilityNode> = null;
 		for (node in metadataNative) {
 			var nativeRole:Int = cast node.get_role();
 			if (nativeRole == AccessibilityRole.Cell)
@@ -323,7 +325,7 @@ class AccessibilityContract {
 			(disabledSnapshot[0].states & AccessibilityState.Focusable) != 0 ||
 			disabledSnapshot[0].actions != 0 ||
 			AccessibilityBridge.buildUpdate(disabledSnapshot, new Map(), disabledSnapshot[0].id)
-				.nativeUpdate.get_focus() != NativeKit.NativeKitConstants.NK_ACCESSIBILITY_ROOT)
+				.nativeUpdate.get_focus() != NativeKitConstants.NK_ACCESSIBILITY_ROOT)
 			return 15;
 		var disabledTree = context.submit(new DisabledSemanticContainer(), frame);
 		var disabledTreeSnapshot = AccessibilityBridge.project(disabledTree,
