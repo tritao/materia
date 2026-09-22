@@ -19,9 +19,13 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = ROOT / "schema/sensor_wire.nkw"
 EXAMPLES = ROOT / "schema/sensor_wire_examples.json"
 LOCK = ROOT / "schema/sensor_wire.lock.json"
-PRIMITIVE_SIZE = {"u8": 1, "u32": 4, "u64": 8, "f32": 4, "f64": 8}
-STORAGE_TYPE = {"u8": "std::uint8_t", "u32": "std::uint32_t", "u64": "std::uint64_t",
-                "f32": "std::uint32_t", "f64": "std::uint64_t"}
+PRIMITIVE_SIZE = {"u8": 1, "u16": 2, "u32": 4, "u64": 8,
+                  "i8": 1, "i16": 2, "i32": 4, "i64": 8, "f32": 4, "f64": 8}
+STORAGE_TYPE = {
+    "u8": "std::uint8_t", "u16": "std::uint16_t", "u32": "std::uint32_t", "u64": "std::uint64_t",
+    "i8": "std::uint8_t", "i16": "std::uint16_t", "i32": "std::uint32_t", "i64": "std::uint64_t",
+    "f32": "std::uint32_t", "f64": "std::uint64_t",
+}
 
 
 def lower_camel(name: str) -> str:
@@ -32,8 +36,13 @@ def lower_camel(name: str) -> str:
 def cpp_type(type_name: str) -> str:
     return {
         "u8": "std::uint8_t",
+        "u16": "std::uint16_t",
         "u32": "std::uint32_t",
         "u64": "std::uint64_t",
+        "i8": "std::int8_t",
+        "i16": "std::int16_t",
+        "i32": "std::int32_t",
+        "i64": "std::int64_t",
         "f32": "float",
         "f64": "double",
         "bytes": "std::span<const std::uint8_t>",
@@ -41,11 +50,7 @@ def cpp_type(type_name: str) -> str:
 
 
 def haxe_type(type_name: str) -> str:
-    return {"u8": "Int", "u32": "Int", "u64": "Int64", "f32": "Float", "f64": "Float", "bytes": "Bytes"}.get(type_name, "Int")
-
-
-def resolved_field_value(field: dict[str, Any]) -> Any:
-    return field["value"]
+    return {"u32": "Int64", "u64": "Int64", "i64": "Int64", "f32": "Float", "f64": "Float", "bytes": "Bytes"}.get(type_name, "Int")
 
 
 def haxe_files(schema: Schema, normalized_schema: dict[str, Any]) -> dict[Path, str]:
@@ -77,7 +82,7 @@ def haxe_files(schema: Schema, normalized_schema: dict[str, Any]) -> dict[Path, 
         fields = normalized_schema["messages"][message.name]["fields"]
         used_types = {f["type"] for f in fields}
         imports = []
-        if "u64" in used_types:
+        if used_types & {"u32", "u64", "i64"}:
             imports.append("haxe.Int64")
         if "bytes" in used_types:
             imports.append("haxe.io.Bytes")
@@ -88,12 +93,102 @@ def haxe_files(schema: Schema, normalized_schema: dict[str, Any]) -> dict[Path, 
         lines += ["/** Generated from schema/sensor_wire.nkw. Do not edit by hand. */", "@:wire", f"class {message.name} {{"]
         for field in fields:
             name = lower_camel(field["name"])
-            initializer = f" = {resolved_field_value(field)}" if field["constant"] else ""
             lines.append(f"\t@:id({field['id']})")
-            lines.append(f"\tpublic var {name}:{haxe_type(field['type'])}{initializer};")
+            lines.append(f"\tpublic var {name}:{haxe_type(field['type'])};")
         lines.extend(["}", ""])
         output[ROOT / "sensor_io/haxe/materia/sensor/wire" / f"{message.name}.hx"] = "\n".join(lines)
+    output[haxe_root / "SensorWireCodec.hx"] = haxe_codec_file(normalized_schema)
     return output
+
+
+def haxe_codec_file(norm: dict[str, Any]) -> str:
+    messages = norm["messages"]
+    enum_storage = {name: item["underlying"] for name, item in norm["enums"].items()}
+    lines = [
+        "package materia.sensor.wire;",
+        "",
+        "import haxe.Int64;",
+        "import haxe.io.Bytes;",
+        "import haxeon.wire.MessagePack;",
+        "import haxeon.wire.MessagePackReader;",
+    ]
+    lines.extend(f"import materia.sensor.wire.{name};" for name in messages)
+    lines.extend([
+        "",
+        "/** Generated MessagePack-payload entry points; wrap or unwrap HMPK separately. */",
+        "class SensorWireCodec {",
+    ])
+
+    for message_name, message in messages.items():
+        fields = message["fields"]
+        value_name = "decoded"
+        validate_name = f"validate{message_name}"
+        reserved = message.get("reserved", [])
+        lines.extend([
+            f"\tpublic static function encode{message_name}(value:{message_name}):Bytes {{",
+            f"\t\t{validate_name}(value);",
+            "\t\treturn MessagePack.encode(value);",
+            "\t}",
+            "",
+            f"\tpublic static function decode{message_name}(bytes:Bytes):{message_name} {{",
+            f"\t\tvalidateKeys(bytes, \"{message_name}\", {[field['id'] for field in fields]}, {json.dumps(reserved)});",
+            f"\t\tvar {value_name}:{message_name} = MessagePack.decode(bytes);",
+            f"\t\t{validate_name}({value_name});",
+            f"\t\treturn {value_name};",
+            "\t}",
+            "",
+            f"\tstatic function {validate_name}(value:{message_name}):Void {{",
+        ])
+        for field in fields:
+            name = lower_camel(field["name"])
+            if field["constant"]:
+                expected = field["value"]
+                if field["type"] in {"i64", "u32"}:
+                    compare = f"Int64.compare(value.{name}, Int64.parseString(\"{expected}\")) != 0"
+                else:
+                    compare = f"value.{name} != {expected}"
+                lines.append(f"\t\tif ({compare}) throw \"invalid constant field {message_name}.{field['name']}\";")
+
+            typ = enum_storage.get(field["type"], field["type"])
+            condition = None
+            if typ in {"u8", "u16"}:
+                high = 2 ** (8 if typ == "u8" else 16) - 1
+                condition = f"value.{name} < 0 || value.{name} > {high}"
+            elif typ == "u32":
+                condition = (f"Int64.compare(value.{name}, Int64.ofInt(0)) < 0 || "
+                             f"Int64.compare(value.{name}, Int64.make(0, -1)) > 0")
+            elif typ in {"i8", "i16", "i32"}:
+                bits = int(typ[1:])
+                condition = f"value.{name} < {-2 ** (bits - 1)} || value.{name} > {2 ** (bits - 1) - 1}"
+            elif typ == "i64" and field["nonnegative"]:
+                condition = f"Int64.compare(value.{name}, Int64.ofInt(0)) < 0"
+            if field["nonnegative"] and typ != "i64":
+                condition = f"({condition}) || value.{name} < 0" if condition else f"value.{name} < 0"
+            if condition:
+                lines.append(f"\t\tif ({condition}) throw \"{message_name}.{field['name']} is out of range\";")
+        lines.extend(["\t}", ""])
+
+    lines.extend([
+        "\tstatic function validateKeys(bytes:Bytes, message:String, required:Array<Int>, reserved:Array<Array<Int>>):Void {",
+        "\t\tvar reader = new MessagePackReader(bytes);",
+        "\t\tvar count = reader.readMapHeader();",
+        "\t\tvar seen:Array<Int> = [];",
+        "\t\tfor (_ in 0...count) {",
+        "\t\t\tvar key = reader.readInt();",
+        "\t\t\tif (key < 0) throw 'negative field ID $key in $message';",
+        "\t\t\tseen.push(key);",
+        "\t\t\tfor (range in reserved)",
+        "\t\t\t\tif (key >= range[0] && key <= range[1]) throw 'reserved field ID $key in $message';",
+        "\t\t\treader.skip();",
+        "\t\t}",
+        "\t\tfor (id in required)",
+        "\t\t\tif (seen.indexOf(id) < 0) throw 'missing required field ID $id in $message';",
+        "\t\tif (!reader.atEnd()) throw 'trailing bytes after $message';",
+        "\t}",
+        "}",
+        "",
+    ])
+    return "\n".join(lines)
 
 
 def cpp_header(schema: Schema, norm: dict[str, Any]) -> str:
@@ -172,7 +267,7 @@ def codec_header(schema: Schema) -> str:
         "",
     ]
     for message in schema.messages:
-        lines.append(f"void write(::nksensor::wire::detail::MessagePackWriter &, const {message.name} &);")
+        lines.append(f"bool write(::nksensor::wire::detail::MessagePackWriter &, const {message.name} &, std::string *error);")
         lines.append(f"bool read(::nksensor::wire::detail::MessagePackReader &, {message.name} &, std::string *error);")
     for packed in schema.packed_structs:
         size_name = f"{packed.name.lower()}_size"
@@ -198,12 +293,28 @@ def decoder_read(field: dict[str, Any], target: str, schema: Schema) -> list[str
                 f"            {target} = static_cast<float>(raw);",
             ]
         return [f"            if (!reader.read_float({target})) {{", f'                set_error(error, "{label} is not a float");', "                return false;", "            }"]
-    if typ == "u64":
-        return [f"            if (!reader.read_nonnegative_i64({target})) {{", f'                set_error(error, "{label} is not a supported integer");', "                return false;", "            }"]
     enum_storage = {enum.name: enum.underlying for enum in schema.enums}
     storage_type = enum_storage.get(typ, typ)
-    maximum = "std::numeric_limits<std::uint8_t>::max()" if storage_type == "u8" else "std::numeric_limits<std::uint32_t>::max()"
     cast_type = typ if typ in enum_storage else cpp_type(typ)
+    if storage_type.startswith("i"):
+        if field["nonnegative"]:
+            range_condition = "raw < 0"
+        else:
+            range_condition = "false"
+        if storage_type != "i64":
+            range_condition += (
+                f" || raw < std::numeric_limits<{cpp_type(storage_type)}>::min()"
+                f" || raw > std::numeric_limits<{cpp_type(storage_type)}>::max()"
+            )
+        return [
+            "            std::int64_t raw = 0;",
+            f"            if (!reader.read_signed_integer(raw) || {range_condition}) {{",
+            f'                set_error(error, "{label} is out of range or not a signed integer");',
+            "                return false;",
+            "            }",
+            f"            {target} = static_cast<{cast_type}>(raw);",
+        ]
+    maximum = f"std::numeric_limits<{cpp_type(storage_type)}>::max()"
     return [
         "            std::uint64_t raw = 0;",
         f"            if (!reader.read_nonnegative(raw) || raw > {maximum}) {{",
@@ -273,6 +384,8 @@ def codec_cpp(schema: Schema, norm: dict[str, Any]) -> str:
             member = f"value.{field['name']}[{index}]" if index else f"value.{field['name']}"
             if field["type"].startswith("f"):
                 lines.append(f"{indent}{member} = std::bit_cast<{cpp_type(field['type'])}>({bits_name});")
+            elif field["type"].startswith("i"):
+                lines.append(f"{indent}{member} = std::bit_cast<{cpp_type(field['type'])}>({bits_name});")
             else:
                 lines.append(f"{indent}{member} = static_cast<{cpp_type(field['type'])}>({bits_name});")
             if count > 1:
@@ -288,63 +401,57 @@ def codec_cpp(schema: Schema, norm: dict[str, Any]) -> str:
     enum_storage = {enum.name: enum.underlying for enum in schema.enums}
     for message in schema.messages:
         fields = norm["messages"][message.name]["fields"]
-        lines.append(f"void write(::nksensor::wire::detail::MessagePackWriter &writer, const {message.name} &value) {{")
+        lines.extend([
+            f"bool write(::nksensor::wire::detail::MessagePackWriter &writer, const {message.name} &value, std::string *error) {{",
+        ])
+        for field in fields:
+            if field["nonnegative"]:
+                lines.extend([
+                    f"    if (value.{field['name']} < 0) {{",
+                    f'        set_error(error, "{message.name}.{field["name"]} must be non-negative");',
+                    "        return false;",
+                    "    }",
+                ])
         lines.append(f"    writer.write_map_header({len(fields)});")
         for field in fields:
             lines.append(f"    writer.write_integer({field['id']});")
             value = f"value.{field['name']}"
             if field["constant"]:
-                value = (
-                    f"static_cast<std::uint64_t>(static_cast<{field['type']}>({field['value']}))"
-                    if field["type"] in enum_names
-                    else str(field["value"])
-                )
-                lines.append(f"    writer.write_integer({value});")
+                if field["type"] in {"f32", "f64"}:
+                    lines.append(f"    writer.write_float64(static_cast<double>({field['value']}));")
+                elif field["type"].startswith("i"):
+                    lines.append(f"    writer.write_signed_integer({field['value']});")
+                elif field["type"] in enum_names and enum_storage[field["type"]].startswith("i"):
+                    lines.append(f"    writer.write_signed_integer({field['value']});")
+                else:
+                    constant = (f"static_cast<std::uint64_t>(static_cast<{field['type']}>({field['value']}))"
+                                if field["type"] in enum_names else str(field["value"]))
+                    lines.append(f"    writer.write_integer({constant});")
             elif field["type"] == "bytes":
                 lines.append(f"    writer.write_binary({value});")
             elif field["type"] in {"f32", "f64"}:
                 lines.append(f"    writer.write_float64(static_cast<double>({value}));")
+            elif field["type"].startswith("i"):
+                lines.append(f"    writer.write_signed_integer({value});")
+            elif field["type"] in enum_names and enum_storage[field["type"]].startswith("i"):
+                lines.append(f"    writer.write_signed_integer(static_cast<std::int64_t>({value}));")
             else:
                 expr = f"static_cast<std::uint64_t>({value})" if field["type"] in enum_names else value
                 lines.append(f"    writer.write_integer({expr});")
-        lines.extend(["}", "", f"bool read(::nksensor::wire::detail::MessagePackReader &reader, {message.name} &value, std::string *error) {{", "    std::uint32_t field_count = 0;", "    if (!reader.read_map_size(field_count)) {", f'        set_error(error, "{message.name} is not a MessagePack map");', "        return false;", "    }"])
+        lines.extend(["    return true;", "}", "", f"bool read(::nksensor::wire::detail::MessagePackReader &reader, {message.name} &value, std::string *error) {{", "    std::uint32_t field_count = 0;", "    if (!reader.read_map_size(field_count)) {", f'        set_error(error, "{message.name} is not a MessagePack map");', "        return false;", "    }"])
         for field in fields:
             lines.append(f"    bool has_{field['name']} = false;")
         lines.extend(["    for (std::uint32_t index = 0; index < field_count; ++index) {", "        std::uint64_t key = 0;", "        if (!reader.read_nonnegative(key)) {", '            set_error(error, "wire field key is not a non-negative integer");', "            return false;", "        }", "        switch (key) {"])
         for field in fields:
             lines.extend([f"        case {field['id']}: {{"])
             if field["constant"]:
-                temp_field = dict(field)
-                temp_field["constant"] = False
-                lines.append("            std::uint64_t raw = 0;")
                 typ = field["type"]
-                if typ == "u64":
-                    lines.append("            if (!reader.read_nonnegative_i64(raw)) {")
-                elif typ == "f64":
-                    lines.append("            double raw_float = 0.0;")
-                    lines.append("            if (!reader.read_float(raw_float)) {")
-                elif typ == "bytes":
-                    lines.append("            std::span<const std::uint8_t> raw_bytes;")
-                    lines.append("            if (!reader.read_binary_view(raw_bytes)) {")
-                else:
-                    storage_type = enum_storage.get(typ, typ)
-                    maximum = "std::numeric_limits<std::uint8_t>::max()" if storage_type == "u8" else "std::numeric_limits<std::uint32_t>::max()"
-                    lines.append(f"            if (!reader.read_nonnegative(raw) || raw > {maximum}) {{")
-                lines.extend(["                set_error(error, \"invalid constant wire field\");", "                return false;", "            }"])
+                temp = f"constant_{field['name']}"
+                lines.append(f"            {cpp_type(typ)} {temp}{{}};")
+                lines.extend(decoder_read(field, temp, schema))
                 expected = field["value"]
-                if typ == "f64":
-                    lines.append(f"            if (raw_float != {expected}) {{")
-                elif typ == "bytes":
-                    lines.append("                set_error(error, \"invalid constant wire field\");")
-                    lines.append("                return false;")
-                    lines.append("            }")
-                    lines.append("            value." + field["name"] + " = {};")
-                    lines.append(f"            has_{field['name']} = true;")
-                    lines.append("            break;")
-                    lines.append("        }")
-                    continue
-                else:
-                    lines.append(f"            if (raw != {expected}) {{")
+                expected_expr = f"static_cast<{typ}>({expected})" if typ in enum_names else str(expected)
+                lines.append(f"            if ({temp} != {expected_expr}) {{")
                 constant_message = f"invalid constant field {message.name}.{field['name']}"
                 if field["name"] == "schema_version":
                     constant_message = f"unsupported {message.name} schema version"
@@ -358,9 +465,27 @@ def codec_cpp(schema: Schema, norm: dict[str, Any]) -> str:
                 lines.extend(decoder_read(field, f"value.{field['name']}", schema))
             lines.append(f"            has_{field['name']} = true;")
             lines.extend(["            break;", "        }"])
-        lines.extend(["        default:", "            if (!reader.skip()) {", '                set_error(error, "wire message contains an invalid unknown field");', "                return false;", "            }", "            break;", "        }", "    }", "    if (!reader.at_end()) {", f'        set_error(error, "{message.name} MessagePack value has trailing bytes");', "        return false;", "    }"])
+        lines.append("        default:")
+        reserved = norm["messages"][message.name].get("reserved", [])
+        for start, end in reserved:
+            lines.extend([
+                f"            if (key >= {start} && key <= {end}) {{",
+                f'                set_error(error, "reserved field ID in {message.name}");',
+                "                return false;",
+                "            }",
+            ])
+        lines.extend(["            if (!reader.skip()) {", '                set_error(error, "wire message contains an invalid unknown field");', "                return false;", "            }", "            break;", "        }", "    }", "    if (!reader.at_end()) {", f'        set_error(error, "{message.name} MessagePack value has trailing bytes");', "        return false;", "    }"])
         missing = " || ".join(f"!has_{field['name']}" for field in fields)
-        lines.extend([f"    if ({missing}) {{", f'        set_error(error, "{message.name} is missing a required field");', "        return false;", "    }", "    return true;", "}", ""])
+        lines.extend([f"    if ({missing}) {{", f'        set_error(error, "{message.name} is missing a required field");', "        return false;", "    }"])
+        for field in fields:
+            if field["nonnegative"]:
+                lines.extend([
+                    f"    if (value.{field['name']} < 0) {{",
+                    f'        set_error(error, "{message.name}.{field["name"]} must be non-negative");',
+                    "        return false;",
+                    "    }",
+                ])
+        lines.extend(["    return true;", "}", ""])
     lines.extend(["} // namespace nksensor::wire::generated::detail", ""])
     return "\n".join(lines)
 
@@ -379,6 +504,20 @@ def _mp_uint(value: int) -> bytes:
     return b"\xcf" + struct.pack(">Q", value)
 
 
+def _mp_int(value: int) -> bytes:
+    if value >= 0:
+        return _mp_uint(value)
+    if value >= -32:
+        return bytes([value & 0xFF])
+    if value >= -(2**7):
+        return b"\xd0" + struct.pack(">b", value)
+    if value >= -(2**15):
+        return b"\xd1" + struct.pack(">h", value)
+    if value >= -(2**31):
+        return b"\xd2" + struct.pack(">i", value)
+    return b"\xd3" + struct.pack(">q", value)
+
+
 def _mp_binary(value: bytes) -> bytes:
     size = len(value)
     if size <= 0xFF:
@@ -392,13 +531,20 @@ def _mp_float(value: float) -> bytes:
     return b"\xcb" + struct.pack(">d", value)
 
 
-def hmpk_message(fields: list[dict[str, Any]], example: dict[str, Any]) -> bytes:
-    count = len(fields)
+def hmpk_message(fields: list[dict[str, Any]], example: dict[str, Any], *,
+                 overrides: dict[int, Any] | None = None,
+                 extra_fields: list[tuple[int, int | None]] | None = None,
+                 omit_ids: set[int] | None = None) -> bytes:
+    overrides = overrides or {}
+    extra_fields = extra_fields or []
+    omit_ids = omit_ids or set()
+    encoded_fields = [field for field in fields if field["id"] not in omit_ids]
+    count = len(encoded_fields) + len(extra_fields)
     if count <= 15:
         payload = bytes([0x80 | count])
     else:
         payload = b"\xde" + struct.pack(">H", count)
-    for field in fields:
+    for field in encoded_fields:
         payload += _mp_uint(field["id"])
         name = field["name"]
         if name == "data" and "data_f64" in example:
@@ -411,11 +557,14 @@ def hmpk_message(fields: list[dict[str, Any]], example: dict[str, Any]) -> bytes
             value = bytes.fromhex(example["data_hex"])
             payload += _mp_binary(value)
             continue
-        value = example[name]
+        value = overrides.get(field["id"], example[name])
         if field["type"] == "f64":
             payload += _mp_float(float(value))
         else:
-            payload += _mp_uint(int(value))
+            payload += _mp_int(int(value))
+    for field_id, value in extra_fields:
+        payload += _mp_uint(field_id)
+        payload += b"\xc0" if value is None else _mp_int(value)
     return b"HMPK\x01\x00" + struct.pack(">I", len(payload)) + payload
 
 
@@ -423,8 +572,29 @@ def vector_fixture(norm: dict[str, Any]) -> str:
     examples = json.loads(EXAMPLES.read_text(encoding="utf-8"))
     lines = ["# Generated from schema/sensor_wire.nkw and sensor_wire_examples.json; complete HMPK frames."]
     for message_name, example in examples.items():
-        fields = norm["messages"][message_name]["fields"]
+        message = norm["messages"][message_name]
+        fields = message["fields"]
         lines.append(f"{message_name}\t{hmpk_message(fields, example).hex()}")
+        for field in fields:
+            if field["constant"]:
+                lines.append(f"{message_name}.invalid.{field['name']}\t"
+                             f"{hmpk_message(fields, example, overrides={field['id']: field['value'] + 1}).hex()}")
+                lines.append(f"{message_name}.invalid.missing_{field['name']}\t"
+                             f"{hmpk_message(fields, example, omit_ids={field['id']}).hex()}")
+            elif field["nonnegative"]:
+                lines.append(f"{message_name}.invalid.{field['name']}\t"
+                             f"{hmpk_message(fields, example, overrides={field['id']: -1}).hex()}")
+        if message.get("reserved"):
+            field_id = message["reserved"][0][0]
+            lines.append(f"{message_name}.reserved\t"
+                         f"{hmpk_message(fields, example, extra_fields=[(field_id, None)]).hex()}")
+        if message_name == "PackedFrameMessage":
+            lines.append(f"{message_name}.extension\t"
+                         f"{hmpk_message(fields, example, extra_fields=[(32, None)]).hex()}")
+            lines.append(f"{message_name}.uint32_max_width\t"
+                         f"{hmpk_message(fields, example, overrides={8: 2**32 - 1}).hex()}")
+            lines.append(f"{message_name}.invalid.width_range\t"
+                         f"{hmpk_message(fields, example, overrides={8: 2**32}).hex()}")
     return "\n".join(lines) + "\n"
 
 
@@ -441,11 +611,11 @@ def haxe_vector_check(norm: dict[str, Any]) -> str:
     lines = [
         "import haxe.Int64;",
         "import haxe.io.Bytes;",
-        "import haxeon.wire.MessagePack;",
         "import haxeon.wire.MessagePackFrame;",
         "import materia.sensor.wire.ImuSampleMessage;",
         "import materia.sensor.wire.LidarScanMessage;",
         "import materia.sensor.wire.PackedFrameMessage;",
+        "import materia.sensor.wire.SensorWireCodec;",
     ]
     lines.extend(f"import materia.sensor.wire.{enum_name};" for enum_name in used_enums)
     lines.extend([
@@ -468,7 +638,7 @@ def haxe_vector_check(norm: dict[str, Any]) -> str:
                 else:
                     literal = example["data_hex"]
                 value_expr = f'bytesFromHex("{literal}")'
-            elif field["type"] == "u64":
+            elif field["type"] in {"u32", "u64", "i64"}:
                 value_expr = f'Int64.parseString("{example[name]}")'
             elif field["type"] in enum_values:
                 item_name = next(key for key, value in enum_values[field["type"]]["values"].items()
@@ -478,7 +648,22 @@ def haxe_vector_check(norm: dict[str, Any]) -> str:
                 value_expr = str(example[name])
             lines.append(f"\t\t{var_name}.{lower_camel(name)} = {value_expr};")
         vector_key = message_name
-        lines.append(f'\t\tverify(expected, "{vector_key}", MessagePackFrame.pack(MessagePack.encode({var_name})));')
+        lines.append(f'\t\tvar {var_name}Bytes = SensorWireCodec.encode{message_name}({var_name});')
+        lines.append(f'\t\tverify(expected, "{vector_key}", MessagePackFrame.pack({var_name}Bytes));')
+        lines.append(f'\t\tSensorWireCodec.decode{message_name}(MessagePackFrame.unpack(getVector(expected, "{vector_key}")));')
+        for field in fields_by_message[message_name]["fields"]:
+            if field["constant"] or field["nonnegative"]:
+                key = f"{message_name}.invalid.{field['name']}"
+                lines.append(f'\t\texpectRejected(expected, "{key}", "{message_name}");')
+            if field["constant"]:
+                key = f"{message_name}.invalid.missing_{field['name']}"
+                lines.append(f'\t\texpectRejected(expected, "{key}", "{message_name}");')
+        if fields_by_message[message_name].get("reserved"):
+            lines.append(f'\t\texpectRejected(expected, "{message_name}.reserved", "{message_name}");')
+        if message_name == "PackedFrameMessage":
+            lines.append('\t\tSensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(getVector(expected, "PackedFrameMessage.extension")));')
+            lines.append('\t\tSensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(getVector(expected, "PackedFrameMessage.uint32_max_width")));')
+            lines.append('\t\texpectRejected(expected, "PackedFrameMessage.invalid.width_range", "PackedFrameMessage");')
     lines.extend([
         "\t\treturn 42;",
         "\t}",
@@ -497,6 +682,28 @@ def haxe_vector_check(norm: dict[str, Any]) -> str:
         "\tstatic function verify(expected:Map<String, Bytes>, name:String, actual:Bytes):Void {",
         "\t\tvar vector = expected.get(name);",
         "\t\tif (vector == null || vector.compare(actual) != 0) throw 'Sensor wire vector differs: $name';",
+        "\t}",
+        "",
+        "\tstatic function getVector(expected:Map<String, Bytes>, name:String):Bytes {",
+        "\t\tvar value = expected.get(name);",
+        "\t\tif (value == null) throw 'Missing Sensor wire vector: $name';",
+        "\t\treturn value;",
+        "\t}",
+        "",
+        "\tstatic function expectRejected(expected:Map<String, Bytes>, name:String, message:String):Void {",
+        "\t\tvar bytes = MessagePackFrame.unpack(getVector(expected, name));",
+        "\t\tvar rejected = false;",
+        "\t\ttry {",
+        "\t\t\tswitch (message) {",
+        "\t\t\t\tcase \"PackedFrameMessage\": SensorWireCodec.decodePackedFrameMessage(bytes);",
+        "\t\t\t\tcase \"ImuSampleMessage\": SensorWireCodec.decodeImuSampleMessage(bytes);",
+        "\t\t\t\tcase \"LidarScanMessage\": SensorWireCodec.decodeLidarScanMessage(bytes);",
+        "\t\t\t\tdefault: throw 'Unknown Sensor wire message: $message';",
+        "\t\t\t}",
+        "\t\t} catch (error:Dynamic) {",
+        "\t\t\trejected = true;",
+        "\t\t}",
+        "\t\tif (!rejected) throw 'Sensor wire decoder accepted invalid vector: $name';",
         "\t}",
         "",
         "\tstatic function bytesFromHex(text:String):Bytes {",
@@ -518,7 +725,17 @@ def haxe_vector_check(norm: dict[str, Any]) -> str:
 
 
 def docs(schema: Schema, norm: dict[str, Any]) -> str:
-    lines = ["# SensorKit wire schema", "", "Generated from `schema/sensor_wire.nkw`. MessagePack fields use integer map keys; the HMPK envelope is version 1.", ""]
+    lines = [
+        "# SensorKit wire schema",
+        "",
+        "Generated from `schema/sensor_wire.nkw`. MessagePack fields use integer map keys; the HMPK envelope is version 1.",
+        "",
+        "Integer ranges follow the declared primitive. Haxe `u32` fields use `Int64` so the full unsigned 32-bit range is representable; "
+        "message fields cannot use `u64` because Haxe `Int64` cannot represent its full range. "
+        "`i64 nonnegative` fields match Haxe `Int64` and restrict the protocol value to `0..2^63-1`. "
+        "Use the generated `SensorWireCodec` entry points in Haxe to enforce constants, ranges, and reserved IDs.",
+        "",
+    ]
     for enum_name, enum in norm["enums"].items():
         lines.append(f"## {enum_name}")
         lines.append("")
@@ -531,18 +748,34 @@ def docs(schema: Schema, norm: dict[str, Any]) -> str:
         lines.extend(["| ID | Field | Type | Rule |", "| ---: | --- | --- | --- |"])
         for field in norm["messages"][message.name]["fields"]:
             rule = f"constant `{field['value']}`" if field["constant"] else "required"
+            if field["nonnegative"]:
+                rule += ", non-negative"
             lines.append(f"| {field['id']} | `{field['name']}` | `{field['type']}` | {rule} |")
         reserved = ", ".join(f"{lo}..{hi}" if lo != hi else str(lo) for lo, hi in norm["messages"][message.name]["reserved"])
-        lines.extend(["", f"Reserved IDs: `{reserved}`.", ""])
+        extension = ", ".join(f"{lo}..{hi}" if lo != hi else str(lo) for lo, hi in norm["messages"][message.name]["extension"])
+        lines.extend([
+            "",
+            f"Reserved IDs: `{reserved}` (permanently invalid).",
+            f"Extension IDs: `{extension}` (unknown values are skipped and later schemas may allocate them).",
+            "",
+        ])
     for packed in schema.packed_structs:
         item = norm["packed_structs"][packed.name]
         lines.extend([f"## {packed.name} (packed)", "", f"Endianness: `{item['endian']}`; size: **{item['size']} bytes**.", "", "| Field | Type | Size |", "| --- | --- | ---: |"])
         for field in item["fields"]:
-            size = {"u8": 1, "u32": 4, "u64": 8, "f32": 4, "f64": 8}[field["type"]] * field["length"]
+            size = PRIMITIVE_SIZE[field["type"]] * field["length"]
             suffix = f"[{field['length']}]" if field["length"] != 1 else ""
             lines.append(f"| `{field['name']}` | `{field['type']}{suffix}` | {size} |")
         lines.append("")
-    lines.extend(["## Compatibility", "", "Existing fields, IDs, types, constants, and packed layouts are immutable. New enum values and new message types can be added. Adding a field to an existing message is rejected; define a new message when the wire shape changes.", ""])
+    lines.extend([
+        "## Compatibility",
+        "",
+        "Existing fields, IDs, types, constants, and packed layouts are immutable. New enum values and message types can be added. "
+        "A new field may consume an ID from an extension range declared by the previous lock; remove that ID from the range in the same change. "
+        "Reserved IDs remain unavailable permanently, and unknown non-reserved fields are skipped. "
+        "Added fields are required, so a new reader does not accept messages written before the field was introduced.",
+        "",
+    ])
     return "\n".join(lines)
 
 

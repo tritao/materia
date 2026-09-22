@@ -161,22 +161,34 @@ namespace {
 void set_error(std::string *error, const char *message) { if (error) *error = message; }
 }
 
-void write(::nksensor::wire::detail::MessagePackWriter &writer, const PackedFrameMessage &value) {
+bool write(::nksensor::wire::detail::MessagePackWriter &writer, const PackedFrameMessage &value, std::string *error) {
+    if (value.sensor < 0) {
+        set_error(error, "PackedFrameMessage.sensor must be non-negative");
+        return false;
+    }
+    if (value.sequence < 0) {
+        set_error(error, "PackedFrameMessage.sequence must be non-negative");
+        return false;
+    }
+    if (value.frame < 0) {
+        set_error(error, "PackedFrameMessage.frame must be non-negative");
+        return false;
+    }
     writer.write_map_header(12);
     writer.write_integer(1);
     writer.write_integer(1);
     writer.write_integer(2);
     writer.write_integer(static_cast<std::uint64_t>(value.message_type));
     writer.write_integer(3);
-    writer.write_integer(value.sensor);
+    writer.write_signed_integer(value.sensor);
     writer.write_integer(4);
-    writer.write_integer(value.sequence);
+    writer.write_signed_integer(value.sequence);
     writer.write_integer(5);
     writer.write_float64(static_cast<double>(value.capture_time));
     writer.write_integer(6);
     writer.write_float64(static_cast<double>(value.delivery_time));
     writer.write_integer(7);
-    writer.write_integer(value.frame);
+    writer.write_signed_integer(value.frame);
     writer.write_integer(8);
     writer.write_integer(value.width);
     writer.write_integer(9);
@@ -187,6 +199,7 @@ void write(::nksensor::wire::detail::MessagePackWriter &writer, const PackedFram
     writer.write_integer(static_cast<std::uint64_t>(value.pixel_format));
     writer.write_integer(12);
     writer.write_binary(value.data);
+    return true;
 }
 
 bool read(::nksensor::wire::detail::MessagePackReader &reader, PackedFrameMessage &value, std::string *error) {
@@ -215,12 +228,14 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, PackedFrameMessag
         }
         switch (key) {
         case 1: {
+            std::uint8_t constant_schema_version{};
             std::uint64_t raw = 0;
             if (!reader.read_nonnegative(raw) || raw > std::numeric_limits<std::uint8_t>::max()) {
-                set_error(error, "invalid constant wire field");
+                set_error(error, "schema version is out of range or not an integer");
                 return false;
             }
-            if (raw != 1) {
+            constant_schema_version = static_cast<std::uint8_t>(raw);
+            if (constant_schema_version != 1) {
                 set_error(error, "unsupported PackedFrameMessage schema version");
                 return false;
             }
@@ -239,18 +254,22 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, PackedFrameMessag
             break;
         }
         case 3: {
-            if (!reader.read_nonnegative_i64(value.sensor)) {
-                set_error(error, "sensor is not a supported integer");
+            std::int64_t raw = 0;
+            if (!reader.read_signed_integer(raw) || raw < 0) {
+                set_error(error, "sensor is out of range or not a signed integer");
                 return false;
             }
+            value.sensor = static_cast<std::int64_t>(raw);
             has_sensor = true;
             break;
         }
         case 4: {
-            if (!reader.read_nonnegative_i64(value.sequence)) {
-                set_error(error, "sequence is not a supported integer");
+            std::int64_t raw = 0;
+            if (!reader.read_signed_integer(raw) || raw < 0) {
+                set_error(error, "sequence is out of range or not a signed integer");
                 return false;
             }
+            value.sequence = static_cast<std::int64_t>(raw);
             has_sequence = true;
             break;
         }
@@ -271,10 +290,12 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, PackedFrameMessag
             break;
         }
         case 7: {
-            if (!reader.read_nonnegative_i64(value.frame)) {
-                set_error(error, "frame is not a supported integer");
+            std::int64_t raw = 0;
+            if (!reader.read_signed_integer(raw) || raw < 0) {
+                set_error(error, "frame is out of range or not a signed integer");
                 return false;
             }
+            value.frame = static_cast<std::int64_t>(raw);
             has_frame = true;
             break;
         }
@@ -327,6 +348,10 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, PackedFrameMessag
             break;
         }
         default:
+            if (key >= 13 && key <= 31) {
+                set_error(error, "reserved field ID in PackedFrameMessage");
+                return false;
+            }
             if (!reader.skip()) {
                 set_error(error, "wire message contains an invalid unknown field");
                 return false;
@@ -342,27 +367,52 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, PackedFrameMessag
         set_error(error, "PackedFrameMessage is missing a required field");
         return false;
     }
+    if (value.sensor < 0) {
+        set_error(error, "PackedFrameMessage.sensor must be non-negative");
+        return false;
+    }
+    if (value.sequence < 0) {
+        set_error(error, "PackedFrameMessage.sequence must be non-negative");
+        return false;
+    }
+    if (value.frame < 0) {
+        set_error(error, "PackedFrameMessage.frame must be non-negative");
+        return false;
+    }
     return true;
 }
 
-void write(::nksensor::wire::detail::MessagePackWriter &writer, const ImuSampleMessage &value) {
+bool write(::nksensor::wire::detail::MessagePackWriter &writer, const ImuSampleMessage &value, std::string *error) {
+    if (value.sensor < 0) {
+        set_error(error, "ImuSampleMessage.sensor must be non-negative");
+        return false;
+    }
+    if (value.sequence < 0) {
+        set_error(error, "ImuSampleMessage.sequence must be non-negative");
+        return false;
+    }
+    if (value.frame < 0) {
+        set_error(error, "ImuSampleMessage.frame must be non-negative");
+        return false;
+    }
     writer.write_map_header(8);
     writer.write_integer(1);
     writer.write_integer(1);
     writer.write_integer(2);
     writer.write_integer(static_cast<std::uint64_t>(static_cast<MessageType>(4)));
     writer.write_integer(3);
-    writer.write_integer(value.sensor);
+    writer.write_signed_integer(value.sensor);
     writer.write_integer(4);
-    writer.write_integer(value.sequence);
+    writer.write_signed_integer(value.sequence);
     writer.write_integer(5);
     writer.write_float64(static_cast<double>(value.capture_time));
     writer.write_integer(6);
     writer.write_float64(static_cast<double>(value.delivery_time));
     writer.write_integer(7);
-    writer.write_integer(value.frame);
+    writer.write_signed_integer(value.frame);
     writer.write_integer(8);
     writer.write_binary(value.data);
+    return true;
 }
 
 bool read(::nksensor::wire::detail::MessagePackReader &reader, ImuSampleMessage &value, std::string *error) {
@@ -387,12 +437,14 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, ImuSampleMessage 
         }
         switch (key) {
         case 1: {
+            std::uint8_t constant_schema_version{};
             std::uint64_t raw = 0;
             if (!reader.read_nonnegative(raw) || raw > std::numeric_limits<std::uint8_t>::max()) {
-                set_error(error, "invalid constant wire field");
+                set_error(error, "schema version is out of range or not an integer");
                 return false;
             }
-            if (raw != 1) {
+            constant_schema_version = static_cast<std::uint8_t>(raw);
+            if (constant_schema_version != 1) {
                 set_error(error, "unsupported ImuSampleMessage schema version");
                 return false;
             }
@@ -401,12 +453,14 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, ImuSampleMessage 
             break;
         }
         case 2: {
+            MessageType constant_message_type{};
             std::uint64_t raw = 0;
             if (!reader.read_nonnegative(raw) || raw > std::numeric_limits<std::uint8_t>::max()) {
-                set_error(error, "invalid constant wire field");
+                set_error(error, "message type is out of range or not an integer");
                 return false;
             }
-            if (raw != 4) {
+            constant_message_type = static_cast<MessageType>(raw);
+            if (constant_message_type != static_cast<MessageType>(4)) {
                 set_error(error, "MessagePack value is not a ImuSampleMessage");
                 return false;
             }
@@ -415,18 +469,22 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, ImuSampleMessage 
             break;
         }
         case 3: {
-            if (!reader.read_nonnegative_i64(value.sensor)) {
-                set_error(error, "sensor is not a supported integer");
+            std::int64_t raw = 0;
+            if (!reader.read_signed_integer(raw) || raw < 0) {
+                set_error(error, "sensor is out of range or not a signed integer");
                 return false;
             }
+            value.sensor = static_cast<std::int64_t>(raw);
             has_sensor = true;
             break;
         }
         case 4: {
-            if (!reader.read_nonnegative_i64(value.sequence)) {
-                set_error(error, "sequence is not a supported integer");
+            std::int64_t raw = 0;
+            if (!reader.read_signed_integer(raw) || raw < 0) {
+                set_error(error, "sequence is out of range or not a signed integer");
                 return false;
             }
+            value.sequence = static_cast<std::int64_t>(raw);
             has_sequence = true;
             break;
         }
@@ -447,10 +505,12 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, ImuSampleMessage 
             break;
         }
         case 7: {
-            if (!reader.read_nonnegative_i64(value.frame)) {
-                set_error(error, "frame is not a supported integer");
+            std::int64_t raw = 0;
+            if (!reader.read_signed_integer(raw) || raw < 0) {
+                set_error(error, "frame is out of range or not a signed integer");
                 return false;
             }
+            value.frame = static_cast<std::int64_t>(raw);
             has_frame = true;
             break;
         }
@@ -463,6 +523,10 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, ImuSampleMessage 
             break;
         }
         default:
+            if (key >= 9 && key <= 31) {
+                set_error(error, "reserved field ID in ImuSampleMessage");
+                return false;
+            }
             if (!reader.skip()) {
                 set_error(error, "wire message contains an invalid unknown field");
                 return false;
@@ -478,25 +542,49 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, ImuSampleMessage 
         set_error(error, "ImuSampleMessage is missing a required field");
         return false;
     }
+    if (value.sensor < 0) {
+        set_error(error, "ImuSampleMessage.sensor must be non-negative");
+        return false;
+    }
+    if (value.sequence < 0) {
+        set_error(error, "ImuSampleMessage.sequence must be non-negative");
+        return false;
+    }
+    if (value.frame < 0) {
+        set_error(error, "ImuSampleMessage.frame must be non-negative");
+        return false;
+    }
     return true;
 }
 
-void write(::nksensor::wire::detail::MessagePackWriter &writer, const LidarScanMessage &value) {
+bool write(::nksensor::wire::detail::MessagePackWriter &writer, const LidarScanMessage &value, std::string *error) {
+    if (value.sensor < 0) {
+        set_error(error, "LidarScanMessage.sensor must be non-negative");
+        return false;
+    }
+    if (value.sequence < 0) {
+        set_error(error, "LidarScanMessage.sequence must be non-negative");
+        return false;
+    }
+    if (value.frame < 0) {
+        set_error(error, "LidarScanMessage.frame must be non-negative");
+        return false;
+    }
     writer.write_map_header(11);
     writer.write_integer(1);
     writer.write_integer(1);
     writer.write_integer(2);
     writer.write_integer(static_cast<std::uint64_t>(static_cast<MessageType>(5)));
     writer.write_integer(3);
-    writer.write_integer(value.sensor);
+    writer.write_signed_integer(value.sensor);
     writer.write_integer(4);
-    writer.write_integer(value.sequence);
+    writer.write_signed_integer(value.sequence);
     writer.write_integer(5);
     writer.write_float64(static_cast<double>(value.capture_time));
     writer.write_integer(6);
     writer.write_float64(static_cast<double>(value.delivery_time));
     writer.write_integer(7);
-    writer.write_integer(value.frame);
+    writer.write_signed_integer(value.frame);
     writer.write_integer(8);
     writer.write_integer(value.horizontal_count);
     writer.write_integer(9);
@@ -505,6 +593,7 @@ void write(::nksensor::wire::detail::MessagePackWriter &writer, const LidarScanM
     writer.write_integer(12);
     writer.write_integer(11);
     writer.write_binary(value.data);
+    return true;
 }
 
 bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage &value, std::string *error) {
@@ -532,12 +621,14 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage 
         }
         switch (key) {
         case 1: {
+            std::uint8_t constant_schema_version{};
             std::uint64_t raw = 0;
             if (!reader.read_nonnegative(raw) || raw > std::numeric_limits<std::uint8_t>::max()) {
-                set_error(error, "invalid constant wire field");
+                set_error(error, "schema version is out of range or not an integer");
                 return false;
             }
-            if (raw != 1) {
+            constant_schema_version = static_cast<std::uint8_t>(raw);
+            if (constant_schema_version != 1) {
                 set_error(error, "unsupported LidarScanMessage schema version");
                 return false;
             }
@@ -546,12 +637,14 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage 
             break;
         }
         case 2: {
+            MessageType constant_message_type{};
             std::uint64_t raw = 0;
             if (!reader.read_nonnegative(raw) || raw > std::numeric_limits<std::uint8_t>::max()) {
-                set_error(error, "invalid constant wire field");
+                set_error(error, "message type is out of range or not an integer");
                 return false;
             }
-            if (raw != 5) {
+            constant_message_type = static_cast<MessageType>(raw);
+            if (constant_message_type != static_cast<MessageType>(5)) {
                 set_error(error, "MessagePack value is not a LidarScanMessage");
                 return false;
             }
@@ -560,18 +653,22 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage 
             break;
         }
         case 3: {
-            if (!reader.read_nonnegative_i64(value.sensor)) {
-                set_error(error, "sensor is not a supported integer");
+            std::int64_t raw = 0;
+            if (!reader.read_signed_integer(raw) || raw < 0) {
+                set_error(error, "sensor is out of range or not a signed integer");
                 return false;
             }
+            value.sensor = static_cast<std::int64_t>(raw);
             has_sensor = true;
             break;
         }
         case 4: {
-            if (!reader.read_nonnegative_i64(value.sequence)) {
-                set_error(error, "sequence is not a supported integer");
+            std::int64_t raw = 0;
+            if (!reader.read_signed_integer(raw) || raw < 0) {
+                set_error(error, "sequence is out of range or not a signed integer");
                 return false;
             }
+            value.sequence = static_cast<std::int64_t>(raw);
             has_sequence = true;
             break;
         }
@@ -592,10 +689,12 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage 
             break;
         }
         case 7: {
-            if (!reader.read_nonnegative_i64(value.frame)) {
-                set_error(error, "frame is not a supported integer");
+            std::int64_t raw = 0;
+            if (!reader.read_signed_integer(raw) || raw < 0) {
+                set_error(error, "frame is out of range or not a signed integer");
                 return false;
             }
+            value.frame = static_cast<std::int64_t>(raw);
             has_frame = true;
             break;
         }
@@ -620,12 +719,14 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage 
             break;
         }
         case 10: {
+            std::uint32_t constant_return_stride{};
             std::uint64_t raw = 0;
             if (!reader.read_nonnegative(raw) || raw > std::numeric_limits<std::uint32_t>::max()) {
-                set_error(error, "invalid constant wire field");
+                set_error(error, "return stride is out of range or not an integer");
                 return false;
             }
-            if (raw != 12) {
+            constant_return_stride = static_cast<std::uint32_t>(raw);
+            if (constant_return_stride != 12) {
                 set_error(error, "LiDAR return stride is not the supported packed format");
                 return false;
             }
@@ -642,6 +743,10 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage 
             break;
         }
         default:
+            if (key >= 12 && key <= 31) {
+                set_error(error, "reserved field ID in LidarScanMessage");
+                return false;
+            }
             if (!reader.skip()) {
                 set_error(error, "wire message contains an invalid unknown field");
                 return false;
@@ -655,6 +760,18 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage 
     }
     if (!has_schema_version || !has_message_type || !has_sensor || !has_sequence || !has_capture_time || !has_delivery_time || !has_frame || !has_horizontal_count || !has_vertical_count || !has_return_stride || !has_data) {
         set_error(error, "LidarScanMessage is missing a required field");
+        return false;
+    }
+    if (value.sensor < 0) {
+        set_error(error, "LidarScanMessage.sensor must be non-negative");
+        return false;
+    }
+    if (value.sequence < 0) {
+        set_error(error, "LidarScanMessage.sequence must be non-negative");
+        return false;
+    }
+    if (value.frame < 0) {
+        set_error(error, "LidarScanMessage.frame must be non-negative");
         return false;
     }
     return true;

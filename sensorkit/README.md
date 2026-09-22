@@ -36,6 +36,19 @@ into the encoded message, an owning `PackedFrame`, and typed camera, depth, and
 segmentation wrappers. Generated Haxeon records are checked in under
 `sensor_io/haxe/materia/sensor/wire/`.
 
+Use the generated `SensorWireCodec` entry points for Haxe MessagePack payload
+encoding and decoding; they validate required fields, schema constants,
+integer ranges, and permanently reserved field IDs around Haxeon's generic
+MessagePack codec. Apply or remove the HMPK envelope with `MessagePackFrame`.
+
+Wire integers use explicit cross-language ranges. `u32` maps to Haxe
+`Int64`, while sensor IDs, sequence numbers, and frame IDs use
+`i64 nonnegative`, which matches the signed range supported by Haxe
+`Int64`. `reserved` IDs are never valid on the wire. `extension` IDs are
+skipped when unknown and can be assigned by a later schema version. Added
+fields remain required; a reader using the new schema therefore requires
+senders to include them.
+
 The initial packed formats are RGBA8 camera data, little-endian R32F depth,
 little-endian R32U or U64 segmentation labels. Payloads are tightly packed
 with no row padding; the stride is still carried explicitly so a future

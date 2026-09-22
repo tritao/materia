@@ -17,6 +17,7 @@ namespace nksensor::wire::detail {
 class MessagePackWriter {
 public:
     void write_integer(std::uint64_t value);
+    void write_signed_integer(std::int64_t value);
     void write_float64(double value);
     void write_map_header(std::size_t count);
     void write_binary(std::span<const std::uint8_t> value);
@@ -47,6 +48,7 @@ public:
     bool at_end() const noexcept { return position_ == bytes_.size(); }
     bool read_nonnegative(std::uint64_t &value);
     bool read_nonnegative_i64(std::uint64_t &value);
+    bool read_signed_integer(std::int64_t &value);
     bool read_float(double &value);
     bool read_map_size(std::uint32_t &count);
     bool read_binary_view(std::span<const std::uint8_t> &value);

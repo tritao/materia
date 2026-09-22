@@ -2,6 +2,8 @@
 
 Generated from `schema/sensor_wire.nkw`. MessagePack fields use integer map keys; the HMPK envelope is version 1.
 
+Integer ranges follow the declared primitive. Haxe `u32` fields use `Int64` so the full unsigned 32-bit range is representable; message fields cannot use `u64` because Haxe `Int64` cannot represent its full range. `i64 nonnegative` fields match Haxe `Int64` and restrict the protocol value to `0..2^63-1`. Use the generated `SensorWireCodec` entry points in Haxe to enforce constants, ranges, and reserved IDs.
+
 ## MessageType
 
 | Name | Value |
@@ -27,18 +29,19 @@ Generated from `schema/sensor_wire.nkw`. MessagePack fields use integer map keys
 | ---: | --- | --- | --- |
 | 1 | `schema_version` | `u8` | constant `1` |
 | 2 | `message_type` | `MessageType` | required |
-| 3 | `sensor` | `u64` | required |
-| 4 | `sequence` | `u64` | required |
+| 3 | `sensor` | `i64` | required, non-negative |
+| 4 | `sequence` | `i64` | required, non-negative |
 | 5 | `capture_time` | `f64` | required |
 | 6 | `delivery_time` | `f64` | required |
-| 7 | `frame` | `u64` | required |
+| 7 | `frame` | `i64` | required, non-negative |
 | 8 | `width` | `u32` | required |
 | 9 | `height` | `u32` | required |
 | 10 | `stride` | `u32` | required |
 | 11 | `pixel_format` | `PixelFormat` | required |
 | 12 | `data` | `bytes` | required |
 
-Reserved IDs: `13..31`.
+Reserved IDs: `13..31` (permanently invalid).
+Extension IDs: `32..63` (unknown values are skipped and later schemas may allocate them).
 
 ## ImuSampleMessage
 
@@ -46,14 +49,15 @@ Reserved IDs: `13..31`.
 | ---: | --- | --- | --- |
 | 1 | `schema_version` | `u8` | constant `1` |
 | 2 | `message_type` | `MessageType` | constant `4` |
-| 3 | `sensor` | `u64` | required |
-| 4 | `sequence` | `u64` | required |
+| 3 | `sensor` | `i64` | required, non-negative |
+| 4 | `sequence` | `i64` | required, non-negative |
 | 5 | `capture_time` | `f64` | required |
 | 6 | `delivery_time` | `f64` | required |
-| 7 | `frame` | `u64` | required |
+| 7 | `frame` | `i64` | required, non-negative |
 | 8 | `data` | `bytes` | required |
 
-Reserved IDs: `9..31`.
+Reserved IDs: `9..31` (permanently invalid).
+Extension IDs: `32..63` (unknown values are skipped and later schemas may allocate them).
 
 ## LidarScanMessage
 
@@ -61,17 +65,18 @@ Reserved IDs: `9..31`.
 | ---: | --- | --- | --- |
 | 1 | `schema_version` | `u8` | constant `1` |
 | 2 | `message_type` | `MessageType` | constant `5` |
-| 3 | `sensor` | `u64` | required |
-| 4 | `sequence` | `u64` | required |
+| 3 | `sensor` | `i64` | required, non-negative |
+| 4 | `sequence` | `i64` | required, non-negative |
 | 5 | `capture_time` | `f64` | required |
 | 6 | `delivery_time` | `f64` | required |
-| 7 | `frame` | `u64` | required |
+| 7 | `frame` | `i64` | required, non-negative |
 | 8 | `horizontal_count` | `u32` | required |
 | 9 | `vertical_count` | `u32` | required |
 | 10 | `return_stride` | `u32` | constant `12` |
 | 11 | `data` | `bytes` | required |
 
-Reserved IDs: `12..31`.
+Reserved IDs: `12..31` (permanently invalid).
+Extension IDs: `32..63` (unknown values are skipped and later schemas may allocate them).
 
 ## ImuSampleData (packed)
 
@@ -97,4 +102,4 @@ Endianness: `little`; size: **12 bytes**.
 
 ## Compatibility
 
-Existing fields, IDs, types, constants, and packed layouts are immutable. New enum values and new message types can be added. Adding a field to an existing message is rejected; define a new message when the wire shape changes.
+Existing fields, IDs, types, constants, and packed layouts are immutable. New enum values and message types can be added. A new field may consume an ID from an extension range declared by the previous lock; remove that ID from the range in the same change. Reserved IDs remain unavailable permanently, and unknown non-reserved fields are skipped. Added fields are required, so a new reader does not accept messages written before the field was introduced.

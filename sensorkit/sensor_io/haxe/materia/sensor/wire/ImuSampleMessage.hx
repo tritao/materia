@@ -7,9 +7,9 @@ import haxe.io.Bytes;
 @:wire
 class ImuSampleMessage {
 	@:id(1)
-	public var schemaVersion:Int = 1;
+	public var schemaVersion:Int;
 	@:id(2)
-	public var messageType:Int = 4;
+	public var messageType:Int;
 	@:id(3)
 	public var sensor:Int64;
 	@:id(4)

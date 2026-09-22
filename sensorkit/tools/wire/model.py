@@ -39,6 +39,7 @@ class Field:
     type_ref: TypeRef
     constant: bool = False
     value: Any = None
+    nonnegative: bool = False
 
 
 @dataclass
@@ -46,6 +47,7 @@ class Message:
     name: str
     fields: list[Field] = field(default_factory=list)
     reserved: list[tuple[int, int]] = field(default_factory=list)
+    extension: list[tuple[int, int]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

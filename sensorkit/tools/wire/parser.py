@@ -119,31 +119,35 @@ class Parser:
                 self.expect("{")
                 fields: list[Field] = []
                 reserved: list[tuple[int, int]] = []
+                extension: list[tuple[int, int]] = []
                 while self.peek() != "}":
-                    if self.peek() == "reserved":
-                        self.take()
+                    if self.peek() in {"reserved", "extension"}:
+                        declaration = self.take()
                         start = self.integer()
                         end = start
                         if self.peek() == "..":
                             self.take()
                             end = self.integer()
-                        reserved.append((start, end))
+                        (reserved if declaration == "reserved" else extension).append((start, end))
                         self.expect(";")
                         continue
                     field_id = self.integer()
                     field_name = self.identifier()
                     self.expect(":")
                     field_type = self.type_ref()
+                    nonnegative = self.peek() == "nonnegative"
+                    if nonnegative:
+                        self.take()
                     constant = self.peek() == "constant"
                     value = None
                     if constant:
                         self.take()
                         self.expect("=")
                         value = self.literal()
-                    fields.append(Field(field_id, field_name, field_type, constant, value))
+                    fields.append(Field(field_id, field_name, field_type, constant, value, nonnegative))
                     self.optional_semicolon()
                 self.expect("}")
-                schema.messages.append(Message(name, fields, reserved))
+                schema.messages.append(Message(name, fields, reserved, extension))
             elif kind == "packed":
                 name = self.identifier()
                 self.expect("endian")

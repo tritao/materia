@@ -284,18 +284,19 @@ std::optional<std::vector<std::uint8_t>> encode_packed_frame(
 
     generated::PackedFrameMessage message;
     message.message_type = frame.type;
-    message.sensor = frame.header.sensor;
-    message.sequence = frame.header.sequence;
+    message.sensor = static_cast<std::int64_t>(frame.header.sensor);
+    message.sequence = static_cast<std::int64_t>(frame.header.sequence);
     message.capture_time = frame.header.capture_time;
     message.delivery_time = frame.header.delivery_time;
-    message.frame = frame.header.frame;
+    message.frame = static_cast<std::int64_t>(frame.header.frame);
     message.width = frame.width;
     message.height = frame.height;
     message.stride = frame.stride;
     message.pixel_format = frame.format;
     message.data = frame.data;
     MessagePackWriter payload;
-    generated::detail::write(payload, message);
+    if (!generated::detail::write(payload, message, error))
+        return std::nullopt;
 
     return encode_hmpk_payload(payload, error, max_messagepack_bytes);
 }
@@ -331,11 +332,11 @@ std::optional<PackedFrameView> view_packed_frame(
 
     PackedFrameView frame;
     frame.type = message.message_type;
-    frame.header.sensor = message.sensor;
-    frame.header.sequence = message.sequence;
+    frame.header.sensor = static_cast<SensorId>(message.sensor);
+    frame.header.sequence = static_cast<std::uint64_t>(message.sequence);
     frame.header.capture_time = message.capture_time;
     frame.header.delivery_time = message.delivery_time;
-    frame.header.frame = message.frame;
+    frame.header.frame = static_cast<FrameId>(message.frame);
     frame.width = message.width;
     frame.height = message.height;
     frame.stride = message.stride;
@@ -567,14 +568,15 @@ std::optional<std::vector<std::uint8_t>> encode_imu_sample(
     const auto data = generated::detail::pack(packed_data);
 
     generated::ImuSampleMessage message;
-    message.sensor = sample.header.sensor;
-    message.sequence = sample.header.sequence;
+    message.sensor = static_cast<std::int64_t>(sample.header.sensor);
+    message.sequence = static_cast<std::int64_t>(sample.header.sequence);
     message.capture_time = sample.header.capture_time;
     message.delivery_time = sample.header.delivery_time;
-    message.frame = sample.header.frame;
+    message.frame = static_cast<std::int64_t>(sample.header.frame);
     message.data = data;
     MessagePackWriter payload;
-    generated::detail::write(payload, message);
+    if (!generated::detail::write(payload, message, error))
+        return std::nullopt;
 
     return encode_hmpk_payload(payload, error, max_messagepack_bytes);
 }
@@ -592,11 +594,11 @@ std::optional<ImuSampleView> view_imu_sample(
         return std::nullopt;
 
     ImuSampleView sample;
-    sample.header.sensor = message.sensor;
-    sample.header.sequence = message.sequence;
+    sample.header.sensor = static_cast<SensorId>(message.sensor);
+    sample.header.sequence = static_cast<std::uint64_t>(message.sequence);
     sample.header.capture_time = message.capture_time;
     sample.header.delivery_time = message.delivery_time;
-    sample.header.frame = message.frame;
+    sample.header.frame = static_cast<FrameId>(message.frame);
     sample.data = message.data;
     if (!validate_sensor_header(sample.header, error, "IMU sample") ||
         !validate_imu_data(sample.data, error))
@@ -667,16 +669,17 @@ std::optional<std::vector<std::uint8_t>> encode_lidar_scan(
     }
 
     generated::LidarScanMessage message;
-    message.sensor = scan.header.sensor;
-    message.sequence = scan.header.sequence;
+    message.sensor = static_cast<std::int64_t>(scan.header.sensor);
+    message.sequence = static_cast<std::int64_t>(scan.header.sequence);
     message.capture_time = scan.header.capture_time;
     message.delivery_time = scan.header.delivery_time;
-    message.frame = scan.header.frame;
+    message.frame = static_cast<std::int64_t>(scan.header.frame);
     message.horizontal_count = scan.horizontal_count;
     message.vertical_count = scan.vertical_count;
     message.data = data;
     MessagePackWriter payload;
-    generated::detail::write(payload, message);
+    if (!generated::detail::write(payload, message, error))
+        return std::nullopt;
 
     return encode_hmpk_payload(payload, error, max_messagepack_bytes);
 }
@@ -694,11 +697,11 @@ std::optional<LidarScanView> view_lidar_scan(
         return std::nullopt;
 
     LidarScanView scan;
-    scan.header.sensor = message.sensor;
-    scan.header.sequence = message.sequence;
+    scan.header.sensor = static_cast<SensorId>(message.sensor);
+    scan.header.sequence = static_cast<std::uint64_t>(message.sequence);
     scan.header.capture_time = message.capture_time;
     scan.header.delivery_time = message.delivery_time;
-    scan.header.frame = message.frame;
+    scan.header.frame = static_cast<FrameId>(message.frame);
     scan.horizontal_count = message.horizontal_count;
     scan.vertical_count = message.vertical_count;
     scan.return_stride = message.return_stride;

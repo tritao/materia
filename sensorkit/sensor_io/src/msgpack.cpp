@@ -52,6 +52,26 @@ void MessagePackWriter::write_integer(std::uint64_t value) {
     }
 }
 
+void MessagePackWriter::write_signed_integer(std::int64_t value) {
+    if (value >= 0) {
+        write_integer(static_cast<std::uint64_t>(value));
+    } else if (value >= -32) {
+        write_byte(static_cast<std::uint8_t>(value));
+    } else if (value >= std::numeric_limits<std::int8_t>::min()) {
+        write_byte(0xd0);
+        write_byte(static_cast<std::uint8_t>(value));
+    } else if (value >= std::numeric_limits<std::int16_t>::min()) {
+        write_byte(0xd1);
+        write_be16(static_cast<std::uint16_t>(value));
+    } else if (value >= std::numeric_limits<std::int32_t>::min()) {
+        write_byte(0xd2);
+        write_be32(static_cast<std::uint32_t>(value));
+    } else {
+        write_byte(0xd3);
+        write_be64(static_cast<std::uint64_t>(value));
+    }
+}
+
 void MessagePackWriter::write_float64(double value) {
     std::uint64_t bits = 0;
     static_assert(sizeof(bits) == sizeof(value));
@@ -226,6 +246,28 @@ bool MessagePackReader::read_nonnegative(std::uint64_t &value) {
 bool MessagePackReader::read_nonnegative_i64(std::uint64_t &value) {
     if (!read_nonnegative(value) || value > signed_int64_max)
         return false;
+    return true;
+}
+
+bool MessagePackReader::read_signed_integer(std::int64_t &value) {
+    Integer integer;
+    if (!read_integer(integer))
+        return false;
+    if (!integer.negative) {
+        if (integer.magnitude > signed_int64_max)
+            return false;
+        value = static_cast<std::int64_t>(integer.magnitude);
+        return true;
+    }
+
+    constexpr auto signed_int64_min_magnitude = std::uint64_t{1} << 63;
+    if (integer.magnitude > signed_int64_min_magnitude)
+        return false;
+    if (integer.magnitude == signed_int64_min_magnitude) {
+        value = std::numeric_limits<std::int64_t>::min();
+        return true;
+    }
+    value = -static_cast<std::int64_t>(integer.magnitude);
     return true;
 }
 
