@@ -9,6 +9,9 @@ import nativekit.ui.core.PropertyEditResult;
 import nativekit.ui.core.ViewportCamera;
 import app.SceneDocumentSession;
 import app.SensorConfiguration;
+import robotkit.world.McapRobotRecording;
+import robotkit.world.McapRecordingReader;
+import robotkit.world.ReplayRobot;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -283,10 +286,65 @@ class SceneEditingTests {
     sensors.add("imu");
     check(sensors.model.sensors.length==2&&sensors.model.sensors[sensors.selectedIndex].kind=="imu",
       "sensor UI adds and selects an IMU");
-    check(sensors.properties().length==12,"IMU hides LiDAR-only range and ray fields");
+    check(sensors.properties().length==14,"IMU hides LiDAR-only range and ray fields");
     check(sensors.removeSelected()&&sensors.model.sensors.length==1,
       "sensor UI removes the selected sensor");
+    check(sensors.document.undo()&&sensors.model.sensors.length==2,
+      "sensor add/remove operations participate in undo");
     check(sensors.diagnostics().length==0,"sensor UI produces a runtime-valid model");
+    check(sensors.apply(),"valid sensor edits build a simulation runtime: "+sensors.applyError);
+    var appliedRevision=sensors.appliedRevision;
+    sensors.model.sensors[0].rayCount=0;
+    check(!sensors.apply()&&sensors.appliedRevision==appliedRevision,
+      "failed sensor rebuild preserves the running configuration");
+    sensors.model.sensors[0].rayCount=8;
+    var observation=sensors.step();
+    check(observation!=null&&observation.sensors.length>0,
+      "applied sensor configuration produces simulated measurements");
+    sensors.dispose();
+  }
+
+  static function sensorWorkflow():Void {
+    var directory = "build/sensor-workflow-" + Std.random(100000000);
+    FileSystem.createDirectory(directory);
+    var documentPath = directory + "/robot.materia.json";
+    var recordingPath = directory + "/robot.mcap";
+    var session = new SceneDocumentSession();
+    var rate = new PropertyBinding(session.sensors.properties()[2], session.sensors.context());
+    var mountX = new PropertyBinding(session.sensors.properties()[9], session.sensors.context());
+    check(rate.apply(PropertyValue.Float(20.0)) == PropertyEditResult.Applied,
+      "sensor workflow edits acquisition rate");
+    check(mountX.apply(PropertyValue.Float(0.25)) == PropertyEditResult.Applied,
+      "sensor workflow edits mount position");
+    check(session.isDirty(), "sensor edits dirty the application document");
+    session.save(documentPath);
+    session.open(documentPath);
+    var restoredFrame = session.sensors.model.sensors[0].frame;
+    check(restoredFrame != null && session.sensors.model.sensors[0].updateRate == 20.0 &&
+      restoredFrame.position[0] == 0.25,
+      "sensor settings survive document save and reload");
+    check(session.sensors.apply(), "reloaded sensor document builds a simulation");
+    var observation = session.sensors.step();
+    for (index in 0...8) observation = session.sensors.step();
+    check(observation != null && observation.sensors.length > 0,
+      "reloaded configuration produces sensor measurements");
+    if (observation == null) throw "Sensor workflow has no observation";
+    var writer = new McapRobotRecording(recordingPath);
+    for (frame in observation.sensors.toArray()) writer.recordSensor(session.sensors.robotId, frame);
+    writer.close();
+    var loaded = McapRecordingReader.load(recordingPath);
+    var replay = new ReplayRobot(session.sensors.robotId, loaded);
+    var replayed = replay.sensors();
+    check(replayed.length > 0 && replayed[0].sensorId == session.sensors.model.sensors[0].id,
+      "record/replay preserves configured sensor identity");
+    check(replayed[0].mountPosition.get(0) == 0.25 && replayed[0].values.length > 0,
+      "record/replay preserves sensor mount and measurements");
+    replay.close(); session.dispose();
+    FileSystem.deleteFile(recordingPath);
+    var statusPath = recordingPath + ".incomplete.status";
+    if (FileSystem.exists(statusPath)) FileSystem.deleteFile(statusPath);
+  }
+
   }
 
   static function main():Int {
@@ -352,6 +410,7 @@ class SceneEditingTests {
       viewportDragging();
       editingLifecycle();
       sensorConfiguration();
+      sensorWorkflow();
       SceneDocumentTests.run();
       Sys.println("Scene editing tests passed");
       return 0;

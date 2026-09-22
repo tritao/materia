@@ -252,7 +252,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var dragPointerY:Float = 0.0;
   var sceneInspector:Null<PropertyInspector> = null;
   var inspectorSelectionRevision:Int = -1;
-  public final sensors:SensorConfiguration;
+  public var sensors(get, never):SensorConfiguration;
+  function get_sensors():SensorConfiguration return session.sensors;
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
       ?world:RobotWorld, ?hostContext:DesktopUiHostContext) {
@@ -262,7 +263,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
     session = new SceneDocumentSession();
-    sensors = new SensorConfiguration();
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);
     documents = new SceneDocumentController(session, function(save, path, complete) {
       var chooser = files;
@@ -365,7 +365,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function diagnosticState():Dynamic return componentLab == null ? {
     selectedNode: scene.selectedId,
     scene: scene.diagnosticState(),
-    document: {path: session.path, label: session.label(), dirty: scene.document.isDirty,
+    document: {path: session.path, label: session.label(), dirty: session.isDirty(),
       confirmation: documents.needsConfirmation(), choosing: documents.choosing, error: documents.error},
     selection: ui.commandContext.selection.copy(),
     gridVisible: gridVisible,
@@ -535,8 +535,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView("add-imu",new Button("+ IMU",null,function(){sensors.add("imu");commands.refresh();},"sensor-add-imu")),
       new KeyedView("remove",new Button("Remove",null,function(){sensors.removeSelected();commands.refresh();},"sensor-remove"))
     ]);
-    var content:Array<KeyedView>=[new KeyedView("heading",sectionHeading("SENSORS")),
-      new KeyedView("actions",actions),new KeyedView("list",new Column("sensor-list",rows))];
+    var runtimeActions=new Row("sensor-runtime-actions",[
+      new KeyedView("undo",new Button("Undo",null,function(){sensors.document.undo();commands.refresh();},"sensor-undo")),
+      new KeyedView("redo",new Button("Redo",null,function(){sensors.document.redo();commands.refresh();},"sensor-redo")),
+      new KeyedView("apply",new Button(sensors.appliedRevision == 0 ? "Apply" : "Rebuild",null,function(){
+        log(sensors.apply() ? "Sensor simulation configuration applied" : "Sensor configuration rejected");
+        commands.refresh();
+      },"sensor-apply")),
+      new KeyedView("reset",new Button("Reset",null,function(){
+        log(sensors.reset() ? "Sensor simulation reset" : "No sensor simulation to reset");
+        commands.refresh();
+      },"sensor-reset"))
+    ]);
+    var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
+      new KeyedView("actions",actions),new KeyedView("runtime-actions",runtimeActions),
+      new KeyedView("list",new Column("sensor-list",rows))];
     var selected=sensors.selected();
     if(selected!=null)content.push(new KeyedView("properties",new PropertyInspector(
       "sensor-inspector:"+selected.id,sensors.properties(),null,null,null,null,"Sensor configuration")));

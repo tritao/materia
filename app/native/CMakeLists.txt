@@ -28,7 +28,19 @@ set(NK_LIBRARY_TYPE SHARED)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../scenekit/scene" scene)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../scenekit/scene_render" scene_render)
 
-foreach(target_name nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render)
+# Sensor editing can atomically compile and rebuild the same RobotKit/SimKit
+# runtime used by robotd. Reuse the already-created SceneKit targets instead of
+# adding the complete dependency graph a second time.
+set(RK_BUILD_SHARED ON CACHE BOOL "Build RobotKit as a shared library" FORCE)
+set(RK_BUILD_TESTS OFF CACHE BOOL "Disable RobotKit tests in the app build" FORCE)
+set(RK_BUILD_SIMKIT ON CACHE BOOL "Enable the SimKit-backed RobotKit runtime" FORCE)
+set(NKSIM_BUILD_MUJOCO OFF CACHE BOOL "Keep the editor test runtime deterministic" FORCE)
+set(NK_LIBRARY_TYPE SHARED)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../simkit/sim_core" sim_core)
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../robotkit" robotkit)
+
+foreach(target_name nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render
+        nativekit_sim_core robotkit_runtime)
     if(TARGET "${target_name}")
         set_target_properties("${target_name}" PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
@@ -40,7 +52,7 @@ endforeach()
 # Haxeon's coarse CMake artifact is a build stamp.  The runtime libraries
 # loaded by the generated FFI calls are the libnativekit*.so files above.
 add_custom_target(haxeon_app_native
-    DEPENDS nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render
+    DEPENDS nativekit nativekit_gpu nativekit_ui nativekit_scene nativekit_scene_render robotkit_runtime
     COMMAND "${CMAKE_COMMAND}" -E touch "${HAXEON_NATIVE_OUTPUT_DIR}/app.hdll"
     BYPRODUCTS "${HAXEON_NATIVE_OUTPUT_DIR}/app.hdll"
     COMMENT "Building NativeKit, GPU, and UIKit native dependencies")

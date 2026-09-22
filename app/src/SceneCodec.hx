@@ -22,8 +22,16 @@ class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
   public static inline var VERSION:Int = 1;
 
-  public static function encode(scene:EditorScene):String
-    return Json.stringify({format: FORMAT, version: VERSION, objects: scene.records()}, null, "  ") + "\n";
+  public static function encode(scene:EditorScene, ?sensors:SensorConfiguration):String
+    return Json.stringify({format: FORMAT, version: VERSION, objects: scene.records(),
+      sensors:sensors == null ? null : sensors.records()}, null, "  ") + "\n";
+
+  public static function decodeSensors(text:String):Null<Dynamic> {
+    var root:Dynamic = Json.parse(text);
+    if (stringField(root, "format") != FORMAT || numberField(root, "version") != VERSION)
+      throw "Unsupported scene document";
+    return Reflect.hasField(root, "sensors") ? Reflect.field(root, "sensors") : null;
+  }
 
   /** Validate the entire file before allocating native scene resources. */
   public static function decode(text:String):Array<SceneObjectData> {

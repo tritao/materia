@@ -7,41 +7,52 @@ import haxe.io.Path as FilePath;
 /** Owns the current document; unsuccessful I/O leaves it and its history intact. */
 class SceneDocumentSession {
   public var scene(default, null):EditorScene;
+  public var sensors(default, null):SensorConfiguration;
   public var path(default, null):Null<String> = null;
   public var generation(default, null):Int = 0;
 
-  public function new() scene = new EditorScene();
+  public function new() { scene = new EditorScene(); sensors = new SensorConfiguration(); }
 
-  public function newDocument():Void replace(new EditorScene(), null);
+  public function newDocument():Void replace(new EditorScene(), new SensorConfiguration(), null);
 
   public function open(file:String):Void {
     var absolute = checkedPath(file);
-    var data = SceneCodec.decode(File.getContent(absolute));
+    var text = File.getContent(absolute);
+    var data = SceneCodec.decode(text);
     var next = new EditorScene(data);
-    replace(next, absolute);
+    var nextSensors:SensorConfiguration;
+    try nextSensors = new SensorConfiguration(SceneCodec.decodeSensors(text))
+    catch (error:Dynamic) { next.dispose(); throw error; }
+    replace(next, nextSensors, absolute);
   }
 
   public function save(?file:String):Void {
     var destination = file == null ? path : file;
     if (destination == null) throw "Choose a filename for this scene";
     var absolute = checkedPath(destination);
-    AtomicFile.write(absolute, SceneCodec.encode(scene));
+    AtomicFile.write(absolute, SceneCodec.encode(scene, sensors));
     // Do not move the savepoint or change the document path until publication succeeds.
     path = absolute;
     scene.document.markSaved();
+    sensors.document.markSaved();
   }
 
   public function label():String {
     var name = path == null ? "Untitled" : FilePath.withoutDirectory(path);
-    return name + (scene.document.isDirty ? " *" : "");
+    return name + (isDirty() ? " *" : "");
   }
 
-  function replace(next:EditorScene, file:Null<String>):Void {
+  public function isDirty():Bool return scene.document.isDirty || sensors.document.isDirty;
+
+  function replace(next:EditorScene, nextSensors:SensorConfiguration, file:Null<String>):Void {
     var previous = scene;
+    var previousSensors = sensors;
     scene = next;
+    sensors = nextSensors;
     path = file;
     generation++;
     previous.dispose();
+    previousSensors.dispose();
   }
 
   static function checkedPath(value:String):String {
@@ -51,5 +62,5 @@ class SceneDocumentSession {
     return FilePath.isAbsolute(value) ? value : Sys.getCwd() + "/" + value;
   }
 
-  public function dispose():Void scene.dispose();
+  public function dispose():Void { scene.dispose(); sensors.dispose(); }
 }

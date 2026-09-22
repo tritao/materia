@@ -63,14 +63,14 @@ class SceneDocumentTests {
       session.scene.select("tower");
       new PropertyBinding(session.scene.properties()[2], session.scene.context()).apply(PropertyValue.Bool(false));
       session.save(second);
-      var encoded = SceneCodec.encode(session.scene);
+      var encoded = SceneCodec.encode(session.scene, session.sensors);
       var oldRevision = session.scene.revision;
       session.newDocument();
       check(session.scene.revision > oldRevision, "new document invalidates retained viewport and tree caches");
       oldRevision = session.scene.revision;
       session.open(second);
       check(session.scene.revision > oldRevision, "opened document invalidates retained viewport and tree caches");
-      check(SceneCodec.encode(session.scene) == encoded, "round trip preserves every serialized property");
+      check(SceneCodec.encode(session.scene, session.sensors) == encoded, "round trip preserves every serialized property");
       check(!session.scene.document.canUndo && !session.scene.document.isDirty, "opened document starts with clean history");
       check(!session.scene.info("tower").visible(), "hidden state is restored");
       check(session.scene.pick(1.1, 0) == "scene", "loaded hidden geometry is excluded from picking");

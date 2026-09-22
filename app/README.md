@@ -58,13 +58,16 @@ through UIKit's canvas; perspective GPU scene rendering is not integrated yet.
 The Sensors workspace tab edits RobotKit sensor definitions without exposing
 runtime or hardware handles. It supports adding/removing LiDAR and IMU sensors,
 selection, identity, update rate, LiDAR ray/range settings, deterministic noise,
-and frame mount translation/quaternion fields. Property ranges mirror
-`RobotRuntimeCompiler` limits, and the panel displays the first compiler
-diagnostic while the editable model is invalid. These settings remain local
-editor configuration; applying them to physical hardware is never automatic.
+link selection, and explicit shared or independent frame mounts. Sensor changes
+participate in document undo/redo and are saved atomically with the scene.
+Apply/Rebuild validates and constructs a replacement RobotKit/SimKit runtime
+before retiring the current one; a failed rebuild leaves the running
+configuration intact. Reset restores the applied physics state without copying
+unapplied editor values into it. Applying settings to physical hardware is
+never automatic.
 
 Scene files are UTF-8 JSON with `format: "materia.scene"`, `version: 1`, and an
-`objects` array. Each rectangle stores its stable string `id`, `label`, `type`,
+`objects` array plus an optional `sensors` robot configuration. Each rectangle stores its stable string `id`, `label`, `type`,
 `x/y/z`, `width/height`, `red/green/blue`, and `visible` fields. Selection, camera,
 undo history, native handles, and docking preferences are not serialized.
 The loader validates field types, unique IDs, finite coordinates, positive

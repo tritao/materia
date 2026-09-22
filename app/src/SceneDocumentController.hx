@@ -61,7 +61,7 @@ class SceneDocumentController {
 
   function protect(action:Void->Void):Void {
     if (blocked()) return;
-    if (session.scene.document.isDirty) { pending = action; changed(); }
+    if (session.isDirty()) { pending = action; changed(); }
     else action();
   }
 
