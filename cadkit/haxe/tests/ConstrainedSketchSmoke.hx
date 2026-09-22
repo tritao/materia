@@ -132,11 +132,40 @@ class ConstrainedSketchSmoke {
 		var width=document.defineParameter("width",10);width.bind(feature.dimension("width"));
 		var extrude=document.add(new ExtrudeFeature(feature,0,0,2));document.setOutput(extrude);document.recompute();
 		near(document.result().volume(),100);
+		for (nextWidth in [7.0, 14.0, 9.0]) {
+			width.set(nextWidth);
+			document.recompute();
+			near(document.result().volume(), nextWidth * 5 * 2);
+		}
+		width.set(10);document.recompute();near(document.result().volume(),100);
 		width.set(12);document.recompute();near(document.result().volume(),120);
 		check(document.undo(),"constrained sketch undo");document.recompute();near(document.result().volume(),100);
 		var loaded=DocumentCodec.decode(DocumentCodec.encode(document));near(loaded.result().volume(),100);
 		loaded.parameter("width").set(14);loaded.recompute();near(loaded.result().volume(),140);
 		loaded.close();document.close();
+
+		var locked = new ConstrainedSketch();
+		for (point in [new SketchPoint("l0", 0, 0), new SketchPoint("l1", 10, 0), new SketchPoint("l2", 10, 5),
+			new SketchPoint("l3", 0, 5)]) locked.addPoint(point);
+		locked.addEntity(SketchEntity.line("locked.bottom", "l0", "l1"))
+			.addEntity(SketchEntity.line("locked.right", "l1", "l2"))
+			.addEntity(SketchEntity.line("locked.top", "l2", "l3"))
+			.addEntity(SketchEntity.line("locked.left", "l3", "l0"));
+		for (index in 0...4)
+			locked.addConstraint(SketchConstraint.fixed("locked.fixed" + index, "l" + index));
+		locked.addConstraint(SketchConstraint.distance("locked.width", "l0", "l1", 10));
+		var failureDocument = new Document();
+		var lockedFeature = failureDocument.add(new ConstrainedSketchFeature(locked));
+		failureDocument.setOutput(lockedFeature);
+		failureDocument.recompute();
+		var committedShape = failureDocument.result();
+		lockedFeature.dimension("locked.width").set(12);
+		failed = false;
+		try failureDocument.recompute() catch (error:Dynamic) failed = true;
+		check(failed && failureDocument.result() == committedShape && lockedFeature.lastDiagnostic != null
+			&& lockedFeature.lastAttemptDiagnostic != null && lockedFeature.lastAttemptDiagnostic.status == "conflicting",
+			"failed attempt diagnostics are separate from committed geometry");
+		failureDocument.close();
 
 		var plate=new ConstrainedMountingPlate();
 		var oldVolume=plate.finish.currentShape().volume();

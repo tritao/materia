@@ -36,8 +36,8 @@ class ConstrainedSketch {
 	}
 
 	/** Solve into a temporary snapshot. A failure throws and leaves lastSolution unchanged. */
-	public function solve():SolvedSketch {
-		var candidate = SketchSolver.solve(this);
+	public function solve(?seed:SolvedSketch):SolvedSketch {
+		var candidate = SketchSolver.solve(this, seed == null ? committed : seed);
 		committed = candidate;
 		return candidate;
 	}

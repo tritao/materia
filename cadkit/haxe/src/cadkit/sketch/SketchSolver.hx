@@ -9,11 +9,19 @@ class SketchSolver {
 	private final radiusIndex:Map<String, Int>;
 	private final points:Map<String, SketchPoint>;
 	private final entities:Map<String, SketchEntity>;
+	private final seed:Null<SolvedSketch>;
+	private final tangentBranches:Map<String, Bool>;
+	private final tangentSides:Map<String, Float>;
 	private var variableCount:Int;
+	private var solveTolerance:Float;
 
-	private function new(sketch:ConstrainedSketch) {
+	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>) {
 		this.sketch = sketch; pointIndex = new Map(); radiusIndex = new Map(); points = new Map(); entities = new Map();
+		this.seed = seed;
+		tangentBranches = new Map();
+		tangentSides = new Map();
 		variableCount = 0;
+		solveTolerance = sketch.settings.tolerance;
 		for (point in sketch.points()) { points.set(point.id, point); pointIndex.set(point.id, variableCount); variableCount += 2; }
 		for (entity in sketch.entities()) {
 			entities.set(entity.id, entity);
@@ -21,8 +29,8 @@ class SketchSolver {
 		}
 	}
 
-	public static function solve(sketch:ConstrainedSketch):SolvedSketch {
-		return new SketchSolver(sketch).run();
+	public static function solve(sketch:ConstrainedSketch, seed:Null<SolvedSketch> = null):SolvedSketch {
+		return new SketchSolver(sketch, seed).run();
 	}
 
 	private function invalid(message:String, ids:Array<String>):SketchSolveError
@@ -31,13 +39,21 @@ class SketchSolver {
 	private function run():SolvedSketch {
 		validate();
 		var x:Array<Float> = [];
-		for (point in sketch.points()) { x.push(point.x); x.push(point.y); }
-		for (entity in sketch.entities()) if (entity.kind == "circle" || entity.kind == "arc") x.push(entity.radius);
+		for (point in sketch.points()) {
+			var value = seededPoint(point);
+			x.push(value[0]);
+			x.push(value[1]);
+		}
+		for (entity in sketch.entities())
+			if (entity.kind == "circle" || entity.kind == "arc")
+				x.push(seededRadius(entity));
+		solveTolerance = sketch.settings.tolerance * modelScale(x);
+		initializeTangentBranches(x);
 		var damping = sketch.settings.initialDamping;
 		var current = residuals(x);
 		var currentNorm = norm(current.values);
 		var iterations = 0;
-		while (iterations < sketch.settings.maxIterations && currentNorm > sketch.settings.tolerance) {
+		while (iterations < sketch.settings.maxIterations && currentNorm > solveTolerance) {
 			iterations++;
 			var j = jacobian(x, current.values);
 			var normal = matrix(variableCount, variableCount, 0);
@@ -58,10 +74,10 @@ class SketchSolver {
 		var j = jacobian(x, current.values);
 		var rankValue = rank(j, sketch.settings.rankTolerance);
 		var dof = variableCount - rankValue;
-		var badIds = failingOwners(current, sketch.settings.tolerance * 10);
-		if (currentNorm > sketch.settings.tolerance) {
+		var badIds = failingOwners(current, solveTolerance * 10);
+		if (currentNorm > solveTolerance) {
 			var gradientNorm = norm(gradient(j, current.values));
-			var stationaryLimit = Math.max(sketch.settings.rankTolerance, sketch.settings.tolerance * 10) * (1 + currentNorm);
+			var stationaryLimit = Math.max(sketch.settings.rankTolerance, solveTolerance * 10) * (1 + currentNorm);
 			var locallyConflicting = gradientNorm <= stationaryLimit;
 			var status = locallyConflicting ? "conflicting" : "nonconvergent";
 			var message = locallyConflicting
@@ -162,10 +178,83 @@ class SketchSolver {
 		else out.push(distance(p,center(eid,x,owner))-radius(eid,x,owner));
 	}
 	private function tangent(aid:String,bid:String,x:Array<Float>,owner:String,out:Array<Float>):Void {
-		var a=entity(aid,owner), b=entity(bid,owner);
-		if(a.kind=="line" && b.kind=="line") throw invalid("line-line tangency is unsupported",[owner]);
-		if(a.kind=="line" || b.kind=="line") { var l=a.kind=="line"?aid:bid; var q=a.kind=="line"?bid:aid; var ends=line(l,x,owner); var d=direction(l,x,owner); var c=center(q,x,owner); out.push(Math.abs(cross([c[0]-ends[0][0],c[1]-ends[0][1]],d))/Math.pow(dot(d,d),0.5)-radius(q,x,owner)); }
-		else { var separation=distance(center(aid,x,owner),center(bid,x,owner)); var ra=radius(aid,x,owner), rb=radius(bid,x,owner); var external=Math.abs(separation-(ra+rb)); var internal=Math.abs(separation-Math.abs(ra-rb)); out.push(external<internal?separation-(ra+rb):separation-Math.abs(ra-rb)); }
+		var first = entity(aid, owner);
+		var second = entity(bid, owner);
+		if (first.kind == "line" && second.kind == "line")
+			throw invalid("line-line tangency is unsupported", [owner]);
+		if (first.kind == "line" || second.kind == "line") {
+			var lineId = first.kind == "line" ? aid : bid;
+			var circleId = first.kind == "line" ? bid : aid;
+			var ends = line(lineId, x, owner);
+			var lineDirection = direction(lineId, x, owner);
+			var circleCenter = center(circleId, x, owner);
+			var signedDistance = cross([circleCenter[0] - ends[0][0], circleCenter[1] - ends[0][1]], lineDirection)
+				/ Math.pow(dot(lineDirection, lineDirection), 0.5);
+			var storedSide = tangentSides.get(owner);
+			var side:Float = storedSide == null ? (signedDistance < 0 ? -1 : 1) : cast storedSide;
+			out.push(signedDistance - side * radius(circleId, x, owner));
+		} else {
+			var separation = distance(center(aid, x, owner), center(bid, x, owner));
+			var firstRadius = radius(aid, x, owner);
+			var secondRadius = radius(bid, x, owner);
+			var storedBranch = tangentBranches.get(owner);
+			var external:Bool = storedBranch == null ? true : cast storedBranch;
+			out.push(external ? separation - (firstRadius + secondRadius) : separation - Math.abs(firstRadius - secondRadius));
+		}
+	}
+
+	private function initializeTangentBranches(x:Array<Float>):Void {
+		for (constraint in sketch.constraints()) {
+			if (constraint.kind != "tangent")
+				continue;
+			var second = needSecond(constraint);
+			var firstEntity = entity(constraint.first, constraint.id);
+			var secondEntity = entity(second, constraint.id);
+			if (firstEntity.kind == "line" || secondEntity.kind == "line") {
+				var lineId = firstEntity.kind == "line" ? constraint.first : second;
+				var circleId = firstEntity.kind == "line" ? second : constraint.first;
+				var ends = line(lineId, x, constraint.id);
+				var lineDirection = direction(lineId, x, constraint.id);
+				var circleCenter = center(circleId, x, constraint.id);
+				var signedDistance = cross([circleCenter[0] - ends[0][0], circleCenter[1] - ends[0][1]], lineDirection)
+					/ Math.pow(dot(lineDirection, lineDirection), 0.5);
+				tangentSides.set(constraint.id, signedDistance < 0 ? -1 : 1);
+			} else {
+				var separation = distance(center(constraint.first, x, constraint.id), center(second, x, constraint.id));
+				var firstRadius = radius(constraint.first, x, constraint.id);
+				var secondRadius = radius(second, x, constraint.id);
+				var externalResidual = Math.abs(separation - (firstRadius + secondRadius));
+				var internalResidual = Math.abs(separation - Math.abs(firstRadius - secondRadius));
+				tangentBranches.set(constraint.id, externalResidual <= internalResidual);
+			}
+		}
+	}
+
+	private function seededPoint(point:SketchPoint):Array<Float> {
+		if (seed == null)
+			return [point.x, point.y];
+		try {
+			return seed.point(point.id);
+		} catch (error:Dynamic) {
+			return [point.x, point.y];
+		}
+	}
+
+	private function seededRadius(entity:SketchEntity):Float {
+		if (seed == null)
+			return entity.radius;
+		try {
+			return seed.radius(entity.id);
+		} catch (error:Dynamic) {
+			return entity.radius;
+		}
+	}
+
+	private function modelScale(x:Array<Float>):Float {
+		var scale = 1.0;
+		for (value in x)
+			scale = Math.max(scale, Math.abs(value));
+		return scale;
 	}
 	private function symmetry(pa:String,pb:String,axis:String,x:Array<Float>,owner:String,out:Array<Float>):Void {
 		var a=point(pa,x), b=point(pb,x), ends=line(axis,x,owner), d=direction(axis,x,owner); var dd=dot(d,d); if(dd<1e-12) throw invalid("collapsed symmetry axis",[owner]);
