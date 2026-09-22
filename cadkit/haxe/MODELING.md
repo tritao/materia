@@ -165,6 +165,13 @@ reversed mode negates the direction, and symmetric mode centers the extrusion
 on the source profile. Legacy documents with editable XYZ extrusion components
 remain readable.
 
+`LinearPatternFeature` generates a centered compound of independent instances
+along an arbitrary unit direction and, optionally, a second nonparallel axis.
+Counts and spacing are editable named parameters; counts must remain positive
+integers. The pattern does not perform a Boolean operation. Pass its compound
+to `BooleanFeature` or the recording builder's `add`/`subtract` methods when
+the instances should modify a target solid.
+
 ## Current operation limits
 
 Splines interpolate nonperiodic point lists. Loft builds a solid through closed

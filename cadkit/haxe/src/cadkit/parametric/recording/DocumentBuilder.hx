@@ -14,6 +14,7 @@ import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.GridFeature;
+import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.parametric.features.LoftFeature;
 import cadkit.parametric.features.OffsetFeature;
 import cadkit.parametric.features.PolylineFeature;
@@ -129,6 +130,22 @@ class DocumentBuilder {
 		var feature = document.add(new GridFeature(source, columns, rows, spacingX.value, spacingY.value));
 		bind(spacingX, feature, "grid.spacingX");
 		bind(spacingY, feature, "grid.spacingY");
+		return feature;
+	}
+
+	public function linearPattern(source:Feature, count:NamedParameter, spacing:NamedParameter, direction:Vector,
+		?secondCount:NamedParameter, ?secondSpacing:NamedParameter, ?secondDirection:Vector):LinearPatternFeature {
+		check();
+		if ((secondCount == null) != (secondSpacing == null) || (secondCount == null) != (secondDirection == null))
+			throw new ParametricError("linear pattern second axis needs count, spacing, and direction");
+		var feature = document.add(new LinearPatternFeature(source, count.value, spacing.value, direction,
+			secondCount == null ? 1 : secondCount.value, secondSpacing == null ? 1 : secondSpacing.value, secondDirection));
+		bind(count, feature, "linear.count");
+		bind(spacing, feature, "linear.spacing");
+		if (secondCount != null) {
+			bind(secondCount, feature, "linear.secondCount");
+			bind(secondSpacing, feature, "linear.secondSpacing");
+		}
 		return feature;
 	}
 

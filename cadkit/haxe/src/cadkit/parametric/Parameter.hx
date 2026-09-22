@@ -7,14 +7,16 @@ import cadkit.parametric.Feature;
 class Parameter {
 	public final name:String;
 	public final minimum:Float;
+	public final integer:Bool;
 	public var value(default, null):Float;
 
 	private final owner:Feature;
 
-	public function new(owner:Feature, name:String, value:Float, minimum:Float) {
+	public function new(owner:Feature, name:String, value:Float, minimum:Float, integer:Bool = false) {
 		this.owner = owner;
 		this.name = name;
 		this.minimum = minimum;
+		this.integer = integer;
 		validate(value);
 		this.value = value;
 		owner.registerParameter(this);
@@ -52,5 +54,7 @@ class Parameter {
 	private function validate(candidate:Float):Void {
 		if (!Math.isFinite(candidate) || candidate <= minimum)
 			throw new ParametricError(name + " must be finite and greater than " + Std.string(minimum));
+		if (integer && candidate != Std.int(candidate))
+			throw new ParametricError(name + " must be an integer");
 	}
 }

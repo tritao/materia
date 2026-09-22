@@ -63,6 +63,7 @@ class HaxeonSmoke {
 
 	static function main():Int {
 		ConstrainedSketchSmoke.run();
+		PatternSmoke.run();
 		ModelingSmoke.run();
 		DocumentModelingSmoke.run();
 		RecordingBuilderSmoke.run();

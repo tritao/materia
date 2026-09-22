@@ -9,6 +9,7 @@ import cadkit.parametric.features.OffsetFeature;
 import cadkit.parametric.features.ShellFeature;
 import cadkit.parametric.features.ProjectFeature;
 import cadkit.parametric.features.GridFeature;
+import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.SketchFeature;
@@ -459,6 +460,12 @@ class DocumentCodec {
 		if (type == "grid")
 			return new GridFeature(requiredFeature(document, intField(record, "source")), intField(record, "columns"), intField(record, "rows"),
 				numberField(record, "spacingX"), numberField(record, "spacingY"));
+		if (type == "linear-pattern") {
+			var rawSecondDirection:Dynamic = Reflect.field(record, "secondDirection");
+			return new LinearPatternFeature(requiredFeature(document, intField(record, "source")), numberField(record, "count"),
+				numberField(record, "spacing"), decodeVector(requiredField(record, "direction")), numberField(record, "secondCount"),
+				numberField(record, "secondSpacing"), rawSecondDirection == null ? null : decodeVector(rawSecondDirection));
+		}
 		return null;
 	}
 
@@ -558,6 +565,22 @@ class DocumentCodec {
 				rows: value.rows,
 				spacingX: value.spacingX.value,
 				spacingY: value.spacingY.value
+			};
+		}
+		if (type == "linear-pattern") {
+			var value:LinearPatternFeature = cast feature;
+
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				source: value.source.id.toInt(),
+				count: value.count.value,
+				spacing: value.spacing.value,
+				direction: encodeVector(value.direction),
+				secondCount: value.secondCount.value,
+				secondSpacing: value.secondSpacing.value,
+				secondDirection: value.secondDirection == null ? null : encodeVector(value.secondDirection)
 			};
 		}
 		return null;
