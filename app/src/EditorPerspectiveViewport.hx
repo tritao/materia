@@ -15,6 +15,7 @@ import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.UiEvent;
 import nativekit.ui.core.UiEventKind;
+import nativekit.ui.core.UiKey;
 import nativekit.ui.core.View;
 import nativekit.ui.host.DesktopUiHostContext;
 import nativekit.ui.semantics.AccessibilityRole;
@@ -43,6 +44,9 @@ class EditorPerspectiveViewport implements View {
   var pointerStartX:Float = 0.0;
   var pointerStartY:Float = 0.0;
   var pointerMoved:Bool = false;
+  var objectDrag:Null<PerspectiveSceneDrag> = null;
+  var gridSnapEnabled:Bool = false;
+  var gridStep:Float = EditorSceneViewport.GRID_STEP;
 
   public function new(key:String, scene:EditorScene, host:DesktopUiHostContext, ?style:LayoutStyle) {
     this.key = key;
@@ -55,6 +59,7 @@ class EditorPerspectiveViewport implements View {
     return context.withScope(new Key(key), function() {
       var node = new RenderNode(context.id("perspective"), LayoutVisualKind.Custom, style);
       node.hitTestSelf = true;
+      node.focusable = true;
       node.semantics = new Semantics(AccessibilityRole.Image,
         "Scene perspective GPU view");
       node.onPaint(paint, "perspective:" + scene.revision + ":" + camera.revision + ":" +
@@ -130,6 +135,31 @@ class EditorPerspectiveViewport implements View {
 
   public function resetView():Void camera.reset();
 
+  public function setPlacementOptions(snap:Bool, step:Float):Void {
+    gridSnapEnabled = snap;
+    gridStep = step;
+  }
+
+  public function dragging():Bool return objectDrag != null;
+
+  public function commitDrag():Null<PerspectivePointer> {
+    if (objectDrag == null) return null;
+    objectDrag.commit(); objectDrag = null;
+    return releaseNavigation();
+  }
+
+  public function cancelDrag():Null<PerspectivePointer> {
+    if (objectDrag == null) return null;
+    objectDrag.cancel(); objectDrag = null;
+    return releaseNavigation();
+  }
+
+  function releaseNavigation():Null<PerspectivePointer> {
+    var pointer = navigationPointer;
+    navigationPointer = null; navigationMode = 0;
+    return pointer == null ? null : new PerspectivePointer(pointer, pointerX, pointerY);
+  }
+
   public function pick(localX:Float, localY:Float):String {
     return pickScene(scene, camera, Math.max(1, renderedWidth), Math.max(1, renderedHeight),
       localX, localY);
@@ -180,6 +210,15 @@ class EditorPerspectiveViewport implements View {
       if (event.button != 0 && event.button != 2) return;
       navigationPointer = event.pointerId;
       navigationMode = event.button == 0 ? 1 : 2;
+      if (event.button == 0) {
+        var hit = pick(event.localX, event.localY);
+        if (hit != "scene") {
+          scene.select(hit);
+          objectDrag = PerspectiveSceneDrag.begin(scene, camera, hit, event.localX, event.localY,
+            Math.max(1, renderedWidth), Math.max(1, renderedHeight), gridSnapEnabled, gridStep);
+          if (objectDrag != null) navigationMode = 3;
+        }
+      }
       pointerX = event.x; pointerY = event.y;
       pointerStartX = event.x; pointerStartY = event.y; pointerMoved = false;
       event.capturePointer(); event.preventDefault(); event.stopPropagation();
@@ -191,12 +230,17 @@ class EditorPerspectiveViewport implements View {
       if (Math.abs(event.x - pointerStartX) >= 3.0 || Math.abs(event.y - pointerStartY) >= 3.0)
         pointerMoved = true;
       if (navigationMode == 1) camera.orbit(deltaX, deltaY);
-      else camera.pan(deltaX, deltaY, Math.max(1, renderedHeight));
+      else if (navigationMode == 2) camera.pan(deltaX, deltaY, Math.max(1, renderedHeight));
+      else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY,
+        Math.max(1, renderedWidth), Math.max(1, renderedHeight));
       event.preventDefault(); event.stopPropagation();
     });
     var finish = function(event:UiEvent) {
       if (navigationPointer == null || event.pointerId != navigationPointer) return;
-      if (event.kind == UiEventKind.PointerUp && navigationMode == 1 && !pointerMoved)
+      if (navigationMode == 3 && objectDrag != null) {
+        if (event.kind == UiEventKind.PointerUp) objectDrag.commit(); else objectDrag.cancel();
+        objectDrag = null;
+      } else if (event.kind == UiEventKind.PointerUp && navigationMode == 1 && !pointerMoved)
         scene.select(pick(event.localX, event.localY));
       navigationPointer = null; navigationMode = 0;
       event.releasePointer(); event.preventDefault(); event.stopPropagation();
@@ -207,6 +251,12 @@ class EditorPerspectiveViewport implements View {
       camera.zoom(event.deltaY);
       event.preventDefault(); event.stopPropagation();
     });
+    node.on(UiEventKind.KeyDown, function(event:UiEvent) {
+      if (event.key != UiKey.Escape || objectDrag == null) return;
+      objectDrag.cancel(); objectDrag = null;
+      navigationPointer = null; navigationMode = 0;
+      event.releasePointer(); event.preventDefault(); event.stopPropagation();
+    });
   }
 
   static function defaultStyle():LayoutStyle {
@@ -215,5 +265,14 @@ class EditorPerspectiveViewport implements View {
     result.height = LayoutAxis.stretch();
     result.clipToParent = true;
     return result;
+  }
+}
+
+class PerspectivePointer {
+  public final id:Int;
+  public final x:Float;
+  public final y:Float;
+  public function new(id:Int, x:Float, y:Float) {
+    this.id = id; this.x = x; this.y = y;
   }
 }

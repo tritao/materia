@@ -14,6 +14,7 @@ import app.SensorConfiguration;
 import app.ApplicationSimulation;
 import app.PerspectiveCamera;
 import app.EditorPerspectiveViewport;
+import app.PerspectiveSceneDrag;
 import robotkit.world.RobotWorld;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
@@ -75,6 +76,32 @@ class SceneEditingTests {
     camera.reset();
     near(camera.targetX, 0.0, "perspective reset restores target X");
     near(camera.targetY, 0.0, "perspective reset restores target Y");
+  }
+
+  static function perspectiveDragging():Void {
+    var scene = new EditorScene();
+    var camera = new PerspectiveCamera();
+    camera.frame(-1.5, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
+    var drag = PerspectiveSceneDrag.begin(scene, camera, "box", 400, 300, 800, 600, false, 0.2);
+    check(drag != null, "perspective drag begins on its movement plane");
+    check(drag.update(camera, 500, 300, 800, 600), "perspective drag previews movement");
+    var movedX = scene.info("box").localTransform().element(12);
+    check(movedX != -1.5 && drag.commit(), "perspective release commits one move");
+    check(scene.document.history.undoCount == 1, "perspective drag creates one undo entry");
+    scene.document.undo();
+    near(scene.info("box").localTransform().element(12), -1.5,
+      "undo restores the perspective drag origin");
+    scene.document.redo();
+    near(scene.info("box").localTransform().element(12), movedX,
+      "redo restores the perspective move");
+    var cancel = PerspectiveSceneDrag.begin(scene, camera, "box", 400, 300, 800, 600, true, 0.2);
+    check(cancel != null && cancel.update(camera, 450, 350, 800, 600),
+      "snapped perspective drag previews movement");
+    check(cancel.cancel(), "perspective drag cancels");
+    near(scene.info("box").localTransform().element(12), movedX,
+      "cancel restores the perspective drag origin");
+    check(scene.document.history.undoCount == 1, "cancel adds no undo entry");
+    scene.dispose();
   }
 
   static function editingLifecycle():Void {
@@ -583,6 +610,7 @@ class SceneEditingTests {
       editingLifecycle();
       renderingParity();
       perspectiveCameraMath();
+      perspectiveDragging();
       sensorConfiguration();
       sensorWorkflow();
       SceneDocumentTests.run();

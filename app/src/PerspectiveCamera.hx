@@ -103,6 +103,16 @@ class PerspectiveCamera {
       direction[0], direction[1], direction[2]);
   }
 
+  public function intersectPlaneZ(x:Float, y:Float, width:Float, height:Float,
+      planeZ:Float):Null<PerspectivePlanePoint> {
+    var ray = screenRay(x, y, width, height);
+    if (Math.abs(ray.directionZ) < 0.000001) return null;
+    var distance = (planeZ - ray.originZ) / ray.directionZ;
+    if (distance < 0.0) return null;
+    return new PerspectivePlanePoint(ray.originX + ray.directionX * distance,
+      ray.originY + ray.directionY * distance, planeZ);
+  }
+
   function eyePosition():Array<Float> {
     var cosPitch = Math.cos(pitch);
     return [targetX + distance * cosPitch * Math.cos(yaw),
@@ -133,5 +143,14 @@ class PerspectiveRay {
       directionX:Float, directionY:Float, directionZ:Float) {
     this.originX = originX; this.originY = originY; this.originZ = originZ;
     this.directionX = directionX; this.directionY = directionY; this.directionZ = directionZ;
+  }
+}
+
+class PerspectivePlanePoint {
+  public final x:Float;
+  public final y:Float;
+  public final z:Float;
+  public function new(x:Float, y:Float, z:Float) {
+    this.x = x; this.y = y; this.z = z;
   }
 }

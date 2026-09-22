@@ -710,6 +710,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function perspectivePanel():View {
+    if (perspectiveViewport != null)
+      perspectiveViewport.setPlacementOptions(gridSnapEnabled, gridSpacing);
     return perspectiveViewport == null
       ? new Text("Perspective rendering requires the desktop GPU host.")
       : perspectiveViewport;
@@ -731,7 +733,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = sceneInspector;
-    inspector.enabled = !viewportContent.dragging();
+    inspector.enabled = !viewportContent.dragging() &&
+      (perspectiveViewport == null || !perspectiveViewport.dragging());
     return new Column(
       "inspector-panel",
       [
@@ -895,7 +898,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       cancelActiveDrag();
       updateCommandContext();
       commands.refresh();
-    }, new Shortcut(UiKey.Escape), function() return viewportContent.dragging()));
+    }, new Shortcut(UiKey.Escape), function() return viewportContent.dragging() ||
+      (perspectiveViewport != null && perspectiveViewport.dragging())));
   }
 
   function registerGridSpacing(id:String, label:String, spacing:Float):Void {
@@ -939,12 +943,22 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.refresh();
   }
 
-  function canEditObjects():Bool return !documents.blocked() && !viewportContent.dragging();
+  function canEditObjects():Bool return !documents.blocked() && !viewportContent.dragging() &&
+    (perspectiveViewport == null || !perspectiveViewport.dragging());
 
   function commitActiveDrag():Void {
-    if (!viewportContent.dragging()) return;
-    viewportContent.commitDrag();
-    releaseDragPointer();
+    var changed = false;
+    if (viewportContent.dragging()) {
+      viewportContent.commitDrag();
+      releaseDragPointer();
+      changed = true;
+    }
+    if (perspectiveViewport != null && perspectiveViewport.dragging()) {
+      var pointer = perspectiveViewport.commitDrag();
+      if (pointer != null) ui.pointerCancel(pointer.id, pointer.x, pointer.y);
+      changed = true;
+    }
+    if (!changed) return;
     updateCommandContext();
     commands.refresh();
   }
@@ -952,6 +966,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function cancelActiveDrag():Void {
     if (viewportContent.dragging()) viewportContent.cancelDrag();
     releaseDragPointer();
+    if (perspectiveViewport != null && perspectiveViewport.dragging()) {
+      var pointer = perspectiveViewport.cancelDrag();
+      if (pointer != null) ui.pointerCancel(pointer.id, pointer.x, pointer.y);
+    }
     updateCommandContext();
     commands.refresh();
   }
