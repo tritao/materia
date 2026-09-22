@@ -10,6 +10,7 @@ import nativekit.scene.GeometryData;
 import nativekit.scene.MaterialData;
 import nativekit.scene.Transform;
 import nativekit.ui.core.EditorDocument;
+import nativekit.ui.core.EditOperation;
 import nativekit.ui.core.CommandContext;
 import nativekit.ui.core.PropertyDescriptor;
 import nativekit.ui.core.PropertyDescriptorOptions;
@@ -21,8 +22,9 @@ class EditorScene {
   // Retained UI caches survive document replacement, so revisions must too.
   static var nextRevision:Int = 0;
   public final document:EditorDocument;
-  final scene:Scene;
-  final objects:Array<EditorSceneObject>;
+  var scene:Scene;
+  var objects:Array<EditorSceneObject>;
+  var nextObjectId:Int = 1;
   var snapshot:Snapshot;
   var spatial:SpatialIndex;
   public var selectedId(default, null):String = "box";
@@ -79,6 +81,93 @@ class EditorScene {
       transaction.dispose();
       throw error;
     }
+  }
+
+  public function canCreate():Bool return objects.length < 10000;
+
+  function allocateId():String {
+    var id = "rectangle-" + nextObjectId;
+    nextObjectId++;
+    while (object(id) != null) {
+      id = "rectangle-" + nextObjectId;
+      nextObjectId++;
+    }
+    return id;
+  }
+
+  public function createRectangle():Bool {
+    if (!canCreate()) return false;
+    var data = records();
+    var id = allocateId();
+    data.push({id: id, label: "Rectangle", type: "rectangle", x: 0.0, y: 0.0, z: 0.0,
+      width: 1.6, height: 1.2, red: 0.22, green: 0.52, blue: 0.85, visible: true});
+    return changeObjects("Create rectangle", data, id);
+  }
+
+  public function duplicateSelected():Bool {
+    if (!canCreate() || object(selectedId) == null) return false;
+    var data = records();
+    var source:SceneObjectData = null;
+    for (item in data) if (item.id == selectedId) source = item;
+    var id = allocateId();
+    data.push({id: id, label: source.label + " copy", type: source.type,
+      x: Math.min(1000000, source.x + 0.25), y: Math.min(1000000, source.y + 0.25), z: source.z,
+      width: source.width, height: source.height, red: source.red, green: source.green,
+      blue: source.blue, visible: source.visible});
+    return changeObjects("Duplicate object", data, id);
+  }
+
+  public function deleteSelected():Bool {
+    if (object(selectedId) == null) return false;
+    var data = records();
+    var index = 0;
+    while (data[index].id != selectedId) index++;
+    data.splice(index, 1);
+    var next = data.length == 0 ? "scene" : data[index < data.length ? index : data.length - 1].id;
+    return changeObjects("Delete object", data, next);
+  }
+
+  function changeObjects(label:String, after:Array<SceneObjectData>, selection:String):Bool {
+    var before = records();
+    var previousSelection = selectedId;
+    return document.apply(new EditOperation(label,
+      function() replaceObjects(after, selection),
+      function() replaceObjects(before, previousSelection)));
+  }
+
+  // Build before swapping so allocation failures preserve the live scene and history.
+  // Rebuilding also releases removed geometry/materials instead of accumulating tombstones.
+  function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
+    var next = new EditorScene(data);
+    var oldScene = scene;
+    var oldSnapshot = snapshot;
+    var oldSpatial = spatial;
+    scene = next.scene;
+    snapshot = next.snapshot;
+    spatial = next.spatial;
+    objects = next.objects;
+    next.scene = oldScene;
+    next.snapshot = oldSnapshot;
+    next.spatial = oldSpatial;
+    next.dispose();
+    selectedId = selection;
+    selectionRevision++;
+    nextRevision++;
+    revision = nextRevision;
+  }
+
+  public function setName(id:String, label:String):Void {
+    if (StringTools.trim(label).length == 0 || SceneCodec.containsNul(label))
+      throw "Name cannot be empty or contain NUL";
+    var item = object(id);
+    if (item == null) throw "Unknown scene object: " + id;
+    var transaction = scene.beginTransaction();
+    try {
+      transaction.setName(item.occurrence, label);
+      transaction.commit();
+    } catch (error:Dynamic) { transaction.dispose(); throw error; }
+    item.label = label;
+    publish();
   }
 
   public function items():Array<EditorSceneObject> return objects.copy();
@@ -174,6 +263,25 @@ class EditorScene {
           default: throw "Visibility requires a boolean";
         }
       }, visibility));
+    var name = new PropertyDescriptorOptions();
+    name.category = "Object";
+    name.validator = function(_, value) return switch (value) {
+      case PropertyValue.Text(text):
+        StringTools.trim(text).length == 0 || SceneCodec.containsNul(text)
+          ? "Name cannot be empty or contain NUL" : null;
+      default: "Name requires text";
+    };
+    result.push(new PropertyDescriptor(prefix + "name", "Name", PropertyType.Text,
+      function(_) {
+        var item = object(id);
+        if (item == null) throw "Unknown scene object: " + id;
+        return PropertyValue.Text(item.label);
+      }, function(_, value) {
+        switch (value) {
+          case PropertyValue.Text(text): setName(id, text);
+          default: throw "Name requires text";
+        }
+      }, name));
     return result;
   }
 
@@ -228,7 +336,7 @@ class EditorScene {
 
 class EditorSceneObject {
   public final id:String;
-  public final label:String;
+  public var label:String;
   public final occurrence:Occurrence;
   public final width:Float;
   public final height:Float;

@@ -297,6 +297,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     )];
     if (contextMenuVisible) {
       var menu = new CommandMenu("scene-context-menu", [
+        "scene.create",
+        "scene.duplicate",
+        "scene.delete",
         "scene.frame-selected",
         "scene.toggle-grid",
         "workspace.reset"
@@ -519,6 +522,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "hierarchy-panel",
       [
         new KeyedView("heading", sectionHeading("SCENE HIERARCHY")),
+        new KeyedView("actions", new Column("scene-object-actions", [
+          new KeyedView("create", new CommandButton("scene-create", "scene.create", commands)),
+          new KeyedView("duplicate", new CommandButton("scene-duplicate", "scene.duplicate", commands)),
+          new KeyedView("delete", new CommandButton("scene-delete", "scene.delete", commands))
+        ])),
         new KeyedView(
           "tree",
           tree
@@ -665,12 +673,30 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function installCommands():Void {
     workspace.installCommands(commands, "workspace");
+    commands.register(new Command("scene.create", "Add rectangle", function() {
+      scene.createRectangle();
+      updateCommandContext();
+      commands.refresh();
+    }, null, function() return !documents.blocked() && scene.canCreate()));
+    commands.register(new Command("scene.duplicate", "Duplicate", function() {
+      scene.duplicateSelected();
+      updateCommandContext();
+      commands.refresh();
+    }, new Shortcut(68, UiModifier.Control), function() return !documents.blocked()
+      && scene.canCreate() && scene.object(scene.selectedId) != null));
+    commands.register(new Command("scene.delete", "Delete", function() {
+      scene.deleteSelected();
+      updateCommandContext();
+      commands.refresh();
+    }, null, function() return !documents.blocked() && scene.object(scene.selectedId) != null));
     commands.register(new Command("editor.undo", "Undo", function() {
       scene.document.undo();
+      updateCommandContext();
       commands.refresh();
     }, new Shortcut(UiKey.Z, UiModifier.Control), function() return !documents.blocked() && scene.document.canUndo));
     commands.register(new Command("editor.redo", "Redo", function() {
       scene.document.redo();
+      updateCommandContext();
       commands.refresh();
     }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return !documents.blocked() && scene.document.canRedo));
     commands.register(new Command("editor.new", "New", function() documents.requestNew(),

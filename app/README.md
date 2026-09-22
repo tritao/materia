@@ -15,10 +15,16 @@ SceneKit. `src/Main.hx` composes:
 
 The editor starts with two planar SceneKit meshes in an orthographic XY view.
 Click an object in the viewport or hierarchy to select it; the yellow outline
-tracks selection. Edit Position X/Y (metres) or Visible in the inspector.
+tracks selection. Edit Name, Position X/Y (metres), or Visible in the inspector.
 Hidden objects remain selectable in the hierarchy. Click empty viewport space
 or the Scene root to clear object selection.
 
+- Add rectangle, Duplicate (`Ctrl+D`), and Delete are available in the hierarchy
+  panel, viewport context menu, and command palette. Rename through the inspector's
+  Name field. These edits support undo/redo and mark the document as unsaved.
+- Create and duplicate select the new object; duplicates retain appearance and
+  visibility with a small XY offset. Delete selects a neighbour or the Scene root.
+  Undo restores the previous objects, order, and selection; redo retains object IDs.
 - Middle-drag pans the view; the wheel zooms around the pointer.
 - Frame selected fits the selected object's bounds.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
