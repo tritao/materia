@@ -12,6 +12,12 @@ import cadkit.parametric.features.GridFeature;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.SketchFeature;
+import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.sketch.ConstrainedSketch;
+import cadkit.sketch.SketchPoint;
+import cadkit.sketch.SketchEntity;
+import cadkit.sketch.SketchConstraint;
+import cadkit.sketch.SolverSettings;
 import haxe.Json;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
@@ -77,6 +83,8 @@ class DocumentCodec {
 				var modeling = decodeModelingFeature(featureType, record, document);
 				if (modeling != null) {
 					feature = document.add(modeling);
+				} else if (featureType == "constrained-sketch") {
+					feature = document.add(decodeConstrainedSketch(record));
 				} else if (featureType == "sketch") {
 					var planeRecord = requiredField(record, "plane");
 					feature = document.add(new SketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
@@ -178,7 +186,9 @@ class DocumentCodec {
 		var modeling = encodeModelingFeature(feature, references);
 		if (modeling != null)
 			return modeling;
-		if (featureType == "sketch") {
+		if (featureType == "constrained-sketch") {
+			return encodeConstrainedSketch(cast feature, references);
+		} else if (featureType == "sketch") {
 			var sketch:SketchFeature = cast feature;
 			return {
 				id: feature.id.toInt(),
@@ -298,6 +308,33 @@ class DocumentCodec {
 		}
 		throw new ParametricError("unsupported feature type: " + featureType);
 	}
+
+	private static function encodeConstrainedSketch(feature:ConstrainedSketchFeature,references:Array<Dynamic>):Dynamic {
+		var sketch=feature.sketch();var points:Array<Dynamic> = [];var entities:Array<Dynamic> = [];var constraints:Array<Dynamic> = [];
+		for(p in sketch.points())points.push({id:p.id,x:p.x,y:p.y});
+		for(e in sketch.entities())entities.push({id:e.id,kind:e.kind,first:e.first,second:e.second,radius:e.radius,startAngle:e.startAngle,endAngle:e.endAngle,clockwise:e.clockwise,construction:e.construction});
+		for(c in sketch.constraints()){var value=c.value;if(c.kind=="distance"||c.kind=="radius"||c.kind=="angle")value=feature.dimension(c.id).value;constraints.push({id:c.id,kind:c.kind,first:c.first,second:c.second,third:c.third,value:value});}
+		return {id:feature.id.toInt(),type:"constrained-sketch",references:references,units:sketch.units,
+			plane:{origin:encodeVector(sketch.plane.origin),xDirection:encodeVector(sketch.plane.xDirection),normal:encodeVector(sketch.plane.normal)},
+			settings:{tolerance:sketch.settings.tolerance,rankTolerance:sketch.settings.rankTolerance,maxIterations:sketch.settings.maxIterations,initialDamping:sketch.settings.initialDamping},
+			points:points,entities:entities,constraints:constraints};
+	}
+
+	private static function decodeConstrainedSketch(record:Dynamic):ConstrainedSketchFeature {
+		var p=requiredField(record,"plane"),s=requiredField(record,"settings");
+		var sketch=new ConstrainedSketch(new Plane(decodeVector(requiredField(p,"origin")),decodeVector(requiredField(p,"xDirection")),decodeVector(requiredField(p,"normal"))),stringField(record,"units"),
+			new SolverSettings(numberField(s,"tolerance"),numberField(s,"rankTolerance"),intField(s,"maxIterations"),numberField(s,"initialDamping")));
+		var pointRecords:Array<Dynamic> = cast requiredField(record,"points");for(value in pointRecords)sketch.addPoint(new SketchPoint(stringField(value,"id"),numberField(value,"x"),numberField(value,"y")));
+		var entityRecords:Array<Dynamic> = cast requiredField(record,"entities");for(value in entityRecords)sketch.addEntity(switch(stringField(value,"kind")){
+			case "line":SketchEntity.line(stringField(value,"id"),stringField(value,"first"),stringField(value,"second"),boolField(value,"construction"));
+			case "circle":SketchEntity.circle(stringField(value,"id"),stringField(value,"first"),numberField(value,"radius"),boolField(value,"construction"));
+			case "arc":SketchEntity.arc(stringField(value,"id"),stringField(value,"first"),numberField(value,"radius"),numberField(value,"startAngle"),numberField(value,"endAngle"),boolField(value,"clockwise"),boolField(value,"construction"));
+			default:throw new ParametricError("unsupported constrained sketch entity");});
+		var constraintRecords:Array<Dynamic> = cast requiredField(record,"constraints");for(value in constraintRecords)sketch.addConstraint(SketchConstraint.raw(stringField(value,"id"),stringField(value,"kind"),stringField(value,"first"),optionalString(value,"second"),optionalString(value,"third"),numberField(value,"value")));
+		return new ConstrainedSketchFeature(sketch);
+	}
+
+	private static function optionalString(record:Dynamic,name:String):Null<String> { var value:Dynamic=Reflect.field(record,name);if(value==null)return null;if(!Std.isOfType(value,String))throw new ParametricError("document field is not a string: "+name);return cast value; }
 
 	private static function decodeModelingFeature(type:String, record:Dynamic, document:Document):Null<Feature> {
 		if (type == "wire")

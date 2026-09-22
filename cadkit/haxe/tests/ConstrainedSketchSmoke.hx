@@ -1,0 +1,110 @@
+import cadkit.sketch.ConstrainedSketch;
+import cadkit.sketch.SketchConstraint;
+import cadkit.sketch.SketchEntity;
+import cadkit.sketch.SketchPoint;
+import cadkit.sketch.SketchSolveError;
+import cadkit.sketch.SketchProfile;
+import cadkit.sketch.ProfileError;
+import cadkit.parametric.Document;
+import cadkit.parametric.DocumentCodec;
+import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.parametric.features.ExtrudeFeature;
+
+class ConstrainedSketchSmoke {
+	static function check(value:Bool, message:String):Void { if (!value) throw message; }
+	static function near(value:Float, expected:Float):Void { check(Math.abs(value - expected) < 1e-5, 'expected $expected, got $value'); }
+
+	public static function run():Void {
+		var sketch = new ConstrainedSketch();
+		sketch.addPoint(new SketchPoint("p0", 0.2, -0.1)).addPoint(new SketchPoint("p1", 9.7, 0.3))
+			.addPoint(new SketchPoint("p2", 10.4, 5.1)).addPoint(new SketchPoint("p3", -0.3, 4.8));
+		sketch.addEntity(SketchEntity.line("bottom", "p0", "p1")).addEntity(SketchEntity.line("right", "p1", "p2"))
+			.addEntity(SketchEntity.line("top", "p2", "p3")).addEntity(SketchEntity.line("left", "p3", "p0"));
+		sketch.addConstraint(SketchConstraint.fixed("origin", "p0"))
+			.addConstraint(SketchConstraint.horizontal("h0", "bottom")).addConstraint(SketchConstraint.horizontal("h1", "top"))
+			.addConstraint(SketchConstraint.vertical("v0", "right")).addConstraint(SketchConstraint.vertical("v1", "left"))
+			.addConstraint(SketchConstraint.distance("width", "p0", "p1", 10))
+			.addConstraint(SketchConstraint.distance("height", "p1", "p2", 5));
+		var solved = sketch.solve();
+		near(solved.x("p1") - solved.x("p0"), 10); near(solved.y("p2") - solved.y("p1"), 5);
+		check(solved.diagnostic.converged, "rectangle converges");
+
+		var circle = new ConstrainedSketch();
+		circle.addPoint(new SketchPoint("c", 2, 3)).addEntity(SketchEntity.circle("circle", "c", 1.2));
+		circle.addConstraint(SketchConstraint.fixed("center", "c")).addConstraint(SketchConstraint.radius("r", "circle", 4));
+		near(circle.solve().radius("circle"), 4);
+
+		var loose = new ConstrainedSketch();
+		loose.addPoint(new SketchPoint("a", 0, 0)).addPoint(new SketchPoint("b", 2, 1)).addEntity(SketchEntity.line("l", "a", "b"));
+		loose.addConstraint(SketchConstraint.horizontal("horizontal", "l"));
+		check(loose.solve().diagnostic.status == "under-constrained", "local degrees of freedom");
+		loose.addConstraint(SketchConstraint.horizontal("duplicate", "l"));
+		check(loose.solve().diagnostic.status == "redundant", "redundancy diagnosis");
+
+		var conflict = new ConstrainedSketch();
+		conflict.addPoint(new SketchPoint("a", 0, 0)).addPoint(new SketchPoint("b", 1, 0));
+		conflict.addConstraint(SketchConstraint.fixed("fa", "a")).addConstraint(SketchConstraint.fixed("fb", "b"))
+			.addConstraint(SketchConstraint.distance("impossible", "a", "b", 2));
+		var failed = false;
+		try conflict.solve() catch (error:SketchSolveError) {
+			failed = error.diagnostic.status == "conflicting" && error.diagnostic.constraintIds.length > 0;
+		}
+		check(failed, "conflicting constraints are distinct");
+
+		var mixed=new ConstrainedSketch();
+		for(p in [new SketchPoint("m0",0,0),new SketchPoint("m1",2,0),new SketchPoint("m2",0,1),new SketchPoint("m3",2,1),
+			new SketchPoint("m4",0,2),new SketchPoint("mc1",0,4),new SketchPoint("mc2",2,4),new SketchPoint("ms0",-1,2),new SketchPoint("ms1",1,2)])mixed.addPoint(p);
+		mixed.addEntity(SketchEntity.line("ml1","m0","m1")).addEntity(SketchEntity.line("ml2","m2","m3"))
+			.addEntity(SketchEntity.line("ml3","m0","m4")).addEntity(SketchEntity.circle("mcircle1","mc1",1))
+			.addEntity(SketchEntity.circle("mcircle2","mc2",1)).addEntity(SketchEntity.circle("mcircle3","mc1",1))
+			.addEntity(SketchEntity.arc("marc","mc1",1,0,Math.PI,false,true));
+		mixed.addConstraint(SketchConstraint.equal("equal.lines","ml1","ml2")).addConstraint(SketchConstraint.parallel("parallel","ml1","ml2"))
+			.addConstraint(SketchConstraint.perpendicular("perpendicular","ml1","ml3")).addConstraint(SketchConstraint.angle("angle","ml1","ml3",Math.PI/2))
+			.addConstraint(SketchConstraint.concentric("concentric","mcircle1","mcircle3")).addConstraint(SketchConstraint.pointOn("point.on","m1","ml1"))
+			.addConstraint(SketchConstraint.tangent("tangent.circles","mcircle1","mcircle2")).addConstraint(SketchConstraint.symmetric("symmetric","ms0","ms1","ml3"))
+			.addConstraint(SketchConstraint.equal("equal.radii","mcircle1","marc"));
+		check(mixed.solve().diagnostic.converged,"expanded constraint set");
+
+		var open=new ConstrainedSketch();open.addPoint(new SketchPoint("o0",0,0)).addPoint(new SketchPoint("o1",1,0)).addEntity(SketchEntity.line("open.line","o0","o1"));
+		failed=false;try SketchProfile.build(open,open.solve()) catch(error:ProfileError) failed=error.kind=="open"&&error.entityIds.length>0;
+		check(failed,"open profiles identify entities");
+
+		var profile = new ConstrainedSketch();
+		profile.addPoint(new SketchPoint("q0", -10, -5)).addPoint(new SketchPoint("q1", 10, -5))
+			.addPoint(new SketchPoint("q2", 10, 5)).addPoint(new SketchPoint("q3", -10, 5));
+		profile.addEntity(SketchEntity.line("qb", "q0", "q1")).addEntity(SketchEntity.line("qr", "q1", "q2"))
+			.addEntity(SketchEntity.line("qt", "q2", "q3")).addEntity(SketchEntity.line("ql", "q3", "q0"));
+		for (i in 0...4) {
+			var id = "hc" + i;
+			profile.addPoint(new SketchPoint(id, i % 2 == 0 ? -6 : 6, i < 2 ? -2 : 2));
+			profile.addEntity(SketchEntity.circle("hole" + i, id, 1));
+			profile.addConstraint(SketchConstraint.fixed("fix" + i, id));
+			profile.addConstraint(SketchConstraint.radius("holeRadius" + i, "hole" + i, 1));
+		}
+		for (i in 0...4) profile.addConstraint(SketchConstraint.fixed("corner" + i, "q" + i));
+		var face = SketchProfile.build(profile, profile.solve());
+		var solid = face.extrude(3);
+		near(solid.shape.volume(), (200 - 4 * Math.PI) * 3);
+		solid.close(); face.close();
+
+		var document=new Document();
+		var feature=document.add(new ConstrainedSketchFeature(sketch));
+		var width=document.defineParameter("width",10);width.bind(feature.dimension("width"));
+		var extrude=document.add(new ExtrudeFeature(feature,0,0,2));document.setOutput(extrude);document.recompute();
+		near(document.result().volume(),100);
+		width.set(12);document.recompute();near(document.result().volume(),120);
+		check(document.undo(),"constrained sketch undo");document.recompute();near(document.result().volume(),100);
+		var loaded=DocumentCodec.decode(DocumentCodec.encode(document));near(loaded.result().volume(),100);
+		loaded.parameter("width").set(14);loaded.recompute();near(loaded.result().volume(),140);
+		loaded.close();document.close();
+
+		var plate=new ConstrainedMountingPlate();
+		var oldVolume=plate.finish.currentShape().volume();
+		plate.resize(100,60,12,4);check(plate.finish.currentShape().volume()>oldVolume,"mounting plate recompute");
+		check(plate.document.undo(),"mounting plate undo");plate.document.recompute();near(plate.finish.currentShape().volume(),oldVolume);
+		check(plate.document.redo(),"mounting plate redo");plate.document.recompute();
+		var saved=DocumentCodec.decode(DocumentCodec.encode(plate.document));near(saved.result().volume(),plate.finish.currentShape().volume());saved.close();
+		var previous=plate.finish.currentShape();failed=false;try plate.resize(20,20,9,3) catch(error:Dynamic) failed=true;
+		check(failed&&previous==plate.finish.currentShape(),"contradictory plate edit preserves solid");plate.close();
+	}
+}

@@ -24,6 +24,8 @@ import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.SweepFeature;
 import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.WireFeature;
+import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.sketch.ConstrainedSketch;
 
 /** Explicit recorder for the serializable document feature set.
  * Methods borrow features and dimensions and return document-owned features.
@@ -73,6 +75,18 @@ class DocumentBuilder {
 		var feature = document.add(new SketchFeature("slot", length.value, width.value, plane));
 		bind(length, feature, "sketch.width");
 		bind(width, feature, "sketch.height");
+		return feature;
+	}
+
+	/** Record a constrained sketch and bind dimension constraint IDs to named parameters. */
+	public function constrainedSketch(sketch:ConstrainedSketch, dimensions:Map<String, NamedParameter>):ConstrainedSketchFeature {
+		check();
+		var feature=document.add(new ConstrainedSketchFeature(sketch));
+		for(constraintId in dimensions.keys()) {
+			var dimension=dimensions.get(constraintId);
+			if(dimension==null||dimension.document!=document)throw new ParametricError("named parameter belongs to another builder");
+			dimension.bind(feature.dimension(constraintId));
+		}
 		return feature;
 	}
 

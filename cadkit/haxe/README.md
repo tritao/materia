@@ -109,3 +109,33 @@ parameter editing, recompute, JSON persistence, and undo/redo.
 `cadkit.parametric.recording.DocumentBuilder` is the explicit bridge from
 builder-style construction to a serializable feature graph. Named dimensions
 can drive multiple feature parameters and retain their bindings after reload.
+
+## Constrained sketches
+
+`cadkit.sketch` provides an OCCT-independent two-dimensional constraint model
+with stable string IDs, construction geometry, explicit workplanes and units,
+and separate authored and solved coordinates. `ConstrainedSketch.solve()` uses
+bounded damped nonlinear least squares and commits a new solution snapshot only
+after convergence. Diagnostics distinguish invalid input, local under- or
+full-constraint rank, redundant constraints, and nonconvergent/conflicting
+constraints; the latter reports the constraint IDs with significant residuals.
+
+The initial constraint set includes fixed points, coincidence, horizontal and
+vertical lines, distance and radius dimensions, equal length/radius, parallel,
+perpendicular, angle, concentricity, point-on-entity, tangency, and reflection
+symmetry. Tangency supports line-circle, line-arc, circle-circle, circle-arc,
+and arc-arc combinations. Arcs retain their authored direction.
+
+`SketchProfile.build()` converts a successful solution through the existing
+native edge, wire, and planar-face constructors. Construction entities are
+excluded. Open, branching, self-intersecting, empty, and native-invalid
+boundaries raise `ProfileError` with entity IDs. Nested loops become holes.
+
+`ConstrainedSketchFeature` integrates constrained profiles with staged document
+recompute. Distance, radius, and angle constraints become bindable feature
+parameters named `constraint.<id>`. The document codec persists entities,
+constraints, solver settings, workplanes, and named bindings. The recording
+builder exposes `constrainedSketch()`. See
+`examples/modeling/ConstrainedMountingPlate.hx` for one centered, filleted plate
+whose width, height, edge clearance, hole radius, and thickness survive
+recompute, undo/redo, and JSON reload.
