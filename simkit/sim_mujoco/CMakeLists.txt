@@ -53,6 +53,14 @@ target_include_directories(nativekit_sim_mujoco
 target_link_libraries(nativekit_sim_mujoco
     PUBLIC NativeKit::sim_core
     PRIVATE ${NK_MUJOCO_TARGET})
+if(UNIX AND NOT APPLE)
+    # Some Linux toolchains enable --as-needed by default. Keep MuJoCo's
+    # DT_NEEDED entry even when the plugin is linked as a shared module, and
+    # fail the build instead of shipping a plugin with unresolved mj_* APIs.
+    target_link_options(nativekit_sim_mujoco PRIVATE
+        "LINKER:--no-as-needed"
+        "LINKER:-z,defs")
+endif()
 set_target_properties(nativekit_sim_mujoco PROPERTIES
     EXPORT_NAME sim_mujoco
     CXX_VISIBILITY_PRESET hidden
