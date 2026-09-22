@@ -126,3 +126,11 @@ reference remapping. Both selection mechanisms are serialized by the codec;
 legacy documents without a recipe retain their original reference semantics.
 The editable mounting-plate example exercises parameter edits, selection
 reevaluation, transactional failure recovery, persistence, and undo/redo.
+
+`cadkit.parametric.recording.DocumentBuilder` constructs this same feature DAG
+through an explicit builder API. `NamedParameter` records one-to-many bindings
+to stable feature parameter names; edits route through a document transaction,
+so all bound slots undo together. The codec stores these bindings and the
+selected output feature as optional version-1 fields, preserving compatibility
+with documents written before recording support. Immediate modeling builders
+remain independent and never create hidden document state.

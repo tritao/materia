@@ -105,3 +105,7 @@ polyline, and grid features. `SelectionRecipe` persists geometric selection
 intent for finishing and shell operations. See the
 [editable mounting plate](../examples/modeling/EditableMountingPlate.hx) for
 parameter editing, recompute, JSON persistence, and undo/redo.
+
+`cadkit.parametric.recording.DocumentBuilder` is the explicit bridge from
+builder-style construction to a serializable feature graph. Named dimensions
+can drive multiple feature parameters and retain their bindings after reload.

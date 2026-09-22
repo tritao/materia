@@ -33,10 +33,28 @@ class DocumentCodec {
 		var encodedFeatures:Array<Dynamic> = [];
 		for (index in 0...document.featureCount())
 			encodedFeatures.push(encodeFeature(document.featureAt(index)));
+		var encodedParameters:Array<Dynamic> = [];
+		for (parameter in document.namedParameters()) {
+			var bindings:Array<Dynamic> = [];
+			for (binding in parameter.bindings())
+				bindings.push({
+					feature: binding.ownerFeature().id.toInt(),
+					parameter: binding.name
+				});
+			if (bindings.length == 0)
+				throw new ParametricError("named parameter has no bindings: " + parameter.name);
+			encodedParameters.push({
+				name: parameter.name,
+				value: parameter.value,
+				bindings: bindings
+			});
+		}
 		return Json.stringify({
 			format: FORMAT,
 			version: VERSION,
-			features: encodedFeatures
+			features: encodedFeatures,
+			parameters: encodedParameters,
+			output: document.outputFeature().id.toInt()
 		});
 	}
 
@@ -61,44 +79,23 @@ class DocumentCodec {
 					feature = document.add(modeling);
 				} else if (featureType == "sketch") {
 					var planeRecord = requiredField(record, "plane");
-					feature = document.add(new SketchFeature(
-						stringField(record, "profile"),
-						numberField(record, "width"),
-						numberField(record, "height"),
-						new Plane(
-							decodeVector(requiredField(planeRecord, "origin")),
-							decodeVector(requiredField(planeRecord, "xDirection")),
+					feature = document.add(new SketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
+						new Plane(decodeVector(requiredField(planeRecord, "origin")), decodeVector(requiredField(planeRecord, "xDirection")),
 							decodeVector(requiredField(planeRecord, "normal")))));
 				} else if (featureType == "box") {
-					feature = document.add(new BoxFeature(
-						numberField(record, "width"),
-						numberField(record, "depth"),
-						numberField(record, "height")));
+					feature = document.add(new BoxFeature(numberField(record, "width"), numberField(record, "depth"), numberField(record, "height")));
 				} else if (featureType == "cylinder") {
-					feature = document.add(new CylinderFeature(
-						numberField(record, "radius"),
-						numberField(record, "height")));
+					feature = document.add(new CylinderFeature(numberField(record, "radius"), numberField(record, "height")));
 				} else if (featureType == "face") {
-					feature = document.add(new FaceFeature(
-						requiredFeature(document, intField(record, "source")),
-						intField(record, "index"),
+					feature = document.add(new FaceFeature(requiredFeature(document, intField(record, "source")), intField(record, "index"),
 						optionalFaceFingerprint(record)));
 				} else if (featureType == "extrude") {
-					feature = document.add(new ExtrudeFeature(
-						requiredFeature(document, intField(record, "source")),
-						numberField(record, "x"),
-						numberField(record, "y"),
-						numberField(record, "z")));
+					feature = document.add(new ExtrudeFeature(requiredFeature(document, intField(record, "source")), numberField(record, "x"),
+						numberField(record, "y"), numberField(record, "z")));
 				} else if (featureType == "revolve") {
-					feature = document.add(new RevolveFeature(
-						requiredFeature(document, intField(record, "source")),
-						numberField(record, "originX"),
-						numberField(record, "originY"),
-						numberField(record, "originZ"),
-						numberField(record, "axisX"),
-						numberField(record, "axisY"),
-						numberField(record, "axisZ"),
-						numberField(record, "angle")));
+					feature = document.add(new RevolveFeature(requiredFeature(document, intField(record, "source")), numberField(record, "originX"),
+						numberField(record, "originY"), numberField(record, "originZ"), numberField(record, "axisX"), numberField(record, "axisY"),
+						numberField(record, "axisZ"), numberField(record, "angle")));
 				} else if (featureType == "fillet") {
 					var filletSource = requiredFeature(document, intField(record, "source"));
 					feature = document.add(new FilletFeature(filletSource, numberField(record, "radius"), null, optionalEdgeFingerprints(record),
@@ -108,16 +105,11 @@ class DocumentCodec {
 					feature = document.add(new ChamferFeature(chamferSource, numberField(record, "distance"), null, optionalEdgeFingerprints(record),
 						optionalSelection(record)));
 				} else if (featureType == "transform") {
-					feature = document.add(new TransformFeature(
-						requiredFeature(document, intField(record, "source")),
-						numberField(record, "x"),
-						numberField(record, "y"),
-						numberField(record, "z")));
+					feature = document.add(new TransformFeature(requiredFeature(document, intField(record, "source")), numberField(record, "x"),
+						numberField(record, "y"), numberField(record, "z")));
 				} else if (featureType == "boolean") {
-					feature = document.add(new BooleanFeature(
-						requiredFeature(document, intField(record, "first")),
-						requiredFeature(document, intField(record, "second")),
-						booleanOperation(stringField(record, "operation"))));
+					feature = document.add(new BooleanFeature(requiredFeature(document, intField(record, "first")),
+						requiredFeature(document, intField(record, "second")), booleanOperation(stringField(record, "operation"))));
 				} else {
 					throw new ParametricError("unsupported feature type: " + featureType);
 				}
@@ -137,6 +129,24 @@ class DocumentCodec {
 				for (reference in references)
 					decodeReference(pendingFeature, reference);
 			}
+
+			var parameterRecords:Dynamic = Reflect.field(root, "parameters");
+			if (parameterRecords != null) {
+				var records:Array<Dynamic> = cast parameterRecords;
+				for (record in records) {
+					var named = document.defineParameter(stringField(record, "name"), numberField(record, "value"));
+					var bindings:Array<Dynamic> = cast requiredField(record, "bindings");
+					if (bindings.length == 0)
+						throw new ParametricError("named parameter has no bindings: " + named.name);
+					for (binding in bindings) {
+						var feature = requiredFeature(document, intField(binding, "feature"));
+						named.bind(feature.parameter(stringField(binding, "parameter")));
+					}
+				}
+			}
+			var output:Dynamic = Reflect.field(root, "output");
+			if (output != null)
+				document.setOutput(requiredFeature(document, integerValue(output, "output")));
 
 			document.recompute();
 			return document;
@@ -462,18 +472,14 @@ class DocumentCodec {
 		};
 	}
 
-	private static function containsReference(
-		references:Array<TopologyReference>,
-		candidate:TopologyReference):Bool {
+	private static function containsReference(references:Array<TopologyReference>, candidate:TopologyReference):Bool {
 		for (reference in references)
 			if (reference == candidate)
 				return true;
 		return false;
 	}
 
-	private static function appendEdgeFingerprints(
-		record:Dynamic,
-		references:Array<TopologyReference>):Void {
+	private static function appendEdgeFingerprints(record:Dynamic, references:Array<TopologyReference>):Void {
 		if (references.length == 0)
 			return;
 		var encoded:Array<Dynamic> = [];
@@ -496,8 +502,7 @@ class DocumentCodec {
 		return decodeFingerprint(value, CadKit.ShapeKind.Face);
 	}
 
-	private static function optionalEdgeFingerprints(
-		record:Dynamic):Null<Array<TopologyFingerprint>> {
+	private static function optionalEdgeFingerprints(record:Dynamic):Null<Array<TopologyFingerprint>> {
 		var value:Dynamic = Reflect.field(record, "edges");
 		if (value == null)
 			return null;
@@ -510,8 +515,7 @@ class DocumentCodec {
 		return result;
 	}
 
-	private static function encodeFingerprint(
-		fingerprint:Null<TopologyFingerprint>):Dynamic {
+	private static function encodeFingerprint(fingerprint:Null<TopologyFingerprint>):Dynamic {
 		if (fingerprint == null)
 			return null;
 		return {
@@ -527,20 +531,10 @@ class DocumentCodec {
 		};
 	}
 
-	private static function decodeFingerprint(
-		record:Dynamic,
-		kind:CadKit.ShapeKind):TopologyFingerprint {
-		return TopologyFingerprint.fromData(
-			kind,
-			surfaceKind(stringField(record, "surface")),
-			curveKind(stringField(record, "curve")),
-			numberField(record, "x"),
-			numberField(record, "y"),
-			numberField(record, "z"),
-			numberField(record, "dx"),
-			numberField(record, "dy"),
-			numberField(record, "dz"),
-			numberField(record, "measure"));
+	private static function decodeFingerprint(record:Dynamic, kind:CadKit.ShapeKind):TopologyFingerprint {
+		return TopologyFingerprint.fromData(kind, surfaceKind(stringField(record, "surface")), curveKind(stringField(record, "curve")),
+			numberField(record, "x"), numberField(record, "y"), numberField(record, "z"), numberField(record, "dx"), numberField(record, "dy"),
+			numberField(record, "dz"), numberField(record, "measure"));
 	}
 
 	private static function encodeVector(value:Vector):Dynamic {
@@ -581,6 +575,12 @@ class DocumentCodec {
 
 	private static function intField(value:Dynamic, name:String):Int {
 		var result = numberField(value, name);
+		return integerValue(result, name);
+	}
+
+	private static function integerValue(result:Float, name:String):Int {
+		if (!Math.isFinite(result))
+			throw new ParametricError("document field is not finite: " + name);
 		var integer = Std.int(result);
 		if (result != integer)
 			throw new ParametricError("document field is not an integer: " + name);

@@ -17,10 +17,13 @@ class Parameter {
 		this.minimum = minimum;
 		validate(value);
 		this.value = value;
+		owner.registerParameter(this);
 	}
 
 	public function set(next:Float):Void {
 		validate(next);
+		if (owner.document != null && owner.document.setNamedParameter(this, next))
+			return;
 		if (next == value)
 			return;
 
@@ -38,9 +41,16 @@ class Parameter {
 		owner.parameterRestored(this);
 	}
 
+	public function ownerFeature():Feature {
+		return owner;
+	}
+
+	public function validateValue(value:Float):Void {
+		validate(value);
+	}
+
 	private function validate(candidate:Float):Void {
 		if (!Math.isFinite(candidate) || candidate <= minimum)
-			throw new ParametricError(
-				name + " must be finite and greater than " + Std.string(minimum));
+			throw new ParametricError(name + " must be finite and greater than " + Std.string(minimum));
 	}
 }

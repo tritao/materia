@@ -1,39 +1,42 @@
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
-import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.ParametricError;
+import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.GridFeature;
-import cadkit.parametric.features.BooleanFeature;
-import cadkit.parametric.features.BooleanOperation;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.FilletFeature;
+import cadkit.parametric.recording.DocumentBuilder;
 import cadkit.modeling.Vector;
 import sys.io.File;
 
 /** Reusable document example: dimensions, hole spacing, thickness and fillets are parameters. */
 class EditableMountingPlate {
 	public final document:Document;
-	public final outline:SketchFeature;
-	public final hole:SketchFeature;
-	public final holes:GridFeature;
-	public final extrusion:ExtrudeFeature;
-	public final finish:FilletFeature;
+	public var outline(default, null):SketchFeature;
+	public var hole(default, null):SketchFeature;
+	public var holes(default, null):GridFeature;
+	public var extrusion(default, null):ExtrudeFeature;
+	public var finish(default, null):FilletFeature;
 
 	public function new() {
-		document = new Document();
-		try {
-			outline = document.add(new SketchFeature("rectangle", 80, 50));
-			hole = document.add(new SketchFeature("circle", 3));
-			holes = document.add(new GridFeature(hole, 2, 2, 60, 30));
-			var profile = document.add(new BooleanFeature(outline, holes, BooleanOperation.Cut));
-			extrusion = document.add(new ExtrudeFeature(profile, 0, 0, 6));
-			finish = document.add(new FilletFeature(extrusion, 2, null, null, new SelectionRecipe("edge", "line", Vector.Z(), "ends", Vector.X(), 4)));
-			document.recompute();
-		} catch (error:Dynamic) {
-			document.close();
-			throw error;
-		}
+		document = DocumentBuilder.build(function(builder) {
+			var width = builder.dimension("plate.width", 80);
+			var depth = builder.dimension("plate.depth", 50);
+			var holeRadius = builder.dimension("holes.radius", 3);
+			var spacingX = builder.dimension("holes.spacingX", 60);
+			var spacingY = builder.dimension("holes.spacingY", 30);
+			var thickness = builder.dimension("plate.thickness", 6);
+			var filletRadius = builder.dimension("fillet.radius", 2);
+
+			outline = builder.rectangle(width, depth);
+			hole = builder.circle(holeRadius);
+			holes = builder.grid(hole, 2, 2, spacingX, spacingY);
+			var profile = builder.subtract(outline, holes);
+			extrusion = builder.extrude(profile, thickness);
+			finish = builder.fillet(extrusion, filletRadius, new SelectionRecipe("edge", "line", Vector.Z(), "ends", Vector.X(), 4));
+			builder.output(finish);
+		});
 	}
 
 	/** Validate a grouped edit through staged recompute before committing undo history. */
@@ -49,10 +52,10 @@ class EditableMountingPlate {
 			throw new ParametricError("holes must be separated and clear of the rounded plate boundary");
 		var transaction = document.beginTransaction();
 		try {
-			outline.width.set(width);
-			outline.height.set(depth);
-			holes.spacingX.set(spacingX);
-			holes.spacingY.set(spacingY);
+			document.parameter("plate.width").set(width);
+			document.parameter("plate.depth").set(depth);
+			document.parameter("holes.spacingX").set(spacingX);
+			document.parameter("holes.spacingY").set(spacingY);
 			document.recompute();
 		} catch (error:Dynamic) {
 			transaction.cancel();

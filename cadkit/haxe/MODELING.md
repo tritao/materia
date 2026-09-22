@@ -121,7 +121,45 @@ parameters, and plane; recompute recreates geometry. Transactions support
 parameter undo/redo. Existing version-1 documents remain readable.
 
 This adapter is optional: immediate modeling does not create a feature graph.
-General automatic recording of builder scripts is not implemented.
+Immediate builders do not silently create feature graphs. Use the explicit
+recording builder below when the result must remain editable.
+
+## Recording builder and named dimensions
+
+`cadkit.parametric.recording.DocumentBuilder` creates the same serializable
+features described below while using builder-style construction. It owns its
+document until `finish()` succeeds. `DocumentBuilder.build(callback)` closes
+the partial document when construction or initial recompute fails.
+
+```haxe
+var document = DocumentBuilder.build(function(builder) {
+    var width = builder.dimension("plate.width", 80);
+    var depth = builder.dimension("plate.depth", 50);
+    var thickness = builder.dimension("plate.thickness", 6);
+    var profile = builder.rectangle(width, depth);
+    var solid = builder.extrude(profile, thickness);
+    builder.output(solid);
+});
+
+document.parameter("plate.width").set(100);
+document.recompute();
+var shape = document.result(); // borrowed committed output
+```
+
+Named dimensions can bind several scalar feature slots. Editing the dimension,
+or any bound feature parameter, changes every binding as one undoable edit.
+The codec saves dimension names, current values, bindings, and the selected
+document output. Reloaded documents preserve those relationships. JSON from
+older documents remains readable; without an explicit output it uses the last
+feature, matching the earlier behavior. Persistence saves current model state,
+not the undo/redo stacks.
+
+The recorder covers rectangle/circle/slot/box primitives, wires and polylines,
+grids, planar and solid booleans, positive-Z extrusion, translation, revolution,
+loft, sweep, offset, shell, projection, fillet, and chamfer. Operations whose
+editable meaning is not represented must be rejected explicitly with
+`unsupported(name)`. Named extrusion currently accepts positive Z only because
+one scalar dimension cannot independently bind multiple vector components.
 
 ## Current operation limits
 

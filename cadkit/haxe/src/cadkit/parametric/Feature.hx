@@ -17,7 +17,9 @@ class Feature {
 	public var provenance(default, null):Null<Operation>;
 	public var document(default, null):Null<Document>;
 	public var ownerToken(default, null):Int;
+
 	private final topologyReferences:Array<TopologyReference>;
+	private final scalarParameters:Array<Parameter>;
 
 	public function new() {
 		id = new FeatureId(0);
@@ -27,6 +29,22 @@ class Feature {
 		document = null;
 		ownerToken = 0;
 		topologyReferences = [];
+		scalarParameters = [];
+	}
+
+	/** Scalar slots registered by Parameter construction; stable names are codec binding keys. */
+	public function registerParameter(parameter:Parameter):Void {
+		for (existing in scalarParameters)
+			if (existing.name == parameter.name)
+				throw new ParametricError("duplicate feature parameter: " + parameter.name);
+		scalarParameters.push(parameter);
+	}
+
+	public function parameter(name:String):Parameter {
+		for (value in scalarParameters)
+			if (value.name == name)
+				return value;
+		throw new ParametricError("unknown feature parameter: " + name);
 	}
 
 	public function dependencies():Array<FeatureId> {
@@ -92,8 +110,7 @@ class Feature {
 	}
 
 	/** Reports reference states changed while a staged evaluation was attempted. */
-	public function topologyReferenceReport(
-		previous:Array<Int>):TopologyRemapReport {
+	public function topologyReferenceReport(previous:Array<Int>):TopologyRemapReport {
 		var report = new TopologyRemapReport();
 		for (index in 0...topologyReferences.length) {
 			var reference = topologyReferences[index];

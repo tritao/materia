@@ -27,7 +27,8 @@ workplanes, additional operations, and document integration.
 
 ## Editable mounting plate
 
-`EditableMountingPlate.hx` builds the same design as a document feature graph.
+`EditableMountingPlate.hx` builds the same design with the explicit recording
+builder. Its seven named dimensions and selected output survive JSON reload.
 Its `resize(width, depth, spacingX, spacingY)` groups and validates parameter
 edits and recomputes the corner fillets. Width/depth, hole radius, spacing,
 extrusion height, and fillet radius are exposed through its feature parameters.
@@ -38,4 +39,5 @@ and output `editable-mounting-plate.hl`. Running it writes
 `editable-mounting-plate.json`, `editable-mounting-plate.step`, and
 `editable-mounting-plate-reloaded.step`. It changes dimensions and hole spacing,
 checks the undo/redo path, reloads the saved document, and exports it again.
-Both examples are exercised by `./scripts/test-haxeon`.
+Both examples are exercised by `./scripts/test-haxeon`, including shared named
+dimensions, direct bound-feature edits, failed-builder cleanup, and persistence.

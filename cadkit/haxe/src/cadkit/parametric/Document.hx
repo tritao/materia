@@ -15,18 +15,27 @@ class Document {
 	private static var nextToken:Int = 1;
 
 	private var nextId:Int;
+	private final dimensions:Array<NamedParameter>;
+	private var updatingNamedParameter:Bool;
+	private var selectedOutput:Null<Feature>;
+	private var closed:Bool;
 	private final token:Int;
 	private final features:Array<Feature>;
 	private var byId:Map<Int, Feature>;
 	private var activeTransaction:Null<Transaction>;
 	private final undoStack:Array<ChangeSet>;
 	private final redoStack:Array<ChangeSet>;
+
 	public var lastRemapReport(default, null):TopologyRemapReport;
 
 	public function new() {
 		token = nextToken;
 		nextToken++;
 		nextId = 1;
+		dimensions = [];
+		updatingNamedParameter = false;
+		selectedOutput = null;
+		closed = false;
 		features = [];
 		byId = new Map<Int, Feature>();
 		activeTransaction = null;
@@ -36,12 +45,12 @@ class Document {
 	}
 
 	public function add<T:Feature>(feature:T):T {
+		ensureOpen();
 		if (feature.document != null)
 			throw new ParametricError("feature is already attached to a document");
 
 		for (dependency in feature.dependencyFeatures()) {
-			if (dependency.ownerToken != token || dependency.id.toInt() == 0 ||
-				!byId.exists(dependency.id.toInt()))
+			if (dependency.ownerToken != token || dependency.id.toInt() == 0 || !byId.exists(dependency.id.toInt()))
 				throw new ParametricError("feature dependency is not in this document");
 			if (dependency.id.toInt() == feature.id.toInt() && feature.id.toInt() != 0)
 				throw new ParametricError("feature cannot depend on itself");
@@ -53,6 +62,98 @@ class Document {
 		features.push(feature);
 		byId.set(featureId.toInt(), feature);
 		return feature;
+	}
+
+	public function isClosed():Bool {
+		return closed;
+	}
+
+	private function ensureOpen():Void {
+		if (closed)
+			throw new ParametricError("document is closed");
+	}
+
+	public function defineParameter(name:String, value:Float):NamedParameter {
+		ensureOpen();
+		if (name == null || StringTools.trim(name) == "" || !Math.isFinite(value))
+			throw new ParametricError("named parameter needs a nonempty name and finite value");
+		for (existing in dimensions)
+			if (existing.name == name)
+				throw new ParametricError("duplicate named parameter: " + name);
+		var result = new NamedParameter(this, name, value);
+		dimensions.push(result);
+		return result;
+	}
+
+	public function parameter(name:String):NamedParameter {
+		ensureOpen();
+		for (value in dimensions)
+			if (value.name == name)
+				return value;
+		throw new ParametricError("unknown named parameter: " + name);
+	}
+
+	public function namedParameters():Array<NamedParameter> {
+		ensureOpen();
+		return dimensions.copy();
+	}
+
+	public function setOutput(feature:Feature):Void {
+		ensureOpen();
+		if (feature.document != this || featureById(feature.id.toInt()) != feature)
+			throw new ParametricError("output belongs to another document");
+		selectedOutput = feature;
+	}
+
+	/** Legacy documents use the last feature as output. */
+	public function outputFeature():Feature {
+		ensureOpen();
+		if (selectedOutput != null)
+			return selectedOutput;
+		if (features.length == 0)
+			throw new ParametricError("document has no output feature");
+		return features[features.length - 1];
+	}
+
+	/** Borrow the last successfully committed output. Recompute dirty edits explicitly. */
+	public function result():Shape {
+		var shape = outputFeature().currentShape();
+		if (shape == null)
+			throw new ParametricError("document output has not been evaluated");
+		return shape;
+	}
+
+	/** Internal Parameter.set routing. Validate every bound slot before touching any value. */
+	public function setNamedParameter(parameter:Parameter, next:Float):Bool {
+		ensureOpen();
+		if (updatingNamedParameter)
+			return false;
+		for (named in dimensions) {
+			if (!named.contains(parameter))
+				continue;
+			var bindings = named.bindings();
+			for (binding in bindings)
+				binding.validateValue(next);
+			if (named.value == next)
+				return true;
+			var ownTransaction = activeTransaction == null;
+			var transaction = ownTransaction ? beginTransaction() : activeTransaction;
+			updatingNamedParameter = true;
+			try {
+				for (binding in bindings)
+					binding.set(next);
+				updatingNamedParameter = false;
+			} catch (error:Dynamic) {
+				updatingNamedParameter = false;
+				if (ownTransaction)
+					transaction.cancel();
+				throw error;
+			}
+			if (ownTransaction)
+				transaction.commit();
+			return true;
+		}
+		return false;
 	}
 
 	public function featureCount():Int {
@@ -70,6 +171,7 @@ class Document {
 	}
 
 	public function recompute():Void {
+		ensureOpen();
 		var order = topologicalOrder();
 		var context = new EvaluationContext(this);
 		var stagedFeatures:Array<Feature> = [];
@@ -128,6 +230,7 @@ class Document {
 	}
 
 	public function beginTransaction():Transaction {
+		ensureOpen();
 		if (activeTransaction != null)
 			throw new ParametricError("nested transactions are not supported");
 		activeTransaction = new Transaction(this);
@@ -163,12 +266,19 @@ class Document {
 	}
 
 	public function close():Void {
+		if (closed)
+			return;
 		if (activeTransaction != null)
 			activeTransaction.cancel();
 		for (feature in features)
 			feature.close();
 		features.resize(0);
 		byId = new Map<Int, Feature>();
+		dimensions.resize(0);
+		undoStack.resize(0);
+		redoStack.resize(0);
+		selectedOutput = null;
+		closed = true;
 	}
 
 	public function recordParameterChange(parameter:Parameter, oldValue:Float):Void {
@@ -234,11 +344,7 @@ class Document {
 		return order;
 	}
 
-	private function visit(
-		feature:Feature,
-		visiting:Map<Int, Bool>,
-		visited:Map<Int, Bool>,
-		order:Array<Feature>):Void {
+	private function visit(feature:Feature, visiting:Map<Int, Bool>, visited:Map<Int, Bool>, order:Array<Feature>):Void {
 		var key = feature.id.toInt();
 		if (visited.exists(key))
 			return;
