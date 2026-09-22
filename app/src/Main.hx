@@ -491,7 +491,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
               "editor.save-as",
               "editor.undo",
               "editor.redo",
-              "scene.frame-selected"
+              "scene.frame-selected",
+              "scene.reset-perspective"
             ],
             commands
           )
@@ -853,9 +854,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.refresh();
     }, new Shortcut(UiKey.K, UiModifier.Control), function() return !documents.blocked()));
     commands.register(new Command("scene.frame-selected", "Frame selected", function() {
-      viewportContent.frameSelected(viewportCamera);
+      if (workspace.activePanelId == "perspective" && perspectiveViewport != null)
+        perspectiveViewport.frameSelected();
+      else
+        viewportContent.frameSelected(viewportCamera);
       log("Framed " + scene.selectedId);
-    }, null, function() return !documents.blocked() && scene.object(scene.selectedId) != null));
+    }, null, function() return !documents.blocked() && scene.items().length > 0));
+    commands.register(new Command("scene.reset-perspective", "Reset perspective view", function() {
+      if (perspectiveViewport != null) perspectiveViewport.resetView();
+      log("Perspective view reset");
+    }, null, function() return !documents.blocked() && perspectiveViewport != null));
     commands.register(new Command("scene.show-perspective", "Show perspective view", function() {
       workspace.open("perspective", "viewport");
       commands.refresh();

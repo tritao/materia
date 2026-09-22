@@ -12,6 +12,7 @@ import nativekit.scene.Transform;
 import app.SceneDocumentSession;
 import app.SensorConfiguration;
 import app.ApplicationSimulation;
+import app.PerspectiveCamera;
 import robotkit.world.RobotWorld;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
@@ -30,6 +31,36 @@ class SceneEditingTests {
   }
   static function near(actual:Float, expected:Float, message:String):Void
     check(Math.abs(actual - expected) < 0.00001, message);
+
+  static function perspectiveCameraMath():Void {
+    var camera = new PerspectiveCamera();
+    var initialDistance = camera.distance;
+    var initialRevision = camera.revision;
+    camera.orbit(20, -10);
+    check(camera.revision > initialRevision && camera.pitch > -1.49 && camera.pitch < 1.49,
+      "perspective orbit changes bounded camera state");
+    var targetX = camera.targetX, targetY = camera.targetY;
+    camera.pan(30, -15, 600);
+    check(camera.targetX != targetX || camera.targetY != targetY,
+      "perspective pan moves the orbit target");
+    camera.zoom(-120);
+    check(camera.distance < initialDistance, "perspective wheel zoom moves closer");
+    camera.frame(2.0, -3.0, 0.0, 4.0, 2.0, 0.1, 16.0 / 9.0);
+    near(camera.targetX, 2.0, "perspective framing centers X");
+    near(camera.targetY, -3.0, "perspective framing centers Y");
+    check(camera.distance > 0.0, "perspective framing preserves a positive distance");
+    var wideDistance = camera.distance;
+    camera.frame(2.0, -3.0, 0.0, 4.0, 2.0, 0.1, 0.5);
+    check(camera.distance > wideDistance, "perspective framing adapts to a narrow resize");
+    var matrix = camera.viewProjection(16.0 / 9.0);
+    for (index in 0...16) {
+      var value = matrix.element(index);
+      check(value == value && value - value == 0.0, "perspective matrix remains finite");
+    }
+    camera.reset();
+    near(camera.targetX, 0.0, "perspective reset restores target X");
+    near(camera.targetY, 0.0, "perspective reset restores target Y");
+  }
 
   static function editingLifecycle():Void {
     var directory = "build/editing-lifecycle-" + Std.random(100000000);
@@ -536,6 +567,7 @@ class SceneEditingTests {
       viewportDragging();
       editingLifecycle();
       renderingParity();
+      perspectiveCameraMath();
       sensorConfiguration();
       sensorWorkflow();
       SceneDocumentTests.run();
