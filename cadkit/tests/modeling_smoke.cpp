@@ -87,6 +87,12 @@ int main() {
     check(cad_shape_place(plate,{0,0,0},{1,0,0},{1,0,0},&bad)==CAD_ERROR_INVALID_ARGUMENT && bad==0);
     cad_shape placed=0; ok(cad_shape_place(plate,{0,0,0},{1,0,0},{0,-1,0},&placed)); keep(placed); valid(placed);
     cad_bounds bounds; ok(cad_shape_bounds(placed,&bounds)); near(bounds.min.y,-6); near(bounds.max.z,25);
+    cad_shape mirrored=0; ok(cad_shape_mirror(plate,{0,0,0},{1,0,0},&mirrored)); keep(mirrored); valid(mirrored);
+    ok(cad_shape_bounds(mirrored,&bounds)); near(bounds.min.x,-40); near(bounds.max.x,40);
+    check(cad_shape_mirror(plate,{0,0,0},{0,0,0},&bad)==CAD_ERROR_INVALID_ARGUMENT && bad==0);
+    cad_operation mirror_operation=0; ok(cad_shape_mirror_operation(plate,{0,0,0},{1,0,0},&mirror_operation));
+    cad_shape mirrored_result=0; ok(cad_operation_result_shape(mirror_operation,&mirrored_result)); keep(mirrored_result); valid(mirrored_result);
+    cad_operation_destroy(mirror_operation);
     cad_shape arc=0; ok(cad_arc({1,0,0},{0,1,0},{-1,0,0},&arc)); keep(arc);
     double length=0; ok(cad_edge_length(arc,&length)); near(length,std::acos(-1));
     check(cad_arc({0,0,0},{1,0,0},{2,0,0},&bad)!=CAD_OK && bad==0);

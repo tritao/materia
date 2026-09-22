@@ -10,6 +10,9 @@ import cadkit.parametric.features.LinearPatternFeature;
 import cadkit.parametric.features.PolarPatternFeature;
 import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.RotationFeature;
+import cadkit.parametric.features.MirrorFeature;
+import cadkit.parametric.features.FilletFeature;
+import cadkit.parametric.features.SketchFeature;
 
 class PatternSmoke {
 	static function check(value:Bool, message:String):Void {
@@ -172,5 +175,70 @@ class PatternSmoke {
 		near(restoredRotation.result().bounds().get_max().get_y(), 1);
 		restoredRotation.close();
 		rotationDocument.close();
+
+		var mirrorDocument = new Document();
+		var mirrorSource = mirrorDocument.add(new BoxFeature(10, 5, 3));
+		var reflected = mirrorDocument.add(new MirrorFeature(mirrorSource, new Vector(), Vector.X(), "copy"));
+		var retained = mirrorDocument.add(new MirrorFeature(mirrorSource, new Vector(), Vector.X(), "both"));
+		var fusedMirror = mirrorDocument.add(new MirrorFeature(mirrorSource, new Vector(), Vector.X(), "fuse"));
+		var downstreamFillet = mirrorDocument.add(new FilletFeature(fusedMirror, 0.4));
+		mirrorDocument.setOutput(downstreamFillet);
+		mirrorDocument.recompute();
+		near(reflected.currentShape().bounds().get_min().get_x(), -10);
+		near(reflected.currentShape().bounds().get_max().get_x(), 0);
+		near(reflected.currentShape().volume(), 150);
+		check(CadKit.shapeValidChecked(reflected.currentShape().borrowHandle()) != 0, "reflected solid is valid");
+		check(retained.currentShape().subshapeCount(CadKit.ShapeKind.Solid) == 2, "mirror both retains two solids");
+		near(retained.currentShape().volume(), 300);
+		near(fusedMirror.currentShape().volume(), 300);
+		check(CadKit.shapeValidChecked(fusedMirror.currentShape().borrowHandle()) != 0, "fused mirror is valid");
+		check(CadKit.shapeValidChecked(downstreamFillet.currentShape().borrowHandle()) != 0, "mirrored solid supports downstream fillets");
+		var minimumNormal = 0.0;
+		var maximumNormal = 0.0;
+		var reflectedFaces = reflected.currentShape().faces();
+		for (index in 0...reflectedFaces.count()) {
+			var face = reflectedFaces.at(index);
+			var center = face.center();
+			if (Math.abs(center.get_x() + 10) < 1e-6)
+				minimumNormal = face.normal().get_x();
+			if (Math.abs(center.get_x()) < 1e-6)
+				maximumNormal = face.normal().get_x();
+			face.close();
+		}
+		near(minimumNormal, -1);
+		near(maximumNormal, 1);
+		var restoredMirror = DocumentCodec.decode(DocumentCodec.encode(mirrorDocument));
+		near(restoredMirror.result().volume(), downstreamFillet.currentShape().volume());
+		restoredMirror.close();
+		var committedMirror = mirrorDocument.result();
+		downstreamFillet.radius.set(100);
+		var mirrorFailure = false;
+		try mirrorDocument.recompute() catch (error:Dynamic) mirrorFailure = true;
+		check(mirrorFailure && mirrorDocument.result() == committedMirror,
+			"downstream mirror failure preserves committed geometry");
+		mirrorDocument.close();
+
+		var profileMirrorDocument = new Document();
+		var profile = profileMirrorDocument.add(new SketchFeature("rectangle", 2, 4));
+		var movedProfile = profileMirrorDocument.add(new TransformFeature(profile, 3, 0, 0));
+		var mirroredProfile = profileMirrorDocument.add(new MirrorFeature(movedProfile, new Vector(), Vector.X(), "copy"));
+		profileMirrorDocument.setOutput(mirroredProfile);
+		profileMirrorDocument.recompute();
+		near(mirroredProfile.currentShape().area(), 8);
+		near(Math.abs(mirroredProfile.currentShape().faceNormal().get_z()), 1);
+		check(CadKit.shapeValidChecked(mirroredProfile.currentShape().borrowHandle()) != 0, "reflected profile is valid");
+		profileMirrorDocument.close();
+
+		var bracket = new MirroredMountingBracket();
+		var bracketVolume = bracket.finish.currentShape().volume();
+		check(bracketVolume > 0, "mirrored mounting bracket initial solid");
+		bracket.resize(100, 70);
+		check(bracket.finish.currentShape().volume() > bracketVolume, "mirrored bracket resize");
+		near(bracket.finish.currentShape().bounds().get_min().get_x(), -50);
+		near(bracket.finish.currentShape().bounds().get_max().get_x(), 50);
+		var restoredBracket = DocumentCodec.decode(DocumentCodec.encode(bracket.document));
+		near(restoredBracket.result().volume(), bracket.finish.currentShape().volume());
+		restoredBracket.close();
+		bracket.close();
 	}
 }

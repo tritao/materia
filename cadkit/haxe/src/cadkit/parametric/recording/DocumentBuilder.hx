@@ -27,6 +27,7 @@ import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.SweepFeature;
 import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.RotationFeature;
+import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.WireFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.features.CylinderFeature;
@@ -308,6 +309,11 @@ class DocumentBuilder {
 		var feature = document.add(new RotationFeature(source, pivot, axis, angle.value));
 		bind(angle, feature, "rotation.angle");
 		return feature;
+	}
+
+	public function mirror(source:Feature, planeOrigin:Vector, planeNormal:Vector, mode:String = "copy"):MirrorFeature {
+		check();
+		return document.add(new MirrorFeature(source, planeOrigin, planeNormal, mode));
 	}
 
 	public function revolve(source:Feature, origin:Vector, axis:Vector, angle:NamedParameter):RevolveFeature {

@@ -109,6 +109,8 @@ interface CadKit @target("x86_64-linux-gnu") @library("cadkit-core") {
 	extern fn cad_shape_revolve_operation(profile: cad_shape, axis_origin: cad_vec3, axis_direction: cad_vec3, angle: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_rotate(shape: cad_shape, axis: cad_vec3, angle: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_rotate_operation(shape: cad_shape, axis: cad_vec3, angle: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
+	extern fn cad_shape_mirror(shape: cad_shape, plane_origin: cad_vec3, plane_normal: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_shape_mirror_operation(shape: cad_shape, plane_origin: cad_vec3, plane_normal: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_subshape_at(shape: cad_shape, kind: cad_shape_kind, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_subshape_count(shape: cad_shape, kind: cad_shape_kind, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_shape_subshapes(shape: cad_shape, kind: cad_shape_kind, output: ptr<cad_shape>, capacity: u32) -> cad_result;

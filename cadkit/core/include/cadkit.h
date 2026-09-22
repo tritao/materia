@@ -234,6 +234,12 @@ CADKIT_API cad_result cad_shape_rotate(
     double angle,
     cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
+CADKIT_API cad_result cad_shape_mirror(
+    cad_shape shape,
+    cad_vec3 plane_origin,
+    cad_vec3 plane_normal,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
 /* Creates an independent owning handle for the same OCCT topology. */
 CADKIT_API cad_result cad_shape_clone(
     cad_shape shape,
@@ -290,6 +296,12 @@ CADKIT_API cad_result cad_shape_rotate_operation(
     cad_shape shape,
     cad_vec3 axis,
     double angle,
+    cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
+CADKIT_API cad_result cad_shape_mirror_operation(
+    cad_shape shape,
+    cad_vec3 plane_origin,
+    cad_vec3 plane_normal,
     cad_operation* out_operation CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
 CADKIT_API cad_result cad_shape_extrude_operation(

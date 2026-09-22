@@ -207,6 +207,14 @@ class Shape {
 		return new Operation(CadKit.shapeRotateOperationChecked(native.borrow(), axis, angle));
 	}
 
+	public function mirror(planeOrigin:CadKit.Vec3, planeNormal:CadKit.Vec3):Shape {
+		return new Shape(CadKit.shapeMirrorChecked(native.borrow(), planeOrigin, planeNormal));
+	}
+
+	public function mirrorOperation(planeOrigin:CadKit.Vec3, planeNormal:CadKit.Vec3):Operation {
+		return new Operation(CadKit.shapeMirrorOperationChecked(native.borrow(), planeOrigin, planeNormal));
+	}
+
 	public function fuse(other:Shape):Shape {
 		return new Shape(CadKit.fuseChecked(native.borrow(), other.native.borrow()));
 	}

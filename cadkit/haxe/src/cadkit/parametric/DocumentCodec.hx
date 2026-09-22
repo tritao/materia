@@ -34,6 +34,7 @@ import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.RotationFeature;
+import cadkit.parametric.features.MirrorFeature;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
@@ -131,6 +132,10 @@ class DocumentCodec {
 				} else if (featureType == "rotation") {
 					feature = document.add(new RotationFeature(requiredFeature(document, intField(record, "source")),
 						decodeVector(requiredField(record, "pivot")), decodeVector(requiredField(record, "axis")), numberField(record, "angle")));
+				} else if (featureType == "mirror") {
+					feature = document.add(new MirrorFeature(requiredFeature(document, intField(record, "source")),
+						decodeVector(requiredField(record, "planeOrigin")), decodeVector(requiredField(record, "planeNormal")),
+						stringField(record, "mode")));
 				} else if (featureType == "boolean") {
 					feature = document.add(new BooleanFeature(requiredFeature(document, intField(record, "first")),
 						requiredFeature(document, intField(record, "second")), booleanOperation(stringField(record, "operation"))));
@@ -334,6 +339,17 @@ class DocumentCodec {
 				pivot: encodeVector(rotation.pivot),
 				axis: encodeVector(rotation.axis),
 				angle: rotation.angle.value,
+				references: references
+			};
+		} else if (featureType == "mirror") {
+			var mirror:MirrorFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				source: mirror.source.id.toInt(),
+				planeOrigin: encodeVector(mirror.planeOrigin),
+				planeNormal: encodeVector(mirror.planeNormal),
+				mode: mirror.mode,
 				references: references
 			};
 		} else if (featureType == "boolean") {

@@ -1606,6 +1606,32 @@ extern "C" CADKIT_API cad_result cad_shape_rotate(
     }
 }
 
+extern "C" CADKIT_API cad_result cad_shape_mirror(
+    cad_shape shape,
+    cad_vec3 plane_origin,
+    cad_vec3 plane_normal,
+    cad_shape* out_shape) {
+    clear_error();
+    if (out_shape == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    }
+    *out_shape = 0;
+    if (!std::isfinite(plane_origin.x) || !std::isfinite(plane_origin.y) || !std::isfinite(plane_origin.z) ||
+        !std::isfinite(plane_normal.x) || !std::isfinite(plane_normal.y) || !std::isfinite(plane_normal.z)) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "mirror plane must be finite");
+    }
+    try {
+        gp_Trsf transform;
+        transform.SetMirror(gp_Ax2(gp_Pnt(plane_origin.x, plane_origin.y, plane_origin.z),
+                                   gp_Dir(plane_normal.x, plane_normal.y, plane_normal.z)));
+        return make_transformed_shape(shape, transform, out_shape);
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_INVALID_ARGUMENT, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    }
+}
+
 extern "C" CADKIT_API cad_result cad_shape_clone(
     cad_shape shape,
     cad_shape* out_shape) {
@@ -1785,6 +1811,32 @@ extern "C" CADKIT_API cad_result cad_shape_rotate_operation(
         return fail(CAD_ERROR_OPERATION_FAILED, error);
     } catch (...) {
         return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_shape_mirror_operation(
+    cad_shape shape,
+    cad_vec3 plane_origin,
+    cad_vec3 plane_normal,
+    cad_operation* out_operation) {
+    clear_error();
+    if (out_operation == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_operation must not be null");
+    }
+    *out_operation = 0;
+    if (!std::isfinite(plane_origin.x) || !std::isfinite(plane_origin.y) || !std::isfinite(plane_origin.z) ||
+        !std::isfinite(plane_normal.x) || !std::isfinite(plane_normal.y) || !std::isfinite(plane_normal.z)) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "mirror plane must be finite");
+    }
+    try {
+        gp_Trsf transform;
+        transform.SetMirror(gp_Ax2(gp_Pnt(plane_origin.x, plane_origin.y, plane_origin.z),
+                                   gp_Dir(plane_normal.x, plane_normal.y, plane_normal.z)));
+        return make_transform_operation(shape, transform, out_operation);
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_INVALID_ARGUMENT, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
     }
 }
 

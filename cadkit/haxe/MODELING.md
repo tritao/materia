@@ -185,6 +185,13 @@ arbitrary axis. Its angle is an editable parameter and may be bound to a named
 dimension through `DocumentBuilder.rotate`. Rotation uses the placement
 operation, preserving generated/modified history where OCCT reports it.
 
+`MirrorFeature` reflects profiles or solids across an explicit plane. `copy`
+returns only the reflection and retains transform history, `both` returns an
+unfused compound containing the source and reflection, and `fuse` joins both
+halves through a Boolean operation. Mirrored cutting tools remain independent
+features and can be subtracted later. `MirroredMountingBracket.hx` demonstrates
+a fused half-model followed by a mirrored pair of counterbore tools.
+
 ## Current operation limits
 
 Splines interpolate nonperiodic point lists. Loft builds a solid through closed
