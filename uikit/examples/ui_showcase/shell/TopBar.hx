@@ -1,5 +1,6 @@
 package shell;
 
+import nativekit.ffi.NativeKitTypes.WindowDecorationRegionKind;
 import LayoutAlignmentY;
 import LayoutAxis;
 import LayoutDistribution;

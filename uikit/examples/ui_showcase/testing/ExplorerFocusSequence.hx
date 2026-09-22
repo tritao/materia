@@ -2,6 +2,7 @@ package testing;
 
 import UiExplorer;
 import NativeKitEventValue.NativeKitTextEdit;
+import nativekit.ffi.NativeKitTypes.TextEditAction;
 import nativekit.ui.core.State;
 import nativekit.ui.core.WidgetId;
 import nativekit.ui.semantics.AccessibilityRole;
