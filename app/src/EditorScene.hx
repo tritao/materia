@@ -56,15 +56,7 @@ class EditorScene {
   function addObject(id:String, label:String, x:Float, y:Float, z:Float,
       width:Float, height:Float, red:Float, green:Float, blue:Float, visible:Bool = true):Void {
     var geometry = scene.createGeometry();
-    var mesh = new GeometryData();
-    mesh.addVertex(-width / 2, -height / 2, 0);
-    mesh.addVertex(width / 2, -height / 2, 0);
-    mesh.addVertex(width / 2, height / 2, 0);
-    mesh.addVertex(-width / 2, height / 2, 0);
-    mesh.addTriangle(0, 1, 2);
-    mesh.addTriangle(0, 2, 3);
-    mesh.setBounds(-width / 2, -height / 2, 0, width / 2, height / 2, 0);
-    scene.setGeometryData(geometry, mesh);
+    scene.setGeometryData(geometry, rectangleGeometry(width, height));
     var material = scene.createMaterial();
     scene.setMaterialData(material, MaterialData.opaque(red, green, blue));
     var transaction = scene.beginTransaction();
@@ -256,6 +248,24 @@ class EditorScene {
     publish();
   }
 
+  public function setDimensions(id:String, width:Float, height:Float):Void {
+    if (!validDimension(width) || !validDimension(height))
+      throw "Rectangle dimensions must be finite and positive";
+    if (object(id) == null) throw "Unknown scene object: " + id;
+    var data = records();
+    for (item in data) if (item.id == id) { item.width = width; item.height = height; }
+    replaceObjects(data, selectedId);
+  }
+
+  public function setColour(id:String, red:Float, green:Float, blue:Float):Void {
+    if (!validColour(red) || !validColour(green) || !validColour(blue))
+      throw "Rectangle colour channels must be finite values from 0 to 1";
+    if (object(id) == null) throw "Unknown scene object: " + id;
+    var data = records();
+    for (item in data) if (item.id == id) { item.red = red; item.green = green; item.blue = blue; }
+    replaceObjects(data, selectedId);
+  }
+
   function publish():Void {
     var next = scene.snapshot();
     var nextSpatial:SpatialIndex;
@@ -304,7 +314,114 @@ class EditorScene {
           default: throw "Name requires text";
         }
       }, name));
+    result.push(dimensionProperty(id, true, prefix));
+    result.push(dimensionProperty(id, false, prefix));
+    var colour = new PropertyDescriptorOptions();
+    colour.category = "Rendering";
+    colour.validator = function(_, value) return switch (value) {
+      case PropertyValue.Text(text): decodeColour(text) == null ? "Colour requires #RRGGBB" : null;
+      default: "Colour requires #RRGGBB";
+    };
+    // Property history stores the displayed text. Retain exact channel snapshots so
+    // undoing a hex edit restores values loaded from a document without quantizing them.
+    var colourSnapshots:Map<String, Array<Float>> = new Map();
+    var initialColour = requiredObject(id);
+    colourSnapshots.set(encodeColour(initialColour.red, initialColour.green, initialColour.blue),
+      [initialColour.red, initialColour.green, initialColour.blue]);
+    result.push(new PropertyDescriptor(prefix + "colour", "Colour", PropertyType.Text,
+      function(_) {
+        var item = requiredObject(id);
+        return PropertyValue.Text(encodeColour(item.red, item.green, item.blue));
+      }, function(_, value) {
+        switch (value) {
+          case PropertyValue.Text(text):
+            var key = text.toUpperCase();
+            var channels = colourSnapshots.get(key);
+            if (channels == null) channels = decodeColour(key);
+            if (channels == null) throw "Colour requires #RRGGBB";
+            var current = requiredObject(id);
+            colourSnapshots.set(encodeColour(current.red, current.green, current.blue),
+              [current.red, current.green, current.blue]);
+            setColour(id, channels[0], channels[1], channels[2]);
+          default: throw "Colour requires #RRGGBB";
+        }
+      }, colour));
     return result;
+  }
+
+  function dimensionProperty(id:String, width:Bool, prefix:String):PropertyDescriptor {
+    var settings = new PropertyDescriptorOptions();
+    settings.category = "Geometry";
+    settings.unit = "m";
+    settings.minimum = 0.000001;
+    settings.maximum = 1000000.0;
+    settings.step = 0.1;
+    settings.validator = function(_, value) {
+      var number:Null<Float> = switch (value) {
+        case PropertyValue.Float(next): next;
+        case PropertyValue.Int(next): next;
+        default: null;
+      };
+      return number == null || !validDimension(number) ? "Dimension must be finite and positive" : null;
+    };
+    return new PropertyDescriptor(prefix + (width ? "width" : "height"), width ? "Width" : "Height",
+      PropertyType.Float, function(_) {
+        var item = requiredObject(id);
+        return PropertyValue.Float(width ? item.width : item.height);
+      }, function(_, value) {
+        var item = requiredObject(id);
+        var number:Float = switch (value) {
+          case PropertyValue.Float(next): next;
+          case PropertyValue.Int(next): next;
+          default: throw "Dimension requires a number";
+        };
+        setDimensions(id, width ? number : item.width, width ? item.height : number);
+      }, settings);
+  }
+
+  function requiredObject(id:String):EditorSceneObject {
+    var item = object(id);
+    if (item == null) throw "Unknown scene object: " + id;
+    return item;
+  }
+
+  static function rectangleGeometry(width:Float, height:Float):GeometryData {
+    var mesh = new GeometryData();
+    mesh.addVertex(-width / 2, -height / 2, 0);
+    mesh.addVertex(width / 2, -height / 2, 0);
+    mesh.addVertex(width / 2, height / 2, 0);
+    mesh.addVertex(-width / 2, height / 2, 0);
+    mesh.addTriangle(0, 1, 2);
+    mesh.addTriangle(0, 2, 3);
+    mesh.setBounds(-width / 2, -height / 2, 0, width / 2, height / 2, 0);
+    return mesh;
+  }
+
+  static inline function validDimension(value:Float):Bool
+    return value == value && value - value == 0.0 && value >= 0.000001 && value <= 1000000.0;
+
+  static inline function validColour(value:Float):Bool
+    return value == value && value - value == 0.0 && value >= 0.0 && value <= 1.0;
+
+  static function encodeColour(red:Float, green:Float, blue:Float):String
+    return "#" + StringTools.hex(Math.round(red * 255), 2) +
+      StringTools.hex(Math.round(green * 255), 2) + StringTools.hex(Math.round(blue * 255), 2);
+
+  static function decodeColour(value:String):Null<Array<Float>> {
+    if (value == null || value.length != 7 || value.charAt(0) != "#") return null;
+    var channels:Array<Float> = [];
+    for (offset in [1, 3, 5]) {
+      var pair = value.substr(offset, 2);
+      for (index in 0...2) {
+        var code = pair.charCodeAt(index);
+        if (!((code >= 48 && code <= 57) || (code >= 65 && code <= 70) ||
+            (code >= 97 && code <= 102))) return null;
+      }
+      var parsed = Std.parseInt("0x" + pair);
+      if (parsed == null) return null;
+      channels.push(parsed / 255.0);
+    }
+    return channels;
   }
 
   function positionProperty(id:String, axis:Int, prefix:String):PropertyDescriptor {

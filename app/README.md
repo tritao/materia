@@ -15,7 +15,8 @@ SceneKit. `src/Main.hx` composes:
 
 The editor starts with two planar SceneKit meshes in an orthographic XY view.
 Click an object in the viewport or hierarchy to select it; the yellow outline
-tracks selection. Edit Name, Position X/Y (metres), or Visible in the inspector.
+tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
+(`#RRGGBB`), or Visible in the inspector.
 Hidden objects remain selectable in the hierarchy. Click empty viewport space
 or the Scene root to clear object selection.
 
@@ -30,6 +31,8 @@ or the Scene root to clear object selection.
 - Saving commits an active drag before writing. New, Open, and Close cancel it before
   continuing through the normal unsaved-change confirmation.
 - Optional 0.2 m grid snapping is available from the viewport context menu.
+- Positive finite dimension edits rebuild geometry and picking bounds together;
+  framing, duplication, undo/redo, and scene persistence use the edited size and colour.
 - Middle-drag pans the view; the wheel zooms around the pointer.
 - Frame selected fits the selected object's bounds.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.

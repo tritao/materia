@@ -43,13 +43,19 @@ class SceneEditingTests {
     check(viewport.revision() > revision && viewport.pick(camera,
       EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y) == originalId,
       "viewport observes created geometry");
-    check(empty.properties().length == 4, "inspector observes created selection");
+    check(empty.properties().length == 7, "inspector observes all created-object properties");
 
     var name = new PropertyBinding(empty.properties()[3], empty.context());
     check(name.apply(PropertyValue.Text("Hidden panel")) == PropertyEditResult.Applied,
       "rename succeeds through inspector binding");
     var renamed = empty.object(originalId);
     check(renamed != null && renamed.label == "Hidden panel", "hierarchy model observes rename");
+    check(new PropertyBinding(empty.properties()[4], empty.context()).apply(PropertyValue.Float(2.4))
+      == PropertyEditResult.Applied, "width edit succeeds");
+    check(new PropertyBinding(empty.properties()[5], empty.context()).apply(PropertyValue.Float(0.8))
+      == PropertyEditResult.Applied, "height edit succeeds");
+    check(new PropertyBinding(empty.properties()[6], empty.context()).apply(PropertyValue.Text("#336699"))
+      == PropertyEditResult.Applied, "colour edit succeeds");
     var visible = new PropertyBinding(empty.properties()[2], empty.context());
     check(visible.apply(PropertyValue.Bool(false)) == PropertyEditResult.Applied,
       "visibility edit succeeds through inspector binding");
@@ -61,8 +67,11 @@ class SceneEditingTests {
     var duplicate = empty.object(duplicateId);
     check(duplicateId != originalId && duplicate != null && duplicate.label == "Hidden panel copy",
       "duplicate has a distinct stable ID and copied name");
+    var duplicateState = empty.items()[1];
     check(!empty.info(duplicateId).visible() && tree.childKeyAt("scene", 0) == originalId
       && tree.childKeyAt("scene", 1) == duplicateId, "hidden state and hierarchy order duplicate together");
+    check(duplicateState.width == 2.4 && duplicateState.height == 0.8 && nearValue(duplicateState.red, 0.2),
+      "dimensions and colour duplicate together");
     check(empty.deleteSelected(), "duplicate deletes");
     check(empty.object(duplicateId) == null && empty.selectedId == originalId,
       "delete removes selection and selects its neighbour");
@@ -88,6 +97,9 @@ class SceneEditingTests {
         "reopen preserves surviving stable identity");
       check(session.scene.items()[0].label == "Hidden panel" && !session.scene.info(originalId).visible(),
         "reopen preserves rename and hidden state");
+      var reopened = session.scene.items()[0];
+      check(reopened.width == 2.4 && reopened.height == 0.8 && nearValue(reopened.blue, 0.6),
+        "reopen preserves dimensions and colour");
       check(!session.scene.document.isDirty && !session.scene.document.canUndo,
         "reopened document starts clean with fresh history");
     } catch (error:Dynamic) {
@@ -99,6 +111,68 @@ class SceneEditingTests {
     session.dispose();
     FileSystem.deleteFile(file);
     FileSystem.deleteDirectory(directory);
+  }
+
+  static inline function nearValue(actual:Float, expected:Float):Bool
+    return Math.abs(actual - expected) < 0.00001;
+
+  static function rectangleProperties():Void {
+    var scene = new EditorScene();
+    var viewport = new EditorSceneViewport(scene);
+    var camera = new ViewportCamera();
+    try {
+      scene.select("box");
+      var width = new PropertyBinding(scene.properties()[4], scene.context());
+      var height = new PropertyBinding(scene.properties()[5], scene.context());
+      var colour = new PropertyBinding(scene.properties()[6], scene.context());
+      check(switch (width.apply(PropertyValue.Float(0.0))) {
+        case PropertyEditResult.Rejected(_): true;
+        default: false;
+      }, "zero width is rejected");
+      var notFinite = 0.0;
+      notFinite = notFinite / notFinite;
+      check(switch (height.apply(PropertyValue.Float(notFinite))) {
+        case PropertyEditResult.Rejected(_): true;
+        default: false;
+      }, "non-finite height is rejected");
+      check(switch (colour.apply(PropertyValue.Text("#12GG00"))) {
+        case PropertyEditResult.Rejected(_): true;
+        default: false;
+      }, "invalid colour is rejected");
+      check(width.apply(PropertyValue.Float(4.0)) == PropertyEditResult.Applied, "width updates");
+      check(height.apply(PropertyValue.Float(0.5)) == PropertyEditResult.Applied, "height updates");
+      check(colour.apply(PropertyValue.Text("#33CC66")) == PropertyEditResult.Applied, "colour updates");
+      check(scene.pick(0.3, 0.0) == "box", "expanded geometry updates picking bounds");
+      check(scene.pick(-1.5, 0.4) == "scene", "reduced geometry removes stale picking bounds");
+      viewport.frameSelected(camera);
+      near(camera.zoom, Math.min((viewport.viewportWidth - 96.0) / (4.0 * EditorSceneViewport.SCALE),
+        (viewport.viewportHeight - 96.0) / (0.5 * EditorSceneViewport.SCALE)),
+        "framing uses edited dimensions");
+      var item = scene.items()[0];
+      check(nearValue(item.red, 0.2) && nearValue(item.green, 0.8)
+        && nearValue(item.blue, 0.4), "edited colour updates scene material state");
+      scene.document.undo();
+      item = scene.items()[0];
+      check(nearValue(item.red, 0.22) && nearValue(item.green, 0.52)
+        && nearValue(item.blue, 0.85), "colour undo restores exact source channels");
+      scene.document.undo();
+      item = scene.items()[0];
+      check(item.height == 1.2, "height undo restores geometry");
+      scene.document.undo();
+      item = scene.items()[0];
+      check(item.width == 1.6 && scene.pick(0.3, 0.0) == "scene",
+        "width undo restores geometry and picking");
+      scene.document.redo();
+      scene.document.redo();
+      scene.document.redo();
+      item = scene.items()[0];
+      check(item.width == 4.0 && item.height == 0.5 && nearValue(item.green, 0.8),
+        "redo restores dimensions and colour");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
   }
 
   static function viewportDragging():Void {
@@ -215,6 +289,7 @@ class SceneEditingTests {
       check(scene.properties().length == 0 && !scene.context().hasSelection, "empty selection has no editable properties");
       scene.dispose();
       scene.dispose();
+      rectangleProperties();
       viewportDragging();
       editingLifecycle();
       SceneDocumentTests.run();
