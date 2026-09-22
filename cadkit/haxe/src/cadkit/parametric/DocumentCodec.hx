@@ -10,6 +10,7 @@ import cadkit.parametric.features.ShellFeature;
 import cadkit.parametric.features.ProjectFeature;
 import cadkit.parametric.features.GridFeature;
 import cadkit.parametric.features.LinearPatternFeature;
+import cadkit.parametric.features.PolarPatternFeature;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.SketchFeature;
@@ -466,6 +467,11 @@ class DocumentCodec {
 				numberField(record, "spacing"), decodeVector(requiredField(record, "direction")), numberField(record, "secondCount"),
 				numberField(record, "secondSpacing"), rawSecondDirection == null ? null : decodeVector(rawSecondDirection));
 		}
+		if (type == "polar-pattern")
+			return new PolarPatternFeature(requiredFeature(document, intField(record, "source")), numberField(record, "count"),
+				numberField(record, "radius"), numberField(record, "angularSpan"), decodeVector(requiredField(record, "axisOrigin")),
+				decodeVector(requiredField(record, "axisDirection")), decodeVector(requiredField(record, "radialDirection")),
+				boolField(record, "orientInstances"), numberField(record, "startAngle"));
 		return null;
 	}
 
@@ -581,6 +587,24 @@ class DocumentCodec {
 				secondCount: value.secondCount.value,
 				secondSpacing: value.secondSpacing.value,
 				secondDirection: value.secondDirection == null ? null : encodeVector(value.secondDirection)
+			};
+		}
+		if (type == "polar-pattern") {
+			var value:PolarPatternFeature = cast feature;
+
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				source: value.source.id.toInt(),
+				count: value.count.value,
+				radius: value.radius.value,
+				startAngle: value.startAngle.value,
+				angularSpan: value.angularSpan.value,
+				axisOrigin: encodeVector(value.axisOrigin),
+				axisDirection: encodeVector(value.axisDirection),
+				radialDirection: encodeVector(value.radialDirection),
+				orientInstances: value.orientInstances
 			};
 		}
 		return null;

@@ -154,8 +154,8 @@ older documents remains readable; without an explicit output it uses the last
 feature, matching the earlier behavior. Persistence saves current model state,
 not the undo/redo stacks.
 
-The recorder covers rectangle/circle/slot/box primitives, constrained sketches, wires and polylines,
-grids, planar and solid booleans, positive-Z extrusion, translation, revolution,
+The recorder covers rectangle/circle/slot/box/cylinder primitives, constrained sketches, wires and polylines,
+grids, linear and polar patterns, planar and solid booleans, extrusion, translation, revolution,
 loft, sweep, offset, shell, projection, fillet, and chamfer. Operations whose
 editable meaning is not represented must be rejected explicitly with
 `unsupported(name)`. Recorded extrusion uses a scalar amount and a fixed unit
@@ -171,6 +171,14 @@ Counts and spacing are editable named parameters; counts must remain positive
 integers. The pattern does not perform a Boolean operation. Pass its compound
 to `BooleanFeature` or the recording builder's `add`/`subtract` methods when
 the instances should modify a target solid.
+
+`PolarPatternFeature` places instances at an editable radius around an explicit
+axis and radial direction. Count, radius, start angle, and angular span are
+normal feature parameters. A span of positive or negative `2π` omits the
+duplicate endpoint; partial spans include both ends. Instance orientation may
+rotate with the orbit or remain fixed. `ParametricFlange.hx` demonstrates a
+bolt-circle cut, while `VentilatedEnclosure.hx` patterns an attached profile
+before applying one through-all pocket operation.
 
 ## Current operation limits
 

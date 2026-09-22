@@ -8,15 +8,17 @@ class Parameter {
 	public final name:String;
 	public final minimum:Float;
 	public final integer:Bool;
+	public final maximum:Float;
 	public var value(default, null):Float;
 
 	private final owner:Feature;
 
-	public function new(owner:Feature, name:String, value:Float, minimum:Float, integer:Bool = false) {
+	public function new(owner:Feature, name:String, value:Float, minimum:Float, integer:Bool = false, maximum:Float = 1e300) {
 		this.owner = owner;
 		this.name = name;
 		this.minimum = minimum;
 		this.integer = integer;
+		this.maximum = maximum;
 		validate(value);
 		this.value = value;
 		owner.registerParameter(this);
@@ -54,6 +56,8 @@ class Parameter {
 	private function validate(candidate:Float):Void {
 		if (!Math.isFinite(candidate) || candidate <= minimum)
 			throw new ParametricError(name + " must be finite and greater than " + Std.string(minimum));
+		if (candidate > maximum)
+			throw new ParametricError(name + " must not exceed " + Std.string(maximum));
 		if (integer && candidate != Std.int(candidate))
 			throw new ParametricError(name + " must be an integer");
 	}

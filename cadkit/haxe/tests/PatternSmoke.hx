@@ -7,6 +7,7 @@ import cadkit.parametric.features.BooleanOperation;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.LinearPatternFeature;
+import cadkit.parametric.features.PolarPatternFeature;
 import cadkit.parametric.features.TransformFeature;
 
 class PatternSmoke {
@@ -47,9 +48,11 @@ class PatternSmoke {
 		document.recompute();
 		near(document.result().volume(), 30 * 10 * 5 - 5 * Math.PI * 5);
 
+		var committedLinearCut = document.result();
 		var failed = false;
 		try count.set(3.5) catch (error:Dynamic) failed = true;
-		check(failed && count.value == 5, "linear count rejects non-integers atomically");
+		check(failed && count.value == 5 && document.result() == committedLinearCut,
+			"linear count rejects non-integers atomically");
 		var restored = DocumentCodec.decode(DocumentCodec.encode(document));
 		near(restored.result().volume(), document.result().volume());
 		restored.parameter("holes.count").set(3);
@@ -77,5 +80,72 @@ class PatternSmoke {
 		near(twoAxisDocument.result().volume(), 6);
 		check(array.currentShape().subshapeCount(CadKit.ShapeKind.Solid) == 6, "two-axis linear pattern instance count");
 		twoAxisDocument.close();
+
+		var polarDocument = new Document();
+		var flange = polarDocument.add(new CylinderFeature(30, 6));
+		var boltHole = polarDocument.add(new CylinderFeature(2, 6));
+		var boltHoles = polarDocument.add(new PolarPatternFeature(boltHole, 6, 20, 2 * Math.PI,
+			new Vector(), Vector.Z(), Vector.X()));
+		var boltCount = polarDocument.defineParameter("bolts.count", 6);
+		var boltRadius = polarDocument.defineParameter("bolts.circle-radius", 20);
+		var boltSpan = polarDocument.defineParameter("bolts.angular-span", 2 * Math.PI);
+		boltCount.bind(boltHoles.count);
+		boltRadius.bind(boltHoles.radius);
+		boltSpan.bind(boltHoles.angularSpan);
+		var drilledFlange = polarDocument.add(new BooleanFeature(flange, boltHoles, BooleanOperation.Cut));
+		polarDocument.setOutput(drilledFlange);
+		polarDocument.recompute();
+		near(polarDocument.result().volume(), Math.PI * 30 * 30 * 6 - 6 * Math.PI * 2 * 2 * 6);
+		check(boltHoles.currentShape().subshapeCount(CadKit.ShapeKind.Solid) == 6,
+			"full polar pattern does not duplicate its endpoint");
+		boltCount.set(8);
+		polarDocument.recompute();
+		near(polarDocument.result().volume(), Math.PI * 30 * 30 * 6 - 8 * Math.PI * 2 * 2 * 6);
+		check(polarDocument.undo(), "polar count undo");
+		polarDocument.recompute();
+		near(polarDocument.result().volume(), Math.PI * 30 * 30 * 6 - 6 * Math.PI * 2 * 2 * 6);
+		check(polarDocument.redo(), "polar count redo");
+		polarDocument.recompute();
+		var restoredPolar = DocumentCodec.decode(DocumentCodec.encode(polarDocument));
+		near(restoredPolar.result().volume(), polarDocument.result().volume());
+		check(restoredPolar.parameter("bolts.count").value == 8, "polar count reload");
+		restoredPolar.close();
+		polarDocument.close();
+
+		var orientationDocument = new Document();
+		var orientationSeed = orientationDocument.add(new BoxFeature(2, 1, 1));
+		var fixedOrientation = orientationDocument.add(new PolarPatternFeature(orientationSeed, 2, 10, Math.PI / 2,
+			new Vector(), Vector.Z(), Vector.X(), false));
+		var rotatingOrientation = orientationDocument.add(new PolarPatternFeature(orientationSeed, 2, 10, Math.PI / 2,
+			new Vector(), Vector.Z(), Vector.X(), true));
+		orientationDocument.setOutput(rotatingOrientation);
+		orientationDocument.recompute();
+		near(fixedOrientation.currentShape().bounds().get_max().get_y(), 11);
+		near(rotatingOrientation.currentShape().bounds().get_max().get_y(), 12);
+		orientationDocument.close();
+
+		var flangeExample = new ParametricFlange();
+		near(flangeExample.finish.currentShape().volume(), Math.PI * 30 * 30 * 6 - 6 * Math.PI * 2 * 2 * 6);
+		flangeExample.resize(36, 8, 25);
+		near(flangeExample.finish.currentShape().volume(), Math.PI * 36 * 36 * 6 - 8 * Math.PI * 2 * 2 * 6);
+		var restoredFlange = DocumentCodec.decode(DocumentCodec.encode(flangeExample.document));
+		near(restoredFlange.result().volume(), flangeExample.finish.currentShape().volume());
+		restoredFlange.close();
+		flangeExample.close();
+
+		var ventilationExample = new VentilatedEnclosure();
+		near(ventilationExample.finish.currentShape().volume(), 60 * 40 * 5 - 5 * 4 * 20 * 5);
+		ventilationExample.resize(80, 7, 10);
+		near(ventilationExample.finish.currentShape().volume(), 80 * 40 * 5 - 7 * 4 * 20 * 5);
+		near(ventilationExample.slot.currentShape().center().get_x(), 40);
+		var restoredVentilation = DocumentCodec.decode(DocumentCodec.encode(ventilationExample.document));
+		near(restoredVentilation.result().volume(), ventilationExample.finish.currentShape().volume());
+		restoredVentilation.close();
+		var committedVentilation = ventilationExample.finish.currentShape();
+		var failedResize = false;
+		try ventilationExample.resize(30, 7, 10) catch (error:Dynamic) failedResize = true;
+		check(failedResize && ventilationExample.finish.currentShape() == committedVentilation,
+			"failed patterned enclosure edit preserves committed geometry");
+		ventilationExample.close();
 	}
 }

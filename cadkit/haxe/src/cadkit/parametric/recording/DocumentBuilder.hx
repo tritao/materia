@@ -15,6 +15,7 @@ import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.GridFeature;
 import cadkit.parametric.features.LinearPatternFeature;
+import cadkit.parametric.features.PolarPatternFeature;
 import cadkit.parametric.features.LoftFeature;
 import cadkit.parametric.features.OffsetFeature;
 import cadkit.parametric.features.PolylineFeature;
@@ -26,6 +27,7 @@ import cadkit.parametric.features.SweepFeature;
 import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.WireFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.sketch.ConstrainedSketch;
 
@@ -115,6 +117,14 @@ class DocumentBuilder {
 		return feature;
 	}
 
+	public function cylinder(radius:NamedParameter, height:NamedParameter):CylinderFeature {
+		check();
+		var feature = document.add(new CylinderFeature(radius.value, height.value));
+		bind(radius, feature, "cylinder.radius");
+		bind(height, feature, "cylinder.height");
+		return feature;
+	}
+
 	public function wire(source:Feature):WireFeature {
 		check();
 		return document.add(new WireFeature(source));
@@ -146,6 +156,20 @@ class DocumentBuilder {
 			bind(secondCount, feature, "linear.secondCount");
 			bind(secondSpacing, feature, "linear.secondSpacing");
 		}
+		return feature;
+	}
+
+	public function polarPattern(source:Feature, count:NamedParameter, radius:NamedParameter, angularSpan:NamedParameter,
+		axisOrigin:Vector, axisDirection:Vector, radialDirection:Vector, orientInstances:Bool = true,
+		?startAngle:NamedParameter):PolarPatternFeature {
+		check();
+		var feature = document.add(new PolarPatternFeature(source, count.value, radius.value, angularSpan.value,
+			axisOrigin, axisDirection, radialDirection, orientInstances, startAngle == null ? 0 : startAngle.value));
+		bind(count, feature, "polar.count");
+		bind(radius, feature, "polar.radius");
+		bind(angularSpan, feature, "polar.angularSpan");
+		if (startAngle != null)
+			bind(startAngle, feature, "polar.startAngle");
 		return feature;
 	}
 
