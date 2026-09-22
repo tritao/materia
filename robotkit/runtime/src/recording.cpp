@@ -3,7 +3,6 @@
 #define MCAP_IMPLEMENTATION
 #include <mcap/reader.hpp>
 #include <mcap/writer.hpp>
-
 #include "robotkit_runtime.h"
 
 #include <algorithm>
@@ -14,76 +13,217 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
 
 namespace {
-constexpr const char* kNames[] = {"", "command", "snapshot", "sensor", "fault", "world", "world_event"};
-constexpr const char* kSchema = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload","type":"object","required":["version","ordinal","type"],"properties":{"version":{"const":1},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"type":{"type":"string"}}})";
-struct Item { uint32_t kind; uint32_t version; uint64_t ordinal; std::vector<std::byte> data; };
+constexpr const char* Names[] = {"", "command", "snapshot", "sensor", "fault", "world", "world_event"};
+constexpr const char* Schema = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload v1","type":"object","additionalProperties":true,"required":["version","ordinal","recordingTimestampNs","robotId","sourceSequence","sourceTimestampNs","sourceClockId","type","payload"],"properties":{"version":{"const":1},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"recordingTimestampNs":{"type":"string","pattern":"^[0-9]+$"},"robotId":{"type":"string"},"sourceSequence":{"type":"string"},"sourceTimestampNs":{"type":"string"},"sourceClockId":{"type":"string"},"type":{"type":"string"},"payload":{"type":"object"}}})";
+
+struct Item {
+  uint32_t kind = 0;
+  uint32_t version = 1;
+  uint64_t ordinal = 0;
+  uint64_t timestamp = 0;
+  std::vector<std::byte> data;
+};
 struct Writer {
-  std::mutex mutex; std::condition_variable cv; std::deque<Item> queue; size_t capacity;
-  uint64_t accepted=0, written=0, dropped=0; uint32_t state=RK_RECORDING_OPEN;
-  std::string error; std::string incompleteMarker; bool stopping=false; std::thread thread;
-  Writer(size_t cap,std::string marker): capacity(cap),incompleteMarker(std::move(marker)) {}
+  std::mutex mutex;
+  std::condition_variable cv;
+  std::deque<Item> queue;
+  uint64_t capacityBytes;
+  uint64_t queuedBytes = 0, accepted = 0, written = 0, dropped = 0;
+  uint32_t state = RK_RECORDING_OPEN;
+  std::string error, marker;
+  bool stopping = false;
+  std::thread thread;
+  Writer(uint64_t capacity, std::string markerPath)
+      : capacityBytes(capacity), marker(std::move(markerPath)) {}
 };
 struct Reader {
-  mcap::McapReader mcap; std::vector<Item> items; size_t index=0;
+  mcap::McapReader mcap;
+  bool damaged = false;
+  std::optional<mcap::LinearMessageView> messages;
+  std::optional<mcap::LinearMessageView::Iterator> iterator;
+  std::optional<Item> current;
 };
-std::mutex g_mutex; uint32_t g_next=1;
-std::unordered_map<uint32_t,std::shared_ptr<Writer>> g_writers;
-std::unordered_map<uint32_t,std::shared_ptr<Reader>> g_readers;
 
-template<class T> std::shared_ptr<T> lookup(std::unordered_map<uint32_t,std::shared_ptr<T>>& map,uint32_t id){
-  std::lock_guard lock(g_mutex); auto it=map.find(id); return it==map.end()?nullptr:it->second;
+std::mutex RegistryMutex;
+uint32_t NextHandle = 1;
+std::unordered_map<uint32_t, std::shared_ptr<Writer>> Writers;
+std::unordered_map<uint32_t, std::shared_ptr<Reader>> Readers;
+
+template<class T> std::shared_ptr<T> lookup(std::unordered_map<uint32_t,std::shared_ptr<T>>& values, uint32_t id) {
+  std::lock_guard lock(RegistryMutex);
+  auto found = values.find(id);
+  return found == values.end() ? nullptr : found->second;
 }
-bool valid_kind(uint32_t kind){ return kind>=RK_RECORDING_COMMAND && kind<=RK_RECORDING_WORLD_EVENT; }
-void set_failure(const std::shared_ptr<Writer>& w,const std::string& error){
-  std::lock_guard lock(w->mutex); if(w->error.empty()) w->error=error; w->state=RK_RECORDING_FAILED; w->stopping=true; w->cv.notify_all();
+bool validKind(uint32_t kind) { return kind >= RK_RECORDING_COMMAND && kind <= RK_RECORDING_WORLD_EVENT; }
+bool validSchemaData(const mcap::ByteArray& data) {
+  const auto size = std::strlen(Schema);
+  return data.size() == size && std::memcmp(data.data(), Schema, size) == 0;
 }
-void run_writer(const std::shared_ptr<Writer>& w,std::string path){
-  mcap::McapWriter out; auto options=mcap::McapWriterOptions("robotkit"); options.compression=mcap::Compression::None;
-  auto status=out.open(path,options); if(!status.ok()){set_failure(w,status.message);return;}
-  std::array<mcap::ChannelId,7> channels{};
-  for(uint32_t kind=1;kind<=6;++kind){
-    mcap::Schema schema(std::string("robotkit.")+kNames[kind]+".v1","jsonschema",kSchema); out.addSchema(schema);
-    mcap::Channel channel(std::string("robotkit/")+kNames[kind],"json",schema.id); channel.metadata["robotkit.schema_version"]="1"; out.addChannel(channel); channels[kind]=channel.id;
+void fail(const std::shared_ptr<Writer>& writer, const std::string& message) {
+  std::lock_guard lock(writer->mutex);
+  if (writer->error.empty()) writer->error = message;
+  writer->state = RK_RECORDING_FAILED;
+  writer->stopping = true;
+  writer->cv.notify_all();
+}
+void writeStatus(const std::shared_ptr<Writer>& writer) {
+  std::ofstream out(writer->marker + ".status", std::ios::binary | std::ios::trunc);
+  if (!out) return;
+  out << "state=" << writer->state << "\naccepted=" << writer->accepted
+      << "\nwritten=" << writer->written << "\ndropped=" << writer->dropped
+      << "\nqueued=" << writer->queue.size() << "\nqueued_bytes=" << writer->queuedBytes
+      << "\nerror=" << writer->error << "\n";
+}
+void writerMain(const std::shared_ptr<Writer>& writer, const std::string& path) {
+  mcap::McapWriter output;
+  auto options = mcap::McapWriterOptions("robotkit");
+  options.compression = mcap::Compression::None;
+  auto result = output.open(path, options);
+  if (!result.ok()) { fail(writer, result.message); writeStatus(writer); return; }
+  std::array<mcap::ChannelId, 7> channels{};
+  for (uint32_t kind = 1; kind <= 6; ++kind) {
+    mcap::Schema schema(std::string("robotkit.") + Names[kind] + ".v1", "jsonschema", Schema);
+    output.addSchema(schema);
+    mcap::Channel channel(std::string("robotkit/") + Names[kind], "json", schema.id);
+    channel.metadata["robotkit.schema_version"] = "1";
+    output.addChannel(channel);
+    channels[kind] = channel.id;
   }
-  for(;;){
-    Item item; { std::unique_lock lock(w->mutex); w->cv.wait(lock,[&]{return w->stopping||!w->queue.empty();});
-      if(w->queue.empty()){if(w->stopping) break; continue;} item=std::move(w->queue.front()); w->queue.pop_front(); }
-    mcap::Message msg; msg.channelId=channels[item.kind]; msg.sequence=static_cast<uint32_t>(item.ordinal); msg.logTime=item.ordinal; msg.publishTime=item.ordinal; msg.data=item.data.data(); msg.dataSize=item.data.size();
-    status=out.write(msg); if(!status.ok()){set_failure(w,status.message);break;}
-    std::lock_guard lock(w->mutex); ++w->written;
+  for (;;) {
+    Item item;
+    {
+      std::unique_lock lock(writer->mutex);
+      writer->cv.wait(lock, [&] { return writer->stopping || !writer->queue.empty(); });
+      if (writer->queue.empty()) { if (writer->stopping) break; continue; }
+      item = std::move(writer->queue.front());
+      writer->queuedBytes -= item.data.size();
+      writer->queue.pop_front();
+    }
+    mcap::Message message;
+    message.channelId = channels[item.kind];
+    message.sequence = static_cast<uint32_t>(item.ordinal);
+    message.logTime = item.timestamp;
+    message.publishTime = item.ordinal;
+    message.data = item.data.data();
+    message.dataSize = item.data.size();
+    result = output.write(message);
+    if (!result.ok()) { fail(writer, result.message); break; }
+    std::lock_guard lock(writer->mutex);
+    ++writer->written;
   }
-  out.close(); std::lock_guard lock(w->mutex); if(w->state!=RK_RECORDING_FAILED) w->state=RK_RECORDING_CLOSED;
+  output.close();
+  std::lock_guard lock(writer->mutex);
+  if (writer->state != RK_RECORDING_FAILED) writer->state = RK_RECORDING_CLOSED;
+  writeStatus(writer);
+}
+
+rk_result validateAndCache(const std::shared_ptr<Reader>& reader) {
+  if (reader->damaged) return RK_ERROR_BACKEND;
+  if (!reader->iterator || *reader->iterator == reader->messages->end()) return RK_ERROR_STALE_STATE;
+  const auto& view = **reader->iterator;
+  const auto& topic = view.channel->topic;
+  uint32_t kind = 0;
+  for (uint32_t index = 1; index <= 6; ++index)
+    if (topic == std::string("robotkit/") + Names[index]) kind = index;
+  auto version = view.channel->metadata.find("robotkit.schema_version");
+  if (!kind || !view.schema || view.schema->encoding != "jsonschema" ||
+      view.schema->name != std::string("robotkit.") + Names[kind] + ".v1" ||
+      version == view.channel->metadata.end() || version->second != "1" ||
+      !validSchemaData(view.schema->data))
+    return RK_ERROR_UNSUPPORTED;
+  Item item;
+  item.kind = kind;
+  item.ordinal = view.message.publishTime;
+  item.timestamp = view.message.logTime;
+  item.data.assign(view.message.data, view.message.data + view.message.dataSize);
+  reader->current = std::move(item);
+  ++(*reader->iterator);
+  return reader->damaged ? RK_ERROR_BACKEND : RK_OK;
 }
 }
 
 extern "C" {
-rk_result rk_recording_writer_create(const char* path,uint32_t capacity,rk_recording_writer_handle* out){
-  if(!path||!*path||capacity==0||!out) return RK_ERROR_INVALID_ARGUMENT;
-  try { std::string marker=std::string(path)+".incomplete";{std::ofstream pending(marker,std::ios::binary|std::ios::trunc);if(!pending)return RK_ERROR_BACKEND;pending<<"RobotKit recording was not closed cleanly\n";}auto w=std::make_shared<Writer>(capacity,marker); {std::lock_guard lock(g_mutex);out->id=g_next++;g_writers[out->id]=w;} w->thread=std::thread(run_writer,w,std::string(path)); return RK_OK; } catch(...) {return RK_ERROR_OUT_OF_MEMORY;}
+rk_result rk_recording_writer_create(const char* path, uint64_t capacity, rk_recording_writer_handle* out) {
+  if (!path || !*path || !capacity || !out) return RK_ERROR_INVALID_ARGUMENT;
+  try {
+    std::string marker = std::string(path) + ".incomplete";
+    { std::ofstream pending(marker, std::ios::trunc); if (!pending) return RK_ERROR_BACKEND; pending << "incomplete\n"; }
+    auto writer = std::make_shared<Writer>(capacity, marker);
+    { std::lock_guard lock(RegistryMutex); out->id = NextHandle++; Writers[out->id] = writer; }
+    writer->thread = std::thread(writerMain, writer, std::string(path));
+    return RK_OK;
+  } catch (...) { return RK_ERROR_OUT_OF_MEMORY; }
 }
-rk_result rk_recording_writer_enqueue(rk_recording_writer_handle h,rk_recording_event_kind kind,uint32_t version,uint64_t ordinal,const uint8_t* payload,uint32_t size){
-  auto w=lookup(g_writers,h.id); if(!w) return RK_ERROR_INVALID_HANDLE; if(!valid_kind(kind)||version!=1||(!payload&&size)) return RK_ERROR_INVALID_ARGUMENT;
-  std::lock_guard lock(w->mutex); if(w->state!=RK_RECORDING_OPEN) return RK_ERROR_INVALID_STATE; if(w->queue.size()>=w->capacity){++w->dropped;return RK_ERROR_QUEUE_FULL;}
-  Item item{kind,version,ordinal,{}}; item.data.resize(size); std::memcpy(item.data.data(),payload,size); w->queue.push_back(std::move(item));++w->accepted;w->cv.notify_one();return RK_OK;
+rk_result rk_recording_writer_enqueue(rk_recording_writer_handle handle, rk_recording_event_kind kind,
+    uint32_t version, uint64_t ordinal, uint64_t timestamp, const uint8_t* payload, uint32_t size) {
+  auto writer = lookup(Writers, handle.id);
+  if (!writer) return RK_ERROR_INVALID_HANDLE;
+  if (!validKind(kind) || version != 1 || (!payload && size)) return RK_ERROR_INVALID_ARGUMENT;
+  std::lock_guard lock(writer->mutex);
+  if (writer->state != RK_RECORDING_OPEN) return RK_ERROR_INVALID_STATE;
+  if (size > writer->capacityBytes || writer->queuedBytes > writer->capacityBytes - size) {
+    ++writer->dropped; writeStatus(writer); return RK_ERROR_QUEUE_FULL;
+  }
+  Item item{kind, version, ordinal, timestamp, {}};
+  item.data.resize(size);
+  if (size) std::memcpy(item.data.data(), payload, size);
+  writer->queuedBytes += size;
+  writer->queue.push_back(std::move(item));
+  ++writer->accepted;
+  writer->cv.notify_one();
+  return RK_OK;
 }
-rk_result rk_recording_writer_get_status(rk_recording_writer_handle h,rk_recording_writer_status* s){
-  auto w=lookup(g_writers,h.id); if(!w) return RK_ERROR_INVALID_HANDLE; if(!s||s->struct_size<sizeof(*s)) return RK_ERROR_INVALID_ARGUMENT; std::lock_guard lock(w->mutex);
-  s->state=w->state;s->accepted=w->accepted;s->written=w->written;s->dropped=w->dropped;s->queued=w->queue.size();std::memset(s->error,0,sizeof(s->error));std::memcpy(s->error,w->error.data(),std::min(w->error.size(),sizeof(s->error)-1));return RK_OK;
+rk_result rk_recording_writer_get_status(rk_recording_writer_handle handle, rk_recording_writer_status* status) {
+  auto writer = lookup(Writers, handle.id);
+  if (!writer) return RK_ERROR_INVALID_HANDLE;
+  if (!status || status->struct_size < sizeof(*status)) return RK_ERROR_INVALID_ARGUMENT;
+  std::lock_guard lock(writer->mutex);
+  status->state=writer->state; status->accepted=writer->accepted; status->written=writer->written;
+  status->dropped=writer->dropped; status->queued=writer->queue.size(); status->queued_bytes=writer->queuedBytes;
+  std::memset(status->error,0,sizeof(status->error));
+  std::memcpy(status->error,writer->error.data(),std::min(writer->error.size(),sizeof(status->error)-1));
+  return RK_OK;
 }
-rk_result rk_recording_writer_finish(rk_recording_writer_handle h){auto w=lookup(g_writers,h.id);if(!w)return RK_ERROR_INVALID_HANDLE;{{std::lock_guard lock(w->mutex);w->stopping=true;if(w->state==RK_RECORDING_OPEN)w->state=RK_RECORDING_CLOSING;}w->cv.notify_all();}if(w->thread.joinable())w->thread.join();std::lock_guard lock(w->mutex);if(w->state!=RK_RECORDING_CLOSED)return RK_ERROR_BACKEND;std::error_code error;std::filesystem::remove(w->incompleteMarker,error);return error?RK_ERROR_BACKEND:RK_OK;}
-void rk_recording_writer_destroy(rk_recording_writer_handle h){
-  std::shared_ptr<Writer>w;
-  {std::lock_guard lock(g_mutex);auto it=g_writers.find(h.id);if(it==g_writers.end())return;w=it->second;g_writers.erase(it);}
-  {std::lock_guard lock(w->mutex);if(w->state==RK_RECORDING_OPEN){w->error="writer destroyed without finish";w->state=RK_RECORDING_FAILED;}w->stopping=true;}
-  w->cv.notify_all();if(w->thread.joinable())w->thread.join();
+rk_result rk_recording_writer_finish(rk_recording_writer_handle handle) {
+  auto writer=lookup(Writers,handle.id); if(!writer)return RK_ERROR_INVALID_HANDLE;
+  {std::lock_guard lock(writer->mutex);writer->stopping=true;if(writer->state==RK_RECORDING_OPEN)writer->state=RK_RECORDING_CLOSING;}
+  writer->cv.notify_all(); if(writer->thread.joinable())writer->thread.join();
+  std::lock_guard lock(writer->mutex); writeStatus(writer);
+  if(writer->state!=RK_RECORDING_CLOSED)return RK_ERROR_BACKEND;
+  std::error_code error;std::filesystem::remove(writer->marker,error);return error?RK_ERROR_BACKEND:RK_OK;
 }
-rk_result rk_recording_reader_open(const char* path,rk_recording_reader_handle* out){if(!path||!*path||!out)return RK_ERROR_INVALID_ARGUMENT;try{if(std::filesystem::exists(std::string(path)+".incomplete"))return RK_ERROR_INVALID_STATE;auto r=std::make_shared<Reader>();auto s=r->mcap.open(path);if(!s.ok())return RK_ERROR_BACKEND;s=r->mcap.readSummary(mcap::ReadSummaryMethod::NoFallbackScan);if(!s.ok())return RK_ERROR_BACKEND;bool damaged=false;auto problem=[&](const mcap::Status&){damaged=true;};for(const auto& view:r->mcap.readMessages(problem)){auto topic=view.channel->topic;if(topic.rfind("robotkit/",0)!=0||!view.schema||view.schema->encoding!="jsonschema")return RK_ERROR_UNSUPPORTED;uint32_t kind=0;for(uint32_t i=1;i<=6;++i)if(topic==std::string("robotkit/")+kNames[i])kind=i;if(!kind||view.schema->name!=std::string("robotkit.")+kNames[kind]+".v1")return RK_ERROR_UNSUPPORTED;auto version=view.channel->metadata.find("robotkit.schema_version");if(version==view.channel->metadata.end()||version->second!="1")return RK_ERROR_UNSUPPORTED;Item item{kind,1,view.message.logTime,{}};item.data.assign(view.message.data,view.message.data+view.message.dataSize);r->items.push_back(std::move(item));}if(damaged)return RK_ERROR_BACKEND;{std::lock_guard lock(g_mutex);out->id=g_next++;g_readers[out->id]=r;}return RK_OK;}catch(...){return RK_ERROR_BACKEND;}}
-rk_result rk_recording_reader_next(rk_recording_reader_handle h,rk_recording_message* m,uint8_t* payload,uint32_t* size){auto r=lookup(g_readers,h.id);if(!r)return RK_ERROR_INVALID_HANDLE;if(!m||m->struct_size<sizeof(*m)||!size)return RK_ERROR_INVALID_ARGUMENT;if(r->index>=r->items.size())return RK_ERROR_STALE_STATE;auto& item=r->items[r->index];m->kind=item.kind;m->schema_version=item.version;m->ordinal=item.ordinal;m->payload_size=item.data.size();if(!payload||*size<item.data.size()){*size=item.data.size();return RK_ERROR_LIMIT;}std::memcpy(payload,item.data.data(),item.data.size());*size=item.data.size();++r->index;return RK_OK;}
-void rk_recording_reader_destroy(rk_recording_reader_handle h){std::lock_guard lock(g_mutex);g_readers.erase(h.id);}
+void rk_recording_writer_destroy(rk_recording_writer_handle handle) {
+  std::shared_ptr<Writer> writer;
+  {std::lock_guard lock(RegistryMutex);auto found=Writers.find(handle.id);if(found==Writers.end())return;writer=found->second;Writers.erase(found);}
+  {std::lock_guard lock(writer->mutex);if(writer->state==RK_RECORDING_OPEN){writer->error="writer destroyed without finish";writer->state=RK_RECORDING_FAILED;}writer->stopping=true;writeStatus(writer);}
+  writer->cv.notify_all();if(writer->thread.joinable())writer->thread.join();
+}
+rk_result rk_recording_reader_open(const char* path,rk_recording_reader_handle* out) {
+  if(!path||!*path||!out)return RK_ERROR_INVALID_ARGUMENT;
+  try {
+    if(std::filesystem::exists(std::string(path)+".incomplete"))return RK_ERROR_INVALID_STATE;
+    auto reader=std::make_shared<Reader>();auto status=reader->mcap.open(path);if(!status.ok())return RK_ERROR_BACKEND;
+    status=reader->mcap.readSummary(mcap::ReadSummaryMethod::NoFallbackScan);if(!status.ok())return RK_ERROR_BACKEND;
+    reader->messages.emplace(reader->mcap.readMessages([raw=reader.get()](const mcap::Status&){raw->damaged=true;}));
+    reader->iterator.emplace(reader->messages->begin());
+    {std::lock_guard lock(RegistryMutex);out->id=NextHandle++;Readers[out->id]=reader;}return RK_OK;
+  } catch(...) {return RK_ERROR_BACKEND;}
+}
+rk_result rk_recording_reader_next(rk_recording_reader_handle handle,rk_recording_message* message,uint8_t* payload,uint32_t* size) {
+  auto reader=lookup(Readers,handle.id);if(!reader)return RK_ERROR_INVALID_HANDLE;
+  if(!message||message->struct_size<sizeof(*message)||!size)return RK_ERROR_INVALID_ARGUMENT;
+  if(!reader->current){auto status=validateAndCache(reader);if(status!=RK_OK)return status;}
+  auto& item=*reader->current;message->kind=item.kind;message->schema_version=item.version;
+  message->ordinal=item.ordinal;message->recording_timestamp_ns=item.timestamp;message->payload_size=item.data.size();
+  if(!payload||*size<item.data.size()){*size=item.data.size();return RK_ERROR_LIMIT;}
+  std::memcpy(payload,item.data.data(),item.data.size());*size=item.data.size();reader->current.reset();return RK_OK;
+}
+void rk_recording_reader_destroy(rk_recording_reader_handle handle){std::lock_guard lock(RegistryMutex);Readers.erase(handle.id);}
 }

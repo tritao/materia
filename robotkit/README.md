@@ -108,11 +108,14 @@ offline debugging and behavior reuse.
 
 ### Persistent recordings
 
-`McapRobotRecording` preserves the in-memory `RobotRecording` while enqueueing
-versioned JSON payloads to a bounded native writer thread. Call `close()` to
+`McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing
+versioned JSON payloads to a byte-bounded native writer thread. Pass
+`retainInMemory = false` for file-only capture. Call `close()` to
 drain the queue and write the MCAP footer. Queue overflow, I/O failure, and a
 writer destroyed without a clean finish are explicit failures; `status()`
-exposes accepted, written, queued, and dropped counts. Files are currently
+exposes accepted, written, queued-event, queued-byte, and dropped counts.
+Terminal status is persisted beside the recording and can be inspected after
+restart with `McapRecordingReader.status(path)`. Files are currently
 uncompressed for straightforward inspection.
 
 Every message carries a recording-wide 64-bit ordinal. It is the sole replay
@@ -123,8 +126,14 @@ cover commands, robot snapshots, individual sensor frames, faults, world
 snapshots, and world lifecycle events. Recorded commands are history only;
 loading a file never forwards them to a live adapter.
 
+Recording timestamps are captured separately from event ordinals and stored as
+MCAP log time; the ordinal is stored as MCAP publish time. The reader validates
+the exact channel schema, channel/event type agreement, envelope ordinal and
+timestamp, and payload contract. `McapRecordingReader.next()` is an incremental
+cursor; the convenience `load()` method is the explicitly retaining variant.
+
 ```haxe
-var writer = new McapRobotRecording("session.mcap", 1024);
+var writer = new McapRobotRecording("session.mcap", 16 * 1024 * 1024, false);
 writer.recordSnapshot(robot.snapshot());
 writer.close();
 
@@ -136,7 +145,9 @@ while (replay.advance()) { /* deterministic single-step playback */ }
 The native dependency is pinned to MCAP C++ 2.1.3. To independently inspect a
 fixture with the official Python MCAP implementation, retain the test file with
 `ROBOTKIT_KEEP_MCAP=1` and open it using `mcap.reader.make_reader`; CI/native
-tests also reject truncated files and unknown schemas.
+tests also reject truncated files and unknown schemas. Run
+`robotkit/tests/mcap-independent.sh` for the automated official-Python-reader
+cross-check.
 
 `robotkit/tests/world-tcp.sh` exercises the same `HoldJointBehavior` against a
 local `SimulatedRobot` and a TCP-connected `RemoteRobot` hosted by `robotd`.

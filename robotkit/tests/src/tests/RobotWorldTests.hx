@@ -1,5 +1,6 @@
 package tests;
 
+import RobotKitRuntime;
 import haxe.Int64;
 import sys.thread.Mutex;
 import sys.thread.Thread;
@@ -32,6 +33,7 @@ import robotkit.world.RobotRecording;
 import robotkit.world.RobotRecordingEvent;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
+import robotkit.world.McapRecordingStatus;
 import robotkit.world.RobotRecordingCodec;
 import robotkit.world.RobotRecordingEntry;
 import robotkit.behavior.HoldJointBehavior;
@@ -49,6 +51,7 @@ class RobotWorldTests {
     testRecordingEventLog();
     testReplayCorrectness();
     testMcapRoundTrip();
+    testMcapRobustness();
     testForwardingAndLifecycle();
     testMixedSimulatedAndRemoteWorld();
     testRuntimeUsesCompiledJointRate();
@@ -59,6 +62,69 @@ class RobotWorldTests {
     testSensorResetPublication();
     testConfiguredSensors();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
+  }
+
+  static function testMcapRobustness():Void {
+    var longPath='/tmp/robotkit-${Sys.getPid()}-long.mcap';
+    var writer=new McapRobotRecording(longPath,16*1024*1024,false);
+    equal(writer.memory,null,"file-only recording disables in-memory retention");
+    for(index in 0...1000) writer.recordSnapshot(new RobotSnapshot("long",Int64.ofInt(index),
+      Int64.ofInt(index),[index],[],[],1,0,Int64.ofInt(index),[],"long.clock","host"));
+    writer.close();
+    var terminal=McapRecordingReader.status(longPath);
+    check(terminal!=null,"terminal recording status survives close");
+    var terminalValue:McapRecordingStatus=cast terminal;
+    equal(terminalValue.written,Int64.ofInt(1000),"persisted status retains write count");
+    var cursor=new McapRecordingReader(longPath),count=0,firstTime=Int64.ofInt(0);
+    while(true){var entry=cursor.next();if(entry==null)break;var entryValue:RobotRecordingEntry=cast entry;
+      if(count==0)firstTime=entryValue.recordingTimestampNs;count++;}
+    cursor.close();
+    equal(count,1000,"incremental reader traverses a long recording");
+    check(Int64.compare(firstTime,Int64.ofInt(0))>0,"recording timestamp is captured independently");
+    sys.FileSystem.deleteFile(longPath);sys.FileSystem.deleteFile(longPath+".incomplete.status");
+
+    var overflowPath='/tmp/robotkit-${Sys.getPid()}-overflow.mcap';
+    var overflow=new McapRobotRecording(overflowPath,1,false);
+    throws(function() overflow.recordSnapshot(new RobotSnapshot("overflow",Int64.ofInt(1),
+      Int64.ofInt(1),[1.0],[],[],1,0)),"byte-bounded queue reports oversized payload overflow");
+    throws(overflow.close,"close reports prior recording drop");
+    var overflowStatus=McapRecordingReader.status(overflowPath);
+    var overflowStatusValue:McapRecordingStatus=cast overflowStatus;
+    check(overflowStatus!=null&&Int64.compare(overflowStatusValue.dropped,Int64.ofInt(1))==0,
+      "drop status survives reopening");
+    sys.FileSystem.deleteFile(overflowPath);sys.FileSystem.deleteFile(overflowPath+".incomplete.status");
+
+    var failurePath='/tmp/robotkit-${Sys.getPid()}-write-failure';
+    sys.FileSystem.createDirectory(failurePath);
+    var failed=new McapRobotRecording(failurePath,1024,false);
+    // The native writer cannot open a directory as an MCAP file.
+    Sys.sleep(0.02);
+    throws(failed.close,"asynchronous MCAP write-open failure is visible");
+    var failureStatus=McapRecordingReader.status(failurePath);
+    var failureStatusValue:McapRecordingStatus=cast failureStatus;
+    check(failureStatus!=null&&failureStatusValue.error.length>0,
+      "write failure survives process restart");
+    sys.FileSystem.deleteFile(failurePath+".incomplete");
+    sys.FileSystem.deleteFile(failurePath+".incomplete.status");
+    sys.FileSystem.deleteDirectory(failurePath);
+
+    var mismatchPath='/tmp/robotkit-${Sys.getPid()}-schema-mismatch.mcap';
+    var mismatchEntry=new RobotRecordingEntry(Int64.ofInt(0),"mismatch",
+      RobotRecordingEvent.Sensor("mismatch",new SensorFrame("sensor","imu","frame",
+        Int64.ofInt(1),Int64.ofInt(1),[1.0])));
+    var opened=RobotKitRuntime.rk_recording_writer_create(mismatchPath,Int64.ofInt(4096));
+    equal(opened.status,RobotKitRuntimeConstants.RK_OK,"schema mismatch fixture opens");
+    var payload=RobotRecordingCodec.encode(mismatchEntry);
+    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,1,
+      mismatchEntry.ordinal,mismatchEntry.recordingTimestampNs,payload),RobotKitRuntimeConstants.RK_OK,
+      "schema mismatch fixture writes payload to wrong channel");
+    equal(RobotKitRuntime.rk_recording_writer_finish(opened.out_writer.borrow()),RobotKitRuntimeConstants.RK_OK,
+      "schema mismatch fixture closes");
+    opened.out_writer.close();
+    var mismatchReader=new McapRecordingReader(mismatchPath);
+    throws(function(){mismatchReader.next();},"payload type must match MCAP channel schema");
+    mismatchReader.close();sys.FileSystem.deleteFile(mismatchPath);
+    sys.FileSystem.deleteFile(mismatchPath+".incomplete.status");
   }
 
   static function testReplayCorrectness():Void {
@@ -105,7 +171,7 @@ class RobotWorldTests {
 
   static function testMcapRoundTrip():Void {
     var path = '/tmp/robotkit-${Sys.getPid()}-roundtrip.mcap';
-    var writer = new McapRobotRecording(path, 32);
+    var writer = new McapRobotRecording(path, 1024 * 1024);
     var sensor = new SensorFrame("lidar/front", "lidar", "frame/front",
       Int64.parseString("9007199254740993"), Int64.parseString("9223372036854775000"),
       [1.25, 2.5], Int64.parseString("9223372036854775001"), "link/base",

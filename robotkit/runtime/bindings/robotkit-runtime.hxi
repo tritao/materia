@@ -166,9 +166,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_recording_reader_next(reader: rk_recording_reader_handle, message: ptr<rk_recording_message>, payload: nullable<ptr<u8>> @out_buffer("inout_payload_size"), inout_payload_size: ptr<u32> @inout) -> rk_result;
 	extern fn rk_recording_reader_open(path: utf8, out_reader: ptr<rk_recording_reader_handle> @out @owned) -> rk_result;
-	extern fn rk_recording_writer_create(path: utf8, queue_capacity: u32, out_writer: ptr<rk_recording_writer_handle> @out @owned) -> rk_result;
+	extern fn rk_recording_writer_create(path: utf8, queue_capacity_bytes: u64, out_writer: ptr<rk_recording_writer_handle> @out @owned) -> rk_result;
 	extern fn rk_recording_writer_destroy(writer: rk_recording_writer_handle) -> void;
-	extern fn rk_recording_writer_enqueue(writer: rk_recording_writer_handle, kind: rk_recording_event_kind, schema_version: u32, ordinal: u64, payload: ptr<const<u8>> @in_array("payload_size"), payload_size: u32) -> rk_result;
+	extern fn rk_recording_writer_enqueue(writer: rk_recording_writer_handle, kind: rk_recording_event_kind, schema_version: u32, ordinal: u64, recording_timestamp_ns: u64, payload: ptr<const<u8>> @in_array("payload_size"), payload_size: u32) -> rk_result;
 	extern fn rk_recording_writer_finish(writer: rk_recording_writer_handle) -> rk_result;
 	extern fn rk_recording_writer_get_status(writer: rk_recording_writer_handle, status: ptr<rk_recording_writer_status>) -> rk_result;
 	/**
@@ -290,21 +290,23 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		max_effort: f64 @offset(24);
 	}
-	struct rk_recording_message @layout(24, 8) {
+	struct rk_recording_message @layout(32, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		kind: rk_recording_event_kind @offset(4);
 		schema_version: u32 @offset(8);
 		payload_size: u32 @offset(12);
 		ordinal: u64 @offset(16);
+		recording_timestamp_ns: u64 @offset(24);
 	}
-	struct rk_recording_writer_status @layout(296, 8) {
+	struct rk_recording_writer_status @layout(304, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		state: rk_recording_state @offset(4);
 		accepted: u64 @offset(8);
 		written: u64 @offset(16);
 		dropped: u64 @offset(24);
 		queued: u64 @offset(32);
-		error: array<c_char, 256> @offset(40);
+		queued_bytes: u64 @offset(40);
+		error: array<c_char, 256> @offset(48);
 	}
 	/**
 	 * Static control capabilities reported by a RobotRuntime endpoint.

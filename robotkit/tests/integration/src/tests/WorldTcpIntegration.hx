@@ -85,7 +85,7 @@ class WorldTcpIntegration {
       // not sequence numbers or timestamps from independently ticking clocks.
       var tick = 3;
       var recordingPath = '/tmp/robotkit-world-tcp-${Sys.getPid()}.mcap';
-      var recording = new McapRobotRecording(recordingPath, 64);
+      var recording = new McapRobotRecording(recordingPath, 1024 * 1024);
       var recordedTargets:Array<Float> = [];
       for (target in [-0.4, 0.75, 0.0]) {
         var shared = new HoldJointBehavior(0, target);

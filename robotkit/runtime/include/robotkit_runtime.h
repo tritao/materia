@@ -129,6 +129,7 @@ typedef struct rk_recording_writer_status {
     uint64_t written;
     uint64_t dropped;
     uint64_t queued;
+    uint64_t queued_bytes;
     char error[256];
 } rk_recording_writer_status;
 
@@ -138,12 +139,14 @@ typedef struct rk_recording_message {
     uint32_t schema_version;
     uint32_t payload_size;
     uint64_t ordinal;
+    uint64_t recording_timestamp_ns;
 } rk_recording_message;
 
 RK_API rk_result RK_CALL rk_recording_writer_create(const char *path RK_UTF8,
-    uint32_t queue_capacity, rk_recording_writer_handle *out_writer RK_OUT RK_OWNED);
+    uint64_t queue_capacity_bytes, rk_recording_writer_handle *out_writer RK_OUT RK_OWNED);
 RK_API rk_result RK_CALL rk_recording_writer_enqueue(rk_recording_writer_handle writer,
     rk_recording_event_kind kind, uint32_t schema_version, uint64_t ordinal,
+    uint64_t recording_timestamp_ns,
     const uint8_t *payload RK_IN_ARRAY(payload_size), uint32_t payload_size);
 RK_API rk_result RK_CALL rk_recording_writer_get_status(rk_recording_writer_handle writer,
     rk_recording_writer_status *status);

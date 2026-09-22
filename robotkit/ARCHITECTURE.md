@@ -274,9 +274,14 @@ Persistent recording is an adapter below the world boundary. Haxe owns the
 versioned RobotKit payload contract; a small C ABI owns a bounded queue and the
 MCAP reader/writer. Neither MCAP headers nor MCAP concepts appear in `Robot`,
 `RobotWorld`, behavior contexts, or runtime observation contracts. The writer
-uses one channel/schema per event kind and no compression. MCAP log/publish
-times are the recording ordinal rather than a source time, making file order
-deterministic even for equal timestamps, unrelated clocks, or clock resets.
+uses one channel/schema per event kind and no compression. File order and the
+recording ordinal—not unrelated source clocks—define deterministic replay.
+
+The current format uses MCAP log time for the independent wall-clock recording
+timestamp and publish time for the full-width event ordinal. Reader cursors are
+incremental and schema-validating. Writer queues are bounded by payload bytes,
+in-memory retention is optional, and a companion terminal-status record keeps
+write failures and drop counts visible across process restarts.
 
 World-level behaviors leave command deadlines unset. Nonzero world-command
 deadlines are currently rejected rather than ignored or translated without a

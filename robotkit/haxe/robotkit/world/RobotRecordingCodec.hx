@@ -12,6 +12,7 @@ class RobotRecordingCodec {
     var root:Dynamic = {
       version: VERSION,
       ordinal: Int64.toStr(entry.ordinal),
+      recordingTimestampNs: Int64.toStr(entry.recordingTimestampNs),
       robotId: entry.robotId,
       sourceSequence: Int64.toStr(entry.sourceSequence),
       sourceTimestampNs: Int64.toStr(entry.sourceTimestampNs),
@@ -62,7 +63,8 @@ class RobotRecordingCodec {
         WorldEvent(switch string(payload,"kind") {case "attached":RobotAttached(id);case "detached":RobotDetached(id);case "changed":RobotChanged(id);case _:throw "Unsupported RobotKit world event";});
       case _: throw "Unsupported RobotKit recording event type";
     };
-    return new RobotRecordingEntry(ordinal, robotId, event, sequence, timestamp, clock);
+    return new RobotRecordingEntry(ordinal, robotId, event, sequence, timestamp, clock,
+      wide(root, "recordingTimestampNs"));
   }
 
   static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,sensors:[for(s in v.sensors.toArray()) sensor(s)]};
