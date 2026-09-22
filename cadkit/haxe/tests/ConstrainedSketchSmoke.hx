@@ -199,5 +199,21 @@ class ConstrainedSketchSmoke {
 		var saved=DocumentCodec.decode(DocumentCodec.encode(plate.document));near(saved.result().volume(),plate.finish.currentShape().volume());saved.close();
 		var previous=plate.finish.currentShape();failed=false;try plate.resize(20,20,9,3) catch(error:Dynamic) failed=true;
 		check(failed&&previous==plate.finish.currentShape(),"contradictory plate edit preserves solid");plate.close();
+
+		var bracket = new ConstrainedSlottedBracket();
+		var bracketVolume = bracket.finish.currentShape().volume();
+		check(bracketVolume > 0, "slotted bracket initial solid");
+		for (dimensions in [
+			[90.0, 55.0, 3.5, 7.0, 2.0],
+			[100.0, 60.0, 4.0, 8.0, 2.5],
+			[85.0, 48.0, 2.5, 5.0, 1.5]
+		]) {
+			bracket.resize(dimensions[0], dimensions[1], dimensions[2], dimensions[3], dimensions[4]);
+			check(bracket.finish.currentShape().volume() > 0, "slotted bracket dimension set");
+		}
+		check(bracket.document.undo(), "slotted bracket undo");
+		bracket.document.recompute();
+		check(bracket.finish.currentShape().volume() > 0, "slotted bracket undo recompute");
+		bracket.close();
 	}
 }

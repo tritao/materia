@@ -73,8 +73,10 @@ operations; their Haxeon feature wrappers consume face or wire profiles.
 a geometric fingerprint and persists it for remapping across recompute.
 `FilletFeature` and `ChamferFeature` can own persistent selected-edge
 references while remapping those references against their source feature.
-Geometric sketches are supplied by the modeling layer described below;
-a sketch constraint solver remains a later layer.
+Geometric sketches are supplied by the modeling layer described below. The
+Haxeon-owned `cadkit.sketch` layer adds constrained authored geometry, a pure
+Haxeon numerical solver, diagnostics, and validated conversion to native
+profiles without adding solver policy to the native core.
 
 STEP file transfer is also a core boundary operation: `cad_step_import` and
 `cad_step_export` use OCCT's `TKDESTEP` provider without introducing a UI,
@@ -110,7 +112,8 @@ The optional parametric `SketchFeature` adapter consumes the modeling layer
 and persists rectangle/circle/slot parameters and a workplane through
 `DocumentCodec`. The modeling layer does not depend on the document model.
 See `haxe/MODELING.md` for ownership rules and operation limits. Geometric
-sketch construction is available; a constraint solver remains a later layer.
+sketch construction and constrained sketch solving are available; interactive
+inference, dragging, and large-sketch optimization remain later layers.
 
 The document adapter additionally serializes wire extraction, editable
 polyline paths, solid loft, sweep, planar-wire offset, selected-face shell,

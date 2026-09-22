@@ -154,7 +154,7 @@ older documents remains readable; without an explicit output it uses the last
 feature, matching the earlier behavior. Persistence saves current model state,
 not the undo/redo stacks.
 
-The recorder covers rectangle/circle/slot/box primitives, wires and polylines,
+The recorder covers rectangle/circle/slot/box primitives, constrained sketches, wires and polylines,
 grids, planar and solid booleans, positive-Z extrusion, translation, revolution,
 loft, sweep, offset, shell, projection, fillet, and chamfer. Operations whose
 editable meaning is not represented must be rejected explicitly with
@@ -170,8 +170,29 @@ rails or frame controls. Offset operates on planar wires with round joins and
 may return several wires. Shell removes selected faces from one solid and
 uses a signed thickness (negative inward). Projection is directional onto an
 existing target shape and returns curves. These are initial operation APIs,
-not full build123d feature parity. Sketch constraints, assemblies, variable
-fillets, and operator-overloaded syntax remain separate future work.
+not full build123d feature parity. Assemblies, variable fillets, interactive
+constraint inference and dragging, and operator-overloaded syntax remain separate future work.
+
+## Constrained sketches
+
+`cadkit.sketch.ConstrainedSketch` stores stable point, line, circle, arc, and
+constraint IDs separately from solved coordinates. Construction entities take
+part in solving but do not produce profile edges. The pure Haxeon solver uses
+bounded damped least squares, seeds edits from the last successful solution,
+and reports convergence, residual, local rank-based degrees of freedom,
+redundancy, nonconvergence, and locally conflicting stationary residuals.
+
+`SketchProfile.build()` validates line and curved boundaries, rejects overlap,
+and classifies arbitrary nesting by parity so islands within holes become
+material again. Exact curves are passed to the native wire and face builders;
+sampling is used only for intersection and containment validation.
+
+`ConstrainedSketchFeature` exposes dimensional constraints as normal feature
+parameters and supports controlled entity and constraint edits. These edits
+participate in document transactions and undo/redo. The document codec stores
+the current authored model, workplane, solver settings, IDs, and parameter
+bindings. See `ConstrainedMountingPlate.hx` and
+`ConstrainedSlottedBracket.hx` for complete editable examples.
 
 ## Validation
 
