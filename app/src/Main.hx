@@ -577,10 +577,20 @@ class ReferenceEditorApp implements DesktopUiApplication {
         log(simulation.rebuild(sensors,scene) ? "Shared simulation configuration applied" : "Simulation rebuild rejected: "+simulation.error);
         commands.refresh();
       },"sensor-apply")),
+      new KeyedView("run",new Button("Run",null,function(){
+        try {simulation.start();log("Simulation running");} catch(error:Dynamic){log("Run rejected: "+Std.string(error));}
+        commands.refresh();
+      },"sensor-run")),
+      new KeyedView("pause",new Button("Pause",null,function(){
+        simulation.stop();log("Simulation paused");commands.refresh();
+      },"sensor-pause")),
       new KeyedView("reset",new Button("Reset",null,function(){
         log(simulation.reset() ? "Shared simulation reset" : "No simulation to reset");
         commands.refresh();
-      },"sensor-reset"))
+      },"sensor-reset")),
+      new KeyedView("design",new Button("Design",null,function(){
+        simulation.clear();log("Returned to design mode");commands.refresh();
+      },"sensor-design"))
     ]);
     var backendActions=new Row("sensor-backend-actions",[
       new KeyedView("deterministic",new Button("Deterministic",null,function(){
@@ -593,6 +603,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView("apply-state",new Text(simulation.pending(sensors,scene)
         ? "Pending edits · rebuild resets simulated robots and environment"
         : "Applied configuration · physics is authoritative")),
+      new KeyedView("simulation-mode",new Text("Mode: "+(simulation.isActive()
+        ? (simulation.isRunning()?"Running":"Paused") : "Design"))),
       new KeyedView("robots",new Column("sensor-robots",robotRows)),
       new KeyedView("backend",new Text("Physics: "+simulation.backendName())),
       new KeyedView("backend-actions",backendActions),new KeyedView("actions",actions),
@@ -643,7 +655,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function viewportPanel():View {
-    viewportContent.setRuntimeRevision(simulation.visualRevision());
+    viewportContent.setSimulationState(simulation.isActive(),simulation.environmentVisualState(),
+      simulation.visualRevision());
     if (sceneViewport != null) {
       sceneViewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0),
         Color.rgba(0.16, 0.24, 0.36, 0.75), viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
@@ -724,13 +737,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function paintSimulationOverlay(canvas:Canvas):Void {
-    for(object in simulation.environmentVisualState()) {
-      var center=simulationPoint(object.position[0],object.position[1]);
-      canvas.fillRect(new Rect(center.x-4,center.y-4,8,8),Color.rgba(0.95,0.35,0.3,0.9));
-    }
     for(robot in simulation.visualState()) {
       var base=simulationPoint(robot.position[0],robot.position[1]);
       canvas.fillRect(new Rect(base.x-5,base.y-5,10,10),Color.rgba(0.3,1.0,0.65,0.95));
+      for(link in robot.links){var linkPoint=simulationPoint(link.position[0],link.position[1]);
+        canvas.fillRect(new Rect(linkPoint.x-4,linkPoint.y-4,8,8),Color.rgba(0.2,0.85,0.55,0.9));}
       for(sensor in robot.sensors) {
         var linkPosition=robot.position,linkRotation=robot.rotation;
         for(link in robot.links)if(link.id==sensor.linkId){linkPosition=link.position;linkRotation=link.rotation;break;}
@@ -766,8 +777,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];
 
   function perspectivePanel():View {
-    if (perspectiveViewport != null)
+    if (perspectiveViewport != null) {
       perspectiveViewport.setPlacementOptions(gridSnapEnabled, gridSpacing);
+      perspectiveViewport.setSimulationState(simulation.isActive(),simulation.environmentVisualState(),
+        simulation.visualRevision(),simulation.visualState());
+    }
     return perspectiveViewport == null
       ? new Text("Perspective rendering requires the desktop GPU host.")
       : perspectiveViewport;
@@ -789,7 +803,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = sceneInspector;
-    inspector.enabled = !viewportContent.dragging() &&
+    inspector.enabled = !simulation.isActive() && !viewportContent.dragging() &&
       (perspectiveViewport == null || !perspectiveViewport.dragging());
     return new Column(
       "inspector-panel",
@@ -1000,7 +1014,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.refresh();
   }
 
-  function canEditObjects():Bool return !documents.blocked() && !viewportContent.dragging() &&
+  function canEditObjects():Bool return !documents.blocked() && !simulation.isActive() && !viewportContent.dragging() &&
     (perspectiveViewport == null || !perspectiveViewport.dragging());
 
   function commitActiveDrag():Void {

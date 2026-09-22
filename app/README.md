@@ -136,6 +136,12 @@ interactive camera uses left-drag orbit, middle-drag pan, and wheel zoom.
 Frame selected will fit the selected rectangle (or the whole scene when selection
 is empty), while Reset view restores the documented default camera.
 
+The editor has explicit design and simulation presentation modes. Apply/Rebuild
+enters simulation mode; both running and paused simulations render and pick the
+latest physics poses in XY and perspective. Geometry editing is disabled until
+the Design action detaches the simulation. Reset restores the applied poses,
+while Save always writes the unchanged design poses.
+
 To connect the editor to a running headless robot process, pass its TCP
 endpoint. The editor keeps its own NativeKit event loop and uses RobotKit's
 typed client over loopback:

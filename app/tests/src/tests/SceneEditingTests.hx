@@ -124,6 +124,41 @@ class SceneEditingTests {
     scene.dispose();
   }
 
+  static function simulationViewportSemantics():Void {
+    var scene=new EditorScene(),viewport=new EditorSceneViewport(scene),camera=new ViewportCamera();
+    scene.select("tower");var design=scene.info("tower").worldTransform(),dirty=scene.document.isDirty;
+    var half=Math.PI/8,pose:{id:String,position:Array<Float>,rotation:Array<Float>}={
+      id:"tower",position:[3.0,2.0,1.5],rotation:[0.0,0.0,Math.sin(half),Math.cos(half)]};
+    viewport.setSimulationState(true,[pose],7);
+    var screen=camera.worldToViewport(EditorSceneViewport.ORIGIN_X+300,EditorSceneViewport.ORIGIN_Y-200);
+    check(viewport.pick(camera,screen.x,screen.y)=="tower",
+      "XY picking follows a moved and rotated simulation body");
+    check(!viewport.beginDrag(camera,screen.x,screen.y,false)&&!viewport.editingEnabled(),
+      "paused simulation geometry cannot be dragged");
+    viewport.frameSelected(camera);
+    var framed=camera.worldToViewport(EditorSceneViewport.ORIGIN_X+300,EditorSceneViewport.ORIGIN_Y-200);
+    near(framed.x,viewport.viewportWidth/2,"XY framing follows the simulation pose");
+    near(framed.y,viewport.viewportHeight/2,"XY framing follows simulation Y");
+    near(scene.info("tower").worldTransform().element(12),design.element(12),
+      "simulation presentation preserves design X");
+    check(scene.document.isDirty==dirty&&scene.document.history.undoCount==0,
+      "simulation presentation creates no dirty state or undo entry");
+    var reopened=new EditorScene(app.SceneCodec.decode(app.SceneCodec.encode(scene)));
+    near(reopened.info("tower").worldTransform().element(12),design.element(12),
+      "save and reopen preserve the design pose instead of the simulation pose");
+    reopened.dispose();
+
+    var displayed=new EditorScene(scene.records());displayed.setPresentationPose(
+      pose.id,pose.position,pose.rotation);displayed.select("tower");
+    var perspective=new PerspectiveCamera();perspective.frame(3.0,2.0,1.5,1.8,1.8,0.2,4.0/3.0);
+    check(EditorPerspectiveViewport.pickScene(displayed,perspective,800,600,400,300)=="tower",
+      "perspective picking follows rotated simulation geometry and stable document IDs");
+    displayed.setVisible("tower",false);
+    check(EditorPerspectiveViewport.pickScene(displayed,perspective,800,600,400,300)=="scene",
+      "simulation picking excludes hidden geometry");
+    displayed.dispose();scene.dispose();
+  }
+
   static function editingLifecycle():Void {
     var directory = "build/editing-lifecycle-" + Std.random(100000000);
     FileSystem.createDirectory(directory);
@@ -716,6 +751,7 @@ class SceneEditingTests {
       renderingParity();
       perspectiveCameraMath();
       perspectiveDragging();
+      simulationViewportSemantics();
       sensorConfiguration();
       sensorWorkflow();
       SceneDocumentTests.run();
