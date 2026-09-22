@@ -88,10 +88,48 @@ selection alone does not require a physics rebuild.
 Scene rectangles persist an extrusion depth plus independent collision-enabled,
 dynamic-body, and mass settings. Visibility affects rendering only. Application
 runs default to the bundled MuJoCo backend, while the sensor panel can select
-the deterministic backend used by tests; changing backend remains pending until
+the Test backend used by automated checks; changing backend remains pending until
 Rebuild. The XY viewport overlays read-only runtime robot poses, sensor mounts,
 and LiDAR rays. New/Open stops and detaches the previous document's simulated
 robots but leaves independently attached remote robots untouched.
+
+## Script-owned setups
+
+Materia setup scripts are ordinary compiled Haxe classes registered in
+`SetupScriptRegistry`; they reuse `RobotModel`, `SensorConfiguration`, and the
+existing simulation APIs. They are not interpreted and are **not sandboxed**:
+registered code runs in the Materia process with the process's normal file,
+network, and environment permissions. Evaluation returns configuration data
+only—robot topology and poses, stable sensor/frame IDs and mounts, environment
+objects, timestep, noise values, and backend. Runtime handles and running
+behaviors remain application-owned; behavior code continues to issue commands
+through the existing world while simulation is active.
+Scripts remain responsible for cleaning up any temporary resources they create
+during evaluation. Materia owns and disposes only the configuration placed in
+the output object, including partially produced output when evaluation fails.
+
+Open the bundled two-robot example with:
+
+```sh
+../haxeon/scripts/haxeon run --project haxeon.json -- \
+  --setup-script=materia.examples.two-robot
+```
+
+The Sensors panel identifies script-origin values, reloads the registered
+script transactionally, and optionally records stable-ID overrides. Script
+fields are otherwise read-only. Reload or validation failure leaves the active
+simulation untouched; successful evaluation becomes pending configuration and
+only Apply/Rebuild restarts physics. Undo/redo affects overrides, never script
+source. Script-owned scene files persist the script reference, configuration
+version, override mode, and overrides—not a competing copy of the evaluated
+robots or environment. Renamed or removed IDs are reported as stale overrides.
+
+The same registry and validation/rebuild path has a headless entry point:
+
+```sh
+./haxeon/scripts/haxeon run --project app/scripted/haxeon.json -- \
+  materia.examples.two-robot
+```
 
 Scene files are UTF-8 JSON with `format: "materia.scene"`, `version: 1`, and an
 `objects` array plus an optional `sensors` robot configuration. Each rectangle stores its stable string `id`, `label`, `type`,

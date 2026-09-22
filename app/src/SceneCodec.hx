@@ -6,9 +6,28 @@ class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
   public static inline var VERSION:Int = 1;
 
-  public static function encode(scene:EditorScene, ?sensors:SensorConfiguration):String
-    return Json.stringify({format: FORMAT, version: VERSION, objects: scene.records(),
-      sensors:sensors == null ? null : sensors.records()}, null, "  ") + "\n";
+  public static function encode(scene:EditorScene, ?sensors:SensorConfiguration,
+      ?script:ScriptOwnershipRecord):String
+    return Json.stringify({format: FORMAT, version: VERSION,
+      objects:script == null ? scene.records() : [],
+      sensors:script == null && sensors != null ? sensors.records() : null,
+      script:script}, null, "  ") + "\n";
+
+  public static function decodeScript(text:String):Null<ScriptOwnershipRecord> {
+    var root:Dynamic=Json.parse(text);
+    if(stringField(root,"format")!=FORMAT||numberField(root,"version")!=VERSION)
+      throw "Unsupported scene document";
+    var value:Dynamic=Reflect.field(root,"script");if(value==null)return null;
+    var reference=stringField(value,"reference"),version=Std.int(numberField(value,"version"));
+    var enabled:Dynamic=field(value,"overridesEnabled");if(!Std.isOfType(enabled,Bool))throw "Invalid script override mode";
+    var overridesEnabled:Bool=enabled;
+    var raw:Dynamic=field(value,"overrides");if(!Std.isOfType(raw,Array))throw "Invalid script overrides";
+    var overrides:Array<ScriptOverrideRecord> = [];
+    var items:Array<Dynamic> = raw;
+    for(item in items)overrides.push({targetId:stringField(item,"targetId"),
+      property:stringField(item,"property"),value:numberField(item,"value")});
+    return {reference:reference,version:version,overridesEnabled:overridesEnabled,overrides:overrides};
+  }
 
   public static function decodeSensors(text:String):Null<Dynamic> {
     var root:Dynamic = Json.parse(text);

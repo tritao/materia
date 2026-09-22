@@ -105,10 +105,10 @@ class Main {
           arg != "--lab" && arg != "--dark" && arg != "--perspective" &&
           arg.indexOf("--story=") != 0 &&
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
-          arg.indexOf("--robot=") != 0) {
+          arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--capture-dir=PATH] [--frames=N] " +
-          "[--robot=HOST:PORT]");
+          "[--robot=HOST:PORT] [--setup-script=REFERENCE]");
         return 2;
       }
 
@@ -138,7 +138,8 @@ class Main {
         world.attach(remote);
         remote.connect(robotHost, diagnostics.robotPort, context.events);
       }
-      var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context);
+      var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context,
+        diagnostics.setupScript);
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
@@ -155,9 +156,10 @@ private class ReferenceEditorLaunchOptions {
   public final darkTheme:Bool;
   public final robotHost:Null<String>;
   public final robotPort:Int;
+  public final setupScript:Null<String>;
   public function new(captureDirectory:Null<String>, frameLimit:Int,
       componentLab:Bool, storyId:Null<String>, darkTheme:Bool,
-      robotHost:Null<String>, robotPort:Int) {
+      robotHost:Null<String>, robotPort:Int,setupScript:Null<String>) {
     this.captureDirectory = captureDirectory;
     this.frameLimit = frameLimit;
     this.componentLab = componentLab;
@@ -165,6 +167,7 @@ private class ReferenceEditorLaunchOptions {
     this.darkTheme = darkTheme;
     this.robotHost = robotHost;
     this.robotPort = robotPort;
+    this.setupScript=setupScript;
   }
 
   public static function fromArgs(args:Array<String>):Null<ReferenceEditorLaunchOptions> {
@@ -173,6 +176,7 @@ private class ReferenceEditorLaunchOptions {
     var lab = args.indexOf("--lab") >= 0;
     var story:Null<String> = null;
     var robotEndpoint:Null<String> = null;
+    var setupScript:Null<String> = null;
     for (arg in args) {
       if (arg.indexOf("--capture-dir=") == 0)
         directory = arg.substr(14);
@@ -188,11 +192,16 @@ private class ReferenceEditorLaunchOptions {
         lab = true;
       } else if (arg.indexOf("--robot=") == 0) {
         robotEndpoint = arg.substr(8);
+      } else if(arg.indexOf("--setup-script=")==0) {
+        setupScript=arg.substr(15);
       }
     }
     if (directory != null && directory.length == 0) {
       Sys.println("materia: --capture-dir requires a path");
       return null;
+    }
+    if(setupScript!=null&&StringTools.trim(setupScript).length==0){
+      Sys.println("materia: --setup-script requires a registered reference");return null;
     }
     if (directory != null && frames == 0) frames = 3;
     if (story != null && story.length == 0) {
@@ -216,7 +225,7 @@ private class ReferenceEditorLaunchOptions {
       robotPort = parsedPort;
     }
     return new ReferenceEditorLaunchOptions(directory, frames, lab, story,
-      args.indexOf("--dark") >= 0, robotHost, robotPort);
+      args.indexOf("--dark") >= 0, robotHost, robotPort,setupScript);
   }
 }
 
@@ -263,7 +272,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function get_sensors():SensorConfiguration return session.sensors;
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
-      ?world:RobotWorld, ?hostContext:DesktopUiHostContext) {
+      ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String) {
     this.hostContext = hostContext;
     ui = new UiContext(null, fonts, theme == null ? Theme.light() : theme);
     commands = ui.commands;
@@ -273,6 +282,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     storage = new FileDockWorkspacePersistence(workspacePath);
     session = new SceneDocumentSession();
     session.beforeReplace=simulation.clear;
+    if(setupScript!=null){var scripted=session.openScript(setupScript);
+      simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);
     documents = new SceneDocumentController(session, function(save, path, complete) {
       var chooser = files;
@@ -566,14 +577,22 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var button=new Button(sensor.name+" · "+sensor.kind,null,function(){sensors.select(index);commands.refresh();},"sensor:"+sensor.id);
       button.selected=index==sensors.selectedIndex;rows.push(new KeyedView("sensor:"+sensor.id,button));
     }
+    var ownership=session.scriptOwnership;
+    var addLidar=new Button("+ LiDAR",null,function(){sensors.add("lidar");commands.refresh();},"sensor-add-lidar");
+    var addImu=new Button("+ IMU",null,function(){sensors.add("imu");commands.refresh();},"sensor-add-imu");
+    var removeSensor=new Button("Remove",null,function(){sensors.removeSelected();commands.refresh();},"sensor-remove");
+    addLidar.enabled=ownership==null;addImu.enabled=ownership==null;removeSensor.enabled=ownership==null;
     var actions=new Row("sensor-actions",[
-      new KeyedView("add-lidar",new Button("+ LiDAR",null,function(){sensors.add("lidar");commands.refresh();},"sensor-add-lidar")),
-      new KeyedView("add-imu",new Button("+ IMU",null,function(){sensors.add("imu");commands.refresh();},"sensor-add-imu")),
-      new KeyedView("remove",new Button("Remove",null,function(){sensors.removeSelected();commands.refresh();},"sensor-remove"))
+      new KeyedView("add-lidar",addLidar),new KeyedView("add-imu",addImu),
+      new KeyedView("remove",removeSensor)
     ]);
     var runtimeActions=new Row("sensor-runtime-actions",[
-      new KeyedView("undo",new Button("Undo",null,function(){sensors.document.undo();commands.refresh();},"sensor-undo")),
-      new KeyedView("redo",new Button("Redo",null,function(){sensors.document.redo();commands.refresh();},"sensor-redo")),
+      new KeyedView("undo",new Button("Undo",null,function(){
+        if(ownership==null)sensors.document.undo();else {ownership.document.undo();refreshScriptMaterialization("Override undone");}
+        commands.refresh();},"sensor-undo")),
+      new KeyedView("redo",new Button("Redo",null,function(){
+        if(ownership==null)sensors.document.redo();else {ownership.document.redo();refreshScriptMaterialization("Override redone");}
+        commands.refresh();},"sensor-redo")),
       new KeyedView("apply",new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild",null,function(){
         log(simulation.rebuild(sensors,scene) ? "Shared simulation configuration applied" : "Simulation rebuild rejected: "+simulation.error);
         commands.refresh();
@@ -594,7 +613,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       },"sensor-design"))
     ]);
     var backendActions=new Row("sensor-backend-actions",[
-      new KeyedView("deterministic",new Button("Deterministic",null,function(){
+      new KeyedView("deterministic",new Button("Test backend",null,function(){
         simulation.setBackend(ApplicationSimulation.DETERMINISTIC);commands.refresh();
       },"sensor-backend-deterministic")),
       new KeyedView("mujoco",new Button("MuJoCo",null,function(){
@@ -606,18 +625,65 @@ class ReferenceEditorApp implements DesktopUiApplication {
         : "Applied configuration · physics is authoritative")),
       new KeyedView("simulation-mode",new Text("Mode: "+(simulation.isActive()
         ? (simulation.isRunning()?"Running":"Paused") : "Design"))),
+      new KeyedView("ownership",new Text(ownership==null?"Origin: document":
+        'Origin: script · ${ownership.reference} · configuration v${ownership.configurationVersion}')),
       new KeyedView("robots",new Column("sensor-robots",robotRows)),
-      new KeyedView("backend",new Text("Physics: "+simulation.backendName())),
+      new KeyedView("backend",new Text("Physics: "+simulation.userBackendName())),
       new KeyedView("backend-actions",backendActions),new KeyedView("actions",actions),
       new KeyedView("runtime-actions",runtimeActions),
       new KeyedView("list",new Column("sensor-list",rows))];
+    if(ownership!=null){
+      var overrideLabel=ownership.overridesEnabled?"Disable overrides":"Enable overrides";
+      content.insert(2,new KeyedView("script-actions",new Row("script-actions",[
+        new KeyedView("reload",new Button("Reload script",null,function(){
+          try {var result=session.reloadScript();simulation.setBackend(result.backend);
+            simulation.setTimestep(result.timestep);documentChanged();log("Script reloaded; Apply/Rebuild restarts simulation");}
+          catch(error:Dynamic)log("Script reload rejected; active simulation unchanged: "+Std.string(error));
+          commands.refresh();},"script-reload")),
+        new KeyedView("overrides",new Button(overrideLabel,null,function(){
+          ownership.setOverridesEnabled(!ownership.overridesEnabled);
+          refreshScriptMaterialization(ownership.overridesEnabled?"Overrides enabled":"Overrides disabled");
+        },"script-overrides"))
+      ])));
+    }
     var selected=sensors.selected();
     if(!sensors.isEditable())content.push(new KeyedView("read-only",new Text("Remote robot configuration is read-only")));
-    if(selected!=null)content.push(new KeyedView("properties",new PropertyInspector(
-      "sensor-inspector:"+selected.id,sensors.properties(),null,null,null,null,"Sensor configuration")));
+    if(selected!=null){
+      if(ownership!=null){
+        content.push(new KeyedView("sensor-origin",new Text("Selected values: "+
+          ownership.sensorRateOrigin(sensors.robotId,selected.id))));
+        var decreaseRate=new Button("Rate -1 Hz",null,function(){
+            try {ownership.setSensorRate(sensors.robotId,selected.id,Math.max(0,selected.updateRate-1));
+              refreshScriptMaterialization("Sensor rate override changed");}
+            catch(error:Dynamic)log("Override rejected: "+Std.string(error));
+          },"script-rate-decrease");
+        var increaseRate=new Button("Rate +1 Hz",null,function(){
+            try {ownership.setSensorRate(sensors.robotId,selected.id,selected.updateRate+1);
+              refreshScriptMaterialization("Sensor rate override changed");}
+            catch(error:Dynamic)log("Override rejected: "+Std.string(error));
+          },"script-rate-increase");
+        var revertRate=new Button("Revert rate",null,function(){
+            if(ownership.revertSensorRate(sensors.robotId,selected.id))
+              refreshScriptMaterialization("Sensor rate reverted to script value");
+          },"script-rate-revert");
+        decreaseRate.enabled=ownership.overridesEnabled;
+        increaseRate.enabled=ownership.overridesEnabled;
+        revertRate.enabled=ownership.overridesEnabled;
+        var rateActions=new Row("script-rate-actions",[
+          new KeyedView("decrease",decreaseRate),new KeyedView("increase",increaseRate),
+          new KeyedView("revert",revertRate)]);
+        content.push(new KeyedView("rate-actions",rateActions));
+      }
+      var sensorInspector=new PropertyInspector("sensor-inspector:"+selected.id,
+        sensors.properties(),null,null,null,null,"Sensor configuration");
+      sensorInspector.enabled=ownership==null;
+      content.push(new KeyedView("properties",sensorInspector));
+    }
     var diagnostics=sensors.diagnostics();
     if(diagnostics.length>0)content.push(new KeyedView("diagnostics",new Text(
       diagnostics[0].code+": "+diagnostics[0].message)));
+    if(ownership!=null&&ownership.diagnostics.length>0)
+      content.push(new KeyedView("script-diagnostics",new Text(ownership.diagnostics.join("\n"))));
     return new ScrollView("sensor-scroll",new Column("sensor-panel",content,style),style);
   }
 
@@ -1001,7 +1067,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function documentChanged():Void {
     cancelActiveDrag();
     if (sceneGeneration != session.generation) {
-      log("Document replaced; active simulation stopped and detached");
+      var ownership=session.scriptOwnership;
+      if(ownership!=null){simulation.setBackend(ownership.backend());simulation.setTimestep(ownership.timestep());}
+      log("Document configuration replaced");
       sceneGeneration = session.generation;
       treeModel = new EditorSceneTree(scene);
       viewportContent = new EditorSceneViewport(scene);
@@ -1018,6 +1086,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }
     paletteVisible = false;
     contextMenuVisible = false;
+    commands.refresh();
+  }
+
+  function refreshScriptMaterialization(message:String):Void {
+    try {var result=session.refreshScriptOverrides();simulation.setBackend(result.backend);
+      simulation.setTimestep(result.timestep);documentChanged();log(message+"; Apply/Rebuild restarts simulation");}
+    catch(error:Dynamic)log("Script override rejected: "+Std.string(error));
     commands.refresh();
   }
 

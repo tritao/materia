@@ -754,6 +754,7 @@ class SceneEditingTests {
       simulationViewportSemantics();
       sensorConfiguration();
       sensorWorkflow();
+      ScriptedSetupTests.run();
       SceneDocumentTests.run();
       Sys.println("Scene editing tests passed");
       return 0;

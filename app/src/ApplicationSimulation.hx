@@ -28,6 +28,8 @@ class ApplicationSimulation {
   public var appliedEnvironmentRevision(default, null):Int = -1;
   public var backend(default,null):Int;
   public var appliedBackend(default,null):Int=-1;
+  public var timestep(default,null):Float=0.01;
+  public var appliedTimestep(default,null):Float=-1.0;
   public var error(default, null):Null<String> = null;
   var simulation:Null<Simulation> = null;
   var simulatedIds:Array<String> = [];
@@ -44,10 +46,15 @@ class ApplicationSimulation {
     if(backend==value)return false;backend=value;return true;
   }
   public function backendName():String return backend==MUJOCO?"MuJoCo":"Deterministic";
+  public function userBackendName():String return backend==MUJOCO?"MuJoCo":"Test backend";
+  public function setTimestep(value:Float):Bool {
+    if(!Math.isFinite(value)||value<=0)throw "Simulation timestep must be finite and positive";
+    if(timestep==value)return false;timestep=value;return true;
+  }
 
   public function pending(configuration:SensorConfiguration, scene:EditorScene):Bool
     return appliedDocumentRevision != configuration.revision() ||
-      appliedEnvironmentRevision != scene.environmentRevision||appliedBackend!=backend;
+      appliedEnvironmentRevision != scene.environmentRevision||appliedBackend!=backend||appliedTimestep!=timestep;
 
   /** Builds the complete candidate before changing any live world adapter. */
   public function rebuild(configuration:SensorConfiguration, scene:EditorScene):Bool {
@@ -64,7 +71,7 @@ class ApplicationSimulation {
         if (existing != null && simulatedIds.indexOf(id) < 0)
           throw 'Robot "$id" is remote and read-only';
       }
-      candidate = new Simulation(0.01,1,backend);
+      candidate = new Simulation(timestep,1,backend);
       for (index in 0...models.length) {
         var editable=models[index];
         var blueprint = RobotRuntimeCompiler.compile(editable.model, appliedRevision + 1);
@@ -105,6 +112,7 @@ class ApplicationSimulation {
       appliedDocumentRevision = configuration.revision();
       appliedEnvironmentRevision = scene.environmentRevision;
       appliedBackend=backend;
+      appliedTimestep=timestep;
       error = null;
       if (previousSimulation != null) previousSimulation.dispose();
       for (robot in previousRobots) robot.close();
@@ -163,7 +171,7 @@ class ApplicationSimulation {
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);
     if (simulation != null) simulation.dispose(); simulation = null;
-    appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;
+    appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;appliedTimestep=-1;
   }
   public function dispose():Void clear();
 }
