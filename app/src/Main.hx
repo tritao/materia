@@ -535,6 +535,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function sensorPanel():View {
     var style=fillStyle();style.padding=new Insets(8.0,8.0,8.0,8.0);
     style.background=Color.rgba(0.98,0.99,1.0,1.0);
+    var robotRows:Array<KeyedView> = [];
+    if (world != null) for (id in world.snapshot().robotIds()) {
+      var robotButton = new Button(id,null,function(){sensors.selectRobot(id);commands.refresh();},"sensor-robot:"+id);
+      robotButton.selected = id == sensors.robotId;
+      robotRows.push(new KeyedView("robot:"+id,robotButton));
+    }
+    if (robotRows.length == 0) robotRows.push(new KeyedView("robot-id",new Text("Robot: "+sensors.robotId)));
     var rows:Array<KeyedView> = [];
     for(index in 0...sensors.model.sensors.length) {
       var sensor=sensors.model.sensors[index];
@@ -559,6 +566,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       },"sensor-reset"))
     ]);
     var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
+      new KeyedView("robots",new Column("sensor-robots",robotRows)),
       new KeyedView("actions",actions),new KeyedView("runtime-actions",runtimeActions),
       new KeyedView("list",new Column("sensor-list",rows))];
     var selected=sensors.selected();

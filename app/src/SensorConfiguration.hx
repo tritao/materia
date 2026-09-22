@@ -50,6 +50,13 @@ class SensorConfiguration {
     if(index<0||index>=model.sensors.length||index==selectedIndex)return false;
     selectedIndex=index;return true;
   }
+  public function selectRobot(id:String):Bool {
+    if (id == null || StringTools.trim(id).length == 0 || id == robotId) return false;
+    var before = robotId;
+    document.apply(new EditOperation("Select robot", function() robotId = id,
+      function() robotId = before));
+    return true;
+  }
   public function add(kind:String):Sensor {
     var sensor = createSensor(kind);
     var previous = selectedIndex;

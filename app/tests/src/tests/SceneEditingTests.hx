@@ -278,6 +278,10 @@ class SceneEditingTests {
     var sensors=new SensorConfiguration();
     check(sensors.model.sensors.length==1&&sensors.model.sensors[sensors.selectedIndex].kind=="lidar",
       "sensor panel starts with an editable LiDAR");
+    check(sensors.selectRobot("robot/selected")&&sensors.robotId=="robot/selected",
+      "sensor configuration selects an explicit robot target");
+    check(sensors.document.undo()&&sensors.robotId=="materia/robot",
+      "robot selection participates in undo");
     var properties=sensors.properties();
     var rays=new PropertyBinding(properties[3],sensors.context());
     check(switch rays.apply(PropertyValue.Int(65)){case PropertyEditResult.Rejected(_):true;default:false;},
