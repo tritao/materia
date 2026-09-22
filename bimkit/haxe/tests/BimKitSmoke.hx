@@ -4,7 +4,18 @@ import bimkit.BimError;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.Placement;
+import cadkit.parametric.Feature;
+import cadkit.parametric.EvaluationContext;
+import cadkit.parametric.EvaluationResult;
 import haxe.Json;
+
+private class FailingBimFeature extends Feature {
+	public function new()
+		super();
+
+	override public function evaluate(context:EvaluationContext):EvaluationResult
+		throw "injected downstream evaluation failure";
+}
 
 class BimKitSmoke {
 	static function check(value:Bool, message:String):Void {
@@ -82,8 +93,10 @@ class BimKitSmoke {
 		var validationCalls = 0;
 		model.cad.beforeRecompute = function() {
 			validationCalls++;
-			if (validationCalls > 1)
-				throw "injected cut failure";
+			if (validationCalls == 2) {
+				var failure = model.cad.add(new FailingBimFeature());
+				model.cad.trackFeatureCreation(failure);
+			}
 			if (validator != null)
 				validator();
 		};
