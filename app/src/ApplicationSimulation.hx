@@ -132,6 +132,8 @@ class ApplicationSimulation {
     simulation.reset(); running = false; return true;
   }
   public function isRunning():Bool return running;
+  /** True in both running and paused simulation modes. */
+  public function isActive():Bool return simulation!=null;
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
   public function visualRevision():Int return simulation==null?0:Int64.toInt(simulation.stepIndex());
   /** Read-only runtime state for overlays; never mutates the editable document. */

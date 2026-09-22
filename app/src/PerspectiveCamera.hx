@@ -103,6 +103,14 @@ class PerspectiveCamera {
       direction[0], direction[1], direction[2]);
   }
 
+  public function project(x:Float,y:Float,z:Float,width:Float,height:Float):Null<PerspectiveScreenPoint>{
+    var matrix=viewProjection(width/Math.max(1.0,height)),source=[x,y,z,1.0],clip:Array<Float> = [];
+    for(row in 0...4){var value=0.0;for(column in 0...4)value+=matrix.element(column*4+row)*source[column];clip.push(value);}
+    if(clip[3]<=0.000001)return null;
+    return new PerspectiveScreenPoint((clip[0]/clip[3]*0.5+0.5)*width,
+      (0.5-clip[1]/clip[3]*0.5)*height,clip[2]/clip[3]);
+  }
+
   public function intersectPlaneZ(x:Float, y:Float, width:Float, height:Float,
       planeZ:Float):Null<PerspectivePlanePoint> {
     var ray = screenRay(x, y, width, height);
@@ -153,4 +161,8 @@ class PerspectivePlanePoint {
   public function new(x:Float, y:Float, z:Float) {
     this.x = x; this.y = y; this.z = z;
   }
+}
+class PerspectiveScreenPoint {
+  public final x:Float;public final y:Float;public final depth:Float;
+  public function new(x:Float,y:Float,depth:Float){this.x=x;this.y=y;this.depth=depth;}
 }

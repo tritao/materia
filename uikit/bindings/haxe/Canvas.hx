@@ -135,6 +135,20 @@ class Canvas {
 		commands.drawPath(path);
 	}
 
+	/** Fills a transient path and transfers its lifetime to this canvas update. */
+	public function fillTransient(path:Path, color:Color):Void {
+		if (path == null || path.isDisposed() || color == null)
+			throw "Transient fill requires a live path and color";
+		try {
+			var paint = SolidPaint.create(color);
+			try {
+				fill(path, paint);
+				transientResources.push(path);
+				transientResources.push(paint);
+			} catch (error:Dynamic) { paint.dispose(); throw error; }
+		} catch (error:Dynamic) { path.dispose(); throw error; }
+	}
+
 	public function stroke(path:Path, paint:Paint, width:Float, cap:LineCap = LineCap.Butt, join:LineJoin = LineJoin.Miter,
 		miterLimit:Float = 4.0):Void {
 		setPaint(paint);

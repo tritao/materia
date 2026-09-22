@@ -200,6 +200,23 @@ class EditorScene {
 
   public function renderSnapshot():Snapshot return snapshot;
 
+  /** Applies a runtime-only pose to a disposable presentation scene. */
+  public function setPresentationPose(id:String,position:Array<Float>,rotation:Array<Float>):Void {
+    var item=object(id);
+    if(item==null||position==null||position.length!=3||rotation==null||rotation.length!=4)
+      throw "Invalid presentation pose";
+    var x=rotation[0],y=rotation[1],z=rotation[2],w=rotation[3];
+    var transform=Transform.identity()
+      .set(0,1-2*(y*y+z*z)).set(1,2*(x*y+z*w)).set(2,2*(x*z-y*w))
+      .set(4,2*(x*y-z*w)).set(5,1-2*(x*x+z*z)).set(6,2*(y*z+x*w))
+      .set(8,2*(x*z+y*w)).set(9,2*(y*z-x*w)).set(10,1-2*(x*x+y*y))
+      .translated(position[0],position[1],position[2]);
+    var transaction=scene.beginTransaction();
+    try {transaction.setTransform(item.occurrence,transform);transaction.commit();}
+    catch(error:Dynamic){transaction.dispose();throw error;}
+    publish();
+  }
+
   public function configureRenderView(view:SceneView, viewProjection:Transform):SceneView {
     view.setViewProjection(viewProjection);
     var selected = object(selectedId);
