@@ -149,6 +149,7 @@ class Document {
 			named.synchronize(nextValue);
 		} catch (error:Dynamic) {
 			named.replaceExpression(previous);
+			named.synchronize(previousValue);
 			throw error;
 		}
 		if (record)
@@ -203,6 +204,7 @@ class Document {
 				continue;
 			if (named.expression != null)
 				throw new ParametricError("expression parameters are read-only: " + named.name);
+			named.validateCanonical(next);
 			var bindings = named.bindings();
 			for (binding in bindings)
 				binding.validateValue(next);
@@ -232,6 +234,7 @@ class Document {
 		ensureOpen();
 		if (parameter.document != this || this.parameter(parameter.name) != parameter)
 			throw new ParametricError("named parameter belongs to another document");
+		parameter.validateCanonical(next);
 		var previous = parameter.value;
 		if (previous == next)
 			return;

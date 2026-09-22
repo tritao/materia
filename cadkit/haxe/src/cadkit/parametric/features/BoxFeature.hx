@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import cadkit.Shape;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
@@ -13,9 +14,9 @@ class BoxFeature extends Feature {
 
 	public function new(widthValue:Float, depthValue:Float, heightValue:Float) {
 		super();
-		width = new Parameter(this, "box.width", widthValue, 0.0);
-		depth = new Parameter(this, "box.depth", depthValue, 0.0);
-		height = new Parameter(this, "box.height", heightValue, 0.0);
+		width = new Parameter(this, "box.width", widthValue, 0.0, false, 1e300, ParameterKind.Length);
+		depth = new Parameter(this, "box.depth", depthValue, 0.0, false, 1e300, ParameterKind.Length);
+		height = new Parameter(this, "box.height", heightValue, 0.0, false, 1e300, ParameterKind.Length);
 	}
 
 	override public function serializationType():String {

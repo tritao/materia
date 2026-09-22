@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import CadKit;
 import cadkit.Edge;
 import cadkit.Operation;
@@ -36,7 +37,7 @@ class ChamferFeature extends Feature {
 		if (savedFingerprints != null && savedFingerprints.length == 0)
 			throw new ParametricError("chamfer selection must not be empty");
 		this.source = source;
-		distance = new Parameter(this, "chamfer.distance", distanceValue, 0.0);
+		distance = new Parameter(this, "chamfer.distance", distanceValue, 0.0, false, 1e300, ParameterKind.Length);
 		edgeReferences = [];
 		pendingEdges = null;
 		if (selectedEdges != null) {

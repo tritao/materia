@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import CadKit;
 import cadkit.Shape;
 import cadkit.Operation;
@@ -23,7 +24,7 @@ class ShellFeature extends Feature {
 			throw new ParametricError("shell requires a face selection");
 		this.source = source;
 		this.selection = selection;
-		this.thickness = new Parameter(this, "shell.thickness", thickness, -1e300);
+		this.thickness = new Parameter(this, "shell.thickness", thickness, -1e300, false, 1e300, ParameterKind.Length);
 	}
 
 	override public function serializationType():String {

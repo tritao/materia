@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import CadKit;
 import cadkit.Edge;
 import cadkit.Operation;
@@ -36,7 +37,7 @@ class FilletFeature extends Feature {
 		if (savedFingerprints != null && savedFingerprints.length == 0)
 			throw new ParametricError("fillet selection must not be empty");
 		this.source = source;
-		radius = new Parameter(this, "fillet.radius", radiusValue, 0.0);
+		radius = new Parameter(this, "fillet.radius", radiusValue, 0.0, false, 1e300, ParameterKind.Length);
 		edgeReferences = [];
 		pendingEdges = null;
 		if (selectedEdges != null) {

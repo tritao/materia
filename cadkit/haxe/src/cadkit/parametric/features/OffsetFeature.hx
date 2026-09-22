@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import CadKit;
 import cadkit.Operation;
 import cadkit.parametric.Feature;
@@ -16,7 +17,7 @@ class OffsetFeature extends Feature {
 	public function new(source:Feature, distance:Float) {
 		super();
 		this.source = source;
-		this.distance = new Parameter(this, "offset.distance", distance, -1e300);
+		this.distance = new Parameter(this, "offset.distance", distance, -1e300, false, 1e300, ParameterKind.Length);
 	}
 
 	override public function serializationType():String {

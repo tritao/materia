@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import cadkit.modeling.Axis;
 import cadkit.modeling.Location;
 import cadkit.modeling.Vector;
@@ -21,7 +22,7 @@ class RotationFeature extends Feature {
 		this.source = source;
 		this.pivot = pivot;
 		this.axis = axis.normalized();
-		angle = new Parameter(this, "rotation.angle", angleValue, -1e300);
+		angle = new Parameter(this, "rotation.angle", angleValue, -1e300, false, 1e300, ParameterKind.Angle);
 	}
 
 	override public function serializationType():String {

@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import CadKit;
 import cadkit.Shape;
 import cadkit.modeling.Vector;
@@ -23,9 +24,9 @@ class PolylineFeature extends Feature {
 		coordinates = [];
 		for (i in 0...points.length) {
 			var p = points[i];
-			coordinates.push(new Parameter(this, "polyline." + i + ".x", p.x, -1e300));
-			coordinates.push(new Parameter(this, "polyline." + i + ".y", p.y, -1e300));
-			coordinates.push(new Parameter(this, "polyline." + i + ".z", p.z, -1e300));
+			coordinates.push(new Parameter(this, "polyline." + i + ".x", p.x, -1e300, false, 1e300, ParameterKind.Length));
+			coordinates.push(new Parameter(this, "polyline." + i + ".y", p.y, -1e300, false, 1e300, ParameterKind.Length));
+			coordinates.push(new Parameter(this, "polyline." + i + ".z", p.z, -1e300, false, 1e300, ParameterKind.Length));
 		}
 	}
 

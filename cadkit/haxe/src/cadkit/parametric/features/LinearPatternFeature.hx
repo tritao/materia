@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import CadKit;
 import cadkit.Shape;
 import cadkit.modeling.Model;
@@ -31,10 +32,10 @@ class LinearPatternFeature extends Feature {
 			throw new ParametricError("linear pattern needs a second direction when its second count exceeds one");
 		if (this.secondDirection != null && Math.abs(this.direction.dot(this.secondDirection)) > 1 - 1e-10)
 			throw new ParametricError("linear pattern directions must not be parallel");
-		count = new Parameter(this, "linear.count", countValue, 0, true, 10000);
-		spacing = new Parameter(this, "linear.spacing", spacingValue, 0);
-		secondCount = new Parameter(this, "linear.secondCount", secondCountValue, 0, true, 10000);
-		secondSpacing = new Parameter(this, "linear.secondSpacing", secondSpacingValue, 0);
+		count = new Parameter(this, "linear.count", countValue, 0, true, 10000, ParameterKind.Count);
+		spacing = new Parameter(this, "linear.spacing", spacingValue, 0, false, 1e300, ParameterKind.Length);
+		secondCount = new Parameter(this, "linear.secondCount", secondCountValue, 0, true, 10000, ParameterKind.Count);
+		secondSpacing = new Parameter(this, "linear.secondSpacing", secondSpacingValue, 0, false, 1e300, ParameterKind.Length);
 	}
 
 	override public function serializationType():String {

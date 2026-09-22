@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import cadkit.Geometry;
 import cadkit.Operation;
 import cadkit.parametric.EvaluationContext;
@@ -31,13 +32,13 @@ class RevolveFeature extends Feature {
 		super();
 		this.source = source;
 		// Axis components may be zero; OCCT validates that the complete axis is non-zero.
-		originX = new Parameter(this, "revolve.originX", originXValue, -1.0e300);
-		originY = new Parameter(this, "revolve.originY", originYValue, -1.0e300);
-		originZ = new Parameter(this, "revolve.originZ", originZValue, -1.0e300);
+		originX = new Parameter(this, "revolve.originX", originXValue, -1.0e300, false, 1e300, ParameterKind.Length);
+		originY = new Parameter(this, "revolve.originY", originYValue, -1.0e300, false, 1e300, ParameterKind.Length);
+		originZ = new Parameter(this, "revolve.originZ", originZValue, -1.0e300, false, 1e300, ParameterKind.Length);
 		axisX = new Parameter(this, "revolve.axisX", axisXValue, -1.0e300);
 		axisY = new Parameter(this, "revolve.axisY", axisYValue, -1.0e300);
 		axisZ = new Parameter(this, "revolve.axisZ", axisZValue, -1.0e300);
-		angle = new Parameter(this, "revolve.angle", angleValue, -1.0e300);
+		angle = new Parameter(this, "revolve.angle", angleValue, -1.0e300, false, 1e300, ParameterKind.Angle);
 	}
 
 	override public function serializationType():String {

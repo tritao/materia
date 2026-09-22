@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import CadKit;
 import cadkit.Shape;
 import cadkit.modeling.Axis;
@@ -34,10 +35,10 @@ class PolarPatternFeature extends Feature {
 		var projected = radialDirection.subtract(this.axisDirection.scale(radialDirection.dot(this.axisDirection)));
 		this.radialDirection = normalized(projected, "polar pattern radial direction");
 		this.orientInstances = orientInstances;
-		count = new Parameter(this, "polar.count", countValue, 0, true, 10000);
-		radius = new Parameter(this, "polar.radius", radiusValue, 0);
-		startAngle = new Parameter(this, "polar.startAngle", startAngleValue, -1e300);
-		angularSpan = new Parameter(this, "polar.angularSpan", angularSpanValue, -1e300);
+		count = new Parameter(this, "polar.count", countValue, 0, true, 10000, ParameterKind.Count);
+		radius = new Parameter(this, "polar.radius", radiusValue, 0, false, 1e300, ParameterKind.Length);
+		startAngle = new Parameter(this, "polar.startAngle", startAngleValue, -1e300, false, 1e300, ParameterKind.Angle);
+		angularSpan = new Parameter(this, "polar.angularSpan", angularSpanValue, -1e300, false, 1e300, ParameterKind.Angle);
 	}
 
 	override public function serializationType():String {

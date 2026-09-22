@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import CadKit;
 import cadkit.Shape;
 import cadkit.modeling.Model;
@@ -28,8 +29,8 @@ class GridFeature extends Feature {
 		this.source = source;
 		this.columns = columns;
 		this.rows = rows;
-		this.spacingX = new Parameter(this, "grid.spacingX", spacingX, 0);
-		this.spacingY = new Parameter(this, "grid.spacingY", spacingY, 0);
+		this.spacingX = new Parameter(this, "grid.spacingX", spacingX, 0, false, 1e300, ParameterKind.Length);
+		this.spacingY = new Parameter(this, "grid.spacingY", spacingY, 0, false, 1e300, ParameterKind.Length);
 	}
 
 	override public function serializationType():String {

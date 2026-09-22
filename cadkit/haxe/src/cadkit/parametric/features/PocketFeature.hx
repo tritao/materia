@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import CadKit;
 import cadkit.Operation;
 import cadkit.Shape;
@@ -25,7 +26,7 @@ class PocketFeature extends Feature {
 		this.target = target;
 		this.profile = profile;
 		this.mode = mode;
-		depth = new Parameter(this, "pocket.depth", depthValue, 0);
+		depth = new Parameter(this, "pocket.depth", depthValue, 0, false, 1e300, ParameterKind.Length);
 	}
 
 	public static function blind(target:Feature, profile:Feature, depth:Float):PocketFeature {

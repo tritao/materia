@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.parametric.Feature;
@@ -23,8 +24,8 @@ class SketchFeature extends Feature {
 			throw new ParametricError("unsupported sketch profile: " + profile);
 		this.profile = profile;
 		this.plane = plane == null ? Plane.XY() : plane;
-		width = new Parameter(this, "sketch.width", widthValue, 0);
-		height = new Parameter(this, "sketch.height", heightValue, 0);
+		width = new Parameter(this, "sketch.width", widthValue, 0, false, 1e300, ParameterKind.Length);
+		height = new Parameter(this, "sketch.height", heightValue, 0, false, 1e300, ParameterKind.Length);
 	}
 
 	override public function serializationType():String {

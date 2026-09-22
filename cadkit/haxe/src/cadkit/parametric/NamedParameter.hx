@@ -58,6 +58,8 @@ class NamedParameter {
 			throw new ParametricError("named parameter is not registered");
 		if (contains(parameter))
 			throw new ParametricError("duplicate named parameter binding");
+		if (kind != ParameterKind.Scalar && parameter.kind != kind)
+			throw new ParametricError("named parameter type " + kind + " cannot bind to " + parameter.kind + " feature parameter " + parameter.name);
 		for (named in document.namedParameters())
 			if (named != this && named.contains(parameter))
 				throw new ParametricError("feature parameter is already named");
@@ -90,15 +92,22 @@ class NamedParameter {
 	}
 
 	public function synchronize(next:Float):Void {
+		validateCanonical(next);
+		validateSynchronized(next);
 		storedValue = next;
-		for (target in targets) {
-			target.validateValue(next);
+		for (target in targets)
 			target.restore(next);
-		}
 	}
 
 	public function validateSynchronized(next:Float):Void {
 		for (target in targets)
 			target.validateValue(next);
+	}
+
+	public function validateCanonical(next:Float):Void {
+		if (!Math.isFinite(next))
+			throw new ParametricError("named parameter must be finite: " + name);
+		if (kind == ParameterKind.Count && next != Std.int(next))
+			throw new ParametricError("count parameter must be an integer: " + name);
 	}
 }

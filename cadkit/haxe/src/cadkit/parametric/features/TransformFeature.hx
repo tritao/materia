@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import cadkit.Geometry;
 import cadkit.Operation;
 import cadkit.parametric.EvaluationContext;
@@ -19,9 +20,9 @@ class TransformFeature extends Feature {
 		this.source = source;
 		// Haxeon has no POSITIVE_INFINITY constant; this finite floor is far
 		// outside practical CAD coordinates while preserving unrestricted motion.
-		x = new Parameter(this, "transform.x", xValue, -1.0e300);
-		y = new Parameter(this, "transform.y", yValue, -1.0e300);
-		z = new Parameter(this, "transform.z", zValue, -1.0e300);
+		x = new Parameter(this, "transform.x", xValue, -1.0e300, false, 1e300, ParameterKind.Length);
+		y = new Parameter(this, "transform.y", yValue, -1.0e300, false, 1e300, ParameterKind.Length);
+		z = new Parameter(this, "transform.z", zValue, -1.0e300, false, 1e300, ParameterKind.Length);
 	}
 
 	override public function serializationType():String {

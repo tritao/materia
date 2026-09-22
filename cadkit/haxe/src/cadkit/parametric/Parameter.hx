@@ -9,16 +9,19 @@ class Parameter {
 	public final minimum:Float;
 	public final integer:Bool;
 	public final maximum:Float;
+	public final kind:String;
 	public var value(default, null):Float;
 
 	private final owner:Feature;
 
-	public function new(owner:Feature, name:String, value:Float, minimum:Float, integer:Bool = false, maximum:Float = 1e300) {
+	public function new(owner:Feature, name:String, value:Float, minimum:Float, integer:Bool = false, maximum:Float = 1e300,
+		kind:String = ParameterKind.Scalar) {
 		this.owner = owner;
 		this.name = name;
 		this.minimum = minimum;
 		this.integer = integer;
 		this.maximum = maximum;
+		this.kind = ParameterKind.validate(kind);
 		validate(value);
 		this.value = value;
 		owner.registerParameter(this);

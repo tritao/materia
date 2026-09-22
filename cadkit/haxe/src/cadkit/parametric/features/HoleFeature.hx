@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import cadkit.Shape;
 import cadkit.modeling.Location;
 import cadkit.modeling.Axis;
@@ -51,13 +52,13 @@ class HoleFeature extends Feature {
 		this.flipped = flipped;
 		this.style = style;
 		this.mode = mode;
-		x = new Parameter(this, "hole.x", xValue, -1e300);
-		y = new Parameter(this, "hole.y", yValue, -1e300);
-		diameter = new Parameter(this, "hole.diameter", diameterValue, 0);
-		depth = new Parameter(this, "hole.depth", depthValue, 0);
-		recessDiameter = new Parameter(this, "hole.recessDiameter", recessDiameterValue, 0);
-		recessDepth = new Parameter(this, "hole.recessDepth", recessDepthValue, 0);
-		includedAngle = new Parameter(this, "hole.includedAngle", includedAngleValue, 0);
+		x = new Parameter(this, "hole.x", xValue, -1e300, false, 1e300, ParameterKind.Length);
+		y = new Parameter(this, "hole.y", yValue, -1e300, false, 1e300, ParameterKind.Length);
+		diameter = new Parameter(this, "hole.diameter", diameterValue, 0, false, 1e300, ParameterKind.Length);
+		depth = new Parameter(this, "hole.depth", depthValue, 0, false, 1e300, ParameterKind.Length);
+		recessDiameter = new Parameter(this, "hole.recessDiameter", recessDiameterValue, 0, false, 1e300, ParameterKind.Length);
+		recessDepth = new Parameter(this, "hole.recessDepth", recessDepthValue, 0, false, 1e300, ParameterKind.Length);
+		includedAngle = new Parameter(this, "hole.includedAngle", includedAngleValue, 0, false, 1e300, ParameterKind.Angle);
 	}
 
 	public static function plain(target:Feature, selection:SelectionRecipe, xDirection:Vector, mode:String,

@@ -4,6 +4,7 @@ import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.Feature;
 import cadkit.parametric.Parameter;
+import cadkit.parametric.ParameterKind;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchProfile;
@@ -52,8 +53,9 @@ class ConstrainedSketchFeature extends Feature {
 			throw "attached constrained sketches require support, selection, and X direction together";
 		for (constraint in authored.constraints())
 			if (isDimensional(constraint.kind)) {
-				dimensionSlots.set(constraint.id,
-					new Parameter(this, "constraint." + constraint.id, constraint.value, constraint.kind == "angle" ? -1e300 : 0));
+				dimensionSlots.set(constraint.id, new Parameter(this, "constraint." + constraint.id, constraint.value,
+					constraint.kind == "angle" ? -1e300 : 0, false, 1e300,
+					constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length));
 				dimensionKinds.set(constraint.id, constraint.kind);
 			}
 	}
@@ -121,8 +123,9 @@ class ConstrainedSketchFeature extends Feature {
 		for (id in required.keys()) {
 			var constraint = required.get(id);
 			if (!dimensionSlots.exists(id)) {
-				dimensionSlots.set(id,
-					new Parameter(this, "constraint." + id, constraint.value, constraint.kind == "angle" ? -1e300 : 0));
+				dimensionSlots.set(id, new Parameter(this, "constraint." + id, constraint.value,
+					constraint.kind == "angle" ? -1e300 : 0, false, 1e300,
+					constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length));
 				dimensionKinds.set(id, constraint.kind);
 			} else {
 				if (dimensionKinds.get(id) != constraint.kind)

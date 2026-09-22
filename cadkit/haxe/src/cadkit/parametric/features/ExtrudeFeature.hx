@@ -1,5 +1,6 @@
 package cadkit.parametric.features;
 
+import cadkit.parametric.ParameterKind;
 import cadkit.Geometry;
 import cadkit.Operation;
 import cadkit.parametric.EvaluationContext;
@@ -27,7 +28,7 @@ class ExtrudeFeature extends Feature {
 		x = new Parameter(this, "extrude.x", xValue, -1.0e300);
 		y = new Parameter(this, "extrude.y", yValue, -1.0e300);
 		z = new Parameter(this, "extrude.z", zValue, -1.0e300);
-		amount = amountValue == null ? null : new Parameter(this, "extrude.amount", amountValue, 0);
+		amount = amountValue == null ? null : new Parameter(this, "extrude.amount", amountValue, 0, false, 1e300, ParameterKind.Length);
 		this.reversed = reversed;
 		this.symmetric = symmetric;
 	}

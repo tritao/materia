@@ -1,7 +1,23 @@
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
+import cadkit.parametric.Feature;
+import cadkit.parametric.Parameter;
+import cadkit.parametric.ParameterExpression;
 import cadkit.parametric.ParameterKind;
 import cadkit.parametric.features.BoxFeature;
+
+private class TypedParameterProbeFeature extends Feature {
+	public final permissive:Parameter;
+	public final restrictive:Parameter;
+	public final looseCount:Parameter;
+
+	public function new() {
+		super();
+		permissive = new Parameter(this, "probe.permissive", 10, 0, false, 1e300, ParameterKind.Length);
+		restrictive = new Parameter(this, "probe.restrictive", 10, 4, false, 1e300, ParameterKind.Length);
+		looseCount = new Parameter(this, "probe.count", 2, 0, false, 1e300, ParameterKind.Count);
+	}
+}
 
 class TypedParameterSmoke {
 	static function check(value:Bool, message:String):Void {
@@ -87,6 +103,63 @@ class TypedParameterSmoke {
 		near(earlier.valueIn("m"), 1);
 		check(document.redo(), "expression definition redo");
 		near(earlier.valueIn("m"), 2.3);
+
+		var historyDocument = new Document();
+		var historyBox = historyDocument.add(new BoxFeature(10, 8, 6));
+		var historyWidth = historyDocument.defineTypedParameter("history.width", 10, ParameterKind.Length, "mm");
+		historyDocument.defineTypedParameter("history.other", 20, ParameterKind.Length, "mm");
+		historyWidth.bind(historyBox.width);
+		historyDocument.setExpression("history.width", "history.other");
+		near(historyBox.width.value, 20);
+		check(historyDocument.undo(), "bound expression undo");
+		near(historyBox.width.value, 10);
+		check(historyWidth.expression == null, "bound expression undo restores the expression");
+		check(historyDocument.redo(), "bound expression redo");
+		near(historyBox.width.value, 20);
+		check(historyDocument.undo(), "bound expression second undo");
+		var cancelled = historyDocument.beginTransaction();
+		historyDocument.setExpression("history.width", "history.other");
+		cancelled.cancel();
+		near(historyBox.width.value, 10);
+		check(historyWidth.expression == null, "cancelled bound expression restores the expression");
+		historyDocument.close();
+
+		var validationDocument = new Document();
+		var probe = validationDocument.add(new TypedParameterProbeFeature());
+		var sharedLength = validationDocument.defineTypedParameter("validation.length", 10, ParameterKind.Length, "mm");
+		validationDocument.defineTypedParameter("validation.small", 3, ParameterKind.Length, "mm");
+		sharedLength.bind(probe.permissive);
+		sharedLength.bind(probe.restrictive);
+		failed = false;
+		try validationDocument.setExpression("validation.length", "validation.small") catch (error:Dynamic) failed = true;
+		check(failed, "all expression binding targets are validated");
+		near(probe.permissive.value, 10);
+		near(probe.restrictive.value, 10);
+		check(sharedLength.expression == null && !validationDocument.undo(), "failed expression change has no history entry");
+
+		var typedCount = validationDocument.defineTypedParameter("validation.count", 2, ParameterKind.Count, "count");
+		typedCount.bind(probe.looseCount);
+		failed = false;
+		try probe.looseCount.set(2.5) catch (error:Dynamic) failed = true;
+		check(failed && probe.looseCount.value == 2, "direct bound slot edits enforce the named count type");
+		var typedAngle = validationDocument.defineTypedParameter("validation.angle", 10, ParameterKind.Angle, "rad");
+		var typedBox = validationDocument.add(new BoxFeature(10, 10, 10));
+		failed = false;
+		try typedAngle.bind(typedBox.depth) catch (error:Dynamic) failed = true;
+		check(failed, "typed feature bindings require compatible quantities");
+		validationDocument.close();
+
+		var parserDocument = new Document();
+		parserDocument.defineTypedParameter("parser.other", 20, ParameterKind.Length, "mm");
+		parserDocument.defineTypedParameter("parser.width", 10, ParameterKind.Length, "mm");
+		var ratio = parserDocument.defineExpression("parser.ratio", ParameterKind.Scalar, "1",
+			"parser.other / (parser.other - parser.width)");
+		near(ratio.value, 2);
+		failed = false;
+		try new ParameterExpression("1.2.3") catch (error:Dynamic) failed = true;
+		check(failed, "malformed numeric literals are rejected");
+		near(parserDocument.defineExpression("parser.scientific", ParameterKind.Scalar, "1", "1.2e3").value, 1200);
+		parserDocument.close();
 
 		var encoded = DocumentCodec.encode(document);
 		var restored = DocumentCodec.decode(encoded);

@@ -18,11 +18,11 @@ class ParameterExpressionChange implements DocumentChange {
 
 	public function undo():Void {
 		parameter.replaceExpression(oldExpression);
-		parameter.restoreStored(oldValue);
+		parameter.synchronize(oldValue);
 	}
 
 	public function redo():Void {
 		parameter.replaceExpression(newExpression);
-		parameter.restoreStored(newValue);
+		parameter.synchronize(newValue);
 	}
 }

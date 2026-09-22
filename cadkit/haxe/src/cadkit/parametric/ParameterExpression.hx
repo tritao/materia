@@ -36,7 +36,7 @@ class ParameterExpression {
 		skipSpace();
 		if (index != source.length)
 			throw new ParametricError("unexpected expression token at " + index);
-		if (!Math.isFinite(result.value))
+		if (dimensional && !Math.isFinite(result.value))
 			throw new ParametricError("parameter expression produced a non-finite value");
 		return result;
 	}
@@ -51,8 +51,9 @@ class ParameterExpression {
 			var right = multiplication(dimensional);
 			if (dimensional && left.kind != right.kind)
 				throw new ParametricError("expression addition requires matching parameter types");
-			left = new ExpressionValue(operator == "+" ? left.value + right.value : left.value - right.value,
-				dimensional ? left.kind : ParameterKind.Scalar);
+			left = dimensional
+				? new ExpressionValue(operator == "+" ? left.value + right.value : left.value - right.value, left.kind)
+				: new ExpressionValue(1, ParameterKind.Scalar);
 		}
 	}
 
@@ -65,7 +66,9 @@ class ParameterExpression {
 			var operator = source.charAt(index - 1);
 			var right = unary(dimensional);
 			var kind = dimensional ? combinedKind(left.kind, right.kind, operator) : ParameterKind.Scalar;
-			left = new ExpressionValue(operator == "*" ? left.value * right.value : left.value / right.value, kind);
+			left = dimensional
+				? new ExpressionValue(operator == "*" ? left.value * right.value : left.value / right.value, kind)
+				: new ExpressionValue(1, ParameterKind.Scalar);
 		}
 	}
 
@@ -90,19 +93,33 @@ class ParameterExpression {
 			return value;
 		}
 		var start = index;
-		while (index < source.length) {
-			var code = source.charCodeAt(index);
-			if ((code >= 48 && code <= 57) || code == 46)
+		var first = source.charCodeAt(index);
+		if (isDigit(first) || (first == 46 && isDigit(source.charCodeAt(index + 1)))) {
+			while (isDigit(source.charCodeAt(index))) index++;
+			if (source.charCodeAt(index) == 46) {
 				index++;
-			else
-				break;
-		}
-		if (index > start) {
+				while (isDigit(source.charCodeAt(index))) index++;
+			}
+			var exponent = source.charCodeAt(index);
+			if (exponent == 69 || exponent == 101) {
+				index++;
+				var sign = source.charCodeAt(index);
+				if (sign == 43 || sign == 45) index++;
+				var exponentStart = index;
+				while (isDigit(source.charCodeAt(index))) index++;
+				if (index == exponentStart)
+					throw new ParametricError("invalid expression number");
+			}
+			if (source.charCodeAt(index) == 46)
+				throw new ParametricError("invalid expression number");
 			var number = Std.parseFloat(source.substring(start, index));
 			if (!Math.isFinite(number))
 				throw new ParametricError("invalid expression number");
 			return new ExpressionValue(number, ParameterKind.Scalar);
 		}
+		var identifierStart = source.charCodeAt(index);
+		if (!isLetter(identifierStart) && identifierStart != 95)
+			throw new ParametricError("expected expression value at " + index);
 		while (index < source.length) {
 			var code = source.charCodeAt(index);
 			if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code == 95 || code == 46)
@@ -113,6 +130,14 @@ class ParameterExpression {
 		if (index == start)
 			throw new ParametricError("expected expression value at " + index);
 		return lookup(source.substring(start, index));
+	}
+
+	private static function isDigit(code:Null<Int>):Bool {
+		return code != null && code >= 48 && code <= 57;
+	}
+
+	private static function isLetter(code:Null<Int>):Bool {
+		return code != null && ((code >= 65 && code <= 90) || (code >= 97 && code <= 122));
 	}
 
 	private static function combinedKind(left:String, right:String, operator:String):String {
