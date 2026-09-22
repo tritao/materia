@@ -159,3 +159,10 @@ local transform. Datum attachment establishes feature-local geometry first,
 then element and parent placements apply to its committed output. Reparenting
 can preserve either local or world placement. Placement edits invalidate only
 cached placed views, leaving unchanged local feature geometry clean.
+
+Reusable definitions own persistent IDs, typed defaults, named local outputs,
+and a revision. Instance elements combine a definition reference, validated
+overrides, and the normal element placement hierarchy. Local definition shapes
+are cached by definition revision and resolved inputs, remain immutable, and
+are shared by equivalent instances. Definition and override edits stage every
+affected local result before replacing committed instance geometry.

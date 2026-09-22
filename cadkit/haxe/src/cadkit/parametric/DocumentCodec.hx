@@ -43,6 +43,9 @@ import cadkit.parametric.LevelElement;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.ElementReference;
 import cadkit.parametric.Placement;
+import cadkit.parametric.DefinitionId;
+import cadkit.parametric.DefinitionInput;
+import cadkit.parametric.InstanceElement;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
@@ -72,10 +75,77 @@ class DocumentCodec {
 		}
 		var encodedElements:Array<Dynamic> = [];
 		for (element in document.allElements()) {
-			var placement=encodePlacement(element.localPlacement);var parent=element.placementParent==null?null:encodeElementReference(element.placementParent);
-			if(element.kind=="geometry") { var geometry:Feature=cast element.output; encodedElements.push({id:element.id.value,name:element.name,kind:element.kind,output:geometry.id.toInt(),placement:placement,parent:parent}); }
-			else if(element.kind=="level") { var level:LevelElement=cast element; encodedElements.push({id:level.id.value,name:level.name,kind:level.kind,elevation:level.elevation,offset:level.offset,relativeTo:level.relativeTo==null?null:encodeElementReference(level.relativeTo),placement:placement,parent:parent}); }
-			else { var datum:ReferencePlaneElement=cast element; encodedElements.push({id:datum.id.value,name:datum.name,kind:datum.kind,plane:{origin:encodeVector(datum.plane.origin),xDirection:encodeVector(datum.plane.xDirection),normal:encodeVector(datum.plane.normal)},placement:placement,parent:parent}); }
+			var placement = encodePlacement(element.localPlacement);
+			var parent = element.placementParent == null ? null : encodeElementReference(element.placementParent);
+			if (element.kind == "geometry") {
+				var geometry:Feature = cast element.output;
+				encodedElements.push({
+					id: element.id.value,
+					name: element.name,
+					kind: element.kind,
+					output: geometry.id.toInt(),
+					placement: placement,
+					parent: parent
+				});
+			} else if (element.kind == "instance") {
+				var instance:InstanceElement = cast element;
+				var overrides:Array<Dynamic> = [];
+				for (name in instance.overrideNames())
+					overrides.push({name: name, value: instance.overrideValue(name)});
+				encodedElements.push({
+					id: element.id.value,
+					name: element.name,
+					kind: element.kind,
+					definition: instance.definitionId.value,
+					overrides: overrides,
+					placement: placement,
+					parent: parent
+				});
+			} else if (element.kind == "level") {
+				var level:LevelElement = cast element;
+				encodedElements.push({
+					id: level.id.value,
+					name: level.name,
+					kind: level.kind,
+					elevation: level.elevation,
+					offset: level.offset,
+					relativeTo: level.relativeTo == null ? null : encodeElementReference(level.relativeTo),
+					placement: placement,
+					parent: parent
+				});
+			} else {
+				var datum:ReferencePlaneElement = cast element;
+				encodedElements.push({
+					id: datum.id.value,
+					name: datum.name,
+					kind: datum.kind,
+					plane: {
+						origin: encodeVector(datum.plane.origin),
+						xDirection: encodeVector(datum.plane.xDirection),
+						normal: encodeVector(datum.plane.normal)
+					},
+					placement: placement,
+					parent: parent
+				});
+			}
+		}
+		var encodedDefinitions:Array<Dynamic> = [];
+		for (definition in document.allDefinitions()) {
+			var inputs:Array<Dynamic> = [];
+			for (input in definition.inputs())
+				inputs.push({
+					name: input.name,
+					kind: input.kind,
+					unit: input.unit,
+					value: UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit)
+				});
+			encodedDefinitions.push({
+				id: definition.id.value,
+				name: definition.name,
+				recipe: definition.recipe,
+				revision: definition.revision,
+				inputs: inputs
+			});
 		}
 		return Json.stringify({
 			format: FORMAT,
@@ -83,6 +153,7 @@ class DocumentCodec {
 			documentId: document.id.value,
 			features: encodedFeatures,
 			parameters: encodedParameters,
+			definitions: encodedDefinitions,
 			elements: encodedElements,
 			output: document.outputFeature().id.toInt()
 		});
@@ -111,9 +182,12 @@ class DocumentCodec {
 				} else if (featureType == "constrained-sketch") {
 					feature = document.add(decodeConstrainedSketch(record, document));
 				} else if (featureType == "datum-sketch") {
-					feature=document.add(new DatumSketchFeature(stringField(record,"profile"),numberField(record,"width"),numberField(record,"height"),decodeElementReference(requiredField(record,"datum")),numberField(record,"offset")));
+					feature = document.add(new DatumSketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
+						decodeElementReference(requiredField(record, "datum")), numberField(record, "offset")));
 				} else if (featureType == "level-extrude") {
-					feature=document.add(new LevelExtrudeFeature(requiredFeature(document,intField(record,"source")),decodeElementReference(requiredField(record,"base")),decodeElementReference(requiredField(record,"top")),numberField(record,"baseOffset"),numberField(record,"topOffset")));
+					feature = document.add(new LevelExtrudeFeature(requiredFeature(document, intField(record, "source")),
+						decodeElementReference(requiredField(record, "base")), decodeElementReference(requiredField(record, "top")),
+						numberField(record, "baseOffset"), numberField(record, "topOffset")));
 				} else if (featureType == "sketch") {
 					var planeRecord = requiredField(record, "plane");
 					feature = document.add(new SketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
@@ -129,11 +203,11 @@ class DocumentCodec {
 				} else if (featureType == "extrude") {
 					var extrudeSource = requiredFeature(document, intField(record, "source"));
 					var encodedAmount:Dynamic = Reflect.field(record, "amount");
-					feature = encodedAmount == null
-						? document.add(new ExtrudeFeature(extrudeSource, numberField(record, "x"), numberField(record, "y"), numberField(record, "z")))
-						: document.add(ExtrudeFeature.along(extrudeSource, finiteNumber(encodedAmount, "amount"),
-							new Vector(numberField(record, "x"), numberField(record, "y"), numberField(record, "z")),
-							optionalBool(record, "reversed", false), optionalBool(record, "symmetric", false)));
+					feature = encodedAmount == null ? document.add(new ExtrudeFeature(extrudeSource, numberField(record, "x"), numberField(record, "y"),
+						numberField(record,
+							"z"))) : document.add(ExtrudeFeature.along(extrudeSource, finiteNumber(encodedAmount, "amount"),
+								new Vector(numberField(record, "x"), numberField(record, "y"), numberField(record, "z")),
+								optionalBool(record, "reversed", false), optionalBool(record, "symmetric", false)));
 				} else if (featureType == "pocket") {
 					feature = document.add(new PocketFeature(requiredFeature(document, intField(record, "target")),
 						requiredFeature(document, intField(record, "profile")), stringField(record, "mode"), numberField(record, "depth")));
@@ -157,8 +231,7 @@ class DocumentCodec {
 						decodeVector(requiredField(record, "pivot")), decodeVector(requiredField(record, "axis")), numberField(record, "angle")));
 				} else if (featureType == "mirror") {
 					feature = document.add(new MirrorFeature(requiredFeature(document, intField(record, "source")),
-						decodeVector(requiredField(record, "planeOrigin")), decodeVector(requiredField(record, "planeNormal")),
-						stringField(record, "mode")));
+						decodeVector(requiredField(record, "planeOrigin")), decodeVector(requiredField(record, "planeNormal")), stringField(record, "mode")));
 				} else if (featureType == "boolean") {
 					feature = document.add(new BooleanFeature(requiredFeature(document, intField(record, "first")),
 						requiredFeature(document, intField(record, "second")), booleanOperation(stringField(record, "operation"))));
@@ -189,8 +262,8 @@ class DocumentCodec {
 				if (rawKind == null)
 					document.defineParameter(stringField(record, "name"), numberField(record, "value"));
 				else
-					document.defineTypedParameter(stringField(record, "name"), numberField(record, "value"),
-						stringField(record, "kind"), stringField(record, "unit"));
+					document.defineTypedParameter(stringField(record, "name"), numberField(record, "value"), stringField(record, "kind"),
+						stringField(record, "unit"));
 			}
 			for (record in parameterRecords) {
 				var rawExpression:Dynamic = Reflect.field(record, "expression");
@@ -215,15 +288,49 @@ class DocumentCodec {
 			if (version == 1) {
 				document.installElement("Model", effectiveOutput, new ElementId());
 			} else {
+				var definitionRecords:Array<Dynamic> = cast requiredField(root, "definitions");
+				for (definitionRecord in definitionRecords) {
+					var inputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "inputs");
+					var inputs:Array<DefinitionInput> = [];
+					for (inputRecord in inputRecords)
+						inputs.push(new DefinitionInput(stringField(inputRecord, "name"), stringField(inputRecord, "kind"), stringField(inputRecord, "unit"),
+							numberField(inputRecord, "value")));
+					var definition = document.installDefinition(new DefinitionId(stringField(definitionRecord, "id")), stringField(definitionRecord, "name"),
+						stringField(definitionRecord, "recipe"), inputs);
+					definition.restoreRevision(intField(definitionRecord, "revision"));
+				}
 				var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
 				for (elementRecord in elementRecords) {
-					var kind=stringField(elementRecord,"kind"); var eid=new ElementId(stringField(elementRecord,"id")); var ename=stringField(elementRecord,"name");
-					if(kind=="geometry") document.installElement(ename,requiredFeature(document,intField(elementRecord,"output")),eid);
-					else if(kind=="level") { var relative:Dynamic=Reflect.field(elementRecord,"relativeTo");document.installLevel(ename,eid,numberField(elementRecord,"elevation"),numberField(elementRecord,"offset"),relative==null?null:decodeElementReference(relative)); }
-					else if(kind=="reference-plane") { var p=requiredField(elementRecord,"plane"); document.installReferencePlane(ename,eid,new Plane(decodeVector(requiredField(p,"origin")),decodeVector(requiredField(p,"xDirection")),decodeVector(requiredField(p,"normal")))); }
-					else throw new ParametricError("unsupported element kind: "+kind);
+					var kind = stringField(elementRecord, "kind");
+					var eid = new ElementId(stringField(elementRecord, "id"));
+					var ename = stringField(elementRecord, "name");
+					if (kind == "geometry")
+						document.installElement(ename, requiredFeature(document, intField(elementRecord, "output")), eid);
+					else if (kind == "instance") {
+						var overrideRecords:Array<Dynamic> = cast requiredField(elementRecord, "overrides");
+						var overrides = new Map<String, Float>();
+						for (overrideRecord in overrideRecords)
+							overrides.set(stringField(overrideRecord, "name"), numberField(overrideRecord, "value"));
+						document.installInstance(ename, eid, new DefinitionId(stringField(elementRecord, "definition")), overrides);
+					} else if (kind == "level") {
+						var relative:Dynamic = Reflect.field(elementRecord, "relativeTo");
+						document.installLevel(ename, eid, numberField(elementRecord, "elevation"), numberField(elementRecord, "offset"),
+							relative == null ? null : decodeElementReference(relative));
+					} else if (kind == "reference-plane") {
+						var p = requiredField(elementRecord, "plane");
+						document.installReferencePlane(ename, eid,
+							new Plane(decodeVector(requiredField(p, "origin")), decodeVector(requiredField(p, "xDirection")),
+								decodeVector(requiredField(p, "normal"))));
+					} else
+						throw new ParametricError("unsupported element kind: " + kind);
 				}
-				for(elementRecord in elementRecords){var loaded=document.element(new ElementId(stringField(elementRecord,"id")));var rawParent:Dynamic=Reflect.field(elementRecord,"parent");document.restoreElementPlacement(loaded,decodePlacement(requiredField(elementRecord,"placement")),rawParent==null?null:decodeElementReference(rawParent));document.worldPlacement(loaded);}
+				for (elementRecord in elementRecords) {
+					var loaded = document.element(new ElementId(stringField(elementRecord, "id")));
+					var rawParent:Dynamic = Reflect.field(elementRecord, "parent");
+					document.restoreElementPlacement(loaded, decodePlacement(requiredField(elementRecord, "placement")),
+						rawParent == null ? null : decodeElementReference(rawParent));
+					document.worldPlacement(loaded);
+				}
 			}
 
 			document.recompute();
@@ -256,8 +363,32 @@ class DocumentCodec {
 		var modeling = encodeModelingFeature(feature, references);
 		if (modeling != null)
 			return modeling;
-		if (featureType == "datum-sketch") { var sketch:DatumSketchFeature=cast feature; return {id:feature.id.toInt(),type:featureType,profile:sketch.profile,width:sketch.width.value,height:sketch.height.value,offset:sketch.offset.value,datum:encodeElementReference(sketch.datum),references:references}; }
-		if (featureType == "level-extrude") { var extrusion:LevelExtrudeFeature=cast feature; return {id:feature.id.toInt(),type:featureType,source:extrusion.source.id.toInt(),base:encodeElementReference(extrusion.base),top:encodeElementReference(extrusion.top),baseOffset:extrusion.baseOffset.value,topOffset:extrusion.topOffset.value,references:references}; }
+		if (featureType == "datum-sketch") {
+			var sketch:DatumSketchFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				profile: sketch.profile,
+				width: sketch.width.value,
+				height: sketch.height.value,
+				offset: sketch.offset.value,
+				datum: encodeElementReference(sketch.datum),
+				references: references
+			};
+		}
+		if (featureType == "level-extrude") {
+			var extrusion:LevelExtrudeFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				source: extrusion.source.id.toInt(),
+				base: encodeElementReference(extrusion.base),
+				top: encodeElementReference(extrusion.top),
+				baseOffset: extrusion.baseOffset.value,
+				topOffset: extrusion.topOffset.value,
+				references: references
+			};
+		}
 		if (featureType == "constrained-sketch") {
 			return encodeConstrainedSketch(cast feature, references);
 		} else if (featureType == "sketch") {
@@ -417,10 +548,20 @@ class DocumentCodec {
 		throw new ParametricError("unsupported feature type: " + featureType);
 	}
 
-	private static function encodeElementReference(value:ElementReference):Dynamic return {document:value.documentId.value,element:value.elementId.value};
-	private static function decodeElementReference(value:Dynamic):ElementReference return new ElementReference(new DocumentId(stringField(value,"document")),new ElementId(stringField(value,"element")));
-	private static function encodePlacement(value:Placement):Dynamic { var p=value.location.plane;return {origin:encodeVector(p.origin),xDirection:encodeVector(p.xDirection),normal:encodeVector(p.normal)}; }
-	private static function decodePlacement(value:Dynamic):Placement return new Placement(new Plane(decodeVector(requiredField(value,"origin")),decodeVector(requiredField(value,"xDirection")),decodeVector(requiredField(value,"normal"))));
+	private static function encodeElementReference(value:ElementReference):Dynamic
+		return {document: value.documentId.value, element: value.elementId.value};
+
+	private static function decodeElementReference(value:Dynamic):ElementReference
+		return new ElementReference(new DocumentId(stringField(value, "document")), new ElementId(stringField(value, "element")));
+
+	private static function encodePlacement(value:Placement):Dynamic {
+		var p = value.location.plane;
+		return {origin: encodeVector(p.origin), xDirection: encodeVector(p.xDirection), normal: encodeVector(p.normal)};
+	}
+
+	private static function decodePlacement(value:Dynamic):Placement
+		return new Placement(new Plane(decodeVector(requiredField(value, "origin")), decodeVector(requiredField(value, "xDirection")),
+			decodeVector(requiredField(value, "normal"))));
 
 	private static function encodeConstrainedSketch(feature:ConstrainedSketchFeature, references:Array<Dynamic>):Dynamic {
 		var sketch = feature.sketch();
@@ -484,10 +625,11 @@ class DocumentCodec {
 	private static function decodeConstrainedSketch(record:Dynamic, document:Document):ConstrainedSketchFeature {
 		var plane = requiredField(record, "plane");
 		var settings = requiredField(record, "settings");
-		var sketch = new ConstrainedSketch(new Plane(decodeVector(requiredField(plane, "origin")),
-			decodeVector(requiredField(plane, "xDirection")), decodeVector(requiredField(plane, "normal"))),
-			stringField(record, "units"), new SolverSettings(numberField(settings, "tolerance"),
-				numberField(settings, "rankTolerance"), intField(settings, "maxIterations"), numberField(settings, "initialDamping")));
+		var sketch = new ConstrainedSketch(new Plane(decodeVector(requiredField(plane, "origin")), decodeVector(requiredField(plane, "xDirection")),
+			decodeVector(requiredField(plane, "normal"))),
+			stringField(record, "units"),
+			new SolverSettings(numberField(settings, "tolerance"), numberField(settings, "rankTolerance"), intField(settings, "maxIterations"),
+				numberField(settings, "initialDamping")));
 		var pointRecords:Array<Dynamic> = cast requiredField(record, "points");
 		for (value in pointRecords)
 			sketch.addPoint(new SketchPoint(stringField(value, "id"), numberField(value, "x"), numberField(value, "y")));
@@ -495,20 +637,19 @@ class DocumentCodec {
 		for (value in entityRecords) {
 			var entity = switch (stringField(value, "kind")) {
 				case "line": SketchEntity.line(stringField(value, "id"), stringField(value, "first"), stringField(value, "second"),
-					boolField(value, "construction"));
+						boolField(value, "construction"));
 				case "circle": SketchEntity.circle(stringField(value, "id"), stringField(value, "first"), numberField(value, "radius"),
-					boolField(value, "construction"));
+						boolField(value, "construction"));
 				case "arc": SketchEntity.arc(stringField(value, "id"), stringField(value, "first"), numberField(value, "radius"),
-					numberField(value, "startAngle"), numberField(value, "endAngle"), boolField(value, "clockwise"),
-					boolField(value, "construction"));
+						numberField(value, "startAngle"), numberField(value, "endAngle"), boolField(value, "clockwise"), boolField(value, "construction"));
 				default: throw new ParametricError("unsupported constrained sketch entity");
 			};
 			sketch.addEntity(entity);
 		}
 		var constraintRecords:Array<Dynamic> = cast requiredField(record, "constraints");
 		for (value in constraintRecords)
-			sketch.addConstraint(SketchConstraint.raw(stringField(value, "id"), stringField(value, "kind"),
-				stringField(value, "first"), optionalString(value, "second"), optionalString(value, "third"), numberField(value, "value")));
+			sketch.addConstraint(SketchConstraint.raw(stringField(value, "id"), stringField(value, "kind"), stringField(value, "first"),
+				optionalString(value, "second"), optionalString(value, "third"), numberField(value, "value")));
 		var supportValue:Dynamic = Reflect.field(record, "support");
 		if (supportValue == null)
 			return new ConstrainedSketchFeature(sketch);
@@ -517,7 +658,14 @@ class DocumentCodec {
 			numberField(record, "supportOffset"), boolField(record, "supportFlipped"));
 	}
 
-	private static function optionalString(record:Dynamic,name:String):Null<String> { var value:Dynamic=Reflect.field(record,name);if(value==null)return null;if(!Std.isOfType(value,String))throw new ParametricError("document field is not a string: "+name);return cast value; }
+	private static function optionalString(record:Dynamic, name:String):Null<String> {
+		var value:Dynamic = Reflect.field(record, name);
+		if (value == null)
+			return null;
+		if (!Std.isOfType(value, String))
+			throw new ParametricError("document field is not a string: " + name);
+		return cast value;
+	}
 
 	private static function decodeModelingFeature(type:String, record:Dynamic, document:Document):Null<Feature> {
 		if (type == "wire")
@@ -556,16 +704,14 @@ class DocumentCodec {
 				numberField(record, "secondSpacing"), rawSecondDirection == null ? null : decodeVector(rawSecondDirection));
 		}
 		if (type == "polar-pattern")
-			return new PolarPatternFeature(requiredFeature(document, intField(record, "source")), numberField(record, "count"),
-				numberField(record, "radius"), numberField(record, "angularSpan"), decodeVector(requiredField(record, "axisOrigin")),
-				decodeVector(requiredField(record, "axisDirection")), decodeVector(requiredField(record, "radialDirection")),
-				boolField(record, "orientInstances"), numberField(record, "startAngle"));
+			return new PolarPatternFeature(requiredFeature(document, intField(record, "source")), numberField(record, "count"), numberField(record, "radius"),
+				numberField(record, "angularSpan"), decodeVector(requiredField(record, "axisOrigin")), decodeVector(requiredField(record, "axisDirection")),
+				decodeVector(requiredField(record, "radialDirection")), boolField(record, "orientInstances"), numberField(record, "startAngle"));
 		if (type == "hole") {
 			var rawIncludedAngle:Dynamic = Reflect.field(record, "includedAngle");
-			return new HoleFeature(requiredFeature(document, intField(record, "target")),
-				decodeSelection(requiredField(record, "selection")), decodeVector(requiredField(record, "xDirection")),
-				stringField(record, "style"), stringField(record, "mode"), numberField(record, "x"), numberField(record, "y"),
-				numberField(record, "diameter"), numberField(record, "depth"), numberField(record, "recessDiameter"),
+			return new HoleFeature(requiredFeature(document, intField(record, "target")), decodeSelection(requiredField(record, "selection")),
+				decodeVector(requiredField(record, "xDirection")), stringField(record, "style"), stringField(record, "mode"), numberField(record, "x"),
+				numberField(record, "y"), numberField(record, "diameter"), numberField(record, "depth"), numberField(record, "recessDiameter"),
 				numberField(record, "recessDepth"), numberField(record, "offset"), boolField(record, "flipped"),
 				rawIncludedAngle == null ? Math.PI / 2 : finiteNumber(rawIncludedAngle, "includedAngle"));
 		}

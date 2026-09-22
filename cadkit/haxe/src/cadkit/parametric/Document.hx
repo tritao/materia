@@ -1,6 +1,7 @@
 package cadkit.parametric;
 
 import cadkit.Shape;
+import cadkit.Geometry;
 import cadkit.parametric.ChangeSet;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
@@ -30,17 +31,33 @@ import cadkit.parametric.DatumChanges.ReferencePlaneChange;
 import cadkit.modeling.Plane;
 import cadkit.parametric.Placement;
 import cadkit.parametric.PlacementChange;
+import cadkit.parametric.Definition;
+import cadkit.parametric.DefinitionId;
+import cadkit.parametric.DefinitionInput;
+import cadkit.parametric.InstanceElement;
+import cadkit.parametric.DefinitionChanges.DefinitionDefaultChange;
+import cadkit.parametric.DefinitionChanges.InstanceOverrideChange;
+import cadkit.parametric.DefinitionChanges.DefinitionCreateChange;
 
 /** Haxeon-owned parametric feature document. */
 class Document {
 	private static var nextToken:Int = 1;
 
 	private var nextId:Int;
+
 	public final id:DocumentId;
+
 	private final elements:Array<Element>;
 	private var elementsById:Map<String, Element>;
 	private var issuedElementIds:Map<String, Bool>;
 	private final dimensions:Array<NamedParameter>;
+	private final definitions:Array<Definition>;
+	private var definitionsById:Map<String, Definition>;
+	private final definitionCache:Map<String, Shape>;
+	private final issuedDefinitionIds:Map<String, Bool>;
+
+	public var definitionEvaluationCount(default, null):Int;
+
 	private var updatingNamedParameter:Bool;
 	private var selectedOutput:Null<Feature>;
 	private var closed:Bool;
@@ -59,6 +76,11 @@ class Document {
 		nextToken++;
 		nextId = 1;
 		dimensions = [];
+		definitions = [];
+		definitionsById = new Map();
+		definitionCache = new Map();
+		issuedDefinitionIds = new Map();
+		definitionEvaluationCount = 0;
 		elements = [];
 		elementsById = new Map<String, Element>();
 		issuedElementIds = new Map<String, Bool>();
@@ -71,6 +93,188 @@ class Document {
 		undoStack = [];
 		redoStack = [];
 		lastRemapReport = new TopologyRemapReport();
+	}
+
+	public function createWindowDefinition(name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition {
+		var result = installDefinition(new DefinitionId(), name, "window", [
+			new DefinitionInput("width", ParameterKind.Length, "mm", width),
+			new DefinitionInput("height", ParameterKind.Length, "mm", height),
+			new DefinitionInput("frameThickness", ParameterKind.Length, "mm", frameThickness),
+			new DefinitionInput("depth", ParameterKind.Length, "mm", depth)
+		]);
+		recordDocumentChange(new DefinitionCreateChange(this, result, definitions.length - 1));
+		return result;
+	}
+
+	public function installDefinition(id:DefinitionId, name:String, recipe:String, inputs:Array<DefinitionInput>):Definition {
+		if (issuedDefinitionIds.exists(id.value))
+			throw new ParametricError("duplicate or previously issued definition ID: " + id.value);
+		var result = new Definition(this, id, name, recipe, inputs);
+		definitions.push(result);
+		definitionsById.set(id.value, result);
+		issuedDefinitionIds.set(id.value, true);
+		return result;
+	}
+
+	public function restoreDefinitionRemoval(definition:Definition):Void {
+		definitions.remove(definition);
+		definitionsById.remove(definition.id.value);
+	}
+
+	public function restoreDefinitionInsertion(definition:Definition, index:Int):Void {
+		if (definitionsById.exists(definition.id.value))
+			throw new ParametricError("definition is already registered");
+		definitions.insert(index, definition);
+		definitionsById.set(definition.id.value, definition);
+	}
+
+	public function definition(id:DefinitionId):Definition {
+		var result = definitionsById.get(id.value);
+		if (result == null)
+			throw new ParametricError("unresolved definition: " + id.value);
+		return result;
+	}
+
+	public function allDefinitions():Array<Definition>
+		return definitions.copy();
+
+	public function createInstance(name:String, definition:Definition):InstanceElement {
+		if (definition.document != this)
+			throw new ParametricError("definition belongs to another document");
+		var id = newElementId();
+		var result = new InstanceElement(this, id, name, definition.id);
+		installRecord(result);
+		result.restoreDirectShape(resolveInstanceShape(result));
+		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
+		return result;
+	}
+
+	public function installInstance(name:String, id:ElementId, definitionId:DefinitionId, overrides:Map<String, Float>):InstanceElement {
+		definition(definitionId);
+		var result = new InstanceElement(this, id, name, definitionId);
+		for (key in overrides.keys()) {
+			definition(definitionId).input(key);
+			result.restoreOverride(key, overrides.get(key));
+		}
+		installRecord(result);
+		result.restoreDirectShape(resolveInstanceShape(result));
+		return result;
+	}
+
+	public function duplicateInstance(source:InstanceElement, ?name:String):InstanceElement {
+		validateOwnedElement(source);
+		var overrides = new Map<String, Float>();
+		for (key in source.overrideNames())
+			overrides.set(key, cast source.overrideValue(key));
+		var result = installInstance(name == null ? source.name + " copy" : name, newElementId(), source.definitionId, overrides);
+		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
+		return result;
+	}
+
+	private function instanceKey(instance:InstanceElement):String {
+		var definition = definition(instance.definitionId);
+		var parts = [definition.id.value, Std.string(definition.revision)];
+		for (input in definition.inputs())
+			parts.push(input.name + "=" + Std.string(instance.resolved(input.name)));
+		return parts.join("|");
+	}
+
+	private function resolveInstanceShape(instance:InstanceElement):Shape {
+		var key = instanceKey(instance);
+		var known = definitionCache.get(key);
+		if (known != null)
+			return known;
+		var result = evaluateDefinition(definition(instance.definitionId), instance);
+		definitionCache.set(key, result);
+		return result;
+	}
+
+	private function evaluateDefinition(definition:Definition, instance:InstanceElement):Shape {
+		definitionEvaluationCount++;
+		if (definition.recipe != "window")
+			throw new ParametricError("unsupported definition recipe: " + definition.recipe);
+		var width = instance.resolved("width"),
+			height = instance.resolved("height"),
+			frame = instance.resolved("frameThickness"),
+			depth = instance.resolved("depth");
+		if (width <= 2 * frame || height <= 2 * frame || depth <= 0 || frame <= 0)
+			throw new ParametricError("window dimensions do not define a valid frame");
+		var outer = Shape.box(width, depth, height);
+		var inner = Shape.box(width - 2 * frame, depth + 2, height - 2 * frame).translate(Geometry.vec3(frame, -1, frame));
+		try {
+			var result = outer.cut(inner);
+			outer.close();
+			inner.close();
+			return result;
+		} catch (e:Dynamic) {
+			outer.close();
+			inner.close();
+			throw e;
+		}
+	}
+
+	private function refreshDefinition(definition:Definition):Void {
+		var staged:Array<{instance:InstanceElement, shape:Shape}> = [];
+		for (element in elements)
+			if (element.kind == "instance") {
+				var instance:InstanceElement = cast element;
+				if (instance.definitionId.value == definition.id.value)
+					staged.push({instance: instance, shape: resolveInstanceShape(instance)});
+			}
+		for (value in staged)
+			value.instance.restoreDirectShape(value.shape);
+	}
+
+	public function setDefinitionDefault(definition:Definition, name:String, value:Float, ?unit:String):Void {
+		var input = definition.input(name);
+		var canonical = UnitConversion.toCanonical(value, input.kind, unit == null ? input.unit : unit);
+		var before = input.defaultValue;
+		var revision = definition.revision;
+		if (before == canonical)
+			return;
+		definition.restoreDefault(name, canonical, revision + 1);
+		try
+			refreshDefinition(definition)
+		catch (e:Dynamic) {
+			definition.restoreDefault(name, before, revision);
+			throw e;
+		}
+		recordDocumentChange(new DefinitionDefaultChange(this, definition, name, before, revision, canonical, revision + 1));
+	}
+
+	public function restoreDefinitionDefault(definition:Definition, name:String, value:Float, revision:Int):Void {
+		definition.restoreDefault(name, value, revision);
+		refreshDefinition(definition);
+	}
+
+	public function setInstanceOverride(instance:InstanceElement, name:String, value:Float, ?unit:String):Void {
+		validateOwnedElement(instance);
+		var input = definition(instance.definitionId).input(name);
+		var canonical = UnitConversion.toCanonical(value, input.kind, unit == null ? input.unit : unit);
+		var before = instance.overrideValue(name);
+		instance.restoreOverride(name, canonical);
+		try
+			instance.restoreDirectShape(resolveInstanceShape(instance))
+		catch (e:Dynamic) {
+			instance.restoreOverride(name, before);
+			throw e;
+		}
+		recordDocumentChange(new InstanceOverrideChange(this, instance, name, before, canonical));
+	}
+
+	public function removeInstanceOverride(instance:InstanceElement, name:String):Void {
+		validateOwnedElement(instance);
+		var before = instance.overrideValue(name);
+		if (before == null)
+			return;
+		instance.restoreOverride(name, null);
+		instance.restoreDirectShape(resolveInstanceShape(instance));
+		recordDocumentChange(new InstanceOverrideChange(this, instance, name, before, null));
+	}
+
+	public function restoreInstanceOverride(instance:InstanceElement, name:String, value:Null<Float>):Void {
+		instance.restoreOverride(name, value);
+		instance.restoreDirectShape(resolveInstanceShape(instance));
 	}
 
 	public function createElement(name:String, output:Feature):Element {
@@ -96,64 +300,165 @@ class Document {
 		return result;
 	}
 
-	public function createLevel(name:String,elevation:Float,offset:Float=0,?relativeTo:ElementReference):LevelElement {
-		if(relativeTo!=null) resolveElement(relativeTo,"level"); var id=newElementId(); var result=new LevelElement(this,id,name,elevation,offset,relativeTo); installRecord(result); recordDocumentChange(new ElementCreateChange(this,result,elements.length-1)); return result;
+	public function createLevel(name:String, elevation:Float, offset:Float = 0, ?relativeTo:ElementReference):LevelElement {
+		if (relativeTo != null)
+			resolveElement(relativeTo, "level");
+		var id = newElementId();
+		var result = new LevelElement(this, id, name, elevation, offset, relativeTo);
+		installRecord(result);
+		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
+		return result;
 	}
-	public function createReferencePlane(name:String,plane:Plane):ReferencePlaneElement {
-		var id=newElementId(); var result=new ReferencePlaneElement(this,id,name,plane); installRecord(result); recordDocumentChange(new ElementCreateChange(this,result,elements.length-1)); return result;
+
+	public function createReferencePlane(name:String, plane:Plane):ReferencePlaneElement {
+		var id = newElementId();
+		var result = new ReferencePlaneElement(this, id, name, plane);
+		installRecord(result);
+		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
+		return result;
 	}
-	public function installLevel(name:String,id:ElementId,elevation:Float,offset:Float=0,?relativeTo:ElementReference):LevelElement { if(relativeTo!=null)resolveElement(relativeTo,"level");var result=new LevelElement(this,id,name,elevation,offset,relativeTo);installRecord(result);return result; }
-	public function installReferencePlane(name:String,id:ElementId,plane:Plane):ReferencePlaneElement { var result=new ReferencePlaneElement(this,id,name,plane);installRecord(result);return result; }
-	private function newElementId():ElementId { var value=new ElementId(); while(issuedElementIds.exists(value.value)) value=new ElementId(); return value; }
-	private function installRecord(result:Element):Void { validateElementName(result.name); if(issuedElementIds.exists(result.id.value)) throw new ParametricError("duplicate or previously issued element ID: "+result.id.value); elements.push(result);elementsById.set(result.id.value,result);issuedElementIds.set(result.id.value,true); }
-	public function setLevelElevation(level:LevelElement,value:Float):Void { validateOwnedElement(level);if(!Math.isFinite(value))throw new ParametricError("level elevation must be finite");var old=level.elevation;if(old==value)return;level.restoreElevation(value);recordDocumentChange(new LevelElevationChange(level,old,value)); }
-	public function setReferencePlane(datum:ReferencePlaneElement,value:Plane):Void { validateOwnedElement(datum);var old=datum.plane;datum.restorePlane(value);recordDocumentChange(new ReferencePlaneChange(datum,old,value)); }
-	public function datumChanged(datum:Element):Void { for(feature in features) if(feature.datumDependencies().indexOf(datum.id.value)>=0) feature.markDirty(); }
+
+	public function installLevel(name:String, id:ElementId, elevation:Float, offset:Float = 0, ?relativeTo:ElementReference):LevelElement {
+		if (relativeTo != null)
+			resolveElement(relativeTo, "level");
+		var result = new LevelElement(this, id, name, elevation, offset, relativeTo);
+		installRecord(result);
+		return result;
+	}
+
+	public function installReferencePlane(name:String, id:ElementId, plane:Plane):ReferencePlaneElement {
+		var result = new ReferencePlaneElement(this, id, name, plane);
+		installRecord(result);
+		return result;
+	}
+
+	private function newElementId():ElementId {
+		var value = new ElementId();
+		while (issuedElementIds.exists(value.value))
+			value = new ElementId();
+		return value;
+	}
+
+	private function installRecord(result:Element):Void {
+		validateElementName(result.name);
+		if (issuedElementIds.exists(result.id.value))
+			throw new ParametricError("duplicate or previously issued element ID: " + result.id.value);
+		elements.push(result);
+		elementsById.set(result.id.value, result);
+		issuedElementIds.set(result.id.value, true);
+	}
+
+	public function setLevelElevation(level:LevelElement, value:Float):Void {
+		validateOwnedElement(level);
+		if (!Math.isFinite(value))
+			throw new ParametricError("level elevation must be finite");
+		var old = level.elevation;
+		if (old == value)
+			return;
+		level.restoreElevation(value);
+		recordDocumentChange(new LevelElevationChange(level, old, value));
+	}
+
+	public function setReferencePlane(datum:ReferencePlaneElement, value:Plane):Void {
+		validateOwnedElement(datum);
+		var old = datum.plane;
+		datum.restorePlane(value);
+		recordDocumentChange(new ReferencePlaneChange(datum, old, value));
+	}
+
+	public function datumChanged(datum:Element):Void {
+		for (feature in features)
+			if (feature.datumDependencies().indexOf(datum.id.value) >= 0)
+				feature.markDirty();
+	}
 
 	public function worldPlacement(element:Element):Placement {
-		validateOwnedElement(element); return resolvePlacement(element,new Map<String,Bool>());
+		validateOwnedElement(element);
+		return resolvePlacement(element, new Map<String, Bool>());
 	}
-	private function resolvePlacement(element:Element,visiting:Map<String,Bool>):Placement {
-		if (visiting.exists(element.id.value)) throw new ParametricError("placement parent cycle: " + element.id.value);
+
+	private function resolvePlacement(element:Element, visiting:Map<String, Bool>):Placement {
+		if (visiting.exists(element.id.value))
+			throw new ParametricError("placement parent cycle: " + element.id.value);
 		visiting.set(element.id.value, true);
 		var result = element.localPlacement;
 		if (element.placementParent != null) {
-			var parent = resolveElement(element.placementParent, "geometry");
+			var parent = resolveElement(element.placementParent);
+			if (!isPlaceable(parent))
+				throw new ParametricError("incompatible placement parent kind: " + parent.kind);
 			result = resolvePlacement(parent, visiting).compose(result);
 		}
 		visiting.remove(element.id.value);
 		return result;
 	}
+
 	public function setElementPlacement(element:Element, value:Placement):Void {
 		validateOwnedElement(element);
-		if (element.kind != "geometry") throw new ParametricError("only geometry elements have placements");
+		if (!isPlaceable(element))
+			throw new ParametricError("element kind does not support placement: " + element.kind);
 		var old = element.localPlacement;
-		if (old == value) return;
+		if (old == value)
+			return;
 		restoreElementPlacement(element, value, element.placementParent);
 		recordDocumentChange(new PlacementChange(this, element, old, element.placementParent, value, element.placementParent));
 	}
+
 	public function reparentElement(element:Element, parent:Null<ElementReference>, preserveWorld:Bool):Void {
 		validateOwnedElement(element);
-		if (element.kind != "geometry") throw new ParametricError("only geometry elements have placement parents");
+		if (!isPlaceable(element))
+			throw new ParametricError("element kind does not support placement parents: " + element.kind);
 		validatePlacementParent(element, parent);
 		var oldParent = element.placementParent;
 		var oldLocal = element.localPlacement;
 		var world = worldPlacement(element);
 		var next = oldLocal;
 		if (preserveWorld) {
-			var parentWorld = parent == null ? Placement.identity() : worldPlacement(resolveElement(parent, "geometry"));
+			var parentWorld = parent == null ? Placement.identity() : worldPlacement(resolveElement(parent));
 			next = parentWorld.inverse().compose(world);
 		}
 		restoreElementPlacement(element, next, parent);
 		recordDocumentChange(new PlacementChange(this, element, oldLocal, oldParent, next, parent));
 	}
-	private function validatePlacementParent(element:Element,parent:Null<ElementReference>):Void { var cursor=parent;var seen=new Map<String,Bool>();while(cursor!=null){var candidate=resolveElement(cursor,"geometry");if(candidate==element)throw new ParametricError("placement parent cycle: "+element.id.value);if(seen.exists(candidate.id.value))throw new ParametricError("placement parent cycle: "+candidate.id.value);seen.set(candidate.id.value,true);cursor=candidate.placementParent;} }
-	public function restoreElementPlacement(element:Element,value:Placement,parent:Null<ElementReference>):Void { element.restorePlacement(value,parent);invalidatePlacedDescendants(element.id.value,new Map<String,Bool>()); }
-	private function invalidatePlacedDescendants(id:String,seen:Map<String,Bool>):Void { if(seen.exists(id))return;seen.set(id,true);for(candidate in elements)if(candidate.placementParent!=null && candidate.placementParent.elementId.value==id){candidate.clearPlacedShape();invalidatePlacedDescendants(candidate.id.value,seen);} }
+
+	private function isPlaceable(element:Element):Bool
+		return element.kind == "geometry" || element.kind == "instance";
+
+	private function validatePlacementParent(element:Element, parent:Null<ElementReference>):Void {
+		var cursor = parent;
+		var seen = new Map<String, Bool>();
+		while (cursor != null) {
+			var candidate = resolveElement(cursor);
+			if (!isPlaceable(candidate))
+				throw new ParametricError("incompatible placement parent kind: " + candidate.kind);
+			if (candidate == element)
+				throw new ParametricError("placement parent cycle: " + element.id.value);
+			if (seen.exists(candidate.id.value))
+				throw new ParametricError("placement parent cycle: " + candidate.id.value);
+			seen.set(candidate.id.value, true);
+			cursor = candidate.placementParent;
+		}
+	}
+
+	public function restoreElementPlacement(element:Element, value:Placement, parent:Null<ElementReference>):Void {
+		element.restorePlacement(value, parent);
+		invalidatePlacedDescendants(element.id.value, new Map<String, Bool>());
+	}
+
+	private function invalidatePlacedDescendants(id:String, seen:Map<String, Bool>):Void {
+		if (seen.exists(id))
+			return;
+		seen.set(id, true);
+		for (candidate in elements)
+			if (candidate.placementParent != null && candidate.placementParent.elementId.value == id) {
+				candidate.clearPlacedShape();
+				invalidatePlacedDescendants(candidate.id.value, seen);
+			}
+	}
 
 	public function duplicateElement(source:Element, ?name:String):Element {
 		validateOwnedElement(source);
-		if(source.output==null) throw new ParametricError("datum duplication requires its typed API");
+		if (source.output == null)
+			throw new ParametricError("datum duplication requires its typed API");
 		return createElement(name == null ? source.name + " copy" : name, cast source.output);
 	}
 
@@ -167,7 +472,8 @@ class Document {
 	public function renameElement(target:Element, name:String):Void {
 		validateOwnedElement(target);
 		validateElementName(name);
-		if (target.name == name) return;
+		if (target.name == name)
+			return;
 		var previous = target.name;
 		target.restoreName(name);
 		recordDocumentChange(new ElementNameChange(target, previous, name));
@@ -176,7 +482,8 @@ class Document {
 	public function setElementOutput(target:Element, output:Feature):Void {
 		validateOwnedElement(target);
 		validateElementOutput(output);
-		if (target.output == output) return;
+		if (target.output == output)
+			return;
 		var previous = target.output;
 		target.restoreOutput(output);
 		recordDocumentChange(new ElementOutputChange(target, previous, output));
@@ -213,20 +520,24 @@ class Document {
 	}
 
 	public function resolveElement(reference:ElementReference, ?expectedKind:String):Element {
-		var state=reference.state(this,expectedKind);
-		if(state!="resolved") throw new ParametricError("element reference is "+state+": "+reference.elementId.value);
+		var state = reference.state(this, expectedKind);
+		if (state != "resolved")
+			throw new ParametricError("element reference is " + state + ": " + reference.elementId.value);
 		return element(reference.elementId);
 	}
 
 	public function levelElevation(reference:ElementReference):Float {
-		return resolveLevel(reference,new Map<String,Bool>());
+		return resolveLevel(reference, new Map<String, Bool>());
 	}
-	private function resolveLevel(reference:ElementReference,visiting:Map<String,Bool>):Float {
-		var level:LevelElement=cast resolveElement(reference,"level");
-		if(visiting.exists(level.id.value)) throw new ParametricError("level reference cycle: "+level.id.value);
-		visiting.set(level.id.value,true);
-		var value=level.elevation+level.offset;
-		if(level.relativeTo!=null) value+=resolveLevel(level.relativeTo,visiting);
+
+	private function resolveLevel(reference:ElementReference, visiting:Map<String, Bool>):Float {
+		var level:LevelElement = cast resolveElement(reference, "level");
+		if (visiting.exists(level.id.value))
+			throw new ParametricError("level reference cycle: " + level.id.value);
+		visiting.set(level.id.value, true);
+		var value = level.elevation + level.offset;
+		if (level.relativeTo != null)
+			value += resolveLevel(level.relativeTo, visiting);
 		visiting.remove(level.id.value);
 		return value;
 	}
@@ -243,7 +554,7 @@ class Document {
 	public function restoreElementRemoval(element:Element):Void {
 		validateOwnedElement(element);
 		datumChanged(element);
-		invalidatePlacedDescendants(element.id.value,new Map<String,Bool>());
+		invalidatePlacedDescendants(element.id.value, new Map<String, Bool>());
 		element.clearPlacedShape();
 		elements.remove(element);
 		elementsById.remove(element.id.value);
@@ -306,8 +617,7 @@ class Document {
 				throw new ParametricError("duplicate named parameter: " + name);
 		var validatedKind = ParameterKind.validate(kind);
 		var validatedUnit = UnitConversion.validateUnit(validatedKind, unit);
-		var result = new NamedParameter(this, name, UnitConversion.toCanonical(value, validatedKind, validatedUnit),
-			validatedKind, validatedUnit);
+		var result = new NamedParameter(this, name, UnitConversion.toCanonical(value, validatedKind, validatedUnit), validatedKind, validatedUnit);
 		dimensions.push(result);
 		return result;
 	}
@@ -633,7 +943,11 @@ class Document {
 		features.resize(0);
 		byId = new Map<Int, Feature>();
 		dimensions.resize(0);
-		for(element in elements) element.clearPlacedShape();
+		definitions.resize(0);
+		for (element in elements)
+			element.clearPlacedShape();
+		for (shape in definitionCache)
+			shape.close();
 		elements.resize(0);
 		elementsById = new Map<String, Element>();
 		issuedElementIds = new Map<String, Bool>();
