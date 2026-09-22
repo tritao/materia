@@ -69,6 +69,18 @@ as faults, and exposes explicit stop/reset-safety commands. `RobotEndpoint`
 only has `apply()` and `sample()` plus the rollback hook needed by a shared
 transactional simulation tick. Backends do not receive runtime ownership.
 
+Position targets are retained as runtime intent and emitted on every owner
+tick. When a command supplies `max_rate`, the runtime advances a deterministic
+position reference by at most `max_rate × period` per tick before passing it to
+the endpoint. A new position command therefore changes the common controller
+reference path, not backend-specific interpolation. The loopback endpoint tracks
+those setpoints exactly; physical endpoints and simulation consume the same
+per-tick commands. A zero `max_rate` leaves interpolation to the endpoint.
+Every sample is checked for valid shape and finite values, and observed joint
+positions are checked against the compiled envelope. Stale/malformed samples,
+limit violations, and endpoint failures latch a runtime fault and trigger a
+best-effort emergency-stop command through the same endpoint boundary.
+
 The first concrete physical backend is `SerialRobotEndpoint`: a fixed framed
 POSIX command/state stream with non-blocking reads. It is intentionally a
 specific endpoint, not a universal driver hierarchy. Disconnects and incomplete

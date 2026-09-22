@@ -10,6 +10,7 @@ import robotkit.runtime.RobotCompileException;
 import robotkit.runtime.Simulation;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
+import robotkit.model.Actuator;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.world.RobotCapabilities;
@@ -44,6 +45,7 @@ class RobotWorldTests {
     testRecordingEventLog();
     testForwardingAndLifecycle();
     testMixedSimulatedAndRemoteWorld();
+    testRuntimeUsesCompiledJointRate();
     testWorldHostComposition();
     testCompilerDiagnosticsAndTopology();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
@@ -352,6 +354,31 @@ class RobotWorldTests {
     world.close();
     simulation.step(Int64.ofInt(2000));
     equal(simulation.stepIndex(), Int64.ofInt(2), "RobotWorld does not own shared simulation");
+    simulation.dispose();
+  }
+
+  static function testRuntimeUsesCompiledJointRate():Void {
+    var model = new RobotModel("rate-limited-arm");
+    var base = model.addLink(new Link("base"));
+    var tool = model.addLink(new Link("tool"));
+    var joint = model.addJoint(new Joint("shoulder", JointType.Revolute, base, tool));
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    joint.limits.velocity = 2.0;
+    joint.drive = new Actuator("shoulder-motor", 100.0, 1.0);
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    equal(blueprint.joints[0].maxRate, 1.0,
+      "runtime compiler combines joint and actuator rate limits");
+
+    var simulation = new Simulation(0.1);
+    var runtime = simulation.addRobot(blueprint);
+    runtime.submitPosition(0, 0.8, 1);
+    simulation.step(Int64.ofInt(100));
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.1) < 0.000000001,
+      "runtime applies the compiled rate limit on the first shared tick");
+    simulation.step(Int64.ofInt(200));
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.2) < 0.000000001,
+      "runtime keeps advancing the same target on later shared ticks");
     simulation.dispose();
   }
 

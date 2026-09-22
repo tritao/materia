@@ -29,6 +29,7 @@ int main(void) {
     command.targets[0].joint = 0;
     command.targets[0].mode = RK_TARGET_POSITION;
     command.targets[0].target = 1.0;
+    command.targets[0].max_rate = 10.0;
     assert(rk_robot_runtime_submit(runtime, &command) == RK_OK);
 
     /* Standalone runtimes advance through their worker lifecycle. */

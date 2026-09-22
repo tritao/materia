@@ -35,11 +35,15 @@ class RobotRuntimeCompiler {
           throw 'Joint ${joint.name} has unknown type ${joint.type}';
       };
       var maxEffort = joint.limits.effort;
+      var maxRate = joint.limits.velocity;
       var drive = joint.drive;
-      if (drive != null)
+      if (drive != null) {
         maxEffort = drive.maxEffort;
+        if (drive.maxRate > 0.0 && (maxRate == 0.0 || drive.maxRate < maxRate))
+          maxRate = drive.maxRate;
+      }
       result.addJoint(new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
-        joint.limits.lower, joint.limits.upper, maxEffort));
+        joint.limits.lower, joint.limits.upper, maxEffort, maxRate));
     }
     return result;
   }

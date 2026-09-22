@@ -127,7 +127,8 @@ void failed_command_phase_does_not_advance() {
     assert(rk_simulation_add_robot(simulation, &model, &first) == RK_OK);
     assert(rk_simulation_add_robot(simulation, &model, &second) == RK_OK);
 
-    const auto first_target = target(0.8, 1);
+    auto first_target = target(0.8, 1);
+    first_target.targets[0].max_rate = 2.0;
     rk_robot_command emergency{};
     emergency.struct_size = sizeof(emergency);
     emergency.sequence = 1;
@@ -138,6 +139,7 @@ void failed_command_phase_does_not_advance() {
     assert(rk_robot_runtime_submit(second, &rejected_target) == RK_OK);
     /* Emergency stop arbitrates over the later motion request in one cycle. */
     assert(rk_simulation_step(simulation, 100) == RK_OK);
+    assert(std::abs(snapshot(first).position[0] - 0.02) < 1e-12);
 
     rk_simulation_clock clock{};
     clock.struct_size = sizeof(clock);
@@ -149,6 +151,7 @@ void failed_command_phase_does_not_advance() {
     assert(rk_simulation_step(simulation, 200) == RK_ERROR_SAFETY_STOPPED);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
     assert(clock.step_index == 1);
+    assert(std::abs(snapshot(first).position[0] - 0.02) < 1e-12);
 
     rk_robot_command clear_stop{};
     clear_stop.struct_size = sizeof(clear_stop);
@@ -156,7 +159,7 @@ void failed_command_phase_does_not_advance() {
     clear_stop.kind = RK_COMMAND_RESET_SAFETY;
     assert(rk_robot_runtime_submit(second, &clear_stop) == RK_OK);
     assert(rk_simulation_step(simulation, 200) == RK_OK);
-    assert(snapshot(first).position[0] > 0.0);
+    assert(std::abs(snapshot(first).position[0] - 0.04) < 1e-12);
     rk_simulation_destroy(simulation);
 }
 

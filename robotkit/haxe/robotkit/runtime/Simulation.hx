@@ -31,7 +31,7 @@ class Simulation {
     ensureLive();
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue());
     check(result.status, "simulation.addRobot");
-    var runtime = new RobotRuntime(result.out_runtime);
+    var runtime = new RobotRuntime(result.out_runtime, blueprint);
     robots.push(runtime);
     return runtime;
   }

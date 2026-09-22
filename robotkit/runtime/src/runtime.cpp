@@ -81,6 +81,10 @@ rk_result InMemoryRobot::apply(const rk_robot_command &command) {
 }
 
 rk_result InMemoryRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
+    const auto elapsed_seconds = has_sample_timestamp_ &&
+        timestamp_ns > last_sample_timestamp_ns_
+        ? static_cast<double>(timestamp_ns - last_sample_timestamp_ns_) / 1'000'000'000.0
+        : 0.0;
     state.struct_size = sizeof(state);
     state.source_timestamp_ns = timestamp_ns;
     state.received_timestamp_ns = timestamp_ns;
@@ -88,10 +92,14 @@ rk_result InMemoryRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
     for (uint32_t index = 0; index < joint_count_; ++index) {
         const double old_position = state.position[index];
         if (!stopped_ && has_target_[index])
-            state.position[index] += (targets_[index] - state.position[index]) * 0.25;
-        state.velocity[index] = state.position[index] - old_position;
+            state.position[index] = targets_[index];
+        state.velocity[index] = elapsed_seconds > 0.0
+            ? (state.position[index] - old_position) / elapsed_seconds
+            : 0.0;
         state.effort[index] = 0.0;
     }
+    last_sample_timestamp_ns_ = timestamp_ns;
+    has_sample_timestamp_ = true;
     return RK_OK;
 }
 
@@ -206,28 +214,44 @@ rk_result RobotRuntime::step_owner(uint64_t timestamp_ns) {
     return publish_sample(timestamp_ns);
 }
 
+void RobotRuntime::latch_fault() {
+    rk_robot_command emergency_stop{};
+    emergency_stop.struct_size = sizeof(emergency_stop);
+    emergency_stop.sequence = ++endpoint_command_sequence_;
+    emergency_stop.kind = RK_COMMAND_EMERGENCY_STOP;
+    endpoint_->apply(emergency_stop);
+    control_ = {};
+    std::lock_guard state_lock(state_mutex_);
+    state_.mode = RK_ROBOT_MODE_FAULT;
+    state_.safety = RK_SAFETY_FAULT;
+    state_backup_valid_ = false;
+}
+
 rk_result RobotRuntime::apply_pending_commands() {
     std::deque<rk_robot_command> commands;
     {
         std::lock_guard queue_lock(queue_mutex_);
         commands.swap(commands_);
     }
-    if (commands.empty())
-        return RK_OK;
-
-    auto command = arbitrate(commands);
     {
         std::lock_guard state_lock(state_mutex_);
         state_backup_ = state_;
         state_backup_valid_ = true;
     }
+    control_backup_ = control_;
+
+    const bool has_command = !commands.empty();
+    rk_robot_command command{};
+    if (has_command)
+        command = arbitrate(commands);
 
     rk_safety_state safety = RK_SAFETY_READY;
     {
         std::lock_guard state_lock(state_mutex_);
         safety = state_.safety;
     }
-    if ((safety == RK_SAFETY_EMERGENCY_STOP || safety == RK_SAFETY_FAULT) &&
+    if (has_command &&
+        (safety == RK_SAFETY_EMERGENCY_STOP || safety == RK_SAFETY_FAULT) &&
         command.kind != RK_COMMAND_RESET_SAFETY &&
         command.kind != RK_COMMAND_EMERGENCY_STOP) {
         std::lock_guard state_lock(state_mutex_);
@@ -235,64 +259,111 @@ rk_result RobotRuntime::apply_pending_commands() {
         return RK_ERROR_SAFETY_STOPPED;
     }
 
-    if (command.kind == RK_COMMAND_JOINT_TARGETS) {
+    if (has_command && command.kind == RK_COMMAND_JOINT_TARGETS) {
         rk_robot_state current{};
         {
             std::lock_guard state_lock(state_mutex_);
             current = state_;
         }
-        const auto period_seconds = std::chrono::duration<double>(period_).count();
         for (uint32_t index = 0; index < command.target_count; ++index) {
-            auto &target = command.targets[index];
+            const auto &target = command.targets[index];
             const auto &joint = blueprint_.joints[target.joint];
             if (target.mode == RK_TARGET_POSITION &&
                 (target.target < joint.lower_limit || target.target > joint.upper_limit)) {
-                std::lock_guard state_lock(state_mutex_);
-                state_.mode = RK_ROBOT_MODE_FAULT;
-                state_.safety = RK_SAFETY_FAULT;
-                state_backup_valid_ = false;
+                latch_fault();
                 return RK_ERROR_LIMIT;
             }
             if (target.mode == RK_TARGET_EFFORT && joint.max_effort > 0.0 &&
                 std::abs(target.target) > joint.max_effort) {
-                std::lock_guard state_lock(state_mutex_);
-                state_.mode = RK_ROBOT_MODE_FAULT;
-                state_.safety = RK_SAFETY_FAULT;
-                state_backup_valid_ = false;
+                latch_fault();
                 return RK_ERROR_LIMIT;
             }
-            if (target.mode == RK_TARGET_POSITION && target.max_rate > 0.0 &&
-                std::isfinite(period_seconds)) {
-                const auto maximum_delta = target.max_rate * period_seconds;
-                const auto minimum = current.position[target.joint] - maximum_delta;
-                const auto maximum = current.position[target.joint] + maximum_delta;
-                target.target = std::clamp(target.target, minimum, maximum);
+        }
+        for (uint32_t index = 0; index < command.target_count; ++index) {
+            const auto &target = command.targets[index];
+            const auto joint = target.joint;
+            if (target.mode == RK_TARGET_POSITION &&
+                (!control_.active[joint] || control_.targets[joint].mode != RK_TARGET_POSITION)) {
+                control_.position_reference[joint] = current.position[joint];
+                control_.reference_initialized[joint] = true;
             }
+            control_.targets[joint] = target;
             if (target.mode == RK_TARGET_EFFORT && target.max_effort > 0.0 &&
-                std::abs(target.target) > target.max_effort)
-                target.target = std::copysign(target.max_effort, target.target);
+                std::abs(control_.targets[joint].target) > target.max_effort)
+                control_.targets[joint].target = std::copysign(
+                    target.max_effort, control_.targets[joint].target);
+            control_.active[joint] = true;
         }
     }
 
-    const auto result = endpoint_->apply(command);
+    const bool lifecycle_command = has_command && command.kind != RK_COMMAND_NONE &&
+        command.kind != RK_COMMAND_JOINT_TARGETS;
+    if (lifecycle_command) {
+        control_ = {};
+    }
+
+    rk_robot_command output{};
+    output.struct_size = sizeof(output);
+    output.timestamp_ns = has_command ? command.timestamp_ns : 0;
+    if (lifecycle_command) {
+        output.kind = command.kind;
+        output.target_count = 0;
+    } else {
+        output.kind = RK_COMMAND_JOINT_TARGETS;
+        const auto period_seconds = std::chrono::duration<double>(period_).count();
+        uint32_t active_count = 0;
+        rk_robot_state current{};
+        {
+            std::lock_guard state_lock(state_mutex_);
+            current = state_;
+        }
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+            if (!control_.active[joint])
+                continue;
+            auto target = control_.targets[joint];
+            if (target.mode == RK_TARGET_POSITION) {
+                if (!control_.reference_initialized[joint]) {
+                    control_.position_reference[joint] = current.position[joint];
+                    control_.reference_initialized[joint] = true;
+                }
+                const double delta = target.target - control_.position_reference[joint];
+                if (target.max_rate > 0.0 && std::isfinite(period_seconds)) {
+                    const double maximum_delta = target.max_rate * period_seconds;
+                    control_.position_reference[joint] += std::clamp(
+                        delta, -maximum_delta, maximum_delta);
+                } else {
+                    control_.position_reference[joint] = target.target;
+                }
+                target.target = control_.position_reference[joint];
+            }
+            output.targets[active_count++] = target;
+        }
+        output.target_count = active_count;
+        if (active_count == 0 && has_command && command.kind == RK_COMMAND_NONE)
+            output.kind = RK_COMMAND_NONE;
+        else if (active_count == 0) {
+            state_backup_valid_ = false;
+            return RK_OK;
+        }
+    }
+
+    output.sequence = ++endpoint_command_sequence_;
+    const auto result = endpoint_->apply(output);
     if (result != RK_OK) {
-        std::lock_guard state_lock(state_mutex_);
-        state_.mode = RK_ROBOT_MODE_FAULT;
-        state_.safety = RK_SAFETY_FAULT;
-        state_backup_valid_ = false;
+        latch_fault();
         return result;
     }
     std::lock_guard state_lock(state_mutex_);
-    if (command.kind == RK_COMMAND_EMERGENCY_STOP) {
+    if (lifecycle_command && command.kind == RK_COMMAND_EMERGENCY_STOP) {
         state_.mode = RK_ROBOT_MODE_FAULT;
         state_.safety = RK_SAFETY_EMERGENCY_STOP;
-    } else if (command.kind == RK_COMMAND_STOP) {
+    } else if (lifecycle_command && command.kind == RK_COMMAND_STOP) {
         state_.mode = RK_ROBOT_MODE_STOPPING;
         state_.safety = RK_SAFETY_STOPPING;
-    } else if (command.kind == RK_COMMAND_RESET_SAFETY) {
+    } else if (lifecycle_command && command.kind == RK_COMMAND_RESET_SAFETY) {
         state_.mode = RK_ROBOT_MODE_IDLE;
         state_.safety = RK_SAFETY_READY;
-    } else if (command.kind == RK_COMMAND_JOINT_TARGETS) {
+    } else if (has_command && command.kind == RK_COMMAND_JOINT_TARGETS) {
         state_.mode = RK_ROBOT_MODE_TRACKING;
         state_.safety = RK_SAFETY_READY;
     }
@@ -306,13 +377,27 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
         std::lock_guard state_lock(state_mutex_);
         next = state_;
     }
+    const auto runtime_mode = next.mode;
+    const auto runtime_safety = next.safety;
+    next.source_timestamp_ns = 0;
+    next.received_timestamp_ns = 0;
     const auto result = endpoint_->sample(timestamp_ns, next);
-    if (result != RK_OK) {
-        std::lock_guard state_lock(state_mutex_);
-        state_.mode = RK_ROBOT_MODE_FAULT;
-        state_.safety = RK_SAFETY_FAULT;
-        state_backup_valid_ = false;
-        return result;
+    next.mode = runtime_mode;
+    next.safety = runtime_safety;
+    const auto sample_validation = result == RK_OK
+        ? rk_robot_state_validate(&next) : RK_OK;
+    if (result != RK_OK || sample_validation != RK_OK ||
+        next.joint_count != blueprint_.joint_count) {
+        latch_fault();
+        return result != RK_OK ? result : RK_ERROR_BACKEND;
+    }
+    for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+        const auto &limits = blueprint_.joints[joint];
+        if (next.position[joint] < limits.lower_limit ||
+            next.position[joint] > limits.upper_limit) {
+            latch_fault();
+            return RK_ERROR_LIMIT;
+        }
     }
     {
         std::lock_guard state_lock(state_mutex_);
@@ -337,6 +422,7 @@ void RobotRuntime::discard_pending_commands() noexcept {
     std::lock_guard state_lock(state_mutex_);
     if (state_backup_valid_) {
         state_ = state_backup_;
+        control_ = control_backup_;
         state_backup_valid_ = false;
     }
 }
@@ -353,6 +439,8 @@ void RobotRuntime::reset_state() noexcept {
     state_.joint_count = blueprint_.joint_count;
     state_.mode = RK_ROBOT_MODE_IDLE;
     state_.safety = RK_SAFETY_READY;
+    control_ = {};
+    control_backup_ = {};
     state_backup_valid_ = false;
 }
 

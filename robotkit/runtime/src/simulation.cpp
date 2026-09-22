@@ -136,7 +136,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         robot_base_bodies_.push_back(binding->bodies_.front());
 
         auto runtime = std::make_shared<RobotRuntime>(
-            blueprint, std::static_pointer_cast<RobotEndpoint>(binding));
+            blueprint, std::static_pointer_cast<RobotEndpoint>(binding), period_);
         runtime->set_externally_driven(true);
         const auto handle = internal::register_runtime(runtime);
         runtimes_.push_back(std::move(runtime));

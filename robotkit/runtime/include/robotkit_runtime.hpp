@@ -33,13 +33,14 @@ public:
     virtual ~RobotEndpoint() = default;
 
     /**
-     * Applies one validated command batch to the backend.
+     * Applies one validated command or per-cycle controller output batch.
      *
      * The endpoint should not advance shared time here. A simulation can call
      * discard_pending() if a different robot rejects its command, so staged
      * changes must remain rollback-safe until the world tick is committed.
      *
-     * @param command Complete command batch removed from the runtime mailbox.
+     * @param command Runtime-arbitrated intent or the generated actuator
+     * setpoints for the current owner tick.
      * @return RK_OK when accepted, or a backend/safety/argument error.
      */
     virtual rk_result apply(const rk_robot_command &command) = 0;
@@ -53,7 +54,8 @@ public:
      *
      * @param timestamp_ns Observation timestamp chosen by the owner.
      * @param state Destination state, including arrays sized by the runtime
-     * layout.
+     * layout. The runtime preserves its own mode and safety fields around this
+     * call; endpoints should populate source time and observed physical state.
      * @return RK_OK when a complete state was copied, or a backend error.
      */
     virtual rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) = 0;
@@ -73,9 +75,9 @@ public:
  * Small loopback robot adapter used by runtime tests and initial host bring-up.
  *
  * It is intentionally not a simulator and does not model bodies, contacts,
- * or a physics clock. It only moves joints toward the most recent position
- * targets, making it useful for checking mailbox and snapshot plumbing before
- * a real physical or simulated endpoint is available.
+ * or a physics clock. It tracks the most recent position setpoints exactly,
+ * making it useful for deterministic controller tests before a physical or
+ * simulated endpoint is available.
  */
 class RK_API InMemoryRobot final : public RobotEndpoint {
 public:
@@ -89,6 +91,8 @@ private:
     double targets_[RK_MAX_JOINTS]{};
     bool has_target_[RK_MAX_JOINTS]{};
     bool stopped_ = false;
+    uint64_t last_sample_timestamp_ns_ = 0;
+    bool has_sample_timestamp_ = false;
 };
 
 /**
@@ -129,8 +133,16 @@ public:
     void set_externally_driven(bool value) noexcept;
 
 private:
+    struct ControlState {
+        rk_joint_target targets[RK_MAX_JOINTS]{};
+        double position_reference[RK_MAX_JOINTS]{};
+        bool active[RK_MAX_JOINTS]{};
+        bool reference_initialized[RK_MAX_JOINTS]{};
+    };
+
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
+    void latch_fault();
 
     rk_robot_runtime_blueprint blueprint_{};
     std::shared_ptr<RobotEndpoint> endpoint_;
@@ -146,6 +158,9 @@ private:
     bool externally_driven_ = false;
     uint64_t last_command_sequence_ = 0;
     rk_robot_state state_backup_{};
+    ControlState control_{};
+    ControlState control_backup_{};
+    uint64_t endpoint_command_sequence_ = 0;
     bool state_backup_valid_ = false;
 };
 
