@@ -9,6 +9,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.parametric.features.ExtrudeFeature;
+import cadkit.sketch.SolverSettings;
 
 class ConstrainedSketchSmoke {
 	static function check(value:Bool, message:String):Void { if (!value) throw message; }
@@ -50,6 +51,18 @@ class ConstrainedSketchSmoke {
 			failed = error.diagnostic.status == "conflicting" && error.diagnostic.constraintIds.length > 0;
 		}
 		check(failed, "conflicting constraints are distinct");
+
+		var limited = new ConstrainedSketch(null, "mm", new SolverSettings(1e-12, 1e-7, 1, 1e-3));
+		limited.addPoint(new SketchPoint("a", 0, 0)).addPoint(new SketchPoint("b", 100, 50));
+		limited.addConstraint(SketchConstraint.fixed("fixed", "a")).addConstraint(SketchConstraint.distance("target", "a", "b", 2));
+		failed = false;
+		try limited.solve() catch (error:SketchSolveError) failed = error.diagnostic.status == "nonconvergent";
+		check(failed, "iteration exhaustion is nonconvergence");
+
+		var invalid = new ConstrainedSketch(); invalid.addPoint(new SketchPoint("bad", 0 / 0, 0));
+		failed = false;
+		try invalid.solve() catch (error:SketchSolveError) failed = error.diagnostic.status == "invalid" && error.diagnostic.constraintIds[0] == "bad";
+		check(failed, "non-finite authored input is invalid");
 
 		var mixed=new ConstrainedSketch();
 		for(p in [new SketchPoint("m0",0,0),new SketchPoint("m1",2,0),new SketchPoint("m2",0,1),new SketchPoint("m3",2,1),

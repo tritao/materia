@@ -60,8 +60,14 @@ class SketchSolver {
 		var dof = variableCount - rankValue;
 		var badIds = failingOwners(current, sketch.settings.tolerance * 10);
 		if (currentNorm > sketch.settings.tolerance) {
-			var diagnostic = new SolveDiagnostic("conflicting", false, currentNorm, dof, iterations, badIds,
-				"constraint solve did not converge; the reported constraints retain significant residuals");
+			var gradientNorm = norm(gradient(j, current.values));
+			var stationaryLimit = Math.max(sketch.settings.rankTolerance, sketch.settings.tolerance * 10) * (1 + currentNorm);
+			var locallyConflicting = gradientNorm <= stationaryLimit;
+			var status = locallyConflicting ? "conflicting" : "nonconvergent";
+			var message = locallyConflicting
+				? "solve stopped at a locally stationary residual; the listed constraints are locally incompatible, which is not proof of global inconsistency"
+				: "constraint solve exhausted its iteration limit while a local descent direction remained";
+			var diagnostic = new SolveDiagnostic(status, false, currentNorm, dof, iterations, badIds, message);
 			throw new SketchSolveError(diagnostic);
 		}
 		var redundant = redundantIds(x, j, rankValue);
@@ -77,16 +83,34 @@ class SketchSolver {
 	}
 
 	private function validate():Void {
+		if (sketch.units == null || StringTools.trim(sketch.units) == "")
+			throw invalid("sketch units must be nonempty", []);
+		if (!Math.isFinite(sketch.settings.tolerance) || sketch.settings.tolerance <= 0
+			|| !Math.isFinite(sketch.settings.rankTolerance) || sketch.settings.rankTolerance <= 0
+			|| sketch.settings.maxIterations <= 0
+			|| !Math.isFinite(sketch.settings.initialDamping) || sketch.settings.initialDamping <= 0)
+			throw invalid("solver tolerances, iteration limit, and damping must be finite and positive", []);
+		for (point in sketch.points())
+			if (!Math.isFinite(point.x) || !Math.isFinite(point.y))
+				throw invalid("point coordinates must be finite", [point.id]);
 		for (entity in sketch.entities()) {
 			if (!points.exists(entity.first) || (entity.kind == "line" && (entity.second == null || !points.exists(entity.second))))
 				throw invalid("entity references a missing point", [entity.id]);
 			if (entity.kind != "line" && entity.kind != "circle" && entity.kind != "arc") throw invalid("unsupported entity kind", [entity.id]);
 			if ((entity.kind == "circle" || entity.kind == "arc") && (!Math.isFinite(entity.radius) || entity.radius <= 0))
 				throw invalid("circle and arc radii must be positive", [entity.id]);
+			if (entity.kind == "arc" && (!Math.isFinite(entity.startAngle) || !Math.isFinite(entity.endAngle)
+				|| Math.abs(entity.endAngle - entity.startAngle) < 1e-12))
+				throw invalid("arc angles must be finite and span a nonzero angle", [entity.id]);
 			if (entity.kind == "line") {
 				var a:SketchPoint = cast points.get(entity.first); var b:SketchPoint = cast points.get(entity.second);
 				if (a.x == b.x && a.y == b.y) throw invalid("collapsed authored line", [entity.id]);
 			}
+		}
+		for (constraint in sketch.constraints()) {
+			if (!Math.isFinite(constraint.value)) throw invalid("constraint values must be finite", [constraint.id]);
+			if ((constraint.kind == "distance" || constraint.kind == "radius") && constraint.value <= 0)
+				throw invalid("distance and radius constraints must be positive", [constraint.id]);
 		}
 		// Evaluating once validates every constraint reference and supported combination.
 		var initial:Array<Float> = [];
@@ -148,6 +172,7 @@ class SketchSolver {
 		var mid=[(a[0]+b[0])/2,(a[1]+b[1])/2]; out.push(cross([mid[0]-ends[0][0],mid[1]-ends[0][1]],d)/Math.pow(dd,0.5)); out.push(dot([b[0]-a[0],b[1]-a[1]],d)/Math.pow(dd,0.5));
 	}
 	private function jacobian(x:Array<Float>, base:Array<Float>):Array<Array<Float>> { var j=matrix(base.length,variableCount,0); for(col in 0...variableCount){var h=1e-6*Math.max(1,Math.abs(x[col]));var t=x.copy();t[col]+=h;var r=residuals(t).values;for(row in 0...base.length)j[row][col]=(r[row]-base[row])/h;}return j; }
+	private function gradient(j:Array<Array<Float>>, residual:Array<Float>):Array<Float> { var result=fill(variableCount,0);for(row in 0...j.length)for(column in 0...variableCount)result[column]+=j[row][column]*residual[row];return result; }
 	private function redundantIds(x:Array<Float>, full:Array<Array<Float>>, fullRank:Int):Array<String> { var result:Array<String> = []; var set=residuals(x); for(c in sketch.constraints()){var reduced:Array<Array<Float>> = [];for(i in 0...full.length)if(set.owners[i]!=c.id)reduced.push(full[i]);if(rank(reduced,sketch.settings.rankTolerance)==fullRank)result.push(c.id);}return result; }
 	private function failingOwners(set:ResidualSet,t:Float):Array<String>{var out:Array<String> = [];for(i in 0...set.values.length)if(Math.abs(set.values[i])>t&&!contains(out,set.owners[i]))out.push(set.owners[i]);return out;}
 	private static function contains(a:Array<String>,v:String):Bool{for(x in a)if(x==v)return true;return false;}
