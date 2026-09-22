@@ -1,7 +1,7 @@
 {
   "version": 1,
   "package": { "name": "scene-editing-tests" },
-  "entry": "tests.SceneEditingTests",
+  "entry": "tests.AppTests",
   "sourceRoots": ["src"],
   "scopeSourceRoots": false,
   "dependencies": { "app": { "path": ".." } },

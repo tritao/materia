@@ -154,7 +154,7 @@ and malformed files leave the current scene and history intact. Files are
 written atomically, and history retains the saved state as an undo boundary.
 Older files without physics fields remain compatible through validated defaults.
 
-Run the scene editing and document regression checks from the repository root:
+Run the scene editing, document, and CAD plate regression checks from the repository root:
 
 ```sh
 ./haxeon/scripts/haxeon run --project app/tests/haxeon.json

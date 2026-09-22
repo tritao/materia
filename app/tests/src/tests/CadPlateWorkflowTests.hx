@@ -3,6 +3,7 @@ package tests;
 import app.CadPlateModel;
 import app.CadPlateModel.CadPlateParameters;
 import app.EditorScene;
+import app.PerspectiveCamera;
 import app.SceneDocumentSession;
 import nativekit.ui.core.PropertyBinding;
 import nativekit.ui.core.PropertyEditResult;
@@ -108,9 +109,60 @@ class CadPlateWorkflowTests {
     if (FileSystem.exists(stepFile)) FileSystem.deleteFile(stepFile);
   }
 
+  static function faceHoleWorkflow():Void {
+    var session = new SceneDocumentSession();
+    var root = Sys.getCwd() + "/../build-cad";
+    if (!FileSystem.exists(root)) FileSystem.createDirectory(root);
+    var sceneFile = root + "/face-hole-workflow.scene";
+    try {
+      var scene = session.scene;
+      check(scene.createMountingPlate(), "create plate for face operation");
+      var id = scene.selectedId;
+      var camera = new PerspectiveCamera();
+      camera.frame(0.02, 0.0, 0.0, 0.08, 0.05, 0.006, 4.0 / 3.0);
+      var point:app.PerspectiveCamera.PerspectiveScreenPoint = camera.project(0.02, 0.0, 0.0, 800, 600);
+      check(point != null, "project target point into perspective viewport");
+      var ray = camera.screenRay(point.x, point.y, 800, 600);
+      check(scene.selectAtRay(ray.originX, ray.originY, ray.originZ,
+        ray.directionX, ray.directionY, ray.directionZ) == id,
+        "perspective ray selects CAD plate material");
+      check(scene.canAddHoleOnSelectedFace(), "ray hit retains a selectable CAD face");
+      var hitX = scene.selectedCadFaceX, hitY = scene.selectedCadFaceY;
+      check(scene.pick(hitX, hitY) == id, "picked face location initially contains material");
+      var originalGraph = object(scene, id).cadGraph;
+      var undoCount = scene.document.history.undoCount;
+      check(scene.addHoleOnSelectedFace(), "add through hole at selected face point");
+      check(scene.document.history.undoCount == undoCount + 1,
+        "face operation creates exactly one undo step");
+      check(object(scene, id).cadGraph != originalGraph, "face operation updates feature graph");
+      check(scene.canAddHoleOnSelectedFace(), "top face selection remaps after recompute");
+      check(scene.pick(hitX, hitY) == "scene", "new hole is pick-through at the picked point");
+      check(scene.pick(hitX + 0.01, hitY) == id, "material beside new hole stays pickable");
+      check(scene.document.undo(), "undo face operation");
+      check(object(scene, id).cadGraph == originalGraph && scene.pick(hitX, hitY) == id,
+        "undo restores original graph and geometry");
+      check(scene.document.redo(), "redo face operation");
+      check(scene.pick(hitX, hitY) == "scene", "redo restores new hole geometry");
+      session.save(sceneFile);
+      check(!session.isDirty(), "face operation savepoint is clean");
+      session.open(sceneFile);
+      scene = session.scene;
+      check(scene.pick(hitX, hitY) == "scene" && scene.pick(hitX + 0.01, hitY) == id,
+        "reopen retains face-created hole and material picking");
+      check(!session.isDirty(), "reopen preserves clean savepoint");
+    } catch (error:Dynamic) {
+      session.dispose();
+      if (FileSystem.exists(sceneFile)) FileSystem.deleteFile(sceneFile);
+      throw error;
+    }
+    session.dispose();
+    if (FileSystem.exists(sceneFile)) FileSystem.deleteFile(sceneFile);
+  }
+
   static function main():Int {
     try {
       run();
+      faceHoleWorkflow();
       Sys.println("CAD plate workflow tests passed");
       return 0;
     } catch (error:Dynamic) {
