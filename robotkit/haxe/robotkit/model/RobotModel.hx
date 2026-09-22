@@ -6,6 +6,12 @@ class RobotModel {
   public final links:Array<Link> = [];
   public final joints:Array<Joint> = [];
   public final sensors:Array<Sensor> = [];
+  public final frames:Array<Frame> = [];
+
+  public function addFrame(frame:Frame):Frame {
+    frames.push(frame);
+    return frame;
+  }
 
   public function new(name:String) {
     this.name = name;

@@ -9,6 +9,8 @@ import RobotKitRuntime;
  * model makes validation and native handle creation deterministic.
  */
 class RobotRuntimeBlueprint {
+  /** Semantic mappings are absent only for manually constructed native blueprints. */
+  public final identity:Null<RobotRuntimeIdentity>;
   public final revision:Int;
   public final jointCount:Int;
   public final linkCount:Int;
@@ -16,10 +18,11 @@ class RobotRuntimeBlueprint {
   public final joints:Array<RobotRuntimeJointBlueprint> = [];
 
   public function new(revision:Int, jointCount:Int, linkCount:Int,
-      ?frameCount:Int = 0) {
+      ?frameCount:Int = 0, ?identity:RobotRuntimeIdentity) {
     if (revision < 0 || jointCount < 0 || jointCount > RobotKitRuntimeConstants.RK_MAX_JOINTS ||
-        linkCount < 1)
+        linkCount < 1 || frameCount < 0)
       throw "Invalid RobotKit runtime blueprint";
+    this.identity = identity;
     this.revision = revision;
     this.jointCount = jointCount;
     this.linkCount = linkCount;

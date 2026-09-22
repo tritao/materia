@@ -34,7 +34,7 @@ class RobotSnapshot {
     this.sourceSequence = sourceSequence;
     this.sourceTimestampNs = sourceTimestampNs;
     this.receivedTimestampNs = receivedTimestampNs == null
-      ? sourceTimestampNs
+      ? Int64.ofInt(0)
       : receivedTimestampNs;
     this.positions = new ImmutableFloatArray(positions);
     this.velocities = new ImmutableFloatArray(velocities);

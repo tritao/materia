@@ -66,6 +66,7 @@ private:
     uint32_t physics_substeps_ = 1;
     uint64_t step_index_ = 0;
     double simulation_time_ = 0.0;
+    double gravity_[3] = {0.0, 0.0, -9.81};
     bool topology_frozen_ = false;
     std::vector<nkscene_occurrence_id> occurrences_;
     std::vector<nksim_body> bodies_;
@@ -79,6 +80,7 @@ private:
         nksim_shape shape = 0;
         nksim_body body = 0;
         bool active = false;
+        double half_extents[3]{};
     };
     std::vector<EnvironmentObject> objects_;
     std::chrono::nanoseconds period_;

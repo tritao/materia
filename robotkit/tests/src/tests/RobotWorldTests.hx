@@ -48,7 +48,127 @@ class RobotWorldTests {
     testRuntimeUsesCompiledJointRate();
     testWorldHostComposition();
     testCompilerDiagnosticsAndTopology();
+    testStableModelIdentity();
+    testSensorAndClockContracts();
+    testSensorResetPublication();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
+  }
+
+  static function testSensorResetPublication():Void {
+    var model = new RobotModel("sensor-reset");
+    model.addLink(new Link("base"));
+    var simulation = new Simulation();
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    var robot = new SimulatedRobot("sensor-reset", runtime, "sensor-reset", ["base"], []);
+    simulation.spawnBox([2.0, 0.0, 0.0], [0.25, 0.25, 0.25]);
+    simulation.step(Int64.ofInt(100));
+    var before = robot.snapshot();
+    equal(before.sensors.get(1).values.get(0), 1.75, "adapter exposes scene ray distance");
+    simulation.reset();
+    simulation.teleportRobot(0, [1.0, 0.0, 0.0]);
+    simulation.step(Int64.ofInt(100));
+    var after = robot.snapshot();
+    equal(after.sourceSequence, before.sourceSequence, "reset repeats source sequence");
+    equal(after.sensors.get(1).values.get(0), 0.75,
+      "adapter refreshes sensors even when reset repeats sequence");
+    equal(before.sensors.get(1).values.get(0), 1.75, "old sensor snapshot survives reset");
+    simulation.step(Int64.ofInt(200));
+    equal(robot.snapshot().sensors.length, 3, "second sample publishes measured IMU");
+    var rejected = false;
+    try robot.submit(RobotCommand.JointPosition(0, 0.0, Int64.ofInt(100)))
+    catch (_:Dynamic) rejected = true;
+    check(rejected, "simulation never silently ignores an unsupported deadline");
+    robot.close();
+    simulation.dispose();
+  }
+
+  static function testSensorAndClockContracts():Void {
+    var input = [0.0, 0.0, 0.0, 0.0, 0.0, 9.81];
+    var snapshot = new robotkit.runtime.RobotSnapshot(Int64.ofInt(1), Int64.ofInt(2),
+      Int64.ofInt(3), 0, 0, 1, 0, [], [], [], Int64.ofInt(4), input, [for (_ in 0...8) 2.0]);
+    input[5] = -1.0;
+    equal(snapshot.imu.get(5), 9.81, "runtime sensor payload owns a copy");
+    var copy = snapshot.withRobotId(Int64.ofInt(5));
+    var frames = robotkit.world.RobotSensorFrames.fromRuntimeSnapshot(copy);
+    equal(frames.length, 3, "runtime projection preserves valid measurements");
+    var mutable = frames[1].values.toArray();
+    mutable[5] = 0.0;
+    equal(frames[1].values.get(5), 9.81, "sensor frames expose defensive copies");
+    equal(frames[1].receivedTimestampNs, Int64.ofInt(4), "projection preserves receive time");
+    var absent = new robotkit.runtime.RobotSnapshot(Int64.ofInt(1), Int64.ofInt(0),
+      Int64.ofInt(999), 0, 0, 1, 0, [], [], []);
+    equal(absent.receivedTimestampNs, Int64.ofInt(0), "unknown receipt is not source time");
+    equal(robotkit.world.RobotSensorFrames.fromRuntimeSnapshot(absent).length, 1,
+      "endpoints without sensors do not fabricate IMU or LiDAR");
+    var intents = new robotkit.behavior.IntentBuffer();
+    intents.publish(new robotkit.behavior.JointTargetIntent(0, 1, 0.5, Int64.ofInt(100)));
+    check(intents.current(Int64.ofInt(99)) != null, "intent valid before local deadline");
+    equal(intents.current(Int64.ofInt(100)), null, "intent expires exactly at local deadline");
+  }
+
+  static function testStableModelIdentity():Void {
+    var model = new RobotModel("identity-arm");
+    var base = model.addLink(new Link("base", "link/base"));
+    var elbow = model.addLink(new Link("elbow", "link/elbow"));
+    var tool = model.addLink(new Link("tool", "link/tool"));
+    var shoulder = model.addJoint(new Joint("shoulder", JointType.Revolute,
+      base, elbow, "joint/shoulder"));
+    var wrist = model.addJoint(new Joint("wrist", JointType.Revolute,
+      elbow, tool, "joint/wrist"));
+    var imu = model.addSensor(new robotkit.model.Sensor("imu", "imu", 100, "sensor/imu"));
+    model.addSensor(new robotkit.model.Sensor("lidar", "lidar", 10, "sensor/lidar"));
+    var frame = model.addFrame(new robotkit.model.Frame("base frame", base, "frame/base"));
+    model.addFrame(new robotkit.model.Frame("tool frame", tool, "frame/tool"));
+    var original = RobotRuntimeCompiler.compile(model, 1);
+    var originalIds = original.identity;
+    check(originalIds != null, "compiler supplies semantic identity mappings");
+    if (originalIds == null) throw "missing compiled identity";
+
+    base.name = "renamed base";
+    shoulder.name = "renamed shoulder";
+    imu.name = "renamed imu";
+    model.links.reverse();
+    model.joints.reverse();
+    model.sensors.reverse();
+    frame.name = "renamed frame";
+    model.frames.reverse();
+    var edited = RobotRuntimeCompiler.compile(model, 2);
+    var editedIds = edited.identity;
+    if (editedIds == null) throw "missing edited identity";
+    equal(originalIds.linkIndex(base.id), 0, "old blueprint retains link mapping");
+    equal(editedIds.linkIndex(base.id), 2, "new blueprint maps stable ID after reorder");
+    equal(editedIds.jointIndex(shoulder.id), 1, "joint ID survives rename and reorder");
+    equal(editedIds.sensorIndex(imu.id), 1, "sensor ID survives rename and reorder");
+    equal(originalIds.sensorId(0), imu.id, "old sensor mapping is detached from model");
+    equal(edited.frameCount, 2, "frame count reaches blueprint");
+    equal(originalIds.frameId(0), frame.id, "old frame mapping is detached");
+    equal(editedIds.frameIndex(frame.id), 1, "frame ID survives rename and reorder");
+    equal(editedIds.frameLinkId(1), base.id, "frame attachment survives link reorder");
+    equal(editedIds.frameId(-1), null, "invalid frame index rejected");
+    equal(editedIds.linkId(edited.joints[0].parentLink), elbow.id,
+      "native parent index resolves to semantic parent after reorder");
+    equal(editedIds.jointId(edited.joints[0].joint), wrist.id,
+      "native joint index resolves to semantic joint");
+    equal(editedIds.linkIndex("missing"), -1, "unknown ID has no runtime index");
+    equal(editedIds.jointId(-1), null, "invalid index has no semantic ID");
+
+    var legacy = new Link("legacy");
+    legacy.name = "renamed legacy";
+    equal(legacy.id, "legacy", "legacy identity is assigned only at construction");
+    model.addLink(new Link("different name", base.id));
+    model.addJoint(new Joint("different joint", JointType.Fixed, base, tool, shoulder.id));
+    model.addSensor(new robotkit.model.Sensor("different sensor", "imu", 0, imu.id));
+    model.addSensor(new robotkit.model.Sensor("empty ID", "imu", 0, ""));
+    model.addFrame(new robotkit.model.Frame("duplicate", base, frame.id));
+    model.addFrame(new robotkit.model.Frame("foreign", new Link("foreign"), ""));
+    var diagnostics = RobotRuntimeCompiler.validate(model);
+    check(hasDiagnostic(diagnostics, "RK_LINK_ID_DUPLICATE"), "duplicate link IDs rejected");
+    check(hasDiagnostic(diagnostics, "RK_JOINT_ID_DUPLICATE"), "duplicate joint IDs rejected");
+    check(hasDiagnostic(diagnostics, "RK_SENSOR_ID_DUPLICATE"), "duplicate sensor IDs rejected");
+    check(hasDiagnostic(diagnostics, "RK_SENSOR_ID"), "empty semantic IDs rejected");
+    check(hasDiagnostic(diagnostics, "RK_FRAME_ID_DUPLICATE"), "duplicate frame IDs rejected");
+    check(hasDiagnostic(diagnostics, "RK_FRAME_ID"), "empty frame IDs rejected");
+    check(hasDiagnostic(diagnostics, "RK_FRAME_LINK"), "foreign frame links rejected");
   }
 
   static function testCompilerDiagnosticsAndTopology():Void {
@@ -320,10 +440,13 @@ class RobotWorldTests {
       "second simulated command routed independently");
     equal(firstValue.sourceTimestampNs, Int64.ofInt(10000000), "simulation clock reaches first robot");
     equal(secondValue.sourceTimestampNs, Int64.ofInt(10000000), "simulation clock reaches second robot");
-    equal(firstValue.receivedTimestampNs, Int64.ofInt(1000), "world receive timestamp reaches first robot");
-    equal(secondValue.receivedTimestampNs, Int64.ofInt(1000), "world receive timestamp reaches second robot");
-    equal(firstValue.sensors.length, 3,
-      "simulated robot publishes encoders, IMU, and LiDAR frames");
+    check(Int64.compare(firstValue.receivedTimestampNs, Int64.ofInt(1000)) > 0,
+      "runtime receive clock is not simulation tick argument");
+    check(Int64.compare(value.receivedTimestampNs, secondValue.receivedTimestampNs) >= 0,
+      "world stamps its own publication after runtime acceptance");
+    equal(value.sourceTimestampNs, Int64.ofInt(0), "mixed source clocks are not aggregated");
+    equal(firstValue.sensors.length, 2,
+      "first sample primes IMU derivative and publishes encoders plus LiDAR");
     equal(firstValue.sensors.get(0).sourceTimestampNs, Int64.ofInt(10000000),
       "sensor source clock matches robot source clock");
     equal(firstValue.sensors.get(1).frameId, "base_link",
@@ -343,7 +466,7 @@ class RobotWorldTests {
     check(replay.advance(), "replay advances through the same snapshot boundary");
     var replayNext = replayWorld.snapshot().robot("replay-sim-a");
     var replayNextValue:RobotSnapshot = cast replayNext;
-    check(replayNextValue != null && replayNextValue.sensors.length == 3,
+    check(replayNextValue != null && replayNextValue.sensors.length == 2,
       "replay preserves sensor frames");
     var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25));
     equal(behavior.update(first), 1, "world behavior emits a transport-neutral command");

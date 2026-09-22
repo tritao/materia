@@ -20,7 +20,7 @@ class SensorFrame {
     this.sequence = sequence;
     this.sourceTimestampNs = sourceTimestampNs;
     this.receivedTimestampNs = receivedTimestampNs == null
-      ? sourceTimestampNs : receivedTimestampNs;
+      ? Int64.ofInt(0) : receivedTimestampNs;
     this.values = new ImmutableFloatArray(values);
   }
 }

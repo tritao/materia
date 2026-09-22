@@ -1,6 +1,7 @@
 package robotkit.world;
 
 import sys.thread.Mutex;
+import nativekit.ffi.NativeKit;
 
 /**
  * Owns the logical robot composition for one Materia world.
@@ -127,21 +128,16 @@ class RobotWorld {
     pump();
     var source = new Map<RobotId, RobotSnapshot>();
     var sourceTimestampNs = haxe.Int64.ofInt(0);
-    var receivedTimestampNs = haxe.Int64.ofInt(0);
     for (robot in allRobots()) {
       var value = robot.snapshot();
       source.set(robot.id(), value);
-      if (haxe.Int64.compare(value.sourceTimestampNs, sourceTimestampNs) > 0)
-        sourceTimestampNs = value.sourceTimestampNs;
-      if (haxe.Int64.compare(value.receivedTimestampNs, receivedTimestampNs) > 0)
-        receivedTimestampNs = value.receivedTimestampNs;
     }
     // Some adapters discover a new sample while they are being observed. Apply
     // that notification before publishing the snapshot so its sequence describes
     // the state that was actually returned.
     pump();
     return new WorldSnapshot(sequence, topologyRevision, sourceTimestampNs, source,
-      receivedTimestampNs);
+      NativeKit.nk_time_now_ns());
   }
 
   /** Enqueues an adapter notification for application by the world owner. */

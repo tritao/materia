@@ -17,7 +17,12 @@ class RobotRuntimeCompiler {
     if (diagnostics.length > 0)
       throw new RobotCompileException(robot == null ? "<null>" : robot.name, diagnostics);
     var result = new RobotRuntimeBlueprint(revision, robot.joints.length,
-      robot.links.length);
+      robot.links.length, robot.frames.length, new RobotRuntimeIdentity(
+        [for (link in robot.links) link.id],
+        [for (joint in robot.joints) joint.id],
+        [for (sensor in robot.sensors) sensor.id],
+        [for (frame in robot.frames) frame.id],
+        [for (frame in robot.frames) frame.link.id]));
     for (index in 0...robot.joints.length) {
       var joint:robotkit.model.Joint = robot.joints[index];
       var parent = robot.links.indexOf(joint.parent);
@@ -69,6 +74,7 @@ class RobotRuntimeCompiler {
       diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_LIMIT", "joints",
         'robot contains ${robot.joints.length} joints, but the runtime supports at most ${RobotKitRuntimeConstants.RK_MAX_JOINTS}'));
 
+    var linkIds = new Map<String, Bool>();
     var linkNames = new Map<String, Bool>();
     for (index in 0...robot.links.length) {
       var link = robot.links[index];
@@ -78,6 +84,14 @@ class RobotRuntimeCompiler {
           "link is null"));
         continue;
       }
+      if (link.id == null || link.id.length == 0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_ID", '$path.id',
+          "link ID is empty"));
+      else if (linkIds.exists(link.id))
+        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_ID_DUPLICATE", '$path.id',
+          'duplicate link ID "${link.id}"'));
+      else
+        linkIds.set(link.id, true);
       if (link.name == null || link.name.length == 0)
         diagnostics.push(new RobotCompileDiagnostic("RK_LINK_NAME", '$path.name',
           "link name is empty"));
@@ -88,6 +102,7 @@ class RobotRuntimeCompiler {
         linkNames.set(link.name, true);
     }
 
+    var jointIds = new Map<String, Bool>();
     var jointNames = new Map<String, Bool>();
     var adjacency:Array<Array<Int>> = [];
     var indegree:Array<Int> = [];
@@ -104,6 +119,14 @@ class RobotRuntimeCompiler {
           "joint is null"));
         continue;
       }
+      if (joint.id == null || joint.id.length == 0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_ID", '$path.id',
+          "joint ID is empty"));
+      else if (jointIds.exists(joint.id))
+        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_ID_DUPLICATE", '$path.id',
+          'duplicate joint ID "${joint.id}"'));
+      else
+        jointIds.set(joint.id, true);
       if (joint.name == null || joint.name.length == 0)
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_NAME", '$path.name',
           "joint name is empty"));
@@ -168,6 +191,26 @@ class RobotRuntimeCompiler {
           'unknown joint type "${joint.type}"'));
     }
 
+    var frameIds = new Map<String, Bool>();
+    for (index in 0...robot.frames.length) {
+      var frame = robot.frames[index];
+      var path = 'frames[$index]';
+      if (frame == null) {
+        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_NULL", path, "frame is null"));
+        continue;
+      }
+      if (frame.id == null || frame.id.length == 0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_ID", '$path.id', "frame ID is empty"));
+      else if (frameIds.exists(frame.id))
+        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_ID_DUPLICATE", '$path.id', "duplicate frame ID"));
+      else frameIds.set(frame.id, true);
+      if (frame.name == null || frame.name.length == 0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_NAME", '$path.name', "frame name is empty"));
+      if (frame.link == null || robot.links.indexOf(frame.link) < 0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_FRAME_LINK", '$path.link', "frame link does not belong to this robot"));
+    }
+
+    var sensorIds = new Map<String, Bool>();
     var sensorNames = new Map<String, Bool>();
     for (index in 0...robot.sensors.length) {
       var sensor = robot.sensors[index];
@@ -177,6 +220,14 @@ class RobotRuntimeCompiler {
           "sensor is null"));
         continue;
       }
+      if (sensor.id == null || sensor.id.length == 0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_ID", '$path.id',
+          "sensor ID is empty"));
+      else if (sensorIds.exists(sensor.id))
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_ID_DUPLICATE", '$path.id',
+          'duplicate sensor ID "${sensor.id}"'));
+      else
+        sensorIds.set(sensor.id, true);
       if (sensor.name == null || sensor.name.length == 0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_NAME", '$path.name',
           "sensor name is empty"));

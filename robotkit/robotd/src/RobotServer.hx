@@ -314,9 +314,8 @@ class RobotServer {
       sendFault(409, "stale RobotKit command sequence", false);
       return;
     }
-    if (Int64.compare(value.expiryNs, Int64.ofInt(0)) != 0
-        && Int64.compare(value.expiryNs, NativeKit.nk_time_now_ns()) < 0) {
-      sendFault(408, "expired RobotKit command", false);
+    if (Int64.compare(value.expiryNs, Int64.ofInt(0)) != 0) {
+      sendFault(422, "absolute deadlines require clock synchronization", false);
       return;
     }
     if (value.joint != 0 || value.mode != 1) {

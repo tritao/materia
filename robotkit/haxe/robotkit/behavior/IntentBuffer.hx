@@ -19,7 +19,7 @@ class IntentBuffer {
     if (intent == null)
       return null;
     if (Int64.compare(intent.expiryNs, Int64.ofInt(0)) != 0
-        && Int64.compare(intent.expiryNs, nowNs) < 0) {
+        && Int64.compare(intent.expiryNs, nowNs) <= 0) {
       latest = null;
       return null;
     }

@@ -1,6 +1,9 @@
 #include "simulation_robot.hpp"
 
 #include "simulation.hpp"
+#include "sensor_math.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace robotkit {
 
@@ -72,6 +75,50 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                 break;
             }
         }
+    }
+    // All measurements use the same immutable physics snapshot as encoders.
+    uint64_t body_count = 0;
+    if (nksim_snapshot_get_body_count(simulation_.snapshot_, &body_count) != NKSIM_OK)
+        return RK_ERROR_BACKEND;
+    std::vector<nksim_body_state> bodies(body_count);
+    const nksim_body_state *base = nullptr;
+    for (uint64_t index = 0; index < body_count; ++index) {
+        bodies[index].struct_size = sizeof(nksim_body_state);
+        if (nksim_snapshot_get_body(simulation_.snapshot_, index, &bodies[index]) != NKSIM_OK)
+            return RK_ERROR_BACKEND;
+        if (bodies[index].body == base_body_) base = &bodies[index];
+    }
+    if (!base) return RK_ERROR_BACKEND;
+    const double now = simulation_.simulation_time_;
+    // A first sample primes the derivative. Do not fabricate acceleration.
+    state.sensor_flags = 2;
+    if (previous_time_ >= 0.0 && now > previous_time_) {
+        double acceleration[3];
+        for (int i = 0; i < 3; ++i)
+            acceleration[i] = (base->linear_velocity[i] - previous_velocity_[i]) / (now - previous_time_);
+        sensors::imu(base->rotation, base->angular_velocity, acceleration,
+                     simulation_.gravity_, state.imu);
+        state.sensor_flags |= 1;
+    }
+    previous_time_ = now;
+    std::copy_n(base->linear_velocity, 3, previous_velocity_);
+    for (int ray = 0; ray < 8; ++ray) {
+        const double angle = ray * 0.7853981633974483;
+        const double local[3] = {std::cos(angle), std::sin(angle), 0.0};
+        double direction[3];
+        sensors::rotate(base->rotation, local, direction);
+        double range = 10.0;
+        for (const auto &body : bodies) {
+            // Exclude every link of this robot, but observe other robots.
+            if (std::find(bodies_.begin(), bodies_.end(), body.body) != bodies_.end()) continue;
+            const double robot_extents[3] = {0.05, 0.05, 0.05};
+            const double *extents = robot_extents;
+            for (const auto &object : simulation_.objects_)
+                if (object.active && object.body == body.body) { extents = object.half_extents; break; }
+            range = sensors::ray_box(base->position, direction, body.position,
+                                     body.rotation, extents, range);
+        }
+        state.lidar[ray] = range;
     }
     return RK_OK;
 }

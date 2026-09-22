@@ -30,6 +30,10 @@ class WorldTcpIntegration {
         var state = world.snapshot().robot(LOGICAL_ID);
         return state != null && state.positions.length > 0;
       }, "remote robot did not publish its initial state");
+      var deadlineRejected = false;
+      try remote.submit(robotkit.world.RobotCommand.JointPosition(0, 0.9, Int64.ofInt(123)))
+      catch (_:Dynamic) deadlineRejected = true;
+      if (!deadlineRejected) throw "remote adapter forwarded an unmapped absolute deadline";
       var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.5));
       if (behavior.update(remote) != 1)
         throw "transport-neutral behavior did not submit a remote command";
@@ -42,6 +46,15 @@ class WorldTcpIntegration {
       var position = state == null ? 0.0 : state.positions.get(0);
       if (state == null || state.sensors.length != 3)
         throw "robotd did not transport simulated encoder, IMU, and LiDAR frames";
+      for (sensor in state.sensors.toArray()) {
+        if (sensor.kind == "imu" && (sensor.values.length != 6 || Math.abs(sensor.values.get(5) - 9.81) > 1e-9))
+          throw "transport changed the stationary IMU specific force";
+        if (sensor.kind == "lidar")
+          for (range in sensor.values.toArray())
+            if (range != 10.0) throw "single-robot LiDAR must exclude self geometry";
+        if (Int64.compare(sensor.receivedTimestampNs, sensor.sourceTimestampNs) == 0)
+          throw "sensor receipt reused simulation source time";
+      }
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();

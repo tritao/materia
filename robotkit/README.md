@@ -58,6 +58,15 @@ simulation owner. Each simulated robot publishes transport-neutral joint
 encoder, IMU, and LiDAR frames with the same source clock, frame IDs, and
 sequences used by the remote path.
 
+IMU measures base-frame angular velocity and specific force from physics body
+state; its first sample after reset/teleport primes the derivative. LiDAR uses
+eight planar rays against the current box geometry, excluding own links.
+These measurements use SimKit's test backend; MuJoCo dynamics, arbitrary sensor
+mounts, and configurable scan patterns remain future work. Runtime receipt
+timestamps use the actual local monotonic clock, not the simulation tick hint.
+Absolute world-command deadlines are rejected until clock negotiation and
+runtime enforcement are available.
+
 `robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
 `Robot` interface used by `RemoteRobot`. It does not own or dispose the
 shared simulation, allowing one `RobotWorld` to contain local simulated robots

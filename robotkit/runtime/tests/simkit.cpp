@@ -1,4 +1,5 @@
 #include "robotkit_simkit.h"
+#include "../src/sensor_math.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -70,8 +71,12 @@ void shared_world_steps_once() {
     assert(second_state.sequence == 1);
     assert(first_state.source_timestamp_ns == 10000000);
     assert(second_state.source_timestamp_ns == 10000000);
-    assert(first_state.received_timestamp_ns == 1000);
-    assert(second_state.received_timestamp_ns == 1000);
+    assert(first_state.received_timestamp_ns > 1000);
+    assert(second_state.received_timestamp_ns >= first_state.received_timestamp_ns);
+    assert(first_state.sensor_flags == 2); // IMU derivative needs two samples.
+    assert(std::abs(first_state.lidar[0] - 0.95) < 1e-9);
+    assert(std::abs(second_state.lidar[4] - 0.95) < 1e-9);
+    assert(first_state.lidar[4] == 10.0); // Own geometry excluded.
     assert(std::abs(first_state.position[0] - 0.4) < 1e-12);
     assert(std::abs(second_state.position[0] + 0.3) < 1e-12);
 
@@ -84,6 +89,8 @@ void shared_world_steps_once() {
     assert(clock.step_index == 2);
     assert(snapshot(first).sequence == 2);
     assert(snapshot(second).sequence == 2);
+    assert(snapshot(first).sensor_flags == 3);
+    assert(std::abs(snapshot(first).imu[5] - 9.81) < 1e-9);
 
     assert(rk_simulation_stop(simulation) == RK_OK);
     rk_simulation_pose pose{};
@@ -163,10 +170,78 @@ void failed_command_phase_does_not_advance() {
     rk_simulation_destroy(simulation);
 }
 
+void sensor_geometry_and_reset() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    auto model = blueprint(1);
+    // Root identity must follow topology, not link array order.
+    model.joints[0].parent_link = 1;
+    model.joints[0].child_link = 0;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    rk_simulation_object_desc box{};
+    box.struct_size = sizeof(box);
+    box.position[0] = 2.0;
+    box.rotation[2] = box.rotation[3] = std::sqrt(0.5); // quarter turn
+    box.half_extents[0] = 0.5;
+    box.half_extents[1] = box.half_extents[2] = 0.25;
+    rk_simulation_object object = 0;
+    assert(rk_simulation_spawn_object(simulation, &box, &object) == RK_OK);
+    assert(rk_simulation_step(simulation, 100) == RK_OK);
+    const auto before = snapshot(robot);
+    assert(std::abs(before.lidar[0] - 1.75) < 1e-6);
+    assert(before.lidar[2] == 10.0);
+    assert(rk_simulation_step(simulation, 200) == RK_OK);
+    assert(snapshot(robot).sensor_flags == 3);
+    assert(std::abs(snapshot(robot).imu[5] - 9.81) < 1e-9);
+    assert(before.sensor_flags == 2); // Old observation remains unchanged.
+    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(rk_simulation_reset(simulation) == RK_OK);
+    assert(snapshot(robot).sensor_flags == 0);
+    assert(rk_simulation_step(simulation, 300) == RK_OK);
+    assert(snapshot(robot).sensor_flags == 2);
+    assert(std::abs(snapshot(robot).lidar[0] - 1.75) < 1e-6);
+    assert(rk_simulation_stop(simulation) == RK_OK);
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    pose.rotation[1] = std::sqrt(0.5);
+    pose.rotation[3] = std::sqrt(0.5);
+    assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
+    assert(rk_simulation_step(simulation, 400) == RK_OK);
+    assert(snapshot(robot).sensor_flags == 2); // Teleport primes derivative.
+    assert(rk_simulation_step(simulation, 500) == RK_OK);
+    assert(std::abs(snapshot(robot).imu[3] + 9.81) < 1e-9);
+    assert(std::abs(snapshot(robot).imu[5]) < 1e-9);
+    assert(rk_simulation_stop(simulation) == RK_OK);
+    pose.rotation[1] = 0.0;
+    pose.rotation[3] = 1.0;
+    assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
+    assert(rk_simulation_remove_object(simulation, object) == RK_OK);
+    assert(rk_simulation_step(simulation, 600) == RK_OK);
+    assert(snapshot(robot).lidar[0] == 10.0);
+    rk_simulation_destroy(simulation);
+
+    // Free fall: accelerometer measures specific force, not gravity itself.
+    const double identity[4] = {0, 0, 0, 1};
+    const double gravity[3] = {0, 0, -9.81};
+    const double gyro[3] = {1, 2, 3};
+    double imu[6];
+    robotkit::sensors::imu(identity, gyro, gravity, gravity, imu);
+    for (int i = 0; i < 3; ++i) {
+        assert(imu[i] == gyro[i]);
+        assert(imu[i + 3] == 0.0);
+    }
+}
+
 } // namespace
 
 int main() {
     shared_world_steps_once();
     failed_command_phase_does_not_advance();
+    sensor_geometry_and_reset();
     return 0;
 }

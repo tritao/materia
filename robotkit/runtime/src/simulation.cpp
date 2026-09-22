@@ -1,6 +1,7 @@
 #include "simulation.hpp"
 #include "simulation_robot.hpp"
 #include "runtime_registry.hpp"
+#include "sensor_math.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -47,6 +48,7 @@ Simulation::Simulation(double fixed_timestep, uint32_t physics_substeps)
         desc.scene = scene_;
         desc.fixed_timestep = fixed_timestep_;
         desc.physics_substeps = physics_substeps_;
+        std::copy_n(gravity_, 3, desc.gravity);
         require_sim(nksim_world_create(&desc, &world_), "nksim_world_create");
         const double half_extents[] = {0.05, 0.05, 0.05};
         require_sim(nksim_shape_create_box(world_, half_extents, &shape_),
@@ -80,6 +82,13 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     try {
         auto binding = std::shared_ptr<SimulationRobot>(new SimulationRobot(*this));
         const auto robot_index = static_cast<uint32_t>(bindings_.size());
+        uint32_t root = 0;
+        for (uint32_t candidate = 0; candidate < blueprint.link_count; ++candidate) {
+            bool child = false;
+            for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint)
+                child = child || blueprint.joints[joint].child_link == candidate;
+            if (!child) { root = candidate; break; }
+        }
         nkscene_transaction transaction = 0;
         require_scene(nkscene_transaction_begin(scene_, &transaction),
                       "nkscene_transaction_begin");
@@ -107,7 +116,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             nksim_body_desc desc{};
             desc.struct_size = sizeof(desc);
             desc.occurrence = binding->occurrences_[index];
-            desc.motion_type = index == 0 ? NKSIM_MOTION_STATIC : NKSIM_MOTION_DYNAMIC;
+            desc.motion_type = index == root ? NKSIM_MOTION_STATIC : NKSIM_MOTION_DYNAMIC;
             desc.mass = 1.0;
             desc.shape = shape_;
             desc.collision_layer = desc.collision_mask = 1;
@@ -133,7 +142,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             joints_.push_back(joint);
         }
         bindings_.push_back(binding);
-        robot_base_bodies_.push_back(binding->bodies_.front());
+        binding->base_body_ = binding->bodies_[root];
+        robot_base_bodies_.push_back(binding->base_body_);
 
         auto runtime = std::make_shared<RobotRuntime>(
             blueprint, std::static_pointer_cast<RobotEndpoint>(binding), period_);
@@ -197,7 +207,9 @@ bool valid_pose(const double position[3], const double rotation[4]) {
         if (!std::isfinite(position[index])) return false;
     for (int index = 0; index < 4; ++index)
         if (!std::isfinite(rotation[index])) return false;
-    return true;
+    double norm = 0.0;
+    for (int index = 0; index < 4; ++index) norm += rotation[index] * rotation[index];
+    return std::abs(norm - 1.0) < 1e-6;
 }
 
 rk_result set_body_pose(nksim_world world, nksim_body body, const double position[3],
@@ -223,8 +235,11 @@ rk_result Simulation::teleport_robot(uint32_t robot_index, const rk_simulation_p
     std::lock_guard tick_lock(tick_mutex_);
     if (running_ || stopping_ || host_ != 0 || robot_index >= robot_base_bodies_.size())
         return RK_ERROR_INVALID_STATE;
-    return pose.struct_size < sizeof(pose) ? RK_ERROR_INVALID_ARGUMENT
-        : set_body_pose(world_, robot_base_bodies_[robot_index], pose.position, pose.rotation);
+    if (pose.struct_size < sizeof(pose)) return RK_ERROR_INVALID_ARGUMENT;
+    const auto result = set_body_pose(world_, robot_base_bodies_[robot_index], pose.position, pose.rotation);
+    if (result == RK_OK)
+        if (auto binding = bindings_[robot_index].lock()) binding->previous_time_ = -1.0;
+    return result;
 }
 
 rk_result Simulation::spawn_object(const rk_simulation_object_desc &desc,
@@ -243,8 +258,17 @@ rk_result Simulation::spawn_object(const rk_simulation_object_desc &desc,
     if (nkscene_transaction_begin(scene_, &transaction) != NKS_OK)
         return RK_ERROR_BACKEND;
     EnvironmentObject object;
+    std::copy_n(desc.half_extents, 3, object.half_extents);
     nkscene_transform transform{};
     transform.matrix[0] = transform.matrix[5] = transform.matrix[10] = transform.matrix[15] = 1.0f;
+    for (int column = 0; column < 3; ++column) {
+        double axis[3]{};
+        axis[column] = 1.0;
+        double rotated[3];
+        sensors::rotate(desc.rotation, axis, rotated);
+        for (int row = 0; row < 3; ++row)
+            transform.matrix[column * 4 + row] = static_cast<float>(rotated[row]);
+    }
     transform.matrix[12] = static_cast<float>(desc.position[0]);
     transform.matrix[13] = static_cast<float>(desc.position[1]);
     transform.matrix[14] = static_cast<float>(desc.position[2]);

@@ -7,6 +7,7 @@ class JointTargetIntent {
   public final joint:Int;
   public final mode:Int;
   public final target:Float;
+  /** Absolute same-process monotonic deadline; zero means no expiry. */
   public final expiryNs:Int64;
 
   public function new(joint:Int, mode:Int, target:Float, expiryNs:Int64) {

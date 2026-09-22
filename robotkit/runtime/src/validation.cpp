@@ -18,6 +18,16 @@ bool valid_target_mode(rk_joint_target_mode mode) {
     return mode >= RK_TARGET_POSITION && mode <= RK_TARGET_EFFORT;
 }
 
+template <typename T> bool valid_sensors(const T &value) {
+    if (value.sensor_flags & ~3u) return false;
+    if (value.sensor_flags & 1u)
+        for (double sample : value.imu) if (!is_finite(sample)) return false;
+    if (value.sensor_flags & 2u)
+        for (double sample : value.lidar)
+            if (!is_finite(sample) || sample < 0.0 || sample > 10.0) return false;
+    return true;
+}
+
 } // namespace
 
 extern "C" {
@@ -74,7 +84,7 @@ rk_result RK_CALL rk_robot_command_validate_for_blueprint(
 rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state) {
     if (!has_full_struct(state) || state->joint_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (state->mode > RK_ROBOT_MODE_FAULT || state->safety > RK_SAFETY_FAULT)
+    if (state->mode > RK_ROBOT_MODE_FAULT || state->safety > RK_SAFETY_FAULT || !valid_sensors(*state))
         return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < state->joint_count; ++index) {
         if (!is_finite(state->position[index]) || !is_finite(state->velocity[index]) ||
@@ -90,7 +100,7 @@ rk_result RK_CALL rk_robot_snapshot_validate(const rk_robot_snapshot *snapshot) 
     if (snapshot->mode > RK_ROBOT_MODE_FAULT || snapshot->safety > RK_SAFETY_FAULT ||
         snapshot->endpoint > RK_ENDPOINT_FAULT)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (snapshot->fault_code < 0)
+    if (snapshot->fault_code < 0 || !valid_sensors(*snapshot))
         return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < snapshot->joint_count; ++index) {
         if (!is_finite(snapshot->position[index]) || !is_finite(snapshot->velocity[index]) ||

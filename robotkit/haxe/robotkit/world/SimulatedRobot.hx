@@ -18,6 +18,7 @@ class SimulatedRobot implements Robot {
   var changeListener:Null < RobotId -> Void > = null;
   var commandSequence:Int = 0;
   var observedSequence:Int64 = Int64.ofInt(-1);
+  var observedReceipt:Int64 = Int64.ofInt(-1);
   var currentSensors:Array<SensorFrame> = [];
   var closed:Bool = false;
 
@@ -84,7 +85,9 @@ class SimulatedRobot implements Robot {
   public function submit(command:RobotCommand):Void {
     ensureOpen();
     switch command {
-      case JointPosition(joint, target, _):
+      case JointPosition(joint, target, expiryNs):
+        if (expiryNs != null && haxe.Int64.compare(expiryNs, haxe.Int64.ofInt(0)) != 0)
+          throw "Runtime command deadlines are not supported; use bounded local intents";
         commandSequence++;
         runtime.submitPosition(joint, target, commandSequence);
     }
@@ -116,9 +119,10 @@ class SimulatedRobot implements Robot {
   }
 
   function observe(value:robotkit.runtime.RobotSnapshot):Void {
-    if (value.sequence == observedSequence)
+    if (value.sequence == observedSequence && value.receivedTimestampNs == observedReceipt)
       return;
     observedSequence = value.sequence;
+    observedReceipt = value.receivedTimestampNs;
     currentSensors = RobotSensorFrames.fromRuntimeSnapshot(value);
     var listener = changeListener;
     if (listener != null)

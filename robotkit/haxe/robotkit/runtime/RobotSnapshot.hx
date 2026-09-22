@@ -23,6 +23,8 @@ class RobotSnapshot {
   public final q:ImmutableFloatArray;
   public final dq:ImmutableFloatArray;
   public final effort:ImmutableFloatArray;
+  public final imu:ImmutableFloatArray;
+  public final lidar:ImmutableFloatArray;
 
   /** Compatibility alias; source time is the runtime's primary observation clock. */
   public var timestampNs(get, never):Int64;
@@ -30,12 +32,12 @@ class RobotSnapshot {
   public function new(robotId:Int64, sequence:Int64, sourceTimestampNs:Int64,
       mode:Int, safety:Int, endpoint:Int, faultCode:Int,
       q:Array<Float>, dq:Array<Float>, effort:Array<Float>,
-      ?receivedTimestampNs:Int64) {
+      ?receivedTimestampNs:Int64, ?imu:Array<Float>, ?lidar:Array<Float>) {
     this.robotId = robotId;
     this.sequence = sequence;
     this.sourceTimestampNs = sourceTimestampNs;
     this.receivedTimestampNs = receivedTimestampNs == null
-      ? sourceTimestampNs
+      ? Int64.ofInt(0)
       : receivedTimestampNs;
     this.mode = mode;
     this.safety = safety;
@@ -44,6 +46,8 @@ class RobotSnapshot {
     this.q = new ImmutableFloatArray(q);
     this.dq = new ImmutableFloatArray(dq);
     this.effort = new ImmutableFloatArray(effort);
+    this.imu = new ImmutableFloatArray(imu == null ? [] : imu);
+    this.lidar = new ImmutableFloatArray(lidar == null ? [] : lidar);
   }
 
   /** Converts the native ABI value while leaving the semantic robot ID unset. */
@@ -60,13 +64,15 @@ class RobotSnapshot {
     }
     return new RobotSnapshot(Int64.ofInt(0), value.get_sequence(), value.get_source_timestamp_ns(),
       value.get_mode(), value.get_safety(), value.get_endpoint(), value.get_fault_code(),
-      positions, velocities, efforts, value.get_received_timestamp_ns());
+      positions, velocities, efforts, value.get_received_timestamp_ns(),
+      (value.get_sensor_flags() & 1) != 0 ? [for (i in 0...6) value.get_imu(i)] : [],
+      (value.get_sensor_flags() & 2) != 0 ? [for (i in 0...8) value.get_lidar(i)] : []);
   }
 
   /** Returns an immutable copy associated with a caller-provided robot ID. */
   public function withRobotId(value:Int64):RobotSnapshot
     return new RobotSnapshot(value, sequence, sourceTimestampNs, mode, safety, endpoint, faultCode,
-      q.toArray(), dq.toArray(), effort.toArray(), receivedTimestampNs);
+      q.toArray(), dq.toArray(), effort.toArray(), receivedTimestampNs, imu.toArray(), lidar.toArray());
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;
 }

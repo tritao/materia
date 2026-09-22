@@ -6,6 +6,7 @@ import haxe.Int64;
 class WorldSnapshot {
   public final sequence:Int;
   public final topologyRevision:Int;
+  /** Zero for a mixed-clock world; inspect each robot's source timestamp. */
   public final sourceTimestampNs:Int64;
   public final receivedTimestampNs:Int64;
   final robotMap:Map<RobotId, RobotSnapshot>;
@@ -19,7 +20,7 @@ class WorldSnapshot {
     this.topologyRevision = topologyRevision;
     this.sourceTimestampNs = sourceTimestampNs;
     this.receivedTimestampNs = receivedTimestampNs == null
-      ? sourceTimestampNs
+      ? Int64.ofInt(0)
       : receivedTimestampNs;
     robotMap = new Map<RobotId, RobotSnapshot>();
     for (id in source.keys()) {

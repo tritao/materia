@@ -36,7 +36,7 @@ class Simulation {
     return runtime;
   }
 
-  /** Applies every attached runtime command and advances the world once. */
+  /** Advances once. timestampNs is a legacy hint, not source or receive time. */
   public function step(timestampNs:Int64):Void {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_step(owner.borrow(), timestampNs), "simulation.step");

@@ -36,6 +36,18 @@ int main() {
     state.position[0] = 1.0;
     state.position[1] = -0.5;
     assert(rk_robot_state_validate(&state) == RK_OK);
+    state.sensor_flags = 4;
+    assert(rk_robot_state_validate(&state) == RK_ERROR_INVALID_ARGUMENT);
+    state.sensor_flags = 1;
+    state.imu[0] = NAN;
+    assert(rk_robot_state_validate(&state) == RK_ERROR_INVALID_ARGUMENT);
+    state.sensor_flags = 2;
+    state.lidar[0] = -1.0;
+    assert(rk_robot_state_validate(&state) == RK_ERROR_INVALID_ARGUMENT);
+    state.lidar[0] = 11.0;
+    assert(rk_robot_state_validate(&state) == RK_ERROR_INVALID_ARGUMENT);
+    state.lidar[0] = 10.0;
+    assert(rk_robot_state_validate(&state) == RK_OK); // Invalid absent IMU ignored.
 
     rk_robot_capabilities capabilities{};
     capabilities.struct_size = sizeof(capabilities);

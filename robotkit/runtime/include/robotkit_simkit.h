@@ -54,7 +54,7 @@ typedef struct rk_simulation_desc {
  *
  * step_index counts successfully completed physics advances. simulation_time
  * is the corresponding fixed-step time in seconds; it is independent of the
- * caller-provided observation timestamp passed to rk_simulation_step().
+ * legacy owner-clock hint passed to rk_simulation_step().
  */
 typedef struct rk_simulation_clock {
     uint32_t struct_size RK_STRUCT_SIZE;
@@ -122,13 +122,14 @@ RK_API rk_result RK_CALL rk_simulation_add_robot(
 /**
  * Applies all attached robot commands and advances the world exactly once.
  *
- * timestamp_ns labels the snapshots published by this tick; it does not
- * change the fixed simulation clock. If any command fails, the world is not
+ * timestamp_ns is a compatibility owner-clock hint. Simulation samples use
+ * fixed simulation source time and actual local monotonic receipt time,
+ * neither derived from this argument. If any command fails, the world is not
  * advanced and staged commands are discarded so robots cannot observe a
  * partially committed tick.
  *
  * @param simulation Shared simulation owner.
- * @param timestamp_ns Observation timestamp published to every runtime.
+ * @param timestamp_ns Legacy owner-clock hint, ignored by simulated sensors.
  * @return RK_OK after one complete world advance, or an error with no advance.
  */
 RK_API rk_result RK_CALL rk_simulation_step(rk_simulation simulation,

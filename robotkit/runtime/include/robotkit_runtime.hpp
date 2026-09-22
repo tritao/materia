@@ -49,10 +49,11 @@ public:
      * Samples the backend's latest state into a caller-owned value.
      *
      * A shared Simulation calls this after its one world step; the endpoint
-     * itself never owns shared time. timestamp_ns labels the observation and
-     * is not a request to advance the backend.
+     * itself never owns shared time. timestamp_ns is an owner-clock hint, not
+     * a receive timestamp or a request to advance the backend. Endpoints with
+     * their own clock publish it (including epoch zero) as source time.
      *
-     * @param timestamp_ns Observation timestamp chosen by the owner.
+     * @param timestamp_ns Owner-clock sampling hint; not Runtime acceptance time.
      * @param state Destination state, including arrays sized by the runtime
      * layout. The runtime preserves its own mode and safety fields around this
      * call; endpoints should populate source time and observed physical state.

@@ -68,7 +68,7 @@ extern "C" {
 /** API-wide limits and version identifiers. */
 enum {
     RK_MAX_JOINTS = 64, /**< Maximum joints carried by one fixed-size ABI value. */
-    RK_API_VERSION = 1 /**< Version of the RobotKit C data contract. */
+    RK_API_VERSION = 2 /**< Version of the RobotKit C data contract (sensor payloads). */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -201,7 +201,7 @@ typedef struct rk_joint_target {
 typedef struct rk_robot_command {
     uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
     uint64_t sequence; /**< Monotonic command sequence chosen by the caller. */
-    uint64_t timestamp_ns; /**< Optional command timestamp or deadline in nanoseconds. */
+    uint64_t timestamp_ns; /**< Optional issuer/source timestamp metadata, NOT a deadline. */
     rk_command_kind kind; /**< Operation represented by this batch. */
     uint32_t target_count; /**< Number of valid entries in targets. */
     rk_joint_target targets[RK_MAX_JOINTS]; /**< Fixed-capacity target payload. */
@@ -220,6 +220,9 @@ typedef struct rk_robot_state {
     double velocity[RK_MAX_JOINTS];
     double effort[RK_MAX_JOINTS];
     uint64_t received_timestamp_ns; /**< Monotonic timestamp when Runtime accepted the sample. */
+    uint32_t sensor_flags; /**< Bit 0: IMU valid; bit 1: planar LiDAR valid. */
+    double imu[6]; /**< Base-frame angular velocity xyz, specific force xyz (SI). */
+    double lidar[8]; /**< Base-frame XY rays, +X then counterclockwise, max range 10 m. */
 } rk_robot_state;
 
 /** Immutable published runtime snapshot; native handles never enter this ABI. */
@@ -243,6 +246,9 @@ typedef struct rk_robot_snapshot {
     uint32_t reserved0;
     uint64_t reserved[2];
     uint64_t received_timestamp_ns; /**< Runtime receive timestamp in nanoseconds. */
+    uint32_t sensor_flags; /**< Bit 0: IMU valid; bit 1: planar LiDAR valid. */
+    double imu[6]; /**< Base-frame angular velocity xyz, specific force xyz (SI). */
+    double lidar[8]; /**< Base-frame XY rays, +X then counterclockwise, max range 10 m. */
 } rk_robot_snapshot;
 
 /** Static control capabilities reported by a RobotRuntime endpoint. */

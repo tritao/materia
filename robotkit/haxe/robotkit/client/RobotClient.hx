@@ -173,6 +173,9 @@ class RobotClient {
   public function sendJointTarget(joint:Int, mode:Int, target:Float,
       ?expiryNs:Int64):Int64 {
     ensureReady();
+    // Monotonic clocks on different hosts have no shared epoch.
+    if (expiryNs != null && Int64.compare(expiryNs, Int64.ofInt(0)) != 0)
+      throw "Remote absolute deadlines require clock synchronization";
     var sequence = nextCommandSequence();
     var value = new JointTarget(robotId(), joint, mode, target,
       sequence, expiryNs == null ? Int64.ofInt(0) : expiryNs);

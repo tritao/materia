@@ -17,7 +17,7 @@ public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
     void discard_pending() noexcept override { pending_targets_.clear(); }
-    void reset() noexcept { pending_targets_.clear(); stopped_ = false; }
+    void reset() noexcept { pending_targets_.clear(); stopped_ = false; previous_time_ = -1.0; }
 
 private:
     friend class Simulation;
@@ -30,6 +30,9 @@ private:
     std::vector<nksim_joint> joints_;
     std::vector<nksim_joint_target> pending_targets_;
     bool stopped_ = false;
+    nksim_body base_body_ = 0;
+    double previous_time_ = -1.0;
+    double previous_velocity_[3]{};
 };
 
 } // namespace robotkit

@@ -142,6 +142,20 @@ int main() {
     blueprint.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -1.0, 1.0, 3.0};
     blueprint.joints[1] = {1, RK_RUNTIME_JOINT_REVOLUTE, 1, 2, -1.0, 1.0, 3.0};
 
+    // Zero is a valid source epoch, not a missing-timestamp sentinel.
+    auto clock_endpoint = std::make_shared<FaultEndpoint>();
+    robotkit::RobotRuntime clock_runtime(blueprint, clock_endpoint);
+    const auto before_receive = std::chrono::steady_clock::now().time_since_epoch();
+    assert(clock_runtime.publish_sample(0) == RK_OK);
+    rk_robot_state clock_state{};
+    assert(clock_runtime.snapshot(clock_state) == RK_OK);
+    const auto after_receive = std::chrono::steady_clock::now().time_since_epoch();
+    assert(clock_state.source_timestamp_ns == 0);
+    assert(clock_state.received_timestamp_ns >= static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(before_receive).count()));
+    assert(clock_state.received_timestamp_ns <= static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(after_receive).count()));
+
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, std::move(endpoint));
 

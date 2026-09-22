@@ -7,6 +7,7 @@ class JointTarget {
   @:id(3) public var mode:Int;
   @:id(4) public var target:Float;
   @:id(5) public var sequence:haxe.Int64;
+  /** Reserved: must be zero until a shared deadline clock is negotiated. */
   @:id(6) public var expiryNs:haxe.Int64;
 
   public function new(?robotId:haxe.Int64 = null, ?joint:Int = 0, ?mode:Int = 1,

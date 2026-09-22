@@ -34,6 +34,90 @@ has both `sourceTimestampNs` (the robot, simulator, or sensor clock) and
 `receivedTimestampNs` (the runtime/world receive clock). The old
 `timestampNs` names remain read-only compatibility aliases only.
 
+## Core contracts
+
+These rules apply across the editable Haxeon model, compiled runtime,
+simulation, protocol, and endpoint adapters. Backend identifiers and clock
+values must not escape their boundary as if they were domain identity or a
+shared time base.
+
+### Identity
+
+`RobotId`, `LinkId`, `JointId`, `SensorId`, and `FrameId` are semantic,
+stable identities. Names are presentation values and may change without
+changing identity. Runtime array indices, SceneKit occurrence IDs, and MuJoCo
+IDs are temporary mappings owned by their backend; they must not be serialized
+as model identity or retained as document references. Imports and compilation
+must preserve semantic IDs while rebuilding those mappings.
+
+Links, joints, sensors, and frames expose immutable string IDs, unique within each
+entity kind in a robot model, and editable names. Existing constructors default
+the ID to the initial name once; importers must supply the persisted ID.
+Compilation rejects empty or duplicate IDs and attaches a copied
+`RobotRuntimeIdentity` mapping to the blueprint. Native indices remain local
+to that compiled revision. Sensor indices in this mapping identify model
+slots, not SensorKit registrations. Manually constructed native blueprints
+may omit the mapping. Frames currently coincide with their owning link origin;
+compilation preserves frame IDs and semantic link attachments across reordering.
+Arbitrary mount transforms and carrying editable-model IDs into world
+descriptions, wire messages, and recordings remain subsequent work. Built-in
+runtime sensors retain their existing IDs (`imu`, `lidar`, `joint_encoders`)
+and base-frame ID (`base_link`), scoped to the robot.
+
+### Frames and units
+
+RobotKit uses a right-handed world with `+Z` up and `+X` forward. Lengths are
+meters, angles are radians, and durations are seconds. Quaternions use
+`x, y, z, w` component order. A transform `A_T_B` maps coordinates expressed
+in frame `B` into frame `A`; composition follows
+`world_T_sensor = world_T_link * link_T_sensor`. Matrix representations use
+column-major storage and multiply column vectors, matching SceneKit. Adapters
+for external conventions, including ROS, convert at their boundary and leave
+the internal model unchanged.
+
+### Time and command provenance
+
+Keep source and receive clocks distinct. The API names below describe the
+meaning of a timestamp; each command or observation carries only the fields
+that apply to it:
+
+| Field | Clock or meaning |
+| --- | --- |
+| `sourceTimestamp` | Clock of the robot, simulator, or sensor that produced the value |
+| `receivedTimestamp` | Local monotonic clock when a runtime or world accepted it |
+| `captureTimestamp` | Sensor clock at acquisition |
+| `deliveryTimestamp` | Receiver clock when a sensor sample was delivered |
+| `commandIssuedTimestamp` | Issuing client's monotonic clock |
+| `commandDeadline` | Receiving endpoint's clock; checked only in that clock domain |
+| `simulationTime` | Time owned and advanced by `Simulation` |
+
+When an issuer and receiver use different clocks, a session must establish an
+explicit mapping before a deadline can cross that boundary. Source timestamps
+must not be reused as receive times or deadlines. Commands should carry an
+identifier, monotonic sequence, and the snapshot revision they were derived
+from so an endpoint can reject stale or superseded intent. Until those fields
+are represented end to end, adapters must not infer snapshot provenance.
+Native command `timestamp_ns` is issuer metadata, not an enforced deadline.
+World command adapters and robotd reject nonzero absolute expiry values until
+deadline enforcement and clock negotiation exist; they never silently compare
+client and server clock epochs. Local `IntentBuffer` deadlines use the same
+process monotonic clock and expire at (not after) the deadline.
+
+Runtime receive time is stamped after sample validation using `steady_clock`;
+source epoch zero is preserved. Missing receive timestamps are zero (unknown),
+never copied from source time. `RobotWorld` stamps its snapshot publication in
+the local clock and leaves aggregate source time zero: unrelated robot clocks
+cannot be meaningfully combined using a maximum. Per-robot source times remain
+available without reinterpretation.
+
+### Ownership
+
+The existing ownership matrix below is normative: `RobotWorld` owns attached
+logical adapters, `Simulation` owns simulated execution and its clock, and
+`robotd` owns the deployed runtime and endpoint. Adapters may translate values
+at those boundaries, but may not transfer runtime, physics, or process
+lifecycle ownership to another layer.
+
 `RemoteRobot` owns a network client. `SimulatedRobot` is only an adapter over a
 `RobotRuntime` supplied by an externally owned `Simulation`; it never creates,
 steps, stops, or disposes that simulation.
@@ -133,11 +217,22 @@ While stopped, the simulation owner can reset the whole world, reset one robot,
 teleport a robot, and spawn/remove/teleport environment objects. The editable
 scene is therefore the source of initial/configuration state. After a running
 host starts, physics owns the live state and runtime commands are the only
-normal way to change robot motion. Simulated joint-encoder, IMU, and LiDAR
-frames are emitted after each shared tick through one canonical projection;
-their identity, frame ID, sequence, and two-clock timestamps match the remote
-sensor transport. Native SensorKit models can replace that projection without
-changing the RobotWorld or RobotClient boundary.
+normal way to change robot motion. Sensor measurements use the same physics
+snapshot as joint encoders. Base-frame IMU values are angular velocity followed
+by specific force, `R^-1 * (dv/dt - gravity)`; gravity is `(0, 0, -9.81)`.
+The first sample after creation, reset, or teleport primes the derivative and
+does not publish IMU. LiDAR casts eight planar rays counterclockwise from +X,
+with a 10 m maximum, against oriented boxes at their physics poses. It excludes
+all own links and includes other robots and environment objects. This matches
+the current box-only simulation geometry; mesh queries, sensor mount offsets,
+configurable scan resolution/rates, and noise models are not implemented.
+
+Native ABI version 2 carries bounded IMU/LiDAR payloads with validity flags.
+Both `SimulatedRobot` and robotd project only valid measurements through the
+same immutable sensor frames; endpoints without those measurements do not
+invent them. Rebuild native consumers for the extended structs. Tests run the
+SimKit test backend, not MuJoCo; articulated body dynamics remain limited by
+that backend. The free-fall specific-force equation is also tested separately.
 
 ## Deployment boundary
 
@@ -154,10 +249,10 @@ or recorded state without backend conditionals. `worldd` is only a headless
 composition of `RobotWorld` plus `Simulation`; it does not create a parallel
 domain model.
 
-World-level behaviors leave command deadlines unset unless the application
-provides an endpoint-clock deadline. Each concrete adapter is responsible for
-translating a default deadline into its own clock; source timestamps are never
-silently reused as receive or command time.
+World-level behaviors leave command deadlines unset. Nonzero world-command
+deadlines are currently rejected rather than ignored or translated without a
+clock mapping. Local runtime behaviors may use bounded `IntentBuffer` expiry;
+source timestamps are never silently reused as receive or command time.
 
 ## Ownership and shutdown
 
