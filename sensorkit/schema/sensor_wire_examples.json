@@ -1,0 +1,43 @@
+{
+  "PackedFrameMessage": {
+    "schema_version": 1,
+    "message_type": 1,
+    "sensor": 40,
+    "sequence": 7,
+    "capture_time": 3.0,
+    "delivery_time": 3.125,
+    "frame": 9,
+    "width": 2,
+    "height": 1,
+    "stride": 8,
+    "pixel_format": 1,
+    "data_hex": "ff0000ff00ff00ff"
+  },
+  "ImuSampleMessage": {
+    "schema_version": 1,
+    "message_type": 4,
+    "sensor": 61,
+    "sequence": 14,
+    "capture_time": 8.0,
+    "delivery_time": 8.04,
+    "frame": 17,
+    "data_f64": [
+      1.0, -2.5, 3.25, -4.0, 5.5, -6.75,
+      0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+      1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9
+    ]
+  },
+  "LidarScanMessage": {
+    "schema_version": 1,
+    "message_type": 5,
+    "sensor": 63,
+    "sequence": 15,
+    "capture_time": 9.0,
+    "delivery_time": 9.05,
+    "frame": 19,
+    "horizontal_count": 3,
+    "vertical_count": 1,
+    "return_stride": 12,
+    "data_hex": "000020400000403f010000000000c8420000000000000000000040410000904001000000"
+  }
+}

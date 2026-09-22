@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nativekit_sensor_core.hpp"
+#include "nativekit_sensor_wire_generated.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -27,27 +28,15 @@ namespace nksensor::wire {
  * The MessagePack payload is framed with Haxeon's existing HMPK envelope:
  * magic, version, flags, big-endian payload length, then exactly one value.
  */
-constexpr std::uint8_t current_frame_version = 1;
+using generated::MessageType;
+using generated::PixelFormat;
+
+constexpr std::uint8_t current_frame_version = generated::current_frame_version;
 constexpr std::size_t frame_header_size = 10;
 constexpr std::size_t default_max_messagepack_bytes = 16 * 1024 * 1024;
-constexpr std::size_t imu_packed_value_count = 24;
-constexpr std::size_t imu_packed_data_size = imu_packed_value_count * sizeof(double);
-constexpr std::size_t lidar_packed_return_size = 12;
-
-enum class MessageType : std::uint8_t {
-    camera_frame = 1,
-    depth_frame = 2,
-    segmentation_frame = 3,
-    imu_sample = 4,
-    lidar_scan = 5,
-};
-
-enum class PixelFormat : std::uint8_t {
-    rgba8 = 1,
-    r32f_le = 2,
-    r32u_le = 3,
-    u64_le = 4,
-};
+constexpr std::size_t imu_packed_value_count = generated::imu_packed_value_count;
+constexpr std::size_t imu_packed_data_size = generated::imu_packed_data_size;
+constexpr std::size_t lidar_packed_return_size = generated::lidar_packed_return_size;
 
 /** A non-owning packed image-like payload view into an encoded HMPK message. */
 struct PackedFrameView {

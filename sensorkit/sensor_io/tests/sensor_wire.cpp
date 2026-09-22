@@ -4,8 +4,10 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -68,6 +70,29 @@ LidarScan make_lidar_scan() {
     return scan;
 }
 
+std::vector<std::uint8_t> sensor_wire_vector(std::string_view name) {
+    std::ifstream input(NKSENSOR_SENSOR_WIRE_VECTORS_PATH);
+    assert(input.good());
+    std::string line;
+    while (std::getline(input, line)) {
+        if (line.empty() || line.front() == '#')
+            continue;
+        const auto separator = line.find('\t');
+        assert(separator != std::string::npos);
+        if (line.substr(0, separator) != name)
+            continue;
+        const auto hex = std::string_view(line).substr(separator + 1);
+        assert(hex.size() % 2 == 0);
+        std::vector<std::uint8_t> bytes;
+        bytes.reserve(hex.size() / 2);
+        for (std::size_t index = 0; index < hex.size(); index += 2)
+            bytes.push_back(static_cast<std::uint8_t>(std::stoul(std::string(hex.substr(index, 2)), nullptr, 16)));
+        return bytes;
+    }
+    assert(false && "missing generated SensorKit wire vector");
+    return {};
+}
+
 void encodes_haxeon_hmpk_and_messagepack_binary() {
     std::string error;
     const auto encoded = encode_camera_frame(make_frame(), &error);
@@ -86,29 +111,50 @@ void encodes_haxeon_hmpk_and_messagepack_binary() {
                               (*encoded)[9];
     assert(payload_size == encoded->size() - frame_header_size);
     assert((*encoded)[frame_header_size] == 0x8c); // fixmap(12), Haxeon map shape
+    assert(*encoded == sensor_wire_vector("PackedFrameMessage"));
+}
 
-    const std::vector<std::uint8_t> expected_payload{
-        0x8c,
-        0x01, 0x01,
-        0x02, 0x01,
-        0x03, 0x28,
-        0x04, 0x07,
-        0x05, 0xcb, 0x40, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x06, 0xcb, 0x40, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x07, 0x09,
-        0x08, 0x02,
-        0x09, 0x01,
-        0x0a, 0x08,
-        0x0b, 0x01,
-        0x0c, 0xc4, 0x08, 0xff, 0x00, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff};
-    assert(std::vector<std::uint8_t>(encoded->begin() + frame_header_size,
-                                     encoded->end()) == expected_payload);
+void generated_codec_validates_constants_and_skips_unknown_fields() {
+    std::string error;
+    auto bad_version = encode_camera_frame(make_frame());
+    assert(bad_version.has_value());
+    (*bad_version)[frame_header_size + 2] = 2;
+    assert(!view_packed_frame(*bad_version, &error).has_value());
+    assert(error.find("schema version") != std::string::npos);
 
-    /* The final field is bin8(8), followed by the two RGBA pixels. */
-    const auto data_marker = std::find(encoded->begin() + frame_header_size,
-                                       encoded->end(), static_cast<std::uint8_t>(0xc4));
-    assert(data_marker != encoded->end());
-    assert(data_marker + 1 != encoded->end() && *(data_marker + 1) == 8);
+    auto bad_type = encode_imu_sample(make_imu_sample());
+    assert(bad_type.has_value());
+    (*bad_type)[frame_header_size + 4] = static_cast<std::uint8_t>(MessageType::lidar_scan);
+    assert(!view_imu_sample(*bad_type, &error).has_value());
+    assert(error.find("not a ImuSampleMessage") != std::string::npos);
+
+    auto missing_data = encode_camera_frame(make_frame());
+    assert(missing_data.has_value());
+    (*missing_data)[frame_header_size] = 0x8b; // map now omits its final field
+    missing_data->resize(missing_data->size() - 11); // key plus bin8(8) and data
+    const auto shortened_payload_size =
+        static_cast<std::uint32_t>(missing_data->size() - frame_header_size);
+    (*missing_data)[6] = static_cast<std::uint8_t>(shortened_payload_size >> 24);
+    (*missing_data)[7] = static_cast<std::uint8_t>(shortened_payload_size >> 16);
+    (*missing_data)[8] = static_cast<std::uint8_t>(shortened_payload_size >> 8);
+    (*missing_data)[9] = static_cast<std::uint8_t>(shortened_payload_size);
+    assert(!view_packed_frame(*missing_data, &error).has_value());
+    assert(error.find("missing a required field") != std::string::npos);
+
+    auto extended = encode_camera_frame(make_frame());
+    assert(extended.has_value());
+    assert((*extended)[frame_header_size] == 0x8c);
+    (*extended)[frame_header_size] = 0x8d; // one extra integer-keyed field
+    extended->push_back(13);              // reserved and therefore unknown
+    extended->push_back(0xc0);            // nil value
+    const auto payload_size = static_cast<std::uint32_t>(extended->size() - frame_header_size);
+    (*extended)[6] = static_cast<std::uint8_t>(payload_size >> 24);
+    (*extended)[7] = static_cast<std::uint8_t>(payload_size >> 16);
+    (*extended)[8] = static_cast<std::uint8_t>(payload_size >> 8);
+    (*extended)[9] = static_cast<std::uint8_t>(payload_size);
+    const auto view = view_camera_frame(*extended, &error);
+    assert(view.has_value());
+    assert(view->data.size() == make_frame().rgba8.size());
 }
 
 void view_decoder_is_zero_copy_and_owned_decoder_copies() {
@@ -247,6 +293,7 @@ void imu_codec_is_packed_zero_copy_and_lossless() {
     assert(encoded.has_value());
     assert(error.empty());
     assert((*encoded)[frame_header_size] == 0x88); // fixmap(8)
+    assert(*encoded == sensor_wire_vector("ImuSampleMessage"));
 
     const auto view = view_imu_sample(*encoded, &error);
     assert(view.has_value());
@@ -290,6 +337,7 @@ void lidar_codec_is_packed_zero_copy_and_round_trips() {
     assert(encoded.has_value());
     assert(error.empty());
     assert((*encoded)[frame_header_size] == 0x8b); // fixmap(11)
+    assert(*encoded == sensor_wire_vector("LidarScanMessage"));
 
     const auto view = view_lidar_scan(*encoded, &error);
     assert(view.has_value());
@@ -401,6 +449,7 @@ void enforces_messagepack_size_limit() {
 
 int main() {
     encodes_haxeon_hmpk_and_messagepack_binary();
+    generated_codec_validates_constants_and_skips_unknown_fields();
     view_decoder_is_zero_copy_and_owned_decoder_copies();
     generic_packed_codec_supports_depth_and_segmentation_formats();
     typed_depth_codec_preserves_little_endian_r32f_values();

@@ -1,8 +1,8 @@
 #include "nativekit_sensor_wire.hpp"
 #include "msgpack.hpp"
+#include "sensor_wire_codec.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -16,9 +16,6 @@ using detail::MessagePackReader;
 using detail::MessagePackWriter;
 
 constexpr std::uint8_t hmpk_magic[] = {'H', 'M', 'P', 'K'};
-constexpr std::size_t packed_frame_field_count = 12;
-constexpr std::size_t imu_sample_field_count = 8;
-constexpr std::size_t lidar_scan_field_count = 11;
 constexpr std::uint64_t signed_int64_max =
     static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
 
@@ -72,40 +69,6 @@ bool read_le64(std::span<const std::uint8_t> bytes, std::size_t offset,
     return true;
 }
 
-void append_le_double(std::vector<std::uint8_t> &bytes, double value) {
-    std::uint64_t bits = 0;
-    static_assert(sizeof(bits) == sizeof(value));
-    std::memcpy(&bits, &value, sizeof(bits));
-    append_le64(bytes, bits);
-}
-
-bool read_le_double(std::span<const std::uint8_t> bytes, std::size_t offset,
-                    double &value) {
-    std::uint64_t bits = 0;
-    if (!read_le64(bytes, offset, bits))
-        return false;
-    static_assert(sizeof(bits) == sizeof(value));
-    std::memcpy(&value, &bits, sizeof(value));
-    return true;
-}
-
-void append_le_float(std::vector<std::uint8_t> &bytes, float value) {
-    std::uint32_t bits = 0;
-    static_assert(sizeof(bits) == sizeof(value));
-    std::memcpy(&bits, &value, sizeof(bits));
-    append_le32(bytes, bits);
-}
-
-bool read_le_float(std::span<const std::uint8_t> bytes, std::size_t offset,
-                   float &value) {
-    std::uint32_t bits = 0;
-    if (!read_le32(bytes, offset, bits))
-        return false;
-    static_assert(sizeof(bits) == sizeof(value));
-    std::memcpy(&value, &bits, sizeof(value));
-    return true;
-}
-
 bool validate_sensor_header(const SensorSampleHeader &header, std::string *error,
                            std::string_view name) {
     if (header.sensor > signed_int64_max || header.sequence > signed_int64_max ||
@@ -121,20 +84,20 @@ bool validate_sensor_header(const SensorSampleHeader &header, std::string *error
 }
 
 bool validate_imu_data(std::span<const std::uint8_t> data, std::string *error) {
-    if (data.size() != imu_packed_data_size) {
-        set_error(error, "IMU packed payload must contain exactly 24 binary64 values");
+    generated::ImuSampleData values;
+    if (!generated::detail::unpack(data, values)) {
+        set_error(error, "IMU packed payload does not match the generated layout");
         return false;
     }
-    for (std::size_t index = 0; index < imu_packed_value_count; ++index) {
-        double value = 0.0;
-        if (!read_le_double(data, index * sizeof(double), value)) {
-            set_error(error, "IMU packed payload is truncated");
-            return false;
-        }
-        if (!std::isfinite(value)) {
-            set_error(error, "IMU packed values must be finite");
-            return false;
-        }
+    const auto all_finite = [](const auto &items) {
+        return std::all_of(items.begin(), items.end(),
+                           [](double value) { return std::isfinite(value); });
+    };
+    if (!all_finite(values.angular_velocity) || !all_finite(values.linear_acceleration) ||
+        !all_finite(values.angular_velocity_covariance) ||
+        !all_finite(values.linear_acceleration_covariance)) {
+        set_error(error, "IMU packed values must be finite");
+        return false;
     }
     return true;
 }
@@ -164,19 +127,17 @@ bool validate_lidar_data(std::span<const std::uint8_t> data,
     }
 
     for (std::size_t index = 0; index < count; ++index) {
+        generated::LidarReturn value;
         const auto offset = index * lidar_packed_return_size;
-        float range = 0.0f;
-        float intensity = 0.0f;
-        if (!read_le_float(data, offset, range) ||
-            !read_le_float(data, offset + sizeof(float), intensity)) {
+        if (!generated::detail::unpack(data.subspan(offset, lidar_packed_return_size), value)) {
             set_error(error, "LiDAR packed payload is truncated");
             return false;
         }
-        if (!std::isfinite(range) || !std::isfinite(intensity)) {
+        if (!std::isfinite(value.range) || !std::isfinite(value.intensity)) {
             set_error(error, "LiDAR range and intensity values must be finite");
             return false;
         }
-        if (data[offset + 8] > 1) {
+        if (value.hit > 1) {
             set_error(error, "LiDAR hit flag is invalid");
             return false;
         }
@@ -253,37 +214,6 @@ bool validate_packed_frame(const PackedFrameView &frame, std::size_t max_bytes,
     return true;
 }
 
-bool read_field_integer(MessagePackReader &reader, std::uint64_t &value,
-                        std::string *error, std::string_view field) {
-    if (!reader.read_nonnegative(value)) {
-        set_error(error, std::string(field) + " is not a non-negative integer");
-        return false;
-    }
-    return true;
-}
-
-bool read_field_i64(MessagePackReader &reader, std::uint64_t &value, std::string *error,
-                    std::string_view field) {
-    if (!reader.read_nonnegative_i64(value)) {
-        set_error(error, std::string(field) + " is not a supported integer");
-        return false;
-    }
-    return true;
-}
-
-bool read_field_u32(MessagePackReader &reader, std::uint32_t &value, std::string *error,
-                    std::string_view field) {
-    std::uint64_t raw = 0;
-    if (!read_field_integer(reader, raw, error, field))
-        return false;
-    if (raw > std::numeric_limits<std::uint32_t>::max()) {
-        set_error(error, std::string(field) + " is out of range");
-        return false;
-    }
-    value = static_cast<std::uint32_t>(raw);
-    return true;
-}
-
 std::optional<std::span<const std::uint8_t>> messagepack_payload(
     std::span<const std::uint8_t> encoded, std::size_t max_bytes, std::string *error) {
     if (encoded.size() < frame_header_size) {
@@ -352,34 +282,20 @@ std::optional<std::vector<std::uint8_t>> encode_packed_frame(
         return std::nullopt;
     }
 
+    generated::PackedFrameMessage message;
+    message.message_type = frame.type;
+    message.sensor = frame.header.sensor;
+    message.sequence = frame.header.sequence;
+    message.capture_time = frame.header.capture_time;
+    message.delivery_time = frame.header.delivery_time;
+    message.frame = frame.header.frame;
+    message.width = frame.width;
+    message.height = frame.height;
+    message.stride = frame.stride;
+    message.pixel_format = frame.format;
+    message.data = frame.data;
     MessagePackWriter payload;
-    payload.write_map_header(packed_frame_field_count);
-
-    /* Field IDs are stable Haxeon @:wire identities. Never reuse an ID. */
-    payload.write_integer(1);
-    payload.write_integer(current_frame_version);
-    payload.write_integer(2);
-    payload.write_integer(static_cast<std::uint8_t>(frame.type));
-    payload.write_integer(3);
-    payload.write_integer(frame.header.sensor);
-    payload.write_integer(4);
-    payload.write_integer(frame.header.sequence);
-    payload.write_integer(5);
-    payload.write_float64(frame.header.capture_time);
-    payload.write_integer(6);
-    payload.write_float64(frame.header.delivery_time);
-    payload.write_integer(7);
-    payload.write_integer(frame.header.frame);
-    payload.write_integer(8);
-    payload.write_integer(frame.width);
-    payload.write_integer(9);
-    payload.write_integer(frame.height);
-    payload.write_integer(10);
-    payload.write_integer(frame.stride);
-    payload.write_integer(11);
-    payload.write_integer(static_cast<std::uint8_t>(frame.format));
-    payload.write_integer(12);
-    payload.write_binary(frame.data);
+    generated::detail::write(payload, message);
 
     return encode_hmpk_payload(payload, error, max_messagepack_bytes);
 }
@@ -409,146 +325,22 @@ std::optional<PackedFrameView> view_packed_frame(
         return std::nullopt;
 
     MessagePackReader reader(*payload);
-    std::uint32_t field_count = 0;
-    if (!reader.read_map_size(field_count)) {
-        set_error(error, "packed frame is not a MessagePack map");
+    generated::PackedFrameMessage message;
+    if (!generated::detail::read(reader, message, error))
         return std::nullopt;
-    }
 
     PackedFrameView frame;
-    bool has_version = false;
-    bool has_type = false;
-    bool has_sensor = false;
-    bool has_sequence = false;
-    bool has_capture = false;
-    bool has_delivery = false;
-    bool has_frame = false;
-    bool has_width = false;
-    bool has_height = false;
-    bool has_stride = false;
-    bool has_format = false;
-    bool has_data = false;
-
-    for (std::uint32_t index = 0; index < field_count; ++index) {
-        std::uint64_t key = 0;
-        if (!reader.read_nonnegative(key)) {
-            set_error(error, "packed frame field key is not a non-negative integer");
-            return std::nullopt;
-        }
-        switch (key) {
-        case 1: {
-            std::uint32_t version = 0;
-            if (!read_field_u32(reader, version, error, "schema version") || version != 1) {
-                if (version != 1)
-                    set_error(error, "unsupported packed frame schema version");
-                return std::nullopt;
-            }
-            has_version = true;
-            break;
-        }
-        case 2: {
-            std::uint32_t type = 0;
-            if (!read_field_u32(reader, type, error, "message type") ||
-                type > std::numeric_limits<std::uint8_t>::max()) {
-                if (type > std::numeric_limits<std::uint8_t>::max())
-                    set_error(error, "packed frame message type is out of range");
-                return std::nullopt;
-            }
-            frame.type = static_cast<MessageType>(type);
-            has_type = true;
-            break;
-        }
-        case 3: {
-            std::uint64_t value = 0;
-            if (!read_field_i64(reader, value, error, "sensor"))
-                return std::nullopt;
-            frame.header.sensor = value;
-            has_sensor = true;
-            break;
-        }
-        case 4: {
-            std::uint64_t value = 0;
-            if (!read_field_i64(reader, value, error, "sequence"))
-                return std::nullopt;
-            frame.header.sequence = value;
-            has_sequence = true;
-            break;
-        }
-        case 5:
-            if (!reader.read_float(frame.header.capture_time)) {
-                set_error(error, "capture time is not a float");
-                return std::nullopt;
-            }
-            has_capture = true;
-            break;
-        case 6:
-            if (!reader.read_float(frame.header.delivery_time)) {
-                set_error(error, "delivery time is not a float");
-                return std::nullopt;
-            }
-            has_delivery = true;
-            break;
-        case 7: {
-            std::uint64_t value = 0;
-            if (!read_field_i64(reader, value, error, "frame"))
-                return std::nullopt;
-            frame.header.frame = value;
-            has_frame = true;
-            break;
-        }
-        case 8:
-            if (!read_field_u32(reader, frame.width, error, "width"))
-                return std::nullopt;
-            has_width = true;
-            break;
-        case 9:
-            if (!read_field_u32(reader, frame.height, error, "height"))
-                return std::nullopt;
-            has_height = true;
-            break;
-        case 10:
-            if (!read_field_u32(reader, frame.stride, error, "stride"))
-                return std::nullopt;
-            has_stride = true;
-            break;
-        case 11: {
-            std::uint32_t value = 0;
-            if (!read_field_u32(reader, value, error, "pixel format") ||
-                value > std::numeric_limits<std::uint8_t>::max()) {
-                if (value > std::numeric_limits<std::uint8_t>::max())
-                    set_error(error, "packed frame pixel format is out of range");
-                return std::nullopt;
-            }
-            frame.format = static_cast<PixelFormat>(value);
-            has_format = true;
-            break;
-        }
-        case 12:
-            if (!reader.read_binary_view(frame.data)) {
-                set_error(error, "packed frame data is not MessagePack binary");
-                return std::nullopt;
-            }
-            has_data = true;
-            break;
-        default:
-            if (!reader.skip()) {
-                set_error(error, "packed frame contains an invalid unknown field");
-                return std::nullopt;
-            }
-            break;
-        }
-    }
-
-    if (!reader.at_end()) {
-        set_error(error, "packed frame MessagePack value has trailing bytes");
-        return std::nullopt;
-    }
-    if (!has_version || !has_type || !has_sensor || !has_sequence || !has_capture ||
-        !has_delivery || !has_frame || !has_width || !has_height || !has_stride ||
-        !has_format || !has_data) {
-        set_error(error, "packed frame is missing a required field");
-        return std::nullopt;
-    }
+    frame.type = message.message_type;
+    frame.header.sensor = message.sensor;
+    frame.header.sequence = message.sequence;
+    frame.header.capture_time = message.capture_time;
+    frame.header.delivery_time = message.delivery_time;
+    frame.header.frame = message.frame;
+    frame.width = message.width;
+    frame.height = message.height;
+    frame.stride = message.stride;
+    frame.format = message.pixel_format;
+    frame.data = message.data;
     if (!validate_packed_frame(frame, max_messagepack_bytes, error))
         return std::nullopt;
     return frame;
@@ -750,64 +542,39 @@ std::optional<std::vector<std::uint8_t>> encode_imu_sample(
     if (!validate_sensor_header(sample.header, error, "IMU sample"))
         return std::nullopt;
 
-    /* Keep this layout explicit: it is the stable binary contract shared by
-     * C++, Haxe, and any other transport consumer. Matrix3 is row-major. */
-    const std::array<double, imu_packed_value_count> values{
+    generated::ImuSampleData packed_data;
+    packed_data.angular_velocity = {
         sample.angular_velocity.x,
         sample.angular_velocity.y,
-        sample.angular_velocity.z,
+        sample.angular_velocity.z};
+    packed_data.linear_acceleration = {
         sample.linear_acceleration.x,
         sample.linear_acceleration.y,
-        sample.linear_acceleration.z,
-        sample.angular_velocity_covariance.values[0],
-        sample.angular_velocity_covariance.values[1],
-        sample.angular_velocity_covariance.values[2],
-        sample.angular_velocity_covariance.values[3],
-        sample.angular_velocity_covariance.values[4],
-        sample.angular_velocity_covariance.values[5],
-        sample.angular_velocity_covariance.values[6],
-        sample.angular_velocity_covariance.values[7],
-        sample.angular_velocity_covariance.values[8],
-        sample.linear_acceleration_covariance.values[0],
-        sample.linear_acceleration_covariance.values[1],
-        sample.linear_acceleration_covariance.values[2],
-        sample.linear_acceleration_covariance.values[3],
-        sample.linear_acceleration_covariance.values[4],
-        sample.linear_acceleration_covariance.values[5],
-        sample.linear_acceleration_covariance.values[6],
-        sample.linear_acceleration_covariance.values[7],
-        sample.linear_acceleration_covariance.values[8]};
-
-    std::vector<std::uint8_t> data;
-    data.reserve(imu_packed_data_size);
-    for (const auto value : values) {
-        if (!std::isfinite(value)) {
-            set_error(error, "IMU sample values must be finite");
-            return std::nullopt;
-        }
-        append_le_double(data, value);
+        sample.linear_acceleration.z};
+    packed_data.angular_velocity_covariance = sample.angular_velocity_covariance.values;
+    packed_data.linear_acceleration_covariance = sample.linear_acceleration_covariance.values;
+    const auto all_finite = [](const auto &items) {
+        return std::all_of(items.begin(), items.end(),
+                           [](double value) { return std::isfinite(value); });
+    };
+    if (!all_finite(packed_data.angular_velocity) ||
+        !all_finite(packed_data.linear_acceleration) ||
+        !all_finite(packed_data.angular_velocity_covariance) ||
+        !all_finite(packed_data.linear_acceleration_covariance)) {
+        set_error(error, "IMU sample values must be finite");
+        return std::nullopt;
     }
+    const auto data = generated::detail::pack(packed_data);
 
+    generated::ImuSampleMessage message;
+    message.sensor = sample.header.sensor;
+    message.sequence = sample.header.sequence;
+    message.capture_time = sample.header.capture_time;
+    message.delivery_time = sample.header.delivery_time;
+    message.frame = sample.header.frame;
+    message.data = data;
     MessagePackWriter payload;
-    payload.write_map_header(imu_sample_field_count);
-
-    /* Fields 1-7 deliberately match PackedFrame's shared sample header. */
-    payload.write_integer(1);
-    payload.write_integer(current_frame_version);
-    payload.write_integer(2);
-    payload.write_integer(static_cast<std::uint8_t>(MessageType::imu_sample));
-    payload.write_integer(3);
-    payload.write_integer(sample.header.sensor);
-    payload.write_integer(4);
-    payload.write_integer(sample.header.sequence);
-    payload.write_integer(5);
-    payload.write_float64(sample.header.capture_time);
-    payload.write_integer(6);
-    payload.write_float64(sample.header.delivery_time);
-    payload.write_integer(7);
-    payload.write_integer(sample.header.frame);
-    payload.write_integer(8);
-    payload.write_binary(data);
+    generated::detail::write(payload, message);
 
     return encode_hmpk_payload(payload, error, max_messagepack_bytes);
 }
@@ -820,104 +587,17 @@ std::optional<ImuSampleView> view_imu_sample(
         return std::nullopt;
 
     MessagePackReader reader(*payload);
-    std::uint32_t field_count = 0;
-    if (!reader.read_map_size(field_count)) {
-        set_error(error, "IMU sample is not a MessagePack map");
+    generated::ImuSampleMessage message;
+    if (!generated::detail::read(reader, message, error))
         return std::nullopt;
-    }
 
     ImuSampleView sample;
-    bool has_version = false;
-    bool has_type = false;
-    bool has_sensor = false;
-    bool has_sequence = false;
-    bool has_capture = false;
-    bool has_delivery = false;
-    bool has_frame = false;
-    bool has_data = false;
-
-    for (std::uint32_t index = 0; index < field_count; ++index) {
-        std::uint64_t key = 0;
-        if (!reader.read_nonnegative(key)) {
-            set_error(error, "IMU sample field key is not a non-negative integer");
-            return std::nullopt;
-        }
-        switch (key) {
-        case 1: {
-            std::uint32_t version = 0;
-            if (!read_field_u32(reader, version, error, "schema version") || version != 1) {
-                if (version != 1)
-                    set_error(error, "unsupported IMU sample schema version");
-                return std::nullopt;
-            }
-            has_version = true;
-            break;
-        }
-        case 2: {
-            std::uint32_t type = 0;
-            if (!read_field_u32(reader, type, error, "message type"))
-                return std::nullopt;
-            if (type != static_cast<std::uint8_t>(MessageType::imu_sample)) {
-                set_error(error, "MessagePack value is not an IMU sample");
-                return std::nullopt;
-            }
-            has_type = true;
-            break;
-        }
-        case 3:
-            if (!read_field_i64(reader, sample.header.sensor, error, "sensor"))
-                return std::nullopt;
-            has_sensor = true;
-            break;
-        case 4:
-            if (!read_field_i64(reader, sample.header.sequence, error, "sequence"))
-                return std::nullopt;
-            has_sequence = true;
-            break;
-        case 5:
-            if (!reader.read_float(sample.header.capture_time)) {
-                set_error(error, "capture time is not a float");
-                return std::nullopt;
-            }
-            has_capture = true;
-            break;
-        case 6:
-            if (!reader.read_float(sample.header.delivery_time)) {
-                set_error(error, "delivery time is not a float");
-                return std::nullopt;
-            }
-            has_delivery = true;
-            break;
-        case 7:
-            if (!read_field_i64(reader, sample.header.frame, error, "frame"))
-                return std::nullopt;
-            has_frame = true;
-            break;
-        case 8:
-            if (!reader.read_binary_view(sample.data)) {
-                set_error(error, "IMU sample data is not MessagePack binary");
-                return std::nullopt;
-            }
-            has_data = true;
-            break;
-        default:
-            if (!reader.skip()) {
-                set_error(error, "IMU sample contains an invalid unknown field");
-                return std::nullopt;
-            }
-            break;
-        }
-    }
-
-    if (!reader.at_end()) {
-        set_error(error, "IMU sample MessagePack value has trailing bytes");
-        return std::nullopt;
-    }
-    if (!has_version || !has_type || !has_sensor || !has_sequence || !has_capture ||
-        !has_delivery || !has_frame || !has_data) {
-        set_error(error, "IMU sample is missing a required field");
-        return std::nullopt;
-    }
+    sample.header.sensor = message.sensor;
+    sample.header.sequence = message.sequence;
+    sample.header.capture_time = message.capture_time;
+    sample.header.delivery_time = message.delivery_time;
+    sample.header.frame = message.frame;
+    sample.data = message.data;
     if (!validate_sensor_header(sample.header, error, "IMU sample") ||
         !validate_imu_data(sample.data, error))
         return std::nullopt;
@@ -931,22 +611,22 @@ std::optional<ImuSample> decode_imu_sample(
     if (!view.has_value())
         return std::nullopt;
 
-    std::array<double, imu_packed_value_count> values{};
-    for (std::size_t index = 0; index < values.size(); ++index) {
-        if (!read_le_double(view->data, index * sizeof(double), values[index])) {
-            set_error(error, "IMU packed payload is truncated");
-            return std::nullopt;
-        }
+    generated::ImuSampleData packed_data;
+    if (!generated::detail::unpack(view->data, packed_data)) {
+        set_error(error, "IMU packed payload is truncated");
+        return std::nullopt;
     }
 
     ImuSample sample;
     sample.header = view->header;
-    sample.angular_velocity = {values[0], values[1], values[2]};
-    sample.linear_acceleration = {values[3], values[4], values[5]};
-    std::copy(values.begin() + 6, values.begin() + 15,
-              sample.angular_velocity_covariance.values.begin());
-    std::copy(values.begin() + 15, values.end(),
-              sample.linear_acceleration_covariance.values.begin());
+    sample.angular_velocity = {packed_data.angular_velocity[0],
+                               packed_data.angular_velocity[1],
+                               packed_data.angular_velocity[2]};
+    sample.linear_acceleration = {packed_data.linear_acceleration[0],
+                                  packed_data.linear_acceleration[1],
+                                  packed_data.linear_acceleration[2]};
+    sample.angular_velocity_covariance.values = packed_data.angular_velocity_covariance;
+    sample.linear_acceleration_covariance.values = packed_data.linear_acceleration_covariance;
     return sample;
 }
 
@@ -974,46 +654,29 @@ std::optional<std::vector<std::uint8_t>> encode_lidar_scan(
     std::vector<std::uint8_t> data;
     data.reserve(count * lidar_packed_return_size);
     for (const auto &value : scan.returns) {
-        const auto range = static_cast<float>(value.range);
-        const auto intensity = static_cast<float>(value.intensity);
-        if (!std::isfinite(range) || !std::isfinite(intensity)) {
+        generated::LidarReturn packed_return;
+        packed_return.range = static_cast<float>(value.range);
+        packed_return.intensity = static_cast<float>(value.intensity);
+        packed_return.hit = value.hit ? 1 : 0;
+        if (!std::isfinite(packed_return.range) || !std::isfinite(packed_return.intensity)) {
             set_error(error, "LiDAR range and intensity values must be finite");
             return std::nullopt;
         }
-        append_le_float(data, range);
-        append_le_float(data, intensity);
-        data.push_back(value.hit ? 1 : 0);
-        data.push_back(0);
-        data.push_back(0);
-        data.push_back(0);
+        const auto packed_bytes = generated::detail::pack(packed_return);
+        data.insert(data.end(), packed_bytes.begin(), packed_bytes.end());
     }
 
+    generated::LidarScanMessage message;
+    message.sensor = scan.header.sensor;
+    message.sequence = scan.header.sequence;
+    message.capture_time = scan.header.capture_time;
+    message.delivery_time = scan.header.delivery_time;
+    message.frame = scan.header.frame;
+    message.horizontal_count = scan.horizontal_count;
+    message.vertical_count = scan.vertical_count;
+    message.data = data;
     MessagePackWriter payload;
-    payload.write_map_header(lidar_scan_field_count);
-
-    /* Fields 1-7 deliberately match the other SensorWire measurements. */
-    payload.write_integer(1);
-    payload.write_integer(current_frame_version);
-    payload.write_integer(2);
-    payload.write_integer(static_cast<std::uint8_t>(MessageType::lidar_scan));
-    payload.write_integer(3);
-    payload.write_integer(scan.header.sensor);
-    payload.write_integer(4);
-    payload.write_integer(scan.header.sequence);
-    payload.write_integer(5);
-    payload.write_float64(scan.header.capture_time);
-    payload.write_integer(6);
-    payload.write_float64(scan.header.delivery_time);
-    payload.write_integer(7);
-    payload.write_integer(scan.header.frame);
-    payload.write_integer(8);
-    payload.write_integer(scan.horizontal_count);
-    payload.write_integer(9);
-    payload.write_integer(scan.vertical_count);
-    payload.write_integer(10);
-    payload.write_integer(lidar_packed_return_size);
-    payload.write_integer(11);
-    payload.write_binary(data);
+    generated::detail::write(payload, message);
 
     return encode_hmpk_payload(payload, error, max_messagepack_bytes);
 }
@@ -1026,123 +689,20 @@ std::optional<LidarScanView> view_lidar_scan(
         return std::nullopt;
 
     MessagePackReader reader(*payload);
-    std::uint32_t field_count = 0;
-    if (!reader.read_map_size(field_count)) {
-        set_error(error, "LiDAR scan is not a MessagePack map");
+    generated::LidarScanMessage message;
+    if (!generated::detail::read(reader, message, error))
         return std::nullopt;
-    }
 
     LidarScanView scan;
-    bool has_version = false;
-    bool has_type = false;
-    bool has_sensor = false;
-    bool has_sequence = false;
-    bool has_capture = false;
-    bool has_delivery = false;
-    bool has_frame = false;
-    bool has_horizontal = false;
-    bool has_vertical = false;
-    bool has_stride = false;
-    bool has_data = false;
-
-    for (std::uint32_t index = 0; index < field_count; ++index) {
-        std::uint64_t key = 0;
-        if (!reader.read_nonnegative(key)) {
-            set_error(error, "LiDAR scan field key is not a non-negative integer");
-            return std::nullopt;
-        }
-        switch (key) {
-        case 1: {
-            std::uint32_t version = 0;
-            if (!read_field_u32(reader, version, error, "schema version") || version != 1) {
-                if (version != 1)
-                    set_error(error, "unsupported LiDAR scan schema version");
-                return std::nullopt;
-            }
-            has_version = true;
-            break;
-        }
-        case 2: {
-            std::uint32_t type = 0;
-            if (!read_field_u32(reader, type, error, "message type"))
-                return std::nullopt;
-            if (type != static_cast<std::uint8_t>(MessageType::lidar_scan)) {
-                set_error(error, "MessagePack value is not a LiDAR scan");
-                return std::nullopt;
-            }
-            has_type = true;
-            break;
-        }
-        case 3:
-            if (!read_field_i64(reader, scan.header.sensor, error, "sensor"))
-                return std::nullopt;
-            has_sensor = true;
-            break;
-        case 4:
-            if (!read_field_i64(reader, scan.header.sequence, error, "sequence"))
-                return std::nullopt;
-            has_sequence = true;
-            break;
-        case 5:
-            if (!reader.read_float(scan.header.capture_time)) {
-                set_error(error, "capture time is not a float");
-                return std::nullopt;
-            }
-            has_capture = true;
-            break;
-        case 6:
-            if (!reader.read_float(scan.header.delivery_time)) {
-                set_error(error, "delivery time is not a float");
-                return std::nullopt;
-            }
-            has_delivery = true;
-            break;
-        case 7:
-            if (!read_field_i64(reader, scan.header.frame, error, "frame"))
-                return std::nullopt;
-            has_frame = true;
-            break;
-        case 8:
-            if (!read_field_u32(reader, scan.horizontal_count, error, "horizontal count"))
-                return std::nullopt;
-            has_horizontal = true;
-            break;
-        case 9:
-            if (!read_field_u32(reader, scan.vertical_count, error, "vertical count"))
-                return std::nullopt;
-            has_vertical = true;
-            break;
-        case 10:
-            if (!read_field_u32(reader, scan.return_stride, error, "return stride"))
-                return std::nullopt;
-            has_stride = true;
-            break;
-        case 11:
-            if (!reader.read_binary_view(scan.data)) {
-                set_error(error, "LiDAR scan data is not MessagePack binary");
-                return std::nullopt;
-            }
-            has_data = true;
-            break;
-        default:
-            if (!reader.skip()) {
-                set_error(error, "LiDAR scan contains an invalid unknown field");
-                return std::nullopt;
-            }
-            break;
-        }
-    }
-
-    if (!reader.at_end()) {
-        set_error(error, "LiDAR scan MessagePack value has trailing bytes");
-        return std::nullopt;
-    }
-    if (!has_version || !has_type || !has_sensor || !has_sequence || !has_capture ||
-        !has_delivery || !has_frame || !has_horizontal || !has_vertical || !has_stride ||
-        !has_data) {
-        set_error(error, "LiDAR scan is missing a required field");
-        return std::nullopt;
-    }
+    scan.header.sensor = message.sensor;
+    scan.header.sequence = message.sequence;
+    scan.header.capture_time = message.capture_time;
+    scan.header.delivery_time = message.delivery_time;
+    scan.header.frame = message.frame;
+    scan.horizontal_count = message.horizontal_count;
+    scan.vertical_count = message.vertical_count;
+    scan.return_stride = message.return_stride;
+    scan.data = message.data;
     if (!validate_sensor_header(scan.header, error, "LiDAR scan") ||
         !validate_lidar_data(scan.data, scan.horizontal_count, scan.vertical_count,
                              scan.return_stride, max_messagepack_bytes, error))
@@ -1168,17 +728,16 @@ std::optional<LidarScan> decode_lidar_scan(
     scan.returns.resize(count);
     for (std::size_t index = 0; index < count; ++index) {
         const auto offset = index * lidar_packed_return_size;
-        float range = 0.0f;
-        float intensity = 0.0f;
-        if (!read_le_float(view->data, offset, range) ||
-            !read_le_float(view->data, offset + sizeof(float), intensity)) {
+        generated::LidarReturn packed_return;
+        if (!generated::detail::unpack(
+                view->data.subspan(offset, lidar_packed_return_size), packed_return)) {
             set_error(error, "LiDAR packed payload is truncated");
             return std::nullopt;
         }
         auto &value = scan.returns[index];
-        value.hit = view->data[offset + 8] != 0;
-        value.range = static_cast<double>(range);
-        value.intensity = static_cast<double>(intensity);
+        value.hit = packed_return.hit != 0;
+        value.range = static_cast<double>(packed_return.range);
+        value.intensity = static_cast<double>(packed_return.intensity);
     }
     return scan;
 }

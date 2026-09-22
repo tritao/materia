@@ -28,14 +28,13 @@ sensor_render  SceneKit GPU rendering and RGBA8 camera capture
 versioned `HMPK` envelope and encodes image-like sensor data as one
 integer-keyed MessagePack map whose payload is a packed binary field. Camera,
 depth, and segmentation share this `PackedFrame` wire shape; `messageType` and
-`pixelFormat` select the interpretation of the data. The integer field IDs are
-stable `@:wire` identities: schema version (1), message type (2), sensor (3),
-sequence (4), capture time (5), delivery time (6), frame (7), width (8), height
-(9), stride (10), pixel format (11), and image data (12). The C++ decoder
-provides a generic `PackedFrameView` whose data span points directly into the
-encoded message, an owning `PackedFrame`, and typed camera, depth, and
-segmentation wrappers. The matching Haxeon record is in
-`sensor_io/haxe/materia/sensor/wire/PackedFrameMessage.hx`.
+`pixelFormat` select the interpretation of the data. The canonical definitions
+and field tables live in [`schema/sensor_wire.nkw`](schema/sensor_wire.nkw) and
+the generated [wire reference](sensor_io/generated/sensor_wire.md). The C++
+decoder provides a generic `PackedFrameView` whose data span points directly
+into the encoded message, an owning `PackedFrame`, and typed camera, depth, and
+segmentation wrappers. Generated Haxeon records are checked in under
+`sensor_io/haxe/materia/sensor/wire/`.
 
 The initial packed formats are RGBA8 camera data, little-endian R32F depth,
 little-endian R32U or U64 segmentation labels. Payloads are tightly packed
@@ -135,3 +134,10 @@ cmake -S sensorkit -B /tmp/materia-sensorkit-build -DNK_BUILD_TESTS=ON
 cmake --build /tmp/materia-sensorkit-build
 ctest --test-dir /tmp/materia-sensorkit-build --output-on-failure
 ```
+
+Regenerate the checked-in protocol artifacts with
+`cmake --build /tmp/materia-sensorkit-build --target sensor_wire_generate`.
+CTest checks that generation is current and exercises the schema validator.
+When the sibling Haxeon checkout and local toolchain are available, the
+`sensor_wire_haxe_vectors` target compiles the generated Haxe records and checks
+them against the same HMPK vectors used by the C++ tests.

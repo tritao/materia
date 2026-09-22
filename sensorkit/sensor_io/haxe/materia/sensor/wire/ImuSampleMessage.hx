@@ -3,19 +3,13 @@ package materia.sensor.wire;
 import haxe.Int64;
 import haxe.io.Bytes;
 
-/**
- * Haxeon representation of SensorKit's v1 packed IMU wire value.
- *
- * `data` contains 24 little-endian IEEE-754 binary64 values in this order:
- * angular velocity xyz, linear acceleration xyz, angular-velocity covariance
- * row-major, and linear-acceleration covariance row-major.
- */
+/** Generated from schema/sensor_wire.nkw. Do not edit by hand. */
 @:wire
 class ImuSampleMessage {
 	@:id(1)
-	public var schemaVersion:Int;
+	public var schemaVersion:Int = 1;
 	@:id(2)
-	public var messageType:Int;
+	public var messageType:Int = 4;
 	@:id(3)
 	public var sensor:Int64;
 	@:id(4)

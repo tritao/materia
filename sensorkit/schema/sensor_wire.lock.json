@@ -1,0 +1,330 @@
+{
+  "constants": {
+    "CURRENT_FRAME_VERSION": 1
+  },
+  "enums": {
+    "MessageType": {
+      "underlying": "u8",
+      "values": {
+        "camera_frame": 1,
+        "depth_frame": 2,
+        "imu_sample": 4,
+        "lidar_scan": 5,
+        "segmentation_frame": 3
+      }
+    },
+    "PixelFormat": {
+      "underlying": "u8",
+      "values": {
+        "r32f_le": 2,
+        "r32u_le": 3,
+        "rgba8": 1,
+        "u64_le": 4
+      }
+    }
+  },
+  "messages": {
+    "ImuSampleMessage": {
+      "fields": [
+        {
+          "constant": true,
+          "id": 1,
+          "name": "schema_version",
+          "type": "u8",
+          "value": 1
+        },
+        {
+          "constant": true,
+          "id": 2,
+          "name": "message_type",
+          "type": "MessageType",
+          "value": 4
+        },
+        {
+          "constant": false,
+          "id": 3,
+          "name": "sensor",
+          "type": "u64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 4,
+          "name": "sequence",
+          "type": "u64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 5,
+          "name": "capture_time",
+          "type": "f64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 6,
+          "name": "delivery_time",
+          "type": "f64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 7,
+          "name": "frame",
+          "type": "u64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 8,
+          "name": "data",
+          "type": "bytes",
+          "value": null
+        }
+      ],
+      "reserved": [
+        [
+          9,
+          31
+        ]
+      ]
+    },
+    "LidarScanMessage": {
+      "fields": [
+        {
+          "constant": true,
+          "id": 1,
+          "name": "schema_version",
+          "type": "u8",
+          "value": 1
+        },
+        {
+          "constant": true,
+          "id": 2,
+          "name": "message_type",
+          "type": "MessageType",
+          "value": 5
+        },
+        {
+          "constant": false,
+          "id": 3,
+          "name": "sensor",
+          "type": "u64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 4,
+          "name": "sequence",
+          "type": "u64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 5,
+          "name": "capture_time",
+          "type": "f64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 6,
+          "name": "delivery_time",
+          "type": "f64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 7,
+          "name": "frame",
+          "type": "u64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 8,
+          "name": "horizontal_count",
+          "type": "u32",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 9,
+          "name": "vertical_count",
+          "type": "u32",
+          "value": null
+        },
+        {
+          "constant": true,
+          "id": 10,
+          "name": "return_stride",
+          "type": "u32",
+          "value": 12
+        },
+        {
+          "constant": false,
+          "id": 11,
+          "name": "data",
+          "type": "bytes",
+          "value": null
+        }
+      ],
+      "reserved": [
+        [
+          12,
+          31
+        ]
+      ]
+    },
+    "PackedFrameMessage": {
+      "fields": [
+        {
+          "constant": true,
+          "id": 1,
+          "name": "schema_version",
+          "type": "u8",
+          "value": 1
+        },
+        {
+          "constant": false,
+          "id": 2,
+          "name": "message_type",
+          "type": "MessageType",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 3,
+          "name": "sensor",
+          "type": "u64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 4,
+          "name": "sequence",
+          "type": "u64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 5,
+          "name": "capture_time",
+          "type": "f64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 6,
+          "name": "delivery_time",
+          "type": "f64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 7,
+          "name": "frame",
+          "type": "u64",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 8,
+          "name": "width",
+          "type": "u32",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 9,
+          "name": "height",
+          "type": "u32",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 10,
+          "name": "stride",
+          "type": "u32",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 11,
+          "name": "pixel_format",
+          "type": "PixelFormat",
+          "value": null
+        },
+        {
+          "constant": false,
+          "id": 12,
+          "name": "data",
+          "type": "bytes",
+          "value": null
+        }
+      ],
+      "reserved": [
+        [
+          13,
+          31
+        ]
+      ]
+    }
+  },
+  "packed_structs": {
+    "ImuSampleData": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 3,
+          "name": "angular_velocity",
+          "type": "f64"
+        },
+        {
+          "length": 3,
+          "name": "linear_acceleration",
+          "type": "f64"
+        },
+        {
+          "length": 9,
+          "name": "angular_velocity_covariance",
+          "type": "f64"
+        },
+        {
+          "length": 9,
+          "name": "linear_acceleration_covariance",
+          "type": "f64"
+        }
+      ],
+      "size": 192
+    },
+    "LidarReturn": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "range",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "intensity",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "hit",
+          "type": "u8"
+        },
+        {
+          "length": 3,
+          "name": "reserved",
+          "type": "u8"
+        }
+      ],
+      "size": 12
+    }
+  },
+  "version": 1
+}

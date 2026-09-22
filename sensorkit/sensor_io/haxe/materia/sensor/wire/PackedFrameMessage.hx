@@ -3,18 +3,11 @@ package materia.sensor.wire;
 import haxe.Int64;
 import haxe.io.Bytes;
 
-/**
- * Haxeon representation of SensorKit's v1 packed-frame wire value.
- *
- * Camera, depth, segmentation, and future image-like sensors share this one
- * record. `messageType` and `pixelFormat` select the interpretation of `data`.
- * The native encoder wraps MessagePack.encode(PackedFrameMessage) in
- * haxeon.wire.MessagePackFrame.
- */
+/** Generated from schema/sensor_wire.nkw. Do not edit by hand. */
 @:wire
 class PackedFrameMessage {
 	@:id(1)
-	public var schemaVersion:Int;
+	public var schemaVersion:Int = 1;
 	@:id(2)
 	public var messageType:Int;
 	@:id(3)

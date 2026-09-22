@@ -1,0 +1,75 @@
+# SensorKit v1 wire schema. Field IDs are permanent within each message.
+
+const CURRENT_FRAME_VERSION : u8 = 1;
+
+enum MessageType : u8 {
+    camera_frame = 1
+    depth_frame = 2
+    segmentation_frame = 3
+    imu_sample = 4
+    lidar_scan = 5
+}
+
+enum PixelFormat : u8 {
+    rgba8 = 1
+    r32f_le = 2
+    r32u_le = 3
+    u64_le = 4
+}
+
+message PackedFrameMessage {
+    1 schema_version : u8 constant = CURRENT_FRAME_VERSION
+    2 message_type : MessageType
+    3 sensor : u64
+    4 sequence : u64
+    5 capture_time : f64
+    6 delivery_time : f64
+    7 frame : u64
+    8 width : u32
+    9 height : u32
+    10 stride : u32
+    11 pixel_format : PixelFormat
+    12 data : bytes
+    reserved 13..31;
+}
+
+message ImuSampleMessage {
+    1 schema_version : u8 constant = CURRENT_FRAME_VERSION
+    2 message_type : MessageType constant = imu_sample
+    3 sensor : u64
+    4 sequence : u64
+    5 capture_time : f64
+    6 delivery_time : f64
+    7 frame : u64
+    8 data : bytes
+    reserved 9..31;
+}
+
+message LidarScanMessage {
+    1 schema_version : u8 constant = CURRENT_FRAME_VERSION
+    2 message_type : MessageType constant = lidar_scan
+    3 sensor : u64
+    4 sequence : u64
+    5 capture_time : f64
+    6 delivery_time : f64
+    7 frame : u64
+    8 horizontal_count : u32
+    9 vertical_count : u32
+    10 return_stride : u32 constant = sizeof(LidarReturn)
+    11 data : bytes
+    reserved 12..31;
+}
+
+packed ImuSampleData endian little {
+    angular_velocity : f64[3]
+    linear_acceleration : f64[3]
+    angular_velocity_covariance : f64[9]
+    linear_acceleration_covariance : f64[9]
+}
+
+packed LidarReturn endian little {
+    range : f32
+    intensity : f32
+    hit : u8
+    reserved : u8[3]
+}
