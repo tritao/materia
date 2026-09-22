@@ -106,6 +106,38 @@ objects. It does not introduce a second world model. `ReplayRobot`, recording,
 and `WorldBehaviorRunner` use the same `Robot`/snapshot/command boundary for
 offline debugging and behavior reuse.
 
+### Persistent recordings
+
+`McapRobotRecording` preserves the in-memory `RobotRecording` while enqueueing
+versioned JSON payloads to a bounded native writer thread. Call `close()` to
+drain the queue and write the MCAP footer. Queue overflow, I/O failure, and a
+writer destroyed without a clean finish are explicit failures; `status()`
+exposes accepted, written, queued, and dropped counts. Files are currently
+uncompressed for straightforward inspection.
+
+Every message carries a recording-wide 64-bit ordinal. It is the sole replay
+ordering key: robot and sensor source timestamps retain their clock-domain IDs
+and are never compared across domains. Wide sequences and timestamps are JSON
+decimal strings, avoiding precision loss in generic JSON tools. Payload schemas
+cover commands, robot snapshots, individual sensor frames, faults, world
+snapshots, and world lifecycle events. Recorded commands are history only;
+loading a file never forwards them to a live adapter.
+
+```haxe
+var writer = new McapRobotRecording("session.mcap", 1024);
+writer.recordSnapshot(robot.snapshot());
+writer.close();
+
+var recording = McapRecordingReader.load("session.mcap");
+var replay = new ReplayRobot("offline", recording);
+while (replay.advance()) { /* deterministic single-step playback */ }
+```
+
+The native dependency is pinned to MCAP C++ 2.1.3. To independently inspect a
+fixture with the official Python MCAP implementation, retain the test file with
+`ROBOTKIT_KEEP_MCAP=1` and open it using `mcap.reader.make_reader`; CI/native
+tests also reject truncated files and unknown schemas.
+
 `robotkit/tests/world-tcp.sh` exercises the same `HoldJointBehavior` against a
 local `SimulatedRobot` and a TCP-connected `RemoteRobot` hosted by `robotd`.
 Three successive targets check command counts, unchanged-snapshot suppression,

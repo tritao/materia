@@ -30,6 +30,10 @@ import robotkit.world.SensorFrame;
 import robotkit.world.ReplayRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.RobotRecordingEvent;
+import robotkit.world.McapRobotRecording;
+import robotkit.world.McapRecordingReader;
+import robotkit.world.RobotRecordingCodec;
+import robotkit.world.RobotRecordingEntry;
 import robotkit.behavior.HoldJointBehavior;
 import robotkit.behavior.WorldBehaviorRunner;
 import robotkit.worldd.WorldHost;
@@ -43,6 +47,7 @@ class RobotWorldTests {
     testCrossThreadEventQueue();
     testImmutableSnapshots();
     testRecordingEventLog();
+    testMcapRoundTrip();
     testForwardingAndLifecycle();
     testMixedSimulatedAndRemoteWorld();
     testRuntimeUsesCompiledJointRate();
@@ -53,6 +58,47 @@ class RobotWorldTests {
     testSensorResetPublication();
     testConfiguredSensors();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
+  }
+
+  static function testMcapRoundTrip():Void {
+    var path = '/tmp/robotkit-${Sys.getPid()}-roundtrip.mcap';
+    var writer = new McapRobotRecording(path, 32);
+    var sensor = new SensorFrame("lidar/front", "lidar", "frame/front",
+      Int64.parseString("9007199254740993"), Int64.parseString("9223372036854775000"),
+      [1.25, 2.5], Int64.parseString("9223372036854775001"), "link/base",
+      [0.1, 0.2, 0.3], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2", "host.monotonic");
+    var first = new RobotSnapshot("robot-a", Int64.parseString("9007199254740995"),
+      Int64.parseString("9223372036854775000"), [0.5], [0.25], [0.125], 1, 0,
+      Int64.parseString("9223372036854775002"), [sensor], "robot-a.reset-2", "host.monotonic");
+    var second = new RobotSnapshot("robot-b", Int64.ofInt(3), Int64.ofInt(10),
+      [0.75], [], [], 1, 0, Int64.ofInt(20), [], "robot-b.boot-1", "host.monotonic");
+    writer.recordCommand(RobotCommand.JointPosition(0, 0.75, Int64.parseString("9223372036854775003")), "robot-a");
+    writer.recordSnapshot(first);
+    writer.recordSensor("robot-a", sensor);
+    writer.recordFault(new RobotFault("robot-b", 42, "recorded fault", false));
+    var robots = new Map<RobotId,RobotSnapshot>(); robots.set(first.id,first); robots.set(second.id,second);
+    writer.recordWorld(new robotkit.world.WorldSnapshot(7,2,Int64.ofInt(0),robots,Int64.ofInt(50)));
+    writer.recordEvent(RobotWorldEvent.RobotChanged("robot-a"));
+    writer.close();
+
+    var loaded = McapRecordingReader.load(path);
+    equal(loaded.entries.length, 6, "MCAP reload preserves every event type");
+    equal(loaded.snapshots[0].sourceTimestampNs, first.sourceTimestampNs, "MCAP preserves exact 64-bit timestamps");
+    equal(loaded.snapshots[0].sourceSequence, first.sourceSequence, "MCAP preserves exact 64-bit sequences");
+    equal(loaded.snapshots[0].sourceClockId, "robot-a.reset-2", "MCAP preserves reset clock identity");
+    equal(loaded.snapshots[0].sensors.get(0).frameId, "frame/front", "MCAP preserves sensor frame identity");
+    equal(loaded.snapshots[0].sensors.get(0).mountPosition.get(2), 0.3, "MCAP preserves sensor mount");
+    equal(loaded.worlds[0].robotIds().length, 2, "MCAP preserves multiple robots");
+    for (index in 0...loaded.entries.length) equal(loaded.entries[index].ordinal, Int64.ofInt(index), "MCAP uses arrival ordinals");
+    var replay = new ReplayRobot("robot-a", loaded);
+    var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25));
+    equal(behavior.update(replay), 1, "reloaded observations use unchanged behavior APIs");
+    replay.close();
+    if (Sys.getEnv("ROBOTKIT_KEEP_MCAP") == null) sys.FileSystem.deleteFile(path);
+    else Sys.println('RobotKit MCAP fixture: $path');
+    var unsupported = haxe.io.Bytes.ofString('{"version":2,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
+    throws(function() RobotRecordingCodec.decode(unsupported), "unsupported recording schema rejected");
+    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString("{")), "malformed recording payload rejected");
   }
 
   static function testConfiguredSensors():Void {

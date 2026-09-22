@@ -270,6 +270,14 @@ or recorded state without backend conditionals. `worldd` is only a headless
 composition of `RobotWorld` plus `Simulation`; it does not create a parallel
 domain model.
 
+Persistent recording is an adapter below the world boundary. Haxe owns the
+versioned RobotKit payload contract; a small C ABI owns a bounded queue and the
+MCAP reader/writer. Neither MCAP headers nor MCAP concepts appear in `Robot`,
+`RobotWorld`, behavior contexts, or runtime observation contracts. The writer
+uses one channel/schema per event kind and no compression. MCAP log/publish
+times are the recording ordinal rather than a source time, making file order
+deterministic even for equal timestamps, unrelated clocks, or clock resets.
+
 World-level behaviors leave command deadlines unset. Nonzero world-command
 deadlines are currently rejected rather than ignored or translated without a
 clock mapping. Local runtime behaviors may use bounded `IntentBuffer` expiry;

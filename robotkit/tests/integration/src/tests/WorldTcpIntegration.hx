@@ -7,6 +7,9 @@ import robotkit.world.RobotStatus;
 import robotkit.world.RobotWorld;
 import robotkit.behavior.HoldJointBehavior;
 import robotkit.behavior.WorldBehaviorRunner;
+import robotkit.world.McapRobotRecording;
+import robotkit.world.McapRecordingReader;
+import robotkit.world.ReplayRobot;
 
 /** End-to-end assertion of the world adapter against a real robotd TCP peer. */
 class WorldTcpIntegration {
@@ -81,12 +84,16 @@ class WorldTcpIntegration {
       // Same behavior instance, fresh runner per adapter. Compare settled values,
       // not sequence numbers or timestamps from independently ticking clocks.
       var tick = 3;
+      var recordingPath = '/tmp/robotkit-world-tcp-${Sys.getPid()}.mcap';
+      var recording = new McapRobotRecording(recordingPath, 64);
+      var recordedTargets:Array<Float> = [];
       for (target in [-0.4, 0.75, 0.0]) {
         var shared = new HoldJointBehavior(0, target);
         var localRunner = new WorldBehaviorRunner(shared);
         var remoteRunner = new WorldBehaviorRunner(shared);
         if (localRunner.update(local) != 1 || remoteRunner.update(remote) != 1)
           throw "shared behavior did not emit one command on each adapter";
+        recording.recordCommand(robotkit.world.RobotCommand.JointPosition(0,target,null), LOGICAL_ID);
         if (localRunner.update(local) != 0 || remoteRunner.update(remote) != 0)
           throw "runner emitted duplicate commands for an unchanged snapshot";
         simulation.step(Int64.ofInt(tick++));
@@ -100,6 +107,8 @@ class WorldTcpIntegration {
         }, "shared behavior failed to converge remotely");
         var expected = local.snapshot();
         var actual = remote.snapshot();
+        recording.recordSnapshot(actual);
+        recordedTargets.push(target);
         if (expected.positions.get(0) != target || actual.positions.get(0) != expected.positions.get(0)
             || expected.faultCode != 0 || actual.faultCode != 0)
           throw "local and remote behavior outcomes differ";
@@ -121,6 +130,17 @@ class WorldTcpIntegration {
           if (!found) throw "remote sensor identity missing";
         }
       }
+      recording.close();
+      var loaded = McapRecordingReader.load(recordingPath);
+      var replay = new ReplayRobot(LOGICAL_ID, loaded);
+      for (index in 0...recordedTargets.length) {
+        if (index > 0 && !replay.advance()) throw "replay ended before recorded observations";
+        if (replay.snapshot().positions.get(0) != recordedTargets[index])
+          throw "replay changed the recorded observation sequence";
+        if (new WorldBehaviorRunner(new HoldJointBehavior(0,recordedTargets[index])).update(replay) != 1)
+          throw "replayed observation changed behavior output";
+      }
+      replay.close(); sys.FileSystem.deleteFile(recordingPath);
       Sys.println("Shared behavior parity passed: three targets, local simulation and robotd TCP");
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
