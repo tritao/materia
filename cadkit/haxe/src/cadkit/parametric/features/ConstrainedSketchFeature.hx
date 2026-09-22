@@ -13,6 +13,10 @@ import cadkit.sketch.SketchSolveError;
 import cadkit.sketch.SketchPoint;
 import cadkit.sketch.SketchEntity;
 import cadkit.parametric.features.ConstrainedSketchChange;
+import cadkit.parametric.FeatureId;
+import cadkit.parametric.SelectionRecipe;
+import cadkit.modeling.Vector;
+import cadkit.sketch.FaceWorkplane;
 
 /** Serializable document feature backed by an authored constrained sketch. */
 class ConstrainedSketchFeature extends Feature {
@@ -23,8 +27,14 @@ class ConstrainedSketchFeature extends Feature {
 	public var lastAttemptDiagnostic(default,null):Null<SolveDiagnostic>;
 	private var committedSolution:Null<SolvedSketch>;
 	private var pendingSolution:Null<SolvedSketch>;
+	public final support:Null<Feature>;
+	public final supportSelection:Null<SelectionRecipe>;
+	public final supportXDirection:Null<Vector>;
+	public final supportOffset:Float;
+	public final supportFlipped:Bool;
 
-	public function new(authored:ConstrainedSketch) {
+	public function new(authored:ConstrainedSketch, ?support:Feature, ?supportSelection:SelectionRecipe, ?supportXDirection:Vector,
+		supportOffset:Float = 0, supportFlipped:Bool = false) {
 		super();
 		this.authored = authored.copy();
 		dimensionSlots = new Map();
@@ -33,6 +43,13 @@ class ConstrainedSketchFeature extends Feature {
 		lastAttemptDiagnostic = null;
 		committedSolution = null;
 		pendingSolution = null;
+		this.support = support;
+		this.supportSelection = supportSelection;
+		this.supportXDirection = supportXDirection;
+		this.supportOffset = supportOffset;
+		this.supportFlipped = supportFlipped;
+		if ((support == null) != (supportSelection == null) || (support != null && supportXDirection == null))
+			throw "attached constrained sketches require support, selection, and X direction together";
 		for (constraint in authored.constraints())
 			if (isDimensional(constraint.kind)) {
 				dimensionSlots.set(constraint.id,
@@ -194,8 +211,19 @@ class ConstrainedSketchFeature extends Feature {
 		return "constrained-sketch";
 	}
 
+	override public function dependencies():Array<FeatureId> {
+		return support == null ? [] : [support.id];
+	}
+
+	override public function dependencyFeatures():Array<Feature> {
+		return support == null ? [] : [support];
+	}
+
 	override public function evaluate(context:EvaluationContext):EvaluationResult {
-		var candidate = new ConstrainedSketch(authored.plane, authored.units, authored.settings);
+		var plane = authored.plane;
+		if (support != null)
+			plane = FaceWorkplane.resolve(context.shape(support), supportSelection, supportXDirection, supportOffset, supportFlipped);
+		var candidate = new ConstrainedSketch(plane, authored.units, authored.settings);
 		for (point in authored.points())
 			candidate.addPoint(point);
 		for (entity in authored.entities())

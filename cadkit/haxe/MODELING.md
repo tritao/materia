@@ -195,7 +195,11 @@ sampling is used only for intersection and containment validation.
 parameters and supports controlled entity and constraint edits. These edits
 participate in document transactions and undo/redo. The document codec stores
 the current authored model, workplane, solver settings, IDs, and parameter
-bindings. See `ConstrainedMountingPlate.hx` and
+bindings. A constrained sketch may also depend on a supporting solid and derive
+its workplane from exactly one planar `SelectionRecipe`. The attached plane
+uses an explicit projected X direction and supports normal flipping and signed
+offset. It is recomputed from the staged supporting shape, while authored point
+coordinates and dimensions remain local to the plane. See `ConstrainedMountingPlate.hx` and
 `ConstrainedSlottedBracket.hx` for complete editable examples.
 
 ## Validation

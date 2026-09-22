@@ -14,6 +14,8 @@ import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.recording.DocumentBuilder;
+import cadkit.parametric.SelectionRecipe;
+import cadkit.parametric.features.BoxFeature;
 
 class ConstrainedSketchSmoke {
 	static function check(value:Bool, message:String):Void { if (!value) throw message; }
@@ -289,6 +291,37 @@ class ConstrainedSketchSmoke {
 		near(symmetricDocument.result().bounds().get_min().get_z(), -2.5);
 		near(symmetricDocument.result().bounds().get_max().get_z(), 2.5);
 		symmetricDocument.close();
+
+		var attachedModel = new ConstrainedSketch();
+		attachedModel.addPoint(new SketchPoint("attached.center", 0, 0))
+			.addEntity(SketchEntity.circle("attached.circle", "attached.center", 2))
+			.addConstraint(SketchConstraint.fixed("attached.fixed", "attached.center"))
+			.addConstraint(SketchConstraint.radius("attached.radius", "attached.circle", 2));
+		var topSelection = new SelectionRecipe("face", "plane", Vector.Z(), "max", Vector.Z(), 1);
+		var attachedDocument = new Document();
+		var attachedBox = attachedDocument.add(new BoxFeature(20, 30, 10));
+		var attachedFeature = attachedDocument.add(new ConstrainedSketchFeature(attachedModel, attachedBox, topSelection, Vector.X(), 2));
+		var flippedFeature = attachedDocument.add(new ConstrainedSketchFeature(attachedModel, attachedBox, topSelection, Vector.X(), 2, true));
+		attachedDocument.setOutput(attachedFeature); attachedDocument.recompute();
+		near(attachedDocument.result().center().get_z(), 12);
+		near(flippedFeature.currentShape().center().get_z(), 8);
+		attachedBox.height.set(15); attachedBox.width.set(24); attachedDocument.recompute();
+		near(attachedDocument.result().center().get_x(), 12);
+		near(attachedDocument.result().center().get_z(), 17);
+		near(flippedFeature.currentShape().center().get_z(), 13);
+		var restoredAttached = DocumentCodec.decode(DocumentCodec.encode(attachedDocument));
+		near(restoredAttached.result().center().get_z(), 17);
+		restoredAttached.close(); attachedDocument.close();
+
+		var ambiguousDocument = new Document();
+		var ambiguousBox = ambiguousDocument.add(new BoxFeature(20, 30, 10));
+		var ambiguousFaces = new SelectionRecipe("face", "plane", Vector.Z(), "all", Vector.Z(), 1);
+		var ambiguousAttached = ambiguousDocument.add(new ConstrainedSketchFeature(attachedModel, ambiguousBox, ambiguousFaces, Vector.X()));
+		ambiguousDocument.setOutput(ambiguousAttached);
+		failed = false;
+		try ambiguousDocument.recompute() catch (error:Dynamic) failed = true;
+		check(failed, "ambiguous attached face selection is rejected");
+		ambiguousDocument.close();
 
 		var plate=new ConstrainedMountingPlate();
 		var oldVolume=plate.finish.currentShape().volume();

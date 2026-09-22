@@ -90,6 +90,19 @@ class DocumentBuilder {
 		return feature;
 	}
 
+	public function attachedConstrainedSketch(sketch:ConstrainedSketch, support:Feature, selection:SelectionRecipe,
+		xDirection:Vector, dimensions:Map<String, NamedParameter>, offset:Float = 0, flip:Bool = false):ConstrainedSketchFeature {
+		check();
+		var feature = document.add(new ConstrainedSketchFeature(sketch, support, selection, xDirection, offset, flip));
+		for (constraintId in dimensions.keys()) {
+			var dimension = dimensions.get(constraintId);
+			if (dimension == null || dimension.document != document)
+				throw new ParametricError("named parameter belongs to another builder");
+			dimension.bind(feature.dimension(constraintId));
+		}
+		return feature;
+	}
+
 	public function box(width:NamedParameter, depth:NamedParameter, height:NamedParameter):BoxFeature {
 		check();
 		var feature = document.add(new BoxFeature(width.value, depth.value, height.value));
