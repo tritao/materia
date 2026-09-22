@@ -142,3 +142,53 @@ including profile validation and all new native operations.
 `./scripts/test-haxeon` compiles the generated FFI and the modeling example,
 then checks dimensions, topology, finishing, STEP round trips, workplanes,
 patterns, selectors, history, cleanup, and profile document recompute/persistence.
+
+## Editable feature graphs
+
+The document layer also provides these serializable features:
+
+| Feature | Inputs and editable parameters |
+| --- | --- |
+| `WireFeature` | Extracts the sole wire of a profile; rejects profiles with holes or multiple wires |
+| `PolylineFeature` | World-space point coordinates (`coordinate(point, axis)`); point count and closure are fixed |
+| `LoftFeature` | Ordered wire-feature dependencies; solid loft, with fixed ruled/smooth option |
+| `SweepFeature` | Face/wire profile and connected wire path |
+| `OffsetFeature` | Planar wire and signed offset distance |
+| `ShellFeature` | One solid, a face-selection recipe, and signed thickness |
+| `ProjectFeature` | Edge/wire source, target shape, and editable projection direction |
+| `GridFeature` | Source, fixed row/column counts, editable positive XY spacing |
+
+Loft, sweep, offset, and shell retain native operation history. Projection and
+grid compounds currently do not. Grids contain translated copies rather than
+boolean unions and use world XY coordinates. The native operation limits above
+also apply to feature evaluation. Zero offset/thickness/direction and invalid
+geometry fail staged recompute, preserving committed shapes. Undo restores
+parameters; call `recompute()` after undo or redo.
+
+`SelectionRecipe` stores geometric intent for shell, fillet, and chamfer. It
+supports face/edge kinds, plane/line/circle filters, optional parallel
+directions, positional minima/maxima/both ends, and an explicit expected
+count. The recipe is evaluated against the staged source on every recompute.
+A missing match reports `Unresolved`; a nonzero count different from the
+expected count reports `Ambiguous`. These states propagate through
+`RecomputeError`. A recipe does not claim that a regenerated edge is the same
+topological entity as an old edge. Existing persistent reference/fingerprint
+selection remains available and keeps its original remapping semantics.
+
+For example, the plate's finishing feature uses:
+
+```haxe
+var corners = new SelectionRecipe(
+    "edge", "line", Vector.Z(), "ends", Vector.X(), 4);
+var finish = document.add(new FilletFeature(extrusion, 2, null, null, corners));
+```
+
+The [editable mounting plate](../examples/modeling/EditableMountingPlate.hx)
+contains six features: rectangle, circle, hole grid, planar subtraction,
+extrusion, and selected-edge fillet. Its `resize()` groups width, depth, and
+hole-spacing edits in a transaction, checks hole clearance, and recomputes
+before committing. Invalid edits cancel the parameter transaction. The example
+writes JSON and STEP, exercises undo/redo, reloads the JSON, and exports the
+reloaded shape. The JSON stores the feature graph and current parameters,
+including the selection recipe; it does not store the undo/redo session stack.
+After reload, subsequent edits create a new undo/redo history.

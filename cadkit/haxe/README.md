@@ -99,3 +99,9 @@ patterns, richer selectors, and resource scopes. See [MODELING.md](MODELING.md)
 and the [mounting plate example](../examples/modeling/MountingPlate.hx).
 `SketchFeature` connects rectangle, circle, and slot profiles to the existing
 parametric document and its JSON codec.
+
+The document layer also includes loft, sweep, offset, shell, projection, wire,
+polyline, and grid features. `SelectionRecipe` persists geometric selection
+intent for finishing and shell operations. See the
+[editable mounting plate](../examples/modeling/EditableMountingPlate.hx) for
+parameter editing, recompute, JSON persistence, and undo/redo.

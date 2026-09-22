@@ -1,6 +1,14 @@
 package cadkit.parametric;
 
 import CadKit;
+import cadkit.parametric.features.WireFeature;
+import cadkit.parametric.features.PolylineFeature;
+import cadkit.parametric.features.LoftFeature;
+import cadkit.parametric.features.SweepFeature;
+import cadkit.parametric.features.OffsetFeature;
+import cadkit.parametric.features.ShellFeature;
+import cadkit.parametric.features.ProjectFeature;
+import cadkit.parametric.features.GridFeature;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.features.SketchFeature;
@@ -48,7 +56,10 @@ class DocumentCodec {
 				var featureId = intField(record, "id");
 				var featureType = stringField(record, "type");
 				var feature:Feature;
-				if (featureType == "sketch") {
+				var modeling = decodeModelingFeature(featureType, record, document);
+				if (modeling != null) {
+					feature = document.add(modeling);
+				} else if (featureType == "sketch") {
 					var planeRecord = requiredField(record, "plane");
 					feature = document.add(new SketchFeature(
 						stringField(record, "profile"),
@@ -90,18 +101,12 @@ class DocumentCodec {
 						numberField(record, "angle")));
 				} else if (featureType == "fillet") {
 					var filletSource = requiredFeature(document, intField(record, "source"));
-					feature = document.add(new FilletFeature(
-						filletSource,
-						numberField(record, "radius"),
-						null,
-						optionalEdgeFingerprints(record)));
+					feature = document.add(new FilletFeature(filletSource, numberField(record, "radius"), null, optionalEdgeFingerprints(record),
+						optionalSelection(record)));
 				} else if (featureType == "chamfer") {
 					var chamferSource = requiredFeature(document, intField(record, "source"));
-					feature = document.add(new ChamferFeature(
-						chamferSource,
-						numberField(record, "distance"),
-						null,
-						optionalEdgeFingerprints(record)));
+					feature = document.add(new ChamferFeature(chamferSource, numberField(record, "distance"), null, optionalEdgeFingerprints(record),
+						optionalSelection(record)));
 				} else if (featureType == "transform") {
 					feature = document.add(new TransformFeature(
 						requiredFeature(document, intField(record, "source")),
@@ -160,6 +165,9 @@ class DocumentCodec {
 				references.push(encodeReference(reference));
 		}
 
+		var modeling = encodeModelingFeature(feature, references);
+		if (modeling != null)
+			return modeling;
 		if (featureType == "sketch") {
 			var sketch:SketchFeature = cast feature;
 			return {
@@ -238,6 +246,7 @@ class DocumentCodec {
 				source: fillet.source.id.toInt(),
 				radius: fillet.radius.value,
 				references: references,
+				selection: encodeSelection(fillet.selection),
 				edges: null
 			};
 			appendEdgeFingerprints(filletRecord, fillet.edgeReferences);
@@ -250,6 +259,7 @@ class DocumentCodec {
 				source: chamfer.source.id.toInt(),
 				distance: chamfer.distance.value,
 				references: references,
+				selection: encodeSelection(chamfer.selection),
 				edges: null
 			};
 			appendEdgeFingerprints(chamferRecord, chamfer.edgeReferences);
@@ -277,6 +287,172 @@ class DocumentCodec {
 			};
 		}
 		throw new ParametricError("unsupported feature type: " + featureType);
+	}
+
+	private static function decodeModelingFeature(type:String, record:Dynamic, document:Document):Null<Feature> {
+		if (type == "wire")
+			return new WireFeature(requiredFeature(document, intField(record, "source")));
+		if (type == "polyline") {
+			var raw:Array<Dynamic> = cast requiredField(record, "points");
+			var points:Array<Vector> = [];
+			for (point in raw)
+				points.push(decodeVector(point));
+			return new PolylineFeature(points, boolField(record, "closed"));
+		}
+		if (type == "loft") {
+			var raw:Array<Dynamic> = cast requiredField(record, "sections");
+			var sections:Array<Feature> = [];
+			for (item in raw)
+				sections.push(requiredFeature(document, intField(item, "id")));
+			return new LoftFeature(sections, boolField(record, "ruled"));
+		}
+		if (type == "sweep")
+			return new SweepFeature(requiredFeature(document, intField(record, "profile")), requiredFeature(document, intField(record, "path")));
+		if (type == "offset")
+			return new OffsetFeature(requiredFeature(document, intField(record, "source")), numberField(record, "distance"));
+		if (type == "shell")
+			return new ShellFeature(requiredFeature(document, intField(record, "source")), numberField(record, "thickness"),
+				decodeSelection(requiredField(record, "selection")));
+		if (type == "project")
+			return new ProjectFeature(requiredFeature(document, intField(record, "source")), requiredFeature(document, intField(record, "target")),
+				decodeVector(requiredField(record, "direction")));
+		if (type == "grid")
+			return new GridFeature(requiredFeature(document, intField(record, "source")), intField(record, "columns"), intField(record, "rows"),
+				numberField(record, "spacingX"), numberField(record, "spacingY"));
+		return null;
+	}
+
+	private static function encodeModelingFeature(feature:Feature, references:Array<Dynamic>):Dynamic {
+		var type = feature.serializationType();
+		if (type == "wire") {
+			var value:WireFeature = cast feature;
+
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				source: value.source.id.toInt()
+			};
+		}
+		if (type == "polyline") {
+			var value:PolylineFeature = cast feature;
+			var points:Array<Dynamic> = [];
+			for (point in value.points())
+				points.push(encodeVector(point));
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				points: points,
+				closed: value.closed
+			};
+		}
+		if (type == "loft") {
+			var value:LoftFeature = cast feature;
+			var sections:Array<Dynamic> = [];
+			for (section in value.dependencyFeatures())
+				sections.push({id: section.id.toInt()});
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				sections: sections,
+				ruled: value.ruled
+			};
+		}
+		if (type == "sweep") {
+			var value:SweepFeature = cast feature;
+
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				profile: value.profile.id.toInt(),
+				path: value.path.id.toInt()
+			};
+		}
+		if (type == "offset") {
+			var value:OffsetFeature = cast feature;
+
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				source: value.source.id.toInt(),
+				distance: value.distance.value
+			};
+		}
+		if (type == "shell") {
+			var value:ShellFeature = cast feature;
+
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				source: value.source.id.toInt(),
+				thickness: value.thickness.value,
+				selection: encodeSelection(value.selection)
+			};
+		}
+		if (type == "project") {
+			var value:ProjectFeature = cast feature;
+
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				source: value.source.id.toInt(),
+				target: value.target.id.toInt(),
+				direction: encodeVector(new Vector(value.x.value, value.y.value, value.z.value))
+			};
+		}
+		if (type == "grid") {
+			var value:GridFeature = cast feature;
+
+			return {
+				id: feature.id.toInt(),
+				type: type,
+				references: references,
+				source: value.source.id.toInt(),
+				columns: value.columns,
+				rows: value.rows,
+				spacingX: value.spacingX.value,
+				spacingY: value.spacingY.value
+			};
+		}
+		return null;
+	}
+
+	private static function encodeSelection(selection:Null<SelectionRecipe>):Dynamic {
+		if (selection == null)
+			return null;
+		return {
+			kind: selection.kind,
+			geometry: selection.geometry,
+			parallel: selection.parallel == null ? null : encodeVector(selection.parallel),
+			position: selection.position,
+			axis: encodeVector(selection.axis),
+			expectedCount: selection.expectedCount,
+			tolerance: selection.tolerance
+		};
+	}
+
+	private static function optionalSelection(record:Dynamic):Null<SelectionRecipe> {
+		var value:Dynamic = Reflect.field(record, "selection");
+		return value == null ? null : decodeSelection(value);
+	}
+
+	private static function decodeSelection(record:Dynamic):SelectionRecipe {
+		var parallel:Dynamic = Reflect.field(record, "parallel");
+		return new SelectionRecipe(stringField(record, "kind"), stringField(record, "geometry"), parallel == null ? null : decodeVector(parallel),
+			stringField(record, "position"), decodeVector(requiredField(record, "axis")), intField(record, "expectedCount"), numberField(record, "tolerance"));
+	}
+
+	private static function boolField(record:Dynamic, name:String):Bool {
+		var value:Dynamic = requiredField(record, name);
+		if (!Std.isOfType(value, Bool))
+			throw new ParametricError("document field is not a boolean: " + name);
+		return cast value;
 	}
 
 	private static function encodeReference(reference:TopologyReference):Dynamic {

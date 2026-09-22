@@ -111,3 +111,18 @@ and persists rectangle/circle/slot parameters and a workplane through
 `DocumentCodec`. The modeling layer does not depend on the document model.
 See `haxe/MODELING.md` for ownership rules and operation limits. Geometric
 sketch construction is available; a constraint solver remains a later layer.
+
+The document adapter additionally serializes wire extraction, editable
+polyline paths, solid loft, sweep, planar-wire offset, selected-face shell,
+directional projection, and centered XY grid features. They consume staged
+results through `EvaluationContext` and inherit document recompute atomicity
+and parameter transactions. Loft/sweep/offset/shell retain native operation
+history; projection and grid assembly return shapes without history.
+
+`SelectionRecipe` stores a geometric query with an expected cardinality for
+shell/fillet/chamfer. It evaluates against each staged source and rejects missing
+or changed-cardinality selections, independently of persistent topological
+reference remapping. Both selection mechanisms are serialized by the codec;
+legacy documents without a recipe retain their original reference semantics.
+The editable mounting-plate example exercises parameter edits, selection
+reevaluation, transactional failure recovery, persistence, and undo/redo.

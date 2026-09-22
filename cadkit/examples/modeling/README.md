@@ -24,3 +24,18 @@ LD_LIBRARY_PATH="$repo_root/build/debug/core:$repo_root/build/debug/lin64/gcc/li
 
 See [the modeling API](../../haxe/MODELING.md) for ownership, selections,
 workplanes, additional operations, and document integration.
+
+## Editable mounting plate
+
+`EditableMountingPlate.hx` builds the same design as a document feature graph.
+Its `resize(width, depth, spacingX, spacingY)` groups and validates parameter
+edits and recomputes the corner fillets. Width/depth, hole radius, spacing,
+extrusion height, and fillet radius are exposed through its feature parameters.
+The example conservatively keeps holes clear of the rounded boundary.
+
+Use the standalone command above with entry/source `EditableMountingPlate`
+and output `editable-mounting-plate.hl`. Running it writes
+`editable-mounting-plate.json`, `editable-mounting-plate.step`, and
+`editable-mounting-plate-reloaded.step`. It changes dimensions and hole spacing,
+checks the undo/redo path, reloads the saved document, and exports it again.
+Both examples are exercised by `./scripts/test-haxeon`.
