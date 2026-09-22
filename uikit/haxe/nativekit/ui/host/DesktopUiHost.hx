@@ -1,8 +1,6 @@
 package nativekit.ui.host;
 
 import FontCollection;
-import FrameInfo;
-import LayoutFrame;
 import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;
 import NativeKitEventValue;
@@ -12,30 +10,9 @@ import nativekit.ffi.NativeKitGpu;
 import NativeKitSurface;
 import NativeKitSurface.NativeKitSurfaceFrameSubscription;
 import Renderer;
-import Surface;
 import haxe.Json;
-import nativekit.ui.core.NativeInputAdapter;
 import sys.FileSystem;
 import sys.io.File;
-
-private class DesktopUiFrameState {
-	public var running:Bool = true;
-	public var ready:Bool = false;
-	public var logicalWidth:Float;
-	public var logicalHeight:Float;
-	public var framebufferWidth:Int;
-	public var framebufferHeight:Int;
-	public var scale:Float = 1.0;
-	public var rendered:Int = 0;
-	public var callbackError:Null<Dynamic> = null;
-
-	public function new(width:Int, height:Int) {
-		logicalWidth = width;
-		logicalHeight = height;
-		framebufferWidth = width;
-		framebufferHeight = height;
-	}
-}
 
 /** Owns the complete NativeKit desktop lifecycle for one UIKit application. */
 class DesktopUiHost {
@@ -51,10 +28,9 @@ class DesktopUiHost {
 		var eventSubscription:Null<NativeKitEventSubscription> = null;
 		var nativeSurface:Null<NativeKitSurface> = null;
 		var frameSubscription:Null<NativeKitSurfaceFrameSubscription> = null;
-		var input:Null<NativeInputAdapter> = null;
 		var fonts:Null<FontCollection> = null;
-		var renderer:Null<Renderer> = null;
-		var application:Null<DesktopUiApplication> = null;
+		var runtime:Null<UiHostRuntime> = null;
+		var session:Null<UiHostSession> = null;
 		var eventHistory:Array<String> = [];
 		var result = 0;
 
@@ -95,49 +71,22 @@ class DesktopUiHost {
 				throw "Surface creation failed: " + NativeKit.nk_last_error();
 			surface = createdSurface.out_surface.borrow();
 
-			var state = new DesktopUiFrameState(options.width, options.height);
-			var layoutFrame = new LayoutFrame(options.width, options.height);
-			var frameInfo = new FrameInfo(options.width, options.height,
-				options.width, options.height, 1.0);
-			var previousTime = Sys.time();
 			var pump = new NativeKitEvents();
 			events = pump;
 			fonts = FontCollection.create();
 			fonts.addSystemFallbacks();
-			renderer = Renderer.create();
-			var hostContext = new DesktopUiHostContext(fonts, pump, window, function() { state.running = false; });
-			application = create(hostContext);
-			if (application == null)
-				throw "Desktop UI application factory returned null";
+			var active = true;
+			session = new UiHostSession(function() active = false);
+			var hostContext = new DesktopUiHostContext(fonts, pump, window,
+				function() session.stop(), function() {
+					if (active && surface.isValid()) NativeKit.nk_surface_request_frame(surface);
+				});
+			runtime = new UiHostRuntime(session, hostContext, window, surface,
+				options.width, options.height);
+			runtime.start(function(_) return create(hostContext));
+			if (session.state == UiHostLifecycle.Failed) throw session.error;
 			var borrowedSurface = NativeKitSurface.borrowNativeHandle(surface);
 			nativeSurface = borrowedSurface;
-			application.context().attachPlatformSurface(borrowedSurface);
-			application.context().attachPlatformWindow(window);
-			input = new NativeInputAdapter(application.context(), new Handle(window.rawValue()),
-				new Handle(surface.rawValue()));
-			input.attach(pump);
-
-			var renderFrame = function(framebufferWidth:Int, framebufferHeight:Int) {
-				if (!state.running || !state.ready || framebufferWidth <= 0 || framebufferHeight <= 0)
-					return;
-				state.framebufferWidth = framebufferWidth;
-				state.framebufferHeight = framebufferHeight;
-				var now = Sys.time();
-				layoutFrame.setViewport(state.logicalWidth, state.logicalHeight);
-				layoutFrame.deltaSeconds = Math.max(0.0, Math.min(0.1, now - previousTime));
-				previousTime = now;
-				frameInfo.set(state.logicalWidth, state.logicalHeight, framebufferWidth,
-					framebufferHeight, state.scale);
-				try application.submit(layoutFrame)
-				catch (error:Dynamic) throw "UI submit failed: " + Std.string(error);
-				try application.context().render(renderer, Surface.fromNativeHandle(surface), frameInfo)
-				catch (error:Dynamic) throw "UI render failed: " + Std.string(error);
-				state.rendered++;
-				if (options.captureDirectory != null && state.rendered >= options.frameLimit) {
-					writeDiagnostics(options, application, renderer, state, eventHistory);
-					state.running = false;
-				}
-			};
 
 			eventSubscription = pump.listen(function(value) {
 				if (options.eventHistoryLimit > 0) {
@@ -150,48 +99,48 @@ class DesktopUiHost {
 					case WindowResize(source, width, height) if (source.rawValue() == window.rawValue()):
 						if (NativeKit.nk_surface_set_bounds(surface, 0, 0, width, height) != Result.Ok)
 							throw "Surface resize failed";
-						state.logicalWidth = width;
-						state.logicalHeight = height;
+						runtime.resize(width, height, runtime.framebufferWidth, runtime.framebufferHeight);
 					case WindowScaleChanged(source, scale) if (source.rawValue() == window.rawValue()):
-						state.scale = scale;
+						runtime.setScale(scale);
 					case SurfaceReady(source) if (source.rawValue() == surface.rawValue()):
-						state.ready = true;
 						var size = NativeKit.nk_surface_get_framebuffer_size(surface);
 						if (size.status != Result.Ok) throw "Framebuffer size query failed";
-						state.framebufferWidth = size.out_width;
-						state.framebufferHeight = size.out_height;
 						var scale = NativeKit.nk_window_get_scale(window);
 						if (scale.status != Result.Ok) throw "Window scale query failed";
-						state.scale = scale.out_scale;
+						runtime.setScale(scale.out_scale);
+						runtime.resize(runtime.logicalWidth, runtime.logicalHeight,
+							size.out_width, size.out_height);
 						if (frameSubscription == null)
 							frameSubscription = borrowedSurface.onFrame(function(width, height) {
 								try {
-									renderFrame(width, height);
-									if (state.running && NativeKit.nk_surface_request_frame(surface) != Result.Ok)
+									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
+									runtime.render(Sys.time());
+									if (options.captureDirectory != null && runtime.rendered >= options.frameLimit) {
+										writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime, eventHistory);
+										session.stop();
+									}
+									if (active && NativeKit.nk_surface_request_frame(surface) != Result.Ok)
 										throw "Surface frame request failed";
 								} catch (error:Dynamic) {
-									state.callbackError = error;
-									state.running = false;
+									runtime.fail("frame-callback", error);
+									active = false;
 								}
 							});
 						if (NativeKit.nk_surface_request_frame(surface) != Result.Ok)
 							throw "Initial surface frame request failed";
 					case SurfaceResize(source, width, height, framebufferWidth, framebufferHeight)
 							if (source.rawValue() == surface.rawValue()):
-						state.logicalWidth = width;
-						state.logicalHeight = height;
-						state.framebufferWidth = framebufferWidth;
-						state.framebufferHeight = framebufferHeight;
+						runtime.resize(width, height, framebufferWidth, framebufferHeight);
 					case SurfaceLost(source) if (source.rawValue() == surface.rawValue()):
-						state.ready = false;
+						runtime.setSurfaceReady(false);
 					case _:
 				}
 			});
 
-			while (state.running) {
+			while (active) {
 				var hadEvent = pump.poll();
-				if (state.callbackError != null) throw state.callbackError;
-				if (state.running && !hadEvent) pump.wait(1.0 / options.targetFps);
+				if (session.state == UiHostLifecycle.Failed) throw session.error;
+				if (active && !hadEvent) pump.wait(1.0 / options.targetFps);
 			}
 		} catch (error:Dynamic) {
 			Sys.println(options.title + ": " + Std.string(error));
@@ -200,10 +149,8 @@ class DesktopUiHost {
 			result = 1;
 		}
 
-		if (input != null) input.detach();
 		if (frameSubscription != null) frameSubscription.dispose();
-		if (application != null) application.dispose();
-		if (renderer != null) renderer.dispose();
+		if (runtime != null) runtime.dispose();
 		if (fonts != null) fonts.dispose();
 		if (eventSubscription != null) eventSubscription.dispose();
 		if (nativeSurface != null) nativeSurface.releaseBorrowed();
@@ -215,7 +162,7 @@ class DesktopUiHost {
 	}
 
 	static function writeDiagnostics(options:DesktopUiHostOptions,
-			application:DesktopUiApplication, renderer:Renderer, state:DesktopUiFrameState,
+			application:DesktopUiApplication, renderer:Renderer, state:UiHostRuntime,
 			events:Array<String>):Void {
 		var directory:String = cast options.captureDirectory;
 		createDirectories(directory);
