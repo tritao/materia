@@ -2,7 +2,7 @@ package robotkit.runtime;
 
 import RobotKitRuntime;
 
-/** Immutable native joint description embedded in a RobotRuntimeBlueprint. */
+/** Compiled joint limits and default control rate for one runtime joint. */
 class RobotRuntimeJointBlueprint {
   public final joint:Int;
   public final type:Int;
@@ -11,9 +11,10 @@ class RobotRuntimeJointBlueprint {
   public final lowerLimit:Float;
   public final upperLimit:Float;
   public final maxEffort:Float;
+  public final maxRate:Float;
 
   public function new(joint:Int, type:Int, parentLink:Int, childLink:Int,
-      lowerLimit:Float, upperLimit:Float, maxEffort:Float) {
+      lowerLimit:Float, upperLimit:Float, maxEffort:Float, ?maxRate:Float = 0.0) {
     this.joint = joint;
     this.type = type;
     this.parentLink = parentLink;
@@ -21,6 +22,7 @@ class RobotRuntimeJointBlueprint {
     this.lowerLimit = lowerLimit;
     this.upperLimit = upperLimit;
     this.maxEffort = maxEffort;
+    this.maxRate = maxRate;
   }
 
   @:allow(RobotRuntimeBlueprint)

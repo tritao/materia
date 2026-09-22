@@ -93,4 +93,48 @@ rk_result RK_CALL rk_simulation_get_clock(rk_simulation simulation,
     return RK_OK;
 }
 
+rk_result RK_CALL rk_simulation_reset(rk_simulation simulation) {
+    const auto value = resolve(simulation);
+    return value ? value->reset() : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation, uint32_t robot_index) {
+    const auto value = resolve(simulation);
+    return value ? value->reset_robot(robot_index) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_teleport_robot(rk_simulation simulation, uint32_t robot_index,
+                                                const rk_simulation_pose *pose) {
+    if (!pose)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->teleport_robot(robot_index, *pose)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_spawn_object(rk_simulation simulation,
+                                             const rk_simulation_object_desc *desc,
+                                             rk_simulation_object *out_object) {
+    if (!desc || !out_object)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->spawn_object(*desc, *out_object) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_remove_object(rk_simulation simulation,
+                                              rk_simulation_object object) {
+    const auto value = resolve(simulation);
+    return value ? value->remove_object(object) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_teleport_object(rk_simulation simulation,
+                                                rk_simulation_object object,
+                                                const rk_simulation_pose *pose) {
+    if (!pose)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->teleport_object(object, *pose)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
 } // extern "C"

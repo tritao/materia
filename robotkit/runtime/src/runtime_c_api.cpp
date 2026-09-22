@@ -1,5 +1,6 @@
 #include "robotkit_runtime.h"
 #include "robotkit_runtime.hpp"
+#include "robotkit_serial_endpoint.hpp"
 #include "runtime_registry.hpp"
 
 #include <memory>
@@ -47,20 +48,42 @@ void destroy_runtime(rk_robot_runtime handle) {
 
 extern "C" {
 
-rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_layout *layout,
+rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprint *blueprint,
                                     rk_robot_runtime *out_runtime) {
-    if (!out_runtime || rk_robot_runtime_layout_validate(layout) != RK_OK)
+    if (!out_runtime || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     try {
         std::shared_ptr<robotkit::RobotEndpoint> endpoint =
-            std::make_shared<robotkit::InMemoryRobot>(layout->joint_count);
-        auto runtime = std::make_shared<robotkit::RobotRuntime>(*layout, endpoint);
+            std::make_shared<robotkit::InMemoryRobot>(blueprint->joint_count);
+        auto runtime = std::make_shared<robotkit::RobotRuntime>(*blueprint, endpoint);
         const auto handle = robotkit::internal::register_runtime(std::move(runtime));
         *out_runtime = handle;
         return RK_OK;
     } catch (...) {
         return RK_ERROR_OUT_OF_MEMORY;
+    }
+}
+
+rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprint *blueprint,
+                                                 const char *device_path, uint32_t baud,
+                                                 rk_robot_runtime *out_runtime) {
+    if (!out_runtime || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
+        !device_path)
+        return RK_ERROR_INVALID_ARGUMENT;
+    *out_runtime = RK_INVALID_ROBOT_RUNTIME;
+    try {
+        auto endpoint = robotkit::SerialRobotEndpoint::open(device_path, baud);
+        if (!endpoint)
+            return RK_ERROR_BACKEND;
+        auto runtime = std::make_shared<robotkit::RobotRuntime>(*blueprint,
+            std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint));
+        *out_runtime = robotkit::internal::register_runtime(std::move(runtime));
+        return RK_OK;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
     }
 }
 

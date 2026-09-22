@@ -1,6 +1,8 @@
 package tests;
 
 import haxe.Int64;
+import sys.thread.Mutex;
+import sys.thread.Thread;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.RobotRuntimeJointBlueprint;
@@ -8,6 +10,7 @@ import robotkit.runtime.RobotCompileException;
 import robotkit.runtime.Simulation;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
+import robotkit.model.Actuator;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.world.RobotCapabilities;
@@ -22,6 +25,14 @@ import robotkit.world.RemoteRobot;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.StopMode;
 import robotkit.world.RobotWorld;
+import robotkit.world.RobotWorldEvent;
+import robotkit.world.SensorFrame;
+import robotkit.world.ReplayRobot;
+import robotkit.world.RobotRecording;
+import robotkit.world.RobotRecordingEvent;
+import robotkit.behavior.HoldJointBehavior;
+import robotkit.behavior.WorldBehaviorRunner;
+import robotkit.worldd.WorldHost;
 
 class RobotWorldTests {
   static var assertions = 0;
@@ -29,9 +40,13 @@ class RobotWorldTests {
   public static function main():Void {
     testAttachDetachAndIdentity();
     testSequenceAndTopology();
+    testCrossThreadEventQueue();
     testImmutableSnapshots();
+    testRecordingEventLog();
     testForwardingAndLifecycle();
     testMixedSimulatedAndRemoteWorld();
+    testRuntimeUsesCompiledJointRate();
+    testWorldHostComposition();
     testCompilerDiagnosticsAndTopology();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
   }
@@ -86,6 +101,17 @@ class RobotWorldTests {
     check(threw, "invalid topology refuses native lowering");
   }
 
+  static function testWorldHostComposition():Void {
+    var model = new RobotModel("headless-arm");
+    model.addLink(new Link("base"));
+    var host = new WorldHost();
+    var robot = host.addSimulatedRobot("headless-arm", model);
+    var snapshot = host.step(Int64.ofInt(3000));
+    check(snapshot.robot(robot.id()) != null,
+      "worldd composes one world and one shared simulation");
+    host.close();
+  }
+
   static function hasDiagnostic(diagnostics:Array<robotkit.runtime.RobotCompileDiagnostic>,
       code:String):Bool {
     for (diagnostic in diagnostics)
@@ -111,6 +137,8 @@ class RobotWorldTests {
 
   static function testSequenceAndTopology():Void {
     var world = new RobotWorld();
+    var events = 0;
+    var subscription = world.subscribe(function(_) events++);
     var left = new FakeRobot("left");
     var right = new FakeRobot("right");
     equal(world.snapshot().sequence, 0, "new world sequence");
@@ -119,14 +147,20 @@ class RobotWorldTests {
     equal(world.snapshot().sequence, 1, "attach advances sequence");
     equal(world.snapshot().topologyRevision, 1, "attach advances topology");
     left.emitChange();
+    equal(world.pendingEventCount(), 1, "adapter changes wait in the owner event queue");
+    equal(world.pump(), 1, "owner pump applies one queued adapter change");
+    equal(world.pendingEventCount(), 0, "owner pump drains adapter changes");
     equal(world.snapshot().sequence, 2, "state change advances sequence");
     equal(world.snapshot().topologyRevision, 1, "state change preserves topology");
+    equal(events, 2, "world subscriptions run on the owner pump");
+    equal(world.health().ready, 1, "world health summarizes attached robots");
     world.attach(right);
     equal(world.snapshot().sequence, 3, "second attach advances sequence");
     equal(world.snapshot().topologyRevision, 2, "second attach advances topology");
     world.detach(left.id());
     equal(world.snapshot().sequence, 4, "detach advances sequence");
     equal(world.snapshot().topologyRevision, 3, "detach advances topology");
+    subscription.dispose();
     world.close();
   }
 
@@ -141,10 +175,42 @@ class RobotWorldTests {
     var second = world.snapshot();
     var firstRobot = first.robot("arm");
     var secondRobot = second.robot("arm");
-    check(firstRobot != null && firstRobot.positions[0] == 1.0, "old snapshot owns copied arrays");
-    check(secondRobot != null && secondRobot.positions[0] == 9.0, "new snapshot observes new state");
+    check(firstRobot != null && firstRobot.positions.get(0) == 1.0, "old snapshot owns copied arrays");
+    check(secondRobot != null && secondRobot.positions.get(0) == 9.0, "new snapshot observes new state");
     first.robots().resize(0);
     check(second.robot("arm") != null, "snapshot maps are independent");
+    world.close();
+  }
+
+  static function testCrossThreadEventQueue():Void {
+    var world = new RobotWorld();
+    var doneMutex = new Mutex();
+    var done = false;
+    var rejected = false;
+    Thread.create(function() {
+      try {
+        world.robotIds();
+      } catch (_:Dynamic) {
+        rejected = true;
+      }
+      world.enqueue(RobotWorldEvent.RobotChanged("owner-test"));
+      doneMutex.acquire();
+      done = true;
+      doneMutex.release();
+    });
+    var completed = false;
+    for (_ in 0...500) {
+      doneMutex.acquire();
+      completed = done;
+      doneMutex.release();
+      if (completed) break;
+      Sys.sleep(0.01);
+    }
+    check(completed, "worker thread completes owner-boundary probe");
+    check(rejected, "RobotWorld rejects direct non-owner map access");
+    equal(world.pendingEventCount(), 1, "worker thread feeds changes through the event queue");
+    world.pump();
+    equal(world.pendingEventCount(), 0, "owner applies queued cross-thread events");
     world.close();
   }
 
@@ -164,6 +230,42 @@ class RobotWorldTests {
     world.close();
     equal(robot.closeCount, 1, "world close is idempotent");
     throws(function() world.submit("arm", command), "closed world rejects commands");
+  }
+
+  static function testRecordingEventLog():Void {
+    var world = new RobotWorld();
+    var recording = new RobotRecording();
+    var subscription = recording.attach(world);
+    var robot = new FakeRobot("recorded-arm");
+    world.attach(robot);
+    equal(recording.events.length, 0,
+      "recording observes world events only on the owner pump");
+    world.pump();
+    equal(recording.events.length, 1, "recording captures attachment events");
+    switch recording.events[0] {
+      case WorldEvent(RobotAttached(id)):
+        equal(id, "recorded-arm", "recording preserves attached robot identity");
+      case _:
+        check(false, "recording first event is attachment");
+    }
+    robot.emitChange();
+    world.pump();
+    equal(recording.events.length, 2, "recording captures queued adapter changes");
+    var snapshot = world.snapshot().robot("recorded-arm");
+    check(snapshot != null, "recording test has a robot snapshot");
+    recording.recordCommand(RobotCommand.JointPosition(0, 0.5, null));
+    recording.recordSnapshot(cast snapshot);
+    recording.recordFault(new RobotFault("fault-1", 7, "test fault", false));
+    recording.recordWorld(world.snapshot());
+    equal(recording.events.length, 6, "recording keeps one ordered typed event stream");
+    check(recording.commands.length == 1 && recording.snapshots.length == 1 &&
+      recording.faults.length == 1 && recording.worlds.length == 1,
+      "recording retains typed indexes alongside the event stream");
+    subscription.dispose();
+    world.detach(robot.id());
+    world.pump();
+    equal(recording.events.length, 6, "disposed recording stops receiving world events");
+    world.close();
   }
 
   static function testMixedSimulatedAndRemoteWorld():Void {
@@ -212,12 +314,43 @@ class RobotWorldTests {
     var firstValue:RobotSnapshot = cast firstState;
     var secondValue:RobotSnapshot = cast secondState;
     var remoteValue:RobotSnapshot = cast remoteState;
-    check(Math.abs(firstValue.positions[0] - 0.4) < 0.000000001,
+    check(Math.abs(firstValue.positions.get(0) - 0.4) < 0.000000001,
       "first simulated command routed independently");
-    check(Math.abs(secondValue.positions[0] + 0.3) < 0.000000001,
+    check(Math.abs(secondValue.positions.get(0) + 0.3) < 0.000000001,
       "second simulated command routed independently");
-    equal(firstValue.timestampNs, Int64.ofInt(1000), "shared simulation timestamp reaches first robot");
-    equal(secondValue.timestampNs, Int64.ofInt(1000), "shared simulation timestamp reaches second robot");
+    equal(firstValue.sourceTimestampNs, Int64.ofInt(10000000), "simulation clock reaches first robot");
+    equal(secondValue.sourceTimestampNs, Int64.ofInt(10000000), "simulation clock reaches second robot");
+    equal(firstValue.receivedTimestampNs, Int64.ofInt(1000), "world receive timestamp reaches first robot");
+    equal(secondValue.receivedTimestampNs, Int64.ofInt(1000), "world receive timestamp reaches second robot");
+    equal(firstValue.sensors.length, 3,
+      "simulated robot publishes encoders, IMU, and LiDAR frames");
+    equal(firstValue.sensors.get(0).sourceTimestampNs, Int64.ofInt(10000000),
+      "sensor source clock matches robot source clock");
+    equal(firstValue.sensors.get(1).frameId, "base_link",
+      "sensor frame identity is explicit");
+    var recording = new RobotRecording();
+    recording.recordSnapshot(firstValue);
+    recording.recordSnapshot(secondValue);
+    recording.recordWorld(value);
+    var replay = new ReplayRobot("replay-sim-a", recording);
+    var replayWorld = new RobotWorld();
+    replayWorld.attach(replay);
+    var replayInitial = replayWorld.snapshot().robot("replay-sim-a");
+    check(replayInitial != null, "replay world publishes a robot snapshot");
+    var replayInitialValue:RobotSnapshot = cast replayInitial;
+    equal(replayInitialValue.sourceTimestampNs, Int64.ofInt(10000000),
+      "replay preserves source timestamps");
+    check(replay.advance(), "replay advances through the same snapshot boundary");
+    var replayNext = replayWorld.snapshot().robot("replay-sim-a");
+    var replayNextValue:RobotSnapshot = cast replayNext;
+    check(replayNextValue != null && replayNextValue.sensors.length == 3,
+      "replay preserves sensor frames");
+    var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25));
+    equal(behavior.update(first), 1, "world behavior emits a transport-neutral command");
+    equal(behavior.update(first), 0, "world behavior does not repeat an unchanged snapshot");
+    var replayBehavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25));
+    equal(replayBehavior.update(replay), 1, "same behavior can consume replay state");
+    replayWorld.close();
     equal(remoteValue.sourceSequence, Int64.ofInt(0), "remote state remains independently sourced");
     var remoteStatus = remote.status();
     check(switch remoteStatus {
@@ -228,6 +361,31 @@ class RobotWorldTests {
     world.close();
     simulation.step(Int64.ofInt(2000));
     equal(simulation.stepIndex(), Int64.ofInt(2), "RobotWorld does not own shared simulation");
+    simulation.dispose();
+  }
+
+  static function testRuntimeUsesCompiledJointRate():Void {
+    var model = new RobotModel("rate-limited-arm");
+    var base = model.addLink(new Link("base"));
+    var tool = model.addLink(new Link("tool"));
+    var joint = model.addJoint(new Joint("shoulder", JointType.Revolute, base, tool));
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    joint.limits.velocity = 2.0;
+    joint.drive = new Actuator("shoulder-motor", 100.0, 1.0);
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    equal(blueprint.joints[0].maxRate, 1.0,
+      "runtime compiler combines joint and actuator rate limits");
+
+    var simulation = new Simulation(0.1);
+    var runtime = simulation.addRobot(blueprint);
+    runtime.submitPosition(0, 0.8, 1);
+    simulation.step(Int64.ofInt(100));
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.1) < 0.000000001,
+      "runtime applies the compiled rate limit on the first shared tick");
+    simulation.step(Int64.ofInt(200));
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.2) < 0.000000001,
+      "runtime keeps advancing the same target on later shared ticks");
     simulation.dispose();
   }
 
@@ -251,7 +409,7 @@ class RobotWorldTests {
 private class FakeRobot implements Robot {
   final logicalId:RobotId;
   public var positions:Array<Float> = [0.0];
-  public var listener:Null < Void -> Void > = null;
+  public var listener:Null < RobotId -> Void > = null;
   public var lastCommand:Null<RobotCommand> = null;
   public var lastStop:Null<StopMode> = null;
   public var closed = false;
@@ -279,11 +437,12 @@ private class FakeRobot implements Robot {
     1,
     0
   );
+  public function sensors():Array<SensorFrame> return [];
   public function fault():Null < RobotFault > return null;
   public function submit(command:RobotCommand):Void lastCommand = command;
   public function stop(mode:StopMode):Void lastStop = mode;
-  public function setChangeListener(value:Null < Void -> Void >):Void listener = value;
-  public function emitChange():Void if (listener != null) listener();
+  public function setChangeListener(value:Null < RobotId -> Void >):Void listener = value;
+  public function emitChange():Void if (listener != null) listener(logicalId);
   public function close():Void {
     closed = true;
     closeCount++;

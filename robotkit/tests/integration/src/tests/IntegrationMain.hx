@@ -5,6 +5,7 @@ class IntegrationMain {
     var arguments = Sys.args();
     var port = parsePort(arguments);
     if (arguments.indexOf("--smoke") >= 0) RobotClientSmoke.run("127.0.0.1", port);
+    else if (arguments.indexOf("--sessions") >= 0) RobotSessionIntegration.run("127.0.0.1", port);
     else WorldTcpIntegration.run("127.0.0.1", port);
   }
 

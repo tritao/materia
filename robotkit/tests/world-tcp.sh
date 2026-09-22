@@ -10,12 +10,18 @@ server_log="$log_dir/world-tcp-server.log"
 mkdir -p "$log_dir"
 
 "$repo_dir/haxeon/scripts/haxeon" build --project "$server_project"
-"$repo_dir/haxeon/scripts/haxeon" run --project "$server_project" -- \
-  --server --once --robot-id=42 --port="$port" >"$server_log" 2>&1 &
+server_mode="--server --once"
+client_mode=""
+if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" == "1" ]]; then
+  server_mode="--server"
+  client_mode="--sessions"
+fi
+setsid "$repo_dir/haxeon/scripts/haxeon" run --project "$server_project" -- \
+  $server_mode --robot-id=42 --port="$port" >"$server_log" 2>&1 &
 server_pid=$!
 cleanup() {
   if kill -0 "$server_pid" 2>/dev/null; then
-    kill "$server_pid" 2>/dev/null || true
+    kill -- "-$server_pid" 2>/dev/null || kill "$server_pid" 2>/dev/null || true
     wait "$server_pid" 2>/dev/null || true
   fi
 }
@@ -34,6 +40,8 @@ done
 
 grep -q "robotd: listening" "$server_log"
 "$repo_dir/haxeon/scripts/haxeon" run --project "$client_project" -- \
-  --port="$port"
-wait "$server_pid"
-trap - EXIT
+  --port="$port" $client_mode
+if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" ]]; then
+  wait "$server_pid"
+  trap - EXIT
+fi

@@ -17,6 +17,7 @@ import robotkit.protocol.RobotFrame.RobotFrameStream;
 import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.RobotProtocol;
 import robotkit.protocol.RobotStateMsg;
+import robotkit.protocol.SensorFrameMsg;
 import robotkit.protocol.Stop;
 import robotkit.transport.NativeTransport;
 
@@ -28,6 +29,7 @@ import robotkit.transport.NativeTransport;
  */
 class RobotClient {
   public final clientName:String;
+  public final requestedRole:String;
   public var welcome:Null<robotkit.protocol.Welcome> = null;
   public var description:Null<RobotDescription> = null;
   public var capabilities:Null<RobotCapabilities> = null;
@@ -35,6 +37,7 @@ class RobotClient {
   public var lastFault:Null<Fault> = null;
   public var stateListener:Null<RobotStateMsg->Void> = null;
   public var faultListener:Null<Fault->Void> = null;
+  public var sensorListener:Null<SensorFrameMsg->Void> = null;
   public var statusListener:Null<Void->Void> = null;
 
   var nativeRuntime:Null<NativeKitRuntime> = null;
@@ -51,8 +54,9 @@ class RobotClient {
   var failure:Null<String> = null;
   var closed:Bool = false;
 
-  public function new(?clientName:String = "materia") {
+  public function new(?clientName:String = "materia", ?requestedRole:String = "controller") {
     this.clientName = clientName;
+    this.requestedRole = requestedRole;
   }
 
   /** Connects to robotd and starts the NativeKit event subscription. */
@@ -162,6 +166,9 @@ class RobotClient {
   public function isReady():Bool
     return isConnected() && Int64.compare(sessionId, Int64.ofInt(0)) != 0;
 
+  public function hasControlLease():Bool
+    return isReady() && welcome != null && welcome.controlGranted;
+
   /** Sends one position/velocity/effort-independent joint target. */
   public function sendJointTarget(joint:Int, mode:Int, target:Float,
       ?expiryNs:Int64):Int64 {
@@ -217,7 +224,7 @@ class RobotClient {
         var statusChanged = statusListener;
         if (statusChanged != null)
           statusChanged();
-        send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1")));
+        send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1", requestedRole)));
       } else if (kind == EventKind.TransportData) {
         receive(currentTransport);
       } else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {
@@ -279,6 +286,13 @@ class RobotClient {
         listener(value);
       if (value.fatal)
         failure = value.message;
+    case RobotMessageType.SensorFrame:
+      if (!validSession(frame))
+        return;
+      var sensor = RobotProtocol.decodeSensorFrame(frame);
+      var listener = sensorListener;
+      if (listener != null)
+        listener(sensor);
     case _:
   }
 
@@ -301,6 +315,8 @@ class RobotClient {
   function ensureReady():Void {
     if (!isReady())
       throw "RobotKit client is not ready; wait for Welcome first";
+    if (!hasControlLease())
+      throw "RobotKit client does not hold the control lease";
     raiseFailure();
   }
 

@@ -436,6 +436,7 @@ nksim_result World::create_body(const nksim_body_desc &desc, nksim_body *out_bod
         return result;
     }
     body->backend_body = backend_body;
+    body->initial_state = body->state;
     *out_body = handle;
     return NKSIM_OK;
 }
@@ -468,6 +469,51 @@ nksim_result World::get_body_state(nksim_body body, nksim_body_state *out_state)
     if (!value)
         return NKSIM_ERROR_INVALID_HANDLE;
     *out_state = value->state;
+    return NKSIM_OK;
+}
+
+nksim_result World::set_body_state(nksim_body body, const nksim_body_state &state) {
+    if (!owns_thread() || !valid_struct_size(state.struct_size, sizeof(state)))
+        return !owns_thread() ? NKSIM_ERROR_WRONG_THREAD : NKSIM_ERROR_INVALID_ARGUMENT;
+    auto *value = bodies.get(body);
+    if (!value || state.body != body)
+        return NKSIM_ERROR_INVALID_HANDLE;
+    value->state = state;
+    value->state.struct_size = sizeof(value->state);
+    value->state.body = body;
+    value->state.occurrence = value->desc.occurrence;
+    return set_backend_body_state(*value);
+}
+
+nksim_result World::reset_body(nksim_body body) {
+    if (!owns_thread())
+        return NKSIM_ERROR_WRONG_THREAD;
+    auto *value = bodies.get(body);
+    if (!value)
+        return NKSIM_ERROR_INVALID_HANDLE;
+    value->state = value->initial_state;
+    return set_backend_body_state(*value);
+}
+
+nksim_result World::reset() {
+    if (!owns_thread())
+        return NKSIM_ERROR_WRONG_THREAD;
+    nksim_result result = NKSIM_OK;
+    bodies.for_each([&](nksim_body, Body &body) {
+        if (result != NKSIM_OK)
+            return;
+        body.state = body.initial_state;
+        result = set_backend_body_state(body);
+    });
+    if (result != NKSIM_OK)
+        return result;
+    joints.for_each([&](nksim_joint, Joint &joint) {
+        joint.state = {};
+        joint.state.struct_size = sizeof(joint.state);
+        joint.state.joint = joint.handle;
+    });
+    clock.time = 0.0;
+    clock.step_index = 0;
     return NKSIM_OK;
 }
 

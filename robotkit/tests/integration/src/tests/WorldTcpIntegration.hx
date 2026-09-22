@@ -3,9 +3,10 @@ package tests;
 import NativeKitRuntime;
 import haxe.Int64;
 import robotkit.world.RemoteRobot;
-import robotkit.world.RobotCommand;
 import robotkit.world.RobotStatus;
 import robotkit.world.RobotWorld;
+import robotkit.behavior.HoldJointBehavior;
+import robotkit.behavior.WorldBehaviorRunner;
 
 /** End-to-end assertion of the world adapter against a real robotd TCP peer. */
 class WorldTcpIntegration {
@@ -25,14 +26,22 @@ class WorldTcpIntegration {
       if (protocolId == null || Int64.compare(protocolId,
         Int64.ofInt(42)) != 0) throw 'expected protocol robot ID 42, got ${Std.string(protocolId)}';
 
-      world.submit(LOGICAL_ID, RobotCommand.JointPosition(0, 0.5, null));
       waitUntil(runtime, function() {
         var state = world.snapshot().robot(LOGICAL_ID);
-        return state != null && state.id == LOGICAL_ID && state.positions.length > 0 && state.positions[0] == 0.5;
+        return state != null && state.positions.length > 0;
+      }, "remote robot did not publish its initial state");
+      var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.5));
+      if (behavior.update(remote) != 1)
+        throw "transport-neutral behavior did not submit a remote command";
+      waitUntil(runtime, function() {
+        var state = world.snapshot().robot(LOGICAL_ID);
+        return state != null && state.id == LOGICAL_ID && state.positions.length > 0 && state.positions.get(0) == 0.5;
       }, "translated world command did not update robotd state");
 
       var state = world.snapshot().robot(LOGICAL_ID);
-      var position = state == null ? 0.0 : state.positions[0];
+      var position = state == null ? 0.0 : state.positions.get(0);
+      if (state == null || state.sensors.length != 3)
+        throw "robotd did not transport simulated encoder, IMU, and LiDAR frames";
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();

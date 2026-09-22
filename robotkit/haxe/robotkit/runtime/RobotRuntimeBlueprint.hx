@@ -47,15 +47,4 @@ class RobotRuntimeBlueprint {
     return value;
   }
 
-  /** Builds the low-level layout needed only by standalone native creation. */
-  @:allow(RobotRuntime)
-  function nativeLayout():rk_robot_runtime_layout {
-    var value = new rk_robot_runtime_layout();
-    value.set_struct_size(rk_robot_runtime_layout.size());
-    value.set_revision(haxe.Int64.ofInt(revision));
-    value.set_joint_count(jointCount);
-    value.set_link_count(linkCount);
-    value.set_frame_count(frameCount);
-    return value;
-  }
 }

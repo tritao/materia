@@ -12,18 +12,20 @@ import RobotKitRuntime;
  */
 class RobotRuntime {
   final owner:Ownedrk_robot_runtime;
+  final defaultMaxRates:Array<Float>;
   var disposed:Bool = false;
 
   @:allow(robotkit.runtime.Simulation)
-  private function new(owner:Ownedrk_robot_runtime) {
+  private function new(owner:Ownedrk_robot_runtime, blueprint:RobotRuntimeBlueprint) {
     this.owner = owner;
+    defaultMaxRates = [for (joint in blueprint.joints) joint.maxRate];
   }
 
   /** Creates a standalone in-memory runtime with its own worker lifecycle. */
   public static function create(blueprint:RobotRuntimeBlueprint):RobotRuntime {
-    var result = RobotKitRuntime.rk_robot_runtime_create(blueprint.nativeLayout());
+    var result = RobotKitRuntime.rk_robot_runtime_create(blueprint.nativeValue());
     check(result.status, "runtime.create");
-    return new RobotRuntime(result.out_runtime);
+    return new RobotRuntime(result.out_runtime, blueprint);
   }
 
   /** Starts a standalone runtime worker; Simulation-owned runtimes reject this. */
@@ -56,7 +58,7 @@ class RobotRuntime {
       target.set_joint(index);
       target.set_mode(RobotKitRuntimeConstants.RK_TARGET_POSITION);
       target.set_target(positions[index]);
-      target.set_max_rate(0.0);
+      target.set_max_rate(index < defaultMaxRates.length ? defaultMaxRates[index] : 0.0);
       target.set_max_effort(0.0);
       command.set_targets(index, target);
     }
@@ -80,7 +82,8 @@ class RobotRuntime {
     target.set_joint(joint);
     target.set_mode(RobotKitRuntimeConstants.RK_TARGET_POSITION);
     target.set_target(targetValue);
-    target.set_max_rate(0.0);
+    target.set_max_rate(joint >= 0 && joint < defaultMaxRates.length
+      ? defaultMaxRates[joint] : 0.0);
     target.set_max_effort(0.0);
     command.set_targets(0, target);
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
@@ -100,6 +103,19 @@ class RobotRuntime {
     command.set_target_count(0);
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.submitStop");
+  }
+
+  /** Clears a latched safety stop only after the application has acknowledged it. */
+  public function resetSafety(sequence:Int):Void {
+    ensureLive();
+    var command = new rk_robot_command();
+    command.set_struct_size(rk_robot_command.size());
+    command.set_sequence(haxe.Int64.ofInt(sequence));
+    command.set_timestamp_ns(haxe.Int64.ofInt(0));
+    command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_RESET_SAFETY);
+    command.set_target_count(0);
+    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+      "runtime.resetSafety");
   }
 
   /** Reads the latest published native state without advancing time. */

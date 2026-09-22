@@ -15,6 +15,11 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         pending_targets_.clear();
         return RK_OK;
     }
+    if (command.kind == RK_COMMAND_RESET_SAFETY) {
+        stopped_ = false;
+        pending_targets_.clear();
+        return RK_OK;
+    }
     if (stopped_)
         return RK_ERROR_SAFETY_STOPPED;
     if (command.kind == RK_COMMAND_NONE)
@@ -46,7 +51,8 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
     if (simulation_.snapshot_ == 0)
         return RK_ERROR_INVALID_STATE;
     state.struct_size = sizeof(state);
-    state.timestamp_ns = timestamp_ns;
+    state.source_timestamp_ns = static_cast<uint64_t>(
+        simulation_.simulation_time_ * 1'000'000'000.0);
     state.joint_count = static_cast<uint32_t>(joints_.size());
     for (uint32_t index = 0; index < state.joint_count; ++index)
         state.position[index] = state.velocity[index] = state.effort[index] = 0.0;

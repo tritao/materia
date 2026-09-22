@@ -19,7 +19,9 @@ class RobotContext {
   public function jointTarget(joint:Int, mode:Int, target:Float,
       ?expiryNs:Int64):Void {
     var expiry = expiryNs == null
-      ? Int64.add(snapshot.timestampNs, Int64.ofInt(DEFAULT_INTENT_LIFETIME_NS))
+      // Expiry is evaluated by the receiver's clock. Source time may be a
+      // simulator/device epoch and must not be mixed with receive time.
+      ? Int64.add(snapshot.receivedTimestampNs, Int64.ofInt(DEFAULT_INTENT_LIFETIME_NS))
       : expiryNs;
     intents.publish(new JointTargetIntent(joint, mode, target, expiry));
   }

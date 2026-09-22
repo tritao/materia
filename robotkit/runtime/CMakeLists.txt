@@ -1,7 +1,8 @@
 add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/validation.cpp
     src/runtime.cpp
-    src/runtime_c_api.cpp)
+    src/runtime_c_api.cpp
+    src/serial_endpoint.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
@@ -39,6 +40,15 @@ if(RK_BUILD_TESTS)
     target_link_libraries(robotkit_runtime_c_api_tests PRIVATE RobotKit::runtime)
     add_test(NAME robotkit_runtime_c_api COMMAND robotkit_runtime_c_api_tests)
     set_tests_properties(robotkit_runtime_c_api PROPERTIES LABELS "robot;runtime;abi" TIMEOUT 30)
+
+    if(NOT WIN32)
+        add_executable(robotkit_serial_endpoint_tests tests/serial_endpoint.cpp)
+        target_compile_features(robotkit_serial_endpoint_tests PRIVATE cxx_std_20)
+        target_link_libraries(robotkit_serial_endpoint_tests PRIVATE RobotKit::runtime)
+        add_test(NAME robotkit_serial_endpoint COMMAND robotkit_serial_endpoint_tests)
+        set_tests_properties(robotkit_serial_endpoint PROPERTIES LABELS "robot;runtime;hardware"
+            TIMEOUT 30)
+    endif()
 endif()
 
 install(TARGETS robotkit_runtime EXPORT RobotKitTargets

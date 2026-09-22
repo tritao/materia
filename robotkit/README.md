@@ -4,10 +4,10 @@ RobotKit is the complete robotics layer for Materia. It owns robot models,
 commands, control, runtime ownership, endpoint adapters, world orchestration,
 and the protocol shared by `robotd` and editor clients.
 
-The first increment contains deliberately small boundaries:
+The current increment contains deliberately small boundaries:
 
 - `runtime`: engine-neutral values and validation, an owner-thread runtime,
-  command mailbox, and immutable snapshots;
+  command mailbox, immutable snapshots, and the first framed serial endpoint;
 - `haxe/robotkit/protocol`: versioned framing independent of any particular transport;
 - `haxe`: Haxeon façades, protocol clients, and `RobotWorld` orchestration;
 - `robotd`: one independently deployable logical robot host;
@@ -20,8 +20,9 @@ policy.
 RobotKit receives only compiled runtime blueprints and bulk data at execution
 boundaries. A standalone `RobotRuntime` can use the in-memory endpoint for
 host bring-up, while `Simulation` owns the shared SimKit backend for live
-multi-robot execution. MuJoCo model loading, controllers, NativeKit transport
-adapters, and physical endpoints remain later increments.
+multi-robot execution. The first physical boundary is a deliberately small
+POSIX framed serial endpoint; its device protocol remains replaceable until a
+specific controller is selected.
 
 Build and test RobotKit independently:
 
@@ -49,6 +50,14 @@ code continues to depend on robot-scoped submit/snapshot APIs.
 Participating runtimes cannot be stepped individually; applications must call
 `Simulation.step()` so the shared-world boundary remains explicit.
 
+`Simulation` also owns explicit runtime-scene operations: reset, per-robot
+reset, robot teleport, environment-object spawn/remove/teleport, and one
+shared simulation clock. These edits are accepted while stopped. Once running,
+physics is authoritative and editable-scene changes must go through the
+simulation owner. Each simulated robot publishes transport-neutral joint
+encoder, IMU, and LiDAR frames with the same source clock, frame IDs, and
+sequences used by the remote path.
+
 `robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
 `Robot` interface used by `RemoteRobot`. It does not own or dispose the
 shared simulation, allowing one `RobotWorld` to contain local simulated robots
@@ -56,6 +65,26 @@ and remote physical robots without backend-specific orchestration.
 
 The complete ownership and tick model is documented in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+`RobotWorld` is a single-owner composition object. Its owner thread is checked
+at the boundary; adapter callbacks only enqueue `RobotWorldEvent` values, and
+the owner applies them with `pump()` while building a snapshot.
+`WorldSnapshot` and `RobotSnapshot` own copied arrays and sensor frames, expose
+no mutable maps, and distinguish backend/source time from the time the world
+received an observation.
+
+The ownership rule is intentionally simple:
+
+```text
+RobotWorld owns attached adapters
+Simulation owns simulated runtimes and physics
+robotd owns the deployed runtime and endpoint
+```
+
+`robotkit.worldd.WorldHost` is only a headless composition of those existing
+objects. It does not introduce a second world model. `ReplayRobot`, recording,
+and `WorldBehaviorRunner` use the same `Robot`/snapshot/command boundary for
+offline debugging and behavior reuse.
 
 Behavior hosting builds on that same boundary. `RobotBehaviorRunner` receives a
 `RobotSnapshot`, gives a behavior a read-only `RobotContext`, and publishes the

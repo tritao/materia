@@ -6,13 +6,21 @@ import haxe.Int64;
 class WorldSnapshot {
   public final sequence:Int;
   public final topologyRevision:Int;
-  public final timestampNs:Int64;
+  public final sourceTimestampNs:Int64;
+  public final receivedTimestampNs:Int64;
   final robotMap:Map<RobotId, RobotSnapshot>;
 
-  public function new(sequence:Int, topologyRevision:Int, timestampNs:Int64, source:Map<RobotId, RobotSnapshot>) {
+  /** Compatibility alias for callers that used the old single timestamp. */
+  public var timestampNs(get, never):Int64;
+
+  public function new(sequence:Int, topologyRevision:Int, sourceTimestampNs:Int64,
+      source:Map<RobotId, RobotSnapshot>, ?receivedTimestampNs:Int64) {
     this.sequence = sequence;
     this.topologyRevision = topologyRevision;
-    this.timestampNs = timestampNs;
+    this.sourceTimestampNs = sourceTimestampNs;
+    this.receivedTimestampNs = receivedTimestampNs == null
+      ? sourceTimestampNs
+      : receivedTimestampNs;
     robotMap = new Map<RobotId, RobotSnapshot>();
     for (id in source.keys()) {
       var value = source.get(id);
@@ -21,12 +29,14 @@ class WorldSnapshot {
         new RobotSnapshot(
           value.id,
           value.sourceSequence,
-          value.timestampNs,
-          value.positions,
-          value.velocities,
-          value.efforts,
+          value.sourceTimestampNs,
+          value.positions.toArray(),
+          value.velocities.toArray(),
+          value.efforts.toArray(),
           value.mode,
-          value.faultCode
+          value.faultCode,
+          value.receivedTimestampNs,
+          value.sensors.toArray()
         )
       );
     }
@@ -48,4 +58,6 @@ class WorldSnapshot {
     for (id in robotIds()) result.push(robotMap.get(id));
     return result;
   }
+
+  inline function get_timestampNs():Int64 return sourceTimestampNs;
 }

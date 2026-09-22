@@ -15,9 +15,10 @@ class SimulatedRobot implements Robot {
   final runtime:RobotRuntime;
   final robotDescription:RobotDescription;
   final robotCapabilities:RobotCapabilities;
-  var changeListener:Null < Void -> Void > = null;
+  var changeListener:Null < RobotId -> Void > = null;
   var commandSequence:Int = 0;
   var observedSequence:Int64 = Int64.ofInt(-1);
+  var currentSensors:Array<SensorFrame> = [];
   var closed:Bool = false;
 
   public function new(id:RobotId, runtime:RobotRuntime, name:String,
@@ -60,12 +61,14 @@ class SimulatedRobot implements Robot {
     return new robotkit.world.RobotSnapshot(
       logicalId,
       value.sequence,
-      value.timestampNs,
-      value.q,
-      value.dq,
-      value.effort,
+      value.sourceTimestampNs,
+      value.q.toArray(),
+      value.dq.toArray(),
+      value.effort.toArray(),
       value.mode,
-      value.faultCode
+      value.faultCode,
+      value.receivedTimestampNs,
+      currentSensors
     );
   }
 
@@ -93,7 +96,16 @@ class SimulatedRobot implements Robot {
     runtime.submitStop(commandSequence, mode == StopMode.Emergency);
   }
 
-  public function setChangeListener(listener:Null < Void -> Void >):Void {
+  public function sensors():Array<SensorFrame> {
+    var result:Array<SensorFrame> = [];
+    for (frame in currentSensors)
+      result.push(new SensorFrame(frame.sensorId, frame.kind, frame.frameId,
+        frame.sequence, frame.sourceTimestampNs, frame.values.toArray(),
+        frame.receivedTimestampNs));
+    return result;
+  }
+
+  public function setChangeListener(listener:Null < RobotId -> Void >):Void {
     changeListener = listener;
   }
 
@@ -107,9 +119,10 @@ class SimulatedRobot implements Robot {
     if (value.sequence == observedSequence)
       return;
     observedSequence = value.sequence;
+    currentSensors = RobotSensorFrames.fromRuntimeSnapshot(value);
     var listener = changeListener;
     if (listener != null)
-      listener();
+      listener(logicalId);
   }
 
   function ensureOpen():Void {

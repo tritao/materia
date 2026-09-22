@@ -68,8 +68,10 @@ void shared_world_steps_once() {
     const auto second_state = snapshot(second);
     assert(first_state.sequence == 1);
     assert(second_state.sequence == 1);
-    assert(first_state.timestamp_ns == 1000);
-    assert(second_state.timestamp_ns == 1000);
+    assert(first_state.source_timestamp_ns == 10000000);
+    assert(second_state.source_timestamp_ns == 10000000);
+    assert(first_state.received_timestamp_ns == 1000);
+    assert(second_state.received_timestamp_ns == 1000);
     assert(std::abs(first_state.position[0] - 0.4) < 1e-12);
     assert(std::abs(second_state.position[0] + 0.3) < 1e-12);
 
@@ -82,6 +84,29 @@ void shared_world_steps_once() {
     assert(clock.step_index == 2);
     assert(snapshot(first).sequence == 2);
     assert(snapshot(second).sequence == 2);
+
+    assert(rk_simulation_stop(simulation) == RK_OK);
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    pose.rotation[3] = 1.0;
+    pose.position[0] = 4.0;
+    assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
+    assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
+    assert(snapshot(first).sequence == 0);
+    rk_simulation_object_desc object_desc{};
+    object_desc.struct_size = sizeof(object_desc);
+    object_desc.motion_type = 0;
+    object_desc.half_extents[0] = object_desc.half_extents[1] = object_desc.half_extents[2] = 0.25;
+    object_desc.rotation[3] = 1.0;
+    rk_simulation_object object = RK_INVALID_SIMULATION_OBJECT;
+    assert(rk_simulation_spawn_object(simulation, &object_desc, &object) == RK_OK);
+    assert(object != RK_INVALID_SIMULATION_OBJECT);
+    pose.position[2] = 2.0;
+    assert(rk_simulation_teleport_object(simulation, object, &pose) == RK_OK);
+    assert(rk_simulation_remove_object(simulation, object) == RK_OK);
+    assert(rk_simulation_reset(simulation) == RK_OK);
+    assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
+    assert(clock.step_index == 0);
 
     rk_simulation_destroy(simulation);
     rk_robot_state destroyed{};
@@ -102,7 +127,8 @@ void failed_command_phase_does_not_advance() {
     assert(rk_simulation_add_robot(simulation, &model, &first) == RK_OK);
     assert(rk_simulation_add_robot(simulation, &model, &second) == RK_OK);
 
-    const auto first_target = target(0.8, 1);
+    auto first_target = target(0.8, 1);
+    first_target.targets[0].max_rate = 2.0;
     rk_robot_command emergency{};
     emergency.struct_size = sizeof(emergency);
     emergency.sequence = 1;
@@ -111,20 +137,29 @@ void failed_command_phase_does_not_advance() {
     assert(rk_robot_runtime_submit(first, &first_target) == RK_OK);
     assert(rk_robot_runtime_submit(second, &emergency) == RK_OK);
     assert(rk_robot_runtime_submit(second, &rejected_target) == RK_OK);
-    assert(rk_simulation_step(simulation, 100) == RK_ERROR_SAFETY_STOPPED);
+    /* Emergency stop arbitrates over the later motion request in one cycle. */
+    assert(rk_simulation_step(simulation, 100) == RK_OK);
+    assert(std::abs(snapshot(first).position[0] - 0.02) < 1e-12);
 
     rk_simulation_clock clock{};
     clock.struct_size = sizeof(clock);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
-    assert(clock.step_index == 0);
+    assert(clock.step_index == 1);
+
+    const auto rejected_after_stop = target(-0.8, 3);
+    assert(rk_robot_runtime_submit(second, &rejected_after_stop) == RK_OK);
+    assert(rk_simulation_step(simulation, 200) == RK_ERROR_SAFETY_STOPPED);
+    assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
+    assert(clock.step_index == 1);
+    assert(std::abs(snapshot(first).position[0] - 0.02) < 1e-12);
 
     rk_robot_command clear_stop{};
     clear_stop.struct_size = sizeof(clear_stop);
-    clear_stop.sequence = 3;
-    clear_stop.kind = RK_COMMAND_STOP;
+    clear_stop.sequence = 4;
+    clear_stop.kind = RK_COMMAND_RESET_SAFETY;
     assert(rk_robot_runtime_submit(second, &clear_stop) == RK_OK);
     assert(rk_simulation_step(simulation, 200) == RK_OK);
-    assert(std::abs(snapshot(first).position[0]) < 1e-12);
+    assert(std::abs(snapshot(first).position[0] - 0.04) < 1e-12);
     rk_simulation_destroy(simulation);
 }
 

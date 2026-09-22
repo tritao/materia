@@ -64,7 +64,7 @@ class RobotHost {
     var snapshot = runtime.snapshot();
     var endpoint = args.indexOf("--in-memory") >= 0 ? "in-memory" : "simkit";
     Sys.println('robotd: compiled ${robot.name} with ${blueprint.jointCount} joints via $endpoint; '
-      + 'native position=${snapshot.q[0]}');
+      + 'native position=${snapshot.q.get(0)}');
     runtime.dispose();
     if (simulation != null)
       simulation.dispose();

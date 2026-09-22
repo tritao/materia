@@ -13,9 +13,10 @@ interface Robot {
   function description():RobotDescription;
   function capabilities():RobotCapabilities;
   function snapshot():RobotSnapshot;
+  function sensors():Array<SensorFrame>;
   function fault():Null<RobotFault>;
   function submit(command:RobotCommand):Void;
   function stop(mode:StopMode):Void;
-  function setChangeListener(listener:Null < Void -> Void >):Void;
+  function setChangeListener(listener:Null < RobotId -> Void >):Void;
   function close():Void;
 }

@@ -4,13 +4,21 @@
 #include <time.h>
 
 int main(void) {
-    rk_robot_runtime_layout layout = {0};
-    layout.struct_size = sizeof(layout);
-    layout.revision = 1;
-    layout.joint_count = 1;
+    rk_robot_runtime_blueprint blueprint = {0};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.revision = 1;
+    blueprint.joint_count = 1;
+    blueprint.link_count = 2;
+    blueprint.joints[0].joint = 0;
+    blueprint.joints[0].type = RK_RUNTIME_JOINT_REVOLUTE;
+    blueprint.joints[0].parent_link = 0;
+    blueprint.joints[0].child_link = 1;
+    blueprint.joints[0].lower_limit = -1.0;
+    blueprint.joints[0].upper_limit = 1.0;
+    blueprint.joints[0].max_effort = 3.0;
 
     rk_robot_runtime runtime = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_robot_runtime_create(&layout, &runtime) == RK_OK);
+    assert(rk_robot_runtime_create(&blueprint, &runtime) == RK_OK);
     assert(runtime != RK_INVALID_ROBOT_RUNTIME);
 
     rk_robot_command command = {0};
@@ -21,6 +29,7 @@ int main(void) {
     command.targets[0].joint = 0;
     command.targets[0].mode = RK_TARGET_POSITION;
     command.targets[0].target = 1.0;
+    command.targets[0].max_rate = 10.0;
     assert(rk_robot_runtime_submit(runtime, &command) == RK_OK);
 
     /* Standalone runtimes advance through their worker lifecycle. */

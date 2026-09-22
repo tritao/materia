@@ -380,9 +380,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
           robotId: state.id,
           sequence: Std.string(state.sourceSequence),
           timestampNs: Std.string(state.timestampNs),
-          q: state.positions.copy(),
-          dq: state.velocities.copy(),
-          effort: state.efforts.copy(),
+          q: state.positions.toArray(),
+          dq: state.velocities.toArray(),
+          effort: state.efforts.toArray(),
           mode: state.mode,
           fault: state.faultCode
         },

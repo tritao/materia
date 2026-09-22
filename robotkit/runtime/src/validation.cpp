@@ -22,14 +22,9 @@ bool valid_target_mode(rk_joint_target_mode mode) {
 
 extern "C" {
 
-rk_result RK_CALL rk_robot_runtime_layout_validate(const rk_robot_runtime_layout *layout) {
-    if (!has_full_struct(layout) || layout->joint_count > RK_MAX_JOINTS)
-        return RK_ERROR_INVALID_ARGUMENT;
-    return RK_OK;
-}
-
 rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blueprint *blueprint) {
-    if (!has_full_struct(blueprint) || blueprint->joint_count > RK_MAX_JOINTS)
+    if (!has_full_struct(blueprint) || blueprint->joint_count > RK_MAX_JOINTS ||
+        blueprint->link_count == 0)
         return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < blueprint->joint_count; ++index) {
         const auto &joint = blueprint->joints[index];
@@ -47,10 +42,11 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
 rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command) {
     if (!has_full_struct(command) || command->target_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (command->kind > RK_COMMAND_EMERGENCY_STOP)
+    if (command->kind > RK_COMMAND_RESET_SAFETY)
         return RK_ERROR_INVALID_ARGUMENT;
     if ((command->kind == RK_COMMAND_NONE || command->kind == RK_COMMAND_STOP ||
-         command->kind == RK_COMMAND_EMERGENCY_STOP) && command->target_count != 0)
+         command->kind == RK_COMMAND_EMERGENCY_STOP ||
+         command->kind == RK_COMMAND_RESET_SAFETY) && command->target_count != 0)
         return RK_ERROR_INVALID_ARGUMENT;
 
     for (uint32_t index = 0; index < command->target_count; ++index) {
@@ -63,12 +59,13 @@ rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command) {
     return RK_OK;
 }
 
-rk_result RK_CALL rk_robot_command_validate_for_layout(const rk_robot_command *command,
-                                                        const rk_robot_runtime_layout *layout) {
-    if (rk_robot_runtime_layout_validate(layout) != RK_OK || rk_robot_command_validate(command) != RK_OK)
+rk_result RK_CALL rk_robot_command_validate_for_blueprint(
+    const rk_robot_command *command, const rk_robot_runtime_blueprint *blueprint) {
+    if (rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
+        rk_robot_command_validate(command) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < command->target_count; ++index) {
-        if (command->targets[index].joint >= layout->joint_count)
+        if (command->targets[index].joint >= blueprint->joint_count)
             return RK_ERROR_INVALID_ARGUMENT;
     }
     return RK_OK;

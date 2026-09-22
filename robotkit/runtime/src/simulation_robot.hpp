@@ -17,6 +17,7 @@ public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
     void discard_pending() noexcept override { pending_targets_.clear(); }
+    void reset() noexcept { pending_targets_.clear(); stopped_ = false; }
 
 private:
     friend class Simulation;

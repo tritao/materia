@@ -2,6 +2,7 @@
 #define ROBOTKIT_SIMULATION_HPP
 
 #include "robotkit_runtime.hpp"
+#include "robotkit_simkit.h"
 #include "nativekit_sim.h"
 #include "nativekit_sim_host.h"
 
@@ -37,6 +38,13 @@ public:
     rk_result stop();
     /** Applies all robot mailboxes and advances the physics host exactly once. */
     rk_result step(uint64_t timestamp_ns);
+    rk_result reset();
+    rk_result reset_robot(uint32_t robot_index);
+    rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
+    rk_result spawn_object(const rk_simulation_object_desc &desc,
+                           rk_simulation_object &out_object);
+    rk_result remove_object(rk_simulation_object object);
+    rk_result teleport_object(rk_simulation_object object, const rk_simulation_pose &pose);
     /** Returns the number of completed shared physics steps. */
     uint64_t step_index() const;
     /** Returns the fixed-step simulation time in seconds. */
@@ -65,6 +73,14 @@ private:
     std::vector<std::weak_ptr<SimulationRobot>> bindings_;
     std::vector<std::shared_ptr<RobotRuntime>> runtimes_;
     std::vector<rk_robot_runtime> handles_;
+    std::vector<nksim_body> robot_base_bodies_;
+    struct EnvironmentObject {
+        nkscene_occurrence_id occurrence{};
+        nksim_shape shape = 0;
+        nksim_body body = 0;
+        bool active = false;
+    };
+    std::vector<EnvironmentObject> objects_;
     std::chrono::nanoseconds period_;
     mutable std::mutex tick_mutex_;
     mutable std::mutex state_mutex_;
