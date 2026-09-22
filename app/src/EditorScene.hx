@@ -24,6 +24,7 @@ import nativekit.ui.core.PropertyValue;
 class EditorScene {
   // Retained UI caches survive document replacement, so revisions must too.
   static var nextRevision:Int = 0;
+  static var nextEnvironmentRevision:Int = 0;
   public final document:EditorDocument;
   var scene:Scene;
   var objects:Array<EditorSceneObject>;
@@ -33,12 +34,16 @@ class EditorScene {
   var selectionMaterial:Material;
   public var selectedId(default, null):String = "box";
   public var revision(default, null):Int;
+  /** Changes only when simulation-consumed scene content changes, not selection. */
+  public var environmentRevision(default, null):Int;
   public var selectionRevision(default, null):Int = 1;
   var disposed:Bool = false;
 
   public function new(?data:Array<SceneObjectData>) {
     nextRevision++;
     revision = nextRevision;
+    nextEnvironmentRevision++;
+    environmentRevision = nextEnvironmentRevision;
     document = new EditorDocument("scene");
     scene = Scene.create();
     objects = [];
@@ -155,6 +160,8 @@ class EditorScene {
     selectionRevision++;
     nextRevision++;
     revision = nextRevision;
+    nextEnvironmentRevision++;
+    environmentRevision = nextEnvironmentRevision;
   }
 
   public function setName(id:String, label:String):Void {
@@ -312,6 +319,8 @@ class EditorScene {
     spatial = nextSpatial;
     nextRevision++;
     revision = nextRevision;
+    nextEnvironmentRevision++;
+    environmentRevision = nextEnvironmentRevision;
   }
 
   public function properties():Array<PropertyDescriptor> {

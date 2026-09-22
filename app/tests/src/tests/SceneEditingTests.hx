@@ -17,6 +17,10 @@ import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
 import robotkit.world.ReplayRobot;
 import robotkit.world.RobotRecording;
+import robotkit.model.Actuator;
+import robotkit.model.Joint;
+import robotkit.model.JointType;
+import robotkit.model.Link;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -278,6 +282,23 @@ class SceneEditingTests {
   }
 
   static function sensorConfiguration():Void {
+    var historySensors=new SensorConfiguration();
+    historySensors.add("imu");
+    historySensors.selectRobot("robot/history-b");
+    var secondCount=historySensors.model.sensors.length;
+    check(historySensors.document.undo()&&historySensors.model.sensors.length==secondCount,
+      "undo after switching robots leaves the selected robot unchanged");
+    historySensors.selectRobot("materia/robot");
+    check(historySensors.model.sensors.length==1,
+      "cross-robot undo removes the sensor from its owning model");
+    historySensors.selectRobot("robot/history-b");
+    check(historySensors.document.redo()&&historySensors.model.sensors.length==secondCount,
+      "redo after switching robots leaves the selected robot unchanged");
+    historySensors.selectRobot("materia/robot");
+    check(historySensors.model.sensors.length==2,
+      "cross-robot redo restores the sensor to its owning model");
+    historySensors.dispose();
+
     var sensors=new SensorConfiguration();
     check(sensors.model.sensors.length==1&&sensors.model.sensors[sensors.selectedIndex].kind=="lidar",
       "sensor panel starts with an editable LiDAR");
@@ -307,11 +328,25 @@ class SceneEditingTests {
     var world=new RobotWorld();
     var simulation=new ApplicationSimulation(world);
     check(simulation.rebuild(sensors,scene),"valid sensor edits build a shared simulation: "+simulation.error);
+    check(!simulation.pending(sensors,scene),"successful rebuild clears sensor and environment pending state");
+    scene.select("tower");
+    check(!simulation.pending(sensors,scene),"selection-only changes do not dirty simulation state");
+    scene.setPosition("tower",0,2.0);
+    check(simulation.pending(sensors,scene),"scene-only geometry edits require a rebuild");
     var appliedRevision=simulation.appliedRevision;
     sensors.model.sensors[0].rayCount=0;
     check(!simulation.rebuild(sensors,scene)&&simulation.appliedRevision==appliedRevision,
       "failed sensor rebuild preserves the running configuration");
+    check(simulation.pending(sensors,scene),"failed replacement retains pending environment state");
     sensors.model.sensors[0].rayCount=8;
+    simulation.start();
+    check(simulation.rebuild(sensors,scene)&&simulation.isRunning(),
+      "rebuilding a running simulation preserves realtime state");
+    simulation.stop();
+    var replacement=new EditorScene(scene.records());scene.dispose();scene=replacement;
+    check(simulation.pending(sensors,scene),
+      "replacing a document with equivalent geometry still requires a rebuild");
+    check(simulation.rebuild(sensors,scene),"replacement scene rebuild succeeds");
     var observation=simulation.step().robot("materia/robot");
     check(observation!=null&&observation.sensors.length>0,
       "applied sensor configuration produces simulated measurements");
@@ -333,12 +368,26 @@ class SceneEditingTests {
       "sensor workflow edits mount position");
     check(session.sensors.selectRobot("materia/robot-b"),"sensor workflow adds a second robot target");
     new PropertyBinding(session.sensors.properties()[2],session.sensors.context()).apply(PropertyValue.Float(10.0));
+    var arm=session.sensors.model.addLink(new Link("Arm","arm"));
+    var joint=new Joint("Arm joint",JointType.Revolute,session.sensors.model.links[0],arm,"joint/arm");
+    joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=3.0;
+    joint.drive=new Actuator("Arm drive",3.0,2.0);session.sensors.model.addJoint(joint);
+    check(session.sensors.setRobotPose("materia/robot-b",[0.0,3.0,0.0],[0.0,0.0,0.0,1.0]),
+      "sensor workflow stores an explicit robot pose");
     check(session.isDirty(), "sensor edits dirty the application document");
     session.save(documentPath);
     session.open(documentPath);
     check(session.sensors.configuredRobotIds().length==2,"two robot configurations survive reload");
     check(session.sensors.model.sensors[0].updateRate==10.0,
       "selected second robot retains its independent sensor rate");
+    check(session.sensors.model.joints.length==1,"joint topology survives reload");
+    var restoredJoint=session.sensors.model.joints[0];
+    check(restoredJoint.id=="joint/arm"&&
+      restoredJoint.parent.id=="base"&&restoredJoint.child.id=="arm"&&restoredJoint.limits.lower==-1.0&&
+      restoredJoint.limits.upper==1.0&&restoredJoint.drive!=null&&restoredJoint.drive.maxEffort==3.0&&
+      session.sensors.robotPosition("materia/robot-b")[1]==3.0&&
+      session.sensors.robotPosition("materia/robot")[1]==0.0,
+      "joint topology, actuator settings, and robot pose survive reload");
     session.sensors.selectRobot("materia/robot");
     var restoredFrame = session.sensors.model.sensors[0].frame;
     check(restoredFrame != null && session.sensors.model.sensors[0].updateRate == 20.0 &&
@@ -346,11 +395,13 @@ class SceneEditingTests {
       "sensor settings survive document save and reload");
     var world=new RobotWorld();
     var simulation=new ApplicationSimulation(world);
+    var monitor=new ReplayRobot("monitor/remote",new RobotRecording());world.attach(monitor);
     check(simulation.rebuild(session.sensors,session.scene), "reloaded robots build one shared simulation");
+    check(world.robot("monitor/remote")==monitor,"shared rebuild leaves unrelated remote adapters attached");
     var appliedRevision=simulation.appliedRevision;
     session.sensors.selectRobot("remote/readonly");
     world.attach(new ReplayRobot("remote/readonly",new RobotRecording()));
-    session.sensors.setReadOnlyRobots(["remote/readonly"]);
+    session.sensors.setReadOnlyRobots(["remote/readonly","monitor/remote"]);
     check(!session.sensors.isEditable()&&session.sensors.properties().length==0,
       "remote robot sensor targets are read-only");
     check(!simulation.rebuild(session.sensors,session.scene)&&simulation.appliedRevision==appliedRevision&&
@@ -359,10 +410,15 @@ class SceneEditingTests {
       "unsupported remote configuration can be removed without touching the live world");
     var remote=world.detach("remote/readonly");if(remote!=null)remote.close();
     session.sensors.selectRobot("materia/robot");
-    session.sensors.setReadOnlyRobots(["remote/readonly"]);
+    session.sensors.setReadOnlyRobots(["remote/readonly","monitor/remote"]);
+    session.scene.setPosition("tower",1,0.5);simulation.start();
+    check(simulation.rebuild(session.sensors,session.scene)&&simulation.isRunning()&&
+      world.robot("monitor/remote")==monitor,
+      "running scene rebuild preserves unrelated remote adapters");
+    simulation.stop();
     var observation = simulation.step();
     for (index in 0...8) observation = simulation.step();
-    check(observation.robotIds().length==2,"shared simulation publishes two independently configured robots");
+    check(observation.robotIds().length==3,"shared world publishes two simulated robots and its unchanged remote adapter");
     var firstRobot=observation.robot("materia/robot");
     if(firstRobot==null)throw "Shared simulation lost the first robot";
     var sawObstacle=false;

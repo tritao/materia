@@ -13,6 +13,7 @@ class ApplicationSimulation {
   public final world:RobotWorld;
   public var appliedRevision(default, null):Int = 0;
   public var appliedDocumentRevision(default, null):Int = -1;
+  public var appliedEnvironmentRevision(default, null):Int = -1;
   public var error(default, null):Null<String> = null;
   var simulation:Null<Simulation> = null;
   var simulatedIds:Array<String> = [];
@@ -20,8 +21,9 @@ class ApplicationSimulation {
 
   public function new(world:RobotWorld) this.world = world;
 
-  public function pending(configuration:SensorConfiguration):Bool
-    return appliedDocumentRevision != configuration.revision();
+  public function pending(configuration:SensorConfiguration, scene:EditorScene):Bool
+    return appliedDocumentRevision != configuration.revision() ||
+      appliedEnvironmentRevision != scene.environmentRevision;
 
   /** Builds the complete candidate before changing any live world adapter. */
   public function rebuild(configuration:SensorConfiguration, scene:EditorScene):Bool {
@@ -44,7 +46,7 @@ class ApplicationSimulation {
         var id = editable.id;
         candidateRobots.push(new SimulatedRobot(id, runtime, editable.model.name,
           [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
-        if (index > 0) candidate.teleportRobot(index, [0.0, index * 2.0, 0.0]);
+        candidate.teleportRobot(index, editable.position, editable.rotation);
       }
       for (object in scene.records()) if (object.visible)
         candidate.spawnBox([object.x, object.y, object.z],
@@ -70,6 +72,7 @@ class ApplicationSimulation {
       simulatedIds = [for (robot in candidateRobots) robot.id()];
       appliedRevision++;
       appliedDocumentRevision = configuration.revision();
+      appliedEnvironmentRevision = scene.environmentRevision;
       error = null;
       if (previousSimulation != null) previousSimulation.dispose();
       for (robot in previousRobots) robot.close();

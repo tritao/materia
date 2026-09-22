@@ -9,6 +9,9 @@ import nativekit.ui.core.PropertyOption;
 import nativekit.ui.core.PropertyType;
 import nativekit.ui.core.PropertyValue;
 import robotkit.model.Frame;
+import robotkit.model.Actuator;
+import robotkit.model.Joint;
+import robotkit.model.JointLimits;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Sensor;
@@ -25,6 +28,9 @@ class SensorConfiguration {
   final configurations:Map<String, Dynamic> = new Map();
   final liveModels:Map<String, RobotModel> = new Map();
   final selections:Map<String, Int> = new Map();
+  final nextIds:Map<String, Int> = new Map();
+  final positions:Map<String, Array<Float>> = new Map();
+  final rotations:Map<String, Array<Float>> = new Map();
   final readOnlyRobots:Map<String, Bool> = new Map();
 
   public function new(?data:Dynamic) {
@@ -81,41 +87,49 @@ class SensorConfiguration {
   public function removeRobotConfiguration(id:String):Bool {
     captureCurrent();
     if(!configurations.exists(id)||configuredRobotIds().length<=1)return false;
-    var record=configurations.get(id),live=liveModels.get(id),selection=selections.get(id);
+    var record=configurations.get(id),live=liveModels.get(id),selection=selections.get(id),savedNextId=nextIds.get(id);
+    var position=robotPosition(id),rotation=robotRotation(id);
     var fallback=[for(candidate in configuredRobotIds())if(candidate!=id)candidate][0];
     document.apply(new EditOperation("Remove robot configuration",function(){
-      configurations.remove(id);liveModels.remove(id);selections.remove(id);
+      configurations.remove(id);liveModels.remove(id);selections.remove(id);nextIds.remove(id);positions.remove(id);rotations.remove(id);
       if(robotId==id)activate(fallback,configurations.get(fallback));
     },function(){
       configurations.set(id,record);if(live!=null)liveModels.set(id,live);if(selection!=null)selections.set(id,selection);
+      if(savedNextId!=null)nextIds.set(id,savedNextId);
+      positions.set(id,position.copy());rotations.set(id,rotation.copy());
     }));
     return true;
   }
   public function isEditable():Bool return !readOnlyRobots.exists(robotId);
   public function add(kind:String):Sensor {
     ensureEditable();
+    var owner = model;
+    var ownerId = robotId;
     var sensor = createSensor(kind);
     var previous = selectedIndex;
     document.apply(new EditOperation("Add " + kind + " sensor", function() {
-      if (model.sensors.indexOf(sensor) < 0) model.addSensor(sensor);
-      selectedIndex = model.sensors.indexOf(sensor);
+      if (owner.sensors.indexOf(sensor) < 0) owner.addSensor(sensor);
+      if (robotId == ownerId) selectedIndex = owner.sensors.indexOf(sensor);
     }, function() {
-      model.sensors.remove(sensor);
-      selectedIndex = previous;
+      owner.sensors.remove(sensor);
+      if (robotId == ownerId) selectedIndex = previous;
     }));
     return sensor;
   }
   public function removeSelected():Bool {
     ensureEditable();
     if(model.sensors.length==0)return false;
+    var owner = model;
+    var ownerId = robotId;
     var index = selectedIndex;
-    var sensor = model.sensors[index];
+    var sensor = owner.sensors[index];
     document.apply(new EditOperation("Remove sensor", function() {
-      model.sensors.remove(sensor);
-      selectedIndex=model.sensors.length==0?-1:Std.int(Math.min(index,model.sensors.length-1));
+      owner.sensors.remove(sensor);
+      if (robotId == ownerId)
+        selectedIndex=owner.sensors.length==0?-1:Std.int(Math.min(index,owner.sensors.length-1));
     }, function() {
-      model.sensors.insert(index, sensor);
-      selectedIndex = index;
+      owner.sensors.insert(index, sensor);
+      if (robotId == ownerId) selectedIndex = index;
     }));
     return true;
   }
@@ -142,13 +156,14 @@ class SensorConfiguration {
     for(id in liveModels.keys())configurations.set(id,singleRecordFor(id,liveModels.get(id)));
     return [for(id in configuredRobotIds()) configurations.get(id)];
   }
-  public function robotModels():Array<{id:String,model:RobotModel}> {
-    captureCurrent(); var selected=robotId; var result:Array<{id:String,model:RobotModel}> = [];
+  public function robotModels():Array<{id:String,model:RobotModel,position:Array<Float>,rotation:Array<Float>}> {
+    captureCurrent(); var selected=robotId;
+    var result:Array<{id:String,model:RobotModel,position:Array<Float>,rotation:Array<Float>}> = [];
     for(id in configuredRobotIds()) {
       if(!liveModels.exists(id))loadRobot(configurations.get(id));
       var live = liveModels.get(id);
       if (live == null) throw 'Robot "$id" has no editable model';
-      result.push({id:id,model:live});
+      result.push({id:id,model:live,position:robotPosition(id),rotation:robotRotation(id)});
     }
     activate(selected,configurations.get(selected));
     return result;
@@ -156,7 +171,15 @@ class SensorConfiguration {
   function singleRecord():Dynamic return singleRecordFor(robotId,model);
   function singleRecordFor(id:String,value:RobotModel):Dynamic return {
     robotId: id,
+    name: value.name,
+    pose: {position:robotPosition(id), rotation:robotRotation(id)},
     links: [for (link in value.links) {id:link.id, name:link.name}],
+    joints: [for (joint in value.joints) {id:joint.id, name:joint.name, type:joint.type,
+      parentId:joint.parent.id, childId:joint.child.id,
+      limits:{lower:joint.limits.lower,upper:joint.limits.upper,
+        velocity:joint.limits.velocity,effort:joint.limits.effort},
+      drive:joint.drive==null?null:{name:joint.drive.name,maxEffort:joint.drive.maxEffort,
+        maxRate:joint.drive.maxRate}}],
     frames: [for (frame in value.frames) {id:frame.id, name:frame.name, linkId:frame.link.id,
       position:frame.position.copy(), rotation:frame.rotation.copy()}],
     sensors: [for (sensor in value.sensors) {id:sensor.id, name:sensor.name, kind:sensor.kind,
@@ -167,11 +190,14 @@ class SensorConfiguration {
 
   function captureCurrent():Void {
     configurations.set(robotId, singleRecord()); liveModels.set(robotId,model);
-    selections.set(robotId,selectedIndex);
+    selections.set(robotId,selectedIndex);nextIds.set(robotId,nextId);
   }
   function activate(id:String,record:Dynamic):Void {
     var live=liveModels.get(id);
-    if(live==null)loadRobot(record); else {robotId=id;model=live;var selected=selections.get(id);selectedIndex=selected==null?0:selected;}
+    if(live==null)loadRobot(record); else {
+      robotId=id;model=live;var selected=selections.get(id);selectedIndex=selected==null?0:selected;
+      var savedNextId=nextIds.get(id);nextId=savedNextId==null?1:savedNextId;
+    }
   }
   function createDefault(id:String):Void {
     robotId=id; model=new RobotModel("Materia robot");
@@ -180,9 +206,36 @@ class SensorConfiguration {
     nextId=1; addDirect("lidar"); captureCurrent();
   }
 
+  public function robotPosition(id:String):Array<Float> {
+    var value=positions.get(id);return value==null?[0.0,0.0,0.0]:value.copy();
+  }
+  public function robotRotation(id:String):Array<Float> {
+    var value=rotations.get(id);return value==null?[0.0,0.0,0.0,1.0]:value.copy();
+  }
+  public function setRobotPose(id:String,position:Array<Float>,rotation:Array<Float>):Bool {
+    ensureEditableRobot(id);
+    var nextPosition=checkedVector(position,"robot pose position",3);
+    var nextRotation=checkedVector(rotation,"robot pose rotation",4);
+    var norm=0.0;for(value in nextRotation)norm+=value*value;
+    if(Math.abs(norm-1.0)>0.000001)throw "Robot pose rotation must be a unit quaternion";
+    var beforePosition=robotPosition(id),beforeRotation=robotRotation(id);
+    if(equalVector(beforePosition,nextPosition)&&equalVector(beforeRotation,nextRotation))return false;
+    return document.apply(new EditOperation("Move robot "+id,function(){
+      positions.set(id,nextPosition.copy());rotations.set(id,nextRotation.copy());
+    },function(){positions.set(id,beforePosition.copy());rotations.set(id,beforeRotation.copy());}));
+  }
+
   function loadRobot(data:Dynamic):Void {
     robotId = requiredString(data, "robotId");
-    model = new RobotModel("Materia robot");
+    var modelName:Dynamic=Reflect.field(data,"name");
+    model = new RobotModel(Std.isOfType(modelName,String)&&StringTools.trim(cast modelName).length>0
+      ? cast modelName : "Materia robot");
+    var pose:Dynamic=Reflect.field(data,"pose");
+    var loadedPosition=pose==null?[0.0,0.0,0.0]:vector(pose,"position",3);
+    var loadedRotation=pose==null?[0.0,0.0,0.0,1.0]:vector(pose,"rotation",4);
+    positions.set(robotId,loadedPosition);rotations.set(robotId,loadedRotation);
+    var poseNorm=0.0;for(value in loadedRotation)poseNorm+=value*value;
+    if(Math.abs(poseNorm-1.0)>0.000001)throw "Robot pose rotation must be a unit quaternion";
     var links = new Map<String, Link>();
     for (value in requiredArray(data, "links")) {
       var link = model.addLink(new Link(requiredString(value, "name"), requiredString(value, "id")));
@@ -190,6 +243,22 @@ class SensorConfiguration {
       links.set(link.id, link);
     }
     if (model.links.length == 0) throw "Sensor document requires a robot link";
+    var jointValues:Dynamic=Reflect.field(data,"joints");
+    if(jointValues!=null)for(value in requiredArray(data,"joints")) {
+      var parent=links.get(requiredString(value,"parentId"));
+      var child=links.get(requiredString(value,"childId"));
+      if(parent==null||child==null)throw "Sensor joint references an unknown link";
+      var kind:String=requiredString(value,"type");
+      var joint=new Joint(requiredString(value,"name"),cast kind,parent,child,requiredString(value,"id"));
+      var limits:Dynamic=Reflect.field(value,"limits");
+      if(limits==null)throw "Sensor joint requires limits";
+      joint.limits=new JointLimits(finite(limits,"lower"),finite(limits,"upper"),
+        finite(limits,"velocity"),finite(limits,"effort"));
+      var drive:Dynamic=Reflect.field(value,"drive");
+      if(drive!=null)joint.drive=new Actuator(requiredString(drive,"name"),
+        finite(drive,"maxEffort"),finite(drive,"maxRate"));
+      model.addJoint(joint);
+    }
     var frames = new Map<String, Frame>();
     for (value in requiredArray(data, "frames")) {
       var link = links.get(requiredString(value, "linkId"));
@@ -225,7 +294,7 @@ class SensorConfiguration {
       if (suffix != null && suffix >= nextId) nextId=suffix+1;
     }
     if (diagnostics().length > 0) throw diagnostics()[0].message;
-    liveModels.set(robotId,model); selections.set(robotId,selectedIndex);
+    liveModels.set(robotId,model); selections.set(robotId,selectedIndex);nextIds.set(robotId,nextId);
   }
 
   static function requiredArray(value:Dynamic, name:String):Array<Dynamic> {
@@ -252,6 +321,15 @@ class SensorConfiguration {
     }
     return result;
   }
+  static function checkedVector(value:Array<Float>,name:String,count:Int):Array<Float> {
+    if(value==null||value.length!=count)throw 'Invalid $name';
+    var result:Array<Float> = [];
+    for(item in value){if(!Math.isFinite(item))throw 'Invalid $name';result.push(item);}
+    return result;
+  }
+  static function equalVector(left:Array<Float>,right:Array<Float>):Bool {
+    for(index in 0...left.length)if(left[index]!=right[index])return false;return true;
+  }
 
   public function dispose():Void {}
   public function context():CommandContext {
@@ -265,6 +343,7 @@ class SensorConfiguration {
   public function properties():Array<PropertyDescriptor> {
     if (!isEditable()) return [];
     var sensor=selected();if(sensor==null)return [];
+    var owner=model;
     var result:Array<PropertyDescriptor> = [];
     result.push(text(sensor,"name","Name",function()return sensor.name,function(value)sensor.name=value));
     result.push(readonlyText(sensor,"kind","Kind",sensor.kind));
@@ -280,14 +359,14 @@ class SensorConfiguration {
       function(value)sensor.noiseStddev=value,0.0,1000000.0,null,0.001));
     result.push(integer(sensor,"seed","Noise seed",function()return sensor.noiseSeed,
       function(value)sensor.noiseSeed=value,0,2147483647));
-    result.push(choice(sensor, "mount-mode", "Mount ownership", function() return mountMode(sensor),
-      function(value) setMountMode(sensor, value), [
+    result.push(choice(sensor, "mount-mode", "Mount ownership", function() return mountMode(owner,sensor),
+      function(value) setMountMode(owner,sensor, value), [
         new PropertyOption("shared", "Shared frame"),
         new PropertyOption("independent", "Independent frame")
       ], "Mount"));
-    result.push(choice(sensor, "link", "Mounted link", function() return sensorLink(sensor).id,
-      function(value) setSensorLink(sensor, value),
-      [for (link in model.links) new PropertyOption(link.id, link.name)], "Mount"));
+    result.push(choice(sensor, "link", "Mounted link", function() return sensorLink(owner,sensor).id,
+      function(value) setSensorLink(owner,sensor, value),
+      [for (link in owner.links) new PropertyOption(link.id, link.name)], "Mount"));
     var frame=sensor.frame;
     if(frame!=null) {
       for(axis in 0...3) result.push(number(sensor,"position-"+axis,"Mount "+["X","Y","Z"][axis],
@@ -300,40 +379,40 @@ class SensorConfiguration {
     return result;
   }
 
-  function sensorLink(sensor:Sensor):Link return sensor.frame == null ? model.links[0] : sensor.frame.link;
-  function mountMode(sensor:Sensor):String {
+  function sensorLink(owner:RobotModel,sensor:Sensor):Link return sensor.frame == null ? owner.links[0] : sensor.frame.link;
+  function mountMode(owner:RobotModel,sensor:Sensor):String {
     var frame = sensor.frame;
     if (frame == null) return "independent";
-    var users = 0; for (candidate in model.sensors) if (candidate.frame == frame) users++;
-    return users > 1 || frame == model.frames[0] ? "shared" : "independent";
+    var users = 0; for (candidate in owner.sensors) if (candidate.frame == frame) users++;
+    return users > 1 || frame == owner.frames[0] ? "shared" : "independent";
   }
-  function setMountMode(sensor:Sensor, mode:String):Void {
+  function setMountMode(owner:RobotModel,sensor:Sensor, mode:String):Void {
     if (mode == "shared") {
-      var link = sensorLink(sensor);
-      for (frame in model.frames) if (frame.link == link && frame.id.indexOf("shared") >= 0) {
+      var link = sensorLink(owner,sensor);
+      for (frame in owner.frames) if (frame.link == link && frame.id.indexOf("shared") >= 0) {
         sensor.frame = frame; return;
       }
-      if (model.frames[0].link == link) { sensor.frame = model.frames[0]; return; }
+      if (owner.frames[0].link == link) { sensor.frame = owner.frames[0]; return; }
       var shared = new Frame(link.name + " shared sensor mount", link, link.id + "/sensors/shared");
-      model.addFrame(shared); sensor.frame = shared;
+      owner.addFrame(shared); sensor.frame = shared;
     } else if (mode == "independent") {
       var source = sensor.frame;
       var frameId = sensor.id + "/mount";
-      for (candidate in model.frames) if (candidate.id == frameId) { sensor.frame = candidate; return; }
-      var frame = new Frame(sensor.name + " mount", sensorLink(sensor), frameId);
+      for (candidate in owner.frames) if (candidate.id == frameId) { sensor.frame = candidate; return; }
+      var frame = new Frame(sensor.name + " mount", sensorLink(owner,sensor), frameId);
       if (source != null) { frame.position = source.position.copy(); frame.rotation = source.rotation.copy(); }
-      model.addFrame(frame); sensor.frame = frame;
+      owner.addFrame(frame); sensor.frame = frame;
     } else throw "Unknown sensor mount ownership";
   }
-  function setSensorLink(sensor:Sensor, linkId:String):Void {
-    var link:Null<Link> = null; for (candidate in model.links) if (candidate.id == linkId) link = candidate;
+  function setSensorLink(owner:RobotModel,sensor:Sensor, linkId:String):Void {
+    var link:Null<Link> = null; for (candidate in owner.links) if (candidate.id == linkId) link = candidate;
     if (link == null) throw "Unknown sensor link";
     var source = sensor.frame;
     var frameId = sensor.id + "/mount/" + link.id;
-    for (candidate in model.frames) if (candidate.id == frameId) { sensor.frame = candidate; return; }
+    for (candidate in owner.frames) if (candidate.id == frameId) { sensor.frame = candidate; return; }
     var frame = new Frame(sensor.name + " mount", link, frameId);
     if (source != null) { frame.position = source.position.copy(); frame.rotation = source.rotation.copy(); }
-    model.addFrame(frame); sensor.frame = frame;
+    owner.addFrame(frame); sensor.frame = frame;
   }
 
   static function settings(category:String,min:Null<Float>,max:Null<Float>,unit:Null<String>,step:Float):PropertyDescriptorOptions {
@@ -341,6 +420,10 @@ class SensorConfiguration {
     value.unit=unit;value.step=step;return value;
   }
   function ensureEditable():Void if (!isEditable()) throw 'Remote robot "$robotId" is read-only';
+  function ensureEditableRobot(id:String):Void {
+    if(readOnlyRobots.exists(id))throw 'Remote robot "$id" is read-only';
+    if(id!=robotId&&!configurations.exists(id)&&!liveModels.exists(id))throw 'Unknown robot "$id"';
+  }
   static function number(sensor:Sensor,id:String,label:String,read:Void->Float,write:Float->Void,
       min:Float,max:Float,unit:Null<String>,step:Float):PropertyDescriptor
     return new PropertyDescriptor(sensor.id+":"+id,label,PropertyType.Float,

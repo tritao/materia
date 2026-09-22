@@ -579,7 +579,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       },"sensor-reset"))
     ]);
     var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
-      new KeyedView("apply-state",new Text(simulation.pending(sensors)
+      new KeyedView("apply-state",new Text(simulation.pending(sensors,scene)
         ? "Pending edits · rebuild resets simulated robots and environment"
         : "Applied configuration · physics is authoritative")),
       new KeyedView("robots",new Column("sensor-robots",robotRows)),

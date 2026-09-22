@@ -78,6 +78,10 @@ adapters to the shared `RobotWorld`. Attached robots not owned by that
 simulation are treated as remote and read-only. Rebuild replaces all simulated
 robots and environment bodies together; pending edits never mutate active
 physics, and any validation or construction failure preserves the active world.
+Each robot record includes its stable identity, model name, links, joints,
+limits, optional actuator, frames, sensors, and explicit world pose. Pending
+state covers both robot edits and scene-content or document replacement;
+selection alone does not require a physics rebuild.
 
 Scene files are UTF-8 JSON with `format: "materia.scene"`, `version: 1`, and an
 `objects` array plus an optional `sensors` robot configuration. Each rectangle stores its stable string `id`, `label`, `type`,
