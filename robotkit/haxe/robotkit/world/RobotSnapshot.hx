@@ -8,6 +8,8 @@ class RobotSnapshot {
   public final sourceSequence:Int64;
   public final sourceTimestampNs:Int64;
   public final receivedTimestampNs:Int64;
+  public final sourceClockId:String;
+  public final receivedClockId:String;
   public final positions:ImmutableFloatArray;
   public final velocities:ImmutableFloatArray;
   public final efforts:ImmutableFloatArray;
@@ -28,7 +30,9 @@ class RobotSnapshot {
     mode:Int,
     faultCode:Int,
     ?receivedTimestampNs:Int64,
-    ?sensors:Array<SensorFrame>
+    ?sensors:Array<SensorFrame>,
+    ?sourceClockId:String = "unspecified",
+    ?receivedClockId:String = "robotkit.monotonic"
   ) {
     this.id = id;
     this.sourceSequence = sourceSequence;
@@ -36,6 +40,8 @@ class RobotSnapshot {
     this.receivedTimestampNs = receivedTimestampNs == null
       ? Int64.ofInt(0)
       : receivedTimestampNs;
+    this.sourceClockId = sourceClockId;
+    this.receivedClockId = receivedClockId;
     this.positions = new ImmutableFloatArray(positions);
     this.velocities = new ImmutableFloatArray(velocities);
     this.efforts = new ImmutableFloatArray(efforts);

@@ -10,6 +10,8 @@ class SensorFrame {
   public final sequence:Int64;
   public final sourceTimestampNs:Int64;
   public final receivedTimestampNs:Int64;
+  public final sourceClockId:String;
+  public final receivedClockId:String;
   public final values:ImmutableFloatArray;
   public final linkId:String;
   public final mountPosition:ImmutableFloatArray;
@@ -17,7 +19,8 @@ class SensorFrame {
 
   public function new(sensorId:String, kind:String, frameId:String, sequence:Int64,
       sourceTimestampNs:Int64, values:Array<Float>, ?receivedTimestampNs:Int64,
-      ?linkId:String = "", ?mountPosition:Array<Float>, ?mountRotation:Array<Float>) {
+      ?linkId:String = "", ?mountPosition:Array<Float>, ?mountRotation:Array<Float>,
+      ?sourceClockId:String = "unspecified", ?receivedClockId:String = "robotkit.monotonic") {
     this.sensorId = sensorId;
     this.kind = kind;
     this.frameId = frameId;
@@ -25,6 +28,8 @@ class SensorFrame {
     this.sourceTimestampNs = sourceTimestampNs;
     this.receivedTimestampNs = receivedTimestampNs == null
       ? Int64.ofInt(0) : receivedTimestampNs;
+    this.sourceClockId = sourceClockId;
+    this.receivedClockId = receivedClockId;
     this.values = new ImmutableFloatArray(values);
     this.linkId = linkId;
     this.mountPosition = new ImmutableFloatArray(mountPosition == null ? [0.0, 0.0, 0.0] : mountPosition);
@@ -32,5 +37,6 @@ class SensorFrame {
   }
 
   public function copy():SensorFrame return new SensorFrame(sensorId, kind, frameId, sequence,
-    sourceTimestampNs, values.toArray(), receivedTimestampNs, linkId, mountPosition.toArray(), mountRotation.toArray());
+    sourceTimestampNs, values.toArray(), receivedTimestampNs, linkId, mountPosition.toArray(),
+    mountRotation.toArray(), sourceClockId, receivedClockId);
 }

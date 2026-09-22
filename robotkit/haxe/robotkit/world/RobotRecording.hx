@@ -9,15 +9,18 @@ class RobotRecording {
   public final faults:Array<RobotFault> = [];
   public final worlds:Array<WorldSnapshot> = [];
   public final events:Array<RobotRecordingEvent> = [];
+  public final entries:Array<RobotRecordingEntry> = [];
+  var nextOrdinal:Int64 = Int64.ofInt(0);
 
   public function new() {}
 
-  public function recordCommand(command:RobotCommand):Void {
+  public function recordCommand(command:RobotCommand, ?robotId:RobotId = ""):Void {
     switch command {
       case JointPosition(joint, target, expiryNs):
         var copy = RobotCommand.JointPosition(joint, target, expiryNs);
         commands.push(copy);
         events.push(RobotRecordingEvent.Command(copy));
+        append(RobotRecordingEvent.Command(copy), robotId);
     }
   }
 
@@ -25,6 +28,7 @@ class RobotRecording {
     var copy = copyRobotSnapshot(snapshot);
     snapshots.push(copy);
     events.push(RobotRecordingEvent.Snapshot(copyRobotSnapshot(copy)));
+    append(RobotRecordingEvent.Snapshot(copyRobotSnapshot(copy)), copy.id);
   }
 
   public function recordFault(fault:RobotFault):Void {
@@ -32,6 +36,8 @@ class RobotRecording {
     faults.push(copy);
     events.push(RobotRecordingEvent.Fault(
       new RobotFault(copy.id, copy.code, copy.message, copy.fatal)));
+    append(RobotRecordingEvent.Fault(
+      new RobotFault(copy.id, copy.code, copy.message, copy.fatal)), copy.id);
   }
 
   public function recordWorld(snapshot:WorldSnapshot):Void {
@@ -44,13 +50,20 @@ class RobotRecording {
       snapshot.sourceTimestampNs, source, snapshot.receivedTimestampNs);
     worlds.push(copy);
     events.push(RobotRecordingEvent.World(copy));
+    append(RobotRecordingEvent.World(copy), "");
+  }
+
+  public function recordSensor(robotId:RobotId, sensor:SensorFrame):Void {
+    var copy = sensor.copy();
+    events.push(RobotRecordingEvent.Sensor(robotId, copy));
+    append(RobotRecordingEvent.Sensor(robotId, copy.copy()), robotId);
   }
 
   /** Records one owner-thread world notification in arrival order. */
   public function recordEvent(event:RobotWorldEvent):Void switch event {
-    case RobotAttached(id): events.push(RobotRecordingEvent.WorldEvent(RobotAttached(id)));
-    case RobotDetached(id): events.push(RobotRecordingEvent.WorldEvent(RobotDetached(id)));
-    case RobotChanged(id): events.push(RobotRecordingEvent.WorldEvent(RobotChanged(id)));
+    case RobotAttached(id): pushWorldEvent(RobotAttached(id), id);
+    case RobotDetached(id): pushWorldEvent(RobotDetached(id), id);
+    case RobotChanged(id): pushWorldEvent(RobotChanged(id), id);
   }
 
   /** Subscribes this recording to lifecycle and adapter events. */
@@ -63,5 +76,39 @@ class RobotRecording {
     return new RobotSnapshot(value.id, value.sourceSequence, value.sourceTimestampNs,
       value.positions.toArray(), value.velocities.toArray(), value.efforts.toArray(),
       value.mode, value.faultCode, value.receivedTimestampNs,
-      value.sensors.toArray());
+      value.sensors.toArray(), value.sourceClockId, value.receivedClockId);
+
+  function pushWorldEvent(event:RobotWorldEvent, robotId:RobotId):Void {
+    events.push(RobotRecordingEvent.WorldEvent(event));
+    append(RobotRecordingEvent.WorldEvent(event), robotId);
+  }
+
+  function append(event:RobotRecordingEvent, robotId:RobotId):Void {
+    var sequence = Int64.ofInt(0);
+    var timestamp = Int64.ofInt(0);
+    var clock = "unspecified";
+    switch event {
+      case Snapshot(value): sequence = value.sourceSequence; timestamp = value.sourceTimestampNs; clock = value.sourceClockId;
+      case Sensor(_, value): sequence = value.sequence; timestamp = value.sourceTimestampNs; clock = value.sourceClockId;
+      case _: // Event-specific fields remain zero when the source contract has none.
+    }
+    entries.push(new RobotRecordingEntry(nextOrdinal, robotId, event, sequence, timestamp, clock));
+    nextOrdinal = Int64.add(nextOrdinal, Int64.ofInt(1));
+  }
+
+  /** Used by persistent readers after schema validation. */
+  public function ingest(entry:RobotRecordingEntry):Void {
+    if (entry == null) throw "Cannot ingest a null recording entry";
+    entries.push(entry);
+    events.push(entry.event);
+    switch entry.event {
+      case Command(value): commands.push(value);
+      case Snapshot(value): snapshots.push(copyRobotSnapshot(value));
+      case Fault(value): faults.push(new RobotFault(value.id, value.code, value.message, value.fatal));
+      case World(value): worlds.push(value);
+      case Sensor(_, _), WorldEvent(_):
+    }
+    if (Int64.compare(entry.ordinal, nextOrdinal) >= 0)
+      nextOrdinal = Int64.add(entry.ordinal, Int64.ofInt(1));
+  }
 }
