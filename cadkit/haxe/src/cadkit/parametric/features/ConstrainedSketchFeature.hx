@@ -18,6 +18,7 @@ import cadkit.parametric.features.ConstrainedSketchChange;
 class ConstrainedSketchFeature extends Feature {
 	private var authored:ConstrainedSketch;
 	private final dimensionSlots:Map<String, Parameter>;
+	private final dimensionKinds:Map<String, String>;
 	public var lastDiagnostic(default,null):Null<SolveDiagnostic>;
 	public var lastAttemptDiagnostic(default,null):Null<SolveDiagnostic>;
 	private var committedSolution:Null<SolvedSketch>;
@@ -26,13 +27,16 @@ class ConstrainedSketchFeature extends Feature {
 		super();
 		this.authored = authored.copy();
 		dimensionSlots = new Map();
+		dimensionKinds = new Map();
 		lastDiagnostic = null;
 		lastAttemptDiagnostic = null;
 		committedSolution = null;
 		for (constraint in authored.constraints())
-			if (isDimensional(constraint.kind))
+			if (isDimensional(constraint.kind)) {
 				dimensionSlots.set(constraint.id,
 					new Parameter(this, "constraint." + constraint.id, constraint.value, constraint.kind == "angle" ? -1e300 : 0));
+				dimensionKinds.set(constraint.id, constraint.kind);
+			}
 	}
 
 	public function sketch():ConstrainedSketch {
@@ -95,32 +99,57 @@ class ConstrainedSketchFeature extends Feature {
 		for (constraint in next.constraints())
 			if (isDimensional(constraint.kind))
 				required.set(constraint.id, constraint);
-		var removed:Array<String> = [];
-		for (id in dimensionSlots.keys())
-			if (!required.exists(id))
-				removed.push(id);
-		for (id in removed) {
-			var slot = dimensionSlots.get(id);
-			if (isBound(slot))
-				throw "cannot remove a dimensional constraint while it is bound: " + id;
-			unregisterParameter(slot);
-			dimensionSlots.remove(id);
-		}
 		for (id in required.keys()) {
 			var constraint = required.get(id);
-			if (!dimensionSlots.exists(id))
+			if (!dimensionSlots.exists(id)) {
 				dimensionSlots.set(id,
 					new Parameter(this, "constraint." + id, constraint.value, constraint.kind == "angle" ? -1e300 : 0));
+				dimensionKinds.set(id, constraint.kind);
+			} else {
+				if (dimensionKinds.get(id) != constraint.kind)
+					throw "cannot change the kind of a dimensional constraint while preserving its parameter: " + id;
+				restoreDimensionValue(dimensionSlots.get(id), constraint.value);
+			}
 		}
 	}
 
-	private function isBound(slot:Parameter):Bool {
-		if (document == null)
-			return false;
-		for (named in document.namedParameters())
-			if (named.contains(slot))
-				return true;
-		return false;
+	private function restoreDimensionValue(slot:Parameter, value:Float):Void {
+		if (document != null) {
+			for (named in document.namedParameters()) {
+				if (!named.contains(slot))
+					continue;
+				for (binding in named.bindings())
+					binding.restore(value);
+				return;
+			}
+		}
+		slot.restore(value);
+	}
+
+	override public function parameterChanged(parameter:Parameter, oldValue:Float):Void {
+		synchronizeAuthoredDimension(parameter);
+		if (document != null)
+			document.recordParameterChange(parameter, oldValue);
+		markDirty();
+	}
+
+	override public function parameterRestored(parameter:Parameter):Void {
+		synchronizeAuthoredDimension(parameter);
+		markDirty();
+	}
+
+	private function synchronizeAuthoredDimension(parameter:Parameter):Void {
+		for (id in dimensionSlots.keys()) {
+			if (dimensionSlots.get(id) != parameter)
+				continue;
+			for (constraint in authored.constraints()) {
+				if (constraint.id == id) {
+					authored.replaceConstraint(SketchConstraint.raw(constraint.id, constraint.kind, constraint.first,
+						constraint.second, constraint.third, parameter.value));
+					return;
+				}
+			}
+		}
 	}
 
 	private static function validateReferences(sketch:ConstrainedSketch):Void {

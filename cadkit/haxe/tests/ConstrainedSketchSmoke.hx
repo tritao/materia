@@ -163,6 +163,24 @@ class ConstrainedSketchSmoke {
 		failed = false;
 		try feature.removePoint("p0") catch (error:Dynamic) failed = true;
 		check(failed && feature.sketch().points().length == 4, "referenced point removal is rejected atomically");
+		var widthIdentity = feature.dimension("width");
+		width.set(12); document.recompute();
+		feature.removeConstraint("width"); document.recompute();
+		check(document.undo(), "dimensional constraint removal undo");
+		check(feature.dimension("width") == widthIdentity && feature.dimension("width").value == 12,
+			"dimensional constraint undo preserves identity and value");
+		check(document.undo(), "dimension value undo after constraint restore");
+		check(feature.dimension("width") == widthIdentity && feature.dimension("width").value == 10,
+			"parameter history retains restored identity");
+		check(document.redo(), "dimension value redo after constraint restore");
+		check(feature.dimension("width").value == 12, "parameter redo uses restored identity");
+		feature.replaceConstraint(SketchConstraint.distance("width", "p0", "p1", 20));
+		check(feature.dimension("width") == widthIdentity && feature.dimension("width").value == 20,
+			"dimensional replacement preserves identity and applies its value");
+		document.recompute(); near(document.result().volume(), 200);
+		check(document.undo(), "dimensional replacement undo"); document.recompute();
+		check(feature.dimension("width").value == 12, "dimensional replacement restores its value");
+		width.set(10); document.recompute();
 
 		var loaded=DocumentCodec.decode(DocumentCodec.encode(document));near(loaded.result().volume(),100);
 		loaded.parameter("width").set(14);loaded.recompute();near(loaded.result().volume(),140);
