@@ -210,11 +210,18 @@ class EditorScene {
   public function setPosition(id:String, axis:Int, value:Float):Void {
     if (axis < 0 || axis > 1 || value != value || value - value != 0.0 || Math.abs(value) > 1000000)
       throw "Position requires a finite X or Y coordinate";
+    var before = info(id).localTransform();
+    setPositionXY(id, axis == 0 ? value : before.element(12), axis == 1 ? value : before.element(13));
+  }
+
+  /** Updates both planar coordinates atomically; used for live viewport previews. */
+  public function setPositionXY(id:String, x:Float, y:Float):Void {
+    if (!finiteCoordinate(x) || !finiteCoordinate(y))
+      throw "Position requires finite X and Y coordinates";
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
     var before = info(id).localTransform();
-    var current = Transform.identity().translated(before.element(12), before.element(13), before.element(14));
-    current.set(12 + axis, value);
+    var current = Transform.identity().translated(x, y, before.element(14));
     var transaction = scene.beginTransaction();
     try {
       transaction.setTransform(item.occurrence, current);
@@ -222,6 +229,21 @@ class EditorScene {
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
     publish();
   }
+
+  /** Records a move whose final position has already been applied as a drag preview. */
+  public function recordMove(id:String, fromX:Float, fromY:Float, toX:Float, toY:Float):Bool {
+    if (!finiteCoordinate(fromX) || !finiteCoordinate(fromY) ||
+        !finiteCoordinate(toX) || !finiteCoordinate(toY))
+      throw "Move requires finite planar coordinates";
+    if (object(id) == null) throw "Unknown scene object: " + id;
+    if (fromX == toX && fromY == toY) return false;
+    return document.record(new EditOperation("Move object",
+      function() setPositionXY(id, toX, toY),
+      function() setPositionXY(id, fromX, fromY)));
+  }
+
+  static inline function finiteCoordinate(value:Float):Bool
+    return value == value && value - value == 0.0 && Math.abs(value) <= 1000000;
 
   public function setVisible(id:String, visible:Bool):Void {
     var item = object(id);

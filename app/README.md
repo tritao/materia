@@ -25,6 +25,9 @@ or the Scene root to clear object selection.
 - Create and duplicate select the new object; duplicates retain appearance and
   visibility with a small XY offset. Delete selects a neighbour or the Scene root.
   Undo restores the previous objects, order, and selection; redo retains object IDs.
+- Left-drag an object to move it in XY. The initial grab point is preserved, movement
+  previews live, and release creates one undo step. Escape cancels the active drag.
+- Optional 0.2 m grid snapping is available from the viewport context menu.
 - Middle-drag pans the view; the wheel zooms around the pointer.
 - Frame selected fits the selected object's bounds.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.

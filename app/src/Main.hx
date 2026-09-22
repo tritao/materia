@@ -239,6 +239,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final telemetry:PlotModel;
   final logLines:Array<String>;
   var gridVisible:Bool;
+  var gridSnapEnabled:Bool;
   var paletteVisible:Bool;
   var contextMenuVisible:Bool;
   var contextMenuX:Float;
@@ -269,6 +270,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     telemetry = makeTelemetry();
     logLines = ["Scene ready: two editable objects", "Select a box; edit position or visibility", "Middle-drag to pan; scroll to zoom"];
     gridVisible = true;
+    gridSnapEnabled = false;
     paletteVisible = false;
     contextMenuVisible = false;
     contextMenuX = 0.0;
@@ -302,6 +304,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.delete",
         "scene.frame-selected",
         "scene.toggle-grid",
+        "scene.toggle-grid-snap",
         "workspace.reset"
       ], contextMenuX, contextMenuY, commands, ui.commandContext, function() {
         contextMenuVisible = false;
@@ -356,6 +359,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       confirmation: documents.needsConfirmation(), choosing: documents.choosing, error: documents.error},
     selection: ui.commandContext.selection.copy(),
     gridVisible: gridVisible,
+    gridSnapEnabled: gridSnapEnabled,
     paletteVisible: paletteVisible,
     contextMenuVisible: contextMenuVisible,
     camera: {
@@ -539,7 +543,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function viewportPanel():View {
     if (sceneViewport != null) {
       sceneViewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0),
-        Color.rgba(0.16, 0.24, 0.36, 0.75), 32.0, gridVisible);
+        Color.rgba(0.16, 0.24, 0.36, 0.75), EditorSceneViewport.GRID_STEP * EditorSceneViewport.SCALE, gridVisible);
       return sceneViewport;
     }
     var viewportStyle = fillStyle();
@@ -549,17 +553,25 @@ class ReferenceEditorApp implements DesktopUiApplication {
       viewportContent,
       viewportCamera,
       viewportStyle,
-      "Scene XY view: select objects, middle-drag to pan, scroll to zoom"
+      "Scene XY view: drag objects, middle-drag to pan, scroll to zoom"
     );
     viewport.panButton = 2; // NativeKit middle button.
     viewport.setOverlay(function(_, geometry) {
       viewportContent.viewportWidth = geometry.width;
       viewportContent.viewportHeight = geometry.height;
     });
-    viewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0), Color.rgba(0.16, 0.24, 0.36, 0.75), 32.0, gridVisible);
+    viewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0), Color.rgba(0.16, 0.24, 0.36, 0.75),
+      EditorSceneViewport.GRID_STEP * EditorSceneViewport.SCALE, gridVisible);
+    var dragPointer:Null<Int> = null;
     viewport.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (event.button == 0) {
-        scene.select(viewportContent.pick(viewportCamera, event.localX, event.localY));
+        var hit = viewportContent.pick(viewportCamera, event.localX, event.localY);
+        scene.select(hit);
+        if (hit != "scene" && viewportContent.beginDrag(viewportCamera,
+            event.localX, event.localY, gridSnapEnabled)) {
+          dragPointer = event.pointerId;
+          event.capturePointer();
+        }
         updateCommandContext();
         commands.refresh();
         event.preventDefault();
@@ -575,6 +587,30 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.refresh();
     }
     );
+    viewport.on(UiEventKind.PointerMove, function(event:UiEvent) {
+      if (dragPointer == null || event.pointerId != dragPointer) return;
+      if (viewportContent.updateDrag(viewportCamera, event.localX, event.localY)) commands.refresh();
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    viewport.on(UiEventKind.PointerUp, function(event:UiEvent) {
+      if (dragPointer == null || event.pointerId != dragPointer) return;
+      viewportContent.commitDrag();
+      dragPointer = null;
+      event.releasePointer();
+      updateCommandContext();
+      commands.refresh();
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    viewport.on(UiEventKind.PointerCancel, function(event:UiEvent) {
+      if (dragPointer == null || event.pointerId != dragPointer) return;
+      viewportContent.cancelDrag();
+      dragPointer = null;
+      event.releasePointer();
+      updateCommandContext();
+      commands.refresh();
+    });
     sceneViewport = viewport;
     return viewport;
   }
@@ -724,6 +760,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
       gridVisible = !gridVisible;
       log(gridVisible ? "Grid enabled" : "Grid disabled");
     }, null, null, function() return gridVisible));
+    commands.register(new Command("scene.toggle-grid-snap", "Toggle grid snapping", function() {
+      gridSnapEnabled = !gridSnapEnabled;
+      log(gridSnapEnabled ? "Grid snapping enabled" : "Grid snapping disabled");
+    }, null, null, function() return gridSnapEnabled));
+    commands.register(new Command("scene.cancel-drag", "Cancel object drag", function() {
+      viewportContent.cancelDrag();
+      updateCommandContext();
+      commands.refresh();
+    }, new Shortcut(UiKey.Escape), function() return viewportContent.dragging()));
   }
 
   function documentChanged():Void {

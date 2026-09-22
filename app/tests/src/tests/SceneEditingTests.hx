@@ -101,6 +101,61 @@ class SceneEditingTests {
     FileSystem.deleteDirectory(directory);
   }
 
+  static function viewportDragging():Void {
+    var scene = new EditorScene();
+    var viewport = new EditorSceneViewport(scene);
+    var camera = new ViewportCamera(2.0, 40.0, -30.0);
+    try {
+      var grabWorld = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 1.2 * EditorSceneViewport.SCALE,
+        EditorSceneViewport.ORIGIN_Y - 0.2 * EditorSceneViewport.SCALE);
+      check(viewport.beginDrag(camera, grabWorld.x, grabWorld.y, false),
+        "left drag begins on an object after camera pan and zoom");
+      near(scene.info("box").localTransform().element(12), -1.5, "drag start preserves X grab offset");
+      near(scene.info("box").localTransform().element(13), 0.0, "drag start preserves Y grab offset");
+
+      var movedPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 0.0 * EditorSceneViewport.SCALE,
+        EditorSceneViewport.ORIGIN_Y - 0.7 * EditorSceneViewport.SCALE);
+      check(viewport.updateDrag(camera, movedPointer.x, movedPointer.y), "drag preview moves object");
+      near(scene.info("box").localTransform().element(12), -0.3, "preview X includes initial grab offset");
+      near(scene.info("box").localTransform().element(13), 0.5, "preview Y includes initial grab offset");
+      check(!scene.document.isDirty && scene.document.history.undoCount == 0,
+        "drag preview does not add history entries");
+      check(viewport.commitDrag(), "release commits moved preview");
+      check(scene.document.isDirty && scene.document.history.undoCount == 1,
+        "completed drag creates exactly one undo step");
+      scene.document.undo();
+      near(scene.info("box").localTransform().element(12), -1.5, "undo restores pre-drag X");
+      near(scene.info("box").localTransform().element(13), 0.0, "undo restores pre-drag Y");
+      scene.document.redo();
+      near(scene.info("box").localTransform().element(12), -0.3, "redo restores dragged X");
+      near(scene.info("box").localTransform().element(13), 0.5, "redo restores dragged Y");
+
+      var center = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 0.3 * EditorSceneViewport.SCALE,
+        EditorSceneViewport.ORIGIN_Y - 0.5 * EditorSceneViewport.SCALE);
+      check(viewport.beginDrag(camera, center.x, center.y, false), "second drag begins");
+      var cancelledPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 1.3 * EditorSceneViewport.SCALE,
+        EditorSceneViewport.ORIGIN_Y + 0.4 * EditorSceneViewport.SCALE);
+      viewport.updateDrag(camera, cancelledPointer.x, cancelledPointer.y);
+      check(viewport.cancelDrag(), "Escape cancels active drag");
+      near(scene.info("box").localTransform().element(12), -0.3, "cancel restores original X");
+      near(scene.info("box").localTransform().element(13), 0.5, "cancel restores original Y");
+      check(scene.document.history.undoCount == 1, "cancel does not create an undo step");
+
+      check(viewport.beginDrag(camera, center.x, center.y, true), "snapped drag begins");
+      var snappedPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 0.06 * EditorSceneViewport.SCALE,
+        EditorSceneViewport.ORIGIN_Y - 0.94 * EditorSceneViewport.SCALE);
+      viewport.updateDrag(camera, snappedPointer.x, snappedPointer.y);
+      near(scene.info("box").localTransform().element(12), 0.0, "grid snapping rounds X");
+      near(scene.info("box").localTransform().element(13), 1.0, "grid snapping rounds Y");
+      viewport.commitDrag();
+      check(scene.document.history.undoCount == 2, "snapped drag commits one undo step");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
+  }
+
   static function main():Int {
     var scene = new EditorScene();
     try {
@@ -160,6 +215,7 @@ class SceneEditingTests {
       check(scene.properties().length == 0 && !scene.context().hasSelection, "empty selection has no editable properties");
       scene.dispose();
       scene.dispose();
+      viewportDragging();
       editingLifecycle();
       SceneDocumentTests.run();
       Sys.println("Scene editing tests passed");
