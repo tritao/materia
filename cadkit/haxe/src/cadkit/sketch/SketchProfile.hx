@@ -4,100 +4,431 @@ import cadkit.modeling.Curve;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
-import cadkit.sketch.ProfileError;
 
 private class ProfileSegment {
 	public final entity:SketchEntity;
 	public final start:Array<Float>;
 	public final end:Array<Float>;
-	public function new(entity:SketchEntity,start:Array<Float>,end:Array<Float>){this.entity=entity;this.start=start;this.end=end;}
+	public final reversed:Bool;
+
+	public function new(entity:SketchEntity, start:Array<Float>, end:Array<Float>, reversed:Bool = false) {
+		this.entity = entity;
+		this.start = start;
+		this.end = end;
+		this.reversed = reversed;
+	}
 }
 
-/** Validates solved boundaries and converts them through Cadkit's existing native constructors. */
+private class ProfileBoundary {
+	public final segments:Null<Array<ProfileSegment>>;
+	public final circle:Null<SketchEntity>;
+	public final polyline:Array<Array<Float>>;
+	public final area:Float;
+	public final entityIds:Array<String>;
+	public var parent:Int;
+	public var depth:Int;
+
+	public function new(segments:Null<Array<ProfileSegment>>, circle:Null<SketchEntity>, polyline:Array<Array<Float>>, area:Float,
+		entityIds:Array<String>) {
+		this.segments = segments;
+		this.circle = circle;
+		this.polyline = polyline;
+		this.area = area;
+		this.entityIds = entityIds;
+		parent = -1;
+		depth = 0;
+	}
+}
+
+/** Curve-aware validation and exact native construction of solved profile boundaries. */
 class SketchProfile {
 	public static function build(authored:ConstrainedSketch, solved:SolvedSketch):Sketch {
-		var tolerance = Math.max(authored.settings.tolerance * 10, 1e-7);
-		var segments:Array<ProfileSegment> = []; var circles:Array<SketchEntity> = [];
+		var scale = modelScale(authored, solved);
+		var tolerance = Math.max(authored.settings.tolerance * Math.max(1, scale) * 10, 1e-8 * Math.max(1, scale));
+		var segments:Array<ProfileSegment> = [];
+		var circles:Array<SketchEntity> = [];
 		for (entity in authored.entities()) {
-			if (entity.construction) continue;
-			if (entity.kind == "circle") circles.push(entity);
-			else if (entity.kind == "line") segments.push(new ProfileSegment(entity, solved.point(entity.first), solved.point(entity.second)));
-			else if (entity.kind == "arc") {
-				var center=solved.point(entity.first), radius=solved.radius(entity.id);
-				segments.push(new ProfileSegment(entity,
-					[center[0]+radius*Math.cos(entity.startAngle),center[1]+radius*Math.sin(entity.startAngle)],
-					[center[0]+radius*Math.cos(entity.endAngle),center[1]+radius*Math.sin(entity.endAngle)]));
+			if (entity.construction)
+				continue;
+			if (entity.kind == "circle") {
+				circles.push(entity);
+			} else if (entity.kind == "line") {
+				segments.push(new ProfileSegment(entity, solved.point(entity.first), solved.point(entity.second)));
+			} else if (entity.kind == "arc") {
+				var center = solved.point(entity.first);
+				var radius = solved.radius(entity.id);
+				segments.push(new ProfileSegment(entity, arcPoint(center, radius, entity.startAngle),
+					arcPoint(center, radius, entity.endAngle)));
 			}
 		}
-		if (segments.length == 0 && circles.length == 0) throw new ProfileError("empty", [], "sketch has no profile geometry");
-		var loops = connectedLoops(segments, tolerance);
-		for (loop in loops) rejectSelfIntersection(loop, tolerance);
+		if (segments.length == 0 && circles.length == 0)
+			throw new ProfileError("empty", [], "sketch has no profile geometry");
 
-		var boundaries:Array<{curve:Curve, sample:Array<Float>, area:Float, ids:Array<String>}> = [];
-		for (loop in loops) boundaries.push(makeLoop(loop, authored.plane, solved));
-		for (circle in circles) {
-			var center=solved.point(circle.first), localPlane=new Plane(authored.plane.toWorld(new Vector(center[0],center[1])),authored.plane.xDirection,authored.plane.normal);
-			boundaries.push({curve:Curve.circle(solved.radius(circle.id),localPlane),sample:center,area:Math.PI*solved.radius(circle.id)*solved.radius(circle.id),ids:[circle.id]});
-		}
-		// Each boundary is assigned to the smallest larger boundary containing its sample.
-		var parent:Array<Int> = []; for (_ in boundaries) parent.push(-1);
-		for (i in 0...boundaries.length) {
-			var best=-1; var bestArea=1e300;
-			for (j in 0...boundaries.length) if(i!=j && boundaries[j].area>boundaries[i].area+tolerance && containsBoundary(boundaries[j],boundaries[i].sample,authored,solved))
-				if(boundaries[j].area<bestArea){best=j;bestArea=boundaries[j].area;}
-			parent[i]=best;
-		}
-		var result:Null<Sketch> = null;
-		try {
-			for(i in 0...boundaries.length) if(parent[i]<0) {
-				var holes:Array<Curve> = []; for(j in 0...boundaries.length) if(parent[j]==i) holes.push(boundaries[j].curve);
-				var face=Sketch.face(boundaries[i].curve,holes,authored.plane);
-				if(result==null) result=face; else { var combined=result.combine(face); result.close(); face.close(); result=combined; }
+		var boundaries:Array<ProfileBoundary> = [];
+		for (loop in connectedLoops(segments, tolerance))
+			boundaries.push(loopBoundary(loop, solved, tolerance));
+		for (circle in circles)
+			boundaries.push(circleBoundary(circle, solved, tolerance));
+		validateIntersections(boundaries, tolerance);
+		classifyNesting(boundaries, tolerance);
+		return constructFaces(boundaries, authored.plane, solved);
+	}
+
+	private static function loopBoundary(loop:Array<ProfileSegment>, solved:SolvedSketch, tolerance:Float):ProfileBoundary {
+		var polyline:Array<Array<Float>> = [];
+		var signedArea = 0.0;
+		for (segment in loop) {
+			if (segment.entity.kind == "line") {
+				appendPoint(polyline, segment.start, tolerance);
+				signedArea += cross(segment.start, segment.end) / 2;
+				continue;
 			}
-			if(result==null) throw new ProfileError("ambiguous",allIds(boundaries),"profile has no outer boundary");
-			for(boundary in boundaries) boundary.curve.close();
-			return result;
-		} catch(error:Dynamic) {
-			for(boundary in boundaries) boundary.curve.close();
-			if(result!=null) result.close();
-			if(Std.isOfType(error,ProfileError)) throw error;
-			throw new ProfileError("invalid",allIds(boundaries),"native profile construction failed: "+Std.string(error));
+			var entity = segment.entity;
+			var center = solved.point(entity.first);
+			var radius = solved.radius(entity.id);
+			var delta = arcDelta(entity);
+			var startAngle = entity.startAngle;
+			if (segment.reversed) {
+				startAngle = entity.endAngle;
+				delta = -delta;
+			}
+			var steps = arcSteps(radius, Math.abs(delta), tolerance);
+			for (index in 0...steps)
+				appendPoint(polyline, arcPoint(center, radius, startAngle + delta * index / steps), tolerance);
+			signedArea += (center[0] * (segment.end[1] - segment.start[1])
+				- center[1] * (segment.end[0] - segment.start[0]) + radius * radius * delta) / 2;
+		}
+		appendPoint(polyline, loop[loop.length - 1].end, tolerance);
+		var entityIds = ids(loop);
+		rejectSelfIntersection(polyline, entityIds, tolerance);
+		return new ProfileBoundary(loop, null, polyline, Math.abs(signedArea), entityIds);
+	}
+
+	private static function circleBoundary(entity:SketchEntity, solved:SolvedSketch, tolerance:Float):ProfileBoundary {
+		var center = solved.point(entity.first);
+		var radius = solved.radius(entity.id);
+		var count = arcSteps(radius, 2 * Math.PI, tolerance);
+		var polyline:Array<Array<Float>> = [];
+		for (index in 0...count)
+			polyline.push(arcPoint(center, radius, 2 * Math.PI * index / count));
+		polyline.push(polyline[0]);
+		return new ProfileBoundary(null, entity, polyline, Math.PI * radius * radius, [entity.id]);
+	}
+
+	private static function classifyNesting(boundaries:Array<ProfileBoundary>, tolerance:Float):Void {
+		for (index in 0...boundaries.length) {
+			var sample = interiorPoint(boundaries[index].polyline);
+			var best = -1;
+			var bestArea = 1e300;
+			for (candidate in 0...boundaries.length) {
+				if (candidate == index || boundaries[candidate].area <= boundaries[index].area + tolerance * tolerance)
+					continue;
+				if (boundaries[candidate].area < bestArea && pointIn(boundaries[candidate].polyline, sample, tolerance)) {
+					best = candidate;
+					bestArea = boundaries[candidate].area;
+				}
+			}
+			boundaries[index].parent = best;
+		}
+		for (index in 0...boundaries.length) {
+			var depth = 0;
+			var parent = boundaries[index].parent;
+			var guard = 0;
+			while (parent >= 0) {
+				depth++;
+				parent = boundaries[parent].parent;
+				guard++;
+				if (guard > boundaries.length)
+					throw new ProfileError("ambiguous", boundaries[index].entityIds, "cyclic profile nesting");
+			}
+			boundaries[index].depth = depth;
 		}
 	}
 
-	private static function connectedLoops(segments:Array<ProfileSegment>,t:Float):Array<Array<ProfileSegment>> {
-		var loops:Array<Array<ProfileSegment>> = []; var used:Array<Bool> = []; for(_ in segments)used.push(false);
-		for(i in 0...segments.length) if(!used[i]) {
-			var loop:Array<ProfileSegment> = []; var current=i; var start=segments[i].start; var end=segments[i].end;
-			while(true){used[current]=true;loop.push(segments[current]);if(near(end,start,t))break;var found=-1;var reversed=false;var count=0;
-				for(j in 0...segments.length)if(!used[j]){if(near(segments[j].start,end,t)){found=j;reversed=false;count++;}else if(near(segments[j].end,end,t)){found=j;reversed=true;count++;}}
-				if(count==0)throw new ProfileError("open",ids(loop),"open boundary near entity "+segments[current].entity.id);
-				if(count>1)throw new ProfileError("branching",ids(loop),"branching boundary near entity "+segments[current].entity.id);
-				current=found;if(reversed){var old=segments[current];segments[current]=new ProfileSegment(old.entity,old.end,old.start);}end=segments[current].end;
+	private static function validateIntersections(boundaries:Array<ProfileBoundary>, tolerance:Float):Void {
+		for (first in 0...boundaries.length) {
+			for (second in (first + 1)...boundaries.length) {
+				if (polylinesIntersect(boundaries[first].polyline, boundaries[second].polyline, tolerance))
+					throw new ProfileError("overlapping", boundaries[first].entityIds.concat(boundaries[second].entityIds),
+						"profile boundaries overlap or touch");
+			}
+		}
+	}
+
+	private static function constructFaces(boundaries:Array<ProfileBoundary>, plane:Plane, solved:SolvedSketch):Sketch {
+		var curves:Array<Curve> = [];
+		var result:Null<Sketch> = null;
+		try {
+			for (boundary in boundaries)
+				curves.push(makeCurve(boundary, plane, solved));
+			for (index in 0...boundaries.length) {
+				if (boundaries[index].depth % 2 != 0)
+					continue;
+				var holes:Array<Curve> = [];
+				for (candidate in 0...boundaries.length)
+					if (boundaries[candidate].parent == index && boundaries[candidate].depth % 2 == 1)
+						holes.push(curves[candidate]);
+				var face = Sketch.face(curves[index], holes, plane);
+				if (result == null) {
+					result = face;
+				} else {
+					var combined = result.combine(face);
+					result.close();
+					face.close();
+					result = combined;
+				}
+			}
+			if (result == null)
+				throw new ProfileError("ambiguous", allIds(boundaries), "profile has no outer boundary");
+			for (curve in curves)
+				curve.close();
+			return result;
+		} catch (error:Dynamic) {
+			for (curve in curves)
+				curve.close();
+			if (result != null)
+				result.close();
+			if (Std.isOfType(error, ProfileError))
+				throw error;
+			throw new ProfileError("invalid", allIds(boundaries), "native profile construction failed: " + Std.string(error));
+		}
+	}
+
+	private static function makeCurve(boundary:ProfileBoundary, plane:Plane, solved:SolvedSketch):Curve {
+		if (boundary.circle != null) {
+			var entity = boundary.circle;
+			var center = solved.point(entity.first);
+			var localPlane = new Plane(world(plane, center), plane.xDirection, plane.normal);
+			return Curve.circle(solved.radius(entity.id), localPlane);
+		}
+		var parts:Array<Curve> = [];
+		try {
+			for (segment in boundary.segments) {
+				if (segment.entity.kind == "line") {
+					parts.push(Curve.line(world(plane, segment.start), world(plane, segment.end)));
+					continue;
+				}
+				var entity = segment.entity;
+				var center = solved.point(entity.first);
+				var radius = solved.radius(entity.id);
+				var delta = arcDelta(entity);
+				var startAngle = entity.startAngle;
+				if (segment.reversed) {
+					startAngle = entity.endAngle;
+					delta = -delta;
+				}
+				parts.push(Curve.arc(world(plane, segment.start), world(plane, arcPoint(center, radius, startAngle + delta / 2)),
+					world(plane, segment.end)));
+			}
+			var wire = Curve.wire(parts);
+			for (part in parts)
+				part.close();
+			return wire;
+		} catch (error:Dynamic) {
+			for (part in parts)
+				part.close();
+			throw error;
+		}
+	}
+
+	private static function connectedLoops(segments:Array<ProfileSegment>, tolerance:Float):Array<Array<ProfileSegment>> {
+		var loops:Array<Array<ProfileSegment>> = [];
+		var used:Array<Bool> = [];
+		for (_ in segments)
+			used.push(false);
+		for (index in 0...segments.length) {
+			if (used[index])
+				continue;
+			var loop:Array<ProfileSegment> = [];
+			var current = index;
+			var start = segments[index].start;
+			var end = segments[index].end;
+			while (true) {
+				used[current] = true;
+				loop.push(segments[current]);
+				if (near(end, start, tolerance))
+					break;
+				var found = -1;
+				var reversed = false;
+				var count = 0;
+				for (candidate in 0...segments.length) {
+					if (used[candidate])
+						continue;
+					if (near(segments[candidate].start, end, tolerance)) {
+						found = candidate;
+						reversed = false;
+						count++;
+					} else if (near(segments[candidate].end, end, tolerance)) {
+						found = candidate;
+						reversed = true;
+						count++;
+					}
+				}
+				if (count == 0)
+					throw new ProfileError("open", ids(loop), "open boundary near entity " + segments[current].entity.id);
+				if (count > 1)
+					throw new ProfileError("branching", ids(loop), "branching boundary near entity " + segments[current].entity.id);
+				current = found;
+				if (reversed) {
+					var old = segments[current];
+					segments[current] = new ProfileSegment(old.entity, old.end, old.start, !old.reversed);
+				}
+				end = segments[current].end;
 			}
 			loops.push(loop);
 		}
 		return loops;
 	}
 
-	private static function makeLoop(loop:Array<ProfileSegment>,plane:Plane,solved:SolvedSketch):{curve:Curve,sample:Array<Float>,area:Float,ids:Array<String>} {
-		var curves:Array<Curve> = []; var area=0.0;
-		try { for(segment in loop){area+=segment.start[0]*segment.end[1]-segment.end[0]*segment.start[1];
-			if(segment.entity.kind=="line")curves.push(Curve.line(world(plane,segment.start),world(plane,segment.end)));
-			else {var e=segment.entity,c=solved.point(e.first),r=solved.radius(e.id);var delta=e.endAngle-e.startAngle;if(e.clockwise){while(delta>=0)delta-=2*Math.PI;}else while(delta<=0)delta+=2*Math.PI;var mid=e.startAngle+delta/2;curves.push(Curve.arc(world(plane,segment.start),world(plane,[c[0]+r*Math.cos(mid),c[1]+r*Math.sin(mid)]),world(plane,segment.end)));}}
-			var wire=Curve.wire(curves);for(curve in curves)curve.close();return {curve:wire,sample:loop[0].start,area:Math.abs(area/2),ids:ids(loop)};
-		}catch(error:Dynamic){for(curve in curves)curve.close();throw error;}
+	private static function rejectSelfIntersection(polyline:Array<Array<Float>>, entityIds:Array<String>, tolerance:Float):Void {
+		var count = polyline.length - 1;
+		for (first in 0...count) {
+			for (second in (first + 1)...count) {
+				if (second == first + 1 || (first == 0 && second == count - 1))
+					continue;
+				if (segmentsIntersect(polyline[first], polyline[first + 1], polyline[second], polyline[second + 1], tolerance))
+					throw new ProfileError("self-intersecting", entityIds, "self-intersecting profile boundary");
+			}
+		}
 	}
 
-	private static function rejectSelfIntersection(loop:Array<ProfileSegment>,t:Float):Void { for(i in 0...loop.length)for(j in i+1...loop.length){if(j==i+1||(i==0&&j==loop.length-1))continue;if(intersects(loop[i].start,loop[i].end,loop[j].start,loop[j].end,t))throw new ProfileError("self-intersecting",[loop[i].entity.id,loop[j].entity.id],"self-intersecting profile boundary");} }
-	private static function intersects(a:Array<Float>,b:Array<Float>,c:Array<Float>,d:Array<Float>,t:Float):Bool { var ab=[b[0]-a[0],b[1]-a[1]],cd=[d[0]-c[0],d[1]-c[1]],den=cross(ab,cd);if(Math.abs(den)<t)return false;var ac=[c[0]-a[0],c[1]-a[1]],u=cross(ac,cd)/den,v=cross(ac,ab)/den;return u>t&&u<1-t&&v>t&&v<1-t; }
-	private static function containsBoundary(boundary:{curve:Curve,sample:Array<Float>,area:Float,ids:Array<String>},p:Array<Float>,authored:ConstrainedSketch,solved:SolvedSketch):Bool {
-		if(boundary.ids.length==1){var e:Null<SketchEntity> = null;for(candidate in authored.entities())if(candidate.id==boundary.ids[0])e=candidate;if(e!=null&&e.kind=="circle"){var c=solved.point(e.first),r=solved.radius(e.id);return (p[0]-c[0])*(p[0]-c[0])+(p[1]-c[1])*(p[1]-c[1])<r*r;}}
-		var vertices:Array<Array<Float>> = [];for(id in boundary.ids)for(e in authored.entities())if(e.id==id&&e.kind=="line")vertices.push(solved.point(e.first));var inside=false;var j=vertices.length-1;for(i in 0...vertices.length){var a=vertices[i],b=vertices[j];if((a[1]>p[1])!=(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;j=i;}return inside;
+	private static function polylinesIntersect(first:Array<Array<Float>>, second:Array<Array<Float>>, tolerance:Float):Bool {
+		for (a in 0...(first.length - 1))
+			for (b in 0...(second.length - 1))
+				if (segmentsIntersect(first[a], first[a + 1], second[b], second[b + 1], tolerance))
+					return true;
+		return false;
 	}
-	private static function world(plane:Plane,p:Array<Float>):Vector return plane.toWorld(new Vector(p[0],p[1]));
-	private static function near(a:Array<Float>,b:Array<Float>,t:Float):Bool return Math.abs(a[0]-b[0])<=t&&Math.abs(a[1]-b[1])<=t;
-	private static function cross(a:Array<Float>,b:Array<Float>):Float return a[0]*b[1]-a[1]*b[0];
-	private static function ids(loop:Array<ProfileSegment>):Array<String>{var out:Array<String> = [];for(s in loop)out.push(s.entity.id);return out;}
-	private static function allIds(boundaries:Array<{curve:Curve,sample:Array<Float>,area:Float,ids:Array<String>}>):Array<String>{var out:Array<String> = [];for(b in boundaries)for(id in b.ids)out.push(id);return out;}
+
+	private static function segmentsIntersect(a:Array<Float>, b:Array<Float>, c:Array<Float>, d:Array<Float>, tolerance:Float):Bool {
+		var ab = [b[0] - a[0], b[1] - a[1]];
+		var cd = [d[0] - c[0], d[1] - c[1]];
+		var denominator = cross(ab, cd);
+		if (Math.abs(denominator) <= tolerance)
+			return pointSegmentDistance(a, c, d) <= tolerance || pointSegmentDistance(b, c, d) <= tolerance
+				|| pointSegmentDistance(c, a, b) <= tolerance || pointSegmentDistance(d, a, b) <= tolerance;
+		var ac = [c[0] - a[0], c[1] - a[1]];
+		var u = cross(ac, cd) / denominator;
+		var v = cross(ac, ab) / denominator;
+		return u >= -tolerance && u <= 1 + tolerance && v >= -tolerance && v <= 1 + tolerance;
+	}
+
+	private static function pointSegmentDistance(point:Array<Float>, start:Array<Float>, end:Array<Float>):Float {
+		var dx = end[0] - start[0];
+		var dy = end[1] - start[1];
+		var lengthSquared = dx * dx + dy * dy;
+		if (lengthSquared == 0)
+			return distance(point, start);
+		var parameter = ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / lengthSquared;
+		parameter = Math.max(0, Math.min(1, parameter));
+		return distance(point, [start[0] + parameter * dx, start[1] + parameter * dy]);
+	}
+
+	private static function pointIn(polyline:Array<Array<Float>>, point:Array<Float>, tolerance:Float):Bool {
+		for (index in 0...(polyline.length - 1))
+			if (pointSegmentDistance(point, polyline[index], polyline[index + 1]) <= tolerance)
+				return false;
+		var inside = false;
+		var previous = polyline.length - 2;
+		for (index in 0...(polyline.length - 1)) {
+			var current = polyline[index];
+			var prior = polyline[previous];
+			if ((current[1] > point[1]) != (prior[1] > point[1])
+				&& point[0] < (prior[0] - current[0]) * (point[1] - current[1]) / (prior[1] - current[1]) + current[0])
+				inside = !inside;
+			previous = index;
+		}
+		return inside;
+	}
+
+	private static function interiorPoint(polyline:Array<Array<Float>>):Array<Float> {
+		var x = 0.0;
+		var y = 0.0;
+		var count = polyline.length - 1;
+		for (index in 0...count) {
+			x += polyline[index][0];
+			y += polyline[index][1];
+		}
+		var center = [x / count, y / count];
+		if (pointIn(polyline, center, 0))
+			return center;
+		for (index in 0...count) {
+			var candidate = [(polyline[index][0] + center[0]) / 2, (polyline[index][1] + center[1]) / 2];
+			if (pointIn(polyline, candidate, 0))
+				return candidate;
+		}
+		return polyline[0];
+	}
+
+	private static function modelScale(authored:ConstrainedSketch, solved:SolvedSketch):Float {
+		var scale = 1.0;
+		for (point in authored.points()) {
+			var value = solved.point(point.id);
+			scale = Math.max(scale, Math.max(Math.abs(value[0]), Math.abs(value[1])));
+		}
+		for (entity in authored.entities())
+			if (entity.kind == "circle" || entity.kind == "arc")
+				scale = Math.max(scale, solved.radius(entity.id));
+		return scale;
+	}
+
+	private static function arcDelta(entity:SketchEntity):Float {
+		var delta = entity.endAngle - entity.startAngle;
+		if (entity.clockwise) {
+			while (delta >= 0)
+				delta -= 2 * Math.PI;
+		} else {
+			while (delta <= 0)
+				delta += 2 * Math.PI;
+		}
+		return delta;
+	}
+
+	private static function arcSteps(radius:Float, sweep:Float, tolerance:Float):Int {
+		var target = Math.max(tolerance, radius * 1e-4);
+		var step = Math.pow(8 * target / Math.max(radius, 1e-12), 0.5);
+		return Std.int(Math.max(8, Math.min(512, Math.ceil(sweep / Math.max(step, 0.01)))));
+	}
+
+	private static function arcPoint(center:Array<Float>, radius:Float, angle:Float):Array<Float> {
+		return [center[0] + radius * Math.cos(angle), center[1] + radius * Math.sin(angle)];
+	}
+
+	private static function appendPoint(values:Array<Array<Float>>, point:Array<Float>, tolerance:Float):Void {
+		if (values.length == 0 || !near(values[values.length - 1], point, tolerance))
+			values.push(point);
+	}
+
+	private static function world(plane:Plane, point:Array<Float>):Vector {
+		return plane.toWorld(new Vector(point[0], point[1]));
+	}
+
+	private static function near(first:Array<Float>, second:Array<Float>, tolerance:Float):Bool {
+		return distance(first, second) <= tolerance;
+	}
+
+	private static function distance(first:Array<Float>, second:Array<Float>):Float {
+		var x = first[0] - second[0];
+		var y = first[1] - second[1];
+		return Math.pow(x * x + y * y, 0.5);
+	}
+
+	private static function cross(first:Array<Float>, second:Array<Float>):Float {
+		return first[0] * second[1] - first[1] * second[0];
+	}
+
+	private static function ids(loop:Array<ProfileSegment>):Array<String> {
+		var result:Array<String> = [];
+		for (segment in loop)
+			result.push(segment.entity.id);
+		return result;
+	}
+
+	private static function allIds(boundaries:Array<ProfileBoundary>):Array<String> {
+		var result:Array<String> = [];
+		for (boundary in boundaries)
+			for (id in boundary.entityIds)
+				result.push(id);
+		return result;
+	}
 }

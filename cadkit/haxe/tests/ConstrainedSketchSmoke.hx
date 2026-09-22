@@ -100,6 +100,33 @@ class ConstrainedSketchSmoke {
 		near(solid.shape.volume(), (200 - 4 * Math.PI) * 3);
 		solid.close(); face.close();
 
+		var capsule = new ConstrainedSketch();
+		for (point in [
+			new SketchPoint("cap.left", -3, 0), new SketchPoint("cap.right", 3, 0),
+			new SketchPoint("cap.bl", -3, -2), new SketchPoint("cap.br", 3, -2),
+			new SketchPoint("cap.tl", -3, 2), new SketchPoint("cap.tr", 3, 2),
+			new SketchPoint("cap.hole", 0, 0), new SketchPoint("cap.island", 0, 0)
+		]) capsule.addPoint(point);
+		capsule.addEntity(SketchEntity.line("cap.bottom", "cap.bl", "cap.br"))
+			.addEntity(SketchEntity.arc("cap.rightArc", "cap.right", 2, -Math.PI / 2, Math.PI / 2))
+			// Authored left-to-right so loop assembly must reverse this edge.
+			.addEntity(SketchEntity.line("cap.top", "cap.tl", "cap.tr"))
+			.addEntity(SketchEntity.arc("cap.leftArc", "cap.left", 2, Math.PI / 2, 3 * Math.PI / 2))
+			.addEntity(SketchEntity.circle("cap.holeCircle", "cap.hole", 1))
+			.addEntity(SketchEntity.circle("cap.islandCircle", "cap.island", 0.4));
+		var capsuleFace = SketchProfile.build(capsule, capsule.solve());
+		near(capsuleFace.shape.area(), 24 + 4 * Math.PI - Math.PI + 0.16 * Math.PI);
+		capsuleFace.close();
+
+		var overlap = new ConstrainedSketch();
+		overlap.addPoint(new SketchPoint("overlap.a", 0, 0)).addPoint(new SketchPoint("overlap.b", 1, 0))
+			.addEntity(SketchEntity.circle("overlap.first", "overlap.a", 2))
+			.addEntity(SketchEntity.circle("overlap.second", "overlap.b", 2));
+		failed = false;
+		try SketchProfile.build(overlap, overlap.solve()) catch (error:ProfileError)
+			failed = error.kind == "overlapping" && error.entityIds.length == 2;
+		check(failed, "overlapping curved boundaries identify entities");
+
 		var document=new Document();
 		var feature=document.add(new ConstrainedSketchFeature(sketch));
 		var width=document.defineParameter("width",10);width.bind(feature.dimension("width"));
