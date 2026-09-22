@@ -53,7 +53,7 @@ class EditorScene {
       } else {
         for (item in data) addObject(item.id, item.label, item.x, item.y, item.z,
           item.width, item.height, item.depth, item.red, item.green, item.blue, item.visible,
-          item.collisionEnabled,item.dynamicBody,item.mass,item.type);
+          item.collisionEnabled,item.dynamicBody,item.mass,item.type,item.cadGraph);
         selectedId = data.length == 0 ? "scene" : data[0].id;
       }
       selectionMaterial = scene.createMaterial();
@@ -67,10 +67,11 @@ class EditorScene {
   function addObject(id:String, label:String, x:Float, y:Float, z:Float,
       width:Float, height:Float, depth:Float, red:Float, green:Float, blue:Float,
       visible:Bool = true,collisionEnabled:Bool=true,dynamicBody:Bool=false,mass:Float=1.0,
-      kind:String="rectangle"):Void {
+      kind:String="rectangle",?cadGraph:String):Void {
     var geometry = scene.createGeometry();
     var geometryData = kind == "cad-plate"
-      ? CadSceneGeometry.mountingPlate(width, height, depth, 0.012)
+      ? CadSceneGeometry.mountingPlateGraph(cadGraph == null
+          ? defaultCadGraph(width, height, depth) : cadGraph)
       : boxGeometry(width, height, depth);
     scene.setGeometryData(geometry, geometryData);
     var material = scene.createMaterial();
@@ -85,7 +86,8 @@ class EditorScene {
       transaction.setTransform(occurrence, Transform.identity().translated(x, y, z));
       transaction.commit();
       objects.push(new EditorSceneObject(id, label, kind, occurrence, width, height, depth,
-        collisionEnabled,dynamicBody,mass,red,green,blue));
+        collisionEnabled,dynamicBody,mass,red,green,blue,cadGraph == null && kind == "cad-plate"
+          ? defaultCadGraph(width, height, depth) : cadGraph));
     } catch (error:Dynamic) {
       transaction.dispose();
       throw error;
@@ -117,9 +119,12 @@ class EditorScene {
   public function createMountingPlate():Bool {
     if (!canCreate()) return false;
     var data = records(), id = allocateId("plate");
+    var model = CadPlateModel.create(0.08, 0.05, 0.006, 0.012);
+    var graph = model.encode();
+    model.close();
     data.push({id:id, label:"Mounting plate", type:"cad-plate", x:0.0, y:0.0, z:0.0,
       width:0.08, height:0.05, depth:0.006, collisionEnabled:false, dynamicBody:false, mass:1.0,
-      red:0.34, green:0.62, blue:0.78, visible:true});
+      red:0.34, green:0.62, blue:0.78, visible:true, cadGraph:graph});
     return changeObjects("Create mounting plate", data, id);
   }
 
@@ -133,7 +138,8 @@ class EditorScene {
       x: Math.min(1000000, source.x + 0.25), y: Math.min(1000000, source.y + 0.25), z: source.z,
       width: source.width, height: source.height, red: source.red, green: source.green,
       blue: source.blue, visible: source.visible,depth:source.depth,
-      collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass});
+      collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass,
+      cadGraph:source.cadGraph});
     return changeObjects("Duplicate object", data, id);
   }
 
@@ -336,9 +342,46 @@ class EditorScene {
     if (!validDimension(width) || !validDimension(height)||!validDimension(chosenDepth))
       throw "Rectangle dimensions must be finite and positive";
     if (object(id) == null) throw "Unknown scene object: " + id;
-    var data = records();
-    for (item in data) if (item.id == id) { item.width=width;item.height=height;item.depth=chosenDepth; }
+    var data = records(), target = requiredObject(id);
+    if (target.kind == "cad-plate") {
+      var model = CadPlateModel.decode(requiredCadGraph(target));
+      try {
+        model.setMetreValues([
+          {name:CadPlateModel.WIDTH, value:width},
+          {name:CadPlateModel.HEIGHT, value:height},
+          {name:CadPlateModel.THICKNESS, value:chosenDepth}
+        ]);
+        var graph = model.encode();
+        model.close();
+        for (item in data) if (item.id == id) {
+          item.width=width; item.height=height; item.depth=chosenDepth; item.cadGraph=graph;
+        }
+      } catch (error:Dynamic) { model.close(); throw error; }
+    } else for (item in data) if (item.id == id) {
+      item.width=width; item.height=height; item.depth=chosenDepth;
+    }
     replaceObjects(data, selectedId);
+  }
+
+  public function setCadParameter(id:String, name:String, value:Float):Void {
+    if (!validDimension(value) && name != CadPlateModel.HOLE_X && name != CadPlateModel.HOLE_Y)
+      throw "CAD dimensions must be finite and positive";
+    if ((name == CadPlateModel.HOLE_X || name == CadPlateModel.HOLE_Y) && !finiteCoordinate(value))
+      throw "Hole position must be finite";
+    var target = requiredObject(id);
+    if (target.kind != "cad-plate") throw "Object is not a CAD plate";
+    var model = CadPlateModel.decode(requiredCadGraph(target));
+    try {
+      model.setMetres(name, value);
+      var parameters = model.parameters(), graph = model.encode();
+      model.close();
+      var data = records();
+      for (item in data) if (item.id == id) {
+        item.width=parameters.width; item.height=parameters.height;
+        item.depth=parameters.thickness; item.cadGraph=graph;
+      }
+      replaceObjects(data, selectedId);
+    } catch (error:Dynamic) { model.close(); throw error; }
   }
 
   public function setColour(id:String, red:Float, green:Float, blue:Float):Void {
@@ -433,6 +476,11 @@ class EditorScene {
         }
       }, colour));
     result.push(dimensionProperty(id, 2, prefix));
+    if (requiredObject(id).kind == "cad-plate") {
+      result.push(cadProperty(id,CadPlateModel.HOLE_DIAMETER,"Hole diameter",false,prefix));
+      result.push(cadProperty(id,CadPlateModel.HOLE_X,"Hole X",true,prefix));
+      result.push(cadProperty(id,CadPlateModel.HOLE_Y,"Hole Y",true,prefix));
+    }
     result.push(boolProperty(id,"collision","Collision enabled",function(item)return item.collisionEnabled,
       "Physics",prefix));
     result.push(boolProperty(id,"dynamic","Dynamic body",function(item)return item.dynamicBody,
@@ -471,6 +519,28 @@ class EditorScene {
         };
         setDimensions(id,axis==0?number:item.width,axis==1?number:item.height,axis==2?number:item.depth);
       }, settings);
+  }
+
+  function cadProperty(id:String, name:String, label:String, signed:Bool,
+      prefix:String):PropertyDescriptor {
+    var options = new PropertyDescriptorOptions();
+    options.category = "Geometry"; options.unit = "m"; options.step = 0.001;
+    options.minimum = signed ? -1000000.0 : 0.000001; options.maximum = 1000000.0;
+    options.validator = function(_, value) {
+      var number:Null<Float> = switch value { case Float(v):v; case Int(v):v; default:null; };
+      if (number == null || !Math.isFinite(number) || (!signed && number <= 0))
+        return signed ? "Position must be finite" : "Dimension must be finite and positive";
+      return null;
+    };
+    return new PropertyDescriptor(prefix+name,label,PropertyType.Float,function(_) {
+      var model=CadPlateModel.decode(requiredCadGraph(requiredObject(id)));
+      var values=model.parameters(); model.close();
+      return PropertyValue.Float(name==CadPlateModel.HOLE_DIAMETER?values.holeDiameter:
+        name==CadPlateModel.HOLE_X?values.holeX:values.holeY);
+    },function(_,value) {
+      var number:Float=switch value {case Float(v):v;case Int(v):v;default:throw label+" requires a number";};
+      setCadParameter(id,name,number);
+    },options);
   }
 
   function boolProperty(id:String,key:String,label:String,read:EditorSceneObject->Bool,
@@ -575,7 +645,7 @@ class EditorScene {
         x: transform.element(12), y: transform.element(13), z: transform.element(14),
         width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
-        visible: state.visible()});
+        visible: state.visible(),cadGraph:item.cadGraph});
     }
     return result;
   }
@@ -598,6 +668,16 @@ class EditorScene {
     snapshot.dispose();
     scene.dispose();
   }
+
+  static function defaultCadGraph(width:Float,height:Float,depth:Float):String {
+    var model=CadPlateModel.create(width,height,depth,Math.min(0.012,Math.min(width,height)*0.5));
+    var graph=model.encode();model.close();return graph;
+  }
+
+  static function requiredCadGraph(item:EditorSceneObject):String {
+    if(item.cadGraph==null)throw "CAD plate is missing its feature graph";
+    return item.cadGraph;
+  }
 }
 
 class EditorSceneObject {
@@ -614,11 +694,13 @@ class EditorSceneObject {
   public final red:Float;
   public final green:Float;
   public final blue:Float;
+  public final cadGraph:Null<String>;
   public function new(id:String,label:String,kind:String,occurrence:Occurrence,width:Float,height:Float,depth:Float,
-      collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float) {
+      collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float,?cadGraph:String) {
     this.id = id; this.label = label; this.kind = kind; this.occurrence = occurrence;
     this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;
     this.dynamicBody=dynamicBody;this.mass=mass;
     this.red = red; this.green = green; this.blue = blue;
+    this.cadGraph=cadGraph;
   }
 }

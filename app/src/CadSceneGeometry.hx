@@ -1,7 +1,6 @@
 package app;
 
 import cadkit.Mesh;
-import cadkit.modeling.Part;
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 
@@ -11,24 +10,15 @@ class CadSceneGeometry {
 
   public static function mountingPlate(widthMetres:Float, heightMetres:Float,
       thicknessMetres:Float, holeDiameterMetres:Float):GeometryData {
-    var scale = 1.0 / METRES_PER_MILLIMETRE;
-    var base = Part.box(widthMetres * scale, heightMetres * scale, thicknessMetres * scale);
-    var hole = Part.cylinder(holeDiameterMetres * scale / 2.0, thicknessMetres * scale);
-    try {
-      var plate = base.subtract(hole);
-      try {
-        var mesh = plate.shape.tessellate(0.1, 0.35);
-        var result = fromMesh(mesh);
-        plate.close(); base.close(); hole.close();
-        return result;
-      } catch (error:Dynamic) {
-        plate.close();
-        throw error;
-      }
-    } catch (error:Dynamic) {
-      base.close(); hole.close();
-      throw error;
-    }
+    var plate = CadPlateModel.create(widthMetres, heightMetres, thicknessMetres, holeDiameterMetres);
+    try { var result = plate.geometry(); plate.close(); return result; }
+    catch (error:Dynamic) { plate.close(); throw error; }
+  }
+
+  public static function mountingPlateGraph(graph:String):GeometryData {
+    var plate = CadPlateModel.decode(graph);
+    try { var result = plate.geometry(); plate.close(); return result; }
+    catch (error:Dynamic) { plate.close(); throw error; }
   }
 
   public static function fromMesh(mesh:Mesh):GeometryData {

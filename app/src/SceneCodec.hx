@@ -59,6 +59,9 @@ class SceneCodec {
       var visibleValue:Bool=visible;
       var collisionEnabled=optionalBool(value,"collisionEnabled",visibleValue);
       var dynamicBody=optionalBool(value,"dynamicBody",false);
+      var cadGraph=optionalText(value,"cadGraph");
+      if(kind=="cad-plate"&&cadGraph!=null&&cadGraph.length>10000000)
+        throw "CAD feature graph is too large";
       result.push({id: id, label: stringField(value, "label"), type: kind,
         x: bounded(value, "x", -1000000, 1000000), y: bounded(value, "y", -1000000, 1000000),
         z: bounded(value, "z", -1000000, 1000000),
@@ -68,7 +71,7 @@ class SceneCodec {
         collisionEnabled:collisionEnabled,dynamicBody:dynamicBody,
         mass:optionalBounded(value,"mass",0.000001,1000000,1.0),
         red: bounded(value, "red", 0, 1), green: bounded(value, "green", 0, 1),
-        blue: bounded(value, "blue", 0, 1), visible: cast visible});
+        blue: bounded(value, "blue", 0, 1), visible: visibleValue,cadGraph:cadGraph});
     }
     return result;
   }
@@ -107,6 +110,11 @@ class SceneCodec {
   static function optionalBool(value:Dynamic,name:String,fallback:Bool):Bool {
     if(!Reflect.hasField(value,name))return fallback;
     var result=Reflect.field(value,name);if(!Std.isOfType(result,Bool))throw 'Scene field must be boolean: $name';
+    return cast result;
+  }
+  static function optionalText(value:Dynamic,name:String):Null<String> {
+    if(!Reflect.hasField(value,name)||Reflect.field(value,name)==null)return null;
+    var result=Reflect.field(value,name);if(!Std.isOfType(result,String))throw 'Scene field must be text: $name';
     return cast result;
   }
 }
