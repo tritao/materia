@@ -208,9 +208,13 @@ class ScriptedSetupTests {
         "the same behavior consumes replay observations without altering historical commands");
       replay.close();
     }
-    FileSystem.deleteFile(recordingPath);
-    var recordingStatusPath = recordingPath + ".incomplete.status";
-    if (FileSystem.exists(recordingStatusPath)) FileSystem.deleteFile(recordingStatusPath);
+    var keepRecording = Sys.getEnv("MATERIA_KEEP_SCRIPT_MCAP") == "1";
+    if (keepRecording) Sys.println("Materia scripted MCAP fixture: " + recordingPath);
+    else {
+      FileSystem.deleteFile(recordingPath);
+      var recordingStatusPath = recordingPath + ".incomplete.status";
+      if (FileSystem.exists(recordingStatusPath)) FileSystem.deleteFile(recordingStatusPath);
+    }
     simulation.start();
     var generation = session.generation;
     SetupScriptRegistry.register(TwoRobotSetupScript.REFERENCE, function() return new FailingReloadScript());
@@ -227,6 +231,6 @@ class ScriptedSetupTests {
     reopened.dispose();
     session.dispose();
     FileSystem.deleteFile(path);
-    FileSystem.deleteDirectory(directory);
+    if (!keepRecording) FileSystem.deleteDirectory(directory);
   }
 }

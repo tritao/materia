@@ -160,6 +160,14 @@ Run the scene editing and document regression checks from the repository root:
 ./haxeon/scripts/haxeon run --project app/tests/haxeon.json
 ```
 
+The scripted regression opens and saves the two-robot setup, checks typed overrides,
+steps MuJoCo, and replays both robots' sensor frames from MCAP. To also validate
+that recording with an independent Python MCAP reader, run:
+
+```sh
+app/tests/scripted-mcap-independent.sh
+```
+
 `Main` is a complete desktop host. It initializes NativeKit, creates a resizable
 window and GPU surface, routes typed native input into the shared `UiContext`,
 and renders from the surface's request-driven frame callback. The main thread
