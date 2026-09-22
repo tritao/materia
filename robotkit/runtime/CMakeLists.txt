@@ -2,10 +2,12 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/validation.cpp
     src/runtime.cpp
     src/runtime_c_api.cpp
+    src/recording.cpp
     src/serial_endpoint.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
+target_link_libraries(robotkit_runtime PRIVATE robotkit_mcap_headers)
 target_compile_definitions(robotkit_runtime PRIVATE RK_BUILDING_LIBRARY)
 if(NOT RK_BUILD_SHARED OR EMSCRIPTEN)
     target_compile_definitions(robotkit_runtime PUBLIC RK_STATIC)
@@ -40,6 +42,12 @@ if(RK_BUILD_TESTS)
     target_link_libraries(robotkit_runtime_c_api_tests PRIVATE RobotKit::runtime)
     add_test(NAME robotkit_runtime_c_api COMMAND robotkit_runtime_c_api_tests)
     set_tests_properties(robotkit_runtime_c_api PROPERTIES LABELS "robot;runtime;abi" TIMEOUT 30)
+
+    add_executable(robotkit_recording_tests tests/recording.cpp)
+    target_compile_features(robotkit_recording_tests PRIVATE cxx_std_20)
+    target_link_libraries(robotkit_recording_tests PRIVATE RobotKit::runtime)
+    add_test(NAME robotkit_recording COMMAND robotkit_recording_tests)
+    set_tests_properties(robotkit_recording PROPERTIES LABELS "robot;recording;mcap" TIMEOUT 30)
 
     if(NOT WIN32)
         add_executable(robotkit_serial_endpoint_tests tests/serial_endpoint.cpp)

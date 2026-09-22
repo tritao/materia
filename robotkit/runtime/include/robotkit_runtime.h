@@ -29,6 +29,9 @@
 #define RK_HANDLE __attribute__((annotate("hxi:handle")))
 #define RK_HANDLE_DESTROY(symbol) __attribute__((annotate("hxi:handle_destroy")))
 #define RK_OWNED __attribute__((annotate("hxi:owned")))
+#define RK_UTF8 __attribute__((annotate("hxi:utf8")))
+#define RK_IN_ARRAY(count) __attribute__((annotate("hxi:in_array")))
+#define RK_OUT_BUFFER(size) __attribute__((annotate("hxi:out_buffer")))
 #define RK_STRUCT_SIZE __attribute__((annotate("hxi:struct_size")))
 #else
 #define RK_OUT
@@ -36,6 +39,9 @@
 #define RK_HANDLE
 #define RK_HANDLE_DESTROY(symbol)
 #define RK_OWNED
+#define RK_UTF8
+#define RK_IN_ARRAY(count)
+#define RK_OUT_BUFFER(size)
 #define RK_STRUCT_SIZE
 #endif
 
@@ -89,6 +95,68 @@ enum {
     RK_ERROR_LIMIT = -10, /**< Command violates a compiled joint or actuator limit. */
     RK_ERROR_STALE_STATE = -11 /**< The endpoint only supplied an old observation. */
 };
+
+/* ------------------------------------------------------------------------- */
+/* Persistent recording                                                      */
+/* ------------------------------------------------------------------------- */
+
+enum { RK_RECORDING_FORMAT_VERSION = 1 };
+typedef uint32_t rk_recording_event_kind;
+enum {
+    RK_RECORDING_COMMAND = 1,
+    RK_RECORDING_SNAPSHOT = 2,
+    RK_RECORDING_SENSOR = 3,
+    RK_RECORDING_FAULT = 4,
+    RK_RECORDING_WORLD = 5,
+    RK_RECORDING_WORLD_EVENT = 6
+};
+
+typedef uint32_t rk_recording_state;
+enum {
+    RK_RECORDING_OPEN = 1,
+    RK_RECORDING_CLOSING = 2,
+    RK_RECORDING_CLOSED = 3,
+    RK_RECORDING_FAILED = 4
+};
+
+typedef struct rk_recording_writer_handle { uint32_t id; } rk_recording_writer_handle RK_HANDLE RK_HANDLE_DESTROY(rk_recording_writer_destroy);
+typedef struct rk_recording_reader_handle { uint32_t id; } rk_recording_reader_handle RK_HANDLE RK_HANDLE_DESTROY(rk_recording_reader_destroy);
+
+typedef struct rk_recording_writer_status {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    rk_recording_state state;
+    uint64_t accepted;
+    uint64_t written;
+    uint64_t dropped;
+    uint64_t queued;
+    char error[256];
+} rk_recording_writer_status;
+
+typedef struct rk_recording_message {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    rk_recording_event_kind kind;
+    uint32_t schema_version;
+    uint32_t payload_size;
+    uint64_t ordinal;
+} rk_recording_message;
+
+RK_API rk_result RK_CALL rk_recording_writer_create(const char *path RK_UTF8,
+    uint32_t queue_capacity, rk_recording_writer_handle *out_writer RK_OUT RK_OWNED);
+RK_API rk_result RK_CALL rk_recording_writer_enqueue(rk_recording_writer_handle writer,
+    rk_recording_event_kind kind, uint32_t schema_version, uint64_t ordinal,
+    const uint8_t *payload RK_IN_ARRAY(payload_size), uint32_t payload_size);
+RK_API rk_result RK_CALL rk_recording_writer_get_status(rk_recording_writer_handle writer,
+    rk_recording_writer_status *status);
+RK_API rk_result RK_CALL rk_recording_writer_finish(rk_recording_writer_handle writer);
+RK_API void RK_CALL rk_recording_writer_destroy(rk_recording_writer_handle writer);
+
+RK_API rk_result RK_CALL rk_recording_reader_open(const char *path RK_UTF8,
+    rk_recording_reader_handle *out_reader RK_OUT RK_OWNED);
+/** Returns RK_ERROR_STALE_STATE at clean end of file. */
+RK_API rk_result RK_CALL rk_recording_reader_next(rk_recording_reader_handle reader,
+    rk_recording_message *message, uint8_t *payload RK_OUT_BUFFER(inout_payload_size),
+    uint32_t *inout_payload_size RK_INOUT);
+RK_API void RK_CALL rk_recording_reader_destroy(rk_recording_reader_handle reader);
 
 /* ------------------------------------------------------------------------- */
 /* Identifiers and states                                                    */

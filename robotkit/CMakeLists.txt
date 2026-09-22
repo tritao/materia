@@ -4,6 +4,23 @@ project(RobotKit VERSION 0.1.0 LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 include(CTest)
+include(FetchContent)
+
+# Header-only MCAP C++ implementation, pinned for reproducible recordings.
+FetchContent_Declare(mcap
+    GIT_REPOSITORY https://github.com/foxglove/mcap.git
+    GIT_TAG 1420296ffcfdcde4b6894c0c1aba0ad083f93dde
+    GIT_SHALLOW TRUE)
+if(POLICY CMP0169)
+    cmake_policy(SET CMP0169 OLD)
+endif()
+FetchContent_GetProperties(mcap)
+if(NOT mcap_POPULATED)
+    FetchContent_Populate(mcap)
+endif()
+add_library(robotkit_mcap_headers INTERFACE)
+target_include_directories(robotkit_mcap_headers INTERFACE
+    "${mcap_SOURCE_DIR}/cpp/mcap/include")
 
 option(RK_BUILD_SHARED "Build RobotKit libraries as shared libraries" ON)
 option(RK_BUILD_TESTS "Build RobotKit tests" ${BUILD_TESTING})

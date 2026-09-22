@@ -90,6 +90,17 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < Operation completed successfully.
 	 */
 	const RK_OK = 0;
+	const RK_RECORDING_CLOSED = 3;
+	const RK_RECORDING_CLOSING = 2;
+	const RK_RECORDING_COMMAND = 1;
+	const RK_RECORDING_FAILED = 4;
+	const RK_RECORDING_FAULT = 4;
+	const RK_RECORDING_FORMAT_VERSION = 1;
+	const RK_RECORDING_OPEN = 1;
+	const RK_RECORDING_SENSOR = 3;
+	const RK_RECORDING_SNAPSHOT = 2;
+	const RK_RECORDING_WORLD = 5;
+	const RK_RECORDING_WORLD_EVENT = 6;
 	/**
 	 * < Endpoint or command processing fault.
 	 */
@@ -149,6 +160,17 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < Target joint velocity.
 	 */
 	const RK_TARGET_VELOCITY = 2;
+	extern fn rk_recording_reader_destroy(reader: rk_recording_reader_handle) -> void;
+	/**
+	 * Returns RK_ERROR_STALE_STATE at clean end of file.
+	 */
+	extern fn rk_recording_reader_next(reader: rk_recording_reader_handle, message: ptr<rk_recording_message>, payload: nullable<ptr<u8>> @out_buffer("inout_payload_size"), inout_payload_size: ptr<u32> @inout) -> rk_result;
+	extern fn rk_recording_reader_open(path: utf8, out_reader: ptr<rk_recording_reader_handle> @out @owned) -> rk_result;
+	extern fn rk_recording_writer_create(path: utf8, queue_capacity: u32, out_writer: ptr<rk_recording_writer_handle> @out @owned) -> rk_result;
+	extern fn rk_recording_writer_destroy(writer: rk_recording_writer_handle) -> void;
+	extern fn rk_recording_writer_enqueue(writer: rk_recording_writer_handle, kind: rk_recording_event_kind, schema_version: u32, ordinal: u64, payload: ptr<const<u8>> @in_array("payload_size"), payload_size: u32) -> rk_result;
+	extern fn rk_recording_writer_finish(writer: rk_recording_writer_handle) -> rk_result;
+	extern fn rk_recording_writer_get_status(writer: rk_recording_writer_handle, status: ptr<rk_recording_writer_status>) -> rk_result;
 	/**
 	 * Validates capability flags and the advertised joint count.
 	 */
@@ -267,6 +289,22 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * < Optional effort limit; zero means backend default.
 		 */
 		max_effort: f64 @offset(24);
+	}
+	struct rk_recording_message @layout(24, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		kind: rk_recording_event_kind @offset(4);
+		schema_version: u32 @offset(8);
+		payload_size: u32 @offset(12);
+		ordinal: u64 @offset(16);
+	}
+	struct rk_recording_writer_status @layout(296, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		state: rk_recording_state @offset(4);
+		accepted: u64 @offset(8);
+		written: u64 @offset(16);
+		dropped: u64 @offset(24);
+		queued: u64 @offset(32);
+		error: array<c_char, 256> @offset(40);
 	}
 	/**
 	 * Static control capabilities reported by a RobotRuntime endpoint.
@@ -582,6 +620,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * Index of a link in a compiled RobotRuntime layout.
 	 */
 	type rk_link_id = u32;
+	type rk_recording_event_kind = u32;
+	handle rk_recording_reader_handle : u32 @destroy("rk_recording_reader_destroy");
+	type rk_recording_state = u32;
+	handle rk_recording_writer_handle : u32 @destroy("rk_recording_writer_destroy");
 	/**
 	 * Result returned by RobotKit C ABI functions.
 	 */
