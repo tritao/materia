@@ -66,6 +66,7 @@ class HaxeonSmoke {
 		PatternSmoke.run();
 		HoleSmoke.run();
 		TypedParameterSmoke.run();
+		ElementSmoke.run();
 		ModelingSmoke.run();
 		DocumentModelingSmoke.run();
 		RecordingBuilderSmoke.run();

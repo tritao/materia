@@ -15,12 +15,18 @@ import cadkit.parametric.ParameterExpression;
 import cadkit.parametric.ParameterKind;
 import cadkit.parametric.ParameterExpressionChange;
 import cadkit.parametric.UnitConversion;
+import cadkit.parametric.DocumentId;
+import cadkit.parametric.Element;
+import cadkit.parametric.ElementId;
 
 /** Haxeon-owned parametric feature document. */
 class Document {
 	private static var nextToken:Int = 1;
 
 	private var nextId:Int;
+	public final id:DocumentId;
+	private final elements:Array<Element>;
+	private var elementsById:Map<String, Element>;
 	private final dimensions:Array<NamedParameter>;
 	private var updatingNamedParameter:Bool;
 	private var selectedOutput:Null<Feature>;
@@ -34,11 +40,14 @@ class Document {
 
 	public var lastRemapReport(default, null):TopologyRemapReport;
 
-	public function new() {
+	public function new(?id:DocumentId) {
+		this.id = id == null ? new DocumentId() : id;
 		token = nextToken;
 		nextToken++;
 		nextId = 1;
 		dimensions = [];
+		elements = [];
+		elementsById = new Map<String, Element>();
 		updatingNamedParameter = false;
 		selectedOutput = null;
 		closed = false;
@@ -48,6 +57,49 @@ class Document {
 		undoStack = [];
 		redoStack = [];
 		lastRemapReport = new TopologyRemapReport();
+	}
+
+	public function createElement(name:String, output:Feature, ?id:ElementId):Element {
+		ensureOpen();
+		validateElementName(name);
+		validateElementOutput(output);
+		var identity = id == null ? new ElementId() : id;
+		if (elementsById.exists(identity.value))
+			throw new ParametricError("duplicate element ID: " + identity.value);
+		var result = new Element(this, identity, name, output);
+		elements.push(result);
+		elementsById.set(identity.value, result);
+		return result;
+	}
+
+	public function elementCount():Int {
+		ensureOpen();
+		return elements.length;
+	}
+
+	public function elementAt(index:Int):Element {
+		ensureOpen();
+		if (index < 0 || index >= elements.length)
+			throw new ParametricError("element index is out of range");
+		return elements[index];
+	}
+
+	public function element(id:ElementId):Element {
+		ensureOpen();
+		var result = elementsById.get(id.value);
+		if (result == null)
+			throw new ParametricError("unresolved element: " + id.value);
+		return result;
+	}
+
+	private function validateElementName(name:String):Void {
+		if (name == null || StringTools.trim(name) == "")
+			throw new ParametricError("element name must not be empty");
+	}
+
+	private function validateElementOutput(output:Feature):Void {
+		if (output == null || output.document != this || featureById(output.id.toInt()) != output)
+			throw new ParametricError("element output belongs to another document");
 	}
 
 	public function add<T:Feature>(feature:T):T {
@@ -417,6 +469,8 @@ class Document {
 		features.resize(0);
 		byId = new Map<Int, Feature>();
 		dimensions.resize(0);
+		elements.resize(0);
+		elementsById = new Map<String, Element>();
 		undoStack.resize(0);
 		redoStack.resize(0);
 		selectedOutput = null;
