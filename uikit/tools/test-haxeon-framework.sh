@@ -43,6 +43,7 @@ fi
 	"$module_dir/haxe/nativekit/ui/core/"*.hx \
 	"$module_dir/haxe/nativekit/ui/style/"*.hx \
 	"$module_dir/haxe/nativekit/ui/widgets/"*.hx \
+	"$module_dir/haxe/nativekit/ui/host/"*.hx \
 	"$module_dir/bindings/haxe/"*.hx)
 
 runtime_library_path="$build_dir:$build_dir/nativekit/modules/gpu:$build_dir/nativekit:$haxeon_dir/out:$haxeon_dir/.tools/hashlink:$haxeon_dir/vendor/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"

@@ -76,11 +76,19 @@ class DesktopUiHost {
 			fonts = FontCollection.create();
 			fonts.addSystemFallbacks();
 			var active = true;
+			var surfaceAvailable = false;
+			var framePending = false;
+			var frameRequested = true;
+			var scheduleFrame = function() {
+				frameRequested = true;
+				if (!active || !surfaceAvailable || framePending) return;
+				if (NativeKit.nk_surface_request_frame(surface) != Result.Ok)
+					throw "Surface frame request failed";
+				framePending = true;
+			};
 			session = new UiHostSession(function() active = false);
 			var hostContext = new DesktopUiHostContext(fonts, pump, window,
-				function() session.stop(), function() {
-					if (active && surface.isValid()) NativeKit.nk_surface_request_frame(surface);
-				});
+				function() session.stop(), scheduleFrame);
 			runtime = new UiHostRuntime(session, hostContext, window, surface,
 				options.width, options.height);
 			runtime.start(function(_) return create(hostContext));
@@ -103,6 +111,7 @@ class DesktopUiHost {
 					case WindowScaleChanged(source, scale) if (source.rawValue() == window.rawValue()):
 						runtime.setScale(scale);
 					case SurfaceReady(source) if (source.rawValue() == surface.rawValue()):
+						surfaceAvailable = true;
 						var size = NativeKit.nk_surface_get_framebuffer_size(surface);
 						if (size.status != Result.Ok) throw "Framebuffer size query failed";
 						var scale = NativeKit.nk_window_get_scale(window);
@@ -114,6 +123,9 @@ class DesktopUiHost {
 						if (frameSubscription == null)
 							frameSubscription = borrowedSurface.onFrame(function(width, height) {
 								try {
+									framePending = false;
+									if (!active || !surfaceAvailable || !frameRequested) return;
+									frameRequested = false;
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
 									runtime.render(Sys.time());
 									if (session.state == UiHostLifecycle.Failed) active = false;
@@ -121,19 +133,22 @@ class DesktopUiHost {
 										writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime, eventHistory);
 										session.stop();
 									}
-									if (active && NativeKit.nk_surface_request_frame(surface) != Result.Ok)
-										throw "Surface frame request failed";
+									if (active && session.state == UiHostLifecycle.Running) {
+										frameRequested = true;
+										scheduleFrame();
+									}
 								} catch (error:Dynamic) {
 									runtime.fail("frame-callback", error);
 									active = false;
 								}
 							});
-						if (NativeKit.nk_surface_request_frame(surface) != Result.Ok)
-							throw "Initial surface frame request failed";
+						scheduleFrame();
 					case SurfaceResize(source, width, height, framebufferWidth, framebufferHeight)
 							if (source.rawValue() == surface.rawValue()):
 						runtime.resize(width, height, framebufferWidth, framebufferHeight);
 					case SurfaceLost(source) if (source.rawValue() == surface.rawValue()):
+						surfaceAvailable = false;
+						framePending = false;
 						runtime.setSurfaceReady(false);
 					case _:
 				}

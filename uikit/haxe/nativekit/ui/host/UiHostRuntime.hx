@@ -12,17 +12,16 @@ import nativekit.ui.core.NativeInputAdapter;
 /** Shared application, input, frame, and disposal ownership used by host adapters. */
 class UiHostRuntime {
 	public final session:UiHostSession;
-	public var logicalWidth(default, null):Float;
-	public var logicalHeight(default, null):Float;
-	public var framebufferWidth(default, null):Int;
-	public var framebufferHeight(default, null):Int;
-	public var scale(default, null):Float = 1.0;
+	public var logicalWidth(get, never):Float;
+	public var logicalHeight(get, never):Float;
+	public var framebufferWidth(get, never):Int;
+	public var framebufferHeight(get, never):Int;
+	public var scale(get, never):Float;
 	public var rendered(default, null):Int = 0;
-	public var surfaceReady(default, null):Bool = false;
+	public var surfaceReady(get, never):Bool;
 
 	final window:WindowHandle;
 	final surface:SurfaceHandle;
-	final events:NativeKitEvents;
 	final context:UiHostContext;
 	var application:Null<UiApplication> = null;
 	var input:Null<NativeInputAdapter> = null;
@@ -30,7 +29,7 @@ class UiHostRuntime {
 	var renderer:Null<Renderer> = null;
 	var frame:LayoutFrame;
 	var frameInfo:FrameInfo;
-	var previousTime:Float = -1.0;
+	final frameState:UiHostFrameState;
 	var disposed:Bool = false;
 	var started:Bool = false;
 	var callbackDepth:Int = 0;
@@ -42,14 +41,17 @@ class UiHostRuntime {
 		this.context = context;
 		this.window = window;
 		this.surface = surface;
-		this.events = context.events;
-		logicalWidth = width;
-		logicalHeight = height;
-		framebufferWidth = width;
-		framebufferHeight = height;
+		frameState = new UiHostFrameState(width, height);
 		frame = new LayoutFrame(width, height);
 		frameInfo = new FrameInfo(width, height, width, height, 1.0);
 	}
+
+	function get_logicalWidth():Float return frameState.logicalWidth;
+	function get_logicalHeight():Float return frameState.logicalHeight;
+	function get_framebufferWidth():Int return frameState.framebufferWidth;
+	function get_framebufferHeight():Int return frameState.framebufferHeight;
+	function get_scale():Float return frameState.scale;
+	function get_surfaceReady():Bool return frameState.surfaceAvailable;
 
 	public function start(create:UiHostContext->UiApplication):Void {
 		if (started || disposed || session.state == UiHostLifecycle.Failed ||
@@ -73,7 +75,7 @@ class UiHostRuntime {
 				created.context().attachPlatformWindow(window);
 				input = new NativeInputAdapter(created.context(), new Handle(window.rawValue()),
 					new Handle(surface.rawValue()));
-				input.attach(events);
+				input.attach(context.events);
 				session.transition(UiHostLifecycle.Running);
 			}
 		} catch (error:Dynamic) {
@@ -85,26 +87,21 @@ class UiHostRuntime {
 
 	public function resize(width:Float, height:Float, framebufferWidth:Int,
 			framebufferHeight:Int):Void {
-		logicalWidth = width;
-		logicalHeight = height;
-		this.framebufferWidth = framebufferWidth;
-		this.framebufferHeight = framebufferHeight;
+		frameState.resize(width, height, framebufferWidth, framebufferHeight);
 	}
 
-	public function setScale(value:Float):Void if (value > 0.0) scale = value;
-	public function setSurfaceReady(value:Bool):Void surfaceReady = value;
+	public function setScale(value:Float):Void frameState.setScale(value);
+	public function setSurfaceReady(value:Bool):Void frameState.setSurfaceAvailable(value);
 
 	/** Renders at most once for the adapter's scheduling callback. */
 	public function render(timeSeconds:Float):Bool {
-		if (disposed || session.state != UiHostLifecycle.Running || !surfaceReady || application == null ||
-			renderer == null || framebufferWidth <= 0 || framebufferHeight <= 0)
+		if (disposed || session.state != UiHostLifecycle.Running || !frameState.canRender() ||
+			application == null || renderer == null)
 			return false;
 		try {
 			callbackDepth++;
 			frame.setViewport(logicalWidth, logicalHeight);
-			frame.deltaSeconds = previousTime < 0.0 ? 0.0 :
-				Math.max(0.0, Math.min(0.1, timeSeconds - previousTime));
-			previousTime = timeSeconds;
+			frame.deltaSeconds = frameState.nextDelta(timeSeconds);
 			frameInfo.set(logicalWidth, logicalHeight, framebufferWidth, framebufferHeight, scale);
 			application.submit(frame);
 			if (session.state != UiHostLifecycle.Running || disposeRequested) {

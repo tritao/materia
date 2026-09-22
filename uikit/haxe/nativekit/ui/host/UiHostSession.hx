@@ -31,6 +31,7 @@ class UiHostSession {
 	public final cleanupErrors:Array<UiHostError> = [];
 	final stopCallback:Void->Void;
 	var disposed:Bool = false;
+	var stopNotified:Bool = false;
 
 	public function new(stopCallback:Void->Void) this.stopCallback = stopCallback;
 
@@ -71,11 +72,14 @@ class UiHostSession {
 	function cleanupFailed(stage:String, cause:Dynamic):Void
 		cleanupErrors.push(new UiHostError(stage, cause));
 
-	public function isActive():Bool return state != UiHostLifecycle.Stopped && state != UiHostLifecycle.Failed;
+	public function isActive():Bool return state == UiHostLifecycle.Starting ||
+		state == UiHostLifecycle.LoadingResources || state == UiHostLifecycle.Running;
 
 	/** Stops the hosted application. Browser hosts do not claim to close the tab. */
 	public function stop():Void {
-		if (disposed || state == UiHostLifecycle.Stopped || state == UiHostLifecycle.Failed) return;
+		if (disposed || stopNotified || state == UiHostLifecycle.Stopped ||
+			state == UiHostLifecycle.Failed) return;
+		stopNotified = true;
 		state = UiHostLifecycle.Stopping;
 		stopCallback();
 	}
@@ -85,6 +89,9 @@ class UiHostSession {
 		disposed = true;
 		if (state != UiHostLifecycle.Stopped && state != UiHostLifecycle.Failed)
 			state = UiHostLifecycle.Stopping;
-		stopCallback();
+		if (!stopNotified) {
+			stopNotified = true;
+			stopCallback();
+		}
 	}
 }

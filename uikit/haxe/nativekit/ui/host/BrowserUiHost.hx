@@ -27,7 +27,7 @@ class BrowserUiHost {
 	var fonts:Null<FontCollection> = null;
 	var hostContext:Null<UiHostContext> = null;
 	var runtime:Null<UiHostRuntime> = null;
-	var pending:Null<Map<String, BrowserUiFontAsset>> = null;
+	var pending:Null<UiHostPendingResources<BrowserUiFontAsset>> = null;
 	var loaded:Null<Map<String, Bytes>> = null;
 	var pendingCount:Int = 0;
 	var logicalWidth:Float;
@@ -104,7 +104,7 @@ class BrowserUiHost {
 			finishResources();
 		} catch (error:Dynamic) fail("font-load", error);
 		#else
-		pending = new Map();
+		pending = new UiHostPendingResources();
 		loaded = new Map();
 		for (font in options.fonts) {
 			var resource = new Resource();
@@ -114,7 +114,7 @@ class BrowserUiHost {
 			resource.set_mime_type("font/ttf");
 			resource.set_display_name(font.name);
 			var request = NativeKit.nk_resource_load_async_checked(resource);
-			pending.set(Std.string(request), font);
+			pending.add(Std.string(request), font);
 			pendingCount++;
 		}
 		#end
@@ -211,9 +211,8 @@ class BrowserUiHost {
 	function handleFont(request:haxe.Int64, result:Result, data:Bytes):Void {
 		if (stopped || pending == null) return;
 		var key = Std.string(request);
-		var font = pending.get(key);
+		var font = pending.resolve(key);
 		if (font == null) return;
-		pending.remove(key);
 		if (result != Result.Ok || data.length == 0) {
 			fail("font-load", "Failed to load browser font " + font.uri);
 			return;
@@ -254,6 +253,9 @@ class BrowserUiHost {
 				}
 				if (NativeKit.nk_surface_present(surface) != Result.Ok)
 					throw "Browser surface presentation failed";
+				// Preserve the existing continuously animated showcase contract. A later
+				// idle policy can stop this implicit request without changing schedulers.
+				frameRequested = true;
 			}
 			return 1;
 		} catch (error:Dynamic) {
@@ -273,6 +275,7 @@ class BrowserUiHost {
 	function stopHost():Void {
 		if (stopped) return;
 		stopping = true;
+		if (pending != null) pending.cancel();
 		pending = null;
 		loaded = null;
 		pendingCount = 0;

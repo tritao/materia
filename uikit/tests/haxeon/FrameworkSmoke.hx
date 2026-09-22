@@ -223,9 +223,22 @@ import nativekit.ui.debug.UiInspector;
 import nativekit.ui.debug.UiFrameMetrics;
 import nativekit.ui.debug.AccessibilityAudit;
 import AccessibilityContract;
+import nativekit.ui.host.UiHostFrameState;
+import nativekit.ui.host.UiHostSession;
+import nativekit.ui.host.UiHostSession.UiHostLifecycle;
+import nativekit.ui.host.UiHostContext;
+import nativekit.ui.host.UiHostRuntime;
+import nativekit.ui.host.UiApplication;
+import nativekit.ui.host.UiHostPendingResources;
 
 class FrameworkSmoke {
 	static function main():Int {
+		if (!hostFrameLifecycleValid())
+			return 270;
+		if (!hostSessionLifecycleValid())
+			return 271;
+		if (!hostPendingResourcesValid())
+			return 273;
 		if (!coordinateMathValid())
 			return 240;
 		var anchorIndex = new VirtualExtentIndex(100, 20.0, 40.0, 200.0, 0, 0,
@@ -242,6 +255,8 @@ class FrameworkSmoke {
 			return 2;
 		var fonts = FontCollection.create();
 		fonts.add(fontPath);
+		if (!hostRuntimeLifecycleValid(fonts))
+			return 272;
 		var session = LayoutSession.create();
 		var context = new UiContext(session, fonts);
 		if (context.buildContext.fonts != fonts)
@@ -2994,6 +3009,83 @@ class FrameworkSmoke {
 		return 0;
 	}
 
+	static function hostFrameLifecycleValid():Bool {
+		var state = new UiHostFrameState(800, 600);
+		if (state.canRender()) return false;
+		state.setSurfaceAvailable(true);
+		if (!state.canRender() || state.nextDelta(10.0) != 0.0) return false;
+		if (state.nextDelta(10.25) != 0.1) return false;
+		state.setSurfaceAvailable(false);
+		state.resize(1024, 768, 2048, 1536);
+		if (state.canRender()) return false;
+		state.setSurfaceAvailable(true);
+		if (!state.canRender() || state.nextDelta(30.0) != 0.0) return false;
+		state.resize(1024, 768, 0, 0);
+		return !state.canRender();
+	}
+
+	static function hostSessionLifecycleValid():Bool {
+		var stops = 0;
+		var session = new UiHostSession(function() stops++);
+		if (!session.isActive() || session.state != UiHostLifecycle.Starting) return false;
+		session.stop();
+		session.stop();
+		session.dispose();
+		return stops == 1 && !session.isActive() &&
+			session.state == UiHostLifecycle.Stopping;
+	}
+
+	static function hostPendingResourcesValid():Bool {
+		var pending = new UiHostPendingResources<String>();
+		pending.add("first", "font-a");
+		pending.add("second", "font-b");
+		if (pending.remaining != 2 || pending.resolve("first") != "font-a" ||
+			pending.remaining != 1) return false;
+		pending.cancel();
+		return pending.remaining == 0 && pending.resolve("second") == null;
+	}
+
+	static function hostRuntimeLifecycleValid(fonts:FontCollection):Bool {
+		var failedSession = new UiHostSession(function() {});
+		var failedRuntime = testHostRuntime(failedSession, fonts);
+		var factoryCalls = 0;
+		failedRuntime.start(function(_) {
+			factoryCalls++;
+			throw "factory failure";
+		});
+		if (failedSession.state != UiHostLifecycle.Failed || failedSession.error == null ||
+			factoryCalls != 1) return false;
+		var originalError:nativekit.ui.host.UiHostSession.UiHostError = cast failedSession.error;
+		var originalFailure = originalError.message;
+		failedRuntime.start(function(_) {
+			factoryCalls++;
+			return new SmokeHostApplication(false);
+		});
+		var retainedError:nativekit.ui.host.UiHostSession.UiHostError = cast failedSession.error;
+		if (factoryCalls != 1 || retainedError.message != originalFailure) return false;
+
+		var stoppedRuntime:Null<UiHostRuntime> = null;
+		var stoppedSession = new UiHostSession(function() {
+			if (stoppedRuntime != null) stoppedRuntime.dispose();
+		});
+		stoppedRuntime = testHostRuntime(stoppedSession, fonts);
+		var stoppedApp = new SmokeHostApplication(true);
+		stoppedRuntime.start(function(_) {
+			stoppedSession.stop();
+			return stoppedApp;
+		});
+		return stoppedSession.state == UiHostLifecycle.Stopping &&
+			stoppedApp.disposeCalls == 1 && stoppedSession.cleanupErrors.length == 1 &&
+			!stoppedRuntime.isCallbackActive();
+	}
+
+	static function testHostRuntime(session:UiHostSession, fonts:FontCollection):UiHostRuntime {
+		var context = new UiHostContext(fonts, new NativeKitEvents(),
+			function() session.stop(), function() {});
+		return new UiHostRuntime(session, context, WindowHandle.invalid(), SurfaceHandle.invalid(),
+			800, 600);
+	}
+
 	static function decorationStyleContract():Int {
 		var decorationsA = DecorationChain.of([
 			new BackgroundDecoration(Color.rgba(0.1, 0.2, 0.3, 1.0)),
@@ -4140,4 +4232,18 @@ private class SmokeVectorExtension implements PropertyEditorExtension {
 
 	static inline function finite(value:Float):Bool
 		return value == value && value - value == 0.0;
+}
+
+private class SmokeHostApplication implements UiApplication {
+	public var disposeCalls(default, null):Int = 0;
+	final throwOnDispose:Bool;
+	final placeholder:Dynamic = {};
+
+	public function new(throwOnDispose:Bool) this.throwOnDispose = throwOnDispose;
+	public function context():UiContext return cast placeholder;
+	public function submit(frame:LayoutFrame):RenderNode return cast placeholder;
+	public function dispose():Void {
+		disposeCalls++;
+		if (throwOnDispose) throw "application dispose failure";
+	}
 }
