@@ -2,27 +2,37 @@ package bimkit;
 
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ElementId;
+import cadkit.parametric.DocumentId;
+import cadkit.parametric.ElementReference;
+import cadkit.parametric.Placement;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
 import haxe.Json;
 
 /** Persistence for BIM records keyed by persistent CadKit element IDs. */
 class BimCodec {
 	public static inline var FORMAT:String = "bimkit.document";
-	public static inline var VERSION:Int = 1;
+	public static inline var VERSION:Int = 2;
 
 	public static function encode(model:BimDocument):String {
 		var walls:Array<Dynamic> = [];
 		for (wall in model.allWallRoles())
 			walls.push({element: wall.elementId.value, uncutOutput: wall.uncutOutput.id.toInt()});
 		var relationships:Array<Dynamic> = [];
-		for (wall in model.allWallRoles())
-			for (relationship in model.openingsForWall(wall.elementId))
-				relationships.push({
-					opening: relationship.openingId.value,
-					wall: relationship.wallId.value,
-					along: relationship.along,
-					sill: relationship.sill,
-					output: relationship.outputName
-				});
+		for (relationship in model.allRelationships())
+			relationships.push({
+				opening: relationship.openingId.value,
+				wall: relationship.wallId.value,
+				along: relationship.along,
+				sill: relationship.sill,
+				output: relationship.outputName,
+				unhostPlacement: encodePlacement(relationship.unhostPlacement),
+				unhostParent: relationship.unhostParent == null ? null : {
+					document: relationship.unhostParent.documentId.value,
+					element: relationship.unhostParent.elementId.value
+				},
+				unhostDepth: relationship.unhostDepth
+			});
 		return Json.stringify({
 			format: FORMAT,
 			version: VERSION,
@@ -38,7 +48,7 @@ class BimCodec {
 			throw new BimError("unsupported BimKit document format");
 		var cad:cadkit.parametric.Document;
 		try {
-			cad = DocumentCodec.decode(fieldString(root, "cadkit"));
+			cad = DocumentCodec.decode(fieldString(root, "cadkit"), false, false);
 		} catch (error:Dynamic) {
 			throw new BimError("CadKit decode failed: " + Std.string(Reflect.field(error, "message")));
 		}
@@ -59,9 +69,15 @@ class BimCodec {
 				var wall = new ElementId(fieldString(record, "wall"));
 				cad.element(opening);
 				model.wallRole(wall);
+				var rawParent:Dynamic = Reflect.field(record, "unhostParent");
+				var rawDepth:Dynamic = Reflect.field(record, "unhostDepth");
 				model.installRelationship(new HostRelationship(opening, wall, fieldNumber(record, "along"), fieldNumber(record, "sill"),
-					fieldString(record, "output")));
+					fieldString(record, "output"), decodePlacement(required(record, "unhostPlacement")),
+					rawParent == null ? null : new ElementReference(new DocumentId(fieldString(rawParent, "document")),
+						new ElementId(fieldString(rawParent, "element"))),
+					rawDepth == null ? null : fieldNumber(record, "unhostDepth")));
 			}
+			cad.recompute();
 			return model;
 		} catch (error:Dynamic) {
 			model.close();
@@ -75,6 +91,21 @@ class BimCodec {
 			throw new BimError("missing BimKit field: " + name);
 		return result;
 	}
+
+	private static function encodeVector(value:Vector):Dynamic
+		return {x: value.x, y: value.y, z: value.z};
+
+	private static function decodeVector(value:Dynamic):Vector
+		return new Vector(fieldNumber(value, "x"), fieldNumber(value, "y"), fieldNumber(value, "z"));
+
+	private static function encodePlacement(value:Placement):Dynamic {
+		var plane = value.location.plane;
+		return {origin: encodeVector(plane.origin), xDirection: encodeVector(plane.xDirection), normal: encodeVector(plane.normal)};
+	}
+
+	private static function decodePlacement(value:Dynamic):Placement
+		return new Placement(new Plane(decodeVector(required(value, "origin")), decodeVector(required(value, "xDirection")),
+			decodeVector(required(value, "normal"))));
 
 	private static function fieldString(value:Dynamic, name:String):String {
 		var result:Dynamic = required(value, name);

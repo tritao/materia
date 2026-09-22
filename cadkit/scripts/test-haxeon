@@ -23,6 +23,7 @@ mkdir -p "$(dirname -- "$output")"
 	"--root=$repo_root/examples/modeling" \
 	"--root=$repo_root/../bimkit/haxe/src" \
 	"--root=$repo_root/../bimkit/haxe/tests" \
+	"--root=$repo_root/../bimkit/examples" \
 	"--ffi-interface=$repo_root/haxe/abi/CadKit.hxi" \
 	"--ffi-projection=$repo_root/haxe/abi/CadKit.hxmap" \
 	"$repo_root/haxe/tests/HaxeonSmoke.hx"
