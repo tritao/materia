@@ -37,6 +37,8 @@ import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.DatumSketchFeature;
 import cadkit.parametric.features.LevelExtrudeFeature;
+import cadkit.parametric.features.DefinitionOutputFeature;
+import cadkit.parametric.features.ToolCollectionFeature;
 import cadkit.parametric.DocumentId;
 import cadkit.parametric.ElementId;
 import cadkit.parametric.LevelElement;
@@ -240,6 +242,20 @@ class DocumentCodec {
 				} else if (featureType == "boolean") {
 					feature = document.add(new BooleanFeature(requiredFeature(document, intField(record, "first")),
 						requiredFeature(document, intField(record, "second")), booleanOperation(stringField(record, "operation"))));
+				} else if (featureType == "definition-output") {
+					feature = document.add(new DefinitionOutputFeature(decodeElementReference(requiredField(record, "instance")),
+						stringField(record, "output")));
+				} else if (featureType == "tool-collection") {
+					var toolIds:Array<Dynamic> = cast requiredField(record, "tools");
+					var labelValues:Array<Dynamic> = cast requiredField(record, "labels");
+					var labels:Array<String> = [];
+					for (label in labelValues) {
+						if (!Std.isOfType(label, String))
+							throw new ParametricError("document tool label is not a string");
+						labels.push(cast label);
+					}
+					feature = document.add(new ToolCollectionFeature([for (toolId in toolIds) requiredFeature(document, integerValue(toolId, "tool"))],
+						labels));
 				} else {
 					throw new ParametricError("unsupported feature type: " + featureType);
 				}
@@ -347,7 +363,8 @@ class DocumentCodec {
 		} catch (error:Dynamic) {
 			if (document != null)
 				document.close();
-			throw new ParametricError("document decode failed: " + Std.string(error));
+			var detail:Dynamic = Reflect.field(error, "message");
+			throw new ParametricError("document decode failed: " + (detail == null ? Std.string(error) : Std.string(detail)));
 		}
 	}
 
@@ -551,6 +568,24 @@ class DocumentCodec {
 				first: booleanFeature.first.id.toInt(),
 				second: booleanFeature.second.id.toInt(),
 				operation: encodeBooleanOperation(booleanFeature.operation),
+				references: references
+			};
+		} else if (featureType == "definition-output") {
+			var output:DefinitionOutputFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				instance: encodeElementReference(output.instance),
+				output: output.outputName,
+				references: references
+			};
+		} else if (featureType == "tool-collection") {
+			var collection:ToolCollectionFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				tools: [for (tool in collection.tools) tool.id.toInt()],
+				labels: collection.labels.copy(),
 				references: references
 			};
 		}

@@ -15,6 +15,7 @@ class Element {
 	public var output(default, null):Null<Feature>;
 	public var localPlacement(default, null):Placement;
 	public var placementParent(default, null):Null<ElementReference>;
+	public var placementDerived(default, null):Bool;
 
 	private var committedOutput:Null<Feature>;
 	private var directShape:Null<Shape>;
@@ -29,6 +30,7 @@ class Element {
 		committedOutput = output;
 		localPlacement = Placement.identity();
 		placementParent = null;
+		placementDerived = false;
 		placedShape = null;
 		directShape = null;
 	}
@@ -65,6 +67,10 @@ class Element {
 		placementParent = parent;
 		clearPlacedShape();
 	}
+
+	/** Generic authority marker used by adapters that derive placement from other authored data. */
+	public function restorePlacementDerived(value:Bool):Void
+		placementDerived = value;
 
 	public function clearPlacedShape():Void {
 		if (placedShape != null) {

@@ -237,6 +237,8 @@ class Document {
 			}
 		for (value in staged)
 			value.instance.restoreDirectShape(value.shape);
+		for (value in staged)
+			invalidateElementFeatures(value.instance.id.value);
 	}
 
 	public function setDefinitionDefault(definition:Definition, name:String, value:Float, ?unit:String):Void {
@@ -273,6 +275,7 @@ class Document {
 			instance.restoreOverride(name, before);
 			throw e;
 		}
+		invalidateElementFeatures(instance.id.value);
 		recordDocumentChange(new InstanceOverrideChange(this, instance, name, before, canonical));
 	}
 
@@ -283,12 +286,14 @@ class Document {
 			return;
 		instance.restoreOverride(name, null);
 		instance.restoreDirectShape(resolveInstanceShape(instance));
+		invalidateElementFeatures(instance.id.value);
 		recordDocumentChange(new InstanceOverrideChange(this, instance, name, before, null));
 	}
 
 	public function restoreInstanceOverride(instance:InstanceElement, name:String, value:Null<Float>):Void {
 		instance.restoreOverride(name, value);
 		instance.restoreDirectShape(resolveInstanceShape(instance));
+		invalidateElementFeatures(instance.id.value);
 	}
 
 	public function createElement(name:String, output:Feature):Element {
@@ -408,6 +413,8 @@ class Document {
 
 	public function setElementPlacement(element:Element, value:Placement):Void {
 		validateOwnedElement(element);
+		if (element.placementDerived)
+			throw new ParametricError("element placement is derived: " + element.id.value);
 		if (!isPlaceable(element))
 			throw new ParametricError("element kind does not support placement: " + element.kind);
 		var old = element.localPlacement;
@@ -419,6 +426,8 @@ class Document {
 
 	public function reparentElement(element:Element, parent:Null<ElementReference>, preserveWorld:Bool):Void {
 		validateOwnedElement(element);
+		if (element.placementDerived)
+			throw new ParametricError("element placement is derived: " + element.id.value);
 		if (!isPlaceable(element))
 			throw new ParametricError("element kind does not support placement parents: " + element.kind);
 		validatePlacementParent(element, parent);
@@ -455,7 +464,17 @@ class Document {
 
 	public function restoreElementPlacement(element:Element, value:Placement, parent:Null<ElementReference>):Void {
 		element.restorePlacement(value, parent);
+		invalidateElementFeatures(element.id.value);
 		invalidatePlacedDescendants(element.id.value, new Map<String, Bool>());
+	}
+
+	private function invalidateElementFeatures(id:String):Void {
+		for (feature in features)
+			for (dependency in feature.elementDependencies())
+				if (dependency == id) {
+					invalidate(feature);
+					break;
+				}
 	}
 
 	private function invalidatePlacedDescendants(id:String, seen:Map<String, Bool>):Void {
