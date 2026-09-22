@@ -15,6 +15,7 @@ class EditorSceneViewport implements ViewportContent {
   public static inline var GRID_STEP:Float = 0.2;
   final scene:EditorScene;
   var drag:Null<EditorSceneDrag> = null;
+  public var gridStep(default, null):Float = GRID_STEP;
   public var viewportWidth:Float = 640.0;
   public var viewportHeight:Float = 520.0;
 
@@ -30,6 +31,14 @@ class EditorSceneViewport implements ViewportContent {
 
   public function dragging():Bool return drag != null;
 
+  public function setGridStep(value:Float):Bool {
+    if (value != value || value - value != 0.0 || value <= 0.0 || value > 1000000.0)
+      throw "Grid spacing must be finite and positive";
+    if (value == gridStep) return false;
+    gridStep = value;
+    return true;
+  }
+
   /** Begins a primary-button move while retaining the pointer-to-origin offset. */
   public function beginDrag(camera:ViewportCamera, x:Float, y:Float, snap:Bool):Bool {
     if (drag != null) cancelDrag();
@@ -43,15 +52,21 @@ class EditorSceneViewport implements ViewportContent {
     return true;
   }
 
-  public function updateDrag(camera:ViewportCamera, x:Float, y:Float):Bool {
+  public function updateDrag(camera:ViewportCamera, x:Float, y:Float, constrain:Bool = false):Bool {
     var active = drag;
     if (active == null) return false;
     var point = scenePoint(camera, x, y);
     var nextX = point.x + active.offsetX;
     var nextY = point.y + active.offsetY;
+    if (constrain) {
+      if (active.constraintAxis < 0)
+        active.constraintAxis = Math.abs(nextX - active.startX) >= Math.abs(nextY - active.startY) ? 0 : 1;
+      if (active.constraintAxis == 0) nextY = active.startY;
+      else nextX = active.startX;
+    }
     if (active.snap) {
-      nextX = Math.round(nextX / GRID_STEP) * GRID_STEP;
-      nextY = Math.round(nextY / GRID_STEP) * GRID_STEP;
+      nextX = Math.round(nextX / gridStep) * gridStep;
+      nextY = Math.round(nextY / gridStep) * gridStep;
     }
     nextX = Math.max(-1000000.0, Math.min(1000000.0, nextX));
     nextY = Math.max(-1000000.0, Math.min(1000000.0, nextY));
@@ -127,6 +142,7 @@ private class EditorSceneDrag {
   public final snap:Bool;
   public var currentX:Float;
   public var currentY:Float;
+  public var constraintAxis:Int = -1;
   public function new(id:String, startX:Float, startY:Float, offsetX:Float, offsetY:Float, snap:Bool) {
     this.id = id; this.startX = startX; this.startY = startY;
     this.offsetX = offsetX; this.offsetY = offsetY; this.snap = snap;

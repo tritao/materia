@@ -234,6 +234,21 @@ class EditorScene {
       function() setPositionXY(id, fromX, fromY)));
   }
 
+  public function nudgeSelected(deltaX:Float, deltaY:Float):Bool {
+    var item = object(selectedId);
+    if (item == null || !finiteCoordinate(deltaX) || !finiteCoordinate(deltaY) ||
+        (deltaX == 0.0 && deltaY == 0.0)) return false;
+    var transform = info(item.id).localTransform();
+    var fromX = transform.element(12);
+    var fromY = transform.element(13);
+    var toX = Math.max(-1000000.0, Math.min(1000000.0, fromX + deltaX));
+    var toY = Math.max(-1000000.0, Math.min(1000000.0, fromY + deltaY));
+    if (fromX == toX && fromY == toY) return false;
+    return document.apply(new EditOperation("Nudge object",
+      function() setPositionXY(item.id, toX, toY),
+      function() setPositionXY(item.id, fromX, fromY)));
+  }
+
   static inline function finiteCoordinate(value:Float):Bool
     return value == value && value - value == 0.0 && Math.abs(value) <= 1000000;
 

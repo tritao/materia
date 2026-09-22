@@ -168,6 +168,16 @@ class SceneEditingTests {
       item = scene.items()[0];
       check(item.width == 4.0 && item.height == 0.5 && nearValue(item.green, 0.8),
         "redo restores dimensions and colour");
+      var nudgeHistory = scene.document.history.undoCount;
+      check(scene.nudgeSelected(0.1, 0.0), "arrow-sized nudge applies");
+      check(scene.nudgeSelected(0.0, 1.0), "Shift-sized nudge applies");
+      near(scene.info("box").localTransform().element(12), -1.4, "small nudge uses 0.1 m step");
+      near(scene.info("box").localTransform().element(13), 1.0, "large nudge uses 1 m step");
+      check(scene.document.history.undoCount == nudgeHistory + 2, "each nudge is one undo operation");
+      scene.document.undo();
+      near(scene.info("box").localTransform().element(13), 0.0, "large nudge undo is independent");
+      scene.document.undo();
+      near(scene.info("box").localTransform().element(12), -1.5, "small nudge undo is independent");
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
@@ -215,6 +225,23 @@ class SceneEditingTests {
       near(scene.info("box").localTransform().element(13), 0.5, "cancel restores original Y");
       check(scene.document.history.undoCount == 1, "cancel does not create an undo step");
 
+      check(viewport.beginDrag(camera, center.x, center.y, false), "constrained drag begins");
+      var horizontalPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 0.4 * EditorSceneViewport.SCALE,
+        EditorSceneViewport.ORIGIN_Y - 0.7 * EditorSceneViewport.SCALE);
+      viewport.updateDrag(camera, horizontalPointer.x, horizontalPointer.y, true);
+      near(scene.info("box").localTransform().element(12), 0.4, "horizontal constraint keeps dominant X");
+      near(scene.info("box").localTransform().element(13), 0.5, "horizontal constraint locks Y");
+      viewport.commitDrag();
+      scene.document.undo();
+      check(viewport.beginDrag(camera, center.x, center.y, false), "vertical constrained drag begins");
+      var verticalPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 0.1 * EditorSceneViewport.SCALE,
+        EditorSceneViewport.ORIGIN_Y - 1.4 * EditorSceneViewport.SCALE);
+      viewport.updateDrag(camera, verticalPointer.x, verticalPointer.y, true);
+      near(scene.info("box").localTransform().element(12), -0.3, "vertical constraint locks X");
+      near(scene.info("box").localTransform().element(13), 1.4, "vertical constraint keeps dominant Y");
+      viewport.commitDrag();
+      scene.document.undo();
+
       check(viewport.beginDrag(camera, center.x, center.y, true), "snapped drag begins");
       var snappedPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 0.06 * EditorSceneViewport.SCALE,
         EditorSceneViewport.ORIGIN_Y - 0.94 * EditorSceneViewport.SCALE);
@@ -223,6 +250,17 @@ class SceneEditingTests {
       near(scene.info("box").localTransform().element(13), 1.0, "grid snapping rounds Y");
       viewport.commitDrag();
       check(scene.document.history.undoCount == 2, "snapped drag commits one undo step");
+      var snappedCenter = camera.worldToViewport(EditorSceneViewport.ORIGIN_X,
+        EditorSceneViewport.ORIGIN_Y - 1.0 * EditorSceneViewport.SCALE);
+      check(viewport.setGridStep(0.5), "grid spacing is configurable");
+      check(viewport.beginDrag(camera, snappedCenter.x, snappedCenter.y, true),
+        "drag uses configured grid spacing");
+      var customGridPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 0.74 * EditorSceneViewport.SCALE,
+        EditorSceneViewport.ORIGIN_Y - 1.26 * EditorSceneViewport.SCALE);
+      viewport.updateDrag(camera, customGridPointer.x, customGridPointer.y);
+      near(scene.info("box").localTransform().element(12), 0.5, "configured grid rounds X");
+      near(scene.info("box").localTransform().element(13), 1.5, "configured grid rounds Y");
+      viewport.cancelDrag();
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;

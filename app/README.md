@@ -30,7 +30,10 @@ or the Scene root to clear object selection.
   previews live, and release creates one undo step. Escape cancels the active drag.
 - Saving commits an active drag before writing. New, Open, and Close cancel it before
   continuing through the normal unsaved-change confirmation.
-- Optional 0.2 m grid snapping is available from the viewport context menu.
+- Optional grid snapping is available from the viewport context menu with 0.1,
+  0.2, and 0.5 m spacing choices.
+- Hold Shift while dragging to lock movement to the first dominant axis. Arrow
+  keys nudge by 0.1 m; Shift+Arrow nudges by 1 m. Each nudge is independently undoable.
 - Positive finite dimension edits rebuild geometry and picking bounds together;
   framing, duplication, undo/redo, and scene persistence use the edited size and colour.
 - Middle-drag pans the view; the wheel zooms around the pointer.

@@ -240,6 +240,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final logLines:Array<String>;
   var gridVisible:Bool;
   var gridSnapEnabled:Bool;
+  var gridSpacing:Float;
   var paletteVisible:Bool;
   var contextMenuVisible:Bool;
   var contextMenuX:Float;
@@ -274,6 +275,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     logLines = ["Scene ready: two editable objects", "Select a box; edit position or visibility", "Middle-drag to pan; scroll to zoom"];
     gridVisible = true;
     gridSnapEnabled = false;
+    gridSpacing = EditorSceneViewport.GRID_STEP;
     paletteVisible = false;
     contextMenuVisible = false;
     contextMenuX = 0.0;
@@ -308,6 +310,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.frame-selected",
         "scene.toggle-grid",
         "scene.toggle-grid-snap",
+        "scene.grid-spacing-0.1",
+        "scene.grid-spacing-0.2",
+        "scene.grid-spacing-0.5",
         "workspace.reset"
       ], contextMenuX, contextMenuY, commands, ui.commandContext, function() {
         contextMenuVisible = false;
@@ -363,6 +368,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     selection: ui.commandContext.selection.copy(),
     gridVisible: gridVisible,
     gridSnapEnabled: gridSnapEnabled,
+    gridSpacing: gridSpacing,
     paletteVisible: paletteVisible,
     contextMenuVisible: contextMenuVisible,
     camera: {
@@ -546,7 +552,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function viewportPanel():View {
     if (sceneViewport != null) {
       sceneViewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0),
-        Color.rgba(0.16, 0.24, 0.36, 0.75), EditorSceneViewport.GRID_STEP * EditorSceneViewport.SCALE, gridVisible);
+        Color.rgba(0.16, 0.24, 0.36, 0.75), viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
       return sceneViewport;
     }
     var viewportStyle = fillStyle();
@@ -564,7 +570,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       viewportContent.viewportHeight = geometry.height;
     });
     viewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0), Color.rgba(0.16, 0.24, 0.36, 0.75),
-      EditorSceneViewport.GRID_STEP * EditorSceneViewport.SCALE, gridVisible);
+      viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
     viewport.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (event.button == 0) {
         var hit = viewportContent.pick(viewportCamera, event.localX, event.localY);
@@ -595,7 +601,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (dragPointer == null || event.pointerId != dragPointer) return;
       dragPointerX = event.x;
       dragPointerY = event.y;
-      if (viewportContent.updateDrag(viewportCamera, event.localX, event.localY)) commands.refresh();
+      if (viewportContent.updateDrag(viewportCamera, event.localX, event.localY,
+          (event.modifiers & UiModifier.Shift) != 0)) commands.refresh();
       event.preventDefault();
       event.stopPropagation();
     });
@@ -771,11 +778,45 @@ class ReferenceEditorApp implements DesktopUiApplication {
       gridSnapEnabled = !gridSnapEnabled;
       log(gridSnapEnabled ? "Grid snapping enabled" : "Grid snapping disabled");
     }, null, null, function() return gridSnapEnabled));
+    registerGridSpacing("scene.grid-spacing-0.1", "Grid spacing: 0.1 m", 0.1);
+    registerGridSpacing("scene.grid-spacing-0.2", "Grid spacing: 0.2 m", 0.2);
+    registerGridSpacing("scene.grid-spacing-0.5", "Grid spacing: 0.5 m", 0.5);
+    registerNudgeCommand("scene.nudge-left", "Nudge left", UiKey.Left, 0, -0.1, 0.0);
+    registerNudgeCommand("scene.nudge-right", "Nudge right", UiKey.Right, 0, 0.1, 0.0);
+    registerNudgeCommand("scene.nudge-up", "Nudge up", UiKey.Up, 0, 0.0, 0.1);
+    registerNudgeCommand("scene.nudge-down", "Nudge down", UiKey.Down, 0, 0.0, -0.1);
+    registerNudgeCommand("scene.nudge-left-large", "Nudge left (large)", UiKey.Left,
+      UiModifier.Shift, -1.0, 0.0);
+    registerNudgeCommand("scene.nudge-right-large", "Nudge right (large)", UiKey.Right,
+      UiModifier.Shift, 1.0, 0.0);
+    registerNudgeCommand("scene.nudge-up-large", "Nudge up (large)", UiKey.Up,
+      UiModifier.Shift, 0.0, 1.0);
+    registerNudgeCommand("scene.nudge-down-large", "Nudge down (large)", UiKey.Down,
+      UiModifier.Shift, 0.0, -1.0);
     commands.register(new Command("scene.cancel-drag", "Cancel object drag", function() {
       cancelActiveDrag();
       updateCommandContext();
       commands.refresh();
     }, new Shortcut(UiKey.Escape), function() return viewportContent.dragging()));
+  }
+
+  function registerGridSpacing(id:String, label:String, spacing:Float):Void {
+    commands.register(new Command(id, label, function() {
+      viewportContent.setGridStep(spacing);
+      gridSpacing = spacing;
+      log("Grid spacing set to " + spacing + " m");
+      commands.refresh();
+    }, null, null, function() return gridSpacing == spacing));
+  }
+
+  function registerNudgeCommand(id:String, label:String, key:Int, modifiers:Int,
+      deltaX:Float, deltaY:Float):Void {
+    commands.register(new Command(id, label, function() {
+      scene.nudgeSelected(deltaX, deltaY);
+      updateCommandContext();
+      commands.refresh();
+    }, new Shortcut(key, modifiers), function() return canEditObjects() &&
+      scene.object(scene.selectedId) != null));
   }
 
   function documentChanged():Void {
@@ -784,6 +825,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       sceneGeneration = session.generation;
       treeModel = new EditorSceneTree(scene);
       viewportContent = new EditorSceneViewport(scene);
+      viewportContent.setGridStep(gridSpacing);
       sceneViewport = null;
       sceneInspector = null;
       inspectorSelectionRevision = -1;
