@@ -61,9 +61,7 @@ class PerspectiveCamera {
   }
 
   public function viewProjection(aspect:Float):Transform {
-    var cosPitch = Math.cos(pitch);
-    var eye = [targetX + distance * cosPitch * Math.cos(yaw),
-      targetY + distance * cosPitch * Math.sin(yaw), targetZ + distance * Math.sin(pitch)];
+    var eye = eyePosition();
     var forward = normalize([targetX - eye[0], targetY - eye[1], targetZ - eye[2]]);
     var side = normalize(cross(forward, [0.0, 0.0, 1.0]));
     var up = cross(side, forward);
@@ -88,6 +86,29 @@ class PerspectiveCamera {
     return result;
   }
 
+  /** Builds a world-space camera ray through a viewport pixel. */
+  public function screenRay(x:Float, y:Float, width:Float, height:Float):PerspectiveRay {
+    width = Math.max(1.0, width); height = Math.max(1.0, height);
+    var eye = eyePosition();
+    var forward = normalize([targetX - eye[0], targetY - eye[1], targetZ - eye[2]]);
+    var right = normalize(cross(forward, [0.0, 0.0, 1.0]));
+    var up = cross(right, forward);
+    var scale = Math.tan(FOV_Y * Math.PI / 360.0);
+    var screenX = (2.0 * x / width - 1.0) * scale * width / height;
+    var screenY = (1.0 - 2.0 * y / height) * scale;
+    var direction = normalize([forward[0] + right[0] * screenX + up[0] * screenY,
+      forward[1] + right[1] * screenX + up[1] * screenY,
+      forward[2] + right[2] * screenX + up[2] * screenY]);
+    return new PerspectiveRay(eye[0], eye[1], eye[2],
+      direction[0], direction[1], direction[2]);
+  }
+
+  function eyePosition():Array<Float> {
+    var cosPitch = Math.cos(pitch);
+    return [targetX + distance * cosPitch * Math.cos(yaw),
+      targetY + distance * cosPitch * Math.sin(yaw), targetZ + distance * Math.sin(pitch)];
+  }
+
   static inline function clamp(value:Float, low:Float, high:Float):Float
     return Math.max(low, Math.min(high, value));
   static function normalize(value:Array<Float>):Array<Float> {
@@ -99,4 +120,18 @@ class PerspectiveCamera {
   static function cross(left:Array<Float>, right:Array<Float>):Array<Float>
     return [left[1] * right[2] - left[2] * right[1],
       left[2] * right[0] - left[0] * right[2], left[0] * right[1] - left[1] * right[0]];
+}
+
+class PerspectiveRay {
+  public final originX:Float;
+  public final originY:Float;
+  public final originZ:Float;
+  public final directionX:Float;
+  public final directionY:Float;
+  public final directionZ:Float;
+  public function new(originX:Float, originY:Float, originZ:Float,
+      directionX:Float, directionY:Float, directionZ:Float) {
+    this.originX = originX; this.originY = originY; this.originZ = originZ;
+    this.directionX = directionX; this.directionY = directionY; this.directionZ = directionZ;
+  }
 }

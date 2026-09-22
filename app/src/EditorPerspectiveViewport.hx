@@ -40,6 +40,9 @@ class EditorPerspectiveViewport implements View {
   var navigationMode:Int = 0;
   var pointerX:Float = 0.0;
   var pointerY:Float = 0.0;
+  var pointerStartX:Float = 0.0;
+  var pointerStartY:Float = 0.0;
+  var pointerMoved:Bool = false;
 
   public function new(key:String, scene:EditorScene, host:DesktopUiHostContext, ?style:LayoutStyle) {
     this.key = key;
@@ -127,6 +130,36 @@ class EditorPerspectiveViewport implements View {
 
   public function resetView():Void camera.reset();
 
+  public function pick(localX:Float, localY:Float):String {
+    return pickScene(scene, camera, Math.max(1, renderedWidth), Math.max(1, renderedHeight),
+      localX, localY);
+  }
+
+  public static function pickScene(scene:EditorScene, camera:PerspectiveCamera,
+      width:Float, height:Float, localX:Float, localY:Float):String {
+    var ray = camera.screenRay(localX, localY, width, height);
+    var closest = 1000000000.0;
+    var result = "scene";
+    for (item in scene.items()) {
+      var state = scene.info(item.id);
+      if (!state.visible()) continue;
+      var transform = state.worldTransform();
+      var z = transform.element(14);
+      if (Math.abs(ray.directionZ) < 0.000001) continue;
+      var distance = (z - ray.originZ) / ray.directionZ;
+      if (distance < 0.0 || distance >= closest) continue;
+      var x = ray.originX + ray.directionX * distance;
+      var y = ray.originY + ray.directionY * distance;
+      var centerX = transform.element(12), centerY = transform.element(13);
+      if (Math.abs(x - centerX) <= item.width / 2 &&
+          Math.abs(y - centerY) <= item.height / 2) {
+        closest = distance;
+        result = item.id;
+      }
+    }
+    return result;
+  }
+
   public function dispose():Void {
     if (surface != null) surface.dispose();
     surface = null;
@@ -148,18 +181,23 @@ class EditorPerspectiveViewport implements View {
       navigationPointer = event.pointerId;
       navigationMode = event.button == 0 ? 1 : 2;
       pointerX = event.x; pointerY = event.y;
+      pointerStartX = event.x; pointerStartY = event.y; pointerMoved = false;
       event.capturePointer(); event.preventDefault(); event.stopPropagation();
     });
     node.on(UiEventKind.PointerMove, function(event:UiEvent) {
       if (navigationPointer == null || event.pointerId != navigationPointer) return;
       var deltaX = event.x - pointerX, deltaY = event.y - pointerY;
       pointerX = event.x; pointerY = event.y;
+      if (Math.abs(event.x - pointerStartX) >= 3.0 || Math.abs(event.y - pointerStartY) >= 3.0)
+        pointerMoved = true;
       if (navigationMode == 1) camera.orbit(deltaX, deltaY);
       else camera.pan(deltaX, deltaY, Math.max(1, renderedHeight));
       event.preventDefault(); event.stopPropagation();
     });
     var finish = function(event:UiEvent) {
       if (navigationPointer == null || event.pointerId != navigationPointer) return;
+      if (event.kind == UiEventKind.PointerUp && navigationMode == 1 && !pointerMoved)
+        scene.select(pick(event.localX, event.localY));
       navigationPointer = null; navigationMode = 0;
       event.releasePointer(); event.preventDefault(); event.stopPropagation();
     };

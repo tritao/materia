@@ -13,6 +13,7 @@ import app.SceneDocumentSession;
 import app.SensorConfiguration;
 import app.ApplicationSimulation;
 import app.PerspectiveCamera;
+import app.EditorPerspectiveViewport;
 import robotkit.world.RobotWorld;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
@@ -57,6 +58,20 @@ class SceneEditingTests {
       var value = matrix.element(index);
       check(value == value && value - value == 0.0, "perspective matrix remains finite");
     }
+    var ray = camera.screenRay(800, 450, 1600, 900);
+    var planeDistance = (camera.targetZ - ray.originZ) / ray.directionZ;
+    near(ray.originX + ray.directionX * planeDistance, camera.targetX,
+      "center camera ray reaches framed X");
+    near(ray.originY + ray.directionY * planeDistance, camera.targetY,
+      "center camera ray reaches framed Y");
+    var scene = new EditorScene();
+    camera.frame(-1.5, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
+    check(EditorPerspectiveViewport.pickScene(scene, camera, 800, 600, 400, 300) == "box",
+      "perspective ray selects the framed object");
+    scene.setVisible("box", false);
+    check(EditorPerspectiveViewport.pickScene(scene, camera, 800, 600, 400, 300) == "scene",
+      "perspective ray ignores hidden objects");
+    scene.dispose();
     camera.reset();
     near(camera.targetX, 0.0, "perspective reset restores target X");
     near(camera.targetY, 0.0, "perspective reset restores target Y");
