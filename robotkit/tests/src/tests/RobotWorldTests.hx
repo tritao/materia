@@ -47,6 +47,7 @@ class RobotWorldTests {
     testCrossThreadEventQueue();
     testImmutableSnapshots();
     testRecordingEventLog();
+    testReplayCorrectness();
     testMcapRoundTrip();
     testForwardingAndLifecycle();
     testMixedSimulatedAndRemoteWorld();
@@ -58,6 +59,48 @@ class RobotWorldTests {
     testSensorResetPublication();
     testConfiguredSensors();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
+  }
+
+  static function testReplayCorrectness():Void {
+    var recording = new RobotRecording();
+    recording.recordCommand(RobotCommand.JointPosition(0, 99.0, null), "robot-a");
+    recording.recordSnapshot(new RobotSnapshot("robot-a", Int64.ofInt(7), Int64.ofInt(100),
+      [1.0], [], [], 1, 0, Int64.ofInt(200), [], "robot-a.boot-1", "host"));
+    recording.recordSnapshot(new RobotSnapshot("robot-b", Int64.ofInt(7), Int64.ofInt(100),
+      [9.0], [], [], 1, 0, Int64.ofInt(200), [], "robot-b.boot-1", "host"));
+    recording.recordSensor("robot-b", new SensorFrame("wrong", "imu", "b/frame",
+      Int64.ofInt(1), Int64.ofInt(101), [9.0], Int64.ofInt(201), "b/link"));
+    recording.recordSensor("robot-a", new SensorFrame("imu", "imu", "a/frame",
+      Int64.ofInt(1), Int64.ofInt(101), [1.0], Int64.ofInt(201), "a/link",
+      null, null, "robot-a.boot-1", "host"));
+    recording.recordFault(new RobotFault("robot-b", 90, "wrong robot", true));
+    recording.recordFault(new RobotFault("robot-a", 12, "selected fault", false));
+    // The source sequence repeats after a reset; clock identity distinguishes the observation.
+    recording.recordSnapshot(new RobotSnapshot("robot-a", Int64.ofInt(7), Int64.ofInt(1),
+      [2.0], [], [], 1, 0, Int64.ofInt(300), [], "robot-a.boot-2", "host"));
+
+    var originalCommandCount = recording.commands.length;
+    var replay = new ReplayRobot("robot-a", recording);
+    equal(replay.snapshot().id, "robot-a", "replay selects one recorded robot");
+    equal(replay.snapshot().positions.get(0), 1.0, "replay begins with selected robot snapshot");
+    var runner = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.25));
+    equal(runner.update(replay), 1, "behavior consumes initial replay observation");
+    equal(recording.commands.length, originalCommandCount, "replay leaves historical commands unchanged");
+    equal(replay.generatedCommands.commands.length, 1, "replay captures generated commands separately");
+
+    check(replay.advance(), "replay advances to selected sensor event");
+    equal(replay.sensors().length, 1, "replay applies selected sensor event");
+    equal(replay.sensors()[0].sensorId, "imu", "replay excludes another robot sensor");
+    check(replay.advance(), "replay advances to selected fault event");
+    var replayFault:RobotFault = cast replay.fault();
+    equal(replayFault.code, 12, "replay applies selected fault event");
+    equal(replay.snapshot().faultCode, 12, "fault event updates replay observation");
+    check(replay.advance(), "replay advances across source clock reset");
+    equal(replay.snapshot().positions.get(0), 2.0, "replay never substitutes interleaved robot snapshot");
+    equal(replay.fault(), null, "healthy snapshot clears replayed fault");
+    equal(runner.update(replay), 1, "behavior processes repeated sequence after clock reset");
+    check(!replay.advance(), "replay contains only selected robot observations");
+    replay.close();
   }
 
   static function testMcapRoundTrip():Void {
@@ -147,7 +190,7 @@ class RobotWorldTests {
     equal(robot.snapshot().sensors.get(0).sequence, Int64.ofInt(2), "10 Hz scan updates on source-clock schedule");
     var recording = new RobotRecording();
     recording.recordSnapshot(second);
-    var replay = new ReplayRobot("recorded", recording);
+    var replay = new ReplayRobot("configured", recording);
     equal(replay.snapshot().sensors.get(0).frameId, "frame/stable", "recording retains frame identity");
     equal(replay.snapshot().sensors.get(0).mountPosition.get(0), 0.5, "recording retains mount metadata");
     simulation.reset();
@@ -568,16 +611,16 @@ class RobotWorldTests {
     recording.recordSnapshot(firstValue);
     recording.recordSnapshot(secondValue);
     recording.recordWorld(value);
-    var replay = new ReplayRobot("replay-sim-a", recording);
+    var replay = new ReplayRobot("sim-a", recording);
     var replayWorld = new RobotWorld();
     replayWorld.attach(replay);
-    var replayInitial = replayWorld.snapshot().robot("replay-sim-a");
+    var replayInitial = replayWorld.snapshot().robot("sim-a");
     check(replayInitial != null, "replay world publishes a robot snapshot");
     var replayInitialValue:RobotSnapshot = cast replayInitial;
     equal(replayInitialValue.sourceTimestampNs, Int64.ofInt(10000000),
       "replay preserves source timestamps");
     check(replay.advance(), "replay advances through the same snapshot boundary");
-    var replayNext = replayWorld.snapshot().robot("replay-sim-a");
+    var replayNext = replayWorld.snapshot().robot("sim-a");
     var replayNextValue:RobotSnapshot = cast replayNext;
     check(replayNextValue != null && replayNextValue.sensors.length == 2,
       "replay preserves sensor frames");
