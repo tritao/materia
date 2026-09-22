@@ -4,6 +4,7 @@ import cadkit.parametric.ElementReference;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.Feature;
+import cadkit.parametric.Placement;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.DatumSketchFeature;
@@ -167,5 +168,10 @@ class ElementSmoke {
 		near(datumReload.result().volume(),800000);
 		datumReload.close();datumDocument.close();
 		var twoLevel=new TwoLevelDatumBuilding();var wallId=twoLevel.walls[0].id.value;var oldRoofZ=twoLevel.roof.shape().bounds().get_max().get_z();twoLevel.setUpper(3500);check(twoLevel.walls[0].id.value==wallId && twoLevel.roof.shape().bounds().get_max().get_z()>oldRoofZ,"level edit updates walls and roof placement");var loadedTwoLevel=DocumentCodec.decode(DocumentCodec.encode(twoLevel.document));check(loadedTwoLevel.elementCount()==8,"two-level building datums and geometry survive reload");loadedTwoLevel.close();twoLevel.close();
+
+		var hierarchy=new Document();var parentFeature=hierarchy.add(new BoxFeature(2,2,2));var childFeature=hierarchy.add(new BoxFeature(1,1,1));var otherFeature=hierarchy.add(new BoxFeature(2,2,2));var parentElement=hierarchy.createElement("Parent",parentFeature);var childElement=hierarchy.createElement("Child",childFeature);var otherParent=hierarchy.createElement("Other parent",otherFeature);hierarchy.setOutput(childFeature);hierarchy.recompute();
+		parentElement.setPlacement(new Placement(new Plane(new Vector(10,0,0),Vector.X(),Vector.Z())));childElement.setPlacement(new Placement(new Plane(new Vector(2,0,0),Vector.X(),Vector.Z())));childElement.reparent(new ElementReference(hierarchy.id,parentElement.id),false);near(childElement.shape().bounds().get_min().get_x(),12);check(!childFeature.dirty,"placement changes do not rebuild local geometry");
+		parentElement.setPlacement(new Placement(new Plane(new Vector(20,0,0),Vector.X(),Vector.Z())));near(childElement.shape().bounds().get_min().get_x(),22);otherParent.setPlacement(new Placement(new Plane(new Vector(100,0,0),Vector.X(),Vector.Z())));childElement.reparent(new ElementReference(hierarchy.id,otherParent.id),true);near(childElement.shape().bounds().get_min().get_x(),22);check(hierarchy.undo(),"reparent undo");near(childElement.shape().bounds().get_min().get_x(),22);check(hierarchy.redo(),"reparent redo");
+		failed=false;try otherParent.reparent(new ElementReference(hierarchy.id,childElement.id),false) catch(e:Dynamic) failed=true;check(failed,"placement parent cycles are rejected");hierarchy.removeElement(otherParent.id);failed=false;try childElement.shape() catch(e:Dynamic) failed=true;check(failed,"missing placement parent is explicit");check(hierarchy.undo(),"placement parent removal undo");var restoredHierarchy=DocumentCodec.decode(DocumentCodec.encode(hierarchy));near(restoredHierarchy.elementAt(1).shape().bounds().get_min().get_x(),22);restoredHierarchy.close();hierarchy.close();
 	}
 }

@@ -152,3 +152,10 @@ distinguish missing documents, missing elements, and incompatible kinds.
 `LevelExtrudeFeature` derives placement and height from two levels and their
 offsets. Explicit datum dependencies invalidate affected features, and failed
 resolution preserves their committed geometry.
+
+Geometry elements also own a rigid local `Placement` and may reference a
+geometry-element parent. World placement composes the parent transform with the
+local transform. Datum attachment establishes feature-local geometry first,
+then element and parent placements apply to its committed output. Reparenting
+can preserve either local or world placement. Placement edits invalidate only
+cached placed views, leaving unchanged local feature geometry clean.

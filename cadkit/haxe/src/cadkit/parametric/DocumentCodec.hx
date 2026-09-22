@@ -42,6 +42,7 @@ import cadkit.parametric.ElementId;
 import cadkit.parametric.LevelElement;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.ElementReference;
+import cadkit.parametric.Placement;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
@@ -71,9 +72,10 @@ class DocumentCodec {
 		}
 		var encodedElements:Array<Dynamic> = [];
 		for (element in document.allElements()) {
-			if(element.kind=="geometry") { var geometry:Feature=cast element.output; encodedElements.push({id:element.id.value,name:element.name,kind:element.kind,output:geometry.id.toInt()}); }
-			else if(element.kind=="level") { var level:LevelElement=cast element; encodedElements.push({id:level.id.value,name:level.name,kind:level.kind,elevation:level.elevation,offset:level.offset,relativeTo:level.relativeTo==null?null:encodeElementReference(level.relativeTo)}); }
-			else { var datum:ReferencePlaneElement=cast element; encodedElements.push({id:datum.id.value,name:datum.name,kind:datum.kind,plane:{origin:encodeVector(datum.plane.origin),xDirection:encodeVector(datum.plane.xDirection),normal:encodeVector(datum.plane.normal)}}); }
+			var placement=encodePlacement(element.localPlacement);var parent=element.placementParent==null?null:encodeElementReference(element.placementParent);
+			if(element.kind=="geometry") { var geometry:Feature=cast element.output; encodedElements.push({id:element.id.value,name:element.name,kind:element.kind,output:geometry.id.toInt(),placement:placement,parent:parent}); }
+			else if(element.kind=="level") { var level:LevelElement=cast element; encodedElements.push({id:level.id.value,name:level.name,kind:level.kind,elevation:level.elevation,offset:level.offset,relativeTo:level.relativeTo==null?null:encodeElementReference(level.relativeTo),placement:placement,parent:parent}); }
+			else { var datum:ReferencePlaneElement=cast element; encodedElements.push({id:datum.id.value,name:datum.name,kind:datum.kind,plane:{origin:encodeVector(datum.plane.origin),xDirection:encodeVector(datum.plane.xDirection),normal:encodeVector(datum.plane.normal)},placement:placement,parent:parent}); }
 		}
 		return Json.stringify({
 			format: FORMAT,
@@ -221,6 +223,7 @@ class DocumentCodec {
 					else if(kind=="reference-plane") { var p=requiredField(elementRecord,"plane"); document.installReferencePlane(ename,eid,new Plane(decodeVector(requiredField(p,"origin")),decodeVector(requiredField(p,"xDirection")),decodeVector(requiredField(p,"normal")))); }
 					else throw new ParametricError("unsupported element kind: "+kind);
 				}
+				for(elementRecord in elementRecords){var loaded=document.element(new ElementId(stringField(elementRecord,"id")));var rawParent:Dynamic=Reflect.field(elementRecord,"parent");document.restoreElementPlacement(loaded,decodePlacement(requiredField(elementRecord,"placement")),rawParent==null?null:decodeElementReference(rawParent));document.worldPlacement(loaded);}
 			}
 
 			document.recompute();
@@ -416,6 +419,8 @@ class DocumentCodec {
 
 	private static function encodeElementReference(value:ElementReference):Dynamic return {document:value.documentId.value,element:value.elementId.value};
 	private static function decodeElementReference(value:Dynamic):ElementReference return new ElementReference(new DocumentId(stringField(value,"document")),new ElementId(stringField(value,"element")));
+	private static function encodePlacement(value:Placement):Dynamic { var p=value.location.plane;return {origin:encodeVector(p.origin),xDirection:encodeVector(p.xDirection),normal:encodeVector(p.normal)}; }
+	private static function decodePlacement(value:Dynamic):Placement return new Placement(new Plane(decodeVector(requiredField(value,"origin")),decodeVector(requiredField(value,"xDirection")),decodeVector(requiredField(value,"normal"))));
 
 	private static function encodeConstrainedSketch(feature:ConstrainedSketchFeature, references:Array<Dynamic>):Dynamic {
 		var sketch = feature.sketch();

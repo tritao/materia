@@ -13,7 +13,10 @@ class Element {
 	public final kind:String;
 	public var name(default, null):String;
 	public var output(default, null):Null<Feature>;
+	public var localPlacement(default, null):Placement;
+	public var placementParent(default, null):Null<ElementReference>;
 	private var committedOutput:Null<Feature>;
+	private var placedShape:Null<Shape>;
 
 	public function new(document:Document, id:ElementId, name:String, kind:String, ?output:Feature) {
 		this.document = document;
@@ -22,6 +25,7 @@ class Element {
 		this.kind = kind;
 		this.output = output;
 		committedOutput = output;
+		localPlacement=Placement.identity(); placementParent=null; placedShape=null;
 	}
 
 	public function shape():Shape {
@@ -30,13 +34,20 @@ class Element {
 		var result = committedOutput.currentShape();
 		if (result == null)
 			throw new ParametricError("element output has not been evaluated: " + id.value);
-		return result;
+		var world=document.worldPlacement(this);
+		if(world.isIdentity()) return result;
+		if(placedShape==null) placedShape=world.location.apply(result);
+		return placedShape;
 	}
 
 	public function restoreName(value:String):Void name = value;
-	public function restoreOutput(value:Feature):Void output = value;
-	public function commitOutput():Void committedOutput = output;
+	public function restoreOutput(value:Feature):Void { output = value; clearPlacedShape(); }
+	public function commitOutput():Void { committedOutput = output; clearPlacedShape(); }
+	public function restorePlacement(value:Placement,parent:Null<ElementReference>):Void { localPlacement=value;placementParent=parent;clearPlacedShape(); }
+	public function clearPlacedShape():Void { if(placedShape!=null){placedShape.close();placedShape=null;} }
 
 	public function rename(value:String):Void document.renameElement(this, value);
 	public function setOutput(value:Feature):Void document.setElementOutput(this, value);
+	public function setPlacement(value:Placement):Void document.setElementPlacement(this,value);
+	public function reparent(parent:Null<ElementReference>,preserveWorld:Bool):Void document.reparentElement(this,parent,preserveWorld);
 }

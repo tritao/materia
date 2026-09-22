@@ -28,6 +28,8 @@ import cadkit.parametric.ElementChanges.ElementOutputChange;
 import cadkit.parametric.DatumChanges.LevelElevationChange;
 import cadkit.parametric.DatumChanges.ReferencePlaneChange;
 import cadkit.modeling.Plane;
+import cadkit.parametric.Placement;
+import cadkit.parametric.PlacementChange;
 
 /** Haxeon-owned parametric feature document. */
 class Document {
@@ -107,6 +109,47 @@ class Document {
 	public function setLevelElevation(level:LevelElement,value:Float):Void { validateOwnedElement(level);if(!Math.isFinite(value))throw new ParametricError("level elevation must be finite");var old=level.elevation;if(old==value)return;level.restoreElevation(value);recordDocumentChange(new LevelElevationChange(level,old,value)); }
 	public function setReferencePlane(datum:ReferencePlaneElement,value:Plane):Void { validateOwnedElement(datum);var old=datum.plane;datum.restorePlane(value);recordDocumentChange(new ReferencePlaneChange(datum,old,value)); }
 	public function datumChanged(datum:Element):Void { for(feature in features) if(feature.datumDependencies().indexOf(datum.id.value)>=0) feature.markDirty(); }
+
+	public function worldPlacement(element:Element):Placement {
+		validateOwnedElement(element); return resolvePlacement(element,new Map<String,Bool>());
+	}
+	private function resolvePlacement(element:Element,visiting:Map<String,Bool>):Placement {
+		if (visiting.exists(element.id.value)) throw new ParametricError("placement parent cycle: " + element.id.value);
+		visiting.set(element.id.value, true);
+		var result = element.localPlacement;
+		if (element.placementParent != null) {
+			var parent = resolveElement(element.placementParent, "geometry");
+			result = resolvePlacement(parent, visiting).compose(result);
+		}
+		visiting.remove(element.id.value);
+		return result;
+	}
+	public function setElementPlacement(element:Element, value:Placement):Void {
+		validateOwnedElement(element);
+		if (element.kind != "geometry") throw new ParametricError("only geometry elements have placements");
+		var old = element.localPlacement;
+		if (old == value) return;
+		restoreElementPlacement(element, value, element.placementParent);
+		recordDocumentChange(new PlacementChange(this, element, old, element.placementParent, value, element.placementParent));
+	}
+	public function reparentElement(element:Element, parent:Null<ElementReference>, preserveWorld:Bool):Void {
+		validateOwnedElement(element);
+		if (element.kind != "geometry") throw new ParametricError("only geometry elements have placement parents");
+		validatePlacementParent(element, parent);
+		var oldParent = element.placementParent;
+		var oldLocal = element.localPlacement;
+		var world = worldPlacement(element);
+		var next = oldLocal;
+		if (preserveWorld) {
+			var parentWorld = parent == null ? Placement.identity() : worldPlacement(resolveElement(parent, "geometry"));
+			next = parentWorld.inverse().compose(world);
+		}
+		restoreElementPlacement(element, next, parent);
+		recordDocumentChange(new PlacementChange(this, element, oldLocal, oldParent, next, parent));
+	}
+	private function validatePlacementParent(element:Element,parent:Null<ElementReference>):Void { var cursor=parent;var seen=new Map<String,Bool>();while(cursor!=null){var candidate=resolveElement(cursor,"geometry");if(candidate==element)throw new ParametricError("placement parent cycle: "+element.id.value);if(seen.exists(candidate.id.value))throw new ParametricError("placement parent cycle: "+candidate.id.value);seen.set(candidate.id.value,true);cursor=candidate.placementParent;} }
+	public function restoreElementPlacement(element:Element,value:Placement,parent:Null<ElementReference>):Void { element.restorePlacement(value,parent);invalidatePlacedDescendants(element.id.value,new Map<String,Bool>()); }
+	private function invalidatePlacedDescendants(id:String,seen:Map<String,Bool>):Void { if(seen.exists(id))return;seen.set(id,true);for(candidate in elements)if(candidate.placementParent!=null && candidate.placementParent.elementId.value==id){candidate.clearPlacedShape();invalidatePlacedDescendants(candidate.id.value,seen);} }
 
 	public function duplicateElement(source:Element, ?name:String):Element {
 		validateOwnedElement(source);
@@ -200,6 +243,8 @@ class Document {
 	public function restoreElementRemoval(element:Element):Void {
 		validateOwnedElement(element);
 		datumChanged(element);
+		invalidatePlacedDescendants(element.id.value,new Map<String,Bool>());
+		element.clearPlacedShape();
 		elements.remove(element);
 		elementsById.remove(element.id.value);
 	}
@@ -588,6 +633,7 @@ class Document {
 		features.resize(0);
 		byId = new Map<Int, Feature>();
 		dimensions.resize(0);
+		for(element in elements) element.clearPlacedShape();
 		elements.resize(0);
 		elementsById = new Map<String, Element>();
 		issuedElementIds = new Map<String, Bool>();
