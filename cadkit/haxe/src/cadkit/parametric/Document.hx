@@ -18,6 +18,10 @@ import cadkit.parametric.UnitConversion;
 import cadkit.parametric.DocumentId;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
+import cadkit.parametric.ElementChanges.ElementCreateChange;
+import cadkit.parametric.ElementChanges.ElementRemoveChange;
+import cadkit.parametric.ElementChanges.ElementNameChange;
+import cadkit.parametric.ElementChanges.ElementOutputChange;
 
 /** Haxeon-owned parametric feature document. */
 class Document {
@@ -60,6 +64,13 @@ class Document {
 	}
 
 	public function createElement(name:String, output:Feature, ?id:ElementId):Element {
+		var result = installElement(name, output, id);
+		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
+		return result;
+	}
+
+	/** Codec path: installs a persisted record without creating undo history. */
+	public function installElement(name:String, output:Feature, ?id:ElementId):Element {
 		ensureOpen();
 		validateElementName(name);
 		validateElementOutput(output);
@@ -70,6 +81,41 @@ class Document {
 		elements.push(result);
 		elementsById.set(identity.value, result);
 		return result;
+	}
+
+	public function duplicateElement(source:Element, ?name:String):Element {
+		validateOwnedElement(source);
+		return createElement(name == null ? source.name + " copy" : name, source.output);
+	}
+
+	public function removeElement(id:ElementId):Void {
+		var target = element(id);
+		var index = elements.indexOf(target);
+		restoreElementRemoval(target);
+		recordDocumentChange(new ElementRemoveChange(this, target, index));
+	}
+
+	public function renameElement(target:Element, name:String):Void {
+		validateOwnedElement(target);
+		validateElementName(name);
+		if (target.name == name) return;
+		var previous = target.name;
+		target.restoreName(name);
+		recordDocumentChange(new ElementNameChange(target, previous, name));
+	}
+
+	public function setElementOutput(target:Element, output:Feature):Void {
+		validateOwnedElement(target);
+		validateElementOutput(output);
+		if (target.output == output) return;
+		var previous = target.output;
+		target.restoreOutput(output);
+		recordDocumentChange(new ElementOutputChange(target, previous, output));
+	}
+
+	public function allElements():Array<Element> {
+		ensureOpen();
+		return elements.copy();
 	}
 
 	public function elementCount():Int {
@@ -90,6 +136,30 @@ class Document {
 		if (result == null)
 			throw new ParametricError("unresolved element: " + id.value);
 		return result;
+	}
+
+	public function findElement(id:ElementId):Null<Element> {
+		ensureOpen();
+		return elementsById.get(id.value);
+	}
+
+	public function restoreElementInsertion(element:Element, index:Int):Void {
+		if (element.document != this || elementsById.exists(element.id.value))
+			throw new ParametricError("cannot restore element: " + element.id.value);
+		var insertion = index < 0 ? 0 : (index > elements.length ? elements.length : index);
+		elements.insert(insertion, element);
+		elementsById.set(element.id.value, element);
+	}
+
+	public function restoreElementRemoval(element:Element):Void {
+		validateOwnedElement(element);
+		elements.remove(element);
+		elementsById.remove(element.id.value);
+	}
+
+	private function validateOwnedElement(element:Element):Void {
+		if (element == null || element.document != this || elementsById.get(element.id.value) != element)
+			throw new ParametricError("element belongs to another document or has been removed");
 	}
 
 	private function validateElementName(name:String):Void {
@@ -351,6 +421,8 @@ class Document {
 			lastRemapReport = new TopologyRemapReport();
 			for (feature in stagedFeatures)
 				lastRemapReport.merge(feature.remapTopologyReferences());
+			for (element in elements)
+				element.commitOutput();
 		} catch (error:Dynamic) {
 			for (feature in features)
 				feature.discardEvaluation();
