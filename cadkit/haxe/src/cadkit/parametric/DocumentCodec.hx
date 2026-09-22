@@ -35,11 +35,13 @@ import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
+import cadkit.parametric.DocumentId;
+import cadkit.parametric.ElementId;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 1;
+	public static inline var VERSION:Int = 2;
 
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
@@ -62,26 +64,34 @@ class DocumentCodec {
 				bindings: bindings
 			});
 		}
+		var encodedElements:Array<Dynamic> = [];
+		for (element in document.allElements())
+			encodedElements.push({id: element.id.value, name: element.name, output: element.output.id.toInt()});
 		return Json.stringify({
 			format: FORMAT,
 			version: VERSION,
+			documentId: document.id.value,
 			features: encodedFeatures,
 			parameters: encodedParameters,
+			elements: encodedElements,
 			output: document.outputFeature().id.toInt()
 		});
 	}
 
-	public static function decode(text:String):Document {
+	public static function decode(text:String, clone:Bool = false):Document {
 		var document:Null<Document> = null;
 		try {
 			var root:Dynamic = Json.parse(text);
 			if (stringField(root, "format") != FORMAT)
 				throw new ParametricError("unsupported document format");
-			if (intField(root, "version") != VERSION)
+			var version = intField(root, "version");
+			if (version != 1 && version != VERSION)
 				throw new ParametricError("unsupported document version");
 
 			var records:Array<Dynamic> = cast requiredField(root, "features");
-			document = new Document();
+			document = version == 1 || clone
+				? new Document()
+				: new Document(new DocumentId(stringField(root, "documentId")));
 			var pendingReferences:Array<Dynamic> = [];
 			for (record in records) {
 				var featureId = intField(record, "id");
@@ -188,8 +198,19 @@ class DocumentCodec {
 				}
 			}
 			var output:Dynamic = Reflect.field(root, "output");
-			if (output != null)
-				document.setOutput(requiredFeature(document, integerValue(output, "output")));
+			if (output != null) {
+				var selected = requiredFeature(document, integerValue(output, "output"));
+				document.setOutput(selected);
+				if (version == 1)
+					document.installElement("Model", selected);
+			}
+			if (version >= 2) {
+				var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
+				for (elementRecord in elementRecords)
+					document.installElement(stringField(elementRecord, "name"),
+						requiredFeature(document, intField(elementRecord, "output")),
+						new ElementId(stringField(elementRecord, "id")));
+			}
 
 			document.recompute();
 			return document;

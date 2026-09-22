@@ -137,3 +137,11 @@ so all bound slots undo together. The codec stores these bindings and the
 selected output feature as optional version-1 fields, preserving compatibility
 with documents written before recording support. Immediate modeling builders
 remain independent and never create hidden document state.
+
+Documents also own persistent `DocumentId` and `ElementId` values. An element
+records a name and one output feature, and several elements can expose separate
+committed shapes from the same feature graph. Element creation, removal,
+renaming, duplication, and output reassignment use document undo/redo without
+deleting features. Format version 2 persists this registry; version 1 documents
+migrate their selected output to a single `Model` element. These IDs describe
+document-level objects and do not replace topology remapping for faces or edges.
