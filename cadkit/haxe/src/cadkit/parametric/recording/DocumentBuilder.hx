@@ -6,6 +6,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.Feature;
 import cadkit.parametric.NamedParameter;
 import cadkit.parametric.ParametricError;
+import cadkit.parametric.ParameterKind;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
@@ -54,6 +55,36 @@ class DocumentBuilder {
 	public function dimension(name:String, value:Float):NamedParameter {
 		check();
 		return document.defineParameter(name, value);
+	}
+
+	public function typedParameter(name:String, value:Float, kind:String, unit:String):NamedParameter {
+		check();
+		return document.defineTypedParameter(name, value, kind, unit);
+	}
+
+	public function length(name:String, value:Float, unit:String = "mm"):NamedParameter {
+		return typedParameter(name, value, ParameterKind.Length, unit);
+	}
+
+	public function angle(name:String, value:Float, unit:String = "rad"):NamedParameter {
+		return typedParameter(name, value, ParameterKind.Angle, unit);
+	}
+
+	public function count(name:String, value:Int):NamedParameter {
+		return typedParameter(name, value, ParameterKind.Count, "count");
+	}
+
+	public function area(name:String, value:Float, unit:String = "mm2"):NamedParameter {
+		return typedParameter(name, value, ParameterKind.Area, unit);
+	}
+
+	public function volume(name:String, value:Float, unit:String = "mm3"):NamedParameter {
+		return typedParameter(name, value, ParameterKind.Volume, unit);
+	}
+
+	public function expression(name:String, kind:String, unit:String, source:String):NamedParameter {
+		check();
+		return document.defineExpression(name, kind, unit, source);
 	}
 
 	private function bind(dimension:NamedParameter, feature:Feature, slot:String):Void {
@@ -380,9 +411,6 @@ class DocumentBuilder {
 	public function finish():Document {
 		check();
 		try {
-			for (parameter in document.namedParameters())
-				if (parameter.bindings().length == 0)
-					throw new ParametricError("named parameter has no feature bindings: " + parameter.name);
 			document.outputFeature();
 			document.recompute();
 			finished = true;

@@ -53,11 +53,12 @@ class DocumentCodec {
 					feature: binding.ownerFeature().id.toInt(),
 					parameter: binding.name
 				});
-			if (bindings.length == 0)
-				throw new ParametricError("named parameter has no bindings: " + parameter.name);
 			encodedParameters.push({
 				name: parameter.name,
-				value: parameter.value,
+				value: parameter.valueIn(parameter.unit),
+				kind: parameter.kind,
+				unit: parameter.unit,
+				expression: parameter.expression == null ? null : parameter.expression.source,
 				bindings: bindings
 			});
 		}
@@ -163,10 +164,23 @@ class DocumentCodec {
 			if (parameterRecords != null) {
 				var records:Array<Dynamic> = cast parameterRecords;
 				for (record in records) {
-					var named = document.defineParameter(stringField(record, "name"), numberField(record, "value"));
+					var rawKind:Dynamic = Reflect.field(record, "kind");
+					var named = rawKind == null
+						? document.defineParameter(stringField(record, "name"), numberField(record, "value"))
+						: document.defineTypedParameter(stringField(record, "name"), numberField(record, "value"),
+							stringField(record, "kind"), stringField(record, "unit"));
+				}
+				for (record in records) {
+					var rawExpression:Dynamic = Reflect.field(record, "expression");
+					if (rawExpression != null) {
+						if (!Std.isOfType(rawExpression, String))
+							throw new ParametricError("document field is not a string: expression");
+						document.installExpression(stringField(record, "name"), cast rawExpression);
+					}
+				}
+				for (record in records) {
+					var named = document.parameter(stringField(record, "name"));
 					var bindings:Array<Dynamic> = cast requiredField(record, "bindings");
-					if (bindings.length == 0)
-						throw new ParametricError("named parameter has no bindings: " + named.name);
 					for (binding in bindings) {
 						var feature = requiredFeature(document, intField(binding, "feature"));
 						named.bind(feature.parameter(stringField(binding, "parameter")));

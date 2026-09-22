@@ -154,6 +154,24 @@ older documents remains readable; without an explicit output it uses the last
 feature, matching the earlier behavior. Persistence saves current model state,
 not the undo/redo stacks.
 
+Named parameters may be declared as `length`, `angle`, `count`, `area`, or
+`volume`. Canonical values use millimetres, radians, integer counts, square
+millimetres, and cubic millimetres. Explicit conversions support
+`mm/cm/m/in/ft`, `rad/deg`, and the corresponding squared and cubed length
+units. `valueIn(unit)` converts for display and `set(value, unit)` accepts an
+explicit input unit. Legacy `dimension()` values remain unitless scalars.
+
+`Document.defineExpression` and `DocumentBuilder.expression` create read-only
+derived parameters. Expressions support named references, parentheses, unary
+signs, and `+`, `-`, `*`, and `/`; addition requires identical quantity types,
+while multiplication and division derive length, area, and volume types.
+Dependencies are evaluated before feature recompute. Unknown references,
+dimension mismatches, non-finite results, fractional counts, and dependency
+cycles fail without replacing committed geometry. Expression definitions,
+types, units, dependencies, and bindings survive document serialization.
+`ExpressionDrivenWall.hx` implements `wall.height = upperLevel.elevation -
+baseLevel.elevation` and updates the bound solid from level edits.
+
 The recorder covers rectangle/circle/slot/box/cylinder primitives, constrained sketches, wires and polylines,
 grids, linear and polar patterns, planar and solid booleans, extrusion, translation, revolution,
 loft, sweep, offset, shell, projection, fillet, and chamfer. Operations whose

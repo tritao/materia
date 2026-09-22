@@ -9,6 +9,12 @@ import cadkit.parametric.FeatureId;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.RecomputeError;
 import cadkit.parametric.Transaction;
+import cadkit.parametric.ExpressionValue;
+import cadkit.parametric.NamedParameterChange;
+import cadkit.parametric.ParameterExpression;
+import cadkit.parametric.ParameterKind;
+import cadkit.parametric.ParameterExpressionChange;
+import cadkit.parametric.UnitConversion;
 
 /** Haxeon-owned parametric feature document. */
 class Document {
@@ -74,15 +80,79 @@ class Document {
 	}
 
 	public function defineParameter(name:String, value:Float):NamedParameter {
+		return defineTypedParameter(name, value, ParameterKind.Scalar, "1");
+	}
+
+	public function defineTypedParameter(name:String, value:Float, kind:String, unit:String):NamedParameter {
 		ensureOpen();
 		if (name == null || StringTools.trim(name) == "" || !Math.isFinite(value))
 			throw new ParametricError("named parameter needs a nonempty name and finite value");
 		for (existing in dimensions)
 			if (existing.name == name)
 				throw new ParametricError("duplicate named parameter: " + name);
-		var result = new NamedParameter(this, name, value);
+		var validatedKind = ParameterKind.validate(kind);
+		var validatedUnit = UnitConversion.validateUnit(validatedKind, unit);
+		var result = new NamedParameter(this, name, UnitConversion.toCanonical(value, validatedKind, validatedUnit),
+			validatedKind, validatedUnit);
 		dimensions.push(result);
 		return result;
+	}
+
+	public function defineExpression(name:String, kind:String, unit:String, source:String):NamedParameter {
+		ensureOpen();
+		if (name == null || StringTools.trim(name) == "")
+			throw new ParametricError("named parameter needs a nonempty name");
+		for (existing in dimensions)
+			if (existing.name == name)
+				throw new ParametricError("duplicate named parameter: " + name);
+		var parsed = new ParameterExpression(source);
+		for (dependency in parsed.dependencies) {
+			if (dependency == name)
+				throw new ParametricError("parameter expression cycle detected: " + name);
+			parameter(dependency);
+		}
+		var validatedKind = ParameterKind.validate(kind);
+		var validatedUnit = UnitConversion.validateUnit(validatedKind, unit);
+		var result = new NamedParameter(this, name, 0, validatedKind, validatedUnit, parsed);
+		dimensions.push(result);
+		try {
+			var evaluated = expressionValue(result);
+			result.synchronize(evaluated);
+		} catch (error:Dynamic) {
+			dimensions.pop();
+			throw error;
+		}
+		return result;
+	}
+
+	public function setExpression(name:String, source:String):Void {
+		installParameterExpression(name, source, true);
+	}
+
+	/** Codec path: install persisted expression structure without creating undo history. */
+	public function installExpression(name:String, source:String):Void {
+		installParameterExpression(name, source, false);
+	}
+
+	private function installParameterExpression(name:String, source:String, record:Bool):Void {
+		ensureOpen();
+		var named = parameter(name);
+		var parsed = new ParameterExpression(source);
+		for (dependency in parsed.dependencies)
+			parameter(dependency);
+		var previous = named.expression;
+		var previousValue = named.value;
+		named.replaceExpression(parsed);
+		var nextValue:Float;
+		try {
+			nextValue = expressionValue(named);
+			named.synchronize(nextValue);
+		} catch (error:Dynamic) {
+			named.replaceExpression(previous);
+			throw error;
+		}
+		if (record)
+			recordDocumentChange(new ParameterExpressionChange(named, previous, parsed, previousValue, nextValue));
 	}
 
 	public function parameter(name:String):NamedParameter {
@@ -131,6 +201,8 @@ class Document {
 		for (named in dimensions) {
 			if (!named.contains(parameter))
 				continue;
+			if (named.expression != null)
+				throw new ParametricError("expression parameters are read-only: " + named.name);
 			var bindings = named.bindings();
 			for (binding in bindings)
 				binding.validateValue(next);
@@ -156,6 +228,23 @@ class Document {
 		return false;
 	}
 
+	public function setStandaloneNamedParameter(parameter:NamedParameter, next:Float):Void {
+		ensureOpen();
+		if (parameter.document != this || this.parameter(parameter.name) != parameter)
+			throw new ParametricError("named parameter belongs to another document");
+		var previous = parameter.value;
+		if (previous == next)
+			return;
+		parameter.restoreStored(next);
+		recordDocumentChange(new NamedParameterChange(parameter, previous, next));
+	}
+
+	public function expressionValue(parameter:NamedParameter):Float {
+		var visiting = new Map<String, Bool>();
+		var cached = new Map<String, ExpressionValue>();
+		return evaluateNamed(parameter, visiting, cached).value;
+	}
+
 	public function featureCount():Int {
 		return features.length;
 	}
@@ -172,6 +261,7 @@ class Document {
 
 	public function recompute():Void {
 		ensureOpen();
+		synchronizeExpressions();
 		var order = topologicalOrder();
 		var context = new EvaluationContext(this);
 		var stagedFeatures:Array<Feature> = [];
@@ -231,6 +321,45 @@ class Document {
 				throw recomputeError;
 			throw error;
 		}
+	}
+
+	private function synchronizeExpressions():Void {
+		var visiting = new Map<String, Bool>();
+		var cached = new Map<String, ExpressionValue>();
+		var staged:Array<{parameter:NamedParameter, value:Float}> = [];
+		for (named in dimensions) {
+			if (named.expression == null)
+				continue;
+			var value = evaluateNamed(named, visiting, cached).value;
+			named.validateSynchronized(value);
+			staged.push({parameter: named, value: value});
+		}
+		for (entry in staged)
+			entry.parameter.synchronize(entry.value);
+	}
+
+	private function evaluateNamed(named:NamedParameter, visiting:Map<String, Bool>, cached:Map<String, ExpressionValue>):ExpressionValue {
+		var known = cached.get(named.name);
+		if (known != null)
+			return known;
+		if (visiting.exists(named.name))
+			throw new ParametricError("parameter expression cycle detected: " + named.name);
+		visiting.set(named.name, true);
+		var result:ExpressionValue;
+		if (named.expression == null) {
+			result = new ExpressionValue(named.value, named.kind);
+		} else {
+			result = named.expression.evaluate(function(dependency:String) {
+				return evaluateNamed(parameter(dependency), visiting, cached);
+			});
+			if (result.kind != named.kind)
+				throw new ParametricError("expression for " + named.name + " produces " + result.kind + ", expected " + named.kind);
+			if (named.kind == ParameterKind.Count && result.value != Std.int(result.value))
+				throw new ParametricError("count expression must produce an integer: " + named.name);
+		}
+		visiting.remove(named.name);
+		cached.set(named.name, result);
+		return result;
 	}
 
 	public function beginTransaction():Transaction {
