@@ -145,3 +145,10 @@ deleting features. Format version 2 persists this registry. Version 1 input is
 migrated by exposing its effective output as a `Model` element. These IDs
 describe document-level objects and do not replace topology remapping for faces
 or edges.
+
+Levels and reference planes are geometry-free element kinds. Datum references
+distinguish missing documents, missing elements, and incompatible kinds.
+`DatumSketchFeature` resolves a workplane from either datum kind, while
+`LevelExtrudeFeature` derives placement and height from two levels and their
+offsets. Explicit datum dependencies invalidate affected features, and failed
+resolution preserves their committed geometry.

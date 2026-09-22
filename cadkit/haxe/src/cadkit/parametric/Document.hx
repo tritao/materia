@@ -95,17 +95,18 @@ class Document {
 	}
 
 	public function createLevel(name:String,elevation:Float,offset:Float=0,?relativeTo:ElementReference):LevelElement {
-		var id=newElementId(); var result=new LevelElement(this,id,name,elevation,offset,relativeTo); installRecord(result); recordDocumentChange(new ElementCreateChange(this,result,elements.length-1)); return result;
+		if(relativeTo!=null) resolveElement(relativeTo,"level"); var id=newElementId(); var result=new LevelElement(this,id,name,elevation,offset,relativeTo); installRecord(result); recordDocumentChange(new ElementCreateChange(this,result,elements.length-1)); return result;
 	}
 	public function createReferencePlane(name:String,plane:Plane):ReferencePlaneElement {
 		var id=newElementId(); var result=new ReferencePlaneElement(this,id,name,plane); installRecord(result); recordDocumentChange(new ElementCreateChange(this,result,elements.length-1)); return result;
 	}
-	public function installLevel(name:String,id:ElementId,elevation:Float,offset:Float=0,?relativeTo:ElementReference):LevelElement { var result=new LevelElement(this,id,name,elevation,offset,relativeTo);installRecord(result);return result; }
+	public function installLevel(name:String,id:ElementId,elevation:Float,offset:Float=0,?relativeTo:ElementReference):LevelElement { if(relativeTo!=null)resolveElement(relativeTo,"level");var result=new LevelElement(this,id,name,elevation,offset,relativeTo);installRecord(result);return result; }
 	public function installReferencePlane(name:String,id:ElementId,plane:Plane):ReferencePlaneElement { var result=new ReferencePlaneElement(this,id,name,plane);installRecord(result);return result; }
 	private function newElementId():ElementId { var value=new ElementId(); while(issuedElementIds.exists(value.value)) value=new ElementId(); return value; }
 	private function installRecord(result:Element):Void { validateElementName(result.name); if(issuedElementIds.exists(result.id.value)) throw new ParametricError("duplicate or previously issued element ID: "+result.id.value); elements.push(result);elementsById.set(result.id.value,result);issuedElementIds.set(result.id.value,true); }
 	public function setLevelElevation(level:LevelElement,value:Float):Void { validateOwnedElement(level);if(!Math.isFinite(value))throw new ParametricError("level elevation must be finite");var old=level.elevation;if(old==value)return;level.restoreElevation(value);recordDocumentChange(new LevelElevationChange(level,old,value)); }
 	public function setReferencePlane(datum:ReferencePlaneElement,value:Plane):Void { validateOwnedElement(datum);var old=datum.plane;datum.restorePlane(value);recordDocumentChange(new ReferencePlaneChange(datum,old,value)); }
+	public function datumChanged(datum:Element):Void { for(feature in features) if(feature.datumDependencies().indexOf(datum.id.value)>=0) feature.markDirty(); }
 
 	public function duplicateElement(source:Element, ?name:String):Element {
 		validateOwnedElement(source);
@@ -168,16 +169,37 @@ class Document {
 		return elementsById.get(id.value);
 	}
 
+	public function resolveElement(reference:ElementReference, ?expectedKind:String):Element {
+		var state=reference.state(this,expectedKind);
+		if(state!="resolved") throw new ParametricError("element reference is "+state+": "+reference.elementId.value);
+		return element(reference.elementId);
+	}
+
+	public function levelElevation(reference:ElementReference):Float {
+		return resolveLevel(reference,new Map<String,Bool>());
+	}
+	private function resolveLevel(reference:ElementReference,visiting:Map<String,Bool>):Float {
+		var level:LevelElement=cast resolveElement(reference,"level");
+		if(visiting.exists(level.id.value)) throw new ParametricError("level reference cycle: "+level.id.value);
+		visiting.set(level.id.value,true);
+		var value=level.elevation+level.offset;
+		if(level.relativeTo!=null) value+=resolveLevel(level.relativeTo,visiting);
+		visiting.remove(level.id.value);
+		return value;
+	}
+
 	public function restoreElementInsertion(element:Element, index:Int):Void {
 		if (element.document != this || elementsById.exists(element.id.value))
 			throw new ParametricError("cannot restore element: " + element.id.value);
 		var insertion = index < 0 ? 0 : (index > elements.length ? elements.length : index);
 		elements.insert(insertion, element);
 		elementsById.set(element.id.value, element);
+		datumChanged(element);
 	}
 
 	public function restoreElementRemoval(element:Element):Void {
 		validateOwnedElement(element);
+		datumChanged(element);
 		elements.remove(element);
 		elementsById.remove(element.id.value);
 	}

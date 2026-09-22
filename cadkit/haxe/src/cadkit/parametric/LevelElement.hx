@@ -15,5 +15,5 @@ class LevelElement extends Element {
 		this.elevation=elevation; this.offset=offset; this.relativeTo=relativeTo;
 	}
 	public function setElevation(value:Float, unit:String="mm"):Void document.setLevelElevation(this, UnitConversion.toCanonical(value,"length",unit));
-	public function restoreElevation(value:Float):Void elevation=value;
+	public function restoreElevation(value:Float):Void { elevation=value; document.datumChanged(this); }
 }

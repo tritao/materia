@@ -33,6 +33,7 @@ class EvaluationContext {
 				"feature " + feature.id.toInt() + " has not been evaluated");
 		return committed;
 	}
+	public function owner():Document return document;
 
 	/** Returns staged history when available, otherwise the committed history. */
 	public function operation(feature:Feature):Null<Operation> {

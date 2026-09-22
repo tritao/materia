@@ -67,6 +67,7 @@ class Feature {
 	public function dependencyFeatures():Array<Feature> {
 		return [];
 	}
+	public function datumDependencies():Array<String> return [];
 
 	public function evaluate(context:EvaluationContext):EvaluationResult {
 		throw new ParametricError("feature has no evaluator");

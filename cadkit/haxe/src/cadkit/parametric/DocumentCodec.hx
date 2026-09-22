@@ -35,10 +35,13 @@ import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
+import cadkit.parametric.features.DatumSketchFeature;
+import cadkit.parametric.features.LevelExtrudeFeature;
 import cadkit.parametric.DocumentId;
 import cadkit.parametric.ElementId;
 import cadkit.parametric.LevelElement;
 import cadkit.parametric.ReferencePlaneElement;
+import cadkit.parametric.ElementReference;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
@@ -69,7 +72,7 @@ class DocumentCodec {
 		var encodedElements:Array<Dynamic> = [];
 		for (element in document.allElements()) {
 			if(element.kind=="geometry") { var geometry:Feature=cast element.output; encodedElements.push({id:element.id.value,name:element.name,kind:element.kind,output:geometry.id.toInt()}); }
-			else if(element.kind=="level") { var level:LevelElement=cast element; encodedElements.push({id:level.id.value,name:level.name,kind:level.kind,elevation:level.elevation,offset:level.offset}); }
+			else if(element.kind=="level") { var level:LevelElement=cast element; encodedElements.push({id:level.id.value,name:level.name,kind:level.kind,elevation:level.elevation,offset:level.offset,relativeTo:level.relativeTo==null?null:encodeElementReference(level.relativeTo)}); }
 			else { var datum:ReferencePlaneElement=cast element; encodedElements.push({id:datum.id.value,name:datum.name,kind:datum.kind,plane:{origin:encodeVector(datum.plane.origin),xDirection:encodeVector(datum.plane.xDirection),normal:encodeVector(datum.plane.normal)}}); }
 		}
 		return Json.stringify({
@@ -105,6 +108,10 @@ class DocumentCodec {
 					feature = document.add(modeling);
 				} else if (featureType == "constrained-sketch") {
 					feature = document.add(decodeConstrainedSketch(record, document));
+				} else if (featureType == "datum-sketch") {
+					feature=document.add(new DatumSketchFeature(stringField(record,"profile"),numberField(record,"width"),numberField(record,"height"),decodeElementReference(requiredField(record,"datum")),numberField(record,"offset")));
+				} else if (featureType == "level-extrude") {
+					feature=document.add(new LevelExtrudeFeature(requiredFeature(document,intField(record,"source")),decodeElementReference(requiredField(record,"base")),decodeElementReference(requiredField(record,"top")),numberField(record,"baseOffset"),numberField(record,"topOffset")));
 				} else if (featureType == "sketch") {
 					var planeRecord = requiredField(record, "plane");
 					feature = document.add(new SketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
@@ -210,7 +217,7 @@ class DocumentCodec {
 				for (elementRecord in elementRecords) {
 					var kind=stringField(elementRecord,"kind"); var eid=new ElementId(stringField(elementRecord,"id")); var ename=stringField(elementRecord,"name");
 					if(kind=="geometry") document.installElement(ename,requiredFeature(document,intField(elementRecord,"output")),eid);
-					else if(kind=="level") document.installLevel(ename,eid,numberField(elementRecord,"elevation"),numberField(elementRecord,"offset"));
+					else if(kind=="level") { var relative:Dynamic=Reflect.field(elementRecord,"relativeTo");document.installLevel(ename,eid,numberField(elementRecord,"elevation"),numberField(elementRecord,"offset"),relative==null?null:decodeElementReference(relative)); }
 					else if(kind=="reference-plane") { var p=requiredField(elementRecord,"plane"); document.installReferencePlane(ename,eid,new Plane(decodeVector(requiredField(p,"origin")),decodeVector(requiredField(p,"xDirection")),decodeVector(requiredField(p,"normal")))); }
 					else throw new ParametricError("unsupported element kind: "+kind);
 				}
@@ -246,6 +253,8 @@ class DocumentCodec {
 		var modeling = encodeModelingFeature(feature, references);
 		if (modeling != null)
 			return modeling;
+		if (featureType == "datum-sketch") { var sketch:DatumSketchFeature=cast feature; return {id:feature.id.toInt(),type:featureType,profile:sketch.profile,width:sketch.width.value,height:sketch.height.value,offset:sketch.offset.value,datum:encodeElementReference(sketch.datum),references:references}; }
+		if (featureType == "level-extrude") { var extrusion:LevelExtrudeFeature=cast feature; return {id:feature.id.toInt(),type:featureType,source:extrusion.source.id.toInt(),base:encodeElementReference(extrusion.base),top:encodeElementReference(extrusion.top),baseOffset:extrusion.baseOffset.value,topOffset:extrusion.topOffset.value,references:references}; }
 		if (featureType == "constrained-sketch") {
 			return encodeConstrainedSketch(cast feature, references);
 		} else if (featureType == "sketch") {
@@ -404,6 +413,9 @@ class DocumentCodec {
 		}
 		throw new ParametricError("unsupported feature type: " + featureType);
 	}
+
+	private static function encodeElementReference(value:ElementReference):Dynamic return {document:value.documentId.value,element:value.elementId.value};
+	private static function decodeElementReference(value:Dynamic):ElementReference return new ElementReference(new DocumentId(stringField(value,"document")),new ElementId(stringField(value,"element")));
 
 	private static function encodeConstrainedSketch(feature:ConstrainedSketchFeature, references:Array<Dynamic>):Dynamic {
 		var sketch = feature.sketch();

@@ -5,6 +5,9 @@ import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.Feature;
 import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.SketchFeature;
+import cadkit.parametric.features.DatumSketchFeature;
+import cadkit.parametric.features.LevelExtrudeFeature;
 import haxe.Json;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
@@ -18,6 +21,7 @@ class ElementSmoke {
 	static function check(value:Bool, message:String):Void {
 		if (!value) throw message;
 	}
+	static function near(value:Float,expected:Float):Void check(Math.abs(value-expected)<1e-6*Math.max(1,Math.abs(expected)),'expected $expected, got $value');
 
 	public static function run():Void {
 		var document = new Document();
@@ -83,6 +87,7 @@ class ElementSmoke {
 		persisted.recompute();
 		var level=persisted.createLevel("Level 1",3000);
 		var plane=persisted.createReferencePlane("Grid A",new Plane(new Vector(0,0,0),Vector.X(),Vector.Z()));
+		plane.setPlane(new Plane(new Vector(5,0,0),Vector.X(),Vector.Z()));check(persisted.undo() && plane.plane.origin.x==0,"reference-plane edits are transactional");
 		level.setElevation(3.5,"m");
 		check(level.elevation==3500 && persisted.undo() && level.elevation==3000,"level edits are transactional");
 		var encoded = DocumentCodec.encode(persisted);
@@ -140,5 +145,27 @@ class ElementSmoke {
 			"building identities survive save and reload");
 		restoredBuilding.close();
 		building.close();
+
+		var datumDocument=new Document();
+		var baseLevel=datumDocument.createLevel("Base",0);
+		var topLevel=datumDocument.createLevel("Top",3000);
+		var baseRef=new ElementReference(datumDocument.id,baseLevel.id);
+		var topRef=new ElementReference(datumDocument.id,topLevel.id);
+		check(baseRef.state(datumDocument,"reference-plane")==ElementReference.IncompatibleKind,"datum kind mismatch is explicit");
+		var profile=datumDocument.add(new SketchFeature("rectangle",10,20));
+		var between=datumDocument.add(new LevelExtrudeFeature(profile,baseRef,topRef));
+		datumDocument.setOutput(between);datumDocument.recompute();
+		near(between.currentShape().volume(),600000);
+		topLevel.setElevation(4000);datumDocument.recompute();near(between.currentShape().volume(),800000);
+		var committed=between.currentShape();topLevel.setElevation(-10);failed=false;try datumDocument.recompute() catch(e:Dynamic) failed=true;
+		check(failed && between.currentShape()==committed,"crossed levels preserve committed geometry");
+		check(datumDocument.undo(),"crossed level undo");datumDocument.recompute();
+		datumDocument.removeElement(topLevel.id);failed=false;try datumDocument.recompute() catch(e:Dynamic) failed=true;
+		check(failed && topRef.state(datumDocument)==ElementReference.UnresolvedElement,"deleted level fails explicitly");
+		check(datumDocument.undo(),"deleted level undo");datumDocument.recompute();
+		var datumReload=DocumentCodec.decode(DocumentCodec.encode(datumDocument));
+		near(datumReload.result().volume(),800000);
+		datumReload.close();datumDocument.close();
+		var twoLevel=new TwoLevelDatumBuilding();var wallId=twoLevel.walls[0].id.value;var oldRoofZ=twoLevel.roof.shape().bounds().get_max().get_z();twoLevel.setUpper(3500);check(twoLevel.walls[0].id.value==wallId && twoLevel.roof.shape().bounds().get_max().get_z()>oldRoofZ,"level edit updates walls and roof placement");var loadedTwoLevel=DocumentCodec.decode(DocumentCodec.encode(twoLevel.document));check(loadedTwoLevel.elementCount()==8,"two-level building datums and geometry survive reload");loadedTwoLevel.close();twoLevel.close();
 	}
 }
