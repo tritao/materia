@@ -74,8 +74,8 @@ def haxe_files(schema: Schema, normalized_schema: dict[str, Any]) -> dict[Path, 
             "/** Generated from schema/sensor_wire.nkw. Do not edit by hand. */",
             "class SensorWireConstants {",
         ]
-        for name, value in normalized_schema["constants"].items():
-            lines.append(f"\tpublic static inline var {lower_camel(name)}:Int = {value};")
+        for name, constant in normalized_schema["constants"].items():
+            lines.append(f"\tpublic static inline var {lower_camel(name)}:Int = {constant['value']};")
         lines.extend(["}", ""])
         output[haxe_root / "SensorWireConstants.hx"] = "\n".join(lines)
     for message in schema.messages:
@@ -123,7 +123,6 @@ def haxe_codec_file(norm: dict[str, Any]) -> str:
         fields = message["fields"]
         value_name = "decoded"
         validate_name = f"validate{message_name}"
-        reserved = message.get("reserved", [])
         lines.extend([
             f"\tpublic static function encode{message_name}(value:{message_name}):Bytes {{",
             f"\t\t{validate_name}(value);",
@@ -131,7 +130,7 @@ def haxe_codec_file(norm: dict[str, Any]) -> str:
             "\t}",
             "",
             f"\tpublic static function decode{message_name}(bytes:Bytes):{message_name} {{",
-            f"\t\tvalidateKeys(bytes, \"{message_name}\", {[field['id'] for field in fields]}, {json.dumps(reserved)});",
+            f"\t\tvalidateKeys(bytes, \"{message_name}\", {[field['id'] for field in fields]});",
             f"\t\tvar {value_name}:{message_name} = MessagePack.decode(bytes);",
             f"\t\t{validate_name}({value_name});",
             f"\t\treturn {value_name};",
@@ -169,16 +168,15 @@ def haxe_codec_file(norm: dict[str, Any]) -> str:
         lines.extend(["\t}", ""])
 
     lines.extend([
-        "\tstatic function validateKeys(bytes:Bytes, message:String, required:Array<Int>, reserved:Array<Array<Int>>):Void {",
+        "\tstatic function validateKeys(bytes:Bytes, message:String, required:Array<Int>):Void {",
         "\t\tvar reader = new MessagePackReader(bytes);",
         "\t\tvar count = reader.readMapHeader();",
         "\t\tvar seen:Array<Int> = [];",
         "\t\tfor (_ in 0...count) {",
         "\t\t\tvar key = reader.readInt();",
         "\t\t\tif (key < 0) throw 'negative field ID $key in $message';",
+        "\t\t\tif (seen.indexOf(key) >= 0) throw 'duplicate field ID $key in $message';",
         "\t\t\tseen.push(key);",
-        "\t\t\tfor (range in reserved)",
-        "\t\t\t\tif (key >= range[0] && key <= range[1]) throw 'reserved field ID $key in $message';",
         "\t\t\treader.skip();",
         "\t\t}",
         "\t\tfor (id in required)",
@@ -211,7 +209,7 @@ def cpp_header(schema: Schema, norm: dict[str, Any]) -> str:
     for constant in norm["constants"].items():
         name, value = constant
         type_name = next(item.type_name for item in schema.constants if item.name == name)
-        lines.append(f"inline constexpr {cpp_type(type_name)} {name.lower()} = {value};")
+        lines.append(f"inline constexpr {cpp_type(type_name)} {name.lower()} = {value['value']};")
     if norm["constants"]:
         lines.append("")
     for packed in schema.packed_structs:
@@ -334,6 +332,7 @@ def codec_cpp(schema: Schema, norm: dict[str, Any]) -> str:
         "#include <bit>",
         "#include <limits>",
         "#include <string>",
+        "#include <unordered_set>",
         "",
         "namespace nksensor::wire::generated::detail {",
     ]
@@ -441,7 +440,7 @@ def codec_cpp(schema: Schema, norm: dict[str, Any]) -> str:
         lines.extend(["    return true;", "}", "", f"bool read(::nksensor::wire::detail::MessagePackReader &reader, {message.name} &value, std::string *error) {{", "    std::uint32_t field_count = 0;", "    if (!reader.read_map_size(field_count)) {", f'        set_error(error, "{message.name} is not a MessagePack map");', "        return false;", "    }"])
         for field in fields:
             lines.append(f"    bool has_{field['name']} = false;")
-        lines.extend(["    for (std::uint32_t index = 0; index < field_count; ++index) {", "        std::uint64_t key = 0;", "        if (!reader.read_nonnegative(key)) {", '            set_error(error, "wire field key is not a non-negative integer");', "            return false;", "        }", "        switch (key) {"])
+        lines.extend(["    std::unordered_set<std::uint64_t> seen_keys;", "    for (std::uint32_t index = 0; index < field_count; ++index) {", "        std::uint64_t key = 0;", "        if (!reader.read_nonnegative(key)) {", '            set_error(error, "wire field key is not a non-negative integer");', "            return false;", "        }", "        if (!seen_keys.insert(key).second) {", f'            set_error(error, "duplicate field ID in {message.name}");', "            return false;", "        }", "        switch (key) {"])
         for field in fields:
             lines.extend([f"        case {field['id']}: {{"])
             if field["constant"]:
@@ -466,14 +465,6 @@ def codec_cpp(schema: Schema, norm: dict[str, Any]) -> str:
             lines.append(f"            has_{field['name']} = true;")
             lines.extend(["            break;", "        }"])
         lines.append("        default:")
-        reserved = norm["messages"][message.name].get("reserved", [])
-        for start, end in reserved:
-            lines.extend([
-                f"            if (key >= {start} && key <= {end}) {{",
-                f'                set_error(error, "reserved field ID in {message.name}");',
-                "                return false;",
-                "            }",
-            ])
         lines.extend(["            if (!reader.skip()) {", '                set_error(error, "wire message contains an invalid unknown field");', "                return false;", "            }", "            break;", "        }", "    }", "    if (!reader.at_end()) {", f'        set_error(error, "{message.name} MessagePack value has trailing bytes");', "        return false;", "    }"])
         missing = " || ".join(f"!has_{field['name']}" for field in fields)
         lines.extend([f"    if ({missing}) {{", f'        set_error(error, "{message.name} is missing a required field");', "        return false;", "    }"])
@@ -534,7 +525,8 @@ def _mp_float(value: float) -> bytes:
 def hmpk_message(fields: list[dict[str, Any]], example: dict[str, Any], *,
                  overrides: dict[int, Any] | None = None,
                  extra_fields: list[tuple[int, int | None]] | None = None,
-                 omit_ids: set[int] | None = None) -> bytes:
+                 omit_ids: set[int] | None = None,
+                 trailing_data: bytes = b"") -> bytes:
     overrides = overrides or {}
     extra_fields = extra_fields or []
     omit_ids = omit_ids or set()
@@ -547,6 +539,9 @@ def hmpk_message(fields: list[dict[str, Any]], example: dict[str, Any], *,
     for field in encoded_fields:
         payload += _mp_uint(field["id"])
         name = field["name"]
+        if name == "data" and field["id"] in overrides:
+            payload += _mp_binary(bytes(overrides[field["id"]]))
+            continue
         if name == "data" and "data_f64" in example:
             value = b"".join(struct.pack("<d", float(item)) for item in example["data_f64"])
             if len(value) != 24 * 8:
@@ -565,6 +560,7 @@ def hmpk_message(fields: list[dict[str, Any]], example: dict[str, Any], *,
     for field_id, value in extra_fields:
         payload += _mp_uint(field_id)
         payload += b"\xc0" if value is None else _mp_int(value)
+    payload += trailing_data
     return b"HMPK\x01\x00" + struct.pack(">I", len(payload)) + payload
 
 
@@ -575,6 +571,14 @@ def vector_fixture(norm: dict[str, Any]) -> str:
         message = norm["messages"][message_name]
         fields = message["fields"]
         lines.append(f"{message_name}\t{hmpk_message(fields, example).hex()}")
+        sensor = next(field for field in fields if field["name"] == "sensor")
+        lines.append(f"{message_name}.invalid.duplicate_field\t"
+                     f"{hmpk_message(fields, example, extra_fields=[(sensor['id'], example['sensor'] + 1)]).hex()}")
+        data = next(field for field in fields if field["name"] == "data")
+        lines.append(f"{message_name}.invalid.missing_field\t"
+                     f"{hmpk_message(fields, example, omit_ids={data['id']}).hex()}")
+        lines.append(f"{message_name}.invalid.trailing_data\t"
+                     f"{hmpk_message(fields, example, trailing_data=bytes([0xC0])).hex()}")
         for field in fields:
             if field["constant"]:
                 lines.append(f"{message_name}.invalid.{field['name']}\t"
@@ -584,17 +588,17 @@ def vector_fixture(norm: dict[str, Any]) -> str:
             elif field["nonnegative"]:
                 lines.append(f"{message_name}.invalid.{field['name']}\t"
                              f"{hmpk_message(fields, example, overrides={field['id']: -1}).hex()}")
-        if message.get("reserved"):
-            field_id = message["reserved"][0][0]
-            lines.append(f"{message_name}.reserved\t"
-                         f"{hmpk_message(fields, example, extra_fields=[(field_id, None)]).hex()}")
         if message_name == "PackedFrameMessage":
-            lines.append(f"{message_name}.extension\t"
-                         f"{hmpk_message(fields, example, extra_fields=[(32, None)]).hex()}")
+            lines.append(f"{message_name}.unknown_field\t"
+                         f"{hmpk_message(fields, example, extra_fields=[(1000, None)]).hex()}")
             lines.append(f"{message_name}.uint32_max_width\t"
                          f"{hmpk_message(fields, example, overrides={8: 2**32 - 1}).hex()}")
             lines.append(f"{message_name}.invalid.width_range\t"
                          f"{hmpk_message(fields, example, overrides={8: 2**32}).hex()}")
+        elif message_name == "LidarScanMessage":
+            packed_data = bytes.fromhex(example["data_hex"])
+            lines.append(f"{message_name}.invalid.packed_size\t"
+                         f"{hmpk_message(fields, example, overrides={data['id']: packed_data[:-1]}).hex()}")
     return "\n".join(lines) + "\n"
 
 
@@ -658,10 +662,11 @@ def haxe_vector_check(norm: dict[str, Any]) -> str:
             if field["constant"]:
                 key = f"{message_name}.invalid.missing_{field['name']}"
                 lines.append(f'\t\texpectRejected(expected, "{key}", "{message_name}");')
-        if fields_by_message[message_name].get("reserved"):
-            lines.append(f'\t\texpectRejected(expected, "{message_name}.reserved", "{message_name}");')
+        lines.append(f'\t\texpectRejected(expected, "{message_name}.invalid.duplicate_field", "{message_name}");')
+        lines.append(f'\t\texpectRejected(expected, "{message_name}.invalid.missing_field", "{message_name}");')
+        lines.append(f'\t\texpectRejected(expected, "{message_name}.invalid.trailing_data", "{message_name}");')
         if message_name == "PackedFrameMessage":
-            lines.append('\t\tSensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(getVector(expected, "PackedFrameMessage.extension")));')
+            lines.append('\t\tSensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(getVector(expected, "PackedFrameMessage.unknown_field")));')
             lines.append('\t\tSensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(getVector(expected, "PackedFrameMessage.uint32_max_width")));')
             lines.append('\t\texpectRejected(expected, "PackedFrameMessage.invalid.width_range", "PackedFrameMessage");')
     lines.extend([
@@ -733,7 +738,7 @@ def docs(schema: Schema, norm: dict[str, Any]) -> str:
         "Integer ranges follow the declared primitive. Haxe `u32` fields use `Int64` so the full unsigned 32-bit range is representable; "
         "message fields cannot use `u64` because Haxe `Int64` cannot represent its full range. "
         "`i64 nonnegative` fields match Haxe `Int64` and restrict the protocol value to `0..2^63-1`. "
-        "Use the generated `SensorWireCodec` entry points in Haxe to enforce constants, ranges, and reserved IDs.",
+        "Use the generated `SensorWireCodec` entry points in Haxe to enforce required fields, duplicates, constants, and integer ranges.",
         "",
     ]
     for enum_name, enum in norm["enums"].items():
@@ -751,14 +756,7 @@ def docs(schema: Schema, norm: dict[str, Any]) -> str:
             if field["nonnegative"]:
                 rule += ", non-negative"
             lines.append(f"| {field['id']} | `{field['name']}` | `{field['type']}` | {rule} |")
-        reserved = ", ".join(f"{lo}..{hi}" if lo != hi else str(lo) for lo, hi in norm["messages"][message.name]["reserved"])
-        extension = ", ".join(f"{lo}..{hi}" if lo != hi else str(lo) for lo, hi in norm["messages"][message.name]["extension"])
-        lines.extend([
-            "",
-            f"Reserved IDs: `{reserved}` (permanently invalid).",
-            f"Extension IDs: `{extension}` (unknown values are skipped and later schemas may allocate them).",
-            "",
-        ])
+        lines.append("")
     for packed in schema.packed_structs:
         item = norm["packed_structs"][packed.name]
         lines.extend([f"## {packed.name} (packed)", "", f"Endianness: `{item['endian']}`; size: **{item['size']} bytes**.", "", "| Field | Type | Size |", "| --- | --- | ---: |"])
@@ -770,10 +768,9 @@ def docs(schema: Schema, norm: dict[str, Any]) -> str:
     lines.extend([
         "## Compatibility",
         "",
-        "Existing fields, IDs, types, constants, and packed layouts are immutable. New enum values and message types can be added. "
-        "A new field may consume an ID from an extension range declared by the previous lock; remove that ID from the range in the same change. "
-        "Reserved IDs remain unavailable permanently, and unknown non-reserved fields are skipped. "
-        "Added fields are required, so a new reader does not accept messages written before the field was introduced.",
+        "Published message shapes and packed layouts are immutable. Existing field IDs, types, and constants cannot change. "
+        "Create a new message and message type when a shape must change. Existing enum values cannot change; new enum values and message types may be added. "
+        "Unknown MessagePack fields are skipped, and duplicate field IDs are rejected.",
         "",
     ])
     return "\n".join(lines)

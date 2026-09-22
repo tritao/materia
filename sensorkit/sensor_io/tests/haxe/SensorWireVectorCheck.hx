@@ -34,8 +34,10 @@ class SensorWireVectorCheck {
 		expectRejected(expected, "PackedFrameMessage.invalid.sensor", "PackedFrameMessage");
 		expectRejected(expected, "PackedFrameMessage.invalid.sequence", "PackedFrameMessage");
 		expectRejected(expected, "PackedFrameMessage.invalid.frame", "PackedFrameMessage");
-		expectRejected(expected, "PackedFrameMessage.reserved", "PackedFrameMessage");
-		SensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(getVector(expected, "PackedFrameMessage.extension")));
+		expectRejected(expected, "PackedFrameMessage.invalid.duplicate_field", "PackedFrameMessage");
+		expectRejected(expected, "PackedFrameMessage.invalid.missing_field", "PackedFrameMessage");
+		expectRejected(expected, "PackedFrameMessage.invalid.trailing_data", "PackedFrameMessage");
+		SensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(getVector(expected, "PackedFrameMessage.unknown_field")));
 		SensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(getVector(expected, "PackedFrameMessage.uint32_max_width")));
 		expectRejected(expected, "PackedFrameMessage.invalid.width_range", "PackedFrameMessage");
 		var imu = new ImuSampleMessage();
@@ -57,7 +59,9 @@ class SensorWireVectorCheck {
 		expectRejected(expected, "ImuSampleMessage.invalid.sensor", "ImuSampleMessage");
 		expectRejected(expected, "ImuSampleMessage.invalid.sequence", "ImuSampleMessage");
 		expectRejected(expected, "ImuSampleMessage.invalid.frame", "ImuSampleMessage");
-		expectRejected(expected, "ImuSampleMessage.reserved", "ImuSampleMessage");
+		expectRejected(expected, "ImuSampleMessage.invalid.duplicate_field", "ImuSampleMessage");
+		expectRejected(expected, "ImuSampleMessage.invalid.missing_field", "ImuSampleMessage");
+		expectRejected(expected, "ImuSampleMessage.invalid.trailing_data", "ImuSampleMessage");
 		var lidar = new LidarScanMessage();
 		lidar.schemaVersion = 1;
 		lidar.messageType = MessageType.lidarScan;
@@ -82,7 +86,9 @@ class SensorWireVectorCheck {
 		expectRejected(expected, "LidarScanMessage.invalid.frame", "LidarScanMessage");
 		expectRejected(expected, "LidarScanMessage.invalid.return_stride", "LidarScanMessage");
 		expectRejected(expected, "LidarScanMessage.invalid.missing_return_stride", "LidarScanMessage");
-		expectRejected(expected, "LidarScanMessage.reserved", "LidarScanMessage");
+		expectRejected(expected, "LidarScanMessage.invalid.duplicate_field", "LidarScanMessage");
+		expectRejected(expected, "LidarScanMessage.invalid.missing_field", "LidarScanMessage");
+		expectRejected(expected, "LidarScanMessage.invalid.trailing_data", "LidarScanMessage");
 		return 42;
 	}
 

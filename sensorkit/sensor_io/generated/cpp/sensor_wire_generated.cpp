@@ -5,6 +5,7 @@
 #include <bit>
 #include <limits>
 #include <string>
+#include <unordered_set>
 
 namespace nksensor::wire::generated::detail {
 std::array<std::uint8_t, imusampledata_size> pack(const ImuSampleData &value) {
@@ -220,10 +221,15 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, PackedFrameMessag
     bool has_stride = false;
     bool has_pixel_format = false;
     bool has_data = false;
+    std::unordered_set<std::uint64_t> seen_keys;
     for (std::uint32_t index = 0; index < field_count; ++index) {
         std::uint64_t key = 0;
         if (!reader.read_nonnegative(key)) {
             set_error(error, "wire field key is not a non-negative integer");
+            return false;
+        }
+        if (!seen_keys.insert(key).second) {
+            set_error(error, "duplicate field ID in PackedFrameMessage");
             return false;
         }
         switch (key) {
@@ -348,10 +354,6 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, PackedFrameMessag
             break;
         }
         default:
-            if (key >= 13 && key <= 31) {
-                set_error(error, "reserved field ID in PackedFrameMessage");
-                return false;
-            }
             if (!reader.skip()) {
                 set_error(error, "wire message contains an invalid unknown field");
                 return false;
@@ -429,10 +431,15 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, ImuSampleMessage 
     bool has_delivery_time = false;
     bool has_frame = false;
     bool has_data = false;
+    std::unordered_set<std::uint64_t> seen_keys;
     for (std::uint32_t index = 0; index < field_count; ++index) {
         std::uint64_t key = 0;
         if (!reader.read_nonnegative(key)) {
             set_error(error, "wire field key is not a non-negative integer");
+            return false;
+        }
+        if (!seen_keys.insert(key).second) {
+            set_error(error, "duplicate field ID in ImuSampleMessage");
             return false;
         }
         switch (key) {
@@ -523,10 +530,6 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, ImuSampleMessage 
             break;
         }
         default:
-            if (key >= 9 && key <= 31) {
-                set_error(error, "reserved field ID in ImuSampleMessage");
-                return false;
-            }
             if (!reader.skip()) {
                 set_error(error, "wire message contains an invalid unknown field");
                 return false;
@@ -613,10 +616,15 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage 
     bool has_vertical_count = false;
     bool has_return_stride = false;
     bool has_data = false;
+    std::unordered_set<std::uint64_t> seen_keys;
     for (std::uint32_t index = 0; index < field_count; ++index) {
         std::uint64_t key = 0;
         if (!reader.read_nonnegative(key)) {
             set_error(error, "wire field key is not a non-negative integer");
+            return false;
+        }
+        if (!seen_keys.insert(key).second) {
+            set_error(error, "duplicate field ID in LidarScanMessage");
             return false;
         }
         switch (key) {
@@ -743,10 +751,6 @@ bool read(::nksensor::wire::detail::MessagePackReader &reader, LidarScanMessage 
             break;
         }
         default:
-            if (key >= 12 && key <= 31) {
-                set_error(error, "reserved field ID in LidarScanMessage");
-                return false;
-            }
             if (!reader.skip()) {
                 set_error(error, "wire message contains an invalid unknown field");
                 return false;

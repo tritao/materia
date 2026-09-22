@@ -30,8 +30,6 @@ message PackedFrameMessage {
     10 stride : u32
     11 pixel_format : PixelFormat
     12 data : bytes
-    reserved 13..31;
-    extension 32..63;
 }
 
 message ImuSampleMessage {
@@ -43,8 +41,6 @@ message ImuSampleMessage {
     6 delivery_time : f64
     7 frame : i64 nonnegative
     8 data : bytes
-    reserved 9..31;
-    extension 32..63;
 }
 
 message LidarScanMessage {
@@ -57,10 +53,8 @@ message LidarScanMessage {
     7 frame : i64 nonnegative
     8 horizontal_count : u32
     9 vertical_count : u32
-    10 return_stride : u32 constant = sizeof(LidarReturn)
+    10 return_stride : u32 constant = 12
     11 data : bytes
-    reserved 12..31;
-    extension 32..63;
 }
 
 packed ImuSampleData endian little {

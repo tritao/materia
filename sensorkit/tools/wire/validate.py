@@ -55,18 +55,16 @@ def normalized(schema: Schema) -> dict[str, Any]:
         packed_sizes[packed.name] = size
 
     def resolved(value: Any) -> Any:
-        if isinstance(value, str) and value.startswith("sizeof(") and value.endswith(")"):
-            struct_name = value[7:-1]
-            if struct_name not in packed_sizes:
-                raise ValidationError(f"unknown packed struct {struct_name} in sizeof")
-            return packed_sizes[struct_name]
         return _resolve(value, constants, enum_values)
 
     for constant in schema.constants:
         constants[constant.name] = resolved(constant.value)
     result = {
         "version": 1,
-        "constants": {constant.name: resolved(constant.value) for constant in schema.constants},
+        "constants": {
+            constant.name: {"type": constant.type_name, "value": resolved(constant.value)}
+            for constant in schema.constants
+        },
         "enums": {
             enum.name: {"underlying": enum.underlying, "values": {v.name: v.value for v in enum.values}}
             for enum in schema.enums
@@ -113,28 +111,12 @@ def normalized(schema: Schema) -> dict[str, Any]:
         message_names.add(message.name)
         field_ids: set[int] = set()
         field_names: set[str] = set()
-        reserved_ranges = sorted(message.reserved)
-        extension_ranges = sorted(message.extension)
-        for index, (start, end) in enumerate(reserved_ranges):
-            if start <= 0 or end < start or end > 0x7FFFFFFF:
-                raise ValidationError(f"{message.name} has an invalid reserved range")
-            if index and start <= reserved_ranges[index - 1][1]:
-                raise ValidationError(f"{message.name} has overlapping reserved ranges")
-        for index, (start, end) in enumerate(extension_ranges):
-            if start <= 0 or end < start or end > 0x7FFFFFFF:
-                raise ValidationError(f"{message.name} has an invalid extension range")
-            if index and start <= extension_ranges[index - 1][1]:
-                raise ValidationError(f"{message.name} has overlapping extension ranges")
-            if any(start <= reserved_end and reserved_start <= end for reserved_start, reserved_end in reserved_ranges):
-                raise ValidationError(f"{message.name} has overlapping reserved and extension ranges")
         message_fields: list[dict[str, Any]] = []
         for field in message.fields:
             if field.id <= 0 or field.id > 0x7FFFFFFF:
                 raise ValidationError(f"{message.name}.{field.name} has an invalid field ID")
-            if field.id in field_ids or any(start <= field.id <= end for start, end in reserved_ranges):
-                raise ValidationError(f"{message.name} has a duplicate or reserved field ID {field.id}")
-            if any(start <= field.id <= end for start, end in extension_ranges):
-                raise ValidationError(f"{message.name} field ID {field.id} is still declared as an extension")
+            if field.id in field_ids:
+                raise ValidationError(f"{message.name} has a duplicate field ID {field.id}")
             if field.name in field_names:
                 raise ValidationError(f"{message.name} has a duplicate field name {field.name}")
             field_ids.add(field.id)
@@ -178,8 +160,6 @@ def normalized(schema: Schema) -> dict[str, Any]:
             message_ids[resolved_id] = message.name
         result["messages"][message.name] = {
             "fields": message_fields,
-            "reserved": [[start, end] for start, end in reserved_ranges],
-            "extension": [[start, end] for start, end in extension_ranges],
         }
 
     for packed in schema.packed_structs:
@@ -225,55 +205,19 @@ def validate_evolution(current: dict[str, Any], old: dict[str, Any]) -> None:
                 for member, value in previous_value.get("values", {}).items():
                     if new_value.get("values", {}).get(member) != value:
                         raise ValidationError(f"schema evolution changed enum value {name}.{member}")
+            elif group == "constants":
+                # Older locks stored only the resolved value. Accept that one-time
+                # representation upgrade, then preserve type and value together.
+                old_value = previous_value.get("value") if isinstance(previous_value, dict) else previous_value
+                if new_value.get("value") != old_value:
+                    raise ValidationError(f"schema evolution changed constant {name}")
+                if isinstance(previous_value, dict) and new_value != previous_value:
+                    raise ValidationError(f"schema evolution changed constant {name}")
             elif group == "messages":
-                old_fields = {field["id"]: field for field in previous_value.get("fields", [])}
-                new_fields = {field["id"]: field for field in new_value.get("fields", [])}
-                for field_id, old_field in old_fields.items():
-                    new_field = new_fields.get(field_id)
-                    if new_field is None:
-                        raise ValidationError(f"schema evolution changed field {name}.{old_field['name']}")
-                    old_type = old_field.get("type")
-                    new_type = new_field.get("type")
-                    corrected_unsigned_i64 = old_type == "u64" and new_type == "i64" and new_field.get("nonnegative")
-                    if old_type != new_type and not corrected_unsigned_i64:
-                        raise ValidationError(f"schema evolution changed field {name}.{old_field['name']}")
-                    for key in ("id", "name", "constant", "value"):
-                        if old_field.get(key) != new_field.get(key):
-                            raise ValidationError(f"schema evolution changed field {name}.{old_field['name']}")
-                    old_nonnegative = old_field.get("nonnegative", corrected_unsigned_i64)
-                    if old_nonnegative != new_field.get("nonnegative", False):
-                        raise ValidationError(f"schema evolution changed field {name}.{old_field['name']}")
-                added_ids = sorted(set(new_fields) - set(old_fields))
-                old_extension = previous_value.get("extension", [])
-                for field_id in added_ids:
-                    if not any(start <= field_id <= end for start, end in old_extension):
-                        raise ValidationError(f"schema evolution added field {name}.{new_fields[field_id]['name']} outside an extension range")
-                current_extension = new_value.get("extension", [])
-                remaining_ranges: list[list[int]] = []
-                for start, end in old_extension:
-                    cursor = start
-                    for field_id in (item for item in added_ids if start <= item <= end):
-                        if cursor <= field_id - 1:
-                            remaining_ranges.append([cursor, field_id - 1])
-                        cursor = field_id + 1
-                    if cursor <= end:
-                        remaining_ranges.append([cursor, end])
-                for start, end in remaining_ranges:
-                    cursor = start
-                    for current_start, current_end in current_extension:
-                        if current_end < cursor:
-                            continue
-                        if current_start > cursor:
-                            break
-                        cursor = min(end + 1, current_end + 1)
-                        if cursor > end:
-                            break
-                    if cursor <= end:
-                        raise ValidationError(f"schema evolution removed unallocated extension IDs from {name}")
-                if any(not any(new_lo <= old_lo and old_hi <= new_hi
-                               for new_lo, new_hi in new_value.get("reserved", []))
-                       for old_lo, old_hi in previous_value.get("reserved", [])):
-                    raise ValidationError(f"schema evolution unreserved field IDs in {name}")
+                # Ignore allocation ranges found only in old locks. Message fields
+                # themselves remain frozen.
+                if new_value.get("fields", []) != previous_value.get("fields", []):
+                    raise ValidationError(f"schema evolution changed message {name}")
             elif new_value != previous_value:
                 raise ValidationError(f"schema evolution changed {group[:-1]} {name}")
 

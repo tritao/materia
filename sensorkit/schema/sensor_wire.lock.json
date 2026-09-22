@@ -1,6 +1,9 @@
 {
   "constants": {
-    "CURRENT_FRAME_VERSION": 1
+    "CURRENT_FRAME_VERSION": {
+      "type": "u8",
+      "value": 1
+    }
   },
   "enums": {
     "MessageType": {
@@ -25,12 +28,6 @@
   },
   "messages": {
     "ImuSampleMessage": {
-      "extension": [
-        [
-          32,
-          63
-        ]
-      ],
       "fields": [
         {
           "constant": true,
@@ -96,21 +93,9 @@
           "type": "bytes",
           "value": null
         }
-      ],
-      "reserved": [
-        [
-          9,
-          31
-        ]
       ]
     },
     "LidarScanMessage": {
-      "extension": [
-        [
-          32,
-          63
-        ]
-      ],
       "fields": [
         {
           "constant": true,
@@ -200,21 +185,9 @@
           "type": "bytes",
           "value": null
         }
-      ],
-      "reserved": [
-        [
-          12,
-          31
-        ]
       ]
     },
     "PackedFrameMessage": {
-      "extension": [
-        [
-          32,
-          63
-        ]
-      ],
       "fields": [
         {
           "constant": true,
@@ -312,12 +285,6 @@
           "type": "bytes",
           "value": null
         }
-      ],
-      "reserved": [
-        [
-          13,
-          31
-        ]
       ]
     }
   },

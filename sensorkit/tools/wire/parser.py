@@ -69,11 +69,6 @@ class Parser:
         if re.fullmatch(r"\d+\.\d+", token):
             return float(token)
         if re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", token):
-            if token == "sizeof" and self.peek() == "(":
-                self.take()
-                name = self.identifier()
-                self.expect(")")
-                return f"sizeof({name})"
             if self.peek() == ".":
                 self.take()
                 return (token, self.identifier())
@@ -118,19 +113,7 @@ class Parser:
                 name = self.identifier()
                 self.expect("{")
                 fields: list[Field] = []
-                reserved: list[tuple[int, int]] = []
-                extension: list[tuple[int, int]] = []
                 while self.peek() != "}":
-                    if self.peek() in {"reserved", "extension"}:
-                        declaration = self.take()
-                        start = self.integer()
-                        end = start
-                        if self.peek() == "..":
-                            self.take()
-                            end = self.integer()
-                        (reserved if declaration == "reserved" else extension).append((start, end))
-                        self.expect(";")
-                        continue
                     field_id = self.integer()
                     field_name = self.identifier()
                     self.expect(":")
@@ -147,7 +130,7 @@ class Parser:
                     fields.append(Field(field_id, field_name, field_type, constant, value, nonnegative))
                     self.optional_semicolon()
                 self.expect("}")
-                schema.messages.append(Message(name, fields, reserved, extension))
+                schema.messages.append(Message(name, fields))
             elif kind == "packed":
                 name = self.identifier()
                 self.expect("endian")

@@ -16,7 +16,7 @@ class SensorWireCodec {
 	}
 
 	public static function decodePackedFrameMessage(bytes:Bytes):PackedFrameMessage {
-		validateKeys(bytes, "PackedFrameMessage", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], [[13, 31]]);
+		validateKeys(bytes, "PackedFrameMessage", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 		var decoded:PackedFrameMessage = MessagePack.decode(bytes);
 		validatePackedFrameMessage(decoded);
 		return decoded;
@@ -41,7 +41,7 @@ class SensorWireCodec {
 	}
 
 	public static function decodeImuSampleMessage(bytes:Bytes):ImuSampleMessage {
-		validateKeys(bytes, "ImuSampleMessage", [1, 2, 3, 4, 5, 6, 7, 8], [[9, 31]]);
+		validateKeys(bytes, "ImuSampleMessage", [1, 2, 3, 4, 5, 6, 7, 8]);
 		var decoded:ImuSampleMessage = MessagePack.decode(bytes);
 		validateImuSampleMessage(decoded);
 		return decoded;
@@ -63,7 +63,7 @@ class SensorWireCodec {
 	}
 
 	public static function decodeLidarScanMessage(bytes:Bytes):LidarScanMessage {
-		validateKeys(bytes, "LidarScanMessage", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], [[12, 31]]);
+		validateKeys(bytes, "LidarScanMessage", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 		var decoded:LidarScanMessage = MessagePack.decode(bytes);
 		validateLidarScanMessage(decoded);
 		return decoded;
@@ -83,16 +83,15 @@ class SensorWireCodec {
 		if (Int64.compare(value.returnStride, Int64.ofInt(0)) < 0 || Int64.compare(value.returnStride, Int64.make(0, -1)) > 0) throw "LidarScanMessage.return_stride is out of range";
 	}
 
-	static function validateKeys(bytes:Bytes, message:String, required:Array<Int>, reserved:Array<Array<Int>>):Void {
+	static function validateKeys(bytes:Bytes, message:String, required:Array<Int>):Void {
 		var reader = new MessagePackReader(bytes);
 		var count = reader.readMapHeader();
 		var seen:Array<Int> = [];
 		for (_ in 0...count) {
 			var key = reader.readInt();
 			if (key < 0) throw 'negative field ID $key in $message';
+			if (seen.indexOf(key) >= 0) throw 'duplicate field ID $key in $message';
 			seen.push(key);
-			for (range in reserved)
-				if (key >= range[0] && key <= range[1]) throw 'reserved field ID $key in $message';
 			reader.skip();
 		}
 		for (id in required)

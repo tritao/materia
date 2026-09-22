@@ -38,16 +38,18 @@ segmentation wrappers. Generated Haxeon records are checked in under
 
 Use the generated `SensorWireCodec` entry points for Haxe MessagePack payload
 encoding and decoding; they validate required fields, schema constants,
-integer ranges, and permanently reserved field IDs around Haxeon's generic
-MessagePack codec. Apply or remove the HMPK envelope with `MessagePackFrame`.
+integer ranges, and duplicate field IDs around Haxeon's generic MessagePack
+codec. Unknown fields are skipped and trailing data is rejected. Apply or
+remove the HMPK envelope with `MessagePackFrame`.
 
 Wire integers use explicit cross-language ranges. `u32` maps to Haxe
 `Int64`, while sensor IDs, sequence numbers, and frame IDs use
 `i64 nonnegative`, which matches the signed range supported by Haxe
-`Int64`. `reserved` IDs are never valid on the wire. `extension` IDs are
-skipped when unknown and can be assigned by a later schema version. Added
-fields remain required; a reader using the new schema therefore requires
-senders to include them.
+`Int64`. Published message shapes and packed layouts are immutable. Preserve
+existing field IDs, types, constants, enum values, and packed layouts; define a
+new message and message type when a shape changes. New enum values and message
+types may be added. This keeps unknown-field skipping for forward tolerance
+without allowing changes to an existing message.
 
 The initial packed formats are RGBA8 camera data, little-endian R32F depth,
 little-endian R32U or U64 segmentation labels. Payloads are tightly packed
