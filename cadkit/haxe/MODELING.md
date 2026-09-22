@@ -233,6 +233,13 @@ The tool remains separate from its Boolean cut and may be passed through linear
 or polar pattern features first. `CounterboredEnclosureLid.hx` demonstrates a
 four-hole patterned cut that follows lid size and thickness changes.
 
+Countersinks use explicit bore diameter, mouth diameter, and included angle.
+Their conical depth is derived from those dimensions and must be positive and
+shallower than the blind depth or current through-all target extent. Included
+angles must lie strictly between zero and `π` radians. `CountersunkFlange.hx`
+patterns a face-attached countersink tool around a bolt circle and keeps the
+through cut valid when flange radius and thickness change.
+
 ## Validation
 
 `ctest --test-dir build/debug --output-on-failure` exercises the C boundary,

@@ -220,6 +220,31 @@ class DocumentBuilder {
 		return feature;
 	}
 
+	public function blindCountersink(target:Feature, selection:SelectionRecipe, xDirection:Vector,
+		x:NamedParameter, y:NamedParameter, diameter:NamedParameter, depth:NamedParameter,
+		mouthDiameter:NamedParameter, includedAngle:NamedParameter, offset:Float = 0, flipped:Bool = false):HoleFeature {
+		check();
+		var feature = document.add(HoleFeature.countersink(target, selection, xDirection, "blind", x.value, y.value,
+			diameter.value, depth.value, mouthDiameter.value, includedAngle.value, offset, flipped));
+		bindHolePosition(feature, x, y, diameter);
+		bind(depth, feature, "hole.depth");
+		bind(mouthDiameter, feature, "hole.recessDiameter");
+		bind(includedAngle, feature, "hole.includedAngle");
+		return feature;
+	}
+
+	public function throughCountersink(target:Feature, selection:SelectionRecipe, xDirection:Vector,
+		x:NamedParameter, y:NamedParameter, diameter:NamedParameter,
+		mouthDiameter:NamedParameter, includedAngle:NamedParameter, offset:Float = 0, flipped:Bool = false):HoleFeature {
+		check();
+		var feature = document.add(HoleFeature.countersink(target, selection, xDirection, "through-all", x.value, y.value,
+			diameter.value, 1, mouthDiameter.value, includedAngle.value, offset, flipped));
+		bindHolePosition(feature, x, y, diameter);
+		bind(mouthDiameter, feature, "hole.recessDiameter");
+		bind(includedAngle, feature, "hole.includedAngle");
+		return feature;
+	}
+
 	private function bindHolePosition(feature:HoleFeature, x:NamedParameter, y:NamedParameter, diameter:NamedParameter):Void {
 		bind(x, feature, "hole.x");
 		bind(y, feature, "hole.y");

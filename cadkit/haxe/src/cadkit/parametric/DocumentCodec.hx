@@ -473,12 +473,15 @@ class DocumentCodec {
 				numberField(record, "radius"), numberField(record, "angularSpan"), decodeVector(requiredField(record, "axisOrigin")),
 				decodeVector(requiredField(record, "axisDirection")), decodeVector(requiredField(record, "radialDirection")),
 				boolField(record, "orientInstances"), numberField(record, "startAngle"));
-		if (type == "hole")
+		if (type == "hole") {
+			var rawIncludedAngle:Dynamic = Reflect.field(record, "includedAngle");
 			return new HoleFeature(requiredFeature(document, intField(record, "target")),
 				decodeSelection(requiredField(record, "selection")), decodeVector(requiredField(record, "xDirection")),
 				stringField(record, "style"), stringField(record, "mode"), numberField(record, "x"), numberField(record, "y"),
 				numberField(record, "diameter"), numberField(record, "depth"), numberField(record, "recessDiameter"),
-				numberField(record, "recessDepth"), numberField(record, "offset"), boolField(record, "flipped"));
+				numberField(record, "recessDepth"), numberField(record, "offset"), boolField(record, "flipped"),
+				rawIncludedAngle == null ? Math.PI / 2 : finiteNumber(rawIncludedAngle, "includedAngle"));
+		}
 		return null;
 	}
 
@@ -633,7 +636,8 @@ class DocumentCodec {
 				diameter: value.diameter.value,
 				depth: value.depth.value,
 				recessDiameter: value.recessDiameter.value,
-				recessDepth: value.recessDepth.value
+				recessDepth: value.recessDepth.value,
+				includedAngle: value.includedAngle.value
 			};
 		}
 		return null;

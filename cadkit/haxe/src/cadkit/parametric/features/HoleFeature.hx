@@ -2,7 +2,10 @@ package cadkit.parametric.features;
 
 import cadkit.Shape;
 import cadkit.modeling.Location;
+import cadkit.modeling.Axis;
 import cadkit.modeling.Plane;
+import cadkit.modeling.Part;
+import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
@@ -28,13 +31,15 @@ class HoleFeature extends Feature {
 	public final depth:Parameter;
 	public final recessDiameter:Parameter;
 	public final recessDepth:Parameter;
+	public final includedAngle:Parameter;
 
 	public function new(target:Feature, selection:SelectionRecipe, xDirection:Vector, style:String, mode:String,
 		xValue:Float, yValue:Float, diameterValue:Float, depthValue:Float = 1,
-		recessDiameterValue:Float = 1, recessDepthValue:Float = 1, offset:Float = 0, flipped:Bool = false) {
+		recessDiameterValue:Float = 1, recessDepthValue:Float = 1, offset:Float = 0, flipped:Bool = false,
+		includedAngleValue:Float = Math.PI / 2) {
 		super();
-		if (style != "plain" && style != "counterbore")
-			throw new ParametricError("hole style must be plain or counterbore");
+		if (style != "plain" && style != "counterbore" && style != "countersink")
+			throw new ParametricError("hole style must be plain, counterbore, or countersink");
 		if (mode != "blind" && mode != "through-all")
 			throw new ParametricError("hole mode must be blind or through-all");
 		if (!Math.isFinite(offset))
@@ -52,6 +57,7 @@ class HoleFeature extends Feature {
 		depth = new Parameter(this, "hole.depth", depthValue, 0);
 		recessDiameter = new Parameter(this, "hole.recessDiameter", recessDiameterValue, 0);
 		recessDepth = new Parameter(this, "hole.recessDepth", recessDepthValue, 0);
+		includedAngle = new Parameter(this, "hole.includedAngle", includedAngleValue, 0);
 	}
 
 	public static function plain(target:Feature, selection:SelectionRecipe, xDirection:Vector, mode:String,
@@ -64,6 +70,13 @@ class HoleFeature extends Feature {
 		offset:Float = 0, flipped:Bool = false):HoleFeature {
 		return new HoleFeature(target, selection, xDirection, "counterbore", mode, x, y, diameter, depth,
 			recessDiameter, recessDepth, offset, flipped);
+	}
+
+	public static function countersink(target:Feature, selection:SelectionRecipe, xDirection:Vector, mode:String,
+		x:Float, y:Float, diameter:Float, depth:Float, mouthDiameter:Float, includedAngle:Float,
+		offset:Float = 0, flipped:Bool = false):HoleFeature {
+		return new HoleFeature(target, selection, xDirection, "countersink", mode, x, y, diameter, depth,
+			mouthDiameter, 1, offset, flipped, includedAngle);
 	}
 
 	override public function serializationType():String {
@@ -93,6 +106,29 @@ class HoleFeature extends Feature {
 		var bore = cylinderAt(plane, diameter.value / 2, boreLength, margin);
 		if (style == "plain")
 			return EvaluationResult.fromShape(bore);
+		if (style == "countersink") {
+			if (recessDiameter.value <= diameter.value)
+				throwInvalidCountersink(bore, "countersink mouth diameter must exceed the bore diameter");
+			if (includedAngle.value <= 0 || includedAngle.value >= Math.PI)
+				throwInvalidCountersink(bore, "countersink included angle must be between zero and pi radians");
+			var sinkDepth = (recessDiameter.value - diameter.value) / 2 / Math.tan(includedAngle.value / 2);
+			var availableDepth = mode == "blind" ? depth.value : span;
+			if (!Math.isFinite(sinkDepth) || sinkDepth <= 0 || sinkDepth >= availableDepth)
+				throwInvalidCountersink(bore, "countersink dimensions must define a recess shallower than the hole");
+			var sink:Null<Shape> = null;
+			try {
+				sink = countersinkAt(plane, diameter.value / 2, recessDiameter.value / 2, sinkDepth, margin);
+				var result = bore.fuse(sink);
+				bore.close();
+				sink.close();
+				return EvaluationResult.fromShape(result);
+			} catch (error:Dynamic) {
+				bore.close();
+				if (sink != null)
+					sink.close();
+				throw error;
+			}
+		}
 		var recess:Null<Shape> = null;
 		try {
 			recess = cylinderAt(plane, recessDiameter.value / 2, recessDepth.value + margin, margin);
@@ -104,6 +140,34 @@ class HoleFeature extends Feature {
 			bore.close();
 			if (recess != null)
 				recess.close();
+			throw error;
+		}
+	}
+
+	private static function throwInvalidCountersink(bore:Shape, message:String):Void {
+		bore.close();
+		throw new ParametricError(message);
+	}
+
+	private function countersinkAt(plane:Plane, boreRadius:Float, mouthRadius:Float, sinkDepth:Float, margin:Float):Shape {
+		var profile:Null<Sketch> = null;
+		var revolved:Null<Part> = null;
+		try {
+			profile = Sketch.polygon([
+				new Vector(0, 0), new Vector(mouthRadius, 0), new Vector(mouthRadius, margin),
+				new Vector(boreRadius, sinkDepth + margin), new Vector(0, sinkDepth + margin)
+			], Plane.XZ());
+			revolved = profile.revolve(Axis.Z());
+			var localOrigin = plane.toWorld(new Vector(x.value, y.value, 0)).add(plane.normal.scale(margin));
+			var placed = new Location(new Plane(localOrigin, plane.xDirection, plane.normal.scale(-1))).apply(revolved.shape);
+			revolved.close();
+			profile.close();
+			return placed;
+		} catch (error:Dynamic) {
+			if (revolved != null)
+				revolved.close();
+			if (profile != null)
+				profile.close();
 			throw error;
 		}
 	}

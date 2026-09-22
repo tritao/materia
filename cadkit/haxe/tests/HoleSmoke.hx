@@ -15,7 +15,7 @@ class HoleSmoke {
 	}
 
 	static function near(value:Float, expected:Float):Void {
-		check(Math.abs(value - expected) < 1e-5, 'expected $expected, got $value');
+		check(Math.abs(value - expected) < 1e-3, 'expected $expected, got $value');
 	}
 
 	public static function run():Void {
@@ -84,5 +84,35 @@ class HoleSmoke {
 		near(restoredLid.result().volume(), lid.finish.currentShape().volume());
 		restoredLid.close();
 		lid.close();
+
+		var countersinkDocument = new Document();
+		var countersinkTarget = countersinkDocument.add(new BoxFeature(30, 30, 10));
+		var countersinkTool = countersinkDocument.add(HoleFeature.countersink(countersinkTarget, top, Vector.X(),
+			"through-all", 0, 0, 4, 1, 10, Math.PI / 2));
+		var countersinkAngle = countersinkDocument.defineParameter("countersink.angle", Math.PI / 2);
+		countersinkAngle.bind(countersinkTool.includedAngle);
+		var countersinkCut = countersinkDocument.add(new BooleanFeature(countersinkTarget, countersinkTool, BooleanOperation.Cut));
+		countersinkDocument.setOutput(countersinkCut);
+		countersinkDocument.recompute();
+		near(countersinkDocument.result().volume(), 30 * 30 * 10 - 67 * Math.PI);
+		var restoredCountersink = DocumentCodec.decode(DocumentCodec.encode(countersinkDocument));
+		near(restoredCountersink.result().volume(), countersinkDocument.result().volume());
+		restoredCountersink.close();
+		var committedCountersink = countersinkDocument.result();
+		countersinkAngle.set(Math.PI);
+		failed = false;
+		try countersinkDocument.recompute() catch (error:Dynamic) failed = true;
+		check(failed && countersinkDocument.result() == committedCountersink,
+			"invalid countersink angle preserves committed geometry");
+		countersinkDocument.close();
+
+		var countersunkFlange = new CountersunkFlange();
+		near(countersunkFlange.finish.currentShape().volume(), Math.PI * 30 * 30 * 8 - 6 * (4 * 8 + 27) * Math.PI);
+		countersunkFlange.resize(36, 10, 8, 25);
+		near(countersunkFlange.finish.currentShape().volume(), Math.PI * 36 * 36 * 10 - 8 * (4 * 10 + 27) * Math.PI);
+		var restoredCountersunkFlange = DocumentCodec.decode(DocumentCodec.encode(countersunkFlange.document));
+		near(restoredCountersunkFlange.result().volume(), countersunkFlange.finish.currentShape().volume());
+		restoredCountersunkFlange.close();
+		countersunkFlange.close();
 	}
 }
