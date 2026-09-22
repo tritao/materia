@@ -15,11 +15,21 @@ class SceneFileDialogs {
 
   public function choose(save:Bool, current:Null<String>,
       complete:Null<String>->Null<String>->Void):Void {
+    chooseResource(save,save ? "Save scene" : "Open scene",
+      save ? "Untitled.materia.json" : null,current,complete);
+  }
+
+  public function chooseExport(title:String,suggestedName:String,
+      complete:Null<String>->Null<String>->Void):Void
+    chooseResource(true,title,suggestedName,null,complete);
+
+  function chooseResource(save:Bool,title:String,suggestedName:Null<String>,current:Null<String>,
+      complete:Null<String>->Null<String>->Void):Void {
     var options = new FileDialogOptions();
-    options.set_title(save ? "Save scene" : "Open scene");
+    options.set_title(title);
     if (save) {
       options.set_flags(DialogFlags.ConfirmOverwrite);
-      options.set_suggested_name("Untitled.materia.json");
+      if(suggestedName!=null)options.set_suggested_name(suggestedName);
     }
     if (current != null) options.set_initial_path(current);
     var parent = new Handle(host.window.rawValue());

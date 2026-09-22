@@ -504,6 +504,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
               "editor.open",
               "editor.save",
               "editor.save-as",
+              "scene.export-step",
               "editor.undo",
               "editor.redo",
               "scene.frame-selected",
@@ -961,6 +962,20 @@ class ReferenceEditorApp implements DesktopUiApplication {
       updateCommandContext();
       commands.refresh();
     }, null, function() return canEditObjects() && scene.canCreate()));
+    commands.register(new Command("scene.export-step", "Export STEP", function() {
+      var chooser=files;
+      if(chooser==null)return;
+      chooser.chooseExport("Export selected CAD part","Mounting plate.step",function(path,error) {
+        if(error!=null){log(error);return;}
+        if(path==null)return;
+        try { scene.exportSelectedCad(path); log("Exported STEP: "+path); }
+        catch(failure:Dynamic) log("STEP export failed: "+Std.string(failure));
+        commands.refresh();
+      });
+    },null,function() {
+      var selected=scene.object(scene.selectedId);
+      return !documents.blocked()&&files!=null&&selected!=null&&selected.kind=="cad-plate";
+    }));
     commands.register(new Command("scene.duplicate", "Duplicate", function() {
       scene.duplicateSelected();
       updateCommandContext();

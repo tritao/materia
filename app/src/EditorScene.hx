@@ -128,6 +128,14 @@ class EditorScene {
     return changeObjects("Create mounting plate", data, id);
   }
 
+  public function exportSelectedCad(path:String):Void {
+    var item=requiredObject(selectedId);
+    if(item.kind!="cad-plate")throw "Select a CAD part to export";
+    var model=CadPlateModel.decode(requiredCadGraph(item));
+    try { model.exportStep(path); model.close(); }
+    catch(error:Dynamic) { model.close(); throw error; }
+  }
+
   public function duplicateSelected():Bool {
     if (!canCreate() || object(selectedId) == null) return false;
     var data = records();
