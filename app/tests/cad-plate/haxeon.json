@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": { "name": "cad-plate-workflow-tests" },
+  "entry": "tests.CadPlateWorkflowTests",
+  "sourceRoots": ["../src"],
+  "scopeSourceRoots": false,
+  "dependencies": { "app": { "path": "../.." } },
+  "target": "host",
+  "outputDir": "../build"
+}
