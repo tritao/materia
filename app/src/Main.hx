@@ -246,6 +246,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var contextMenuY:Float;
   var componentLab:Null<ComponentLab>;
   var sceneViewport:Null<GpuViewport> = null;
+  var dragPointer:Null<Int> = null;
+  var dragPointerX:Float = 0.0;
+  var dragPointerY:Float = 0.0;
   var sceneInspector:Null<PropertyInspector> = null;
   var inspectorSelectionRevision:Int = -1;
 
@@ -262,7 +265,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var chooser = files;
       if (chooser == null) complete(null, "File dialogs require the desktop host");
       else chooser.choose(save, path, complete);
-    }, documentChanged);
+    }, documentChanged, commitActiveDrag, cancelActiveDrag);
     if (hostContext != null) hostContext.onCloseRequested = function(close) documents.requestClose(close);
     treeModel = new EditorSceneTree(scene);
     viewportCamera = new ViewportCamera();
@@ -562,7 +565,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     });
     viewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0), Color.rgba(0.16, 0.24, 0.36, 0.75),
       EditorSceneViewport.GRID_STEP * EditorSceneViewport.SCALE, gridVisible);
-    var dragPointer:Null<Int> = null;
     viewport.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (event.button == 0) {
         var hit = viewportContent.pick(viewportCamera, event.localX, event.localY);
@@ -570,6 +572,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         if (hit != "scene" && viewportContent.beginDrag(viewportCamera,
             event.localX, event.localY, gridSnapEnabled)) {
           dragPointer = event.pointerId;
+          dragPointerX = event.x;
+          dragPointerY = event.y;
           event.capturePointer();
         }
         updateCommandContext();
@@ -589,6 +593,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     );
     viewport.on(UiEventKind.PointerMove, function(event:UiEvent) {
       if (dragPointer == null || event.pointerId != dragPointer) return;
+      dragPointerX = event.x;
+      dragPointerY = event.y;
       if (viewportContent.updateDrag(viewportCamera, event.localX, event.localY)) commands.refresh();
       event.preventDefault();
       event.stopPropagation();
@@ -631,6 +637,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = sceneInspector;
+    inspector.enabled = !viewportContent.dragging();
     return new Column(
       "inspector-panel",
       [
@@ -713,28 +720,28 @@ class ReferenceEditorApp implements DesktopUiApplication {
       scene.createRectangle();
       updateCommandContext();
       commands.refresh();
-    }, null, function() return !documents.blocked() && scene.canCreate()));
+    }, null, function() return canEditObjects() && scene.canCreate()));
     commands.register(new Command("scene.duplicate", "Duplicate", function() {
       scene.duplicateSelected();
       updateCommandContext();
       commands.refresh();
-    }, new Shortcut(68, UiModifier.Control), function() return !documents.blocked()
+    }, new Shortcut(68, UiModifier.Control), function() return canEditObjects()
       && scene.canCreate() && scene.object(scene.selectedId) != null));
     commands.register(new Command("scene.delete", "Delete", function() {
       scene.deleteSelected();
       updateCommandContext();
       commands.refresh();
-    }, null, function() return !documents.blocked() && scene.object(scene.selectedId) != null));
+    }, null, function() return canEditObjects() && scene.object(scene.selectedId) != null));
     commands.register(new Command("editor.undo", "Undo", function() {
       scene.document.undo();
       updateCommandContext();
       commands.refresh();
-    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return !documents.blocked() && scene.document.canUndo));
+    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return canEditObjects() && scene.document.canUndo));
     commands.register(new Command("editor.redo", "Redo", function() {
       scene.document.redo();
       updateCommandContext();
       commands.refresh();
-    }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return !documents.blocked() && scene.document.canRedo));
+    }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return canEditObjects() && scene.document.canRedo));
     commands.register(new Command("editor.new", "New", function() documents.requestNew(),
       new Shortcut(78, UiModifier.Control), function() return !documents.blocked()));
     commands.register(new Command("editor.open", "Open", function() documents.requestOpen(),
@@ -765,13 +772,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
       log(gridSnapEnabled ? "Grid snapping enabled" : "Grid snapping disabled");
     }, null, null, function() return gridSnapEnabled));
     commands.register(new Command("scene.cancel-drag", "Cancel object drag", function() {
-      viewportContent.cancelDrag();
+      cancelActiveDrag();
       updateCommandContext();
       commands.refresh();
     }, new Shortcut(UiKey.Escape), function() return viewportContent.dragging()));
   }
 
   function documentChanged():Void {
+    cancelActiveDrag();
     if (sceneGeneration != session.generation) {
       sceneGeneration = session.generation;
       treeModel = new EditorSceneTree(scene);
@@ -786,6 +794,30 @@ class ReferenceEditorApp implements DesktopUiApplication {
     paletteVisible = false;
     contextMenuVisible = false;
     commands.refresh();
+  }
+
+  function canEditObjects():Bool return !documents.blocked() && !viewportContent.dragging();
+
+  function commitActiveDrag():Void {
+    if (!viewportContent.dragging()) return;
+    viewportContent.commitDrag();
+    releaseDragPointer();
+    updateCommandContext();
+    commands.refresh();
+  }
+
+  function cancelActiveDrag():Void {
+    if (viewportContent.dragging()) viewportContent.cancelDrag();
+    releaseDragPointer();
+    updateCommandContext();
+    commands.refresh();
+  }
+
+  function releaseDragPointer():Void {
+    var pointer = dragPointer;
+    if (pointer == null) return;
+    dragPointer = null;
+    ui.pointerCancel(pointer, dragPointerX, dragPointerY);
   }
 
   function makeDocumentDialog():Null<View> {

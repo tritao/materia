@@ -5,36 +5,44 @@ class SceneDocumentController {
   public final session:SceneDocumentSession;
   final choosePath:Bool->Null<String>->(Null<String>->Null<String>->Void)->Void;
   final changed:Void->Void;
+  final commitPendingEdit:Void->Void;
+  final cancelPendingEdit:Void->Void;
   var pending:Null<Void->Void> = null;
   public var choosing(default, null):Bool = false;
   public var error(default, null):Null<String> = null;
 
   public function new(session:SceneDocumentSession,
-      choosePath:Bool->Null<String>->(Null<String>->Null<String>->Void)->Void, changed:Void->Void) {
+      choosePath:Bool->Null<String>->(Null<String>->Null<String>->Void)->Void, changed:Void->Void,
+      ?commitPendingEdit:Void->Void, ?cancelPendingEdit:Void->Void) {
     this.session = session;
     this.choosePath = choosePath;
     this.changed = changed;
+    this.commitPendingEdit = commitPendingEdit == null ? function() {} : commitPendingEdit;
+    this.cancelPendingEdit = cancelPendingEdit == null ? function() {} : cancelPendingEdit;
   }
 
   public function needsConfirmation():Bool return pending != null;
   public function blocked():Bool return choosing || pending != null || error != null;
 
-  public function requestNew():Void protect(function() {
+  public function requestNew():Void interrupt(function() {
     try session.newDocument() catch (failure:Dynamic) { fail(failure); return; }
     changed();
   });
 
-  public function requestOpen():Void protect(function() {
+  public function requestOpen():Void interrupt(function() {
     choose(false, function(path) {
       try session.open(path) catch (failure:Dynamic) { fail(failure); return; }
       changed();
     });
   });
 
-  public function requestClose(close:Void->Void):Void protect(close);
+  public function requestClose(close:Void->Void):Void interrupt(close);
 
   public function save(as:Bool = false):Void {
-    if (!blocked()) saveThen(as, null);
+    if (!blocked()) {
+      commitPendingEdit();
+      saveThen(as, null);
+    }
   }
 
   public function resolve(choice:String):Void {
@@ -55,6 +63,12 @@ class SceneDocumentController {
     if (blocked()) return;
     if (session.scene.document.isDirty) { pending = action; changed(); }
     else action();
+  }
+
+  function interrupt(action:Void->Void):Void {
+    if (blocked()) return;
+    cancelPendingEdit();
+    protect(action);
   }
 
   function saveThen(as:Bool, after:Null<Void->Void>):Void {

@@ -27,6 +27,8 @@ or the Scene root to clear object selection.
   Undo restores the previous objects, order, and selection; redo retains object IDs.
 - Left-drag an object to move it in XY. The initial grab point is preserved, movement
   previews live, and release creates one undo step. Escape cancels the active drag.
+- Saving commits an active drag before writing. New, Open, and Close cancel it before
+  continuing through the normal unsaved-change confirmation.
 - Optional 0.2 m grid snapping is available from the viewport context menu.
 - Middle-drag pans the view; the wheel zooms around the pointer.
 - Frame selected fits the selected object's bounds.
