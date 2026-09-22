@@ -37,6 +37,7 @@ import cadkit.parametric.features.RotationFeature;
 import cadkit.parametric.features.MirrorFeature;
 import cadkit.parametric.features.DatumSketchFeature;
 import cadkit.parametric.features.LevelExtrudeFeature;
+import cadkit.parametric.features.LevelBoxFeature;
 import cadkit.parametric.features.DefinitionOutputFeature;
 import cadkit.parametric.features.ToolCollectionFeature;
 import cadkit.parametric.DocumentId;
@@ -57,8 +58,12 @@ class DocumentCodec {
 
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
-		for (index in 0...document.featureCount())
-			encodedFeatures.push(encodeFeature(document.featureAt(index)));
+		for (index in 0...document.featureCount()) {
+			var feature = document.featureAt(index);
+			var encoded = encodeFeature(feature);
+			Reflect.setField(encoded, "active", feature.active);
+			encodedFeatures.push(encoded);
+		}
 		var encodedParameters:Array<Dynamic> = [];
 		for (parameter in document.namedParameters()) {
 			var bindings:Array<Dynamic> = [];
@@ -166,7 +171,7 @@ class DocumentCodec {
 		});
 	}
 
-	public static function decode(text:String, clone:Bool = false):Document {
+	public static function decode(text:String, clone:Bool = false, evaluate:Bool = true):Document {
 		var document:Null<Document> = null;
 		try {
 			var root:Dynamic = Json.parse(text);
@@ -193,6 +198,10 @@ class DocumentCodec {
 						decodeElementReference(requiredField(record, "datum")), numberField(record, "offset")));
 				} else if (featureType == "level-extrude") {
 					feature = document.add(new LevelExtrudeFeature(requiredFeature(document, intField(record, "source")),
+						decodeElementReference(requiredField(record, "base")), decodeElementReference(requiredField(record, "top")),
+						numberField(record, "baseOffset"), numberField(record, "topOffset")));
+				} else if (featureType == "level-box") {
+					feature = document.add(new LevelBoxFeature(numberField(record, "width"), numberField(record, "depth"),
 						decodeElementReference(requiredField(record, "base")), decodeElementReference(requiredField(record, "top")),
 						numberField(record, "baseOffset"), numberField(record, "topOffset")));
 				} else if (featureType == "sketch") {
@@ -262,6 +271,8 @@ class DocumentCodec {
 
 				if (feature.id.toInt() != featureId)
 					throw new ParametricError("feature IDs must be contiguous and ordered");
+				if (!optionalBool(record, "active", true))
+					feature.restoreActive(false);
 				var rawReferences:Array<Dynamic> = cast requiredField(record, "references");
 				pendingReferences.push({
 					feature: feature,
@@ -358,7 +369,8 @@ class DocumentCodec {
 				}
 			}
 
-			document.recompute();
+			if (evaluate)
+				document.recompute();
 			return document;
 		} catch (error:Dynamic) {
 			if (document != null)
@@ -412,6 +424,20 @@ class DocumentCodec {
 				top: encodeElementReference(extrusion.top),
 				baseOffset: extrusion.baseOffset.value,
 				topOffset: extrusion.topOffset.value,
+				references: references
+			};
+		}
+		if (featureType == "level-box") {
+			var wall:LevelBoxFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				width: wall.width.value,
+				depth: wall.depth.value,
+				base: encodeElementReference(wall.base),
+				top: encodeElementReference(wall.top),
+				baseOffset: wall.baseOffset.value,
+				topOffset: wall.topOffset.value,
 				references: references
 			};
 		}

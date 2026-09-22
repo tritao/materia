@@ -7,6 +7,8 @@ import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.Feature;
 import cadkit.parametric.FeatureId;
+import cadkit.parametric.FeatureActiveChange;
+import cadkit.parametric.OutputSelectionChange;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.RecomputeError;
 import cadkit.parametric.Transaction;
@@ -71,6 +73,11 @@ class Document {
 
 	public var lastRemapReport(default, null):TopologyRemapReport;
 
+	/** Optional layer-owned validation run before any staged feature evaluation. */
+	public var beforeRecompute:Null<Void->Void>;
+
+	public var afterRecompute:Null<Void->Void>;
+
 	public function new(?id:DocumentId) {
 		this.id = id == null ? new DocumentId() : id;
 		token = nextToken;
@@ -94,6 +101,8 @@ class Document {
 		undoStack = [];
 		redoStack = [];
 		lastRemapReport = new TopologyRemapReport();
+		beforeRecompute = null;
+		afterRecompute = null;
 	}
 
 	public function createWindowDefinition(name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition {
@@ -249,9 +258,11 @@ class Document {
 		if (before == canonical)
 			return;
 		definition.restoreDefault(name, canonical, revision + 1);
-		try
-			refreshDefinition(definition)
-		catch (e:Dynamic) {
+		try {
+			if (beforeRecompute != null)
+				beforeRecompute();
+			refreshDefinition(definition);
+		} catch (e:Dynamic) {
 			definition.restoreDefault(name, before, revision);
 			throw e;
 		}
@@ -269,9 +280,11 @@ class Document {
 		var canonical = UnitConversion.toCanonical(value, input.kind, unit == null ? input.unit : unit);
 		var before = instance.overrideValue(name);
 		instance.restoreOverride(name, canonical);
-		try
-			instance.restoreDirectShape(resolveInstanceShape(instance))
-		catch (e:Dynamic) {
+		try {
+			if (beforeRecompute != null)
+				beforeRecompute();
+			instance.restoreDirectShape(resolveInstanceShape(instance));
+		} catch (e:Dynamic) {
 			instance.restoreOverride(name, before);
 			throw e;
 		}
@@ -285,7 +298,14 @@ class Document {
 		if (before == null)
 			return;
 		instance.restoreOverride(name, null);
-		instance.restoreDirectShape(resolveInstanceShape(instance));
+		try {
+			if (beforeRecompute != null)
+				beforeRecompute();
+			instance.restoreDirectShape(resolveInstanceShape(instance));
+		} catch (error:Dynamic) {
+			instance.restoreOverride(name, before);
+			throw error;
+		}
 		invalidateElementFeatures(instance.id.value);
 		recordDocumentChange(new InstanceOverrideChange(this, instance, name, before, null));
 	}
@@ -628,6 +648,23 @@ class Document {
 		return feature;
 	}
 
+	/** Retain a new graph node for identity, but deactivate it if its transaction is undone. */
+	public function trackFeatureCreation(feature:Feature):Void {
+		if (activeTransaction == null || feature.document != this)
+			throw new ParametricError("tracked feature creation requires an active document transaction");
+		recordDocumentChange(new FeatureActiveChange(feature, false, true));
+	}
+
+	public function setFeatureActive(feature:Feature, value:Bool):Void {
+		if (activeTransaction == null || feature.document != this)
+			throw new ParametricError("feature activation requires an active document transaction");
+		if (feature.active == value)
+			return;
+		var before = feature.active;
+		feature.restoreActive(value);
+		recordDocumentChange(new FeatureActiveChange(feature, before, value));
+	}
+
 	public function isClosed():Bool {
 		return closed;
 	}
@@ -733,6 +770,18 @@ class Document {
 		selectedOutput = feature;
 	}
 
+	public function setOutputTracked(feature:Feature):Void {
+		if (activeTransaction == null)
+			throw new ParametricError("tracked output selection requires an active document transaction");
+		var before = selectedOutput;
+		setOutput(feature);
+		if (before != feature)
+			recordDocumentChange(new OutputSelectionChange(this, before, feature));
+	}
+
+	public function restoreOutputSelection(value:Null<Feature>):Void
+		selectedOutput = value;
+
 	/** Without an explicit selection, the last feature remains the primary output. */
 	public function outputFeature():Feature {
 		ensureOpen();
@@ -821,6 +870,8 @@ class Document {
 
 	public function recompute():Void {
 		ensureOpen();
+		if (beforeRecompute != null)
+			beforeRecompute();
 		synchronizeExpressions();
 		var order = topologicalOrder();
 		var context = new EvaluationContext(this);
@@ -840,7 +891,7 @@ class Document {
 		try {
 			for (feature in order) {
 				current = feature;
-				if (!feature.dirty)
+				if (!feature.active || !feature.dirty)
 					continue;
 
 				var result:EvaluationResult = feature.evaluate(context);
@@ -858,6 +909,8 @@ class Document {
 				lastRemapReport.merge(feature.remapTopologyReferences());
 			for (element in elements)
 				element.commitOutput();
+			if (afterRecompute != null)
+				afterRecompute();
 		} catch (error:Dynamic) {
 			for (feature in features)
 				feature.discardEvaluation();
@@ -1033,6 +1086,28 @@ class Document {
 			var reverse = transaction.documentChanges.length - index - 1;
 			transaction.documentChanges[reverse].undo();
 		}
+		discardCancelledFeatures(transaction.initialFeatureCount);
+	}
+
+	private function discardCancelledFeatures(start:Int):Void {
+		for (index in start...features.length)
+			if (features[index].active)
+				return;
+		if (selectedOutput != null && selectedOutput.id.toInt() > start)
+			return;
+		for (element in elements)
+			if (element.output != null && element.output.id.toInt() > start)
+				return;
+		for (index in 0...start)
+			for (dependency in features[index].dependencies())
+				if (dependency.toInt() > start)
+					return;
+		while (features.length > start) {
+			var feature = features.pop();
+			byId.remove(feature.id.toInt());
+			feature.close();
+		}
+		nextId = start + 1;
 	}
 
 	public function invalidate(feature:Feature):Void {
@@ -1062,7 +1137,8 @@ class Document {
 		var visiting = new Map<Int, Bool>();
 		var visited = new Map<Int, Bool>();
 		for (feature in features)
-			visit(feature, visiting, visited, order);
+			if (feature.active)
+				visit(feature, visiting, visited, order);
 		return order;
 	}
 
@@ -1078,6 +1154,8 @@ class Document {
 			var dependencyFeature = byId.get(dependency.toInt());
 			if (dependencyFeature == null)
 				throw new ParametricError("feature dependency is missing");
+			if (!dependencyFeature.active)
+				throw new ParametricError("active feature depends on an inactive feature");
 			visit(dependencyFeature, visiting, visited, order);
 		}
 		visiting.remove(key);

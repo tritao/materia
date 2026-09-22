@@ -10,6 +10,7 @@ class Transaction {
 	private static var nextIdentity:Int = 1;
 
 	public final identity:Int;
+	public final initialFeatureCount:Int;
 	public final changes:Array<ParameterChange>;
 	public final documentChanges:Array<DocumentChange>;
 
@@ -18,6 +19,7 @@ class Transaction {
 
 	public function new(document:Document) {
 		identity = nextIdentity;
+		initialFeatureCount = document.featureCount();
 		nextIdentity++;
 		this.document = document;
 		this.changes = [];

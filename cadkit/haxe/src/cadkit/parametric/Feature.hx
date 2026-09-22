@@ -13,6 +13,7 @@ import cadkit.parametric.TopologyReference;
 class Feature {
 	public var id(default, null):FeatureId;
 	public var dirty:Bool;
+	public var active(default, null):Bool;
 	public var shape(default, null):Null<Shape>;
 	public var provenance(default, null):Null<Operation>;
 	public var document(default, null):Null<Document>;
@@ -24,6 +25,7 @@ class Feature {
 	public function new() {
 		id = new FeatureId(0);
 		dirty = true;
+		active = true;
 		shape = null;
 		provenance = null;
 		document = null;
@@ -115,6 +117,12 @@ class Feature {
 		dirty = true;
 		if (document != null)
 			document.invalidate(this);
+	}
+
+	public function restoreActive(value:Bool):Void {
+		active = value;
+		if (value)
+			markDirty();
 	}
 
 	public function registerTopologyReference(reference:TopologyReference):Void {
