@@ -72,6 +72,12 @@ class Feature {
 		throw new ParametricError("feature has no evaluator");
 	}
 
+	/** Commit feature-owned staged state after the complete document evaluation succeeds. */
+	public function commitEvaluation():Void {}
+
+	/** Discard feature-owned staged state when any feature in the recompute fails. */
+	public function discardEvaluation():Void {}
+
 	public function currentShape():Null<Shape> {
 		return shape;
 	}

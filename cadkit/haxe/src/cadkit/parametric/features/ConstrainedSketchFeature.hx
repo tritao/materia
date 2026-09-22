@@ -22,6 +22,7 @@ class ConstrainedSketchFeature extends Feature {
 	public var lastDiagnostic(default,null):Null<SolveDiagnostic>;
 	public var lastAttemptDiagnostic(default,null):Null<SolveDiagnostic>;
 	private var committedSolution:Null<SolvedSketch>;
+	private var pendingSolution:Null<SolvedSketch>;
 
 	public function new(authored:ConstrainedSketch) {
 		super();
@@ -31,6 +32,7 @@ class ConstrainedSketchFeature extends Feature {
 		lastDiagnostic = null;
 		lastAttemptDiagnostic = null;
 		committedSolution = null;
+		pendingSolution = null;
 		for (constraint in authored.constraints())
 			if (isDimensional(constraint.kind)) {
 				dimensionSlots.set(constraint.id,
@@ -184,6 +186,10 @@ class ConstrainedSketchFeature extends Feature {
 		return value;
 	}
 
+	public function solvedSketch():Null<SolvedSketch> {
+		return committedSolution;
+	}
+
 	override public function serializationType():String {
 		return "constrained-sketch";
 	}
@@ -211,14 +217,25 @@ class ConstrainedSketchFeature extends Feature {
 		try {
 			var result = EvaluationResult.fromShape(profile.shape.cloneShape());
 			profile.close();
-			committedSolution = solved;
-			lastDiagnostic = solved.diagnostic;
-			lastAttemptDiagnostic = null;
+			pendingSolution = solved;
 			return result;
 		} catch (error:Dynamic) {
 			profile.close();
 			throw error;
 		}
+	}
+
+	override public function commitEvaluation():Void {
+		if (pendingSolution == null)
+			return;
+		committedSolution = pendingSolution;
+		lastDiagnostic = pendingSolution.diagnostic;
+		lastAttemptDiagnostic = null;
+		pendingSolution = null;
+	}
+
+	override public function discardEvaluation():Void {
+		pendingSolution = null;
 	}
 
 	private static function isDimensional(kind:String):Bool {

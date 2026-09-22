@@ -201,10 +201,14 @@ class Document {
 
 			for (index in 0...stagedFeatures.length)
 				stagedFeatures[index].install(stagedResults[index]);
+			for (feature in stagedFeatures)
+				feature.commitEvaluation();
 			lastRemapReport = new TopologyRemapReport();
 			for (feature in stagedFeatures)
 				lastRemapReport.merge(feature.remapTopologyReferences());
 		} catch (error:Dynamic) {
+			for (feature in features)
+				feature.discardEvaluation();
 			lastRemapReport = new TopologyRemapReport();
 			var recomputeError:Null<RecomputeError> = null;
 			if (current != null) {

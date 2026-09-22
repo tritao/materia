@@ -230,6 +230,26 @@ class ConstrainedSketchSmoke {
 			"failed attempt diagnostics are separate from committed geometry");
 		failureDocument.close();
 
+		var stagedDocument = new Document();
+		var stagedSketch = stagedDocument.add(new ConstrainedSketchFeature(sketch));
+		var stagedExtrude = stagedDocument.add(new ExtrudeFeature(stagedSketch, 0, 0, 2));
+		stagedDocument.setOutput(stagedExtrude);
+		stagedDocument.recompute();
+		var committedSolution = stagedSketch.solvedSketch();
+		var committedDiagnostic = stagedSketch.lastDiagnostic;
+		var committedSolid = stagedDocument.result();
+		stagedSketch.dimension("width").set(16);
+		stagedExtrude.z.set(0);
+		failed = false;
+		try stagedDocument.recompute() catch (error:Dynamic) failed = true;
+		check(failed && stagedDocument.result() == committedSolid && stagedSketch.solvedSketch() == committedSolution
+			&& stagedSketch.lastDiagnostic == committedDiagnostic,
+			"downstream failure rolls back staged solver state with geometry");
+		stagedExtrude.z.set(2);
+		stagedDocument.recompute();
+		check(stagedSketch.solvedSketch() != committedSolution, "successful recompute commits staged solver state");
+		stagedDocument.close();
+
 		var plate=new ConstrainedMountingPlate();
 		var oldVolume=plate.finish.currentShape().volume();
 		plate.resize(100,60,12,4);check(plate.finish.currentShape().volume()>oldVolume,"mounting plate recompute");
