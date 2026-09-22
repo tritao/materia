@@ -53,6 +53,7 @@ class EditorDocument {
 
 	/** Marks the current document state as persisted. */
 	public function markSaved():Void {
+		history.breakCoalescing();
 		savedStateToken = history.stateToken;
 		externallyDirty = false;
 	}

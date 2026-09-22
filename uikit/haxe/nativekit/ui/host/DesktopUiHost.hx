@@ -105,7 +105,8 @@ class DesktopUiHost {
 			fonts = FontCollection.create();
 			fonts.addSystemFallbacks();
 			renderer = Renderer.create();
-			application = create(new DesktopUiHostContext(fonts, pump));
+			var hostContext = new DesktopUiHostContext(fonts, pump, window, function() { state.running = false; });
+			application = create(hostContext);
 			if (application == null)
 				throw "Desktop UI application factory returned null";
 			var borrowedSurface = NativeKitSurface.borrowNativeHandle(surface);
@@ -145,7 +146,7 @@ class DesktopUiHost {
 				}
 				switch (value) {
 					case WindowClose(source) if (source.rawValue() == window.rawValue()):
-						state.running = false;
+						hostContext.requestClose();
 					case WindowResize(source, width, height) if (source.rawValue() == window.rawValue()):
 						if (NativeKit.nk_surface_set_bounds(surface, 0, 0, width, height) != Result.Ok)
 							throw "Surface resize failed";

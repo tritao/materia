@@ -86,6 +86,8 @@ import nativekit.ui.theme.Theme;
 import nativekit.ui.host.DesktopUiApplication;
 import nativekit.ui.host.DesktopUiHost;
 import nativekit.ui.host.DesktopUiHostOptions;
+import nativekit.ui.host.DesktopUiHostContext;
+import nativekit.ui.widgets.Dialog;
 
 /**
 	Small executable driver for the shared reference-editor shell.
@@ -133,7 +135,7 @@ class Main {
         world.attach(remote);
         remote.connect(robotHost, diagnostics.robotPort, context.events);
       }
-      var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world);
+      var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context);
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       return editor;
@@ -225,10 +227,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public final world:Null<RobotWorld>;
 
   final storage:FileDockWorkspacePersistence;
-  public final scene:EditorScene;
-  final treeModel:EditorSceneTree;
+  public final session:SceneDocumentSession;
+  public final documents:SceneDocumentController;
+  public var scene(get, never):EditorScene;
+  function get_scene():EditorScene return session.scene;
+  final files:Null<SceneFileDialogs>;
+  var sceneGeneration:Int = 0;
+  var treeModel:EditorSceneTree;
   final viewportCamera:ViewportCamera;
-  final viewportContent:EditorSceneViewport;
+  var viewportContent:EditorSceneViewport;
   final telemetry:PlotModel;
   final logLines:Array<String>;
   var gridVisible:Bool;
@@ -242,13 +249,20 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var inspectorSelectionRevision:Int = -1;
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
-      ?world:RobotWorld) {
+      ?world:RobotWorld, ?hostContext:DesktopUiHostContext) {
     ui = new UiContext(null, fonts, theme == null ? Theme.light() : theme);
     commands = ui.commands;
     this.world = world;
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
-    scene = new EditorScene();
+    session = new SceneDocumentSession();
+    files = hostContext == null ? null : new SceneFileDialogs(hostContext);
+    documents = new SceneDocumentController(session, function(save, path, complete) {
+      var chooser = files;
+      if (chooser == null) complete(null, "File dialogs require the desktop host");
+      else chooser.choose(save, path, complete);
+    }, documentChanged);
+    if (hostContext != null) hostContext.onCloseRequested = function(close) documents.requestClose(close);
     treeModel = new EditorSceneTree(scene);
     viewportCamera = new ViewportCamera();
     viewportContent = new EditorSceneViewport(scene);
@@ -306,6 +320,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       layers.push(new StackChild("command-palette", palette, 0.0, 0.0, 30));
     }
 
+    var documentDialog = makeDocumentDialog();
+    if (documentDialog != null) layers.push(new StackChild("document-dialog", documentDialog,
+      0.0, 0.0, 100, LayoutAxis.grow(), LayoutAxis.grow()));
     var shellStyle = fillStyle();
     shellStyle.background = Color.rgba(0.93, 0.95, 0.98, 1.0);
     return new AppShell("reference-editor-shell", new Stack("overlay-host", layers), topBar(), null, null, shellStyle);
@@ -318,7 +335,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   public function dispose():Void {
     if (world != null) world.close();
-    scene.dispose();
+    if (files != null) files.dispose();
+    session.dispose();
     ui.dispose();
   }
 
@@ -331,6 +349,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function diagnosticState():Dynamic return componentLab == null ? {
     selectedNode: scene.selectedId,
     scene: scene.diagnosticState(),
+    document: {path: session.path, label: session.label(), dirty: scene.document.isDirty,
+      confirmation: documents.needsConfirmation(), choosing: documents.choosing, error: documents.error},
     selection: ui.commandContext.selection.copy(),
     gridVisible: gridVisible,
     paletteVisible: paletteVisible,
@@ -410,7 +430,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     hintStyle.width = LayoutAxis.grow();
     var robotLabel = world == null ? "World: offline"
       : "World: " + Std.string(world.status());
-    var hint = new Text("Reference Editor  ·  Ctrl+K command palette  ·  " + robotLabel,
+    var hint = new Text(session.label() + "  ·  " + robotLabel,
       hintStyle, Color.rgba(0.32, 0.38, 0.47, 1.0));
     return new Row(
       "editor-toolbar-row",
@@ -433,12 +453,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
           new Toolbar(
             "editor-toolbar",
             [
+              "editor.new",
+              "editor.open",
+              "editor.save",
+              "editor.save-as",
               "editor.undo",
               "editor.redo",
-              "editor.save",
-              "scene.frame-selected",
-              "editor.command-palette",
-              "workspace.reset"
+              "scene.frame-selected"
             ],
             commands
           )
@@ -647,28 +668,82 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(new Command("editor.undo", "Undo", function() {
       scene.document.undo();
       commands.refresh();
-    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return scene.document.canUndo));
+    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return !documents.blocked() && scene.document.canUndo));
     commands.register(new Command("editor.redo", "Redo", function() {
       scene.document.redo();
       commands.refresh();
-    }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return scene.document.canRedo));
-    commands.register(new Command("editor.save", "Save workspace", function() {
+    }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return !documents.blocked() && scene.document.canRedo));
+    commands.register(new Command("editor.new", "New", function() documents.requestNew(),
+      new Shortcut(78, UiModifier.Control), function() return !documents.blocked()));
+    commands.register(new Command("editor.open", "Open", function() documents.requestOpen(),
+      new Shortcut(79, UiModifier.Control), function() return !documents.blocked()));
+    commands.register(new Command("editor.save", "Save", function() documents.save(),
+      new Shortcut(UiKey.S, UiModifier.Control), function() return !documents.blocked()));
+    commands.register(new Command("editor.save-as", "Save As", function() documents.save(true),
+      new Shortcut(UiKey.S, UiModifier.Control | UiModifier.Shift), function() return !documents.blocked()));
+    commands.register(new Command("workspace.save", "Save workspace", function() {
       saveWorkspace();
       log("Workspace saved");
-    }, new Shortcut(UiKey.S, UiModifier.Control)));
+    }));
     commands.register(new Command("editor.command-palette", "Open command palette", function() {
       paletteVisible = true;
       contextMenuVisible = false;
       commands.refresh();
-    }, new Shortcut(UiKey.K, UiModifier.Control)));
+    }, new Shortcut(UiKey.K, UiModifier.Control), function() return !documents.blocked()));
     commands.register(new Command("scene.frame-selected", "Frame selected", function() {
       viewportContent.frameSelected(viewportCamera);
       log("Framed " + scene.selectedId);
-    }, null, function() return scene.object(scene.selectedId) != null));
+    }, null, function() return !documents.blocked() && scene.object(scene.selectedId) != null));
     commands.register(new Command("scene.toggle-grid", "Toggle grid", function() {
       gridVisible = !gridVisible;
       log(gridVisible ? "Grid enabled" : "Grid disabled");
     }, null, null, function() return gridVisible));
+  }
+
+  function documentChanged():Void {
+    if (sceneGeneration != session.generation) {
+      sceneGeneration = session.generation;
+      treeModel = new EditorSceneTree(scene);
+      viewportContent = new EditorSceneViewport(scene);
+      sceneViewport = null;
+      sceneInspector = null;
+      inspectorSelectionRevision = -1;
+      viewportCamera.setPan(0, 0);
+      viewportCamera.setZoom(1);
+      updateCommandContext();
+    }
+    paletteVisible = false;
+    contextMenuVisible = false;
+    commands.refresh();
+  }
+
+  function makeDocumentDialog():Null<View> {
+    if (!documents.needsConfirmation() && documents.error == null) return null;
+    var style = new LayoutStyle();
+    style.width = LayoutAxis.grow();
+    style.childGap = 12.0;
+    style.padding = new Insets(16, 16, 16, 16);
+    var buttons:Array<KeyedView> = [];
+    var title = "Unsaved changes";
+    var message = "Save changes to " + session.label() + " before continuing?";
+    var dismiss = function() documents.resolve("cancel");
+    if (documents.error != null) {
+      title = "Scene document error";
+      message = documents.error;
+      dismiss = documents.dismissError;
+      buttons.push(new KeyedView("close", new Button("Close", null, documents.dismissError, "document-error-close")));
+    } else {
+      buttons.push(new KeyedView("save", new Button("Save", null, function() documents.resolve("save"), "document-confirm-save")));
+      buttons.push(new KeyedView("discard", new Button("Discard", null, function() documents.resolve("discard"), "document-confirm-discard")));
+      buttons.push(new KeyedView("cancel", new Button("Cancel", null, dismiss, "document-confirm-cancel")));
+    }
+    var content = new Column("document-message", [
+      new KeyedView("message", new Text(message)),
+      new KeyedView("buttons", new Row("document-actions", buttons))
+    ], style);
+    var dialog = new Dialog("document-confirmation", title, content, dismiss, 520.0);
+    dialog.dismissOnOutside = false;
+    return dialog;
   }
 
   function updateCommandContext():Void {

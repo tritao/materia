@@ -22,16 +22,33 @@ or the Scene root to clear object selection.
 - Middle-drag pans the view; the wheel zooms around the pointer.
 - Frame selected fits the selected object's bounds.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
-- Save workspace (`Ctrl+S`) persists docking only. Scene edits currently last
-  for the session; document save/open is a subsequent milestone.
+- New (`Ctrl+N`) starts a fresh scene with the two starter objects.
+- Open (`Ctrl+O`), Save (`Ctrl+S`), and Save As (`Ctrl+Shift+S`) use native file
+  dialogs. The toolbar shows the current filename and `*` for unsaved changes.
+- New, Open, and window close ask Save / Discard / Cancel when edits are unsaved.
+  Cancelling a chooser or a failed save keeps the current document open.
+- Docking preferences remain separate and save automatically. The command
+  palette also exposes Save workspace.
 
 `EditorScene` owns the SceneKit scene, published snapshot, spatial index, and
 UIKit `EditorDocument` history. `EditorSceneTree` and `EditorSceneViewport`
 consume that state. Inspector bindings retain object identity so undo works
-after changing selection. The viewport currently composes the planar meshes
+after changing selection. `SceneDocumentSession` owns the document path and
+atomic file publication; `SceneDocumentController` coordinates file commands
+and unsaved-change prompts. The viewport currently composes the planar meshes
 through UIKit's canvas; perspective GPU scene rendering is not integrated yet.
 
-Run the scene editing regression checks from the repository root:
+Scene files are UTF-8 JSON with `format: "materia.scene"`, `version: 1`, and an
+`objects` array. Each rectangle stores its stable string `id`, `label`, `type`,
+`x/y/z`, `width/height`, `red/green/blue`, and `visible` fields. Selection, camera,
+undo history, native handles, and docking preferences are not serialized.
+The loader validates field types, unique IDs, finite coordinates, positive
+dimensions, and color ranges before replacing the scene. Unsupported versions
+and malformed files leave the current scene and history intact. Files are
+written atomically, and history retains the saved state as an undo boundary.
+This first format supports local files and planar rectangles.
+
+Run the scene editing and document regression checks from the repository root:
 
 ```sh
 ./haxeon/scripts/haxeon run --project app/tests/haxeon.json

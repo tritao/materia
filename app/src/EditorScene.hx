@@ -1,6 +1,7 @@
 package app;
 
 import nativekit.scene.Scene;
+import app.SceneCodec.SceneObjectData;
 import nativekit.scene.Snapshot;
 import nativekit.scene.SpatialIndex;
 import nativekit.scene.Occurrence;
@@ -17,28 +18,41 @@ import nativekit.ui.core.PropertyValue;
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 class EditorScene {
+  // Retained UI caches survive document replacement, so revisions must too.
+  static var nextRevision:Int = 0;
   public final document:EditorDocument;
   final scene:Scene;
   final objects:Array<EditorSceneObject>;
   var snapshot:Snapshot;
   var spatial:SpatialIndex;
   public var selectedId(default, null):String = "box";
-  public var revision(default, null):Int = 1;
+  public var revision(default, null):Int;
   public var selectionRevision(default, null):Int = 1;
   var disposed:Bool = false;
 
-  public function new() {
+  public function new(?data:Array<SceneObjectData>) {
+    nextRevision++;
+    revision = nextRevision;
     document = new EditorDocument("scene");
     scene = Scene.create();
     objects = [];
-    addObject("box", "Blue box", -1.5, 0.0, 0.0, 1.6, 1.2, 0.22, 0.52, 0.85);
-    addObject("tower", "Orange tower", 1.1, 0.0, 0.1, 1.2, 1.8, 0.92, 0.48, 0.22);
-    snapshot = scene.snapshot();
-    spatial = SpatialIndex.create(snapshot);
+    try {
+      if (data == null) {
+        addObject("box", "Blue box", -1.5, 0.0, 0.0, 1.6, 1.2, 0.22, 0.52, 0.85);
+        addObject("tower", "Orange tower", 1.1, 0.0, 0.1, 1.2, 1.8, 0.92, 0.48, 0.22);
+      } else {
+        for (item in data) addObject(item.id, item.label, item.x, item.y, item.z,
+          item.width, item.height, item.red, item.green, item.blue, item.visible);
+        selectedId = data.length == 0 ? "scene" : data[0].id;
+      }
+      snapshot = scene.snapshot();
+      try spatial = SpatialIndex.create(snapshot)
+      catch (error:Dynamic) { snapshot.dispose(); throw error; }
+    } catch (error:Dynamic) { scene.dispose(); throw error; }
   }
 
   function addObject(id:String, label:String, x:Float, y:Float, z:Float,
-      width:Float, height:Float, red:Float, green:Float, blue:Float):Void {
+      width:Float, height:Float, red:Float, green:Float, blue:Float, visible:Bool = true):Void {
     var geometry = scene.createGeometry();
     var mesh = new GeometryData();
     mesh.addVertex(-width / 2, -height / 2, 0);
@@ -55,6 +69,7 @@ class EditorScene {
     try {
       var occurrence = transaction.createOccurrence();
       transaction.setName(occurrence, label);
+      transaction.setVisibility(occurrence, visible);
       transaction.setGeometry(occurrence, geometry);
       transaction.setMaterial(occurrence, material);
       transaction.setTransform(occurrence, Transform.identity().translated(x, y, z));
@@ -86,7 +101,8 @@ class EditorScene {
     if (id == selectedId) return false;
     selectedId = id;
     selectionRevision++;
-    revision++;
+    nextRevision++;
+    revision = nextRevision;
     return true;
   }
 
@@ -97,17 +113,18 @@ class EditorScene {
 
   /** Orthographic world-space picking against the same published geometry. */
   public function pick(x:Float, y:Float):String {
-    var hit = spatial.pickRay(x, y, 10.0, 0.0, 0.0, -1.0);
+    var hit = spatial.pickRay(x, y, 1000001.0, 0.0, 0.0, -1.0);
     for (item in objects) if (hit.occurrence().equals(item.occurrence)) return item.id;
     return "scene";
   }
 
   public function setPosition(id:String, axis:Int, value:Float):Void {
-    if (axis < 0 || axis > 1 || value != value || value - value != 0.0)
+    if (axis < 0 || axis > 1 || value != value || value - value != 0.0 || Math.abs(value) > 1000000)
       throw "Position requires a finite X or Y coordinate";
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
-    var current = info(id).localTransform();
+    var before = info(id).localTransform();
+    var current = Transform.identity().translated(before.element(12), before.element(13), before.element(14));
     current.set(12 + axis, value);
     var transaction = scene.beginTransaction();
     try {
@@ -137,7 +154,8 @@ class EditorScene {
     snapshot.dispose();
     snapshot = next;
     spatial = nextSpatial;
-    revision++;
+    nextRevision++;
+    revision = nextRevision;
   }
 
   public function properties():Array<PropertyDescriptor> {
@@ -173,6 +191,19 @@ class EditorScene {
           default: throw "Position requires a number";
         }
       }, settings);
+  }
+
+  public function records():Array<SceneObjectData> {
+    var result:Array<SceneObjectData> = [];
+    for (item in objects) {
+      var state = info(item.id);
+      var transform = state.localTransform();
+      result.push({id: item.id, label: item.label, type: "rectangle",
+        x: transform.element(12), y: transform.element(13), z: transform.element(14),
+        width: item.width, height: item.height, red: item.red, green: item.green, blue: item.blue,
+        visible: state.visible()});
+    }
+    return result;
   }
 
   public function diagnosticState():Dynamic {

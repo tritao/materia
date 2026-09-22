@@ -6,6 +6,7 @@ class EditHistory {
 	final redoStack:Array<EditOperation>;
 	var activeTransaction:Null<EditTransaction>;
 	var nextStateToken:Int;
+	var coalescingAllowed:Bool = true;
 	public var stateToken(default, null):Int;
 	public var revision(default, null):Int;
 
@@ -72,7 +73,11 @@ class EditHistory {
 		return result;
 	}
 
+	/** Preserve this history state as an independently undoable boundary. */
+	public function breakCoalescing():Void coalescingAllowed = false;
+
 	public function undo():Bool {
+		breakCoalescing();
 		ensureNoActiveTransaction();
 		if (undoStack.length == 0)
 			return false;
@@ -86,6 +91,7 @@ class EditHistory {
 	}
 
 	public function redo():Bool {
+		breakCoalescing();
 		ensureNoActiveTransaction();
 		if (redoStack.length == 0)
 			return false;
@@ -152,7 +158,7 @@ class EditHistory {
 	}
 
 	function pushApplied(operation:EditOperation, coalesceKey:Null<String>):Void {
-		if (coalesceKey != null && undoStack.length > 0) {
+		if (coalescingAllowed && coalesceKey != null && undoStack.length > 0) {
 			var previous = undoStack[undoStack.length - 1];
 			if (previous.coalesceKey == coalesceKey && previous.mergeFrom(operation)) {
 				previous.afterStateToken = nextStateToken++;
@@ -162,6 +168,7 @@ class EditHistory {
 				return;
 			}
 		}
+		coalescingAllowed = true;
 		operation.beforeStateToken = stateToken;
 		operation.afterStateToken = nextStateToken++;
 		stateToken = operation.afterStateToken;

@@ -74,6 +74,7 @@ class SceneEditingTests {
       check(scene.properties().length == 0 && !scene.context().hasSelection, "empty selection has no editable properties");
       scene.dispose();
       scene.dispose();
+      SceneDocumentTests.run();
       Sys.println("Scene editing tests passed");
       return 0;
     } catch (error:Dynamic) {

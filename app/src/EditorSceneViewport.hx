@@ -36,8 +36,13 @@ class EditorSceneViewport implements ViewportContent {
   }
 
   public function paint(canvas:Canvas, destination:Rect):Void {
-    // The object order follows depth: the second mesh sits in front of the first.
-    for (item in scene.items()) {
+    var ordered = scene.items();
+    ordered.sort(function(a, b) {
+      var first = scene.info(a.id).worldTransform().element(14);
+      var second = scene.info(b.id).worldTransform().element(14);
+      return first < second ? -1 : first > second ? 1 : 0;
+    });
+    for (item in ordered) {
       var state = scene.info(item.id);
       if (!state.visible()) continue;
       var transform = state.worldTransform();
