@@ -69,7 +69,7 @@ class EditorScene {
       width:Float, height:Float, depth:Float, red:Float, green:Float, blue:Float,
       visible:Bool = true,collisionEnabled:Bool=true,dynamicBody:Bool=false,mass:Float=1.0):Void {
     var geometry = scene.createGeometry();
-    scene.setGeometryData(geometry, rectangleGeometry(width, height));
+    scene.setGeometryData(geometry, boxGeometry(width, height, depth));
     var material = scene.createMaterial();
     scene.setMaterialData(material, MaterialData.opaque(red, green, blue));
     var transaction = scene.beginTransaction();
@@ -468,15 +468,22 @@ class EditorScene {
     return item;
   }
 
-  static function rectangleGeometry(width:Float, height:Float):GeometryData {
+  static function boxGeometry(width:Float, height:Float, depth:Float):GeometryData {
     var mesh = new GeometryData();
-    mesh.addVertex(-width / 2, -height / 2, 0);
-    mesh.addVertex(width / 2, -height / 2, 0);
-    mesh.addVertex(width / 2, height / 2, 0);
-    mesh.addVertex(-width / 2, height / 2, 0);
-    mesh.addTriangle(0, 1, 2);
-    mesh.addTriangle(0, 2, 3);
-    mesh.setBounds(-width / 2, -height / 2, 0, width / 2, height / 2, 0);
+    var halfWidth = width / 2, halfHeight = height / 2, halfDepth = depth / 2;
+    mesh.addVertex(-halfWidth, -halfHeight, -halfDepth);
+    mesh.addVertex(halfWidth, -halfHeight, -halfDepth);
+    mesh.addVertex(halfWidth, halfHeight, -halfDepth);
+    mesh.addVertex(-halfWidth, halfHeight, -halfDepth);
+    mesh.addVertex(-halfWidth, -halfHeight, halfDepth);
+    mesh.addVertex(halfWidth, -halfHeight, halfDepth);
+    mesh.addVertex(halfWidth, halfHeight, halfDepth);
+    mesh.addVertex(-halfWidth, halfHeight, halfDepth);
+    for (triangle in [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7],
+        [0, 1, 5], [0, 5, 4], [3, 7, 6], [3, 6, 2],
+        [0, 4, 7], [0, 7, 3], [1, 2, 6], [1, 6, 5]])
+      mesh.addTriangle(triangle[0], triangle[1], triangle[2]);
+    mesh.setBounds(-halfWidth, -halfHeight, -halfDepth, halfWidth, halfHeight, halfDepth);
     return mesh;
   }
 

@@ -113,13 +113,13 @@ class EditorPerspectiveViewport implements View {
     if (selected != null) {
       var transform = scene.info(selected.id).worldTransform();
       camera.frame(transform.element(12), transform.element(13), transform.element(14),
-        selected.width, selected.height, 0.05, aspect());
+        selected.width, selected.height, selected.depth, aspect());
       return;
     }
     var items = scene.items();
     if (items.length == 0) { camera.reset(); return; }
-    var minX = 1000000000.0, minY = 1000000000.0;
-    var maxX = -1000000000.0, maxY = -1000000000.0;
+    var minX = 1000000000.0, minY = 1000000000.0, minZ = 1000000000.0;
+    var maxX = -1000000000.0, maxY = -1000000000.0, maxZ = -1000000000.0;
     for (item in items) {
       if (!scene.info(item.id).visible()) continue;
       var transform = scene.info(item.id).worldTransform();
@@ -127,10 +127,12 @@ class EditorPerspectiveViewport implements View {
       maxX = Math.max(maxX, transform.element(12) + item.width / 2);
       minY = Math.min(minY, transform.element(13) - item.height / 2);
       maxY = Math.max(maxY, transform.element(13) + item.height / 2);
+      minZ = Math.min(minZ, transform.element(14) - item.depth / 2);
+      maxZ = Math.max(maxZ, transform.element(14) + item.depth / 2);
     }
     if (minX == 1000000000.0) { camera.reset(); return; }
-    camera.frame((minX + maxX) / 2, (minY + maxY) / 2, 0.0,
-      maxX - minX, maxY - minY, 0.05, aspect());
+    camera.frame((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2,
+      maxX - minX, maxY - minY, maxZ - minZ, aspect());
   }
 
   public function resetView():Void camera.reset();
@@ -174,20 +176,38 @@ class EditorPerspectiveViewport implements View {
       var state = scene.info(item.id);
       if (!state.visible()) continue;
       var transform = state.worldTransform();
-      var z = transform.element(14);
-      if (Math.abs(ray.directionZ) < 0.000001) continue;
-      var distance = (z - ray.originZ) / ray.directionZ;
-      if (distance < 0.0 || distance >= closest) continue;
-      var x = ray.originX + ray.directionX * distance;
-      var y = ray.originY + ray.directionY * distance;
       var centerX = transform.element(12), centerY = transform.element(13);
-      if (Math.abs(x - centerX) <= item.width / 2 &&
-          Math.abs(y - centerY) <= item.height / 2) {
+      var centerZ = transform.element(14);
+      var distance = rayBoxDistance(ray,
+        centerX - item.width / 2, centerY - item.height / 2, centerZ - item.depth / 2,
+        centerX + item.width / 2, centerY + item.height / 2, centerZ + item.depth / 2);
+      if (distance != null && distance < closest) {
         closest = distance;
         result = item.id;
       }
     }
     return result;
+  }
+
+  static function rayBoxDistance(ray:PerspectiveRay, minX:Float, minY:Float, minZ:Float,
+      maxX:Float, maxY:Float, maxZ:Float):Null<Float> {
+    var origins = [ray.originX, ray.originY, ray.originZ];
+    var directions = [ray.directionX, ray.directionY, ray.directionZ];
+    var minimums = [minX, minY, minZ], maximums = [maxX, maxY, maxZ];
+    var near = 0.0, far = 1000000000.0;
+    for (axis in 0...3) {
+      var direction = directions[axis], origin = origins[axis];
+      if (Math.abs(direction) < 0.000001) {
+        if (origin < minimums[axis] || origin > maximums[axis]) return null;
+      } else {
+        var first = (minimums[axis] - origin) / direction;
+        var second = (maximums[axis] - origin) / direction;
+        if (first > second) { var swap = first; first = second; second = swap; }
+        near = Math.max(near, first); far = Math.min(far, second);
+        if (near > far) return null;
+      }
+    }
+    return far < 0.0 ? null : near;
   }
 
   public function dispose():Void {

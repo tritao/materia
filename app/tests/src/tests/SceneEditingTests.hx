@@ -74,6 +74,24 @@ class SceneEditingTests {
       "perspective ray ignores hidden objects");
     scene.dispose();
     camera.reset();
+    var centerRay = camera.screenRay(400, 300, 800, 600);
+    var boxes:Array<app.SceneCodec.SceneObjectData> = [];
+    for (entry in [{id:"near", distance:4.0}, {id:"far", distance:6.0}]) boxes.push({
+      id:entry.id, label:entry.id, type:"rectangle",
+      x:centerRay.originX + centerRay.directionX * entry.distance,
+      y:centerRay.originY + centerRay.directionY * entry.distance,
+      z:centerRay.originZ + centerRay.directionZ * entry.distance,
+      width:0.5, height:0.5, depth:0.5, red:0.5, green:0.5, blue:0.5,
+      visible:true, collisionEnabled:true, dynamicBody:false, mass:1.0
+    });
+    var stacked = new EditorScene(boxes);
+    check(EditorPerspectiveViewport.pickScene(stacked, camera, 800, 600, 400, 300) == "near",
+      "perspective ray selects the nearest three-dimensional box");
+    stacked.setVisible("near", false);
+    check(EditorPerspectiveViewport.pickScene(stacked, camera, 800, 600, 400, 300) == "far",
+      "perspective ray continues through a hidden front box");
+    stacked.dispose();
+    camera.reset();
     near(camera.targetX, 0.0, "perspective reset restores target X");
     near(camera.targetY, 0.0, "perspective reset restores target Y");
   }

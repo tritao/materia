@@ -13,7 +13,7 @@ SceneKit. `src/Main.hx` composes:
 - a file-backed docking snapshot under `build/reference-editor-workspace.json`
   (override it with `REFERENCE_EDITOR_WORKSPACE`).
 
-The editor starts with two planar SceneKit meshes in an orthographic XY view.
+The editor starts with two extruded SceneKit boxes in an orthographic XY view.
 Click an object in the viewport or hierarchy to select it; the yellow outline
 tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
 (`#RRGGBB`), or Visible in the inspector.
@@ -36,11 +36,14 @@ or the Scene root to clear object selection.
   keys nudge by 0.1 m; Shift+Arrow nudges by 1 m. Each nudge is independently undoable.
 - Positive finite dimension edits rebuild geometry and picking bounds together;
   framing, duplication, undo/redo, and scene persistence use the edited size and colour.
-- The Perspective tab renders the same SceneKit snapshot through the GPU with a
-  fixed perspective camera. Visibility, object colours, and the yellow selection
-  highlight stay synchronized with the XY view and inspector.
-- Middle-drag pans the view; the wheel zooms around the pointer.
-- Frame selected fits the selected object's bounds.
+- The Perspective tab renders the same extruded SceneKit geometry through the GPU.
+  Visibility, object colours, depth, and the yellow selection highlight stay
+  synchronized with the XY view, simulation, and inspector.
+- Left-drag empty space orbits, middle-drag pans, and the wheel zooms. Frame selected
+  fits the full 3D bounds and Reset view restores the default camera.
+- Perspective clicks use a camera ray against the boxes' 3D bounds. Left-dragging a
+  selected box moves it on its current Z plane with the same snapping and undo rules
+  as the XY viewport.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
 - New (`Ctrl+N`) starts a fresh scene with the two starter objects.
 - Open (`Ctrl+O`), Save (`Ctrl+S`), and Save As (`Ctrl+Shift+S`) use native file
@@ -55,10 +58,9 @@ UIKit `EditorDocument` history. `EditorSceneTree` and `EditorSceneViewport`
 consume that state. Inspector bindings retain object identity so undo works
 after changing selection. `SceneDocumentSession` owns the document path and
 atomic file publication; `SceneDocumentController` coordinates file commands
-and unsaved-change prompts. The XY viewport composes the planar meshes through
-UIKit's canvas, while `EditorPerspectiveViewport` captures SceneKit's GPU renderer
-into the Perspective tab. Camera interaction and perspective picking remain
-follow-up work.
+and unsaved-change prompts. The XY viewport provides a canvas projection of the
+boxes, while `EditorPerspectiveViewport` composites SceneKit's renderer directly
+into the Perspective tab's GPU surface.
 
 The Sensors workspace tab edits RobotKit sensor definitions without exposing
 runtime or hardware handles. It supports adding/removing LiDAR and IMU sensors,
@@ -93,13 +95,14 @@ robots but leaves independently attached remote robots untouched.
 
 Scene files are UTF-8 JSON with `format: "materia.scene"`, `version: 1`, and an
 `objects` array plus an optional `sensors` robot configuration. Each rectangle stores its stable string `id`, `label`, `type`,
-`x/y/z`, `width/height`, `red/green/blue`, and `visible` fields. Selection, camera,
+`x/y/z`, `width/height/depth`, collision and dynamics settings, `red/green/blue`,
+and `visible` fields. Selection, camera,
 undo history, native handles, and docking preferences are not serialized.
 The loader validates field types, unique IDs, finite coordinates, positive
 dimensions, and color ranges before replacing the scene. Unsupported versions
 and malformed files leave the current scene and history intact. Files are
 written atomically, and history retains the saved state as an undo boundary.
-This first format supports local files and planar rectangles.
+Older files without physics fields remain compatible through validated defaults.
 
 Run the scene editing and document regression checks from the repository root:
 
@@ -129,7 +132,7 @@ deterministic frame captures.
 Perspective diagnostics report render dimensions, GPU composition mode, CPU
 transfer bytes, and render latency in `app-state.json`. SceneKit renders into a
 shared GPU image that UIKit composites directly, without an RGBA readback. The
-interactive camera will use left-drag orbit, middle-drag pan, and wheel zoom.
+interactive camera uses left-drag orbit, middle-drag pan, and wheel zoom.
 Frame selected will fit the selected rectangle (or the whole scene when selection
 is empty), while Reset view restores the documented default camera.
 
