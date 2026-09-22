@@ -1065,6 +1065,13 @@ NKUI_API nkui_result nkui_graphics_surface_create(nk_graphics_image image,
 /** Creates a renderer and writes its handle to `out_renderer`. */
 NKUI_API nkui_result nkui_renderer_create(nkui_renderer *out_renderer NKUI_OUT);
 
+/** Initializes the renderer for a surface without beginning a UI frame. */
+NKUI_API nkui_result nkui_renderer_prepare(nkui_renderer renderer, nk_surface surface);
+
+/** Borrows the prepared renderer's opaque NativeKit GPU handle value. */
+NKUI_API nkui_result nkui_renderer_get_gpu_renderer(
+    nkui_renderer renderer, uint32_t *out_gpu_renderer_id NKUI_OUT);
+
 /**
  * Registers one native-owned custom effect implementation.
  *

@@ -236,6 +236,8 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_rays(
  */
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_create(
     nkgpu_renderer renderer, nkscene_render_executor *out_executor NK_OUT NK_OWNED);
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_create_from_renderer_id(
+    uint32_t renderer_id, nkscene_render_executor *out_executor NK_OUT NK_OWNED);
 NKSRENDER_API void NKS_CALL nkscene_render_executor_destroy(nkscene_render_executor executor);
 /** Executes a plan and reports resource, instance, command, and draw counters. */
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_execute(

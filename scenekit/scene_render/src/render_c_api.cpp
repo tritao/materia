@@ -473,6 +473,15 @@ nkscene_result NKS_CALL nkscene_render_executor_create(nkgpu_renderer renderer,
     return NKS_OK;
 }
 
+nkscene_result NKS_CALL nkscene_render_executor_create_from_renderer_id(
+    uint32_t renderer_id, nkscene_render_executor *out_executor) {
+    if (!renderer_id)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    nkgpu_renderer renderer{};
+    renderer.id = renderer_id;
+    return nkscene_render_executor_create(renderer, out_executor);
+}
+
 void NKS_CALL nkscene_render_executor_destroy(nkscene_render_executor executor) {
     auto &state = registry();
     std::lock_guard lock(state.mutex);

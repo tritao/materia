@@ -100,6 +100,8 @@ class UiHostRuntime {
 			return false;
 		try {
 			callbackDepth++;
+			var renderSurface = Surface.fromNativeHandle(surface);
+			context.setGpuRenderer(renderer.prepare(renderSurface));
 			frame.setViewport(logicalWidth, logicalHeight);
 			frame.deltaSeconds = frameState.nextDelta(timeSeconds);
 			frameInfo.set(logicalWidth, logicalHeight, framebufferWidth, framebufferHeight, scale);
@@ -109,7 +111,7 @@ class UiHostRuntime {
 				if (callbackDepth == 0 && disposeRequested) disposeNow();
 				return false;
 			}
-			application.context().render(renderer, Surface.fromNativeHandle(surface), frameInfo);
+			application.context().render(renderer, renderSurface, frameInfo);
 			rendered++;
 			callbackDepth--;
 			if (callbackDepth == 0 && disposeRequested) disposeNow();

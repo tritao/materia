@@ -25,6 +25,7 @@ class UiRendererImpl final : public UiRenderer {
     bool initialize() override;
     bool valid() const override;
     bool lost() const override;
+    nkgpu_renderer gpuRenderer() const override;
     bool beginFrame(bool record, const nk_surface_frame_target *frame_target) override;
     bool beginWindowPass(int width, int height, bool clear) override;
     bool beginTargetPass(ResourceId target, int width, int height, bool load_existing) override;
@@ -1685,6 +1686,10 @@ bool UiRendererImpl::initialize() {
     state_->stats.gpu_resources = 38;
     state_->initialized = true;
     return true;
+}
+
+nkgpu_renderer UiRendererImpl::gpuRenderer() const {
+    return state_ ? state_->renderer : nkgpu_renderer{};
 }
 
 bool UiRendererImpl::valid() const {

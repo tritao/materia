@@ -2,6 +2,7 @@
 #define NATIVEKIT_UI_RENDERER_H
 
 #include "nativekit_graphics.h"
+#include "nativekit_gpu.h"
 #include "display_list/display_list.h"
 #include "prepare/nanovg_path.h"
 #include "prepare/text_engine.h"
@@ -122,6 +123,7 @@ class UiRenderer {
     virtual bool initialize() = 0;
     virtual bool valid() const = 0;
     virtual bool lost() const = 0;
+    virtual nkgpu_renderer gpuRenderer() const = 0;
     /**
      * Starts a frame. When `record` is set the frame is recorded into a sealed
      * submission batch and replayed by endFrame(); otherwise it is drawn inline.

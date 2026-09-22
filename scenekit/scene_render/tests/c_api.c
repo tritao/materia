@@ -68,6 +68,8 @@ int main(void) {
 
     nkgpu_renderer renderer = {0};
     nkscene_render_executor executor = 0;
+    assert(nkscene_render_executor_create_from_renderer_id(0, &executor) ==
+           NKS_ERROR_INVALID_ARGUMENT);
     assert(nkscene_render_executor_create(renderer, &executor) == NKS_OK);
     nkscene_render_pick_request pick_request = 0;
     assert(nkscene_render_executor_pick_pixel_begin(

@@ -13,6 +13,7 @@ class UiHostContext {
 	public var onCloseRequested:Null<(Void->Void)->Void> = null;
 	final close:Void->Void;
 	final scheduleFrame:Void->Void;
+	public var gpuRendererId(default, null):Int = 0;
 
 	public function new(fonts:FontCollection, events:NativeKitEvents,
 			close:Void->Void, scheduleFrame:Void->Void) {
@@ -29,6 +30,9 @@ class UiHostContext {
 
 	/** Requests another frame without prescribing how the host schedules it. */
 	public function requestFrame():Void scheduleFrame();
+
+	@:allow(nativekit.ui.host.UiHostRuntime)
+	function setGpuRenderer(value:Int):Void gpuRendererId = value;
 
 	/** Begins the application-defined close-confirmation flow. */
 	public function requestClose():Void {

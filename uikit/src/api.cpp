@@ -2852,6 +2852,54 @@ extern "C" nkui_result nkui_renderer_create(nkui_renderer *out_renderer) {
     }
 }
 
+extern "C" nkui_result nkui_renderer_prepare(nkui_renderer renderer, nk_surface surface) {
+    if (!surface)
+        return NKUI_ERROR_INVALID_ARGUMENT;
+    if (nk::core::render_executor_physical())
+        return NKUI_OK;
+    nk_surface_frame_target target{};
+    target.struct_size = sizeof(target);
+    if (nk_surface_make_current(surface) != NK_OK ||
+        nk_surface_get_frame_target(surface, &target) != NK_OK)
+        return NKUI_ERROR_RENDERING;
+    std::lock_guard<std::mutex> lock(renderers_mutex);
+    std::unique_lock<std::mutex> cpu_lock(renderer_cpu_mutex);
+    auto *slot = resolve(renderer);
+    if (!slot)
+        return NKUI_ERROR_INVALID_HANDLE;
+    discard_stale_renderer(*slot, target);
+    if (!slot->renderer) {
+        slot->renderer = nkui::create_ui_renderer(surface);
+        if (!slot->renderer)
+            return NKUI_ERROR_RENDERING;
+        slot->backend_api = target.api;
+        slot->backend_device = target.device;
+        slot->backend_native_device = target.native_device;
+    }
+    if (!slot->renderer->valid() && !slot->renderer->initialize())
+        return NKUI_ERROR_RENDERING;
+    if (!register_custom_effects(*slot))
+        return NKUI_ERROR_RENDERING;
+    return NKUI_OK;
+}
+
+extern "C" nkui_result nkui_renderer_get_gpu_renderer(
+    nkui_renderer renderer, uint32_t *out_gpu_renderer_id) {
+    if (!out_gpu_renderer_id)
+        return NKUI_ERROR_INVALID_ARGUMENT;
+    *out_gpu_renderer_id = 0;
+    if (nk::core::render_executor_physical())
+        return NKUI_OK;
+    std::lock_guard<std::mutex> lock(renderers_mutex);
+    auto *slot = resolve(renderer);
+    if (!slot)
+        return NKUI_ERROR_INVALID_HANDLE;
+    if (!slot->renderer || !slot->renderer->valid())
+        return NKUI_ERROR_RENDERING;
+    *out_gpu_renderer_id = slot->renderer->gpuRenderer().id;
+    return *out_gpu_renderer_id ? NKUI_OK : NKUI_ERROR_RENDERING;
+}
+
 extern "C" nkui_result nkui_renderer_destroy(nkui_renderer renderer) {
     std::lock_guard<std::mutex> lock(renderers_mutex);
     auto *slot = resolve(renderer);

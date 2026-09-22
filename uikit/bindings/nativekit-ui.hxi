@@ -784,9 +784,17 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 	 */
 	extern fn nkui_renderer_destroy(renderer: nkui_renderer) -> nkui_result;
 	/**
+	 * Borrows the prepared renderer's opaque NativeKit GPU handle value.
+	 */
+	extern fn nkui_renderer_get_gpu_renderer(renderer: nkui_renderer, out_gpu_renderer_id: ptr<u32> @out) -> nkui_result;
+	/**
 	 * Returns preparation and geometry-cache counters for a renderer.
 	 */
 	extern fn nkui_renderer_get_stats(renderer: nkui_renderer, out_stats: ptr<nkui_renderer_stats> @out) -> nkui_result;
+	/**
+	 * Initializes the renderer for a surface without beginning a UI frame.
+	 */
+	extern fn nkui_renderer_prepare(renderer: nkui_renderer, surface: nk_surface) -> nkui_result;
 	/**
 	 * Registers one native-owned custom effect implementation.
 	 *

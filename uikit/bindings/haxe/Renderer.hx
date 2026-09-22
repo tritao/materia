@@ -18,6 +18,16 @@ class Renderer {
 		return new Renderer(made.out_renderer);
 	}
 
+	/** Prepares the native backend and returns its borrowed GPU renderer. */
+	public function prepare(surface:Surface):Int {
+		ensureLive();
+		UiResult.check(NativeKitUI.nkui_renderer_prepare(value, surface.nativeHandle()),
+			"renderer.prepare");
+		var borrowed = NativeKitUI.nkui_renderer_get_gpu_renderer(value);
+		UiResult.check(borrowed.status, "renderer.gpuRenderer");
+		return borrowed.out_gpu_renderer_id;
+	}
+
 	public function render(list:DisplayList, surface:Surface):Void {
 		ensureLive();
 		UiResult.check(NativeKitUI.nkui_renderer_render(value, list.nativeHandle(), surface.nativeHandle()), "renderer.render");

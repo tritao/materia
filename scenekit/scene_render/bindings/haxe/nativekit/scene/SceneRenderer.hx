@@ -21,11 +21,19 @@ class SceneRenderer {
 	var lastUpdateValue:Null<nkscene_render_update> = null;
 	var disposed:Bool = false;
 
-	private function new(gpuOwner:Null<SceneGpuRenderer>, renderer:nkgpu_renderer) {
+	private function new(gpuOwner:Null<SceneGpuRenderer>, renderer:nkgpu_renderer,
+			borrowedRendererId:Int = 0) {
 		this.gpuOwner = gpuOwner;
-		var made = NativeKitSceneRender.nkscene_render_executor_create(renderer);
-		checkScene(made.status, "sceneRenderer.create");
-		executor = made.out_executor;
+		if (borrowedRendererId == 0) {
+			var made = NativeKitSceneRender.nkscene_render_executor_create(renderer);
+			checkScene(made.status, "sceneRenderer.create");
+			executor = made.out_executor;
+		} else {
+			var made = NativeKitSceneRender.nkscene_render_executor_create_from_renderer_id(
+				borrowedRendererId);
+			checkScene(made.status, "sceneRenderer.create");
+			executor = made.out_executor;
+		}
 	}
 
 	/** Creates a renderer attached to a live NativeKit GPU renderer. */
@@ -39,6 +47,10 @@ class SceneRenderer {
 	/** Creates an executor around a caller-owned renderer handle. */
 	public static function createBorrowed(renderer:nkgpu_renderer):SceneRenderer
 		return new SceneRenderer(null, renderer);
+
+	/** Creates an executor around a caller-owned opaque renderer ID. */
+	public static function createBorrowedId(rendererId:Int):SceneRenderer
+		return new SceneRenderer(null, new nkgpu_renderer(), rendererId);
 
 	/** Compiles, refreshes, or incrementally updates the plan, then executes it. */
 	public function render(snapshot:Snapshot, view:SceneView,

@@ -13,6 +13,7 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	 * headless resource and command path. The renderer must outlive the executor.
 	 */
 	extern fn nkscene_render_executor_create(renderer: nkgpu_renderer, out_executor: ptr<nkscene_render_executor> @out @owned) -> nkscene_result;
+	extern fn nkscene_render_executor_create_from_renderer_id(renderer_id: u32, out_executor: ptr<nkscene_render_executor> @out @owned) -> nkscene_result;
 	extern fn nkscene_render_executor_destroy(executor: nkscene_render_executor) -> void;
 	/**
 	 * Executes a plan and reports resource, instance, command, and draw counters.
