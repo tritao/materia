@@ -64,6 +64,27 @@ class ConstrainedSketchSmoke {
 		try invalid.solve() catch (error:SketchSolveError) failed = error.diagnostic.status == "invalid" && error.diagnostic.constraintIds[0] == "bad";
 		check(failed, "non-finite authored input is invalid");
 
+		var translated = new ConstrainedSketch();
+		translated.addPoint(new SketchPoint("translated.a", 1e9, 1e9))
+			.addPoint(new SketchPoint("translated.b", 1e9 + 10, 1e9))
+			.addConstraint(SketchConstraint.fixed("translated.fixed", "translated.a"))
+			.addConstraint(SketchConstraint.distance("translated.distance", "translated.a", "translated.b", 12));
+		var translatedResult = translated.solve();
+		near(translatedResult.x("translated.b") - translatedResult.x("translated.a"), 12);
+		check(translatedResult.diagnostic.iterations > 0, "translation does not relax linear tolerance");
+		var translatedAngle = new ConstrainedSketch();
+		translatedAngle.addPoint(new SketchPoint("angle.a", 1e9, 1e9))
+			.addPoint(new SketchPoint("angle.b", 1e9 + 10, 1e9))
+			.addPoint(new SketchPoint("angle.c", 1e9 + 1, 1e9 + 5))
+			.addEntity(SketchEntity.line("angle.horizontal", "angle.a", "angle.b"))
+			.addEntity(SketchEntity.line("angle.vertical", "angle.a", "angle.c"))
+			.addConstraint(SketchConstraint.fixed("angle.fixedA", "angle.a"))
+			.addConstraint(SketchConstraint.fixed("angle.fixedB", "angle.b"))
+			.addConstraint(SketchConstraint.distance("angle.length", "angle.a", "angle.c", 5))
+			.addConstraint(SketchConstraint.perpendicular("angle.perpendicular", "angle.horizontal", "angle.vertical"));
+		var translatedAngleResult = translatedAngle.solve();
+		near(translatedAngleResult.x("angle.c") - translatedAngleResult.x("angle.a"), 0);
+
 		var mixed=new ConstrainedSketch();
 		for(p in [new SketchPoint("m0",0,0),new SketchPoint("m1",2,0),new SketchPoint("m2",0,1),new SketchPoint("m3",2,1),
 			new SketchPoint("m4",0,2),new SketchPoint("mc1",0,4),new SketchPoint("mc2",2,4),new SketchPoint("ms0",-1,2),new SketchPoint("ms1",1,2)])mixed.addPoint(p);

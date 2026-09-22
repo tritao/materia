@@ -14,6 +14,7 @@ class SketchSolver {
 	private final tangentSides:Map<String, Float>;
 	private var variableCount:Int;
 	private var solveTolerance:Float;
+	private var normalizationScale:Float;
 
 	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>) {
 		this.sketch = sketch; pointIndex = new Map(); radiusIndex = new Map(); points = new Map(); entities = new Map();
@@ -22,6 +23,7 @@ class SketchSolver {
 		tangentSides = new Map();
 		variableCount = 0;
 		solveTolerance = sketch.settings.tolerance;
+		normalizationScale = 1;
 		for (point in sketch.points()) { points.set(point.id, point); pointIndex.set(point.id, variableCount); variableCount += 2; }
 		for (entity in sketch.entities()) {
 			entities.set(entity.id, entity);
@@ -47,7 +49,8 @@ class SketchSolver {
 		for (entity in sketch.entities())
 			if (entity.kind == "circle" || entity.kind == "arc")
 				x.push(seededRadius(entity));
-		solveTolerance = sketch.settings.tolerance * modelScale(x);
+		normalizationScale = characteristicScale(x);
+		solveTolerance = sketch.settings.tolerance;
 		initializeTangentBranches(x);
 		var damping = sketch.settings.initialDamping;
 		var current = residuals(x);
@@ -156,6 +159,9 @@ class SketchSolver {
 				case "symmetric": symmetry(c.first, needSecond(c), needThird(c), x, c.id, values);
 				default: throw invalid("unsupported constraint kind: " + c.kind, [c.id]);
 			}
+			if (hasLinearResidual(c.kind))
+				for (index in before...values.length)
+					values[index] /= normalizationScale;
 			for (_ in before...values.length) owners.push(c.id);
 		}
 		return {values: values, owners: owners};
@@ -250,17 +256,39 @@ class SketchSolver {
 		}
 	}
 
-	private function modelScale(x:Array<Float>):Float {
-		var scale = 1.0;
-		for (value in x)
-			scale = Math.max(scale, Math.abs(value));
-		return scale;
+	private function characteristicScale(x:Array<Float>):Float {
+		var minimumX = 1e300;
+		var maximumX = -1e300;
+		var minimumY = 1e300;
+		var maximumY = -1e300;
+		for (point in sketch.points()) {
+			var index:Int = cast pointIndex.get(point.id);
+			minimumX = Math.min(minimumX, x[index]);
+			maximumX = Math.max(maximumX, x[index]);
+			minimumY = Math.min(minimumY, x[index + 1]);
+			maximumY = Math.max(maximumY, x[index + 1]);
+		}
+		var scale = sketch.points().length == 0 ? 1 : Math.max(maximumX - minimumX, maximumY - minimumY);
+		for (entity in sketch.entities()) {
+			if (entity.kind == "circle" || entity.kind == "arc") {
+				var index:Int = cast radiusIndex.get(entity.id);
+				scale = Math.max(scale, Math.abs(x[index]));
+			}
+		}
+		for (constraint in sketch.constraints())
+			if (constraint.kind == "distance" || constraint.kind == "radius")
+				scale = Math.max(scale, Math.abs(constraint.value));
+		return Math.max(1, scale);
+	}
+
+	private static function hasLinearResidual(kind:String):Bool {
+		return kind != "parallel" && kind != "perpendicular" && kind != "angle";
 	}
 	private function symmetry(pa:String,pb:String,axis:String,x:Array<Float>,owner:String,out:Array<Float>):Void {
 		var a=point(pa,x), b=point(pb,x), ends=line(axis,x,owner), d=direction(axis,x,owner); var dd=dot(d,d); if(dd<1e-12) throw invalid("collapsed symmetry axis",[owner]);
 		var mid=[(a[0]+b[0])/2,(a[1]+b[1])/2]; out.push(cross([mid[0]-ends[0][0],mid[1]-ends[0][1]],d)/Math.pow(dd,0.5)); out.push(dot([b[0]-a[0],b[1]-a[1]],d)/Math.pow(dd,0.5));
 	}
-	private function jacobian(x:Array<Float>, base:Array<Float>):Array<Array<Float>> { var j=matrix(base.length,variableCount,0); for(col in 0...variableCount){var h=1e-6*Math.max(1,Math.abs(x[col]));var t=x.copy();t[col]+=h;var r=residuals(t).values;for(row in 0...base.length)j[row][col]=(r[row]-base[row])/h;}return j; }
+	private function jacobian(x:Array<Float>, base:Array<Float>):Array<Array<Float>> { var j=matrix(base.length,variableCount,0); for(col in 0...variableCount){var h=1e-6*normalizationScale;var t=x.copy();t[col]+=h;var r=residuals(t).values;for(row in 0...base.length)j[row][col]=(r[row]-base[row])/h;}return j; }
 	private function gradient(j:Array<Array<Float>>, residual:Array<Float>):Array<Float> { var result=fill(variableCount,0);for(row in 0...j.length)for(column in 0...variableCount)result[column]+=j[row][column]*residual[row];return result; }
 	private function redundantIds(x:Array<Float>, full:Array<Array<Float>>, fullRank:Int):Array<String> { var result:Array<String> = []; var set=residuals(x); for(c in sketch.constraints()){var reduced:Array<Array<Float>> = [];for(i in 0...full.length)if(set.owners[i]!=c.id)reduced.push(full[i]);if(rank(reduced,sketch.settings.rankTolerance)==fullRank)result.push(c.id);}return result; }
 	private function failingOwners(set:ResidualSet,t:Float):Array<String>{var out:Array<String> = [];for(i in 0...set.values.length)if(Math.abs(set.values[i])>t&&!contains(out,set.owners[i]))out.push(set.owners[i]);return out;}
