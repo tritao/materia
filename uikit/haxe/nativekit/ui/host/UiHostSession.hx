@@ -28,6 +28,7 @@ class UiHostError {
 class UiHostSession {
 	public var state(default, null):UiHostLifecycle = UiHostLifecycle.Starting;
 	public var error(default, null):Null<UiHostError> = null;
+	public final cleanupErrors:Array<UiHostError> = [];
 	final stopCallback:Void->Void;
 	var disposed:Bool = false;
 
@@ -35,14 +36,40 @@ class UiHostSession {
 
 	@:allow(nativekit.ui.host.UiHostRuntime)
 	@:allow(nativekit.ui.host.BrowserUiHost)
-	function transition(next:UiHostLifecycle):Void state = next;
+	@:allow(nativekit.ui.host.DesktopUiHost)
+	function transition(next:UiHostLifecycle):Void {
+		if (state == next) return;
+		var valid = switch (state) {
+			case UiHostLifecycle.Starting:
+				next == UiHostLifecycle.LoadingResources || next == UiHostLifecycle.Running ||
+				next == UiHostLifecycle.Stopping || next == UiHostLifecycle.Failed;
+			case UiHostLifecycle.LoadingResources:
+				next == UiHostLifecycle.Running || next == UiHostLifecycle.Stopping ||
+				next == UiHostLifecycle.Failed;
+			case UiHostLifecycle.Running:
+				next == UiHostLifecycle.Stopping || next == UiHostLifecycle.Failed;
+			case UiHostLifecycle.Stopping:
+				next == UiHostLifecycle.Stopped || next == UiHostLifecycle.Failed;
+			case UiHostLifecycle.Stopped, UiHostLifecycle.Failed: false;
+			case _: false;
+		};
+		if (!valid) throw "Invalid UI host lifecycle transition";
+		state = next;
+	}
 
 	@:allow(nativekit.ui.host.UiHostRuntime)
 	@:allow(nativekit.ui.host.BrowserUiHost)
+	@:allow(nativekit.ui.host.DesktopUiHost)
 	function fail(stage:String, cause:Dynamic):Void {
 		if (error == null) error = new UiHostError(stage, cause);
-		state = UiHostLifecycle.Failed;
+		if (state != UiHostLifecycle.Stopped) state = UiHostLifecycle.Failed;
 	}
+
+	@:allow(nativekit.ui.host.UiHostRuntime)
+	@:allow(nativekit.ui.host.BrowserUiHost)
+	@:allow(nativekit.ui.host.DesktopUiHost)
+	function cleanupFailed(stage:String, cause:Dynamic):Void
+		cleanupErrors.push(new UiHostError(stage, cause));
 
 	public function isActive():Bool return state != UiHostLifecycle.Stopped && state != UiHostLifecycle.Failed;
 

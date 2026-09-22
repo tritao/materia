@@ -16,6 +16,10 @@ class BrowserUiHost {
 	final session:BrowserUiHostSession;
 	var initialized:Bool = false;
 	var stopped:Bool = false;
+	var stopping:Bool = false;
+	var cleanupPending:Bool = false;
+	var eventDispatching:Bool = false;
+	var frameRequested:Bool = true;
 	var window:WindowHandle = WindowHandle.invalid();
 	var surface:SurfaceHandle = SurfaceHandle.invalid();
 	var events:Null<NativeKitEvents> = null;
@@ -130,19 +134,25 @@ class BrowserUiHost {
 		var activeEvents:NativeKitEvents = cast events;
 		var activeFonts:FontCollection = cast fonts;
 		var context = new UiHostContext(activeFonts, activeEvents, function() session.stop(),
-			function() {});
+			function() frameRequested = true);
 		hostContext = context;
 		var activeRuntime = new UiHostRuntime(session, context, window, surface,
 			options.width, options.height);
 		runtime = activeRuntime;
 		activeRuntime.start(create);
+		if (cleanupPending || session.state == UiHostLifecycle.Failed) {
+			stopHost();
+			return;
+		}
 		activeRuntime.setScale(pixelScale);
 		activeRuntime.resize(logicalWidth, logicalHeight, framebufferWidth, framebufferHeight);
 		activeRuntime.setSurfaceReady(surfaceReady);
+		frameRequested = true;
 	}
 
 	function handleEvent(value:NativeKitEventValue):Void {
-		if (stopped) return;
+		if (stopped || stopping) return;
+		frameRequested = true;
 		try {
 			switch (value) {
 			case Raw(kind, _, request, loadResult, _, _, data)
@@ -156,9 +166,11 @@ class BrowserUiHost {
 				logicalHeight = height;
 				if (NativeKit.nk_surface_set_bounds(surface, 0, 0, width, height) != Result.Ok)
 					throw "Browser surface resize failed";
+				frameRequested = true;
 			case WindowScaleChanged(source, scale) if (source.rawValue() == window.rawValue()):
 				pixelScale = scale;
 				if (runtime != null) runtime.setScale(scale);
+				frameRequested = true;
 			case SurfaceReady(source) if (source.rawValue() == surface.rawValue()):
 				if (NativeKit.nk_surface_make_current(surface) != Result.Ok)
 					throw "Browser surface activation failed";
@@ -170,11 +182,13 @@ class BrowserUiHost {
 				framebufferHeight = size.out_height;
 				pixelScale = scale.out_scale;
 				surfaceReady = framebufferWidth > 0 && framebufferHeight > 0;
+				frameRequested = surfaceReady;
 				var activeRuntime = runtime;
 				if (activeRuntime != null) {
 					activeRuntime.setScale(scale.out_scale);
 					activeRuntime.resize(activeRuntime.logicalWidth, activeRuntime.logicalHeight,
 						size.out_width, size.out_height);
+					activeRuntime.setSurfaceReady(surfaceReady);
 				}
 			case SurfaceResize(source, width, height, framebufferWidth, framebufferHeight)
 				if (source.rawValue() == surface.rawValue()):
@@ -182,8 +196,8 @@ class BrowserUiHost {
 				logicalHeight = height;
 				this.framebufferWidth = framebufferWidth;
 				this.framebufferHeight = framebufferHeight;
-				surfaceReady = framebufferWidth > 0 && framebufferHeight > 0;
 				if (runtime != null) runtime.resize(width, height, framebufferWidth, framebufferHeight);
+				if (surfaceReady) frameRequested = true;
 			case SurfaceLost(source) if (source.rawValue() == surface.rawValue()):
 				surfaceReady = false;
 				if (runtime != null) runtime.setSurfaceReady(false);
@@ -220,18 +234,30 @@ class BrowserUiHost {
 	function advance(timeMilliseconds:Float):Int {
 		if (stopped) return session.state == UiHostLifecycle.Failed ? -1 : 0;
 		try {
-			while (!stopped && events != null && events.poll()) {}
+			eventDispatching = true;
+			while (!stopping && events != null && events.poll()) {}
+			eventDispatching = false;
+			if (cleanupPending || stopping) {
+				stopHost();
+				return session.state == UiHostLifecycle.Failed ? -1 : 0;
+			}
 			var activeRuntime = runtime;
-			if (activeRuntime != null && activeRuntime.surfaceReady && session.state == UiHostLifecycle.Running) {
+			if (frameRequested && activeRuntime != null && activeRuntime.surfaceReady &&
+				session.state == UiHostLifecycle.Running) {
+				frameRequested = false;
 				if (NativeKit.nk_surface_make_current(surface) != Result.Ok)
 					throw "Browser surface activation failed";
 				activeRuntime.render(timeMilliseconds / 1000.0);
-				if (session.state == UiHostLifecycle.Failed) return -1;
+				if (cleanupPending || session.state != UiHostLifecycle.Running) {
+					stopHost();
+					return session.state == UiHostLifecycle.Failed ? -1 : 0;
+				}
 				if (NativeKit.nk_surface_present(surface) != Result.Ok)
 					throw "Browser surface presentation failed";
 			}
 			return 1;
 		} catch (error:Dynamic) {
+			eventDispatching = false;
 			fail("browser-frame", error);
 			return -1;
 		}
@@ -246,25 +272,48 @@ class BrowserUiHost {
 	@:allow(nativekit.ui.host.BrowserUiHostSession)
 	function stopHost():Void {
 		if (stopped) return;
-		stopped = true;
+		stopping = true;
 		pending = null;
 		loaded = null;
 		pendingCount = 0;
-		if (eventSubscription != null) eventSubscription.dispose();
+		if (eventDispatching) {
+			cleanupPending = true;
+			return;
+		}
+		var activeRuntime = runtime;
+		if (activeRuntime != null) activeRuntime.dispose();
+		if (activeRuntime != null && activeRuntime.isCallbackActive()) {
+			cleanupPending = true;
+			return;
+		}
+		cleanupPending = false;
+		stopped = true;
+		var ownedSubscription = eventSubscription;
 		eventSubscription = null;
-		if (runtime != null) runtime.dispose();
+		if (ownedSubscription != null)
+			try ownedSubscription.dispose() catch (error:Dynamic) session.cleanupFailed("event-subscription", error);
 		runtime = null;
 		hostContext = null;
-		if (fonts != null) fonts.dispose();
+		var ownedFonts = fonts;
 		fonts = null;
-		if (surface.isValid()) NativeKit.nk_surface_destroy(surface);
+		if (ownedFonts != null)
+			try ownedFonts.dispose() catch (error:Dynamic) session.cleanupFailed("fonts-dispose", error);
+		var ownedSurface = surface;
 		surface = SurfaceHandle.invalid();
-		if (window.isValid()) NativeKit.nk_window_destroy(window);
+		if (ownedSurface.isValid())
+			try NativeKit.nk_surface_destroy(ownedSurface) catch (error:Dynamic) session.cleanupFailed("surface-destroy", error);
+		var ownedWindow = window;
 		window = WindowHandle.invalid();
-		if (initialized) NativeKit.nk_shutdown();
+		if (ownedWindow.isValid())
+			try NativeKit.nk_window_destroy(ownedWindow) catch (error:Dynamic) session.cleanupFailed("window-destroy", error);
+		var wasInitialized = initialized;
 		initialized = false;
-		if (events != null) events.runtimeShutdown();
+		if (wasInitialized)
+			try NativeKit.nk_shutdown() catch (error:Dynamic) session.cleanupFailed("nativekit-shutdown", error);
+		var ownedEvents = events;
 		events = null;
+		if (ownedEvents != null)
+			try ownedEvents.runtimeShutdown() catch (error:Dynamic) session.cleanupFailed("events-shutdown", error);
 		if (session.state != UiHostLifecycle.Failed)
 			session.transition(UiHostLifecycle.Stopped);
 	}

@@ -32,6 +32,9 @@ class UiHostRuntime {
 	var frameInfo:FrameInfo;
 	var previousTime:Float = -1.0;
 	var disposed:Bool = false;
+	var started:Bool = false;
+	var callbackDepth:Int = 0;
+	var disposeRequested:Bool = false;
 
 	public function new(session:UiHostSession, context:UiHostContext, window:WindowHandle,
 			surface:SurfaceHandle, width:Int, height:Int) {
@@ -49,26 +52,35 @@ class UiHostRuntime {
 	}
 
 	public function start(create:UiHostContext->UiApplication):Void {
-		if (disposed || session.state == UiHostLifecycle.Stopping || session.state == UiHostLifecycle.Stopped) return;
+		if (started || disposed || session.state == UiHostLifecycle.Failed ||
+			session.state == UiHostLifecycle.Stopping || session.state == UiHostLifecycle.Stopped) {
+			fail("application-start", "UI host runtime cannot be started more than once or after termination");
+			return;
+		}
+		started = true;
+		callbackDepth++;
 		try {
 			var created = create(context);
 			if (created == null) throw "UI application factory returned null";
-			if (disposed || session.state == UiHostLifecycle.Stopping || session.state == UiHostLifecycle.Stopped) {
-				created.dispose();
-				return;
+			if (disposeRequested || session.state != UiHostLifecycle.Starting &&
+				session.state != UiHostLifecycle.LoadingResources) {
+				try created.dispose() catch (error:Dynamic) session.cleanupFailed("application-dispose", error);
+			} else {
+				application = created;
+				renderer = Renderer.create();
+				nativeSurface = NativeKitSurface.borrowNativeHandle(surface);
+				created.context().attachPlatformSurface(nativeSurface);
+				created.context().attachPlatformWindow(window);
+				input = new NativeInputAdapter(created.context(), new Handle(window.rawValue()),
+					new Handle(surface.rawValue()));
+				input.attach(events);
+				session.transition(UiHostLifecycle.Running);
 			}
-			application = created;
-			renderer = Renderer.create();
-			nativeSurface = NativeKitSurface.borrowNativeHandle(surface);
-			created.context().attachPlatformSurface(nativeSurface);
-			created.context().attachPlatformWindow(window);
-			input = new NativeInputAdapter(created.context(), new Handle(window.rawValue()),
-				new Handle(surface.rawValue()));
-			input.attach(events);
-			session.transition(UiHostLifecycle.Running);
 		} catch (error:Dynamic) {
 			fail("application-start", error);
 		}
+		callbackDepth--;
+		if (callbackDepth == 0 && disposeRequested) disposeNow();
 	}
 
 	public function resize(width:Float, height:Float, framebufferWidth:Int,
@@ -77,7 +89,6 @@ class UiHostRuntime {
 		logicalHeight = height;
 		this.framebufferWidth = framebufferWidth;
 		this.framebufferHeight = framebufferHeight;
-		surfaceReady = framebufferWidth > 0 && framebufferHeight > 0;
 	}
 
 	public function setScale(value:Float):Void if (value > 0.0) scale = value;
@@ -89,17 +100,27 @@ class UiHostRuntime {
 			renderer == null || framebufferWidth <= 0 || framebufferHeight <= 0)
 			return false;
 		try {
+			callbackDepth++;
 			frame.setViewport(logicalWidth, logicalHeight);
 			frame.deltaSeconds = previousTime < 0.0 ? 0.0 :
 				Math.max(0.0, Math.min(0.1, timeSeconds - previousTime));
 			previousTime = timeSeconds;
 			frameInfo.set(logicalWidth, logicalHeight, framebufferWidth, framebufferHeight, scale);
 			application.submit(frame);
+			if (session.state != UiHostLifecycle.Running || disposeRequested) {
+				callbackDepth--;
+				if (callbackDepth == 0 && disposeRequested) disposeNow();
+				return false;
+			}
 			application.context().render(renderer, Surface.fromNativeHandle(surface), frameInfo);
 			rendered++;
+			callbackDepth--;
+			if (callbackDepth == 0 && disposeRequested) disposeNow();
 			return true;
 		} catch (error:Dynamic) {
+			if (callbackDepth > 0) callbackDepth--;
 			fail("frame", error);
+			if (callbackDepth == 0 && disposeRequested) disposeNow();
 			return false;
 		}
 	}
@@ -113,16 +134,32 @@ class UiHostRuntime {
 	}
 
 	public function dispose():Void {
+		if (disposed || disposeRequested) return;
+		disposeRequested = true;
+		if (callbackDepth > 0) return;
+		disposeNow();
+	}
+
+	public function isCallbackActive():Bool return callbackDepth > 0;
+
+	function disposeNow():Void {
 		if (disposed) return;
 		disposed = true;
-		if (input != null) input.detach();
+		var ownedInput = input;
 		input = null;
-		if (application != null) application.dispose();
+		if (ownedInput != null)
+			try ownedInput.detach() catch (error:Dynamic) session.cleanupFailed("input-detach", error);
+		var ownedApplication = application;
 		application = null;
-		if (renderer != null) renderer.dispose();
+		if (ownedApplication != null)
+			try ownedApplication.dispose() catch (error:Dynamic) session.cleanupFailed("application-dispose", error);
+		var ownedRenderer = renderer;
 		renderer = null;
-		if (nativeSurface != null) nativeSurface.releaseBorrowed();
+		if (ownedRenderer != null)
+			try ownedRenderer.dispose() catch (error:Dynamic) session.cleanupFailed("renderer-dispose", error);
+		var ownedSurface = nativeSurface;
 		nativeSurface = null;
-		if (session.state != UiHostLifecycle.Failed) session.transition(UiHostLifecycle.Stopped);
+		if (ownedSurface != null)
+			try ownedSurface.releaseBorrowed() catch (error:Dynamic) session.cleanupFailed("surface-release", error);
 	}
 }

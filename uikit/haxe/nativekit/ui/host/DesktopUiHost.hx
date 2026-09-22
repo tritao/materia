@@ -110,11 +110,13 @@ class DesktopUiHost {
 						runtime.setScale(scale.out_scale);
 						runtime.resize(runtime.logicalWidth, runtime.logicalHeight,
 							size.out_width, size.out_height);
+						runtime.setSurfaceReady(size.out_width > 0 && size.out_height > 0);
 						if (frameSubscription == null)
 							frameSubscription = borrowedSurface.onFrame(function(width, height) {
 								try {
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
 									runtime.render(Sys.time());
+									if (session.state == UiHostLifecycle.Failed) active = false;
 									if (options.captureDirectory != null && runtime.rendered >= options.frameLimit) {
 										writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime, eventHistory);
 										session.stop();
@@ -143,21 +145,54 @@ class DesktopUiHost {
 				if (active && !hadEvent) pump.wait(1.0 / options.targetFps);
 			}
 		} catch (error:Dynamic) {
+			if (session != null && session.state != UiHostLifecycle.Failed)
+				session.fail("desktop-host", error);
 			Sys.println(options.title + ": " + Std.string(error));
 			var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
 			if (stack.length > 0) Sys.println(stack);
 			result = 1;
 		}
 
-		if (frameSubscription != null) frameSubscription.dispose();
-		if (runtime != null) runtime.dispose();
-		if (fonts != null) fonts.dispose();
-		if (eventSubscription != null) eventSubscription.dispose();
-		if (nativeSurface != null) nativeSurface.releaseBorrowed();
-		if (surface.isValid()) NativeKit.nk_surface_destroy(surface);
-		if (window.isValid()) NativeKit.nk_window_destroy(window);
-		if (initialized) NativeKit.nk_shutdown();
-		if (events != null) events.runtimeShutdown();
+		var ownedFrameSubscription = frameSubscription;
+		frameSubscription = null;
+		if (ownedFrameSubscription != null)
+			try ownedFrameSubscription.dispose() catch (error:Dynamic) if (session != null) session.cleanupFailed("frame-subscription", error);
+		var ownedEventSubscription = eventSubscription;
+		eventSubscription = null;
+		if (ownedEventSubscription != null)
+			try ownedEventSubscription.dispose() catch (error:Dynamic) if (session != null) session.cleanupFailed("event-subscription", error);
+		var ownedRuntime = runtime;
+		runtime = null;
+		if (ownedRuntime != null) ownedRuntime.dispose();
+		var ownedFonts = fonts;
+		fonts = null;
+		if (ownedFonts != null)
+			try ownedFonts.dispose() catch (error:Dynamic) if (session != null) session.cleanupFailed("fonts-dispose", error);
+		var ownedNativeSurface = nativeSurface;
+		nativeSurface = null;
+		if (ownedNativeSurface != null)
+			try ownedNativeSurface.releaseBorrowed() catch (error:Dynamic) if (session != null) session.cleanupFailed("frame-surface-release", error);
+		var ownedSurface = surface;
+		surface = SurfaceHandle.invalid();
+		if (ownedSurface.isValid())
+			try NativeKit.nk_surface_destroy(ownedSurface) catch (error:Dynamic) if (session != null) session.cleanupFailed("surface-destroy", error);
+		var ownedWindow = window;
+		window = WindowHandle.invalid();
+		if (ownedWindow.isValid())
+			try NativeKit.nk_window_destroy(ownedWindow) catch (error:Dynamic) if (session != null) session.cleanupFailed("window-destroy", error);
+		var wasInitialized = initialized;
+		initialized = false;
+		if (wasInitialized)
+			try NativeKit.nk_shutdown() catch (error:Dynamic) if (session != null) session.cleanupFailed("nativekit-shutdown", error);
+		var ownedEvents = events;
+		events = null;
+		if (ownedEvents != null)
+			try ownedEvents.runtimeShutdown() catch (error:Dynamic) if (session != null) session.cleanupFailed("events-shutdown", error);
+		if (session != null && session.state != UiHostLifecycle.Failed &&
+			session.state != UiHostLifecycle.Stopped) {
+			if (session.state != UiHostLifecycle.Stopping) session.transition(UiHostLifecycle.Stopping);
+			session.transition(UiHostLifecycle.Stopped);
+		}
 		return result;
 	}
 

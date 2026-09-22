@@ -20,9 +20,17 @@ import nativekit.ui.host.UiHostSession.UiHostLifecycle;
 
 private class ShowcaseExplorerApplication implements UiApplication {
     final explorer:UiExplorer;
-    public function new(explorer:UiExplorer) this.explorer = explorer;
+    final requestFrame:Void->Void;
+    public function new(explorer:UiExplorer, requestFrame:Void->Void) {
+        this.explorer = explorer;
+        this.requestFrame = requestFrame;
+    }
     public function context():UiContext return explorer.hostContext();
-    public function submit(frame:LayoutFrame):RenderNode return explorer.submitHostFrame(frame);
+    public function submit(frame:LayoutFrame):RenderNode {
+        var submitted = explorer.submitHostFrame(frame);
+        requestFrame();
+        return submitted;
+    }
     public function dispose():Void explorer.dispose();
 }
 
@@ -331,7 +339,7 @@ class ShowcaseWeb {
                 }, false, null, null, null, false);
                 if (requestedUiVisualCase >= 0 && !explorer.setVisualCase(requestedUiVisualCase))
                     throw "UI Explorer rejected the requested visual case";
-                return new ShowcaseExplorerApplication(explorer);
+                return new ShowcaseExplorerApplication(explorer, context.requestFrame);
             });
             browserSession = startedSession;
             initialized = true;
