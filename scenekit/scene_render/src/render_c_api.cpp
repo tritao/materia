@@ -562,6 +562,31 @@ nkscene_result NKS_CALL nkscene_render_executor_capture_rgba8(
     return NKS_OK;
 }
 
+nkscene_result NKS_CALL nkscene_render_executor_render_image_id(
+    nkscene_render_executor executor_handle, nkscene_render_plan plan_handle,
+    nkscene_snapshot snapshot_handle, uint32_t width, uint32_t height, float clear_red,
+    float clear_green, float clear_blue, float clear_alpha, uint32_t *out_image_id) {
+    if (!width || !height || !out_image_id)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    *out_image_id = 0;
+    const auto snapshot = nkscene::resolve_snapshot_handle(snapshot_handle);
+    if (!snapshot)
+        return NKS_ERROR_INVALID_HANDLE;
+    auto &state = registry();
+    std::lock_guard lock(state.mutex);
+    const auto executor = state.executors.get(nkscene::unpack_handle(executor_handle));
+    const auto plan = state.plans.get(nkscene::unpack_handle(plan_handle));
+    if (!executor || !plan)
+        return NKS_ERROR_INVALID_HANDLE;
+    std::vector<std::uint8_t> unused;
+    nk_graphics_image image{};
+    const auto result = executor->capture_rgba8(
+        *plan, *snapshot, width, height, {clear_red, clear_green, clear_blue, clear_alpha},
+        unused, {}, &image);
+    *out_image_id = image.id;
+    return result == NKGPU_OK ? NKS_OK : NKS_ERROR_INVALID_ARGUMENT;
+}
+
 nkscene_result NKS_CALL nkscene_render_executor_pick_pixel(nkscene_render_executor executor_handle,
                                                            nkscene_render_plan plan_handle,
                                                            nkscene_snapshot snapshot_handle,

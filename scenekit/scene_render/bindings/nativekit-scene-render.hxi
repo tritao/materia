@@ -33,6 +33,11 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	 * supplied current plan and snapshot; otherwise the state is stale.
 	 */
 	extern fn nkscene_render_executor_pick_pixel_poll(executor: nkscene_render_executor, request: nkscene_render_pick_request, current_plan: nkscene_render_plan, current_snapshot: nkscene_snapshot, out_state: ptr<u32> @out, out_error: ptr<nkgpu_result> @out, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
+	/**
+	 * Renders into a sampled GPU image owned by the executor. The returned handle
+	 * is borrowed until the executor is destroyed or its target is resized.
+	 */
+	extern fn nkscene_render_executor_render_image_id(executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, width: u32, height: u32, clear_red: f32, clear_green: f32, clear_blue: f32, clear_alpha: f32, out_image_id: ptr<u32> @out) -> nkscene_result;
 	extern fn nkscene_render_pick_request_destroy(request: nkscene_render_pick_request) -> void;
 	extern fn nkscene_render_plan_compile(snapshot: nkscene_snapshot, view: ptr<const<nkscene_render_view>>, out_plan: ptr<nkscene_render_plan> @out @owned) -> nkscene_result;
 	extern fn nkscene_render_plan_destroy(plan: nkscene_render_plan) -> void;

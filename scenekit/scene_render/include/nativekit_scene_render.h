@@ -250,6 +250,12 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_capture_rgba8(
     nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,
     uint32_t width, uint32_t height, float clear_red, float clear_green, float clear_blue,
     float clear_alpha, uint8_t *pixels, uint64_t pixel_size);
+/** Renders into a sampled GPU image owned by the executor. The returned handle
+ * is borrowed until the executor is destroyed or its target is resized. */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_render_image_id(
+    nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,
+    uint32_t width, uint32_t height, float clear_red, float clear_green, float clear_blue,
+    float clear_alpha, uint32_t *out_image_id NK_OUT);
 /** Runs the GPU ID pass and resolves one pixel to scene ownership. */
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_pick_pixel(
     nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,

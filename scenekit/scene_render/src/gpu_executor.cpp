@@ -1843,8 +1843,11 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
                                                  std::uint32_t width, std::uint32_t height,
                                                  std::array<float, 4> clear_color,
                                                  std::vector<std::uint8_t> &out_pixels,
-                                                 RgbaPostProcess post_process) {
+                                                 RgbaPostProcess post_process,
+                                                 nk_graphics_image *out_image) {
     out_pixels.clear();
+    if (out_image)
+        *out_image = {};
     if (!width || !height) {
         state_->last_result = NKGPU_ERROR_INVALID_ARGUMENT;
         return state_->last_result;
@@ -2028,6 +2031,14 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         pass_active = false;
     }
     if ((result = nkgpu_end_frame(state_->renderer)) != NKGPU_OK) {
+        state_->last_result = result;
+        return result;
+    }
+
+    if (out_image) {
+        result = nkgpu_image_get_graphics_image(
+            state_->renderer,
+            apply_post_process ? state_->postprocess_color : state_->capture_color, out_image);
         state_->last_result = result;
         return result;
     }

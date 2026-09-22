@@ -571,7 +571,8 @@ class NKSRENDER_API NativeKitGpuExecutor {
     nkgpu_result capture_rgba8(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
                                std::uint32_t height, std::array<float, 4> clear_color,
                                std::vector<std::uint8_t> &out_pixels,
-                               RgbaPostProcess post_process = {});
+                               RgbaPostProcess post_process = {},
+                               nk_graphics_image *out_image = nullptr);
     /** Renders a depth-tested plan and reads normalized device depth values back. */
     nkgpu_result capture_depth(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
                                std::uint32_t height, std::vector<float> &out_depth);

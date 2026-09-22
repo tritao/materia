@@ -5,6 +5,7 @@ import NativeKitScene;
 import NativeKitSceneRender;
 import NativeKitSceneRenderConstants;
 import haxe.io.Bytes;
+import GraphicsImageRef;
 
 private typedef SceneGpuRenderer = {
 	var nativeHandle:Void->nkgpu_renderer;
@@ -85,6 +86,26 @@ class SceneRenderer {
 		}
 		checkScene(captured, "sceneRenderer.captureRgba8");
 		return pixels;
+	}
+
+	/** Renders directly into a retained, backend-neutral GPU image. */
+	public function renderImage(snapshot:Snapshot, view:SceneView, width:Int, height:Int,
+			clearRed:Float = 0.025, clearGreen:Float = 0.035, clearBlue:Float = 0.055,
+			clearAlpha:Float = 1.0):GraphicsImageRef {
+		ensureLive();
+		if (width <= 0 || height <= 0)
+			throw "Scene image dimensions are invalid";
+		prepare(snapshot, view, null);
+		var rendered = NativeKitSceneRender.nkscene_render_executor_render_image_id(
+			executor.borrow(), planOwner.borrow(), snapshot.nativeHandle(), width, height,
+			clearRed, clearGreen, clearBlue, clearAlpha);
+		if (rendered.status != 0) {
+			var last = NativeKitSceneRender.nkscene_render_executor_get_last_result(executor.borrow());
+			checkScene(last.status, "sceneRenderer.renderImage");
+			checkGpu(last.out_result, "sceneRenderer.renderImage");
+		}
+		checkScene(rendered.status, "sceneRenderer.renderImage");
+		return GraphicsImageRef.fromBorrowedId(rendered.out_image_id, width, height);
 	}
 
 	function prepare(snapshot:Snapshot, view:SceneView, changes:Null<ChangeSet>):Void {

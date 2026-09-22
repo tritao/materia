@@ -93,6 +93,14 @@ int main(void) {
     assert(nkscene_render_executor_capture_rgba8(executor, plan, snapshot, 1, 1,
                0.0f, 0.0f, 0.0f, 1.0f, capture_pixel, sizeof(capture_pixel)) ==
            NKS_ERROR_INVALID_ARGUMENT);
+    uint32_t image_id = 123;
+    assert(nkscene_render_executor_render_image_id(executor, plan, snapshot, 0, 1,
+               0.0f, 0.0f, 0.0f, 1.0f, &image_id) == NKS_ERROR_INVALID_ARGUMENT);
+    assert(nkscene_render_executor_render_image_id(executor, plan, snapshot, 1, 1,
+               0.0f, 0.0f, 0.0f, 1.0f, NULL) == NKS_ERROR_INVALID_ARGUMENT);
+    assert(nkscene_render_executor_render_image_id(executor, plan, snapshot, 1, 1,
+               0.0f, 0.0f, 0.0f, 1.0f, &image_id) == NKS_ERROR_INVALID_ARGUMENT);
+    assert(image_id == 0);
     assert(nkscene_render_executor_get_last_result(executor, &last_result) == NKS_OK);
     assert(last_result == NKGPU_ERROR_INVALID_HANDLE);
 

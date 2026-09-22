@@ -2,8 +2,7 @@ package app;
 
 import Canvas;
 import Color;
-import Image;
-import ImageFormat;
+import GraphicsSurface;
 import LayoutAxis;
 import LayoutStyle;
 import LayoutVisualKind;
@@ -27,15 +26,13 @@ class EditorPerspectiveViewport implements View {
   final host:DesktopUiHostContext;
   var renderer:Null<SceneRenderer> = null;
   final style:LayoutStyle;
-  var image:Null<Image> = null;
+  var surface:Null<GraphicsSurface> = null;
   var renderedRevision:Int = -1;
   var renderedWidth:Int = 0;
   var renderedHeight:Int = 0;
-  var captureCount:Int = 0;
-  var lastCaptureSeconds:Float = 0.0;
-  var totalCaptureSeconds:Float = 0.0;
-  var colouredPixels:Int = 0;
-  var highlightPixels:Int = 0;
+  var renderCount:Int = 0;
+  var lastRenderSeconds:Float = 0.0;
+  var totalRenderSeconds:Float = 0.0;
 
   public function new(key:String, scene:EditorScene, host:DesktopUiHostContext, ?style:LayoutStyle) {
     this.key = key;
@@ -59,49 +56,40 @@ class EditorPerspectiveViewport implements View {
     ensureRenderer();
     var width = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.width))));
     var height = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.height))));
-    if (renderer != null && (image == null || renderedRevision != scene.revision ||
+    if (renderer != null && (surface == null || renderedRevision != scene.revision ||
         width != renderedWidth || height != renderedHeight)) {
       var started = Sys.time();
       var view = scene.configureRenderView(new SceneView(), fixedViewProjection(width / height));
-      var pixels = renderer.captureRgba8(scene.renderSnapshot(), view, width, height);
-      var next = Image.create(width, height, ImageFormat.RGBA8, pixels);
-      colouredPixels = 0;
-      highlightPixels = 0;
-      var offset = 0;
-      while (offset + 3 < pixels.length) {
-        var red = pixels.get(offset), green = pixels.get(offset + 1), blue = pixels.get(offset + 2);
-        if (red != 6 || green != 9 || blue != 14) colouredPixels++;
-        if (red > 80 && green > 70 && blue < 80) highlightPixels++;
-        offset += 4;
-      }
-      if (image != null) image.dispose();
-      image = next;
+      var rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height);
+      var next = GraphicsSurface.fromImage(rendered);
+      rendered.dispose();
+      if (surface != null) surface.dispose();
+      surface = next;
       renderedRevision = scene.revision;
       renderedWidth = width;
       renderedHeight = height;
-      lastCaptureSeconds = Sys.time() - started;
-      totalCaptureSeconds += lastCaptureSeconds;
-      captureCount++;
+      lastRenderSeconds = Sys.time() - started;
+      totalRenderSeconds += lastRenderSeconds;
+      renderCount++;
     }
     canvas.fillRect(new Rect(0, 0, geometry.width, geometry.height),
       Color.rgba(0.025, 0.035, 0.055, 1.0));
-    if (image != null) canvas.drawImage(image, new Rect(0, 0, geometry.width, geometry.height));
+    if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
   }
 
   public function diagnosticState():Dynamic return {
     width: renderedWidth,
     height: renderedHeight,
-    captures: captureCount,
-    rgbaBytes: renderedWidth * renderedHeight * 4,
-    colouredPixels: colouredPixels,
-    highlightPixels: highlightPixels,
-    lastCaptureMilliseconds: lastCaptureSeconds * 1000.0,
-    averageCaptureMilliseconds: captureCount == 0 ? 0.0 : totalCaptureSeconds * 1000.0 / captureCount
+    composition: "gpu-surface",
+    renders: renderCount,
+    cpuTransferBytes: 0,
+    lastRenderMilliseconds: lastRenderSeconds * 1000.0,
+    averageRenderMilliseconds: renderCount == 0 ? 0.0 : totalRenderSeconds * 1000.0 / renderCount
   };
 
   public function dispose():Void {
-    if (image != null) image.dispose();
-    image = null;
+    if (surface != null) surface.dispose();
+    surface = null;
     if (renderer != null) renderer.dispose();
     renderer = null;
   }
