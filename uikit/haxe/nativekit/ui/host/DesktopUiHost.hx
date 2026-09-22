@@ -81,10 +81,6 @@ class DesktopUiHost {
 			var frameRequested = true;
 			var scheduleFrame = function() {
 				frameRequested = true;
-				if (!active || !surfaceAvailable || framePending) return;
-				if (NativeKit.nk_surface_request_frame(surface) != Result.Ok)
-					throw "Surface frame request failed";
-				framePending = true;
 			};
 			session = new UiHostSession(function() active = false);
 			var hostContext = new DesktopUiHostContext(fonts, pump, window, surface,
@@ -157,6 +153,11 @@ class DesktopUiHost {
 			while (active) {
 				var hadEvent = pump.poll();
 				if (session.state == UiHostLifecycle.Failed) throw session.error;
+				if (active && surfaceAvailable && frameRequested && !framePending) {
+					if (NativeKit.nk_surface_request_frame(surface) != Result.Ok)
+						throw "Surface frame request failed";
+					framePending = true;
+				}
 				if (active && !hadEvent) pump.wait(1.0 / options.targetFps);
 			}
 		} catch (error:Dynamic) {
