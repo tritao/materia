@@ -4,6 +4,7 @@ import app.CadSceneGeometry;
 import app.CadPlateModel;
 import app.EditorScene;
 import app.EditorScene.EditorSceneObject;
+import app.EditorSceneTree;
 import app.SceneCodec;
 import cadkit.Shape;
 import nativekit.scene.Scene;
@@ -58,6 +59,34 @@ class CadSceneSmoke {
       var restored=CadPlateModel.decode(restoredPlate.cadGraph);
       if(Math.abs(restored.parameters().holeDiameter-0.016) > 0.000000001)throw "CAD graph did not survive save/reopen";
       restored.close();reopened.dispose();
+      var plateId=editor.selectedId;
+      var dirtyBeforeFacePick=editor.document.isDirty;
+      if(editor.selectAtRay(0.025,0.0,1.0,0.0,0.0,-1.0)!=plateId||
+          editor.selectedCadFaceIndex<0)throw "CAD top face was not selected by mesh picking";
+      if(editor.document.isDirty!=dirtyBeforeFacePick)throw "Face selection changed document history";
+      var featureCount=editor.cadFeatureNames(plateId).length;
+      var hierarchy=new EditorSceneTree(editor);
+      if(hierarchy.childCount(plateId)!=featureCount||
+          !editor.selectTreeKey(hierarchy.childKeyAt(plateId,0))||editor.selectedId!=plateId)
+        throw "CAD hierarchy did not expose selectable feature nodes";
+      editor.selectAtRay(0.025,0.0,1.0,0.0,0.0,-1.0);
+      if(!editor.addHoleOnSelectedFace(0.008)||editor.cadFeatureNames(plateId).length!=featureCount+2||
+          editor.pick(0.025,0.0)!="scene")throw "Face operation did not cut the selected location";
+      if(editor.selectedCadFaceIndex<0)throw "Selected face did not remap after recompute";
+      if(!editor.document.undo()||editor.pick(0.025,0.0)!=plateId)
+        throw "Undo did not restore the plate before the face operation";
+      if(!editor.document.redo()||editor.pick(0.025,0.0)!="scene")
+        throw "Redo did not restore the face operation";
+      var withHole=new EditorScene(SceneCodec.decode(SceneCodec.encode(editor)));
+      if(withHole.pick(0.025,0.0)!="scene")throw "Added face hole did not survive reopen";
+      withHole.dispose();
+      editor.setDimensions(plateId,0.09,0.05,0.006);
+      if(editor.pick(0.025,0.0)!="scene")throw "Added hole was lost when plate dimensions changed";
+      if(!editor.duplicateSelected())throw "CAD plate duplication failed";
+      var duplicate=editor.object(editor.selectedId);
+      if(duplicate==null||duplicate.cadGraph==null||editor.cadFeatureNames(duplicate.id).length!=featureCount+2)
+        throw "CAD plate duplicate lost its feature sequence";
+      editor.select(plateId);
       var stepPath=Sys.getCwd()+"/cad-plate-smoke.step";
       editor.exportSelectedCad(stepPath);
       var imported=Shape.importStep(stepPath);

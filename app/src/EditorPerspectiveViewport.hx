@@ -185,6 +185,13 @@ class EditorPerspectiveViewport implements View {
       localX, localY);
   }
 
+  function selectAt(localX:Float,localY:Float):String {
+    if(!editingEnabled()){var id=pick(localX,localY);scene.select(id);return id;}
+    var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
+    return scene.selectAtRay(ray.originX,ray.originY,ray.originZ,
+      ray.directionX,ray.directionY,ray.directionZ);
+  }
+
   public static function pickScene(scene:EditorScene, camera:PerspectiveCamera,
       width:Float, height:Float, localX:Float, localY:Float):String {
     var ray = camera.screenRay(localX, localY, width, height);
@@ -268,7 +275,7 @@ class EditorPerspectiveViewport implements View {
       if (event.button == 0) {
         var hit = pick(event.localX, event.localY);
         if (hit != "scene"&&editingEnabled()) {
-          scene.select(hit);
+          selectAt(event.localX,event.localY);
           objectDrag = PerspectiveSceneDrag.begin(scene, camera, hit, event.localX, event.localY,
             Math.max(1, renderedWidth), Math.max(1, renderedHeight), gridSnapEnabled, gridStep);
           if (objectDrag != null) navigationMode = 3;
@@ -296,7 +303,7 @@ class EditorPerspectiveViewport implements View {
         if (event.kind == UiEventKind.PointerUp) objectDrag.commit(); else objectDrag.cancel();
         objectDrag = null;
       } else if (event.kind == UiEventKind.PointerUp && navigationMode == 1 && !pointerMoved)
-        scene.select(pick(event.localX, event.localY));
+        selectAt(event.localX,event.localY);
       navigationPointer = null; navigationMode = 0;
       event.releasePointer(); event.preventDefault(); event.stopPropagation();
     };

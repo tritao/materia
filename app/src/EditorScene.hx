@@ -18,6 +18,8 @@ import nativekit.ui.core.PropertyDescriptor;
 import nativekit.ui.core.PropertyDescriptorOptions;
 import nativekit.ui.core.PropertyType;
 import nativekit.ui.core.PropertyValue;
+import nativekit.scene.PickResult;
+import cadkit.parametric.TopologyFingerprint;
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 class EditorScene {
@@ -32,6 +34,11 @@ class EditorScene {
   var spatial:SpatialIndex;
   var selectionMaterial:Material;
   public var selectedId(default, null):String = "box";
+  public var selectedCadFaceIndex(default, null):Int = -1;
+  public var selectedCadFaceX(default, null):Float = 0.0;
+  public var selectedCadFaceY(default, null):Float = 0.0;
+  var selectedCadFaceFingerprint:Null<TopologyFingerprint> = null;
+  var selectedFeatureKey:Null<String> = null;
   public var revision(default, null):Int;
   /** Changes only when simulation-consumed scene content changes, not selection. */
   public var environmentRevision(default, null):Int;
@@ -136,6 +143,25 @@ class EditorScene {
     catch(error:Dynamic) { model.close(); throw error; }
   }
 
+  public function canAddHoleOnSelectedFace():Bool {
+    var item=object(selectedId);
+    return item!=null&&item.kind=="cad-plate"&&selectedCadFaceIndex>=0;
+  }
+
+  public function addHoleOnSelectedFace(diameter:Float=0.008):Bool {
+    if(!canAddHoleOnSelectedFace())return false;
+    var item=requiredObject(selectedId),id=item.id;
+    var model=CadPlateModel.decode(requiredCadGraph(item));
+    var graph:String;
+    try {
+      model.addThroughHole(selectedCadFaceIndex,selectedCadFaceX,selectedCadFaceY,diameter);
+      graph=model.encode();model.close();
+    } catch(error:Dynamic){model.close();throw error;}
+    var data=records();
+    for(record in data)if(record.id==id)record.cadGraph=graph;
+    return changeObjects("Add through hole",data,id);
+  }
+
   public function duplicateSelected():Bool {
     if (!canCreate() || object(selectedId) == null) return false;
     var data = records();
@@ -172,6 +198,8 @@ class EditorScene {
   // Build before swapping so allocation failures preserve the live scene and history.
   // Rebuilding also releases removed geometry/materials instead of accumulating tombstones.
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
+    var previousFace=selectedCadFaceFingerprint;
+    var previousFaceX=selectedCadFaceX,previousFaceY=selectedCadFaceY;
     var next = new EditorScene(data);
     var oldScene = scene;
     var oldSnapshot = snapshot;
@@ -188,6 +216,20 @@ class EditorScene {
     next.selectionMaterial = oldSelectionMaterial;
     next.dispose();
     selectedId = selection;
+    selectedFeatureKey=null;
+    selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
+    if(previousFace!=null){
+      var selected=object(selection);
+      if(selected!=null&&selected.kind=="cad-plate"&&selected.cadGraph!=null){
+        var model=CadPlateModel.decode(selected.cadGraph);
+        try {
+          selectedCadFaceIndex=model.remapFace(previousFace);
+          if(selectedCadFaceIndex>=0){selectedCadFaceFingerprint=model.faceFingerprint(selectedCadFaceIndex);
+            selectedCadFaceX=previousFaceX;selectedCadFaceY=previousFaceY;}
+          model.close();
+        } catch(error:Dynamic){model.close();}
+      }
+    }
     selectionRevision++;
     nextRevision++;
     revision = nextRevision;
@@ -254,12 +296,64 @@ class EditorScene {
 
   public function select(id:String):Bool {
     if (id != "scene" && object(id) == null) return false;
-    if (id == selectedId) return false;
+    if (id == selectedId && selectedFeatureKey==null) return false;
     selectedId = id;
+    selectedFeatureKey=null;selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
     selectionRevision++;
     nextRevision++;
     revision = nextRevision;
     return true;
+  }
+
+  public function treeSelectionKey():String return selectedFeatureKey==null?selectedId:selectedFeatureKey;
+
+  public function selectTreeKey(key:String):Bool {
+    if(key=="scene"||object(key)!=null)return select(key);
+    var marker=key.indexOf(":feature:");
+    if(marker<0)return select(key);
+    var id=key.substr(0,marker),item=object(id);
+    if(item==null||item.kind!="cad-plate")return false;
+    if(selectedId==id&&selectedFeatureKey==key)return false;
+    selectedId=id;selectedFeatureKey=key;
+    selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
+    selectionRevision++;nextRevision++;revision=nextRevision;
+    return true;
+  }
+
+  public function cadFeatureNames(id:String):Array<String> {
+    var item=object(id);
+    if(item==null||item.kind!="cad-plate"||item.cadGraph==null)return [];
+    return CadPlateModel.featureNamesInGraph(item.cadGraph);
+  }
+
+  public function selectAtXY(x:Float,y:Float):String
+    return selectHit(spatial.pickRay(x,y,1000001.0,0.0,0.0,-1.0));
+
+  public function selectAtRay(originX:Float,originY:Float,originZ:Float,
+      directionX:Float,directionY:Float,directionZ:Float):String
+    return selectHit(spatial.pickRay(originX,originY,originZ,directionX,directionY,directionZ));
+
+  function selectHit(hit:PickResult):String {
+    var previousFace=selectedCadFaceIndex;
+    var id="scene";
+    for(item in objects)if(hit.occurrence().equals(item.occurrence)){id=item.id;break;}
+    select(id);
+    selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
+    var item=object(id);
+    if(item!=null&&item.kind=="cad-plate"&&item.cadGraph!=null&&hit.subelement()>=0){
+      var model=CadPlateModel.decode(item.cadGraph);
+      try {
+        var index=hit.subelement();
+        selectedCadFaceFingerprint=model.faceFingerprint(index);
+        selectedCadFaceIndex=index;
+        var transform=info(id).localTransform();
+        selectedCadFaceX=hit.worldX()-transform.element(12);
+        selectedCadFaceY=hit.worldY()-transform.element(13);
+        model.close();
+      } catch(error:Dynamic){model.close();selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;}
+    }
+    if(previousFace!=selectedCadFaceIndex){selectionRevision++;nextRevision++;revision=nextRevision;}
+    return id;
   }
 
   public function context():CommandContext {

@@ -333,6 +333,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var menu = new CommandMenu("scene-context-menu", [
         "scene.create",
         "scene.create-plate",
+        "scene.add-face-hole",
         "scene.duplicate",
         "scene.delete",
         "scene.frame-selected",
@@ -719,13 +720,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     treeStyle.background = Color.rgba(0.98, 0.99, 1.0, 1.0);
     var treeViewport = fillStyle();
     var tree = new TreeView("scene-hierarchy",
-      treeModel, treeViewport, null, 420.0, scene.selectedId, ["scene"], function(id) {
-      scene.select(id);
+      treeModel, treeViewport, null, 420.0, scene.treeSelectionKey(), ["scene"], function(id) {
+      scene.selectTreeKey(id);
       log("Selected " + id);
       updateCommandContext();
       commands.refresh();
     }, function(id) {
-      scene.select(id);
+      scene.selectTreeKey(id);
       log("Activated " + id);
       updateCommandContext();
     }, null, null);
@@ -736,6 +737,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new KeyedView("actions", new Column("scene-object-actions", [
           new KeyedView("create", new CommandButton("scene-create", "scene.create", commands)),
           new KeyedView("create-plate", new CommandButton("scene-create-plate", "scene.create-plate", commands)),
+          new KeyedView("add-face-hole", new CommandButton("scene-add-face-hole", "scene.add-face-hole", commands)),
           new KeyedView("duplicate", new CommandButton("scene-duplicate", "scene.duplicate", commands)),
           new KeyedView("delete", new CommandButton("scene-delete", "scene.delete", commands))
         ])),
@@ -776,7 +778,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     viewport.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (event.button == 0) {
         var hit = viewportContent.pick(viewportCamera, event.localX, event.localY);
-        scene.select(hit);
+        viewportContent.selectAt(viewportCamera,event.localX,event.localY);
         if (hit != "scene" && viewportContent.beginDrag(viewportCamera,
             event.localX, event.localY, gridSnapEnabled)) {
           dragPointer = event.pointerId;
@@ -900,7 +902,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var ownership=session.scriptOwnership;
     inspector.enabled = ownership==null&&!simulation.isActive() && !viewportContent.dragging() &&
       (perspectiveViewport == null || !perspectiveViewport.dragging());
-    var rows:Array<KeyedView>=[new KeyedView("heading",sectionHeading(selected.label))];
+    var rows:Array<KeyedView> = [new KeyedView("heading",sectionHeading(selected.label))];
+    if(selected.kind=="cad-plate")rows.push(new KeyedView("face-selection",
+      new Text(scene.selectedCadFaceIndex<0?"Click a CAD face to select it":
+        "Selected face "+(scene.selectedCadFaceIndex+1)+" · Add hole uses the picked location")));
     if(ownership!=null) {
       rows.push(new KeyedView("origin",new Text("Script-owned · "+
         ownership.propertyOrigins(selected.id,["position","dimensions","mass","collisionEnabled",
@@ -992,6 +997,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
       updateCommandContext();
       commands.refresh();
     }, null, function() return canEditObjects() && scene.canCreate()));
+    commands.register(new Command("scene.add-face-hole", "Add hole on selected face", function() {
+      try {scene.addHoleOnSelectedFace();updateCommandContext();commands.refresh();}
+      catch(error:Dynamic)log("Could not add hole: "+Std.string(error));
+    },null,function() return canEditObjects()&&scene.canAddHoleOnSelectedFace()));
     commands.register(new Command("scene.export-step", "Export STEP", function() {
       var chooser=files;
       if(chooser==null)return;

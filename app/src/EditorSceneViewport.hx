@@ -42,6 +42,12 @@ class EditorSceneViewport implements ViewportContent {
     return result;
   }
 
+  public function selectAt(camera:ViewportCamera,x:Float,y:Float):String {
+    if(simulationActive){var id=pick(camera,x,y);scene.select(id);return id;}
+    var point=scenePoint(camera,x,y);
+    return scene.selectAtXY(point.x,point.y);
+  }
+
   public function dragging():Bool return drag != null;
 
   public function setGridStep(value:Float):Bool {

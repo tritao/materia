@@ -7,6 +7,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ParameterKind;
 import cadkit.parametric.SelectionRecipe;
+import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
 import cadkit.parametric.features.BoxFeature;
@@ -75,6 +76,63 @@ class CadPlateModel {
     holeX: document.parameter(HOLE_X).valueIn("m"),
     holeY: document.parameter(HOLE_Y).valueIn("m")
   };
+
+  public function featureNames():Array<String> {
+    var result:Array<String> = [];
+    for (index in 0...document.featureCount())
+      result.push(document.featureAt(index).serializationType());
+    return result;
+  }
+
+  /** Read tree labels from the persisted graph without allocating CAD shapes per UI frame. */
+  public static function featureNamesInGraph(graph:String):Array<String> {
+    var root:Dynamic=haxe.Json.parse(graph);
+    var features:Array<Dynamic> = cast Reflect.field(root,"features");
+    var result:Array<String> = [];
+    for(feature in features)result.push(Std.string(Reflect.field(feature,"type")));
+    return result;
+  }
+
+  public function faceFingerprint(index:Int):TopologyFingerprint {
+    var face=document.result().faces().at(index);
+    try {
+      var shape=face.cloneShape();
+      try { var result=TopologyFingerprint.capture(shape);shape.close();face.close();return result; }
+      catch(error:Dynamic) {shape.close();throw error;}
+    } catch(error:Dynamic) {face.close();throw error;}
+  }
+
+  public function remapFace(fingerprint:TopologyFingerprint):Int {
+    var shape=document.result(),best=-1,bestScore=-1e30,second=-1e30;
+    for(index in 0...shape.faces().count()) {
+      var face=shape.faces().at(index),candidate=face.cloneShape();
+      var score=fingerprint.score(candidate);
+      candidate.close();face.close();
+      if(score>bestScore){second=bestScore;bestScore=score;best=index;}
+      else if(score>second)second=score;
+    }
+    return bestScore<=-1e29||bestScore-second<=0.000001?-1:best;
+  }
+
+  /** Adds a through hole on the selected top face. */
+  public function addThroughHole(faceIndex:Int,xMetres:Float,yMetres:Float,diameterMetres:Float):Void {
+    var face=faceFingerprint(faceIndex);
+    if(face.dz<0.98)throw "Select the plate's top planar face";
+    var parameters=parameters();
+    if(!Math.isFinite(diameterMetres)||diameterMetres<=0||
+        !Math.isFinite(xMetres)||!Math.isFinite(yMetres)||
+        Math.abs(xMetres)+diameterMetres/2>=parameters.width/2||
+        Math.abs(yMetres)+diameterMetres/2>=parameters.height/2)
+      throw "Hole must fit inside the plate";
+    var source=document.outputFeature();
+    var top=new SelectionRecipe("face","plane",Vector.Z(),"max",Vector.Z(),1);
+    var scale=1.0/CadSceneGeometry.METRES_PER_MILLIMETRE;
+    var hole=document.add(HoleFeature.plain(source,top,Vector.X(),"through-all",
+      xMetres*scale,yMetres*scale,diameterMetres*scale));
+    var cut=document.add(new BooleanFeature(source,hole,BooleanOperation.Cut));
+    document.setOutput(cut);
+    document.recompute();
+  }
 
   /** All parameter changes are one CadKit transaction; failed recompute restores the graph. */
   public function setMetres(name:String, value:Float):Void {
