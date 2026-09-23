@@ -26,6 +26,7 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.ReferenceState;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;
+import cadkit.parametric.TopologyReference;
 import cadkit.parametric.TopologyHistoryMap;
 import cadkit.parametric.TopologyResolver;
 import cadkit.parametric.features.ExtrudeFeature;
@@ -445,6 +446,84 @@ class EditorScene {
     var feature = selectedCadFeature(selectedId);
     return feature != null && feature.active && Std.isOfType(feature, ConstrainedSketchFeature) &&
       (cast(feature, ConstrainedSketchFeature)).supportFaceReference != null && feature.currentShape() != null;
+  }
+
+  /** Describe a broken support-face identity on the selected sketch feature. */
+  public function selectedSketchSupportStatus():Null<String> {
+    var candidate = selectedCadFeature(selectedId);
+    if (candidate == null || !Std.isOfType(candidate, ConstrainedSketchFeature))
+      return null;
+    var sketch:ConstrainedSketchFeature = cast candidate;
+    var reference:TopologyReference = sketch.supportFaceReference;
+    if (reference == null)
+      return null;
+    return switch (reference.state) {
+      case ReferenceState.Deleted: "Sketch support face was deleted. Select a replacement planar face.";
+      case ReferenceState.Ambiguous: "Sketch support face is ambiguous. Select a replacement planar face.";
+      case ReferenceState.Unresolved: "Sketch support face is unresolved. Select a replacement planar face.";
+      case ReferenceState.Resolved, ReferenceState.Remapped, ReferenceState.Closed: null;
+    };
+  }
+
+  public function canRepairSelectedSketchSupportFace():Bool {
+    if (activeSketchEdit != null || selectedCadFace == null ||
+        selectedCadFace.surfaceKind() != CadKit.SurfaceKind.Plane)
+      return false;
+    var candidate = selectedCadFeature(selectedId);
+    if (candidate == null || !Std.isOfType(candidate, ConstrainedSketchFeature))
+      return false;
+    var sketch:ConstrainedSketchFeature = cast candidate;
+    var reference:TopologyReference = sketch.supportFaceReference;
+    if (reference == null || (reference.state != ReferenceState.Deleted &&
+        reference.state != ReferenceState.Ambiguous && reference.state != ReferenceState.Unresolved))
+      return false;
+    var fingerprint = selectedCadFaceFingerprint;
+    if (fingerprint == null)
+      return false;
+    var replacement:Null<Shape> = null;
+    var resolved = false;
+    try {
+      replacement = sketch.resolveSupportFace(fingerprint);
+      resolved = true;
+    } catch (_:Dynamic) {
+    }
+    if (replacement != null)
+      replacement.close();
+    return resolved;
+  }
+
+  /** Rebind the selected sketch to the explicitly picked support face. */
+  public function repairSelectedSketchSupportFace():Bool {
+    if (!canRepairSelectedSketchSupportFace())
+      return false;
+    var id = selectedId;
+    var candidate = selectedCadFeature(id);
+    var sketch:ConstrainedSketchFeature = cast candidate;
+    var replacement:TopologyFingerprint = selectedCadFaceFingerprint;
+    if (replacement == null)
+      return false;
+    var reference:TopologyReference = sketch.supportFaceReference;
+    if (reference == null)
+      return false;
+    var beforeFingerprint = reference.fingerprintData();
+    var beforeState = reference.state;
+    var featureId = sketch.id.toInt();
+    return applyCadEdit(id, "Repair sketch support face", function(owner) {
+      var current = owner.document.featureById(featureId);
+      if (current == null || !Std.isOfType(current, ConstrainedSketchFeature))
+        throw "selected constrained sketch is no longer available";
+      var currentSketch:ConstrainedSketchFeature = cast current;
+      currentSketch.repairSupportFace(replacement);
+      owner.document.recompute();
+    }, function(owner) {
+      var current = owner.document.featureById(featureId);
+      if (current == null || !Std.isOfType(current, ConstrainedSketchFeature))
+        throw "selected constrained sketch is no longer available";
+      var currentSketch:ConstrainedSketchFeature = cast current;
+      // Undo may restore an unresolved authored reference. Keep the prior published
+      // result visible and leave recomputation to an explicit repair or later edit.
+      currentSketch.restoreSupportFaceReference(beforeFingerprint, beforeState);
+    });
   }
 
   /** Cut the selected face-supported sketch through its source solid. */
@@ -1337,7 +1416,9 @@ class EditorScene {
   function selectHit(hit:PickResult):String {
     var previousFace=selectedCadFaceIndex;
     var id=idForHit(hit);
-    select(id);
+    // Keep a selected feature-tree row while picking a replacement face on the same part.
+    if (id != selectedId || (activeSketchEdit != null && selectedFeatureKey != null))
+      select(id);
     clearSelectedCadFace();
     var item=object(id);
     if(item!=null&&isCadKind(item.kind)&&hit.subelement()>=0){

@@ -15,6 +15,9 @@ import app.SceneDocumentSession;
 import app.SceneCodec;
 import cadkit.parametric.EvaluationCancelled;
 import cadkit.parametric.ParametricError;
+import cadkit.parametric.ReferenceState;
+import cadkit.parametric.TopologyFingerprint;
+import cadkit.parametric.TopologyReference;
 import nativekit.ui.core.PropertyBinding;
 import nativekit.ui.core.PropertyDescriptor;
 import nativekit.ui.core.PropertyDescriptorOptions;
@@ -358,6 +361,84 @@ class CadPlateWorkflowTests {
         message = Reflect.field(cause, "message");
       throw "face sketch pocket workflow failed at " + step + ": " +
         (message == null ? Std.string(error) : Std.string(message));
+    }
+    scene.dispose();
+  }
+
+  static function supportFaceRepairWorkflow():Void {
+    var scene = new EditorScene([]);
+    var step = "create a face-supported sketch";
+    try {
+      check(scene.createCadPart(), "create an editable part for support-reference repair");
+      var id = scene.selectedId;
+      check(scene.createSketch() && scene.addSketchDraftRectangle() && scene.applySelectedSketchEdit(),
+        "create the base sketch");
+      check(scene.createExtrusion(), "create the source solid");
+      check(scene.selectAtRay(0, 0, 1, 0, 0, -1) == id && scene.createFaceSketch(),
+        "create a sketch attached to a selected planar face");
+      check(scene.applySelectedSketchEdit(), "apply the attached sketch");
+      var feature:ConstrainedSketchFeature = cast scene.cadSession(id).document.featureAt(2);
+      var support = feature.support;
+      var sourceReference:TopologyReference = feature.supportFaceReference;
+      if (support == null || sourceReference == null || sourceReference.currentShape() == null)
+        throw "attached sketch has no support face to copy";
+      // Exercise the genuinely unresolved case: this attached sketch has no
+      // geometric fallback recipe, so undo must restore the unresolved identity.
+      var repairTarget = new ConstrainedSketchFeature(feature.sketch(), support, null,
+        feature.supportXDirection, feature.supportOffset, feature.supportFlipped,
+        sourceReference.currentShape());
+      scene.cadSession(id).perform(function(owner) {
+        var added:ConstrainedSketchFeature = owner.document.add(repairTarget);
+        owner.document.recompute();
+      });
+      check(scene.selectTreeKey(id + ":feature:3"), "select the attached sketch without a fallback recipe");
+      var reference:TopologyReference = repairTarget.supportFaceReference;
+      if (reference == null || !reference.isResolved())
+        throw "attached sketch did not store a resolved face identity";
+
+      // Model a saved reference whose original support face disappeared. The UI must
+      // require an explicit replacement pick before it allows the authored repair.
+      var broken = TopologyFingerprint.fromData(CadKit.ShapeKind.Face, CadKit.SurfaceKind.Plane,
+        CadKit.CurveKind.Unknown, 1000000000.0, 1000000000.0, 1000000000.0,
+        0.0, 0.0, 1.0, 1.0);
+      reference.restore(null, broken, ReferenceState.Unresolved);
+      check(scene.selectedSketchSupportStatus() != null &&
+        !scene.canRepairSelectedSketchSupportFace(),
+        "broken support identity is explained and cannot be repaired without selecting a face");
+
+      step = "select a replacement face";
+      check(scene.selectAtRay(0, 0, 1, 0, 0, -1) == id &&
+        scene.treeSelectionKey() == id + ":feature:3" && scene.canRepairSelectedSketchSupportFace(),
+        "picking a replacement face keeps the target sketch selected for repair");
+      step = "repair the support face";
+      check(scene.repairSelectedSketchSupportFace() && reference.isResolved(),
+        "repair rebinds the sketch to the explicit face selection");
+      var repairedFingerprint = reference.fingerprintData();
+      check(scene.document.undo() && reference.state == ReferenceState.Unresolved &&
+        reference.fingerprintData().x == broken.x,
+        "project undo restores the prior unresolved reference identity");
+      check(scene.document.redo() && reference.isResolved() &&
+        reference.fingerprintData().x == repairedFingerprint.x &&
+        reference.fingerprintData().y == repairedFingerprint.y &&
+        reference.fingerprintData().z == repairedFingerprint.z,
+        "project redo reapplies the selected support identity");
+
+      step = "save and reopen the repaired face reference";
+      var reopened = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
+      try {
+        var restored:ConstrainedSketchFeature = cast reopened.cadSession(id).document.featureAt(3);
+        var restoredReference:TopologyReference = restored.supportFaceReference;
+        check(restoredReference != null && restoredReference.isResolved(),
+          "the repaired face identity survives save and reopen");
+        check(restored.workplane() != null, "the reopened face sketch keeps its support workplane");
+      } catch (error:Dynamic) {
+        reopened.dispose();
+        throw error;
+      }
+      reopened.dispose();
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw "support-face repair workflow failed at " + step + ": " + Std.string(error);
     }
     scene.dispose();
   }
@@ -837,6 +918,7 @@ class CadPlateWorkflowTests {
       sketchDraftPersistenceWorkflow();
       sketchExtrusionWorkflow();
       faceSketchPocketWorkflow();
+      supportFaceRepairWorkflow();
       verticalFilletWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();

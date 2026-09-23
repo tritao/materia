@@ -20,6 +20,8 @@ import cadkit.parametric.FeatureId;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyReference;
+import cadkit.parametric.TopologyResolver;
+import cadkit.parametric.ReferenceState;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.sketch.FaceWorkplane;
@@ -112,6 +114,71 @@ class ConstrainedSketchFeature extends Feature {
 			face.close();
 			throw error;
 		}
+	}
+
+	/** Resolve an explicitly picked planar face on this sketch's support feature. */
+	public function resolveSupportFace(fingerprint:TopologyFingerprint):Shape {
+		if (support == null || supportFaceReference == null)
+			throw new ParametricError("constrained sketch has no repairable support face");
+		if (fingerprint == null || fingerprint.kind != CadKit.ShapeKind.Face ||
+			fingerprint.surfaceKind != CadKit.SurfaceKind.Plane)
+			throw new ParametricError("replacement support must be a planar face");
+		var source = support.currentShape();
+		if (source == null)
+			throw new ParametricError("support feature has no evaluated shape");
+		var resolution = TopologyResolver.resolve(source, fingerprint, CadKit.ShapeKind.Face);
+		if (resolution.state != ReferenceState.Resolved)
+			throw new ParametricError("selected face does not uniquely match a face on the sketch support",
+				resolution.state);
+		var face = source.subshape(CadKit.ShapeKind.Face, resolution.index);
+		if (face.surfaceKind() != CadKit.SurfaceKind.Plane) {
+			face.close();
+			throw new ParametricError("replacement support must be a planar face");
+		}
+		return face;
+	}
+
+	/** Apply a user-confirmed support-face replacement as one document change. */
+	public function repairSupportFace(fingerprint:TopologyFingerprint):Void {
+		if (document == null)
+			throw new ParametricError("support-face repair requires an attached feature");
+		var reference = supportFaceReference;
+		if (reference == null)
+			throw new ParametricError("constrained sketch has no support-face reference");
+		var replacement = resolveSupportFace(fingerprint);
+		var beforeFingerprint = reference.fingerprintData();
+		var beforeState = reference.state;
+		var afterFingerprint = TopologyFingerprint.capture(replacement);
+		try {
+			reference.rebind(replacement);
+			markDirty();
+			document.recordDocumentChange(new ConstrainedSketchSupportFaceChange(
+				this, beforeFingerprint, beforeState, afterFingerprint));
+		} catch (error:Dynamic) {
+			replacement.close();
+			throw error;
+		}
+		replacement.close();
+	}
+
+	/** Restore one side of a support-face change without recording nested history. */
+	public function restoreSupportFaceReference(fingerprint:TopologyFingerprint, state:ReferenceState):Void {
+		var reference = supportFaceReference;
+		if (reference == null)
+			throw new ParametricError("constrained sketch has no support-face reference");
+		var replacement:Null<Shape> = null;
+		if (state == ReferenceState.Resolved || state == ReferenceState.Remapped)
+			replacement = resolveSupportFace(fingerprint);
+		try {
+			reference.restore(replacement, fingerprint, state);
+		} catch (error:Dynamic) {
+			if (replacement != null)
+				replacement.close();
+			throw error;
+		}
+		if (replacement != null)
+			replacement.close();
+		markDirty();
 	}
 
 	public function addPoint(point:SketchPoint):Void {

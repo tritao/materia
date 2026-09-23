@@ -113,6 +113,38 @@ class TopologyReference {
 		return fingerprint;
 	}
 
+	/** Rebind this document-owned reference to an explicitly selected topology. */
+	public function rebind(topology:Shape):Void {
+		if (topology == null || topology.kind() != kind)
+			throw new ParametricError("replacement topology has the wrong kind");
+		restore(topology, TopologyFingerprint.capture(topology), ReferenceState.Resolved);
+	}
+
+	/** Restore a saved reference state while applying an authored undo/redo change. */
+	public function restore(topology:Null<Shape>, savedFingerprint:TopologyFingerprint,
+		nextState:ReferenceState):Void {
+		if (state == ReferenceState.Closed)
+			throw new ParametricError("closed topology references cannot be restored");
+		if (savedFingerprint == null || savedFingerprint.kind != kind)
+			throw new ParametricError("saved topology fingerprint has the wrong kind");
+		var needsTopology = nextState == ReferenceState.Resolved || nextState == ReferenceState.Remapped;
+		if (needsTopology != (topology != null))
+			throw new ParametricError("resolved topology references require a replacement shape");
+		if (topology != null && topology.kind() != kind)
+			throw new ParametricError("replacement topology has the wrong kind");
+		if (nextState == ReferenceState.Closed)
+			throw new ParametricError("closed topology references cannot be restored");
+
+		var next = topology == null ? null : topology.cloneShape();
+		if (current != null)
+			current.close();
+		current = next;
+		fingerprint = savedFingerprint;
+		fallbackAmbiguous = false;
+		stateGenerationValue++;
+		state = nextState;
+	}
+
 	/** Resolve against a staged or committed shape, recording failure state. */
 	public function resolveFor(result:Shape, ?operation:Operation):Shape {
 		if (state == ReferenceState.Closed)

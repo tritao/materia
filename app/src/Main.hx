@@ -1070,6 +1070,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
       rows.push(new KeyedView("sketch-edit-action",
         sceneAction("edit-selected-sketch", "scene.edit-sketch", "Edit sketch", IconName.Inspect)));
     }
+    var supportStatus = scene.selectedSketchSupportStatus();
+    if (supportStatus != null) {
+      rows.push(new KeyedView("sketch-support-status", new Text(supportStatus)));
+      if (scene.canRepairSelectedSketchSupportFace())
+        rows.push(new KeyedView("repair-sketch-support",
+          sceneAction("repair-sketch-support-face", "scene.repair-sketch-support-face",
+            "Repair support face", IconName.Inspect)));
+    }
     if(scene.isCadPart(selected.id) && scene.hasCadOutput(selected.id))rows.push(new KeyedView("face-selection",
       new Text(scene.selectedCadFaceIndex<0?"Click a CAD face to select it":
         selected.kind=="cad-plate"
@@ -1222,6 +1230,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
       } catch (error:Dynamic) log("Could not edit sketch: " + Std.string(error));
       commands.refresh();
     }, null, function() return canEditObjects() && scene.canBeginSelectedSketchEdit()));
+    commands.register(new Command("scene.repair-sketch-support-face", "Repair selected sketch support face", function() {
+      runSceneEdit("Could not repair sketch support face", function() scene.repairSelectedSketchSupportFace());
+      inspectorSelectionRevision = -1;
+      commands.refresh();
+    }, null, function() return canEditObjects() && scene.canRepairSelectedSketchSupportFace()));
     commands.register(new Command("scene.apply-sketch", "Apply sketch draft", function() {
       runSceneEdit("Could not apply sketch draft", function() scene.applySelectedSketchEdit());
       inspectorSelectionRevision = -1;
