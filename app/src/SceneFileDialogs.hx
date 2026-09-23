@@ -23,6 +23,10 @@ class SceneFileDialogs {
       complete:Null<String>->Null<String>->Void):Void
     chooseResource(true,title,suggestedName,null,complete);
 
+  public function chooseImport(title:String,
+      complete:Null<String>->Null<String>->Void):Void
+    chooseResource(false,title,null,null,complete);
+
   function chooseResource(save:Bool,title:String,suggestedName:Null<String>,current:Null<String>,
       complete:Null<String>->Null<String>->Void):Void {
     var options = new FileDialogOptions();

@@ -223,11 +223,14 @@ CADKIT_API cad_result cad_sphere(
     double radius,
     cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
-/* STEP import/export is file-based and deliberately transfers one shape
- * without application metadata or assembly/document semantics. Paths are
- * UTF-8 strings owned by the caller for the duration of the call. */
+/* STEP import/export transfers geometry without application metadata or
+ * assembly/document semantics. Text and paths are UTF-8 caller-owned strings. */
 CADKIT_API cad_result cad_step_import(
     const char* path CADKIT_HXI_UTF8,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
+CADKIT_API cad_result cad_step_import_text(
+    const char* text CADKIT_HXI_UTF8,
     cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
 CADKIT_API cad_result cad_step_export(

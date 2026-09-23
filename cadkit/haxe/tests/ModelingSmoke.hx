@@ -14,10 +14,12 @@ import cadkit.modeling.BuildLine;
 import cadkit.modeling.BuildSketch;
 import cadkit.modeling.BuildPart;
 import sys.FileSystem;
+import sys.io.File;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.ExtrudeFeature;
+import cadkit.parametric.features.ImportedShapeFeature;
 
 class ModelingSmoke {
 	static function check(value:Bool, message:String):Void {
@@ -74,6 +76,18 @@ class ModelingSmoke {
 		var imported = Shape.importStep(path);
 		near(imported.volume(), rounded.volume());
 		imported.close();
+		var stepText = File.getContent(path);
+		var importedText = Shape.importStepText(stepText);
+		near(importedText.volume(), rounded.volume());
+		importedText.close();
+		var importedDocument = new Document();
+		var importedFeature = importedDocument.add(new ImportedShapeFeature(stepText));
+		importedDocument.setOutput(importedFeature);
+		importedDocument.recompute();
+		var reopenedImport = DocumentCodec.decode(DocumentCodec.encode(importedDocument));
+		near(reopenedImport.result().volume(), rounded.volume());
+		reopenedImport.close();
+		importedDocument.close();
 		FileSystem.deleteFile(path);
 		var generated = plate.generated(CadKit.ShapeKind.Face);
 		check(generated.count() > 0, "extrusion history");

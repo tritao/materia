@@ -26,6 +26,7 @@ import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.ImportedShapeFeature;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.parametric.features.FaceFeature;
@@ -239,6 +240,8 @@ class DocumentCodec {
 					feature = document.add(new BoxFeature(numberField(record, "width"), numberField(record, "depth"), numberField(record, "height")));
 				} else if (featureType == "cylinder") {
 					feature = document.add(new CylinderFeature(numberField(record, "radius"), numberField(record, "height")));
+				} else if (featureType == "imported-step") {
+					feature = document.add(new ImportedShapeFeature(stringField(record, "stepText")));
 				} else if (featureType == "face") {
 					feature = document.add(new FaceFeature(requiredFeature(document, intField(record, "source")), intField(record, "index"),
 						optionalFaceFingerprint(record)));
@@ -521,6 +524,14 @@ class DocumentCodec {
 				type: featureType,
 				radius: cylinder.radius.value,
 				height: cylinder.height.value,
+				references: references
+			};
+		} else if (featureType == "imported-step") {
+			var imported:ImportedShapeFeature = cast feature;
+			return {
+				id: feature.id.toInt(),
+				type: featureType,
+				stepText: imported.stepText,
 				references: references
 			};
 		} else if (featureType == "face") {

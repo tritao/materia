@@ -5,6 +5,9 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <string>
 #include <vector>
 
 namespace {
@@ -74,6 +77,19 @@ int main() {
     std::filesystem::remove(step_path);
     assert(cad_step_export(shape, step_path_string.c_str()) == CAD_OK);
     assert(std::filesystem::is_regular_file(step_path));
+    std::ifstream step_file(step_path, std::ios::binary);
+    const std::string step_text((std::istreambuf_iterator<char>(step_file)),
+        std::istreambuf_iterator<char>());
+    assert(!step_text.empty());
+    cad_shape imported_text = 0;
+    assert(cad_step_import_text(step_text.c_str(), &imported_text) == CAD_OK);
+    assert(imported_text != 0);
+    double imported_text_volume = 0.0;
+    assert(cad_shape_volume(imported_text, &imported_text_volume) == CAD_OK);
+    assert_close(imported_text_volume, volume);
+    cad_shape_destroy(imported_text);
+    cad_shape invalid_imported_text = 0;
+    assert(cad_step_import_text(nullptr, &invalid_imported_text) == CAD_ERROR_INVALID_ARGUMENT);
     cad_shape imported = 0;
     assert(cad_step_import(step_path_string.c_str(), &imported) == CAD_OK);
     assert(imported != 0);

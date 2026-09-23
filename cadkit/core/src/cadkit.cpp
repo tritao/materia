@@ -39,6 +39,8 @@
 #include <Bnd_Box.hxx>
 #include <DESTEP_ConfigurationNode.hxx>
 #include <DESTEP_Provider.hxx>
+#include <IFSelect_ReturnStatus.hxx>
+#include <STEPControl_Reader.hxx>
 #include <gp_Ax1.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
@@ -76,6 +78,7 @@
 #include <mutex>
 #include <new>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -1556,6 +1559,43 @@ extern "C" CADKIT_API cad_result cad_step_import(
     cad_shape* out_shape) {
     clear_error();
     return import_step_shape(path, out_shape);
+}
+
+extern "C" CADKIT_API cad_result cad_step_import_text(
+    const char* text,
+    cad_shape* out_shape) {
+    clear_error();
+    if (out_shape == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    }
+    *out_shape = 0;
+    if (text == nullptr || text[0] == '\0') {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "STEP text must not be null or empty");
+    }
+
+    try {
+        std::istringstream stream(text);
+        STEPControl_Reader reader;
+        if (reader.ReadStream("cadkit-memory.step", stream) != IFSelect_RetDone) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "STEP text import failed");
+        }
+        if (reader.TransferRoots() == 0) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "STEP text contains no transferable roots");
+        }
+        auto imported = reader.OneShape();
+        if (imported.IsNull()) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "STEP text import produced an empty shape");
+        }
+        return insert_shape(std::move(imported), out_shape);
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
 }
 
 extern "C" CADKIT_API cad_result cad_step_export(

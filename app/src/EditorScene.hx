@@ -24,6 +24,7 @@ import cadkit.parametric.TopologyFingerprint;
 import app.CadPlateModel.CadPlateParameters;
 import app.CadPlateModel.CadPlateHoleEdit;
 import app.CadBracketModel;
+import haxe.io.Path as FilePath;
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 class EditorScene {
@@ -171,6 +172,31 @@ class EditorScene {
       width:0.06,height:0.04,depth:0.03,collisionEnabled:false,dynamicBody:false,mass:1.0,
       red:0.64,green:0.66,blue:0.70,visible:true});
     return changeObjects("Create L bracket",data,id);
+  }
+
+  public function importStep(path:String):Bool {
+    if (!canCreate()) return false;
+    var model = CadImportedModel.create(path);
+    var graph:String;
+    var dimensions:CadModelDimensions;
+    try {
+      graph = model.encode();
+      dimensions = model.sceneDimensions();
+    } catch (error:Dynamic) {
+      model.close();
+      throw error;
+    }
+    model.close();
+    var data = records();
+    var id = allocateId("step");
+    var fileName = FilePath.withoutDirectory(path);
+    var extension = fileName.lastIndexOf(".");
+    var sourceName = extension <= 0 ? fileName : fileName.substr(0, extension);
+    data.push({id:id, label:sourceName, type:"cad-step", x:0.0, y:0.0, z:0.0,
+      width:dimensions.width, height:dimensions.height, depth:dimensions.depth,
+      collisionEnabled:false, dynamicBody:false, mass:1.0, red:0.72, green:0.74, blue:0.78,
+      visible:true, cadGraph:graph});
+    return changeObjects("Import STEP", data, id);
   }
 
   public function exportSelectedCad(path:String):Void {
@@ -783,8 +809,11 @@ class EditorScene {
           default: throw "Name requires text";
         }
       }, name));
-    result.push(dimensionProperty(id, 0, prefix));
-    result.push(dimensionProperty(id, 1, prefix));
+    var importedShape = requiredObject(id).kind == "cad-step";
+    if (!importedShape) {
+      result.push(dimensionProperty(id, 0, prefix));
+      result.push(dimensionProperty(id, 1, prefix));
+    }
     var colour = new PropertyDescriptorOptions();
     colour.category = "Rendering";
     colour.validator = function(_, value) return switch (value) {
@@ -815,7 +844,8 @@ class EditorScene {
           default: throw "Colour requires #RRGGBB";
         }
       }, colour));
-    result.push(dimensionProperty(id, 2, prefix));
+    if (!importedShape)
+      result.push(dimensionProperty(id, 2, prefix));
     if (requiredObject(id).kind == "cad-plate") {
       result.push(cadProperty(id,CadPlateModel.HOLE_DIAMETER,"Hole diameter",false,prefix));
       result.push(cadProperty(id,CadPlateModel.HOLE_X,"Hole X",true,prefix));
@@ -1051,7 +1081,10 @@ class EditorScene {
   function createCadSession(graph:Null<String>,width:Float,height:Float,depth:Float,
       kind:String="cad-plate"):CadDocumentSession {
     var model:CadSessionModel;
-    if(kind=="cad-bracket")
+    if(kind=="cad-step") {
+      if (graph == null) throw "Imported STEP object has no persisted source graph";
+      model = CadImportedModel.decode(graph);
+    } else if(kind=="cad-bracket")
       model=graph==null?CadBracketModel.create(width,height,depth):CadBracketModel.decode(graph);
     else
       model=graph==null?CadPlateModel.create(width,height,depth,
@@ -1069,7 +1102,7 @@ class EditorScene {
     return cast requireCadSession(id).model;
 
   static function isCadKind(kind:String):Bool
-    return kind=="cad-plate"||kind=="cad-bracket";
+    return kind=="cad-plate"||kind=="cad-bracket"||kind=="cad-step";
 
   function requireCadSession(id:String):CadDocumentSession {
     var result=cadSessions.get(id);

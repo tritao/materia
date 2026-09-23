@@ -1,6 +1,7 @@
 package tests;
 
 import CadKit;
+import cadkit.Shape;
 import app.CadPlateModel;
 import app.CadPlateModel.CadPlateParameters;
 import cadkit.parametric.features.ConstrainedSketchFeature;
@@ -39,6 +40,53 @@ class CadPlateWorkflowTests {
     for (descriptor in scene.properties()) if (descriptor.label == label)
       return new PropertyBinding(descriptor, scene.context()).apply(PropertyValue.Float(value));
     throw "Missing CAD inspector property: " + label;
+  }
+
+  static function stepImportWorkflow():Void {
+    var session = new SceneDocumentSession();
+    var root = Sys.getCwd() + "/../build-cad";
+    if (!FileSystem.exists(root)) FileSystem.createDirectory(root);
+    var sourceFile = root + "/generic-import.step";
+    var sceneFile = root + "/generic-import.scene";
+    var exportFile = root + "/generic-import-roundtrip.step";
+    var source = Shape.box(20, 40, 60);
+    try source.exportStep(sourceFile) catch (error:Dynamic) { source.close(); throw error; }
+    source.close();
+    try {
+      var scene = session.scene;
+      check(scene.importStep(sourceFile), "import generic STEP body");
+      var id = scene.selectedId;
+      var importedObject:app.EditorSceneObject = cast scene.object(id);
+      check(importedObject.kind == "cad-step", "imported body has a persistent generic CAD kind");
+      var cadSession = scene.cadSession(id);
+      var imported = cadSession.copyPublishedShape();
+      near(imported.volume(), 48000, "generic STEP body has the expected volume");
+      imported.close();
+      var collision:app.CadCollisionBounds = cast cadSession.collisionBounds;
+      near(collision.halfExtents.x, 0.01, "imported collision width follows the source shape");
+      near(collision.halfExtents.y, 0.02, "imported collision depth follows the source shape");
+      near(collision.halfExtents.z, 0.03, "imported collision height follows the source shape");
+      session.save(sceneFile);
+      session.open(sceneFile);
+      scene = session.scene;
+      var reopenedObject:app.EditorSceneObject = cast scene.object(id);
+      check(reopenedObject != null && reopenedObject.kind == "cad-step",
+        "scene save and reopen retain a generic imported CAD body");
+      scene.select(id);
+      scene.exportSelectedCad(exportFile);
+      check(FileSystem.exists(exportFile) && File.getContent(exportFile).indexOf("ISO-10303-21") >= 0,
+        "generic imported body exports STEP after reopening");
+    } catch (error:Dynamic) {
+      session.dispose();
+      if (FileSystem.exists(sourceFile)) FileSystem.deleteFile(sourceFile);
+      if (FileSystem.exists(sceneFile)) FileSystem.deleteFile(sceneFile);
+      if (FileSystem.exists(exportFile)) FileSystem.deleteFile(exportFile);
+      throw error;
+    }
+    session.dispose();
+    if (FileSystem.exists(sourceFile)) FileSystem.deleteFile(sourceFile);
+    if (FileSystem.exists(sceneFile)) FileSystem.deleteFile(sceneFile);
+    if (FileSystem.exists(exportFile)) FileSystem.deleteFile(exportFile);
   }
 
   static function run():Void {
@@ -320,6 +368,7 @@ class CadPlateWorkflowTests {
 
   static function main():Int {
     try {
+      stepImportWorkflow();
       run();
       faceHoleWorkflow();
       bracketWorkflow();

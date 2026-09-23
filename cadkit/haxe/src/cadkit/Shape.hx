@@ -33,6 +33,11 @@ class Shape {
 		return new Shape(CadKit.stepImportChecked(path));
 	}
 
+	/** Import an authored STEP text payload without relying on its original file path. */
+	public static function importStepText(text:String):Shape {
+		return new Shape(CadKit.stepImportTextChecked(text));
+	}
+
 	public function exportStep(path:String):Void {
 		CadKit.stepExportChecked(native.borrow(), path);
 	}

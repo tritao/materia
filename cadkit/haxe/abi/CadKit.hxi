@@ -127,6 +127,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_spline(points: ptr<const<cad_vec3>> @in_array("point_count"), point_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_step_export(shape: cad_shape, path: utf8) -> cad_result;
 	extern fn cad_step_import(path: utf8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_step_import_text(text: utf8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_sweep(profile: cad_shape, spine: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_sweep_operation(profile: cad_shape, spine: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_vertex_position(vertex: cad_shape, out_position: ptr<cad_vec3> @out) -> cad_result;

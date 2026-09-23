@@ -111,6 +111,9 @@ parameter editing, recompute, JSON persistence, and undo/redo.
 `cadkit.parametric.recording.DocumentBuilder` is the explicit bridge from
 builder-style construction to a serializable feature graph. Named dimensions
 can drive multiple feature parameters and retain their bindings after reload.
+`ImportedShapeFeature` embeds STEP text in that graph and imports it again
+during evaluation, so a saved document retains its source geometry without
+depending on the original file path.
 
 `Document.createSubgraphDefinition()` snapshots another authored feature
 document as a reusable definition. Typed definition inputs bind to named

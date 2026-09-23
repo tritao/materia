@@ -1155,6 +1155,20 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(new Command("scene.create-bracket", "Add L bracket", function() {
       runSceneEdit("Could not add L bracket", function() scene.createBracket());
     }, null, function() return canEditObjects() && scene.canCreate()));
+    commands.register(new Command("scene.import-step", "Import STEP part", function() {
+      var chooser=files;
+      if(chooser==null)return;
+      chooser.chooseImport("Import STEP part",function(path,error) {
+        if(error!=null){log(error);return;}
+        if(path==null)return;
+        try {
+          scene.importStep(path);
+          updateCommandContext();
+          log("Imported STEP part: "+path);
+        } catch(failure:Dynamic) log("STEP import failed: "+Std.string(failure));
+        commands.refresh();
+      });
+    },null,function() return canEditObjects()&&files!=null&&scene.canCreate()));
     commands.register(new Command("scene.add-face-hole", "Add hole on selected face", function() {
       runSceneEdit("Could not add hole", function() scene.addHoleOnSelectedFace());
     },null,function() return canEditObjects()&&scene.canAddHoleOnSelectedFace()));
