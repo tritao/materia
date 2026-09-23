@@ -1,6 +1,7 @@
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ElementReference;
+import cadkit.parametric.LevelElement;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.Feature;
@@ -263,6 +264,30 @@ class ElementSmoke {
 		relativeDocument.recompute();
 		near(relativeExtrude.currentShape().bounds().get_min().get_z(), 1700);
 		check(unrelatedFeature.evaluations == 1, "unrelated feature remains unevaluated after datum change");
+		var externalDocument = new Document();
+		var externalLevel = externalDocument.createLevel("External", 900);
+		var externalSketch = relativeDocument.add(new DatumSketchFeature("rectangle", 5, 5,
+			new ElementReference(externalDocument.id, externalLevel.id)));
+		externalSketch.restoreActive(false);
+		var relativeClone = DocumentCodec.decode(DocumentCodec.encode(relativeDocument), true);
+		var clonedRoot:LevelElement = cast relativeClone.elementAt(0);
+		var clonedRelativeLevel:LevelElement = cast relativeClone.elementAt(1);
+		var clonedSketch:DatumSketchFeature = cast relativeClone.featureAt(0);
+		var clonedExternalSketch:DatumSketchFeature = cast relativeClone.featureAt(externalSketch.id.toInt() - 1);
+		var clonedRelativeParent = clonedRelativeLevel.relativeTo;
+		check(relativeClone.id.value != relativeDocument.id.value
+			&& clonedSketch.datum.documentId.value == relativeClone.id.value
+			&& clonedRelativeParent != null && clonedRelativeParent.documentId.value == relativeClone.id.value,
+			"cloning remaps internal datum references to the clone");
+		check(clonedExternalSketch.datum.documentId.value == externalDocument.id.value,
+			"cloning preserves external datum reference identities");
+		near(relativeClone.result().bounds().get_min().get_z(), 1700);
+		clonedRoot.setElevation(1600);
+		relativeClone.recompute();
+		near(relativeClone.result().bounds().get_min().get_z(), 1800);
+		near(relativeDocument.result().bounds().get_min().get_z(), 1700);
+		relativeClone.close();
+		externalDocument.close();
 		relativeDocument.close();
 
 		var twoLevel = new TwoLevelDatumBuilding();

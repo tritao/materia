@@ -183,7 +183,16 @@ class DocumentCodec {
 				throw new ParametricError("unsupported document version");
 
 			var records:Array<Dynamic> = cast requiredField(root, "features");
-			document = version == 1 || clone ? new Document() : new Document(new DocumentId(stringField(root, "documentId")));
+			var sourceDocumentId = optionalString(root, "documentId");
+			var targetDocument:Document = version == 1 || clone ? new Document()
+				: new Document(new DocumentId(stringField(root, "documentId")));
+			document = targetDocument;
+			var decodeElementReferenceInDocument = function(value:Dynamic) {
+				var reference = decodeElementReference(value);
+				if (clone && sourceDocumentId != null && reference.documentId.value == sourceDocumentId)
+					return new ElementReference(targetDocument.id, reference.elementId);
+				return reference;
+			};
 			var pendingReferences:Array<Dynamic> = [];
 			for (record in records) {
 				var featureId = intField(record, "id");
@@ -196,14 +205,14 @@ class DocumentCodec {
 					feature = document.add(decodeConstrainedSketch(record, document));
 				} else if (featureType == "datum-sketch") {
 					feature = document.add(new DatumSketchFeature(stringField(record, "profile"), numberField(record, "width"), numberField(record, "height"),
-						decodeElementReference(requiredField(record, "datum")), numberField(record, "offset")));
+						decodeElementReferenceInDocument(requiredField(record, "datum")), numberField(record, "offset")));
 				} else if (featureType == "level-extrude") {
 					feature = document.add(new LevelExtrudeFeature(requiredFeature(document, intField(record, "source")),
-						decodeElementReference(requiredField(record, "base")), decodeElementReference(requiredField(record, "top")),
+						decodeElementReferenceInDocument(requiredField(record, "base")), decodeElementReferenceInDocument(requiredField(record, "top")),
 						numberField(record, "baseOffset"), numberField(record, "topOffset")));
 				} else if (featureType == "level-box") {
 					feature = document.add(new LevelBoxFeature(numberField(record, "width"), numberField(record, "depth"),
-						decodeElementReference(requiredField(record, "base")), decodeElementReference(requiredField(record, "top")),
+						decodeElementReferenceInDocument(requiredField(record, "base")), decodeElementReferenceInDocument(requiredField(record, "top")),
 						numberField(record, "baseOffset"), numberField(record, "topOffset")));
 				} else if (featureType == "sketch") {
 					var planeRecord = requiredField(record, "plane");
@@ -253,7 +262,7 @@ class DocumentCodec {
 					feature = document.add(new BooleanFeature(requiredFeature(document, intField(record, "first")),
 						requiredFeature(document, intField(record, "second")), booleanOperation(stringField(record, "operation"))));
 				} else if (featureType == "definition-output") {
-					feature = document.add(new DefinitionOutputFeature(decodeElementReference(requiredField(record, "instance")),
+					feature = document.add(new DefinitionOutputFeature(decodeElementReferenceInDocument(requiredField(record, "instance")),
 						stringField(record, "output")));
 				} else if (featureType == "tool-collection") {
 					var toolIds:Array<Dynamic> = cast requiredField(record, "tools");
@@ -351,7 +360,7 @@ class DocumentCodec {
 					} else if (kind == "level") {
 						var relative:Dynamic = Reflect.field(elementRecord, "relativeTo");
 						document.installLevel(ename, eid, numberField(elementRecord, "elevation"), numberField(elementRecord, "offset"),
-							relative == null ? null : decodeElementReference(relative));
+							relative == null ? null : decodeElementReferenceInDocument(relative));
 					} else if (kind == "reference-plane") {
 						var p = requiredField(elementRecord, "plane");
 						document.installReferencePlane(ename, eid,
@@ -364,7 +373,7 @@ class DocumentCodec {
 					var loaded = document.element(new ElementId(stringField(elementRecord, "id")));
 					var rawParent:Dynamic = Reflect.field(elementRecord, "parent");
 					document.restoreElementPlacement(loaded, decodePlacement(requiredField(elementRecord, "placement")),
-						rawParent == null ? null : decodeElementReference(rawParent));
+						rawParent == null ? null : decodeElementReferenceInDocument(rawParent));
 					document.worldPlacement(loaded);
 				}
 			}
