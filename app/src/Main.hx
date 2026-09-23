@@ -437,6 +437,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
   /** Convenience entry point for a NativeKit host's layout phase. */
   public function submit(frame:LayoutFrame):RenderNode {
     viewportWidth = frame.width;
+    if (scene.advanceCadMeshRefinement()) {
+      if (hostContext != null)
+        hostContext.requestFrame();
+      else
+        scene.advanceCadMeshRefinement();
+    }
     return ui.submit(view(), frame);
   }
 

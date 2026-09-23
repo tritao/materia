@@ -38,11 +38,11 @@ class CadImportedModel implements CadSessionModel {
 
   public function close():Void document.close();
 
-  public function geometryFor(source:Shape):GeometryData {
+  public function geometryFor(source:Shape, ?preview:Bool):GeometryData {
     var started = Sys.time();
     var mesh:cadkit.Mesh;
     try {
-      mesh = source.tessellate(0.1, 0.35);
+      mesh = source.tessellate(preview == true ? 0.5 : 0.1, preview == true ? 0.75 : 0.35);
       lastTessellationSeconds = Sys.time() - started;
     } catch (error:Dynamic) {
       lastTessellationSeconds = Sys.time() - started;

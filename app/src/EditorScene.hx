@@ -884,6 +884,25 @@ class EditorScene {
     publish();
   }
 
+  /** Refine preview meshes after they have had one frame to reach the viewport. */
+  public function advanceCadMeshRefinement():Bool {
+    var requestFrame = false;
+    var refined:Array<String> = [];
+    for (id in cadSessions.keys()) {
+      var session = cadSessions.get(id);
+      if (session == null || !session.needsGeometryRefinement())
+        continue;
+      if (session.requestRefinementFrame()) {
+        requestFrame = true;
+      } else if (session.refinePublishedGeometry()) {
+        refined.push(id);
+      }
+    }
+    for (id in refined)
+      syncCadSession(id);
+    return requestFrame;
+  }
+
   /** Resolve a selected face through producer history before considering geometry. */
   function remapSelectedCadFace(session:CadDocumentSession, priorFace:Null<Shape>,
       fingerprint:TopologyFingerprint):Int {

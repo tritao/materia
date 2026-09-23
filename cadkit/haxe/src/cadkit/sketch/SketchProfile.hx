@@ -320,6 +320,22 @@ class SketchProfile {
 	}
 
 	private static function segmentsIntersect(a:Array<Float>, b:Array<Float>, c:Array<Float>, d:Array<Float>, tolerance:Float):Bool {
+		// Most pairs in a discretized profile are spatially separate. Reject those
+		// before building vectors or doing the more expensive intersection math.
+		// The normalized crossing tolerance can extend a segment by tolerance *
+		// its length, while the parallel test uses a distance tolerance, so account
+		// for both to keep this rejection conservative.
+		var abX = b[0] - a[0];
+		var abY = b[1] - a[1];
+		var cdX = d[0] - c[0];
+		var cdY = d[1] - c[1];
+		var padding = Math.max(tolerance, tolerance * Math.max(Math.max(Math.abs(abX), Math.abs(abY)),
+			Math.max(Math.abs(cdX), Math.abs(cdY))));
+		if (Math.max(a[0], b[0]) + padding < Math.min(c[0], d[0]) - padding
+			|| Math.max(c[0], d[0]) + padding < Math.min(a[0], b[0]) - padding
+			|| Math.max(a[1], b[1]) + padding < Math.min(c[1], d[1]) - padding
+			|| Math.max(c[1], d[1]) + padding < Math.min(a[1], b[1]) - padding)
+			return false;
 		var ab = [b[0] - a[0], b[1] - a[1]];
 		var cd = [d[0] - c[0], d[1] - c[1]];
 		var denominator = cross(ab, cd);

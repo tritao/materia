@@ -10,7 +10,8 @@ interface CadSessionModel {
   public function getDocument():Document;
   public function encode():String;
   public function close():Void;
-  public function geometryFor(source:Shape):GeometryData;
+  /** Tessellate an owning result; preview requests the cheaper first-pass mesh. */
+  public function geometryFor(source:Shape, ?preview:Bool):GeometryData;
   public function collisionBoundsFor(source:Shape):CadCollisionBounds;
   public function tessellationSeconds():Float;
   public function geometryConversionSeconds():Float;

@@ -26,6 +26,8 @@ class CadDocumentSession {
   var closed:Bool = false;
   var evaluationGeneration:Int = 0;
   var previewGeneration:Int = 0;
+  var pendingFineGeometry:Bool = false;
+  var refinementFrameRequested:Bool = false;
 
   public function new(model:CadSessionModel) {
     if (model == null)
@@ -194,7 +196,7 @@ class CadDocumentSession {
       ensureEvaluationCurrent(ticket);
       var source = document.result();
       nextShape = source.cloneShape();
-      nextGeometry = model.geometryFor(cast nextShape);
+      nextGeometry = model.geometryFor(cast nextShape, true);
       nextCollisionBounds = model.collisionBoundsFor(cast nextShape);
       ensureEvaluationCurrent(ticket);
     } catch (error:Dynamic) {
@@ -208,6 +210,8 @@ class CadDocumentSession {
     publishedShape = nextShape;
     publishedGeometry = cast nextGeometry;
     collisionBounds = nextCollisionBounds;
+    pendingFineGeometry = true;
+    refinementFrameRequested = false;
     revision++;
     lastPublicationSeconds = Sys.time() - publicationStarted;
     if (priorShape != null)
@@ -221,10 +225,37 @@ class CadDocumentSession {
     publishedShape = null;
     publishedGeometry = null;
     collisionBounds = null;
+    pendingFineGeometry = false;
+    refinementFrameRequested = false;
     revision++;
     lastPublicationSeconds = Sys.time() - publicationStarted;
     if (priorShape != null)
       priorShape.close();
+  }
+
+  public function needsGeometryRefinement():Bool
+    return !closed && pendingFineGeometry && publishedShape != null;
+
+  /** Defer refinement once so the just-published preview can be rendered. */
+  public function requestRefinementFrame():Bool {
+    if (!needsGeometryRefinement() || refinementFrameRequested)
+      return false;
+    refinementFrameRequested = true;
+    return true;
+  }
+
+  /** Replace the coarse viewport mesh for the same published shape revision. */
+  public function refinePublishedGeometry():Bool {
+    if (!needsGeometryRefinement() || !refinementFrameRequested)
+      return false;
+    var nextGeometry = model.geometryFor(cast publishedShape, false);
+    if (closed || !pendingFineGeometry)
+      return false;
+    publishedGeometry = nextGeometry;
+    pendingFineGeometry = false;
+    refinementFrameRequested = false;
+    revision++;
+    return true;
   }
 
   function ensureEvaluationCurrent(ticket:Int):Void {
@@ -247,6 +278,8 @@ class CadDocumentSession {
     publishedShape = null;
     publishedGeometry = null;
     collisionBounds = null;
+    pendingFineGeometry = false;
+    refinementFrameRequested = false;
     selectedTopology = null;
     model.close();
   }

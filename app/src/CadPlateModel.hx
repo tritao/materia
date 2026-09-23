@@ -225,14 +225,14 @@ class CadPlateModel implements CadSessionModel {
     return geometryFor(document.result());
   }
 
-  public function geometryFor(source:Shape):nativekit.scene.GeometryData {
+  public function geometryFor(source:Shape, ?preview:Bool):nativekit.scene.GeometryData {
     var values = parameters();
     var centred = source.translate(Geometry.vec3(
       -values.width * 500.0, -values.height * 500.0, -values.thickness * 500.0));
     var tessellationStarted = Sys.time();
     var mesh:cadkit.Mesh;
     try {
-      mesh=centred.tessellate(0.1, 0.35);
+      mesh=centred.tessellate(preview == true ? 0.5 : 0.1, preview == true ? 0.75 : 0.35);
       lastTessellationSeconds = Sys.time() - tessellationStarted;
     } catch (error:Dynamic) {
       lastTessellationSeconds = Sys.time() - tessellationStarted;
