@@ -1,9 +1,9 @@
 package app;
 
 import nativekit.scene.Scene;
-import nativekit.scene.Snapshot;
+import nativekit.scene.SceneSnapshot;
 import nativekit.scene.SpatialIndex;
-import nativekit.scene.Node;
+import nativekit.scene.NodeId;
 import nativekit.scene.SceneNode;
 import nativekit.scene.GeometryData;
 import nativekit.scene.Geometry;
@@ -32,7 +32,7 @@ class EditorScene {
   var scene(get, never):Scene;
   var objects:Array<EditorSceneObject>;
   var nextObjectId:Int = 1;
-  var snapshot:Snapshot;
+  var snapshot:SceneSnapshot;
   var spatial:SpatialIndex;
   var selectionMaterial:Material;
   public var selectedId(default, null):String = "box";
@@ -339,7 +339,7 @@ class EditorScene {
     return value;
   }
 
-  public function renderSnapshot():Snapshot return snapshot;
+  public function renderSnapshot():SceneSnapshot return snapshot;
 
   public function configureRenderView(view:SceneView, viewProjection:Transform,
       ?poses:Array<SimulationPoseVisual>):SceneView {
@@ -912,7 +912,7 @@ private class SceneBridge {
 
   public function new() scene = Scene.create();
 
-  public function attach(id:String,node:Node,geometry:Geometry,material:Material):Void
+  public function attach(id:String,node:NodeId,geometry:Geometry,material:Material):Void
     objects.set(id,new EditorSceneRuntimeObject(node,geometry,material));
 
   public function runtime(id:String):Null<EditorSceneRuntimeObject>
@@ -926,10 +926,10 @@ private class SceneBridge {
 }
 
 private class EditorSceneRuntimeObject {
-  public final node:Node;
+  public final node:NodeId;
   public final geometry:Geometry;
   public final material:Material;
-  public function new(node:Node, geometry:Geometry, material:Material) {
+  public function new(node:NodeId, geometry:Geometry, material:Material) {
     this.node=node;this.geometry=geometry;this.material=material;
   }
 }

@@ -416,7 +416,7 @@ struct ResourceChanges {
     std::vector<MaterialId> materials;
 };
 
-struct SnapshotNode {
+struct SceneNode {
     NodeId node;
     EntityId source;
     std::string name;
@@ -441,14 +441,14 @@ public:
 
     std::uint64_t revision() const noexcept;
     const RevisionCounters &revisions() const noexcept;
-    std::span<const SnapshotNode> nodes() const noexcept;
+    std::span<const SceneNode> nodes() const noexcept;
     std::span<const NodeId> children(NodeId parent) const noexcept;
     std::span<const NodeId> children_of(NodeId parent) const noexcept { return children(parent); }
     std::span<const NodeId> nodes_for_source(EntityId source) const noexcept;
     std::span<const NodeId> nodes_for_geometry(GeometryId geometry) const noexcept;
     std::span<const NodeId> nodes_for_material(MaterialId material) const noexcept;
-    const SnapshotNode *find_node(NodeId id) const noexcept;
-    const SnapshotNode *find(NodeId id) const noexcept { return find_node(id); }
+    const SceneNode *find_node(NodeId id) const noexcept;
+    const SceneNode *find(NodeId id) const noexcept { return find_node(id); }
     std::string_view name(NodeId id) const noexcept;
     std::string_view entity_name(EntityId id) const noexcept;
     std::span<const GeometryResource> geometries() const noexcept;

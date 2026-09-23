@@ -33,20 +33,20 @@ struct PublishedResourceDelta {
 };
 
 struct PublishedNodePage {
-    std::array<SnapshotNode, published_node_page_capacity> values{};
+    std::array<SceneNode, published_node_page_capacity> values{};
 };
 
 struct PublishedNodeState {
     std::size_t slot_count = 0;
     std::vector<std::shared_ptr<const PublishedNodePage>> pages;
     std::shared_ptr<const std::unordered_map<NodeId, NodeHandle>> changed_handles;
-    mutable std::shared_ptr<const std::unordered_map<NodeId, const SnapshotNode *>>
+    mutable std::shared_ptr<const std::unordered_map<NodeId, const SceneNode *>>
         lookup;
     mutable std::shared_ptr<const SnapshotMaterialization> materialized;
 };
 
 struct SnapshotMaterialization {
-    std::vector<SnapshotNode> nodes;
+    std::vector<SceneNode> nodes;
     std::unordered_map<NodeId, std::vector<NodeId>> children_by_parent;
     std::unordered_map<EntityId, std::vector<NodeId>> nodes_by_source;
     std::unordered_map<GeometryId, std::vector<NodeId>> nodes_by_geometry;

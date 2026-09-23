@@ -22,7 +22,7 @@ struct Entry {
     Bounds bounds;
 };
 
-struct Node {
+struct BvhNode {
     Bounds bounds;
     std::uint32_t left = invalid_slot;
     std::uint32_t right = invalid_slot;
@@ -180,7 +180,7 @@ std::uint32_t vertex_index(const GeometryPayload &payload, std::size_t index) no
 }
 
 template <class Visitor>
-void visit_bounds(const std::vector<Node> &nodes, const std::vector<Entry> &entries,
+void visit_bounds(const std::vector<BvhNode> &nodes, const std::vector<Entry> &entries,
                   std::uint32_t node_index, const Bounds &query, Visitor &&visitor) {
     if (node_index == invalid_slot || !overlaps(nodes[node_index].bounds, query))
         return;
@@ -196,7 +196,7 @@ void visit_bounds(const std::vector<Node> &nodes, const std::vector<Entry> &entr
 }
 
 template <class Visitor>
-void visit_ray(const std::vector<Node> &nodes, const std::vector<Entry> &entries,
+void visit_ray(const std::vector<BvhNode> &nodes, const std::vector<Entry> &entries,
                std::uint32_t node_index, const Ray &ray, Visitor &&visitor) {
     if (node_index == invalid_slot || !ray_hits_bounds(ray, nodes[node_index].bounds))
         return;
@@ -212,7 +212,7 @@ void visit_ray(const std::vector<Node> &nodes, const std::vector<Entry> &entries
 }
 
 template <class Visitor>
-void visit_frustum(const std::vector<Node> &nodes, const std::vector<Entry> &entries,
+void visit_frustum(const std::vector<BvhNode> &nodes, const std::vector<Entry> &entries,
                    std::uint32_t node_index, std::span<const std::array<float, 4>> planes,
                    Visitor &&visitor) {
     if (node_index == invalid_slot || outside_planes(nodes[node_index].bounds, planes))
@@ -241,7 +241,7 @@ struct SceneSpatialIndex::State {
     SceneSnapshot snapshot;
     std::uint64_t revision = 0;
     std::vector<Entry> entries;
-    std::vector<Node> nodes;
+    std::vector<BvhNode> nodes;
     std::unordered_map<NodeId, LocalTransform> pose_transforms;
     mutable std::vector<NodeId> results;
 };

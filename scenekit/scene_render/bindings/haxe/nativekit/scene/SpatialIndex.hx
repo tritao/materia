@@ -12,7 +12,7 @@ class SpatialIndex {
 		this.owner = owner;
 	}
 
-	public static function create(snapshot:Snapshot, ?view:SceneView):SpatialIndex {
+	public static function create(snapshot:SceneSnapshot, ?view:SceneView):SpatialIndex {
 		var owner:Ownednkscene_render_spatial_index;
 		if (view == null) {
 			var made = NativeKitSceneRender.nkscene_render_spatial_index_create(snapshot.nativeHandle());
@@ -36,7 +36,7 @@ class SpatialIndex {
 
 	/** Returns nodes whose snapshot bounds overlap the supplied box. */
 	public function queryBounds(minX:Float, minY:Float, minZ:Float,
-			maxX:Float, maxY:Float, maxZ:Float):Array<Node> {
+			maxX:Float, maxY:Float, maxZ:Float):Array<NodeId> {
 		ensureLive();
 		var bounds = new nkscene_bounds();
 		bounds.set_valid(1);
@@ -54,7 +54,7 @@ class SpatialIndex {
 
 	/** Returns nodes whose snapshot bounds intersect the supplied ray. */
 	public function queryRay(originX:Float, originY:Float, originZ:Float,
-			directionX:Float, directionY:Float, directionZ:Float):Array<Node> {
+			directionX:Float, directionY:Float, directionZ:Float):Array<NodeId> {
 		ensureLive();
 		var ray = makeRay(originX, originY, originZ, directionX, directionY, directionZ),
 			result = NativeKitSceneRender.nkscene_render_spatial_index_query_ray(owner.borrow(), ray);
@@ -82,14 +82,14 @@ class SpatialIndex {
 	public function isDisposed():Bool
 		return disposed;
 
-	function readNodes(count:haxe.Int64):Array<Node> {
-		var result:Array<Node> = [],
+	function readNodes(count:haxe.Int64):Array<NodeId> {
+		var result:Array<NodeId> = [],
 			total = haxe.Int64.toInt(count);
 		for (index in 0...total) {
 			var node = NativeKitSceneRender.nkscene_render_spatial_index_get_node(
 				owner.borrow(), index);
 			check(node.status, "spatialIndex.getNode");
-			result.push(Node.fromNative(node.out_result.get_node()));
+			result.push(NodeId.fromNative(node.out_result.get_node()));
 		}
 		return result;
 	}

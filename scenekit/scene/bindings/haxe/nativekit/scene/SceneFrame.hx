@@ -9,12 +9,12 @@ package nativekit.scene;
  * refreshed frame.
  */
 class SceneFrame {
-	final snapshotValue:Snapshot;
+	final snapshotValue:SceneSnapshot;
 	final changesValue:Null<ChangeSet>;
 	var disposed:Bool = false;
 
 	@:allow(Scene, Transaction)
-	private function new(snapshot:Snapshot, changes:Null<ChangeSet>) {
+	private function new(snapshot:SceneSnapshot, changes:Null<ChangeSet>) {
 		snapshotValue = snapshot;
 		changesValue = changes;
 	}
@@ -24,7 +24,7 @@ class SceneFrame {
 		return new SceneFrame(scene.snapshot(), null);
 
 	/** Returns the immutable scene state retained by this frame. */
-	public function sceneSnapshot():Snapshot {
+	public function sceneSnapshot():SceneSnapshot {
 		ensureLive();
 		return snapshotValue;
 	}

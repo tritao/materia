@@ -10,7 +10,7 @@ namespace {
 
 std::atomic_uint64_t next_gpu_identity{1};
 
-bool culled(const SnapshotNode &node, const SceneCamera &camera,
+bool culled(const SceneNode &node, const SceneCamera &camera,
             const SceneView &view) noexcept {
     return render_internal::culled_by_camera(node.bounds, camera) ||
            render_internal::culled_by_clip_planes(node.bounds, view.clip_planes);

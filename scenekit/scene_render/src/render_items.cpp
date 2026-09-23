@@ -124,7 +124,7 @@ std::array<float, 16> scene_camera_view(const LocalTransform &transform) noexcep
             1.0f};
 }
 
-SceneCamera camera_from_node(const SnapshotNode &node,
+SceneCamera camera_from_node(const SceneNode &node,
                                    const CameraResource &resource) noexcept {
     SceneCamera result;
     result.enabled = true;

@@ -16,7 +16,7 @@ class ScenePresentation {
 	final selectionMaterial:Material;
 	final hoverMaterial:Material;
 	var sourceFilter:Null<SceneViewFilter> = null;
-	final isolatedNodeFallback:Array<Node> = [];
+	final isolatedNodeFallback:Array<NodeId> = [];
 	var disposed:Bool = false;
 
 	private function new(interaction:SceneInteraction, view:SceneView,
@@ -34,7 +34,7 @@ class ScenePresentation {
 			selectionMaterial, hoverMaterial);
 
 	/** Replaces the pending asynchronous GPU hover request. */
-	public function requestHover(renderer:SceneRenderer, snapshot:Snapshot,
+	public function requestHover(renderer:SceneRenderer, snapshot:SceneSnapshot,
 			width:Int, height:Int, x:Int, y:Int):Void {
 		ensureLive();
 		interaction.requestHover(renderer, snapshot, width, height, x, y);
@@ -42,12 +42,12 @@ class ScenePresentation {
 
 	/** Polls hover without applying presentation layers or rendering. */
 	public function pollHover(renderer:SceneRenderer,
-			snapshot:Snapshot):InteractionHoverResult {
+			snapshot:SceneSnapshot):InteractionHoverResult {
 		ensureLive();
 		return interaction.pollHover(renderer, snapshot);
 	}
 
-	public function select(node:Node, mode:SelectionMode):Void {
+	public function select(node:NodeId, mode:SelectionMode):Void {
 		ensureLive();
 		interaction.select(node, mode);
 	}
@@ -124,12 +124,12 @@ class ScenePresentation {
 	}
 
 	/** Isolates the source entities represented by the current selection. */
-	public function isolateSelection(snapshot:Snapshot):ScenePresentation {
+	public function isolateSelection(snapshot:SceneSnapshot):ScenePresentation {
 		ensureLive();
 		var sources:Array<haxe.Int64> = [];
 		isolatedNodeFallback.resize(0);
 		for (node in interaction.selected()) {
-			var info = snapshot.find(node);
+			var info = snapshot.findNode(node);
 			if (info == null)
 				continue;
 			var source = info.sourceValue();
@@ -155,7 +155,7 @@ class ScenePresentation {
 	 * Advances interaction state and renders one frame from an immutable
 	 * snapshot. The view and render plan are reused across frames.
 	 */
-	public function render(renderer:SceneRenderer, snapshot:Snapshot,
+	public function render(renderer:SceneRenderer, snapshot:SceneSnapshot,
 			?changes:Null<ChangeSet>):nkscene_render_execution_stats {
 		ensureLive();
 		interaction.synchronize(snapshot);

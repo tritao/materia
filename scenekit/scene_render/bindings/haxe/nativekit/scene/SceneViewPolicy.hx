@@ -10,7 +10,7 @@ package nativekit.scene;
  */
 class SceneViewPolicy {
 	final visibility:VisibilityFilter;
-	final materialNodes:Array<Node> = [];
+	final materialNodes:Array<NodeId> = [];
 	final materialValues:Array<Material> = [];
 	final isolatedSources:Array<haxe.Int64> = [];
 	final sourceVisibilitySources:Array<haxe.Int64> = [];
@@ -22,26 +22,26 @@ class SceneViewPolicy {
 		visibility = new VisibilityFilter();
 	}
 
-	public function setVisibility(node:Node, visible:Bool):SceneViewPolicy {
+	public function setVisibility(node:NodeId, visible:Bool):SceneViewPolicy {
 		visibility.set(node, visible);
 		return this;
 	}
 
-	public function hide(node:Node):SceneViewPolicy
+	public function hide(node:NodeId):SceneViewPolicy
 		return setVisibility(node, false);
 
-	public function show(node:Node):SceneViewPolicy
+	public function show(node:NodeId):SceneViewPolicy
 		return setVisibility(node, true);
 
 	/** Visibility follows the node hierarchy, so this affects descendants. */
-	public function hideSubtree(node:Node):SceneViewPolicy
+	public function hideSubtree(node:NodeId):SceneViewPolicy
 		return hide(node);
 
 	/** Restores this subtree unless another ancestor policy keeps it hidden. */
-	public function showSubtree(node:Node):SceneViewPolicy
+	public function showSubtree(node:NodeId):SceneViewPolicy
 		return show(node);
 
-	public function setMaterial(node:Node, material:Material):SceneViewPolicy {
+	public function setMaterial(node:NodeId, material:Material):SceneViewPolicy {
 		var stable = node.stableValue();
 		for (index in 0...materialNodes.length) {
 			if (materialNodes[index].stableValue() == stable) {
@@ -135,7 +135,7 @@ class SceneViewPolicy {
 	public function sourceMaterialRuleCount():Int
 		return sourceMaterialSources.length;
 
-	public function applySourceFilter(snapshot:Snapshot,
+	public function applySourceFilter(snapshot:SceneSnapshot,
 			filter:SceneViewFilter):SceneViewPolicy
 		return filter.apply(snapshot, this);
 

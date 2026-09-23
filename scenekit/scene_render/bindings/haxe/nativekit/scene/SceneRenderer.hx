@@ -7,24 +7,18 @@ import NativeKitSceneRenderConstants;
 import haxe.io.Bytes;
 import GraphicsImageRef;
 
-private typedef SceneGpuRenderer = {
-	var nativeHandle:Void->nkgpu_renderer;
-}
-
 /**
  * Keeps render-plan and NativeKit GPU synchronization behind one explicit
  * render boundary. Scene snapshots and change sets are owned by the caller.
  */
 class SceneRenderer {
-	final gpuOwner:Null<SceneGpuRenderer>;
 	var executor:Ownednkscene_render_executor;
 	var planOwner:Null<Ownednkscene_render_plan> = null;
 	var lastUpdateValue:Null<nkscene_render_update> = null;
 	var disposed:Bool = false;
 
-	private function new(gpuOwner:Null<SceneGpuRenderer>, renderer:nkgpu_renderer,
+	private function new(renderer:nkgpu_renderer,
 			borrowedRendererId:Int = 0) {
-		this.gpuOwner = gpuOwner;
 		if (borrowedRendererId == 0) {
 			var made = NativeKitSceneRender.nkscene_render_executor_create(renderer);
 			checkScene(made.status, "sceneRenderer.create");
@@ -37,24 +31,20 @@ class SceneRenderer {
 		}
 	}
 
-	/** Creates a renderer attached to a live NativeKit GPU renderer. */
-	public static function create(renderer:SceneGpuRenderer):SceneRenderer
-		return new SceneRenderer(renderer, renderer.nativeHandle());
+	/** Creates an executor for a live renderer handle. Keep its owner alive. */
+	public static function create(renderer:nkgpu_renderer):SceneRenderer
+		return new SceneRenderer(renderer);
 
 	/** Creates the headless resource/command executor used by tests and tools. */
 	public static function createHeadless():SceneRenderer
-		return new SceneRenderer(null, new nkgpu_renderer());
-
-	/** Creates an executor around a caller-owned renderer handle. */
-	public static function createBorrowed(renderer:nkgpu_renderer):SceneRenderer
-		return new SceneRenderer(null, renderer);
+		return new SceneRenderer(new nkgpu_renderer());
 
 	/** Creates an executor around a caller-owned opaque renderer ID. */
 	public static function createBorrowedId(rendererId:Int):SceneRenderer
-		return new SceneRenderer(null, new nkgpu_renderer(), rendererId);
+		return new SceneRenderer(new nkgpu_renderer(), rendererId);
 
 	/** Compiles, refreshes, or incrementally updates the plan, then executes it. */
-	public function render(snapshot:Snapshot, view:SceneView,
+	public function render(snapshot:SceneSnapshot, view:SceneView,
 			?changes:Null<ChangeSet>):nkscene_render_execution_stats {
 		ensureLive();
 		prepare(snapshot, view, changes);
@@ -68,7 +58,7 @@ class SceneRenderer {
 	}
 
 	/** Renders through the GPU into tightly packed RGBA8 pixels. */
-	public function captureRgba8(snapshot:Snapshot, view:SceneView, width:Int, height:Int,
+	public function captureRgba8(snapshot:SceneSnapshot, view:SceneView, width:Int, height:Int,
 			clearRed:Float = 0.025, clearGreen:Float = 0.035, clearBlue:Float = 0.055,
 			clearAlpha:Float = 1.0):Bytes {
 		ensureLive();
@@ -89,7 +79,7 @@ class SceneRenderer {
 	}
 
 	/** Renders directly into a retained, backend-neutral GPU image. */
-	public function renderImage(snapshot:Snapshot, view:SceneView, width:Int, height:Int,
+	public function renderImage(snapshot:SceneSnapshot, view:SceneView, width:Int, height:Int,
 			clearRed:Float = 0.025, clearGreen:Float = 0.035, clearBlue:Float = 0.055,
 			clearAlpha:Float = 1.0):GraphicsImageRef {
 		ensureLive();
@@ -108,7 +98,7 @@ class SceneRenderer {
 		return GraphicsImageRef.fromBorrowedId(rendered.out_image_id, width, height);
 	}
 
-	function prepare(snapshot:Snapshot, view:SceneView, changes:Null<ChangeSet>):Void {
+	function prepare(snapshot:SceneSnapshot, view:SceneView, changes:Null<ChangeSet>):Void {
 		var snapshotValue = snapshot.nativeHandle(), viewValue = view.nativeValue();
 		if (planOwner == null) {
 			var compiled = NativeKitSceneRender.nkscene_render_plan_compile(snapshotValue, viewValue);
@@ -147,7 +137,7 @@ class SceneRenderer {
 		return planOwner != null;
 
 	/** Performs a GPU ID pass and resolves one pixel to scene ownership. */
-	public function pickPixel(snapshot:Snapshot, width:Int, height:Int, x:Int, y:Int):PickResult {
+	public function pickPixel(snapshot:SceneSnapshot, width:Int, height:Int, x:Int, y:Int):PickResult {
 		ensureLive();
 		if (planOwner == null)
 			throw "sceneRenderer.pickPixel requires a compiled render plan";
@@ -163,7 +153,7 @@ class SceneRenderer {
 	}
 
 	/** Starts a non-blocking GPU ID pass and pixel readback. */
-	public function pickPixelAsync(snapshot:Snapshot, width:Int, height:Int, x:Int, y:Int):PickRequest {
+	public function pickPixelAsync(snapshot:SceneSnapshot, width:Int, height:Int, x:Int, y:Int):PickRequest {
 		ensureLive();
 		if (planOwner == null)
 			throw "sceneRenderer.pickPixelAsync requires a compiled render plan";
@@ -174,7 +164,7 @@ class SceneRenderer {
 	}
 
 	@:allow(PickRequest)
-	function pollPick(request:PickRequest, snapshot:Snapshot):PickPollResult {
+	function pollPick(request:PickRequest, snapshot:SceneSnapshot):PickPollResult {
 		ensureLive();
 		if (planOwner == null)
 			throw "sceneRenderer.pollPick requires a compiled render plan";

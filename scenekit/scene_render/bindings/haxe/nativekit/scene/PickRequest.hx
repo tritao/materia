@@ -16,7 +16,7 @@ class PickRequest {
 	}
 
 	/** Polls without blocking. The request is valid until disposed. */
-	public function poll(snapshot:Snapshot):PickPollResult {
+	public function poll(snapshot:SceneSnapshot):PickPollResult {
 		ensureLive();
 		return renderer.pollPick(this, snapshot);
 	}

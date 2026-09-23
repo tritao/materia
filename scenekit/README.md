@@ -11,6 +11,40 @@ The source is split into three dependency-ordered libraries:
 - `scene_render`: render plans, spatial indexing, picking, and GPU execution;
 - `scene_interaction`: selection, hover, and interaction presentation.
 
+## Scene identity
+
+An entity is a shared logical source. A node identifies one placement in the
+scene hierarchy, and a `SceneNode` is the immutable state of that placement in
+a `SceneSnapshot`:
+
+```text
+EntityId (shared logical source)
+  ├── NodeId (front-left placement)
+  ├── NodeId (front-right placement)
+  ├── NodeId (rear-left placement)
+  └── NodeId (rear-right placement)
+
+SceneSnapshot.findNode(NodeId) → SceneNode
+```
+
+For example, a vehicle can share one wheel entity across four nodes. Each node
+has its own parent and transform while referring to the same geometry and
+material resources. In CAD terms, a node represents one occurrence or placement
+of an entity.
+
+```haxe
+var tx = scene.beginTransaction();
+var vehicle = tx.createNode();
+var frontLeft = tx.createNode();
+tx.setParent(frontLeft, vehicle);
+tx.setSourceEntity(frontLeft, wheelEntity);
+tx.setGeometry(frontLeft, wheelGeometry);
+tx.commit();
+
+var snapshot = scene.snapshot();
+var state:SceneNode = snapshot.findNode(frontLeft);
+```
+
 Configure, build, and test from this directory:
 
 ```sh

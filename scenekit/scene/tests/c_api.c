@@ -177,6 +177,14 @@ int main(void) {
     }
     assert(found_group && found_first && found_second);
 
+    memset(&info, 0, sizeof(info));
+    info.struct_size = sizeof(info);
+    assert(nkscene_snapshot_find_node(snapshot, first, &info) == NKS_OK);
+    assert(info.node.value == first.value);
+    assert(info.parent.value == group.value);
+    nkscene_node_id missing = {UINT64_C(0xdeadbeef)};
+    assert(nkscene_snapshot_find_node(snapshot, missing, &info) == NKS_ERROR_STALE_ID);
+
     const char *name = NULL;
     assert(nkscene_snapshot_get_name(snapshot, first, &name) == NKS_OK);
     assert(name != NULL);

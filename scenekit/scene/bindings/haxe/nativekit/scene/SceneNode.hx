@@ -4,8 +4,8 @@ import NativeKitScene;
 
 /** Immutable node state captured by a scene snapshot. */
 class SceneNode {
-	final nodeValue:Node;
-	final parentValue:Null<Node>;
+	final nodeValue:NodeId;
+	final parentValue:Null<NodeId>;
 	final sourceId:haxe.Int64;
 	final geometryId:haxe.Int64;
 	final materialId:haxe.Int64;
@@ -17,11 +17,11 @@ class SceneNode {
 	final worldTransformRevisionValue:haxe.Int64;
 	final boundsValue:Bounds;
 
-	@:allow(Snapshot)
+	@:allow(SceneSnapshot)
 	private function new(value:nkscene_snapshot_node) {
-		nodeValue = Node.fromNative(value.get_node());
+		nodeValue = NodeId.fromNative(value.get_node());
 		var parent = value.get_parent();
-		parentValue = haxe.Int64.toInt(parent.get_value()) == 0 ? null : Node.fromNative(parent);
+		parentValue = haxe.Int64.toInt(parent.get_value()) == 0 ? null : NodeId.fromNative(parent);
 		sourceId = value.get_source().get_value();
 		geometryId = value.get_geometry().get_value();
 		materialId = value.get_material().get_value();
@@ -34,10 +34,10 @@ class SceneNode {
 		boundsValue = Bounds.fromNative(value.get_bounds());
 	}
 
-	public function node():Node
+	public function node():NodeId
 		return nodeValue;
 
-	public function parent():Null<Node>
+	public function parent():Null<NodeId>
 		return parentValue;
 
 	public function sourceValue():haxe.Int64

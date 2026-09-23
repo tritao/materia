@@ -2,17 +2,17 @@ package nativekit.scene;
 
 /** Reusable set of nodes to highlight through a view material override. */
 class SelectionSet {
-	var entries:Array<Node> = [];
+	var entries:Array<NodeId> = [];
 
 	public function new() {}
 
-	public function add(node:Node):SelectionSet {
+	public function add(node:NodeId):SelectionSet {
 		if (!contains(node))
 			entries.push(node);
 		return this;
 	}
 
-	public function remove(node:Node):SelectionSet {
+	public function remove(node:NodeId):SelectionSet {
 		var index = 0;
 		while (index < entries.length) {
 			if (entries[index].equals(node))
@@ -28,7 +28,7 @@ class SelectionSet {
 		return this;
 	}
 
-	public function contains(node:Node):Bool {
+	public function contains(node:NodeId):Bool {
 		for (value in entries)
 			if (value.equals(node))
 				return true;

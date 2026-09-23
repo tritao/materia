@@ -5,16 +5,16 @@ import NativeKitSceneRender;
 /** Typed Haxe result for one renderer picking query. */
 class PickResult {
 	final picked:nkscene_render_pick_result;
-	final pickedNode:Node;
+	final pickedNode:NodeId;
 
 	@:allow(SceneRenderer, SceneInteraction, SpatialIndex)
 	private function new(picked:nkscene_render_pick_result) {
 		this.picked = picked;
-		pickedNode = Node.fromNative(picked.get_node());
+		pickedNode = NodeId.fromNative(picked.get_node());
 	}
 
 	/** Picked scene node. */
-	public function node():Node
+	public function node():NodeId
 		return pickedNode;
 
 	public function sourceValue():haxe.Int64

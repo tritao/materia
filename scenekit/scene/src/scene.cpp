@@ -53,7 +53,7 @@ const SnapshotMaterialization &SceneSnapshot::materialized() const {
             }
         }
         std::sort(next->nodes.begin(), next->nodes.end(),
-                  [](const SnapshotNode &lhs, const SnapshotNode &rhs) {
+                  [](const SceneNode &lhs, const SceneNode &rhs) {
                       return lhs.node.value < rhs.node.value;
                   });
         next->children_by_parent.reserve(next->nodes.size());
@@ -87,7 +87,7 @@ const RevisionCounters &SceneSnapshot::revisions() const noexcept {
     return state_->revisions;
 }
 
-std::span<const SnapshotNode> SceneSnapshot::nodes() const noexcept {
+std::span<const SceneNode> SceneSnapshot::nodes() const noexcept {
     return materialized().nodes;
 }
 
@@ -125,7 +125,7 @@ SceneSnapshot::nodes_for_material(MaterialId material) const noexcept {
                : std::span<const NodeId>{found->second};
 }
 
-const SnapshotNode *SceneSnapshot::find_node(NodeId id) const noexcept {
+const SceneNode *SceneSnapshot::find_node(NodeId id) const noexcept {
     const auto &published_nodes = *state_->nodes;
     if (published_nodes.changed_handles) {
         const auto changed = published_nodes.changed_handles->find(id);
@@ -144,14 +144,14 @@ const SnapshotNode *SceneSnapshot::find_node(NodeId id) const noexcept {
         std::atomic_load_explicit(&published_nodes.lookup, std::memory_order_acquire);
     if (!cached) {
         auto next =
-            std::make_shared<std::unordered_map<NodeId, const SnapshotNode *>>();
+            std::make_shared<std::unordered_map<NodeId, const SceneNode *>>();
         next->reserve(published_nodes.slot_count);
         for (const auto &page : published_nodes.pages) {
             for (const auto &node : page->values)
                 if (node.node.valid())
                     next->emplace(node.node, &node);
         }
-        std::shared_ptr<const std::unordered_map<NodeId, const SnapshotNode *>>
+        std::shared_ptr<const std::unordered_map<NodeId, const SceneNode *>>
             candidate = std::move(next);
         std::atomic_compare_exchange_strong_explicit(
             &published_nodes.lookup, &cached, std::move(candidate), std::memory_order_release,
@@ -683,7 +683,7 @@ void Scene::publish_state(const ChangeSet *changes,
     }
 
     const auto make_node = [&](NodeId id, NodeHandle handle) {
-        SnapshotNode node;
+        SceneNode node;
         node.node = id;
         if (const auto *source = source_entities.find(handle))
             node.source = source->id;
@@ -725,7 +725,7 @@ void Scene::publish_state(const ChangeSet *changes,
     if (!changed_slots.empty())
         std::atomic_store_explicit(
             &node_state->lookup,
-            std::shared_ptr<const std::unordered_map<NodeId, const SnapshotNode *>>{},
+            std::shared_ptr<const std::unordered_map<NodeId, const SceneNode *>>{},
             std::memory_order_release);
     if (!changed_slots.empty())
         std::atomic_store_explicit(&node_state->materialized,
@@ -1250,7 +1250,7 @@ resolve_change_set_handle(nkscene_change_set changes) noexcept {
     return state.change_sets.get(unpack_handle(changes));
 }
 
-void copy_snapshot_node(const SnapshotNode &source,
+void copy_snapshot_node(const SceneNode &source,
                               nkscene_snapshot_node &target) noexcept {
     target.node.value = source.node.value;
     target.source.value = source.source.value;
@@ -1585,6 +1585,23 @@ nkscene_result NKS_CALL nkscene_snapshot_get_node(
         return NKS_ERROR_INVALID_ARGUMENT;
     nkscene::copy_snapshot_node(nodes[static_cast<std::size_t>(index)],
                                       *out_node);
+    return NKS_OK;
+}
+
+nkscene_result NKS_CALL nkscene_snapshot_find_node(
+    nkscene_snapshot snapshot, nkscene_node_id node,
+    nkscene_snapshot_node *out_node) {
+    if (!out_node || out_node->struct_size < sizeof(nkscene_snapshot_node))
+        return NKS_ERROR_INVALID_ARGUMENT;
+    auto &state = nkscene::registry();
+    std::lock_guard lock(state.mutex);
+    const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
+    if (!value)
+        return NKS_ERROR_INVALID_HANDLE;
+    const auto *found = value->find_node({node.value});
+    if (!found)
+        return NKS_ERROR_STALE_ID;
+    nkscene::copy_snapshot_node(*found, *out_node);
     return NKS_OK;
 }
 

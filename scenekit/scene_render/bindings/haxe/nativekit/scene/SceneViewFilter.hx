@@ -105,7 +105,7 @@ class SceneViewFilter {
 	}
 
 	/** Applies declarative source rules to a view policy. */
-	public function apply(snapshot:Snapshot, policy:SceneViewPolicy):SceneViewPolicy {
+	public function apply(snapshot:SceneSnapshot, policy:SceneViewPolicy):SceneViewPolicy {
 		for (index in 0...visibilitySources.length)
 			policy.setSourceVisibility(visibilitySources[index], visibilityValues[index]);
 		for (index in 0...materialSources.length)

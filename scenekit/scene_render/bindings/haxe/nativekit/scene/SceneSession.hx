@@ -12,12 +12,15 @@ import nativekit.gpu.Renderer;
 class SceneSession {
 	final sceneValue:Scene;
 	final rendererValue:SceneRenderer;
+	final gpuOwner:Null<Renderer>;
 	final viewValue:SceneView;
 	var disposed:Bool = false;
 
-	private function new(scene:Scene, renderer:SceneRenderer, view:SceneView) {
+	private function new(scene:Scene, renderer:SceneRenderer, view:SceneView,
+			gpuOwner:Null<Renderer> = null) {
 		sceneValue = scene;
 		rendererValue = renderer;
+		this.gpuOwner = gpuOwner;
 		viewValue = view;
 	}
 
@@ -27,7 +30,8 @@ class SceneSession {
 
 	/** Creates a session attached to an externally owned GPU renderer. */
 	public static function create(renderer:Renderer):SceneSession
-		return new SceneSession(Scene.create(), SceneRenderer.create(renderer), new SceneView());
+		return new SceneSession(Scene.create(), SceneRenderer.create(renderer.nativeHandle()),
+			new SceneView(), renderer);
 
 	public function scene():Scene {
 		ensureLive();

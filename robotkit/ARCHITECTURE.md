@@ -45,7 +45,7 @@ shared time base.
 
 `RobotId`, `LinkId`, `JointId`, `SensorId`, and `FrameId` are semantic,
 stable identities. Names are presentation values and may change without
-changing identity. Runtime array indices, SceneKit occurrence IDs, and MuJoCo
+changing identity. Runtime array indices, SceneKit node IDs, and MuJoCo
 IDs are temporary mappings owned by their backend; they must not be serialized
 as model identity or retained as document references. Imports and compilation
 must preserve semantic IDs while rebuilding those mappings.

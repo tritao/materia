@@ -181,7 +181,11 @@ void changes_are_domain_precise() {
     assert(changes.changes.front().domains == ChangeDomain::Source);
     assert(changes.revisions.source == 1);
     assert(changes.revisions.transform == 1);
-    assert(scene->snapshot().find(first)->source == nkscene::EntityId{42});
+    const auto snapshot = scene->snapshot();
+    const nkscene::SceneNode *node_state = snapshot.find_node(first);
+    assert(node_state != nullptr);
+    assert(node_state->node == first);
+    assert(node_state->source == nkscene::EntityId{42});
 
     Transaction clear_source(scene);
     clear_source.add_source_entity(first, nkscene::invalid_entity);

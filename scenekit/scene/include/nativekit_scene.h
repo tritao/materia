@@ -392,6 +392,9 @@ NKS_API nkscene_result NKS_CALL
 nkscene_snapshot_get_node(nkscene_snapshot snapshot, uint64_t index,
                                 nkscene_snapshot_node *out_node NK_INOUT);
 NKS_API nkscene_result NKS_CALL
+nkscene_snapshot_find_node(nkscene_snapshot snapshot, nkscene_node_id node,
+                           nkscene_snapshot_node *out_node NK_INOUT);
+NKS_API nkscene_result NKS_CALL
 nkscene_snapshot_get_node_page(nkscene_snapshot snapshot, uint64_t start_index,
                                      nkscene_snapshot_node_page *out_page NK_INOUT);
 NKS_API nkscene_result NKS_CALL nkscene_snapshot_get_child_node_count(

@@ -62,7 +62,7 @@ import nativekit.scene.CameraData;
 import nativekit.scene.LightData;
 import nativekit.scene.Transform;
 import nativekit.scene.TransformUpdate;
-import nativekit.scene.Node;
+import nativekit.scene.NodeId;
 import nativekit.scene.VisibilityFilter;
 import nativekit.scene.SelectionSet;
 import nativekit.scene.SceneInteraction;
@@ -135,10 +135,10 @@ class Main {
 			view = new SceneView().setRoot(group).setViewProjection(Transform.identity())
 				.setCameraNode(cameraNode);
 		var infos = snapshot.nodes(),
-			groupInfo = snapshot.find(group),
-			firstInfo = snapshot.find(first),
-			secondInfo = snapshot.find(second),
-			children = snapshot.children(group);
+			groupInfo = snapshot.findNode(group),
+			firstInfo = snapshot.findNode(first),
+			secondInfo = snapshot.findNode(second),
+			children = snapshot.childrenOf(group);
 		if (infos.length != 5 || groupInfo == null || firstInfo == null || secondInfo == null)
 			return 10;
 		var interaction = SceneInteraction.create();
@@ -221,7 +221,7 @@ class Main {
 		var queryScene = Scene.create(),
 			queryTransaction = queryScene.beginTransaction(),
 			queryGroup = queryTransaction.createNode(),
-			queryLeaves:Array<Node> = [];
+			queryLeaves:Array<NodeId> = [];
 		for (index in 0...49999) {
 			var leaf = queryTransaction.createNode();
 			queryTransaction.setParent(leaf, queryGroup);
@@ -233,8 +233,8 @@ class Main {
 			queryStart = Sys.time(),
 			queryInfos = querySnapshot.nodes(),
 			queryElapsed = Sys.time() - queryStart,
-			queryLast = querySnapshot.find(queryLeaves[queryLeaves.length - 1]),
-			queryChildren = querySnapshot.children(queryGroup);
+			queryLast = querySnapshot.findNode(queryLeaves[queryLeaves.length - 1]),
+			queryChildren = querySnapshot.childrenOf(queryGroup);
 		Sys.println("NativeKit scene query 50k: " + queryElapsed + "s");
 		if (queryInfos.length != 50000
 			|| queryLast == null
@@ -414,8 +414,8 @@ class Main {
 			movedSnapshot = movedFrame.sceneSnapshot(),
 			movedExecution = sceneRenderer.renderFrame(movedFrame, view),
 			update = sceneRenderer.lastUpdate();
-		var oldFirstInfo = snapshot.find(first),
-			movedFirstInfo = movedSnapshot.find(first);
+		var oldFirstInfo = snapshot.findNode(first),
+			movedFirstInfo = movedSnapshot.findNode(first);
 		if (oldFirstInfo == null || movedFirstInfo == null
 			|| Math.abs(oldFirstInfo.worldTransform().element(12) + 0.65) > 0.0001
 			|| Math.abs(movedFirstInfo.worldTransform().element(12) + 0.55) > 0.0001
@@ -465,7 +465,7 @@ class Main {
 			realRuntime.events.poll();
 		if (!ready) return 18;
 		var renderer:Renderer = surface.createRenderer(),
-			realSceneRenderer = SceneRenderer.create(renderer),
+			realSceneRenderer = SceneRenderer.create(renderer.nativeHandle()),
 			realExecution = realSceneRenderer.render(snapshot, view);
 		if (realExecution.get_result() != NativeKitGpu.GpuStatus.Ok
 			|| haxe.Int64.toInt(realExecution.get_commands()) != 2
@@ -611,7 +611,7 @@ class Main {
 		scaleScene.setGeometryData(scaleGeometry, scaleGeometryData);
 		scaleScene.setMaterialData(scaleMaterial, MaterialData.opaque(0.3, 0.8, 0.4));
 		var scaleTransaction = scaleSession.beginTransaction(),
-			scaleLast:Null<Node> = null;
+			scaleLast:Null<NodeId> = null;
 		for (index in 0...50000) {
 			var node = scaleTransaction.createNode();
 			scaleTransaction.setGeometry(node, scaleGeometry);

@@ -31,11 +31,11 @@ class Scene {
 		return new Transaction(this, made.out_transaction);
 	}
 
-	public function snapshot():Snapshot {
+	public function snapshot():SceneSnapshot {
 		ensureLive();
 		var made = NativeKitScene.nkscene_scene_snapshot(owner.borrow());
 		check(made.status, "scene.snapshot");
-		return new Snapshot(made.out_snapshot);
+		return new SceneSnapshot(made.out_snapshot);
 	}
 
 	public function createGeometry():Geometry {

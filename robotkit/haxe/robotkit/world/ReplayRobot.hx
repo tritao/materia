@@ -68,7 +68,7 @@ class ReplayRobot implements Robot {
     var current = emptySnapshot();
     var currentFault:Null<RobotFault> = null;
     for (entry in recording.entries) switch entry.event {
-      case Snapshot(value) if (value.id == logicalId):
+      case SceneSnapshot(value) if (value.id == logicalId):
         current = RobotRecording.copyRobotSnapshot(value);
         if (value.faultCode == 0) currentFault = null;
         source.push(new ReplayObservation(current, currentFault));
@@ -92,7 +92,7 @@ class ReplayRobot implements Robot {
           if (current.faultCode == 0) currentFault = null;
           source.push(new ReplayObservation(current, currentFault));
         }
-      case Command(_), WorldEvent(_), Snapshot(_), Sensor(_, _), Fault(_):
+      case Command(_), WorldEvent(_), SceneSnapshot(_), Sensor(_, _), Fault(_):
     }
   }
 

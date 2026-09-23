@@ -22,7 +22,7 @@ class SceneView {
 		value.set_struct_size(nkscene_render_view.size());
 	}
 
-	public function setRoot(root:Node):SceneView {
+	public function setRoot(root:NodeId):SceneView {
 		value.set_root(root.nativeValue());
 		return this;
 	}
@@ -53,7 +53,7 @@ class SceneView {
 	}
 
 	/** Selects a scene camera node when no explicit matrix is set. */
-	public function setCameraNode(node:Node):SceneView {
+	public function setCameraNode(node:NodeId):SceneView {
 		value.set_camera_node(node.nativeValue());
 		return this;
 	}
@@ -83,7 +83,7 @@ class SceneView {
 		return this;
 	}
 
-	public function setVisibility(node:Node, visible:Bool):SceneView {
+	public function setVisibility(node:NodeId, visible:Bool):SceneView {
 		var stable = node.stableValue();
 		for (override in visibilityOverrides) {
 			if (override.get_node().get_value() == stable) {
@@ -100,20 +100,20 @@ class SceneView {
 		return this;
 	}
 
-	public function setNodeVisibility(node:Node, visible:Bool):SceneView
+	public function setNodeVisibility(node:NodeId, visible:Bool):SceneView
 		return setVisibility(node, visible);
 
-	public function setMaterial(node:Node, material:Material):SceneView {
+	public function setMaterial(node:NodeId, material:Material):SceneView {
 		setMaterialOverride(materialOverrides, node, material);
 		value.set_material_overrides(materialOverrides);
 		return this;
 	}
 
-	public function setNodeMaterial(node:Node, material:Material):SceneView
+	public function setNodeMaterial(node:NodeId, material:Material):SceneView
 		return setMaterial(node, material);
 
 	/** Adds or replaces a runtime world-space pose without changing the scene snapshot. */
-	public function setPose(node:Node, transform:Transform):SceneView {
+	public function setPose(node:NodeId, transform:Transform):SceneView {
 		for (override in poseOverrides) {
 			if (override.get_node().get_value() == node.stableValue()) {
 				override.set_world_transform(transform.nativeValue());
@@ -139,14 +139,14 @@ class SceneView {
 	}
 
 	@:allow(SelectionSet)
-	function setSelectionMaterial(node:Node, material:Material):SceneView {
+	function setSelectionMaterial(node:NodeId, material:Material):SceneView {
 		setMaterialOverride(selectionOverrides, node, material);
 		value.set_selection_overrides(selectionOverrides);
 		return this;
 	}
 
 	@:allow(SceneInteraction)
-	function setHoverMaterial(node:Node, material:Material):SceneView {
+	function setHoverMaterial(node:NodeId, material:Material):SceneView {
 		setMaterialOverride(hoverOverrides, node, material);
 		value.set_hover_overrides(hoverOverrides);
 		return this;
@@ -210,7 +210,7 @@ class SceneView {
 	}
 
 	/** Adds or removes an explicit node from the isolation set. */
-	public function setIsolatedNode(node:Node,
+	public function setIsolatedNode(node:NodeId,
 			isolated:Bool):SceneView {
 		var stable = node.stableValue();
 		for (index in 0...isolatedNodes.length) {
@@ -294,7 +294,7 @@ class SceneView {
 	}
 
 	/** Replaces the hover layer; hover takes precedence over selection. */
-	public function applyHover(node:Null<Node>, highlight:Material):SceneView {
+	public function applyHover(node:Null<NodeId>, highlight:Material):SceneView {
 		clearHoverOverrides();
 		if (node != null)
 			setHoverMaterial(node, highlight);
@@ -345,7 +345,7 @@ class SceneView {
 		return value;
 
 	function setMaterialOverride(overrides:Array<nkscene_render_material_override>,
-			node:Node, material:Material):Void {
+			node:NodeId, material:Material):Void {
 		var stable = node.stableValue(), materialValue = material.id();
 		for (override in overrides) {
 			if (override.get_node().get_value() == stable) {

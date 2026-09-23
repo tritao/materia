@@ -2,11 +2,11 @@ package nativekit.scene;
 
 /** Reusable per-node visibility policy for a SceneView. */
 class VisibilityFilter {
-	final entries:Array<{node:Node, visible:Bool}> = [];
+	final entries:Array<{node:NodeId, visible:Bool}> = [];
 
 	public function new() {}
 
-	public function set(node:Node, visible:Bool):VisibilityFilter {
+	public function set(node:NodeId, visible:Bool):VisibilityFilter {
 		var stable = node.stableValue();
 		for (entry in entries) {
 			if (entry.node.stableValue() == stable) {
@@ -18,10 +18,10 @@ class VisibilityFilter {
 		return this;
 	}
 
-	public function show(node:Node):VisibilityFilter
+	public function show(node:NodeId):VisibilityFilter
 		return set(node, true);
 
-	public function hide(node:Node):VisibilityFilter
+	public function hide(node:NodeId):VisibilityFilter
 		return set(node, false);
 
 	public function clear():VisibilityFilter {

@@ -23,7 +23,7 @@ class SceneInteraction {
 	}
 
 	/** Replaces any pending request with a new asynchronous GPU hover query. */
-	public function requestHover(renderer:SceneRenderer, snapshot:Snapshot,
+	public function requestHover(renderer:SceneRenderer, snapshot:SceneSnapshot,
 			width:Int, height:Int, x:Int, y:Int):Void {
 		ensureLive();
 		var result = NativeKitSceneInteraction.nkscene_interaction_request_hover(
@@ -33,7 +33,7 @@ class SceneInteraction {
 	}
 
 	/** Polls the current hover request without blocking. */
-	public function pollHover(renderer:SceneRenderer, snapshot:Snapshot):InteractionHoverResult {
+	public function pollHover(renderer:SceneRenderer, snapshot:SceneSnapshot):InteractionHoverResult {
 		ensureLive();
 		var result = NativeKitSceneInteraction.nkscene_interaction_poll_hover(
 			owner.borrow(), renderer.nativeExecutor(), renderer.nativePlan(), snapshot.nativeHandle());
@@ -59,7 +59,7 @@ class SceneInteraction {
 			owner.borrow(), pick.nativeValue(), mode), "sceneInteraction.applyPick");
 	}
 
-	public function select(node:Node, mode:SelectionMode):Void {
+	public function select(node:NodeId, mode:SelectionMode):Void {
 		ensureLive();
 		check(NativeKitSceneInteraction.nkscene_interaction_select(
 			owner.borrow(), node.nativeValue(), mode), "sceneInteraction.select");
@@ -71,7 +71,7 @@ class SceneInteraction {
 	}
 
 	/** Removes selected or hovered nodes that are absent from this snapshot. */
-	public function synchronize(snapshot:Snapshot):Void {
+	public function synchronize(snapshot:SceneSnapshot):Void {
 		ensureLive();
 		check(NativeKitSceneInteraction.nkscene_interaction_synchronize(
 			owner.borrow(), snapshot.nativeHandle()), "sceneInteraction.synchronize");
@@ -84,15 +84,15 @@ class SceneInteraction {
 		return result.out_has_hover == 0 ? null : new PickResult(result.out_result);
 	}
 
-	public function selected():Array<Node> {
+	public function selected():Array<NodeId> {
 		ensureLive();
 		var count = NativeKitSceneInteraction.nkscene_interaction_get_selection_count(owner.borrow());
 		check(count.status, "sceneInteraction.selected");
-		var result:Array<Node> = [];
+		var result:Array<NodeId> = [];
 		for (index in 0...haxe.Int64.toInt(count.out_count)) {
 			var value = NativeKitSceneInteraction.nkscene_interaction_get_selected(owner.borrow(), index);
 			check(value.status, "sceneInteraction.selectedNode");
-			result.push(Node.fromNative(value.out_node));
+			result.push(NodeId.fromNative(value.out_node));
 		}
 		return result;
 	}
@@ -115,7 +115,7 @@ class SceneInteraction {
 		return view.applyHover(pick == null ? null : pick.node(), highlight);
 	}
 
-	public function isSelected(node:Node):Bool {
+	public function isSelected(node:NodeId):Bool {
 		ensureLive();
 		var result = NativeKitSceneInteraction.nkscene_interaction_is_selected(
 			owner.borrow(), node.nativeValue());
