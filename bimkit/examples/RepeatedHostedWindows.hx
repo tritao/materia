@@ -23,7 +23,7 @@ class RepeatedHostedWindows {
 		firstWall = model.createLevelWall("North wall", 6000, 200, baseRef, upperRef);
 		secondWall = model.createLevelWall("South wall", 6000, 200, baseRef, upperRef);
 		secondWall.setPlacement(new Placement(new Plane(new Vector(0, 5000, 0), Vector.X(), Vector.Z())));
-		var definition = model.cad.createWindowDefinition("Shared window", 1000, 1200, 80, 200);
+		var definition = model.createWindowDefinition("Shared window", 1000, 1200, 80, 200);
 		windows = [];
 		for (index in 0...4) {
 			var instance = model.cad.createInstance("Window " + (index + 1), definition);

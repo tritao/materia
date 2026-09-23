@@ -48,7 +48,7 @@ class BimKitSmoke {
 		var firstWall = model.createWall("Wall A", 6000, 200, 3000);
 		var secondWall = model.createWall("Wall B", 5000, 250, 3000);
 		secondWall.setPlacement(new Placement(new Plane(new Vector(8000, 0, 0), Vector.X(), Vector.Z())));
-		var definition = model.cad.createWindowDefinition("Window", 1200, 1500, 80, 200);
+		var definition = model.createWindowDefinition("Window", 1200, 1500, 80, 200);
 		var first = model.cad.createInstance("Window A", definition);
 		model.hostOpening(first, firstWall.id, 1000, 900);
 		near(firstWall.shape().volume(), 6000.0 * 200 * 3000 - 1200.0 * 200 * 1500, "hosted opening cuts its wall");

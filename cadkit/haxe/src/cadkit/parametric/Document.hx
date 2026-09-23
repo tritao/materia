@@ -1,7 +1,6 @@
 package cadkit.parametric;
 
 import cadkit.Shape;
-import cadkit.Geometry;
 import cadkit.parametric.ChangeSet;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
@@ -105,16 +104,8 @@ class Document {
 		afterRecompute = null;
 	}
 
-	public function createWindowDefinition(name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition {
-		var result = installDefinition(new DefinitionId(), name, "window", [
-			new DefinitionInput("width", ParameterKind.Length, "mm", width),
-			new DefinitionInput("height", ParameterKind.Length, "mm", height),
-			new DefinitionInput("frameThickness", ParameterKind.Length, "mm", frameThickness),
-			new DefinitionInput("depth", ParameterKind.Length, "mm", depth)
-		], [
-			new DefinitionOutput("body", DefinitionOutput.Geometry),
-			new DefinitionOutput("opening", DefinitionOutput.Tool)
-		]);
+	public function createDefinition(name:String, recipe:String, inputs:Array<DefinitionInput>, outputs:Array<DefinitionOutput>):Definition {
+		var result = installDefinition(new DefinitionId(), name, recipe, inputs, outputs);
 		recordDocumentChange(new DefinitionCreateChange(this, result, definitions.length - 1));
 		return result;
 	}
@@ -210,30 +201,7 @@ class Document {
 
 	private function evaluateDefinition(definition:Definition, instance:InstanceElement, output:String):Shape {
 		definitionEvaluationCount++;
-		if (definition.recipe != "window")
-			throw new ParametricError("unsupported definition recipe: " + definition.recipe);
-		var width = instance.resolved("width"),
-			height = instance.resolved("height"),
-			frame = instance.resolved("frameThickness"),
-			depth = instance.resolved("depth");
-		if (width <= 2 * frame || height <= 2 * frame || depth <= 0 || frame <= 0)
-			throw new ParametricError("window dimensions do not define a valid frame");
-		if (output == "opening")
-			return Shape.box(width, depth + 2, height).translate(Geometry.vec3(0, -1, 0));
-		if (output != "body")
-			throw new ParametricError("unsupported window output: " + output);
-		var outer = Shape.box(width, depth, height);
-		var inner = Shape.box(width - 2 * frame, depth + 2, height - 2 * frame).translate(Geometry.vec3(frame, -1, frame));
-		try {
-			var result = outer.cut(inner);
-			outer.close();
-			inner.close();
-			return result;
-		} catch (e:Dynamic) {
-			outer.close();
-			inner.close();
-			throw e;
-		}
+		return DefinitionEvaluatorRegistry.evaluate(definition, instance, output);
 	}
 
 	private function refreshDefinition(definition:Definition):Void {

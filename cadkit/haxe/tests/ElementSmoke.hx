@@ -1,11 +1,19 @@
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
+import cadkit.Shape;
 import cadkit.parametric.ElementReference;
 import cadkit.parametric.LevelElement;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.Feature;
 import cadkit.parametric.Placement;
+import cadkit.parametric.Definition;
+import cadkit.parametric.DefinitionEvaluator;
+import cadkit.parametric.DefinitionEvaluatorRegistry;
+import cadkit.parametric.DefinitionInput;
+import cadkit.parametric.DefinitionOutput;
+import cadkit.parametric.ParameterKind;
+import cadkit.parametric.ParametricError;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.DatumSketchFeature;
@@ -34,6 +42,21 @@ private class CountingBoxFeature extends BoxFeature {
 	override public function evaluate(context:EvaluationContext):EvaluationResult {
 		evaluations++;
 		return super.evaluate(context);
+	}
+}
+
+private class TestBoxDefinitionEvaluator implements DefinitionEvaluator {
+	public function new() {}
+
+	public function evaluate(definition:Definition, instance:cadkit.parametric.InstanceElement, output:String):Shape {
+		if (output != "body")
+			throw new ParametricError("unsupported test box output: " + output);
+		var width = instance.resolved("width");
+		var height = instance.resolved("height");
+		var depth = instance.resolved("depth");
+		if (width <= 0 || height <= 0 || depth <= 0)
+			throw new ParametricError("test box dimensions must be positive");
+		return Shape.box(width, height, depth);
 	}
 }
 
@@ -342,44 +365,50 @@ class ElementSmoke {
 		restoredHierarchy.close();
 		hierarchy.close();
 
-		var windows = new RepeatedWindows();
-		check(windows.document.definitionEvaluationCount == 1, "identical instances share definition evaluation");
-		check(windows.definition.output("body").purpose == "geometry" && windows.definition.output("opening").purpose == "tool",
-			"definition outputs declare geometry and tool purposes");
-		check(windows.document.definitionOutput(windows.first, "opening").volume() > windows.first.shape().volume(),
-			"tool outputs are available explicitly and excluded from instance display");
-		var firstWindowId = windows.first.id.value;
-		var oldVolume = windows.first.shape().volume();
-		windows.definition.setDefault("frameThickness", 100);
-		check(windows.first.shape().volume() != oldVolume && windows.first.shape().volume() == windows.second.shape().volume(),
-			"shared default edit updates instances");
-		windows.second.setOverride("width", 1400);
-		check(windows.second.shape().volume() != windows.first.shape().volume(), "instance override is independent");
-		var evaluations = windows.document.definitionEvaluationCount;
-		windows.second.setPlacement(new Placement(new Plane(new Vector(6000, 0, 0), Vector.X(), Vector.Z())));
-		check(windows.document.definitionEvaluationCount == evaluations, "instance movement reuses local geometry");
-		windows.second.removeOverride("width");
-		check(windows.second.shape().volume() == windows.first.shape().volume(), "override removal restores inheritance");
-		check(windows.document.undo() && windows.second.overrideValue("width") != null, "override removal undo");
-		check(windows.document.redo() && windows.second.overrideValue("width") == null, "override removal redo");
-		var windowCopy = windows.document.duplicateInstance(windows.first, "Window copy");
-		check(windowCopy.id.value != windows.first.id.value, "instance duplication assigns a new identity");
-		var committedWindow = windows.first.shape();
+		DefinitionEvaluatorRegistry.register("cadkit.test.box", new TestBoxDefinitionEvaluator());
+		var parts = new Document();
+		var definition = parts.createDefinition("Box", "cadkit.test.box", [
+			new DefinitionInput("width", ParameterKind.Length, "mm", 10),
+			new DefinitionInput("height", ParameterKind.Length, "mm", 20),
+			new DefinitionInput("depth", ParameterKind.Length, "mm", 30)
+		], [new DefinitionOutput("body", DefinitionOutput.Geometry)]);
+		var firstPart = parts.createInstance("Box A", definition);
+		var secondPart = parts.createInstance("Box B", definition);
+		check(parts.definitionEvaluationCount == 1, "identical instances share registered recipe evaluation");
+		var oldVolume = firstPart.shape().volume();
+		definition.setDefault("width", 12);
+		check(firstPart.shape().volume() != oldVolume && firstPart.shape().volume() == secondPart.shape().volume(),
+			"shared definition default edit updates instances");
+		secondPart.setOverride("width", 14);
+		check(secondPart.shape().volume() != firstPart.shape().volume(), "instance override is independent");
+		var evaluations = parts.definitionEvaluationCount;
+		secondPart.setPlacement(new Placement(new Plane(new Vector(6000, 0, 0), Vector.X(), Vector.Z())));
+		check(parts.definitionEvaluationCount == evaluations, "instance movement reuses local geometry");
+		secondPart.removeOverride("width");
+		check(secondPart.shape().volume() == firstPart.shape().volume(), "override removal restores inheritance");
+		check(parts.undo() && secondPart.overrideValue("width") != null, "override removal undo");
+		check(parts.redo() && secondPart.overrideValue("width") == null, "override removal redo");
+		var copy = parts.duplicateInstance(firstPart, "Box copy");
+		check(copy.id.value != firstPart.id.value, "instance duplication assigns a new identity");
+		var committedPart = firstPart.shape();
 		failed = false;
 		try
-			windows.definition.setDefault("frameThickness", 700)
+			definition.setDefault("width", -1)
 		catch (e:Dynamic)
 			failed = true;
-		check(failed && windows.first.shape() == committedWindow, "failed definition edit preserves committed instances");
-		var loadedWindows = DocumentCodec.decode(DocumentCodec.encode(windows.document));
-		check(loadedWindows.allDefinitions().length == 1 && loadedWindows.elementAt(2).id.value == firstWindowId,
+		check(failed && firstPart.shape() == committedPart, "failed definition edit preserves committed instances");
+		var loadedParts = DocumentCodec.decode(DocumentCodec.encode(parts));
+		check(loadedParts.allDefinitions().length == 1 && loadedParts.elementAt(0).id.value == firstPart.id.value,
 			"definition and instance identities survive reload");
-		check(loadedWindows.allDefinitions()[0].output("opening").purpose == "tool", "definition output purposes survive reload");
-		loadedWindows.close();
-		windows.close();
+		loadedParts.close();
+		parts.close();
 		var definitionTransactionDocument = new Document();
 		var definitionTransaction = definitionTransactionDocument.beginTransaction();
-		definitionTransactionDocument.createWindowDefinition("Transient", 100, 100, 10, 10);
+		definitionTransactionDocument.createDefinition("Transient", "cadkit.test.box", [
+			new DefinitionInput("width", ParameterKind.Length, "mm", 100),
+			new DefinitionInput("height", ParameterKind.Length, "mm", 100),
+			new DefinitionInput("depth", ParameterKind.Length, "mm", 10)
+		], [new DefinitionOutput("body", DefinitionOutput.Geometry)]);
 		definitionTransaction.cancel();
 		check(definitionTransactionDocument.allDefinitions().length == 0, "definition creation is transactional");
 		definitionTransactionDocument.close();

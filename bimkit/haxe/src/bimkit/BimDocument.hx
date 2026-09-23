@@ -2,11 +2,13 @@ package bimkit;
 
 import bimkit.HostRelationshipChange;
 import bimkit.WallRoleChange;
+import bimkit.BimWindowDefinition;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.Document;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
+import cadkit.parametric.Definition;
 import cadkit.parametric.ElementReference;
 import cadkit.parametric.Feature;
 import cadkit.parametric.InstanceElement;
@@ -27,12 +29,16 @@ class BimDocument {
 	private final relationships:Map<String, HostRelationship>;
 
 	public function new(?cad:Document) {
+		BimWindowDefinition.registerEvaluator();
 		this.cad = cad == null ? new Document() : cad;
 		walls = new Map();
 		relationships = new Map();
 		this.cad.beforeRecompute = validateAllOpenings;
 		this.cad.afterRecompute = synchronizeLevelPlacements;
 	}
+
+	public function createWindowDefinition(name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition
+		return BimWindowDefinition.create(cad, name, width, height, frameThickness, depth);
 
 	public function createWall(name:String, length:Float, thickness:Float, height:Float):Element {
 		var transaction = cad.beginTransaction();

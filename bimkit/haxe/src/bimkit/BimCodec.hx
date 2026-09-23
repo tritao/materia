@@ -46,6 +46,7 @@ class BimCodec {
 		var root:Dynamic = Json.parse(text);
 		if (fieldString(root, "format") != FORMAT || fieldInt(root, "version") != VERSION)
 			throw new BimError("unsupported BimKit document format");
+		BimWindowDefinition.registerEvaluator();
 		var cad:cadkit.parametric.Document;
 		try {
 			cad = DocumentCodec.decode(fieldString(root, "cadkit"), false, false);
