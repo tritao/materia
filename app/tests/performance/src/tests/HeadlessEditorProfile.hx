@@ -12,16 +12,22 @@ import nativekit.ui.debug.UiFrameMetrics;
 import sys.FileSystem;
 import sys.io.File;
 
+private extern class ProfileGc {
+  @:hlNative("std", "gc_major") public static function major():Void;
+  @:hlNative("std", "gc_dump_memory") public static function dump(path:hl.Bytes):Void;
+}
+
 /** Replays real editor input through UiContext without a window or X server. */
 class HeadlessEditorProfile {
   static function main():Int {
     try {
-      if (Sys.args().length != 2) throw "Usage: headless-profile OUTPUT_DIR CYCLES";
+      if (Sys.args().length < 2 || Sys.args().length > 3)
+        throw "Usage: headless-profile OUTPUT_DIR CYCLES [HEAP_DUMP_PATH]";
       var output = Sys.args()[0];
       var cycles = Std.parseInt(Sys.args()[1]);
       if (cycles == null || cycles < 1) throw "CYCLES must be positive";
       if (!FileSystem.exists(output)) FileSystem.createDirectory(output);
-      run(output, cycles);
+      run(output, cycles, Sys.args().length == 3 ? Sys.args()[2] : null);
       return 0;
     } catch (error:Dynamic) {
       Sys.println("Headless editor profile failed: " + Std.string(error));
@@ -29,7 +35,7 @@ class HeadlessEditorProfile {
     }
   }
 
-  static function run(output:String, cycles:Int):Void {
+  static function run(output:String, cycles:Int, heapDumpPath:Null<String>):Void {
     var fontPath = "../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
     if (!FileSystem.exists(fontPath)) throw "Benchmark font is unavailable: " + fontPath;
     var fonts = FontCollection.create();
@@ -74,6 +80,10 @@ class HeadlessEditorProfile {
       File.saveContent(output + "/actions.jsonl", actions.join("\n") + "\n");
       File.saveContent(output + "/retained.jsonl", retained.join("\n") + "\n");
       File.saveContent(output + "/app-state.json", Json.stringify(editor.diagnosticState()));
+      if (heapDumpPath != null) {
+        ProfileGc.major();
+        ProfileGc.dump(cast haxe.io.Bytes.ofString(heapDumpPath).getData());
+      }
     } catch (error:Dynamic) {
       editor.dispose();
       fonts.dispose();

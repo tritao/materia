@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import statistics
 import subprocess
@@ -42,6 +43,8 @@ def main():
     parser.add_argument("--seconds", type=float, help="capture normal event-driven frames for this interval")
     parser.add_argument("--idle-seconds", type=float, help="sample an unbounded editor, then stop it")
     parser.add_argument("--no-profile", action="store_true", help="measure without profiler overhead")
+    parser.add_argument("--heap-dump", action="store_true",
+                        help="save a full GC heap dump and its exact bytecode (headless scenario only)")
     parser.add_argument("--scenario", choices=["tab-inspector"], help="replay a headless UI interaction")
     parser.add_argument("--cycles", type=int, default=20, help="headless Hierarchy/Sensors cycles (default: 20)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the existing compiled editor")
@@ -64,6 +67,8 @@ def main():
         parser.error("--cycles requires --scenario")
     if args.scenario is not None and args.editor_args:
         parser.error("editor arguments after -- are not supported by headless scenarios")
+    if args.heap_dump and args.scenario is None:
+        parser.error("--heap-dump requires a headless scenario")
     output = (args.output_dir or APP / "build/profiles" / time.strftime("%Y%m%d-%H%M%S")).resolve()
     output.mkdir(parents=True, exist_ok=False)
     editor_args = args.editor_args[1:] if args.editor_args[:1] == ["--"] else args.editor_args
@@ -98,6 +103,8 @@ def main():
         if args.scenario is not None:
             environment.pop("DISPLAY", None)
             environment.pop("WAYLAND_DISPLAY", None)
+            if args.heap_dump:
+                shutil.copy2(headless_binary, output / "headless-profile.hl")
         with socket.socket() as reservation:
             reservation.bind(("127.0.0.1", 0))
             port = reservation.getsockname()[1]
@@ -107,6 +114,8 @@ def main():
         command += [str(headless_binary if args.scenario is not None else APP / "build/host/main.hl")]
         if args.scenario is not None:
             command += [str(output), str(args.cycles)]
+            if args.heap_dump:
+                command.append(str(output / "heap.dump"))
         elif args.idle_seconds is None:
             command += ["--capture-dir=" + str(output)]
             command += (["--capture-seconds=" + str(args.seconds)] if args.seconds is not None
@@ -154,7 +163,7 @@ def main():
     frames_file = output / "frame-timeline.jsonl"
     frames = [json.loads(line) for line in frames_file.read_text().splitlines()] if frames_file.exists() else []
     retained_file = output / "retained.jsonl"
-    retained = [json.loads(line) for line in retained_file.read_text().splitlines()] if retained_file.exists() else []
+    retained = [json.loads(line) for line in retained_file.read_text().splitlines() if line.strip()] if retained_file.exists() else []
     samples = [json.loads(line) for line in (output / "memory.jsonl").read_text().splitlines()]
     export = None if args.no_profile else subprocess.run(
         [str(profiler), "export", "--format", "perfetto",

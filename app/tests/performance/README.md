@@ -27,3 +27,10 @@ The gate writes all raw captures under `app/build/profiles/gate-*`. To inspect
 existing captures without launching the app, pass one or more `--capture`
 paths and optionally `--idle-capture` with the matching `--idle-seconds`.
 The JSON summaries show the measured values and any failed checks.
+
+For a heap snapshot, run `python3 app/tools/profile-editor.py --scenario
+tab-inspector --cycles 100 --heap-dump`. The capture contains `heap.dump` and
+the exact `headless-profile.hl` bytecode used for that run. Inspect the pair
+with `python3 haxeon/scripts/inspect-hl-heap.py
+<capture>/headless-profile.hl <capture>/heap.dump`; the shared tool writes
+`heap-report.txt` beside the dump.
