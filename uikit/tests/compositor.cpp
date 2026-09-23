@@ -132,6 +132,12 @@ int main() {
     embedded_source.passes.back().commands.push_back({RenderCommandKind::Path, path});
     embedded_source.passes.front().commands.push_back(
         {RenderCommandKind::CompositeTarget, embedded_target, 10.0f, 20.0f, 80.0f, 40.0f});
+    auto &embedded_composite = embedded_source.passes.front().commands.back();
+    embedded_composite.has_scissor = true;
+    embedded_composite.scissor_x = 10.0f;
+    embedded_composite.scissor_y = 20.0f;
+    embedded_composite.scissor_width = 80.0f;
+    embedded_composite.scissor_height = 40.0f;
     embedded_source.dependencies.push_back({embedded_target, main_target});
     RenderPlan embedded_destination;
     embedded_destination.passes.push_back({main_target, {}, false, {}});
@@ -157,6 +163,11 @@ int main() {
             std::array<float, 6>{1.0f, 0.0f, 0.0f, 1.0f, -30.0f, -40.0f} ||
         embedded_destination.passes.front().commands.front().transform !=
             std::array<float, 6>{0.0f, 1.0f, -1.0f, 0.0f, 100.0f, 50.0f} ||
+        !embedded_destination.passes.front().commands.front().has_scissor ||
+        embedded_destination.passes.front().commands.front().scissor_x != 40.0f ||
+        embedded_destination.passes.front().commands.front().scissor_y != 60.0f ||
+        embedded_destination.passes.front().commands.front().scissor_width != 40.0f ||
+        embedded_destination.passes.front().commands.front().scissor_height != 80.0f ||
         embedded_destination.passes.front().commands.front().resource.value !=
             embedded_remapped_target.value)
         return 40;

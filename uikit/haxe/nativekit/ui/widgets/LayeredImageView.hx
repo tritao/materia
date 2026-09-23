@@ -59,15 +59,13 @@ class LayeredImageView implements View {
 				node.semantics = new Semantics(AccessibilityRole.Image, label);
 			node.onPaint(function(canvas:Canvas, geometry:ResolvedLayoutItem) {
 				for (layer in layers) {
-					var draw = function(target:Canvas) {
+					canvas.withState(function(target) {
+						if (layer.opacity < 1.0)
+							target.setAlpha(layer.opacity);
 						target.drawImage(layer.image,
 							new Rect(layer.x * geometry.width, layer.y * geometry.height,
 								layer.width * geometry.width, layer.height * geometry.height));
-					};
-					if (layer.opacity < 1.0)
-						canvas.withLayer(layer.opacity, draw);
-					else
-						draw(canvas);
+					});
 				}
 			});
 			return node;

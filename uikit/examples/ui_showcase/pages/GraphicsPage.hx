@@ -229,11 +229,17 @@ class GraphicsPage {
 			' · misses=${rendererStats.rasterCacheMisses}' +
 			' · entries=${rendererStats.rasterCacheEntries}';
 		var offset = explorer.state.retainedLayerOffset;
+		var metricsStyle = new LayoutStyle();
+		metricsStyle.width = LayoutAxis.stretch();
+		metricsStyle.childGap = 4.0;
 		return explorer.panel("retained-revisions-panel", [
 			explorer.keyed("heading", explorer.heading("Revision-aware retained work")),
 			explorer.keyed("copy", explorer.caption(
 			"This custom layer is raster-cached and has a stylesheet opacity. Move it to exercise composite and hit-geometry invalidation while the subtree pixels remain reusable.")),
-			explorer.keyed("metrics", explorer.caption(submitSummary + "\n" + cacheSummary)),
+			explorer.keyed("metrics", new Column("retained-revisions-metrics", [
+				explorer.keyed("submit", explorer.caption(submitSummary)),
+				explorer.keyed("cache", explorer.caption(cacheSummary))
+			], metricsStyle)),
 			explorer.keyed("preview", retainedRevisionPreview(explorer, offset)),
 			explorer.keyed("controls", new Row("retained-revisions-controls", [
 				explorer.keyed("move", explorer.button(offset == 0.0 ? "Move cached layer" : "Reset cached layer",

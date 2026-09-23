@@ -243,8 +243,18 @@ void place_main_command(RenderCommand &command, const RenderPlanEmbedOptions &op
     // Custom paint commands are recorded in node-local coordinates. Draw
     // commands receive the explicit command transform below, while
     // compositor-owned target composites receive the embedding placement.
-    if (command.kind == RenderCommandKind::CompositeTarget && !implicit_extent)
+    if (command.kind == RenderCommandKind::CompositeTarget && !implicit_extent) {
         command.transform = compose_transform(options.placement, command.transform);
+        if (command.has_scissor) {
+            const EmbedBounds transformed =
+                transform_bounds(command.scissor_x, command.scissor_y, command.scissor_width,
+                                 command.scissor_height, options.placement);
+            command.scissor_x = transformed.x;
+            command.scissor_y = transformed.y;
+            command.scissor_width = transformed.width;
+            command.scissor_height = transformed.height;
+        }
+    }
 
     if (options.has_command_transform && command.kind != RenderCommandKind::CompositeTarget) {
         command.transform = compose_transform(options.command_transform, command.transform);

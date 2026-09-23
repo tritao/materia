@@ -60,12 +60,18 @@ class ShowcaseDesktop {
         var staticFrame = has(args, "--static-frame");
         var printStats = has(args, "--stats");
         var uiVisualCase = -1;
+        var uiVisualFrameLimit = 1;
         for (arg in args)
             if (arg.indexOf("--ui-visual-case=") == 0) {
                 var parsed = Std.parseInt(arg.substr(17));
                 if (parsed == null)
                     return 2;
                 uiVisualCase = parsed;
+            } else if (arg.indexOf("--ui-visual-frames=") == 0) {
+                var parsed = Std.parseInt(arg.substr(19));
+                if (parsed == null || parsed <= 0)
+                    return 2;
+                uiVisualFrameLimit = parsed;
             }
         var graphicsMode = smoke || staticFrame;
         var initialWidth = graphicsMode ? 900 : UiExplorer.INITIAL_WIDTH;
@@ -74,7 +80,8 @@ class ShowcaseDesktop {
             if (arg != "--smoke-test" && arg != "--ui-smoke-test" && arg != "--ui-static-frame" &&
                     arg != "--ui-window-chrome-test" &&
                     arg != "--static-frame" && arg != "--stats" &&
-                    arg.indexOf("--ui-visual-case=") != 0)
+                    arg.indexOf("--ui-visual-case=") != 0 &&
+                    arg.indexOf("--ui-visual-frames=") != 0)
                 return 2;
 
         var initialized = false;
@@ -232,7 +239,8 @@ class ShowcaseDesktop {
                     frameState.explorer.render(surface, elapsed);
                 }
                 frameState.rendered++;
-                if (staticFrame || uiVisualCase >= 0 ||
+                if (staticFrame ||
+                        (uiVisualCase >= 0 && frameState.rendered >= uiVisualFrameLimit) ||
                         ((smoke || uiSmoke || uiStaticFrame) && frameState.rendered >= 30))
                     frameState.running = false;
             };
