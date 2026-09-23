@@ -68,6 +68,13 @@ if(NK_BUILD_TESTS)
     set_tests_properties(scene_render_benchmark PROPERTIES LABELS "scene;render;benchmark"
         TIMEOUT 30)
 
+    add_executable(nativekit_scene_render_dynamic_benchmark bench/dynamic_scene_benchmark.cpp)
+    target_compile_features(nativekit_scene_render_dynamic_benchmark PRIVATE cxx_std_20)
+    target_include_directories(nativekit_scene_render_dynamic_benchmark PRIVATE
+        src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")
+    target_link_libraries(nativekit_scene_render_dynamic_benchmark PRIVATE
+        NativeKit::scene_render NativeKit::scene)
+
     add_executable(nativekit_scene_render_tests tests/compiler.cpp)
     target_compile_features(nativekit_scene_render_tests PRIVATE cxx_std_20)
     target_include_directories(nativekit_scene_render_tests PRIVATE

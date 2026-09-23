@@ -855,6 +855,109 @@ void spatial_queries_and_cpu_picking_are_snapshot_bound() {
     assert(!index.pick_ray(hidden_ray).node.valid());
 }
 
+void runtime_pose_overrides_render_and_pick_without_mutating_snapshot() {
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    auto &geometry_resource = scene->geometry_store().create(geometry);
+    geometry_resource.bounds.valid = true;
+    geometry_resource.bounds.minimum = {-0.5f, -0.5f, 0.0f};
+    geometry_resource.bounds.maximum = {0.5f, 0.5f, 0.0f};
+    geometry_resource.edit_payload().vertices = {
+        nkscene::GeometryVertex{{-0.5f, -0.5f, 0.0f}},
+        nkscene::GeometryVertex{{0.5f, -0.5f, 0.0f}},
+        nkscene::GeometryVertex{{0.0f, 0.5f, 0.0f}}};
+    geometry_resource.edit_payload().indices = {0, 1, 2};
+    const auto material = scene->reserve_material_id();
+    scene->material_store().create(material);
+    const auto node = scene->reserve_node_id();
+
+    Transaction create(scene);
+    create.add_create(node);
+    ChangeSet changes;
+    assert(scene->commit(create, changes) == NKS_OK);
+    create.close();
+
+    Transaction configure(scene);
+    configure.add_geometry(node, geometry);
+    configure.add_material(node, material);
+    configure.add_transform(node, translated(-4.0f));
+    assert(scene->commit(configure, changes) == NKS_OK);
+    configure.close();
+
+    const auto snapshot = scene->snapshot();
+    const auto *snapshot_node = snapshot.find(node);
+    assert(snapshot_node);
+    assert(snapshot_node->world_transform.transform.matrix[12] == -4.0f);
+
+    nkscene::SceneView view;
+    view.pose_overrides.push_back({node, translated(4.0f)});
+    const auto plan = nkscene::compile(snapshot, view);
+    assert(plan.items().size() == 1);
+    const auto &item = plan.items().front();
+    assert(plan.transforms()[item.transformIndex].transform.matrix[12] == 4.0f);
+
+    const nkscene::Ray design_ray{{-4.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}};
+    const nkscene::Ray runtime_ray{{4.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}};
+    nkscene::SceneSpatialIndex design_index(snapshot);
+    nkscene::SceneSpatialIndex runtime_index(snapshot, &view);
+    assert(design_index.pick_ray(design_ray).node == node);
+    assert(!design_index.pick_ray(runtime_ray).node.valid());
+    assert(!runtime_index.pick_ray(design_ray).node.valid());
+    assert(runtime_index.pick_ray(runtime_ray).node == node);
+
+    // Presentation poses affect consumers of the view, while the immutable
+    // scene snapshot continues to describe the authored transform.
+    assert(snapshot.find(node)->world_transform.transform.matrix[12] == -4.0f);
+}
+
+void geometry_edits_refresh_bounds_and_picking_for_new_snapshots() {
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    auto &geometry_resource = scene->geometry_store().create(geometry);
+    geometry_resource.bounds.valid = true;
+    geometry_resource.bounds.minimum = {-0.5f, -0.5f, 0.0f};
+    geometry_resource.bounds.maximum = {0.5f, 0.5f, 0.0f};
+    geometry_resource.edit_payload().vertices = {
+        nkscene::GeometryVertex{{-0.5f, -0.5f, 0.0f}},
+        nkscene::GeometryVertex{{0.5f, -0.5f, 0.0f}},
+        nkscene::GeometryVertex{{0.0f, 0.5f, 0.0f}}};
+    geometry_resource.edit_payload().indices = {0, 1, 2};
+    const auto material = scene->reserve_material_id();
+    scene->material_store().create(material);
+    const auto node = scene->reserve_node_id();
+
+    Transaction create(scene);
+    create.add_create(node);
+    create.add_geometry(node, geometry);
+    create.add_material(node, material);
+    ChangeSet changes;
+    assert(scene->commit(create, changes) == NKS_OK);
+    create.close();
+    const auto before = scene->snapshot();
+    nkscene::SceneSpatialIndex before_index(before);
+
+    auto &edited_geometry = scene->geometry_store().create(geometry);
+    for (auto &vertex : edited_geometry.edit_payload().vertices)
+        vertex.position[0] += 5.0f;
+    edited_geometry.bounds.minimum[0] = 4.5f;
+    edited_geometry.bounds.maximum[0] = 5.5f;
+    scene->publish();
+
+    const auto after = scene->snapshot();
+    assert(after.find(node)->bounds.minimum[0] == 4.5f);
+    assert(after.find(node)->bounds.maximum[0] == 5.5f);
+    assert(before.find(node)->bounds.minimum[0] == -0.5f);
+    assert(before.find(node)->bounds.maximum[0] == 0.5f);
+
+    nkscene::SceneSpatialIndex after_index(after);
+    const nkscene::Ray old_ray{{0.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}};
+    const nkscene::Ray moved_ray{{5.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}};
+    assert(before_index.pick_ray(old_ray).node == node);
+    assert(!before_index.pick_ray(moved_ray).node.valid());
+    assert(!after_index.pick_ray(old_ray).node.valid());
+    assert(after_index.pick_ray(moved_ray).node == node);
+}
+
 void render_snapshots_are_concurrent_reader_safe() {
     constexpr std::size_t count = 256;
     constexpr std::size_t reader_count = 3;
@@ -934,6 +1037,8 @@ int main() {
     scene_view_culling_uses_spatial_candidates();
     mixed_hierarchy_and_empty_batches_remain_incremental();
     spatial_queries_and_cpu_picking_are_snapshot_bound();
+    runtime_pose_overrides_render_and_pick_without_mutating_snapshot();
+    geometry_edits_refresh_bounds_and_picking_for_new_snapshots();
     render_snapshots_are_concurrent_reader_safe();
     constexpr std::size_t count = 50000;
     auto scene = std::make_shared<Scene>();

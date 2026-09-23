@@ -582,15 +582,14 @@ void Scene::refresh_geometry_bounds(
         const auto *current = bounds.find(handle);
         const bool same = current && current->valid == next.valid &&
             (!next.valid || (current->minimum == next.minimum && current->maximum == next.maximum));
-        if (!same) {
-            if (next.valid)
-                bounds.insert_or_assign(handle, next);
-            else
-                bounds.erase(handle);
-            changes.stats.dirty_bounds++;
-        }
-        record_change(changes, change_indices, id,
-                      ChangeDomain::Geometry | (same ? ChangeDomain::None : ChangeDomain::Bounds));
+        if (same)
+            return;
+        if (next.valid)
+            bounds.insert_or_assign(handle, next);
+        else
+            bounds.erase(handle);
+        changes.stats.dirty_bounds++;
+        record_change(changes, change_indices, id, ChangeDomain::Bounds);
     });
     changes.stats.changed_nodes = changes.changes.size();
     changes.stats.changed_resources = changed_geometries.size();
@@ -605,15 +604,9 @@ void Scene::publish() {
         return;
     }
 
-    ++revisions.scene;
-    bool geometry_changed = false;
     bool bounds_changed = false;
-    for (const auto &change : changes.changes) {
-        geometry_changed = geometry_changed || has_domain(change.domains, ChangeDomain::Geometry);
+    for (const auto &change : changes.changes)
         bounds_changed = bounds_changed || has_domain(change.domains, ChangeDomain::Bounds);
-    }
-    if (geometry_changed)
-        ++revisions.geometry;
     if (bounds_changed)
         ++revisions.bounds;
     changes.scene_revision = revisions.scene;
@@ -769,18 +762,24 @@ void Scene::publish_state(const ChangeSet *changes,
         return node;
     };
 
+    std::unordered_map<std::size_t, std::shared_ptr<PublishedNodePage>> updated_pages;
+    updated_pages.reserve(std::min(changed_slots.size(), page_count));
     for (const auto slot : changed_slots) {
         const auto page_index = slot / published_node_page_capacity;
         const auto offset = slot % published_node_page_capacity;
-        auto page = std::make_shared<PublishedNodePage>();
-        if (node_state->pages[page_index])
-            *page = *node_state->pages[page_index];
+        auto page = updated_pages.find(page_index);
+        if (page == updated_pages.end()) {
+            auto copy = std::make_shared<PublishedNodePage>();
+            if (node_state->pages[page_index])
+                *copy = *node_state->pages[page_index];
+            node_state->pages[page_index] = copy;
+            page = updated_pages.emplace(page_index, std::move(copy)).first;
+        }
         const auto active = active_handles.find(slot);
         if (active == active_handles.end())
-            page->values[offset] = {};
+            page->second->values[offset] = {};
         else
-            page->values[offset] = make_node(nodes.id(active->second), active->second);
-        node_state->pages[page_index] = std::move(page);
+            page->second->values[offset] = make_node(nodes.id(active->second), active->second);
     }
     if (!changed_slots.empty())
         std::atomic_store_explicit(
