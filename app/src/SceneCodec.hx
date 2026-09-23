@@ -11,7 +11,7 @@ class SceneCodec {
       {
     format: FORMAT,
     version: VERSION,
-    objects: script == null ? scene.records() :[],
+    objects: script == null ? scene.recordsForSave() :[],
     sensors : script == null && sensors != null ? sensors.records() : null,
     script : script
   },

@@ -1018,6 +1018,15 @@ class Document {
 		return true;
 	}
 
+	/** Discard local undo records when an enclosing editor owns project history. */
+	public function clearHistory():Void {
+		ensureOpen();
+		if (activeTransaction != null)
+			throw new ParametricError("finish the active transaction before clearing history");
+		undoStack.resize(0);
+		redoStack.resize(0);
+	}
+
 	public function close():Void {
 		if (closed)
 			return;

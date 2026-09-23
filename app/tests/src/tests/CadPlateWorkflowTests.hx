@@ -20,13 +20,7 @@ class CadPlateWorkflowTests {
     check(Math.abs(actual - expected) < 0.00001, message);
 
   static function parameter(scene:EditorScene, name:String):Float {
-    var plate = object(scene, scene.selectedId);
-    var model = CadPlateModel.decode(plate.cadGraph);
-    var values:CadPlateParameters;
-    try {
-      values = model.parameters();
-    } catch (error:Dynamic) { model.close(); throw error; }
-    model.close();
+    var values:CadPlateParameters=scene.cadParameters(scene.selectedId);
     return switch name {
       case CadPlateModel.WIDTH: values.width;
       case CadPlateModel.HEIGHT: values.height;
@@ -55,9 +49,18 @@ class CadPlateWorkflowTests {
       check(scene.createMountingPlate(), "create CAD plate");
       var id = scene.selectedId;
       var plate = object(scene, id);
+      var cadSession = scene.cadSession(id);
+      var sessionRevision = cadSession.revision;
+      var retainedShape = cadSession.copyPublishedShape();
+      var retainedVolume = retainedShape.volume();
       check(plate.kind == "cad-plate", "selected plate has CAD kind");
       check(scene.pick(0.0, 0.0) == "scene", "initial hole is pick-through");
       check(edit(scene, "Width", 0.1) == PropertyEditResult.Applied, "edit width");
+      check(scene.cadSession(id) == cadSession && cadSession.revision > sessionRevision,
+        "parameter editing keeps one live CAD document session and publishes a new result revision");
+      near(retainedShape.volume(), retainedVolume,
+        "a retained published shape stays valid after the session publishes a new revision");
+      retainedShape.close();
       check(edit(scene, "Height", 0.06) == PropertyEditResult.Applied, "edit height");
       check(edit(scene, "Depth", 0.008) == PropertyEditResult.Applied, "edit thickness");
       check(edit(scene, "Hole diameter", 0.01) == PropertyEditResult.Applied, "edit hole diameter");
@@ -71,11 +74,11 @@ class CadPlateWorkflowTests {
         "resized mesh and picking agree at the boundary");
 
       var current = object(scene, id);
-      var graph = current.cadGraph;
+      var graph = scene.currentCadGraph(id);
       var undoCount = scene.document.history.undoCount;
       check(edit(scene, "Hole diameter", 0.2) != PropertyEditResult.Applied,
         "invalid hole recompute is rejected");
-      check(object(scene, id).cadGraph == graph && scene.document.history.undoCount == undoCount,
+      check(scene.currentCadGraph(id) == graph && scene.document.history.undoCount == undoCount,
         "failed recompute keeps last valid mesh and history");
       check(scene.document.undo(), "undo hole Y");
       near(parameter(scene, CadPlateModel.HOLE_Y), 0.0, "undo restores hole Y");
@@ -84,7 +87,7 @@ class CadPlateWorkflowTests {
 
       check(scene.duplicateSelected(), "duplicate CAD plate");
       var copyId = scene.selectedId;
-      check(copyId != id && object(scene, copyId).cadGraph == object(scene, id).cadGraph,
+      check(copyId != id && scene.currentCadGraph(copyId) == scene.currentCadGraph(id),
         "duplicate preserves editable feature graph");
       session.save(sceneFile);
       check(!session.isDirty(), "save marks plate document clean");
@@ -130,25 +133,26 @@ class CadPlateWorkflowTests {
       check(scene.canAddHoleOnSelectedFace(), "ray hit retains a selectable CAD face");
       var hitX = scene.selectedCadFaceX, hitY = scene.selectedCadFaceY;
       check(scene.pick(hitX, hitY) == id, "picked face location initially contains material");
-      var originalGraph = object(scene, id).cadGraph;
+      var originalGraph = scene.currentCadGraph(id);
+      var originalFeatures = scene.cadFeatureNames(id);
       var undoCount = scene.document.history.undoCount;
       var rejected = false;
       try scene.addHoleOnSelectedFace(0.2) catch (error:ParametricError) {
         rejected = error.message == "Hole must fit inside the plate";
       }
-      check(rejected && object(scene, id).cadGraph == originalGraph &&
+      check(rejected && scene.currentCadGraph(id) == originalGraph &&
         scene.document.history.undoCount == undoCount && scene.canAddHoleOnSelectedFace(),
         "invalid face hole preserves geometry, selection, and history");
       check(scene.addHoleOnSelectedFace(), "add through hole at selected face point");
       check(scene.document.history.undoCount == undoCount + 1,
         "face operation creates exactly one undo step");
-      check(object(scene, id).cadGraph != originalGraph, "face operation updates feature graph");
+      check(scene.currentCadGraph(id) != originalGraph, "face operation updates feature graph");
       check(scene.canAddHoleOnSelectedFace(), "top face selection remaps after recompute");
       check(scene.pick(hitX, hitY) == "scene", "new hole is pick-through at the picked point");
       check(scene.pick(hitX + 0.01, hitY) == id, "material beside new hole stays pickable");
       check(scene.document.undo(), "undo face operation");
-      check(object(scene, id).cadGraph == originalGraph && scene.pick(hitX, hitY) == id,
-        "undo restores original graph and geometry");
+      check(scene.cadFeatureNames(id).length == originalFeatures.length && scene.pick(hitX, hitY) == id,
+        "undo restores the active feature tree and geometry");
       check(scene.document.redo(), "redo face operation");
       check(scene.pick(hitX, hitY) == "scene", "redo restores new hole geometry");
       session.save(sceneFile);

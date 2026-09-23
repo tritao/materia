@@ -26,6 +26,33 @@ typedef CadPlateParameters = {
   var holeY:Float;
 }
 
+class CadPlateHoleEdit {
+  public final fingerprint:TopologyFingerprint;
+  public final x:Float;
+  public final y:Float;
+  public final diameter:Float;
+  public var previousOutputId:Int;
+  public var holeFeatureId:Int;
+  public var cutFeatureId:Int;
+
+  public function new(fingerprint:TopologyFingerprint, x:Float, y:Float, diameter:Float,
+      previousOutputId:Int, holeFeatureId:Int, cutFeatureId:Int) {
+    this.fingerprint = fingerprint;
+    this.x = x;
+    this.y = y;
+    this.diameter = diameter;
+    this.previousOutputId = previousOutputId;
+    this.holeFeatureId = holeFeatureId;
+    this.cutFeatureId = cutFeatureId;
+  }
+
+  public function updateFrom(other:CadPlateHoleEdit):Void {
+    previousOutputId = other.previousOutputId;
+    holeFeatureId = other.holeFeatureId;
+    cutFeatureId = other.cutFeatureId;
+  }
+}
+
 /** Typed application boundary around a CadKit mounting-plate feature graph. */
 class CadPlateModel {
   public static inline var WIDTH:String = "plate.width";
@@ -35,7 +62,7 @@ class CadPlateModel {
   public static inline var HOLE_X:String = "hole.offsetx";
   public static inline var HOLE_Y:String = "hole.offsety";
 
-  final document:Document;
+  public final document:Document;
 
   function new(document:Document) this.document = document;
 
@@ -84,7 +111,8 @@ class CadPlateModel {
   public function featureNames():Array<String> {
     var result:Array<String> = [];
     for (index in 0...document.featureCount())
-      result.push(document.featureAt(index).serializationType());
+      if (document.featureAt(index).active)
+        result.push(document.featureAt(index).serializationType());
     return result;
   }
 
@@ -112,7 +140,7 @@ class CadPlateModel {
   }
 
   /** Adds a through hole on the selected top face. */
-  public function addThroughHole(faceIndex:Int,xMetres:Float,yMetres:Float,diameterMetres:Float):Void {
+  public function addThroughHole(faceIndex:Int,xMetres:Float,yMetres:Float,diameterMetres:Float):CadPlateHoleEdit {
     var face=faceFingerprint(faceIndex);
     if(face.dz<0.98)throw new ParametricError("Select the plate's top planar face");
     var parameters=parameters();
@@ -124,11 +152,48 @@ class CadPlateModel {
     var source=document.outputFeature();
     var top=new SelectionRecipe("face","plane",Vector.Z(),"max",Vector.Z(),1);
     var scale=1.0/CadSceneGeometry.METRES_PER_MILLIMETRE;
-    var hole=document.add(HoleFeature.plain(source,top,Vector.X(),"through-all",
-      xMetres*scale,yMetres*scale,diameterMetres*scale));
-    var cut=document.add(new BooleanFeature(source,hole,BooleanOperation.Cut));
-    document.setOutput(cut);
-    document.recompute();
+    var transaction=document.beginTransaction();
+    try {
+      var hole=document.add(HoleFeature.plain(source,top,Vector.X(),"through-all",
+        xMetres*scale,yMetres*scale,diameterMetres*scale));
+      document.trackFeatureCreation(hole);
+      var cut=document.add(new BooleanFeature(source,hole,BooleanOperation.Cut));
+      document.trackFeatureCreation(cut);
+      document.setOutputTracked(cut);
+      document.recompute();
+      transaction.commit();
+      return new CadPlateHoleEdit(face,xMetres,yMetres,diameterMetres,
+        source.id.toInt(),hole.id.toInt(),cut.id.toInt());
+    } catch(error:Dynamic) {
+      transaction.cancel();
+      throw error;
+    }
+  }
+
+  public function setHoleEditActive(edit:CadPlateHoleEdit, active:Bool):Void {
+    var hole=document.featureById(edit.holeFeatureId);
+    var cut=document.featureById(edit.cutFeatureId);
+    if(active&&(hole==null||cut==null)) {
+      var face=remapFace(edit.fingerprint);
+      if(face<0)throw new ParametricError("selected face could not be restored");
+      var replayed=addThroughHole(face,edit.x,edit.y,edit.diameter);
+      edit.updateFrom(replayed);
+      return;
+    }
+    var previous=document.featureById(edit.previousOutputId);
+    if(hole==null||cut==null||previous==null)
+      throw new ParametricError("hole edit references are unresolved");
+    var transaction=document.beginTransaction();
+    try {
+      document.setFeatureActive(hole,active);
+      document.setFeatureActive(cut,active);
+      document.setOutputTracked(active?cut:previous);
+      document.recompute();
+      transaction.commit();
+    } catch(error:Dynamic) {
+      transaction.cancel();
+      throw error;
+    }
   }
 
   /** All parameter changes are one CadKit transaction; failed recompute restores the graph. */
@@ -149,8 +214,12 @@ class CadPlateModel {
   }
 
   public function geometry():nativekit.scene.GeometryData {
+    return geometryFor(document.result());
+  }
+
+  public function geometryFor(source:Shape):nativekit.scene.GeometryData {
     var values = parameters();
-    var centred = document.result().translate(Geometry.vec3(
+    var centred = source.translate(Geometry.vec3(
       -values.width * 500.0, -values.height * 500.0, -values.thickness * 500.0));
     try {
       var result = CadSceneGeometry.fromMesh(centred.tessellate(0.1, 0.35));
