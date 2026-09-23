@@ -4,6 +4,7 @@ import cadkit.modeling.Curve;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
+import cadkit.units.LengthUnits;
 
 private class ProfileSegment {
 	public final entity:SketchEntity;
@@ -43,8 +44,13 @@ private class ProfileBoundary {
 /** Curve-aware validation and exact native construction of solved profile boundaries. */
 class SketchProfile {
 	public static function build(authored:ConstrainedSketch, solved:SolvedSketch):Sketch {
-		var scale = modelScale(authored, solved);
-		var tolerance = Math.max(authored.settings.tolerance * Math.max(1, scale) * 10, 1e-8 * Math.max(1, scale));
+		var factor = LengthUnits.factorToMillimetres(authored.units);
+		if (factor == null)
+			throw new ProfileError("invalid", [], "unsupported sketch length unit: " + authored.units);
+		var canonical = toMillimetres(authored, solved, factor);
+		var scale = modelScale(authored, canonical);
+		var tolerance = Math.max(authored.settings.tolerance * factor * Math.max(1, scale) * 10,
+			1e-8 * Math.max(1, scale));
 		var segments:Array<ProfileSegment> = [];
 		var circles:Array<SketchEntity> = [];
 		for (entity in authored.entities()) {
@@ -53,10 +59,10 @@ class SketchProfile {
 			if (entity.kind == "circle") {
 				circles.push(entity);
 			} else if (entity.kind == "line") {
-				segments.push(new ProfileSegment(entity, solved.point(entity.first), solved.point(entity.second)));
+				segments.push(new ProfileSegment(entity, canonical.point(entity.first), canonical.point(entity.second)));
 			} else if (entity.kind == "arc") {
-				var center = solved.point(entity.first);
-				var radius = solved.radius(entity.id);
+				var center = canonical.point(entity.first);
+				var radius = canonical.radius(entity.id);
 				segments.push(new ProfileSegment(entity, arcPoint(center, radius, entity.startAngle),
 					arcPoint(center, radius, entity.endAngle)));
 			}
@@ -66,12 +72,25 @@ class SketchProfile {
 
 		var boundaries:Array<ProfileBoundary> = [];
 		for (loop in connectedLoops(segments, tolerance))
-			boundaries.push(loopBoundary(loop, solved, tolerance));
+			boundaries.push(loopBoundary(loop, canonical, tolerance));
 		for (circle in circles)
-			boundaries.push(circleBoundary(circle, solved, tolerance));
+			boundaries.push(circleBoundary(circle, canonical, tolerance));
 		validateIntersections(boundaries, tolerance);
 		classifyNesting(boundaries, tolerance);
-		return constructFaces(boundaries, authored.plane, solved);
+		return constructFaces(boundaries, authored.plane, canonical);
+	}
+
+	private static function toMillimetres(authored:ConstrainedSketch, solved:SolvedSketch, factor:Float):SolvedSketch {
+		var coordinates:Map<String, Array<Float>> = new Map();
+		for (point in authored.points()) {
+			var value = solved.point(point.id);
+			coordinates.set(point.id, [value[0] * factor, value[1] * factor]);
+		}
+		var radii:Map<String, Float> = new Map();
+		for (entity in authored.entities())
+			if (entity.kind == "circle" || entity.kind == "arc")
+				radii.set(entity.id, solved.radius(entity.id) * factor);
+		return new SolvedSketch(coordinates, radii, solved.diagnostic);
 	}
 
 	private static function loopBoundary(loop:Array<ProfileSegment>, solved:SolvedSketch, tolerance:Float):ProfileBoundary {

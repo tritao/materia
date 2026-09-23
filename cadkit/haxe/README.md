@@ -146,8 +146,13 @@ perpendicular, angle, concentricity, point-on-entity, tangency, and reflection
 symmetry. Tangency supports line-circle, line-arc, circle-circle, circle-arc,
 and arc-arc combinations. Arcs retain their authored direction.
 
-`SketchProfile.build()` converts a successful solution through the existing
-native edge, wire, and planar-face constructors. Construction entities are
+Sketch points, radii, and dimensional constraints use the authored sketch
+length unit (`mm`, `cm`, `m`, `in`, or `ft`) while solving and editing.
+`SketchProfile.build()` converts local geometry to canonical millimetres before
+creating native edges, wires, and planar faces; the workplane origin stays in
+world millimetres. Constrained-sketch feature dimensions are stored in canonical
+millimetres (angles in radians), with persistence converting them back to the
+authored sketch unit. Construction entities are
 excluded. Open, branching, self-intersecting, empty, and native-invalid
 boundaries raise `ProfileError` with entity IDs. Nested loops become holes.
 

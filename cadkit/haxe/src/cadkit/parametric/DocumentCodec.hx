@@ -715,7 +715,9 @@ class DocumentCodec {
 			});
 		for (constraint in sketch.constraints()) {
 			var value = constraint.value;
-			if (constraint.kind == "distance" || constraint.kind == "radius" || constraint.kind == "angle")
+			if (constraint.kind == "distance" || constraint.kind == "radius")
+				value = UnitConversion.fromCanonical(feature.dimension(constraint.id).value, ParameterKind.Length, sketch.units);
+			else if (constraint.kind == "angle")
 				value = feature.dimension(constraint.id).value;
 			constraints.push({
 				id: constraint.id,

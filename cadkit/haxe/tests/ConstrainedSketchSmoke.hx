@@ -26,8 +26,8 @@ class ConstrainedSketchSmoke {
 	static function check(value:Bool, message:String):Void { if (!value) throw message; }
 	static function near(value:Float, expected:Float):Void { check(Math.abs(value - expected) < 1e-5, 'expected $expected, got $value'); }
 	static function failObserver():Void { throw "observer failure"; }
-	static function fixedRectangle(width:Float, height:Float):ConstrainedSketch {
-		var sketch = new ConstrainedSketch();
+	static function fixedRectangle(width:Float, height:Float, units:String = "mm"):ConstrainedSketch {
+		var sketch = new ConstrainedSketch(null, units);
 		var coordinates = [
 			[-width / 2, -height / 2], [width / 2, -height / 2],
 			[width / 2, height / 2], [-width / 2, height / 2]
@@ -40,6 +40,13 @@ class ConstrainedSketchSmoke {
 			sketch.addEntity(SketchEntity.line("rectangle.edge" + index, "rectangle.point" + index,
 				"rectangle.point" + ((index + 1) % 4)));
 		return sketch;
+	}
+	static function sketchInUnits(source:ConstrainedSketch, units:String):ConstrainedSketch {
+		var result = new ConstrainedSketch(source.plane, units, source.settings);
+		for (point in source.points()) result.addPoint(point);
+		for (entity in source.entities()) result.addEntity(entity);
+		for (constraint in source.constraints()) result.addConstraint(constraint);
+		return result;
 	}
 
 	public static function run():Void {
@@ -194,6 +201,29 @@ class ConstrainedSketchSmoke {
 		near(capsuleFace.shape.area(), 24 + 4 * Math.PI - Math.PI + 0.16 * Math.PI);
 		capsuleFace.close();
 
+		var millimetreRectangle = fixedRectangle(20, 10);
+		var millimetreFace = SketchProfile.build(millimetreRectangle, millimetreRectangle.solve());
+		var centimetreRectangle = fixedRectangle(2, 1, "cm");
+		var centimetreFace = SketchProfile.build(centimetreRectangle, centimetreRectangle.solve());
+		near(millimetreFace.shape.area(), 200);
+		near(centimetreFace.shape.area(), millimetreFace.shape.area());
+		millimetreFace.close();
+		centimetreFace.close();
+		var millimetreCircle = new ConstrainedSketch();
+		millimetreCircle.addPoint(new SketchPoint("mm.circle.center", 0, 0))
+			.addEntity(SketchEntity.circle("mm.circle", "mm.circle.center", 5));
+		var centimetreCircle = new ConstrainedSketch(null, "cm");
+		centimetreCircle.addPoint(new SketchPoint("cm.circle.center", 0, 0))
+			.addEntity(SketchEntity.circle("cm.circle", "cm.circle.center", 0.5));
+		var millimetreCircleFace = SketchProfile.build(millimetreCircle, millimetreCircle.solve());
+		var centimetreCircleFace = SketchProfile.build(centimetreCircle, centimetreCircle.solve());
+		near(centimetreCircleFace.shape.area(), millimetreCircleFace.shape.area());
+		millimetreCircleFace.close();
+		centimetreCircleFace.close();
+		var unsupportedUnits = false;
+		try new ConstrainedSketch(null, "yd") catch (_:Dynamic) unsupportedUnits = true;
+		check(unsupportedUnits, "constrained sketches reject unsupported length units");
+
 		var overlap = new ConstrainedSketch();
 		overlap.addPoint(new SketchPoint("overlap.a", 0, 0)).addPoint(new SketchPoint("overlap.b", 1, 0))
 			.addEntity(SketchEntity.circle("overlap.first", "overlap.a", 2))
@@ -202,6 +232,30 @@ class ConstrainedSketchSmoke {
 		try SketchProfile.build(overlap, overlap.solve()) catch (error:ProfileError)
 			failed = error.kind == "overlapping" && error.entityIds.length == 2;
 		check(failed, "overlapping curved boundaries identify entities");
+
+		var centimetreModel = sketchInUnits(sketch, "cm");
+		var unitDocument = new Document();
+		var unitFeature = unitDocument.add(new ConstrainedSketchFeature(centimetreModel));
+		var unitWidth = unitDocument.defineTypedParameter("width", 100, cadkit.parametric.ParameterKind.Length, "mm");
+		unitWidth.bind(unitFeature.dimension("width"));
+		unitDocument.setOutput(unitFeature);
+		unitDocument.recompute();
+		near(unitFeature.dimension("width").value, 100);
+		near(unitFeature.sketch().constraints()[5].value, 10);
+		near(unitDocument.result().area(), 5000);
+		unitWidth.set(120);
+		unitDocument.recompute();
+		near(unitFeature.dimension("width").value, 120);
+		near(unitFeature.sketch().constraints()[5].value, 12);
+		near(unitDocument.result().area(), 6000);
+		var unitReload = DocumentCodec.decode(DocumentCodec.encode(unitDocument));
+		var unitReloadFeature:ConstrainedSketchFeature = cast unitReload.featureAt(0);
+		near(unitReloadFeature.dimension("width").value, 120);
+		check(unitReloadFeature.sketch().units == "cm", "authored sketch units persist");
+		near(unitReloadFeature.sketch().constraints()[5].value, 12);
+		near(unitReload.result().area(), 6000);
+		unitReload.close();
+		unitDocument.close();
 
 		var document=new Document();
 		var feature=document.add(new ConstrainedSketchFeature(sketch));

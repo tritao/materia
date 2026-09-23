@@ -1,5 +1,7 @@
 package cadkit.parametric;
 
+import cadkit.units.LengthUnits;
+
 /** Explicit conversion to canonical mm, rad, count, mm², and mm³ values. */
 class UnitConversion {
 	public static function canonicalUnit(kind:String):String {
@@ -39,9 +41,9 @@ class UnitConversion {
 				if (unit == "1") 1 else invalid(kind, unit);
 			case ParameterKind.Count:
 				if (unit == "count" || unit == "1") 1 else invalid(kind, unit);
-			case ParameterKind.Length: switch unit {
-				case "mm": 1; case "cm": 10; case "m": 1000; case "in": 25.4; case "ft": 304.8; default: invalid(kind, unit);
-			};
+			case ParameterKind.Length:
+				var factor = LengthUnits.factorToMillimetres(unit);
+				factor == null ? invalid(kind, unit) : factor;
 			case ParameterKind.Angle: switch unit {
 				case "rad": 1; case "deg": Math.PI / 180; default: invalid(kind, unit);
 			};

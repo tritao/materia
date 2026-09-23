@@ -236,6 +236,14 @@ degrees of freedom; after a conflicting edit, the previous solution remains
 available while the draft can be repaired. Profile construction remains an
 explicit later step.
 
+Sketch coordinates, radii, and distance dimensions are authored in the
+sketch's selected length unit (`mm`, `cm`, `m`, `in`, or `ft`). Solving keeps
+those values in that unit; profile construction converts local geometry to
+canonical millimetres before passing it to OCCT. The workplane origin stays in
+world millimetres. Feature dimension parameters use canonical millimetres
+(angles use radians), and the codec converts dimensional constraints back to
+their authored sketch unit when saving.
+
 `SketchProfile.build()` validates line and curved boundaries, rejects overlap,
 and classifies arbitrary nesting by parity so islands within holes become
 material again. Exact curves are passed to the native wire and face builders;

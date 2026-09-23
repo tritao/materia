@@ -22,6 +22,7 @@ import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyReference;
 import cadkit.parametric.TopologyResolver;
 import cadkit.parametric.ReferenceState;
+import cadkit.parametric.UnitConversion;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.sketch.FaceWorkplane;
@@ -81,7 +82,8 @@ class ConstrainedSketchFeature extends Feature {
 		supportFaceReference = null;
 		for (constraint in authored.constraints())
 			if (isDimensional(constraint.kind)) {
-				dimensionSlots.set(constraint.id, new Parameter(this, "constraint." + constraint.id, constraint.value,
+				dimensionSlots.set(constraint.id, new Parameter(this, "constraint." + constraint.id,
+					toCanonicalDimension(authored, constraint.kind, constraint.value),
 					constraint.kind == "angle" ? -1e300 : 0, false, 1e300,
 					constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length));
 				dimensionKinds.set(constraint.id, constraint.kind);
@@ -293,16 +295,17 @@ class ConstrainedSketchFeature extends Feature {
 					retiredDimensionSlots.remove(id);
 					retiredDimensionKinds.remove(id);
 					registerParameter(slot);
-					restoreDimensionValue(slot, constraint.value);
+					restoreDimensionValue(slot, toCanonicalDimension(next, constraint.kind, constraint.value));
 				} else {
-					slot = new Parameter(this, "constraint." + id, constraint.value,
+					slot = new Parameter(this, "constraint." + id,
+						toCanonicalDimension(next, constraint.kind, constraint.value),
 						constraint.kind == "angle" ? -1e300 : 0, false, 1e300,
 						constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length);
 				}
 				dimensionSlots.set(id, slot);
 				dimensionKinds.set(id, constraint.kind);
 			} else {
-				restoreDimensionValue(dimensionSlots.get(id), constraint.value);
+				restoreDimensionValue(dimensionSlots.get(id), toCanonicalDimension(next, constraint.kind, constraint.value));
 			}
 		}
 	}
@@ -359,7 +362,8 @@ class ConstrainedSketchFeature extends Feature {
 			for (constraint in authored.constraints()) {
 				if (constraint.id == id) {
 					authored.replaceConstraint(SketchConstraint.raw(constraint.id, constraint.kind, constraint.first,
-						constraint.second, constraint.third, parameter.value));
+						constraint.second, constraint.third,
+						fromCanonicalDimension(authored, constraint.kind, parameter.value)));
 					return;
 				}
 			}
@@ -441,7 +445,7 @@ class ConstrainedSketchFeature extends Feature {
 			candidate.addEntity(entity);
 		for (constraint in authored.constraints()) {
 			var slot = dimensionSlots.get(constraint.id);
-			var value = slot == null ? constraint.value : slot.value;
+			var value = slot == null ? constraint.value : fromCanonicalDimension(authored, constraint.kind, slot.value);
 			candidate.addConstraint(SketchConstraint.raw(constraint.id, constraint.kind, constraint.first, constraint.second,
 				constraint.third, value));
 		}
@@ -499,5 +503,13 @@ class ConstrainedSketchFeature extends Feature {
 
 	private static function isDimensional(kind:String):Bool {
 		return kind == "distance" || kind == "radius" || kind == "angle";
+	}
+
+	private static function toCanonicalDimension(sketch:ConstrainedSketch, kind:String, value:Float):Float {
+		return kind == "angle" ? value : UnitConversion.toCanonical(value, ParameterKind.Length, sketch.units);
+	}
+
+	private static function fromCanonicalDimension(sketch:ConstrainedSketch, kind:String, value:Float):Float {
+		return kind == "angle" ? value : UnitConversion.fromCanonical(value, ParameterKind.Length, sketch.units);
 	}
 }

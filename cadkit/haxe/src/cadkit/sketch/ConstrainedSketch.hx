@@ -2,6 +2,7 @@ package cadkit.sketch;
 
 import cadkit.modeling.Plane;
 import cadkit.sketch.SketchSolver;
+import cadkit.units.LengthUnits;
 
 /** Authored constraint system. Successful solutions are snapshots and never mutate this model. */
 class ConstrainedSketch {
@@ -14,6 +15,8 @@ class ConstrainedSketch {
 	private var committed:Null<SolvedSketch>;
 
 	public function new(?plane:Plane, units:String = "mm", ?settings:SolverSettings) {
+		if (LengthUnits.factorToMillimetres(units) == null)
+			throw "unsupported sketch length unit: " + units;
 		this.plane = plane == null ? Plane.XY() : plane;
 		this.units = units;
 		this.settings = settings == null ? new SolverSettings() : settings;
