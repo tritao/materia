@@ -84,6 +84,10 @@ int main() {
     cad_shape fused = 0;
     cad_shape cut = 0;
     cad_shape common = 0;
+    double boolean_base_volume = 0.0;
+    double boolean_tool_volume = 0.0;
+    assert(cad_shape_volume(boolean_base, &boolean_base_volume) == CAD_OK);
+    assert(cad_shape_volume(boolean_tool_offset, &boolean_tool_volume) == CAD_OK);
     assert(cad_fuse(boolean_base, boolean_tool_offset, &fused) == CAD_OK);
     assert(cad_cut(boolean_base, boolean_tool_offset, &cut) == CAD_OK);
     assert(cad_common(boolean_base, boolean_tool_offset, &common) == CAD_OK);
@@ -93,6 +97,10 @@ int main() {
     assert_close(volume, 875.0);
     assert(cad_shape_volume(common, &volume) == CAD_OK);
     assert_close(volume, 125.0);
+    assert(cad_shape_volume(boolean_base, &volume) == CAD_OK);
+    assert_close(volume, boolean_base_volume);
+    assert(cad_shape_volume(boolean_tool_offset, &volume) == CAD_OK);
+    assert_close(volume, boolean_tool_volume);
 
     cad_operation cut_operation = 0;
     assert(cad_cut_operation(boolean_base, boolean_tool_offset, &cut_operation) == CAD_OK);
@@ -100,6 +108,10 @@ int main() {
     assert(cad_operation_result_shape(cut_operation, &operation_result) == CAD_OK);
     assert(cad_shape_volume(operation_result, &volume) == CAD_OK);
     assert_close(volume, 875.0);
+    assert(cad_shape_volume(boolean_base, &volume) == CAD_OK);
+    assert_close(volume, boolean_base_volume);
+    assert(cad_shape_volume(boolean_tool_offset, &volume) == CAD_OK);
+    assert_close(volume, boolean_tool_volume);
     uint32_t generated_count = 0;
     uint32_t modified_count = 0;
     uint32_t deleted_count = 0;

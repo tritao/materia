@@ -916,46 +916,6 @@ cad_result make_selected_edge_finish_operation(
 }
 
 template <typename Operation>
-cad_result make_boolean_shape(
-    cad_shape first_handle,
-    cad_shape second_handle,
-    cad_shape* out_shape) {
-    if (out_shape == nullptr) {
-        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
-    }
-    *out_shape = 0;
-
-    TopoDS_Shape first;
-    const auto first_result = copy_shape(first_handle, first);
-    if (first_result != CAD_OK) {
-        return first_result;
-    }
-    TopoDS_Shape second;
-    const auto second_result = copy_shape(second_handle, second);
-    if (second_result != CAD_OK) {
-        return second_result;
-    }
-
-    try {
-        Operation operation(first, second);
-        if (!operation.IsDone() || operation.HasErrors()) {
-            return fail(CAD_ERROR_OPERATION_FAILED, "OCCT boolean operation failed");
-        }
-        return insert_shape(operation.Shape(), out_shape);
-    } catch (const Standard_Failure& error) {
-        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
-    } catch (const std::bad_alloc& error) {
-        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
-    } catch (const std::exception& error) {
-        return fail(CAD_ERROR_OPERATION_FAILED, error);
-    } catch (...) {
-        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
-    }
-}
-
-cad_result insert_operation(OperationData operation, cad_operation* out_operation);
-
-template <typename Operation>
 cad_result collect_operation_history(
     Operation& operation,
     const TopoDS_Shape& first,
@@ -998,15 +958,11 @@ cad_result collect_operation_history(
 }
 
 template <typename Operation>
-cad_result make_boolean_operation(
+cad_result evaluate_boolean(
     cad_shape first_handle,
     cad_shape second_handle,
-    cad_operation* out_operation) {
-    if (out_operation == nullptr) {
-        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_operation must not be null");
-    }
-    *out_operation = 0;
-
+    bool include_history,
+    OperationData& out_data) {
     TopoDS_Shape first;
     const auto first_result = copy_shape(first_handle, first);
     if (first_result != CAD_OK) {
@@ -1027,19 +983,20 @@ cad_result make_boolean_operation(
         operation.SetArguments(arguments);
         operation.SetTools(tools);
         operation.SetNonDestructive(true);
-        operation.SetToFillHistory(true);
+        operation.SetToFillHistory(include_history);
         operation.Build();
         if (!operation.IsDone() || operation.HasErrors()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "OCCT boolean operation failed");
         }
 
-        OperationData data;
-        data.result = operation.Shape();
-        const auto history_result = collect_operation_history(operation, first, &second, data);
-        if (history_result != CAD_OK) {
-            return history_result;
+        out_data.result = operation.Shape();
+        if (include_history) {
+            const auto history_result = collect_operation_history(operation, first, &second, out_data);
+            if (history_result != CAD_OK) {
+                return history_result;
+            }
         }
-        return insert_operation(std::move(data), out_operation);
+        return CAD_OK;
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
     } catch (const std::bad_alloc& error) {
@@ -1049,6 +1006,44 @@ cad_result make_boolean_operation(
     } catch (...) {
         return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
     }
+}
+
+cad_result insert_operation(OperationData operation, cad_operation* out_operation);
+
+template <typename Operation>
+cad_result make_boolean_shape(
+    cad_shape first_handle,
+    cad_shape second_handle,
+    cad_shape* out_shape) {
+    if (out_shape == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_shape must not be null");
+    }
+    *out_shape = 0;
+
+    OperationData data;
+    const auto result = evaluate_boolean<Operation>(first_handle, second_handle, false, data);
+    if (result != CAD_OK) {
+        return result;
+    }
+    return insert_shape(std::move(data.result), out_shape);
+}
+
+template <typename Operation>
+cad_result make_boolean_operation(
+    cad_shape first_handle,
+    cad_shape second_handle,
+    cad_operation* out_operation) {
+    if (out_operation == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_operation must not be null");
+    }
+    *out_operation = 0;
+
+    OperationData data;
+    const auto result = evaluate_boolean<Operation>(first_handle, second_handle, true, data);
+    if (result != CAD_OK) {
+        return result;
+    }
+    return insert_operation(std::move(data), out_operation);
 }
 
 cad_result make_transform_operation(
