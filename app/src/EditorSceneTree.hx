@@ -13,7 +13,7 @@ class EditorSceneTree implements TreeViewModel {
     return start <= 0 && count > 0 ? [new TreeRootMetadata("scene", true)] : [];
   public function rootKeyAt(index:Int):String return "scene";
   public function childCount(parentKey:String):Int return parentKey == "scene" ? scene.items().length
-    : scene.cadFeatureNames(parentKey).length;
+    : scene.cadFeatureCount(parentKey);
   public function childKeyAt(parentKey:String, index:Int):String return parentKey=="scene"
     ? scene.items()[index].id : parentKey+":feature:"+index;
   public function initiallyExpanded(key:String):Bool {
@@ -30,8 +30,8 @@ class EditorSceneTree implements TreeViewModel {
     var marker=key.indexOf(":feature:");
     if(marker>=0){
       var id=key.substr(0,marker),index=Std.parseInt(key.substr(marker+9));
-      var features=scene.cadFeatureNames(id);
-      return new Text(index==null||index<0||index>=features.length?"Feature":"Feature "+(index+1)+" · "+features[index]);
+      return new Text(index==null||index<0||index>=scene.cadFeatureCount(id)?"Feature":
+        "Feature "+(index+1)+" · "+scene.cadFeatureNameAt(id,index));
     }
     return new Text("Scene");
   }

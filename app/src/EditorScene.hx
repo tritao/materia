@@ -22,8 +22,10 @@ import nativekit.ui.core.PropertyValue;
 import nativekit.scene.PickResult;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.modeling.Plane;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
+import cadkit.sketch.SketchEntity;
 import cadkit.sketch.SketchPoint;
 import app.CadPlateModel.CadPlateParameters;
 import app.CadPlateModel.CadPlateHoleEdit;
@@ -189,6 +191,83 @@ class EditorScene {
     return changeObjects("Create CAD part", data, id);
   }
 
+  public function canCreateSketch():Bool {
+    var item = object(selectedId);
+    return item != null && item.kind == "cad-part" && activeSketchEdit == null;
+  }
+
+  /** Add a dimensioned starter profile and open it in the existing sketch draft editor. */
+  public function createSketch():Bool {
+    if (!canCreateSketch())
+      return false;
+    var id = selectedId;
+    var session = requireCadSession(id);
+    var feature = new ConstrainedSketchFeature(starterSketch());
+    var previousOutput = session.document.outputFeatureOrNull();
+    var created = applyCadEdit(id, "Create constrained sketch", function(owner) {
+      var transaction = owner.document.beginTransaction();
+      try {
+        if (feature.document == null) {
+          var attached:ConstrainedSketchFeature = owner.document.add(feature);
+          owner.document.trackFeatureCreation(feature);
+        } else {
+          owner.document.setFeatureActive(feature, true);
+        }
+        owner.document.setOutputTracked(feature);
+        owner.document.recompute();
+        transaction.commit();
+      } catch (error:Dynamic) {
+        transaction.cancel();
+        throw error;
+      }
+    }, function(owner) {
+      var transaction = owner.document.beginTransaction();
+      try {
+        owner.document.setFeatureActive(feature, false);
+        owner.document.setOutputTracked(previousOutput);
+        owner.document.recompute();
+        transaction.commit();
+      } catch (error:Dynamic) {
+        transaction.cancel();
+        throw error;
+      }
+    });
+    if (!created)
+      return false;
+
+    var featureIndex = -1;
+    for (index in 0...session.document.featureCount())
+      if (session.document.featureAt(index) == feature)
+        featureIndex = index;
+    if (featureIndex < 0)
+      throw "created sketch feature is missing from its document";
+    selectedFeatureKey = id + ":feature:" + featureIndex;
+    activeSketchEdit = session.beginSketchEdit(featureIndex);
+    activeSketchObjectId = id;
+    refreshSelectionRevision();
+    return true;
+  }
+
+  static function starterSketch():ConstrainedSketch {
+    var sketch = new ConstrainedSketch(Plane.XY(), "mm");
+    sketch.addPoint(new SketchPoint("p0", -10, -10));
+    sketch.addPoint(new SketchPoint("p1", 10, -10));
+    sketch.addPoint(new SketchPoint("p2", 10, 10));
+    sketch.addPoint(new SketchPoint("p3", -10, 10));
+    sketch.addEntity(SketchEntity.line("bottom", "p0", "p1"));
+    sketch.addEntity(SketchEntity.line("right", "p1", "p2"));
+    sketch.addEntity(SketchEntity.line("top", "p2", "p3"));
+    sketch.addEntity(SketchEntity.line("left", "p3", "p0"));
+    sketch.addConstraint(SketchConstraint.fixed("anchor", "p0"));
+    sketch.addConstraint(SketchConstraint.horizontal("bottom-horizontal", "bottom"));
+    sketch.addConstraint(SketchConstraint.vertical("right-vertical", "right"));
+    sketch.addConstraint(SketchConstraint.horizontal("top-horizontal", "top"));
+    sketch.addConstraint(SketchConstraint.vertical("left-vertical", "left"));
+    sketch.addConstraint(SketchConstraint.distance("width", "p0", "p1", 20));
+    sketch.addConstraint(SketchConstraint.distance("height", "p1", "p2", 20));
+    return sketch;
+  }
+
   public function importStep(path:String):Bool {
     if (!canCreate()) return false;
     var model = CadImportedModel.create(path);
@@ -249,6 +328,14 @@ class EditorScene {
   public function isCadPart(id:String):Bool {
     var item=object(id);
     return item!=null&&isCadKind(item.kind);
+  }
+
+  public function hasCadOutput(id:String):Bool {
+    var item = object(id);
+    if (item == null || !isCadKind(item.kind))
+      return false;
+    var output = requireCadSession(id).document.outputFeatureOrNull();
+    return output != null && output.currentShape() != null;
   }
 
   public function canAddHoleOnSelectedFace():Bool {
@@ -346,9 +433,11 @@ class EditorScene {
     var session = requireCadSession(id);
     scene.setGeometryData(runtimeFor(id).geometry, session.geometry());
     var values = session.model.sceneDimensions();
-    item.width = values.width;
-    item.height = values.height;
-    item.depth = values.depth;
+    // Scene persistence requires strictly positive authored dimensions, while a
+    // valid CAD result can be planar or have kernel-scale numerical thickness.
+    item.width = Math.max(Math.abs(values.width), 0.000001);
+    item.height = Math.max(Math.abs(values.height), 0.000001);
+    item.depth = Math.max(Math.abs(values.depth), 0.000001);
     if (id == selectedId && selectedCadFaceFingerprint != null) {
       var prior = selectedCadFaceFingerprint;
       var priorIndex = selectedCadFaceIndex;
@@ -620,6 +709,20 @@ class EditorScene {
     return requireCadSession(id).model.featureNames();
   }
 
+  public function cadFeatureCount(id:String):Int {
+    var item = object(id);
+    return item == null || !isCadKind(item.kind) ? 0 : requireCadSession(id).document.featureCount();
+  }
+
+  public function cadFeatureNameAt(id:String, index:Int):String {
+    var item = object(id);
+    if (item == null || !isCadKind(item.kind))
+      return "Feature";
+    var feature = requireCadSession(id).document.featureAt(index);
+    var name = feature.serializationType();
+    return feature.active ? name : "Inactive · " + name;
+  }
+
   public function canBeginSelectedSketchEdit():Bool {
     if (activeSketchEdit != null || selectedFeatureKey == null)
       return false;
@@ -630,7 +733,8 @@ class EditorScene {
     if (index == null)
       return false;
     try {
-      return Std.isOfType(requireCadSession(selectedId).document.featureAt(index), ConstrainedSketchFeature);
+      var feature = requireCadSession(selectedId).document.featureAt(index);
+      return feature.active && Std.isOfType(feature, ConstrainedSketchFeature);
     } catch (_:Dynamic) {
       return false;
     }

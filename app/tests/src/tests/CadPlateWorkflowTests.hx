@@ -79,6 +79,52 @@ class CadPlateWorkflowTests {
     scene.dispose();
   }
 
+  static function sketchCreationWorkflow():Void {
+    var scene = new EditorScene([]);
+    try {
+      check(scene.createCadPart(), "create a CAD part for sketch authoring");
+      var id = scene.selectedId;
+      check(scene.createSketch(), "create a constrained starter sketch in an empty part");
+      check(scene.hasActiveSketchEdit() && scene.sketchEditSummary().indexOf("0 degrees of freedom") >= 0,
+        "new sketch opens as a fully constrained editable draft");
+      check(edit(scene, "Dimension width", 30) == PropertyEditResult.Applied,
+        "starter sketch width can be edited in the draft inspector");
+      check(scene.applySelectedSketchEdit(), "apply the created sketch draft");
+      var feature:ConstrainedSketchFeature = cast scene.cadSession(id).document.featureAt(0);
+      near(feature.dimension("width").value, 30, "applied sketch width is authored in the document");
+      check(object(scene, id).depth >= 0.000001,
+        "planar sketch dimensions stay serializable: " + object(scene, id).depth);
+
+      var reopened = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
+      try {
+        var restored:ConstrainedSketchFeature = cast reopened.cadSession(id).document.featureAt(0);
+        near(restored.dimension("width").value, 30,
+          "created sketch dimensions survive editor save and reopen");
+      } catch (error:Dynamic) {
+        reopened.dispose();
+        throw error;
+      }
+      reopened.dispose();
+
+      check(scene.document.undo(), "undo sketch dimension edit");
+      near(feature.dimension("width").value, 20, "undo restores the starter sketch width");
+      check(scene.document.redo(), "redo sketch dimension edit");
+      near(feature.dimension("width").value, 30, "redo restores the edited sketch width");
+      check(scene.document.undo() && scene.document.undo(), "undo edit then sketch creation");
+      check(scene.cadSession(id).document.outputFeatureOrNull() == null,
+        "undoing the only sketch restores the empty part output");
+
+      check(scene.createSketch(), "create another sketch after undoing feature creation");
+      check(scene.treeSelectionKey() == id + ":feature:1" && scene.hasActiveSketchEdit(),
+        "tree selection retains stable document indexes across inactive undone nodes");
+      scene.cancelSelectedSketchEdit();
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
+  }
+
   static function stepImportWorkflow():Void {
     var session = new SceneDocumentSession();
     var root = Sys.getCwd() + "/../build-cad";
@@ -493,6 +539,7 @@ class CadPlateWorkflowTests {
   static function main():Int {
     try {
       emptyCadPartWorkflow();
+      sketchCreationWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();
       bracketWorkflow();

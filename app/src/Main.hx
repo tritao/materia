@@ -1061,11 +1061,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
       rows.push(new KeyedView("sketch-edit-action",
         sceneAction("edit-selected-sketch", "scene.edit-sketch", "Edit sketch", IconName.Inspect)));
     }
-    if(scene.isCadPart(selected.id))rows.push(new KeyedView("face-selection",
+    if(scene.isCadPart(selected.id) && scene.hasCadOutput(selected.id))rows.push(new KeyedView("face-selection",
       new Text(scene.selectedCadFaceIndex<0?"Click a CAD face to select it":
         selected.kind=="cad-plate"
           ?"Selected face "+(scene.selectedCadFaceIndex+1)+" · Add hole uses the picked location"
           :"Selected face "+(scene.selectedCadFaceIndex+1))));
+    if (scene.canCreateSketch())
+      rows.push(new KeyedView("create-sketch",
+        sceneAction("create-constrained-sketch", "scene.create-sketch", "Create sketch", IconName.Plus)));
     if(ownership!=null) {
       rows.push(new KeyedView("origin",textLines("script-object-origins",
         ["Script-owned"].concat(ownership.propertyOrigins(selected.id,["position","dimensions",
@@ -1165,6 +1168,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(new Command("scene.create-part", "Add empty CAD part", function() {
       runSceneEdit("Could not add CAD part", function() scene.createCadPart());
     }, null, function() return canEditObjects() && scene.canCreate()));
+    commands.register(new Command("scene.create-sketch", "Create constrained sketch", function() {
+      runSceneEdit("Could not create sketch", function() scene.createSketch());
+      inspectorSelectionRevision = -1;
+    }, null, function() return canEditObjects() && scene.canCreateSketch()));
     commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
       runSceneEdit("Could not add mounting plate", function() scene.createMountingPlate());
     }, null, function() return canEditObjects() && scene.canCreate()));
@@ -1229,6 +1236,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.refresh();
     }, null, function() return canEditObjects() && scene.object(scene.selectedId) != null));
     commands.register(new Command("editor.undo", "Undo", function() {
+      if (scene.hasActiveSketchEdit()) scene.cancelSelectedSketchEdit();
       runSceneEdit("Could not undo", function() scene.document.undo());
     }, new Shortcut(UiKey.Z, UiModifier.Control), function() return canEditObjects() && scene.document.canUndo));
     commands.register(new Command("editor.redo", "Redo", function() {

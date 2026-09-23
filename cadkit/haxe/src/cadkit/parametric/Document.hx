@@ -850,11 +850,14 @@ class Document {
 		selectedOutput = feature;
 	}
 
-	public function setOutputTracked(feature:Feature):Void {
+	public function setOutputTracked(feature:Null<Feature>):Void {
 		if (activeTransaction == null)
 			throw new ParametricError("tracked output selection requires an active document transaction");
 		var before = selectedOutput;
-		setOutput(feature);
+		if (feature == null)
+			selectedOutput = null;
+		else
+			setOutput(feature);
 		if (before != feature)
 			recordDocumentChange(new OutputSelectionChange(this, before, feature));
 	}
@@ -865,11 +868,14 @@ class Document {
 	/** Without an explicit selection, the last feature remains the primary output. */
 	public function outputFeatureOrNull():Null<Feature> {
 		ensureOpen();
-		if (selectedOutput != null)
+		if (selectedOutput != null && selectedOutput.active)
 			return selectedOutput;
-		if (features.length == 0)
-			return null;
-		return features[features.length - 1];
+		for (index in 0...features.length) {
+			var feature = features[features.length - index - 1];
+			if (feature.active)
+				return feature;
+		}
+		return null;
 	}
 
 	public function outputFeature():Feature {

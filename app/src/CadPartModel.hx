@@ -64,8 +64,9 @@ class CadPartModel implements CadSessionModel {
     if (output == null || output.currentShape() == null)
       return {width: 0.05, height: 0.05, depth: 0.01};
     var bounds = collisionBoundsFor(document.result());
-    return {width: bounds.halfExtents.x * 2, height: bounds.halfExtents.y * 2,
-      depth: bounds.halfExtents.z * 2};
+    return {width: Math.max(bounds.halfExtents.x * 2, 0.000001),
+      height: Math.max(bounds.halfExtents.y * 2, 0.000001),
+      depth: Math.max(bounds.halfExtents.z * 2, 0.000001)};
   }
 
   public function setSceneDimensions(width:Float, height:Float, depth:Float):Void
