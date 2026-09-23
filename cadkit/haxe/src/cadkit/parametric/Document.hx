@@ -350,8 +350,7 @@ class Document {
 			}
 		for (value in staged)
 			value.instance.restoreDirectShape(value.shape);
-		for (value in staged)
-			invalidateElementFeatures(value.instance.id.value);
+		invalidateFrom(DependencyNode.DefinitionNode(definition.id.value));
 	}
 
 	public function setDefinitionDefault(definition:Definition, name:String, value:Float, ?unit:String):Void {
@@ -392,7 +391,7 @@ class Document {
 			instance.restoreOverride(name, before);
 			throw e;
 		}
-		invalidateElementFeatures(instance.id.value);
+		invalidateFrom(DependencyNode.ElementNode(instance.id.value));
 		recordDocumentChange(new InstanceOverrideChange(this, instance, name, before, canonical));
 	}
 
@@ -410,14 +409,14 @@ class Document {
 			instance.restoreOverride(name, before);
 			throw error;
 		}
-		invalidateElementFeatures(instance.id.value);
+		invalidateFrom(DependencyNode.ElementNode(instance.id.value));
 		recordDocumentChange(new InstanceOverrideChange(this, instance, name, before, null));
 	}
 
 	public function restoreInstanceOverride(instance:InstanceElement, name:String, value:Null<Float>):Void {
 		instance.restoreOverride(name, value);
 		instance.restoreDirectShape(resolveInstanceShape(instance));
-		invalidateElementFeatures(instance.id.value);
+		invalidateFrom(DependencyNode.ElementNode(instance.id.value));
 	}
 
 	public function createElement(name:String, output:Feature):Element {
@@ -510,30 +509,7 @@ class Document {
 	}
 
 	public function datumChanged(datum:Element):Void {
-		var affectedDatums = new Map<String, Bool>();
-		var pending = [datum.id.value];
-		affectedDatums.set(datum.id.value, true);
-		var index = 0;
-		while (index < pending.length) {
-			var parentId = pending[index++];
-			for (candidate in elements) {
-				if (affectedDatums.exists(candidate.id.value) || candidate.kind != "level")
-					continue;
-				var level:LevelElement = cast candidate;
-				if (level.relativeTo != null && level.relativeTo.documentId.value == id.value
-					&& level.relativeTo.elementId.value == parentId) {
-					affectedDatums.set(level.id.value, true);
-					pending.push(level.id.value);
-				}
-			}
-		}
-
-		for (feature in features)
-			for (dependency in feature.datumDependencies())
-				if (affectedDatums.exists(dependency)) {
-					feature.markDirty();
-					break;
-				}
+		invalidateFrom(DependencyNode.ElementNode(datum.id.value));
 	}
 
 	public function worldPlacement(element:Element):Placement {
@@ -609,28 +585,7 @@ class Document {
 
 	public function restoreElementPlacement(element:Element, value:Placement, parent:Null<ElementReference>):Void {
 		element.restorePlacement(value, parent);
-		invalidateElementFeatures(element.id.value);
-		invalidatePlacedDescendants(element.id.value, new Map<String, Bool>());
-	}
-
-	private function invalidateElementFeatures(id:String):Void {
-		for (feature in features)
-			for (dependency in feature.elementDependencies())
-				if (dependency == id) {
-					invalidate(feature);
-					break;
-				}
-	}
-
-	private function invalidatePlacedDescendants(id:String, seen:Map<String, Bool>):Void {
-		if (seen.exists(id))
-			return;
-		seen.set(id, true);
-		for (candidate in elements)
-			if (candidate.placementParent != null && candidate.placementParent.elementId.value == id) {
-				candidate.clearPlacedShape();
-				invalidatePlacedDescendants(candidate.id.value, seen);
-			}
+		invalidateFrom(DependencyNode.ElementNode(element.id.value));
 	}
 
 	public function duplicateElement(source:Element, ?name:String):Element {
@@ -664,6 +619,7 @@ class Document {
 			return;
 		var previous = target.output;
 		target.restoreOutput(output);
+		invalidateFrom(DependencyNode.ElementNode(target.id.value));
 		recordDocumentChange(new ElementOutputChange(target, previous, output));
 	}
 
@@ -727,14 +683,11 @@ class Document {
 		elements.insert(insertion, element);
 		elementsById.set(element.id.value, element);
 		datumChanged(element);
-		invalidateElementFeatures(element.id.value);
 	}
 
 	public function restoreElementRemoval(element:Element):Void {
 		validateOwnedElement(element);
 		datumChanged(element);
-		invalidateElementFeatures(element.id.value);
-		invalidatePlacedDescendants(element.id.value, new Map<String, Bool>());
 		element.clearPlacedShape();
 		elements.remove(element);
 		elementsById.remove(element.id.value);
@@ -979,6 +932,7 @@ class Document {
 		if (previous == next)
 			return;
 		parameter.restoreStored(next);
+		invalidateFrom(DependencyNode.ParameterNode(parameter.name));
 		recordDocumentChange(new NamedParameterChange(parameter, previous, next));
 	}
 
@@ -1285,24 +1239,35 @@ class Document {
 	}
 
 	public function invalidate(feature:Feature):Void {
-		feature.dirty = true;
-		var visited = new Map<Int, Bool>();
-		invalidateDependents(feature, visited);
+		invalidateFrom(DependencyNode.FeatureNode(feature.id.toInt()));
 	}
 
-	private function invalidateDependents(source:Feature, visited:Map<Int, Bool>):Void {
-		var sourceId = source.id.toInt();
-		if (visited.exists(sourceId))
-			return;
-		visited.set(sourceId, true);
-		for (candidate in features) {
-			for (dependency in candidate.dependencies()) {
-				if (dependency.toInt() == sourceId) {
-					candidate.dirty = true;
-					invalidateDependents(candidate, visited);
-					break;
-				}
+	private function invalidateFrom(source:DependencyNode):Void {
+		var index = new DependencyIndex(this);
+		var pending:Array<DependencyNode> = [source];
+		var visited = new Map<String, Bool>();
+		var cursor = 0;
+		while (cursor < pending.length) {
+			var current = pending[cursor++];
+			var currentKey = DependencyIndex.key(current);
+			if (visited.exists(currentKey))
+				continue;
+			visited.set(currentKey, true);
+
+			switch (current) {
+				case FeatureNode(featureId):
+					var feature = featureById(featureId);
+					if (feature != null)
+						feature.dirty = true;
+				case ElementNode(elementId):
+					var element = findElement(new ElementId(elementId));
+					if (element != null)
+						element.clearPlacedShape();
+				case DefinitionNode(_), ParameterNode(_):
 			}
+
+			for (dependent in index.dependents(current))
+				pending.push(dependent);
 		}
 	}
 
