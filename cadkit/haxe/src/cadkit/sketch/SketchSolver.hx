@@ -73,15 +73,35 @@ class SketchSolver {
 			var j = jacobian(x, current.values);
 			var normal = matrix(variableCount, variableCount, 0);
 			var gradient = fill(variableCount, 0);
-			for (row in 0...j.length) for (a in 0...variableCount) {
-				gradient[a] += j[row][a] * current.values[row];
-				for (b in 0...variableCount) normal[a][b] += j[row][a] * j[row][b];
+			for (row in 0...j.length) {
+				if (row % 16 == 0)
+					checkCancelled();
+				for (a in 0...variableCount) {
+					if (a % 8 == 0)
+						checkCancelled();
+					gradient[a] += j[row][a] * current.values[row];
+					for (b in 0...variableCount) normal[a][b] += j[row][a] * j[row][b];
+				}
 			}
-			for (i in 0...variableCount) normal[i][i] += damping;
-			var rhs:Array<Float> = []; for (v in gradient) rhs.push(-v);
+			for (i in 0...variableCount) {
+				if (i % 128 == 0)
+					checkCancelled();
+				normal[i][i] += damping;
+			}
+			var rhs:Array<Float> = [];
+			for (index in 0...gradient.length) {
+				if (index % 1024 == 0)
+					checkCancelled();
+				rhs.push(-gradient[index]);
+			}
 			var delta = linearSolve(normal, rhs);
 			if (delta == null) { damping *= 10; continue; }
-			var trial = x.copy(); for (i in 0...variableCount) trial[i] += delta[i];
+			var trial = x.copy();
+			for (i in 0...variableCount) {
+				if (i % 1024 == 0)
+					checkCancelled();
+				trial[i] += delta[i];
+			}
 			var trialSet = residuals(trial); var trialNorm = norm(trialSet.values);
 			if (trialNorm < currentNorm) { x = trial; current = trialSet; currentNorm = trialNorm; damping = Math.max(1e-12, damping * 0.3); }
 			else damping = Math.min(1e12, damping * 10);
@@ -140,7 +160,10 @@ class SketchSolver {
 				if (a.x == b.x && a.y == b.y) throw invalid("collapsed authored line", [entity.id]);
 			}
 		}
+		var constraintIndex = 0;
 		for (constraint in sketch.constraints()) {
+			if (constraintIndex++ % 16 == 0)
+				checkCancelled();
 			if (!Math.isFinite(constraint.value)) throw invalid("constraint values must be finite", [constraint.id]);
 			if ((constraint.kind == "distance" || constraint.kind == "radius") && constraint.value <= 0)
 				throw invalid("distance and radius constraints must be positive", [constraint.id]);
@@ -154,7 +177,10 @@ class SketchSolver {
 
 	private function residuals(x:Array<Float>):ResidualSet {
 		var values:Array<Float> = []; var owners:Array<String> = [];
+		var constraintIndex = 0;
 		for (c in sketch.constraints()) {
+			if (constraintIndex++ % 16 == 0)
+				checkCancelled();
 			var before = values.length;
 			switch (c.kind) {
 				case "fixed": var p = point(c.first, x); var authored = needPoint(c.first, c.id); values.push(p[0] - authored.x); values.push(p[1] - authored.y);
@@ -302,9 +328,53 @@ class SketchSolver {
 		var a=point(pa,x), b=point(pb,x), ends=line(axis,x,owner), d=direction(axis,x,owner); var dd=dot(d,d); if(dd<1e-12) throw invalid("collapsed symmetry axis",[owner]);
 		var mid=[(a[0]+b[0])/2,(a[1]+b[1])/2]; out.push(cross([mid[0]-ends[0][0],mid[1]-ends[0][1]],d)/Math.pow(dd,0.5)); out.push(dot([b[0]-a[0],b[1]-a[1]],d)/Math.pow(dd,0.5));
 	}
-	private function jacobian(x:Array<Float>, base:Array<Float>):Array<Array<Float>> { var j=matrix(base.length,variableCount,0); for(col in 0...variableCount){var h=1e-6*normalizationScale;var t=x.copy();t[col]+=h;var r=residuals(t).values;for(row in 0...base.length)j[row][col]=(r[row]-base[row])/h;}return j; }
-	private function gradient(j:Array<Array<Float>>, residual:Array<Float>):Array<Float> { var result=fill(variableCount,0);for(row in 0...j.length)for(column in 0...variableCount)result[column]+=j[row][column]*residual[row];return result; }
-	private function redundantIds(x:Array<Float>, full:Array<Array<Float>>, fullRank:Int):Array<String> { var result:Array<String> = []; var set=residuals(x); for(c in sketch.constraints()){var reduced:Array<Array<Float>> = [];for(i in 0...full.length)if(set.owners[i]!=c.id)reduced.push(full[i]);if(rank(reduced,sketch.settings.rankTolerance)==fullRank)result.push(c.id);}return result; }
+	private function jacobian(x:Array<Float>, base:Array<Float>):Array<Array<Float>> {
+		var j = matrix(base.length, variableCount, 0);
+		for (column in 0...variableCount) {
+			if (column % 8 == 0)
+				checkCancelled();
+			var step = 1e-6 * normalizationScale;
+			var trial = x.copy();
+			trial[column] += step;
+			var values = residuals(trial).values;
+			for (row in 0...base.length) {
+				if (row % 128 == 0)
+					checkCancelled();
+				j[row][column] = (values[row] - base[row]) / step;
+			}
+		}
+		return j;
+	}
+	private function gradient(j:Array<Array<Float>>, residual:Array<Float>):Array<Float> {
+		var result = fill(variableCount, 0);
+		for (row in 0...j.length) {
+			if (row % 16 == 0)
+				checkCancelled();
+			for (column in 0...variableCount) {
+				if (column % 1024 == 0)
+					checkCancelled();
+				result[column] += j[row][column] * residual[row];
+			}
+		}
+		return result;
+	}
+	private function redundantIds(x:Array<Float>, full:Array<Array<Float>>, fullRank:Int):Array<String> {
+		var result:Array<String> = [];
+		var set = residuals(x);
+		for (constraint in sketch.constraints()) {
+			checkCancelled();
+			var reduced:Array<Array<Float>> = [];
+			for (index in 0...full.length) {
+				if (index % 128 == 0)
+					checkCancelled();
+				if (set.owners[index] != constraint.id)
+					reduced.push(full[index]);
+			}
+			if (rank(reduced, sketch.settings.rankTolerance) == fullRank)
+				result.push(constraint.id);
+		}
+		return result;
+	}
 	private function failingOwners(set:ResidualSet,t:Float):Array<String>{var out:Array<String> = [];for(i in 0...set.values.length)if(Math.abs(set.values[i])>t&&!contains(out,set.owners[i]))out.push(set.owners[i]);return out;}
 	private static function contains(a:Array<String>,v:String):Bool{for(x in a)if(x==v)return true;return false;}
 	private static function vectorDifference(a:Array<Float>,b:Array<Float>,out:Array<Float>):Void{out.push(a[0]-b[0]);out.push(a[1]-b[1]);}
@@ -312,9 +382,117 @@ class SketchSolver {
 	private static function dot(a:Array<Float>,b:Array<Float>):Float return a[0]*b[0]+a[1]*b[1];
 	private static function cross(a:Array<Float>,b:Array<Float>):Float return a[0]*b[1]-a[1]*b[0];
 	private static function wrap(v:Float):Float{while(v>Math.PI)v-=2*Math.PI;while(v< -Math.PI)v+=2*Math.PI;return v;}
-	private static function norm(v:Array<Float>):Float{var s=0.0;for(x in v)s+=x*x;return Math.pow(s,0.5);}
-	private static function fill(n:Int,value:Float):Array<Float>{var a:Array<Float> = [];for(_ in 0...n)a.push(value);return a;}
-	private static function matrix(r:Int,c:Int,value:Float):Array<Array<Float>>{var m:Array<Array<Float>> = [];for(_ in 0...r)m.push(fill(c,value));return m;}
-	private static function linearSolve(a:Array<Array<Float>>,b:Array<Float>):Null<Array<Float>>{var n=b.length,m:Array<Array<Float>> = [];for(i in 0...n){m.push(a[i].copy());m[i].push(b[i]);}for(k in 0...n){var p=k;for(i in k...n)if(Math.abs(m[i][k])>Math.abs(m[p][k]))p=i;if(Math.abs(m[p][k])<1e-15)return null;var tmp=m[k];m[k]=m[p];m[p]=tmp;for(i in (k+1)...n){var f=m[i][k]/m[k][k];for(j in k...(n+1))m[i][j]-=f*m[k][j];}}var x=fill(n,0);var i=n-1;while(i >= 0){var s=m[i][n];for(j in (i+1)...n)s-=m[i][j]*x[j];x[i]=s/m[i][i];i--;}return x;}
-	private static function rank(input:Array<Array<Float>>,tol:Float):Int{if(input.length==0)return 0;var a:Array<Array<Float>> = [];for(r in input)a.push(r.copy());var rows=a.length,cols=a[0].length,row=0,col=0;while(row<rows&&col<cols){var p=row;for(i in row...rows)if(Math.abs(a[i][col])>Math.abs(a[p][col]))p=i;if(Math.abs(a[p][col])<=tol){col++;continue;}var tmp=a[row];a[row]=a[p];a[p]=tmp;var pivot=a[row][col];for(j in col...cols)a[row][j]/=pivot;for(i in 0...rows)if(i!=row){var f=a[i][col];for(j in col...cols)a[i][j]-=f*a[row][j];}row++;col++;}return row;}
+	private function norm(values:Array<Float>):Float {
+		var sum = 0.0;
+		for (index in 0...values.length) {
+			if (index % 1024 == 0)
+				checkCancelled();
+			sum += values[index] * values[index];
+		}
+		return Math.pow(sum, 0.5);
+	}
+
+	private function fill(count:Int, value:Float):Array<Float> {
+		var result:Array<Float> = [];
+		for (index in 0...count) {
+			if (index % 1024 == 0)
+				checkCancelled();
+			result.push(value);
+		}
+		return result;
+	}
+
+	private function matrix(rowCount:Int, columnCount:Int, value:Float):Array<Array<Float>> {
+		var result:Array<Array<Float>> = [];
+		for (row in 0...rowCount) {
+			if (row % 16 == 0)
+				checkCancelled();
+			result.push(fill(columnCount, value));
+		}
+		return result;
+	}
+	private function linearSolve(a:Array<Array<Float>>, b:Array<Float>):Null<Array<Float>> {
+		var n = b.length;
+		var matrix:Array<Array<Float>> = [];
+		for (index in 0...n) {
+			if (index % 64 == 0)
+				checkCancelled();
+			matrix.push(a[index].copy());
+			matrix[index].push(b[index]);
+		}
+		for (column in 0...n) {
+			checkCancelled();
+			var pivotRow = column;
+			for (row in column...n)
+				if (Math.abs(matrix[row][column]) > Math.abs(matrix[pivotRow][column]))
+					pivotRow = row;
+			if (Math.abs(matrix[pivotRow][column]) < 1e-15)
+				return null;
+			var temporary = matrix[column];
+			matrix[column] = matrix[pivotRow];
+			matrix[pivotRow] = temporary;
+			for (row in (column + 1)...n) {
+				if (row % 16 == 0)
+					checkCancelled();
+				var factor = matrix[row][column] / matrix[column][column];
+				for (entry in column...(n + 1))
+					matrix[row][entry] -= factor * matrix[column][entry];
+			}
+		}
+		var result = fill(n, 0);
+		var row = n - 1;
+		while (row >= 0) {
+			checkCancelled();
+			var value = matrix[row][n];
+			for (column in (row + 1)...n)
+				value -= matrix[row][column] * result[column];
+			result[row] = value / matrix[row][row];
+			row--;
+		}
+		return result;
+	}
+
+	private function rank(input:Array<Array<Float>>, tolerance:Float):Int {
+		if (input.length == 0)
+			return 0;
+		var matrix:Array<Array<Float>> = [];
+		for (index in 0...input.length) {
+			if (index % 16 == 0)
+				checkCancelled();
+			matrix.push(input[index].copy());
+		}
+		var rowCount = matrix.length;
+		var columnCount = matrix[0].length;
+		var row = 0;
+		var column = 0;
+		while (row < rowCount && column < columnCount) {
+			checkCancelled();
+			var pivotRow = row;
+			for (candidate in row...rowCount)
+				if (Math.abs(matrix[candidate][column]) > Math.abs(matrix[pivotRow][column]))
+					pivotRow = candidate;
+			if (Math.abs(matrix[pivotRow][column]) <= tolerance) {
+				column++;
+				continue;
+			}
+			var temporary = matrix[row];
+			matrix[row] = matrix[pivotRow];
+			matrix[pivotRow] = temporary;
+			var pivot = matrix[row][column];
+			for (entry in column...columnCount)
+				matrix[row][entry] /= pivot;
+			for (candidate in 0...rowCount) {
+				if (candidate % 16 == 0)
+					checkCancelled();
+				if (candidate == row)
+					continue;
+				var factor = matrix[candidate][column];
+				for (entry in column...columnCount)
+					matrix[candidate][entry] -= factor * matrix[row][entry];
+			}
+			row++;
+			column++;
+		}
+		return row;
+	}
 }

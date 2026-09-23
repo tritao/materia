@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+haxeon_root="${HAXEON_ROOT:-$repo_root/../haxeon}"
+build_root="${CADKIT_BUILD_ROOT:-$repo_root/build/debug}"
+haxe="$haxeon_root/.tools/haxe/haxe"
+hashlink="$haxeon_root/.tools/hashlink/hl"
+output="$repo_root/build/haxeon/sketch-edit-benchmark.hl"
+
+mkdir -p "$(dirname -- "$output")"
+
+"$haxe" \
+	--cwd "$haxeon_root" \
+	-cp src \
+	--run compiler.tools.HaxeonCompiler \
+	--target=hl \
+	"--output=$output" \
+	--entry=SketchEditBenchmark \
+	"--root=$repo_root/haxe/src" \
+	"--root=$repo_root/haxe/tests" \
+	"--root=$repo_root/haxe/benchmarks" \
+	"--root=$repo_root/examples/modeling" \
+	"--ffi-interface=$repo_root/haxe/abi/CadKit.hxi" \
+	"--ffi-projection=$repo_root/haxe/abi/CadKit.hxmap" \
+	"$repo_root/haxe/benchmarks/SketchEditBenchmark.hx"
+
+native_paths="$build_root/core:$build_root/lin64/gcc/libd:$haxeon_root/out:$haxeon_root/.tools/hashlink"
+if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
+	native_paths="$native_paths:$LD_LIBRARY_PATH"
+fi
+
+LD_LIBRARY_PATH="$native_paths" "$hashlink" "$output"
