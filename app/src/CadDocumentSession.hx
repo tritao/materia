@@ -92,9 +92,8 @@ class CadDocumentSession {
     } catch (error:Dynamic) {
       document.evaluationCancellationCheck = previousCancellationCheck;
       diagnostics = [Std.string(error)];
-      if (authored && document.canUndo()) {
+      if (authored && document.undo()) {
         try {
-          document.undo();
           document.recompute();
           document.clearHistory();
         } catch (_:Dynamic) {}
@@ -163,7 +162,7 @@ class CadDocumentSession {
   }
 
   function publishCurrent(ticket:Int):Void {
-    var publicationStarted = haxe.Timer.stamp();
+    var publicationStarted = Sys.time();
     var nextShape:Null<Shape> = null;
     var nextGeometry:Null<GeometryData> = null;
     try {
@@ -173,7 +172,7 @@ class CadDocumentSession {
       nextGeometry = model.geometryFor(cast nextShape);
       ensureEvaluationCurrent(ticket);
     } catch (error:Dynamic) {
-      lastPublicationSeconds = haxe.Timer.stamp() - publicationStarted;
+      lastPublicationSeconds = Sys.time() - publicationStarted;
       if (nextShape != null)
         nextShape.close();
       throw error;
@@ -183,7 +182,7 @@ class CadDocumentSession {
     publishedShape = nextShape;
     publishedGeometry = cast nextGeometry;
     revision++;
-    lastPublicationSeconds = haxe.Timer.stamp() - publicationStarted;
+    lastPublicationSeconds = Sys.time() - publicationStarted;
     if (priorShape != null)
       priorShape.close();
   }

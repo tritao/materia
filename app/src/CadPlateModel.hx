@@ -229,24 +229,24 @@ class CadPlateModel implements CadSessionModel {
     var values = parameters();
     var centred = source.translate(Geometry.vec3(
       -values.width * 500.0, -values.height * 500.0, -values.thickness * 500.0));
-    var tessellationStarted = haxe.Timer.stamp();
+    var tessellationStarted = Sys.time();
     var mesh:cadkit.Mesh;
     try {
       mesh=centred.tessellate(0.1, 0.35);
-      lastTessellationSeconds = haxe.Timer.stamp() - tessellationStarted;
+      lastTessellationSeconds = Sys.time() - tessellationStarted;
     } catch (error:Dynamic) {
-      lastTessellationSeconds = haxe.Timer.stamp() - tessellationStarted;
+      lastTessellationSeconds = Sys.time() - tessellationStarted;
       centred.close();
       throw error;
     }
-    var conversionStarted = haxe.Timer.stamp();
+    var conversionStarted = Sys.time();
     try {
       var result = CadSceneGeometry.fromMesh(mesh);
-      lastGeometryConversionSeconds = haxe.Timer.stamp() - conversionStarted;
+      lastGeometryConversionSeconds = Sys.time() - conversionStarted;
       centred.close();
       return result;
     } catch (error:Dynamic) {
-      lastGeometryConversionSeconds = haxe.Timer.stamp() - conversionStarted;
+      lastGeometryConversionSeconds = Sys.time() - conversionStarted;
       centred.close();
       throw error;
     }

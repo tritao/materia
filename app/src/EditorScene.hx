@@ -218,7 +218,7 @@ class EditorScene {
   public function addHoleOnSelectedFace(diameter:Float=0.008):Bool {
     if(!canAddHoleOnSelectedFace())return false;
     var id=selectedId,faceIndex=selectedCadFaceIndex,x=selectedCadFaceX,y=selectedCadFaceY;
-    var edit:Null<CadPlateHoleEdit>=null;
+    var edit:Null<CadPlateHoleEdit> = null;
     return applyCadEdit(id,"Add through hole",function(session) {
       var model:CadPlateModel=cast session.model;
       if(edit==null)edit=model.addThroughHole(faceIndex,x,y,diameter);
@@ -236,7 +236,7 @@ class EditorScene {
     var source:SceneObjectData = null;
     for (item in data) if (item.id == selectedId) source = item;
     var id = allocateId();
-    var cadGraph = isCadKind(source.kind) ? currentCadGraph(source.id) : source.cadGraph;
+    var cadGraph = isCadKind(source.type) ? currentCadGraph(source.id) : source.cadGraph;
     data.push({id: id, label: source.label + " copy", type: source.type,
       x: Math.min(1000000, source.x + 0.25), y: Math.min(1000000, source.y + 0.25), z: source.z,
       width: source.width, height: source.height, red: source.red, green: source.green,
@@ -1056,7 +1056,9 @@ class EditorScene {
     else
       model=graph==null?CadPlateModel.create(width,height,depth,
         Math.min(0.012,Math.min(width,height)*0.5)):CadPlateModel.decode(graph);
-    try return new CadDocumentSession(model)
+    try {
+      return new CadDocumentSession(model);
+    }
     catch(error:Dynamic){model.close();throw error;}
   }
 

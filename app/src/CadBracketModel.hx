@@ -178,7 +178,7 @@ class CadBracketModel implements CadSessionModel {
       document.parameter(HOLE_RADIUS).set(nextMm*0.25,"mm");
       filletFeature.radius.set(Math.min(1.0,nextMm*0.12));
       var center=holeCenter(width,height,nextMm,anchorX,anchorZ);
-      var authoredCenter:Null<SketchPoint>=null;
+      var authoredCenter:Null<SketchPoint> = null;
       for(point in holeSketch.sketch().points())if(point.id=="hole-center")authoredCenter=point;
       if(authoredCenter==null||authoredCenter.x!=center.x||authoredCenter.y!=center.y)
         holeSketch.replacePoint(new SketchPoint("hole-center",center.x,center.y));
@@ -215,22 +215,22 @@ class CadBracketModel implements CadSessionModel {
   }
 
   public function geometryFor(source:Shape):GeometryData {
-    var tessellationStarted = haxe.Timer.stamp();
+    var tessellationStarted = Sys.time();
     var mesh:cadkit.Mesh;
     try {
       mesh = source.tessellate(0.1, 0.35);
-      lastTessellationSeconds = haxe.Timer.stamp() - tessellationStarted;
+      lastTessellationSeconds = Sys.time() - tessellationStarted;
     } catch (error:Dynamic) {
-      lastTessellationSeconds = haxe.Timer.stamp() - tessellationStarted;
+      lastTessellationSeconds = Sys.time() - tessellationStarted;
       throw error;
     }
-    var conversionStarted = haxe.Timer.stamp();
+    var conversionStarted = Sys.time();
     try {
       var result = CadSceneGeometry.fromMesh(mesh);
-      lastGeometryConversionSeconds = haxe.Timer.stamp() - conversionStarted;
+      lastGeometryConversionSeconds = Sys.time() - conversionStarted;
       return result;
     } catch (error:Dynamic) {
-      lastGeometryConversionSeconds = haxe.Timer.stamp() - conversionStarted;
+      lastGeometryConversionSeconds = Sys.time() - conversionStarted;
       throw error;
     }
   }
