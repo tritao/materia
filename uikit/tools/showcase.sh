@@ -24,6 +24,7 @@ if [[ ! -x "$haxeon_dir/.tools/haxe/haxe" ]]; then
     exit 1
 fi
 
+cmake -S "$module_dir" -B "$build_dir" -DNK_BUILD_EXAMPLES=ON
 cmake --build "$build_dir" --target nativekit_ui
 "$module_dir/tools/check-hxi.sh"
 if [[ -x "$haxeon_dir/scripts/build-runtime.sh" ]]; then

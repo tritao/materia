@@ -410,7 +410,7 @@ bool append_embedded_render_plan(const RenderPlan &source, const RenderPlanEmbed
             command.resource = remap_embedding_resource(command.resource, options);
             command.content_generation =
                 revisioned_cache_key(command.content_generation, options.cache_revision);
-            if (has_bounded_target) {
+            if (has_bounded_target && !options.preserve_bounded_target_local_commands) {
                 // Bounded pass commands are local to the source target origin.
                 // Rebase them when embedding moves that origin in the parent.
                 command.transform[4] -= target_origin_delta_x;

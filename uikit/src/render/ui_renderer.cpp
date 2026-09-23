@@ -607,7 +607,7 @@ void destroy_target(UiRendererImpl::State &state, UiRendererImpl::State::Target 
 }
 
 bool is_transient_target(ResourceId target) {
-    return static_cast<uint16_t>(target.value) >= 0x8000u;
+    return static_cast<uint16_t>(target.value) >= kFirstTransientRenderTargetSlot;
 }
 
 constexpr size_t kMaxPooledTransientTargets = 4;

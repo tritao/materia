@@ -172,6 +172,18 @@ int main() {
             embedded_remapped_target.value)
         return 40;
 
+    RenderPlan embedded_local_destination;
+    embedded_local_destination.passes.push_back({main_target, {}, false, {}});
+    embed_options.preserve_bounded_target_local_commands = true;
+    if (!append_embedded_render_plan(embedded_source, embed_options,
+                                    embedded_local_destination, &embed_error) ||
+        embedded_local_destination.passes.size() != 2 ||
+        embedded_local_destination.passes[1].commands.front().transform !=
+            std::array<float, 6>{1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f} ||
+        embedded_local_destination.passes.front().commands.front().transform !=
+            std::array<float, 6>{0.0f, 1.0f, -1.0f, 0.0f, 100.0f, 50.0f})
+        return 150;
+
     DisplayList color_effect;
     EffectDescriptor effect{};
     effect.kind = EffectKind::ColorMatrix;

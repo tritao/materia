@@ -32,6 +32,7 @@ class RecordingRenderer final : public UiRenderer {
     bool initialize() override { return true; }
     bool valid() const override { return true; }
     bool lost() const override { return false; }
+    nkgpu_renderer gpuRenderer() const override { return {}; }
     bool beginFrame(bool record, const nk_surface_frame_target *) override {
         ++frame_count;
         recorded_frame = record;
@@ -441,10 +442,16 @@ int main() {
     if (!composite_metadata.begin_layer(0.5f, composite_bounds, composite_blur, composite_mask) ||
         !composite_metadata.end_layer())
         return 220;
+    RenderPlan local_clip_custom_plan = custom_plan;
+    local_clip_custom_plan.passes.front().commands.front().scissor_x = 1.0f;
+    local_clip_custom_plan.passes.front().commands.front().scissor_y = 2.0f;
+    LayoutRenderCompiler::CustomPaintPlans local_clip_custom_paints{{2,
+                                                                      &local_clip_custom_plan}};
     LayoutRenderCompiler::CustomPaintComposites composite_paints{{2, &composite_metadata}};
     LayoutRenderFrame split_frame;
     if (!compiler.compile(ordered_snapshot, main_target, 1.5f, split_frame, &compile_error, false,
-                          engine.text_engine(), &custom_paints, nullptr, &composite_paints)) {
+                          engine.text_engine(), &local_clip_custom_paints, nullptr,
+                          &composite_paints)) {
         std::cerr << "split compile failed: "
                   << (compile_error.message ? compile_error.message : "unknown") << "\n";
         return 221;
@@ -461,6 +468,10 @@ int main() {
                                });
         });
     if (content_pass == split_frame.plan().passes.end() ||
+        content_pass->commands.front().scissor_x != 1.5f ||
+        content_pass->commands.front().scissor_y != 3.0f ||
+        content_pass->commands.front().scissor_width != 4.5f ||
+        content_pass->commands.front().scissor_height != 6.0f ||
         split_frame.plan().isolated_layers == 0 || split_frame.plan().dependencies.size() < 2 ||
         std::none_of(split_frame.plan().passes.begin(), split_frame.plan().passes.end(),
                      [](const RenderPass &pass) { return pass.kind == RenderPassKind::Effect; }) ||
@@ -488,7 +499,8 @@ int main() {
     LayoutRenderCompiler::RasterPaintNodes split_raster_paints{2};
     LayoutRenderFrame split_raster_frame;
     if (!compiler.compile(ordered_snapshot, main_target, 1.5f, split_raster_frame, &compile_error,
-                          false, engine.text_engine(), &custom_paints, &split_raster_paints,
+                          false, engine.text_engine(), &local_clip_custom_paints,
+                          &split_raster_paints,
                           &composite_paints))
         return 224;
     if (std::none_of(split_raster_frame.plan().passes.begin(),
@@ -500,6 +512,40 @@ int main() {
                                             });
                      }))
         return 225;
+    const auto split_raster_content = std::find_if(
+        split_raster_frame.plan().passes.begin(), split_raster_frame.plan().passes.end(),
+        [](const RenderPass &pass) {
+            return pass.kind == RenderPassKind::Raster &&
+                   std::any_of(pass.commands.begin(), pass.commands.end(),
+                               [](const RenderCommand &command) {
+                                   return command.custom_payload;
+                               });
+        });
+    if (split_raster_content == split_raster_frame.plan().passes.end())
+        return 226;
+    const auto raster_content_consumer = std::find_if(
+        split_raster_frame.plan().passes.begin(), split_raster_frame.plan().passes.end(),
+        [target = split_raster_content->target](const RenderPass &pass) {
+            return std::any_of(pass.commands.begin(), pass.commands.end(),
+                               [target](const RenderCommand &command) {
+                                   return command.kind == RenderCommandKind::CompositeTarget &&
+                                          command.resource.value == target.value;
+                               });
+        });
+    const auto raster_content_dependency = std::find_if(
+        split_raster_frame.plan().dependencies.begin(),
+        split_raster_frame.plan().dependencies.end(), [target = split_raster_content->target](
+                                                           const RenderDependency &dependency) {
+            return dependency.producer.value == target.value;
+        });
+    std::vector<uint32_t> split_raster_order;
+    RenderPlanScheduleError split_raster_schedule_error{};
+    if (raster_content_consumer == split_raster_frame.plan().passes.end() ||
+        raster_content_dependency == split_raster_frame.plan().dependencies.end() ||
+        raster_content_dependency->consumer.value != raster_content_consumer->target.value ||
+        !schedule_render_plan(split_raster_frame.plan(), split_raster_order,
+                              &split_raster_schedule_error))
+        return 227;
 
     // A style decoration may target an ordinary box without changing its
     // native layout visual kind. Its retained paint joins immediately after

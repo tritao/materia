@@ -129,6 +129,8 @@ struct RenderPlanEmbedOptions {
     /** Optional transform prefix for custom commands in the embedded plan's main pass. */
     bool has_command_transform = false;
     std::array<float, 6> command_transform{1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+    /** Keep isolated layer commands local when placement applies to their final composite. */
+    bool preserve_bounded_target_local_commands = false;
     /** Optional retained-scene revision that must invalidate embedded caches. */
     uint32_t cache_revision = 0;
 };

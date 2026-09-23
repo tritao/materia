@@ -1401,7 +1401,9 @@ nkui_result allocate_resource(nkui::ResourceKind kind, nkui_resource *out,
     if (!out)
         return NKUI_ERROR_INVALID_ARGUMENT;
     out->id = 0;
-    const uint32_t slot_limit = kind == nkui::ResourceKind::RenderTarget ? 0x7FFFu : UINT16_MAX;
+    const uint32_t slot_limit = kind == nkui::ResourceKind::RenderTarget
+                                    ? nkui::kFirstTransientRenderTargetSlot
+                                    : UINT16_MAX;
     const uint32_t first_slot = kind == nkui::ResourceKind::RenderTarget ? 1u : 0u;
     const uint32_t reusable_slots = std::min<uint32_t>(resources.size(), slot_limit);
     for (uint32_t index = first_slot; index < reusable_slots; ++index) {
@@ -3386,7 +3388,8 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
                 break;
             } else if (command.kind == nkui::RenderCommandKind::CompositeTarget) {
                 const uint16_t target_slot = static_cast<uint16_t>(command.resource.value);
-                if (target_slot < 0x8000u && command.resource.value != compile_target.value) {
+                if (target_slot < nkui::kFirstTransientRenderTargetSlot &&
+                    command.resource.value != compile_target.value) {
                     auto *surface_slot = resolve_retained(nkui_resource{command.resource.value},
                                                           nkui::ResourceKind::RenderTarget);
                     if (!surface_slot) {
@@ -3887,7 +3890,8 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                     break;
                 }
                 const uint16_t target_slot = static_cast<uint16_t>(command.resource.value);
-                if (target_slot < 0x8000u && command.resource.value != compile_target.value) {
+                if (target_slot < nkui::kFirstTransientRenderTargetSlot &&
+                    command.resource.value != compile_target.value) {
                     auto *surface_slot = resolve_retained(nkui_resource{command.resource.value},
                                                           nkui::ResourceKind::RenderTarget);
                     if (!surface_slot) {

@@ -264,7 +264,8 @@ if(NK_BUILD_TESTS)
     src/compositor/compositor.cpp
     src/compositor/render_plan.cpp)
     target_include_directories(nativekit_ui_layout_render_compiler_test PRIVATE
-        src "${NKUI_NATIVEKIT_DIR}/include" "${NK_VENDOR_DIR}/clay")
+        src "${NKUI_NATIVEKIT_DIR}/include" "${NKUI_NATIVEKIT_DIR}/modules/gpu/include"
+        "${NK_VENDOR_DIR}/clay")
     target_compile_definitions(nativekit_ui_layout_render_compiler_test PRIVATE
         NKUI_TEST_FONT_PATH="${NK_VENDOR_DIR}/skribidi/example/data/IBMPlexSans-Regular.ttf")
     target_link_libraries(nativekit_ui_layout_render_compiler_test PRIVATE

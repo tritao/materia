@@ -21,6 +21,14 @@ struct ResourceId {
     uint32_t value = 0;
 };
 
+/** Lowest render-target slot reserved for internal raster/composite targets. */
+constexpr uint16_t kFirstTransientRenderTargetSlot = 0x7000u;
+/** Compositor-owned layer targets use this range and above. */
+constexpr uint16_t kFirstCompositorRenderTargetSlot = 0x8000u;
+/** Rasterized custom content uses the reserved range immediately below compositor targets. */
+constexpr uint16_t kLastRasterContentRenderTargetSlot =
+    kFirstCompositorRenderTargetSlot - 1;
+
 ResourceId make_resource_id(ResourceKind kind, uint16_t generation, uint16_t slot);
 bool is_resource_id(ResourceId id, ResourceKind kind);
 

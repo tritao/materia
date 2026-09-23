@@ -366,11 +366,13 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
         std::vector<LayoutRect> clips;
         uint32_t transient_slot = 1;
         uint32_t transient_target_slot =
-            (static_cast<uint16_t>(main_target.value) == 0x8000u) ? 0x8001 : 0x8000;
+            (static_cast<uint16_t>(main_target.value) == kFirstCompositorRenderTargetSlot)
+                ? kFirstCompositorRenderTargetSlot + 1
+                : kFirstCompositorRenderTargetSlot;
         // Composite wrappers are compiled by Compositor, whose first private
         // target is 0x8000. Keep the retained-content target in the adjacent
         // reserved range so the wrapper cannot sample its own layer target.
-        uint32_t composite_content_slot = 0x7FFF;
+        uint32_t composite_content_slot = kLastRasterContentRenderTargetSlot;
         std::size_t current_main_pass = 0;
 
         struct RasterRoot {
@@ -513,9 +515,10 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
         const auto append_custom_plan =
             [&](const RenderPlan &custom_plan, std::size_t primitive_index,
                 ResourceId destination_target, std::size_t destination_pass,
-                const std::array<float, 6> *command_transform = nullptr,
-                const LayoutRect *clip_override = nullptr,
-                uint32_t cache_revision = 0) -> bool {
+            const std::array<float, 6> *command_transform = nullptr,
+            const LayoutRect *clip_override = nullptr,
+            uint32_t cache_revision = 0,
+            bool preserve_bounded_target_local_commands = false) -> bool {
             const auto &primitive = snapshot.primitives[primitive_index];
             std::unordered_map<uint32_t, ResourceId> remapped_targets;
             for (const auto &pass : custom_plan.passes) {
@@ -551,6 +554,8 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
             options.has_command_transform = command_transform != nullptr;
             if (command_transform)
                 options.command_transform = *command_transform;
+            options.preserve_bounded_target_local_commands =
+                preserve_bounded_target_local_commands;
             options.cache_revision = cache_revision;
             RenderPlanEmbedError embed_error;
             if (!append_embedded_render_plan(custom_plan, options, out.plan_, &embed_error))
@@ -564,7 +569,7 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
                 ResourceId destination_target, std::size_t destination_pass, bool raster,
                 const std::array<float, 6> *command_transform = nullptr,
                 const LayoutRect *clip_override = nullptr) -> bool {
-            if (!composite_content_slot)
+            if (composite_content_slot < kFirstTransientRenderTargetSlot)
                 return fail(error, primitive_index, "custom render-target limit exceeded");
             const auto &primitive = snapshot.primitives[primitive_index];
             const auto *scene_item = snapshot.find(primitive.node_id);
@@ -572,6 +577,8 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
                 scene_item ? scene_item->content_revision : primitive.content_revision;
             const uint32_t composite_revision =
                 scene_item ? scene_item->composite_revision : primitive.composite_revision;
+            const LayoutRect content_clip{0.0f, 0.0f, primitive.bounds.width,
+                                          primitive.bounds.height};
             const ResourceId content_target = make_resource_id(
                 ResourceKind::RenderTarget, 1, static_cast<uint16_t>(composite_content_slot--));
             RenderPass content_pass;
@@ -586,7 +593,7 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
             out.plan_.passes.push_back(std::move(content_pass));
             const std::size_t content_pass_index = out.plan_.passes.size() - 1;
             if (!append_custom_plan(content_plan, primitive_index, content_target,
-                                    content_pass_index, &content_transform, nullptr,
+                                    content_pass_index, &content_transform, &content_clip,
                                     content_revision))
                 return false;
 
@@ -595,7 +602,6 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
             if (!composite_plan)
                 return false;
             if (raster) {
-                out.plan_.dependencies.push_back({content_target, main_target});
                 RenderPass continuation;
                 continuation.target = main_target;
                 continuation.load_existing = true;
@@ -604,9 +610,28 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
                 destination_target = main_target;
                 destination_pass = current_main_pass;
             }
-            return append_custom_plan(*composite_plan, primitive_index, destination_target,
-                                      destination_pass, command_transform, clip_override,
-                                      composite_revision);
+            if (!append_custom_plan(*composite_plan, primitive_index, destination_target,
+                                    destination_pass, command_transform, clip_override,
+                                    composite_revision, true))
+                return false;
+            if (raster) {
+                bool found_consumer = false;
+                for (const auto &pass : out.plan_.passes) {
+                    const bool consumes_content = std::any_of(
+                        pass.commands.begin(), pass.commands.end(), [&](const RenderCommand &command) {
+                            return command.kind == RenderCommandKind::CompositeTarget &&
+                                   command.resource.value == content_target.value;
+                        });
+                    if (!consumes_content)
+                        continue;
+                    out.plan_.dependencies.push_back({content_target, pass.target});
+                    found_consumer = true;
+                }
+                if (!found_consumer)
+                    return fail(error, primitive_index,
+                                "rasterized custom composite has no content consumer");
+            }
+            return true;
         };
         const auto append_custom_for_primitive = [&](std::size_t primitive_index) -> bool {
             if (!custom_paints)
