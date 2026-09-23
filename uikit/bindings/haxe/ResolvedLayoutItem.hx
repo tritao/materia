@@ -92,6 +92,39 @@ class ResolvedLayoutItem {
 			Math.max(0.0, bottom - top));
 	}
 
+	/** Conservative visible rectangle in node-local coordinates for custom painters. */
+	public function visibleLocalBounds():Rect {
+		var visible = clippedViewportBounds();
+		if (visible.width <= 0.0 || visible.height <= 0.0)
+			return new Rect(0.0, 0.0, 0.0, 0.0);
+		var corners = [
+			tryViewportToLocal(new Point(visible.x, visible.y)),
+			tryViewportToLocal(new Point(visible.x + visible.width, visible.y)),
+			tryViewportToLocal(new Point(visible.x, visible.y + visible.height)),
+			tryViewportToLocal(new Point(visible.x + visible.width, visible.y + visible.height))
+		];
+		for (point in corners)
+			if (point == null)
+				return localBounds();
+		var left = width;
+		var top = height;
+		var right = 0.0;
+		var bottom = 0.0;
+		for (point in corners) {
+			var local:Point = cast point;
+			left = Math.min(left, local.x);
+			top = Math.min(top, local.y);
+			right = Math.max(right, local.x);
+			bottom = Math.max(bottom, local.y);
+		}
+		left = Math.max(0.0, left);
+		top = Math.max(0.0, top);
+		right = Math.min(width, right);
+		bottom = Math.min(height, bottom);
+		return new Rect(left, top, Math.max(0.0, right - left),
+			Math.max(0.0, bottom - top));
+	}
+
 	/** Converts a viewport point back to this node's pre-transform layout space. */
 	public function viewportToLayout(x:Float, y:Float):Point {
 		var result = transform.tryInverse();

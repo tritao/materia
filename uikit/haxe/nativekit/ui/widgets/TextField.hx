@@ -129,14 +129,7 @@ class TextField implements View {
 
 			var textNodeStyle = new LayoutStyle();
 			textNodeStyle.width = LayoutAxis.grow();
-			// The retained painter uses document-space y coordinates. Keep its node
-			// tall enough for the full document so its local clip includes scrolled text.
-			textNodeStyle.height = multiline && editor.layoutText().length > 0
-				? LayoutAxis.fixed(Math.max(1.0, editor.layout.measure().height))
-				: (multiline ? LayoutAxis.fit() : LayoutAxis.grow());
-			var builtScrollOffset = multiline ? editor.scrollOffsetY : 0.0;
-			textNodeStyle.transform = Transform2D.identity().translated(0.0,
-				-builtScrollOffset);
+			textNodeStyle.height = LayoutAxis.grow();
 			textNodeStyle.zIndex = 1;
 			var editorContentStyle = new LayoutStyle();
 			editorContentStyle.width = LayoutAxis.grow();
@@ -237,23 +230,14 @@ class TextField implements View {
 			var syncCursor = function(geometry:ResolvedLayoutItem) {
 				var caret = editor.layout.caret(editor.focusPosition());
 				var topX = geometry.x + caret.x + caret.ascender * caret.slope;
-				var topY = geometry.y + caret.y + caret.ascender;
+				var topY = geometry.y + caret.y + caret.ascender - editor.scrollOffsetY;
 				var bottomX = geometry.x + caret.x + caret.descender * caret.slope;
-				var bottomY = geometry.y + caret.y + caret.descender;
+				var bottomY = geometry.y + caret.y + caret.descender - editor.scrollOffsetY;
 				var transform:Transform2D = cast geometry.transform;
 				var screenTopX = transform.a * topX + transform.c * topY + transform.tx;
 				var screenTopY = transform.b * topX + transform.d * topY + transform.ty;
 				var screenBottomX = transform.a * bottomX + transform.c * bottomY + transform.tx;
 				var screenBottomY = transform.b * bottomX + transform.d * bottomY + transform.ty;
-				if (multiline) {
-					// Resolution callbacks can reveal the caret after the node's
-					// transform was built. Keep the same-frame IME anchor in sync.
-					var scrollDelta = editor.scrollOffsetY - builtScrollOffset;
-					screenTopX -= transform.c * scrollDelta;
-					screenTopY -= transform.d * scrollDelta;
-					screenBottomX -= transform.c * scrollDelta;
-					screenBottomY -= transform.d * scrollDelta;
-				}
 				var caretRect = new Rect(Math.min(screenTopX, screenBottomX), Math.min(screenTopY, screenBottomY),
 					Math.max(1.0, absolute(screenBottomX - screenTopX)),
 					Math.max(1.0, absolute(screenBottomY - screenTopY)));
@@ -314,7 +298,8 @@ class TextField implements View {
 				event.capturePointer();
 				var geometry:ResolvedLayoutItem = cast textNode.resolved;
 				var point = geometry.viewportToLayout(event.x, event.y);
-				var position = editor.hitTest(point.x - geometry.x, point.y - geometry.y);
+				var position = editor.hitTest(point.x - geometry.x,
+					point.y - geometry.y + editor.scrollOffsetY);
 				editor.resetCaretBlink(context.gestures.timeSeconds());
 				var extend = (event.modifiers & UiModifier.Shift) != 0;
 				if (extend)
@@ -337,7 +322,8 @@ class TextField implements View {
 				editor.cancelPointerClickIfMoved(event.x, event.y);
 				var geometry:ResolvedLayoutItem = cast textNode.resolved;
 				var point = geometry.viewportToLayout(event.x, event.y);
-				var position = editor.hitTest(point.x - geometry.x, point.y - geometry.y);
+				var position = editor.hitTest(point.x - geometry.x,
+					point.y - geometry.y + editor.scrollOffsetY);
 				if (editor.placeCaretAt(position, true)) {
 					editor.resetCaretBlink(context.gestures.timeSeconds());
 					editor.cancelPointerClick();

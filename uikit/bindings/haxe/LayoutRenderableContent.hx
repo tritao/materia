@@ -11,8 +11,8 @@ typedef LayoutContentPaint = (canvas:Canvas, geometry:ResolvedLayoutItem) -> Voi
  * The painter draws in the custom node's local layout space. LayoutSession
  * applies the resolved position, transform, and ancestor clipping when the
  * list is embedded, matching the framework RenderNode paint contract. The
- * display list is regenerated only when the provider version or local size
- * changes.
+ * display list is regenerated when the provider version or resolved paint
+ * geometry changes. Painters can use visibleLocalBounds() to cull their work.
  */
 class LayoutRenderableContent implements LayoutContent {
 	final measurement:LayoutContent;
@@ -52,7 +52,7 @@ class LayoutRenderableContent implements LayoutContent {
 		canvas.reset();
 		canvas.withState(function(target) {
 			target.resetTransform();
-			target.clip(new Rect(0.0, 0.0, geometry.width, geometry.height));
+			target.clip(geometry.visibleLocalBounds());
 			painter(target, geometry);
 		});
 		list.update(canvas);
@@ -77,6 +77,15 @@ class LayoutRenderableContent implements LayoutContent {
 	}
 
 	static function geometryEqual(a:ResolvedLayoutItem, b:ResolvedLayoutItem):Bool {
-		return a.width == b.width && a.height == b.height;
+		return a.flags == b.flags && a.x == b.x && a.y == b.y &&
+			a.width == b.width && a.height == b.height && a.baseline == b.baseline &&
+			sameRect(a.clipBounds, b.clipBounds) &&
+			sameRect(a.contentBounds, b.contentBounds) &&
+			a.transform.a == b.transform.a && a.transform.b == b.transform.b &&
+			a.transform.c == b.transform.c && a.transform.d == b.transform.d &&
+			a.transform.tx == b.transform.tx && a.transform.ty == b.transform.ty;
 	}
+
+	static function sameRect(a:Rect, b:Rect):Bool
+		return a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height;
 }

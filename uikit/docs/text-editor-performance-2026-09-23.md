@@ -77,3 +77,19 @@ it does not shift offsets for the whole document. Initial UI load stayed near
 1.27 s at 10,000 lines. `TextField.value` and `onChange(String)` still assemble
 a complete string for each edit, and a paragraph without newlines can still
 form one large segment. GPU presentation and IME behavior remain unmeasured.
+
+## Viewport-local custom content (2026-09-24)
+
+UIKit custom content now receives a conservative visible rectangle in node-local
+coordinates, and its retained paint list is clipped to that rectangle. The
+multiline text node uses the 600-pixel viewport height; the editor painter
+translates the document by the scroll offset inside its own canvas. Pointer
+hit testing and IME caret placement convert between viewport and document
+coordinates at the widget boundary.
+
+In three more headless runs of the same 10,000-line workload, alternating
+Control+End and Control+Home kept the text node at 600 px with no layout
+translation. Each end produced a small paint list (6–7 commands); median
+paint-list construction took about 0.01 ms. Median caret jump plus frame
+submission was 1.77 ms, and insertion plus frame submission was 8.85 ms.
+These are CPU timings without GPU presentation or a visual pixel check.

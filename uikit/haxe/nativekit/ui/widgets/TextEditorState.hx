@@ -87,9 +87,11 @@ class TextEditorState {
 				updateLayout(constraints.maxWidth);
 			return layout.measureForConstraints(constraints);
 		});
-		renderContent = new LayoutRenderableContent(renderMeasurement, function(canvas, _) {
-			layout.paint(canvas, renderColor, scrollOffsetY,
-				viewportHeight > 0.0 ? scrollOffsetY + viewportHeight : 1.0e30);
+		renderContent = new LayoutRenderableContent(renderMeasurement, function(canvas, geometry) {
+			var visible = geometry.visibleLocalBounds();
+			canvas.translate(0.0, -scrollOffsetY);
+			layout.paint(canvas, renderColor, scrollOffsetY + visible.y,
+				scrollOffsetY + visible.y + visible.height);
 		});
 		lastLayoutWidth = 1.0;
 		lastLayoutText = layoutText();
