@@ -16,6 +16,7 @@ import cadkit.parametric.ParameterKind;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.CylinderFeature;
+import cadkit.parametric.features.DefinitionOutputFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.DatumSketchFeature;
 import cadkit.parametric.features.LevelExtrudeFeature;
@@ -391,6 +392,18 @@ class ElementSmoke {
 		check(parts.redo() && secondPart.overrideValue("width") == null, "override removal redo");
 		var duplicateInstance = parts.duplicateInstance(firstPart, "Box copy");
 		check(duplicateInstance.id.value != firstPart.id.value, "instance duplication assigns a new identity");
+		var instanceOutput = parts.add(new DefinitionOutputFeature(
+			new ElementReference(parts.id, firstPart.id), "body"));
+		parts.setOutput(instanceOutput);
+		parts.recompute();
+		parts.removeElement(firstPart.id);
+		check(instanceOutput.dirty, "removing a referenced instance invalidates element-dependent features");
+		failed = false;
+		try parts.recompute() catch (_:Dynamic) failed = true;
+		check(failed, "a removed instance cannot leave its old published output looking current");
+		check(parts.undo(), "referenced instance removal undo");
+		parts.recompute();
+		check(!instanceOutput.dirty, "restoring a referenced instance recomputes its dependent feature");
 		var committedPart = firstPart.shape();
 		failed = false;
 		try

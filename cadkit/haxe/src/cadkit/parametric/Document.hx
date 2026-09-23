@@ -727,11 +727,13 @@ class Document {
 		elements.insert(insertion, element);
 		elementsById.set(element.id.value, element);
 		datumChanged(element);
+		invalidateElementFeatures(element.id.value);
 	}
 
 	public function restoreElementRemoval(element:Element):Void {
 		validateOwnedElement(element);
 		datumChanged(element);
+		invalidateElementFeatures(element.id.value);
 		invalidatePlacedDescendants(element.id.value, new Map<String, Bool>());
 		element.clearPlacedShape();
 		elements.remove(element);
