@@ -8,9 +8,9 @@ class LayoutTransaction {
 	var parents:Array<Int> = [];
 	var stringValues:Array<String> = [];
 	var stringBytes:Array<Bytes> = [];
-	var seen:Array<LayoutNode> = [];
+	var seenById:Map<Int, LayoutNode> = new Map();
+	var seenIdCollisions:Map<Int, Array<LayoutNode>> = new Map();
 	var nodeCount:Int = 0;
-	var seenCount:Int = 0;
 	var output:Null<Bytes>;
 	var outputLength:Int = 0;
 
@@ -25,7 +25,8 @@ class LayoutTransaction {
 			throw "Layout transaction requires a root node";
 
 		nodeCount = 0;
-		seenCount = 0;
+		seenById = new Map();
+		seenIdCollisions = new Map();
 		appendNode(root, -1);
 
 		var stringByteCount = 0;
@@ -209,13 +210,25 @@ class LayoutTransaction {
 	}
 
 	function appendNode(node:LayoutNode, parent:Int):Void {
-		if (node == null || seenContains(node))
+		if (node == null)
 			throw "Layout tree contains a duplicate or cyclic node";
-		if (seenCount == seen.length)
-			seen.push(node);
-		else
-			seen[seenCount] = node;
-		seenCount++;
+		var previous = seenById.get(node.id);
+		if (previous == null)
+			seenById.set(node.id, node);
+		else {
+			// IDs make the common path constant time; retain identity checks when IDs repeat.
+			if (previous == node)
+				throw "Layout tree contains a duplicate or cyclic node";
+			var collisions = seenIdCollisions.get(node.id);
+			if (collisions == null) {
+				collisions = [];
+				seenIdCollisions.set(node.id, collisions);
+			} else for (candidate in collisions) {
+				if (candidate == node)
+					throw "Layout tree contains a duplicate or cyclic node";
+			}
+			collisions.push(node);
+		}
 		var index = nodeCount++;
 		if (index == nodes.length) {
 			nodes.push(node);
@@ -234,13 +247,6 @@ class LayoutTransaction {
 		}
 		for (child in node.children)
 			appendNode(child, index);
-	}
-
-	function seenContains(node:LayoutNode):Bool {
-		for (index in 0...seenCount)
-			if (seen[index] == node)
-				return true;
-		return false;
 	}
 
 	static function finite(value:Float):Bool {

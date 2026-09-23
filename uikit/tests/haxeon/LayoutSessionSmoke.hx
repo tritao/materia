@@ -2,7 +2,7 @@ import haxe.io.Bytes;
 import TextLayout.TextPosition;
 
 class LayoutSessionSmoke {
-	static function rejectsInvalidTextStyle(node:LayoutNode):Bool {
+	static function rejectsTransaction(node:LayoutNode):Bool {
 		try {
 			LayoutTransaction.encode(node);
 			return false;
@@ -18,6 +18,20 @@ class LayoutSessionSmoke {
 
 		var fonts = FontCollection.create();
 		fonts.add(fontPath);
+		var duplicateRoot = LayoutNode.box(80);
+		var sharedChild = LayoutNode.box(81);
+		duplicateRoot.add(sharedChild);
+		duplicateRoot.add(sharedChild);
+		if (!rejectsTransaction(duplicateRoot))
+			return 47;
+		var repeatedIdRoot = LayoutNode.box(82);
+		repeatedIdRoot.add(LayoutNode.box(83));
+		repeatedIdRoot.add(LayoutNode.box(83));
+		try {
+			LayoutTransaction.encode(repeatedIdRoot);
+		} catch (_:Dynamic) {
+			return 48;
+		}
 		var infinity = Math.pow(2.0, 1024.0);
 		var infiniteFontSize = LayoutNode.textNode(90, "font size");
 		infiniteFontSize.textStyle.fontSize = infinity;
@@ -25,9 +39,9 @@ class LayoutSessionSmoke {
 		infiniteLetterSpacing.textStyle.letterSpacing = -infinity;
 		var infiniteLineHeight = LayoutNode.textNode(92, "line height");
 		infiniteLineHeight.paragraphStyle.lineHeight = infinity;
-		if (!rejectsInvalidTextStyle(infiniteFontSize) ||
-			!rejectsInvalidTextStyle(infiniteLetterSpacing) ||
-			!rejectsInvalidTextStyle(infiniteLineHeight))
+		if (!rejectsTransaction(infiniteFontSize) ||
+			!rejectsTransaction(infiniteLetterSpacing) ||
+			!rejectsTransaction(infiniteLineHeight))
 			return 5;
 		var session = LayoutSession.create();
 		session.setFonts(fonts);
