@@ -24,7 +24,7 @@ class PropertyValueTools {
 			case Mixed: mixedText;
 			case Bool(data): data ? "true" : "false";
 			case Int(data): Std.string(data);
-			case Float(data): Std.string(data);
+			case Float(data): formatFloat(data);
 			case Text(data) | Enum(data): data;
 			case Custom(_, data): data == null ? "" : Std.string(data);
 		};
@@ -38,7 +38,7 @@ class PropertyValueTools {
 			case Enum(data): data;
 			case Bool(data): data ? "true" : "false";
 			case Int(data): Std.string(data);
-			case Float(data): Std.string(data);
+			case Float(data): formatFloat(data);
 			case Unavailable | Mixed: "";
 			case Custom(_, data): data == null ? "" : Std.string(data);
 		};
@@ -63,4 +63,21 @@ class PropertyValueTools {
 
 	static inline function finite(value:Float):Bool
 		return value == value && value - value == 0.0;
+
+	/** Keep editor fields readable without changing the stored numeric value. */
+	static function formatFloat(value:Float):String {
+		if (!finite(value) || Math.abs(value) > 2000.0 ||
+			(value != 0.0 && Math.abs(value) < 0.000001))
+			return Std.string(value);
+		var scaled = Math.round(Math.abs(value) * 1000000.0);
+		var whole = Std.int(scaled / 1000000);
+		var fraction = scaled % 1000000;
+		var result = (value < 0.0 ? "-" : "") + Std.string(whole);
+		if (fraction == 0)
+			return result;
+		var digits = StringTools.lpad(Std.string(fraction), "0", 6);
+		while (StringTools.endsWith(digits, "0"))
+			digits = digits.substr(0, digits.length - 1);
+		return result + "." + digits;
+	}
 }

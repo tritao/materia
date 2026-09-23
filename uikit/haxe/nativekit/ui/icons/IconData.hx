@@ -12,6 +12,30 @@ class IconData {
 			case IconName.Sun: sun();
 			case IconName.Moon: moon();
 			case IconName.Inspect: inspect();
+			case IconName.ChevronDown: new PathBuilder().moveTo(6, 9).lineTo(12, 15).lineTo(18, 9).build();
+			case IconName.ChevronRight: new PathBuilder().moveTo(9, 6).lineTo(15, 12).lineTo(9, 18).build();
+			case IconName.Plus: new PathBuilder().moveTo(12, 5).lineTo(12, 19)
+				.moveTo(5, 12).lineTo(19, 12).build();
+			case IconName.Copy: new PathBuilder().moveTo(8, 8).lineTo(19, 8).lineTo(19, 19)
+				.lineTo(8, 19).lineTo(8, 8).moveTo(5, 15).lineTo(5, 5).lineTo(15, 5).build();
+			case IconName.Trash: new PathBuilder().moveTo(4, 7).lineTo(20, 7)
+				.moveTo(9, 7).lineTo(9, 4).lineTo(15, 4).lineTo(15, 7)
+				.moveTo(6, 7).lineTo(7, 20).lineTo(17, 20).lineTo(18, 7)
+				.moveTo(10, 10).lineTo(10, 17).moveTo(14, 10).lineTo(14, 17).build();
+			case IconName.NewFile: new PathBuilder().moveTo(13, 3).lineTo(5, 3).lineTo(5, 21)
+				.lineTo(19, 21).lineTo(19, 9).lineTo(13, 3).lineTo(13, 9).lineTo(19, 9)
+				.moveTo(12, 13).lineTo(12, 19).moveTo(9, 16).lineTo(15, 16).build();
+			case IconName.FolderOpen: new PathBuilder().moveTo(3, 7).lineTo(3, 5)
+				.lineTo(10, 5).lineTo(12, 7).lineTo(21, 7).lineTo(21, 10)
+				.moveTo(3, 11).lineTo(22, 11).lineTo(19, 20).lineTo(5, 20).lineTo(3, 11).build();
+			case IconName.Save: new PathBuilder().moveTo(4, 3).lineTo(18, 3).lineTo(21, 6)
+				.lineTo(21, 21).lineTo(3, 21).lineTo(3, 3).lineTo(4, 3)
+				.moveTo(7, 3).lineTo(7, 9).lineTo(17, 9).lineTo(17, 3)
+				.moveTo(7, 21).lineTo(7, 14).lineTo(17, 14).lineTo(17, 21).build();
+			case IconName.Undo: new PathBuilder().moveTo(9, 7).lineTo(4, 12).lineTo(9, 17)
+				.moveTo(4, 12).lineTo(14, 12).cubicTo(18, 12, 20, 14, 20, 18).build();
+			case IconName.Redo: new PathBuilder().moveTo(15, 7).lineTo(20, 12).lineTo(15, 17)
+				.moveTo(20, 12).lineTo(10, 12).cubicTo(6, 12, 4, 14, 4, 18).build();
 			case _: throw "Unsupported icon name";
 		};
 	}

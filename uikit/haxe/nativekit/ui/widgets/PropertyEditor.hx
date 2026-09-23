@@ -141,9 +141,11 @@ class PropertyEditor implements View {
 				for (option in descriptor.options)
 					enumOptions.push(new SelectOption<String>(option.key, option.label,
 						option.key, option.enabled));
+				var selectStyle = new LayoutStyle();
+				selectStyle.width = LayoutAxis.grow();
 				var select = new Select<String>(editorKey, enumOptions, selected, function(next) {
 					applyValue(context, descriptor, PropertyValue.Enum(next));
-				});
+				}, selectStyle);
 				select.enabled = writable;
 				result = select;
 			case PropertyType.Int | PropertyType.Float:
@@ -220,7 +222,7 @@ class PropertyEditor implements View {
 	function textField(context:BuildContext, descriptor:PropertyDescriptor,
 			value:PropertyValue, editorKey:String, writable:Bool):View {
 		var fieldStyle = new LayoutStyle();
-		fieldStyle.width = LayoutAxis.fixed(180.0);
+		fieldStyle.width = LayoutAxis.grow(64.0);
 		var field = new TextField(editorKey, draftOrValue(descriptor, value), function(next) {
 			setDraft(descriptor, next);
 		}, fieldStyle);

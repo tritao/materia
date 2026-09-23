@@ -7,6 +7,7 @@ import nativekit.ui.core.CommandRegistry;
 import nativekit.ui.core.CommandResult;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.View;
+import nativekit.ui.icons.IconName;
 
 /** Button whose label, enabled state, and action are owned by a Command. */
 class CommandButton implements View {
@@ -16,6 +17,8 @@ class CommandButton implements View {
 	public final invocationContext:Null<CommandContext>;
 	public final style:Null<LayoutStyle>;
 	public var variant:ButtonVariant;
+	public var displayLabel:Null<String>;
+	public var leadingIcon:Null<IconName>;
 	public var onResult:Null<CommandResult->Void>;
 
 	public function new(key:String, commandId:String, ?registry:CommandRegistry,
@@ -29,6 +32,8 @@ class CommandButton implements View {
 		this.invocationContext = invocationContext;
 		this.style = style == null ? null : style.copy();
 		variant = ButtonVariant.Primary;
+		displayLabel = null;
+		leadingIcon = null;
 		this.onResult = onResult;
 	}
 
@@ -41,12 +46,15 @@ class CommandButton implements View {
 			return missing.build(context);
 		}
 		var actualContext = invocationContext == null ? context.commandContext : invocationContext;
-		var button = new Button(command.label, style, function() {
+		var button = new Button(displayLabel == null ? command.label : displayLabel, style, function() {
 			var result = commands.executeContext(commandId, actualContext);
 			if (onResult != null)
 				onResult(result);
 		}, key);
 		button.variant = variant;
+		button.leadingIcon = leadingIcon;
+		if (displayLabel != null)
+			button.accessibilityLabel = command.label;
 		button.enabled = command.isEnabled(actualContext);
 		button.selected = command.isChecked(actualContext);
 		button.classes = ["command-button"];

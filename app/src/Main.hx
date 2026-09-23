@@ -3,9 +3,11 @@ package app;
 import Canvas;
 import Color;
 import LayoutAxis;
+import LayoutAlignmentY;
 import LayoutDirection;
 import LayoutFrame;
 import LayoutStyle;
+import LayoutWrapMode;
 import Insets;
 import Rect;
 import PathBuilder;
@@ -37,6 +39,7 @@ import nativekit.ui.core.UiEvent;
 import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiModifier;
+import nativekit.ui.core.TextStyleOverride;
 import nativekit.ui.core.View;
 import nativekit.ui.core.ViewportCamera;
 import nativekit.ui.core.ViewportContent;
@@ -76,7 +79,6 @@ import nativekit.ui.widgets.TabItem;
 import nativekit.ui.widgets.Tabs;
 import nativekit.ui.widgets.Text;
 import nativekit.ui.widgets.TextField;
-import nativekit.ui.widgets.Toolbar;
 import nativekit.ui.widgets.TreeRootMetadata;
 import nativekit.ui.widgets.TreeView;
 import nativekit.ui.widgets.TreeViewModel;
@@ -85,6 +87,7 @@ import robotkit.world.RemoteRobot;
 import robotkit.world.RobotWorld;
 import nativekit.ui.lab.ComponentLab;
 import nativekit.ui.theme.Theme;
+import nativekit.ui.icons.IconName;
 import nativekit.ui.host.DesktopUiApplication;
 import nativekit.ui.host.DesktopUiHost;
 import nativekit.ui.host.DesktopUiHostOptions;
@@ -104,10 +107,12 @@ class Main {
       if (arg != "--reset-workspace" && arg != "--snapshot" &&
           arg != "--lab" && arg != "--dark" && arg != "--perspective" &&
           arg.indexOf("--story=") != 0 &&
+          arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0 &&
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot] " +
-          "[--lab] [--dark] [--perspective] [--story=ID] [--capture-dir=PATH] [--frames=N] " +
+          "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
+          "[--capture-dir=PATH] [--frames=N] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE]");
         return 2;
       }
@@ -123,8 +128,8 @@ class Main {
     if (diagnostics == null) return 2;
     var host = new DesktopUiHostOptions();
     host.title = "Materia Reference Editor";
-    host.width = 1320;
-    host.height = 900;
+    host.width = diagnostics.windowWidth;
+    host.height = diagnostics.windowHeight;
     host.captureDirectory = diagnostics.captureDirectory;
     host.frameLimit = diagnostics.frameLimit;
     return DesktopUiHost.run(host, function(context) {
@@ -157,9 +162,12 @@ private class ReferenceEditorLaunchOptions {
   public final robotHost:Null<String>;
   public final robotPort:Int;
   public final setupScript:Null<String>;
+  public final windowWidth:Int;
+  public final windowHeight:Int;
   public function new(captureDirectory:Null<String>, frameLimit:Int,
       componentLab:Bool, storyId:Null<String>, darkTheme:Bool,
-      robotHost:Null<String>, robotPort:Int,setupScript:Null<String>) {
+      robotHost:Null<String>, robotPort:Int,setupScript:Null<String>,
+      windowWidth:Int, windowHeight:Int) {
     this.captureDirectory = captureDirectory;
     this.frameLimit = frameLimit;
     this.componentLab = componentLab;
@@ -168,6 +176,8 @@ private class ReferenceEditorLaunchOptions {
     this.robotHost = robotHost;
     this.robotPort = robotPort;
     this.setupScript=setupScript;
+    this.windowWidth = windowWidth;
+    this.windowHeight = windowHeight;
   }
 
   public static function fromArgs(args:Array<String>):Null<ReferenceEditorLaunchOptions> {
@@ -177,6 +187,8 @@ private class ReferenceEditorLaunchOptions {
     var story:Null<String> = null;
     var robotEndpoint:Null<String> = null;
     var setupScript:Null<String> = null;
+    var windowWidth = 1320;
+    var windowHeight = 900;
     for (arg in args) {
       if (arg.indexOf("--capture-dir=") == 0)
         directory = arg.substr(14);
@@ -190,6 +202,20 @@ private class ReferenceEditorLaunchOptions {
       } else if (arg.indexOf("--story=") == 0) {
         story = arg.substr(8);
         lab = true;
+      } else if (arg.indexOf("--width=") == 0) {
+        var parsed = Std.parseInt(arg.substr(8));
+        if (parsed == null || parsed < 480) {
+          Sys.println("materia: --width requires at least 480 pixels");
+          return null;
+        }
+        windowWidth = parsed;
+      } else if (arg.indexOf("--height=") == 0) {
+        var parsed = Std.parseInt(arg.substr(9));
+        if (parsed == null || parsed < 360) {
+          Sys.println("materia: --height requires at least 360 pixels");
+          return null;
+        }
+        windowHeight = parsed;
       } else if (arg.indexOf("--robot=") == 0) {
         robotEndpoint = arg.substr(8);
       } else if(arg.indexOf("--setup-script=")==0) {
@@ -225,7 +251,8 @@ private class ReferenceEditorLaunchOptions {
       robotPort = parsedPort;
     }
     return new ReferenceEditorLaunchOptions(directory, frames, lab, story,
-      args.indexOf("--dark") >= 0, robotHost, robotPort,setupScript);
+      args.indexOf("--dark") >= 0, robotHost, robotPort,setupScript,
+      windowWidth, windowHeight);
   }
 }
 
@@ -234,6 +261,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public static inline var WORKSPACE_KEY:String = "reference-editor";
 
   public final ui:UiContext;
+  final appearance:EditorAppearance;
   public final commands:CommandRegistry;
   public final workspace:DockWorkspaceModel;
   public final workspacePath:String;
@@ -256,6 +284,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var gridSnapEnabled:Bool;
   var gridSpacing:Float;
   var paletteVisible:Bool;
+  var toolbarMenuVisible:Bool;
+  var viewportWidth:Float = 1320.0;
   var contextMenuVisible:Bool;
   var contextMenuX:Float;
   var contextMenuY:Float;
@@ -274,7 +304,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
       ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String) {
     this.hostContext = hostContext;
-    ui = new UiContext(null, fonts, theme == null ? Theme.light() : theme);
+    appearance = new EditorAppearance(theme);
+    ui = new UiContext(null, fonts, appearance.theme);
     commands = ui.commands;
     this.world = world == null ? new RobotWorld() : world;
     simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
@@ -304,6 +335,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     gridSnapEnabled = false;
     gridSpacing = EditorSceneViewport.GRID_STEP;
     paletteVisible = false;
+    toolbarMenuVisible = false;
     contextMenuVisible = false;
     contextMenuX = 0.0;
     contextMenuY = 0.0;
@@ -362,17 +394,30 @@ class ReferenceEditorApp implements DesktopUiApplication {
       );
       layers.push(new StackChild("command-palette", palette, 0.0, 0.0, 30));
     }
+    if (toolbarMenuVisible) {
+      var toolbarMenu = new CommandMenu("editor-more-menu", [
+        "editor.save-as", "scene.export-step", "editor.undo", "editor.redo",
+        "scene.frame-selected", "scene.reset-perspective", "scene.show-perspective",
+        "scene.toggle-grid", "editor.command-palette", "workspace.reset"
+      ], Math.max(8.0, viewportWidth - 228.0), 44.0, commands, ui.commandContext,
+        function() { toolbarMenuVisible = false; commands.refresh(); },
+        function(_) { toolbarMenuVisible = false; commands.refresh(); });
+      layers.push(new StackChild("editor-more-menu", toolbarMenu, 0.0, 0.0, 25));
+    }
 
     var documentDialog = makeDocumentDialog();
     if (documentDialog != null) layers.push(new StackChild("document-dialog", documentDialog,
       0.0, 0.0, 100, LayoutAxis.grow(), LayoutAxis.grow()));
     var shellStyle = fillStyle();
-    shellStyle.background = Color.rgba(0.93, 0.95, 0.98, 1.0);
+    shellStyle.background = appearance.canvas;
     return new AppShell("reference-editor-shell", new Stack("overlay-host", layers), topBar(), null, null, shellStyle);
   }
 
   /** Convenience entry point for a NativeKit host's layout phase. */
-  public function submit(frame:LayoutFrame):RenderNode return ui.submit(view(), frame);
+  public function submit(frame:LayoutFrame):RenderNode {
+    viewportWidth = frame.width;
+    return ui.submit(view(), frame);
+  }
 
   public function context():UiContext return ui;
 
@@ -465,63 +510,94 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function topBar():View {
+    var compact = viewportWidth < 1040.0;
+    var minimal = viewportWidth < 800.0;
     var barStyle = fillStyle();
-    barStyle.height = LayoutAxis.fixed(48.0);
+    barStyle.height = LayoutAxis.fixed(44.0);
     barStyle.direction = LayoutDirection.LeftToRight;
-    barStyle.childGap = 14.0;
-    barStyle.padding = new Insets(14.0, 8.0, 14.0, 8.0);
-    barStyle.background = Color.rgba(0.98, 0.99, 1.0, 1.0);
+    barStyle.childAlignY = LayoutAlignmentY.Center;
+    barStyle.childGap = compact ? 6.0 : 10.0;
+    barStyle.padding = new Insets(10.0, 5.0, 10.0, 5.0);
+    barStyle.background = appearance.toolbar;
 
     var titleStyle = new LayoutStyle();
-    titleStyle.width = LayoutAxis.fixed(190.0);
-    var hintStyle = new LayoutStyle();
-    hintStyle.width = LayoutAxis.grow();
-    var robotLabel = world == null ? "World: offline"
-      : "World: " + Std.string(world.status());
-    var hint = new Text(session.label() + "  ·  " + robotLabel,
-      hintStyle, Color.rgba(0.32, 0.38, 0.47, 1.0));
-    return new Row(
-      "editor-toolbar-row",
-      [
-        new KeyedView(
-          "title",
-          new Text(
-            "MATERIA / EDITOR",
-            titleStyle,
-            Color.rgba(
-              0.10,
-              0.14,
-              0.21,
-              1.0
-            )
-          )
-        ),
-        new KeyedView(
-          "commands",
-          new Toolbar(
-            "editor-toolbar",
-            [
-              "editor.new",
-              "editor.open",
-              "editor.save",
-              "editor.save-as",
-              "scene.export-step",
-              "editor.undo",
-              "editor.redo",
-              "scene.frame-selected",
-              "scene.reset-perspective"
-            ],
-            commands
-          )
-        ),
-        new KeyedView(
-          "hint",
-          hint
-        )
-      ],
-      barStyle
-    );
+    titleStyle.width = LayoutAxis.fixed(compact ? 78.0 : 92.0);
+    var fileActions = new Row("toolbar-file", [
+      new KeyedView("new", toolbarAction("toolbar-new", "editor.new", "New", IconName.NewFile, compact)),
+      new KeyedView("open", toolbarAction("toolbar-open", "editor.open", "Open", IconName.FolderOpen, compact)),
+      new KeyedView("save", toolbarAction("toolbar-save", "editor.save", "Save", IconName.Save, compact, true))
+    ], toolbarGroupStyle());
+    var items:Array<KeyedView> = [
+      new KeyedView("brand", new Text("MATERIA", titleStyle, appearance.theme.text,
+        TextStyleOverride.text(13.0, 0.5))),
+      new KeyedView("file", toolbarGroup("file-group", "FILE", fileActions, compact))
+    ];
+    if (!minimal) {
+      items.push(new KeyedView("file-edit-divider", toolbarDivider("file-edit-divider")));
+      var editActions = new Row("toolbar-edit", [
+        new KeyedView("undo", toolbarAction("toolbar-undo", "editor.undo", "Undo", IconName.Undo, compact)),
+        new KeyedView("redo", toolbarAction("toolbar-redo", "editor.redo", "Redo", IconName.Redo, compact))
+      ], toolbarGroupStyle());
+      items.push(new KeyedView("edit", toolbarGroup("edit-group", "EDIT", editActions, compact)));
+      items.push(new KeyedView("edit-view-divider", toolbarDivider("edit-view-divider")));
+      var viewActions = new Row("toolbar-view", [
+        new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected",
+          "Frame", IconName.Inspect, compact))
+      ], toolbarGroupStyle());
+      items.push(new KeyedView("view", toolbarGroup("view-group", "VIEW", viewActions, compact)));
+    }
+    items.push(new KeyedView("space", new Spacer("toolbar-space", LayoutAxis.grow(),
+      LayoutAxis.fixed(1.0))));
+    var documentLabel = shortenLabel(session.label(), compact ? 18 : 30);
+    var status = minimal ? documentLabel : documentLabel + "  ·  World: " +
+      (world == null ? "offline" : Std.string(world.status()));
+    items.push(new KeyedView("status", new Text(status, null, appearance.muted,
+      TextStyleOverride.text(12.0))));
+    var more = new Button(compact ? "" : "More", null, function() {
+      toolbarMenuVisible = !toolbarMenuVisible;
+      commands.refresh();
+    }, "toolbar-more");
+    more.variant = ButtonVariant.Navigation;
+    more.leadingIcon = IconName.ChevronDown;
+    more.accessibilityLabel = "More editor actions";
+    more.selected = toolbarMenuVisible;
+    items.push(new KeyedView("more", more));
+    return new Row("editor-toolbar-row", items, barStyle);
   }
+
+  function toolbarAction(key:String, commandId:String, label:String, icon:IconName,
+      compact:Bool, primary:Bool = false):CommandButton {
+    var action = new CommandButton(key, commandId, commands);
+    action.displayLabel = compact ? "" : label;
+    action.leadingIcon = icon;
+    action.variant = primary ? ButtonVariant.Primary : ButtonVariant.Navigation;
+    return action;
+  }
+
+  function toolbarGroup(key:String, label:String, actions:View, compact:Bool):View {
+    if (compact) return actions;
+    return new Row(key, [
+      new KeyedView("label", new Text(label, null, appearance.heading,
+        TextStyleOverride.text(10.0, 0.8))),
+      new KeyedView("actions", actions)
+    ], toolbarGroupStyle());
+  }
+
+  static function toolbarGroupStyle():LayoutStyle {
+    var style = new LayoutStyle();
+    style.childAlignY = LayoutAlignmentY.Center;
+    style.childGap = 3.0;
+    return style;
+  }
+
+  function toolbarDivider(key:String):View {
+    var divider = new Spacer(key, LayoutAxis.fixed(1.0), LayoutAxis.fixed(20.0));
+    divider.style.background = appearance.divider;
+    return divider;
+  }
+
+  static function shortenLabel(value:String, maximum:Int):String
+    return value.length <= maximum ? value : value.substr(0, maximum - 3) + "...";
 
   function makeWorkspace():DockWorkspaceModel {
     var result = new DockWorkspaceModel();
@@ -550,15 +626,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ));
 
     var centerTabs = DockNode.Tabs(["viewport", "perspective", "console", "telemetry"], "viewport");
-    var editorArea = DockNode.Split(DockSplitAxis.Horizontal, 0.76, centerTabs, DockNode.Panel("inspector"));
-    result.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.22,
+    var editorArea = DockNode.Split(DockSplitAxis.Horizontal, 0.68, centerTabs, DockNode.Panel("inspector"));
+    result.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.25,
       DockNode.Tabs(["hierarchy", "sensors"], "hierarchy"), editorArea));
     return result;
   }
 
   function sensorPanel():View {
-    var style=fillStyle();style.padding=new Insets(8.0,8.0,8.0,8.0);
-    style.background=Color.rgba(0.98,0.99,1.0,1.0);
+    var style=fillStyle();style.padding=new Insets(12.0,12.0,12.0,12.0);
+    style.background=appearance.surface;
     var robotRows:Array<KeyedView> = [];
     var attachedIds = world.robotIds();
     var worldIds = attachedIds.copy();
@@ -580,15 +656,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
       button.selected=index==sensors.selectedIndex;rows.push(new KeyedView("sensor:"+sensor.id,button));
     }
     var ownership=session.scriptOwnership;
-    var addLidar=new Button("+ LiDAR",null,function(){sensors.add("lidar");commands.refresh();},"sensor-add-lidar");
-    var addImu=new Button("+ IMU",null,function(){sensors.add("imu");commands.refresh();},"sensor-add-imu");
+    var addLidar=new Button("LiDAR",null,function(){sensors.add("lidar");commands.refresh();},"sensor-add-lidar");
+    var addImu=new Button("IMU",null,function(){sensors.add("imu");commands.refresh();},"sensor-add-imu");
     var removeSensor=new Button("Remove",null,function(){sensors.removeSelected();commands.refresh();},"sensor-remove");
+    addLidar.leadingIcon=IconName.Plus;addImu.leadingIcon=IconName.Plus;
+    removeSensor.leadingIcon=IconName.Trash;
     addLidar.enabled=ownership==null;addImu.enabled=ownership==null;removeSensor.enabled=ownership==null;
     var actions=new Row("sensor-actions",[
       new KeyedView("add-lidar",addLidar),new KeyedView("add-imu",addImu),
       new KeyedView("remove",removeSensor)
-    ]);
-    var runtimeActions=new Row("sensor-runtime-actions",[
+    ],actionRowStyle());
+    var runtimeActions=new Column("sensor-runtime-actions",[
+      new KeyedView("configuration",new Row("sensor-configuration-actions",[
       new KeyedView("undo",new Button("Undo",null,function(){
         if(ownership==null)sensors.document.undo();else {ownership.document.undo();refreshScriptMaterialization("Override undone");}
         commands.refresh();},"sensor-undo")),
@@ -598,7 +677,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView("apply",new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild",null,function(){
         log(simulation.rebuild(sensors,scene) ? "Shared simulation configuration applied" : "Simulation rebuild rejected: "+simulation.error);
         commands.refresh();
-      },"sensor-apply")),
+      },"sensor-apply"))],actionRowStyle())),
+      new KeyedView("playback",new Row("sensor-playback-actions",[
       new KeyedView("run",new Button("Run",null,function(){
         try {simulation.start();log("Simulation running");} catch(error:Dynamic){log("Run rejected: "+Std.string(error));}
         commands.refresh();
@@ -613,7 +693,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView("design",new Button("Design",null,function(){
         simulation.clear();log("Returned to design mode");commands.refresh();
       },"sensor-design"))
-    ]);
+      ],actionRowStyle()))
+    ],actionColumnStyle());
     var backendActions=new Row("sensor-backend-actions",[
       new KeyedView("deterministic",new Button("Test backend",null,function(){
         if(ownership==null)simulation.setBackend(ApplicationSimulation.DETERMINISTIC);else try {
@@ -626,23 +707,29 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ownership.setOverride(ScriptOwnership.SIMULATION_TARGET,"backend","integer",ApplicationSimulation.MUJOCO);
           refreshScriptMaterialization("Physics backend override changed");
         } catch(error:Dynamic)log("Override rejected: "+Std.string(error));commands.refresh();
-      },"sensor-backend-mujoco"))]);
+      },"sensor-backend-mujoco"))],actionRowStyle());
     var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
       new KeyedView("apply-state",new Text(simulation.pending(sensors,scene)
-        ? "Pending edits · rebuild resets simulated robots and environment"
-        : "Applied configuration · physics is authoritative")),
+        ? "Pending changes · rebuild required"
+        : "Configuration applied",null,appearance.muted,TextStyleOverride.text(12.0))),
       new KeyedView("simulation-mode",new Text("Mode: "+(simulation.isActive()
         ? (simulation.isRunning()?"Running":"Paused") : "Design"))),
-      new KeyedView("ownership",new Text(ownership==null?"Origin: document":
-        'Origin: script · ${ownership.reference} · configuration v${ownership.configurationVersion}')),
+      new KeyedView("ownership",ownership==null?new Text("Origin: document"):
+        textLines("script-origin",["Origin: script",ownership.reference,
+          'configuration v${ownership.configurationVersion}'])),
+      new KeyedView("robots-heading",sectionHeading("ROBOTS")),
       new KeyedView("robots",new Column("sensor-robots",robotRows)),
-      new KeyedView("backend",new Text("Physics: "+simulation.userBackendName())),
-      new KeyedView("backend-actions",backendActions),new KeyedView("actions",actions),
-      new KeyedView("runtime-actions",runtimeActions),
-      new KeyedView("list",new Column("sensor-list",rows))];
+      new KeyedView("backend-heading",sectionHeading("PHYSICS · "+simulation.userBackendName().toUpperCase())),
+      new KeyedView("backend-actions",backendActions),
+      new KeyedView("devices-heading",sectionHeading("DEVICES")),
+      new KeyedView("actions",actions),
+      new KeyedView("list",new Column("sensor-list",rows)),
+      new KeyedView("runtime-heading",sectionHeading("SIMULATION")),
+      new KeyedView("runtime-actions",runtimeActions)];
     if(ownership!=null){
       var overrideLabel=ownership.overridesEnabled?"Disable overrides":"Enable overrides";
-      content.insert(2,new KeyedView("script-actions",new Row("script-actions",[
+      content.insert(4,new KeyedView("script-actions",new Column("script-actions",[
+        new KeyedView("source",new Row("script-source-actions",[
         new KeyedView("reload",new Button("Reload script",null,function(){
           try {var result=session.reloadScript();simulation.setBackend(result.backend);
             simulation.setTimestep(result.timestep);documentChanged();log("Script reloaded; Apply/Rebuild restarts simulation");}
@@ -651,19 +738,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new KeyedView("overrides",new Button(overrideLabel,null,function(){
           ownership.setOverridesEnabled(!ownership.overridesEnabled);
           refreshScriptMaterialization(ownership.overridesEnabled?"Overrides enabled":"Overrides disabled");
-        },"script-overrides")),
+        },"script-overrides"))])),
+        new KeyedView("revert",new Row("script-revert-actions",[
         new KeyedView("revert-simulation",new Button("Revert simulation",null,function(){
           if(ownership.revertTarget(ScriptOwnership.SIMULATION_TARGET))
             refreshScriptMaterialization("Simulation settings reverted to script values");
         },"script-revert-simulation")),
         new KeyedView("remove-stale",new Button("Remove stale",null,function(){
           if(ownership.removeStaleOverrides())refreshScriptMaterialization("Stale overrides removed");
-        },"script-remove-stale"))
+          },"script-remove-stale"))
+        ]))
       ])));
-      content.insert(5,new KeyedView("simulation-origins",new Text(
-        ownership.propertyOrigins(ScriptOwnership.SIMULATION_TARGET,["backend","timestep"]).join(" · "))));
-      content.insert(6,new KeyedView("robot-origins",new Text("Robot pose · "+
-        ownership.propertyOrigins(sensors.robotId,["position","rotation"]).join(" · "))));
+      content.insert(5,new KeyedView("simulation-origins",textLines("script-simulation-origins",
+        ownership.propertyOrigins(ScriptOwnership.SIMULATION_TARGET,["backend","timestep"]))));
+      content.insert(6,new KeyedView("robot-origins",textLines("script-robot-origins",
+        ["Robot pose"].concat(ownership.propertyOrigins(sensors.robotId,["position","rotation"])))));
     }
     var selected=sensors.selected();
     if(!sensors.isEditable())content.push(new KeyedView("read-only",new Text("Remote robot configuration is read-only")));
@@ -672,8 +761,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         var sensorTarget=sensors.robotId+"/"+selected.id;
         var sensorProperties=["updateRate","noiseStddev","noiseSeed","mount.frameId","mount.position","mount.rotation"];
         if(selected.kind=="lidar"){sensorProperties.push("rayCount");sensorProperties.push("maxRange");}
-        content.push(new KeyedView("sensor-origin",new Text("Value origins · "+
-          ownership.propertyOrigins(sensorTarget,sensorProperties).join(" · "))));
+        content.push(new KeyedView("sensor-origin",textLines("script-sensor-origins",
+          ["Value origins"].concat(ownership.propertyOrigins(sensorTarget,sensorProperties)))));
         var decreaseRate=new Button("Rate -1 Hz",null,function(){
             try {ownership.setSensorRate(sensors.robotId,selected.id,Math.max(0,selected.updateRate-1));
               refreshScriptMaterialization("Sensor rate override changed");}
@@ -703,6 +792,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       }
       var sensorInspector=new PropertyInspector("sensor-inspector:"+selected.id,
         sensors.properties(),null,null,null,null,"Sensor configuration");
+      sensorInspector.labelWidth=viewportWidth < 820.0 ? 76.0 : 100.0;
       sensorInspector.enabled=ownership==null;
       content.push(new KeyedView("properties",sensorInspector));
     }
@@ -710,14 +800,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if(diagnostics.length>0)content.push(new KeyedView("diagnostics",new Text(
       diagnostics[0].code+": "+diagnostics[0].message)));
     if(ownership!=null&&ownership.diagnostics.length>0)
-      content.push(new KeyedView("script-diagnostics",new Text(ownership.diagnostics.join("\n"))));
-    return new ScrollView("sensor-scroll",new Column("sensor-panel",content,style),style);
+      content.push(new KeyedView("script-diagnostics",textLines("script-diagnostic-lines",ownership.diagnostics)));
+    var contentStyle=new LayoutStyle();contentStyle.width=LayoutAxis.stretch();
+    contentStyle.height=LayoutAxis.fit();contentStyle.padding=new Insets(8.0,8.0,8.0,8.0);
+    return new ScrollView("sensor-scroll",new Column("sensor-panel",content,contentStyle),style);
   }
 
   function hierarchyPanel():View {
     var treeStyle = fillStyle();
-    treeStyle.padding = new Insets(8.0, 8.0, 8.0, 8.0);
-    treeStyle.background = Color.rgba(0.98, 0.99, 1.0, 1.0);
+    treeStyle.padding = new Insets(10.0, 10.0, 10.0, 10.0);
+    treeStyle.background = appearance.surface;
+    treeStyle.childGap = 6.0;
     var treeViewport = fillStyle();
     var tree = new TreeView("scene-hierarchy",
       treeModel, treeViewport, null, 420.0, scene.treeSelectionKey(), ["scene"], function(id) {
@@ -733,14 +826,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return new Column(
       "hierarchy-panel",
       [
-        new KeyedView("heading", sectionHeading("SCENE HIERARCHY")),
+        new KeyedView("heading", sectionHeading("SCENE")),
         new KeyedView("actions", new Column("scene-object-actions", [
-          new KeyedView("create", new CommandButton("scene-create", "scene.create", commands)),
-          new KeyedView("create-plate", new CommandButton("scene-create-plate", "scene.create-plate", commands)),
-          new KeyedView("add-face-hole", new CommandButton("scene-add-face-hole", "scene.add-face-hole", commands)),
-          new KeyedView("duplicate", new CommandButton("scene-duplicate", "scene.duplicate", commands)),
-          new KeyedView("delete", new CommandButton("scene-delete", "scene.delete", commands))
-        ])),
+          new KeyedView("create", new Row("scene-create-actions", [
+            new KeyedView("rectangle", sceneAction("scene-create", "scene.create", "Rectangle", IconName.Plus)),
+            new KeyedView("plate", sceneAction("scene-create-plate", "scene.create-plate", "Plate", IconName.Plus)),
+            new KeyedView("hole", sceneAction("scene-add-face-hole", "scene.add-face-hole", "Hole", IconName.Plus))
+          ], actionRowStyle())),
+          new KeyedView("edit", new Row("scene-edit-actions", [
+            new KeyedView("duplicate", sceneAction("scene-duplicate", "scene.duplicate", "Duplicate", IconName.Copy)),
+            new KeyedView("delete", sceneAction("scene-delete", "scene.delete", "Delete", IconName.Trash))
+          ], actionRowStyle()))
+        ], actionColumnStyle())),
         new KeyedView(
           "tree",
           tree
@@ -748,6 +845,32 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ],
       treeStyle
     );
+  }
+
+  function sceneAction(key:String, commandId:String, label:String, icon:IconName):CommandButton {
+    var action = new CommandButton(key, commandId, commands);
+    action.displayLabel = label;
+    action.leadingIcon = icon;
+    return action;
+  }
+
+  static function textLines(key:String, lines:Array<String>):View return new Column(key,
+    [for (index in 0...lines.length) new KeyedView("line:"+index,new Text(lines[index]))]);
+
+  static function actionRowStyle():LayoutStyle {
+    var style = new LayoutStyle();
+    style.width = LayoutAxis.grow();
+    style.childGap = 4.0;
+    style.wrapMode = LayoutWrapMode.Wrap;
+    style.rowGap = 4.0;
+    return style;
+  }
+
+  static function actionColumnStyle():LayoutStyle {
+    var style = new LayoutStyle();
+    style.width = LayoutAxis.grow();
+    style.childGap = 4.0;
+    return style;
   }
 
   function viewportPanel():View {
@@ -886,7 +1009,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function inspectorPanel():View {
     var style = fillStyle();
     style.padding = new Insets(10.0, 10.0, 10.0, 10.0);
-    style.background = Color.rgba(0.98, 0.99, 1.0, 1.0);
+    style.background = appearance.surface;
     var selected = scene.object(scene.selectedId);
     if (selected == null)
       return new Column("inspector-empty", [
@@ -899,6 +1022,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = sceneInspector;
+    inspector.labelWidth = viewportWidth < 820.0 ? 76.0 : 116.0;
     var ownership=session.scriptOwnership;
     inspector.enabled = ownership==null&&!simulation.isActive() && !viewportContent.dragging() &&
       (perspectiveViewport == null || !perspectiveViewport.dragging());
@@ -907,9 +1031,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new Text(scene.selectedCadFaceIndex<0?"Click a CAD face to select it":
         "Selected face "+(scene.selectedCadFaceIndex+1)+" · Add hole uses the picked location")));
     if(ownership!=null) {
-      rows.push(new KeyedView("origin",new Text("Script-owned · "+
-        ownership.propertyOrigins(selected.id,["position","dimensions","mass","collisionEnabled",
-          "dynamicBody","visible"]).join(" · "))));
+      rows.push(new KeyedView("origin",textLines("script-object-origins",
+        ["Script-owned"].concat(ownership.propertyOrigins(selected.id,["position","dimensions",
+          "mass","collisionEnabled","dynamicBody","visible"])))));
       rows.push(new KeyedView("revert",new Button("Revert object overrides",null,function(){
         if(ownership.revertTarget(selected.id))refreshScriptMaterialization("Object overrides reverted");
       },"script-object-revert")));
@@ -925,7 +1049,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function consolePanel():View {
     var style = fillStyle();
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
-    style.background = Color.rgba(0.95, 0.97, 0.99, 1.0);
+    style.background = appearance.surface;
     var rows:Array<KeyedView> = [];
     for (index in 0...logLines.length) rows.push(new KeyedView(
       "log:" + index,
@@ -960,7 +1084,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function telemetryPanel():View {
     var style = fillStyle();
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
-    style.background = Color.rgba(0.96, 0.97, 0.99, 1.0);
+    style.background = appearance.surface;
     var plotStyle = fillStyle();
     plotStyle.height = LayoutAxis.grow();
     var plot = new PlotView("frame-telemetry", telemetry, plotStyle, "Frame telemetry");
@@ -982,7 +1106,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function sectionHeading(label:String):Text {
-    return new Text(label, null, Color.rgba(0.24, 0.39, 0.61, 1.0));
+    return new Text(label, null, appearance.heading, TextStyleOverride.text(11.0, 0.8));
   }
 
   function installCommands():Void {

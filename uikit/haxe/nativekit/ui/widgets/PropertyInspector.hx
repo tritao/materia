@@ -10,6 +10,7 @@ import nativekit.ui.core.PropertyInspectorSection;
 import nativekit.ui.core.PropertyValue;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.View;
+import nativekit.ui.icons.IconName;
 import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.Semantics;
 
@@ -212,8 +213,10 @@ private class PropertyInspectorSectionHeader implements View {
 	public function build(context:BuildContext):RenderNode {
 		var style = new LayoutStyle();
 		style.width = LayoutAxis.grow();
-		var button = new Button((section.expanded ? "▾ " : "▸ ") + section.label,
+		var button = new Button(section.label,
 			style, onToggle, key);
+		button.leadingIcon = section.expanded ? IconName.ChevronDown : IconName.ChevronRight;
+		button.iconSize = 14.0;
 		button.variant = ButtonVariant.Navigation;
 		button.selected = section.expanded;
 		button.classes = ["inspector-section-header"];

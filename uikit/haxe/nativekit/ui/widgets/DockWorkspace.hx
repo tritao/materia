@@ -135,7 +135,7 @@ class DockWorkspace implements View {
 		var available = horizontal ? availableWidth : availableHeight;
 		if (available <= 0.0)
 			available = 1000.0;
-		var minimum = 120.0;
+		var minimum = horizontal ? 190.0 : 120.0;
 		var divider = 8.0;
 		var maximum = available - minimum - divider;
 		if (maximum < minimum)

@@ -29,6 +29,8 @@ import nativekit.ui.semantics.Semantics;
 class Button implements View {
 	public final key:String;
 	public final label:String;
+	/** Optional full name when compact visible text abbreviates an action. */
+	public var accessibilityLabel:Null<String>;
 	public final style:LayoutStyle;
 	/** Typed selector classes used by composite controls and application styles. */
 	public var classes:Array<String>;
@@ -48,6 +50,7 @@ class Button implements View {
 
 	public function new(label:String, ?style:LayoutStyle, ?onClick:Void->Void, ?key:String) {
 		this.label = label == null ? "" : label;
+		accessibilityLabel = null;
 		this.key = key == null || key.length == 0
 			? (this.label.length == 0 ? "button" : this.label)
 			: key;
@@ -90,7 +93,8 @@ class Button implements View {
 		node.computedStyle = computed;
 		node.focusable = enabled;
 		node.enabled = enabled;
-		var semantics = new Semantics(semanticRole, label);
+		var semantics = new Semantics(semanticRole,
+			accessibilityLabel == null ? label : accessibilityLabel);
 		semantics.actions = semanticActions;
 		if (selected)
 			semantics.states |= AccessibilityState.Selected;

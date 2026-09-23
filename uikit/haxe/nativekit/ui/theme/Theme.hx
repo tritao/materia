@@ -150,7 +150,11 @@ class Theme {
 			StyleValue.background(Color.rgba(0.12, 0.13, 0.16, 0.0))
 		]);
 		styles.rule(StyleSelector.widget("button").className("menu-item").state(StyleState.Disabled),
-			[StyleValue.background(Color.rgba(0.12, 0.13, 0.16, 0.45))]);
+			[StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 0.0))]);
+		styles.rule(StyleSelector.widget("button").className("menu-item").state(StyleState.Hovered),
+			[StyleValue.background(tokens.selectionHover)]);
+		styles.rule(StyleSelector.widget("button").className("menu-item").state(StyleState.Pressed),
+			[StyleValue.background(tokens.selectionPressed)]);
 		styles.rule(StyleSelector.widget("button").className("select-trigger"), [
 			StyleValue.background(tokens.selectionField),
 			StyleValue.padding(new Insets(12.0, 8.0, 34.0, 8.0)),

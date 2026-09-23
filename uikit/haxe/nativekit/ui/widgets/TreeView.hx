@@ -27,6 +27,7 @@ import nativekit.ui.widgets.ScrollController;
 import nativekit.ui.widgets.ScrollView;
 import nativekit.ui.widgets.Spacer;
 import nativekit.ui.widgets.Text;
+import nativekit.ui.icons.IconName;
 
 /** Model-backed virtual tree with lazy visible-branch indexing and stable selection state. */
 class TreeView implements View {
@@ -692,11 +693,10 @@ private class TreeDisclosure implements View {
 			var style = new LayoutStyle();
 			style.width = LayoutAxis.fixed(16.0);
 			style.height = LayoutAxis.grow();
-			var node = new Text(expanded ? "▾" : "▸", style).build(context);
-			node.semantics = null;
-			node.on(UiEventKind.Click, function(_) { onToggle(); });
-			node.on(UiEventKind.Activate, function(_) { onToggle(); });
-			return node;
+			style.padding = new Insets(0.0, 0.0, 0.0, 0.0);
+			style.background = Color.rgba(0.0, 0.0, 0.0, 0.0);
+			return new IconButton("disclosure", expanded ? IconName.ChevronDown : IconName.ChevronRight,
+				expanded ? "Collapse" : "Expand", onToggle, style).build(context);
 		});
 	}
 }
