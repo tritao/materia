@@ -1048,6 +1048,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
     inspector.enabled = ownership==null&&!simulation.isActive() && !viewportContent.dragging() &&
       (perspectiveViewport == null || !perspectiveViewport.dragging());
     var rows:Array<KeyedView> = [new KeyedView("heading",sectionHeading(selected.label))];
+    if (scene.hasActiveSketchEdit()) {
+      var summary = scene.sketchEditSummary();
+      if (summary != null)
+        rows.push(new KeyedView("sketch-draft-status", new Text(summary)));
+      rows.push(new KeyedView("sketch-draft-actions", new Row("sketch-draft-actions-row", [
+        new KeyedView("apply", sceneAction("apply-sketch-draft", "scene.apply-sketch", "Apply sketch", IconName.Save)),
+        new KeyedView("cancel", sceneAction("cancel-sketch-draft", "scene.cancel-sketch", "Cancel", IconName.Close))
+      ], actionRowStyle())));
+    } else if (scene.canBeginSelectedSketchEdit()) {
+      rows.push(new KeyedView("sketch-edit-action",
+        sceneAction("edit-selected-sketch", "scene.edit-sketch", "Edit sketch", IconName.Inspect)));
+    }
     if(scene.isCadPart(selected.id))rows.push(new KeyedView("face-selection",
       new Text(scene.selectedCadFaceIndex<0?"Click a CAD face to select it":
         selected.kind=="cad-plate"
@@ -1155,6 +1167,23 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(new Command("scene.create-bracket", "Add L bracket", function() {
       runSceneEdit("Could not add L bracket", function() scene.createBracket());
     }, null, function() return canEditObjects() && scene.canCreate()));
+    commands.register(new Command("scene.edit-sketch", "Edit selected sketch", function() {
+      try {
+        scene.beginSelectedSketchEdit();
+        inspectorSelectionRevision = -1;
+      } catch (error:Dynamic) log("Could not edit sketch: " + Std.string(error));
+      commands.refresh();
+    }, null, function() return canEditObjects() && scene.canBeginSelectedSketchEdit()));
+    commands.register(new Command("scene.apply-sketch", "Apply sketch draft", function() {
+      runSceneEdit("Could not apply sketch draft", function() scene.applySelectedSketchEdit());
+      inspectorSelectionRevision = -1;
+      commands.refresh();
+    }, null, function() return canEditObjects() && scene.hasActiveSketchEdit()));
+    commands.register(new Command("scene.cancel-sketch", "Cancel sketch draft", function() {
+      scene.cancelSelectedSketchEdit();
+      inspectorSelectionRevision = -1;
+      commands.refresh();
+    }, null, function() return scene.hasActiveSketchEdit()));
     commands.register(new Command("scene.import-step", "Import STEP part", function() {
       var chooser=files;
       if(chooser==null)return;
@@ -1261,7 +1290,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       updateCommandContext();
       commands.refresh();
     }, new Shortcut(UiKey.Escape), function() return viewportContent.dragging() ||
-      (perspectiveViewport != null && perspectiveViewport.dragging())));
+      (perspectiveViewport != null && perspectiveViewport.dragging()) || scene.hasActiveSketchEdit()));
   }
 
   function registerGridSpacing(id:String, label:String, spacing:Float):Void {
@@ -1336,6 +1365,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function cancelActiveDrag():Void {
+    if (scene.hasActiveSketchEdit()) {
+      scene.cancelSelectedSketchEdit();
+      inspectorSelectionRevision = -1;
+    }
     if (viewportContent.dragging()) viewportContent.cancelDrag();
     releaseDragPointer();
     if (perspectiveViewport != null && perspectiveViewport.dragging()) {

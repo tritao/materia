@@ -8,6 +8,8 @@ typedef PropertyValidator = CommandContext->PropertyValue->Null<String>;
 class PropertyDescriptorOptions {
 	public var category:String;
 	public var readOnly:Bool;
+	/** Whether edits enter the owning editor document's undo history. */
+	public var recordHistory:Bool;
 	public var minimum:Null<Float>;
 	public var maximum:Null<Float>;
 	public var step:Null<Float>;
@@ -19,6 +21,7 @@ class PropertyDescriptorOptions {
 	public function new() {
 		category = "";
 		readOnly = false;
+		recordHistory = true;
 		minimum = null;
 		maximum = null;
 		step = null;

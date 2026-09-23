@@ -21,6 +21,10 @@ import nativekit.ui.core.PropertyType;
 import nativekit.ui.core.PropertyValue;
 import nativekit.scene.PickResult;
 import cadkit.parametric.TopologyFingerprint;
+import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.sketch.ConstrainedSketch;
+import cadkit.sketch.SketchConstraint;
+import cadkit.sketch.SketchPoint;
 import app.CadPlateModel.CadPlateParameters;
 import app.CadPlateModel.CadPlateHoleEdit;
 import app.CadBracketModel;
@@ -46,6 +50,8 @@ class EditorScene {
   public var selectedCadFaceY(default, null):Float = 0.0;
   var selectedCadFaceFingerprint:Null<TopologyFingerprint> = null;
   var selectedFeatureKey:Null<String> = null;
+  var activeSketchEdit:Null<CadSketchEditSession> = null;
+  var activeSketchObjectId:Null<String> = null;
   public var revision(default, null):Int;
   /** Changes only when simulation-consumed scene content changes, not selection. */
   public var environmentRevision(default, null):Int;
@@ -316,6 +322,16 @@ class EditorScene {
     }
   }
 
+  function applyConstrainedSketchSnapshot(session:CadDocumentSession, featureId:Int,
+      sketch:ConstrainedSketch):Void {
+    var candidate = session.document.featureById(featureId);
+    if (candidate == null || !Std.isOfType(candidate, ConstrainedSketchFeature))
+      throw "constrained sketch feature is no longer available";
+    var feature:ConstrainedSketchFeature = cast candidate;
+    feature.replaceSketch(sketch);
+    session.document.recompute();
+  }
+
   function syncCadSession(id:String):Void {
     var item = requiredObject(id);
     var session = requireCadSession(id);
@@ -343,6 +359,12 @@ class EditorScene {
       }
     }
     publish();
+  }
+
+  function refreshSelectionRevision():Void {
+    selectionRevision++;
+    nextRevision++;
+    revision = nextRevision;
   }
 
   // Reconcile document records into the runtime scene while preserving stable nodes.
@@ -554,6 +576,8 @@ class EditorScene {
   public function select(id:String):Bool {
     if (id != "scene" && object(id) == null) return false;
     if (id == selectedId && selectedFeatureKey==null) return false;
+    if (activeSketchEdit != null && (id != activeSketchObjectId || selectedFeatureKey != null))
+      cancelSelectedSketchEdit();
     var previousSession=cadSessions.get(selectedId);
     if(previousSession!=null)previousSession.selectedTopology=null;
     selectedId = id;
@@ -571,7 +595,9 @@ class EditorScene {
     var marker=key.indexOf(":feature:");
     if(marker<0)return select(key);
     var id=key.substr(0,marker),item=object(id);
-    if(item==null||item.kind!="cad-plate")return false;
+    if(item==null||!isCadKind(item.kind))return false;
+    if (activeSketchEdit != null && (id != activeSketchObjectId || key != selectedFeatureKey))
+      cancelSelectedSketchEdit();
     if(selectedId==id&&selectedFeatureKey==key)return false;
     selectedId=id;selectedFeatureKey=key;
     selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
@@ -583,6 +609,85 @@ class EditorScene {
     var item=object(id);
     if(item==null||!isCadKind(item.kind))return [];
     return requireCadSession(id).model.featureNames();
+  }
+
+  public function canBeginSelectedSketchEdit():Bool {
+    if (activeSketchEdit != null || selectedFeatureKey == null)
+      return false;
+    var marker = selectedFeatureKey.indexOf(":feature:");
+    if (marker < 0)
+      return false;
+    var index = Std.parseInt(selectedFeatureKey.substr(marker + 9));
+    if (index == null)
+      return false;
+    try {
+      return Std.isOfType(requireCadSession(selectedId).document.featureAt(index), ConstrainedSketchFeature);
+    } catch (_:Dynamic) {
+      return false;
+    }
+  }
+
+  public function beginSelectedSketchEdit():Bool {
+    if (!canBeginSelectedSketchEdit())
+      return false;
+    var marker = selectedFeatureKey.indexOf(":feature:");
+    var index = Std.parseInt(selectedFeatureKey.substr(marker + 9));
+    activeSketchEdit = requireCadSession(selectedId).beginSketchEdit(index);
+    activeSketchObjectId = selectedId;
+    refreshSelectionRevision();
+    return true;
+  }
+
+  public function hasActiveSketchEdit():Bool
+    return activeSketchEdit != null;
+
+  public function sketchEditSummary():Null<String> {
+    if (activeSketchEdit == null)
+      return null;
+    var diagnostic = activeSketchEdit.sketch.diagnostic;
+    if (diagnostic == null)
+      return "Sketch draft has not been solved";
+    return diagnostic.message + " · " + activeSketchEdit.sketch.degreesOfFreedom
+      + " degrees of freedom" + (diagnostic.constraintIds.length == 0
+        ? "" : " · constraints: " + diagnostic.constraintIds.join(", "));
+  }
+
+  public function cancelSelectedSketchEdit():Bool {
+    if (activeSketchEdit == null)
+      return false;
+    activeSketchEdit.cancel();
+    activeSketchEdit = null;
+    activeSketchObjectId = null;
+    refreshSelectionRevision();
+    return true;
+  }
+
+  public function applySelectedSketchEdit():Bool {
+    var draft = activeSketchEdit;
+    if (draft == null)
+      return false;
+    var id = activeSketchObjectId;
+    if (id == null || object(id) == null)
+      throw "sketch draft owner is no longer in the scene";
+    if (!draft.sketch.isSolved)
+      throw "cannot apply a sketch draft with conflicting or invalid constraints";
+
+    var beforeSketch = draft.feature.sketch();
+    var afterSketch = draft.sketch.snapshot();
+    var featureId = draft.feature.id.toInt();
+    var operation = new EditOperation("Edit constrained sketch", function() {
+      runCadEdit(id, function(session) applyConstrainedSketchSnapshot(session, featureId, afterSketch),
+        function(session) applyConstrainedSketchSnapshot(session, featureId, beforeSketch));
+    }, function() {
+      runCadEdit(id, function(session) applyConstrainedSketchSnapshot(session, featureId, beforeSketch),
+        function(session) applyConstrainedSketchSnapshot(session, featureId, afterSketch));
+    });
+    document.apply(operation);
+    draft.cancel();
+    activeSketchEdit = null;
+    activeSketchObjectId = null;
+    refreshSelectionRevision();
+    return true;
   }
 
   public function selectAtXY(x:Float,y:Float):String
@@ -856,6 +961,8 @@ class EditorScene {
       result.push(bracketProperty(id,"hole-radius","Hole radius",function(model)return model.holeRadius(),
         function(value)setBracketHoleRadius(id,value),prefix));
     }
+    if (activeSketchEdit != null && activeSketchObjectId == id)
+      appendSketchDraftProperties(result, activeSketchEdit, prefix);
     result.push(boolProperty(id,"collision","Collision",function(item)return item.collisionEnabled,
       "Physics",prefix));
     result.push(boolProperty(id,"dynamic","Dynamic body",function(item)return item.dynamicBody,
@@ -863,6 +970,97 @@ class EditorScene {
     result.push(numberProperty(id,"mass","Mass",function(item)return item.mass,
       0.000001,1000000.0,"kg","Physics",prefix));
     return result;
+  }
+
+  function appendSketchDraftProperties(result:Array<PropertyDescriptor>, draft:CadSketchEditSession,
+      prefix:String):Void {
+    var authored = draft.sketch.snapshot();
+    for (point in authored.points()) {
+      var pointId = point.id;
+      result.push(sketchDraftNumberProperty(prefix + "sketch-point-" + pointId + "-x",
+        "Point " + pointId + " X", authored.units, false,
+        function() return sketchPoint(pointId).x,
+        function(value) editSketchDraft(function(sketch) {
+          var current = sketchPoint(pointId);
+          sketch.replacePoint(new SketchPoint(pointId, value, current.y));
+        })));
+      result.push(sketchDraftNumberProperty(prefix + "sketch-point-" + pointId + "-y",
+        "Point " + pointId + " Y", authored.units, false,
+        function() return sketchPoint(pointId).y,
+        function(value) editSketchDraft(function(sketch) {
+          var current = sketchPoint(pointId);
+          sketch.replacePoint(new SketchPoint(pointId, current.x, value));
+        })));
+    }
+    for (constraint in authored.constraints()) {
+      if (constraint.kind != "distance" && constraint.kind != "radius" && constraint.kind != "angle")
+        continue;
+      var constraintId = constraint.id;
+      var unit = constraint.kind == "angle" ? "rad" : authored.units;
+      var positive = constraint.kind != "angle";
+      result.push(sketchDraftNumberProperty(prefix + "sketch-dimension-" + constraintId,
+        "Dimension " + constraintId, unit, positive,
+        function() return sketchConstraint(constraintId).value,
+        function(value) editSketchDraft(function(sketch) {
+          var current = sketchConstraint(constraintId);
+          sketch.replaceConstraint(SketchConstraint.raw(current.id, current.kind, current.first,
+            current.second, current.third, value));
+        })));
+    }
+  }
+
+  function sketchDraftNumberProperty(key:String, label:String, unit:String, positive:Bool,
+      read:Void->Float, write:Float->Void):PropertyDescriptor {
+    var options = new PropertyDescriptorOptions();
+    options.category = "Sketch draft";
+    options.recordHistory = false;
+    options.unit = unit;
+    options.minimum = positive ? 0.000001 : null;
+    options.step = 0.1;
+    options.validator = function(_, value) {
+      var number:Null<Float> = switch (value) {
+        case PropertyValue.Float(next): next;
+        case PropertyValue.Int(next): next;
+        default: null;
+      };
+      return number == null || !Math.isFinite(number) || (positive && number <= 0)
+        ? (positive ? "Value must be finite and positive" : "Value must be finite") : null;
+    };
+    var descriptor = new PropertyDescriptor(key, label, PropertyType.Float,
+      function(_) return PropertyValue.Float(read()), function(_, value) {
+        var number:Float = switch (value) {
+          case PropertyValue.Float(next): next;
+          case PropertyValue.Int(next): next;
+          default: throw "Sketch values must be numeric";
+        };
+        if (!Math.isFinite(number) || (positive && number <= 0))
+          throw (positive ? "Value must be finite and positive" : "Value must be finite");
+        write(number);
+      }, options);
+    return descriptor;
+  }
+
+  function sketchPoint(id:String):SketchPoint {
+    if (activeSketchEdit == null)
+      throw "Sketch draft is no longer active";
+    for (point in activeSketchEdit.sketch.snapshot().points())
+      if (point.id == id) return point;
+    throw "Sketch draft point no longer exists: " + id;
+  }
+
+  function sketchConstraint(id:String):SketchConstraint {
+    if (activeSketchEdit == null)
+      throw "Sketch draft is no longer active";
+    for (constraint in activeSketchEdit.sketch.snapshot().constraints())
+      if (constraint.id == id) return constraint;
+    throw "Sketch draft constraint no longer exists: " + id;
+  }
+
+  function editSketchDraft(change:ConstrainedSketch->Void):Void {
+    if (activeSketchEdit == null)
+      throw "Sketch draft is no longer active";
+    activeSketchEdit.edit(change);
+    refreshSelectionRevision();
   }
 
   function dimensionProperty(id:String, axis:Int, prefix:String):PropertyDescriptor {
@@ -1069,6 +1267,11 @@ class EditorScene {
   public function dispose():Void {
     if (disposed) return;
     disposed = true;
+    if (activeSketchEdit != null) {
+      try activeSketchEdit.cancel() catch (_:Dynamic) {}
+      activeSketchEdit = null;
+      activeSketchObjectId = null;
+    }
     for (session in cadSessions) session.close();
     cadSessions = new Map();
     spatial.dispose();

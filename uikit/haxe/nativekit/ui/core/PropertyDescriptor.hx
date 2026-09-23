@@ -7,6 +7,7 @@ class PropertyDescriptor {
 	public final type:PropertyType;
 	public final category:String;
 	public final readOnly:Bool;
+	public final recordHistory:Bool;
 	public final minimum:Null<Float>;
 	public final maximum:Null<Float>;
 	public final step:Null<Float>;
@@ -40,6 +41,7 @@ class PropertyDescriptor {
 		this.type = type;
 		this.category = config.category == null ? "" : config.category;
 		this.readOnly = config.readOnly;
+		this.recordHistory = config.recordHistory;
 		this.minimum = config.minimum;
 		this.maximum = config.maximum;
 		this.step = config.step;

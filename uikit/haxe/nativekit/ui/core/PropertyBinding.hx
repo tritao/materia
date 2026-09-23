@@ -45,6 +45,14 @@ class PropertyBinding {
 		var before = read();
 		if (registry.same(before, value))
 			return PropertyEditResult.Unchanged;
+		if (!descriptor.recordHistory) {
+			try {
+				descriptor.write(context, value);
+			} catch (error:Dynamic) {
+				return PropertyEditResult.Rejected(error == null ? "Property edit failed" : Std.string(error));
+			}
+			return PropertyEditResult.Applied;
+		}
 
 		var latest = value;
 		var key = coalesceKey == null ? "property:" + descriptor.id : coalesceKey;

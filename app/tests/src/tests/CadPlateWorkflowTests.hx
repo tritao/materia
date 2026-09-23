@@ -14,7 +14,10 @@ import app.SceneDocumentSession;
 import cadkit.parametric.EvaluationCancelled;
 import cadkit.parametric.ParametricError;
 import nativekit.ui.core.PropertyBinding;
+import nativekit.ui.core.PropertyDescriptor;
+import nativekit.ui.core.PropertyDescriptorOptions;
 import nativekit.ui.core.PropertyEditResult;
+import nativekit.ui.core.PropertyType;
 import nativekit.ui.core.PropertyValue;
 import sys.FileSystem;
 import sys.io.File;
@@ -93,6 +96,11 @@ class CadPlateWorkflowTests {
   }
 
   static function sketchDraftWorkflow():Void {
+    var transientOptions = new PropertyDescriptorOptions();
+    transientOptions.recordHistory = false;
+    var transientDescriptor = new PropertyDescriptor("test.transient", "Transient", PropertyType.Float,
+      function(_) return PropertyValue.Float(0), function(_, _) {}, transientOptions);
+    check(!transientDescriptor.recordHistory, "property options preserve transient history policy");
     var model = CadBracketModel.create(0.06, 0.04, 0.03);
     var session = new CadDocumentSession(model);
     try {
@@ -308,6 +316,50 @@ class CadPlateWorkflowTests {
       var bracketModel:app.CadBracketModel=cast modelSession.model;
       var retained=modelSession.copyPublishedShape();
       var volume=retained.volume();
+      check(scene.selectTreeKey(id + ":feature:0") && scene.canBeginSelectedSketchEdit(),
+        "feature-tree sketch selection exposes constrained sketch editing");
+      check(scene.beginSelectedSketchEdit(), "feature-tree command opens a sketch draft");
+      var historyBeforeDraftEdit = scene.document.history.undoCount;
+      var draftPropertyFound=false;
+      for (descriptor in scene.properties()) if (descriptor.label == "Dimension width") {
+        draftPropertyFound=true;
+        check(!descriptor.recordHistory,"draft dimension properties are transient");
+      }
+      check(draftPropertyFound,"draft exposes its dimensional constraint in the inspector");
+      check(edit(scene,"Dimension width",61)==PropertyEditResult.Applied,
+        "sketch inspector edits a draft constraint value");
+      check(scene.document.history.undoCount == historyBeforeDraftEdit,
+        "transient sketch draft edits do not enter project undo history: "+historyBeforeDraftEdit+" -> "+
+          scene.document.history.undoCount+" ("+scene.document.history.undoLabel()+")");
+      near(scene.cadSession(id).document.parameter(CadBracketModel.WIDTH).valueIn("mm"),60,
+        "inspector draft leaves the part unchanged before apply");
+      var authoredBeforeApply:ConstrainedSketchFeature = cast scene.cadSession(id).document.featureAt(0);
+      var rawBeforeApply=0.0;
+      for (constraint in authoredBeforeApply.sketch().constraints())
+        if (constraint.id == "width") rawBeforeApply = constraint.value;
+      near(rawBeforeApply,60,"inspector draft does not edit the authored constraint before apply: "+rawBeforeApply);
+      check(scene.applySelectedSketchEdit(), "applying the sketch inspector draft succeeds");
+      check(scene.document.history.undoCount == historyBeforeDraftEdit + 1,
+        "applying a sketch draft creates exactly one project undo operation");
+      bracketModel=cast scene.cadSession(id).model;
+      near(bracketModel.document.parameter(CadBracketModel.WIDTH).valueIn("mm"),61,
+        "applying the sketch inspector draft updates its bound model parameter");
+      check(scene.document.history.undoLabel() == "Edit constrained sketch",
+        "applying the sketch draft contributes one project undo operation");
+      check(scene.document.undo(), "undo sketch inspector draft");
+      bracketModel=cast scene.cadSession(id).model;
+      var undoWidth=bracketModel.document.parameter(CadBracketModel.WIDTH).valueIn("mm");
+      var restoredProfile:ConstrainedSketchFeature=cast bracketModel.document.featureAt(0);
+      var restoredRawWidth=0.0;
+      for (constraint in restoredProfile.sketch().constraints())
+        if (constraint.id == "width") restoredRawWidth = constraint.value;
+      near(undoWidth,60,"project undo restores the prior sketch graph: "+undoWidth+" raw "+restoredRawWidth);
+      check(scene.document.redo(), "redo sketch inspector draft");
+      bracketModel=cast scene.cadSession(id).model;
+      near(bracketModel.document.parameter(CadBracketModel.WIDTH).valueIn("mm"),61,
+        "project redo restores the edited sketch graph");
+      check(scene.document.undo(), "return sketch inspector test to its baseline");
+      bracketModel=cast scene.cadSession(id).model;
       var initialRadius=bracketModel.holeRadius();
       check(edit(scene,"Hole radius",0.002)==PropertyEditResult.Applied,
         "inspector edits the bracket's supported hole sketch");
@@ -411,10 +463,10 @@ class CadPlateWorkflowTests {
     try {
       stepImportWorkflow();
       sketchDraftWorkflow();
-      run();
-      faceHoleWorkflow();
       bracketWorkflow();
+      faceHoleWorkflow();
       latestOnlyPublication();
+      run();
       Sys.println("CAD part workflow tests passed");
       return 0;
     } catch (error:Dynamic) {
