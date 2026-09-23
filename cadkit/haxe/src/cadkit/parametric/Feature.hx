@@ -160,13 +160,16 @@ class Feature {
 	}
 
 	public function install(result:EvaluationResult):Void {
-		if (shape != null)
-			shape.close();
-		if (provenance != null)
-			provenance.close();
+		var previousShape = shape;
+		var previousProvenance = provenance;
 		shape = result.getShape();
 		provenance = result.getOperation();
+		result.transferOwnership();
 		dirty = false;
+		if (previousShape != null)
+			previousShape.close();
+		if (previousProvenance != null)
+			previousProvenance.close();
 	}
 
 	public function close():Void {

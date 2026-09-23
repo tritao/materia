@@ -406,9 +406,30 @@ class Document {
 	}
 
 	public function datumChanged(datum:Element):Void {
+		var affectedDatums = new Map<String, Bool>();
+		var pending = [datum.id.value];
+		affectedDatums.set(datum.id.value, true);
+		var index = 0;
+		while (index < pending.length) {
+			var parentId = pending[index++];
+			for (candidate in elements) {
+				if (affectedDatums.exists(candidate.id.value) || candidate.kind != "level")
+					continue;
+				var level:LevelElement = cast candidate;
+				if (level.relativeTo != null && level.relativeTo.documentId.value == id.value
+					&& level.relativeTo.elementId.value == parentId) {
+					affectedDatums.set(level.id.value, true);
+					pending.push(level.id.value);
+				}
+			}
+		}
+
 		for (feature in features)
-			if (feature.datumDependencies().indexOf(datum.id.value) >= 0)
-				feature.markDirty();
+			for (dependency in feature.datumDependencies())
+				if (affectedDatums.exists(dependency)) {
+					feature.markDirty();
+					break;
+				}
 	}
 
 	public function worldPlacement(element:Element):Placement {
@@ -909,8 +930,6 @@ class Document {
 				lastRemapReport.merge(feature.remapTopologyReferences());
 			for (element in elements)
 				element.commitOutput();
-			if (afterRecompute != null)
-				afterRecompute();
 		} catch (error:Dynamic) {
 			for (feature in features)
 				feature.discardEvaluation();
@@ -936,6 +955,11 @@ class Document {
 				throw recomputeError;
 			throw error;
 		}
+
+		// Publication succeeded. Observer failures are reported to the caller, but cannot
+		// roll back or dispose resources that are now owned by committed features.
+		if (afterRecompute != null)
+			afterRecompute();
 	}
 
 	private function synchronizeExpressions():Void {

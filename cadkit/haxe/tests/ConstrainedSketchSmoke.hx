@@ -275,6 +275,22 @@ class ConstrainedSketchSmoke {
 		check(stagedSketch.solvedSketch() != committedSolution, "successful recompute commits staged solver state");
 		stagedDocument.close();
 
+		var observerDocument = new Document();
+		var observerBox = observerDocument.add(new BoxFeature(10, 8, 2));
+		observerDocument.setOutput(observerBox);
+		observerDocument.recompute();
+		observerBox.width.set(12);
+		observerDocument.afterRecompute = function() throw "observer failure";
+		failed = false;
+		try observerDocument.recompute() catch (error:Dynamic) failed = true;
+		check(failed, "post-recompute observer failures are reported");
+		near(observerDocument.result().volume(), 192);
+		var publishedShape = observerBox.currentShape();
+		check(publishedShape != null && !publishedShape.isClosed(),
+			"observer failure leaves the newly published shape open");
+		observerDocument.afterRecompute = null;
+		observerDocument.close();
+
 		var workplaneDocument = DocumentBuilder.build(function(builder) {
 			var width = builder.dimension("workplane.width", 20);
 			var height = builder.dimension("workplane.height", 10);

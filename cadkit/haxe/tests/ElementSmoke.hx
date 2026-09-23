@@ -9,6 +9,7 @@ import cadkit.parametric.features.BoxFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.DatumSketchFeature;
 import cadkit.parametric.features.LevelExtrudeFeature;
+import cadkit.parametric.features.ExtrudeFeature;
 import haxe.Json;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
@@ -19,6 +20,20 @@ private class FailingElementFeature extends Feature {
 
 	override public function evaluate(context:EvaluationContext):EvaluationResult
 		throw "intentional element output failure";
+}
+
+private class CountingBoxFeature extends BoxFeature {
+	public var evaluations:Int;
+
+	public function new() {
+		super(2, 3, 4);
+		evaluations = 0;
+	}
+
+	override public function evaluate(context:EvaluationContext):EvaluationResult {
+		evaluations++;
+		return super.evaluate(context);
+	}
 }
 
 class ElementSmoke {
@@ -210,6 +225,26 @@ class ElementSmoke {
 		near(datumReload.result().volume(), 800000);
 		datumReload.close();
 		datumDocument.close();
+
+		var relativeDocument = new Document();
+		var rootLevel = relativeDocument.createLevel("Root", 1000);
+		var relativeLevel = relativeDocument.createLevel("Relative", 200, 0,
+			new ElementReference(relativeDocument.id, rootLevel.id));
+		var relativeSketch = relativeDocument.add(new DatumSketchFeature("rectangle", 10, 20,
+			new ElementReference(relativeDocument.id, relativeLevel.id)));
+		var relativeExtrude = relativeDocument.add(new ExtrudeFeature(relativeSketch, 0, 0, 5));
+		var unrelatedFeature = relativeDocument.add(new CountingBoxFeature());
+		relativeDocument.setOutput(relativeExtrude);
+		relativeDocument.recompute();
+		near(relativeExtrude.currentShape().bounds().get_min().get_z(), 1200);
+		check(unrelatedFeature.evaluations == 1, "unrelated feature evaluates once initially");
+		rootLevel.setElevation(1500);
+		check(relativeSketch.dirty && relativeExtrude.dirty, "ancestor datum changes invalidate dependent features transitively");
+		relativeDocument.recompute();
+		near(relativeExtrude.currentShape().bounds().get_min().get_z(), 1700);
+		check(unrelatedFeature.evaluations == 1, "unrelated feature remains unevaluated after datum change");
+		relativeDocument.close();
+
 		var twoLevel = new TwoLevelDatumBuilding();
 		var wallId = twoLevel.walls[0].id.value;
 		var oldRoofZ = twoLevel.roof.shape().bounds().get_max().get_z();

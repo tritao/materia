@@ -7,10 +7,12 @@ import cadkit.Shape;
 class EvaluationResult {
 	public final shape:Shape;
 	public final operation:Null<Operation>;
+	private var ownsResources:Bool;
 
 	public function new(shape:Shape, operation:Null<Operation>) {
 		this.shape = shape;
 		this.operation = operation;
+		ownsResources = true;
 	}
 
 	public function getShape():Shape {
@@ -19,6 +21,11 @@ class EvaluationResult {
 
 	public function getOperation():Null<Operation> {
 		return operation;
+	}
+
+	/** Transfer staged resources to the feature that is publishing this result. */
+	public function transferOwnership():Void {
+		ownsResources = false;
 	}
 
 	public static function fromShape(shape:Shape):EvaluationResult {
@@ -35,6 +42,9 @@ class EvaluationResult {
 	}
 
 	public function dispose():Void {
+		if (!ownsResources)
+			return;
+		ownsResources = false;
 		shape.close();
 		if (operation != null)
 			operation.close();
