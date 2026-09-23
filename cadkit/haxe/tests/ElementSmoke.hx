@@ -440,11 +440,48 @@ class ElementSmoke {
 		near(reusableInstance.shape().volume(), 7200);
 		reusableInstance.setOverride("width", 1.4);
 		near(reusableInstance.shape().volume(), 8400);
+		var reusableElementId = reusableInstance.id.value;
+		var sharedInstance = reusable.createInstance("Part B", reusableDefinition);
+		sharedInstance.setPlacement(new Placement(new Plane(new Vector(100, 0, 0), Vector.X(), Vector.Z())));
 		var reopenedReusable = DocumentCodec.decode(DocumentCodec.encode(reusable));
 		near(reopenedReusable.elementAt(0).shape().volume(), 8400);
 		var reopenedInstance:cadkit.parametric.InstanceElement = cast reopenedReusable.elementAt(0);
 		near(reopenedReusable.definitionOutput(reopenedInstance, "opening").volume(), Math.PI * 40);
 		reopenedReusable.close();
+		var sharedDefinitionId = reusableInstance.definitionId.value;
+		reusableInstance.setPlacement(new Placement(new Plane(new Vector(50, 0, 0), Vector.X(), Vector.Z())));
+		var placementBeforeUnique = reusableInstance.localPlacement;
+		var uniqueDefinition = reusableInstance.makeUnique();
+		check(uniqueDefinition.id.value != sharedDefinitionId && reusableInstance.id.value == reusableElementId,
+			"make unique changes definition identity while preserving element identity");
+		check(uniqueDefinition.input("width") != reusableDefinition.input("width"),
+			"make unique copies typed inputs rather than sharing defaults");
+		check(reusableInstance.localPlacement == placementBeforeUnique,
+			"make unique preserves the instance's local placement");
+		near(reusableInstance.shape().volume(), 8400);
+		near(reusable.definitionOutput(reusableInstance, "opening").volume(), Math.PI * 40);
+		uniqueDefinition.setDefault("width", 1.6);
+		reusableInstance.removeOverride("width");
+		near(reusableInstance.shape().volume(), 9600);
+		near(sharedInstance.shape().volume(), 7200);
+		var reopenedUnique = DocumentCodec.decode(DocumentCodec.encode(reusable));
+		var reopenedUniqueInstance:cadkit.parametric.InstanceElement = cast reopenedUnique.elementAt(0);
+		check(reopenedUnique.allDefinitions().length == 2 &&
+			reopenedUniqueInstance.definitionId.value == uniqueDefinition.id.value,
+			"unique definition identity and instance assignment survive save and reopen");
+		near(reopenedUniqueInstance.shape().volume(), 9600);
+		near(reopenedUnique.definitionOutput(reopenedUniqueInstance, "opening").volume(), Math.PI * 40);
+		reopenedUnique.close();
+		check(reusable.undo(), "unique default edit can be undone");
+		check(reusable.undo(), "instance override removal can be undone");
+		check(reusable.undo(), "make unique can be undone");
+		var restoredInstance:cadkit.parametric.InstanceElement = cast reusable.elementAt(0);
+		check(restoredInstance.definitionId.value == sharedDefinitionId,
+			"undo make unique restores the shared definition reference");
+		check(reusable.redo(), "make unique can be redone");
+		var redoneInstance:cadkit.parametric.InstanceElement = cast reusable.elementAt(0);
+		check(redoneInstance.definitionId.value == uniqueDefinition.id.value,
+			"redo make unique restores the unique definition reference");
 		reusable.close();
 
 		var definitionTransactionDocument = new Document();

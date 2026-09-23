@@ -65,3 +65,23 @@ class InstanceOverrideChange implements DocumentChange {
 	public function redo():Void
 		document.restoreInstanceOverride(instance, name, after);
 }
+
+class InstanceDefinitionChange implements DocumentChange {
+	final document:Document;
+	final instance:InstanceElement;
+	final before:DefinitionId;
+	final after:DefinitionId;
+
+	public function new(document:Document, instance:InstanceElement, before:DefinitionId, after:DefinitionId) {
+		this.document = document;
+		this.instance = instance;
+		this.before = before;
+		this.after = after;
+	}
+
+	public function undo():Void
+		document.restoreInstanceDefinition(instance, before);
+
+	public function redo():Void
+		document.restoreInstanceDefinition(instance, after);
+}

@@ -1,7 +1,7 @@
 package cadkit.parametric;
 
 class InstanceElement extends Element {
-	public final definitionId:DefinitionId;
+	public var definitionId(default, null):DefinitionId;
 
 	private final overrides:Map<String, Float>;
 
@@ -30,6 +30,10 @@ class InstanceElement extends Element {
 	public function setOverride(name:String, value:Float, ?unit:String):Void
 		document.setInstanceOverride(this, name, value, unit);
 
+	/** Give this instance its own editable definition while preserving its identity and placement. */
+	public function makeUnique(?definitionName:String):Definition
+		return document.makeInstanceUnique(this, definitionName);
+
 	public function removeOverride(name:String):Void
 		document.removeInstanceOverride(this, name);
 
@@ -39,4 +43,7 @@ class InstanceElement extends Element {
 		else
 			overrides.set(name, value);
 	}
+
+	public function restoreDefinitionId(value:DefinitionId):Void
+		definitionId = value;
 }

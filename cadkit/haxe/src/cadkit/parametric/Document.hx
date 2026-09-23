@@ -41,6 +41,7 @@ import cadkit.parametric.InstanceElement;
 import cadkit.parametric.DefinitionChanges.DefinitionDefaultChange;
 import cadkit.parametric.DefinitionChanges.InstanceOverrideChange;
 import cadkit.parametric.DefinitionChanges.DefinitionCreateChange;
+import cadkit.parametric.DefinitionChanges.InstanceDefinitionChange;
 
 /** Haxeon-owned parametric feature document. */
 class Document {
@@ -250,6 +251,63 @@ class Document {
 		var result = installInstance(name == null ? source.name + " copy" : name, newElementId(), source.definitionId, overrides);
 		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
 		return result;
+	}
+
+	/** Detach one instance from its shared definition without changing its element identity. */
+	public function makeInstanceUnique(instance:InstanceElement, ?definitionName:String):Definition {
+		validateOwnedElement(instance);
+		var source = definition(instance.definitionId);
+		var inputs:Array<DefinitionInput> = [];
+		for (input in source.inputs())
+			inputs.push(new DefinitionInput(input.name, input.kind, input.unit,
+				UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit)));
+		var outputs:Array<DefinitionOutput> = [];
+		for (output in source.outputs())
+			outputs.push(new DefinitionOutput(output.name, output.purpose));
+
+		var subgraph:Null<DefinitionSubgraph> = null;
+		var sourceSubgraph = source.subgraph;
+		if (sourceSubgraph != null) {
+			var inputBindings = new Map<String, String>();
+			for (input in source.inputs())
+				inputBindings.set(input.name, sourceSubgraph.parameterName(input.name));
+			var outputFeatures = new Map<String, Int>();
+			for (output in source.outputs())
+				outputFeatures.set(output.name, sourceSubgraph.featureId(output.name));
+			subgraph = new DefinitionSubgraph(sourceSubgraph.graph, inputBindings, outputFeatures);
+		}
+
+		var name = definitionName == null ? instance.name + " definition" : definitionName;
+		var unique = installDefinition(new DefinitionId(), name, source.recipe, inputs, outputs, subgraph);
+		var previousDefinition = instance.definitionId;
+		try {
+			restoreInstanceDefinition(instance, unique.id);
+		} catch (error:Dynamic) {
+			restoreDefinitionRemoval(unique);
+			throw error;
+		}
+		recordDocumentChange(new DefinitionCreateChange(this, unique, definitions.length - 1));
+		recordDocumentChange(new InstanceDefinitionChange(this, instance, previousDefinition, unique.id));
+		return unique;
+	}
+
+	/** Restore an instance's definition and published shape for undo/redo. */
+	public function restoreInstanceDefinition(instance:InstanceElement, definitionId:DefinitionId):Void {
+		validateOwnedElement(instance);
+		var nextDefinition = definition(definitionId);
+		nextDefinition.primaryGeometryOutput();
+		var previousDefinition = instance.definitionId;
+		if (previousDefinition.value == definitionId.value)
+			return;
+		instance.restoreDefinitionId(definitionId);
+		var nextShape:Shape;
+		try {
+			nextShape = resolveInstanceShape(instance);
+		} catch (error:Dynamic) {
+			instance.restoreDefinitionId(previousDefinition);
+			throw error;
+		}
+		instance.restoreDirectShape(nextShape);
 	}
 
 	private function instanceKey(instance:InstanceElement, output:String):String {
