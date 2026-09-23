@@ -130,7 +130,9 @@ def main():
                  "--output", str(output / "editor.hlpc"), str(port)],
                 cwd=APP, stdout=profile_log, stderr=subprocess.STDOUT)
             try:
-                deadline = time.monotonic() + (args.idle_seconds if args.idle_seconds is not None else 60)
+                run_timeout = (args.idle_seconds if args.idle_seconds is not None else
+                               args.seconds + 30 if args.seconds is not None else 60)
+                deadline = time.monotonic() + run_timeout
                 while process.poll() is None and time.monotonic() < deadline:
                     rss = rss_kb(process.pid)
                     if rss is not None:
