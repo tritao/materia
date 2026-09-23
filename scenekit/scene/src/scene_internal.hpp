@@ -20,7 +20,7 @@
 namespace nkscene {
 
 constexpr std::size_t published_node_page_capacity = 256;
-constexpr std::size_t published_direct_lookup_limit = 4096;
+constexpr std::size_t published_direct_lookup_limit = 16384;
 
 struct SnapshotMaterialization;
 

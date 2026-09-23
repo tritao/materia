@@ -3,7 +3,6 @@
 #include "scene_internal.hpp"
 
 #include <algorithm>
-#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -24,6 +23,13 @@ using nkscene::ChangeSet;
 using nkscene::RenderPlan;
 using nkscene::Scene;
 using nkscene::Transaction;
+
+void require(bool condition, const char *message) {
+    if (condition)
+        return;
+    std::fprintf(stderr, "benchmark check failed: %s\n", message);
+    std::exit(EXIT_FAILURE);
+}
 
 constexpr std::size_t node_count = 100'000;
 constexpr std::size_t transforms_per_frame = 5'000;
@@ -120,7 +126,7 @@ int main(int argc, char **argv) {
         create.add_create(node);
     }
     ChangeSet changes;
-    assert(scene->commit(create, changes) == NKS_OK);
+    require(scene->commit(create, changes) == NKS_OK, "create-node transaction failed");
     create.close();
 
     Transaction configure(scene);
@@ -129,12 +135,12 @@ int main(int argc, char **argv) {
         configure.add_material(nodes[index], materials[index % materials.size()]);
         configure.add_transform(nodes[index], transform_for(index, 0));
     }
-    assert(scene->commit(configure, changes) == NKS_OK);
+    require(scene->commit(configure, changes) == NKS_OK, "configure-node transaction failed");
     configure.close();
 
     const nkscene::SceneView view;
     auto plan = nkscene::compile(scene->snapshot(), view);
-    assert(plan.items().size() == node_count);
+    require(plan.items().size() == node_count, "initial render plan is missing nodes");
 
     const auto baseline_rss = resident_bytes();
     auto peak_rss = baseline_rss;
@@ -161,7 +167,7 @@ int main(int argc, char **argv) {
         transaction_build.add(start);
 
         start = Clock::now();
-        assert(scene->commit(move, changes) == NKS_OK);
+        require(scene->commit(move, changes) == NKS_OK, "frame transaction failed");
         move.close();
         commit_publish.add(start);
 
@@ -173,12 +179,12 @@ int main(int argc, char **argv) {
         start = Clock::now();
         const auto render_update = nkscene::update(plan, snapshot, changes, view);
         renderer_update.add(start);
-        assert(!render_update.plan_rebuilt);
+        require(!render_update.plan_rebuilt, "transform update rebuilt the render plan");
 
         if (frame % geometry_edit_interval == 0) {
             start = Clock::now();
             auto *resource = scene->geometry_store().find(geometry);
-            assert(resource);
+            require(resource != nullptr, "benchmark geometry resource disappeared");
             auto &payload = resource->edit_payload();
             const auto height = frame % (geometry_edit_interval * 2) == 0 ? 0.12f : 0.1f;
             for (auto &vertex : payload.vertices)
@@ -191,8 +197,10 @@ int main(int argc, char **argv) {
             start = Clock::now();
             const auto geometry_update = nkscene::refresh(plan, geometry_snapshot, view);
             geometry_renderer_refresh.add(start);
-            assert(!geometry_update.plan_rebuilt);
-            assert(geometry_update.updated_geometry_resources == 1);
+            require(!geometry_update.plan_rebuilt,
+                    "geometry edit rebuilt the render plan");
+            require(geometry_update.updated_geometry_resources == 1,
+                    "geometry edit did not update exactly one resource");
             ++geometry_edits;
         }
 
