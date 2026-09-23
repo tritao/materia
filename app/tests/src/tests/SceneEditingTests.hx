@@ -148,15 +148,17 @@ class SceneEditingTests {
       "save and reopen preserve the design pose instead of the simulation pose");
     reopened.dispose();
 
-    var displayed=new EditorScene(scene.records());displayed.setPresentationPose(
-      pose.id,pose.position,pose.rotation);displayed.select("tower");
+    var perspectiveView=scene.configureRenderView(new SceneView(),Transform.identity(),[pose]);
     var perspective=new PerspectiveCamera();perspective.frame(3.0,2.0,1.5,1.8,1.8,0.2,4.0/3.0);
-    check(EditorPerspectiveViewport.pickScene(displayed,perspective,800,600,400,300)=="tower",
+    var ray=perspective.screenRay(400,300,800,600);
+    check(scene.pickRayWithView(perspectiveView,ray.originX,ray.originY,ray.originZ,
+      ray.directionX,ray.directionY,ray.directionZ)=="tower",
       "perspective picking follows rotated simulation geometry and stable document IDs");
-    displayed.setVisible("tower",false);
-    check(EditorPerspectiveViewport.pickScene(displayed,perspective,800,600,400,300)=="scene",
+    scene.setVisible("tower",false);
+    check(scene.pickRayWithView(perspectiveView,ray.originX,ray.originY,ray.originZ,
+      ray.directionX,ray.directionY,ray.directionZ)=="scene",
       "simulation picking excludes hidden geometry");
-    displayed.dispose();scene.dispose();
+    scene.dispose();
   }
 
   static function editingLifecycle():Void {
