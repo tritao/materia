@@ -159,6 +159,7 @@ class DocumentCodec {
 				outputs: outputs
 			});
 		}
+		var output = document.outputFeatureOrNull();
 		return Json.stringify({
 			format: FORMAT,
 			version: VERSION,
@@ -167,7 +168,7 @@ class DocumentCodec {
 			parameters: encodedParameters,
 			definitions: encodedDefinitions,
 			elements: encodedElements,
-			output: document.outputFeature().id.toInt()
+			output: output == null ? null : output.id.toInt()
 		});
 	}
 
@@ -316,9 +317,8 @@ class DocumentCodec {
 			var rawOutput:Dynamic = Reflect.field(root, "output");
 			if (rawOutput != null)
 				document.setOutput(requiredFeature(document, integerValue(rawOutput, "output")));
-			var effectiveOutput = document.outputFeature();
 			if (version == 1) {
-				document.installElement("Model", effectiveOutput, new ElementId());
+				document.installElement("Model", document.outputFeature(), new ElementId());
 			} else {
 				var definitionRecords:Array<Dynamic> = cast requiredField(root, "definitions");
 				for (definitionRecord in definitionRecords) {

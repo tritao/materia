@@ -46,6 +46,26 @@ class ElementSmoke {
 		check(Math.abs(value - expected) < 1e-6 * Math.max(1, Math.abs(expected)), 'expected $expected, got $value');
 
 	public static function run():Void {
+		var emptyDocument = new Document();
+		var emptyReload = DocumentCodec.decode(DocumentCodec.encode(emptyDocument));
+		check(emptyReload.featureCount() == 0 && emptyReload.elementCount() == 0
+			&& emptyReload.outputFeatureOrNull() == null, "empty documents round-trip without a primary output");
+		emptyReload.close();
+		emptyDocument.close();
+
+		var datumOnlyDocument = new Document();
+		var datumOnlyRoot = datumOnlyDocument.createLevel("Root", 500);
+		var datumOnlyChild = datumOnlyDocument.createLevel("Upper", 750, 25,
+			new ElementReference(datumOnlyDocument.id, datumOnlyRoot.id));
+		datumOnlyDocument.createReferencePlane("Grid A", new Plane(new Vector(10, 0, 0), Vector.X(), Vector.Z()));
+		var datumOnlyReload = DocumentCodec.decode(DocumentCodec.encode(datumOnlyDocument));
+		check(datumOnlyReload.featureCount() == 0 && datumOnlyReload.elementCount() == 3
+			&& datumOnlyReload.elementAt(1).id.value == datumOnlyChild.id.value
+			&& datumOnlyReload.outputFeatureOrNull() == null, "datum-only documents round-trip without a primary output");
+		near(datumOnlyReload.levelElevation(new ElementReference(datumOnlyReload.id, datumOnlyReload.elementAt(1).id)), 1275);
+		datumOnlyReload.close();
+		datumOnlyDocument.close();
+
 		var document = new Document();
 		var box = document.add(new BoxFeature(10, 20, 30));
 		var first = document.createElement("First wall", box);

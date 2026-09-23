@@ -804,13 +804,20 @@ class Document {
 		selectedOutput = value;
 
 	/** Without an explicit selection, the last feature remains the primary output. */
-	public function outputFeature():Feature {
+	public function outputFeatureOrNull():Null<Feature> {
 		ensureOpen();
 		if (selectedOutput != null)
 			return selectedOutput;
 		if (features.length == 0)
-			throw new ParametricError("document has no output feature");
+			return null;
 		return features[features.length - 1];
+	}
+
+	public function outputFeature():Feature {
+		var result = outputFeatureOrNull();
+		if (result == null)
+			throw new ParametricError("document has no output feature");
+		return result;
 	}
 
 	/** Borrow the last successfully committed output. Recompute dirty edits explicitly. */
