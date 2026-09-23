@@ -915,6 +915,7 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 	 * is empty.
 	 */
 	extern fn nkui_text_layout_set_text(layout: nkui_resource, text: nullable<utf8>) -> nkui_result;
+	extern fn nkui_text_layout_set_color(layout: nkui_resource, color: nkui_color) -> nkui_result;
 	/**
 	 * Re-shapes an existing layout while retaining its native resource handle; null text is empty.
 	 */

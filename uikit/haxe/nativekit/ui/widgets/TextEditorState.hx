@@ -2,10 +2,14 @@ package nativekit.ui.widgets;
 
 import nativekit.ffi.NativeKitTypes.TextEditAction;
 import FontCollection;
+import Color;
+import LayoutMeasureConstraints;
+import LayoutMeasureResult;
+import LayoutMeasuredContent;
+import LayoutRenderableContent;
 import NativeKitEventValue.NativeKitTextEdit;
 import ParagraphStyle;
 import Rect;
-import TextLayout;
 import TextStyle;
 
 /** Persistent editable text, selection and IME composition state for one widget ID. */
@@ -27,11 +31,14 @@ class TextEditorState {
 	public var scrollOffsetY(default, null):Float;
 	public var focused:Bool;
 	public var draggingSelection:Bool;
-	public final layout:TextLayout;
+	public final layout:TextEditorLayout;
+	public final renderContent:LayoutRenderableContent;
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
 	/** Cached conversions between document code points, UTF-8 bytes and UTF-16 units. */
 	final offsets:TextOffsetMap;
+	final renderMeasurement:LayoutMeasuredContent;
+	var renderColor:Color;
 	var lastLayoutWidth:Float;
 	var lastLayoutText:String;
 	var lastPointerClickTime:Float;
@@ -70,7 +77,18 @@ class TextEditorState {
 		compositionEnd = -1;
 		focused = false;
 		draggingSelection = false;
-		layout = TextLayout.create(fonts, layoutText(), 1.0, this.textStyle, this.paragraphStyle);
+		layout = new TextEditorLayout(fonts, layoutText(), 1.0, this.textStyle,
+			this.paragraphStyle, offsets);
+		renderColor = Color.rgba(1.0, 1.0, 1.0, 1.0);
+		renderMeasurement = new LayoutMeasuredContent(function(constraints:LayoutMeasureConstraints) {
+			if (Math.isFinite(constraints.maxWidth) && constraints.maxWidth > 0.0)
+				updateLayout(constraints.maxWidth);
+			return layout.measureForConstraints(constraints);
+		});
+		renderContent = new LayoutRenderableContent(renderMeasurement, function(canvas, _) {
+			layout.paint(canvas, renderColor, scrollOffsetY,
+				viewportHeight > 0.0 ? scrollOffsetY + viewportHeight : 1.0e30);
+		});
 		lastLayoutWidth = 1.0;
 		lastLayoutText = layoutText();
 		lastPointerClickTime = -1.0;
@@ -107,7 +125,8 @@ class TextEditorState {
 		selectionFocusAffinity = 0;
 		resetVerticalNavigation();
 		clearComposition();
-		layout.setText(layoutText());
+		layout.setText(layoutText(), offsets);
+		renderMeasurement.invalidate();
 		lastLayoutText = layoutText();
 		return true;
 	}
@@ -117,7 +136,8 @@ class TextEditorState {
 		var nextWidth = Math.max(1.0, width);
 		var value = layoutText();
 		if (nextWidth != lastLayoutWidth || value != lastLayoutText) {
-			layout.update(value, nextWidth, textStyle, paragraphStyle);
+			layout.update(value, nextWidth, textStyle, paragraphStyle, offsets);
+			renderMeasurement.invalidate();
 			lastLayoutWidth = nextWidth;
 			lastLayoutText = value;
 		}
@@ -145,7 +165,8 @@ class TextEditorState {
 		paragraphStyle.alignment = nextParagraphStyle.alignment;
 		paragraphStyle.lineHeight = nextParagraphStyle.lineHeight;
 		paragraphStyle.direction = nextParagraphStyle.direction;
-		layout.update(layoutText(), Math.max(1.0, lastLayoutWidth), textStyle, paragraphStyle);
+		layout.update(layoutText(), Math.max(1.0, lastLayoutWidth), textStyle, paragraphStyle, offsets);
+		renderMeasurement.invalidate();
 		lastLayoutText = layoutText();
 		clampScrollOffset();
 		return true;
@@ -193,9 +214,13 @@ class TextEditorState {
 		var previousCompositionStart = compositionStart;
 		var previousCompositionEnd = compositionEnd;
 		if (textChanged) {
+			var oldDocumentLength = offsets.codepointCount;
 			cancelPointerClick();
 			text = offsets.replaceCodepointsIncremental(first, last, replacement, next);
-			layout.setText(layoutText());
+			var newEnd = first + TextOffsetMap.countCodepoints(replacement);
+			layout.setTextAfterEdit(layoutText(), offsets, first, last, first, newEnd,
+				oldDocumentLength);
+			renderMeasurement.invalidate();
 			lastLayoutText = layoutText();
 		}
 		setSelection(transaction.selectionStart, transaction.selectionEnd);
@@ -211,6 +236,17 @@ class TextEditorState {
 	public function documentOffsets():TextOffsetMap {
 		ensureLive();
 		return offsets;
+	}
+
+	public function setRenderColor(color:Color):Void {
+		ensureLive();
+		if (color == null)
+			return;
+		if (renderColor.red == color.red && renderColor.green == color.green &&
+			renderColor.blue == color.blue && renderColor.alpha == color.alpha)
+			return;
+		renderColor = color;
+		renderMeasurement.invalidate();
 	}
 
 	public function documentLength():Int {
@@ -444,6 +480,8 @@ class TextEditorState {
 		ensureLive();
 		if (!Math.isFinite(height) || height <= 0.0)
 			return false;
+		if (viewportHeight != height)
+			renderMeasurement.invalidate();
 		viewportHeight = height;
 		var metrics = layout.measure();
 		var contentHeight = Math.max(height, metrics.height);
@@ -475,6 +513,7 @@ class TextEditorState {
 		if (next == scrollOffsetY)
 			return false;
 		scrollOffsetY = next;
+		renderMeasurement.invalidate();
 		return true;
 	}
 
@@ -662,6 +701,7 @@ class TextEditorState {
 	public function dispose():Void {
 		if (disposed)
 			return;
+		renderContent.dispose();
 		layout.dispose();
 		disposed = true;
 	}
