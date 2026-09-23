@@ -612,6 +612,25 @@ int main(int argc, char **argv) {
     const auto *align_self_column_item = snapshot.find(748);
     if (!align_self_column_item || std::abs(align_self_column_item->bounds.x - 15.0f) > 0.01f)
         return 50;
+    // Clay keeps the preceding frame's IDs until the new frame ends. Replacing
+    // a dock panel must fit both ID sets even when each tree fits on its own.
+    LayoutEngine switched_engine(8);
+    for (uint32_t frame_index = 0; frame_index < 3; ++frame_index) {
+        std::vector<LayoutNode> switched_nodes;
+        auto switched_root = box(1000 + frame_index * 100, -1);
+        switched_root.style.width = {LayoutSizing::Fixed, 100.0f};
+        switched_root.style.height = {LayoutSizing::Fixed, 100.0f};
+        switched_nodes.push_back(switched_root);
+        for (uint32_t child = 0; child < 6; ++child) {
+            auto node = box(1001 + frame_index * 100 + child, 0);
+            node.style.width = {LayoutSizing::Fixed, 10.0f};
+            node.style.height = {LayoutSizing::Fixed, 10.0f};
+            switched_nodes.push_back(node);
+        }
+        if (!switched_engine.layout(switched_nodes, 100.0f, 100.0f, 1.0f / 60.0f,
+                                    snapshot, &error))
+            return 51 + frame_index;
+    }
     std::cout << "PASS: Clay layout boxes, text, transforms, and geometry\n";
     return 0;
 #endif

@@ -673,7 +673,11 @@ bool LayoutEngine::Impl::layout(const std::vector<LayoutNode> &nodes, float widt
         return false;
     }
     ++required_elements;
-    if (!state.reserve_elements(required_elements)) {
+    // Clay retains the previous frame's IDs until EndLayout prunes them. A tab
+    // switch can therefore need room for both trees during this submission.
+    if (required_elements >
+        (static_cast<std::size_t>(std::numeric_limits<int32_t>::max()) - 1) / 2 ||
+        !state.reserve_elements(required_elements * 2)) {
         if (error)
             error->message = "layout capacity could not grow for this submission";
         return false;

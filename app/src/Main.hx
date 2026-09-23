@@ -1109,21 +1109,27 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return new Text(label, null, appearance.heading, TextStyleOverride.text(11.0, 0.8));
   }
 
+  function runSceneEdit(label:String, action:Void->Bool):Void {
+    try {
+      action();
+      updateCommandContext();
+    } catch (error:Dynamic) {
+      var message = Reflect.field(error, "message");
+      log(label + ": " + (message == null ? Std.string(error) : Std.string(message)));
+    }
+    commands.refresh();
+  }
+
   function installCommands():Void {
     workspace.installCommands(commands, "workspace");
     commands.register(new Command("scene.create", "Add rectangle", function() {
-      scene.createRectangle();
-      updateCommandContext();
-      commands.refresh();
+      runSceneEdit("Could not add rectangle", function() scene.createRectangle());
     }, null, function() return canEditObjects() && scene.canCreate()));
     commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
-      scene.createMountingPlate();
-      updateCommandContext();
-      commands.refresh();
+      runSceneEdit("Could not add mounting plate", function() scene.createMountingPlate());
     }, null, function() return canEditObjects() && scene.canCreate()));
     commands.register(new Command("scene.add-face-hole", "Add hole on selected face", function() {
-      try {scene.addHoleOnSelectedFace();updateCommandContext();commands.refresh();}
-      catch(error:Dynamic)log("Could not add hole: "+Std.string(error));
+      runSceneEdit("Could not add hole", function() scene.addHoleOnSelectedFace());
     },null,function() return canEditObjects()&&scene.canAddHoleOnSelectedFace()));
     commands.register(new Command("scene.export-step", "Export STEP", function() {
       var chooser=files;
@@ -1140,25 +1146,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
       return !documents.blocked()&&files!=null&&selected!=null&&selected.kind=="cad-plate";
     }));
     commands.register(new Command("scene.duplicate", "Duplicate", function() {
-      scene.duplicateSelected();
-      updateCommandContext();
-      commands.refresh();
+      runSceneEdit("Could not duplicate object", function() scene.duplicateSelected());
     }, new Shortcut(68, UiModifier.Control), function() return canEditObjects()
       && scene.canCreate() && scene.object(scene.selectedId) != null));
     commands.register(new Command("scene.delete", "Delete", function() {
-      scene.deleteSelected();
-      updateCommandContext();
-      commands.refresh();
+      runSceneEdit("Could not delete object", function() scene.deleteSelected());
     }, null, function() return canEditObjects() && scene.object(scene.selectedId) != null));
     commands.register(new Command("editor.undo", "Undo", function() {
-      scene.document.undo();
-      updateCommandContext();
-      commands.refresh();
+      runSceneEdit("Could not undo", function() scene.document.undo());
     }, new Shortcut(UiKey.Z, UiModifier.Control), function() return canEditObjects() && scene.document.canUndo));
     commands.register(new Command("editor.redo", "Redo", function() {
-      scene.document.redo();
-      updateCommandContext();
-      commands.refresh();
+      runSceneEdit("Could not redo", function() scene.document.redo());
     }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return canEditObjects() && scene.document.canRedo));
     commands.register(new Command("editor.new", "New", function() documents.requestNew(),
       new Shortcut(78, UiModifier.Control), function() return !documents.blocked()));
