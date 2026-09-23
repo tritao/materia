@@ -6,6 +6,7 @@ import cadkit.modeling.Vector;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.ParameterKind;
+import cadkit.parametric.ParametricError;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.features.BooleanFeature;
@@ -117,13 +118,13 @@ class CadPlateModel {
   /** Adds a through hole on the selected top face. */
   public function addThroughHole(faceIndex:Int,xMetres:Float,yMetres:Float,diameterMetres:Float):Void {
     var face=faceFingerprint(faceIndex);
-    if(face.dz<0.98)throw "Select the plate's top planar face";
+    if(face.dz<0.98)throw new ParametricError("Select the plate's top planar face");
     var parameters=parameters();
     if(!Math.isFinite(diameterMetres)||diameterMetres<=0||
         !Math.isFinite(xMetres)||!Math.isFinite(yMetres)||
         Math.abs(xMetres)+diameterMetres/2>=parameters.width/2||
         Math.abs(yMetres)+diameterMetres/2>=parameters.height/2)
-      throw "Hole must fit inside the plate";
+      throw new ParametricError("Hole must fit inside the plate");
     var source=document.outputFeature();
     var top=new SelectionRecipe("face","plane",Vector.Z(),"max",Vector.Z(),1);
     var scale=1.0/CadSceneGeometry.METRES_PER_MILLIMETRE;

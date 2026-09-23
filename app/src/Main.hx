@@ -83,6 +83,7 @@ import nativekit.ui.widgets.TreeRootMetadata;
 import nativekit.ui.widgets.TreeView;
 import nativekit.ui.widgets.TreeViewModel;
 import FontCollection;
+import cadkit.parametric.ParametricError;
 import robotkit.world.RemoteRobot;
 import robotkit.world.RobotWorld;
 import nativekit.ui.lab.ComponentLab;
@@ -1113,9 +1114,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     try {
       action();
       updateCommandContext();
-    } catch (error:Dynamic) {
-      var message = Reflect.field(error, "message");
-      log(label + ": " + (message == null ? Std.string(error) : Std.string(message)));
+    } catch (error:ParametricError) {
+      log(label + ": " + error.message);
     }
     commands.refresh();
   }
@@ -1123,7 +1123,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function installCommands():Void {
     workspace.installCommands(commands, "workspace");
     commands.register(new Command("scene.create", "Add rectangle", function() {
-      runSceneEdit("Could not add rectangle", function() scene.createRectangle());
+      scene.createRectangle();
+      updateCommandContext();
+      commands.refresh();
     }, null, function() return canEditObjects() && scene.canCreate()));
     commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
       runSceneEdit("Could not add mounting plate", function() scene.createMountingPlate());
@@ -1150,7 +1152,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }, new Shortcut(68, UiModifier.Control), function() return canEditObjects()
       && scene.canCreate() && scene.object(scene.selectedId) != null));
     commands.register(new Command("scene.delete", "Delete", function() {
-      runSceneEdit("Could not delete object", function() scene.deleteSelected());
+      scene.deleteSelected();
+      updateCommandContext();
+      commands.refresh();
     }, null, function() return canEditObjects() && scene.object(scene.selectedId) != null));
     commands.register(new Command("editor.undo", "Undo", function() {
       runSceneEdit("Could not undo", function() scene.document.undo());

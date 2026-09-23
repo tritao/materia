@@ -5,6 +5,7 @@ import app.CadPlateModel.CadPlateParameters;
 import app.EditorScene;
 import app.PerspectiveCamera;
 import app.SceneDocumentSession;
+import cadkit.parametric.ParametricError;
 import nativekit.ui.core.PropertyBinding;
 import nativekit.ui.core.PropertyEditResult;
 import nativekit.ui.core.PropertyValue;
@@ -132,7 +133,9 @@ class CadPlateWorkflowTests {
       var originalGraph = object(scene, id).cadGraph;
       var undoCount = scene.document.history.undoCount;
       var rejected = false;
-      try scene.addHoleOnSelectedFace(0.2) catch (_:Dynamic) rejected = true;
+      try scene.addHoleOnSelectedFace(0.2) catch (error:ParametricError) {
+        rejected = error.message == "Hole must fit inside the plate";
+      }
       check(rejected && object(scene, id).cadGraph == originalGraph &&
         scene.document.history.undoCount == undoCount && scene.canAddHoleOnSelectedFace(),
         "invalid face hole preserves geometry, selection, and history");
