@@ -32,6 +32,7 @@ class DesktopUiHost {
 		var runtime:Null<UiHostRuntime> = null;
 		var session:Null<UiHostSession> = null;
 		var eventHistory:Array<String> = [];
+		var frameHistory:Array<Dynamic> = [];
 		var result = 0;
 
 		try {
@@ -89,6 +90,8 @@ class DesktopUiHost {
 				options.width, options.height);
 			runtime.start(function(_) return create(hostContext));
 			if (session.state == UiHostLifecycle.Failed) throw session.error;
+			if (runtime.app() != null)
+				runtime.app().context().onAnimationFrameRequested = scheduleFrame;
 			var borrowedSurface = NativeKitSurface.borrowNativeHandle(surface);
 			nativeSurface = borrowedSurface;
 
@@ -100,12 +103,15 @@ class DesktopUiHost {
 				switch (value) {
 					case WindowClose(source) if (source.rawValue() == window.rawValue()):
 						hostContext.requestClose();
+						scheduleFrame();
 					case WindowResize(source, width, height) if (source.rawValue() == window.rawValue()):
 						if (NativeKit.nk_surface_set_bounds(surface, 0, 0, width, height) != Result.Ok)
 							throw "Surface resize failed";
 						runtime.resize(width, height, runtime.framebufferWidth, runtime.framebufferHeight);
+						scheduleFrame();
 					case WindowScaleChanged(source, scale) if (source.rawValue() == window.rawValue()):
 						runtime.setScale(scale);
+						scheduleFrame();
 					case SurfaceReady(source) if (source.rawValue() == surface.rawValue()):
 						surfaceAvailable = true;
 						var size = NativeKit.nk_surface_get_framebuffer_size(surface);
@@ -123,14 +129,34 @@ class DesktopUiHost {
 									if (!active || !surfaceAvailable || !frameRequested) return;
 									frameRequested = false;
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
+									var frameStartedAt = Sys.time();
 									runtime.render(Sys.time());
+									if (options.captureDirectory != null) {
+										var metrics = runtime.app() == null ? null : runtime.app().context().frameMetrics;
+										frameHistory.push({
+											frame: runtime.rendered,
+											startedAtSeconds: frameStartedAt,
+											frameSeconds: Sys.time() - frameStartedAt,
+											submitSeconds: metrics == null ? null : metrics.submitSeconds,
+											viewSeconds: metrics == null ? null : metrics.viewSeconds,
+											treeAndStyleSeconds: metrics == null ? null : metrics.treeAndStyleSeconds,
+											nativeLayoutSeconds: metrics == null ? null : metrics.nativeLayoutSeconds,
+											reconcileSeconds: metrics == null ? null : metrics.reconcileSeconds,
+											renderSeconds: metrics == null ? null : metrics.renderSeconds,
+											customPaintSeconds: metrics == null ? null : metrics.customPaintSeconds,
+											nativeRenderSeconds: metrics == null ? null : metrics.nativeRenderSeconds,
+											nodeCount: metrics == null ? null : metrics.nodeCount
+										});
+									}
 									if (session.state == UiHostLifecycle.Failed) active = false;
 									if (options.captureDirectory != null && runtime.rendered >= options.frameLimit) {
-										writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime, eventHistory);
+										writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime, eventHistory, frameHistory);
 										session.stop();
 									}
-									if (active && session.state == UiHostLifecycle.Running) {
-										frameRequested = true;
+									var continueFrames = options.continuousFrames;
+									if (active && session.state == UiHostLifecycle.Running &&
+										(options.captureDirectory != null || runtime.app().context().needsAnimationFrame ||
+										(continueFrames != null && continueFrames()))) {
 										scheduleFrame();
 									}
 								} catch (error:Dynamic) {
@@ -140,13 +166,15 @@ class DesktopUiHost {
 							});
 						scheduleFrame();
 					case SurfaceResize(source, width, height, framebufferWidth, framebufferHeight)
-							if (source.rawValue() == surface.rawValue()):
+						if (source.rawValue() == surface.rawValue()):
 						runtime.resize(width, height, framebufferWidth, framebufferHeight);
+						scheduleFrame();
 					case SurfaceLost(source) if (source.rawValue() == surface.rawValue()):
 						surfaceAvailable = false;
 						framePending = false;
 						runtime.setSurfaceReady(false);
 					case _:
+						scheduleFrame();
 				}
 			});
 
@@ -221,7 +249,7 @@ class DesktopUiHost {
 
 	static function writeDiagnostics(options:DesktopUiHostOptions,
 			application:DesktopUiApplication, renderer:Renderer, state:UiHostRuntime,
-			events:Array<String>):Void {
+			events:Array<String>, frames:Array<Dynamic>):Void {
 		var directory:String = cast options.captureDirectory;
 		createDirectories(directory);
 		File.saveContent(directory + "/ui-tree.txt", application.context().dumpTree() + "\n");
@@ -258,6 +286,8 @@ class DesktopUiHost {
 			Json.stringify(frameData, null, "  ") + "\n");
 		File.saveContent(directory + "/events.jsonl",
 			[for (event in events) Json.stringify({event: event})].join("\n") + "\n");
+		File.saveContent(directory + "/frame-timeline.jsonl",
+			[for (frame in frames) Json.stringify(frame)].join("\n") + "\n");
 		var screenshot = directory + "/frame.png";
 		var screenshotResult = Sys.command("import", ["-window", options.title, screenshot]);
 		if (screenshotResult != 0)

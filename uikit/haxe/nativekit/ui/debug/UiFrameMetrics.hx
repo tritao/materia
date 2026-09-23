@@ -26,6 +26,12 @@ class UiFrameMetrics {
 	/** Nodes whose previous resolved geometry object was retained. */
 	public final resolvedGeometryReusedNodes:Int;
 	public final submitSeconds:Float;
+	public var viewSeconds(default, null):Float = 0.0;
+	public var treeAndStyleSeconds(default, null):Float = 0.0;
+	public var nativeLayoutSeconds(default, null):Float = 0.0;
+	public var reconcileSeconds(default, null):Float = 0.0;
+	public var customPaintSeconds(default, null):Float = 0.0;
+	public var nativeRenderSeconds(default, null):Float = 0.0;
 	public var paintedNodes(default, null):Int;
 	public var paintSkippedNodes(default, null):Int;
 	/** Paint-capable visible nodes skipped because either resolved axis was empty. */
@@ -81,6 +87,19 @@ class UiFrameMetrics {
 		this.emptyPaintNodes = emptyPaintNodes < 0 ? 0 : emptyPaintNodes;
 		renderSeconds = seconds < 0.0 ? 0.0 : seconds;
 		totalSeconds = submitSeconds + renderSeconds;
+	}
+
+	public function setSubmitPhases(view:Float, treeAndStyle:Float, nativeLayout:Float,
+			reconcile:Float):Void {
+		viewSeconds = view;
+		treeAndStyleSeconds = treeAndStyle;
+		nativeLayoutSeconds = nativeLayout;
+		reconcileSeconds = reconcile;
+	}
+
+	public function setRenderPhases(customPaint:Float, nativeRender:Float):Void {
+		customPaintSeconds = customPaint;
+		nativeRenderSeconds = nativeRender;
 	}
 
 	/** Marks a frame whose previously submitted tree and native layout were reused. */

@@ -133,6 +133,9 @@ class Main {
     host.height = diagnostics.windowHeight;
     host.captureDirectory = diagnostics.captureDirectory;
     host.frameLimit = diagnostics.frameLimit;
+    var activeEditor:Null<ReferenceEditorApp> = null;
+    host.continuousFrames = function() return activeEditor != null &&
+      (activeEditor.simulation.isRunning() || diagnostics.robotHost != null);
     return DesktopUiHost.run(host, function(context) {
       var activeTheme = Theme.light();
       if (diagnostics.darkTheme) activeTheme = Theme.dark();
@@ -146,6 +149,7 @@ class Main {
       }
       var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context,
         diagnostics.setupScript);
+      activeEditor = editor;
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");

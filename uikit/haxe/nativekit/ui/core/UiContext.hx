@@ -247,7 +247,9 @@ class UiContext {
 		}
 		buildContext.beginFrame();
 		diagnosticStage = 4;
+		var viewStartedAt = Sys.time();
 		var view = build();
+		var viewBuiltAt = Sys.time();
 		var next = buildContext.withScope(new nativekit.ui.core.Key("root"), function() return view == null ? null : view.build(buildContext));
 		if (next == null || next.parent != null)
 			throw "A view must produce one unparented render tree root";
@@ -269,6 +271,7 @@ class UiContext {
 					nativeLayoutReused = false;
 			});
 		var resolved:Array<ResolvedLayoutItem> = [];
+		var nativeLayoutStartedAt = Sys.time();
 		if (nativeLayoutReused) {
 			next.walk(function(node) {
 				var previous = previousById.get(node.id.value);
@@ -278,6 +281,7 @@ class UiContext {
 			});
 		} else
 			resolved = session.submit(next.layout, frame);
+		var nativeLayoutEndedAt = Sys.time();
 		diagnosticStage = 6;
 		var byId = new Map<Int, ResolvedLayoutItem>();
 		var nodesById = new Map<Int, RenderNode>();
@@ -360,6 +364,7 @@ class UiContext {
 			resolvedGeometryChangedNodes > 0 || focusChanged))
 			accessibilityBridge.update(next, focus.focusedId);
 		frameNumber++;
+		var submitEndedAt = Sys.time();
 		lastFrameMetrics = new UiFrameMetrics(frameNumber, nodeCount,
 			buildContext.styleResolver.resolutions - styleResolutionsBefore,
 			buildContext.styleResolver.cacheHits - styleCacheHitsBefore,
@@ -370,8 +375,11 @@ class UiContext {
 			styleInvalidation.textLayoutInvalidatedNodes, styleInvalidation.paintInvalidatedNodes,
 			styleInvalidation.compositeInvalidatedNodes, styleInvalidation.semanticsInvalidatedNodes,
 			styleInvalidation.hitGeometryInvalidatedNodes,
-				Sys.time() - submitStartedAt, !nativeLayoutReused, nativeLayoutReused,
+				submitEndedAt - submitStartedAt, !nativeLayoutReused, nativeLayoutReused,
 				resolvedGeometryChangedNodes, resolvedGeometryReusedNodes);
+		lastFrameMetrics.setSubmitPhases(viewBuiltAt - viewStartedAt,
+			nativeLayoutStartedAt - viewBuiltAt, nativeLayoutEndedAt - nativeLayoutStartedAt,
+			submitEndedAt - nativeLayoutEndedAt);
 		diagnosticStage = 0;
 		return next;
 	}
@@ -547,10 +555,15 @@ class UiContext {
 			customListHasCommands.remove(nodeId);
 		}
 		diagnosticStage = 24;
+		var nativeRenderStartedAt = Sys.time();
 		session.render(renderer, surface, frame);
-		if (lastFrameMetrics != null)
-			lastFrameMetrics.completeRender(Sys.time() - renderStartedAt, paintedNodes,
+		if (lastFrameMetrics != null) {
+			var renderEndedAt = Sys.time();
+			lastFrameMetrics.completeRender(renderEndedAt - renderStartedAt, paintedNodes,
 				paintSkippedNodes, emptyPaintNodes);
+			lastFrameMetrics.setRenderPhases(nativeRenderStartedAt - renderStartedAt,
+				renderEndedAt - nativeRenderStartedAt);
+		}
 		diagnosticStage = 0;
 	}
 

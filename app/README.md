@@ -223,6 +223,30 @@ from the app project directory. Native PNG capture currently uses ImageMagick's
 `import`; if it is unavailable or cannot access the desktop session, the other
 artifacts are still written along with `screenshot-error.txt`.
 
+`frame-timeline.jsonl` records the duration and UI submit/render timing for every
+captured frame.
+
+For a bounded HashLink CPU/allocation/GC capture with process RSS sampled at
+100 ms intervals, run from the repository root:
+
+```sh
+python3 app/tools/profile-editor.py --frames 240
+python3 app/tools/profile-editor.py --no-profile --frames 240
+python3 app/tools/profile-editor.py --no-profile --idle-seconds 10
+```
+
+The output directory contains `editor.hlpc`, `editor.perfetto.json`,
+`memory.jsonl`, `frame-timeline.jsonl`, `profiler.log`, and `launch.log`.
+Open `editor.hlpc` with `haxeon/.tools/hashlink/hlprof-live report` or view the
+Perfetto file as a timeline. Profiling adds frame overhead, so compare timings
+across profiled runs rather than treating them as normal frame rates. Pass editor
+options after `--`, for example `-- --perspective`.
+
+The idle mode stops its isolated editor process after the requested interval;
+it reports RSS and CPU changes over the final five seconds. Captured frames also
+record view, tree/style, native layout, reconciliation, custom paint, and native
+render durations.
+
 UIKit's reusable Component Lab can be opened through the same desktop host:
 
 ```sh

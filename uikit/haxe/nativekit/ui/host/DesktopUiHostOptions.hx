@@ -5,6 +5,8 @@ class DesktopUiHostOptions extends UiHostOptions {
 	public var targetFps:Float = 60.0;
 	public var captureDirectory:Null<String> = null;
 	public var frameLimit:Int = 0;
+	/** True while application state changes without input events, such as live simulation. */
+	public var continuousFrames:Null<Void->Bool> = null;
 	public var eventHistoryLimit:Int = 100;
 
 	public function new() super();
