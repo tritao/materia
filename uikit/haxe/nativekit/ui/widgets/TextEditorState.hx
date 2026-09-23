@@ -11,6 +11,8 @@ import NativeKitEventValue.NativeKitTextEdit;
 import ParagraphStyle;
 import Rect;
 import TextStyle;
+import nativekit.editorkit.TextDocument;
+import nativekit.editorkit.TextOffsetMap;
 
 /** Persistent editable text, selection and IME composition state for one widget ID. */
 class TextEditorState {
@@ -36,7 +38,7 @@ class TextEditorState {
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
 	/** Cached conversions between document code points, UTF-8 bytes and UTF-16 units. */
-	final offsets:TextOffsetMap;
+	final offsets:TextDocument;
 	final renderMeasurement:LayoutMeasuredContent;
 	var renderColor:Color;
 	var lastLayoutWidth:Float;
@@ -60,7 +62,7 @@ class TextEditorState {
 		if (fonts == null || fonts.isDisposed())
 			throw "Text editor requires a live font collection";
 		this.text = text == null ? "" : text;
-		offsets = new TextOffsetMap(this.text);
+		offsets = new TextDocument(this.text);
 		this.textStyle = copyTextStyle(textStyle == null ? new TextStyle() : textStyle);
 		this.paragraphStyle = copyParagraphStyle(paragraphStyle == null ? new ParagraphStyle() : paragraphStyle);
 		var end = offsets.codepointCount;
@@ -113,7 +115,7 @@ class TextEditorState {
 			return false;
 		cancelPointerClick();
 		text = next;
-		offsets.replaceCodepointsIncremental(0, offsets.codepointCount, next, next);
+		offsets.replace(0, offsets.codepointCount, next);
 		var caret = offsets.codepointCount;
 		selectionStart = caret;
 		selectionEnd = caret;
@@ -207,8 +209,7 @@ class TextEditorState {
 			last = swap;
 		}
 		var replacement = transaction.replacementText == null ? "" : transaction.replacementText;
-		var next = offsets.replaceCodepoints(first, last, replacement);
-		var textChanged = next != text;
+		var textChanged = offsets.sliceCodepoints(first, last) != replacement;
 		var previousStart = selectionStart;
 		var previousEnd = selectionEnd;
 		var previousCompositionStart = compositionStart;
@@ -216,7 +217,8 @@ class TextEditorState {
 		if (textChanged) {
 			var oldDocumentLength = offsets.codepointCount;
 			cancelPointerClick();
-			text = offsets.replaceCodepointsIncremental(first, last, replacement, next);
+			offsets.replace(first, last, replacement);
+			text = offsets.text;
 			var newEnd = first + TextOffsetMap.countCodepoints(replacement);
 			layout.setTextAfterEdit(layoutText(), offsets, first, last, first, newEnd,
 				oldDocumentLength);
@@ -233,7 +235,7 @@ class TextEditorState {
 			previousCompositionStart != compositionStart || previousCompositionEnd != compositionEnd;
 	}
 
-	public function documentOffsets():TextOffsetMap {
+	public function documentOffsets():TextDocument {
 		ensureLive();
 		return offsets;
 	}

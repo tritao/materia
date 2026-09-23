@@ -9,6 +9,7 @@ import ParagraphStyle;
 import Rect;
 import TextLayout;
 import TextStyle;
+import nativekit.editorkit.TextDocument;
 
 /** Retained layouts for bounded groups of paragraphs in one editor document. */
 class TextEditorLayout {
@@ -21,7 +22,7 @@ class TextEditorLayout {
 
 	final fonts:FontCollection;
 	var paragraphs:Array<TextEditorParagraphRecord>;
-	var offsets:TextOffsetMap;
+	var offsets:TextDocument;
 	var paragraphLineCount:Int;
 	var contentWidth:Float;
 	var contentHeight:Float;
@@ -30,7 +31,7 @@ class TextEditorLayout {
 	var disposed:Bool;
 
 	public function new(fonts:FontCollection, value:String, width:Float, textStyle:TextStyle,
-			paragraphStyle:ParagraphStyle, ?offsetMap:TextOffsetMap) {
+			paragraphStyle:ParagraphStyle, ?offsetMap:TextDocument) {
 		if (fonts == null || fonts.isDisposed())
 			throw "Editor layout requires a live font collection";
 		if (width <= 0.0 || textStyle == null || paragraphStyle == null)
@@ -52,10 +53,10 @@ class TextEditorLayout {
 	function get_paragraphCount():Int
 		return paragraphLineCount;
 
-	static function chunkCount(offsetMap:TextOffsetMap):Int
+	static function chunkCount(offsetMap:TextDocument):Int
 		return Std.int((offsetMap.paragraphCount() + paragraphsPerLayout - 1) / paragraphsPerLayout);
 
-	static function chunkRangeAt(offsetMap:TextOffsetMap, index:Int):TextRange {
+	static function chunkRangeAt(offsetMap:TextDocument, index:Int):TextRange {
 		var firstParagraph = index * paragraphsPerLayout;
 		var lastParagraph = Std.int(Math.min(offsetMap.paragraphCount() - 1,
 			firstParagraph + paragraphsPerLayout - 1));
@@ -65,14 +66,14 @@ class TextEditorLayout {
 
 	/** Updates only paragraph resources whose text or shaping inputs changed. */
 	public function update(value:String, nextWidth:Float, nextTextStyle:TextStyle,
-			nextParagraphStyle:ParagraphStyle, ?offsetMap:TextOffsetMap):Void {
+			nextParagraphStyle:ParagraphStyle, ?offsetMap:TextDocument):Void {
 		ensureLive();
 		if (nextWidth <= 0.0 || nextTextStyle == null || nextParagraphStyle == null)
 			throw "Editor layout update arguments are invalid";
 		var actualText = value == null ? "" : value;
-		var nextOffsets = offsetMap == null ? new TextOffsetMap(actualText) : offsetMap;
+		var nextOffsets = offsetMap == null ? new TextDocument(actualText) : offsetMap;
 		if (nextOffsets.text != actualText)
-			nextOffsets = new TextOffsetMap(actualText);
+			nextOffsets = new TextDocument(actualText);
 		var styleChanged = textStyle.font != nextTextStyle.font ||
 			textStyle.fontSize != nextTextStyle.fontSize ||
 			textStyle.letterSpacing != nextTextStyle.letterSpacing ||
@@ -151,7 +152,7 @@ class TextEditorLayout {
 		recomputeMetrics();
 	}
 
-	public function setText(value:String, ?offsetMap:TextOffsetMap):Void
+	public function setText(value:String, ?offsetMap:TextDocument):Void
 		update(value, width, textStyle, paragraphStyle, offsetMap);
 
 	/**
@@ -159,7 +160,7 @@ class TextEditorLayout {
 	 * records are carried by paragraph index, so a keystroke does not rebuild a
 	 * document-wide text-to-record lookup table or reslice every paragraph.
 	 */
-	public function setTextAfterEdit(value:String, nextOffsets:TextOffsetMap,
+	public function setTextAfterEdit(value:String, nextOffsets:TextDocument,
 			oldStart:Int, oldEnd:Int, newStart:Int, newEnd:Int,
 			oldDocumentLength:Int):Void {
 		ensureLive();
@@ -255,7 +256,7 @@ class TextEditorLayout {
 	}
 
 	/** Keeps chunks outside a newline edit and repartitions only its neighborhood. */
-	function setTextAfterParagraphEdit(value:String, nextOffsets:TextOffsetMap,
+	function setTextAfterParagraphEdit(value:String, nextOffsets:TextDocument,
 			oldStart:Int, oldEnd:Int, oldDocumentLength:Int):Void {
 		var previous = paragraphs;
 		var first = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);

@@ -54,3 +54,26 @@ evaluate. These measurements do not establish a need for tile rendering.
 
 The workload is synthetic ASCII text with one font. It does not measure GPU
 rasterization, long wrapped lines, syntax highlighting, or IME composition.
+
+## Segmented document follow-up (2026-09-24)
+
+The same full UI workload was rerun after moving editable text and its Unicode
+offset indexes into EditorKit segments. Each cell is the median of three runs.
+
+| Lines | Previous insert + frame | Segmented insert + frame | Segmented delete + frame | Segmented newline + frame | Segmented caret jump |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,000 | 5.9 ms | 3.8 ms | 3.7 ms | 5.4 ms | 0.21 ms |
+| 5,000 | 19.4 ms | 5.2 ms | 5.2 ms | 6.7 ms | 0.70 ms |
+| 10,000 | 36.6 ms | 7.2 ms | 7.3 ms | 9.3 ms | 1.30 ms |
+
+For the core workload, median middle insertion/deletion at 10,000 lines took
+5.7 ms each, compared with roughly 24 ms for a core edit before segmentation.
+The core newline insertion at the start took 8.1 ms, with the paragraph count
+advancing from 10,001 to 10,002 in each run.
+
+The new offset arrays are local to roughly 2 KiB newline-aligned segments.
+An edit rebuilds affected segments and an index of segment prefix lengths;
+it does not shift offsets for the whole document. Initial UI load stayed near
+1.27 s at 10,000 lines. `TextField.value` and `onChange(String)` still assemble
+a complete string for each edit, and a paragraph without newlines can still
+form one large segment. GPU presentation and IME behavior remain unmeasured.

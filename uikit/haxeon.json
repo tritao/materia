@@ -4,7 +4,8 @@
 	"sourceRoots": ["haxe", "bindings/haxe"],
 	"scopeSourceRoots": false,
 	"dependencies": {
-		"nativekit": { "path": "../nativekit" }
+		"nativekit": { "path": "../nativekit" },
+		"editorkit": { "path": "../editorkit" }
 	},
 	"ffi": {
 		"interfaces": ["bindings/nativekit-ui.hxi"],
