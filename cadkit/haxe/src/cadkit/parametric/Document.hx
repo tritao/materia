@@ -1085,14 +1085,14 @@ class Document {
 		if (activeTransaction == null || activeTransaction.identity != transaction.identity)
 			throw new ParametricError("transaction does not belong to this document");
 		activeTransaction = null;
+		for (index in 0...transaction.documentChanges.length) {
+			var reverse = transaction.documentChanges.length - index - 1;
+			transaction.documentChanges[reverse].undo();
+		}
 		for (index in 0...transaction.changes.length) {
 			var reverse = transaction.changes.length - index - 1;
 			var change = transaction.changes[reverse];
 			change.parameter.restore(change.oldValue);
-		}
-		for (index in 0...transaction.documentChanges.length) {
-			var reverse = transaction.documentChanges.length - index - 1;
-			transaction.documentChanges[reverse].undo();
 		}
 		discardCancelledFeatures(transaction.initialFeatureCount);
 	}

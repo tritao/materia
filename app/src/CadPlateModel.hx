@@ -1,6 +1,5 @@
 package app;
 
-import CadKit;
 import cadkit.Geometry;
 import cadkit.Shape;
 import cadkit.modeling.Vector;
@@ -10,8 +9,6 @@ import cadkit.parametric.ParameterKind;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;
-import cadkit.parametric.TopologyResolver;
-import cadkit.parametric.ReferenceState;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
 import cadkit.parametric.features.BoxFeature;
@@ -54,7 +51,7 @@ class CadPlateHoleEdit {
 }
 
 /** Typed application boundary around a CadKit mounting-plate feature graph. */
-class CadPlateModel {
+class CadPlateModel implements CadSessionModel {
   public static inline var WIDTH:String = "plate.width";
   public static inline var HEIGHT:String = "plate.height";
   public static inline var THICKNESS:String = "plate.thickness";
@@ -108,6 +105,21 @@ class CadPlateModel {
     holeY: document.parameter(HOLE_Y).valueIn("m")
   };
 
+  public function getDocument():Document return document;
+
+  public function sceneDimensions():CadModelDimensions {
+    var values=parameters();
+    return {width:values.width,height:values.height,depth:values.thickness};
+  }
+
+  public function setSceneDimensions(width:Float,height:Float,depth:Float):Void {
+    setMetreValues([
+      {name:WIDTH,value:width},
+      {name:HEIGHT,value:height},
+      {name:THICKNESS,value:depth}
+    ]);
+  }
+
   public function featureNames():Array<String> {
     var result:Array<String> = [];
     for (index in 0...document.featureCount())
@@ -126,17 +138,11 @@ class CadPlateModel {
   }
 
   public function faceFingerprint(index:Int):TopologyFingerprint {
-    var face=document.result().faces().at(index);
-    try {
-      var shape=face.cloneShape();
-      try { var result=TopologyFingerprint.capture(shape);shape.close();face.close();return result; }
-      catch(error:Dynamic) {shape.close();throw error;}
-    } catch(error:Dynamic) {face.close();throw error;}
+    return CadModelTopology.faceFingerprint(document.result(),index);
   }
 
   public function remapFace(fingerprint:TopologyFingerprint):Int {
-    var resolution=TopologyResolver.resolve(document.result(),fingerprint,CadKit.ShapeKind.Face);
-    return resolution.state==ReferenceState.Resolved?resolution.index:-1;
+    return CadModelTopology.remapFace(document.result(),fingerprint);
   }
 
   /** Adds a through hole on the selected top face. */

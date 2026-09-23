@@ -105,14 +105,16 @@ class SceneCodec {
       if (id == "scene" || ids.exists(id)) throw "Duplicate or reserved object ID: " + id;
       ids.set(id, true);
       var kind = stringField(value, "type");
-      if (kind != "rectangle" && kind != "cad-plate") throw "Unsupported scene object type: " + kind;
+      if (kind != "rectangle" && kind != "cad-plate" && kind != "cad-bracket")
+        throw "Unsupported scene object type: " + kind;
       var visible:Dynamic = field(value, "visible");
       if (!Std.isOfType(visible, Bool)) throw "Object visibility must be a boolean";
       var visibleValue:Bool = visible;
       var collisionEnabled = optionalBool(value, "collisionEnabled", visibleValue);
       var dynamicBody = optionalBool(value, "dynamicBody", false);
       var cadGraph = optionalText(value, "cadGraph");
-      if (kind == "cad-plate" && cadGraph != null && cadGraph.length > 10000000) throw "CAD feature graph is too large";
+      if ((kind == "cad-plate" || kind == "cad-bracket")
+          && cadGraph != null && cadGraph.length > 10000000) throw "CAD feature graph is too large";
       result.push({
         id: id,
         label: stringField(value, "label"),

@@ -244,7 +244,25 @@ class ConstrainedSketchSmoke {
 		document.recompute(); near(document.result().volume(), 200);
 		check(document.undo(), "dimensional replacement undo"); document.recompute();
 		check(feature.dimension("width").value == 12, "dimensional replacement restores its value");
+		var anchorBefore=feature.sketch().points()[0];
+		feature.replacePoint(new SketchPoint(anchorBefore.id,anchorBefore.x+2,anchorBefore.y+3));
+		document.recompute();
+		check(feature.sketch().points()[0].x==anchorBefore.x+2,"authored point replacement moves a constrained profile");
+		check(document.undo(),"authored point replacement undo");document.recompute();
+		check(feature.sketch().points()[0].x==anchorBefore.x,"authored point replacement restores its prior position");
+		check(document.redo(),"authored point replacement redo");document.recompute();
+		check(feature.sketch().points()[0].x==anchorBefore.x+2,"authored point replacement replays");
+		feature.replacePoint(anchorBefore);document.recompute();
 		width.set(10); document.recompute();
+		var cancelAnchor=feature.sketch().points()[0];
+		var cancelTransaction=document.beginTransaction();
+		width.set(13);
+		feature.replacePoint(new SketchPoint(cancelAnchor.id,cancelAnchor.x+4,cancelAnchor.y));
+		cancelTransaction.cancel();
+		check(width.value==10&&feature.dimension("width").value==10
+			&&feature.sketch().points()[0].x==cancelAnchor.x,
+			"cancel restores parameter bindings after authored sketch changes");
+		document.recompute();
 
 		var loaded=DocumentCodec.decode(DocumentCodec.encode(document));near(loaded.result().volume(),100);
 		loaded.parameter("width").set(14);loaded.recompute();near(loaded.result().volume(),140);

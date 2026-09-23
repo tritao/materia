@@ -63,6 +63,10 @@ class ConstrainedSketch {
 		replaceById(constraintValues, value.id, value, "constraint");
 	}
 
+	public function replacePoint(value:SketchPoint):Void {
+		replaceById(pointValues, value.id, value, "point");
+	}
+
 	public function replaceEntity(value:SketchEntity):Void {
 		replaceById(entityValues, value.id, value, "entity");
 	}

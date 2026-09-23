@@ -23,6 +23,7 @@ import nativekit.scene.PickResult;
 import cadkit.parametric.TopologyFingerprint;
 import app.CadPlateModel.CadPlateParameters;
 import app.CadPlateModel.CadPlateHoleEdit;
+import app.CadBracketModel;
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 class EditorScene {
@@ -90,8 +91,8 @@ class EditorScene {
     var session:Null<CadDocumentSession> = null;
     var storedCadGraph = cadGraph;
     var geometryData:GeometryData;
-    if (kind == "cad-plate") {
-      session = createCadSession(storedCadGraph, width, height, depth);
+    if (isCadKind(kind)) {
+      session = createCadSession(storedCadGraph, width, height, depth, kind);
       if (storedCadGraph == null)
         storedCadGraph = session.encode();
       geometryData = session.geometry();
@@ -163,10 +164,50 @@ class EditorScene {
     return changeObjects("Create mounting plate", data, id);
   }
 
+  public function createBracket():Bool {
+    if (!canCreate()) return false;
+    var data=records(),id=allocateId("bracket");
+    data.push({id:id,label:"L bracket",type:"cad-bracket",x:0.0,y:0.0,z:0.0,
+      width:0.06,height:0.04,depth:0.03,collisionEnabled:false,dynamicBody:false,mass:1.0,
+      red:0.64,green:0.66,blue:0.70,visible:true});
+    return changeObjects("Create L bracket",data,id);
+  }
+
   public function exportSelectedCad(path:String):Void {
     var item=requiredObject(selectedId);
-    if(item.kind!="cad-plate")throw "Select a CAD part to export";
+    if(!isCadKind(item.kind))throw "Select a CAD part to export";
     requireCadSession(item.id).model.exportStep(path);
+  }
+
+  public function setBracketHoleRadius(id:String,value:Float):Void {
+    if(requiredObject(id).kind!="cad-bracket")throw "Object is not a CAD bracket";
+    var model=cadBracketModel(id),before=model.holeRadius();
+    if(before==value)return;
+    applyCadEdit(id,"Edit bracket hole radius",function(session) {
+      var target:CadBracketModel=cast session.model;
+      target.setHoleRadius(value);
+    },function(session) {
+      var target:CadBracketModel=cast session.model;
+      target.setHoleRadius(before);
+    });
+  }
+
+  public function setBracketWallThickness(id:String,value:Float):Void {
+    if(requiredObject(id).kind!="cad-bracket")throw "Object is not a CAD bracket";
+    var model=cadBracketModel(id),before=model.wallThickness();
+    if(before==value)return;
+    applyCadEdit(id,"Edit bracket wall thickness",function(session) {
+      var target:CadBracketModel=cast session.model;
+      target.setWallThickness(value);
+    },function(session) {
+      var target:CadBracketModel=cast session.model;
+      target.setWallThickness(before);
+    });
+  }
+
+  public function isCadPart(id:String):Bool {
+    var item=object(id);
+    return item!=null&&isCadKind(item.kind);
   }
 
   public function canAddHoleOnSelectedFace():Bool {
@@ -179,11 +220,13 @@ class EditorScene {
     var id=selectedId,faceIndex=selectedCadFaceIndex,x=selectedCadFaceX,y=selectedCadFaceY;
     var edit:Null<CadPlateHoleEdit>=null;
     return applyCadEdit(id,"Add through hole",function(session) {
-      if(edit==null)edit=session.model.addThroughHole(faceIndex,x,y,diameter);
-      else session.model.setHoleEditActive(edit,true);
+      var model:CadPlateModel=cast session.model;
+      if(edit==null)edit=model.addThroughHole(faceIndex,x,y,diameter);
+      else model.setHoleEditActive(edit,true);
     },function(session) {
       if(edit==null)throw "CAD hole edit was not created";
-      session.model.setHoleEditActive(edit,false);
+      var model:CadPlateModel=cast session.model;
+      model.setHoleEditActive(edit,false);
     });
   }
 
@@ -193,7 +236,7 @@ class EditorScene {
     var source:SceneObjectData = null;
     for (item in data) if (item.id == selectedId) source = item;
     var id = allocateId();
-    var cadGraph = source.kind == "cad-plate" ? currentCadGraph(source.id) : source.cadGraph;
+    var cadGraph = isCadKind(source.kind) ? currentCadGraph(source.id) : source.cadGraph;
     data.push({id: id, label: source.label + " copy", type: source.type,
       x: Math.min(1000000, source.x + 0.25), y: Math.min(1000000, source.y + 0.25), z: source.z,
       width: source.width, height: source.height, red: source.red, green: source.green,
@@ -217,7 +260,7 @@ class EditorScene {
     var before = records();
     var afterIds:Map<String, Bool> = new Map();
     for (record in after) afterIds.set(record.id, true);
-    for (record in before) if (record.type == "cad-plate" && !afterIds.exists(record.id))
+    for (record in before) if (isCadKind(record.type) && !afterIds.exists(record.id))
       record.cadGraph = currentCadGraph(record.id);
     var previousSelection = selectedId;
     return document.apply(new EditOperation(label,
@@ -251,10 +294,10 @@ class EditorScene {
     var item = requiredObject(id);
     var session = requireCadSession(id);
     scene.setGeometryData(runtimeFor(id).geometry, session.geometry());
-    var values = session.model.parameters();
+    var values = session.model.sceneDimensions();
     item.width = values.width;
     item.height = values.height;
-    item.depth = values.thickness;
+    item.depth = values.depth;
     if (id == selectedId && selectedCadFaceFingerprint != null) {
       var prior = selectedCadFaceFingerprint;
       var priorIndex = selectedCadFaceIndex;
@@ -291,11 +334,11 @@ class EditorScene {
     try {
       for (record in data) {
         var item = current.get(record.id);
-        var session = item == null || item.kind != "cad-plate" || item.cadGraph != record.cadGraph
+        var session = item == null || !isCadKind(item.kind) || item.kind != record.type || item.cadGraph != record.cadGraph
           ? null : cadSessions.get(record.id);
         var storedGraph = record.cadGraph;
-        if (record.type == "cad-plate" && session == null) {
-          session = createCadSession(storedGraph, record.width, record.height, record.depth);
+        if (isCadKind(record.type) && session == null) {
+          session = createCadSession(storedGraph, record.width, record.height, record.depth, record.type);
           stagedCadSessions.push(session);
           storedGraph = session.encode();
         }
@@ -383,7 +426,7 @@ class EditorScene {
     selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
     if(previousFace!=null){
       var selected=object(selection);
-      if(selected!=null&&selected.kind=="cad-plate"){
+      if(selected!=null&&isCadKind(selected.kind)){
         var session=cadSessions.get(selected.id);
         if(session!=null)try {
           selectedCadFaceIndex=session.model.remapFace(previousFace);
@@ -512,7 +555,7 @@ class EditorScene {
 
   public function cadFeatureNames(id:String):Array<String> {
     var item=object(id);
-    if(item==null||item.kind!="cad-plate")return [];
+    if(item==null||!isCadKind(item.kind))return [];
     return requireCadSession(id).model.featureNames();
   }
 
@@ -529,7 +572,7 @@ class EditorScene {
     select(id);
     selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
     var item=object(id);
-    if(item!=null&&item.kind=="cad-plate"&&hit.subelement()>=0){
+    if(item!=null&&isCadKind(item.kind)&&hit.subelement()>=0){
       var session=requireCadSession(id);
       try {
         var index=hit.subelement();
@@ -638,20 +681,12 @@ class EditorScene {
       throw "Rectangle dimensions must be finite and positive";
     var target = object(id);
     if (target == null) throw "Unknown scene object: " + id;
-    if (target.kind == "cad-plate") {
-      var before = requireCadSession(id).model.parameters();
-      var after = [
-        {name:CadPlateModel.WIDTH, value:width},
-        {name:CadPlateModel.HEIGHT, value:height},
-        {name:CadPlateModel.THICKNESS, value:chosenDepth}
-      ];
-      var old = [
-        {name:CadPlateModel.WIDTH, value:before.width},
-        {name:CadPlateModel.HEIGHT, value:before.height},
-        {name:CadPlateModel.THICKNESS, value:before.thickness}
-      ];
-      applyCadEdit(id,"Edit CAD dimensions",function(session)session.model.setMetreValues(after),
-        function(session)session.model.setMetreValues(old));
+    if (isCadKind(target.kind)) {
+      var before = requireCadSession(id).model.sceneDimensions();
+      if(before.width==width&&before.height==height&&before.depth==chosenDepth)return;
+      applyCadEdit(id,"Edit CAD dimensions",
+        function(session)session.model.setSceneDimensions(width,height,chosenDepth),
+        function(session)session.model.setSceneDimensions(before.width,before.height,before.depth));
       return;
     }
     var data = records();
@@ -668,7 +703,7 @@ class EditorScene {
       throw "Hole position must be finite";
     var target = requiredObject(id);
     if (target.kind != "cad-plate") throw "Object is not a CAD plate";
-    var values=requireCadSession(id).model.parameters();
+    var values=cadPlateModel(id).parameters();
     var before:Float=switch(name) {
       case CadPlateModel.WIDTH:values.width;
       case CadPlateModel.HEIGHT:values.height;
@@ -680,8 +715,13 @@ class EditorScene {
     };
     var next=[{name:name,value:value}];
     var previous=[{name:name,value:before}];
-    applyCadEdit(id,"Edit CAD parameter",function(session)session.model.setMetreValues(next),
-      function(session)session.model.setMetreValues(previous));
+    applyCadEdit(id,"Edit CAD parameter",function(session) {
+      var model:CadPlateModel=cast session.model;
+      model.setMetreValues(next);
+    },function(session) {
+      var model:CadPlateModel=cast session.model;
+      model.setMetreValues(previous);
+    });
   }
 
   public function setColour(id:String, red:Float, green:Float, blue:Float):Void {
@@ -780,6 +820,11 @@ class EditorScene {
       result.push(cadProperty(id,CadPlateModel.HOLE_DIAMETER,"Hole diameter",false,prefix));
       result.push(cadProperty(id,CadPlateModel.HOLE_X,"Hole X",true,prefix));
       result.push(cadProperty(id,CadPlateModel.HOLE_Y,"Hole Y",true,prefix));
+    } else if (requiredObject(id).kind == "cad-bracket") {
+      result.push(bracketProperty(id,"wall","Wall thickness",function(model)return model.wallThickness(),
+        function(value)setBracketWallThickness(id,value),prefix));
+      result.push(bracketProperty(id,"hole-radius","Hole radius",function(model)return model.holeRadius(),
+        function(value)setBracketHoleRadius(id,value),prefix));
     }
     result.push(boolProperty(id,"collision","Collision",function(item)return item.collisionEnabled,
       "Physics",prefix));
@@ -833,13 +878,31 @@ class EditorScene {
       return null;
     };
     return new PropertyDescriptor(prefix+name,label,PropertyType.Float,function(_) {
-      var values=requireCadSession(id).model.parameters();
+      var values=cadPlateModel(id).parameters();
       return PropertyValue.Float(name==CadPlateModel.HOLE_DIAMETER?values.holeDiameter:
         name==CadPlateModel.HOLE_X?values.holeX:values.holeY);
     },function(_,value) {
       var number:Float=switch value {case Float(v):v;case Int(v):v;default:throw label+" requires a number";};
       setCadParameter(id,name,number);
     },options);
+  }
+
+  function bracketProperty(id:String,key:String,label:String,read:CadBracketModel->Float,
+      write:Float->Void,prefix:String):PropertyDescriptor {
+    var options=new PropertyDescriptorOptions();
+    options.category="Geometry";options.unit="m";options.step=0.001;
+    options.minimum=0.000001;options.maximum=1000000.0;
+    options.validator=function(_,value) {
+      var number:Null<Float> = switch value {case Float(v):v;case Int(v):v;default:null;};
+      return number==null||!Math.isFinite(number)||number<=0
+        ?"Dimension must be finite and positive":null;
+    };
+    return new PropertyDescriptor(prefix+key,label,PropertyType.Float,function(_) {
+      return PropertyValue.Float(read(cadBracketModel(id)));
+    },function(_,value) {
+        var number:Float=switch value {case Float(v):v;case Int(v):v;default:throw label+" requires a number";};
+        write(number);
+      },options);
   }
 
   function boolProperty(id:String,key:String,label:String,read:EditorSceneObject->Bool,
@@ -950,7 +1013,7 @@ class EditorScene {
   /** Save boundary: serialize each live authored CAD document only when requested. */
   public function recordsForSave():Array<SceneObjectData> {
     var result=records();
-    for(record in result)if(record.type=="cad-plate")
+    for(record in result)if(isCadKind(record.type))
       record.cadGraph=currentCadGraph(record.id);
     return result;
   }
@@ -962,7 +1025,7 @@ class EditorScene {
     return requireCadSession(id);
 
   public function cadParameters(id:String):CadPlateParameters
-    return requireCadSession(id).model.parameters();
+    return cadPlateModel(id).parameters();
 
   public function diagnosticState():Dynamic {
     var values:Array<Dynamic> = [];
@@ -985,22 +1048,31 @@ class EditorScene {
 
   function get_scene():Scene return bridge.scene;
 
-  function createCadSession(graph:Null<String>,width:Float,height:Float,depth:Float):CadDocumentSession {
-    var source=graph==null?defaultCadGraph(width,height,depth):graph;
-    var model=CadPlateModel.decode(source);
+  function createCadSession(graph:Null<String>,width:Float,height:Float,depth:Float,
+      kind:String="cad-plate"):CadDocumentSession {
+    var model:CadSessionModel;
+    if(kind=="cad-bracket")
+      model=graph==null?CadBracketModel.create(width,height,depth):CadBracketModel.decode(graph);
+    else
+      model=graph==null?CadPlateModel.create(width,height,depth,
+        Math.min(0.012,Math.min(width,height)*0.5)):CadPlateModel.decode(graph);
     try return new CadDocumentSession(model)
     catch(error:Dynamic){model.close();throw error;}
   }
+
+  function cadPlateModel(id:String):CadPlateModel
+    return cast requireCadSession(id).model;
+
+  function cadBracketModel(id:String):CadBracketModel
+    return cast requireCadSession(id).model;
+
+  static function isCadKind(kind:String):Bool
+    return kind=="cad-plate"||kind=="cad-bracket";
 
   function requireCadSession(id:String):CadDocumentSession {
     var result=cadSessions.get(id);
     if(result==null)throw "CAD document session is unavailable for: "+id;
     return result;
-  }
-
-  static function defaultCadGraph(width:Float,height:Float,depth:Float):String {
-    var model=CadPlateModel.create(width,height,depth,Math.min(0.012,Math.min(width,height)*0.5));
-    var graph=model.encode();model.close();return graph;
   }
 
 }

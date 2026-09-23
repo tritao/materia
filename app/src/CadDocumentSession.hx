@@ -1,12 +1,14 @@
 package app;
 
 import cadkit.Shape;
+import cadkit.parametric.Document;
 import cadkit.parametric.TopologyFingerprint;
 import nativekit.scene.GeometryData;
 
 /** Long-lived editor owner for one authored CadKit document and its published viewport result. */
 class CadDocumentSession {
-  public final model:CadPlateModel;
+  public final model:CadSessionModel;
+  public final document:Document;
   public var revision(default, null):Int = 0;
   public var diagnostics(default, null):Array<String> = [];
   public var selectedTopology:Null<TopologyFingerprint> = null;
@@ -16,10 +18,11 @@ class CadDocumentSession {
   var publishedGeometry:Null<GeometryData>;
   var closed:Bool = false;
 
-  public function new(model:CadPlateModel) {
+  public function new(model:CadSessionModel) {
     if (model == null)
       throw "CAD document sessions require a model";
     this.model = model;
+    document = model.getDocument();
     publishCurrent();
   }
 
@@ -51,16 +54,16 @@ class CadDocumentSession {
       edit(this);
       authored = true;
       publishCurrent();
-      model.document.clearHistory();
+      document.clearHistory();
       diagnostics = [];
     } catch (error:Dynamic) {
       diagnostics = [Std.string(error)];
-      if (authored && model.document.canUndo()) {
+      if (authored && document.canUndo()) {
         try {
-          model.document.undo();
-          model.document.recompute();
+          document.undo();
+          document.recompute();
           publishCurrent();
-          model.document.clearHistory();
+          document.clearHistory();
         } catch (_:Dynamic) {}
       }
       throw error;
@@ -82,7 +85,7 @@ class CadDocumentSession {
   }
 
   function publishCurrent():Void {
-    var source = model.document.result();
+    var source = document.result();
     var nextShape = source.cloneShape();
     var nextGeometry:GeometryData;
     try {

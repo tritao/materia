@@ -1048,9 +1048,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     inspector.enabled = ownership==null&&!simulation.isActive() && !viewportContent.dragging() &&
       (perspectiveViewport == null || !perspectiveViewport.dragging());
     var rows:Array<KeyedView> = [new KeyedView("heading",sectionHeading(selected.label))];
-    if(selected.kind=="cad-plate")rows.push(new KeyedView("face-selection",
+    if(scene.isCadPart(selected.id))rows.push(new KeyedView("face-selection",
       new Text(scene.selectedCadFaceIndex<0?"Click a CAD face to select it":
-        "Selected face "+(scene.selectedCadFaceIndex+1)+" · Add hole uses the picked location")));
+        selected.kind=="cad-plate"
+          ?"Selected face "+(scene.selectedCadFaceIndex+1)+" · Add hole uses the picked location"
+          :"Selected face "+(scene.selectedCadFaceIndex+1))));
     if(ownership!=null) {
       rows.push(new KeyedView("origin",textLines("script-object-origins",
         ["Script-owned"].concat(ownership.propertyOrigins(selected.id,["position","dimensions",
@@ -1150,13 +1152,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
       runSceneEdit("Could not add mounting plate", function() scene.createMountingPlate());
     }, null, function() return canEditObjects() && scene.canCreate()));
+    commands.register(new Command("scene.create-bracket", "Add L bracket", function() {
+      runSceneEdit("Could not add L bracket", function() scene.createBracket());
+    }, null, function() return canEditObjects() && scene.canCreate()));
     commands.register(new Command("scene.add-face-hole", "Add hole on selected face", function() {
       runSceneEdit("Could not add hole", function() scene.addHoleOnSelectedFace());
     },null,function() return canEditObjects()&&scene.canAddHoleOnSelectedFace()));
     commands.register(new Command("scene.export-step", "Export STEP", function() {
       var chooser=files;
       if(chooser==null)return;
-      chooser.chooseExport("Export selected CAD part","Mounting plate.step",function(path,error) {
+      chooser.chooseExport("Export selected CAD part","CAD part.step",function(path,error) {
         if(error!=null){log(error);return;}
         if(path==null)return;
         try { scene.exportSelectedCad(path); log("Exported STEP: "+path); }
@@ -1165,7 +1170,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       });
     },null,function() {
       var selected=scene.object(scene.selectedId);
-      return !documents.blocked()&&files!=null&&selected!=null&&selected.kind=="cad-plate";
+      return !documents.blocked()&&files!=null&&selected!=null&&scene.isCadPart(selected.id);
     }));
     commands.register(new Command("scene.duplicate", "Duplicate", function() {
       runSceneEdit("Could not duplicate object", function() scene.duplicateSelected());

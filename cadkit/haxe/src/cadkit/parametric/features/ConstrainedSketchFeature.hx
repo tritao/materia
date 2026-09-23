@@ -84,6 +84,10 @@ class ConstrainedSketchFeature extends Feature {
 		edit(function(sketch) sketch.replaceEntity(entity));
 	}
 
+	public function replacePoint(point:SketchPoint):Void {
+		edit(function(sketch) sketch.replacePoint(point));
+	}
+
 	public function replaceConstraint(constraint:SketchConstraint):Void {
 		edit(function(sketch) sketch.replaceConstraint(constraint));
 	}

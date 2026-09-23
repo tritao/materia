@@ -2,6 +2,7 @@ package tests;
 
 import app.CadPlateModel;
 import app.CadPlateModel.CadPlateParameters;
+import cadkit.parametric.features.ConstrainedSketchFeature;
 import app.EditorScene;
 import app.PerspectiveCamera;
 import app.SceneDocumentSession;
@@ -171,11 +172,83 @@ class CadPlateWorkflowTests {
     if (FileSystem.exists(sceneFile)) FileSystem.deleteFile(sceneFile);
   }
 
+  static function bracketWorkflow():Void {
+    var session=new SceneDocumentSession();
+    var root=Sys.getCwd()+"/../build-cad";
+    if(!FileSystem.exists(root))FileSystem.createDirectory(root);
+    var sceneFile=root+"/bracket-workflow.scene";
+    try {
+      var scene=session.scene;
+      check(scene.createBracket(),"create constrained L bracket");
+      var id=scene.selectedId;
+      var modelSession=scene.cadSession(id);
+      var expected=["constrained-sketch","extrude","constrained-sketch","pocket","fillet"];
+      var actual=scene.cadFeatureNames(id);
+      check(actual.length==expected.length,"bracket exposes its authored feature tree");
+      for(index in 0...expected.length)
+        check(actual[index]==expected[index],"bracket feature order includes sketch, extrusion, supported pocket, and fillet");
+      var profile:ConstrainedSketchFeature=cast modelSession.document.featureAt(0);
+      check(profile.solvedSketch()!=null&&profile.solvedSketch().diagnostic.degreesOfFreedom==0,
+        "bracket profile is fully constrained before solid construction");
+      var bracketModel:app.CadBracketModel=cast modelSession.model;
+      var retained=modelSession.copyPublishedShape();
+      var volume=retained.volume();
+      var initialRadius=bracketModel.holeRadius();
+      check(edit(scene,"Hole radius",0.002)==PropertyEditResult.Applied,
+        "inspector edits the bracket's supported hole sketch");
+      near(bracketModel.holeRadius(),0.002,"hole sketch radius edits the pocket feature");
+      check(scene.document.undo(),"undo bracket hole radius edit");
+      near(bracketModel.holeRadius(),initialRadius,"undo restores the bracket hole radius");
+      check(scene.document.redo(),"redo bracket hole radius edit");
+      near(bracketModel.holeRadius(),0.002,"redo restores the edited bracket hole radius");
+      check(edit(scene,"Wall thickness",0.007)==PropertyEditResult.Applied,
+        "inspector edits the bracket's constrained wall dimension");
+      near(bracketModel.wallThickness(),0.007,"wall edit updates both constrained profile dimensions");
+      near(bracketModel.holeRadius(),0.00175,"wall edit keeps the supported hole inside the upright");
+      check(scene.document.undo(),"undo bracket wall thickness edit");
+      near(bracketModel.wallThickness(),0.006,"undo restores bracket wall thickness");
+      near(bracketModel.holeRadius(),0.002,"undo restores the previous hole radius with the wall");
+      check(scene.document.redo(),"redo bracket wall thickness edit");
+      near(bracketModel.wallThickness(),0.007,"redo restores bracket wall thickness");
+      scene.setDimensions(id,0.07,0.045,0.035);
+      near(modelSession.model.sceneDimensions().width,0.07,"upstream width edit recomputes the bracket");
+      check(modelSession.revision>1&&retained.volume()==volume,
+        "recompute publishes a new bracket result while retained geometry remains valid");
+      var failed=false,revision=modelSession.revision,undoCount=scene.document.history.undoCount;
+      try scene.setDimensions(id,0.01,0.045,0.035) catch(_:ParametricError) failed=true;
+      check(failed&&modelSession.revision==revision&&scene.document.history.undoCount==undoCount,
+        "an invalid bracket edit preserves its published result and project history");
+      retained.close();
+      check(scene.document.undo(),"undo bracket dimension edit");
+      near(modelSession.model.sceneDimensions().width,0.06,"undo restores the authored bracket dimension");
+      check(scene.document.redo(),"redo bracket dimension edit");
+      near(modelSession.model.sceneDimensions().width,0.07,"redo reapplies the bracket dimension");
+      session.save(sceneFile);
+      session.open(sceneFile);
+      scene=session.scene;
+      scene.select(id);
+      check(scene.cadFeatureNames(id).length==expected.length,
+        "save and reopen preserve the complete bracket feature graph");
+      near(scene.cadSession(id).model.sceneDimensions().height,0.045,
+        "save and reopen preserve upstream sketch dimensions");
+      var reopenedBracket:app.CadBracketModel=cast scene.cadSession(id).model;
+      near(reopenedBracket.wallThickness(),0.007,"save and reopen preserve bracket feature parameters");
+      near(reopenedBracket.holeRadius(),0.00175,"save and reopen preserve the supported pocket dimension");
+    } catch(error:Dynamic) {
+      session.dispose();
+      if(FileSystem.exists(sceneFile))FileSystem.deleteFile(sceneFile);
+      throw error;
+    }
+    session.dispose();
+    if(FileSystem.exists(sceneFile))FileSystem.deleteFile(sceneFile);
+  }
+
   static function main():Int {
     try {
       run();
       faceHoleWorkflow();
-      Sys.println("CAD plate workflow tests passed");
+      bracketWorkflow();
+      Sys.println("CAD part workflow tests passed");
       return 0;
     } catch (error:Dynamic) {
       Sys.println("CAD plate workflow tests failed: " + Std.string(error));

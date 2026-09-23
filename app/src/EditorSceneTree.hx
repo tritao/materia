@@ -19,7 +19,7 @@ class EditorSceneTree implements TreeViewModel {
   public function initiallyExpanded(key:String):Bool {
     if(key=="scene")return true;
     var item=scene.object(key);
-    return item!=null&&item.kind=="cad-plate";
+    return item!=null&&scene.isCadPart(item.id);
   }
   public function estimatedExtent():Float return 28.0;
   public function extentIsUniform():Bool return true;
