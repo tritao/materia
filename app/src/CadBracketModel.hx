@@ -28,6 +28,8 @@ class CadBracketModel implements CadSessionModel {
   public static inline var HOLE_RADIUS:String = "bracket.hole-radius";
 
   public final document:Document;
+  var lastTessellationSeconds:Float = 0;
+  var lastGeometryConversionSeconds:Float = 0;
   final anchorX:Float;
   final anchorZ:Float;
   final holeSketch:ConstrainedSketchFeature;
@@ -213,9 +215,29 @@ class CadBracketModel implements CadSessionModel {
   }
 
   public function geometryFor(source:Shape):GeometryData {
-    var mesh = source.tessellate(0.1, 0.35);
-    return CadSceneGeometry.fromMesh(mesh);
+    var tessellationStarted = haxe.Timer.stamp();
+    var mesh:cadkit.Mesh;
+    try {
+      mesh = source.tessellate(0.1, 0.35);
+      lastTessellationSeconds = haxe.Timer.stamp() - tessellationStarted;
+    } catch (error:Dynamic) {
+      lastTessellationSeconds = haxe.Timer.stamp() - tessellationStarted;
+      throw error;
+    }
+    var conversionStarted = haxe.Timer.stamp();
+    try {
+      var result = CadSceneGeometry.fromMesh(mesh);
+      lastGeometryConversionSeconds = haxe.Timer.stamp() - conversionStarted;
+      return result;
+    } catch (error:Dynamic) {
+      lastGeometryConversionSeconds = haxe.Timer.stamp() - conversionStarted;
+      throw error;
+    }
   }
+
+  public function tessellationSeconds():Float return lastTessellationSeconds;
+
+  public function geometryConversionSeconds():Float return lastGeometryConversionSeconds;
 
   public function exportStep(path:String):Void document.result().exportStep(path);
 

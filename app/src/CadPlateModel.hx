@@ -60,6 +60,8 @@ class CadPlateModel implements CadSessionModel {
   public static inline var HOLE_Y:String = "hole.offsety";
 
   public final document:Document;
+  var lastTessellationSeconds:Float = 0;
+  var lastGeometryConversionSeconds:Float = 0;
 
   function new(document:Document) this.document = document;
 
@@ -227,15 +229,32 @@ class CadPlateModel implements CadSessionModel {
     var values = parameters();
     var centred = source.translate(Geometry.vec3(
       -values.width * 500.0, -values.height * 500.0, -values.thickness * 500.0));
+    var tessellationStarted = haxe.Timer.stamp();
+    var mesh:cadkit.Mesh;
     try {
-      var result = CadSceneGeometry.fromMesh(centred.tessellate(0.1, 0.35));
+      mesh=centred.tessellate(0.1, 0.35);
+      lastTessellationSeconds = haxe.Timer.stamp() - tessellationStarted;
+    } catch (error:Dynamic) {
+      lastTessellationSeconds = haxe.Timer.stamp() - tessellationStarted;
+      centred.close();
+      throw error;
+    }
+    var conversionStarted = haxe.Timer.stamp();
+    try {
+      var result = CadSceneGeometry.fromMesh(mesh);
+      lastGeometryConversionSeconds = haxe.Timer.stamp() - conversionStarted;
       centred.close();
       return result;
     } catch (error:Dynamic) {
+      lastGeometryConversionSeconds = haxe.Timer.stamp() - conversionStarted;
       centred.close();
       throw error;
     }
   }
+
+  public function tessellationSeconds():Float return lastTessellationSeconds;
+
+  public function geometryConversionSeconds():Float return lastGeometryConversionSeconds;
 
   public function exportStep(path:String):Void {
     var values = parameters();

@@ -18,7 +18,8 @@
     "cad_vec3": "Vec3",
     "cad_bounds": "Bounds",
     "cad_mesh_options": "MeshOptions",
-    "cad_mesh_face_range": "MeshFaceRange"
+    "cad_mesh_face_range": "MeshFaceRange",
+    "cad_resource_counts": "ResourceCounts"
   },
   "enumValueNames": {
     "cad_shape_kind": {

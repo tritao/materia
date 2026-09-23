@@ -11,6 +11,8 @@ interface CadSessionModel {
   public function encode():String;
   public function close():Void;
   public function geometryFor(source:Shape):GeometryData;
+  public function tessellationSeconds():Float;
+  public function geometryConversionSeconds():Float;
   public function sceneDimensions():CadModelDimensions;
   public function setSceneDimensions(width:Float, height:Float, depth:Float):Void;
   public function featureNames():Array<String>;

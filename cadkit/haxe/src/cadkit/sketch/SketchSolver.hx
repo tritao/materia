@@ -1,5 +1,7 @@
 package cadkit.sketch;
 
+import cadkit.parametric.EvaluationCancelled;
+
 private typedef ResidualSet = { values:Array<Float>, owners:Array<String> };
 
 /** Deterministic damped nonlinear least-squares solver implemented entirely in Haxeon. */
@@ -10,15 +12,17 @@ class SketchSolver {
 	private final points:Map<String, SketchPoint>;
 	private final entities:Map<String, SketchEntity>;
 	private final seed:Null<SolvedSketch>;
+	private final cancellationCheck:Null<Void->Bool>;
 	private final tangentBranches:Map<String, Bool>;
 	private final tangentSides:Map<String, Float>;
 	private var variableCount:Int;
 	private var solveTolerance:Float;
 	private var normalizationScale:Float;
 
-	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>) {
+	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>) {
 		this.sketch = sketch; pointIndex = new Map(); radiusIndex = new Map(); points = new Map(); entities = new Map();
 		this.seed = seed;
+		this.cancellationCheck = cancellationCheck;
 		tangentBranches = new Map();
 		tangentSides = new Map();
 		variableCount = 0;
@@ -31,14 +35,21 @@ class SketchSolver {
 		}
 	}
 
-	public static function solve(sketch:ConstrainedSketch, seed:Null<SolvedSketch> = null):SolvedSketch {
-		return new SketchSolver(sketch, seed).run();
+	public static function solve(sketch:ConstrainedSketch, seed:Null<SolvedSketch> = null,
+		cancellationCheck:Null<Void->Bool> = null):SolvedSketch {
+		return new SketchSolver(sketch, seed, cancellationCheck).run();
+	}
+
+	private function checkCancelled():Void {
+		if (cancellationCheck != null && cancellationCheck())
+			throw new EvaluationCancelled();
 	}
 
 	private function invalid(message:String, ids:Array<String>):SketchSolveError
 		return new SketchSolveError(new SolveDiagnostic("invalid", false, 1e300, variableCount, 0, ids, message));
 
 	private function run():SolvedSketch {
+		checkCancelled();
 		validate();
 		var x:Array<Float> = [];
 		for (point in sketch.points()) {
@@ -57,6 +68,7 @@ class SketchSolver {
 		var currentNorm = norm(current.values);
 		var iterations = 0;
 		while (iterations < sketch.settings.maxIterations && currentNorm > solveTolerance) {
+			checkCancelled();
 			iterations++;
 			var j = jacobian(x, current.values);
 			var normal = matrix(variableCount, variableCount, 0);
@@ -74,6 +86,7 @@ class SketchSolver {
 			if (trialNorm < currentNorm) { x = trial; current = trialSet; currentNorm = trialNorm; damping = Math.max(1e-12, damping * 0.3); }
 			else damping = Math.min(1e12, damping * 10);
 		}
+		checkCancelled();
 		var j = jacobian(x, current.values);
 		var rankValue = rank(j, sketch.settings.rankTolerance);
 		var dof = variableCount - rankValue;
@@ -94,6 +107,7 @@ class SketchSolver {
 		var ids = redundant.length > 0 ? redundant : [];
 		var diagnostic = new SolveDiagnostic(status, true, currentNorm, dof, iterations, ids,
 			status == "redundant" ? "solution converged with locally redundant constraints" : "solution converged");
+		checkCancelled();
 		var coordinates:Map<String, Array<Float>> = new Map();
 		for (point in sketch.points()) { var i:Int = cast pointIndex.get(point.id); coordinates.set(point.id, [x[i], x[i + 1]]); }
 		var radii:Map<String, Float> = new Map();

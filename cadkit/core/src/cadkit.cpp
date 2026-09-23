@@ -2752,6 +2752,36 @@ extern "C" CADKIT_API cad_result cad_mesh_face_range_count(
     });
 }
 
+extern "C" CADKIT_API cad_result cad_resource_counts_get(cad_resource_counts* out_counts) {
+    clear_error();
+    if (out_counts == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_counts must not be null");
+    }
+    *out_counts = {};
+    {
+        std::lock_guard lock(g_shapes_mutex);
+        out_counts->shape_count = static_cast<std::uint32_t>(std::count_if(
+            g_shapes.begin(), g_shapes.end(), [](const ShapeEntry& entry) {
+                return entry.shape.has_value();
+            }));
+    }
+    {
+        std::lock_guard lock(g_meshes_mutex);
+        out_counts->mesh_count = static_cast<std::uint32_t>(std::count_if(
+            g_meshes.begin(), g_meshes.end(), [](const MeshEntry& entry) {
+                return entry.mesh.has_value();
+            }));
+    }
+    {
+        std::lock_guard lock(g_operations_mutex);
+        out_counts->operation_count = static_cast<std::uint32_t>(std::count_if(
+            g_operations.begin(), g_operations.end(), [](const OperationEntry& entry) {
+                return entry.operation.has_value();
+            }));
+    }
+    return CAD_OK;
+}
+
 extern "C" CADKIT_API cad_result cad_mesh_face_range_at(
     cad_mesh mesh,
     std::uint32_t index,

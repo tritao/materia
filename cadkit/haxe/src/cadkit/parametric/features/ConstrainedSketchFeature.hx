@@ -28,6 +28,8 @@ class ConstrainedSketchFeature extends Feature {
 	private final retiredDimensionKinds:Map<String, String>;
 	public var lastDiagnostic(default,null):Null<SolveDiagnostic>;
 	public var lastAttemptDiagnostic(default,null):Null<SolveDiagnostic>;
+	public var lastSolveSeconds(default,null):Float;
+	public var lastProfileBuildSeconds(default,null):Float;
 	private var committedSolution:Null<SolvedSketch>;
 	private var pendingSolution:Null<SolvedSketch>;
 	public final support:Null<Feature>;
@@ -46,6 +48,8 @@ class ConstrainedSketchFeature extends Feature {
 		retiredDimensionKinds = new Map();
 		lastDiagnostic = null;
 		lastAttemptDiagnostic = null;
+		lastSolveSeconds = 0;
+		lastProfileBuildSeconds = 0;
 		committedSolution = null;
 		pendingSolution = null;
 		this.support = support;
@@ -284,14 +288,34 @@ class ConstrainedSketchFeature extends Feature {
 				constraint.third, value));
 		}
 		var solved:SolvedSketch;
+		var solveStarted = haxe.Timer.stamp();
 		try {
-			solved = candidate.solve(committedSolution);
-		} catch (error:SketchSolveError) {
-			lastAttemptDiagnostic = error.diagnostic;
+			solved = candidate.solve(committedSolution, function() return context.isCancelled());
+		} catch (error:Dynamic) {
+			lastSolveSeconds = haxe.Timer.stamp() - solveStarted;
+			context.recordSketchSolve(lastSolveSeconds);
+			if (Std.isOfType(error, SketchSolveError)) {
+				var solveError:SketchSolveError = cast error;
+				lastAttemptDiagnostic = solveError.diagnostic;
+			}
 			throw error;
 		}
-		var profile = SketchProfile.build(candidate, solved);
+		lastSolveSeconds = haxe.Timer.stamp() - solveStarted;
+		context.recordSketchSolve(lastSolveSeconds);
+		context.checkCancelled();
+		var profileStarted = haxe.Timer.stamp();
+		var profile:cadkit.modeling.Sketch;
 		try {
+			profile = SketchProfile.build(candidate, solved);
+		} catch (error:Dynamic) {
+			lastProfileBuildSeconds = haxe.Timer.stamp() - profileStarted;
+			context.recordSketchProfile(lastProfileBuildSeconds);
+			throw error;
+		}
+		lastProfileBuildSeconds = haxe.Timer.stamp() - profileStarted;
+		context.recordSketchProfile(lastProfileBuildSeconds);
+		try {
+			context.checkCancelled();
 			var result = EvaluationResult.fromShape(profile.shape.cloneShape());
 			profile.close();
 			pendingSolution = solved;

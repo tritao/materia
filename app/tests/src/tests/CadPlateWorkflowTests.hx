@@ -1,11 +1,13 @@
 package tests;
 
+import CadKit;
 import app.CadPlateModel;
 import app.CadPlateModel.CadPlateParameters;
 import cadkit.parametric.features.ConstrainedSketchFeature;
 import app.EditorScene;
 import app.PerspectiveCamera;
 import app.SceneDocumentSession;
+import cadkit.parametric.EvaluationCancelled;
 import cadkit.parametric.ParametricError;
 import nativekit.ui.core.PropertyBinding;
 import nativekit.ui.core.PropertyEditResult;
@@ -182,6 +184,16 @@ class CadPlateWorkflowTests {
       check(scene.createBracket(),"create constrained L bracket");
       var id=scene.selectedId;
       var modelSession=scene.cadSession(id);
+      var metrics=modelSession.performanceMetrics();
+      check(metrics.recomputeAttempts>0&&metrics.evaluatedFeatures>0&&metrics.sketchSolveCount>=2,
+        "published bracket metrics include feature and sketch work");
+      check(metrics.recomputeSeconds>=0&&metrics.sketchSolveSeconds>=0&&
+        metrics.sketchProfileSeconds>=0&&metrics.tessellationSeconds>=0&&
+        metrics.geometryConversionSeconds>=0&&metrics.publicationSeconds>=0,
+        "bracket metrics separate recompute, solve, tessellation, conversion, and publication time");
+      check(metrics.nativeShapeHandles>=0&&metrics.nativeMeshHandles>=0&&
+        metrics.nativeOperationHandles>=0,
+        "native live-handle diagnostics are available for editing-session memory checks");
       var expected=["constrained-sketch","extrude","constrained-sketch","pocket","fillet"];
       var actual=scene.cadFeatureNames(id);
       check(actual.length==expected.length,"bracket exposes its authored feature tree");
@@ -243,11 +255,61 @@ class CadPlateWorkflowTests {
     if(FileSystem.exists(sceneFile))FileSystem.deleteFile(sceneFile);
   }
 
+  static function latestOnlyPublication():Void {
+    var resourcesBefore=CadKit.resourceCountsGetChecked();
+    var session=new SceneDocumentSession();
+    try {
+      var scene=session.scene;
+      check(scene.createBracket(),"create bracket for cancellation checks");
+      var cadSession=scene.cadSession(scene.selectedId);
+      var dimensions=cadSession.model.sceneDimensions();
+      var revision=cadSession.revision;
+      var published=cadSession.copyPublishedShape();
+      var volume=published.volume();
+
+      var olderPreview=cadSession.beginPreview();
+      var newerPreview=cadSession.beginPreview();
+      check(!cadSession.publishPreview(olderPreview,published),
+        "superseded preview tickets cannot publish");
+      check(cadSession.publishPreview(newerPreview,published)&&cadSession.previewResult!=null,
+        "current preview tickets publish an owned snapshot");
+      cadSession.cancelPreview(olderPreview);
+      check(cadSession.previewResult!=null,"cancelling an old preview preserves the current preview");
+      cadSession.cancelPreview(newerPreview);
+      check(cadSession.previewResult==null,"cancelling the current preview releases its snapshot");
+
+      cadSession.document.afterRecompute=function()cadSession.cancelPendingEvaluation();
+      var cancelled=false;
+      try cadSession.perform(function(active) {
+        active.model.setSceneDimensions(dimensions.width+0.005,dimensions.height,dimensions.depth);
+      }) catch(error:EvaluationCancelled) cancelled=true;
+      cadSession.document.afterRecompute=null;
+      var restored=cadSession.model.sceneDimensions();
+      check(cancelled,"a superseded recompute is reported as cancellation");
+      check(restored.width==dimensions.width&&restored.height==dimensions.height&&
+        restored.depth==dimensions.depth&&cadSession.revision==revision,
+        "cancellation rolls authored inputs back without publishing a stale revision");
+      check(published.volume()==volume&&cadSession.document.evaluationCancellationCheck==null,
+        "cancellation preserves the prior shape and restores the document callback");
+      published.close();
+    } catch(error:Dynamic) {
+      session.dispose();
+      throw error;
+    }
+    session.dispose();
+    var resourcesAfter=CadKit.resourceCountsGetChecked();
+    check(resourcesAfter.get_shapeCount()==resourcesBefore.get_shapeCount()&&
+      resourcesAfter.get_meshCount()==resourcesBefore.get_meshCount()&&
+      resourcesAfter.get_operationCount()==resourcesBefore.get_operationCount(),
+      "closing the edited session releases its native shapes, meshes, and operations");
+  }
+
   static function main():Int {
     try {
       run();
       faceHoleWorkflow();
       bracketWorkflow();
+      latestOnlyPublication();
       Sys.println("CAD part workflow tests passed");
       return 0;
     } catch (error:Dynamic) {

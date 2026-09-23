@@ -10,6 +10,7 @@ import cadkit.parametric.FeatureActiveChange;
 import cadkit.parametric.OutputSelectionChange;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.RecomputeError;
+import cadkit.parametric.EvaluationCancelled;
 import cadkit.parametric.Transaction;
 import cadkit.parametric.ExpressionValue;
 import cadkit.parametric.NamedParameterChange;
@@ -59,6 +60,12 @@ class Document {
 	private final issuedDefinitionIds:Map<String, Bool>;
 
 	public var definitionEvaluationCount(default, null):Int;
+	public var recomputeAttemptCount(default, null):Int;
+	public var lastRecomputeSeconds(default, null):Float;
+	public var lastRecomputeFeatureCount(default, null):Int;
+	public var lastSketchSolveSeconds(default, null):Float;
+	public var lastSketchSolveCount(default, null):Int;
+	public var lastSketchProfileSeconds(default, null):Float;
 
 	private var updatingNamedParameter:Bool;
 	private var selectedOutput:Null<Feature>;
@@ -77,6 +84,9 @@ class Document {
 
 	public var afterRecompute:Null<Void->Void>;
 
+	/** Checked between feature evaluations and by cooperative sketch solving. */
+	public var evaluationCancellationCheck:Null<Void->Bool>;
+
 	public function new(?id:DocumentId) {
 		this.id = id == null ? new DocumentId() : id;
 		token = nextToken;
@@ -88,6 +98,12 @@ class Document {
 		definitionCache = new Map();
 		issuedDefinitionIds = new Map();
 		definitionEvaluationCount = 0;
+		recomputeAttemptCount = 0;
+		lastRecomputeSeconds = 0;
+		lastRecomputeFeatureCount = 0;
+		lastSketchSolveSeconds = 0;
+		lastSketchSolveCount = 0;
+		lastSketchProfileSeconds = 0;
 		elements = [];
 		elementsById = new Map<String, Element>();
 		issuedElementIds = new Map<String, Bool>();
@@ -102,6 +118,7 @@ class Document {
 		lastRemapReport = new TopologyRemapReport();
 		beforeRecompute = null;
 		afterRecompute = null;
+		evaluationCancellationCheck = null;
 	}
 
 	public function createDefinition(name:String, recipe:String, inputs:Array<DefinitionInput>, outputs:Array<DefinitionOutput>):Definition {
@@ -866,13 +883,22 @@ class Document {
 
 	public function recompute():Void {
 		ensureOpen();
-		if (beforeRecompute != null)
-			beforeRecompute();
-		synchronizeExpressions();
-		var order = topologicalOrder();
+		var started = haxe.Timer.stamp();
 		var context = new EvaluationContext(this);
+		var order:Array<Feature>;
+		try {
+			if (beforeRecompute != null)
+				beforeRecompute();
+			context.checkCancelled();
+			synchronizeExpressions();
+			order = topologicalOrder();
+		} catch (error:Dynamic) {
+			recordRecomputeMetrics(started, 0, context);
+			throw error;
+		}
 		var stagedFeatures:Array<Feature> = [];
 		var stagedResults:Array<EvaluationResult> = [];
+		var evaluatedFeatureCount = 0;
 		var current:Null<Feature> = null;
 		var previousStates:Map<Int, Array<Int>> = new Map();
 		for (feature in features) {
@@ -886,15 +912,18 @@ class Document {
 
 		try {
 			for (feature in order) {
+				context.checkCancelled();
 				current = feature;
 				if (!feature.active || !feature.dirty)
 					continue;
 
+				evaluatedFeatureCount++;
 				var result:EvaluationResult = feature.evaluate(context);
 				stagedFeatures.push(feature);
 				stagedResults.push(result);
 				context.stage(feature, result);
 			}
+			context.checkCancelled();
 
 			for (index in 0...stagedFeatures.length)
 				stagedFeatures[index].install(stagedResults[index]);
@@ -926,15 +955,31 @@ class Document {
 				var reverse = stagedResults.length - index - 1;
 				stagedResults[reverse].dispose();
 			}
+			recordRecomputeMetrics(started, evaluatedFeatureCount, context);
+			if (Std.isOfType(error, EvaluationCancelled))
+				throw error;
 			if (recomputeError != null)
 				throw recomputeError;
 			throw error;
 		}
+		recordRecomputeMetrics(started, evaluatedFeatureCount, context);
 
 		// Publication succeeded. Observer failures are reported to the caller, but cannot
 		// roll back or dispose resources that are now owned by committed features.
 		if (afterRecompute != null)
 			afterRecompute();
+	}
+
+	public function isEvaluationCancelled():Bool
+		return evaluationCancellationCheck != null && evaluationCancellationCheck();
+
+	private function recordRecomputeMetrics(started:Float, evaluated:Int, context:EvaluationContext):Void {
+		recomputeAttemptCount++;
+		lastRecomputeSeconds = Math.max(0, haxe.Timer.stamp() - started);
+		lastRecomputeFeatureCount = evaluated;
+		lastSketchSolveSeconds = context.sketchSolveSeconds;
+		lastSketchSolveCount = context.sketchSolveCount;
+		lastSketchProfileSeconds = context.sketchProfileSeconds;
 	}
 
 	private function synchronizeExpressions():Void {

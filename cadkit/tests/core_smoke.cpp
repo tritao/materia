@@ -16,6 +16,30 @@ void assert_close(double actual, double expected) {
 } // namespace
 
 int main() {
+    cad_resource_counts resource_baseline{};
+    assert(cad_resource_counts_get(&resource_baseline) == CAD_OK);
+    cad_shape diagnostic_shape = 0;
+    cad_mesh diagnostic_mesh = 0;
+    cad_operation diagnostic_operation = 0;
+    cad_mesh_options diagnostic_mesh_options{0.1, 0.5};
+    assert(cad_box(1.0, 1.0, 1.0, &diagnostic_shape) == CAD_OK);
+    assert(cad_shape_tessellate(diagnostic_shape, &diagnostic_mesh_options, &diagnostic_mesh) == CAD_OK);
+    assert(cad_shape_translate_operation(diagnostic_shape, {1.0, 0.0, 0.0},
+                                        &diagnostic_operation) == CAD_OK);
+    cad_resource_counts resource_live{};
+    assert(cad_resource_counts_get(&resource_live) == CAD_OK);
+    assert(resource_live.shape_count == resource_baseline.shape_count + 1);
+    assert(resource_live.mesh_count == resource_baseline.mesh_count + 1);
+    assert(resource_live.operation_count == resource_baseline.operation_count + 1);
+    cad_shape_destroy(diagnostic_shape);
+    cad_mesh_destroy(diagnostic_mesh);
+    cad_operation_destroy(diagnostic_operation);
+    cad_resource_counts resource_released{};
+    assert(cad_resource_counts_get(&resource_released) == CAD_OK);
+    assert(resource_released.shape_count == resource_baseline.shape_count);
+    assert(resource_released.mesh_count == resource_baseline.mesh_count);
+    assert(resource_released.operation_count == resource_baseline.operation_count);
+
     cad_shape shape = 0;
     assert(cad_box(10.0, 20.0, 30.0, &shape) == CAD_OK);
     assert(shape != 0);

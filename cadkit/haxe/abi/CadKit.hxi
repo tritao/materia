@@ -79,6 +79,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_mesh_face_range_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_mesh_index_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_mesh_vertex_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
+	extern fn cad_resource_counts_get(out_counts: ptr<cad_resource_counts> @out) -> cad_result;
 	extern fn cad_operation_destroy(operation: cad_operation) -> void;
 	extern fn cad_operation_history_count(operation: cad_operation, relation: cad_history_relation, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_operation_history_source_at(operation: cad_operation, relation: cad_history_relation, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -143,6 +144,11 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	struct cad_mesh_options @layout(16, 8) {
 		linear_deflection: f64 @offset(0);
 		angular_deflection: f64 @offset(8);
+	}
+	struct cad_resource_counts @layout(12, 4) {
+		shape_count: u32 @offset(0);
+		mesh_count: u32 @offset(4);
+		operation_count: u32 @offset(8);
 	}
 	struct cad_shape_ref @layout(4, 4) {
 		shape: cad_shape @offset(0);

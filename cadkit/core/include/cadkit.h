@@ -131,6 +131,13 @@ typedef struct cad_mesh_face_range {
     uint32_t index_count;
 } cad_mesh_face_range;
 
+/* Current live native handle counts; these are resource diagnostics, not byte sizes. */
+typedef struct cad_resource_counts {
+    uint32_t shape_count;
+    uint32_t mesh_count;
+    uint32_t operation_count;
+} cad_resource_counts;
+
 /* Modeling constructors. Points are world coordinates; angles use radians.
  * Counted arrays are borrowed for the call. All shape outputs are owned.
  * Failures zero the output handle. Wires must be connected; faces planar.
@@ -485,6 +492,9 @@ CADKIT_API cad_result cad_mesh_index_count(
 CADKIT_API cad_result cad_mesh_face_range_count(
     cad_mesh mesh,
     uint32_t* out_count CADKIT_HXI_OUT);
+
+CADKIT_API cad_result cad_resource_counts_get(
+    cad_resource_counts* out_counts CADKIT_HXI_OUT);
 
 CADKIT_API cad_result cad_mesh_face_range_at(
     cad_mesh mesh,
