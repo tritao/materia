@@ -22,7 +22,12 @@ class CadSketchEditSession {
     this.owner = owner;
     this.feature = feature;
     isNew = feature == null;
-    sketch = new SketchSession(feature == null ? initialSketch : feature.sketch());
+    var source = initialSketch;
+    if (source == null && feature != null)
+      source = feature.sketch();
+    if (source == null)
+      throw "CAD sketch edit sessions require an authored sketch";
+    sketch = new SketchSession(source);
   }
 
   /** Solve an isolated edit while leaving the published document untouched. */

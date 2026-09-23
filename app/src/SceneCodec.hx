@@ -100,6 +100,7 @@ class SceneCodec {
     if (values.length > 10000) throw "Scene documents support at most 10000 objects";
     var result:Array<SceneObjectData> = [];
     var ids:Map<String, Bool> = new Map();
+    var sketchDraftCount = 0;
     for (value in values) {
       var id = stringField(value, "id");
       if (id == "scene" || ids.exists(id)) throw "Duplicate or reserved object ID: " + id;
@@ -113,8 +114,19 @@ class SceneCodec {
       var collisionEnabled = optionalBool(value, "collisionEnabled", visibleValue);
       var dynamicBody = optionalBool(value, "dynamicBody", false);
       var cadGraph = optionalText(value, "cadGraph");
+      var sketchDraft = optionalText(value, "sketchDraft");
       if ((kind == "cad-plate" || kind == "cad-bracket" || kind == "cad-step" || kind == "cad-part")
           && cadGraph != null && cadGraph.length > 10000000) throw "CAD feature graph is too large";
+      if (sketchDraft != null) {
+        sketchDraftCount++;
+        if (sketchDraftCount > 1) throw "Scene documents can contain only one active sketch draft";
+        if (sketchDraft.length > 10000000 ||
+            (kind != "cad-plate" && kind != "cad-bracket" && kind != "cad-step" && kind != "cad-part"))
+          throw "Invalid sketch draft owner";
+        var draft = SketchDraftCodec.decode(sketchDraft);
+        if (draft.featureIndex < 0 && kind != "cad-part")
+          throw "new sketch drafts require a generic CAD part";
+      }
       result.push({
         id: id,
         label: stringField(value, "label"),
@@ -179,7 +191,8 @@ class SceneCodec {
           1
         ),
         visible: visibleValue,
-        cadGraph: cadGraph
+        cadGraph: cadGraph,
+        sketchDraft: sketchDraft
       }
       );
     }

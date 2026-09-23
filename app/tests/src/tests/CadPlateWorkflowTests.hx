@@ -143,6 +143,23 @@ class CadPlateWorkflowTests {
         "an applied sketch can reopen as a separate transient draft");
       check(edit(scene, "Dimension width", 32) == PropertyEditResult.Applied,
         "an existing sketch dimension can be edited in the draft");
+      var pendingEditReload = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
+      try {
+        var persistedFeature:ConstrainedSketchFeature = cast pendingEditReload.cadSession(id).document.featureAt(0);
+        var pendingWidth:Float = -1;
+        var pendingDraft = pendingEditReload.sketchDraftSnapshot();
+        if (pendingDraft == null) throw "reopened existing sketch draft is missing";
+        for (constraint in pendingDraft.constraints())
+          if (constraint.id == "width") pendingWidth = constraint.value;
+        check(pendingEditReload.hasActiveSketchEdit() &&
+          pendingEditReload.treeSelectionKey() == id + ":feature:0" &&
+          persistedFeature.dimension("width").value == 30 && pendingWidth == 32,
+          "save and reopen retain an unapplied edit separately from the evaluated feature");
+      } catch (error:Dynamic) {
+        pendingEditReload.dispose();
+        throw error;
+      }
+      pendingEditReload.dispose();
       check(scene.applySelectedSketchEdit(), "apply the existing sketch edit");
       near(feature.dimension("width").value, 32, "applied edit updates the authored dimension");
       check(scene.document.undo(), "undo sketch dimension edit");
@@ -169,6 +186,53 @@ class CadPlateWorkflowTests {
       throw error;
     }
     scene.dispose();
+  }
+
+  static function sketchDraftPersistenceWorkflow():Void {
+    var file = "/tmp/cadkit-sketch-draft-roundtrip.scene";
+    if (FileSystem.exists(file)) FileSystem.deleteFile(file);
+    var session = new SceneDocumentSession();
+    try {
+      var scene = session.scene;
+      check(scene.createCadPart(), "create a part for draft persistence");
+      var id = scene.selectedId;
+      check(scene.createSketch() && session.isDirty(),
+        "starting an empty sketch marks the editor document dirty");
+      session.save(file);
+      check(!session.isDirty(), "saving an empty sketch draft establishes a savepoint");
+      session.open(file);
+      scene = session.scene;
+      check(scene.selectedId == id && scene.hasActiveSketchEdit() &&
+        scene.cadSession(id).document.featureCount() == 0 && !scene.canApplySelectedSketchEdit(),
+        "an empty, unappliable sketch draft survives save and reopen");
+
+      check(scene.addSketchDraftRectangleBetween(1, 2, 11, 8) && session.isDirty(),
+        "editing a restored draft marks the document dirty");
+      session.save(file);
+      session.open(file);
+      scene = session.scene;
+      var restoredDraft = scene.sketchDraftSnapshot();
+      var restoredSolution = scene.sketchDraftSolution();
+      check(scene.hasActiveSketchEdit() && scene.canApplySelectedSketchEdit() &&
+        restoredDraft.points().length == 4 && restoredSolution != null &&
+        scene.cadSession(id).document.featureCount() == 0,
+        "saved draft geometry reopens as an isolated, solved profile");
+      near(restoredSolution.x("rect1.p0"), 1, "saved draft retains its workplane position");
+      near(restoredSolution.y("rect1.p0"), 2, "saved draft retains its workplane position");
+
+      check(scene.cancelSelectedSketchEdit() && session.isDirty(),
+        "cancelling a saved draft marks its removal for persistence");
+      session.save(file);
+      session.open(file);
+      check(!session.scene.hasActiveSketchEdit() && !session.isDirty(),
+        "saving a cancelled draft removes its checkpoint on reopen");
+    } catch (error:Dynamic) {
+      session.dispose();
+      if (FileSystem.exists(file)) FileSystem.deleteFile(file);
+      throw error;
+    }
+    session.dispose();
+    if (FileSystem.exists(file)) FileSystem.deleteFile(file);
   }
 
   static function sketchExtrusionWorkflow():Void {
@@ -770,6 +834,7 @@ class CadPlateWorkflowTests {
     try {
       emptyCadPartWorkflow();
       sketchCreationWorkflow();
+      sketchDraftPersistenceWorkflow();
       sketchExtrusionWorkflow();
       faceSketchPocketWorkflow();
       verticalFilletWorkflow();

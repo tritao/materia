@@ -56,18 +56,19 @@ class CadDocumentSession {
   }
 
   /** Open an isolated editable draft for a constrained-sketch feature. */
-  public function beginSketchEdit(featureIndex:Int):CadSketchEditSession {
+  public function beginSketchEdit(featureIndex:Int, ?draft:ConstrainedSketch):CadSketchEditSession {
     ensureOpen();
     var candidate = document.featureAt(featureIndex);
     if (!Std.isOfType(candidate, ConstrainedSketchFeature))
       throw "selected CAD feature is not a constrained sketch";
-    return new CadSketchEditSession(this, cast candidate);
+    return new CadSketchEditSession(this, cast candidate, draft);
   }
 
   /** Start an unattached sketch draft; no feature exists until a valid profile is applied. */
-  public function beginNewSketchEdit(?plane:Plane, units:String = "mm"):CadSketchEditSession {
+  public function beginNewSketchEdit(?plane:Plane, units:String = "mm",
+      ?draft:ConstrainedSketch):CadSketchEditSession {
     ensureOpen();
-    return new CadSketchEditSession(this, null, new ConstrainedSketch(plane, units));
+    return new CadSketchEditSession(this, null, draft == null ? new ConstrainedSketch(plane, units) : draft);
   }
 
   public function performanceMetrics():CadPerformanceMetrics {

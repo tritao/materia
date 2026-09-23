@@ -42,6 +42,7 @@ import cadkit.sketch.SolvedSketch;
 import app.CadPlateModel.CadPlateParameters;
 import app.CadPlateModel.CadPlateHoleEdit;
 import app.CadBracketModel;
+import app.SketchDraftCodec.SketchDraftRecord;
 import haxe.io.Path as FilePath;
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
@@ -68,6 +69,9 @@ class EditorScene {
   var activeSketchEdit:Null<CadSketchEditSession> = null;
   var activeSketchObjectId:Null<String> = null;
   var sketchEditPlaneValue:Null<Plane> = null;
+  var sketchDraftRevision:Int = 0;
+  var savedSketchDraftRevision:Int = 0;
+  var savedSketchDraftPresent:Bool = false;
   public var revision(default, null):Int;
   /** Changes only when simulation-consumed scene content changes, not selection. */
   public var environmentRevision(default, null):Int;
@@ -92,6 +96,14 @@ class EditorScene {
           item.width, item.height, item.depth, item.red, item.green, item.blue, item.visible,
           item.collisionEnabled,item.dynamicBody,item.mass,item.type,item.cadGraph);
         selectedId = data.length == 0 ? "scene" : data[0].id;
+        var savedDraft:Null<SceneObjectData> = null;
+        for (item in data) if (item.sketchDraft != null) {
+          if (savedDraft != null)
+            throw "scene contains more than one active sketch draft";
+          savedDraft = item;
+        }
+        if (savedDraft != null)
+          restoreSketchDraft(savedDraft);
       }
       selectionMaterial = scene.createMaterial();
       scene.setMaterialData(selectionMaterial, MaterialData.opaque(1.0, 0.88, 0.35));
@@ -222,6 +234,7 @@ class EditorScene {
     sketchEditPlaneValue = plane;
     activeSketchEdit = session.beginNewSketchEdit(plane, "mm");
     activeSketchObjectId = id;
+    sketchDraftRevision++;
     refreshSelectionRevision();
     return true;
   }
@@ -1173,11 +1186,57 @@ class EditorScene {
   public function hasActiveSketchEdit():Bool
     return activeSketchEdit != null;
 
+  function restoreSketchDraft(owner:SceneObjectData):Void {
+    var encoded = owner.sketchDraft;
+    if (encoded == null)
+      return;
+    var restored:SketchDraftRecord = SketchDraftCodec.decode(encoded);
+    var session = requireCadSession(owner.id);
+    if (restored.featureIndex < 0) {
+      if (owner.type != "cad-part")
+        throw "new sketch drafts require a generic CAD part";
+      activeSketchEdit = session.beginNewSketchEdit(restored.sketch.plane,
+        restored.sketch.units, restored.sketch);
+      sketchEditPlaneValue = restored.sketch.plane;
+      selectedFeatureKey = null;
+    } else {
+      if (restored.featureIndex >= session.document.featureCount())
+        throw "sketch draft references a missing feature";
+      var feature = session.document.featureAt(restored.featureIndex);
+      if (!Std.isOfType(feature, ConstrainedSketchFeature) || !feature.active)
+        throw "sketch draft must reference an active constrained sketch feature";
+      var sketchFeature:ConstrainedSketchFeature = cast feature;
+      activeSketchEdit = session.beginSketchEdit(restored.featureIndex, restored.sketch);
+      sketchEditPlaneValue = sketchFeature.workplane();
+      selectedFeatureKey = owner.id + ":feature:" + restored.featureIndex;
+    }
+    activeSketchObjectId = owner.id;
+    selectedId = owner.id;
+    sketchDraftRevision = 1;
+    savedSketchDraftRevision = sketchDraftRevision;
+    savedSketchDraftPresent = true;
+    refreshSelectionRevision();
+  }
+
+  function sketchDraftFeatureIndex(draft:CadSketchEditSession):Int {
+    if (draft.feature == null)
+      return -1;
+    if (activeSketchObjectId == null)
+      throw "sketch draft has no owning CAD object";
+    var session = requireCadSession(activeSketchObjectId);
+    for (index in 0...session.document.featureCount())
+      if (session.document.featureAt(index) == draft.feature)
+        return index;
+    throw "sketch draft feature is no longer in its document";
+  }
+
   public function sketchDraftPlane():Null<Plane>
     return activeSketchEdit == null ? null : sketchEditPlaneValue;
 
-  public function sketchDraftSnapshot():Null<ConstrainedSketch>
-    return activeSketchEdit == null ? null : activeSketchEdit.sketch.snapshot();
+  public function sketchDraftSnapshot():Null<ConstrainedSketch> {
+    var draft = activeSketchEdit;
+    return draft == null ? null : draft.sketch.snapshot();
+  }
 
   public function sketchDraftSolution():Null<SolvedSketch> {
     if (activeSketchEdit == null)
@@ -1646,6 +1705,7 @@ class EditorScene {
     if (activeSketchEdit == null)
       throw "Sketch draft is no longer active";
     activeSketchEdit.edit(change);
+    sketchDraftRevision++;
     refreshSelectionRevision();
   }
 
@@ -1902,7 +1962,29 @@ class EditorScene {
     var result=records();
     for(record in result)if(isCadKind(record.type))
       record.cadGraph=currentCadGraph(record.id);
+    var draft = activeSketchEdit;
+    if (draft != null) {
+      var featureIndex = sketchDraftFeatureIndex(draft);
+      var foundOwner = false;
+      for (record in result) if (record.id == activeSketchObjectId) {
+        record.sketchDraft = SketchDraftCodec.encode(draft.sketch.snapshot(), featureIndex);
+        foundOwner = true;
+      }
+      if (!foundOwner)
+        throw "sketch draft owner is no longer in the scene";
+    }
     return result;
+  }
+
+  public function hasUnsavedSketchDraftChanges():Bool {
+    var present = activeSketchEdit != null;
+    return present != savedSketchDraftPresent ||
+      (present && sketchDraftRevision != savedSketchDraftRevision);
+  }
+
+  public function markSaved():Void {
+    savedSketchDraftPresent = activeSketchEdit != null;
+    savedSketchDraftRevision = sketchDraftRevision;
   }
 
   public function currentCadGraph(id:String):String
@@ -1920,7 +2002,8 @@ class EditorScene {
       values.push({id: item.id, label: item.label, x: item.x, y: item.y, visible: item.visible});
     }
     return {objects: values, selectedId: selectedId, revision: revision,
-      canUndo: document.canUndo, canRedo: document.canRedo, dirty: document.isDirty};
+      canUndo: document.canUndo, canRedo: document.canRedo,
+      dirty: document.isDirty || hasUnsavedSketchDraftChanges()};
   }
 
   public function dispose():Void {

@@ -64,6 +64,7 @@ class SceneDocumentSession {
     // Do not move the savepoint or change the document path until publication succeeds.
     path = absolute;
     scene.document.markSaved();
+    scene.markSaved();
     sensors.document.markSaved();
     if(scriptOwnership!=null)scriptOwnership.markSaved();
   }
@@ -73,7 +74,8 @@ class SceneDocumentSession {
     return name + (isDirty() ? " *" : "");
   }
 
-  public function isDirty():Bool return scene.document.isDirty || sensors.document.isDirty ||
+  public function isDirty():Bool return scene.document.isDirty || scene.hasUnsavedSketchDraftChanges() ||
+    sensors.document.isDirty ||
     (scriptOwnership!=null&&scriptOwnership.document.isDirty);
 
   function replace(next:EditorScene, nextSensors:SensorConfiguration, file:Null<String>,
