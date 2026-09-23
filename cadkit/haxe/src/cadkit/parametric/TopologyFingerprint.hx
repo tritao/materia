@@ -110,15 +110,15 @@ class TopologyFingerprint {
 		if (candidate.kind() != kind)
 			return -1.0e30;
 
-		var distance = Math.sqrt(distanceTo(candidate));
+		var distance = Math.pow(distanceTo(candidate), 0.5);
 		var positionScale:Float;
 		var normalizedSizeChange = 0.0;
 		var directionAgreement = 1.0;
 		if (kind == CadKit.ShapeKind.Face) {
 			if (candidate.surfaceKind() != surfaceKind)
 				return -1.0e30;
-			var referenceSize = Math.sqrt(measure);
-			var candidateSize = Math.sqrt(candidate.faceArea());
+			var referenceSize = Math.pow(measure, 0.5);
+			var candidateSize = Math.pow(candidate.faceArea(), 0.5);
 			positionScale = Math.max(referenceSize, candidateSize);
 			normalizedSizeChange = relativeSizeChange(referenceSize, candidateSize);
 			var normal = candidate.faceNormal();

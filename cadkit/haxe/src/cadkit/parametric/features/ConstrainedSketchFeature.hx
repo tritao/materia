@@ -288,11 +288,11 @@ class ConstrainedSketchFeature extends Feature {
 				constraint.third, value));
 		}
 		var solved:SolvedSketch;
-		var solveStarted = haxe.Timer.stamp();
+		var solveStarted = Sys.time();
 		try {
 			solved = candidate.solve(committedSolution, function() return context.isCancelled());
 		} catch (error:Dynamic) {
-			lastSolveSeconds = haxe.Timer.stamp() - solveStarted;
+			lastSolveSeconds = Sys.time() - solveStarted;
 			context.recordSketchSolve(lastSolveSeconds);
 			if (Std.isOfType(error, SketchSolveError)) {
 				var solveError:SketchSolveError = cast error;
@@ -300,19 +300,19 @@ class ConstrainedSketchFeature extends Feature {
 			}
 			throw error;
 		}
-		lastSolveSeconds = haxe.Timer.stamp() - solveStarted;
+		lastSolveSeconds = Sys.time() - solveStarted;
 		context.recordSketchSolve(lastSolveSeconds);
 		context.checkCancelled();
-		var profileStarted = haxe.Timer.stamp();
+		var profileStarted = Sys.time();
 		var profile:cadkit.modeling.Sketch;
 		try {
 			profile = SketchProfile.build(candidate, solved);
 		} catch (error:Dynamic) {
-			lastProfileBuildSeconds = haxe.Timer.stamp() - profileStarted;
+			lastProfileBuildSeconds = Sys.time() - profileStarted;
 			context.recordSketchProfile(lastProfileBuildSeconds);
 			throw error;
 		}
-		lastProfileBuildSeconds = haxe.Timer.stamp() - profileStarted;
+		lastProfileBuildSeconds = Sys.time() - profileStarted;
 		context.recordSketchProfile(lastProfileBuildSeconds);
 		try {
 			context.checkCancelled();

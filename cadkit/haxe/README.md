@@ -110,6 +110,15 @@ parameter editing, recompute, JSON persistence, and undo/redo.
 builder-style construction to a serializable feature graph. Named dimensions
 can drive multiple feature parameters and retain their bindings after reload.
 
+`Document.createSubgraphDefinition()` snapshots another authored feature
+document as a reusable definition. Typed definition inputs bind to named
+parameters in that graph, and each named output selects a feature result.
+Instances apply their overrides to the graph's parameters and retain their own
+placement; the first geometry output is the instance's primary shape. These
+definitions round-trip through `DocumentCodec`. Registered recipe evaluators
+remain available for domain-owned procedural definitions such as BimKit's
+window, using the same typed-input and named-output contract.
+
 ## Constrained sketches
 
 `cadkit.sketch` provides an OCCT-independent two-dimensional constraint model

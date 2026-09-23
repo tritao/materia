@@ -17,6 +17,8 @@ class DefinitionEvaluatorRegistry {
 	}
 
 	public static function evaluate(definition:Definition, instance:InstanceElement, output:String):Shape {
+		if (definition.subgraph != null)
+			return new FeatureSubgraphEvaluator().evaluate(definition, instance, output);
 		var evaluator = evaluators.get(definition.recipe);
 		if (evaluator == null)
 			throw new ParametricError("unsupported definition recipe: " + definition.recipe);

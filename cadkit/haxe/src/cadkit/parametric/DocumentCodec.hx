@@ -54,7 +54,7 @@ import cadkit.parametric.InstanceElement;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 2;
+	public static inline var VERSION:Int = 3;
 
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
@@ -150,13 +150,29 @@ class DocumentCodec {
 			var outputs:Array<Dynamic> = [];
 			for (output in definition.outputs())
 				outputs.push({name: output.name, purpose: output.purpose});
+			var subgraph:Dynamic = null;
+			var graphPayload = definition.subgraph;
+			if (graphPayload != null) {
+				var inputBindings:Array<Dynamic> = [];
+				for (input in definition.inputs())
+					inputBindings.push({input: input.name, parameter: graphPayload.parameterName(input.name)});
+				var outputFeatures:Array<Dynamic> = [];
+				for (output in definition.outputs())
+					outputFeatures.push({output: output.name, feature: graphPayload.featureId(output.name)});
+				subgraph = {
+					graph: graphPayload.graph,
+					inputBindings: inputBindings,
+					outputFeatures: outputFeatures
+				};
+			}
 			encodedDefinitions.push({
 				id: definition.id.value,
 				name: definition.name,
 				recipe: definition.recipe,
 				revision: definition.revision,
 				inputs: inputs,
-				outputs: outputs
+				outputs: outputs,
+				subgraph: subgraph
 			});
 		}
 		var output = document.outputFeatureOrNull();
@@ -179,7 +195,7 @@ class DocumentCodec {
 			if (stringField(root, "format") != FORMAT)
 				throw new ParametricError("unsupported document format");
 			var version = intField(root, "version");
-			if (version != 1 && version != VERSION)
+			if (version != 1 && version != 2 && version != VERSION)
 				throw new ParametricError("unsupported document version");
 
 			var records:Array<Dynamic> = cast requiredField(root, "features");
@@ -340,8 +356,29 @@ class DocumentCodec {
 					var outputs:Array<DefinitionOutput> = [];
 					for (outputRecord in outputRecords)
 						outputs.push(new DefinitionOutput(stringField(outputRecord, "name"), stringField(outputRecord, "purpose")));
+					var subgraph:Null<DefinitionSubgraph> = null;
+					var rawSubgraph:Dynamic = Reflect.field(definitionRecord, "subgraph");
+					if (rawSubgraph != null) {
+						var inputBindings = new Map<String, String>();
+						var rawInputBindings:Array<Dynamic> = cast requiredField(rawSubgraph, "inputBindings");
+						for (binding in rawInputBindings) {
+							var inputName = stringField(binding, "input");
+							if (inputBindings.exists(inputName))
+								throw new ParametricError("duplicate subgraph input binding: " + inputName);
+							inputBindings.set(inputName, stringField(binding, "parameter"));
+						}
+						var outputFeatures = new Map<String, Int>();
+						var rawOutputFeatures:Array<Dynamic> = cast requiredField(rawSubgraph, "outputFeatures");
+						for (output in rawOutputFeatures) {
+							var outputName = stringField(output, "output");
+							if (outputFeatures.exists(outputName))
+								throw new ParametricError("duplicate subgraph output binding: " + outputName);
+							outputFeatures.set(outputName, intField(output, "feature"));
+						}
+						subgraph = new DefinitionSubgraph(stringField(rawSubgraph, "graph"), inputBindings, outputFeatures);
+					}
 					var definition = document.installDefinition(new DefinitionId(stringField(definitionRecord, "id")), stringField(definitionRecord, "name"),
-						stringField(definitionRecord, "recipe"), inputs, outputs);
+						stringField(definitionRecord, "recipe"), inputs, outputs, subgraph);
 					definition.restoreRevision(intField(definitionRecord, "revision"));
 				}
 				var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");

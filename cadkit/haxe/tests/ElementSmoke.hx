@@ -15,6 +15,7 @@ import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.ParameterKind;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.CylinderFeature;
 import cadkit.parametric.features.SketchFeature;
 import cadkit.parametric.features.DatumSketchFeature;
 import cadkit.parametric.features.LevelExtrudeFeature;
@@ -41,7 +42,7 @@ private class CountingBoxFeature extends BoxFeature {
 
 	override public function evaluate(context:EvaluationContext):EvaluationResult {
 		evaluations++;
-		return super.evaluate(context);
+		return EvaluationResult.fromShape(Shape.box(width.value, depth.value, height.value));
 	}
 }
 
@@ -388,8 +389,8 @@ class ElementSmoke {
 		check(secondPart.shape().volume() == firstPart.shape().volume(), "override removal restores inheritance");
 		check(parts.undo() && secondPart.overrideValue("width") != null, "override removal undo");
 		check(parts.redo() && secondPart.overrideValue("width") == null, "override removal redo");
-		var copy = parts.duplicateInstance(firstPart, "Box copy");
-		check(copy.id.value != firstPart.id.value, "instance duplication assigns a new identity");
+		var duplicateInstance = parts.duplicateInstance(firstPart, "Box copy");
+		check(duplicateInstance.id.value != firstPart.id.value, "instance duplication assigns a new identity");
 		var committedPart = firstPart.shape();
 		failed = false;
 		try
@@ -402,6 +403,50 @@ class ElementSmoke {
 			"definition and instance identities survive reload");
 		loadedParts.close();
 		parts.close();
+
+		var graph = new Document();
+		var graphBody = graph.add(new BoxFeature(10, 20, 30));
+		var graphOpening = graph.add(new CylinderFeature(2, 10));
+		graph.defineTypedParameter("body.width", 10, ParameterKind.Length, "mm").bind(graphBody.width);
+		graph.defineTypedParameter("body.depth", 20, ParameterKind.Length, "mm").bind(graphBody.depth);
+		graph.defineTypedParameter("body.height", 30, ParameterKind.Length, "mm").bind(graphBody.height);
+		graph.defineTypedParameter("opening.radius", 2, ParameterKind.Length, "mm").bind(graphOpening.radius);
+		graph.defineTypedParameter("opening.height", 10, ParameterKind.Length, "mm").bind(graphOpening.height);
+		var reusable = new Document();
+		var inputBindings = new Map<String, String>();
+		inputBindings.set("width", "body.width");
+		inputBindings.set("depth", "body.depth");
+		inputBindings.set("height", "body.height");
+		inputBindings.set("openingRadius", "opening.radius");
+		inputBindings.set("openingHeight", "opening.height");
+		var outputFeatures = new Map<String, Int>();
+		outputFeatures.set("frame", graphBody.id.toInt());
+		outputFeatures.set("opening", graphOpening.id.toInt());
+		var reusableDefinition = reusable.createSubgraphDefinition("Reusable part", graph, [
+			new DefinitionInput("width", ParameterKind.Length, "cm", 1),
+			new DefinitionInput("depth", ParameterKind.Length, "mm", 20),
+			new DefinitionInput("height", ParameterKind.Length, "mm", 30),
+			new DefinitionInput("openingRadius", ParameterKind.Length, "mm", 2),
+			new DefinitionInput("openingHeight", ParameterKind.Length, "mm", 10)
+		], [
+			new DefinitionOutput("frame", DefinitionOutput.Geometry),
+			new DefinitionOutput("opening", DefinitionOutput.Tool)
+		], inputBindings, outputFeatures);
+		graph.close();
+		var reusableInstance = reusable.createInstance("Part A", reusableDefinition);
+		near(reusableInstance.shape().volume(), 6000);
+		near(reusable.definitionOutput(reusableInstance, "opening").volume(), Math.PI * 40);
+		reusableDefinition.setDefault("width", 1.2);
+		near(reusableInstance.shape().volume(), 7200);
+		reusableInstance.setOverride("width", 1.4);
+		near(reusableInstance.shape().volume(), 8400);
+		var reopenedReusable = DocumentCodec.decode(DocumentCodec.encode(reusable));
+		near(reopenedReusable.elementAt(0).shape().volume(), 8400);
+		var reopenedInstance:cadkit.parametric.InstanceElement = cast reopenedReusable.elementAt(0);
+		near(reopenedReusable.definitionOutput(reopenedInstance, "opening").volume(), Math.PI * 40);
+		reopenedReusable.close();
+		reusable.close();
+
 		var definitionTransactionDocument = new Document();
 		var definitionTransaction = definitionTransactionDocument.beginTransaction();
 		definitionTransactionDocument.createDefinition("Transient", "cadkit.test.box", [

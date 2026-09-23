@@ -127,10 +127,69 @@ class Document {
 		return result;
 	}
 
-	public function installDefinition(id:DefinitionId, name:String, recipe:String, inputs:Array<DefinitionInput>, outputs:Array<DefinitionOutput>):Definition {
+	/** Snapshot a feature document as a reusable, input-bound, named-output definition. */
+	public function createSubgraphDefinition(name:String, graph:Document, inputs:Array<DefinitionInput>,
+		outputs:Array<DefinitionOutput>, inputBindings:Map<String, String>, outputFeatures:Map<String, Int>):Definition {
+		ensureOpen();
+		if (graph == null || graph == this || graph.isClosed())
+			throw new ParametricError("definition subgraph must be a separate open document");
+		if (inputs == null || outputs == null || inputBindings == null || outputFeatures == null)
+			throw new ParametricError("definition subgraph ports must not be null");
+
+		var inputNames = new Map<String, Bool>();
+		var boundParameters = new Map<String, Bool>();
+		for (input in inputs) {
+			inputNames.set(input.name, true);
+			var parameterName = inputBindings.get(input.name);
+			if (parameterName == null)
+				throw new ParametricError("definition input has no subgraph binding: " + input.name);
+			if (boundParameters.exists(parameterName))
+				throw new ParametricError("subgraph parameter is bound to more than one definition input: " + parameterName);
+			var parameter = graph.parameter(parameterName);
+			if (parameter.kind != input.kind)
+				throw new ParametricError("definition input type does not match subgraph parameter: " + input.name);
+			if (parameter.expression != null)
+				throw new ParametricError("definition input cannot bind an expression parameter: " + parameterName);
+			boundParameters.set(parameterName, true);
+		}
+		for (name in inputBindings.keys())
+			if (!inputNames.exists(name))
+				throw new ParametricError("subgraph binding references an unknown definition input: " + name);
+
+		var outputNames = new Map<String, Bool>();
+		for (output in outputs) {
+			outputNames.set(output.name, true);
+			var featureId = outputFeatures.get(output.name);
+			if (featureId == null)
+				throw new ParametricError("definition output has no subgraph feature: " + output.name);
+			var feature = graph.featureById(featureId);
+			if (feature == null || !feature.active)
+				throw new ParametricError("definition output feature is missing or inactive: " + output.name);
+		}
+		for (name in outputFeatures.keys())
+			if (!outputNames.exists(name))
+				throw new ParametricError("subgraph output references an unknown definition output: " + name);
+
+		var primaryGeometry = false;
+		for (output in outputs)
+			if (output.purpose == DefinitionOutput.Geometry)
+				primaryGeometry = true;
+		if (!primaryGeometry)
+			throw new ParametricError("subgraph definition requires a geometry output");
+
+		var subgraph = new DefinitionSubgraph(DocumentCodec.encode(graph), inputBindings, outputFeatures);
+		var result = installDefinition(new DefinitionId(), name, Definition.SubgraphRecipe, inputs, outputs, subgraph);
+		recordDocumentChange(new DefinitionCreateChange(this, result, definitions.length - 1));
+		return result;
+	}
+
+	public function installDefinition(id:DefinitionId, name:String, recipe:String, inputs:Array<DefinitionInput>,
+		outputs:Array<DefinitionOutput>, ?subgraph:DefinitionSubgraph):Definition {
 		if (issuedDefinitionIds.exists(id.value))
 			throw new ParametricError("duplicate or previously issued definition ID: " + id.value);
-		var result = new Definition(this, id, name, recipe, inputs, outputs);
+		if ((recipe == Definition.SubgraphRecipe) != (subgraph != null))
+			throw new ParametricError("feature subgraph recipe and graph payload do not match");
+		var result = new Definition(this, id, name, recipe, inputs, outputs, subgraph);
 		definitions.push(result);
 		definitionsById.set(id.value, result);
 		issuedDefinitionIds.set(id.value, true);
@@ -162,6 +221,7 @@ class Document {
 	public function createInstance(name:String, definition:Definition):InstanceElement {
 		if (definition.document != this)
 			throw new ParametricError("definition belongs to another document");
+		definition.primaryGeometryOutput();
 		var id = newElementId();
 		var result = new InstanceElement(this, id, name, definition.id);
 		installRecord(result);
@@ -171,7 +231,7 @@ class Document {
 	}
 
 	public function installInstance(name:String, id:ElementId, definitionId:DefinitionId, overrides:Map<String, Float>):InstanceElement {
-		definition(definitionId);
+		definition(definitionId).primaryGeometryOutput();
 		var result = new InstanceElement(this, id, name, definitionId);
 		for (key in overrides.keys()) {
 			definition(definitionId).input(key);
@@ -202,7 +262,8 @@ class Document {
 	}
 
 	private function resolveInstanceShape(instance:InstanceElement):Shape {
-		return definitionOutput(instance, "body");
+		var definition = definition(instance.definitionId);
+		return definitionOutput(instance, definition.primaryGeometryOutput().name);
 	}
 
 	public function definitionOutput(instance:InstanceElement, output:String):Shape {
@@ -883,7 +944,7 @@ class Document {
 
 	public function recompute():Void {
 		ensureOpen();
-		var started = haxe.Timer.stamp();
+		var started = Sys.time();
 		var context = new EvaluationContext(this);
 		var order:Array<Feature>;
 		try {
@@ -975,7 +1036,7 @@ class Document {
 
 	private function recordRecomputeMetrics(started:Float, evaluated:Int, context:EvaluationContext):Void {
 		recomputeAttemptCount++;
-		lastRecomputeSeconds = Math.max(0, haxe.Timer.stamp() - started);
+		lastRecomputeSeconds = Math.max(0, Sys.time() - started);
 		lastRecomputeFeatureCount = evaluated;
 		lastSketchSolveSeconds = context.sketchSolveSeconds;
 		lastSketchSolveCount = context.sketchSolveCount;

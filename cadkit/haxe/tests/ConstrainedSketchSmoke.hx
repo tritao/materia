@@ -24,6 +24,7 @@ import cadkit.parametric.features.TransformFeature;
 class ConstrainedSketchSmoke {
 	static function check(value:Bool, message:String):Void { if (!value) throw message; }
 	static function near(value:Float, expected:Float):Void { check(Math.abs(value - expected) < 1e-5, 'expected $expected, got $value'); }
+	static function failObserver():Void { throw "observer failure"; }
 	static function fixedRectangle(width:Float, height:Float):ConstrainedSketch {
 		var sketch = new ConstrainedSketch();
 		var coordinates = [
@@ -212,10 +213,15 @@ class ConstrainedSketchSmoke {
 		var widthIdentity = feature.dimension("width");
 		width.set(12); document.recompute();
 		failed = false;
-		try feature.removeConstraint("width") catch (error:Dynamic)
-			failed = Std.string(error).indexOf("named parameter width") >= 0;
+		var widthRemovalError = "";
+		try feature.removeConstraint("width") catch (error:Dynamic) {
+			var detail:Dynamic = Reflect.field(error, "message");
+			widthRemovalError = detail == null ? Std.string(error) : cast detail;
+			failed = widthRemovalError.indexOf("named parameter width") >= 0;
+		}
 		check(failed && feature.sketch().constraints().length == baseConstraintCount
-			&& feature.dimension("width") == widthIdentity, "bound dimensional constraint removal explains its dependency");
+			&& feature.dimension("width") == widthIdentity,
+			"bound dimensional constraint removal explains its dependency; error=" + widthRemovalError);
 		width.unbind(widthIdentity);
 		feature.removeConstraint("width"); document.recompute();
 		failed = false;
@@ -316,7 +322,7 @@ class ConstrainedSketchSmoke {
 		observerDocument.setOutput(observerBox);
 		observerDocument.recompute();
 		observerBox.width.set(12);
-		observerDocument.afterRecompute = function() throw "observer failure";
+		observerDocument.afterRecompute = failObserver;
 		failed = false;
 		try observerDocument.recompute() catch (error:Dynamic) failed = true;
 		check(failed, "post-recompute observer failures are reported");

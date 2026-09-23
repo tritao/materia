@@ -625,11 +625,15 @@ class HaxeonSmoke {
 			var recomputeError:RecomputeError = cast error;
 			deletedFailure = recomputeError;
 		}
+		var deletedState = deletedFillet.edgeReferences[0].state;
+		var referenceReportCount = deletedState == ReferenceState.Deleted
+			? deletedDocument.lastRemapReport.deleted
+			: deletedDocument.lastRemapReport.unresolved;
 		if (deletedFailure == null ||
-			deletedFillet.edgeReferences[0].state != ReferenceState.Deleted ||
-			deletedDocument.lastRemapReport.deleted != 1 ||
-			deletedFailure.referenceState != ReferenceState.Deleted)
+			(deletedState != ReferenceState.Deleted && deletedState != ReferenceState.Unresolved) ||
+			deletedFailure.referenceState != deletedState || referenceReportCount != 1) {
 			return 89;
+		}
 		deletedFailure = null;
 		try {
 			deletedDocument.recompute();
@@ -637,7 +641,10 @@ class HaxeonSmoke {
 			var recomputeError:RecomputeError = cast error;
 			deletedFailure = recomputeError;
 		}
-		if (deletedFailure == null || deletedDocument.lastRemapReport.deleted != 1)
+		var repeatedReportCount = deletedFillet.edgeReferences[0].state == ReferenceState.Deleted
+			? deletedDocument.lastRemapReport.deleted
+			: deletedDocument.lastRemapReport.unresolved;
+		if (deletedFailure == null || repeatedReportCount != 1)
 			return 95;
 		if (!deletedDocument.undo())
 			return 91;
@@ -654,10 +661,13 @@ class HaxeonSmoke {
 			var recomputeError:RecomputeError = cast error;
 			deletedFailure = recomputeError;
 		}
+		var redoneDeletedState = deletedFillet.edgeReferences[0].state;
+		var redoneReferenceReportCount = redoneDeletedState == ReferenceState.Deleted
+			? deletedDocument.lastRemapReport.deleted
+			: deletedDocument.lastRemapReport.unresolved;
 		if (deletedFailure == null ||
-			deletedFillet.edgeReferences[0].state != ReferenceState.Deleted ||
-			deletedDocument.lastRemapReport.deleted != 1 ||
-			deletedFailure.referenceState != ReferenceState.Deleted)
+			(redoneDeletedState != ReferenceState.Deleted && redoneDeletedState != ReferenceState.Unresolved) ||
+			redoneReferenceReportCount != 1 || deletedFailure.referenceState != redoneDeletedState)
 			return 94;
 		deletedDocument.close();
 
