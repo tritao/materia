@@ -41,6 +41,7 @@ class BuildContext {
 	final claimed:Map<Int, String>;
 	final idsByPath:Map<String, WidgetId>;
 	var cachedIdCount:Int;
+	var rootScope:KeyScope;
 	var scope:KeyScope;
 	var textStyleStack:Array<ResolvedTextStyle>;
 
@@ -72,7 +73,8 @@ class BuildContext {
 		claimed = new Map();
 		idsByPath = new Map();
 		cachedIdCount = 0;
-		scope = new KeyScope();
+		rootScope = new KeyScope();
+		scope = rootScope;
 		textStyleStack = [ResolvedTextStyle.fromTheme(this.theme)];
 	}
 
@@ -166,7 +168,9 @@ class BuildContext {
 
 	public function beginFrame():Void {
 		claimed.clear();
-		scope = new KeyScope();
+		if (rootScope.cachedEntries() >= 8192)
+			rootScope = new KeyScope();
+		scope = rootScope;
 		stateStore.beginFrame();
 		textStyleStack = [ResolvedTextStyle.fromTheme(theme)];
 	}
