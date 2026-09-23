@@ -19,8 +19,10 @@ class TopologyReference {
 	public var state(default, null):ReferenceState;
 
 	private final remapFeature:Feature;
+	/** Explicit geometric intent used only when identity/history cannot resolve the topology. */
+	private final fallbackSelection:Null<SelectionRecipe>;
 	private var current:Null<Shape>;
-	private final fingerprint:TopologyFingerprint;
+	private var fingerprint:TopologyFingerprint;
 	private var fallbackAmbiguous:Bool;
 	private var stateGenerationValue:Int;
 
@@ -29,9 +31,11 @@ class TopologyReference {
 		topology:Null<Shape>,
 		?savedKind:CadKit.ShapeKind,
 		?savedFingerprint:TopologyFingerprint,
-		?remapFeature:Feature) {
+		?remapFeature:Feature,
+		?fallbackSelection:SelectionRecipe) {
 		this.feature = feature;
 		this.remapFeature = remapFeature == null ? feature : remapFeature;
+		this.fallbackSelection = fallbackSelection;
 		if (topology == null) {
 			if (savedKind == null || savedFingerprint == null)
 				throw new ParametricError("unresolved topology references need fingerprint data");
@@ -57,15 +61,17 @@ class TopologyReference {
 		feature:Feature,
 		kind:CadKit.ShapeKind,
 		fingerprint:TopologyFingerprint,
-		?remapFeature:Feature):TopologyReference {
-		return new TopologyReference(feature, null, kind, fingerprint, remapFeature);
+		?remapFeature:Feature,
+		?fallbackSelection:SelectionRecipe):TopologyReference {
+		return new TopologyReference(feature, null, kind, fingerprint, remapFeature, fallbackSelection);
 	}
 
 	public static function fromShape(
 		feature:Feature,
 		topology:Shape,
-		?remapFeature:Feature):TopologyReference {
-		return new TopologyReference(feature, topology, null, null, remapFeature);
+		?remapFeature:Feature,
+		?fallbackSelection:SelectionRecipe):TopologyReference {
+		return new TopologyReference(feature, topology, null, null, remapFeature, fallbackSelection);
 	}
 
 	public static function fromFace(
@@ -133,6 +139,8 @@ class TopologyReference {
 		var resolved = findFallback(result);
 		if (resolved != null)
 			return resolved;
+		if (fallbackSelection != null)
+			return fallbackSelection.resolve(result)[0];
 		if (fallbackAmbiguous) {
 			markAmbiguous();
 			throw new ParametricError(
@@ -182,6 +190,18 @@ class TopologyReference {
 		}
 
 		var fallback = findFallback(result);
+		if (fallback == null && fallbackSelection != null) {
+			try {
+				fallback = fallbackSelection.resolve(result)[0];
+			} catch (error:Dynamic) {
+				if (Std.isOfType(error, ParametricError)) {
+					var parametric:ParametricError = cast error;
+					fallbackAmbiguous = parametric.referenceState == ReferenceState.Ambiguous;
+				} else {
+					throw error;
+				}
+			}
+		}
 		if (fallback != null) {
 			replace(fallback, ReferenceState.Remapped);
 			return state;
@@ -219,9 +239,11 @@ class TopologyReference {
 	}
 
 	private function replace(next:Shape, nextState:ReferenceState):Void {
+		var nextFingerprint = TopologyFingerprint.capture(next);
 		if (current != null)
 			current.close();
 		current = next;
+		fingerprint = nextFingerprint;
 		setState(nextState);
 	}
 

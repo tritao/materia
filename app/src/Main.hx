@@ -1069,9 +1069,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (scene.canCreateSketch())
       rows.push(new KeyedView("create-sketch",
         sceneAction("create-constrained-sketch", "scene.create-sketch", "Create sketch", IconName.Plus)));
+    if (scene.canCreateFaceSketch())
+      rows.push(new KeyedView("create-face-sketch",
+        sceneAction("create-face-sketch", "scene.create-face-sketch", "Sketch on face", IconName.Plus)));
     if (scene.canCreateExtrusion())
       rows.push(new KeyedView("create-extrusion",
         sceneAction("create-extrusion", "scene.create-extrusion", "Extrude", IconName.Plus)));
+    if (scene.canCreatePocket())
+      rows.push(new KeyedView("create-pocket",
+        sceneAction("create-pocket", "scene.create-pocket", "Pocket", IconName.Plus)));
     if(ownership!=null) {
       rows.push(new KeyedView("origin",textLines("script-object-origins",
         ["Script-owned"].concat(ownership.propertyOrigins(selected.id,["position","dimensions",
@@ -1179,6 +1185,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
       runSceneEdit("Could not create extrusion", function() scene.createExtrusion());
       inspectorSelectionRevision = -1;
     }, null, function() return canEditObjects() && scene.canCreateExtrusion()));
+    commands.register(new Command("scene.create-face-sketch", "Sketch on selected face", function() {
+      runSceneEdit("Could not create face sketch", function() scene.createFaceSketch());
+      inspectorSelectionRevision = -1;
+    }, null, function() return canEditObjects() && scene.canCreateFaceSketch()));
+    commands.register(new Command("scene.create-pocket", "Pocket selected face sketch", function() {
+      runSceneEdit("Could not create pocket", function() scene.createPocket());
+      inspectorSelectionRevision = -1;
+    }, null, function() return canEditObjects() && scene.canCreatePocket()));
     commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
       runSceneEdit("Could not add mounting plate", function() scene.createMountingPlate());
     }, null, function() return canEditObjects() && scene.canCreate()));

@@ -438,6 +438,10 @@ class DocumentCodec {
 		} else if (featureType == "chamfer") {
 			var selectedChamfer:ChamferFeature = cast feature;
 			excluded = selectedChamfer.edgeReferences;
+		} else if (featureType == "constrained-sketch") {
+			var selectedSketch:ConstrainedSketchFeature = cast feature;
+			if (selectedSketch.supportFaceReference != null)
+				excluded = [selectedSketch.supportFaceReference];
 		}
 
 		var references:Array<Dynamic> = [];
@@ -743,6 +747,8 @@ class DocumentCodec {
 			constraints: constraints,
 			support: feature.support == null ? null : feature.support.id.toInt(),
 			supportSelection: encodeSelection(feature.supportSelection),
+			supportFaceFingerprint: feature.supportFaceReference == null ? null :
+				encodeFingerprint(feature.supportFaceReference.fingerprintData()),
 			supportXDirection: feature.supportXDirection == null ? null : encodeVector(feature.supportXDirection),
 			supportOffset: feature.supportOffset,
 			supportFlipped: feature.supportFlipped
@@ -780,9 +786,12 @@ class DocumentCodec {
 		var supportValue:Dynamic = Reflect.field(record, "support");
 		if (supportValue == null)
 			return new ConstrainedSketchFeature(sketch);
+		var rawSupportSelection:Dynamic = Reflect.field(record, "supportSelection");
+		var supportSelection = rawSupportSelection == null ? null : decodeSelection(rawSupportSelection);
 		return new ConstrainedSketchFeature(sketch, requiredFeature(document, integerValue(cast supportValue, "support")),
-			decodeSelection(requiredField(record, "supportSelection")), decodeVector(requiredField(record, "supportXDirection")),
-			numberField(record, "supportOffset"), boolField(record, "supportFlipped"));
+			supportSelection, decodeVector(requiredField(record, "supportXDirection")),
+			numberField(record, "supportOffset"), boolField(record, "supportFlipped"), null,
+			optionalSupportFaceFingerprint(record));
 	}
 
 	private static function optionalString(record:Dynamic, name:String):Null<String> {
@@ -1076,6 +1085,13 @@ class DocumentCodec {
 
 	private static function optionalFaceFingerprint(record:Dynamic):Null<TopologyFingerprint> {
 		var value:Dynamic = Reflect.field(record, "fingerprint");
+		if (value == null)
+			return null;
+		return decodeFingerprint(value, CadKit.ShapeKind.Face);
+	}
+
+	private static function optionalSupportFaceFingerprint(record:Dynamic):Null<TopologyFingerprint> {
+		var value:Dynamic = Reflect.field(record, "supportFaceFingerprint");
 		if (value == null)
 			return null;
 		return decodeFingerprint(value, CadKit.ShapeKind.Face);

@@ -187,6 +187,80 @@ class CadPlateWorkflowTests {
     scene.dispose();
   }
 
+  static function faceSketchPocketWorkflow():Void {
+    var scene = new EditorScene([]);
+    var step = "create part";
+    try {
+      check(scene.createCadPart(), "create an editable part for a face-supported pocket");
+      var id = scene.selectedId;
+      step = "create base sketch";
+      check(scene.createSketch(), "create the base profile");
+      check(scene.applySelectedSketchEdit(), "apply the base profile");
+      step = "create base extrusion";
+      check(scene.createExtrusion(), "create the base solid");
+      nearWithin(scene.cadSession(id).document.result().volume(), 4000, 0.001,
+        "base extrusion has the expected volume");
+
+      step = "select support face";
+      check(scene.selectAtRay(0, 0, 1, 0, 0, -1) == id,
+        "ray selection identifies a face on the new solid");
+      check(scene.canCreateFaceSketch(), "a selected solid face offers a face sketch");
+      step = "create attached sketch";
+      check(scene.createFaceSketch() && scene.hasActiveSketchEdit(),
+        "face sketch starts in the constrained sketch editor");
+      check(!scene.canCreatePocket(), "an unfinished face sketch cannot create a pocket");
+      step = "apply attached sketch";
+      check(scene.applySelectedSketchEdit(), "apply the face sketch while retaining the solid output");
+      check(scene.cadSession(id).document.outputFeatureOrNull() == scene.cadSession(id).document.featureAt(1),
+        "face sketch remains an input while the base solid stays visible");
+      step = "create pocket";
+      check(scene.canCreatePocket() && scene.createPocket(),
+        "a solved face sketch creates a through pocket");
+      nearWithin(scene.cadSession(id).document.result().volume(), 3640, 0.001,
+        "through pocket removes the authored sketch area through the solid");
+
+      step = "edit upstream sketch";
+      check(scene.selectTreeKey(id + ":feature:0") && scene.beginSelectedSketchEdit(),
+        "the upstream base sketch remains editable after pocket creation");
+      step = "change upstream dimension";
+      check(edit(scene, "Dimension width", 24) == PropertyEditResult.Applied,
+        "upstream sketch dimensions can change below a face-supported pocket");
+      step = "recompute downstream pocket";
+      check(scene.applySelectedSketchEdit(), "publish the upstream dimension change");
+      nearWithin(scene.cadSession(id).document.result().volume(), 4440, 0.001,
+        "the selected support face follows its extrusion when the base width changes");
+      check(scene.document.undo(), "undo the upstream sketch edit");
+      nearWithin(scene.cadSession(id).document.result().volume(), 3640, 0.001,
+        "undo restores the previous pocket result");
+      check(scene.document.redo(), "redo the upstream sketch edit");
+      nearWithin(scene.cadSession(id).document.result().volume(), 4440, 0.001,
+        "redo recomputes the face-supported pocket");
+
+      step = "save and reopen";
+      var reopened = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
+      try {
+        var document = reopened.cadSession(id).document;
+        check(document.featureCount() == 4, "base, face sketch, and pocket survive save and reopen");
+        nearWithin(document.result().volume(), 4440, 0.001,
+          "saved face reference rebuilds the same pocket after reopen");
+      } catch (error:Dynamic) {
+        reopened.dispose();
+        throw error;
+      }
+      reopened.dispose();
+    } catch (error:Dynamic) {
+      scene.dispose();
+      var cause:Dynamic = Reflect.field(error, "cause");
+      var inner:Dynamic = cause == null ? null : Reflect.field(cause, "cause");
+      var message:Dynamic = inner == null ? null : Reflect.field(inner, "message");
+      if (message == null && cause != null)
+        message = Reflect.field(cause, "message");
+      throw "face sketch pocket workflow failed at " + step + ": " +
+        (message == null ? Std.string(error) : Std.string(message));
+    }
+    scene.dispose();
+  }
+
   static function stepImportWorkflow():Void {
     var session = new SceneDocumentSession();
     var root = Sys.getCwd() + "/../build-cad";
@@ -603,6 +677,7 @@ class CadPlateWorkflowTests {
       emptyCadPartWorkflow();
       sketchCreationWorkflow();
       sketchExtrusionWorkflow();
+      faceSketchPocketWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();
       bracketWorkflow();

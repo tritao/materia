@@ -1,5 +1,7 @@
 package cadkit.parametric.features;
 
+import CadKit;
+import cadkit.Shape;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.Feature;
@@ -16,6 +18,8 @@ import cadkit.sketch.SketchEntity;
 import cadkit.parametric.features.ConstrainedSketchChange;
 import cadkit.parametric.FeatureId;
 import cadkit.parametric.SelectionRecipe;
+import cadkit.parametric.TopologyFingerprint;
+import cadkit.parametric.TopologyReference;
 import cadkit.modeling.Vector;
 import cadkit.sketch.FaceWorkplane;
 
@@ -37,9 +41,13 @@ class ConstrainedSketchFeature extends Feature {
 	public final supportXDirection:Null<Vector>;
 	public final supportOffset:Float;
 	public final supportFlipped:Bool;
+	public var supportFaceReference(default, null):Null<TopologyReference>;
+	private var pendingSupportFace:Null<Shape>;
+	private var pendingSupportFaceFingerprint:Null<TopologyFingerprint>;
 
 	public function new(authored:ConstrainedSketch, ?support:Feature, ?supportSelection:SelectionRecipe, ?supportXDirection:Vector,
-		supportOffset:Float = 0, supportFlipped:Bool = false) {
+		supportOffset:Float = 0, supportFlipped:Bool = false, ?supportFace:Shape,
+		?savedSupportFaceFingerprint:TopologyFingerprint) {
 		super();
 		this.authored = authored.copy();
 		dimensionSlots = new Map();
@@ -57,8 +65,17 @@ class ConstrainedSketchFeature extends Feature {
 		this.supportXDirection = supportXDirection;
 		this.supportOffset = supportOffset;
 		this.supportFlipped = supportFlipped;
-		if ((support == null) != (supportSelection == null) || (support != null && supportXDirection == null))
-			throw "attached constrained sketches require support, selection, and X direction together";
+		var hasFaceReference = supportFace != null || savedSupportFaceFingerprint != null;
+		if ((support == null && (supportSelection != null || hasFaceReference || supportXDirection != null)) ||
+			(support != null && (supportXDirection == null || (supportSelection == null && !hasFaceReference))) ||
+			(supportFace != null && savedSupportFaceFingerprint != null))
+			throw "attached constrained sketches require a support face selection and an X direction";
+		if (hasFaceReference && supportSelection != null && (supportSelection.kind != "face" ||
+			supportSelection.geometry != "plane" || supportSelection.expectedCount != 1))
+			throw "face-reference fallback must select exactly one planar face";
+		pendingSupportFace = supportFace == null ? null : supportFace.cloneShape();
+		pendingSupportFaceFingerprint = savedSupportFaceFingerprint;
+		supportFaceReference = null;
 		for (constraint in authored.constraints())
 			if (isDimensional(constraint.kind)) {
 				dimensionSlots.set(constraint.id, new Parameter(this, "constraint." + constraint.id, constraint.value,
@@ -198,6 +215,26 @@ class ConstrainedSketchFeature extends Feature {
 		}
 	}
 
+	override public function onAttached():Void {
+		if (support == null)
+			return;
+		if (pendingSupportFace != null) {
+			supportFaceReference = TopologyReference.fromShape(this, pendingSupportFace, support, supportSelection);
+			pendingSupportFace = null;
+		} else if (pendingSupportFaceFingerprint != null) {
+			supportFaceReference = TopologyReference.fromFingerprint(
+				this, CadKit.ShapeKind.Face, pendingSupportFaceFingerprint, support, supportSelection);
+			pendingSupportFaceFingerprint = null;
+		}
+	}
+
+	override public function onClose():Void {
+		if (pendingSupportFace != null) {
+			pendingSupportFace.close();
+			pendingSupportFace = null;
+		}
+	}
+
 	private function restoreDimensionValue(slot:Parameter, value:Float):Void {
 		if (document != null) {
 			for (named in document.namedParameters()) {
@@ -287,8 +324,24 @@ class ConstrainedSketchFeature extends Feature {
 
 	override public function evaluate(context:EvaluationContext):EvaluationResult {
 		var plane = authored.plane;
-		if (support != null)
-			plane = FaceWorkplane.resolve(context.shape(support), supportSelection, supportXDirection, supportOffset, supportFlipped);
+		if (support != null) {
+			if (supportFaceReference != null) {
+				var selectedFace = supportFaceReference.resolveFor(
+					context.shape(support), context.operation(support));
+				try {
+					plane = FaceWorkplane.fromFace(selectedFace, supportXDirection, supportOffset, supportFlipped);
+					selectedFace.close();
+				} catch (error:Dynamic) {
+					selectedFace.close();
+					throw error;
+				}
+			} else if (supportSelection != null) {
+				plane = FaceWorkplane.resolve(context.shape(support), supportSelection, supportXDirection,
+					supportOffset, supportFlipped);
+			} else {
+				throw new ParametricError("attached sketch has no selected support face");
+			}
+		}
 		var candidate = new ConstrainedSketch(plane, authored.units, authored.settings);
 		for (point in authored.points())
 			candidate.addPoint(point);

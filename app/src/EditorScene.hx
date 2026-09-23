@@ -24,11 +24,13 @@ import CadKit;
 import cadkit.Shape;
 import cadkit.parametric.Feature;
 import cadkit.parametric.ReferenceState;
+import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyHistoryMap;
 import cadkit.parametric.TopologyResolver;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.parametric.features.PocketFeature;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.sketch.ConstrainedSketch;
@@ -223,6 +225,55 @@ class EditorScene {
     return true;
   }
 
+  public function canCreateFaceSketch():Bool {
+    if (activeSketchEdit != null || selectedCadFace == null || selectedCadFaceIndex < 0)
+      return false;
+    var item = object(selectedId);
+    if (item == null || item.kind != "cad-part")
+      return false;
+    var output = requireCadSession(selectedId).document.outputFeatureOrNull();
+    var shape = output == null ? null : output.currentShape();
+    return selectedCadFace.surfaceKind() == CadKit.SurfaceKind.Plane && shape != null &&
+      shape.subshapeCount(CadKit.ShapeKind.Solid) > 0;
+  }
+
+  /** Create a face-attached sketch using the exact face selected in the viewport. */
+  public function createFaceSketch():Bool {
+    if (!canCreateFaceSketch())
+      return false;
+    var id = selectedId;
+    var session = requireCadSession(id);
+    var support = session.document.outputFeatureOrNull();
+    if (support == null)
+      return false;
+    var supportShape = support.currentShape();
+    if (supportShape == null)
+      return false;
+    var normal = Vector.fromNative(selectedCadFace.faceNormal()).normalized();
+    var xDirection = Math.abs(normal.dot(Vector.X())) > 0.99 ? Vector.Y() : Vector.X();
+    var fallback = supportSelectionForFace(supportShape, selectedCadFace, normal);
+    var feature = new ConstrainedSketchFeature(starterSketch(6), support, fallback,
+      xDirection, 0, false, selectedCadFace);
+    if (!addCadFeature(id, "Create face sketch", feature, false))
+      return false;
+    var featureIndex = selectCadFeature(id, feature);
+    clearSelectedCadFace();
+    activeSketchEdit = session.beginSketchEdit(featureIndex);
+    activeSketchObjectId = id;
+    refreshSelectionRevision();
+    return true;
+  }
+
+  function supportSelectionForFace(support:Shape, face:Shape, normal:Vector):Null<SelectionRecipe> {
+    var recipe = new SelectionRecipe("face", "plane", normal, "max", normal, 1, 0.000001);
+    var matches:Array<Shape>;
+    try matches = recipe.resolve(support) catch (_:Dynamic) return null;
+    var isSelectedFace = matches.length == 1 && matches[0].sameAs(face);
+    for (match in matches)
+      match.close();
+    return isSelectedFace ? recipe : null;
+  }
+
   public function canCreateExtrusion():Bool {
     if (activeSketchEdit != null)
       return false;
@@ -276,7 +327,32 @@ class EditorScene {
     });
   }
 
-  function addCadFeature(id:String, label:String, feature:Feature):Bool {
+  public function canCreatePocket():Bool {
+    if (activeSketchEdit != null)
+      return false;
+    var item = object(selectedId);
+    if (item == null || item.kind != "cad-part")
+      return false;
+    var feature = selectedCadFeature(selectedId);
+    return feature != null && feature.active && Std.isOfType(feature, ConstrainedSketchFeature) &&
+      (cast(feature, ConstrainedSketchFeature)).supportFaceReference != null && feature.currentShape() != null;
+  }
+
+  /** Cut the selected face-supported sketch through its source solid. */
+  public function createPocket():Bool {
+    if (!canCreatePocket())
+      return false;
+    var id = selectedId;
+    var sketch:ConstrainedSketchFeature = cast selectedCadFeature(id);
+    var pocket = PocketFeature.throughAll(sketch.support, sketch);
+    if (!addCadFeature(id, "Create pocket", pocket))
+      return false;
+    selectCadFeature(id, pocket);
+    refreshSelectionRevision();
+    return true;
+  }
+
+  function addCadFeature(id:String, label:String, feature:Feature, publishAsOutput:Bool = true):Bool {
     var session = requireCadSession(id);
     var previousOutput = session.document.outputFeatureOrNull();
     return applyCadEdit(id, label, function(owner) {
@@ -288,7 +364,8 @@ class EditorScene {
         } else {
           owner.document.setFeatureActive(feature, true);
         }
-        owner.document.setOutputTracked(feature);
+        if (publishAsOutput)
+          owner.document.setOutputTracked(feature);
         owner.document.recompute();
         transaction.commit();
       } catch (error:Dynamic) {
@@ -336,12 +413,13 @@ class EditorScene {
     throw "created CAD feature is missing from its document";
   }
 
-  static function starterSketch():ConstrainedSketch {
+  static function starterSketch(side:Float = 20):ConstrainedSketch {
     var sketch = new ConstrainedSketch(Plane.XY(), "mm");
-    sketch.addPoint(new SketchPoint("p0", -10, -10));
-    sketch.addPoint(new SketchPoint("p1", 10, -10));
-    sketch.addPoint(new SketchPoint("p2", 10, 10));
-    sketch.addPoint(new SketchPoint("p3", -10, 10));
+    var halfSide = side / 2;
+    sketch.addPoint(new SketchPoint("p0", -halfSide, -halfSide));
+    sketch.addPoint(new SketchPoint("p1", halfSide, -halfSide));
+    sketch.addPoint(new SketchPoint("p2", halfSide, halfSide));
+    sketch.addPoint(new SketchPoint("p3", -halfSide, halfSide));
     sketch.addEntity(SketchEntity.line("bottom", "p0", "p1"));
     sketch.addEntity(SketchEntity.line("right", "p1", "p2"));
     sketch.addEntity(SketchEntity.line("top", "p2", "p3"));
@@ -351,8 +429,8 @@ class EditorScene {
     sketch.addConstraint(SketchConstraint.vertical("right-vertical", "right"));
     sketch.addConstraint(SketchConstraint.horizontal("top-horizontal", "top"));
     sketch.addConstraint(SketchConstraint.vertical("left-vertical", "left"));
-    sketch.addConstraint(SketchConstraint.distance("width", "p0", "p1", 20));
-    sketch.addConstraint(SketchConstraint.distance("height", "p1", "p2", 20));
+    sketch.addConstraint(SketchConstraint.distance("width", "p0", "p1", side));
+    sketch.addConstraint(SketchConstraint.distance("height", "p1", "p2", side));
     return sketch;
   }
 
