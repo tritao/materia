@@ -27,8 +27,8 @@ class RobotRecording {
   public function recordSnapshot(snapshot:RobotSnapshot):Void {
     var copy = copyRobotSnapshot(snapshot);
     snapshots.push(copy);
-    events.push(RobotRecordingEvent.SceneSnapshot(copyRobotSnapshot(copy)));
-    append(RobotRecordingEvent.SceneSnapshot(copyRobotSnapshot(copy)), copy.id);
+    events.push(RobotRecordingEvent.RobotSnapshot(copyRobotSnapshot(copy)));
+    append(RobotRecordingEvent.RobotSnapshot(copyRobotSnapshot(copy)), copy.id);
   }
 
   public function recordFault(fault:RobotFault):Void {
@@ -88,7 +88,7 @@ class RobotRecording {
     var timestamp = Int64.ofInt(0);
     var clock = "unspecified";
     switch event {
-      case SceneSnapshot(value): sequence = value.sourceSequence; timestamp = value.sourceTimestampNs; clock = value.sourceClockId;
+      case RobotSnapshot(value): sequence = value.sourceSequence; timestamp = value.sourceTimestampNs; clock = value.sourceClockId;
       case Sensor(_, value): sequence = value.sequence; timestamp = value.sourceTimestampNs; clock = value.sourceClockId;
       case _: // Event-specific fields remain zero when the source contract has none.
     }
@@ -103,7 +103,7 @@ class RobotRecording {
     events.push(entry.event);
     switch entry.event {
       case Command(value): commands.push(value);
-      case SceneSnapshot(value): snapshots.push(copyRobotSnapshot(value));
+      case RobotSnapshot(value): snapshots.push(copyRobotSnapshot(value));
       case Fault(value): faults.push(new RobotFault(value.id, value.code, value.message, value.fatal));
       case World(value): worlds.push(value);
       case Sensor(_, _), WorldEvent(_):

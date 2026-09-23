@@ -25,7 +25,7 @@ class RobotRecordingCodec {
           Reflect.setField(root, "payload", {kind:"jointPosition", joint:joint, target:target,
             expiryNs:expiryNs == null ? null : Int64.toStr(expiryNs)});
         }
-      case SceneSnapshot(value): Reflect.setField(root, "type", "snapshot"); Reflect.setField(root, "payload", snapshot(value));
+      case RobotSnapshot(value): Reflect.setField(root, "type", "snapshot"); Reflect.setField(root, "payload", snapshot(value));
       case Sensor(robotId, value): Reflect.setField(root, "type", "sensor"); Reflect.setField(root, "robotId", robotId); Reflect.setField(root, "payload", sensor(value));
       case Fault(value): Reflect.setField(root, "type", "fault"); Reflect.setField(root, "payload", {id:value.id, code:value.code, message:value.message, fatal:value.fatal});
       case World(value):
@@ -51,7 +51,7 @@ class RobotRecordingCodec {
       case "command":
         if (string(payload,"kind") != "jointPosition") throw "Unsupported RobotKit command payload";
         Command(JointPosition(fieldInt(payload,"joint"), fieldFloat(payload,"target"), nullableWide(payload,"expiryNs")));
-      case "snapshot": SceneSnapshot(readSnapshot(payload));
+      case "snapshot": RobotSnapshot(readSnapshot(payload));
       case "sensor": Sensor(robotId, readSensor(payload));
       case "fault": Fault(new RobotFault(string(payload,"id"),fieldInt(payload,"code"),string(payload,"message"),fieldBool(payload,"fatal")));
       case "world":

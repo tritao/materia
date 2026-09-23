@@ -55,7 +55,7 @@ class McapRobotRecording {
   function flushLast():Void {
     if (closed) throw "Recording is closed";
     var entry=staging.entries[staging.entries.length-1], bytes=RobotRecordingCodec.encode(entry);
-    var kind = switch entry.event {case Command(_):1;case SceneSnapshot(_):2;case Sensor(_,_):3;case Fault(_):4;case World(_):5;case WorldEvent(_):6;};
+    var kind = switch entry.event {case Command(_):1;case RobotSnapshot(_):2;case Sensor(_,_):3;case Fault(_):4;case World(_):5;case WorldEvent(_):6;};
     check(RobotKitRuntime.rk_recording_writer_enqueue(owner.borrow(),kind,
       RobotRecordingEntry.VERSION,entry.ordinal,entry.recordingTimestampNs,bytes),
       "enqueue recording event");

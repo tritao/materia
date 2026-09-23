@@ -60,7 +60,7 @@ class McapRecordingReader {
   }
 
   static function kind(event:RobotRecordingEvent):Int return switch event {
-    case Command(_):1;case SceneSnapshot(_):2;case Sensor(_,_):3;
+    case Command(_):1;case RobotSnapshot(_):2;case Sensor(_,_):3;
     case Fault(_):4;case World(_):5;case WorldEvent(_):6;
   };
   static function parseWide(fields:Map<String,String>,name:String):Int64

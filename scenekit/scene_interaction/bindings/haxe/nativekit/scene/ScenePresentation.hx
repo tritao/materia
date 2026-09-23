@@ -15,8 +15,6 @@ class ScenePresentation {
 	public final view:SceneView;
 	final selectionMaterial:Material;
 	final hoverMaterial:Material;
-	var sourceFilter:Null<SceneViewFilter> = null;
-	final isolatedNodeFallback:Array<NodeId> = [];
 	var disposed:Bool = false;
 
 	private function new(interaction:SceneInteraction, view:SceneView,
@@ -57,69 +55,24 @@ class ScenePresentation {
 		interaction.clearSelection();
 	}
 
-	/** Installs a persistent source filter for this presentation. */
+	/** Applies source rules to the view. The view remains their sole owner. */
 	public function setSourceFilter(filter:Null<SceneViewFilter>):ScenePresentation {
 		ensureLive();
-		sourceFilter = filter;
-		isolatedNodeFallback.resize(0);
 		view.clearIsolation();
 		if (filter == null) {
 			view.clearSourceFilter();
-		} else {
-			filter.applyTo(view);
+			return this;
 		}
+	filter.applyTo(view);
 		return this;
 	}
 
 	public function clearSourceFilter():ScenePresentation
 		return setSourceFilter(null);
 
-	public function hideSource(source:haxe.Int64):ScenePresentation {
-		ensureLive();
-		ensureSourceFilter().hideSource(source);
-		applySourceFilter();
-		return this;
-	}
-
-	public function showSource(source:haxe.Int64):ScenePresentation {
-		ensureLive();
-		ensureSourceFilter().showSource(source);
-		applySourceFilter();
-		return this;
-	}
-
-	public function setSourceMaterial(source:haxe.Int64,
-			material:Material):ScenePresentation {
-		ensureLive();
-		ensureSourceFilter().setSourceMaterial(source, material);
-		applySourceFilter();
-		return this;
-	}
-
-	public function isolateSource(source:haxe.Int64):ScenePresentation {
-		ensureLive();
-		isolatedNodeFallback.resize(0);
-		ensureSourceFilter().isolateSource(source);
-		applySourceFilter();
-		return this;
-	}
-
-	public function isolateSources(sources:Array<haxe.Int64>):ScenePresentation {
-		ensureLive();
-		isolatedNodeFallback.resize(0);
-		ensureSourceFilter().isolateSources(sources);
-		applySourceFilter();
-		return this;
-	}
-
 	public function clearIsolation():ScenePresentation {
 		ensureLive();
-		if (sourceFilter != null) {
-			sourceFilter.clearIsolation();
-		}
-		isolatedNodeFallback.resize(0);
 		view.clearIsolation();
-		applySourceFilter();
 		return this;
 	}
 
@@ -127,14 +80,14 @@ class ScenePresentation {
 	public function isolateSelection(snapshot:SceneSnapshot):ScenePresentation {
 		ensureLive();
 		var sources:Array<haxe.Int64> = [];
-		isolatedNodeFallback.resize(0);
+		view.clearIsolation();
 		for (node in interaction.selected()) {
 			var info = snapshot.findNode(node);
 			if (info == null)
 				continue;
 			var source = info.sourceValue();
 			if (source == haxe.Int64.ofInt(0)) {
-				isolatedNodeFallback.push(node);
+				view.setIsolatedNode(node, true);
 				continue;
 			}
 			var found = false;
@@ -146,8 +99,8 @@ class ScenePresentation {
 			if (!found)
 				sources.push(source);
 		}
-		ensureSourceFilter().isolateSources(sources);
-		applySourceFilter();
+		for (source in sources)
+			view.setIsolatedSource(source, true);
 		return this;
 	}
 
@@ -159,7 +112,6 @@ class ScenePresentation {
 			?changes:Null<ChangeSet>):nkscene_render_execution_stats {
 		ensureLive();
 		interaction.synchronize(snapshot);
-		applySourceFilter();
 		if (renderer.hasPlan())
 			interaction.pollHover(renderer, snapshot);
 		interaction.applySelection(view, selectionMaterial);
@@ -180,21 +132,5 @@ class ScenePresentation {
 	function ensureLive():Void {
 		if (disposed)
 			throw "Scene presentation has been disposed";
-	}
-
-	function ensureSourceFilter():SceneViewFilter {
-		var result = sourceFilter;
-		if (result == null) {
-			result = new SceneViewFilter();
-			sourceFilter = result;
-		}
-		return result;
-	}
-
-	function applySourceFilter():Void {
-		if (sourceFilter != null)
-			sourceFilter.applyTo(view);
-		for (node in isolatedNodeFallback)
-			view.setIsolatedNode(node, true);
 	}
 }

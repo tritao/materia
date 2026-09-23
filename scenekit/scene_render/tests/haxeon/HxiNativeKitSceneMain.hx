@@ -334,7 +334,7 @@ class Main {
 			presentationRenderer = SceneRenderer.createHeadless(),
 			sourcePresentation = ScenePresentation.create(presentationView, highlight, hoverHighlight);
 		sourcePresentation.select(first, SelectionMode.Replace);
-		sourcePresentation.hideSource(haxe.Int64.ofInt(84));
+		presentationView.setSourceVisibility(haxe.Int64.ofInt(84), false);
 		var sourcePresentationExecution = sourcePresentation.render(presentationRenderer, snapshot),
 			sourcePresentationUpdate = presentationRenderer.lastUpdate();
 		if (presentationView.sourceVisibilityOverrideCount() != 1
