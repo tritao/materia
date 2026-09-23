@@ -233,7 +233,7 @@ For a bounded HashLink CPU/allocation/GC capture with process RSS sampled at
 python3 app/tools/profile-editor.py --frames 240
 python3 app/tools/profile-editor.py --no-profile --frames 240
 python3 app/tools/profile-editor.py --no-profile --idle-seconds 10
-python3 app/tools/profile-editor.py --no-profile --seconds 4 --scenario tab-inspector
+python3 app/tools/profile-editor.py --no-profile --scenario tab-inspector --cycles 20
 ```
 
 The output directory contains `editor.hlpc`, `editor.perfetto.json`,
@@ -249,9 +249,12 @@ record view, tree/style, native layout, reconciliation, custom paint, and native
 render durations, along with per-frame style resolutions, cache hits and misses,
 and changed-node counts.
 
-The timed capture keeps normal event-driven frame scheduling. The
-`tab-inspector` scenario records its clicks and rename in `actions.jsonl` and
-checks that the final scene contains the committed name `Profile box`.
+The timed desktop capture keeps normal event-driven frame scheduling. The
+`tab-inspector` scenario runs without a display server: it submits the real
+editor UI, clicks Hierarchy and Sensors through `UiContext`, edits the inspector
+field, and checks the committed name `Profile box`. It records each action and
+submit in `actions.jsonl` and `frame-timeline.jsonl`. These headless timings
+include UI tree construction and native layout, but no window or GPU rendering.
 
 UIKit's reusable Component Lab can be opened through the same desktop host:
 

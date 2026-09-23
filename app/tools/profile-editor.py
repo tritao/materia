@@ -5,12 +5,10 @@ import argparse
 import json
 import os
 from pathlib import Path
-import re
 import socket
 import statistics
 import subprocess
 import sys
-import threading
 import time
 
 
@@ -38,56 +36,14 @@ def cpu_seconds(pid):
         return None
 
 
-def run_scenario(pid, output):
-    """Replay a small editor interaction against the test process's own window."""
-    actions = output / "actions.jsonl"
-    try:
-        deadline = time.monotonic() + 10
-        window = None
-        while time.monotonic() < deadline:
-            listing = subprocess.check_output(["wmctrl", "-lp"], text=True)
-            for line in listing.splitlines():
-                parts = line.split(maxsplit=4)
-                if len(parts) == 5 and parts[2] == str(pid) and "Materia Reference Editor" in parts[4]:
-                    window = parts[0]
-                    break
-            if window is not None:
-                break
-            time.sleep(0.1)
-        if window is None:
-            raise RuntimeError("editor window did not appear")
-        geometry = subprocess.check_output(["xwininfo", "-id", window], text=True)
-        x = int(re.search(r"Absolute upper-left X:\s*(-?\d+)", geometry).group(1))
-        y = int(re.search(r"Absolute upper-left Y:\s*(-?\d+)", geometry).group(1))
-        subprocess.run(["xdotool", "windowactivate", window], check=True)
-        time.sleep(0.5)
-        with actions.open("w") as log:
-            for name, px, py in (("hierarchy", 40, 60), ("sensors", 120, 60),
-                                 ("inspector-name", 1180, 320)):
-                subprocess.run(["xdotool", "mousemove", str(x + px), str(y + py), "click", "1"], check=True)
-                log.write(json.dumps({"action": name, "timeSeconds": time.time()}) + "\n")
-                log.flush()
-                time.sleep(0.35)
-            subprocess.run(["xdotool", "windowactivate", "--sync", window], check=True)
-            log.write(json.dumps({"action": "focus", "window": window,
-                                  "activeWindow": subprocess.check_output(["xdotool", "getactivewindow"], text=True).strip(),
-                                  "timeSeconds": time.time()}) + "\n")
-            subprocess.run(["xdotool", "key", "ctrl+a"], check=True)
-            subprocess.run(["xdotool", "type", "--clearmodifiers", "--delay", "1",
-                            "Profile box"], check=True)
-            subprocess.run(["xdotool", "key", "Return"], check=True)
-            log.write(json.dumps({"action": "rename", "timeSeconds": time.time()}) + "\n")
-    except (OSError, ValueError, AttributeError, subprocess.CalledProcessError, RuntimeError) as error:
-        actions.write_text(json.dumps({"error": str(error)}) + "\n")
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--frames", type=int, default=240)
     parser.add_argument("--seconds", type=float, help="capture normal event-driven frames for this interval")
     parser.add_argument("--idle-seconds", type=float, help="sample an unbounded editor, then stop it")
     parser.add_argument("--no-profile", action="store_true", help="measure without profiler overhead")
-    parser.add_argument("--scenario", choices=["tab-inspector"], help="replay a fixed UI interaction")
+    parser.add_argument("--scenario", choices=["tab-inspector"], help="replay a headless UI interaction")
+    parser.add_argument("--cycles", type=int, default=20, help="headless Hierarchy/Sensors cycles (default: 20)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the existing compiled editor")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("editor_args", nargs=argparse.REMAINDER)
@@ -100,47 +56,64 @@ def main():
         parser.error("--idle-seconds must be positive")
     if args.seconds is not None and args.idle_seconds is not None:
         parser.error("--seconds and --idle-seconds are mutually exclusive")
-    if args.scenario is not None and args.idle_seconds is not None:
-        parser.error("--scenario requires a frame or timed capture")
+    if args.scenario is not None and (args.seconds is not None or args.idle_seconds is not None):
+        parser.error("--scenario runs headlessly and cannot use --seconds or --idle-seconds")
+    if args.cycles < 1:
+        parser.error("--cycles must be positive")
+    if args.scenario is None and args.cycles != 20:
+        parser.error("--cycles requires --scenario")
+    if args.scenario is not None and args.editor_args:
+        parser.error("editor arguments after -- are not supported by headless scenarios")
     output = (args.output_dir or APP / "build/profiles" / time.strftime("%Y%m%d-%H%M%S")).resolve()
     output.mkdir(parents=True, exist_ok=False)
     editor_args = args.editor_args[1:] if args.editor_args[:1] == ["--"] else args.editor_args
     runtime = ROOT / "haxeon/.tools/hashlink/hl"
     profiler = ROOT / "haxeon/.tools/hashlink/hlprof-live"
     with (output / "launch.log").open("w") as log, (output / "memory.jsonl").open("w") as memory:
+        headless_binary = APP / "build/host/headless-profile.hl"
         if args.skip_build:
-            if not (APP / "build/host/main.hl").exists():
-                parser.error("--skip-build requires an existing app/build/host/main.hl")
-            log.write("Reusing existing app/build/host/main.hl; source changes are not included.\n")
+            binary = headless_binary if args.scenario is not None else APP / "build/host/main.hl"
+            if not binary.exists():
+                parser.error(f"--skip-build requires an existing {binary}")
+            log.write(f"Reusing existing {binary}; source changes are not included.\n")
         else:
             build = subprocess.run([str(HAXEON), "build", "--project", str(APP / "haxeon.json")],
                                    cwd=APP, stdout=log, stderr=subprocess.STDOUT)
             if build.returncode:
                 print(f"build failed; see {output / 'launch.log'}", file=sys.stderr)
                 return build.returncode
+            if args.scenario is not None:
+                build = subprocess.run([str(HAXEON), "build", "--compiler-only",
+                                        "--project", str(APP / "tests/performance/haxeon.json"),
+                                        "--output", str(headless_binary)],
+                                       cwd=APP, stdout=log, stderr=subprocess.STDOUT)
+                if build.returncode:
+                    print(f"headless build failed; see {output / 'launch.log'}", file=sys.stderr)
+                    return build.returncode
         native_dirs = sorted({str(path.parent) for path in (APP / "build/host/native").rglob("*.so")})
         environment = os.environ.copy()
         environment["LD_LIBRARY_PATH"] = os.pathsep.join(
             [str(runtime.parent), str(ROOT / "haxeon/out"), *native_dirs,
              environment.get("LD_LIBRARY_PATH", "")])
+        if args.scenario is not None:
+            environment.pop("DISPLAY", None)
+            environment.pop("WAYLAND_DISPLAY", None)
         with socket.socket() as reservation:
             reservation.bind(("127.0.0.1", 0))
             port = reservation.getsockname()[1]
         command = [str(runtime)]
         if not args.no_profile:
             command += ["--diagnostics", str(port), "--diagnostics-wait"]
-        command += [str(APP / "build/host/main.hl")]
-        if args.idle_seconds is None:
+        command += [str(headless_binary if args.scenario is not None else APP / "build/host/main.hl")]
+        if args.scenario is not None:
+            command += [str(output), str(args.cycles)]
+        elif args.idle_seconds is None:
             command += ["--capture-dir=" + str(output)]
             command += (["--capture-seconds=" + str(args.seconds)] if args.seconds is not None
                         else ["--frames=" + str(args.frames)])
         command += editor_args
         process = subprocess.Popen(command, cwd=APP, env=environment,
                                    stdout=log, stderr=subprocess.STDOUT)
-        scenario = None
-        if args.scenario is not None:
-            scenario = threading.Thread(target=run_scenario, args=(process.pid, output), daemon=True)
-            scenario.start()
         with (output / "profiler.log").open("w") as profile_log:
             capture = None if args.no_profile else subprocess.Popen(
                 [str(profiler), "--connect-timeout", "15", "--rate", "500",
@@ -169,8 +142,6 @@ def main():
                     capture.wait(timeout=10)
                 if capture is not None and capture.returncode:
                     raise RuntimeError("hlprof-live failed; see profiler.log")
-                if scenario is not None:
-                    scenario.join(timeout=2)
             except (RuntimeError, TimeoutError, subprocess.TimeoutExpired) as error:
                 process.terminate()
                 if capture is not None:
@@ -219,9 +190,13 @@ def main():
             actions = [json.loads(line) for line in (output / "actions.jsonl").read_text().splitlines()]
             state = json.loads((output / "app-state.json").read_text())
             labels = {item["id"]: item["label"] for item in state["scene"]["objects"]}
-            if labels.get("box") != "Profile box" or not any(row.get("action") == "rename" for row in actions):
+            tab_counts = {name: sum(row.get("action") == name for row in actions)
+                          for name in ("hierarchy", "sensors")}
+            if (labels.get("box") != "Profile box" or
+                    any(count != args.cycles for count in tab_counts.values()) or
+                    not any(row.get("action") == "rename" for row in actions)):
                 raise ValueError("tab and inspector scenario did not commit the expected rename")
-            print("scenario=tab-inspector verified")
+            print(f"scenario=tab-inspector verified cycles={args.cycles}")
         except (OSError, KeyError, ValueError) as error:
             print(f"scenario verification failed: {error}", file=sys.stderr)
             result = 1
