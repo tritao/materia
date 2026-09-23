@@ -211,10 +211,28 @@ class ConstrainedSketchSmoke {
 		check(failed && feature.sketch().points().length == 4, "referenced point removal is rejected atomically");
 		var widthIdentity = feature.dimension("width");
 		width.set(12); document.recompute();
+		failed = false;
+		try feature.removeConstraint("width") catch (error:Dynamic)
+			failed = Std.string(error).indexOf("named parameter width") >= 0;
+		check(failed && feature.sketch().constraints().length == baseConstraintCount
+			&& feature.dimension("width") == widthIdentity, "bound dimensional constraint removal explains its dependency");
+		width.unbind(widthIdentity);
 		feature.removeConstraint("width"); document.recompute();
+		failed = false;
+		try widthIdentity.set(13) catch (error:Dynamic) failed = true;
+		check(failed, "removed dimension parameters cannot be edited through stale handles");
+		var removedDimensionReload = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
+		var removedDimensionFeature:ConstrainedSketchFeature = cast removedDimensionReload.featureAt(0);
+		var removedNamedWidth = removedDimensionReload.parameter("width");
+		failed = false;
+		try removedDimensionFeature.dimension("width") catch (error:Dynamic) failed = true;
+		check(failed && removedNamedWidth.bindings().length == 0 && removedNamedWidth.value == 12,
+			"removed dimensions and their bindings do not persist as stale parameters");
+		removedDimensionReload.close();
 		check(document.undo(), "dimensional constraint removal undo");
 		check(feature.dimension("width") == widthIdentity && feature.dimension("width").value == 12,
 			"dimensional constraint undo preserves identity and value");
+		width.bind(feature.dimension("width"));
 		check(document.undo(), "dimension value undo after constraint restore");
 		check(feature.dimension("width") == widthIdentity && feature.dimension("width").value == 10,
 			"parameter history retains restored identity");

@@ -54,6 +54,8 @@ class NamedParameter {
 	public function bind(parameter:Parameter):Void {
 		if (document.isClosed() || parameter.ownerFeature().document != document)
 			throw new ParametricError("named parameter binding belongs to another document");
+		if (!parameter.isRegistered())
+			throw new ParametricError("cannot bind an inactive feature parameter: " + parameter.name);
 		if (document.parameter(name) != this)
 			throw new ParametricError("named parameter is not registered");
 		if (contains(parameter))
@@ -68,6 +70,17 @@ class NamedParameter {
 		if (parameter.value != canonical)
 			throw new ParametricError("named parameter binding value differs from its dimension");
 		targets.push(parameter);
+	}
+
+	public function unbind(parameter:Parameter):Void {
+		if (document.isClosed())
+			throw new ParametricError("document is closed");
+		var index = targets.indexOf(parameter);
+		if (index < 0)
+			throw new ParametricError("feature parameter is not bound to " + name);
+		if (targets.length == 1)
+			storedValue = parameter.value;
+		targets.splice(index, 1);
 	}
 
 	public function set(next:Float, ?inputUnit:String):Void {

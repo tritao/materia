@@ -13,6 +13,7 @@ class Parameter {
 	public var value(default, null):Float;
 
 	private final owner:Feature;
+	private var registered:Bool;
 
 	public function new(owner:Feature, name:String, value:Float, minimum:Float, integer:Bool = false, maximum:Float = 1e300,
 		kind:String = ParameterKind.Scalar) {
@@ -22,12 +23,14 @@ class Parameter {
 		this.integer = integer;
 		this.maximum = maximum;
 		this.kind = ParameterKind.validate(kind);
+		registered = true;
 		validate(value);
 		this.value = value;
 		owner.registerParameter(this);
 	}
 
 	public function set(next:Float):Void {
+		ensureRegistered();
 		validate(next);
 		if (owner.document != null && owner.document.setNamedParameter(this, next))
 			return;
@@ -41,6 +44,7 @@ class Parameter {
 
 	/** Internal undo/redo path; does not create another history record. */
 	public function restore(next:Float):Void {
+		ensureRegistered();
 		validate(next);
 		if (next == value)
 			return;
@@ -50,6 +54,14 @@ class Parameter {
 
 	public function ownerFeature():Feature {
 		return owner;
+	}
+
+	public function setRegistered(value:Bool):Void {
+		registered = value;
+	}
+
+	public function isRegistered():Bool {
+		return registered;
 	}
 
 	public function validateValue(value:Float):Void {
@@ -63,5 +75,10 @@ class Parameter {
 			throw new ParametricError(name + " must not exceed " + Std.string(maximum));
 		if (integer && candidate != Std.int(candidate))
 			throw new ParametricError(name + " must be an integer");
+	}
+
+	private function ensureRegistered():Void {
+		if (!registered)
+			throw new ParametricError("feature parameter is no longer active: " + name);
 	}
 }

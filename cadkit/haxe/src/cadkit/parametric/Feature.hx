@@ -34,18 +34,20 @@ class Feature {
 		scalarParameters = [];
 	}
 
-	/** Scalar slots registered by Parameter construction; stable names are codec binding keys. */
+	/** Active scalar slots; stable names are codec binding keys. */
 	public function registerParameter(parameter:Parameter):Void {
 		for (existing in scalarParameters)
 			if (existing.name == parameter.name)
 				throw new ParametricError("duplicate feature parameter: " + parameter.name);
 		scalarParameters.push(parameter);
+		parameter.setRegistered(true);
 	}
 
 	public function unregisterParameter(parameter:Parameter):Void {
 		for (index in 0...scalarParameters.length) {
 			if (scalarParameters[index] == parameter) {
 				scalarParameters.splice(index, 1);
+				parameter.setRegistered(false);
 				return;
 			}
 		}

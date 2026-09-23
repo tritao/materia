@@ -24,6 +24,8 @@ class ConstrainedSketchFeature extends Feature {
 	private var authored:ConstrainedSketch;
 	private final dimensionSlots:Map<String, Parameter>;
 	private final dimensionKinds:Map<String, String>;
+	private final retiredDimensionSlots:Map<String, Parameter>;
+	private final retiredDimensionKinds:Map<String, String>;
 	public var lastDiagnostic(default,null):Null<SolveDiagnostic>;
 	public var lastAttemptDiagnostic(default,null):Null<SolveDiagnostic>;
 	private var committedSolution:Null<SolvedSketch>;
@@ -40,6 +42,8 @@ class ConstrainedSketchFeature extends Feature {
 		this.authored = authored.copy();
 		dimensionSlots = new Map();
 		dimensionKinds = new Map();
+		retiredDimensionSlots = new Map();
+		retiredDimensionKinds = new Map();
 		lastDiagnostic = null;
 		lastAttemptDiagnostic = null;
 		committedSolution = null;
@@ -120,16 +124,54 @@ class ConstrainedSketchFeature extends Feature {
 		for (constraint in next.constraints())
 			if (isDimensional(constraint.kind))
 				required.set(constraint.id, constraint);
+
+		var removedIds:Array<String> = [];
+		for (id in dimensionSlots.keys()) {
+			if (required.exists(id))
+				continue;
+			var slot = dimensionSlots.get(id);
+			removedIds.push(id);
+			if (document != null)
+				for (named in document.namedParameters())
+					if (named.contains(slot))
+						throw new ParametricError("cannot remove dimensional constraint " + id + " while named parameter "
+							+ named.name + " is bound; unbind the parameter first");
+		}
+		for (id in required.keys()) {
+			var constraint = required.get(id);
+			var existingKind = dimensionKinds.get(id);
+			if (existingKind == null)
+				existingKind = retiredDimensionKinds.get(id);
+			if (existingKind != null && existingKind != constraint.kind)
+				throw new ParametricError("cannot change the kind of a dimensional constraint while preserving its parameter: " + id);
+		}
+
+		for (id in removedIds) {
+			var slot = dimensionSlots.get(id);
+			retiredDimensionSlots.set(id, slot);
+			retiredDimensionKinds.set(id, dimensionKinds.get(id));
+			dimensionSlots.remove(id);
+			dimensionKinds.remove(id);
+			unregisterParameter(slot);
+		}
+
 		for (id in required.keys()) {
 			var constraint = required.get(id);
 			if (!dimensionSlots.exists(id)) {
-				dimensionSlots.set(id, new Parameter(this, "constraint." + id, constraint.value,
-					constraint.kind == "angle" ? -1e300 : 0, false, 1e300,
-					constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length));
+				var slot = retiredDimensionSlots.get(id);
+				if (slot != null) {
+					retiredDimensionSlots.remove(id);
+					retiredDimensionKinds.remove(id);
+					registerParameter(slot);
+					restoreDimensionValue(slot, constraint.value);
+				} else {
+					slot = new Parameter(this, "constraint." + id, constraint.value,
+						constraint.kind == "angle" ? -1e300 : 0, false, 1e300,
+						constraint.kind == "angle" ? ParameterKind.Angle : ParameterKind.Length);
+				}
+				dimensionSlots.set(id, slot);
 				dimensionKinds.set(id, constraint.kind);
 			} else {
-				if (dimensionKinds.get(id) != constraint.kind)
-					throw "cannot change the kind of a dimensional constraint while preserving its parameter: " + id;
 				restoreDimensionValue(dimensionSlots.get(id), constraint.value);
 			}
 		}
