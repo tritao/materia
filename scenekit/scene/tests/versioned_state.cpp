@@ -21,6 +21,9 @@ void published_payloads_are_shared_and_snapshot_safe() {
         nkscene::GeometryVertex{{0.0f, 0.0f, 0.0f}},
         nkscene::GeometryVertex{{1.0f, 0.0f, 0.0f}},
         nkscene::GeometryVertex{{0.0f, 1.0f, 0.0f}}};
+    geometry_resource.bounds.valid = true;
+    geometry_resource.bounds.minimum = {0.0f, 0.0f, 0.0f};
+    geometry_resource.bounds.maximum = {1.0f, 1.0f, 0.0f};
     const auto material = scene->reserve_material_id();
     auto &material_resource = scene->material_store().create(material);
     material_resource.edit_state().base_color = {0.2f, 0.4f, 0.8f, 1.0f};
@@ -42,6 +45,8 @@ void published_payloads_are_shared_and_snapshot_safe() {
     assert(before_geometry && before_material);
     assert(before_geometry->payload->vertices.size() == 3);
     assert(before_material->state->base_color[2] == 0.8f);
+    assert(before.find(node)->bounds.valid);
+    assert(before.find(node)->bounds.maximum[0] == 1.0f);
     const auto same = scene->snapshot();
     assert(before.find_geometry(geometry)->payload == same.find_geometry(geometry)->payload);
     assert(before.find_material(material)->state == same.find_material(material)->state);
@@ -49,6 +54,7 @@ void published_payloads_are_shared_and_snapshot_safe() {
     auto &updated_geometry = scene->geometry_store().create(geometry);
     const auto before_geometry_revision = before_geometry->revision;
     updated_geometry.edit_payload().vertices[0].position[0] = 7.0f;
+    updated_geometry.bounds.maximum[0] = 7.0f;
     auto &updated_material = scene->material_store().create(material);
     const auto before_material_revision = before_material->revision;
     updated_material.edit_state().base_color[2] = 0.1f;
@@ -68,6 +74,9 @@ void published_payloads_are_shared_and_snapshot_safe() {
     assert(after.find_material(material)->revision > before_material_revision);
     assert(after.find_geometry(geometry)->payload->vertices[0].position[0] == 7.0f);
     assert(after.find_material(material)->state->base_color[2] == 0.1f);
+    assert(after.find(node)->bounds.maximum[0] == 7.0f);
+    assert(after.revisions().bounds > before.revisions().bounds);
+    assert(before.find(node)->bounds.maximum[0] == 1.0f);
     assert(before.find_geometry(geometry)->payload->vertices[0].position[0] == 0.0f);
     assert(before.find_material(material)->state->base_color[2] == 0.8f);
 

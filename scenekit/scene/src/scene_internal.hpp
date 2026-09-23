@@ -152,7 +152,7 @@ public:
     const LightStore &light_store() const noexcept { return lights; }
 
     /** Publishes externally edited resources into the next immutable snapshot. */
-    void publish() const;
+    void publish();
 
 private:
     struct TransactionOverlay {
@@ -172,6 +172,8 @@ private:
                             TransactionOverlay &overlay) const noexcept;
     void recompute_world_transforms(ChangeSet &changes,
                                     const TransactionOverlay &overlay);
+    void refresh_geometry_bounds(ChangeSet &changes,
+                                 std::unordered_map<NodeId, std::size_t> &change_indices);
     void publish_state(const ChangeSet *changes,
                        std::span<const std::uint32_t> destroyed_slots) const;
     void record_change(ChangeSet &changes, std::unordered_map<NodeId, std::size_t> &indices,

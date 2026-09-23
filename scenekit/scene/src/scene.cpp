@@ -549,7 +549,7 @@ MaterialId Scene::create_material() {
 
 void Scene::destroy_geometry(GeometryId id) noexcept {
     if (geometries.destroy(id))
-        publish_state(nullptr, {});
+        publish();
 }
 
 void Scene::destroy_material(MaterialId id) noexcept {
@@ -557,8 +557,68 @@ void Scene::destroy_material(MaterialId id) noexcept {
         publish_state(nullptr, {});
 }
 
-void Scene::publish() const {
-    publish_state(nullptr, {});
+void Scene::refresh_geometry_bounds(
+    ChangeSet &changes, std::unordered_map<NodeId, std::size_t> &change_indices) {
+    const auto published = std::atomic_load_explicit(&published_, std::memory_order_acquire);
+    std::vector<GeometryId> changed_geometries;
+    geometries.changes_since(published ? published->geometry_store_revision : 0,
+                             changed_geometries);
+    if (changed_geometries.empty())
+        return;
+
+    const std::unordered_set<GeometryId> changed(changed_geometries.begin(),
+                                                  changed_geometries.end());
+    nodes.for_each([&](NodeId id, NodeHandle handle) {
+        const auto *reference = geometry_refs.find(handle);
+        if (!reference || !changed.contains(reference->id))
+            return;
+
+        Bounds next;
+        const auto *resource = geometries.find(reference->id);
+        const auto *world = world_transforms_.find(handle);
+        if (resource && resource->bounds.valid && world)
+            next = transformed_bounds(resource->bounds, world->transform);
+
+        const auto *current = bounds.find(handle);
+        const bool same = current && current->valid == next.valid &&
+            (!next.valid || (current->minimum == next.minimum && current->maximum == next.maximum));
+        if (!same) {
+            if (next.valid)
+                bounds.insert_or_assign(handle, next);
+            else
+                bounds.erase(handle);
+            changes.stats.dirty_bounds++;
+        }
+        record_change(changes, change_indices, id,
+                      ChangeDomain::Geometry | (same ? ChangeDomain::None : ChangeDomain::Bounds));
+    });
+    changes.stats.changed_nodes = changes.changes.size();
+    changes.stats.changed_resources = changed_geometries.size();
+}
+
+void Scene::publish() {
+    ChangeSet changes;
+    std::unordered_map<NodeId, std::size_t> change_indices;
+    refresh_geometry_bounds(changes, change_indices);
+    if (changes.changes.empty()) {
+        publish_state(nullptr, {});
+        return;
+    }
+
+    ++revisions.scene;
+    bool geometry_changed = false;
+    bool bounds_changed = false;
+    for (const auto &change : changes.changes) {
+        geometry_changed = geometry_changed || has_domain(change.domains, ChangeDomain::Geometry);
+        bounds_changed = bounds_changed || has_domain(change.domains, ChangeDomain::Bounds);
+    }
+    if (geometry_changed)
+        ++revisions.geometry;
+    if (bounds_changed)
+        ++revisions.bounds;
+    changes.scene_revision = revisions.scene;
+    changes.revisions = revisions;
+    publish_state(&changes, {});
 }
 
 void Scene::publish_state(const ChangeSet *changes,
@@ -1073,8 +1133,9 @@ nkscene_result Scene::commit(const Transaction &transaction, ChangeSet &changes)
             },
             mutation);
     }
-    changes.stats.changed_nodes = changes.changes.size();
     recompute_world_transforms(changes, overlay);
+    refresh_geometry_bounds(changes, change_indices);
+    changes.stats.changed_nodes = changes.changes.size();
     std::unordered_set<NodeId> effective_state_seen;
     const auto mark_effective = [&](NodeId node) {
         if (effective_state_seen.insert(node).second)
