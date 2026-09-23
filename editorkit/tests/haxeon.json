@@ -1,0 +1,12 @@
+{
+	"version": 1,
+	"package": { "name": "editorkit-check" },
+	"entry": "DocCheck",
+	"sourceRoots": ["src"],
+	"scopeSourceRoots": false,
+	"dependencies": {
+		"editorkit": { "path": ".." }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

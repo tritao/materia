@@ -339,7 +339,8 @@ class FrameworkSmoke {
 		if (fieldRoot.children.length != 1 ||
 			fieldRoot.children[0].layout.visualKind != LayoutVisualKind.Box ||
 			fieldRoot.children[0].children.length != 1 ||
-			fieldRoot.children[0].children[0].layout.visualKind != LayoutVisualKind.Text ||
+			fieldRoot.children[0].children[0].layout.visualKind != LayoutVisualKind.Custom ||
+			fieldRoot.children[0].children[0].layout.intrinsicContent == null ||
 			fieldRoot.children[0].children[0].layout.style.zIndex != 1)
 			return 201;
 		if (fieldRoot.semantics == null || fieldRoot.semantics.role != AccessibilityRole.TextField ||

@@ -40,6 +40,9 @@ class LayoutRenderableContent implements LayoutContent {
 	public function measure(constraints:LayoutMeasureConstraints):LayoutMeasureResult
 		return measurement.measure(constraints);
 
+	public function asRenderable():Null<LayoutRenderableContent>
+		return this;
+
 	/** Rebuilds and returns the retained display list when its cache key changed. */
 	public function paint(geometry:ResolvedLayoutItem):DisplayList {
 		if (geometry == null)

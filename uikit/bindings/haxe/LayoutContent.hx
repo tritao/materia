@@ -4,4 +4,7 @@ interface LayoutContent {
 	function getVersion():Int;
 
 	function measure(constraints:LayoutMeasureConstraints):LayoutMeasureResult;
+
+	/** Returns a paint provider when this content owns a retained display list. */
+	function asRenderable():Null<LayoutRenderableContent>;
 }

@@ -136,6 +136,8 @@ class LayoutSessionSmoke {
 			canvas.fillRect(new Rect(0.0, 0.0, geometry.width, geometry.height),
 				Color.rgba(0.2, 0.4, 0.8, 1.0));
 		});
+		if (measureContent.asRenderable() != null || renderable.asRenderable() != renderable)
+			return 53;
 		measuredNode.intrinsicContent = renderable;
 		resolved = session.submit(root, frame);
 		measuredItem = null;

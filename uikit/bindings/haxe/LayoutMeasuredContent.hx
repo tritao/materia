@@ -29,6 +29,9 @@ class LayoutMeasuredContent implements LayoutContent {
 
 	public function measure(constraints:LayoutMeasureConstraints):LayoutMeasureResult
 		return callback(constraints);
+
+	public function asRenderable():Null<LayoutRenderableContent>
+		return null;
 }
 
 typedef LayoutContentMeasure = (constraints:LayoutMeasureConstraints) -> LayoutMeasureResult;

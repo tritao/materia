@@ -93,3 +93,26 @@ translation. Each end produced a small paint list (6–7 commands); median
 paint-list construction took about 0.01 ms. Median caret jump plus frame
 submission was 1.77 ms, and insertion plus frame submission was 8.85 ms.
 These are CPU timings without GPU presentation or a visual pixel check.
+
+## Headless visual and edge-case check (2026-09-24)
+
+An Xvfb capture exposed an older bug: the intrinsic paint provider was present
+on the text node, but runtime type detection through the `LayoutContent`
+interface failed, so its display list was never attached. `LayoutContent` now
+reports its paint capability explicitly. The text-field capture changed from
+zero non-background pixels in the text bounds to 457; the multiline story also
+renders text. A temporary 10,000-line multiline story visibly rendered the
+last numbered lines, including `009999`, in a 120-pixel editor viewport.
+
+A headless EditorKit check compared segmented and whole-string indexes after
+80 mixed Unicode edits. Document text, paragraph ranges, and sampled code-point,
+UTF-8, and UTF-16 conversions matched. The UIKit framework and layout-session
+smoke checks passed. A 5,000-line, 155 KB Unicode UI workload had median
+insertion plus frame time of 3.49 ms across three runs.
+
+One very long wrapped paragraph is the next measured bottleneck. Median
+insertion plus frame time was 5.3 ms at 5.3 KB, 12.9 ms at 13.3 KB, 25.4 ms
+at 26.5 KB, and 50.5 ms at 53 KB. Each edit reshapes the entire paragraph.
+The Xvfb captures verify renderer output in a virtual display, but they do
+not exercise an operating-system IME session or compare every rendered pixel
+with a golden image.

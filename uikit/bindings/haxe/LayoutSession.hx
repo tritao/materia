@@ -284,8 +284,9 @@ class LayoutSession {
 			if (node.visualKind != LayoutVisualKind.Custom)
 				throw "Intrinsic content requires a Custom layout node";
 			measureContents.set(node.id, node.intrinsicContent);
-			if (Std.isOfType(node.intrinsicContent, LayoutRenderableContent))
-				renderableContents.set(node.id, cast node.intrinsicContent);
+			var renderable = node.intrinsicContent.asRenderable();
+			if (renderable != null)
+				renderableContents.set(node.id, renderable);
 			hasMeasureContents = true;
 		}
 		for (child in node.children)

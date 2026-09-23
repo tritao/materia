@@ -13,4 +13,7 @@ class LayoutImageContent implements LayoutContent {
 
 	public function measure(constraints:LayoutMeasureConstraints):LayoutMeasureResult
 		return new LayoutMeasureResult(image.width, image.height);
+
+	public function asRenderable():Null<LayoutRenderableContent>
+		return null;
 }

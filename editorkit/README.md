@@ -16,3 +16,7 @@ conversion, and paragraph lookup. `text` is assembled lazily for clients that
 need a complete string. UIKit's `TextField.value` and `onChange(String)` still
 request that string on every edit, so those API calls retain a whole-document
 copy. Initial parsing and layout also remain linear in document size.
+
+Run the headless Unicode coordinate and edit check with
+`./haxeon/scripts/haxeon run --project editorkit/tests/haxeon.json` from the
+Materia root.
