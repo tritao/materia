@@ -153,6 +153,8 @@ def main():
                 return 1
     frames_file = output / "frame-timeline.jsonl"
     frames = [json.loads(line) for line in frames_file.read_text().splitlines()] if frames_file.exists() else []
+    retained_file = output / "retained.jsonl"
+    retained = [json.loads(line) for line in retained_file.read_text().splitlines()] if retained_file.exists() else []
     samples = [json.loads(line) for line in (output / "memory.jsonl").read_text().splitlines()]
     export = None if args.no_profile else subprocess.run(
         [str(profiler), "export", "--format", "perfetto",
@@ -186,6 +188,12 @@ def main():
             recent = next(row for row in samples if row["timeSeconds"] >= samples[-1]["timeSeconds"] - 5)
             print(f"final 5s RSS change={(samples[-1]['rssBytes'] - recent['rssBytes']) / 2**20:.1f}MiB "
                   f"CPU={samples[-1]['cpuSeconds'] - recent['cpuSeconds']:.2f}s")
+    if retained:
+        first, last = retained[0], retained[-1]
+        print(f"retained cycles={first['cycle']}..{last['cycle']} "
+              f"workspace listeners={first['workspaceListeners']}..{last['workspaceListeners']} "
+              f"widget resources={first['state']['resources']}..{last['state']['resources']} "
+              f"style entries={first['styles']['styles']}..{last['styles']['styles']}")
     if export is not None and export.returncode == 0:
         events = json.loads((output / "editor.perfetto.json").read_text())["traceEvents"]
         counters = [event["args"] for event in events if event.get("cat") == "hl.gc" and

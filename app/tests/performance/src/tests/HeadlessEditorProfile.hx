@@ -38,6 +38,7 @@ class HeadlessEditorProfile {
     var frame = new LayoutFrame(1320.0, 900.0);
     var frames:Array<String> = [];
     var actions:Array<String> = [];
+    var retained:Array<String> = [];
     try {
       submit(editor, frame, frames, "initial");
       for (cycle in 0...cycles) {
@@ -49,6 +50,12 @@ class HeadlessEditorProfile {
         if (editor.workspace.activePanelId != "hierarchy") throw "Hierarchy tab did not activate";
         submit(editor, frame, frames, "hierarchy");
         action(actions, "hierarchy", cycle);
+        if ((cycle + 1) % 20 == 0)
+          retained.push(Json.stringify({cycle: cycle + 1,
+            workspaceListeners: editor.workspace.listenerCount,
+            state: editor.ui.stateStore.diagnosticCounts(),
+            styles: editor.ui.buildContext.styleResolver.diagnosticCounts(),
+            keys: editor.ui.buildContext.diagnosticKeyCounts()}));
       }
       var nameKey = "editor:" + editor.scene.selectedId + ":" +
         editor.scene.selectionRevision + ":name";
@@ -65,6 +72,7 @@ class HeadlessEditorProfile {
         throw "Inspector rename did not commit";
       File.saveContent(output + "/frame-timeline.jsonl", frames.join("\n") + "\n");
       File.saveContent(output + "/actions.jsonl", actions.join("\n") + "\n");
+      File.saveContent(output + "/retained.jsonl", retained.join("\n") + "\n");
       File.saveContent(output + "/app-state.json", Json.stringify(editor.diagnosticState()));
     } catch (error:Dynamic) {
       editor.dispose();

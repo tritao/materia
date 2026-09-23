@@ -96,6 +96,17 @@ class StateStore {
 	public function contains(id:WidgetId):Bool
 		return id != null && values.exists(id.value);
 
+	/** Bounded-run diagnostics for detecting retained widget state growth. */
+	public function diagnosticCounts():{values:Int, paths:Int, resources:Int} {
+		var valueCount = 0;
+		var pathCount = 0;
+		var resourceCount = 0;
+		for (_ in values.keys()) valueCount++;
+		for (_ in paths.keys()) pathCount++;
+		for (_ in managed.keys()) resourceCount++;
+		return {values: valueCount, paths: pathCount, resources: resourceCount};
+	}
+
 	public function describe(id:WidgetId):String {
 		if (id == null)
 			return "null";

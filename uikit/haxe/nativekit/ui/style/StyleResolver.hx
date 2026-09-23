@@ -62,6 +62,16 @@ class StyleResolver {
 	function get_cachedStyleCount():Int
 		return cacheEntryCount;
 
+	/** Bounded-run diagnostics for retained styles and transition state. */
+	public function diagnosticCounts():{styles:Int, localStyles:Int, targets:Int, animations:Int} {
+		var targetCount = 0;
+		var animationCount = 0;
+		for (_ in targets.keys()) targetCount++;
+		for (_ in activeAnimations.keys()) animationCount++;
+		return {styles: cacheEntryCount, localStyles: localFingerprintCount,
+			targets: targetCount, animations: animationCount};
+	}
+
 	/** Drops resolved styles while retaining animation state and counters. */
 	public function clearCache():Void {
 		cache.clear();

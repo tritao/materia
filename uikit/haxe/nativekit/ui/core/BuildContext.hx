@@ -175,6 +175,10 @@ class BuildContext {
 		textStyleStack = [ResolvedTextStyle.fromTheme(theme)];
 	}
 
+	/** Bounded-run diagnostics for retained key path caches. */
+	public function diagnosticKeyCounts():{ids:Int, paths:Int}
+		return {ids: cachedIdCount, paths: rootScope.cachedEntries()};
+
 	/** Reports a measured subtree only when a diagnostic sink is installed. */
 	public function reportBuild(name:String, preparationSeconds:Float,
 			buildSeconds:Float, root:RenderNode):Void {
