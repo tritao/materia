@@ -81,6 +81,9 @@ class HeadlessEditorProfile {
       File.saveContent(output + "/retained.jsonl", retained.join("\n") + "\n");
       File.saveContent(output + "/app-state.json", Json.stringify(editor.diagnosticState()));
       if (heapDumpPath != null) {
+        frames.resize(0);
+        actions.resize(0);
+        retained.resize(0);
         ProfileGc.major();
         ProfileGc.dump(cast haxe.io.Bytes.ofString(heapDumpPath).getData());
       }

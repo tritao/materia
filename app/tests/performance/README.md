@@ -34,3 +34,5 @@ exact `headless-profile.hl` bytecode used for that run, and a `capture.json`
 manifest. Inspect it with `haxeon/scripts/haxeon heap inspect --capture
 <capture>`; the shared command writes `heap-report.txt` beside the dump. It
 also accepts explicit bytecode and dump paths when no manifest is available.
+The headless workload releases its saved frame and action JSON buffers before
+the heap snapshot so they do not appear as retained editor memory.
