@@ -208,21 +208,62 @@ class EditorScene {
     return item != null && item.kind == "cad-part" && activeSketchEdit == null;
   }
 
-  /** Add a dimensioned starter profile and open it in the existing sketch draft editor. */
+  /** Start a blank sketch draft without adding an unevaluated feature to the document. */
   public function createSketch():Bool {
     if (!canCreateSketch())
       return false;
     var id = selectedId;
     var session = requireCadSession(id);
-    var feature = new ConstrainedSketchFeature(starterSketch());
-    var created = addCadFeature(id, "Create constrained sketch", feature);
-    if (!created)
-      return false;
-
-    var featureIndex = selectCadFeature(id, feature);
-    activeSketchEdit = session.beginSketchEdit(featureIndex);
+    clearSelectedCadFace();
+    selectedFeatureKey = null;
+    activeSketchEdit = session.beginNewSketchEdit(Plane.XY(), "mm");
     activeSketchObjectId = id;
     refreshSelectionRevision();
+    return true;
+  }
+
+  public function canAddSketchDraftRectangle():Bool {
+    var draft = activeSketchEdit;
+    if (draft == null)
+      return false;
+    var sketch = draft.sketch.snapshot();
+    return sketch.points().length == 0 && sketch.entities().length == 0 && sketch.constraints().length == 0;
+  }
+
+  /** Add a fully constrained 20 mm starter rectangle to an otherwise empty draft. */
+  public function addSketchDraftRectangle():Bool {
+    if (!canAddSketchDraftRectangle())
+      return false;
+    var template = starterSketch();
+    editSketchDraft(function(sketch) {
+      for (point in template.points()) sketch.addPoint(point);
+      for (entity in template.entities()) sketch.addEntity(entity);
+      for (constraint in template.constraints()) sketch.addConstraint(constraint);
+    });
+    return true;
+  }
+
+  public function canClearSketchDraft():Bool {
+    var draft = activeSketchEdit;
+    if (draft == null)
+      return false;
+    var sketch = draft.sketch.snapshot();
+    return sketch.points().length > 0 || sketch.entities().length > 0 || sketch.constraints().length > 0;
+  }
+
+  /** Return a draft to the valid empty state so geometry can be redrawn. */
+  public function clearSketchDraft():Bool {
+    if (!canClearSketchDraft())
+      return false;
+    var draft = activeSketchEdit;
+    if (draft == null)
+      return false;
+    var snapshot = draft.sketch.snapshot();
+    editSketchDraft(function(sketch) {
+      for (constraint in snapshot.constraints()) sketch.removeConstraint(constraint.id);
+      for (entity in snapshot.entities()) sketch.removeEntity(entity.id);
+      for (point in snapshot.points()) sketch.removePoint(point.id);
+    });
     return true;
   }
 
@@ -1076,13 +1117,29 @@ class EditorScene {
   public function hasActiveSketchEdit():Bool
     return activeSketchEdit != null;
 
+  public function canApplySelectedSketchEdit():Bool {
+    var draft = activeSketchEdit;
+    if (draft == null || !draft.sketch.isSolved)
+      return false;
+    try {
+      var profile = draft.sketch.buildProfile();
+      profile.close();
+      return true;
+    } catch (_:Dynamic) {
+      return false;
+    }
+  }
+
   public function sketchEditSummary():Null<String> {
-    if (activeSketchEdit == null)
+    var draft = activeSketchEdit;
+    if (draft == null)
       return null;
-    var diagnostic = activeSketchEdit.sketch.diagnostic;
+    if (draft.sketch.snapshot().entities().length == 0)
+      return "Sketch is empty · add geometry to form a profile";
+    var diagnostic = draft.sketch.diagnostic;
     if (diagnostic == null)
       return "Sketch draft has not been solved";
-    return diagnostic.message + " · " + activeSketchEdit.sketch.degreesOfFreedom
+    return diagnostic.message + " · " + draft.sketch.degreesOfFreedom
       + " degrees of freedom" + (diagnostic.constraintIds.length == 0
         ? "" : " · constraints: " + diagnostic.constraintIds.join(", "));
   }
@@ -1104,12 +1161,25 @@ class EditorScene {
     var id = activeSketchObjectId;
     if (id == null || object(id) == null)
       throw "sketch draft owner is no longer in the scene";
-    if (!draft.sketch.isSolved)
-      throw "cannot apply a sketch draft with conflicting or invalid constraints";
+    if (!canApplySelectedSketchEdit())
+      throw "sketch draft needs a solved, closed profile before it can be applied";
 
-    var beforeSketch = draft.feature.sketch();
+    var existingFeature = draft.feature;
+    if (existingFeature == null) {
+      var feature = new ConstrainedSketchFeature(draft.sketch.snapshot());
+      if (!addCadFeature(id, "Create constrained sketch", feature))
+        return false;
+      selectCadFeature(id, feature);
+      draft.cancel();
+      activeSketchEdit = null;
+      activeSketchObjectId = null;
+      refreshSelectionRevision();
+      return true;
+    }
+
+    var beforeSketch = existingFeature.sketch();
     var afterSketch = draft.sketch.snapshot();
-    var featureId = draft.feature.id.toInt();
+    var featureId = existingFeature.id.toInt();
     var operation = new EditOperation("Edit constrained sketch", function() {
       runCadEdit(id, function(session) applyConstrainedSketchSnapshot(session, featureId, afterSketch),
         function(session) applyConstrainedSketchSnapshot(session, featureId, beforeSketch));

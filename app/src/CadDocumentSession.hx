@@ -6,6 +6,8 @@ import cadkit.parametric.Document;
 import cadkit.parametric.EvaluationCancelled;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.modeling.Plane;
+import cadkit.sketch.ConstrainedSketch;
 import nativekit.scene.GeometryData;
 
 /** Long-lived editor owner for one authored CadKit document and its published viewport result. */
@@ -60,6 +62,12 @@ class CadDocumentSession {
     if (!Std.isOfType(candidate, ConstrainedSketchFeature))
       throw "selected CAD feature is not a constrained sketch";
     return new CadSketchEditSession(this, cast candidate);
+  }
+
+  /** Start an unattached sketch draft; no feature exists until a valid profile is applied. */
+  public function beginNewSketchEdit(?plane:Plane, units:String = "mm"):CadSketchEditSession {
+    ensureOpen();
+    return new CadSketchEditSession(this, null, new ConstrainedSketch(plane, units));
   }
 
   public function performanceMetrics():CadPerformanceMetrics {

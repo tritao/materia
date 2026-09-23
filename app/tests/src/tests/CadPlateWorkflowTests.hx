@@ -95,11 +95,16 @@ class CadPlateWorkflowTests {
     try {
       check(scene.createCadPart(), "create a CAD part for sketch authoring");
       var id = scene.selectedId;
-      check(scene.createSketch(), "create a constrained starter sketch in an empty part");
-      check(scene.hasActiveSketchEdit() && scene.sketchEditSummary().indexOf("0 degrees of freedom") >= 0,
-        "new sketch opens as a fully constrained editable draft");
+      check(scene.createSketch(), "start a new sketch draft in an empty part");
+      check(scene.hasActiveSketchEdit() && scene.sketchEditSummary().indexOf("empty") >= 0 &&
+        scene.cadSession(id).document.featureCount() == 0,
+        "an empty sketch remains a transient draft without creating an invalid feature");
+      check(!scene.canApplySelectedSketchEdit(), "an empty draft cannot be applied as a profile");
+      check(scene.addSketchDraftRectangle(), "add starter geometry to the empty draft");
+      check(scene.canApplySelectedSketchEdit() && scene.sketchEditSummary().indexOf("0 degrees of freedom") >= 0,
+        "the draft exposes solver state and enables apply after it forms a closed profile");
       check(edit(scene, "Dimension width", 30) == PropertyEditResult.Applied,
-        "starter sketch width can be edited in the draft inspector");
+        "starter sketch width can be edited before the feature is created");
       check(scene.applySelectedSketchEdit(), "apply the created sketch draft");
       var feature:ConstrainedSketchFeature = cast scene.cadSession(id).document.featureAt(0);
       near(feature.dimension("width").value, 30, "applied sketch width is authored in the document");
@@ -117,17 +122,30 @@ class CadPlateWorkflowTests {
       }
       reopened.dispose();
 
+      check(scene.treeSelectionKey() == id + ":feature:0" && scene.beginSelectedSketchEdit(),
+        "an applied sketch can reopen as a separate transient draft");
+      check(edit(scene, "Dimension width", 32) == PropertyEditResult.Applied,
+        "an existing sketch dimension can be edited in the draft");
+      check(scene.applySelectedSketchEdit(), "apply the existing sketch edit");
+      near(feature.dimension("width").value, 32, "applied edit updates the authored dimension");
       check(scene.document.undo(), "undo sketch dimension edit");
-      near(feature.dimension("width").value, 20, "undo restores the starter sketch width");
+      near(feature.dimension("width").value, 30, "undo restores the previous sketch width");
       check(scene.document.redo(), "redo sketch dimension edit");
-      near(feature.dimension("width").value, 30, "redo restores the edited sketch width");
-      check(scene.document.undo() && scene.document.undo(), "undo edit then sketch creation");
+      near(feature.dimension("width").value, 32, "redo restores the edited sketch width");
+      check(scene.document.undo() && scene.document.undo(), "undo the dimension edit and sketch creation");
       check(scene.cadSession(id).document.outputFeatureOrNull() == null,
         "undoing the only sketch restores the empty part output");
 
       check(scene.createSketch(), "create another sketch after undoing feature creation");
-      check(scene.treeSelectionKey() == id + ":feature:1" && scene.hasActiveSketchEdit(),
+      check(scene.treeSelectionKey() == id && scene.hasActiveSketchEdit() &&
+        scene.addSketchDraftRectangle() && scene.applySelectedSketchEdit(),
+        "a new draft can be applied after an earlier feature was undone");
+      check(scene.treeSelectionKey() == id + ":feature:1",
         "tree selection retains stable document indexes across inactive undone nodes");
+      check(scene.treeSelectionKey() == id + ":feature:1" && scene.beginSelectedSketchEdit(),
+        "the second sketch can be reopened for a draft");
+      check(scene.clearSketchDraft() && !scene.canApplySelectedSketchEdit(),
+        "clearing sketch geometry returns to an unappliable empty draft");
       scene.cancelSelectedSketchEdit();
     } catch (error:Dynamic) {
       scene.dispose();
@@ -142,6 +160,7 @@ class CadPlateWorkflowTests {
       check(scene.createCadPart(), "create a CAD part for extrusion authoring");
       var id = scene.selectedId;
       check(scene.createSketch(), "create a sketch to extrude");
+      check(scene.addSketchDraftRectangle(), "draw a rectangular extrusion profile");
       check(edit(scene, "Dimension width", 30) == PropertyEditResult.Applied,
         "edit the sketch before extrusion");
       check(scene.applySelectedSketchEdit(), "apply the sketch before extrusion");
@@ -195,6 +214,7 @@ class CadPlateWorkflowTests {
       var id = scene.selectedId;
       step = "create base sketch";
       check(scene.createSketch(), "create the base profile");
+      check(scene.addSketchDraftRectangle(), "draw the base profile");
       check(scene.applySelectedSketchEdit(), "apply the base profile");
       step = "create base extrusion";
       check(scene.createExtrusion(), "create the base solid");
@@ -267,6 +287,7 @@ class CadPlateWorkflowTests {
       check(scene.createCadPart(), "create an editable part for edge finishing");
       var id = scene.selectedId;
       check(scene.createSketch(), "create the base profile for edge finishing");
+      check(scene.addSketchDraftRectangle(), "draw the edge-finishing profile");
       check(scene.applySelectedSketchEdit(), "apply the edge-finishing profile");
       check(scene.createExtrusion(), "create the solid to fillet");
       var unfilletedVolume = scene.cadSession(id).document.result().volume();

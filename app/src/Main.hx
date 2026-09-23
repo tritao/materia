@@ -1053,6 +1053,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var summary = scene.sketchEditSummary();
       if (summary != null)
         rows.push(new KeyedView("sketch-draft-status", new Text(summary)));
+      var sketchTools:Array<KeyedView> = [];
+      if (scene.canAddSketchDraftRectangle())
+        sketchTools.push(new KeyedView("add-rectangle",
+          sceneAction("add-sketch-rectangle", "scene.add-sketch-rectangle", "Add rectangle", IconName.Plus)));
+      if (scene.canClearSketchDraft())
+        sketchTools.push(new KeyedView("clear-sketch",
+          sceneAction("clear-sketch-draft", "scene.clear-sketch-draft", "Clear sketch", IconName.Close)));
+      if (sketchTools.length > 0)
+        rows.push(new KeyedView("sketch-draft-tools", new Row("sketch-draft-tools-row", sketchTools, actionRowStyle())));
       rows.push(new KeyedView("sketch-draft-actions", new Row("sketch-draft-actions-row", [
         new KeyedView("apply", sceneAction("apply-sketch-draft", "scene.apply-sketch", "Apply sketch", IconName.Save)),
         new KeyedView("cancel", sceneAction("cancel-sketch-draft", "scene.cancel-sketch", "Cancel", IconName.Close))
@@ -1217,12 +1226,22 @@ class ReferenceEditorApp implements DesktopUiApplication {
       runSceneEdit("Could not apply sketch draft", function() scene.applySelectedSketchEdit());
       inspectorSelectionRevision = -1;
       commands.refresh();
-    }, null, function() return canEditObjects() && scene.hasActiveSketchEdit()));
+    }, null, function() return canEditObjects() && scene.canApplySelectedSketchEdit()));
     commands.register(new Command("scene.cancel-sketch", "Cancel sketch draft", function() {
       scene.cancelSelectedSketchEdit();
       inspectorSelectionRevision = -1;
       commands.refresh();
     }, null, function() return scene.hasActiveSketchEdit()));
+    commands.register(new Command("scene.add-sketch-rectangle", "Add starter rectangle to sketch", function() {
+      runSceneEdit("Could not add sketch rectangle", function() scene.addSketchDraftRectangle());
+      inspectorSelectionRevision = -1;
+      commands.refresh();
+    }, null, function() return canEditObjects() && scene.canAddSketchDraftRectangle()));
+    commands.register(new Command("scene.clear-sketch-draft", "Clear sketch geometry", function() {
+      runSceneEdit("Could not clear sketch", function() scene.clearSketchDraft());
+      inspectorSelectionRevision = -1;
+      commands.refresh();
+    }, null, function() return canEditObjects() && scene.canClearSketchDraft()));
     commands.register(new Command("scene.import-step", "Import STEP part", function() {
       var chooser=files;
       if(chooser==null)return;

@@ -6,20 +6,23 @@ import cadkit.sketch.SketchSession;
 
 /** Isolated constrained-sketch draft attached to a persistent editor CAD session. */
 class CadSketchEditSession {
-  public final feature:ConstrainedSketchFeature;
+  public final feature:Null<ConstrainedSketchFeature>;
   public final sketch:SketchSession;
+  public final isNew:Bool;
   public var active(default, null):Bool = true;
 
   final owner:CadDocumentSession;
 
-  public function new(owner:CadDocumentSession, feature:ConstrainedSketchFeature) {
-    if (owner == null || feature == null)
-      throw "CAD sketch edit sessions require an owner and feature";
-    if (feature.document != owner.document)
+  public function new(owner:CadDocumentSession, ?feature:ConstrainedSketchFeature,
+      ?initialSketch:ConstrainedSketch) {
+    if (owner == null || (feature == null && initialSketch == null))
+      throw "CAD sketch edit sessions require an owner and a feature or draft";
+    if (feature != null && feature.document != owner.document)
       throw "constrained sketch feature belongs to a different CAD session";
     this.owner = owner;
     this.feature = feature;
-    sketch = new SketchSession(feature.sketch());
+    isNew = feature == null;
+    sketch = new SketchSession(feature == null ? initialSketch : feature.sketch());
   }
 
   /** Solve an isolated edit while leaving the published document untouched. */
@@ -31,6 +34,8 @@ class CadSketchEditSession {
   /** Apply the current solved draft through document recompute and result publication. */
   public function apply():Void {
     ensureActive();
+    if (feature == null)
+      throw "new sketch drafts must be applied through the editor document history";
     if (!sketch.isSolved)
       throw "cannot apply a sketch draft with conflicting or invalid constraints";
     owner.perform(function(_) {
