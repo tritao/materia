@@ -4,6 +4,7 @@ import nativekit.ffi.NativeKitTypes.Result;
 import NativeKitSurface;
 import NativeKitTextInput;
 import Rect;
+import nativekit.ui.widgets.TextInputWindow;
 
 /** Synchronizes Haxe editor state with NativeKit's custom-surface IME API. */
 class TextInputBridge {
@@ -67,14 +68,14 @@ class TextInputBridge {
 		return owner != null && activeOwner != null && activeOwner.equals(owner);
 
 	/** Publishes the active document, selection, composition and screen caret. */
-	public function update(text:String, documentLength:Int, selectionStart:Int,
+	public function update(window:TextInputWindow, documentLength:Int, selectionStart:Int,
 			selectionEnd:Int, compositionStart:Int, compositionEnd:Int,
 			inputType:Int, flags:Int, cursor:Rect):Void {
 		ensureLive();
 		if (surface == null || surface.isDisposed() || !requestedActive || cursor == null ||
 			(platformChecked && !platformSupported))
 			return;
-		var result = NativeKitTextInput.updateResult(surface, text == null ? "" : text, 0,
+		var result = NativeKitTextInput.updateResult(surface, window.text, window.start,
 			documentLength, selectionStart,
 			selectionEnd, compositionStart, compositionEnd, cast inputType, cast flags,
 			null, cursor.x, cursor.y, cursor.width, cursor.height);

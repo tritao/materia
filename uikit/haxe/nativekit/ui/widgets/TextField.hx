@@ -245,7 +245,7 @@ class TextField implements View {
 				if (!editor.focused || !context.textInput.isOwner(id) || context.platformSurface == null ||
 					context.platformSurface.isDisposed())
 					return;
-				context.textInput.update(editor.layoutText(), Utf8Text.length(editor.text),
+				context.textInput.update(editor.surroundingText(2048, 2048), editor.documentLength(),
 					editor.selectionStart, editor.selectionEnd, editor.compositionStart,
 					editor.compositionEnd, 0,
 					multiline ? 1 : 0,
