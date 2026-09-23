@@ -256,6 +256,9 @@ field, and checks the committed name `Profile box`. It records each action and
 submit in `actions.jsonl` and `frame-timeline.jsonl`. These headless timings
 include UI tree construction and native layout, but no window or GPU rendering.
 
+The command prints per-action frame and tree/style medians, node counts, and
+style-cache misses.
+
 UIKit's reusable Component Lab can be opened through the same desktop host:
 
 ```sh

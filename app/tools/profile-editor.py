@@ -164,6 +164,17 @@ def main():
         durations = sorted(frame["frameSeconds"] * 1000 for frame in frames)
         print(f"frames={len(frames)} median={statistics.median(durations):.1f}ms "
               f"p95={durations[int((len(durations) - 1) * .95)]:.1f}ms max={durations[-1]:.1f}ms")
+        if args.scenario is not None:
+            for action in ("sensors", "hierarchy", "inspector-focus", "rename"):
+                action_frames = [frame for frame in frames if frame.get("action") == action]
+                if not action_frames:
+                    continue
+                median = statistics.median(frame["frameSeconds"] * 1000 for frame in action_frames)
+                tree = statistics.median(frame["treeAndStyleSeconds"] * 1000 for frame in action_frames)
+                nodes = statistics.median(frame["nodeCount"] for frame in action_frames)
+                misses = statistics.median(frame["styleCacheMisses"] for frame in action_frames)
+                print(f"{action}: frames={len(action_frames)} median={median:.1f}ms "
+                      f"tree/style={tree:.1f}ms nodes={nodes:.0f} cache misses={misses:.0f}")
     if samples:
         start = next((row for row in samples if frames and row["timeSeconds"] >= frames[0]["startedAtSeconds"]), samples[0])
         print(f"RSS start={start['rssBytes'] / 2**20:.1f}MiB "
