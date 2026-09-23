@@ -163,7 +163,14 @@ class DesktopUiHost {
 		} catch (error:Dynamic) {
 			if (session != null && session.state != UiHostLifecycle.Failed)
 				session.fail("desktop-host", error);
-			Sys.println(options.title + ": " + Std.string(error));
+			var detail = Std.string(error);
+			if (Std.isOfType(error, UiHostError)) {
+				var hostError:UiHostError = cast error;
+				detail = hostError.toString();
+				var message = Reflect.field(hostError.cause, "message");
+				if (message != null) detail = hostError.stage + ": " + Std.string(message);
+			}
+			Sys.println(options.title + ": " + detail);
 			var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
 			if (stack.length > 0) Sys.println(stack);
 			result = 1;
