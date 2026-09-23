@@ -100,6 +100,23 @@ class CadPlateWorkflowTests {
         scene.cadSession(id).document.featureCount() == 0,
         "an empty sketch remains a transient draft without creating an invalid feature");
       check(!scene.canApplySelectedSketchEdit(), "an empty draft cannot be applied as a profile");
+      check(!scene.addSketchDraftRectangleBetween(4, 5, 4, 15),
+        "a zero-width viewport rectangle is ignored");
+      check(scene.addSketchDraftRectangleBetween(3, 4, -17, 24),
+        "draw a rectangle by dragging between arbitrary workplane points");
+      var drawn = scene.sketchDraftSnapshot();
+      var drawnSolution = scene.sketchDraftSolution();
+      check(drawn != null && drawn.points().length == 4 && drawn.entities().length == 4 &&
+        drawn.constraints().length == 7 && drawnSolution != null &&
+        scene.canApplySelectedSketchEdit(),
+        "the drawn rectangle becomes a solved, fully constrained profile");
+      near(drawnSolution.x("rect1.p0"), -17, "dragged rectangle preserves its lower-left point");
+      near(drawnSolution.y("rect1.p0"), 4, "dragged rectangle preserves its lower-left point height");
+      near(drawnSolution.x("rect1.p1") - drawnSolution.x("rect1.p0"), 20,
+        "dragged rectangle width follows the pointer span");
+      near(drawnSolution.y("rect1.p2") - drawnSolution.y("rect1.p1"), 20,
+        "dragged rectangle height follows the pointer span");
+      check(scene.clearSketchDraft(), "clear an interactively drawn sketch before starting another profile");
       check(scene.addSketchDraftRectangle(), "add starter geometry to the empty draft");
       check(scene.canApplySelectedSketchEdit() && scene.sketchEditSummary().indexOf("0 degrees of freedom") >= 0,
         "the draft exposes solver state and enables apply after it forms a closed profile");

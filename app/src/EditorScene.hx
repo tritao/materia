@@ -38,6 +38,7 @@ import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
 import cadkit.sketch.SketchPoint;
+import cadkit.sketch.SolvedSketch;
 import app.CadPlateModel.CadPlateParameters;
 import app.CadPlateModel.CadPlateHoleEdit;
 import app.CadBracketModel;
@@ -66,6 +67,7 @@ class EditorScene {
   var selectedFeatureKey:Null<String> = null;
   var activeSketchEdit:Null<CadSketchEditSession> = null;
   var activeSketchObjectId:Null<String> = null;
+  var sketchEditPlaneValue:Null<Plane> = null;
   public var revision(default, null):Int;
   /** Changes only when simulation-consumed scene content changes, not selection. */
   public var environmentRevision(default, null):Int;
@@ -216,7 +218,9 @@ class EditorScene {
     var session = requireCadSession(id);
     clearSelectedCadFace();
     selectedFeatureKey = null;
-    activeSketchEdit = session.beginNewSketchEdit(Plane.XY(), "mm");
+    var plane = Plane.XY();
+    sketchEditPlaneValue = plane;
+    activeSketchEdit = session.beginNewSketchEdit(plane, "mm");
     activeSketchObjectId = id;
     refreshSelectionRevision();
     return true;
@@ -241,6 +245,55 @@ class EditorScene {
       for (constraint in template.constraints()) sketch.addConstraint(constraint);
     });
     return true;
+  }
+
+  /** Add a fully constrained rectangle in the current sketch plane. */
+  public function addSketchDraftRectangleBetween(startX:Float, startY:Float,
+      endX:Float, endY:Float):Bool {
+    var draft = activeSketchEdit;
+    if (draft == null || !Math.isFinite(startX) || !Math.isFinite(startY) ||
+        !Math.isFinite(endX) || !Math.isFinite(endY))
+      return false;
+    var minX = Math.min(startX, endX), maxX = Math.max(startX, endX);
+    var minY = Math.min(startY, endY), maxY = Math.max(startY, endY);
+    if (maxX - minX < 0.000001 || maxY - minY < 0.000001 ||
+        Math.max(Math.max(Math.abs(minX), Math.abs(maxX)),
+          Math.max(Math.abs(minY), Math.abs(maxY))) > 1000000.0)
+      return false;
+    var sketch = draft.sketch.snapshot();
+    var prefixIndex = 1;
+    var prefix = "rect" + prefixIndex;
+    while (sketchHasPrefix(sketch, prefix)) {
+      prefixIndex++;
+      prefix = "rect" + prefixIndex;
+    }
+    var p0 = prefix + ".p0", p1 = prefix + ".p1", p2 = prefix + ".p2", p3 = prefix + ".p3";
+    editSketchDraft(function(value) {
+      value.addPoint(new SketchPoint(p0, minX, minY));
+      value.addPoint(new SketchPoint(p1, maxX, minY));
+      value.addPoint(new SketchPoint(p2, maxX, maxY));
+      value.addPoint(new SketchPoint(p3, minX, maxY));
+      value.addEntity(SketchEntity.line(prefix + ".bottom", p0, p1));
+      value.addEntity(SketchEntity.line(prefix + ".right", p1, p2));
+      value.addEntity(SketchEntity.line(prefix + ".top", p2, p3));
+      value.addEntity(SketchEntity.line(prefix + ".left", p3, p0));
+      value.addConstraint(SketchConstraint.fixed(prefix + ".anchor", p0));
+      value.addConstraint(SketchConstraint.horizontal(prefix + ".bottom-horizontal", prefix + ".bottom"));
+      value.addConstraint(SketchConstraint.vertical(prefix + ".right-vertical", prefix + ".right"));
+      value.addConstraint(SketchConstraint.horizontal(prefix + ".top-horizontal", prefix + ".top"));
+      value.addConstraint(SketchConstraint.vertical(prefix + ".left-vertical", prefix + ".left"));
+      value.addConstraint(SketchConstraint.distance(prefix + ".width", p0, p1, maxX - minX));
+      value.addConstraint(SketchConstraint.distance(prefix + ".height", p1, p2, maxY - minY));
+    });
+    return true;
+  }
+
+  function sketchHasPrefix(sketch:ConstrainedSketch, prefix:String):Bool {
+    var start = prefix + ".";
+    for (point in sketch.points()) if (StringTools.startsWith(point.id, start)) return true;
+    for (entity in sketch.entities()) if (StringTools.startsWith(entity.id, start)) return true;
+    for (constraint in sketch.constraints()) if (StringTools.startsWith(constraint.id, start)) return true;
+    return false;
   }
 
   public function canClearSketchDraft():Bool {
@@ -301,6 +354,7 @@ class EditorScene {
     var featureIndex = selectCadFeature(id, feature);
     clearSelectedCadFace();
     activeSketchEdit = session.beginSketchEdit(featureIndex);
+    sketchEditPlaneValue = feature.workplane();
     activeSketchObjectId = id;
     refreshSelectionRevision();
     return true;
@@ -1109,6 +1163,8 @@ class EditorScene {
     var marker = selectedFeatureKey.indexOf(":feature:");
     var index = Std.parseInt(selectedFeatureKey.substr(marker + 9));
     activeSketchEdit = requireCadSession(selectedId).beginSketchEdit(index);
+    var feature:ConstrainedSketchFeature = cast activeSketchEdit.feature;
+    sketchEditPlaneValue = feature.workplane();
     activeSketchObjectId = selectedId;
     refreshSelectionRevision();
     return true;
@@ -1116,6 +1172,19 @@ class EditorScene {
 
   public function hasActiveSketchEdit():Bool
     return activeSketchEdit != null;
+
+  public function sketchDraftPlane():Null<Plane>
+    return activeSketchEdit == null ? null : sketchEditPlaneValue;
+
+  public function sketchDraftSnapshot():Null<ConstrainedSketch>
+    return activeSketchEdit == null ? null : activeSketchEdit.sketch.snapshot();
+
+  public function sketchDraftSolution():Null<SolvedSketch> {
+    if (activeSketchEdit == null)
+      return null;
+    var session = activeSketchEdit.sketch;
+    return session.solution == null ? session.lastValidSolution : session.solution;
+  }
 
   public function canApplySelectedSketchEdit():Bool {
     var draft = activeSketchEdit;
@@ -1135,13 +1204,14 @@ class EditorScene {
     if (draft == null)
       return null;
     if (draft.sketch.snapshot().entities().length == 0)
-      return "Sketch is empty · add geometry to form a profile";
+      return "Sketch is empty · drag on the workplane to draw a rectangle";
     var diagnostic = draft.sketch.diagnostic;
     if (diagnostic == null)
       return "Sketch draft has not been solved";
     return diagnostic.message + " · " + draft.sketch.degreesOfFreedom
       + " degrees of freedom" + (diagnostic.constraintIds.length == 0
-        ? "" : " · constraints: " + diagnostic.constraintIds.join(", "));
+        ? "" : " · constraints: " + diagnostic.constraintIds.join(", "))
+      + " · drag to add a rectangle";
   }
 
   public function cancelSelectedSketchEdit():Bool {
@@ -1150,6 +1220,7 @@ class EditorScene {
     activeSketchEdit.cancel();
     activeSketchEdit = null;
     activeSketchObjectId = null;
+    sketchEditPlaneValue = null;
     refreshSelectionRevision();
     return true;
   }
@@ -1173,6 +1244,7 @@ class EditorScene {
       draft.cancel();
       activeSketchEdit = null;
       activeSketchObjectId = null;
+      sketchEditPlaneValue = null;
       refreshSelectionRevision();
       return true;
     }
@@ -1191,6 +1263,7 @@ class EditorScene {
     draft.cancel();
     activeSketchEdit = null;
     activeSketchObjectId = null;
+    sketchEditPlaneValue = null;
     refreshSelectionRevision();
     return true;
   }
@@ -1857,6 +1930,7 @@ class EditorScene {
       try activeSketchEdit.cancel() catch (_:Dynamic) {}
       activeSketchEdit = null;
       activeSketchObjectId = null;
+      sketchEditPlaneValue = null;
     }
     if (selectedCadFace != null) {
       selectedCadFace.close();

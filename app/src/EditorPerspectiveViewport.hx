@@ -9,6 +9,8 @@ import LayoutVisualKind;
 import Rect;
 import PathBuilder;
 import ResolvedLayoutItem;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
 import nativekit.scene.SceneRenderer;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
@@ -41,12 +43,14 @@ class EditorPerspectiveViewport implements View {
   final camera:PerspectiveCamera = new PerspectiveCamera();
   var navigationPointer:Null<Int> = null;
   var navigationMode:Int = 0;
+  var sketchDragRevision:Int = 0;
   var pointerX:Float = 0.0;
   var pointerY:Float = 0.0;
   var pointerStartX:Float = 0.0;
   var pointerStartY:Float = 0.0;
   var pointerMoved:Bool = false;
   var objectDrag:Null<PerspectiveSceneDrag> = null;
+  var sketchRectangleDrag:Null<PerspectiveSketchRectangleDrag> = null;
   var gridSnapEnabled:Bool = false;
   var gridStep:Float = EditorSceneViewport.GRID_STEP;
   var simulationActive:Bool=false;
@@ -68,7 +72,8 @@ class EditorPerspectiveViewport implements View {
       node.focusable = true;
       node.semantics = new Semantics(AccessibilityRole.Image,
         "Scene perspective GPU view");
-      node.onPaint(paint, "perspective:" + scene.revision + ":" + runtimeRevision + ":" + camera.revision + ":" +
+      node.onPaint(paint, "perspective:" + scene.revision + ":" + runtimeRevision + ":" +
+        sketchDragRevision + ":" + camera.revision + ":" +
         renderedWidth + "x" + renderedHeight);
       installNavigation(node);
       return node;
@@ -103,6 +108,7 @@ class EditorPerspectiveViewport implements View {
       Color.rgba(0.025, 0.035, 0.055, 1.0));
     if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
     paintSensors(canvas,geometry.width,geometry.height);
+    paintSketchDraft(canvas, geometry.width, geometry.height);
   }
 
   public function diagnosticState():Dynamic return {
@@ -155,17 +161,27 @@ class EditorPerspectiveViewport implements View {
   }
   public function editingEnabled():Bool return !simulationActive;
 
-  public function dragging():Bool return objectDrag != null;
+  public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null;
 
   public function commitDrag():Null<PerspectivePointer> {
-    if (objectDrag == null) return null;
-    objectDrag.commit(); objectDrag = null;
+    if (objectDrag != null) {
+      objectDrag.commit(); objectDrag = null;
+    } else if (sketchRectangleDrag != null) {
+      var active = sketchRectangleDrag;
+      scene.addSketchDraftRectangleBetween(active.startX, active.startY, active.currentX, active.currentY);
+      sketchRectangleDrag = null;
+      sketchDragRevision++;
+    } else return null;
     return releaseNavigation();
   }
 
   public function cancelDrag():Null<PerspectivePointer> {
-    if (objectDrag == null) return null;
-    objectDrag.cancel(); objectDrag = null;
+    if (objectDrag != null) {
+      objectDrag.cancel(); objectDrag = null;
+    } else if (sketchRectangleDrag != null) {
+      sketchRectangleDrag = null;
+      sketchDragRevision++;
+    } else return null;
     return releaseNavigation();
   }
 
@@ -252,6 +268,110 @@ class EditorPerspectiveViewport implements View {
     }
     }
   }
+
+  function paintSketchDraft(canvas:Canvas, width:Float, height:Float):Void {
+    var sketch = scene.sketchDraftSnapshot();
+    var plane = scene.sketchDraftPlane();
+    if (sketch == null || plane == null)
+      return;
+    var solution = scene.sketchDraftSolution();
+    var pointValues:Map<String, Array<Float>> = new Map();
+    for (point in sketch.points()) {
+      var value = [point.x, point.y];
+      if (solution != null) {
+        try value = solution.point(point.id) catch (_:Dynamic) {}
+      }
+      pointValues.set(point.id, value);
+    }
+    var path = new PathBuilder();
+    var hasLine = false;
+    for (entity in sketch.entities()) {
+      var center = pointValues.get(entity.first);
+      if (entity.kind == "line") {
+        if (entity.second == null || center == null)
+          continue;
+        var end = pointValues.get(entity.second);
+        if (end == null)
+          continue;
+        var a = projectSketchPoint(plane, center[0], center[1], width, height);
+        var b = projectSketchPoint(plane, end[0], end[1], width, height);
+        if (a == null || b == null)
+          continue;
+        path.moveTo(a.x, a.y).lineTo(b.x, b.y);
+        hasLine = true;
+      } else if ((entity.kind == "circle" || entity.kind == "arc") && center != null) {
+        var radius = entity.radius;
+        if (solution != null) {
+          try radius = solution.radius(entity.id) catch (_:Dynamic) {}
+        }
+        if (!Math.isFinite(radius) || radius <= 0)
+          continue;
+        var startAngle = entity.kind == "circle" ? 0.0 : entity.startAngle;
+        var sweep = entity.kind == "circle" ? Math.PI * 2 : entity.endAngle - entity.startAngle;
+        if (entity.kind == "arc") {
+          sweep %= Math.PI * 2;
+          if (entity.clockwise) {
+            while (sweep >= 0) sweep -= Math.PI * 2;
+          } else {
+            while (sweep <= 0) sweep += Math.PI * 2;
+          }
+        }
+        var steps = 48;
+        var started = false;
+        var prior:Null<PerspectiveScreenPoint> = null;
+        for (index in 0...(steps + 1)) {
+          var angle = startAngle + sweep * index / steps;
+          var point = projectSketchPoint(plane, center[0] + Math.cos(angle) * radius,
+            center[1] + Math.sin(angle) * radius, width, height);
+          if (point == null)
+            continue;
+          if (!started) {
+            path.moveTo(point.x, point.y);
+            started = true;
+          } else if (prior != null) {
+            path.lineTo(point.x, point.y);
+          }
+          prior = point;
+        }
+        hasLine = hasLine || started;
+      }
+    }
+    var active = sketchRectangleDrag;
+    if (active != null) {
+      var minX = Math.min(active.startX, active.currentX);
+      var maxX = Math.max(active.startX, active.currentX);
+      var minY = Math.min(active.startY, active.currentY);
+      var maxY = Math.max(active.startY, active.currentY);
+      var corners = [[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]];
+      var first:Null<PerspectiveScreenPoint> = null;
+      var prior:Null<PerspectiveScreenPoint> = null;
+      for (corner in corners) {
+        var projected = projectSketchPoint(plane, corner[0], corner[1], width, height);
+        if (projected == null)
+          continue;
+        if (first == null) first = projected;
+        if (prior != null) path.moveTo(prior.x, prior.y).lineTo(projected.x, projected.y);
+        prior = projected;
+      }
+      if (first != null && prior != null) path.moveTo(prior.x, prior.y).lineTo(first.x, first.y);
+      hasLine = true;
+    }
+    if (hasLine)
+      canvas.strokeTransient(path.build(), Color.rgba(1.0, 0.82, 0.22, 0.98), 2.0);
+    for (point in pointValues) {
+      var projected = projectSketchPoint(plane, point[0], point[1], width, height);
+      if (projected != null)
+        canvas.fillRect(new Rect(projected.x - 3, projected.y - 3, 6, 6),
+          Color.rgba(1.0, 0.88, 0.42, 1.0));
+    }
+  }
+
+  function projectSketchPoint(plane:Plane, x:Float, y:Float,
+      width:Float, height:Float):Null<PerspectiveScreenPoint> {
+    var world = plane.toWorld(new Vector(x, y, 0));
+    return camera.project(world.x, world.y, world.z, width, height);
+  }
+
   static function rotateVector(q:Array<Float>,v:Array<Float>):Array<Float>{
     var x=q[0],y=q[1],z=q[2],w=q[3],tx=2*(y*v[2]-z*v[1]),ty=2*(z*v[0]-x*v[2]),tz=2*(x*v[1]-y*v[0]);
     return [v[0]+w*tx+y*tz-z*ty,v[1]+w*ty+z*tx-x*tz,v[2]+w*tz+x*ty-y*tx];
@@ -271,6 +391,17 @@ class EditorPerspectiveViewport implements View {
   function installNavigation(node:RenderNode):Void {
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (event.button != 0 && event.button != 2) return;
+      if (event.button == 0 && editingEnabled() && scene.hasActiveSketchEdit()) {
+        var point = sketchPlanePoint(event.localX, event.localY);
+        if (point == null) return;
+        sketchRectangleDrag = new PerspectiveSketchRectangleDrag(point.x, point.y);
+        sketchDragRevision++;
+        navigationPointer = event.pointerId;
+        navigationMode = 4;
+        pointerX = event.x; pointerY = event.y;
+        event.capturePointer(); event.preventDefault(); event.stopPropagation();
+        return;
+      }
       navigationPointer = event.pointerId;
       navigationMode = event.button == 0 ? 1 : 2;
       if (event.button == 0) {
@@ -292,17 +423,41 @@ class EditorPerspectiveViewport implements View {
       pointerX = event.x; pointerY = event.y;
       if (Math.abs(event.x - pointerStartX) >= 3.0 || Math.abs(event.y - pointerStartY) >= 3.0)
         pointerMoved = true;
+      var sketchDrag = sketchRectangleDrag;
       if (navigationMode == 1) camera.orbit(deltaX, deltaY);
       else if (navigationMode == 2) camera.pan(deltaX, deltaY, Math.max(1, renderedHeight));
       else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY,
         Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+      else if (navigationMode == 4 && sketchDrag != null) {
+        var point = sketchPlanePoint(event.localX, event.localY);
+        if (point != null) {
+          if (sketchDrag.currentX != point.x || sketchDrag.currentY != point.y) {
+            sketchDrag.currentX = point.x;
+            sketchDrag.currentY = point.y;
+            sketchDragRevision++;
+          }
+        }
+      }
       event.preventDefault(); event.stopPropagation();
     });
     var finish = function(event:UiEvent) {
       if (navigationPointer == null || event.pointerId != navigationPointer) return;
+      var sketchDrag = sketchRectangleDrag;
       if (navigationMode == 3 && objectDrag != null) {
         if (event.kind == UiEventKind.PointerUp) objectDrag.commit(); else objectDrag.cancel();
         objectDrag = null;
+      } else if (navigationMode == 4 && sketchDrag != null) {
+        if (event.kind == UiEventKind.PointerUp) {
+          var point = sketchPlanePoint(event.localX, event.localY);
+          if (point != null) {
+            sketchDrag.currentX = point.x;
+            sketchDrag.currentY = point.y;
+          }
+          scene.addSketchDraftRectangleBetween(sketchDrag.startX, sketchDrag.startY,
+            sketchDrag.currentX, sketchDrag.currentY);
+        }
+        sketchRectangleDrag = null;
+        sketchDragRevision++;
       } else if (event.kind == UiEventKind.PointerUp && navigationMode == 1 && !pointerMoved)
         selectAt(event.localX,event.localY);
       navigationPointer = null; navigationMode = 0;
@@ -315,11 +470,41 @@ class EditorPerspectiveViewport implements View {
       event.preventDefault(); event.stopPropagation();
     });
     node.on(UiEventKind.KeyDown, function(event:UiEvent) {
+      if (event.key == UiKey.Escape && sketchRectangleDrag != null) {
+        sketchRectangleDrag = null;
+        sketchDragRevision++;
+        navigationPointer = null; navigationMode = 0;
+        event.releasePointer(); event.preventDefault(); event.stopPropagation();
+        return;
+      }
       if (event.key != UiKey.Escape || objectDrag == null) return;
       objectDrag.cancel(); objectDrag = null;
       navigationPointer = null; navigationMode = 0;
       event.releasePointer(); event.preventDefault(); event.stopPropagation();
     });
+  }
+
+  function sketchPlanePoint(localX:Float, localY:Float):Null<Vector> {
+    var plane = scene.sketchDraftPlane();
+    if (plane == null)
+      return null;
+    var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+    var denominator = plane.normal.x * ray.directionX + plane.normal.y * ray.directionY +
+      plane.normal.z * ray.directionZ;
+    if (Math.abs(denominator) < 0.000001)
+      return null;
+    var distance = (plane.origin.x - ray.originX) * plane.normal.x +
+      (plane.origin.y - ray.originY) * plane.normal.y + (plane.origin.z - ray.originZ) * plane.normal.z;
+    distance /= denominator;
+    if (distance < 0)
+      return null;
+    var world = new Vector(ray.originX + ray.directionX * distance,
+      ray.originY + ray.directionY * distance, ray.originZ + ray.directionZ * distance);
+    var local = plane.toLocal(world);
+    if (gridSnapEnabled)
+      local = new Vector(Math.round(local.x / gridStep) * gridStep,
+        Math.round(local.y / gridStep) * gridStep, 0);
+    return local;
   }
 
   static function defaultStyle():LayoutStyle {
@@ -328,6 +513,17 @@ class EditorPerspectiveViewport implements View {
     result.height = LayoutAxis.stretch();
     result.clipToParent = true;
     return result;
+  }
+}
+
+private class PerspectiveSketchRectangleDrag {
+  public final startX:Float;
+  public final startY:Float;
+  public var currentX:Float;
+  public var currentY:Float;
+  public function new(x:Float, y:Float) {
+    startX = currentX = x;
+    startY = currentY = y;
   }
 }
 

@@ -20,6 +20,7 @@ import cadkit.parametric.FeatureId;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyReference;
+import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.sketch.FaceWorkplane;
 
@@ -87,6 +88,30 @@ class ConstrainedSketchFeature extends Feature {
 
 	public function sketch():ConstrainedSketch {
 		return authored.copy();
+	}
+
+	/** Resolve the world workplane currently used to evaluate this sketch. */
+	public function workplane():Plane {
+		if (support == null)
+			return authored.plane;
+		var supportShape = support.currentShape();
+		if (supportShape == null)
+			throw new ParametricError("attached sketch support has no evaluated shape");
+		if (supportFaceReference == null) {
+			if (supportSelection == null)
+				throw new ParametricError("attached sketch has no selected support face");
+			return FaceWorkplane.resolve(supportShape, supportSelection, supportXDirection,
+				supportOffset, supportFlipped);
+		}
+		var face = supportFaceReference.resolveFor(supportShape, support.provenance);
+		try {
+			var result = FaceWorkplane.fromFace(face, supportXDirection, supportOffset, supportFlipped);
+			face.close();
+			return result;
+		} catch (error:Dynamic) {
+			face.close();
+			throw error;
+		}
 	}
 
 	public function addPoint(point:SketchPoint):Void {
