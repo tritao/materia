@@ -25,7 +25,7 @@ void rebuild_batches(RenderPlan &plan) {
         auto &instances = plan.batches_[found->second].instances;
         plan.item_batch_[item_index] = found->second;
         plan.item_batch_position_[item_index] = instances.size();
-        instances.push_back(item.occurrence);
+        instances.push_back(item.node);
     }
 }
 
@@ -69,11 +69,11 @@ std::size_t move_item_batch(RenderPlan &plan, std::size_t item_index, GeometryId
     auto &old_instances = plan.batches_[old_batch_index].instances;
     const auto old_position = plan.item_batch_position_[item_index];
     assert(old_position < old_instances.size());
-    const auto moved_occurrence = old_instances.back();
-    old_instances[old_position] = moved_occurrence;
+    const auto moved_node = old_instances.back();
+    old_instances[old_position] = moved_node;
     old_instances.pop_back();
-    if (moved_occurrence != plan.items_[item_index].occurrence) {
-        const auto moved_item_index = plan.item_index(moved_occurrence);
+    if (moved_node != plan.items_[item_index].node) {
+        const auto moved_item_index = plan.item_index(moved_node);
         assert(moved_item_index != RenderPlan::invalid_item_index);
         plan.item_batch_position_[moved_item_index] = old_position;
     }
@@ -92,8 +92,8 @@ std::size_t move_item_batch(RenderPlan &plan, std::size_t item_index, GeometryId
                                 old_batch_index);
             replace_batch_index(plan.batches_by_material_, moved_key.material, last_batch_index,
                                 old_batch_index);
-            for (const auto occurrence : plan.batches_[old_batch_index].instances) {
-                const auto moved_item_index = plan.item_index(occurrence);
+            for (const auto node : plan.batches_[old_batch_index].instances) {
+                const auto moved_item_index = plan.item_index(node);
                 assert(moved_item_index != RenderPlan::invalid_item_index);
                 plan.item_batch_[moved_item_index] = old_batch_index;
             }
@@ -110,7 +110,7 @@ std::size_t move_item_batch(RenderPlan &plan, std::size_t item_index, GeometryId
     auto &new_instances = plan.batches_[found->second].instances;
     plan.item_batch_[item_index] = found->second;
     plan.item_batch_position_[item_index] = new_instances.size();
-    new_instances.push_back(plan.items_[item_index].occurrence);
+    new_instances.push_back(plan.items_[item_index].node);
     return 2;
 }
 

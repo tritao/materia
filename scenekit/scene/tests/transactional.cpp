@@ -25,9 +25,9 @@ LocalTransform translated(float x) {
 
 void component_store_is_slot_indexed_and_generation_safe() {
     ComponentStore<std::uint32_t> store;
-    const nkscene::OccurrenceHandle first{4, 1};
-    const nkscene::OccurrenceHandle second{8, 3};
-    const nkscene::OccurrenceHandle third{12, 2};
+    const nkscene::NodeHandle first{4, 1};
+    const nkscene::NodeHandle second{8, 3};
+    const nkscene::NodeHandle third{12, 2};
     store.insert_or_assign(first, 10);
     store.insert_or_assign(second, 20);
     store.insert_or_assign(third, 30);
@@ -39,25 +39,25 @@ void component_store_is_slot_indexed_and_generation_safe() {
     store.insert_or_assign(first, 11);
     assert(*store.find(first) == 11);
 
-    const nkscene::OccurrenceHandle reused{8, 4};
+    const nkscene::NodeHandle reused{8, 4};
     assert(store.find(reused) == nullptr);
     store.insert_or_assign(reused, 40);
     assert(store.find(second) == nullptr);
     assert(*store.find(reused) == 40);
 
     std::size_t visited = 0;
-    store.for_each([&](nkscene::OccurrenceHandle handle, std::uint32_t value) {
+    store.for_each([&](nkscene::NodeHandle handle, std::uint32_t value) {
         ++visited;
         assert(store.find(handle) && *store.find(handle) == value);
     });
     assert(visited == store.size());
 
     ComponentStore<std::uint32_t> sparse;
-    const nkscene::OccurrenceHandle distant{1'000'000, 7};
+    const nkscene::NodeHandle distant{1'000'000, 7};
     sparse.insert_or_assign(distant, 99);
     for (int iteration = 0; iteration < 64; ++iteration) {
         visited = 0;
-        sparse.for_each([&](nkscene::OccurrenceHandle handle, std::uint32_t value) {
+        sparse.for_each([&](nkscene::NodeHandle handle, std::uint32_t value) {
             ++visited;
             assert(handle == distant);
             assert(value == 99);
@@ -66,17 +66,17 @@ void component_store_is_slot_indexed_and_generation_safe() {
     }
 }
 
-void occurrence_handles_reject_stale_components() {
-    nkscene::OccurrenceStore occurrences;
+void node_handles_reject_stale_components() {
+    nkscene::NodeStore nodes;
     ComponentStore<std::uint32_t> store;
-    const auto first_id = occurrences.reserve_id();
-    const auto first = occurrences.create(first_id);
+    const auto first_id = nodes.reserve_id();
+    const auto first = nodes.create(first_id);
     store.insert_or_assign(first, 10);
     assert(*store.find(first) == 10);
-    assert(occurrences.destroy(first_id));
+    assert(nodes.destroy(first_id));
 
-    const auto second_id = occurrences.reserve_id();
-    const auto second = occurrences.create(second_id);
+    const auto second_id = nodes.reserve_id();
+    const auto second = nodes.create(second_id);
     assert(second.slot == first.slot);
     assert(second.generation != first.generation);
     assert(store.erase(first));
@@ -88,9 +88,9 @@ void occurrence_handles_reject_stale_components() {
 
 void hierarchy_links_are_slot_indexed() {
     auto scene = std::make_shared<Scene>();
-    const auto root = scene->reserve_occurrence_id();
-    const auto first = scene->reserve_occurrence_id();
-    const auto second = scene->reserve_occurrence_id();
+    const auto root = scene->reserve_node_id();
+    const auto first = scene->reserve_node_id();
+    const auto second = scene->reserve_node_id();
     Transaction create(scene);
     create.add_create(root);
     create.add_create(first);
@@ -126,24 +126,24 @@ void hierarchy_links_are_slot_indexed() {
     invalid_destroy.close();
 
     Transaction detach_and_destroy(scene);
-    detach_and_destroy.add_parent(first, nkscene::invalid_occurrence);
+    detach_and_destroy.add_parent(first, nkscene::invalid_node);
     detach_and_destroy.add_destroy(second);
     assert(scene->commit(detach_and_destroy, changes) == NKS_OK);
     detach_and_destroy.close();
-    assert(scene->hierarchy_index().parent(first) == nkscene::invalid_occurrence);
+    assert(scene->hierarchy_index().parent(first) == nkscene::invalid_node);
 
-    const auto replacement = scene->reserve_occurrence_id();
+    const auto replacement = scene->reserve_node_id();
     Transaction recreate(scene);
     recreate.add_create(replacement);
     assert(scene->commit(recreate, changes) == NKS_OK);
     recreate.close();
-    assert(scene->hierarchy_index().parent(replacement) == nkscene::invalid_occurrence);
+    assert(scene->hierarchy_index().parent(replacement) == nkscene::invalid_node);
 }
 
 void changes_are_domain_precise() {
     auto scene = std::make_shared<Scene>();
-    const auto first = scene->reserve_occurrence_id();
-    const auto second = scene->reserve_occurrence_id();
+    const auto first = scene->reserve_node_id();
+    const auto second = scene->reserve_node_id();
     Transaction create(scene);
     create.add_create(first);
     create.add_create(second);
@@ -160,7 +160,7 @@ void changes_are_domain_precise() {
     assert(scene->commit(move, changes) == NKS_OK);
     move.close();
     assert(changes.changes.size() == 1);
-    assert(changes.changes.front().occurrence == first);
+    assert(changes.changes.front().node == first);
     assert(changes.changes.front().domains == ChangeDomain::Transform);
     assert(changes.revisions.scene == 2);
     assert(changes.revisions.transform == 1);
@@ -169,7 +169,7 @@ void changes_are_domain_precise() {
     assert(changes.revisions.material == 0);
     assert(changes.revisions.visibility == 0);
     assert(changes.revisions.source == 0);
-    assert(scene->transforms().find(scene->occurrence_store().resolve(first))->matrix[12] ==
+    assert(scene->transforms().find(scene->node_store().resolve(first))->matrix[12] ==
            4.0f);
 
     Transaction source(scene);
@@ -177,7 +177,7 @@ void changes_are_domain_precise() {
     assert(scene->commit(source, changes) == NKS_OK);
     source.close();
     assert(changes.changes.size() == 1);
-    assert(changes.changes.front().occurrence == first);
+    assert(changes.changes.front().node == first);
     assert(changes.changes.front().domains == ChangeDomain::Source);
     assert(changes.revisions.source == 1);
     assert(changes.revisions.transform == 1);
@@ -195,7 +195,7 @@ void changes_are_domain_precise() {
     invalid.add_transform(first, translated(9.0f));
     invalid.add_transform({999999}, translated(10.0f));
     assert(scene->commit(invalid, changes) == NKS_ERROR_STALE_ID);
-    assert(scene->transforms().find(scene->occurrence_store().resolve(first))->matrix[12] ==
+    assert(scene->transforms().find(scene->node_store().resolve(first))->matrix[12] ==
            4.0f);
     assert(scene->revision() == 4);
 
@@ -203,15 +203,15 @@ void changes_are_domain_precise() {
     cycle.add_parent(first, second);
     cycle.add_parent(second, first);
     assert(scene->commit(cycle, changes) == NKS_ERROR_HIERARCHY_CYCLE);
-    assert(scene->hierarchy_index().parent(first) == nkscene::invalid_occurrence);
-    assert(scene->hierarchy_index().parent(second) == nkscene::invalid_occurrence);
+    assert(scene->hierarchy_index().parent(first) == nkscene::invalid_node);
+    assert(scene->hierarchy_index().parent(second) == nkscene::invalid_node);
 }
 
 void one_transaction_reuses_generation_safe_handles() {
     auto scene = std::make_shared<Scene>();
-    const auto root = scene->reserve_occurrence_id();
-    const auto child = scene->reserve_occurrence_id();
-    const auto transient = scene->reserve_occurrence_id();
+    const auto root = scene->reserve_node_id();
+    const auto child = scene->reserve_node_id();
+    const auto transient = scene->reserve_node_id();
 
     Transaction mutation(scene);
     mutation.add_create(root);
@@ -255,102 +255,102 @@ void shared_resources_do_not_follow_instance_transforms() {
     resource.bounds.maximum = {1.0f, 1.0f, 1.0f};
     const auto resource_revision = resource.revision;
 
-    std::vector<nkscene::OccurrenceId> occurrences;
-    occurrences.reserve(count);
+    std::vector<nkscene::NodeId> nodes;
+    nodes.reserve(count);
     Transaction create(scene);
     for (std::size_t index = 0; index < count; ++index) {
-        const auto occurrence = scene->reserve_occurrence_id();
-        occurrences.push_back(occurrence);
-        create.add_create(occurrence);
+        const auto node = scene->reserve_node_id();
+        nodes.push_back(node);
+        create.add_create(node);
     }
     nkscene::ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
 
     Transaction assign_geometry(scene);
-    for (const auto occurrence : occurrences)
-        assign_geometry.add_geometry(occurrence, geometry);
+    for (const auto node : nodes)
+        assign_geometry.add_geometry(node, geometry);
     assert(scene->commit(assign_geometry, changes) == NKS_OK);
     assign_geometry.close();
-    assert(changes.stats.changed_occurrences == count);
+    assert(changes.stats.changed_nodes == count);
     assert(scene->geometry_store().find(geometry)->revision == resource_revision);
 
     Transaction move(scene);
-    move.add_transform(occurrences.front(), translated(12.0f));
+    move.add_transform(nodes.front(), translated(12.0f));
     assert(scene->commit(move, changes) == NKS_OK);
     move.close();
-    assert(changes.stats.changed_occurrences == 1);
+    assert(changes.stats.changed_nodes == 1);
     assert(changes.stats.dirty_world_transforms == 1);
     assert(changes.stats.dirty_bounds == 1);
     assert(scene->geometry_store().find(geometry)->revision == resource_revision);
-    const auto handle = scene->occurrence_store().resolve(occurrences.front());
+    const auto handle = scene->node_store().resolve(nodes.front());
     assert(scene->world_transforms().find(handle)->transform.matrix[12] == 12.0f);
     assert(scene->world_transforms().find(handle)->revision != 0);
 }
 
 void snapshots_are_immutable() {
     auto scene = std::make_shared<Scene>();
-    const auto occurrence = scene->reserve_occurrence_id();
+    const auto node = scene->reserve_node_id();
     Transaction create(scene);
-    create.add_create(occurrence);
+    create.add_create(node);
     nkscene::ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
 
     Transaction move(scene);
-    move.add_transform(occurrence, translated(3.0f));
+    move.add_transform(node, translated(3.0f));
     assert(scene->commit(move, changes) == NKS_OK);
     move.close();
     const auto before = scene->snapshot();
     assert(before.revision() == scene->revision());
-    assert(before.occurrences().size() == 1);
-    assert(before.find(occurrence)->world_transform.transform.matrix[12] == 3.0f);
+    assert(before.nodes().size() == 1);
+    assert(before.find(node)->world_transform.transform.matrix[12] == 3.0f);
 
     Transaction move_again(scene);
-    move_again.add_transform(occurrence, translated(7.0f));
+    move_again.add_transform(node, translated(7.0f));
     assert(scene->commit(move_again, changes) == NKS_OK);
     move_again.close();
-    assert(scene->snapshot().find(occurrence)->world_transform.transform.matrix[12] == 7.0f);
-    assert(before.find(occurrence)->world_transform.transform.matrix[12] == 3.0f);
+    assert(scene->snapshot().find(node)->world_transform.transform.matrix[12] == 7.0f);
+    assert(before.find(node)->world_transform.transform.matrix[12] == 3.0f);
     assert(before.revision() != scene->revision());
 }
 
 void names_and_bulk_transforms_are_transactional() {
     auto scene = std::make_shared<Scene>();
-    std::vector<nkscene::OccurrenceId> occurrences;
+    std::vector<nkscene::NodeId> nodes;
     for (int index = 0; index < 3; ++index)
-        occurrences.push_back(scene->reserve_occurrence_id());
+        nodes.push_back(scene->reserve_node_id());
 
     Transaction create(scene);
-    for (const auto occurrence : occurrences)
-        create.add_create(occurrence);
+    for (const auto node : nodes)
+        create.add_create(node);
     nkscene::ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
 
     std::vector<nkscene::TransformUpdate> updates;
-    for (std::size_t index = 0; index < occurrences.size(); ++index)
-        updates.push_back({occurrences[index], translated(static_cast<float>(index + 1))});
+    for (std::size_t index = 0; index < nodes.size(); ++index)
+        updates.push_back({nodes[index], translated(static_cast<float>(index + 1))});
     Transaction move(scene);
     move.add_transforms(std::span<const nkscene::TransformUpdate>{updates});
     assert(scene->commit(move, changes) == NKS_OK);
     move.close();
-    assert(changes.changes.size() == occurrences.size());
+    assert(changes.changes.size() == nodes.size());
     assert(changes.revisions.transform == 1);
     assert(scene->world_transforms()
-               .find(scene->occurrence_store().resolve(occurrences[2]))
+               .find(scene->node_store().resolve(nodes[2]))
                ->transform.matrix[12] == 3.0f);
 
     constexpr nkscene::EntityId robot_link{100};
     Transaction names(scene);
-    names.add_source_entity(occurrences[0], robot_link);
-    names.add_name(occurrences[0], "panda_link0");
+    names.add_source_entity(nodes[0], robot_link);
+    names.add_name(nodes[0], "panda_link0");
     names.add_entity_name(robot_link, "RobotLink");
     assert(scene->commit(names, changes) == NKS_OK);
     names.close();
     assert(changes.revisions.name == 1);
     const auto snapshot = scene->snapshot();
-    assert(snapshot.name(occurrences[0]) == "panda_link0");
+    assert(snapshot.name(nodes[0]) == "panda_link0");
     assert(snapshot.entity_name(robot_link) == "RobotLink");
 }
 
@@ -358,7 +358,7 @@ void names_and_bulk_transforms_are_transactional() {
 
 int main() {
     component_store_is_slot_indexed_and_generation_safe();
-    occurrence_handles_reject_stale_components();
+    node_handles_reject_stale_components();
     hierarchy_links_are_slot_indexed();
     changes_are_domain_precise();
     one_transaction_reuses_generation_safe_handles();

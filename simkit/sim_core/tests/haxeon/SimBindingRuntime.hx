@@ -8,8 +8,8 @@ class SimBindingRuntime {
     static function main():Int {
         var scene = Scene.create();
         var transaction = scene.beginTransaction();
-        var occurrence = transaction.createOccurrence();
-        transaction.setTransform(occurrence, Transform.identity().translated(0.0, 0.0, 10.0));
+        var node = transaction.createNode();
+        transaction.setTransform(node, Transform.identity().translated(0.0, 0.0, 10.0));
         var initialChanges = transaction.commitWithChanges();
         initialChanges.dispose();
 
@@ -18,7 +18,7 @@ class SimBindingRuntime {
             physicsSubsteps: 2,
             gravity: [0.0, 0.0, -9.81]
         });
-        var body = world.createBody(occurrence, MotionType.Dynamic, 1.0);
+        var body = world.createBody(node, MotionType.Dynamic, 1.0);
         var step = world.step();
         if (haxe.Int64.toInt(step.stepIndex) != 1 || step.physicsSubsteps != 2)
             return 1;

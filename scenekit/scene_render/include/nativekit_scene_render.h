@@ -49,12 +49,12 @@ typedef uint32_t
 /* ------------------------------------------------------------------------- */
 
 typedef struct nkscene_render_visibility_override {
-    nkscene_occurrence_id occurrence;
+    nkscene_node_id node;
     uint32_t visible NK_BOOL32;
 } nkscene_render_visibility_override;
 
 typedef struct nkscene_render_material_override {
-    nkscene_occurrence_id occurrence;
+    nkscene_node_id node;
     nkscene_material_id material;
 } nkscene_render_material_override;
 
@@ -79,9 +79,15 @@ typedef struct nkscene_render_camera {
     nkscene_transform view_projection;
 } nkscene_render_camera;
 
+/** One runtime world-space pose override for a scene node. */
+typedef struct nkscene_render_pose_override {
+    nkscene_node_id node;
+    nkscene_transform world_transform;
+} nkscene_render_pose_override;
+
 typedef struct nkscene_render_view {
     uint32_t struct_size NK_STRUCT_SIZE;
-    nkscene_occurrence_id root;
+    nkscene_node_id root;
     uint32_t include_invisible NK_BOOL32;
     const nkscene_render_visibility_override *
         visibility_overrides NK_BORROWED_ARRAY(visibility_override_count);
@@ -105,10 +111,12 @@ typedef struct nkscene_render_view {
     const nkscene_render_source_material_override *
         source_material_overrides NK_BORROWED_ARRAY(source_material_override_count);
     uint32_t source_material_override_count;
-    const nkscene_occurrence_id *isolated_occurrences NK_BORROWED_ARRAY(isolated_occurrence_count);
-    uint32_t isolated_occurrence_count;
-    /** Optional scene camera occurrence used when camera.enabled is zero. */
-    nkscene_occurrence_id camera_occurrence;
+    const nkscene_node_id *isolated_nodes NK_BORROWED_ARRAY(isolated_node_count);
+    uint32_t isolated_node_count;
+    /** Optional scene camera node used when camera.enabled is zero. */
+    nkscene_node_id camera_node;
+    const nkscene_render_pose_override *pose_overrides NK_BORROWED_ARRAY(pose_override_count);
+    uint32_t pose_override_count;
 } nkscene_render_view;
 
 /* ------------------------------------------------------------------------- */
@@ -136,7 +144,7 @@ typedef struct nkscene_render_update {
 /* ------------------------------------------------------------------------- */
 
 typedef struct nkscene_render_pick_result {
-    nkscene_occurrence_id occurrence;
+    nkscene_node_id node;
     nkscene_entity_id source;
     uint32_t subelement;
     float world_position[3];
@@ -148,9 +156,9 @@ typedef struct nkscene_render_ray {
     float direction[3];
 } nkscene_render_ray;
 
-typedef struct nkscene_render_spatial_occurrence {
-    nkscene_occurrence_id occurrence;
-} nkscene_render_spatial_occurrence;
+typedef struct nkscene_render_spatial_node {
+    nkscene_node_id node;
+} nkscene_render_spatial_node;
 
 enum {
     NKS_RENDER_PICK_PENDING = 1,
@@ -204,6 +212,9 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_plan_pick(
 /** Builds a read-only spatial index for one immutable scene snapshot. */
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_create(
     nkscene_snapshot snapshot, nkscene_render_spatial_index *out_index NK_OUT NK_OWNED);
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_create_with_view(
+    nkscene_snapshot snapshot, const nkscene_render_view *view,
+    nkscene_render_spatial_index *out_index NK_OUT NK_OWNED);
 NKSRENDER_API void NKS_CALL
 nkscene_render_spatial_index_destroy(nkscene_render_spatial_index index);
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_get_revision(
@@ -212,9 +223,9 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_query_bounds(
     nkscene_render_spatial_index index, const nkscene_bounds *bounds, uint64_t *out_count NK_OUT);
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_query_ray(
     nkscene_render_spatial_index index, const nkscene_render_ray *ray, uint64_t *out_count NK_OUT);
-NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_get_occurrence(
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_get_node(
     nkscene_render_spatial_index index, uint64_t result_index,
-    nkscene_render_spatial_occurrence *out_result NK_OUT);
+    nkscene_render_spatial_node *out_result NK_OUT);
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray(
     nkscene_render_spatial_index index, const nkscene_render_ray *ray,
     nkscene_render_pick_result *out_result NK_OUT);

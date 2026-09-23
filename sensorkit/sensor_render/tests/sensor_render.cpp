@@ -50,17 +50,17 @@ std::shared_ptr<Scene> make_colored_scene() {
     material_state.base_color = {0.0f, 0.0f, 0.0f, 1.0f};
     material_state.emissive = {1.0f, 0.0f, 0.0f};
 
-    const auto occurrence = scene->reserve_occurrence_id();
+    const auto node = scene->reserve_node_id();
     Transaction create(scene);
-    create.add_create(occurrence);
+    create.add_create(node);
     ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
 
     Transaction configure(scene);
-    configure.add_geometry(occurrence, geometry);
-    configure.add_material(occurrence, material);
-    configure.add_source_entity(occurrence, EntityId{101});
+    configure.add_geometry(node, geometry);
+    configure.add_material(node, material);
+    configure.add_source_entity(node, EntityId{101});
     assert(scene->commit(configure, changes) == NKS_OK);
     configure.close();
     return scene;

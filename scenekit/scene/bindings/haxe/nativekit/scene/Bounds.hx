@@ -22,7 +22,7 @@ class Bounds {
 		maxZ = value.get_maximum(2);
 	}
 
-	@:allow(OccurrenceInfo)
+	@:allow(SceneNode)
 	static function fromNative(value:nkscene_bounds):Bounds
 		return new Bounds(value);
 }

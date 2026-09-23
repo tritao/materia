@@ -38,10 +38,10 @@ int main(void) {
 
     nkscene_transaction transaction = NKS_INVALID_TRANSACTION;
     assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
-    nkscene_occurrence_id occurrence = NKS_INVALID_OCCURRENCE;
-    assert(nkscene_tx_create_occurrence(transaction, &occurrence) == NKS_OK);
-    assert(nkscene_tx_set_geometry(transaction, occurrence, geometry) == NKS_OK);
-    assert(nkscene_tx_set_material(transaction, occurrence, material) == NKS_OK);
+    nkscene_node_id node = NKS_INVALID_NODE;
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
+    assert(nkscene_tx_set_geometry(transaction, node, geometry) == NKS_OK);
+    assert(nkscene_tx_set_material(transaction, node, material) == NKS_OK);
     nkscene_change_set changes = {0};
     assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
 
@@ -117,7 +117,7 @@ int main(void) {
     nkscene_render_pick_result pick = {0};
     const float world_position[3] = {0.0f, 0.0f, 0.0f};
     assert(nkscene_render_plan_pick(plan, snapshot, 0, world_position, 0.5f, &pick) == NKS_OK);
-    assert(pick.occurrence.value == occurrence.value);
+    assert(pick.node.value == node.value);
     assert(pick.subelement == 1);
 
     nkscene_render_spatial_index spatial_index = 0;
@@ -135,21 +135,21 @@ int main(void) {
     assert(nkscene_render_spatial_index_query_bounds(
                spatial_index, &query_bounds, &query_count) == NKS_OK);
     assert(query_count == 1);
-    nkscene_render_spatial_occurrence query_result = {0};
-    assert(nkscene_render_spatial_index_get_occurrence(
+    nkscene_render_spatial_node query_result = {0};
+    assert(nkscene_render_spatial_index_get_node(
                spatial_index, 0, &query_result) == NKS_OK);
-    assert(query_result.occurrence.value == occurrence.value);
+    assert(query_result.node.value == node.value);
     nkscene_render_ray ray = {{0.25f, 0.25f, 1.0f}, {0.0f, 0.0f, -1.0f}};
     assert(nkscene_render_spatial_index_query_ray(spatial_index, &ray, &query_count) == NKS_OK);
     assert(query_count == 1);
     assert(nkscene_render_spatial_index_pick_ray(spatial_index, &ray, &pick) == NKS_OK);
-    assert(pick.occurrence.value == occurrence.value);
+    assert(pick.node.value == node.value);
     assert(pick.subelement == 1);
     assert(pick.depth == 1.0f);
     nkscene_render_ray rays[1] = {ray};
     nkscene_render_pick_result picks[1] = {{0}};
     assert(nkscene_render_spatial_index_pick_rays(spatial_index, rays, 1, picks) == NKS_OK);
-    assert(picks[0].occurrence.value == occurrence.value);
+    assert(picks[0].node.value == node.value);
     assert(picks[0].subelement == 1);
     assert(picks[0].depth == 1.0f);
     assert(nkscene_render_spatial_index_pick_rays(spatial_index, NULL, 0, NULL) == NKS_OK);
@@ -170,7 +170,7 @@ int main(void) {
         0.0f, 0.0f, 1.0f, 0.0f,
         2.0f, 0.0f, 0.0f, 1.0f,
     }};
-    assert(nkscene_tx_set_transform(transaction, occurrence, &transform) == NKS_OK);
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
     changes = 0;
     assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
     assert(nkscene_scene_snapshot(scene, &snapshot) == NKS_OK);

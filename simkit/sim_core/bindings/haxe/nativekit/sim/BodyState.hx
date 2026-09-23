@@ -6,7 +6,7 @@ import NativeKitScene;
 /** Immutable copy of one simulated body's state. */
 class BodyState {
     public final body:nksim_body;
-    public final occurrence:nkscene_occurrence_id;
+    public final node:nkscene_node_id;
     public final x:Float;
     public final y:Float;
     public final z:Float;
@@ -17,7 +17,7 @@ class BodyState {
 
     private function new(value:nksim_body_state) {
         body = value.get_body();
-        occurrence = value.get_occurrence();
+        node = value.get_node();
         x = value.get_position(0);
         y = value.get_position(1);
         z = value.get_position(2);

@@ -21,30 +21,30 @@ nkscene_transform make_transform(double x, double y, double z) {
     return transform;
 }
 
-nkscene_occurrence_id make_occurrence(nkscene_scene scene, double z) {
+nkscene_node_id make_node(nkscene_scene scene, double z) {
     nkscene_transaction transaction = 0;
     assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
-    nkscene_occurrence_id occurrence{};
-    assert(nkscene_tx_create_occurrence(transaction, &occurrence) == NKS_OK);
+    nkscene_node_id node{};
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
     const auto transform = make_transform(0.0, 0.0, z);
-    assert(nkscene_tx_set_transform(transaction, occurrence, &transform) == NKS_OK);
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
     nkscene_change_set changes = 0;
     assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
     nkscene_change_set_destroy(changes);
-    return occurrence;
+    return node;
 }
 
-struct NestedOccurrences {
-    nkscene_occurrence_id parent{};
-    nkscene_occurrence_id child{};
+struct NestedNodes {
+    nkscene_node_id parent{};
+    nkscene_node_id child{};
 };
 
-NestedOccurrences make_nested_occurrences(nkscene_scene scene) {
+NestedNodes make_nested_nodes(nkscene_scene scene) {
     nkscene_transaction transaction = 0;
     assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
-    NestedOccurrences result;
-    assert(nkscene_tx_create_occurrence(transaction, &result.parent) == NKS_OK);
-    assert(nkscene_tx_create_occurrence(transaction, &result.child) == NKS_OK);
+    NestedNodes result;
+    assert(nkscene_tx_create_node(transaction, &result.parent) == NKS_OK);
+    assert(nkscene_tx_create_node(transaction, &result.child) == NKS_OK);
     const auto parent_transform = make_transform(0.0, 0.0, 5.0);
     const auto child_transform = make_transform(1.0, 2.0, 3.0);
     assert(nkscene_tx_set_transform(transaction, result.parent, &parent_transform) == NKS_OK);
@@ -59,7 +59,7 @@ NestedOccurrences make_nested_occurrences(nkscene_scene scene) {
 void falling_body_updates_scene_and_snapshot() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto occurrence = make_occurrence(scene, 10.0);
+    const auto node = make_node(scene, 10.0);
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -75,7 +75,7 @@ void falling_body_updates_scene_and_snapshot() {
     assert(nksim_shape_create_box(world, half_extents, &shape) == NKSIM_OK);
     nksim_body_desc body_desc{};
     body_desc.struct_size = sizeof(body_desc);
-    body_desc.occurrence = occurrence;
+    body_desc.node = node;
     body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
     body_desc.mass = 2.0;
     body_desc.shape = shape;
@@ -118,10 +118,10 @@ void falling_body_updates_scene_and_snapshot() {
 
     nkscene_snapshot scene_snapshot = 0;
     assert(nkscene_scene_snapshot(scene, &scene_snapshot) == NKS_OK);
-    nkscene_snapshot_occurrence occurrence_state{};
-    occurrence_state.struct_size = sizeof(occurrence_state);
-    assert(nkscene_snapshot_get_occurrence(scene_snapshot, 0, &occurrence_state) == NKS_OK);
-    assert(std::abs(occurrence_state.world_transform.matrix[14] - body_state.position[2]) < 1e-5);
+    nkscene_snapshot_node node_state{};
+    node_state.struct_size = sizeof(node_state);
+    assert(nkscene_snapshot_get_node(scene_snapshot, 0, &node_state) == NKS_OK);
+    assert(std::abs(node_state.world_transform.matrix[14] - body_state.position[2]) < 1e-5);
     nkscene_snapshot_destroy(scene_snapshot);
 
     nksim_snapshot snapshot = 0;
@@ -147,7 +147,7 @@ void falling_body_updates_scene_and_snapshot() {
 void nested_dynamic_body_updates_local_transform() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto occurrences = make_nested_occurrences(scene);
+    const auto nodes = make_nested_nodes(scene);
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -160,7 +160,7 @@ void nested_dynamic_body_updates_local_transform() {
 
     nksim_body_desc body_desc{};
     body_desc.struct_size = sizeof(body_desc);
-    body_desc.occurrence = occurrences.child;
+    body_desc.node = nodes.child;
     body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
     body_desc.mass = 1.0;
     nksim_body body = 0;
@@ -179,18 +179,18 @@ void nested_dynamic_body_updates_local_transform() {
     nkscene_snapshot snapshot = 0;
     assert(nkscene_scene_snapshot(scene, &snapshot) == NKS_OK);
     uint64_t count = 0;
-    assert(nkscene_snapshot_get_occurrence_count(snapshot, &count) == NKS_OK);
-    nkscene_snapshot_occurrence parent_state{};
-    nkscene_snapshot_occurrence child_state{};
+    assert(nkscene_snapshot_get_node_count(snapshot, &count) == NKS_OK);
+    nkscene_snapshot_node parent_state{};
+    nkscene_snapshot_node child_state{};
     parent_state.struct_size = sizeof(parent_state);
     child_state.struct_size = sizeof(child_state);
     for (uint64_t index = 0; index < count; ++index) {
-        nkscene_snapshot_occurrence state{};
+        nkscene_snapshot_node state{};
         state.struct_size = sizeof(state);
-        assert(nkscene_snapshot_get_occurrence(snapshot, index, &state) == NKS_OK);
-        if (state.occurrence.value == occurrences.parent.value)
+        assert(nkscene_snapshot_get_node(snapshot, index, &state) == NKS_OK);
+        if (state.node.value == nodes.parent.value)
             parent_state = state;
-        if (state.occurrence.value == occurrences.child.value)
+        if (state.node.value == nodes.child.value)
             child_state = state;
     }
     assert(std::abs(parent_state.world_transform.matrix[14] - 5.0f) < 1e-5f);
@@ -216,7 +216,7 @@ struct ReplayResult {
 ReplayResult run_replay() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto occurrence = make_occurrence(scene, 10.0);
+    const auto node = make_node(scene, 10.0);
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -230,7 +230,7 @@ ReplayResult run_replay() {
 
     nksim_body_desc body_desc{};
     body_desc.struct_size = sizeof(body_desc);
-    body_desc.occurrence = occurrence;
+    body_desc.node = node;
     body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
     body_desc.mass = 2.0;
     nksim_body body = 0;
@@ -257,9 +257,9 @@ ReplayResult run_replay() {
 
     nkscene_snapshot snapshot = 0;
     assert(nkscene_scene_snapshot(scene, &snapshot) == NKS_OK);
-    nkscene_snapshot_occurrence state{};
+    nkscene_snapshot_node state{};
     state.struct_size = sizeof(state);
-    assert(nkscene_snapshot_get_occurrence(snapshot, 0, &state) == NKS_OK);
+    assert(nkscene_snapshot_get_node(snapshot, 0, &state) == NKS_OK);
     std::copy(std::begin(state.world_transform.matrix), std::end(state.world_transform.matrix),
               result.scene_transform.begin());
     nkscene_snapshot_destroy(snapshot);
@@ -283,8 +283,8 @@ void repeated_replays_are_identical() {
 void batched_joint_targets_are_accepted() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto first = make_occurrence(scene, 0.0);
-    const auto second = make_occurrence(scene, 1.0);
+    const auto first = make_node(scene, 0.0);
+    const auto second = make_node(scene, 1.0);
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
     world_desc.scene = scene;
@@ -298,10 +298,10 @@ void batched_joint_targets_are_accepted() {
     body_desc.struct_size = sizeof(body_desc);
     body_desc.motion_type = NKSIM_MOTION_KINEMATIC;
     body_desc.mass = 1.0;
-    body_desc.occurrence = first;
+    body_desc.node = first;
     nksim_body body_a = 0;
     assert(nksim_body_create(world, &body_desc, &body_a) == NKSIM_OK);
-    body_desc.occurrence = second;
+    body_desc.node = second;
     nksim_body body_b = 0;
     assert(nksim_body_create(world, &body_desc, &body_b) == NKSIM_OK);
 

@@ -53,7 +53,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_world_step(world: nksim_world, out_result: ptr<nksim_step_result> @inout) -> nksim_result;
 	struct nksim_body_desc @layout(80, 8) {
 		struct_size: u32 @offset(0) @struct_size;
-		occurrence: nkscene_occurrence_id @offset(8);
+		node: nkscene_node_id @offset(8);
 		motion_type: u32 @offset(16);
 		mass: f64 @offset(24);
 		shape: nksim_shape @offset(32);
@@ -70,7 +70,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	struct nksim_body_state @layout(144, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		body: nksim_body @offset(4);
-		occurrence: nkscene_occurrence_id @offset(8);
+		node: nkscene_node_id @offset(8);
 		position: array<f64, 3> @offset(16);
 		rotation: array<f64, 4> @offset(40);
 		linear_velocity: array<f64, 3> @offset(72);

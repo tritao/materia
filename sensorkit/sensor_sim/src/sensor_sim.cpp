@@ -177,7 +177,7 @@ nkscene_result SceneLidarAdapter::scan(LidarSensor &sensor, const SensorTick &ti
     std::vector<LidarHit> hits(local_rays.size());
     for (std::size_t index = 0; index < local_rays.size(); ++index) {
         const auto &pick = results[index];
-        if (!pick.occurrence.value)
+        if (!pick.node.value)
             continue;
         const Vec3 world_point{
             pick.world_position[0], pick.world_position[1], pick.world_position[2]};

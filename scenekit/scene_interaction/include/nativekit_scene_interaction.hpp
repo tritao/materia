@@ -56,18 +56,18 @@ class NKSINTERACTION_API SceneInteraction {
     void cancel_hover() noexcept;
 
     void apply_pick(const PickResult &, SelectionMode mode);
-    void select(OccurrenceId, SelectionMode mode);
+    void select(NodeId, SelectionMode mode);
     void clear_selection() noexcept;
     void synchronize(const SceneSnapshot &);
 
     std::optional<PickResult> hovered() const;
-    std::span<const OccurrenceId> selected() const noexcept;
-    bool is_selected(OccurrenceId) const noexcept;
+    std::span<const NodeId> selected() const noexcept;
+    bool is_selected(NodeId) const noexcept;
 
   private:
     std::shared_ptr<GpuPickRequest> hover_request_;
     std::optional<PickResult> hovered_;
-    std::vector<OccurrenceId> selected_;
+    std::vector<NodeId> selected_;
 };
 
 } // namespace nkscene

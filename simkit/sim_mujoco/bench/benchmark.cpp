@@ -8,16 +8,16 @@
 
 namespace {
 
-std::vector<nkscene_occurrence_id> make_box_occurrences(nkscene_scene scene,
+std::vector<nkscene_node_id> make_box_nodes(nkscene_scene scene,
                                                         int count) {
     nkscene_transaction transaction = 0;
     if (nkscene_transaction_begin(scene, &transaction) != NKS_OK)
         return {};
-    std::vector<nkscene_occurrence_id> result;
+    std::vector<nkscene_node_id> result;
     result.reserve(count);
     for (int index = 0; index < count; ++index) {
-        nkscene_occurrence_id occurrence{};
-        if (nkscene_tx_create_occurrence(transaction, &occurrence) != NKS_OK)
+        nkscene_node_id node{};
+        if (nkscene_tx_create_node(transaction, &node) != NKS_OK)
             return {};
         const int row = index / 8;
         const int column = index % 8;
@@ -29,9 +29,9 @@ std::vector<nkscene_occurrence_id> make_box_occurrences(nkscene_scene scene,
         transform.matrix[13] = static_cast<float>((row % 2) * 0.275);
         transform.matrix[14] = static_cast<float>(0.3 + row * 0.55);
         transform.matrix[15] = 1.0f;
-        if (nkscene_tx_set_transform(transaction, occurrence, &transform) != NKS_OK)
+        if (nkscene_tx_set_transform(transaction, node, &transform) != NKS_OK)
             return {};
-        result.push_back(occurrence);
+        result.push_back(node);
     }
     nkscene_change_set changes = 0;
     if (nkscene_transaction_commit_with_changes(transaction, &changes) != NKS_OK)
@@ -40,11 +40,11 @@ std::vector<nkscene_occurrence_id> make_box_occurrences(nkscene_scene scene,
     return result;
 }
 
-nksim_body create_body(nksim_world world, nkscene_occurrence_id occurrence,
+nksim_body create_body(nksim_world world, nkscene_node_id node,
                       uint32_t motion, double mass, nksim_shape shape) {
     nksim_body_desc desc{};
     desc.struct_size = sizeof(desc);
-    desc.occurrence = occurrence;
+    desc.node = node;
     desc.motion_type = motion;
     desc.mass = mass;
     desc.shape = shape;
@@ -62,22 +62,22 @@ int main() {
     nkscene_scene scene = 0;
     if (nkscene_scene_create(&scene) != NKS_OK)
         return 1;
-    const auto occurrences = make_box_occurrences(scene, box_count);
-    if (occurrences.size() != box_count)
+    const auto nodes = make_box_nodes(scene, box_count);
+    if (nodes.size() != box_count)
         return 1;
 
     nkscene_transaction transaction = 0;
     if (nkscene_transaction_begin(scene, &transaction) != NKS_OK)
         return 1;
-    nkscene_occurrence_id floor_occurrence{};
-    if (nkscene_tx_create_occurrence(transaction, &floor_occurrence) != NKS_OK)
+    nkscene_node_id floor_node{};
+    if (nkscene_tx_create_node(transaction, &floor_node) != NKS_OK)
         return 1;
     nkscene_transform floor_transform{};
     floor_transform.matrix[0] = 1.0f;
     floor_transform.matrix[5] = 1.0f;
     floor_transform.matrix[10] = 1.0f;
     floor_transform.matrix[15] = 1.0f;
-    if (nkscene_tx_set_transform(transaction, floor_occurrence, &floor_transform) != NKS_OK)
+    if (nkscene_tx_set_transform(transaction, floor_node, &floor_transform) != NKS_OK)
         return 1;
     nkscene_change_set changes = 0;
     if (nkscene_transaction_commit_with_changes(transaction, &changes) != NKS_OK)
@@ -101,12 +101,12 @@ int main() {
     if (nksim_shape_create_plane(world, plane_normal, 0.0, &floor_shape) != NKSIM_OK ||
         nksim_shape_create_box(world, half_extents, &box_shape) != NKSIM_OK)
         return 1;
-    const auto floor = create_body(world, floor_occurrence, NKSIM_MOTION_STATIC,
+    const auto floor = create_body(world, floor_node, NKSIM_MOTION_STATIC,
                                    0.0, floor_shape);
     std::vector<nksim_body> boxes;
     boxes.reserve(box_count);
-    for (const auto occurrence : occurrences)
-        boxes.push_back(create_body(world, occurrence, NKSIM_MOTION_DYNAMIC, 1.0,
+    for (const auto node : nodes)
+        boxes.push_back(create_body(world, node, NKSIM_MOTION_DYNAMIC, 1.0,
                                     box_shape));
     if (!floor || boxes.size() != box_count)
         return 1;

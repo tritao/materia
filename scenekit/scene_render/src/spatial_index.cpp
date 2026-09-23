@@ -14,22 +14,22 @@ namespace nkscene {
 
 namespace {
 
-constexpr std::uint32_t invalid_node = std::numeric_limits<std::uint32_t>::max();
+constexpr std::uint32_t invalid_slot = std::numeric_limits<std::uint32_t>::max();
 constexpr std::size_t leaf_capacity = 8;
 
 struct Entry {
-    OccurrenceId occurrence;
+    NodeId node;
     Bounds bounds;
 };
 
 struct Node {
     Bounds bounds;
-    std::uint32_t left = invalid_node;
-    std::uint32_t right = invalid_node;
+    std::uint32_t left = invalid_slot;
+    std::uint32_t right = invalid_slot;
     std::uint32_t first = 0;
     std::uint32_t count = 0;
 
-    bool leaf() const noexcept { return left == invalid_node; }
+    bool leaf() const noexcept { return left == invalid_slot; }
 };
 
 Bounds merge_bounds(const Bounds &lhs, const Bounds &rhs) noexcept {
@@ -182,7 +182,7 @@ std::uint32_t vertex_index(const GeometryPayload &payload, std::size_t index) no
 template <class Visitor>
 void visit_bounds(const std::vector<Node> &nodes, const std::vector<Entry> &entries,
                   std::uint32_t node_index, const Bounds &query, Visitor &&visitor) {
-    if (node_index == invalid_node || !overlaps(nodes[node_index].bounds, query))
+    if (node_index == invalid_slot || !overlaps(nodes[node_index].bounds, query))
         return;
     const auto &node = nodes[node_index];
     if (node.leaf()) {
@@ -198,7 +198,7 @@ void visit_bounds(const std::vector<Node> &nodes, const std::vector<Entry> &entr
 template <class Visitor>
 void visit_ray(const std::vector<Node> &nodes, const std::vector<Entry> &entries,
                std::uint32_t node_index, const Ray &ray, Visitor &&visitor) {
-    if (node_index == invalid_node || !ray_hits_bounds(ray, nodes[node_index].bounds))
+    if (node_index == invalid_slot || !ray_hits_bounds(ray, nodes[node_index].bounds))
         return;
     const auto &node = nodes[node_index];
     if (node.leaf()) {
@@ -215,7 +215,7 @@ template <class Visitor>
 void visit_frustum(const std::vector<Node> &nodes, const std::vector<Entry> &entries,
                    std::uint32_t node_index, std::span<const std::array<float, 4>> planes,
                    Visitor &&visitor) {
-    if (node_index == invalid_node || outside_planes(nodes[node_index].bounds, planes))
+    if (node_index == invalid_slot || outside_planes(nodes[node_index].bounds, planes))
         return;
     const auto &node = nodes[node_index];
     if (node.leaf()) {
@@ -231,21 +231,54 @@ void visit_frustum(const std::vector<Node> &nodes, const std::vector<Entry> &ent
 } // namespace
 
 struct SceneSpatialIndex::State {
-    explicit State(const SceneSnapshot &value) : snapshot(value), revision(value.revision()) {}
+    explicit State(const SceneSnapshot &value, const SceneView *view)
+        : snapshot(value), revision(value.revision()) {
+        if (view)
+            for (const auto &pose : view->pose_overrides)
+                pose_transforms.insert_or_assign(pose.node, pose.world_transform);
+    }
 
     SceneSnapshot snapshot;
     std::uint64_t revision = 0;
     std::vector<Entry> entries;
     std::vector<Node> nodes;
-    mutable std::vector<OccurrenceId> results;
+    std::unordered_map<NodeId, LocalTransform> pose_transforms;
+    mutable std::vector<NodeId> results;
 };
 
-SceneSpatialIndex::SceneSpatialIndex(const SceneSnapshot &snapshot)
-    : state_(std::make_unique<State>(snapshot)) {
-    state_->entries.reserve(snapshot.occurrences().size());
-    for (const auto &occurrence : snapshot.occurrences())
-        if (occurrence.bounds.valid)
-            state_->entries.push_back({occurrence.occurrence, occurrence.bounds});
+SceneSpatialIndex::SceneSpatialIndex(const SceneSnapshot &snapshot, const SceneView *view)
+    : state_(std::make_unique<State>(snapshot, view)) {
+    state_->entries.reserve(snapshot.nodes().size());
+    for (const auto &node : snapshot.nodes()) {
+        const auto pose = state_->pose_transforms.find(node.node);
+        if (pose == state_->pose_transforms.end()) {
+            if (node.bounds.valid)
+                state_->entries.push_back({node.node, node.bounds});
+            continue;
+        }
+        const auto *geometry = snapshot.find_geometry(node.geometry);
+        if (!geometry || !geometry->bounds.valid)
+            continue;
+        Bounds bounds;
+        for (auto &value : bounds.minimum)
+            value = std::numeric_limits<float>::infinity();
+        for (auto &value : bounds.maximum)
+            value = -std::numeric_limits<float>::infinity();
+        for (const auto x : {geometry->bounds.minimum[0], geometry->bounds.maximum[0]})
+            for (const auto y : {geometry->bounds.minimum[1], geometry->bounds.maximum[1]})
+                for (const auto z : {geometry->bounds.minimum[2], geometry->bounds.maximum[2]}) {
+                    GeometryVertex vertex;
+                    vertex.position = {x, y, z};
+                    const auto point = transform_point(pose->second, vertex);
+                    const std::array<float, 3> values{point.x, point.y, point.z};
+                    for (std::size_t axis = 0; axis < 3; ++axis) {
+                        bounds.minimum[axis] = std::min(bounds.minimum[axis], values[axis]);
+                        bounds.maximum[axis] = std::max(bounds.maximum[axis], values[axis]);
+                    }
+                }
+        bounds.valid = true;
+        state_->entries.push_back({node.node, bounds});
+    }
     const auto build_node = [&](auto &&self, std::size_t first, std::size_t last) -> std::uint32_t {
         const auto node_index = static_cast<std::uint32_t>(state_->nodes.size());
         state_->nodes.emplace_back();
@@ -284,20 +317,20 @@ std::uint64_t SceneSpatialIndex::source_revision() const noexcept {
     return state_ ? state_->revision : 0;
 }
 
-std::span<const OccurrenceId> SceneSpatialIndex::query_bounds(const Bounds &bounds) const {
+std::span<const NodeId> SceneSpatialIndex::query_bounds(const Bounds &bounds) const {
     if (!state_)
         return {};
     state_->results.clear();
     if (!bounds.valid || state_->nodes.empty())
         return {};
     visit_bounds(state_->nodes, state_->entries, 0, bounds,
-                 [this](const Entry &entry) { state_->results.push_back(entry.occurrence); });
+                 [this](const Entry &entry) { state_->results.push_back(entry.node); });
     std::sort(state_->results.begin(), state_->results.end(),
-              [](OccurrenceId lhs, OccurrenceId rhs) { return lhs.value < rhs.value; });
+              [](NodeId lhs, NodeId rhs) { return lhs.value < rhs.value; });
     return state_->results;
 }
 
-std::span<const OccurrenceId>
+std::span<const NodeId>
 SceneSpatialIndex::query_frustum(std::span<const std::array<float, 4>> planes) const {
     if (!state_)
         return {};
@@ -305,13 +338,13 @@ SceneSpatialIndex::query_frustum(std::span<const std::array<float, 4>> planes) c
     if (state_->nodes.empty())
         return {};
     visit_frustum(state_->nodes, state_->entries, 0, planes,
-                  [this](const Entry &entry) { state_->results.push_back(entry.occurrence); });
+                  [this](const Entry &entry) { state_->results.push_back(entry.node); });
     std::sort(state_->results.begin(), state_->results.end(),
-              [](OccurrenceId lhs, OccurrenceId rhs) { return lhs.value < rhs.value; });
+              [](NodeId lhs, NodeId rhs) { return lhs.value < rhs.value; });
     return state_->results;
 }
 
-std::span<const OccurrenceId> SceneSpatialIndex::query_ray(const Ray &ray) const {
+std::span<const NodeId> SceneSpatialIndex::query_ray(const Ray &ray) const {
     if (!state_)
         return {};
     state_->results.clear();
@@ -321,9 +354,9 @@ std::span<const OccurrenceId> SceneSpatialIndex::query_ray(const Ray &ray) const
     if (!normalize_ray(ray, normalized))
         return {};
     visit_ray(state_->nodes, state_->entries, 0, normalized,
-              [this](const Entry &entry) { state_->results.push_back(entry.occurrence); });
+              [this](const Entry &entry) { state_->results.push_back(entry.node); });
     std::sort(state_->results.begin(), state_->results.end(),
-              [](OccurrenceId lhs, OccurrenceId rhs) { return lhs.value < rhs.value; });
+              [](NodeId lhs, NodeId rhs) { return lhs.value < rhs.value; });
     return state_->results;
 }
 
@@ -331,9 +364,9 @@ std::size_t SceneSpatialIndex::query_result_count() const noexcept {
     return state_ ? state_->results.size() : 0;
 }
 
-OccurrenceId SceneSpatialIndex::query_result(std::size_t index) const noexcept {
+NodeId SceneSpatialIndex::query_result(std::size_t index) const noexcept {
     if (!state_ || index >= state_->results.size())
-        return invalid_occurrence;
+        return {};
     return state_->results[index];
 }
 
@@ -344,14 +377,18 @@ PickResult SceneSpatialIndex::pick_ray(const Ray &ray) const {
         return result;
     const auto candidates = query_ray(ray);
     auto best_distance = std::numeric_limits<float>::infinity();
-    for (const auto occurrence_id : candidates) {
-        const auto *occurrence = state_->snapshot.find(occurrence_id);
-        if (!occurrence || !occurrence->visible || !occurrence->geometry.valid())
+    for (const auto node_id : candidates) {
+        const auto *node = state_->snapshot.find(node_id);
+        if (!node || !node->visible || !node->geometry.valid())
             continue;
-        const auto *geometry = state_->snapshot.find_geometry(occurrence->geometry);
+        const auto *geometry = state_->snapshot.find_geometry(node->geometry);
         if (!geometry)
             continue;
         const auto primitive_count = geometry->payload->element_count() / 3;
+        const auto pose = state_->pose_transforms.find(node_id);
+        const auto &transform = pose == state_->pose_transforms.end()
+                                    ? node->world_transform.transform
+                                    : pose->second;
         for (std::size_t primitive = 0; primitive < primitive_count; ++primitive) {
             const auto first_index =
                 static_cast<std::size_t>(vertex_index(*geometry->payload, primitive * 3));
@@ -365,18 +402,18 @@ PickResult SceneSpatialIndex::pick_ray(const Ray &ray) const {
                 continue;
             float distance = 0.0f;
             if (!ray_hits_triangle(normalized,
-                                   transform_point(occurrence->world_transform.transform,
+                                   transform_point(transform,
                                                    geometry->payload->vertices[first_index]),
-                                   transform_point(occurrence->world_transform.transform,
+                                   transform_point(transform,
                                                    geometry->payload->vertices[second_index]),
-                                   transform_point(occurrence->world_transform.transform,
+                                   transform_point(transform,
                                                    geometry->payload->vertices[third_index]),
                                    distance) ||
                 distance >= best_distance)
                 continue;
             best_distance = distance;
-            result.occurrence = occurrence->occurrence;
-            result.source = occurrence->source;
+            result.node = node->node;
+            result.source = node->source;
             result.subelement = {geometry->subelements->id_for_primitive(primitive)};
             result.worldPosition = scale_add(normalized.origin, normalized.direction, distance);
             result.depth = distance;

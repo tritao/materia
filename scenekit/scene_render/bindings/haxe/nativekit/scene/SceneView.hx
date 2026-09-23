@@ -11,23 +11,24 @@ class SceneView {
 	var selectionOverrides:Array<nkscene_render_material_override> = [];
 	var hoverOverrides:Array<nkscene_render_material_override> = [];
 	var isolatedSources:Array<nkscene_entity_id> = [];
-	var isolatedOccurrences:Array<nkscene_occurrence_id> = [];
+	var isolatedNodes:Array<nkscene_node_id> = [];
 	var sourceVisibilityOverrides:Array<nkscene_render_source_visibility_override> = [];
 	var sourceMaterialOverrides:Array<nkscene_render_source_material_override> = [];
 	var clipPlanes:Array<nkscene_render_clip_plane> = [];
+	var poseOverrides:Array<nkscene_render_pose_override> = [];
 
 	public function new() {
 		value = new nkscene_render_view();
 		value.set_struct_size(nkscene_render_view.size());
 	}
 
-	public function setRoot(root:Occurrence):SceneView {
+	public function setRoot(root:Node):SceneView {
 		value.set_root(root.nativeValue());
 		return this;
 	}
 
 	public function clearRoot():SceneView {
-		value.set_root(new nkscene_occurrence_id());
+		value.set_root(new nkscene_node_id());
 		return this;
 	}
 
@@ -51,18 +52,18 @@ class SceneView {
 		return this;
 	}
 
-	/** Selects a scene camera occurrence when no explicit matrix is set. */
-	public function setCameraOccurrence(occurrence:Occurrence):SceneView {
-		value.set_camera_occurrence(occurrence.nativeValue());
+	/** Selects a scene camera node when no explicit matrix is set. */
+	public function setCameraNode(node:Node):SceneView {
+		value.set_camera_node(node.nativeValue());
 		return this;
 	}
 
-	public function clearCameraOccurrence():SceneView {
-		value.set_camera_occurrence(new nkscene_occurrence_id());
+	public function clearCameraNode():SceneView {
+		value.set_camera_node(new nkscene_node_id());
 		return this;
 	}
 
-	/** Adds a conservative occurrence-level section plane. Kept side is normal * p + distance >= 0. */
+	/** Adds a conservative node-level section plane. Kept side is normal * p + distance >= 0. */
 	public function addClipPlane(normalX:Float, normalY:Float, normalZ:Float,
 			distance:Float, enabled:Bool = true):SceneView {
 		var plane = new nkscene_render_clip_plane();
@@ -82,39 +83,71 @@ class SceneView {
 		return this;
 	}
 
-	public function setVisibility(occurrence:Occurrence, visible:Bool):SceneView {
-		var stable = occurrence.stableValue();
+	public function setVisibility(node:Node, visible:Bool):SceneView {
+		var stable = node.stableValue();
 		for (override in visibilityOverrides) {
-			if (override.get_occurrence().get_value() == stable) {
+			if (override.get_node().get_value() == stable) {
 				override.set_visible(visible ? 1 : 0);
 				value.set_visibility_overrides(visibilityOverrides);
 				return this;
 			}
 		}
 		var override = new nkscene_render_visibility_override();
-		override.set_occurrence(occurrence.nativeValue());
+		override.set_node(node.nativeValue());
 		override.set_visible(visible ? 1 : 0);
 		visibilityOverrides.push(override);
 		value.set_visibility_overrides(visibilityOverrides);
 		return this;
 	}
 
-	public function setMaterial(occurrence:Occurrence, material:Material):SceneView {
-		setMaterialOverride(materialOverrides, occurrence, material);
+	public function setNodeVisibility(node:Node, visible:Bool):SceneView
+		return setVisibility(node, visible);
+
+	public function setMaterial(node:Node, material:Material):SceneView {
+		setMaterialOverride(materialOverrides, node, material);
 		value.set_material_overrides(materialOverrides);
 		return this;
 	}
 
+	public function setNodeMaterial(node:Node, material:Material):SceneView
+		return setMaterial(node, material);
+
+	/** Adds or replaces a runtime world-space pose without changing the scene snapshot. */
+	public function setPose(node:Node, transform:Transform):SceneView {
+		for (override in poseOverrides) {
+			if (override.get_node().get_value() == node.stableValue()) {
+				override.set_world_transform(transform.nativeValue());
+				value.set_pose_overrides(poseOverrides);
+				value.set_pose_override_count(poseOverrides.length);
+				return this;
+			}
+		}
+		var override = new nkscene_render_pose_override();
+		override.set_node(node.nativeValue());
+		override.set_world_transform(transform.nativeValue());
+		poseOverrides.push(override);
+		value.set_pose_overrides(poseOverrides);
+		value.set_pose_override_count(poseOverrides.length);
+		return this;
+	}
+
+	public function clearPoses():SceneView {
+		poseOverrides.resize(0);
+		value.set_pose_overrides(poseOverrides);
+		value.set_pose_override_count(0);
+		return this;
+	}
+
 	@:allow(SelectionSet)
-	function setSelectionMaterial(occurrence:Occurrence, material:Material):SceneView {
-		setMaterialOverride(selectionOverrides, occurrence, material);
+	function setSelectionMaterial(node:Node, material:Material):SceneView {
+		setMaterialOverride(selectionOverrides, node, material);
 		value.set_selection_overrides(selectionOverrides);
 		return this;
 	}
 
 	@:allow(SceneInteraction)
-	function setHoverMaterial(occurrence:Occurrence, material:Material):SceneView {
-		setMaterialOverride(hoverOverrides, occurrence, material);
+	function setHoverMaterial(node:Node, material:Material):SceneView {
+		setMaterialOverride(hoverOverrides, node, material);
 		value.set_hover_overrides(hoverOverrides);
 		return this;
 	}
@@ -176,30 +209,30 @@ class SceneView {
 		return this;
 	}
 
-	/** Adds or removes an explicit occurrence from the isolation set. */
-	public function setIsolatedOccurrence(occurrence:Occurrence,
+	/** Adds or removes an explicit node from the isolation set. */
+	public function setIsolatedNode(node:Node,
 			isolated:Bool):SceneView {
-		var stable = occurrence.stableValue();
-		for (index in 0...isolatedOccurrences.length) {
-			if (isolatedOccurrences[index].get_value() == stable) {
+		var stable = node.stableValue();
+		for (index in 0...isolatedNodes.length) {
+			if (isolatedNodes[index].get_value() == stable) {
 				if (!isolated)
-					isolatedOccurrences.splice(index, 1);
-				value.set_isolated_occurrences(isolatedOccurrences);
+					isolatedNodes.splice(index, 1);
+				value.set_isolated_nodes(isolatedNodes);
 				return this;
 			}
 		}
 		if (isolated)
-			isolatedOccurrences.push(occurrence.nativeValue());
-		value.set_isolated_occurrences(isolatedOccurrences);
+			isolatedNodes.push(node.nativeValue());
+		value.set_isolated_nodes(isolatedNodes);
 		return this;
 	}
 
-	/** Clears source and explicit occurrence isolation while preserving rules. */
+	/** Clears source and explicit node isolation while preserving rules. */
 	public function clearIsolation():SceneView {
 		isolatedSources.resize(0);
-		isolatedOccurrences.resize(0);
+		isolatedNodes.resize(0);
 		value.set_isolated_sources(isolatedSources);
-		value.set_isolated_occurrences(isolatedOccurrences);
+		value.set_isolated_nodes(isolatedNodes);
 		return this;
 	}
 
@@ -231,7 +264,7 @@ class SceneView {
 		selectionOverrides.resize(0);
 		hoverOverrides.resize(0);
 		isolatedSources.resize(0);
-		isolatedOccurrences.resize(0);
+		isolatedNodes.resize(0);
 		sourceVisibilityOverrides.resize(0);
 		sourceMaterialOverrides.resize(0);
 		value.set_visibility_overrides(visibilityOverrides);
@@ -239,7 +272,7 @@ class SceneView {
 		value.set_selection_overrides(selectionOverrides);
 		value.set_hover_overrides(hoverOverrides);
 		value.set_isolated_sources(isolatedSources);
-		value.set_isolated_occurrences(isolatedOccurrences);
+		value.set_isolated_nodes(isolatedNodes);
 		value.set_source_visibility_overrides(sourceVisibilityOverrides);
 		value.set_source_material_overrides(sourceMaterialOverrides);
 		return this;
@@ -261,10 +294,10 @@ class SceneView {
 	}
 
 	/** Replaces the hover layer; hover takes precedence over selection. */
-	public function applyHover(occurrence:Null<Occurrence>, highlight:Material):SceneView {
+	public function applyHover(node:Null<Node>, highlight:Material):SceneView {
 		clearHoverOverrides();
-		if (occurrence != null)
-			setHoverMaterial(occurrence, highlight);
+		if (node != null)
+			setHoverMaterial(node, highlight);
 		return this;
 	}
 
@@ -295,8 +328,8 @@ class SceneView {
 	public function isolatedSourceCount():Int
 		return isolatedSources.length;
 
-	public function isolatedOccurrenceCount():Int
-		return isolatedOccurrences.length;
+	public function isolatedNodeCount():Int
+		return isolatedNodes.length;
 
 	public function sourceVisibilityOverrideCount():Int
 		return sourceVisibilityOverrides.length;
@@ -307,21 +340,21 @@ class SceneView {
 	public function clipPlaneCount():Int
 		return clipPlanes.length;
 
-	@:allow(SceneRenderer)
+	@:allow(SceneRenderer, SpatialIndex)
 	function nativeValue():nkscene_render_view
 		return value;
 
 	function setMaterialOverride(overrides:Array<nkscene_render_material_override>,
-			occurrence:Occurrence, material:Material):Void {
-		var stable = occurrence.stableValue(), materialValue = material.id();
+			node:Node, material:Material):Void {
+		var stable = node.stableValue(), materialValue = material.id();
 		for (override in overrides) {
-			if (override.get_occurrence().get_value() == stable) {
+			if (override.get_node().get_value() == stable) {
 				override.set_material(materialValue);
 				return;
 			}
 		}
 		var override = new nkscene_render_material_override();
-		override.set_occurrence(occurrence.nativeValue());
+		override.set_node(node.nativeValue());
 		override.set_material(materialValue);
 		overrides.push(override);
 	}

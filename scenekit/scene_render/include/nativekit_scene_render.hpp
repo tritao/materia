@@ -41,12 +41,12 @@ void update_ancestor_index(RenderPlan &plan, const SceneSnapshot &snapshot,
 /* ------------------------------------------------------------------------- */
 
 struct VisibilityOverride {
-    OccurrenceId occurrence;
+    NodeId node;
     bool visible = true;
 };
 
 struct MaterialOverride {
-    OccurrenceId occurrence;
+    NodeId node;
     MaterialId material;
 };
 
@@ -64,12 +64,12 @@ struct SourceMaterialOverride {
 struct SceneViewFilter {
     /** Source entities retained by isolation, including their ancestors. */
     std::vector<EntityId> isolated_sources;
-    /** Source-level visibility rules below explicit occurrence overrides. */
+    /** Source-level visibility rules below explicit node overrides. */
     std::vector<SourceVisibilityOverride> source_visibility_overrides;
-    /** Source-level base materials below occurrence and interaction layers. */
+    /** Source-level base materials below node and interaction layers. */
     std::vector<SourceMaterialOverride> source_material_overrides;
-    /** Explicit occurrences retained by isolation, including their subtrees. */
-    std::vector<OccurrenceId> isolated_occurrences;
+    /** Explicit nodes retained by isolation, including their subtrees. */
+    std::vector<NodeId> isolated_nodes;
 
     void set_isolated_source(EntityId source, bool isolated) {
         const auto found = std::find(isolated_sources.begin(), isolated_sources.end(), source);
@@ -99,25 +99,25 @@ struct SceneViewFilter {
             source_material_overrides.push_back({source, material});
     }
 
-    void set_isolated_occurrence(OccurrenceId occurrence, bool isolated) {
+    void set_isolated_node(NodeId node, bool isolated) {
         const auto found =
-            std::find(isolated_occurrences.begin(), isolated_occurrences.end(), occurrence);
-        if (isolated && found == isolated_occurrences.end())
-            isolated_occurrences.push_back(occurrence);
-        else if (!isolated && found != isolated_occurrences.end())
-            isolated_occurrences.erase(found);
+            std::find(isolated_nodes.begin(), isolated_nodes.end(), node);
+        if (isolated && found == isolated_nodes.end())
+            isolated_nodes.push_back(node);
+        else if (!isolated && found != isolated_nodes.end())
+            isolated_nodes.erase(found);
     }
 
     void clear_isolation() noexcept {
         isolated_sources.clear();
-        isolated_occurrences.clear();
+        isolated_nodes.clear();
     }
 
     void clear() noexcept {
         isolated_sources.clear();
         source_visibility_overrides.clear();
         source_material_overrides.clear();
-        isolated_occurrences.clear();
+        isolated_nodes.clear();
     }
 };
 
@@ -133,12 +133,18 @@ struct SceneCamera {
                                           0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
 };
 
+/** Runtime world transform supplied by a presentation without editing the scene. */
+struct PoseOverride {
+    NodeId node;
+    LocalTransform world_transform;
+};
+
 struct SceneView {
-    /** Invalid means that the view contains every occurrence. */
-    OccurrenceId root;
-    /** Include scene-hidden occurrences as visible for inspection views. */
+    /** Invalid means that the view contains every node. */
+    NodeId root;
+    /** Include scene-hidden nodes as visible for inspection views. */
     bool include_invisible = false;
-    /** Later entries replace earlier entries for the same occurrence. */
+    /** Later entries replace earlier entries for the same node. */
     std::vector<VisibilityOverride> visibility_overrides;
     /** Base presentation material overrides. */
     std::vector<MaterialOverride> material_overrides;
@@ -150,31 +156,33 @@ struct SceneView {
     SceneViewFilter filter;
     /** Optional world-to-clip transform used for bounds culling and rendering. */
     SceneCamera camera;
-    /** Optional scene camera occurrence used when camera.enabled is false. */
-    OccurrenceId camera_occurrence;
-    /** Conservative occurrence-level sectioning planes. */
+    /** Optional scene camera node used when camera.enabled is false. */
+    NodeId camera_node;
+    /** Runtime world poses overlaid on this view. */
+    std::vector<PoseOverride> pose_overrides;
+    /** Conservative node-level sectioning planes. */
     std::vector<ClipPlane> clip_planes;
 
-    void set_visibility_override(OccurrenceId occurrence, bool visible) {
+    void set_visibility_override(NodeId node, bool visible) {
         const auto found = std::find_if(
             visibility_overrides.begin(), visibility_overrides.end(),
-            [occurrence](const auto &value) { return value.occurrence == occurrence; });
+            [node](const auto &value) { return value.node == node; });
         if (found != visibility_overrides.end())
             found->visible = visible;
         else
-            visibility_overrides.push_back({occurrence, visible});
+            visibility_overrides.push_back({node, visible});
     }
 
-    void set_material_override(OccurrenceId occurrence, MaterialId material) {
-        set_material_override_in(material_overrides, occurrence, material);
+    void set_material_override(NodeId node, MaterialId material) {
+        set_material_override_in(material_overrides, node, material);
     }
 
-    void set_selection_material_override(OccurrenceId occurrence, MaterialId material) {
-        set_material_override_in(selection_material_overrides, occurrence, material);
+    void set_selection_material_override(NodeId node, MaterialId material) {
+        set_material_override_in(selection_material_overrides, node, material);
     }
 
-    void set_hover_material_override(OccurrenceId occurrence, MaterialId material) {
-        set_material_override_in(hover_material_overrides, occurrence, material);
+    void set_hover_material_override(NodeId node, MaterialId material) {
+        set_material_override_in(hover_material_overrides, node, material);
     }
 
     void set_isolated_source(EntityId source, bool isolated) {
@@ -189,8 +197,8 @@ struct SceneView {
         filter.set_source_material_override(source, material);
     }
 
-    void set_isolated_occurrence(OccurrenceId occurrence, bool isolated) {
-        filter.set_isolated_occurrence(occurrence, isolated);
+    void set_isolated_node(NodeId node, bool isolated) {
+        filter.set_isolated_node(node, isolated);
     }
 
     void clear_selection_material_overrides() noexcept { selection_material_overrides.clear(); }
@@ -199,15 +207,15 @@ struct SceneView {
 
   private:
     static void set_material_override_in(std::vector<MaterialOverride> &overrides,
-                                         OccurrenceId occurrence, MaterialId material) {
+                                         NodeId node, MaterialId material) {
         const auto found =
-            std::find_if(overrides.begin(), overrides.end(), [occurrence](const auto &value) {
-                return value.occurrence == occurrence;
+            std::find_if(overrides.begin(), overrides.end(), [node](const auto &value) {
+                return value.node == node;
             });
         if (found != overrides.end())
             found->material = material;
         else
-            overrides.push_back({occurrence, material});
+            overrides.push_back({node, material});
     }
 };
 
@@ -237,7 +245,7 @@ constexpr bool has_render_flag(RenderFlags value, RenderFlags flag) noexcept {
 }
 
 struct RenderItem {
-    OccurrenceId occurrence;
+    NodeId node;
     GeometryId geometry;
     MaterialId material;
     std::uint32_t pickId = 0;
@@ -248,7 +256,7 @@ struct RenderItem {
 struct InstanceBatch {
     GeometryId geometry;
     MaterialId material;
-    std::vector<OccurrenceId> instances;
+    std::vector<NodeId> instances;
 };
 
 struct RenderUpdate {
@@ -283,7 +291,7 @@ struct SubelementId {
 };
 
 struct PickResult {
-    OccurrenceId occurrence;
+    NodeId node;
     EntityId source;
     SubelementId subelement;
     Vec3 worldPosition;
@@ -312,7 +320,7 @@ struct Ray {
 
 class NKSRENDER_API SceneSpatialIndex {
   public:
-    explicit SceneSpatialIndex(const SceneSnapshot &snapshot);
+    explicit SceneSpatialIndex(const SceneSnapshot &snapshot, const SceneView *view = nullptr);
     ~SceneSpatialIndex();
     SceneSpatialIndex(SceneSpatialIndex &&) noexcept;
     SceneSpatialIndex &operator=(SceneSpatialIndex &&) noexcept;
@@ -320,12 +328,12 @@ class NKSRENDER_API SceneSpatialIndex {
     SceneSpatialIndex &operator=(const SceneSpatialIndex &) = delete;
 
     std::uint64_t source_revision() const noexcept;
-    std::span<const OccurrenceId> query_bounds(const Bounds &) const;
-    /** Returns snapshot occurrences whose bounds intersect all supplied planes. */
-    std::span<const OccurrenceId> query_frustum(std::span<const std::array<float, 4>> planes) const;
-    std::span<const OccurrenceId> query_ray(const Ray &) const;
+    std::span<const NodeId> query_bounds(const Bounds &) const;
+    /** Returns snapshot nodes whose bounds intersect all supplied planes. */
+    std::span<const NodeId> query_frustum(std::span<const std::array<float, 4>> planes) const;
+    std::span<const NodeId> query_ray(const Ray &) const;
     std::size_t query_result_count() const noexcept;
-    OccurrenceId query_result(std::size_t index) const noexcept;
+    NodeId query_result(std::size_t index) const noexcept;
     PickResult pick_ray(const Ray &) const;
     std::vector<PickResult> pick_rays(std::span<const Ray>) const;
 
@@ -339,7 +347,7 @@ class NKSRENDER_API SceneSpatialIndex {
 /* ------------------------------------------------------------------------- */
 
 struct GpuCommand {
-    OccurrenceId occurrence;
+    NodeId node;
     GeometryId geometry;
     MaterialId material;
     std::uint32_t transformIndex = 0;
@@ -378,12 +386,12 @@ class RenderPlan {
     std::span<const RenderItem> items() const noexcept { return items_; }
     std::span<const WorldTransform> transforms() const noexcept { return transforms_; }
     std::span<const InstanceBatch> batches() const noexcept { return batches_; }
-    std::size_t item_index(OccurrenceId occurrence) const noexcept {
-        const auto found = item_by_occurrence_.find(occurrence);
-        return found == item_by_occurrence_.end() ? invalid_item_index : found->second;
+    std::size_t item_index(NodeId node) const noexcept {
+        const auto found = item_by_node_.find(node);
+        return found == item_by_node_.end() ? invalid_item_index : found->second;
     }
-    std::size_t batch_index(OccurrenceId occurrence) const noexcept {
-        const auto item = item_index(occurrence);
+    std::size_t batch_index(NodeId node) const noexcept {
+        const auto item = item_index(node);
         return item == invalid_item_index || item >= item_batch_.size() ? invalid_item_index
                                                                         : item_batch_[item];
     }
@@ -412,8 +420,8 @@ class RenderPlan {
         bool full_rebuild = false;
         bool layout_changed = false;
         bool resource_delta_complete = true;
-        std::vector<OccurrenceId> transforms;
-        std::vector<OccurrenceId> layout_occurrences;
+        std::vector<NodeId> transforms;
+        std::vector<NodeId> layout_nodes;
         std::vector<GeometryId> geometries;
         std::vector<MaterialId> materials;
     };
@@ -440,11 +448,11 @@ class RenderPlan {
     std::vector<RenderItem> items_;
     std::vector<WorldTransform> transforms_;
     std::vector<EntityId> item_sources_;
-    std::vector<std::vector<OccurrenceId>> item_ancestors_;
+    std::vector<std::vector<NodeId>> item_ancestors_;
     std::vector<InstanceBatch> batches_;
-    std::unordered_map<OccurrenceId, std::size_t> item_by_occurrence_;
+    std::unordered_map<NodeId, std::size_t> item_by_node_;
     std::unordered_map<EntityId, std::vector<std::size_t>> items_by_source_;
-    std::unordered_map<OccurrenceId, std::vector<std::size_t>> items_by_ancestor_;
+    std::unordered_map<NodeId, std::vector<std::size_t>> items_by_ancestor_;
     std::unordered_map<GeometryId, std::vector<std::size_t>> items_by_geometry_;
     std::unordered_map<MaterialId, std::vector<std::size_t>> items_by_material_;
     std::unordered_map<GeometryId, std::vector<std::size_t>> batches_by_geometry_;
@@ -456,14 +464,14 @@ class RenderPlan {
     std::unordered_map<MaterialId, std::uint64_t> material_revisions_;
     std::uint64_t geometry_resources_revision_ = 0;
     std::uint64_t material_resources_revision_ = 0;
-    std::vector<OccurrenceId> view_override_occurrences_;
+    std::vector<NodeId> view_override_nodes_;
     std::vector<EntityId> view_source_policy_sources_;
     std::vector<EntityId> view_isolation_sources_;
-    std::vector<OccurrenceId> view_isolation_occurrences_;
+    std::vector<NodeId> view_isolation_nodes_;
     bool view_global_policy_ = false;
     bool view_source_rules_only_ = false;
     bool view_isolation_only_ = false;
-    OccurrenceId view_root_;
+    NodeId view_root_;
     std::array<float, 16> view_projection_ = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                                               0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
     bool camera_enabled_ = false;
@@ -473,14 +481,15 @@ class RenderPlan {
     std::size_t culled_items_ = 0;
     std::size_t compile_count_ = 0;
     std::uint64_t culling_signature_ = 0;
+    std::uint64_t pose_signature_ = 0;
     std::uint64_t gpu_identity_ = 0;
     std::uint64_t gpu_revision_ = 0;
     std::uint64_t gpu_delta_history_start_ = 0;
     std::vector<GpuDelta> gpu_delta_history_;
     std::shared_ptr<SceneSpatialIndex> culling_index_;
-    std::unordered_set<OccurrenceId> culling_dirty_occurrences_;
-    std::unordered_set<OccurrenceId> culling_unbounded_occurrences_;
-    std::unordered_set<OccurrenceId> culled_occurrences_;
+    std::unordered_set<NodeId> culling_dirty_nodes_;
+    std::unordered_set<NodeId> culling_unbounded_nodes_;
+    std::unordered_set<NodeId> culled_nodes_;
 
     friend NKSRENDER_API RenderPlan compile(const SceneSnapshot &, const SceneView &);
     friend NKSRENDER_API RenderUpdate update(RenderPlan &, const SceneSnapshot &, const ChangeSet &,
@@ -576,7 +585,7 @@ class NKSRENDER_API NativeKitGpuExecutor {
     /** Renders a depth-tested plan and reads normalized device depth values back. */
     nkgpu_result capture_depth(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
                                std::uint32_t height, std::vector<float> &out_depth);
-    /** Renders a depth-tested plan and reads encoded occurrence IDs back. */
+    /** Renders a depth-tested plan and reads encoded node IDs back. */
     nkgpu_result capture_pick_ids(const RenderPlan &, const SceneSnapshot &, std::uint32_t width,
                                   std::uint32_t height, std::vector<std::uint32_t> &out_ids);
     /** Renders an ID-only pass and resolves one pixel to scene ownership. */

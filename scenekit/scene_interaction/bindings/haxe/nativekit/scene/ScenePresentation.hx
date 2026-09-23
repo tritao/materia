@@ -16,7 +16,7 @@ class ScenePresentation {
 	final selectionMaterial:Material;
 	final hoverMaterial:Material;
 	var sourceFilter:Null<SceneViewFilter> = null;
-	final isolatedOccurrenceFallback:Array<Occurrence> = [];
+	final isolatedNodeFallback:Array<Node> = [];
 	var disposed:Bool = false;
 
 	private function new(interaction:SceneInteraction, view:SceneView,
@@ -47,9 +47,9 @@ class ScenePresentation {
 		return interaction.pollHover(renderer, snapshot);
 	}
 
-	public function select(occurrence:Occurrence, mode:SelectionMode):Void {
+	public function select(node:Node, mode:SelectionMode):Void {
 		ensureLive();
-		interaction.select(occurrence, mode);
+		interaction.select(node, mode);
 	}
 
 	public function clearSelection():Void {
@@ -61,7 +61,7 @@ class ScenePresentation {
 	public function setSourceFilter(filter:Null<SceneViewFilter>):ScenePresentation {
 		ensureLive();
 		sourceFilter = filter;
-		isolatedOccurrenceFallback.resize(0);
+		isolatedNodeFallback.resize(0);
 		view.clearIsolation();
 		if (filter == null) {
 			view.clearSourceFilter();
@@ -98,7 +98,7 @@ class ScenePresentation {
 
 	public function isolateSource(source:haxe.Int64):ScenePresentation {
 		ensureLive();
-		isolatedOccurrenceFallback.resize(0);
+		isolatedNodeFallback.resize(0);
 		ensureSourceFilter().isolateSource(source);
 		applySourceFilter();
 		return this;
@@ -106,7 +106,7 @@ class ScenePresentation {
 
 	public function isolateSources(sources:Array<haxe.Int64>):ScenePresentation {
 		ensureLive();
-		isolatedOccurrenceFallback.resize(0);
+		isolatedNodeFallback.resize(0);
 		ensureSourceFilter().isolateSources(sources);
 		applySourceFilter();
 		return this;
@@ -117,7 +117,7 @@ class ScenePresentation {
 		if (sourceFilter != null) {
 			sourceFilter.clearIsolation();
 		}
-		isolatedOccurrenceFallback.resize(0);
+		isolatedNodeFallback.resize(0);
 		view.clearIsolation();
 		applySourceFilter();
 		return this;
@@ -127,14 +127,14 @@ class ScenePresentation {
 	public function isolateSelection(snapshot:Snapshot):ScenePresentation {
 		ensureLive();
 		var sources:Array<haxe.Int64> = [];
-		isolatedOccurrenceFallback.resize(0);
-		for (occurrence in interaction.selected()) {
-			var info = snapshot.find(occurrence);
+		isolatedNodeFallback.resize(0);
+		for (node in interaction.selected()) {
+			var info = snapshot.find(node);
 			if (info == null)
 				continue;
 			var source = info.sourceValue();
 			if (source == haxe.Int64.ofInt(0)) {
-				isolatedOccurrenceFallback.push(occurrence);
+				isolatedNodeFallback.push(node);
 				continue;
 			}
 			var found = false;
@@ -194,7 +194,7 @@ class ScenePresentation {
 	function applySourceFilter():Void {
 		if (sourceFilter != null)
 			sourceFilter.applyTo(view);
-		for (occurrence in isolatedOccurrenceFallback)
-			view.setIsolatedOccurrence(occurrence, true);
+		for (node in isolatedNodeFallback)
+			view.setIsolatedNode(node, true);
 	}
 }

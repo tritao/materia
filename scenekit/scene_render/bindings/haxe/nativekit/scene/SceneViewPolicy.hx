@@ -4,13 +4,13 @@ package nativekit.scene;
  * Reusable base presentation rules for a SceneView.
  *
  * Policies are composable: apply them in order and a later rule for the same
- * occurrence replaces an earlier rule in the same layer. Selection and hover
+ * node replaces an earlier rule in the same layer. Selection and hover
  * are intentionally not part of this layer; ScenePresentation owns those
  * transient interaction layers.
  */
 class SceneViewPolicy {
 	final visibility:VisibilityFilter;
-	final materialOccurrences:Array<Occurrence> = [];
+	final materialNodes:Array<Node> = [];
 	final materialValues:Array<Material> = [];
 	final isolatedSources:Array<haxe.Int64> = [];
 	final sourceVisibilitySources:Array<haxe.Int64> = [];
@@ -22,34 +22,34 @@ class SceneViewPolicy {
 		visibility = new VisibilityFilter();
 	}
 
-	public function setVisibility(occurrence:Occurrence, visible:Bool):SceneViewPolicy {
-		visibility.set(occurrence, visible);
+	public function setVisibility(node:Node, visible:Bool):SceneViewPolicy {
+		visibility.set(node, visible);
 		return this;
 	}
 
-	public function hide(occurrence:Occurrence):SceneViewPolicy
-		return setVisibility(occurrence, false);
+	public function hide(node:Node):SceneViewPolicy
+		return setVisibility(node, false);
 
-	public function show(occurrence:Occurrence):SceneViewPolicy
-		return setVisibility(occurrence, true);
+	public function show(node:Node):SceneViewPolicy
+		return setVisibility(node, true);
 
-	/** Visibility follows the occurrence hierarchy, so this affects descendants. */
-	public function hideSubtree(occurrence:Occurrence):SceneViewPolicy
-		return hide(occurrence);
+	/** Visibility follows the node hierarchy, so this affects descendants. */
+	public function hideSubtree(node:Node):SceneViewPolicy
+		return hide(node);
 
 	/** Restores this subtree unless another ancestor policy keeps it hidden. */
-	public function showSubtree(occurrence:Occurrence):SceneViewPolicy
-		return show(occurrence);
+	public function showSubtree(node:Node):SceneViewPolicy
+		return show(node);
 
-	public function setMaterial(occurrence:Occurrence, material:Material):SceneViewPolicy {
-		var stable = occurrence.stableValue();
-		for (index in 0...materialOccurrences.length) {
-			if (materialOccurrences[index].stableValue() == stable) {
+	public function setMaterial(node:Node, material:Material):SceneViewPolicy {
+		var stable = node.stableValue();
+		for (index in 0...materialNodes.length) {
+			if (materialNodes[index].stableValue() == stable) {
 				materialValues[index] = material;
 				return this;
 			}
 		}
-		materialOccurrences.push(occurrence);
+		materialNodes.push(node);
 		materialValues.push(material);
 		return this;
 	}
@@ -110,7 +110,7 @@ class SceneViewPolicy {
 
 	public function clear():SceneViewPolicy {
 		visibility.clear();
-		materialOccurrences.resize(0);
+		materialNodes.resize(0);
 		materialValues.resize(0);
 		isolatedSources.resize(0);
 		sourceVisibilitySources.resize(0);
@@ -124,7 +124,7 @@ class SceneViewPolicy {
 		return visibility.count();
 
 	public function materialCount():Int
-		return materialOccurrences.length;
+		return materialNodes.length;
 
 	public function isolationRuleCount():Int
 		return isolatedSources.length;
@@ -142,8 +142,8 @@ class SceneViewPolicy {
 	/** Applies this policy without disturbing other view layers. */
 	public function apply(view:SceneView):SceneView {
 		view.applyVisibilityFilter(visibility);
-		for (index in 0...materialOccurrences.length)
-			view.setMaterial(materialOccurrences[index], materialValues[index]);
+		for (index in 0...materialNodes.length)
+			view.setMaterial(materialNodes[index], materialValues[index]);
 		for (index in 0...sourceVisibilitySources.length)
 			view.setSourceVisibility(sourceVisibilitySources[index], sourceVisibilityValues[index]);
 		for (index in 0...sourceMaterialSources.length)

@@ -33,7 +33,7 @@ private:
     std::vector<nksim_joint_target> take_pending_targets();
 
     Simulation &simulation_;
-    std::vector<nkscene_occurrence_id> occurrences_;
+    std::vector<nkscene_node_id> nodes_;
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;
     std::vector<nksim_joint_target> pending_targets_;

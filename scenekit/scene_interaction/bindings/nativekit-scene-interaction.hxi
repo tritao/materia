@@ -14,12 +14,12 @@ interface NativeKitSceneInteraction @target("portable-abi64") @library("nativeki
 	extern fn nkscene_interaction_create(out_interaction: ptr<nkscene_interaction> @out @owned) -> nkscene_result;
 	extern fn nkscene_interaction_destroy(interaction: nkscene_interaction) -> void;
 	extern fn nkscene_interaction_get_hover(interaction: nkscene_interaction, out_has_hover: ptr<u32> @out, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
-	extern fn nkscene_interaction_get_selected(interaction: nkscene_interaction, index: u64, out_occurrence: ptr<nkscene_occurrence_id> @out) -> nkscene_result;
+	extern fn nkscene_interaction_get_selected(interaction: nkscene_interaction, index: u64, out_node: ptr<nkscene_node_id> @out) -> nkscene_result;
 	extern fn nkscene_interaction_get_selection_count(interaction: nkscene_interaction, out_count: ptr<u64> @out) -> nkscene_result;
-	extern fn nkscene_interaction_is_selected(interaction: nkscene_interaction, occurrence: nkscene_occurrence_id, out_selected: ptr<u32> @out) -> nkscene_result;
+	extern fn nkscene_interaction_is_selected(interaction: nkscene_interaction, node: nkscene_node_id, out_selected: ptr<u32> @out) -> nkscene_result;
 	extern fn nkscene_interaction_poll_hover(interaction: nkscene_interaction, executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, out_state: ptr<u32> @out, out_error: ptr<nkgpu_result> @out, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
 	extern fn nkscene_interaction_request_hover(interaction: nkscene_interaction, executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, width: u32, height: u32, x: u32, y: u32) -> nkscene_result;
-	extern fn nkscene_interaction_select(interaction: nkscene_interaction, occurrence: nkscene_occurrence_id, mode: u32) -> nkscene_result;
+	extern fn nkscene_interaction_select(interaction: nkscene_interaction, node: nkscene_node_id, mode: u32) -> nkscene_result;
 	extern fn nkscene_interaction_synchronize(interaction: nkscene_interaction, snapshot: nkscene_snapshot) -> nkscene_result;
 	handle nkscene_interaction : u32 @destroy("nkscene_interaction_destroy");
 }

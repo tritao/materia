@@ -57,9 +57,9 @@ void print_stats(const char *name, const nkscene::GpuExecutionStats &stats,
 } // namespace
 
 int main() {
-    constexpr std::size_t occurrence_count = 50000;
+    constexpr std::size_t node_count = 50000;
     constexpr std::size_t group_count = 50;
-    constexpr std::size_t leaf_count = occurrence_count - group_count;
+    constexpr std::size_t leaf_count = node_count - group_count;
     constexpr std::uint32_t width = 128;
     constexpr std::uint32_t height = 96;
 
@@ -114,18 +114,18 @@ int main() {
             scene->material_store().create(material);
         }
 
-        std::vector<nkscene::OccurrenceId> groups;
-        std::vector<nkscene::OccurrenceId> leaves;
+        std::vector<nkscene::NodeId> groups;
+        std::vector<nkscene::NodeId> leaves;
         groups.reserve(group_count);
         leaves.reserve(leaf_count);
         Transaction create(scene);
         for (std::size_t index = 0; index < group_count; ++index) {
-            const auto id = scene->reserve_occurrence_id();
+            const auto id = scene->reserve_node_id();
             groups.push_back(id);
             create.add_create(id);
         }
         for (std::size_t index = 0; index < leaf_count; ++index) {
-            const auto id = scene->reserve_occurrence_id();
+            const auto id = scene->reserve_node_id();
             leaves.push_back(id);
             create.add_create(id);
         }
@@ -181,10 +181,10 @@ int main() {
             std::chrono::duration<double, std::milli>(Clock::now() - pick_start);
         assert(pick_state == NKS_RENDER_PICK_READY);
         assert(pick_error == NKGPU_OK);
-        assert(pick_result.occurrence.valid());
-        std::printf("%-10s %8.3f ms  ready=%d occurrence=%llu\n", "async pick",
+        assert(pick_result.node.valid());
+        std::printf("%-10s %8.3f ms  ready=%d node=%llu\n", "async pick",
                     pick_time.count(), pick_state == NKS_RENDER_PICK_READY,
-                    static_cast<unsigned long long>(pick_result.occurrence.value));
+                    static_cast<unsigned long long>(pick_result.node.value));
 
         Transaction move_one(scene);
         move_one.add_transform(leaves[0], translated(1.0f));

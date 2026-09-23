@@ -9,10 +9,10 @@ class MujocoBindingRuntime {
     static function main():Int {
         var scene = Scene.create();
         var transaction = scene.beginTransaction();
-        var floorOccurrence = transaction.createOccurrence();
-        var occurrence = transaction.createOccurrence();
-        transaction.setTransform(floorOccurrence, Transform.identity());
-        transaction.setTransform(occurrence, Transform.identity().translated(0.0, 0.0, 2.0));
+        var floorNode = transaction.createNode();
+        var node = transaction.createNode();
+        transaction.setTransform(floorNode, Transform.identity());
+        transaction.setTransform(node, Transform.identity().translated(0.0, 0.0, 2.0));
         var initialChanges = transaction.commitWithChanges();
         initialChanges.dispose();
 
@@ -23,8 +23,8 @@ class MujocoBindingRuntime {
         });
         var floorShape = world.createShapePlane(0.0, 0.0, 1.0, 0.0);
         var shape = world.createShapeBox(0.25, 0.25, 0.25);
-        var floor = world.createBody(floorOccurrence, MotionType.Static, 0.0, floorShape);
-        var body = world.createBody(occurrence, MotionType.Dynamic, 1.0, shape);
+        var floor = world.createBody(floorNode, MotionType.Static, 0.0, floorShape);
+        var body = world.createBody(node, MotionType.Dynamic, 1.0, shape);
         for (index in 0...300) {
             var step = world.step();
             if (index == 0 && (haxe.Int64.toInt(step.stepIndex) != 1 ||
@@ -48,10 +48,10 @@ class MujocoBindingRuntime {
         world.dispose();
 
         var jointTransaction = scene.beginTransaction();
-        var baseOccurrence = jointTransaction.createOccurrence();
-        var armOccurrence = jointTransaction.createOccurrence();
-        jointTransaction.setTransform(baseOccurrence, Transform.identity());
-        jointTransaction.setTransform(armOccurrence,
+        var baseNode = jointTransaction.createNode();
+        var armNode = jointTransaction.createNode();
+        jointTransaction.setTransform(baseNode, Transform.identity());
+        jointTransaction.setTransform(armNode,
             Transform.identity().translated(1.0, 0.0, 0.0));
         var jointChanges = jointTransaction.commitWithChanges();
         jointChanges.dispose();
@@ -62,8 +62,8 @@ class MujocoBindingRuntime {
             gravity: [0.0, 0.0, 0.0]
         });
         var armShape = jointWorld.createShapeBox(0.1, 0.1, 0.5);
-        var base = jointWorld.createBody(baseOccurrence, MotionType.Static, 0.0);
-        var arm = jointWorld.createBody(armOccurrence, MotionType.Dynamic, 1.0, armShape);
+        var base = jointWorld.createBody(baseNode, MotionType.Static, 0.0);
+        var arm = jointWorld.createBody(armNode, MotionType.Dynamic, 1.0, armShape);
         var joint = jointWorld.createJoint(JointType.Revolute, base, arm);
         joint.setTargetPosition(0.2, 20.0);
         for (index in 0...20) {

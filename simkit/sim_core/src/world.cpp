@@ -148,27 +148,27 @@ nksim_result World::get_clock(nksim_clock *out_clock) const noexcept {
     return NKSIM_OK;
 }
 
-nksim_result World::occurrence_pose(nkscene_occurrence_id occurrence,
+nksim_result World::node_pose(nkscene_node_id node,
                                     std::array<double, 3> &position,
                                     std::array<double, 4> &rotation) const {
-    if (!occurrence.value)
+    if (!node.value)
         return NKSIM_ERROR_INVALID_ARGUMENT;
     nkscene_snapshot snapshot = 0;
     if (nkscene_scene_snapshot(world_desc.scene, &snapshot) != NKS_OK)
         return NKSIM_ERROR_INVALID_HANDLE;
 
     uint64_t count = 0;
-    if (nkscene_snapshot_get_occurrence_count(snapshot, &count) != NKS_OK) {
+    if (nkscene_snapshot_get_node_count(snapshot, &count) != NKS_OK) {
         nkscene_snapshot_destroy(snapshot);
         return NKSIM_ERROR_SCENE;
     }
-    nkscene_snapshot_occurrence value{};
+    nkscene_snapshot_node value{};
     value.struct_size = sizeof(value);
     nksim_result result = NKSIM_ERROR_STALE_ID;
     for (uint64_t index = 0; index < count; ++index) {
-        if (nkscene_snapshot_get_occurrence(snapshot, index, &value) != NKS_OK)
+        if (nkscene_snapshot_get_node(snapshot, index, &value) != NKS_OK)
             continue;
-        if (value.occurrence.value != occurrence.value)
+        if (value.node.value != node.value)
             continue;
         position = {value.world_transform.matrix[12], value.world_transform.matrix[13],
                     value.world_transform.matrix[14]};
@@ -185,7 +185,7 @@ void World::initialize_body_state(Body &body, const std::array<double, 3> &posit
     body.state = {};
     body.state.struct_size = sizeof(body.state);
     body.state.body = body.handle;
-    body.state.occurrence = body.desc.occurrence;
+    body.state.node = body.desc.node;
     std::copy(position.begin(), position.end(), std::begin(body.state.position));
     std::copy(rotation.begin(), rotation.end(), std::begin(body.state.rotation));
     body.state.rotation[3] = rotation[3];
@@ -211,7 +211,7 @@ nksim_result World::refresh_kinematic_bodies() {
             return;
         std::array<double, 3> position{};
         std::array<double, 4> rotation{};
-        result = occurrence_pose(body.desc.occurrence, position, rotation);
+        result = node_pose(body.desc.node, position, rotation);
         if (result != NKSIM_OK)
             return;
         initialize_body_state(body, position, rotation);
@@ -239,7 +239,7 @@ nksim_result World::read_backend_state() {
                 return;
             body.state.struct_size = sizeof(body.state);
             body.state.body = body.handle;
-            body.state.occurrence = body.desc.occurrence;
+            body.state.node = body.desc.node;
             std::copy(std::begin(state.position), std::end(state.position),
                       std::begin(body.state.position));
             std::copy(std::begin(state.rotation), std::end(state.rotation),
@@ -407,7 +407,7 @@ nksim_result World::create_body(const nksim_body_desc &desc, nksim_body *out_bod
     }
     std::array<double, 3> position{};
     std::array<double, 4> rotation{};
-    auto result = occurrence_pose(desc.occurrence, position, rotation);
+    auto result = node_pose(desc.node, position, rotation);
     if (result != NKSIM_OK)
         return result;
 
@@ -482,7 +482,7 @@ nksim_result World::set_body_state(nksim_body body, const nksim_body_state &stat
     value->state = state;
     value->state.struct_size = sizeof(value->state);
     value->state.body = body;
-    value->state.occurrence = value->desc.occurrence;
+    value->state.node = value->desc.node;
     const auto result = set_backend_body_state(*value);
     if (result != NKSIM_OK) value->state = previous;
     return result;

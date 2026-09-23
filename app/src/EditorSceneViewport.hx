@@ -35,17 +35,26 @@ class EditorSceneViewport implements ViewportContent {
 
   public function pick(camera:ViewportCamera, x:Float, y:Float):String {
     var point = scenePoint(camera, x, y);
-    if(!simulationActive)return scene.pick(point.x,point.y);
-    var ordered=scene.items();ordered.sort(function(a,b)return maximumZ(a)<maximumZ(b)?-1:1);
-    var result="scene";
-    for(item in ordered)if(scene.info(item.id).visible()&&pointInPolygon(point.x,point.y,corners(item)))result=item.id;
-    return result;
+    if (!simulationActive) return scene.pick(point.x, point.y);
+    var view = scene.configureRenderView(new nativekit.scene.SceneView(),
+      nativekit.scene.Transform.identity(), simulationPoseList());
+    return scene.pickRayWithView(view, point.x, point.y, 1000001.0, 0.0, 0.0, -1.0);
   }
 
   public function selectAt(camera:ViewportCamera,x:Float,y:Float):String {
-    if(simulationActive){var id=pick(camera,x,y);scene.select(id);return id;}
     var point=scenePoint(camera,x,y);
+    if (simulationActive) {
+      var view = scene.configureRenderView(new nativekit.scene.SceneView(),
+        nativekit.scene.Transform.identity(), simulationPoseList());
+      return scene.selectRayWithView(view, point.x, point.y, 1000001.0, 0.0, 0.0, -1.0);
+    }
     return scene.selectAtXY(point.x,point.y);
+  }
+
+  function simulationPoseList():Array<SimulationPoseVisual> {
+    var result:Array<SimulationPoseVisual> = [];
+    for (pose in simulationPoses) result.push(pose);
+    return result;
   }
 
   public function dragging():Bool return drag != null;
@@ -64,11 +73,10 @@ class EditorSceneViewport implements ViewportContent {
     if (drag != null) cancelDrag();
     var point = scenePoint(camera, x, y);
     var id = scene.pick(point.x, point.y);
-    if (scene.object(id) == null) return false;
+    var item = scene.object(id);
+    if (item == null) return false;
     scene.select(id);
-    var transform = scene.info(id).localTransform();
-    drag = new EditorSceneDrag(id, transform.element(12), transform.element(13),
-      transform.element(12) - point.x, transform.element(13) - point.y, snap);
+    drag = new EditorSceneDrag(id, item.x, item.y, item.x - point.x, item.y - point.y, snap);
     return true;
   }
 
@@ -133,13 +141,12 @@ class EditorSceneViewport implements ViewportContent {
   public function paint(canvas:Canvas, destination:Rect):Void {
     var ordered = scene.items();
     ordered.sort(function(a, b) {
-      var first = scene.info(a.id).worldTransform().element(14);
-      var second = scene.info(b.id).worldTransform().element(14);
+      var first = simulationActive ? maximumZ(a) : a.z;
+      var second = simulationActive ? maximumZ(b) : b.z;
       return first < second ? -1 : first > second ? 1 : 0;
     });
     for (item in ordered) {
-      var state = scene.info(item.id);
-      if (!state.visible()) continue;
+      if (!item.visible) continue;
       var points=corners(item),path=new PathBuilder();
       for(index in 0...points.length){var point=displayPoint(points[index][0],points[index][1]);
         if(index==0)path.moveTo(point.x,point.y);else path.lineTo(point.x,point.y);}
@@ -154,7 +161,7 @@ class EditorSceneViewport implements ViewportContent {
   function displayedPosition(id:String):Array<Float>{
     var pose=simulationActive?simulationPoses.get(id):null;
     if(pose!=null)return pose.position;
-    var transform=scene.info(id).worldTransform();return [transform.element(12),transform.element(13),transform.element(14)];
+    var item=scene.object(id);return item==null?[0.0,0.0,0.0]:[item.x,item.y,item.z];
   }
   function displayedRotation(id:String):Array<Float>{
     var pose=simulationActive?simulationPoses.get(id):null;return pose==null?[0.0,0.0,0.0,1.0]:pose.rotation;

@@ -14,7 +14,7 @@ class Transform {
 	public static function identity():Transform
 		return new Transform();
 
-	@:allow(OccurrenceInfo)
+	@:allow(SceneNode)
 	static function fromNative(value:nkscene_transform):Transform {
 		var result = new Transform();
 		for (index in 0...16)

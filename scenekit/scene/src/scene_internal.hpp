@@ -5,7 +5,7 @@
 #include "changeset.hpp"
 #include "component_store.hpp"
 #include "hierarchy.hpp"
-#include "occurrence_store.hpp"
+#include "node_store.hpp"
 #include "resources.hpp"
 #include "transaction.hpp"
 
@@ -19,7 +19,7 @@
 
 namespace nkscene {
 
-constexpr std::size_t published_occurrence_page_capacity = 256;
+constexpr std::size_t published_node_page_capacity = 256;
 constexpr std::size_t published_direct_lookup_limit = 4096;
 
 struct SnapshotMaterialization;
@@ -32,25 +32,25 @@ struct PublishedResourceDelta {
     std::shared_ptr<const PublishedResourceDelta> previous;
 };
 
-struct PublishedOccurrencePage {
-    std::array<SnapshotOccurrence, published_occurrence_page_capacity> values{};
+struct PublishedNodePage {
+    std::array<SnapshotNode, published_node_page_capacity> values{};
 };
 
-struct PublishedOccurrenceState {
+struct PublishedNodeState {
     std::size_t slot_count = 0;
-    std::vector<std::shared_ptr<const PublishedOccurrencePage>> pages;
-    std::shared_ptr<const std::unordered_map<OccurrenceId, OccurrenceHandle>> changed_handles;
-    mutable std::shared_ptr<const std::unordered_map<OccurrenceId, const SnapshotOccurrence *>>
+    std::vector<std::shared_ptr<const PublishedNodePage>> pages;
+    std::shared_ptr<const std::unordered_map<NodeId, NodeHandle>> changed_handles;
+    mutable std::shared_ptr<const std::unordered_map<NodeId, const SnapshotNode *>>
         lookup;
     mutable std::shared_ptr<const SnapshotMaterialization> materialized;
 };
 
 struct SnapshotMaterialization {
-    std::vector<SnapshotOccurrence> occurrences;
-    std::unordered_map<OccurrenceId, std::vector<OccurrenceId>> children_by_parent;
-    std::unordered_map<EntityId, std::vector<OccurrenceId>> occurrences_by_source;
-    std::unordered_map<GeometryId, std::vector<OccurrenceId>> occurrences_by_geometry;
-    std::unordered_map<MaterialId, std::vector<OccurrenceId>> occurrences_by_material;
+    std::vector<SnapshotNode> nodes;
+    std::unordered_map<NodeId, std::vector<NodeId>> children_by_parent;
+    std::unordered_map<EntityId, std::vector<NodeId>> nodes_by_source;
+    std::unordered_map<GeometryId, std::vector<NodeId>> nodes_by_geometry;
+    std::unordered_map<MaterialId, std::vector<NodeId>> nodes_by_material;
 };
 
 struct PublishedSceneState {
@@ -61,7 +61,7 @@ struct PublishedSceneState {
     std::uint64_t geometry_resources_revision = 0;
     std::uint64_t material_resources_revision = 0;
     std::shared_ptr<const PublishedResourceDelta> resource_delta;
-    std::shared_ptr<const PublishedOccurrenceState> occurrences;
+    std::shared_ptr<const PublishedNodeState> nodes;
     std::shared_ptr<const std::vector<GeometryResource>> geometries;
     std::shared_ptr<const std::vector<MaterialResource>> materials;
     std::shared_ptr<const std::vector<ImageResource>> images;
@@ -75,7 +75,7 @@ class NKS_API Scene {
 public:
     Scene();
 
-    OccurrenceId reserve_occurrence_id() noexcept { return occurrences.reserve_id(); }
+    NodeId reserve_node_id() noexcept { return nodes.reserve_id(); }
     GeometryId reserve_geometry_id() noexcept { return GeometryId{next_geometry_id++}; }
     MaterialId reserve_material_id() noexcept { return MaterialId{next_material_id++}; }
     ImageId reserve_image_id() noexcept { return ImageId{next_image_id++}; }
@@ -117,8 +117,8 @@ public:
     void destroy_sampler(SamplerId id) noexcept { samplers.destroy(id); }
     void destroy_camera(CameraId id) noexcept { cameras.destroy(id); }
     void destroy_light(LightId id) noexcept { lights.destroy(id); }
-    std::size_t occurrence_count() const noexcept { return occurrences.size(); }
-    bool contains(OccurrenceId id) const noexcept { return occurrences.contains(id); }
+    std::size_t node_count() const noexcept { return nodes.size(); }
+    bool contains(NodeId id) const noexcept { return nodes.contains(id); }
 
     nkscene_result commit(const Transaction &transaction, ChangeSet &changes);
     SceneSnapshot snapshot() const;
@@ -126,7 +126,7 @@ public:
     std::uint64_t revision() const noexcept { return revisions.scene; }
     const RevisionCounters &revision_counters() const noexcept { return revisions; }
 
-    const OccurrenceStore &occurrence_store() const noexcept { return occurrences; }
+    const NodeStore &node_store() const noexcept { return nodes; }
     const HierarchyIndex &hierarchy_index() const noexcept { return hierarchy; }
     const ComponentStore<LocalTransform> &transforms() const noexcept { return local_transforms; }
     const ComponentStore<WorldTransform> &world_transforms() const noexcept {
@@ -157,14 +157,14 @@ public:
 private:
     struct TransactionOverlay {
         struct Entry {
-            OccurrenceId id;
-            OccurrenceHandle handle;
-            OccurrenceId parent = invalid_occurrence;
+            NodeId id;
+            NodeHandle handle;
+            NodeId parent = invalid_node;
             bool live = false;
             bool created = false;
         };
 
-        std::unordered_map<OccurrenceId, std::size_t> indices;
+        std::unordered_map<NodeId, std::size_t> indices;
         std::vector<Entry> entries;
     };
 
@@ -174,10 +174,10 @@ private:
                                     const TransactionOverlay &overlay);
     void publish_state(const ChangeSet *changes,
                        std::span<const std::uint32_t> destroyed_slots) const;
-    void record_change(ChangeSet &changes, std::unordered_map<OccurrenceId, std::size_t> &indices,
-                       OccurrenceId id, ChangeDomain domain);
+    void record_change(ChangeSet &changes, std::unordered_map<NodeId, std::size_t> &indices,
+                       NodeId id, ChangeDomain domain);
 
-    OccurrenceStore occurrences;
+    NodeStore nodes;
     ComponentStore<SourceEntity> source_entities;
     ComponentStore<Parent> parent_components;
     ComponentStore<LocalTransform> local_transforms;

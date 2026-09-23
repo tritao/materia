@@ -102,18 +102,18 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         require_scene(nkscene_transaction_begin(scene_, &transaction),
                       "nkscene_transaction_begin");
         for (uint32_t index = 0; index < blueprint.link_count; ++index) {
-            nkscene_occurrence_id occurrence{};
-            if (nkscene_tx_create_occurrence(transaction, &occurrence) != NKS_OK) {
+            nkscene_node_id node{};
+            if (nkscene_tx_create_node(transaction, &node) != NKS_OK) {
                 nkscene_transaction_cancel(transaction);
-                throw std::runtime_error("nkscene_tx_create_occurrence");
+                throw std::runtime_error("nkscene_tx_create_node");
             }
             const auto transform = robot_transform(robot_index);
-            if (nkscene_tx_set_transform(transaction, occurrence, &transform) != NKS_OK) {
+            if (nkscene_tx_set_transform(transaction, node, &transform) != NKS_OK) {
                 nkscene_transaction_cancel(transaction);
                 throw std::runtime_error("nkscene_tx_set_transform");
             }
-            binding->occurrences_.push_back(occurrence);
-            occurrences_.push_back(occurrence);
+            binding->nodes_.push_back(node);
+            nodes_.push_back(node);
         }
         nkscene_change_set changes = 0;
         require_scene(nkscene_transaction_commit_with_changes(transaction, &changes),
@@ -124,7 +124,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         for (uint32_t index = 0; index < blueprint.link_count; ++index) {
             nksim_body_desc desc{};
             desc.struct_size = sizeof(desc);
-            desc.occurrence = binding->occurrences_[index];
+            desc.node = binding->nodes_[index];
             desc.motion_type = index == root ? NKSIM_MOTION_KINEMATIC : NKSIM_MOTION_DYNAMIC;
             desc.mass = 1.0;
             desc.shape = shape_;
@@ -263,7 +263,7 @@ rk_result set_body_pose(nksim_world world, nksim_body body, const double positio
         ? RK_OK : RK_ERROR_BACKEND;
 }
 
-rk_result set_occurrence_pose(nkscene_scene scene, nkscene_occurrence_id occurrence,
+rk_result set_node_pose(nkscene_scene scene, nkscene_node_id node,
                               const double position[3], const double rotation[4]) {
     nkscene_transform transform{};
     for (int column = 0; column < 3; ++column) {
@@ -280,7 +280,7 @@ rk_result set_occurrence_pose(nkscene_scene scene, nkscene_occurrence_id occurre
     transform.matrix[15] = 1.0f;
     nkscene_transaction transaction = 0;
     if (nkscene_transaction_begin(scene, &transaction) != NKS_OK) return RK_ERROR_BACKEND;
-    if (nkscene_tx_set_transform(transaction, occurrence, &transform) != NKS_OK) {
+    if (nkscene_tx_set_transform(transaction, node, &transform) != NKS_OK) {
         nkscene_transaction_cancel(transaction);
         return RK_ERROR_BACKEND;
     }
@@ -304,7 +304,7 @@ rk_result Simulation::teleport_robot(uint32_t robot_index, const rk_simulation_p
                                 robot_base_bodies_[robot_index]);
     if (root == binding->bodies_.end()) return RK_ERROR_INVALID_HANDLE;
     const auto root_index = static_cast<std::size_t>(root - binding->bodies_.begin());
-    auto result = set_occurrence_pose(scene_, binding->occurrences_[root_index],
+    auto result = set_node_pose(scene_, binding->nodes_[root_index],
                                       pose.position, pose.rotation);
     if (result == RK_OK)
         result = set_body_pose(world_, robot_base_bodies_[robot_index], pose.position, pose.rotation);
@@ -384,8 +384,8 @@ rk_result Simulation::spawn_object(const rk_simulation_object_desc &desc,
     transform.matrix[12] = static_cast<float>(desc.position[0]);
     transform.matrix[13] = static_cast<float>(desc.position[1]);
     transform.matrix[14] = static_cast<float>(desc.position[2]);
-    if (nkscene_tx_create_occurrence(transaction, &object.occurrence) != NKS_OK ||
-        nkscene_tx_set_transform(transaction, object.occurrence, &transform) != NKS_OK) {
+    if (nkscene_tx_create_node(transaction, &object.node) != NKS_OK ||
+        nkscene_tx_set_transform(transaction, object.node, &transform) != NKS_OK) {
         nkscene_transaction_cancel(transaction);
         return RK_ERROR_BACKEND;
     }
@@ -398,7 +398,7 @@ rk_result Simulation::spawn_object(const rk_simulation_object_desc &desc,
         return RK_ERROR_BACKEND;
     nksim_body_desc body_desc{};
     body_desc.struct_size = sizeof(body_desc);
-    body_desc.occurrence = object.occurrence;
+    body_desc.node = object.node;
     body_desc.motion_type = desc.motion_type;
     body_desc.mass = desc.mass;
     body_desc.shape = object.shape;
@@ -425,7 +425,7 @@ rk_result Simulation::remove_object(rk_simulation_object object) {
     nkscene_transaction transaction = 0;
     if (nkscene_transaction_begin(scene_, &transaction) != NKS_OK)
         return RK_ERROR_BACKEND;
-    if (nkscene_tx_destroy_occurrence(transaction, value.occurrence) != NKS_OK) {
+    if (nkscene_tx_destroy_node(transaction, value.node) != NKS_OK) {
         nkscene_transaction_cancel(transaction);
         return RK_ERROR_BACKEND;
     }

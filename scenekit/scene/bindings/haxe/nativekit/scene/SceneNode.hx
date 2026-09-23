@@ -2,10 +2,10 @@ package nativekit.scene;
 
 import NativeKitScene;
 
-/** Read-only occurrence state captured by a scene snapshot. */
-class OccurrenceInfo {
-	final occurrenceValue:Occurrence;
-	final parentValue:Null<Occurrence>;
+/** Immutable node state captured by a scene snapshot. */
+class SceneNode {
+	final nodeValue:Node;
+	final parentValue:Null<Node>;
 	final sourceId:haxe.Int64;
 	final geometryId:haxe.Int64;
 	final materialId:haxe.Int64;
@@ -18,11 +18,10 @@ class OccurrenceInfo {
 	final boundsValue:Bounds;
 
 	@:allow(Snapshot)
-	private function new(value:nkscene_snapshot_occurrence) {
-		occurrenceValue = Occurrence.fromNative(value.get_occurrence());
+	private function new(value:nkscene_snapshot_node) {
+		nodeValue = Node.fromNative(value.get_node());
 		var parent = value.get_parent();
-		parentValue = haxe.Int64.toInt(parent.get_value()) == 0 ? null
-			: Occurrence.fromNative(parent);
+		parentValue = haxe.Int64.toInt(parent.get_value()) == 0 ? null : Node.fromNative(parent);
 		sourceId = value.get_source().get_value();
 		geometryId = value.get_geometry().get_value();
 		materialId = value.get_material().get_value();
@@ -35,12 +34,11 @@ class OccurrenceInfo {
 		boundsValue = Bounds.fromNative(value.get_bounds());
 	}
 
-	public function occurrence():Occurrence
-		return occurrenceValue;
+	public function node():Node
+		return nodeValue;
 
-	public function parent():Null<Occurrence> {
+	public function parent():Null<Node>
 		return parentValue;
-	}
 
 	public function sourceValue():haxe.Int64
 		return sourceId;

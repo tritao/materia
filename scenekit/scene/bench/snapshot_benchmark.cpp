@@ -5,12 +5,12 @@
 #include <memory>
 
 int main() {
-    constexpr std::size_t occurrence_count = 50000;
+    constexpr std::size_t node_count = 50000;
     constexpr std::size_t snapshot_count = 10000;
     auto scene = std::make_shared<nkscene::Scene>();
     nkscene::Transaction create(scene);
-    for (std::size_t index = 0; index < occurrence_count; ++index)
-        create.add_create(scene->reserve_occurrence_id());
+    for (std::size_t index = 0; index < node_count; ++index)
+        create.add_create(scene->reserve_node_id());
     nkscene::ChangeSet changes;
     if (scene->commit(create, changes) != NKS_OK)
         return 1;
@@ -21,8 +21,8 @@ int main() {
         revision_sum += scene->snapshot().revision();
     const auto elapsed = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - start);
-    std::printf("published snapshot x%zu over %zu occurrences: %.3f ms (revision sum=%llu)\n",
-                snapshot_count, occurrence_count, elapsed.count(),
+    std::printf("published snapshot x%zu over %zu nodes: %.3f ms (revision sum=%llu)\n",
+                snapshot_count, node_count, elapsed.count(),
                 static_cast<unsigned long long>(revision_sum));
     return 0;
 }

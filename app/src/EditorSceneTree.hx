@@ -26,7 +26,7 @@ class EditorSceneTree implements TreeViewModel {
   public function extentAt(key:String):Float return 28.0;
   public function buildItem(key:String):View {
     var item=scene.object(key);
-    if(item!=null)return new Text(item.label + (scene.info(key).visible() ? "" : " (hidden)"));
+    if(item!=null)return new Text(item.label + (item.visible ? "" : " (hidden)"));
     var marker=key.indexOf(":feature:");
     if(marker>=0){
       var id=key.substr(0,marker),index=Std.parseInt(key.substr(marker+9));

@@ -9,22 +9,22 @@
 
 namespace {
 
-nkscene_occurrence_id make_occurrence(nkscene_scene scene, double z) {
+nkscene_node_id make_node(nkscene_scene scene, double z) {
     nkscene_transaction transaction = 0;
     assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
-    nkscene_occurrence_id occurrence{};
-    assert(nkscene_tx_create_occurrence(transaction, &occurrence) == NKS_OK);
+    nkscene_node_id node{};
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
     nkscene_transform transform{};
     transform.matrix[0] = 1.0f;
     transform.matrix[5] = 1.0f;
     transform.matrix[10] = 1.0f;
     transform.matrix[15] = 1.0f;
     transform.matrix[14] = static_cast<float>(z);
-    assert(nkscene_tx_set_transform(transaction, occurrence, &transform) == NKS_OK);
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
     nkscene_change_set changes = 0;
     assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
     nkscene_change_set_destroy(changes);
-    return occurrence;
+    return node;
 }
 
 nksim_world make_world(nkscene_scene scene, double timestep) {
@@ -42,7 +42,7 @@ nksim_world make_world(nkscene_scene scene, double timestep) {
 void external_host_owns_world_and_publishes_snapshots() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto occurrence = make_occurrence(scene, 10.0);
+    const auto node = make_node(scene, 10.0);
     const auto world = make_world(scene, 0.01);
 
     const double half_extents[] = {0.5, 0.5, 0.5};
@@ -50,7 +50,7 @@ void external_host_owns_world_and_publishes_snapshots() {
     assert(nksim_shape_create_box(world, half_extents, &shape) == NKSIM_OK);
     nksim_body_desc body_desc{};
     body_desc.struct_size = sizeof(body_desc);
-    body_desc.occurrence = occurrence;
+    body_desc.node = node;
     body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
     body_desc.mass = 1.0;
     body_desc.shape = shape;

@@ -78,7 +78,7 @@ NKSINTERACTION_API void NKS_CALL nkscene_interaction_cancel_hover(nkscene_intera
 NKSINTERACTION_API nkscene_result NKS_CALL nkscene_interaction_apply_pick(
     nkscene_interaction interaction, const nkscene_render_pick_result *pick, uint32_t mode);
 NKSINTERACTION_API nkscene_result NKS_CALL nkscene_interaction_select(
-    nkscene_interaction interaction, nkscene_occurrence_id occurrence, uint32_t mode);
+    nkscene_interaction interaction, nkscene_node_id node, uint32_t mode);
 NKSINTERACTION_API void NKS_CALL
 nkscene_interaction_clear_selection(nkscene_interaction interaction);
 NKSINTERACTION_API nkscene_result NKS_CALL
@@ -89,9 +89,9 @@ nkscene_interaction_get_hover(nkscene_interaction interaction, uint32_t *out_has
 NKSINTERACTION_API nkscene_result NKS_CALL nkscene_interaction_get_selection_count(
     nkscene_interaction interaction, uint64_t *out_count NK_OUT);
 NKSINTERACTION_API nkscene_result NKS_CALL nkscene_interaction_get_selected(
-    nkscene_interaction interaction, uint64_t index, nkscene_occurrence_id *out_occurrence NK_OUT);
+    nkscene_interaction interaction, uint64_t index, nkscene_node_id *out_node NK_OUT);
 NKSINTERACTION_API nkscene_result NKS_CALL
-nkscene_interaction_is_selected(nkscene_interaction interaction, nkscene_occurrence_id occurrence,
+nkscene_interaction_is_selected(nkscene_interaction interaction, nkscene_node_id node,
                                 uint32_t *out_selected NK_OUT);
 
 #ifdef __cplusplus

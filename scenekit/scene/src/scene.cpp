@@ -22,7 +22,7 @@ namespace {
 
 std::shared_ptr<const PublishedSceneState> empty_published_state() {
     auto state = std::make_shared<PublishedSceneState>();
-    state->occurrences = std::make_shared<PublishedOccurrenceState>();
+    state->nodes = std::make_shared<PublishedNodeState>();
     state->geometries = std::make_shared<std::vector<GeometryResource>>();
     state->materials = std::make_shared<std::vector<MaterialResource>>();
     state->images = std::make_shared<std::vector<ImageResource>>();
@@ -41,39 +41,39 @@ SceneSnapshot::SceneSnapshot(std::shared_ptr<const PublishedSceneState> state)
     : state_(std::move(state)) {}
 
 const SnapshotMaterialization &SceneSnapshot::materialized() const {
-    auto &published_occurrences = *state_->occurrences;
+    auto &published_nodes = *state_->nodes;
     auto cached =
-        std::atomic_load_explicit(&published_occurrences.materialized, std::memory_order_acquire);
+        std::atomic_load_explicit(&published_nodes.materialized, std::memory_order_acquire);
     if (!cached) {
         auto next = std::make_shared<SnapshotMaterialization>();
-        for (const auto &page : published_occurrences.pages) {
-            for (const auto &occurrence : page->values) {
-                if (occurrence.occurrence.valid())
-                    next->occurrences.push_back(occurrence);
+        for (const auto &page : published_nodes.pages) {
+            for (const auto &node : page->values) {
+                if (node.node.valid())
+                    next->nodes.push_back(node);
             }
         }
-        std::sort(next->occurrences.begin(), next->occurrences.end(),
-                  [](const SnapshotOccurrence &lhs, const SnapshotOccurrence &rhs) {
-                      return lhs.occurrence.value < rhs.occurrence.value;
+        std::sort(next->nodes.begin(), next->nodes.end(),
+                  [](const SnapshotNode &lhs, const SnapshotNode &rhs) {
+                      return lhs.node.value < rhs.node.value;
                   });
-        next->children_by_parent.reserve(next->occurrences.size());
-        next->occurrences_by_source.reserve(next->occurrences.size());
-        next->occurrences_by_geometry.reserve(next->occurrences.size());
-        next->occurrences_by_material.reserve(next->occurrences.size());
-        for (const auto &occurrence : next->occurrences) {
-            if (occurrence.parent.valid())
-                next->children_by_parent[occurrence.parent].push_back(occurrence.occurrence);
-            next->occurrences_by_source[occurrence.source].push_back(occurrence.occurrence);
-            if (occurrence.geometry.valid())
-                next->occurrences_by_geometry[occurrence.geometry].push_back(occurrence.occurrence);
-            if (occurrence.material.valid())
-                next->occurrences_by_material[occurrence.material].push_back(occurrence.occurrence);
+        next->children_by_parent.reserve(next->nodes.size());
+        next->nodes_by_source.reserve(next->nodes.size());
+        next->nodes_by_geometry.reserve(next->nodes.size());
+        next->nodes_by_material.reserve(next->nodes.size());
+        for (const auto &node : next->nodes) {
+            if (node.parent.valid())
+                next->children_by_parent[node.parent].push_back(node.node);
+            next->nodes_by_source[node.source].push_back(node.node);
+            if (node.geometry.valid())
+                next->nodes_by_geometry[node.geometry].push_back(node.node);
+            if (node.material.valid())
+                next->nodes_by_material[node.material].push_back(node.node);
         }
         std::shared_ptr<const SnapshotMaterialization> candidate = std::move(next);
         std::atomic_compare_exchange_strong_explicit(
-            &published_occurrences.materialized, &cached, std::move(candidate),
+            &published_nodes.materialized, &cached, std::move(candidate),
             std::memory_order_release, std::memory_order_acquire);
-        cached = std::atomic_load_explicit(&published_occurrences.materialized,
+        cached = std::atomic_load_explicit(&published_nodes.materialized,
                                            std::memory_order_acquire);
     }
     return *cached;
@@ -87,85 +87,85 @@ const RevisionCounters &SceneSnapshot::revisions() const noexcept {
     return state_->revisions;
 }
 
-std::span<const SnapshotOccurrence> SceneSnapshot::occurrences() const noexcept {
-    return materialized().occurrences;
+std::span<const SnapshotNode> SceneSnapshot::nodes() const noexcept {
+    return materialized().nodes;
 }
 
-std::span<const OccurrenceId> SceneSnapshot::children(OccurrenceId parent) const noexcept {
+std::span<const NodeId> SceneSnapshot::children(NodeId parent) const noexcept {
     const auto &value = materialized();
     const auto found = value.children_by_parent.find(parent);
-    return found == value.children_by_parent.end() ? std::span<const OccurrenceId>{}
-                                                   : std::span<const OccurrenceId>{found->second};
+    return found == value.children_by_parent.end() ? std::span<const NodeId>{}
+                                                   : std::span<const NodeId>{found->second};
 }
 
-std::span<const OccurrenceId>
-SceneSnapshot::occurrences_for_source(EntityId source) const noexcept {
+std::span<const NodeId>
+SceneSnapshot::nodes_for_source(EntityId source) const noexcept {
     const auto &value = materialized();
-    const auto found = value.occurrences_by_source.find(source);
-    return found == value.occurrences_by_source.end()
-               ? std::span<const OccurrenceId>{}
-               : std::span<const OccurrenceId>{found->second};
+    const auto found = value.nodes_by_source.find(source);
+    return found == value.nodes_by_source.end()
+               ? std::span<const NodeId>{}
+               : std::span<const NodeId>{found->second};
 }
 
-std::span<const OccurrenceId>
-SceneSnapshot::occurrences_for_geometry(GeometryId geometry) const noexcept {
+std::span<const NodeId>
+SceneSnapshot::nodes_for_geometry(GeometryId geometry) const noexcept {
     const auto &value = materialized();
-    const auto found = value.occurrences_by_geometry.find(geometry);
-    return found == value.occurrences_by_geometry.end()
-               ? std::span<const OccurrenceId>{}
-               : std::span<const OccurrenceId>{found->second};
+    const auto found = value.nodes_by_geometry.find(geometry);
+    return found == value.nodes_by_geometry.end()
+               ? std::span<const NodeId>{}
+               : std::span<const NodeId>{found->second};
 }
 
-std::span<const OccurrenceId>
-SceneSnapshot::occurrences_for_material(MaterialId material) const noexcept {
+std::span<const NodeId>
+SceneSnapshot::nodes_for_material(MaterialId material) const noexcept {
     const auto &value = materialized();
-    const auto found = value.occurrences_by_material.find(material);
-    return found == value.occurrences_by_material.end()
-               ? std::span<const OccurrenceId>{}
-               : std::span<const OccurrenceId>{found->second};
+    const auto found = value.nodes_by_material.find(material);
+    return found == value.nodes_by_material.end()
+               ? std::span<const NodeId>{}
+               : std::span<const NodeId>{found->second};
 }
 
-const SnapshotOccurrence *SceneSnapshot::find(OccurrenceId id) const noexcept {
-    const auto &published_occurrences = *state_->occurrences;
-    if (published_occurrences.changed_handles) {
-        const auto changed = published_occurrences.changed_handles->find(id);
-        if (changed != published_occurrences.changed_handles->end()) {
+const SnapshotNode *SceneSnapshot::find_node(NodeId id) const noexcept {
+    const auto &published_nodes = *state_->nodes;
+    if (published_nodes.changed_handles) {
+        const auto changed = published_nodes.changed_handles->find(id);
+        if (changed != published_nodes.changed_handles->end()) {
             const auto handle = changed->second;
-            const auto page_index = handle.slot / published_occurrence_page_capacity;
-            if (page_index >= published_occurrences.pages.size() ||
-                !published_occurrences.pages[page_index])
+            const auto page_index = handle.slot / published_node_page_capacity;
+            if (page_index >= published_nodes.pages.size() ||
+                !published_nodes.pages[page_index])
                 return nullptr;
-            const auto &occurrence = published_occurrences.pages[page_index]
-                                         ->values[handle.slot % published_occurrence_page_capacity];
-            return occurrence.occurrence == id ? &occurrence : nullptr;
+            const auto &node = published_nodes.pages[page_index]
+                                         ->values[handle.slot % published_node_page_capacity];
+            return node.node == id ? &node : nullptr;
         }
     }
     auto cached =
-        std::atomic_load_explicit(&published_occurrences.lookup, std::memory_order_acquire);
+        std::atomic_load_explicit(&published_nodes.lookup, std::memory_order_acquire);
     if (!cached) {
         auto next =
-            std::make_shared<std::unordered_map<OccurrenceId, const SnapshotOccurrence *>>();
-        next->reserve(published_occurrences.slot_count);
-        for (const auto &page : published_occurrences.pages) {
-            for (const auto &occurrence : page->values)
-                if (occurrence.occurrence.valid())
-                    next->emplace(occurrence.occurrence, &occurrence);
+            std::make_shared<std::unordered_map<NodeId, const SnapshotNode *>>();
+        next->reserve(published_nodes.slot_count);
+        for (const auto &page : published_nodes.pages) {
+            for (const auto &node : page->values)
+                if (node.node.valid())
+                    next->emplace(node.node, &node);
         }
-        std::shared_ptr<const std::unordered_map<OccurrenceId, const SnapshotOccurrence *>>
+        std::shared_ptr<const std::unordered_map<NodeId, const SnapshotNode *>>
             candidate = std::move(next);
         std::atomic_compare_exchange_strong_explicit(
-            &published_occurrences.lookup, &cached, std::move(candidate), std::memory_order_release,
+            &published_nodes.lookup, &cached, std::move(candidate), std::memory_order_release,
             std::memory_order_acquire);
         cached =
-            std::atomic_load_explicit(&published_occurrences.lookup, std::memory_order_acquire);
+            std::atomic_load_explicit(&published_nodes.lookup, std::memory_order_acquire);
     }
     const auto found = cached->find(id);
     return found == cached->end() ? nullptr : found->second;
 }
 
-std::string_view SceneSnapshot::name(OccurrenceId id) const noexcept {
-    const auto *occurrence = find(id);
-    return occurrence ? std::string_view{occurrence->name} : std::string_view{};
+std::string_view SceneSnapshot::name(NodeId id) const noexcept {
+    const auto *node = find(id);
+    return node ? std::string_view{node->name} : std::string_view{};
 }
 
 std::string_view SceneSnapshot::entity_name(EntityId id) const noexcept {
@@ -447,17 +447,17 @@ bool valid_sampler_wrap(nkscene_sampler_wrap wrap) noexcept {
 } // namespace
 
 void Scene::recompute_world_transforms(ChangeSet &changes, const TransactionOverlay &overlay) {
-    struct PendingOccurrence {
-        OccurrenceId id;
-        OccurrenceHandle handle;
+    struct PendingNode {
+        NodeId id;
+        NodeHandle handle;
     };
-    const auto handle_for = [&](OccurrenceId id) {
+    const auto handle_for = [&](NodeId id) {
         const auto found = overlay.indices.find(id);
-        return found == overlay.indices.end() ? occurrences.resolve(id)
+        return found == overlay.indices.end() ? nodes.resolve(id)
                                               : overlay.entries[found->second].handle;
     };
-    std::unordered_map<OccurrenceId, OccurrenceHandle> dirty;
-    std::vector<PendingOccurrence> pending;
+    std::unordered_map<NodeId, NodeHandle> dirty;
+    std::vector<PendingNode> pending;
     for (const auto &change : changes.changes) {
         if (has_domain(change.domains, ChangeDomain::Destroyed)) {
             continue;
@@ -466,9 +466,9 @@ void Scene::recompute_world_transforms(ChangeSet &changes, const TransactionOver
             has_domain(change.domains, ChangeDomain::Transform) ||
             has_domain(change.domains, ChangeDomain::Hierarchy) ||
             has_domain(change.domains, ChangeDomain::Geometry)) {
-            const auto handle = handle_for(change.occurrence);
+            const auto handle = handle_for(change.node);
             if (handle.valid())
-                pending.push_back({change.occurrence, handle});
+                pending.push_back({change.node, handle});
         }
     }
     while (!pending.empty()) {
@@ -476,20 +476,20 @@ void Scene::recompute_world_transforms(ChangeSet &changes, const TransactionOver
         pending.pop_back();
         if (!dirty.emplace(current.id, current.handle).second)
             continue;
-        hierarchy.for_each_child(current.handle, [&](OccurrenceId child, OccurrenceHandle handle) {
+        hierarchy.for_each_child(current.handle, [&](NodeId child, NodeHandle handle) {
             pending.push_back({child, handle});
         });
     }
 
-    std::vector<PendingOccurrence> roots;
+    std::vector<PendingNode> roots;
     roots.reserve(dirty.size());
     for (const auto &[id, handle] : dirty) {
         const auto parent = hierarchy.parent_handle(handle);
-        const auto parent_id = occurrences.id(parent);
+        const auto parent_id = nodes.id(parent);
         if (!parent.valid() || !dirty.contains(parent_id))
             roots.push_back({id, handle});
     }
-    std::vector<PendingOccurrence> stack;
+    std::vector<PendingNode> stack;
     for (const auto root : roots) {
         stack.push_back(root);
         while (!stack.empty()) {
@@ -507,7 +507,7 @@ void Scene::recompute_world_transforms(ChangeSet &changes, const TransactionOver
             world_transforms_.insert_or_assign(current.handle,
                                                WorldTransform{world, revisions.scene + 1});
             ++changes.stats.dirty_world_transforms;
-            changes.world_transform_occurrences.push_back(current.id);
+            changes.world_transform_nodes.push_back(current.id);
             if (const auto *geometry = geometry_refs.find(current.handle)) {
                 const auto *resource = geometries.find(geometry->id);
                 if (resource && resource->bounds.valid) {
@@ -521,7 +521,7 @@ void Scene::recompute_world_transforms(ChangeSet &changes, const TransactionOver
                 bounds.erase(current.handle);
             }
             hierarchy.for_each_child(current.handle,
-                                     [&](OccurrenceId child, OccurrenceHandle handle) {
+                                     [&](NodeId child, NodeHandle handle) {
                                          if (dirty.contains(child))
                                              stack.push_back({child, handle});
                                      });
@@ -529,7 +529,7 @@ void Scene::recompute_world_transforms(ChangeSet &changes, const TransactionOver
     }
 }
 
-Scene::Scene() : hierarchy(occurrences) {
+Scene::Scene() : hierarchy(nodes) {
     publish_state(nullptr, {});
 }
 
@@ -619,61 +619,61 @@ void Scene::publish_state(const ChangeSet *changes,
         state->lights = collect.template operator()<LightStore, LightResource>(lights);
     }
 
-    auto occurrence_state = previous && previous->occurrences
-                                ? std::make_shared<PublishedOccurrenceState>(*previous->occurrences)
-                                : std::make_shared<PublishedOccurrenceState>();
-    occurrence_state->slot_count = occurrences.slot_count();
+    auto node_state = previous && previous->nodes
+                                ? std::make_shared<PublishedNodeState>(*previous->nodes)
+                                : std::make_shared<PublishedNodeState>();
+    node_state->slot_count = nodes.slot_count();
     const auto page_count =
-        (occurrence_state->slot_count + published_occurrence_page_capacity - 1) /
-        published_occurrence_page_capacity;
-    occurrence_state->pages.resize(page_count);
+        (node_state->slot_count + published_node_page_capacity - 1) /
+        published_node_page_capacity;
+    node_state->pages.resize(page_count);
 
     std::unordered_set<std::uint32_t> changed_slots;
-    std::unordered_map<std::uint32_t, OccurrenceHandle> active_handles;
-    std::unordered_map<OccurrenceId, OccurrenceHandle> changed_handles;
+    std::unordered_map<std::uint32_t, NodeHandle> active_handles;
+    std::unordered_map<NodeId, NodeHandle> changed_handles;
     const auto direct_lookup_work = changes ? changes->changes.size() +
-                                                  changes->world_transform_occurrences.size() +
-                                                  changes->effective_state_occurrences.size()
-                                            : occurrences.size();
+                                                  changes->world_transform_nodes.size() +
+                                                  changes->effective_state_nodes.size()
+                                            : nodes.size();
     const bool collect_direct_lookup = direct_lookup_work <= published_direct_lookup_limit;
-    const auto add_changed_handle = [&](OccurrenceId id) {
+    const auto add_changed_handle = [&](NodeId id) {
         if (!collect_direct_lookup)
             return;
-        const auto handle = occurrences.resolve(id);
+        const auto handle = nodes.resolve(id);
         if (handle.valid())
             changed_handles[id] = handle;
     };
-    const auto add_active = [&](OccurrenceId id) {
-        const auto handle = occurrences.resolve(id);
+    const auto add_active = [&](NodeId id) {
+        const auto handle = nodes.resolve(id);
         if (handle.valid()) {
             changed_slots.insert(handle.slot);
             active_handles[handle.slot] = handle;
             add_changed_handle(id);
         }
     };
-    const auto add_changed_chain = [&](OccurrenceId id) {
+    const auto add_changed_chain = [&](NodeId id) {
         for (auto current = id; current.valid();) {
             add_changed_handle(current);
             current = hierarchy.parent(current);
         }
     };
     if (!previous) {
-        occurrences.for_each([&](OccurrenceId id, OccurrenceHandle handle) {
+        nodes.for_each([&](NodeId id, NodeHandle handle) {
             changed_slots.insert(handle.slot);
             active_handles[handle.slot] = handle;
         });
     } else if (changes) {
         for (const auto &change : changes->changes) {
-            add_active(change.occurrence);
+            add_active(change.node);
             if (collect_direct_lookup)
-                add_changed_chain(change.occurrence);
+                add_changed_chain(change.node);
         }
-        for (const auto id : changes->world_transform_occurrences) {
+        for (const auto id : changes->world_transform_nodes) {
             add_active(id);
             if (collect_direct_lookup)
                 add_changed_chain(id);
         }
-        for (const auto id : changes->effective_state_occurrences) {
+        for (const auto id : changes->effective_state_nodes) {
             add_active(id);
             if (collect_direct_lookup)
                 add_changed_chain(id);
@@ -682,65 +682,65 @@ void Scene::publish_state(const ChangeSet *changes,
             changed_slots.insert(slot);
     }
 
-    const auto make_occurrence = [&](OccurrenceId id, OccurrenceHandle handle) {
-        SnapshotOccurrence occurrence;
-        occurrence.occurrence = id;
+    const auto make_node = [&](NodeId id, NodeHandle handle) {
+        SnapshotNode node;
+        node.node = id;
         if (const auto *source = source_entities.find(handle))
-            occurrence.source = source->id;
+            node.source = source->id;
         if (const auto *name = names_.find(handle))
-            occurrence.name = *name;
-        occurrence.parent = hierarchy.parent(id);
+            node.name = *name;
+        node.parent = hierarchy.parent(id);
         if (const auto *local = local_transforms.find(handle))
-            occurrence.local_transform = *local;
+            node.local_transform = *local;
         if (const auto *world = world_transforms_.find(handle))
-            occurrence.world_transform = *world;
+            node.world_transform = *world;
         if (const auto *geometry = geometry_refs.find(handle))
-            occurrence.geometry = geometry->id;
+            node.geometry = geometry->id;
         if (const auto *material = material_refs.find(handle))
-            occurrence.material = material->id;
+            node.material = material->id;
         if (const auto *camera = camera_refs_.find(handle))
-            occurrence.camera = camera->id;
+            node.camera = camera->id;
         if (const auto *light = light_refs_.find(handle))
-            occurrence.light = light->id;
+            node.light = light->id;
         if (const auto *visibility = visibilities_.find(handle))
-            occurrence.visible = visibility->visible;
+            node.visible = visibility->visible;
         if (const auto *bound = bounds.find(handle))
-            occurrence.bounds = *bound;
-        return occurrence;
+            node.bounds = *bound;
+        return node;
     };
 
     for (const auto slot : changed_slots) {
-        const auto page_index = slot / published_occurrence_page_capacity;
-        const auto offset = slot % published_occurrence_page_capacity;
-        auto page = std::make_shared<PublishedOccurrencePage>();
-        if (occurrence_state->pages[page_index])
-            *page = *occurrence_state->pages[page_index];
+        const auto page_index = slot / published_node_page_capacity;
+        const auto offset = slot % published_node_page_capacity;
+        auto page = std::make_shared<PublishedNodePage>();
+        if (node_state->pages[page_index])
+            *page = *node_state->pages[page_index];
         const auto active = active_handles.find(slot);
         if (active == active_handles.end())
             page->values[offset] = {};
         else
-            page->values[offset] = make_occurrence(occurrences.id(active->second), active->second);
-        occurrence_state->pages[page_index] = std::move(page);
+            page->values[offset] = make_node(nodes.id(active->second), active->second);
+        node_state->pages[page_index] = std::move(page);
     }
     if (!changed_slots.empty())
         std::atomic_store_explicit(
-            &occurrence_state->lookup,
-            std::shared_ptr<const std::unordered_map<OccurrenceId, const SnapshotOccurrence *>>{},
+            &node_state->lookup,
+            std::shared_ptr<const std::unordered_map<NodeId, const SnapshotNode *>>{},
             std::memory_order_release);
     if (!changed_slots.empty())
-        std::atomic_store_explicit(&occurrence_state->materialized,
+        std::atomic_store_explicit(&node_state->materialized,
                                    std::shared_ptr<const SnapshotMaterialization>{},
                                    std::memory_order_release);
     if (!changed_slots.empty()) {
         if (changed_handles.size() <= published_direct_lookup_limit) {
-            occurrence_state->changed_handles =
-                std::make_shared<const std::unordered_map<OccurrenceId, OccurrenceHandle>>(
+            node_state->changed_handles =
+                std::make_shared<const std::unordered_map<NodeId, NodeHandle>>(
                     std::move(changed_handles));
         } else {
-            occurrence_state->changed_handles.reset();
+            node_state->changed_handles.reset();
         }
     }
-    state->occurrences = std::move(occurrence_state);
+    state->nodes = std::move(node_state);
     std::shared_ptr<const PublishedSceneState> published = std::move(state);
     std::atomic_store_explicit(&published_, std::move(published), std::memory_order_release);
 }
@@ -758,17 +758,17 @@ nkscene_result Scene::validate(const Transaction &transaction,
 
     // Stable IDs are the public transaction ABI. Resolve each one at the
     // transaction boundary and keep the rest of validation slot-oriented.
-    const auto ensure_entry = [&](OccurrenceId id) -> std::size_t {
+    const auto ensure_entry = [&](NodeId id) -> std::size_t {
         const auto found = overlay.indices.find(id);
         if (found != overlay.indices.end())
             return found->second;
 
         TransactionOverlay::Entry entry;
         entry.id = id;
-        entry.handle = occurrences.resolve(id);
+        entry.handle = nodes.resolve(id);
         entry.live = entry.handle.valid();
         if (entry.live)
-            entry.parent = occurrences.id(hierarchy.parent_handle(entry.handle));
+            entry.parent = nodes.id(hierarchy.parent_handle(entry.handle));
         const auto index = overlay.entries.size();
         overlay.entries.push_back(entry);
         overlay.indices.emplace(id, index);
@@ -780,14 +780,14 @@ nkscene_result Scene::validate(const Transaction &transaction,
         std::visit(
             [&](const auto &value) {
                 using T = std::decay_t<decltype(value)>;
-                if constexpr (std::is_same_v<T, CreateOccurrence>) {
-                    if (!value.occurrence.valid()) {
+                if constexpr (std::is_same_v<T, CreateNode>) {
+                    if (!value.node.valid()) {
                         result = NKS_ERROR_INVALID_ARGUMENT;
                         return;
                     }
-                    const auto index = ensure_entry(value.occurrence);
+                    const auto index = ensure_entry(value.node);
                     auto &entry = overlay.entries[index];
-                    // A destroyed occurrence cannot be recreated in the same
+                    // A destroyed node cannot be recreated in the same
                     // transaction; this preserves the original ID semantics.
                     if (entry.live || entry.handle.valid() || entry.created) {
                         result = NKS_ERROR_INVALID_ARGUMENT;
@@ -795,23 +795,23 @@ nkscene_result Scene::validate(const Transaction &transaction,
                     }
                     entry.live = true;
                     entry.created = true;
-                    entry.parent = invalid_occurrence;
-                } else if constexpr (std::is_same_v<T, DestroyOccurrence>) {
-                    if (!value.occurrence.valid()) {
+                    entry.parent = invalid_node;
+                } else if constexpr (std::is_same_v<T, DestroyNode>) {
+                    if (!value.node.valid()) {
                         result = NKS_ERROR_STALE_ID;
                         return;
                     }
-                    auto &entry = overlay.entries[ensure_entry(value.occurrence)];
+                    auto &entry = overlay.entries[ensure_entry(value.node)];
                     if (!entry.live)
                         result = NKS_ERROR_STALE_ID;
                     else
                         entry.live = false;
                 } else if constexpr (std::is_same_v<T, SetParent>) {
-                    if (!value.occurrence.valid()) {
+                    if (!value.node.valid()) {
                         result = NKS_ERROR_STALE_ID;
                         return;
                     }
-                    const auto target_index = ensure_entry(value.occurrence);
+                    const auto target_index = ensure_entry(value.node);
                     const auto parent_index =
                         value.parent.valid() ? ensure_entry(value.parent) : std::size_t{};
                     auto &target = overlay.entries[target_index];
@@ -819,7 +819,7 @@ nkscene_result Scene::validate(const Transaction &transaction,
                         !value.parent.valid() || overlay.entries[parent_index].live;
                     if (!target.live || !valid_parent) {
                         result = NKS_ERROR_STALE_ID;
-                    } else if (value.occurrence == value.parent) {
+                    } else if (value.node == value.parent) {
                         result = NKS_ERROR_HIERARCHY_CYCLE;
                     } else {
                         target.parent = value.parent;
@@ -830,12 +830,12 @@ nkscene_result Scene::validate(const Transaction &transaction,
                                      std::is_same_v<T, SetCamera> || std::is_same_v<T, SetLight> ||
                                      std::is_same_v<T, SetVisibility> ||
                                      std::is_same_v<T, SetSourceEntity>) {
-                    if (!value.occurrence.valid() ||
-                        !overlay.entries[ensure_entry(value.occurrence)].live)
+                    if (!value.node.valid() ||
+                        !overlay.entries[ensure_entry(value.node)].live)
                         result = NKS_ERROR_STALE_ID;
                 } else if constexpr (std::is_same_v<T, SetName>) {
-                    if (!value.occurrence.valid() ||
-                        !overlay.entries[ensure_entry(value.occurrence)].live)
+                    if (!value.node.valid() ||
+                        !overlay.entries[ensure_entry(value.node)].live)
                         result = NKS_ERROR_STALE_ID;
                 } else if constexpr (std::is_same_v<T, SetEntityName>) {
                     if (!value.entity.valid())
@@ -847,7 +847,7 @@ nkscene_result Scene::validate(const Transaction &transaction,
             return result;
     }
 
-    // A live child may not be left attached to an occurrence destroyed by the
+    // A live child may not be left attached to an node destroyed by the
     // same transaction. Newly-created links are checked by the parent walk
     // below; existing links can be inspected directly through their handles.
     for (std::size_t index = 0; index < overlay.entries.size(); ++index) {
@@ -856,7 +856,7 @@ nkscene_result Scene::validate(const Transaction &transaction,
         if (overlay.entries[index].live || !entry_handle.valid())
             continue;
         bool invalid_attachment = false;
-        hierarchy.for_each_child(entry_handle, [&](OccurrenceId child, OccurrenceHandle) {
+        hierarchy.for_each_child(entry_handle, [&](NodeId child, NodeHandle) {
             const auto child_index = ensure_entry(child);
             const auto &child_entry = overlay.entries[child_index];
             if (child_entry.live && child_entry.parent == entry_id)
@@ -867,12 +867,12 @@ nkscene_result Scene::validate(const Transaction &transaction,
     }
 
     // Walk the final parent overlay. This validates both pre-existing links
-    // and links between occurrences created earlier in this transaction.
+    // and links between nodes created earlier in this transaction.
     for (std::size_t start_index = 0; start_index < overlay.entries.size(); ++start_index) {
         const auto &start = overlay.entries[start_index];
         if (!start.live)
             continue;
-        std::unordered_set<OccurrenceId> visited;
+        std::unordered_set<NodeId> visited;
         for (auto current = start.id; current.valid();) {
             const auto current_index = ensure_entry(current);
             const auto &entry = overlay.entries[current_index];
@@ -887,7 +887,7 @@ nkscene_result Scene::validate(const Transaction &transaction,
 }
 
 void Scene::record_change(ChangeSet &changes,
-                          std::unordered_map<OccurrenceId, std::size_t> &indices, OccurrenceId id,
+                          std::unordered_map<NodeId, std::size_t> &indices, NodeId id,
                           ChangeDomain domain) {
     const auto found = indices.find(id);
     if (found == indices.end()) {
@@ -908,27 +908,27 @@ nkscene_result Scene::commit(const Transaction &transaction, ChangeSet &changes)
 
     changes = {};
     bool name_changed = false;
-    std::unordered_map<OccurrenceId, std::size_t> change_indices;
+    std::unordered_map<NodeId, std::size_t> change_indices;
     change_indices.reserve(transaction.mutations().size());
     std::vector<std::uint32_t> destroyed_slots;
-    const auto entry_for = [&](OccurrenceId id) -> TransactionOverlay::Entry & {
+    const auto entry_for = [&](NodeId id) -> TransactionOverlay::Entry & {
         return overlay.entries[overlay.indices.at(id)];
     };
     for (const auto &mutation : transaction.mutations()) {
         std::visit(
             [&](const auto &value) {
                 using T = std::decay_t<decltype(value)>;
-                if constexpr (std::is_same_v<T, CreateOccurrence>) {
-                    const auto handle = occurrences.create(value.occurrence);
-                    auto &entry = entry_for(value.occurrence);
+                if constexpr (std::is_same_v<T, CreateNode>) {
+                    const auto handle = nodes.create(value.node);
+                    auto &entry = entry_for(value.node);
                     entry.handle = handle;
                     entry.live = true;
                     hierarchy.add(handle);
                     local_transforms.insert_or_assign(handle, LocalTransform{});
                     visibilities_.insert_or_assign(handle, Visibility{});
-                    record_change(changes, change_indices, value.occurrence, ChangeDomain::Created);
-                } else if constexpr (std::is_same_v<T, DestroyOccurrence>) {
-                    const auto handle = entry_for(value.occurrence).handle;
+                    record_change(changes, change_indices, value.node, ChangeDomain::Created);
+                } else if constexpr (std::is_same_v<T, DestroyNode>) {
+                    const auto handle = entry_for(value.node).handle;
                     destroyed_slots.push_back(handle.slot);
                     source_entities.erase(handle);
                     parent_components.erase(handle);
@@ -942,110 +942,110 @@ nkscene_result Scene::commit(const Transaction &transaction, ChangeSet &changes)
                     names_.erase(handle);
                     bounds.erase(handle);
                     hierarchy.remove(handle);
-                    occurrences.destroy(handle);
-                    record_change(changes, change_indices, value.occurrence,
+                    nodes.destroy(handle);
+                    record_change(changes, change_indices, value.node,
                                   ChangeDomain::Destroyed);
                 } else if constexpr (std::is_same_v<T, SetParent>) {
-                    auto &target = entry_for(value.occurrence);
+                    auto &target = entry_for(value.node);
                     const auto target_handle = target.handle;
-                    const auto previous = occurrences.id(hierarchy.parent_handle(target_handle));
+                    const auto previous = nodes.id(hierarchy.parent_handle(target_handle));
                     if (previous != value.parent) {
                         const auto parent_handle = value.parent.valid()
                                                        ? entry_for(value.parent).handle
-                                                       : OccurrenceHandle{};
+                                                       : NodeHandle{};
                         hierarchy.reparent(target_handle, parent_handle);
                         parent_components.insert_or_assign(target_handle, Parent{value.parent});
-                        record_change(changes, change_indices, value.occurrence,
+                        record_change(changes, change_indices, value.node,
                                       ChangeDomain::Hierarchy);
                     }
                 } else if constexpr (std::is_same_v<T, SetTransform>) {
-                    const auto handle = entry_for(value.occurrence).handle;
+                    const auto handle = entry_for(value.node).handle;
                     auto *previous = local_transforms.find(handle);
                     if (!previous || !transform_equal(*previous, value.transform)) {
                         local_transforms.insert_or_assign(handle, value.transform);
-                        record_change(changes, change_indices, value.occurrence,
+                        record_change(changes, change_indices, value.node,
                                       ChangeDomain::Transform);
                     }
                 } else if constexpr (std::is_same_v<T, SetGeometry>) {
-                    const auto handle = entry_for(value.occurrence).handle;
+                    const auto handle = entry_for(value.node).handle;
                     const auto *previous = geometry_refs.find(handle);
                     if (!previous || previous->id != value.geometry) {
                         geometry_refs.insert_or_assign(handle, GeometryRef{value.geometry});
-                        record_change(changes, change_indices, value.occurrence,
+                        record_change(changes, change_indices, value.node,
                                       ChangeDomain::Geometry);
                     }
                 } else if constexpr (std::is_same_v<T, SetMaterial>) {
-                    const auto handle = entry_for(value.occurrence).handle;
+                    const auto handle = entry_for(value.node).handle;
                     const auto *previous = material_refs.find(handle);
                     if (!previous || previous->id != value.material) {
                         material_refs.insert_or_assign(handle, MaterialRef{value.material});
-                        record_change(changes, change_indices, value.occurrence,
+                        record_change(changes, change_indices, value.node,
                                       ChangeDomain::Material);
                     }
                 } else if constexpr (std::is_same_v<T, SetCamera>) {
-                    const auto handle = occurrences.resolve(value.occurrence);
+                    const auto handle = nodes.resolve(value.node);
                     const auto *previous = camera_refs_.find(handle);
                     if (value.camera.valid()) {
                         if (!previous || previous->id != value.camera) {
                             camera_refs_.insert_or_assign(handle, CameraRef{value.camera});
-                            record_change(changes, change_indices, value.occurrence,
+                            record_change(changes, change_indices, value.node,
                                           ChangeDomain::Camera);
                         }
                     } else if (previous) {
                         camera_refs_.erase(handle);
-                        record_change(changes, change_indices, value.occurrence,
+                        record_change(changes, change_indices, value.node,
                                       ChangeDomain::Camera);
                     }
                 } else if constexpr (std::is_same_v<T, SetLight>) {
-                    const auto handle = occurrences.resolve(value.occurrence);
+                    const auto handle = nodes.resolve(value.node);
                     const auto *previous = light_refs_.find(handle);
                     if (value.light.valid()) {
                         if (!previous || previous->id != value.light) {
                             light_refs_.insert_or_assign(handle, LightRef{value.light});
-                            record_change(changes, change_indices, value.occurrence,
+                            record_change(changes, change_indices, value.node,
                                           ChangeDomain::Light);
                         }
                     } else if (previous) {
                         light_refs_.erase(handle);
-                        record_change(changes, change_indices, value.occurrence,
+                        record_change(changes, change_indices, value.node,
                                       ChangeDomain::Light);
                     }
                 } else if constexpr (std::is_same_v<T, SetVisibility>) {
-                    const auto handle = entry_for(value.occurrence).handle;
+                    const auto handle = entry_for(value.node).handle;
                     const auto *previous = visibilities_.find(handle);
                     if (!previous || previous->visible != value.visible) {
                         visibilities_.insert_or_assign(handle, Visibility{value.visible});
-                        record_change(changes, change_indices, value.occurrence,
+                        record_change(changes, change_indices, value.node,
                                       ChangeDomain::Visibility);
                     }
                 } else if constexpr (std::is_same_v<T, SetSourceEntity>) {
-                    const auto handle = entry_for(value.occurrence).handle;
+                    const auto handle = entry_for(value.node).handle;
                     const auto *previous = source_entities.find(handle);
                     if (value.source.valid()) {
                         if (!previous || previous->id != value.source) {
                             source_entities.insert_or_assign(handle, SourceEntity{value.source});
-                            record_change(changes, change_indices, value.occurrence,
+                            record_change(changes, change_indices, value.node,
                                           ChangeDomain::Source);
                         }
                     } else if (previous) {
                         source_entities.erase(handle);
-                        record_change(changes, change_indices, value.occurrence,
+                        record_change(changes, change_indices, value.node,
                                       ChangeDomain::Source);
                     }
                 } else if constexpr (std::is_same_v<T, SetName>) {
-                    const auto handle = occurrences.resolve(value.occurrence);
+                    const auto handle = nodes.resolve(value.node);
                     const auto *previous = names_.find(handle);
                     if (value.name.empty()) {
                         if (previous) {
                             names_.erase(handle);
                             name_changed = true;
-                            record_change(changes, change_indices, value.occurrence,
+                            record_change(changes, change_indices, value.node,
                                           ChangeDomain::Name);
                         }
                     } else if (!previous || *previous != value.name) {
                         names_.insert_or_assign(handle, value.name);
                         name_changed = true;
-                        record_change(changes, change_indices, value.occurrence,
+                        record_change(changes, change_indices, value.node,
                                       ChangeDomain::Name);
                     }
                 } else if constexpr (std::is_same_v<T, SetEntityName>) {
@@ -1062,10 +1062,10 @@ nkscene_result Scene::commit(const Transaction &transaction, ChangeSet &changes)
                     }
                     if (changed) {
                         name_changed = true;
-                        occurrences.for_each([&](OccurrenceId occurrence, OccurrenceHandle handle) {
+                        nodes.for_each([&](NodeId node, NodeHandle handle) {
                             const auto *source = source_entities.find(handle);
                             if (source && source->id == value.entity)
-                                record_change(changes, change_indices, occurrence,
+                                record_change(changes, change_indices, node,
                                               ChangeDomain::Name);
                         });
                     }
@@ -1073,23 +1073,23 @@ nkscene_result Scene::commit(const Transaction &transaction, ChangeSet &changes)
             },
             mutation);
     }
-    changes.stats.changed_occurrences = changes.changes.size();
+    changes.stats.changed_nodes = changes.changes.size();
     recompute_world_transforms(changes, overlay);
-    std::unordered_set<OccurrenceId> effective_state_seen;
-    const auto mark_effective = [&](OccurrenceId occurrence) {
-        if (effective_state_seen.insert(occurrence).second)
-            changes.effective_state_occurrences.push_back(occurrence);
+    std::unordered_set<NodeId> effective_state_seen;
+    const auto mark_effective = [&](NodeId node) {
+        if (effective_state_seen.insert(node).second)
+            changes.effective_state_nodes.push_back(node);
     };
-    const auto mark_effective_subtree = [&](OccurrenceId root) {
-        struct PendingOccurrence {
-            OccurrenceId id;
-            OccurrenceHandle handle;
+    const auto mark_effective_subtree = [&](NodeId root) {
+        struct PendingNode {
+            NodeId id;
+            NodeHandle handle;
         };
         const auto found = overlay.indices.find(root);
         const auto root_handle = found == overlay.indices.end()
-                                     ? occurrences.resolve(root)
+                                     ? nodes.resolve(root)
                                      : overlay.entries[found->second].handle;
-        std::vector<PendingOccurrence> pending{{root, root_handle}};
+        std::vector<PendingNode> pending{{root, root_handle}};
         while (!pending.empty()) {
             const auto current = pending.back();
             pending.pop_back();
@@ -1097,7 +1097,7 @@ nkscene_result Scene::commit(const Transaction &transaction, ChangeSet &changes)
                 continue;
             mark_effective(current.id);
             hierarchy.for_each_child(current.handle,
-                                     [&](OccurrenceId child, OccurrenceHandle handle) {
+                                     [&](NodeId child, NodeHandle handle) {
                                          pending.push_back({child, handle});
                                      });
         }
@@ -1105,10 +1105,10 @@ nkscene_result Scene::commit(const Transaction &transaction, ChangeSet &changes)
     for (const auto &change : changes.changes) {
         if (has_domain(change.domains, ChangeDomain::Visibility) ||
             has_domain(change.domains, ChangeDomain::Hierarchy))
-            mark_effective_subtree(change.occurrence);
+            mark_effective_subtree(change.node);
         else if (has_domain(change.domains, ChangeDomain::Material) ||
                  has_domain(change.domains, ChangeDomain::Source))
-            mark_effective(change.occurrence);
+            mark_effective(change.node);
     }
     if (!changes.changes.empty() || name_changed) {
         auto &revision = revisions;
@@ -1250,9 +1250,9 @@ resolve_change_set_handle(nkscene_change_set changes) noexcept {
     return state.change_sets.get(unpack_handle(changes));
 }
 
-void copy_snapshot_occurrence(const SnapshotOccurrence &source,
-                              nkscene_snapshot_occurrence &target) noexcept {
-    target.occurrence.value = source.occurrence.value;
+void copy_snapshot_node(const SnapshotNode &source,
+                              nkscene_snapshot_node &target) noexcept {
+    target.node.value = source.node.value;
     target.source.value = source.source.value;
     target.parent.value = source.parent.value;
     std::copy(source.local_transform.matrix.begin(), source.local_transform.matrix.end(),
@@ -1338,9 +1338,9 @@ nkscene_result NKS_CALL nkscene_transaction_commit_with_changes(
     return nkscene::commit_transaction(transaction_handle, out_changes);
 }
 
-nkscene_result NKS_CALL nkscene_tx_create_occurrence(nkscene_transaction handle,
-                                                     nkscene_occurrence_id *out_occurrence) {
-    if (!out_occurrence)
+nkscene_result NKS_CALL nkscene_tx_create_node(nkscene_transaction handle,
+                                                     nkscene_node_id *out_node) {
+    if (!out_node)
         return NKS_ERROR_INVALID_ARGUMENT;
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -1348,39 +1348,39 @@ nkscene_result NKS_CALL nkscene_tx_create_occurrence(nkscene_transaction handle,
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    const auto id = transaction->scene()->reserve_occurrence_id();
+    const auto id = transaction->scene()->reserve_node_id();
     transaction->add_create(id);
-    out_occurrence->value = id.value;
+    out_node->value = id.value;
     return NKS_OK;
 }
 
-nkscene_result NKS_CALL nkscene_tx_destroy_occurrence(nkscene_transaction handle,
-                                                      nkscene_occurrence_id occurrence) {
+nkscene_result NKS_CALL nkscene_tx_destroy_node(nkscene_transaction handle,
+                                                      nkscene_node_id node) {
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
     std::shared_ptr<nkscene::Transaction> transaction;
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_destroy({occurrence.value});
+    transaction->add_destroy({node.value});
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_tx_set_parent(nkscene_transaction handle,
-                                              nkscene_occurrence_id occurrence,
-                                              nkscene_occurrence_id parent) {
+                                              nkscene_node_id node,
+                                              nkscene_node_id parent) {
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
     std::shared_ptr<nkscene::Transaction> transaction;
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_parent({occurrence.value}, {parent.value});
+    transaction->add_parent({node.value}, {parent.value});
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_tx_set_transform(nkscene_transaction handle,
-                                                 nkscene_occurrence_id occurrence,
+                                                 nkscene_node_id node,
                                                  const nkscene_transform *transform) {
     if (!transform)
         return NKS_ERROR_INVALID_ARGUMENT;
@@ -1390,7 +1390,7 @@ nkscene_result NKS_CALL nkscene_tx_set_transform(nkscene_transaction handle,
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_transform({occurrence.value}, nkscene::from_public_transform(*transform));
+    transaction->add_transform({node.value}, nkscene::from_public_transform(*transform));
     return NKS_OK;
 }
 
@@ -1408,7 +1408,7 @@ nkscene_result NKS_CALL nkscene_tx_set_transforms(nkscene_transaction handle,
     std::vector<nkscene::TransformUpdate> converted;
     converted.reserve(update_count);
     for (uint32_t index = 0; index < update_count; ++index) {
-        converted.push_back({{updates[index].occurrence.value},
+        converted.push_back({{updates[index].node.value},
                              nkscene::from_public_transform(updates[index].transform)});
     }
     transaction->add_transforms(std::span<const nkscene::TransformUpdate>{converted});
@@ -1416,7 +1416,7 @@ nkscene_result NKS_CALL nkscene_tx_set_transforms(nkscene_transaction handle,
 }
 
 nkscene_result NKS_CALL nkscene_tx_set_geometry(nkscene_transaction handle,
-                                                nkscene_occurrence_id occurrence,
+                                                nkscene_node_id node,
                                                 nkscene_geometry_id geometry) {
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -1424,12 +1424,12 @@ nkscene_result NKS_CALL nkscene_tx_set_geometry(nkscene_transaction handle,
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_geometry({occurrence.value}, {geometry.value});
+    transaction->add_geometry({node.value}, {geometry.value});
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_tx_set_material(nkscene_transaction handle,
-                                                nkscene_occurrence_id occurrence,
+                                                nkscene_node_id node,
                                                 nkscene_material_id material) {
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -1437,12 +1437,12 @@ nkscene_result NKS_CALL nkscene_tx_set_material(nkscene_transaction handle,
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_material({occurrence.value}, {material.value});
+    transaction->add_material({node.value}, {material.value});
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_tx_set_camera(nkscene_transaction handle,
-                                              nkscene_occurrence_id occurrence,
+                                              nkscene_node_id node,
                                               nkscene_camera_id camera) {
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -1450,12 +1450,12 @@ nkscene_result NKS_CALL nkscene_tx_set_camera(nkscene_transaction handle,
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_camera({occurrence.value}, {camera.value});
+    transaction->add_camera({node.value}, {camera.value});
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_tx_set_light(nkscene_transaction handle,
-                                             nkscene_occurrence_id occurrence,
+                                             nkscene_node_id node,
                                              nkscene_light_id light) {
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -1463,12 +1463,12 @@ nkscene_result NKS_CALL nkscene_tx_set_light(nkscene_transaction handle,
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_light({occurrence.value}, {light.value});
+    transaction->add_light({node.value}, {light.value});
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_tx_set_visibility(nkscene_transaction handle,
-                                                  nkscene_occurrence_id occurrence,
+                                                  nkscene_node_id node,
                                                   uint32_t visible) {
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -1476,12 +1476,12 @@ nkscene_result NKS_CALL nkscene_tx_set_visibility(nkscene_transaction handle,
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_visibility({occurrence.value}, visible != 0);
+    transaction->add_visibility({node.value}, visible != 0);
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_tx_set_source_entity(nkscene_transaction handle,
-                                                     nkscene_occurrence_id occurrence,
+                                                     nkscene_node_id node,
                                                      nkscene_entity_id source) {
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -1489,12 +1489,12 @@ nkscene_result NKS_CALL nkscene_tx_set_source_entity(nkscene_transaction handle,
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_source_entity({occurrence.value}, {source.value});
+    transaction->add_source_entity({node.value}, {source.value});
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_tx_set_name(nkscene_transaction handle,
-                                            nkscene_occurrence_id occurrence, const char *name) {
+                                            nkscene_node_id node, const char *name) {
     if (!name)
         return NKS_ERROR_INVALID_ARGUMENT;
     auto &state = nkscene::registry();
@@ -1503,7 +1503,7 @@ nkscene_result NKS_CALL nkscene_tx_set_name(nkscene_transaction handle,
     const auto result = nkscene::require_transaction(handle, transaction);
     if (result != NKS_OK)
         return result;
-    transaction->add_name({occurrence.value}, name);
+    transaction->add_name({node.value}, name);
     return NKS_OK;
 }
 
@@ -1556,7 +1556,7 @@ nkscene_result NKS_CALL nkscene_snapshot_get_revision(nkscene_snapshot snapshot,
     return NKS_OK;
 }
 
-nkscene_result NKS_CALL nkscene_snapshot_get_occurrence_count(nkscene_snapshot snapshot,
+nkscene_result NKS_CALL nkscene_snapshot_get_node_count(nkscene_snapshot snapshot,
                                                               uint64_t *out_count) {
     if (!out_count)
         return NKS_ERROR_INVALID_ARGUMENT;
@@ -1565,57 +1565,57 @@ nkscene_result NKS_CALL nkscene_snapshot_get_occurrence_count(nkscene_snapshot s
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    *out_count = value->occurrences().size();
+    *out_count = value->nodes().size();
     return NKS_OK;
 }
 
-nkscene_result NKS_CALL nkscene_snapshot_get_occurrence(
-    nkscene_snapshot snapshot, uint64_t index, nkscene_snapshot_occurrence *out_occurrence) {
-    if (!out_occurrence)
+nkscene_result NKS_CALL nkscene_snapshot_get_node(
+    nkscene_snapshot snapshot, uint64_t index, nkscene_snapshot_node *out_node) {
+    if (!out_node)
         return NKS_ERROR_INVALID_ARGUMENT;
-    if (out_occurrence->struct_size < sizeof(nkscene_snapshot_occurrence))
+    if (out_node->struct_size < sizeof(nkscene_snapshot_node))
         return NKS_ERROR_INVALID_ARGUMENT;
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    const auto occurrences = value->occurrences();
-    if (index >= occurrences.size())
+    const auto nodes = value->nodes();
+    if (index >= nodes.size())
         return NKS_ERROR_INVALID_ARGUMENT;
-    nkscene::copy_snapshot_occurrence(occurrences[static_cast<std::size_t>(index)],
-                                      *out_occurrence);
+    nkscene::copy_snapshot_node(nodes[static_cast<std::size_t>(index)],
+                                      *out_node);
     return NKS_OK;
 }
 
-nkscene_result NKS_CALL nkscene_snapshot_get_occurrence_page(
-    nkscene_snapshot snapshot, uint64_t start_index, nkscene_snapshot_occurrence_page *out_page) {
-    if (!out_page || out_page->struct_size < sizeof(nkscene_snapshot_occurrence_page))
+nkscene_result NKS_CALL nkscene_snapshot_get_node_page(
+    nkscene_snapshot snapshot, uint64_t start_index, nkscene_snapshot_node_page *out_page) {
+    if (!out_page || out_page->struct_size < sizeof(nkscene_snapshot_node_page))
         return NKS_ERROR_INVALID_ARGUMENT;
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    const auto occurrences = value->occurrences();
+    const auto nodes = value->nodes();
     out_page->start_index = start_index;
-    if (start_index >= occurrences.size()) {
+    if (start_index >= nodes.size()) {
         out_page->count = 0;
         return NKS_OK;
     }
-    const auto remaining = occurrences.size() - static_cast<std::size_t>(start_index);
+    const auto remaining = nodes.size() - static_cast<std::size_t>(start_index);
     const auto count =
-        std::min<std::size_t>(remaining, NKS_SCENE_SNAPSHOT_OCCURRENCE_PAGE_CAPACITY);
+        std::min<std::size_t>(remaining, NKS_SCENE_SNAPSHOT_NODE_PAGE_CAPACITY);
     out_page->count = static_cast<uint32_t>(count);
     for (std::size_t index = 0; index < count; ++index)
-        nkscene::copy_snapshot_occurrence(
-            occurrences[static_cast<std::size_t>(start_index) + index],
-            out_page->occurrences[index]);
+        nkscene::copy_snapshot_node(
+            nodes[static_cast<std::size_t>(start_index) + index],
+            out_page->nodes[index]);
     return NKS_OK;
 }
 
-nkscene_result NKS_CALL nkscene_snapshot_get_child_occurrence_count(nkscene_snapshot snapshot,
-                                                                    nkscene_occurrence_id parent,
+nkscene_result NKS_CALL nkscene_snapshot_get_child_node_count(nkscene_snapshot snapshot,
+                                                                    nkscene_node_id parent,
                                                                     uint64_t *out_count) {
     if (!out_count)
         return NKS_ERROR_INVALID_ARGUMENT;
@@ -1629,9 +1629,9 @@ nkscene_result NKS_CALL nkscene_snapshot_get_child_occurrence_count(nkscene_snap
 }
 
 nkscene_result NKS_CALL
-nkscene_snapshot_get_child_occurrence(nkscene_snapshot snapshot, nkscene_occurrence_id parent,
-                                      uint64_t index, nkscene_occurrence_id *out_occurrence) {
-    if (!out_occurrence)
+nkscene_snapshot_get_child_node(nkscene_snapshot snapshot, nkscene_node_id parent,
+                                      uint64_t index, nkscene_node_id *out_node) {
+    if (!out_node)
         return NKS_ERROR_INVALID_ARGUMENT;
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -1641,11 +1641,11 @@ nkscene_snapshot_get_child_occurrence(nkscene_snapshot snapshot, nkscene_occurre
     const auto children = value->children({parent.value});
     if (index >= children.size())
         return NKS_ERROR_INVALID_ARGUMENT;
-    *out_occurrence = {children[static_cast<std::size_t>(index)].value};
+    *out_node = {children[static_cast<std::size_t>(index)].value};
     return NKS_OK;
 }
 
-nkscene_result NKS_CALL nkscene_snapshot_get_source_occurrence_count(nkscene_snapshot snapshot,
+nkscene_result NKS_CALL nkscene_snapshot_get_source_node_count(nkscene_snapshot snapshot,
                                                                      nkscene_entity_id source,
                                                                      uint64_t *out_count) {
     if (!out_count)
@@ -1655,29 +1655,29 @@ nkscene_result NKS_CALL nkscene_snapshot_get_source_occurrence_count(nkscene_sna
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    *out_count = value->occurrences_for_source({source.value}).size();
+    *out_count = value->nodes_for_source({source.value}).size();
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL
-nkscene_snapshot_get_source_occurrence(nkscene_snapshot snapshot, nkscene_entity_id source,
-                                       uint64_t index, nkscene_occurrence_id *out_occurrence) {
-    if (!out_occurrence)
+nkscene_snapshot_get_source_node(nkscene_snapshot snapshot, nkscene_entity_id source,
+                                       uint64_t index, nkscene_node_id *out_node) {
+    if (!out_node)
         return NKS_ERROR_INVALID_ARGUMENT;
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    const auto occurrences = value->occurrences_for_source({source.value});
-    if (index >= occurrences.size())
+    const auto nodes = value->nodes_for_source({source.value});
+    if (index >= nodes.size())
         return NKS_ERROR_INVALID_ARGUMENT;
-    *out_occurrence = {occurrences[static_cast<std::size_t>(index)].value};
+    *out_node = {nodes[static_cast<std::size_t>(index)].value};
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_snapshot_get_name(nkscene_snapshot snapshot,
-                                                  nkscene_occurrence_id occurrence,
+                                                  nkscene_node_id node,
                                                   const char **out_name) {
     if (!out_name)
         return NKS_ERROR_INVALID_ARGUMENT;
@@ -1687,7 +1687,7 @@ nkscene_result NKS_CALL nkscene_snapshot_get_name(nkscene_snapshot snapshot,
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    const auto *info = value->find({occurrence.value});
+    const auto *info = value->find({node.value});
     if (!info)
         return NKS_ERROR_STALE_ID;
     *out_name = info->name.c_str();
@@ -1710,7 +1710,7 @@ nkscene_result NKS_CALL nkscene_snapshot_get_entity_name(nkscene_snapshot snapsh
     return NKS_OK;
 }
 
-nkscene_result NKS_CALL nkscene_snapshot_get_geometry_occurrence_count(nkscene_snapshot snapshot,
+nkscene_result NKS_CALL nkscene_snapshot_get_geometry_node_count(nkscene_snapshot snapshot,
                                                                        nkscene_geometry_id geometry,
                                                                        uint64_t *out_count) {
     if (!out_count)
@@ -1720,28 +1720,28 @@ nkscene_result NKS_CALL nkscene_snapshot_get_geometry_occurrence_count(nkscene_s
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    *out_count = value->occurrences_for_geometry({geometry.value}).size();
+    *out_count = value->nodes_for_geometry({geometry.value}).size();
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL
-nkscene_snapshot_get_geometry_occurrence(nkscene_snapshot snapshot, nkscene_geometry_id geometry,
-                                         uint64_t index, nkscene_occurrence_id *out_occurrence) {
-    if (!out_occurrence)
+nkscene_snapshot_get_geometry_node(nkscene_snapshot snapshot, nkscene_geometry_id geometry,
+                                         uint64_t index, nkscene_node_id *out_node) {
+    if (!out_node)
         return NKS_ERROR_INVALID_ARGUMENT;
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    const auto occurrences = value->occurrences_for_geometry({geometry.value});
-    if (index >= occurrences.size())
+    const auto nodes = value->nodes_for_geometry({geometry.value});
+    if (index >= nodes.size())
         return NKS_ERROR_INVALID_ARGUMENT;
-    *out_occurrence = {occurrences[static_cast<std::size_t>(index)].value};
+    *out_node = {nodes[static_cast<std::size_t>(index)].value};
     return NKS_OK;
 }
 
-nkscene_result NKS_CALL nkscene_snapshot_get_material_occurrence_count(nkscene_snapshot snapshot,
+nkscene_result NKS_CALL nkscene_snapshot_get_material_node_count(nkscene_snapshot snapshot,
                                                                        nkscene_material_id material,
                                                                        uint64_t *out_count) {
     if (!out_count)
@@ -1751,24 +1751,24 @@ nkscene_result NKS_CALL nkscene_snapshot_get_material_occurrence_count(nkscene_s
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    *out_count = value->occurrences_for_material({material.value}).size();
+    *out_count = value->nodes_for_material({material.value}).size();
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL
-nkscene_snapshot_get_material_occurrence(nkscene_snapshot snapshot, nkscene_material_id material,
-                                         uint64_t index, nkscene_occurrence_id *out_occurrence) {
-    if (!out_occurrence)
+nkscene_snapshot_get_material_node(nkscene_snapshot snapshot, nkscene_material_id material,
+                                         uint64_t index, nkscene_node_id *out_node) {
+    if (!out_node)
         return NKS_ERROR_INVALID_ARGUMENT;
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
     const auto value = state.snapshots.get(nkscene::unpack_handle(snapshot));
     if (!value)
         return NKS_ERROR_INVALID_HANDLE;
-    const auto occurrences = value->occurrences_for_material({material.value});
-    if (index >= occurrences.size())
+    const auto nodes = value->nodes_for_material({material.value});
+    if (index >= nodes.size())
         return NKS_ERROR_INVALID_ARGUMENT;
-    *out_occurrence = {occurrences[static_cast<std::size_t>(index)].value};
+    *out_node = {nodes[static_cast<std::size_t>(index)].value};
     return NKS_OK;
 }
 

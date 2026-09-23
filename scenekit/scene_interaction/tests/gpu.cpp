@@ -79,15 +79,15 @@ int main() {
         scene->material_store().create(selection_material);
         const auto hover_material = scene->reserve_material_id();
         scene->material_store().create(hover_material);
-        const auto occurrence = scene->reserve_occurrence_id();
+        const auto node = scene->reserve_node_id();
         nkscene::Transaction create(scene);
-        create.add_create(occurrence);
+        create.add_create(node);
         nkscene::ChangeSet changes;
         assert(scene->commit(create, changes) == NKS_OK);
         create.close();
         nkscene::Transaction configure(scene);
-        configure.add_geometry(occurrence, geometry);
-        configure.add_material(occurrence, material);
+        configure.add_geometry(node, geometry);
+        configure.add_material(node, material);
         assert(scene->commit(configure, changes) == NKS_OK);
         configure.close();
 
@@ -108,13 +108,13 @@ int main() {
         assert(state == nkscene::InteractionHoverState::Ready);
         assert(error == NKGPU_OK);
         assert(interaction.hovered().has_value());
-        assert(interaction.hovered()->occurrence == occurrence);
+        assert(interaction.hovered()->node == node);
         assert(interaction.hovered()->source == nkscene::EntityId{});
 
         nkscene::PickResult picked = *interaction.hovered();
         interaction.apply_pick(picked, nkscene::SelectionMode::Replace);
         assert(interaction.selected().size() == 1);
-        assert(interaction.is_selected(occurrence));
+        assert(interaction.is_selected(node));
 
         nkscene::SceneView presentation_view;
         for (const auto selected : interaction.selected())
@@ -122,7 +122,7 @@ int main() {
         const auto hovered = interaction.hovered();
         assert(hovered.has_value());
         presentation_view.set_hover_material_override(
-            hovered->occurrence, hover_material);
+            hovered->node, hover_material);
         nkscene::ChangeSet no_changes;
         const auto hover_update = nkscene::update(
             plan, snapshot, no_changes, presentation_view);
@@ -150,7 +150,7 @@ int main() {
         state = interaction.poll_hover(executor, changed_plan, snapshot, error);
         assert(state == nkscene::InteractionHoverState::Stale);
         assert(interaction.hovered().has_value());
-        assert(interaction.is_selected(occurrence));
+        assert(interaction.is_selected(node));
     }
 
 cleanup:

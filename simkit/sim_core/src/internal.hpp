@@ -259,7 +259,7 @@ private:
     nksim_result refresh_kinematic_bodies();
     nksim_result read_backend_state();
     nksim_result synchronize_scene(nkscene_change_set *out_changes);
-    nksim_result occurrence_pose(nkscene_occurrence_id occurrence,
+    nksim_result node_pose(nkscene_node_id node,
                                  std::array<double, 3> &position,
                                  std::array<double, 4> &rotation) const;
     nksim_result set_backend_body_state(const Body &body);

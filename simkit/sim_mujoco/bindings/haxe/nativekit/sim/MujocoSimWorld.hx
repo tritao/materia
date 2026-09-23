@@ -2,7 +2,7 @@ package nativekit.sim;
 
 import NativeKitSim;
 import NativeKitSimMujoco;
-import nativekit.scene.Occurrence;
+import nativekit.scene.Node;
 import nativekit.scene.Scene;
 
 /** Creates the engine-neutral simulation façade with the MuJoCo backend. */
@@ -36,9 +36,9 @@ class MujocoSimWorld {
             normalZ:Float, offset:Float):Shape
         return world.createShapePlane(normalX, normalY, normalZ, offset);
 
-    public function createBody(occurrence:Occurrence, motion:MotionType,
+    public function createBody(node:Node, motion:MotionType,
             mass:Float, ?shape:Shape):Body
-        return world.createBody(occurrence, motion, mass, shape);
+        return world.createBody(node, motion, mass, shape);
 
     public function createJoint(type:JointType, bodyA:Body, bodyB:Body):Joint
         return world.createJoint(type, bodyA, bodyB);

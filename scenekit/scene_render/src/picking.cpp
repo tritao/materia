@@ -10,11 +10,11 @@ PickResult pick(const RenderPlan &plan, const SceneSnapshot &snapshot, std::uint
     if (primitive >= plan.items().size())
         return result;
     const auto &item = plan.items()[primitive];
-    const auto *occurrence = snapshot.find(item.occurrence);
-    if (!occurrence)
+    const auto *node = snapshot.find(item.node);
+    if (!node)
         return result;
-    result.occurrence = occurrence->occurrence;
-    result.source = occurrence->source;
+    result.node = node->node;
+    result.source = node->source;
     /* The first headless executor maps one render item to one pick primitive.
      * Geometry subelement tables are retained in the snapshot so this mapping
      * can become primitive-accurate without changing the public result type. */

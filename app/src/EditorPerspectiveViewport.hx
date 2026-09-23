@@ -51,9 +51,6 @@ class EditorPerspectiveViewport implements View {
   var gridStep:Float = EditorSceneViewport.GRID_STEP;
   var simulationActive:Bool=false;
   var runtimeRevision:Int=0;
-  var presentation:Null<EditorScene> = null;
-  var presentationSceneRevision:Int=-1;
-  var presentationRuntimeRevision:Int=-1;
   var simulationPoses:Array<SimulationPoseVisual> = [];
   var robotVisuals:Array<SimulationRobotVisual> = [];
 
@@ -82,15 +79,14 @@ class EditorPerspectiveViewport implements View {
     ensureRenderer();
     var width = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.width))));
     var height = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.height))));
-    var displayed=displayedScene();
-    if(displayed.selectedId!=scene.selectedId)displayed.select(scene.selectedId);
     var displayRevision=scene.revision+runtimeRevision*1000003;
     if (renderer != null && (surface == null || renderedRevision != displayRevision ||
         renderedCameraRevision != camera.revision ||
         width != renderedWidth || height != renderedHeight)) {
       var started = Sys.time();
-      var view = displayed.configureRenderView(new SceneView(), camera.viewProjection(width / height));
-      var rendered = renderer.renderImage(displayed.renderSnapshot(), view, width, height);
+      var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
+        simulationActive ? simulationPoses : null);
+      var rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height);
       var next = GraphicsSurface.fromImage(rendered);
       rendered.dispose();
       if (surface != null) surface.dispose();
@@ -122,21 +118,21 @@ class EditorPerspectiveViewport implements View {
   };
 
   public function frameSelected():Void {
-    var displayed=displayedScene(),selected = displayed.object(scene.selectedId);
+    var selected = scene.object(scene.selectedId);
     if (selected != null) {
-      var transform = displayed.info(selected.id).worldTransform();
+      var transform = displayTransform(selected);
       var bounds=transformedBounds(transform,selected.width,selected.height,selected.depth);
       camera.frame((bounds[0]+bounds[3])/2,(bounds[1]+bounds[4])/2,(bounds[2]+bounds[5])/2,
         bounds[3]-bounds[0],bounds[4]-bounds[1],bounds[5]-bounds[2],aspect());
       return;
     }
-    var items = displayed.items();
+    var items = scene.items();
     if (items.length == 0) { camera.reset(); return; }
     var minX = 1000000000.0, minY = 1000000000.0, minZ = 1000000000.0;
     var maxX = -1000000000.0, maxY = -1000000000.0, maxZ = -1000000000.0;
     for (item in items) {
-      if (!displayed.info(item.id).visible()) continue;
-      var transform = displayed.info(item.id).worldTransform();
+      if (!item.visible) continue;
+      var transform = displayTransform(item);
       var bounds=transformedBounds(transform,item.width,item.height,item.depth);
       minX=Math.min(minX,bounds[0]);minY=Math.min(minY,bounds[1]);minZ=Math.min(minZ,bounds[2]);
       maxX=Math.max(maxX,bounds[3]);maxY=Math.max(maxY,bounds[4]);maxZ=Math.max(maxZ,bounds[5]);
@@ -156,7 +152,6 @@ class EditorPerspectiveViewport implements View {
       ?robots:Array<SimulationRobotVisual>):Void {
     simulationActive=active;simulationPoses=poses==null?[]:poses.copy();runtimeRevision=revision;
     robotVisuals=robots==null?[]:robots.copy();
-    if(!active&&presentation!=null){presentation.dispose();presentation=null;}
   }
   public function editingEnabled():Bool return !simulationActive;
 
@@ -181,14 +176,18 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function pick(localX:Float, localY:Float):String {
-    return pickScene(displayedScene(), camera, Math.max(1, renderedWidth), Math.max(1, renderedHeight),
-      localX, localY);
+    var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
+    var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),
+      simulationActive?simulationPoses:null);
+    return scene.pickRayWithView(view,ray.originX,ray.originY,ray.originZ,
+      ray.directionX,ray.directionY,ray.directionZ);
   }
 
   function selectAt(localX:Float,localY:Float):String {
     if(!editingEnabled()){var id=pick(localX,localY);scene.select(id);return id;}
     var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
-    return scene.selectAtRay(ray.originX,ray.originY,ray.originZ,
+    var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null);
+    return scene.selectRayWithView(view,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ);
   }
 
@@ -208,24 +207,26 @@ class EditorPerspectiveViewport implements View {
     return result;
   }
 
+  function displayTransform(item:EditorSceneObject):Transform {
+    if (simulationActive) for (pose in simulationPoses) if (pose.id == item.id)
+      return poseTransform(pose.position,pose.rotation);
+    return Transform.identity().translated(item.x,item.y,item.z);
+  }
+
+  static function poseTransform(position:Array<Float>,rotation:Array<Float>):Transform {
+    var x=rotation[0],y=rotation[1],z=rotation[2],w=rotation[3];
+    return Transform.identity()
+      .set(0,1-2*(y*y+z*z)).set(1,2*(x*y+z*w)).set(2,2*(x*z-y*w))
+      .set(4,2*(x*y-z*w)).set(5,1-2*(x*x+z*z)).set(6,2*(y*z+x*w))
+      .set(8,2*(x*z+y*w)).set(9,2*(y*z-x*w)).set(10,1-2*(x*x+y*y))
+      .translated(position[0],position[1],position[2]);
+  }
+
   public function dispose():Void {
     if (surface != null) surface.dispose();
     surface = null;
     if (renderer != null) renderer.dispose();
     renderer = null;
-    if(presentation!=null)presentation.dispose();presentation=null;
-  }
-
-  function displayedScene():EditorScene {
-    if(!simulationActive)return scene;
-    if(presentation==null||presentationSceneRevision!=scene.revision||
-        presentationRuntimeRevision!=runtimeRevision){
-      if(presentation!=null)presentation.dispose();presentation=new EditorScene(scene.records());
-      for(pose in simulationPoses)if(presentation.object(pose.id)!=null)
-        presentation.setPresentationPose(pose.id,pose.position,pose.rotation);
-      presentationSceneRevision=scene.revision;presentationRuntimeRevision=runtimeRevision;
-    }
-    return presentation;
   }
   function paintSensors(canvas:Canvas,width:Float,height:Float):Void {
     if(!simulationActive)return;

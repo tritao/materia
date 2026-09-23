@@ -10,24 +10,24 @@ namespace {
 using namespace nksensor;
 using namespace nksensor::sim;
 
-nkscene_occurrence_id make_occurrence(nkscene_scene scene, double z) {
+nkscene_node_id make_node(nkscene_scene scene, double z) {
     nkscene_transaction transaction = 0;
     assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
 
-    nkscene_occurrence_id occurrence{};
-    assert(nkscene_tx_create_occurrence(transaction, &occurrence) == NKS_OK);
+    nkscene_node_id node{};
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
     nkscene_transform transform{};
     transform.matrix[0] = 1.0f;
     transform.matrix[5] = 1.0f;
     transform.matrix[10] = 1.0f;
     transform.matrix[15] = 1.0f;
     transform.matrix[14] = static_cast<float>(z);
-    assert(nkscene_tx_set_transform(transaction, occurrence, &transform) == NKS_OK);
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
 
     nkscene_change_set changes = 0;
     assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
     nkscene_change_set_destroy(changes);
-    return occurrence;
+    return node;
 }
 
 struct SimFixture {
@@ -75,7 +75,7 @@ struct SimFixture {
 SimFixture make_fixture() {
     SimFixture fixture;
     assert(nkscene_scene_create(&fixture.scene) == NKS_OK);
-    const auto occurrence = make_occurrence(fixture.scene, 10.0);
+    const auto node = make_node(fixture.scene, 10.0);
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -87,7 +87,7 @@ SimFixture make_fixture() {
 
     nksim_body_desc body_desc{};
     body_desc.struct_size = sizeof(body_desc);
-    body_desc.occurrence = occurrence;
+    body_desc.node = node;
     body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
     body_desc.mass = 1.0;
     assert(nksim_body_create(fixture.world, &body_desc, &fixture.body) == NKSIM_OK);
@@ -202,10 +202,10 @@ void scene_lidar_adapter_batch_raycast_returns_local_scan() {
 
     nkscene_transaction transaction = 0;
     assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
-    nkscene_occurrence_id occurrence{};
-    assert(nkscene_tx_create_occurrence(transaction, &occurrence) == NKS_OK);
-    assert(nkscene_tx_set_geometry(transaction, occurrence, geometry) == NKS_OK);
-    assert(nkscene_tx_set_material(transaction, occurrence, material) == NKS_OK);
+    nkscene_node_id node{};
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
+    assert(nkscene_tx_set_geometry(transaction, node, geometry) == NKS_OK);
+    assert(nkscene_tx_set_material(transaction, node, material) == NKS_OK);
     nkscene_change_set changes = 0;
     assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
     nkscene_change_set_destroy(changes);

@@ -1,28 +1,28 @@
 package nativekit.scene;
 
-/** Reusable per-occurrence visibility policy for a SceneView. */
+/** Reusable per-node visibility policy for a SceneView. */
 class VisibilityFilter {
-	final entries:Array<{occurrence:Occurrence, visible:Bool}> = [];
+	final entries:Array<{node:Node, visible:Bool}> = [];
 
 	public function new() {}
 
-	public function set(occurrence:Occurrence, visible:Bool):VisibilityFilter {
-		var stable = occurrence.stableValue();
+	public function set(node:Node, visible:Bool):VisibilityFilter {
+		var stable = node.stableValue();
 		for (entry in entries) {
-			if (entry.occurrence.stableValue() == stable) {
+			if (entry.node.stableValue() == stable) {
 				entry.visible = visible;
 				return this;
 			}
 		}
-		entries.push({occurrence: occurrence, visible: visible});
+		entries.push({node: node, visible: visible});
 		return this;
 	}
 
-	public function show(occurrence:Occurrence):VisibilityFilter
-		return set(occurrence, true);
+	public function show(node:Node):VisibilityFilter
+		return set(node, true);
 
-	public function hide(occurrence:Occurrence):VisibilityFilter
-		return set(occurrence, false);
+	public function hide(node:Node):VisibilityFilter
+		return set(node, false);
 
 	public function clear():VisibilityFilter {
 		entries.resize(0);
@@ -35,6 +35,6 @@ class VisibilityFilter {
 	@:allow(SceneView)
 	function apply(view:SceneView):Void {
 		for (entry in entries)
-			view.setVisibility(entry.occurrence, entry.visible);
+			view.setVisibility(entry.node, entry.visible);
 	}
 }

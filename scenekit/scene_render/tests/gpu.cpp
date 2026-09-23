@@ -129,29 +129,29 @@ int main() {
         material_resource.edit_state().sampler = sampler;
 
         Transaction create(scene);
-        const auto occurrence = scene->reserve_occurrence_id();
-        const auto second_occurrence = scene->reserve_occurrence_id();
-        const auto light_occurrence = scene->reserve_occurrence_id();
-        create.add_create(occurrence);
-        create.add_create(second_occurrence);
-        create.add_create(light_occurrence);
+        const auto node = scene->reserve_node_id();
+        const auto second_node = scene->reserve_node_id();
+        const auto light_node = scene->reserve_node_id();
+        create.add_create(node);
+        create.add_create(second_node);
+        create.add_create(light_node);
         ChangeSet changes;
         assert(scene->commit(create, changes) == NKS_OK);
         create.close();
         Transaction configure(scene);
-        configure.add_geometry(occurrence, geometry);
-        configure.add_material(occurrence, material);
-        configure.add_geometry(second_occurrence, geometry);
-        configure.add_material(second_occurrence, material);
-        configure.add_source_entity(occurrence, nkscene::EntityId{42});
-        configure.add_source_entity(second_occurrence, nkscene::EntityId{84});
-        configure.add_light(light_occurrence, light);
+        configure.add_geometry(node, geometry);
+        configure.add_material(node, material);
+        configure.add_geometry(second_node, geometry);
+        configure.add_material(second_node, material);
+        configure.add_source_entity(node, nkscene::EntityId{42});
+        configure.add_source_entity(second_node, nkscene::EntityId{84});
+        configure.add_light(light_node, light);
         nkscene::LocalTransform first_transform;
         first_transform.matrix[12] = -0.8f;
-        configure.add_transform(occurrence, first_transform);
+        configure.add_transform(node, first_transform);
         nkscene::LocalTransform second_transform;
         second_transform.matrix[12] = 0.8f;
-        configure.add_transform(second_occurrence, second_transform);
+        configure.add_transform(second_node, second_transform);
         assert(scene->commit(configure, changes) == NKS_OK);
         configure.close();
 
@@ -181,18 +181,18 @@ int main() {
         nkscene::PickResult picked;
         assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
                                   16, options.height / 2, &picked) == NKGPU_OK);
-        assert(picked.occurrence == occurrence);
+        assert(picked.node == node);
         assert(picked.source == nkscene::EntityId{42});
         assert(picked.subelement.value == 42);
         assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
                                   112, options.height / 2, &picked) == NKGPU_OK);
-        assert(picked.occurrence == second_occurrence);
+        assert(picked.node == second_node);
         assert(picked.source == nkscene::EntityId{84});
         assert(picked.subelement.value == 42);
         nkscene::PickResult miss;
         assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height, 0, 0,
                                   &miss) == NKGPU_OK);
-        assert(!miss.occurrence.valid());
+        assert(!miss.node.valid());
 
         std::shared_ptr<nkscene::GpuPickRequest> stale_request;
         assert(executor.begin_pick_pixel(plan, scene->snapshot(), options.width, options.height,
@@ -222,7 +222,7 @@ int main() {
         }
         assert(async_state == NKS_RENDER_PICK_READY);
         assert(async_error == NKGPU_OK);
-        assert(async_picked.occurrence == occurrence);
+        assert(async_picked.node == node);
         assert(async_picked.source == nkscene::EntityId{42});
         assert(async_picked.subelement.value == 42);
         assert(std::abs(async_picked.worldPosition.x + 0.7421875f) < 0.05f);
@@ -232,7 +232,7 @@ int main() {
         nkscene::LocalTransform transform;
         transform.matrix[12] = 0.25f;
         Transaction move(scene);
-        move.add_transform(occurrence, transform);
+        move.add_transform(node, transform);
         assert(scene->commit(move, changes) == NKS_OK);
         move.close();
         const auto moved_snapshot = scene->snapshot();
@@ -254,7 +254,7 @@ int main() {
         }
         assert(moved_state == NKS_RENDER_PICK_READY);
         assert(moved_error == NKGPU_OK);
-        assert(moved_picked.occurrence == occurrence);
+        assert(moved_picked.node == node);
         assert(moved_picked.source == nkscene::EntityId{42});
 
         stats = executor.execute(plan, scene->snapshot());
@@ -265,7 +265,7 @@ int main() {
         assert(stats.draw_calls == 1);
 
         Transaction change_source(scene);
-        change_source.add_source_entity(second_occurrence, nkscene::EntityId{142});
+        change_source.add_source_entity(second_node, nkscene::EntityId{142});
         assert(scene->commit(change_source, changes) == NKS_OK);
         change_source.close();
         const auto source_snapshot = scene->snapshot();
@@ -279,11 +279,11 @@ int main() {
         assert(stats.instance_records_updated == 0);
         assert(executor.pick_pixel(plan, source_snapshot, options.width, options.height,
                                   112, options.height / 2, &picked) == NKGPU_OK);
-        assert(picked.occurrence == second_occurrence);
+        assert(picked.node == second_node);
         assert(picked.source == nkscene::EntityId{142});
 
         Transaction hide_second(scene);
-        hide_second.add_visibility(second_occurrence, false);
+        hide_second.add_visibility(second_node, false);
         assert(scene->commit(hide_second, changes) == NKS_OK);
         hide_second.close();
         const auto hidden_snapshot = scene->snapshot();
@@ -298,7 +298,7 @@ int main() {
         assert(stats.commands == 1);
 
         Transaction show_second(scene);
-        show_second.add_visibility(second_occurrence, true);
+        show_second.add_visibility(second_node, true);
         assert(scene->commit(show_second, changes) == NKS_OK);
         show_second.close();
         const auto restored_snapshot = scene->snapshot();
@@ -315,7 +315,7 @@ int main() {
         const auto alternate_material = scene->reserve_material_id();
         scene->material_store().create(alternate_material);
         Transaction change_instance_material(scene);
-        change_instance_material.add_material(occurrence, alternate_material);
+        change_instance_material.add_material(node, alternate_material);
         assert(scene->commit(change_instance_material, changes) == NKS_OK);
         change_instance_material.close();
         const auto rematerialized_snapshot = scene->snapshot();
@@ -331,7 +331,7 @@ int main() {
         assert(stats.commands == 2);
 
         Transaction restore_instance_material(scene);
-        restore_instance_material.add_material(occurrence, material);
+        restore_instance_material.add_material(node, material);
         assert(scene->commit(restore_instance_material, changes) == NKS_OK);
         restore_instance_material.close();
         const auto restored_material_snapshot = scene->snapshot();
@@ -405,7 +405,7 @@ int main() {
             nkscene::LocalTransform lagged_transform;
             lagged_transform.matrix[12] = 0.25f + static_cast<float>(iteration) * 0.01f;
             Transaction lagged_move(scene);
-            lagged_move.add_transform(occurrence, lagged_transform);
+            lagged_move.add_transform(node, lagged_transform);
             assert(scene->commit(lagged_move, changes) == NKS_OK);
             lagged_move.close();
             const auto lagged_update = nkscene::update(plan, scene->snapshot(), changes, view);
@@ -433,14 +433,14 @@ int main() {
         material_resource.edit_state().base_color = {0.8f, 0.8f, 0.8f, 1.0f};
 
         Transaction create(scene);
-        const auto occurrence = scene->reserve_occurrence_id();
-        create.add_create(occurrence);
+        const auto node = scene->reserve_node_id();
+        create.add_create(node);
         ChangeSet changes;
         assert(scene->commit(create, changes) == NKS_OK);
         create.close();
         Transaction configure(scene);
-        configure.add_geometry(occurrence, geometry);
-        configure.add_material(occurrence, material);
+        configure.add_geometry(node, geometry);
+        configure.add_material(node, material);
         assert(scene->commit(configure, changes) == NKS_OK);
         configure.close();
 
@@ -459,12 +459,12 @@ int main() {
         nkscene::PickResult clipped;
         assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
                                   48, options.height / 2, &clipped) == NKGPU_OK);
-        assert(!clipped.occurrence.valid());
+        assert(!clipped.node.valid());
 
         nkscene::PickResult visible;
         assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
                                   80, options.height / 2, &visible) == NKGPU_OK);
-        assert(visible.occurrence == occurrence);
+        assert(visible.node == node);
         assert(visible.subelement.value == 7);
     }
 

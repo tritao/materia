@@ -62,7 +62,7 @@ import nativekit.scene.CameraData;
 import nativekit.scene.LightData;
 import nativekit.scene.Transform;
 import nativekit.scene.TransformUpdate;
-import nativekit.scene.Occurrence;
+import nativekit.scene.Node;
 import nativekit.scene.VisibilityFilter;
 import nativekit.scene.SelectionSet;
 import nativekit.scene.SceneInteraction;
@@ -109,11 +109,11 @@ class Main {
 		scene.setLightData(light, new LightData().setIntensity(1.25));
 
 		var transaction = scene.beginTransaction(),
-			group = transaction.createOccurrence(),
-			first = transaction.createOccurrence(),
-			second = transaction.createOccurrence(),
-			cameraOccurrence = transaction.createOccurrence(),
-			lightOccurrence = transaction.createOccurrence();
+			group = transaction.createNode(),
+			first = transaction.createNode(),
+			second = transaction.createNode(),
+			cameraNode = transaction.createNode(),
+			lightNode = transaction.createNode();
 		transaction.setParent(first, group);
 		transaction.setParent(second, group);
 		transaction.setName(group, "World");
@@ -124,8 +124,8 @@ class Main {
 		transaction.setMaterial(second, material);
 		transaction.setSourceEntity(first, haxe.Int64.ofInt(42));
 		transaction.setSourceEntity(second, haxe.Int64.ofInt(84));
-		transaction.setCamera(cameraOccurrence, camera);
-		transaction.setLight(lightOccurrence, light);
+		transaction.setCamera(cameraNode, camera);
+		transaction.setLight(lightNode, light);
 		transaction.setTransforms([
 			new TransformUpdate(first, Transform.identity().translated(-0.65, 0.0, 0.0)),
 			new TransformUpdate(second, Transform.identity().translated(0.65, 0.0, 0.0))
@@ -133,8 +133,8 @@ class Main {
 		var changes = transaction.commitWithChanges(),
 			snapshot = scene.snapshot(),
 			view = new SceneView().setRoot(group).setViewProjection(Transform.identity())
-				.setCameraOccurrence(cameraOccurrence);
-		var infos = snapshot.occurrences(),
+				.setCameraNode(cameraNode);
+		var infos = snapshot.nodes(),
 			groupInfo = snapshot.find(group),
 			firstInfo = snapshot.find(first),
 			secondInfo = snapshot.find(second),
@@ -183,7 +183,7 @@ class Main {
 			|| !spatialBounds[0].equals(first)
 			|| spatialRay.length != 1
 			|| !spatialRay[0].equals(first)
-			|| !spatialPick.occurrence().equals(first)
+			|| !spatialPick.node().equals(first)
 			|| spatialPick.sourceValue() != haxe.Int64.ofInt(42)
 			|| spatialPick.subelement() != 42
 			|| Math.abs(spatialPick.depth() - 1.0) > 0.0001) return 25;
@@ -220,10 +220,10 @@ class Main {
 
 		var queryScene = Scene.create(),
 			queryTransaction = queryScene.beginTransaction(),
-			queryGroup = queryTransaction.createOccurrence(),
-			queryLeaves:Array<Occurrence> = [];
+			queryGroup = queryTransaction.createNode(),
+			queryLeaves:Array<Node> = [];
 		for (index in 0...49999) {
-			var leaf = queryTransaction.createOccurrence();
+			var leaf = queryTransaction.createNode();
 			queryTransaction.setParent(leaf, queryGroup);
 			queryLeaves.push(leaf);
 		}
@@ -231,7 +231,7 @@ class Main {
 		var querySnapshot = queryScene.snapshot(),
 			queryRevision = querySnapshot.revision(),
 			queryStart = Sys.time(),
-			queryInfos = querySnapshot.occurrences(),
+			queryInfos = querySnapshot.nodes(),
 			queryElapsed = Sys.time() - queryStart,
 			queryLast = querySnapshot.find(queryLeaves[queryLeaves.length - 1]),
 			queryChildren = querySnapshot.children(queryGroup);
@@ -371,7 +371,7 @@ class Main {
 		var fallbackIsolationExecution = sourcePresentation.render(presentationRenderer, snapshot),
 			fallbackIsolationUpdate = presentationRenderer.lastUpdate();
 		if (presentationView.isolatedSourceCount() != 0
-			|| presentationView.isolatedOccurrenceCount() != 1
+			|| presentationView.isolatedNodeCount() != 1
 			|| fallbackIsolationUpdate == null
 			|| fallbackIsolationUpdate.get_plan_rebuilt() != 0
 			|| haxe.Int64.toInt(fallbackIsolationExecution.get_commands()) != 2) return 33;
@@ -480,8 +480,8 @@ class Main {
 			|| haxe.Int64.toInt(realMovedExecution.get_instance_records_updated()) != 1) return 20;
 		var pickedFirst = realSceneRenderer.pickPixel(movedSnapshot, 64, 64, 16, 32),
 			pickedSecond = realSceneRenderer.pickPixel(movedSnapshot, 64, 64, 48, 32);
-		if (!pickedFirst.occurrence().equals(first)
-			|| !pickedSecond.occurrence().equals(second)
+		if (!pickedFirst.node().equals(first)
+			|| !pickedSecond.node().equals(second)
 			|| pickedFirst.sourceValue() != haxe.Int64.ofInt(42)
 			|| pickedSecond.sourceValue() != haxe.Int64.ofInt(84)
 			|| pickedFirst.subelement() != 42
@@ -506,7 +506,7 @@ class Main {
 			}
 		}
 		if (asyncPick == null
-			|| !asyncPick.occurrence().equals(first)
+			|| !asyncPick.node().equals(first)
 			|| asyncPick.sourceValue() != haxe.Int64.ofInt(42)
 			|| asyncPick.subelement() != 42
 			|| Math.abs(asyncPick.worldX() + 0.484375) > 0.05
@@ -573,8 +573,8 @@ class Main {
 			|| haxe.Int64.toInt(gpuClippedExecution.get_draw_calls()) != 1) return 23;
 		var clippedLeft = realSceneRenderer.pickPixel(nextFrameSnapshot, 64, 64, 8, 32),
 			clippedRight = realSceneRenderer.pickPixel(nextFrameSnapshot, 64, 64, 16, 32);
-		if (clippedLeft.occurrence().stableValue() != haxe.Int64.ofInt(0)
-			|| !clippedRight.occurrence().equals(first)
+		if (clippedLeft.node().stableValue() != haxe.Int64.ofInt(0)
+			|| !clippedRight.node().equals(first)
 			|| clippedRight.subelement() != 42) return 24;
 		realSceneRenderer.dispose();
 		subscription.dispose();
@@ -611,12 +611,12 @@ class Main {
 		scaleScene.setGeometryData(scaleGeometry, scaleGeometryData);
 		scaleScene.setMaterialData(scaleMaterial, MaterialData.opaque(0.3, 0.8, 0.4));
 		var scaleTransaction = scaleSession.beginTransaction(),
-			scaleLast:Null<Occurrence> = null;
+			scaleLast:Null<Node> = null;
 		for (index in 0...50000) {
-			var occurrence = scaleTransaction.createOccurrence();
-			scaleTransaction.setGeometry(occurrence, scaleGeometry);
-			scaleTransaction.setMaterial(occurrence, scaleMaterial);
-			scaleLast = occurrence;
+			var node = scaleTransaction.createNode();
+			scaleTransaction.setGeometry(node, scaleGeometry);
+			scaleTransaction.setMaterial(node, scaleMaterial);
+			scaleLast = node;
 		}
 		var scaleInitialFrame = scaleSession.commit(scaleTransaction),
 			scaleInitialStats = scaleSession.render(scaleInitialFrame),

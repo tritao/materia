@@ -1,6 +1,6 @@
 package app;
 
-/** Portable scene data. Native occurrence handles are deliberately not persisted. */
+/** Portable scene data. Native node handles are deliberately not persisted. */
 typedef SceneObjectData = {
   var id:String;
   var label:String;

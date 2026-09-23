@@ -3,7 +3,7 @@ package nativekit.sim;
 import NativeKitSim;
 import NativeKitScene;
 
-/** Owns one body handle. The body remains bound to its scene occurrence. */
+/** Owns one body handle. The body remains bound to its scene node. */
 class Body {
     final world:SimWorld;
     final value:nksim_body;

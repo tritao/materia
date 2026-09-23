@@ -2,7 +2,7 @@ package nativekit.sim;
 
 import NativeKitScene;
 import NativeKitSim;
-import nativekit.scene.Occurrence;
+import nativekit.scene.Node;
 import nativekit.scene.Scene;
 
 typedef SimWorldOptions = {
@@ -114,14 +114,14 @@ class SimWorld {
         return shape;
     }
 
-    public function createBody(occurrence:Occurrence, motion:MotionType,
+    public function createBody(node:Node, motion:MotionType,
             mass:Float, ?shape:Shape):Body {
         ensureLive();
         var desc = new nksim_body_desc();
         desc.set_struct_size(nksim_body_desc.size());
-        var occurrenceValue = new nkscene_occurrence_id();
-        occurrenceValue.set_value(occurrence.stableValue());
-        desc.set_occurrence(occurrenceValue);
+        var nodeValue = new nkscene_node_id();
+        nodeValue.set_value(node.stableValue());
+        desc.set_node(nodeValue);
         desc.set_motion_type(motion);
         desc.set_mass(mass);
         var shapeValue = new nksim_shape();

@@ -68,7 +68,7 @@ struct Id {
     friend constexpr bool operator!=(Id lhs, Id rhs) noexcept { return !(lhs == rhs); }
 };
 
-struct OccurrenceTag;
+struct NodeTag;
 struct EntityTag;
 struct GeometryTag;
 struct MaterialTag;
@@ -78,7 +78,7 @@ struct SamplerTag;
 struct CameraTag;
 struct LightTag;
 
-using OccurrenceId = Id<OccurrenceTag>;
+using NodeId = Id<NodeTag>;
 using EntityId = Id<EntityTag>;
 using GeometryId = Id<GeometryTag>;
 using MaterialId = Id<MaterialTag>;
@@ -88,7 +88,7 @@ using SamplerId = Id<SamplerTag>;
 using CameraId = Id<CameraTag>;
 using LightId = Id<LightTag>;
 
-constexpr OccurrenceId invalid_occurrence{};
+constexpr NodeId invalid_node{};
 constexpr EntityId invalid_entity{};
 constexpr GeometryId invalid_geometry{};
 constexpr MaterialId invalid_material{};
@@ -112,7 +112,7 @@ struct WorldTransform {
 };
 
 struct TransformUpdate {
-    OccurrenceId occurrence;
+    NodeId node;
     LocalTransform transform;
 };
 
@@ -374,7 +374,7 @@ constexpr bool has_domain(ChangeDomain value, ChangeDomain domain) noexcept {
 }
 
 struct SceneChange {
-    OccurrenceId occurrence;
+    NodeId node;
     ChangeDomain domains = ChangeDomain::None;
 };
 
@@ -393,7 +393,7 @@ struct RevisionCounters {
 };
 
 struct ChangeStats {
-    std::size_t changed_occurrences = 0;
+    std::size_t changed_nodes = 0;
     std::size_t changed_resources = 0;
     std::size_t dirty_world_transforms = 0;
     std::size_t dirty_bounds = 0;
@@ -406,9 +406,9 @@ struct ChangeSet {
     ChangeStats stats;
     std::vector<SceneChange> changes;
     /** Derived world-transform updates, including descendants of a changed parent. */
-    std::vector<OccurrenceId> world_transform_occurrences;
-    /** Occurrences whose effective view state may change due to scene mutations. */
-    std::vector<OccurrenceId> effective_state_occurrences;
+    std::vector<NodeId> world_transform_nodes;
+    /** Nodes whose effective view state may change due to scene mutations. */
+    std::vector<NodeId> effective_state_nodes;
 };
 
 struct ResourceChanges {
@@ -416,11 +416,11 @@ struct ResourceChanges {
     std::vector<MaterialId> materials;
 };
 
-struct SnapshotOccurrence {
-    OccurrenceId occurrence;
+struct SnapshotNode {
+    NodeId node;
     EntityId source;
     std::string name;
-    OccurrenceId parent;
+    NodeId parent;
     LocalTransform local_transform;
     WorldTransform world_transform;
     GeometryId geometry;
@@ -441,13 +441,15 @@ public:
 
     std::uint64_t revision() const noexcept;
     const RevisionCounters &revisions() const noexcept;
-    std::span<const SnapshotOccurrence> occurrences() const noexcept;
-    std::span<const OccurrenceId> children(OccurrenceId parent) const noexcept;
-    std::span<const OccurrenceId> occurrences_for_source(EntityId source) const noexcept;
-    std::span<const OccurrenceId> occurrences_for_geometry(GeometryId geometry) const noexcept;
-    std::span<const OccurrenceId> occurrences_for_material(MaterialId material) const noexcept;
-    const SnapshotOccurrence *find(OccurrenceId id) const noexcept;
-    std::string_view name(OccurrenceId id) const noexcept;
+    std::span<const SnapshotNode> nodes() const noexcept;
+    std::span<const NodeId> children(NodeId parent) const noexcept;
+    std::span<const NodeId> children_of(NodeId parent) const noexcept { return children(parent); }
+    std::span<const NodeId> nodes_for_source(EntityId source) const noexcept;
+    std::span<const NodeId> nodes_for_geometry(GeometryId geometry) const noexcept;
+    std::span<const NodeId> nodes_for_material(MaterialId material) const noexcept;
+    const SnapshotNode *find_node(NodeId id) const noexcept;
+    const SnapshotNode *find(NodeId id) const noexcept { return find_node(id); }
+    std::string_view name(NodeId id) const noexcept;
     std::string_view entity_name(EntityId id) const noexcept;
     std::span<const GeometryResource> geometries() const noexcept;
     std::span<const MaterialResource> materials() const noexcept;

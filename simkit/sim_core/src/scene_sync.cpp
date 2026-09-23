@@ -123,29 +123,29 @@ nksim_result World::synchronize_scene(nkscene_change_set *out_changes) {
         nkscene_transaction_cancel(transaction);
         return NKSIM_ERROR_SCENE;
     }
-    std::uint64_t occurrence_count = 0;
-    if (nkscene_snapshot_get_occurrence_count(scene_snapshot, &occurrence_count) != NKS_OK) {
+    std::uint64_t node_count = 0;
+    if (nkscene_snapshot_get_node_count(scene_snapshot, &node_count) != NKS_OK) {
         nkscene_snapshot_destroy(scene_snapshot);
         nkscene_transaction_cancel(transaction);
         return NKSIM_ERROR_SCENE;
     }
-    std::unordered_map<std::uint64_t, nkscene_snapshot_occurrence> occurrences;
-    occurrences.reserve(static_cast<std::size_t>(occurrence_count));
-    for (std::uint64_t index = 0; index < occurrence_count; ++index) {
-        nkscene_snapshot_occurrence occurrence{};
-        occurrence.struct_size = sizeof(occurrence);
-        if (nkscene_snapshot_get_occurrence(scene_snapshot, index, &occurrence) != NKS_OK) {
+    std::unordered_map<std::uint64_t, nkscene_snapshot_node> nodes;
+    nodes.reserve(static_cast<std::size_t>(node_count));
+    for (std::uint64_t index = 0; index < node_count; ++index) {
+        nkscene_snapshot_node node{};
+        node.struct_size = sizeof(node);
+        if (nkscene_snapshot_get_node(scene_snapshot, index, &node) != NKS_OK) {
             nkscene_snapshot_destroy(scene_snapshot);
             nkscene_transaction_cancel(transaction);
             return NKSIM_ERROR_SCENE;
         }
-        occurrences.emplace(occurrence.occurrence.value, occurrence);
+        nodes.emplace(node.node.value, node);
     }
 
     std::unordered_map<std::uint64_t, nkscene_transform> dynamic_world_transforms;
     bodies.for_each([&](nksim_body, const Body &body) {
         if (body.desc.motion_type == NKSIM_MOTION_DYNAMIC)
-            dynamic_world_transforms.emplace(body.desc.occurrence.value,
+            dynamic_world_transforms.emplace(body.desc.node.value,
                                              transform_from_state(body.state));
     });
 
@@ -153,22 +153,22 @@ nksim_result World::synchronize_scene(nkscene_change_set *out_changes) {
     bodies.for_each([&](nksim_body, const Body &body) {
         if (result != NKSIM_OK || body.desc.motion_type != NKSIM_MOTION_DYNAMIC)
             return;
-        const auto occurrence = occurrences.find(body.desc.occurrence.value);
-        if (occurrence == occurrences.end()) {
+        const auto node = nodes.find(body.desc.node.value);
+        if (node == nodes.end()) {
             result = NKSIM_ERROR_SCENE;
             return;
         }
 
         nkscene_transform transform = transform_from_state(body.state);
-        if (occurrence->second.parent.value) {
+        if (node->second.parent.value) {
             nkscene_transform parent_world{};
             const auto dynamic_parent = dynamic_world_transforms.find(
-                occurrence->second.parent.value);
+                node->second.parent.value);
             if (dynamic_parent != dynamic_world_transforms.end()) {
                 parent_world = dynamic_parent->second;
             } else {
-                const auto parent = occurrences.find(occurrence->second.parent.value);
-                if (parent == occurrences.end()) {
+                const auto parent = nodes.find(node->second.parent.value);
+                if (parent == nodes.end()) {
                     result = NKSIM_ERROR_SCENE;
                     return;
                 }
@@ -179,7 +179,7 @@ nksim_result World::synchronize_scene(nkscene_change_set *out_changes) {
                 return;
             }
         }
-        if (nkscene_tx_set_transform(transaction, body.desc.occurrence, &transform) != NKS_OK)
+        if (nkscene_tx_set_transform(transaction, body.desc.node, &transform) != NKS_OK)
             result = NKSIM_ERROR_SCENE;
     });
     nkscene_snapshot_destroy(scene_snapshot);

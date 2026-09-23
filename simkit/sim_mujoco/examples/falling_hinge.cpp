@@ -6,11 +6,11 @@
 
 namespace {
 
-nkscene_occurrence_id make_occurrence(nkscene_scene scene, double x, double y, double z) {
+nkscene_node_id make_node(nkscene_scene scene, double x, double y, double z) {
     nkscene_transaction transaction = 0;
     if (nkscene_transaction_begin(scene, &transaction) != NKS_OK)
         return {};
-    nkscene_occurrence_id occurrence{};
+    nkscene_node_id node{};
     nkscene_transform transform{};
     transform.matrix[0] = 1.0f;
     transform.matrix[5] = 1.0f;
@@ -19,8 +19,8 @@ nkscene_occurrence_id make_occurrence(nkscene_scene scene, double x, double y, d
     transform.matrix[13] = static_cast<float>(y);
     transform.matrix[14] = static_cast<float>(z);
     transform.matrix[15] = 1.0f;
-    if (nkscene_tx_create_occurrence(transaction, &occurrence) != NKS_OK ||
-        nkscene_tx_set_transform(transaction, occurrence, &transform) != NKS_OK) {
+    if (nkscene_tx_create_node(transaction, &node) != NKS_OK ||
+        nkscene_tx_set_transform(transaction, node, &transform) != NKS_OK) {
         nkscene_transaction_cancel(transaction);
         return {};
     }
@@ -28,14 +28,14 @@ nkscene_occurrence_id make_occurrence(nkscene_scene scene, double x, double y, d
     if (nkscene_transaction_commit_with_changes(transaction, &changes) != NKS_OK)
         return {};
     nkscene_change_set_destroy(changes);
-    return occurrence;
+    return node;
 }
 
-nksim_body make_body(nksim_world world, nkscene_occurrence_id occurrence,
+nksim_body make_body(nksim_world world, nkscene_node_id node,
                     uint32_t motion, double mass, nksim_shape shape) {
     nksim_body_desc desc{};
     desc.struct_size = sizeof(desc);
-    desc.occurrence = occurrence;
+    desc.node = node;
     desc.motion_type = motion;
     desc.mass = mass;
     desc.shape = shape;
@@ -54,10 +54,10 @@ int main() {
     if (nkscene_scene_create(&scene) != NKS_OK)
         return 1;
 
-    const auto floor_occurrence = make_occurrence(scene, 0.0, 0.0, 0.0);
-    const auto cube_occurrence = make_occurrence(scene, 0.0, 0.0, 3.0);
-    const auto hinge_base_occurrence = make_occurrence(scene, 0.0, 0.0, 1.0);
-    const auto hinge_arm_occurrence = make_occurrence(scene, 1.0, 0.0, 1.0);
+    const auto floor_node = make_node(scene, 0.0, 0.0, 0.0);
+    const auto cube_node = make_node(scene, 0.0, 0.0, 3.0);
+    const auto hinge_base_node = make_node(scene, 0.0, 0.0, 1.0);
+    const auto hinge_arm_node = make_node(scene, 1.0, 0.0, 1.0);
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -83,13 +83,13 @@ int main() {
         return 1;
     }
 
-    const auto floor = make_body(world, floor_occurrence, NKSIM_MOTION_STATIC, 0.0,
+    const auto floor = make_body(world, floor_node, NKSIM_MOTION_STATIC, 0.0,
                                  floor_shape);
-    const auto cube = make_body(world, cube_occurrence, NKSIM_MOTION_DYNAMIC, 1.0,
+    const auto cube = make_body(world, cube_node, NKSIM_MOTION_DYNAMIC, 1.0,
                                 cube_shape);
-    const auto hinge_base = make_body(world, hinge_base_occurrence, NKSIM_MOTION_STATIC,
+    const auto hinge_base = make_body(world, hinge_base_node, NKSIM_MOTION_STATIC,
                                       0.0, 0);
-    const auto hinge_arm = make_body(world, hinge_arm_occurrence, NKSIM_MOTION_DYNAMIC,
+    const auto hinge_arm = make_body(world, hinge_arm_node, NKSIM_MOTION_DYNAMIC,
                                      1.0, arm_shape);
     if (!floor || !cube || !hinge_base || !hinge_arm) {
         nksim_world_destroy(world);

@@ -73,7 +73,7 @@ private:
     double simulation_time_ = 0.0;
     double gravity_[3] = {0.0, 0.0, -9.81};
     bool topology_frozen_ = false;
-    std::vector<nkscene_occurrence_id> occurrences_;
+    std::vector<nkscene_node_id> nodes_;
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;
     std::vector<std::weak_ptr<SimulationRobot>> bindings_;
@@ -82,7 +82,7 @@ private:
     std::vector<nksim_body> robot_base_bodies_;
     std::vector<rk_simulation_pose> robot_initial_poses_;
     struct EnvironmentObject {
-        nkscene_occurrence_id occurrence{};
+        nkscene_node_id node{};
         nksim_shape shape = 0;
         nksim_body body = 0;
         bool active = false;

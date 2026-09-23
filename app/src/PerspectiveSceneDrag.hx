@@ -19,12 +19,10 @@ class PerspectiveSceneDrag {
       x:Float, y:Float, width:Float, height:Float, snap:Bool, gridStep:Float):Null<PerspectiveSceneDrag> {
     var item = scene.object(id);
     if (item == null) return null;
-    var transform = scene.info(id).worldTransform();
-    var point = camera.intersectPlaneZ(x, y, width, height, transform.element(14));
+    var point = camera.intersectPlaneZ(x, y, width, height, item.z);
     if (point == null) return null;
-    return new PerspectiveSceneDrag(scene, id, transform.element(14),
-      transform.element(12), transform.element(13),
-      transform.element(12) - point.x, transform.element(13) - point.y, snap, gridStep);
+    return new PerspectiveSceneDrag(scene, id, item.z, item.x, item.y,
+      item.x - point.x, item.y - point.y, snap, gridStep);
   }
 
   function new(scene:EditorScene, id:String, planeZ:Float, startX:Float, startY:Float,

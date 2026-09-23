@@ -225,11 +225,11 @@ nkgpu_result SceneCameraAdapter::capture_segmentation(
         if (pick_id == 0 || pick_id > plan.items().size())
             continue;
         const auto &item = plan.items()[pick_id - 1];
-        const auto *occurrence = snapshot.find(item.occurrence);
-        if (!occurrence)
+        const auto *node = snapshot.find(item.node);
+        if (!node)
             continue;
-        labels[index] = occurrence->source.valid() ? occurrence->source.value
-                                                   : occurrence->occurrence.value;
+        labels[index] = node->source.valid() ? node->source.value
+                                                   : node->node.value;
     }
 
     out_frame = sensor.sample(tick, labels);

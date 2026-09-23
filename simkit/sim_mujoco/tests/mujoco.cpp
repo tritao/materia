@@ -7,11 +7,11 @@
 
 namespace {
 
-nkscene_occurrence_id make_occurrence_xyz(nkscene_scene scene, double x, double y, double z) {
+nkscene_node_id make_node_xyz(nkscene_scene scene, double x, double y, double z) {
     nkscene_transaction transaction = 0;
     assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
-    nkscene_occurrence_id occurrence{};
-    assert(nkscene_tx_create_occurrence(transaction, &occurrence) == NKS_OK);
+    nkscene_node_id node{};
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
     nkscene_transform transform{};
     transform.matrix[0] = 1.0f;
     transform.matrix[5] = 1.0f;
@@ -20,18 +20,18 @@ nkscene_occurrence_id make_occurrence_xyz(nkscene_scene scene, double x, double 
     transform.matrix[13] = static_cast<float>(y);
     transform.matrix[14] = static_cast<float>(z);
     transform.matrix[15] = 1.0f;
-    assert(nkscene_tx_set_transform(transaction, occurrence, &transform) == NKS_OK);
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
     nkscene_change_set changes = 0;
     assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
     nkscene_change_set_destroy(changes);
-    return occurrence;
+    return node;
 }
 
-nkscene_occurrence_id make_occurrence(nkscene_scene scene, double x) {
-    return make_occurrence_xyz(scene, x, 0.0, 0.0);
+nkscene_node_id make_node(nkscene_scene scene, double x) {
+    return make_node_xyz(scene, x, 0.0, 0.0);
 }
 
-void set_occurrence_x(nkscene_scene scene, nkscene_occurrence_id occurrence, double x) {
+void set_node_x(nkscene_scene scene, nkscene_node_id node, double x) {
     nkscene_transaction transaction = 0;
     assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
     nkscene_transform transform{};
@@ -40,7 +40,7 @@ void set_occurrence_x(nkscene_scene scene, nkscene_occurrence_id occurrence, dou
     transform.matrix[10] = 1.0f;
     transform.matrix[12] = static_cast<float>(x);
     transform.matrix[15] = 1.0f;
-    assert(nkscene_tx_set_transform(transaction, occurrence, &transform) == NKS_OK);
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
     nkscene_change_set changes = 0;
     assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
     nkscene_change_set_destroy(changes);
@@ -53,11 +53,11 @@ nksim_shape make_box(nksim_world world) {
     return shape;
 }
 
-nksim_body make_body(nksim_world world, nkscene_occurrence_id occurrence,
+nksim_body make_body(nksim_world world, nkscene_node_id node,
                     uint32_t motion_type, double mass, nksim_shape shape = 0) {
     nksim_body_desc desc{};
     desc.struct_size = sizeof(desc);
-    desc.occurrence = occurrence;
+    desc.node = node;
     desc.motion_type = motion_type;
     desc.mass = mass;
     desc.shape = shape;
@@ -80,8 +80,8 @@ void step_world(nksim_world world, int count) {
 void revolute_joint_is_owned_by_nativekit() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto base_occurrence = make_occurrence(scene, 0.0);
-    const auto arm_occurrence = make_occurrence(scene, 1.0);
+    const auto base_node = make_node(scene, 0.0);
+    const auto arm_node = make_node(scene, 1.0);
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -94,7 +94,7 @@ void revolute_joint_is_owned_by_nativekit() {
 
     nksim_body_desc base_desc{};
     base_desc.struct_size = sizeof(base_desc);
-    base_desc.occurrence = base_occurrence;
+    base_desc.node = base_node;
     base_desc.motion_type = NKSIM_MOTION_STATIC;
     nksim_body base = 0;
     assert(nksim_body_create(world, &base_desc, &base) == NKSIM_OK);
@@ -104,7 +104,7 @@ void revolute_joint_is_owned_by_nativekit() {
     assert(nksim_shape_create_box(world, half_extents, &shape) == NKSIM_OK);
     nksim_body_desc arm_desc{};
     arm_desc.struct_size = sizeof(arm_desc);
-    arm_desc.occurrence = arm_occurrence;
+    arm_desc.node = arm_node;
     arm_desc.motion_type = NKSIM_MOTION_DYNAMIC;
     arm_desc.mass = 1.0;
     arm_desc.shape = shape;
@@ -159,8 +159,8 @@ void revolute_joint_is_owned_by_nativekit() {
     unchanged.struct_size = sizeof(unchanged);
     assert(nksim_body_get_state(world, arm, &unchanged) == NKSIM_OK);
     assert(unchanged.position[0] == body_state.position[0]);
-    const auto extra_occurrence = make_occurrence(scene, 10.0);
-    const auto extra_body = make_body(world, extra_occurrence, NKSIM_MOTION_STATIC, 0.0);
+    const auto extra_node = make_node(scene, 10.0);
+    const auto extra_body = make_body(world, extra_node, NKSIM_MOTION_STATIC, 0.0);
     step_world(world, 1);
     assert(nksim_joint_get_state(world, joint, &joint_state) == NKSIM_OK);
     assert(nksim_body_get_state(world, arm, &body_state) == NKSIM_OK);
@@ -187,8 +187,8 @@ void revolute_joint_is_owned_by_nativekit() {
 void prismatic_joint_uses_mujoco_velocity_control() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto base_occurrence = make_occurrence(scene, 0.0);
-    const auto slider_occurrence = make_occurrence(scene, 0.0);
+    const auto base_node = make_node(scene, 0.0);
+    const auto slider_node = make_node(scene, 0.0);
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -199,8 +199,8 @@ void prismatic_joint_uses_mujoco_velocity_control() {
     assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
 
     const auto shape = make_box(world);
-    const auto base = make_body(world, base_occurrence, NKSIM_MOTION_STATIC, 0.0);
-    const auto slider = make_body(world, slider_occurrence, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+    const auto base = make_body(world, base_node, NKSIM_MOTION_STATIC, 0.0);
+    const auto slider = make_body(world, slider_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
 
     nksim_joint_desc joint_desc{};
     joint_desc.struct_size = sizeof(joint_desc);
@@ -238,8 +238,8 @@ void prismatic_joint_uses_mujoco_velocity_control() {
 void fixed_joint_rebuilds_and_can_be_removed() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto base_occurrence = make_occurrence(scene, 0.0);
-    const auto child_occurrence = make_occurrence(scene, 1.0);
+    const auto base_node = make_node(scene, 0.0);
+    const auto child_node = make_node(scene, 1.0);
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -251,8 +251,8 @@ void fixed_joint_rebuilds_and_can_be_removed() {
     assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
 
     const auto shape = make_box(world);
-    const auto base = make_body(world, base_occurrence, NKSIM_MOTION_STATIC, 0.0);
-    const auto child = make_body(world, child_occurrence, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+    const auto base = make_body(world, base_node, NKSIM_MOTION_STATIC, 0.0);
+    const auto child = make_body(world, child_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
     nksim_joint_desc joint_desc{};
     joint_desc.struct_size = sizeof(joint_desc);
     joint_desc.type = NKSIM_JOINT_FIXED;
@@ -278,7 +278,7 @@ void fixed_joint_rebuilds_and_can_be_removed() {
 void kinematic_scene_state_drives_mujoco() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto occurrence = make_occurrence(scene, 0.0);
+    const auto node = make_node(scene, 0.0);
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
     world_desc.scene = scene;
@@ -287,9 +287,9 @@ void kinematic_scene_state_drives_mujoco() {
     world_desc.gravity[2] = 0.0;
     nksim_world world = 0;
     assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
-    const auto body = make_body(world, occurrence, NKSIM_MOTION_KINEMATIC, 1.0);
+    const auto body = make_body(world, node, NKSIM_MOTION_KINEMATIC, 1.0);
 
-    set_occurrence_x(scene, occurrence, 3.0);
+    set_node_x(scene, node, 3.0);
     step_world(world, 1);
     nksim_body_state state{};
     state.struct_size = sizeof(state);
@@ -304,8 +304,8 @@ void kinematic_scene_state_drives_mujoco() {
 void plane_shape_stops_dynamic_body() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto floor_occurrence = make_occurrence_xyz(scene, 0.0, 0.0, 0.0);
-    const auto cube_occurrence = make_occurrence_xyz(scene, 0.0, 0.0, 2.0);
+    const auto floor_node = make_node_xyz(scene, 0.0, 0.0, 0.0);
+    const auto cube_node = make_node_xyz(scene, 0.0, 0.0, 2.0);
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -322,9 +322,9 @@ void plane_shape_stops_dynamic_body() {
     nksim_shape cube_shape = 0;
     assert(nksim_shape_create_plane(world, normal, 0.0, &floor_shape) == NKSIM_OK);
     assert(nksim_shape_create_box(world, half_extents, &cube_shape) == NKSIM_OK);
-    const auto floor = make_body(world, floor_occurrence, NKSIM_MOTION_STATIC, 0.0,
+    const auto floor = make_body(world, floor_node, NKSIM_MOTION_STATIC, 0.0,
                                   floor_shape);
-    const auto cube = make_body(world, cube_occurrence, NKSIM_MOTION_DYNAMIC, 1.0,
+    const auto cube = make_body(world, cube_node, NKSIM_MOTION_DYNAMIC, 1.0,
                                 cube_shape);
     step_world(world, 300);
 
@@ -345,7 +345,7 @@ void plane_shape_stops_dynamic_body() {
 double run_deterministic_fall() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto occurrence = make_occurrence(scene, 0.0);
+    const auto node = make_node(scene, 0.0);
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
     world_desc.scene = scene;
@@ -355,7 +355,7 @@ double run_deterministic_fall() {
     nksim_world world = 0;
     assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
     const auto shape = make_box(world);
-    const auto body = make_body(world, occurrence, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+    const auto body = make_body(world, node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
     step_world(world, 100);
     nksim_body_state state{};
     state.struct_size = sizeof(state);
@@ -377,7 +377,7 @@ void mujoco_replay_is_deterministic() {
 void rotated_free_body_preserves_world_angular_velocity() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
-    const auto occurrence = make_occurrence(scene, 0.0);
+    const auto node = make_node(scene, 0.0);
     nksim_world_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.scene = scene;
@@ -386,7 +386,7 @@ void rotated_free_body_preserves_world_angular_velocity() {
     nksim_world world = 0;
     assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
     const auto shape = make_box(world);
-    const auto body = make_body(world, occurrence, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+    const auto body = make_body(world, node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
     nksim_body_state state{};
     state.struct_size = sizeof(state);
     assert(nksim_body_get_state(world, body, &state) == NKSIM_OK);

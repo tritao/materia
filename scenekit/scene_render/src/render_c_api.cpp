@@ -48,12 +48,15 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
     const bool has_source_material_overrides =
         input->struct_size >= offsetof(nkscene_render_view, source_material_override_count) +
                                   sizeof(input->source_material_override_count);
-    const bool has_isolated_occurrences =
-        input->struct_size >= offsetof(nkscene_render_view, isolated_occurrence_count) +
-                                  sizeof(input->isolated_occurrence_count);
-    const bool has_camera_occurrence =
+    const bool has_isolated_nodes =
+        input->struct_size >= offsetof(nkscene_render_view, isolated_node_count) +
+                                  sizeof(input->isolated_node_count);
+    const bool has_camera_node =
         input->struct_size >=
-        offsetof(nkscene_render_view, camera_occurrence) + sizeof(input->camera_occurrence);
+        offsetof(nkscene_render_view, camera_node) + sizeof(input->camera_node);
+    const bool has_pose_overrides =
+        input->struct_size >= offsetof(nkscene_render_view, pose_override_count) +
+                                  sizeof(input->pose_override_count);
     if ((input->visibility_override_count != 0 && !input->visibility_overrides) ||
         (input->material_override_count != 0 && !input->material_overrides) ||
         (input->clip_plane_count != 0 && !input->clip_planes) ||
@@ -65,30 +68,42 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
          !input->source_visibility_overrides) ||
         (has_source_material_overrides && input->source_material_override_count != 0 &&
          !input->source_material_overrides) ||
-        (has_isolated_occurrences && input->isolated_occurrence_count != 0 &&
-         !input->isolated_occurrences))
+        (has_isolated_nodes && input->isolated_node_count != 0 &&
+         !input->isolated_nodes) ||
+        (has_pose_overrides && input->pose_override_count != 0 && !input->pose_overrides))
         return NKS_ERROR_INVALID_ARGUMENT;
 
     output.root = {input->root.value};
     output.include_invisible = input->include_invisible != 0;
-    if (has_camera_occurrence)
-        output.camera_occurrence = {input->camera_occurrence.value};
+    if (has_camera_node)
+        output.camera_node = {input->camera_node.value};
+    if (has_pose_overrides) {
+        output.pose_overrides.reserve(input->pose_override_count);
+        for (uint32_t index = 0; index < input->pose_override_count; ++index) {
+            const auto &value = input->pose_overrides[index];
+            nkscene::PoseOverride pose;
+            pose.node = {value.node.value};
+            for (uint32_t axis = 0; axis < 16; ++axis)
+                pose.world_transform.matrix[axis] = value.world_transform.matrix[axis];
+            output.pose_overrides.push_back(pose);
+        }
+    }
     output.visibility_overrides.reserve(input->visibility_override_count);
     for (uint32_t index = 0; index < input->visibility_override_count; ++index) {
         const auto &value = input->visibility_overrides[index];
-        output.visibility_overrides.push_back({{value.occurrence.value}, value.visible != 0});
+        output.visibility_overrides.push_back({{value.node.value}, value.visible != 0});
     }
     output.material_overrides.reserve(input->material_override_count);
     for (uint32_t index = 0; index < input->material_override_count; ++index) {
         const auto &value = input->material_overrides[index];
-        output.material_overrides.push_back({{value.occurrence.value}, {value.material.value}});
+        output.material_overrides.push_back({{value.node.value}, {value.material.value}});
     }
     if (has_selection_overrides) {
         output.selection_material_overrides.reserve(input->selection_override_count);
         for (uint32_t index = 0; index < input->selection_override_count; ++index) {
             const auto &value = input->selection_overrides[index];
             output.selection_material_overrides.push_back(
-                {{value.occurrence.value}, {value.material.value}});
+                {{value.node.value}, {value.material.value}});
         }
     }
     if (has_hover_overrides) {
@@ -96,7 +111,7 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
         for (uint32_t index = 0; index < input->hover_override_count; ++index) {
             const auto &value = input->hover_overrides[index];
             output.hover_material_overrides.push_back(
-                {{value.occurrence.value}, {value.material.value}});
+                {{value.node.value}, {value.material.value}});
         }
     }
     if (has_isolated_sources) {
@@ -120,11 +135,11 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
                 {{value.source.value}, {value.material.value}});
         }
     }
-    if (has_isolated_occurrences) {
-        output.filter.isolated_occurrences.reserve(input->isolated_occurrence_count);
-        for (uint32_t index = 0; index < input->isolated_occurrence_count; ++index)
-            output.filter.isolated_occurrences.push_back(
-                {input->isolated_occurrences[index].value});
+    if (has_isolated_nodes) {
+        output.filter.isolated_nodes.reserve(input->isolated_node_count);
+        for (uint32_t index = 0; index < input->isolated_node_count; ++index)
+            output.filter.isolated_nodes.push_back(
+                {input->isolated_nodes[index].value});
     }
     output.clip_planes.reserve(input->clip_plane_count);
     for (uint32_t index = 0; index < input->clip_plane_count; ++index) {
@@ -289,7 +304,7 @@ nkscene_result NKS_CALL nkscene_render_plan_pick(nkscene_render_plan plan_handle
         nkscene::pick(*plan, *snapshot, primitive,
                       {world_position[0], world_position[1], world_position[2]}, depth);
     *out_result = {};
-    out_result->occurrence.value = result.occurrence.value;
+    out_result->node.value = result.node.value;
     out_result->source.value = result.source.value;
     out_result->subelement = result.subelement.value;
     out_result->world_position[0] = result.worldPosition.x;
@@ -308,6 +323,29 @@ nkscene_result NKS_CALL nkscene_render_spatial_index_create(
     if (!snapshot)
         return NKS_ERROR_INVALID_HANDLE;
     auto index = std::make_shared<nkscene::SceneSpatialIndex>(*snapshot);
+    auto &state = registry();
+    std::lock_guard lock(state.mutex);
+    const auto handle = state.spatial_indices.create(std::move(index));
+    if (!handle.valid())
+        return NKS_ERROR_OUT_OF_MEMORY;
+    *out_index = nkscene::pack_handle(handle);
+    return NKS_OK;
+}
+
+nkscene_result NKS_CALL nkscene_render_spatial_index_create_with_view(
+    nkscene_snapshot snapshot_handle, const nkscene_render_view *view_input,
+    nkscene_render_spatial_index *out_index) {
+    if (!out_index)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    *out_index = 0;
+    nkscene::SceneView view;
+    const auto view_result = copy_view(view_input, view);
+    if (view_result != NKS_OK)
+        return view_result;
+    const auto snapshot = nkscene::resolve_snapshot_handle(snapshot_handle);
+    if (!snapshot)
+        return NKS_ERROR_INVALID_HANDLE;
+    auto index = std::make_shared<nkscene::SceneSpatialIndex>(*snapshot, &view);
     auto &state = registry();
     std::lock_guard lock(state.mutex);
     const auto handle = state.spatial_indices.create(std::move(index));
@@ -370,9 +408,9 @@ nkscene_result NKS_CALL nkscene_render_spatial_index_query_ray(
     return NKS_OK;
 }
 
-nkscene_result NKS_CALL nkscene_render_spatial_index_get_occurrence(
+nkscene_result NKS_CALL nkscene_render_spatial_index_get_node(
     nkscene_render_spatial_index index_handle, uint64_t result_index,
-    nkscene_render_spatial_occurrence *out_result) {
+    nkscene_render_spatial_node *out_result) {
     if (!out_result)
         return NKS_ERROR_INVALID_ARGUMENT;
     *out_result = {};
@@ -381,10 +419,10 @@ nkscene_result NKS_CALL nkscene_render_spatial_index_get_occurrence(
     const auto index = state.spatial_indices.get(nkscene::unpack_handle(index_handle));
     if (!index)
         return NKS_ERROR_INVALID_HANDLE;
-    const auto occurrence = index->query_result(result_index);
-    if (!occurrence.valid())
+    const auto node = index->query_result(result_index);
+    if (!node.valid())
         return NKS_ERROR_INVALID_ARGUMENT;
-    out_result->occurrence.value = occurrence.value;
+    out_result->node.value = node.value;
     return NKS_OK;
 }
 
@@ -402,7 +440,7 @@ nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray(
                              {ray->direction[0], ray->direction[1], ray->direction[2]}};
     const auto result = index->pick_ray(query);
     *out_result = {};
-    out_result->occurrence.value = result.occurrence.value;
+    out_result->node.value = result.node.value;
     out_result->source.value = result.source.value;
     out_result->subelement = result.subelement.value;
     out_result->world_position[0] = result.worldPosition.x;
@@ -442,7 +480,7 @@ nkscene_result NKS_CALL nkscene_render_spatial_index_pick_rays(
         for (uint64_t i = 0; i < ray_count; ++i) {
             const auto &result = results[static_cast<std::size_t>(i)];
             out_results[i] = {};
-            out_results[i].occurrence.value = result.occurrence.value;
+            out_results[i].node.value = result.node.value;
             out_results[i].source.value = result.source.value;
             out_results[i].subelement = result.subelement.value;
             out_results[i].world_position[0] = result.worldPosition.x;
@@ -609,7 +647,7 @@ nkscene_result NKS_CALL nkscene_render_executor_pick_pixel(nkscene_render_execut
     nkscene::PickResult result;
     const auto gpu_result = executor->pick_pixel(*plan, *snapshot, width, height, x, y, &result);
     *out_result = {};
-    out_result->occurrence.value = result.occurrence.value;
+    out_result->node.value = result.node.value;
     out_result->source.value = result.source.value;
     out_result->subelement = result.subelement.value;
     out_result->world_position[0] = result.worldPosition.x;
@@ -678,7 +716,7 @@ nkscene_result NKS_CALL nkscene_render_executor_pick_pixel_poll(
 
     nkscene::PickResult result;
     *out_state = executor->poll_pick_pixel(*request, *plan, *snapshot, &result, out_error);
-    out_result->occurrence.value = result.occurrence.value;
+    out_result->node.value = result.node.value;
     out_result->source.value = result.source.value;
     out_result->subelement = result.subelement.value;
     out_result->world_position[0] = result.worldPosition.x;

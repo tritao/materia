@@ -52,8 +52,9 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	 * Builds a read-only spatial index for one immutable scene snapshot.
 	 */
 	extern fn nkscene_render_spatial_index_create(snapshot: nkscene_snapshot, out_index: ptr<nkscene_render_spatial_index> @out @owned) -> nkscene_result;
+	extern fn nkscene_render_spatial_index_create_with_view(snapshot: nkscene_snapshot, view: ptr<const<nkscene_render_view>>, out_index: ptr<nkscene_render_spatial_index> @out @owned) -> nkscene_result;
 	extern fn nkscene_render_spatial_index_destroy(index: nkscene_render_spatial_index) -> void;
-	extern fn nkscene_render_spatial_index_get_occurrence(index: nkscene_render_spatial_index, result_index: u64, out_result: ptr<nkscene_render_spatial_occurrence> @out) -> nkscene_result;
+	extern fn nkscene_render_spatial_index_get_node(index: nkscene_render_spatial_index, result_index: u64, out_result: ptr<nkscene_render_spatial_node> @out) -> nkscene_result;
 	extern fn nkscene_render_spatial_index_get_revision(index: nkscene_render_spatial_index, out_revision: ptr<u64> @out) -> nkscene_result;
 	extern fn nkscene_render_spatial_index_pick_ray(index: nkscene_render_spatial_index, ray: ptr<const<nkscene_render_ray>>, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
 	/**
@@ -85,15 +86,19 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		draw_calls: u64 @offset(64);
 	}
 	struct nkscene_render_material_override @layout(16, 8) {
-		occurrence: nkscene_occurrence_id @offset(0);
+		node: nkscene_node_id @offset(0);
 		material: nkscene_material_id @offset(8);
 	}
 	struct nkscene_render_pick_result @layout(40, 8) {
-		occurrence: nkscene_occurrence_id @offset(0);
+		node: nkscene_node_id @offset(0);
 		source: nkscene_entity_id @offset(8);
 		subelement: u32 @offset(16);
 		world_position: array<f32, 3> @offset(20);
 		depth: f32 @offset(32);
+	}
+	struct nkscene_render_pose_override @layout(72, 8) {
+		node: nkscene_node_id @offset(0);
+		world_transform: nkscene_transform @offset(8);
 	}
 	struct nkscene_render_ray @layout(24, 4) {
 		origin: array<f32, 3> @offset(0);
@@ -107,8 +112,8 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		source: nkscene_entity_id @offset(0);
 		visible: u32 @offset(8);
 	}
-	struct nkscene_render_spatial_occurrence @layout(8, 8) {
-		occurrence: nkscene_occurrence_id @offset(0);
+	struct nkscene_render_spatial_node @layout(8, 8) {
+		node: nkscene_node_id @offset(0);
 	}
 	struct nkscene_render_update @layout(96, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -125,9 +130,9 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		visible_items: u64 @offset(80);
 		culled_items: u64 @offset(88);
 	}
-	struct nkscene_render_view @layout(240, 8) {
+	struct nkscene_render_view @layout(256, 8) {
 		struct_size: u32 @offset(0) @struct_size;
-		root: nkscene_occurrence_id @offset(8);
+		root: nkscene_node_id @offset(8);
 		include_invisible: u32 @offset(16);
 		visibility_overrides: ptr<const<nkscene_render_visibility_override>> @offset(24) @borrowed @length_field("visibility_override_count");
 		visibility_override_count: u32 @offset(32);
@@ -146,15 +151,17 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		source_visibility_override_count: u32 @offset(192);
 		source_material_overrides: ptr<const<nkscene_render_source_material_override>> @offset(200) @borrowed @length_field("source_material_override_count");
 		source_material_override_count: u32 @offset(208);
-		isolated_occurrences: ptr<const<nkscene_occurrence_id>> @offset(216) @borrowed @length_field("isolated_occurrence_count");
-		isolated_occurrence_count: u32 @offset(224);
+		isolated_nodes: ptr<const<nkscene_node_id>> @offset(216) @borrowed @length_field("isolated_node_count");
+		isolated_node_count: u32 @offset(224);
+		pose_overrides: ptr<const<nkscene_render_pose_override>> @offset(240) @borrowed @length_field("pose_override_count");
+		pose_override_count: u32 @offset(248);
 		/**
-		 * Optional scene camera occurrence used when camera.enabled is zero.
+		 * Optional scene camera node used when camera.enabled is zero.
 		 */
-		camera_occurrence: nkscene_occurrence_id @offset(232);
+		camera_node: nkscene_node_id @offset(232);
 	}
 	struct nkscene_render_visibility_override @layout(16, 8) {
-		occurrence: nkscene_occurrence_id @offset(0);
+		node: nkscene_node_id @offset(0);
 		visible: u32 @offset(8);
 	}
 	handle nkscene_render_executor : u32 @destroy("nkscene_render_executor_destroy");

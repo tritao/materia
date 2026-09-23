@@ -19,7 +19,7 @@ struct SourceEntity {
 };
 
 struct Parent {
-    OccurrenceId id;
+    NodeId id;
 };
 
 struct GeometryRef {
@@ -42,56 +42,56 @@ struct Visibility {
     bool visible = true;
 };
 
-struct CreateOccurrence {
-    OccurrenceId occurrence;
+struct CreateNode {
+    NodeId node;
 };
 
-struct DestroyOccurrence {
-    OccurrenceId occurrence;
+struct DestroyNode {
+    NodeId node;
 };
 
 struct SetParent {
-    OccurrenceId occurrence;
-    OccurrenceId parent;
+    NodeId node;
+    NodeId parent;
 };
 
 struct SetTransform {
-    OccurrenceId occurrence;
+    NodeId node;
     LocalTransform transform;
 };
 
 struct SetGeometry {
-    OccurrenceId occurrence;
+    NodeId node;
     GeometryId geometry;
 };
 
 struct SetMaterial {
-    OccurrenceId occurrence;
+    NodeId node;
     MaterialId material;
 };
 
 struct SetCamera {
-    OccurrenceId occurrence;
+    NodeId node;
     CameraId camera;
 };
 
 struct SetLight {
-    OccurrenceId occurrence;
+    NodeId node;
     LightId light;
 };
 
 struct SetVisibility {
-    OccurrenceId occurrence;
+    NodeId node;
     bool visible;
 };
 
 struct SetSourceEntity {
-    OccurrenceId occurrence;
+    NodeId node;
     EntityId source;
 };
 
 struct SetName {
-    OccurrenceId occurrence;
+    NodeId node;
     std::string name;
 };
 
@@ -100,7 +100,7 @@ struct SetEntityName {
     std::string name;
 };
 
-using Mutation = std::variant<CreateOccurrence, DestroyOccurrence, SetParent,
+using Mutation = std::variant<CreateNode, DestroyNode, SetParent,
                               SetTransform, SetGeometry, SetMaterial, SetCamera, SetLight,
                               SetVisibility, SetSourceEntity, SetName, SetEntityName>;
 
@@ -112,38 +112,38 @@ public:
     bool active() const noexcept { return active_; }
     void close() noexcept { active_ = false; }
 
-    void add_create(OccurrenceId id) { mutations_.emplace_back(CreateOccurrence{id}); }
-    void add_destroy(OccurrenceId id) { mutations_.emplace_back(DestroyOccurrence{id}); }
-    void add_parent(OccurrenceId id, OccurrenceId parent) {
+    void add_create(NodeId id) { mutations_.emplace_back(CreateNode{id}); }
+    void add_destroy(NodeId id) { mutations_.emplace_back(DestroyNode{id}); }
+    void add_parent(NodeId id, NodeId parent) {
         mutations_.emplace_back(SetParent{id, parent});
     }
-    void add_transform(OccurrenceId id, const LocalTransform &transform) {
+    void add_transform(NodeId id, const LocalTransform &transform) {
         mutations_.emplace_back(SetTransform{id, transform});
     }
     void add_transforms(std::span<const TransformUpdate> updates) {
         mutations_.reserve(mutations_.size() + updates.size());
         for (const auto &update : updates)
-            add_transform(update.occurrence, update.transform);
+            add_transform(update.node, update.transform);
     }
-    void add_geometry(OccurrenceId id, GeometryId geometry) {
+    void add_geometry(NodeId id, GeometryId geometry) {
         mutations_.emplace_back(SetGeometry{id, geometry});
     }
-    void add_material(OccurrenceId id, MaterialId material) {
+    void add_material(NodeId id, MaterialId material) {
         mutations_.emplace_back(SetMaterial{id, material});
     }
-    void add_camera(OccurrenceId id, CameraId camera) {
+    void add_camera(NodeId id, CameraId camera) {
         mutations_.emplace_back(SetCamera{id, camera});
     }
-    void add_light(OccurrenceId id, LightId light) {
+    void add_light(NodeId id, LightId light) {
         mutations_.emplace_back(SetLight{id, light});
     }
-    void add_visibility(OccurrenceId id, bool visible) {
+    void add_visibility(NodeId id, bool visible) {
         mutations_.emplace_back(SetVisibility{id, visible});
     }
-    void add_source_entity(OccurrenceId id, EntityId source) {
+    void add_source_entity(NodeId id, EntityId source) {
         mutations_.emplace_back(SetSourceEntity{id, source});
     }
-    void add_name(OccurrenceId id, std::string name) {
+    void add_name(NodeId id, std::string name) {
         mutations_.emplace_back(SetName{id, std::move(name)});
     }
     void add_entity_name(EntityId id, std::string name) {

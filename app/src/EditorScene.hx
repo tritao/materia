@@ -3,9 +3,10 @@ package app;
 import nativekit.scene.Scene;
 import nativekit.scene.Snapshot;
 import nativekit.scene.SpatialIndex;
-import nativekit.scene.Occurrence;
-import nativekit.scene.OccurrenceInfo;
+import nativekit.scene.Node;
+import nativekit.scene.SceneNode;
 import nativekit.scene.GeometryData;
+import nativekit.scene.Geometry;
 import nativekit.scene.MaterialData;
 import nativekit.scene.Material;
 import nativekit.scene.SceneView;
@@ -27,7 +28,8 @@ class EditorScene {
   static var nextRevision:Int = 0;
   static var nextEnvironmentRevision:Int = 0;
   public final document:EditorDocument;
-  var scene:Scene;
+  var bridge:SceneBridge;
+  var scene(get, never):Scene;
   var objects:Array<EditorSceneObject>;
   var nextObjectId:Int = 1;
   var snapshot:Snapshot;
@@ -51,8 +53,8 @@ class EditorScene {
     nextEnvironmentRevision++;
     environmentRevision = nextEnvironmentRevision;
     document = new EditorDocument("scene");
-    scene = Scene.create();
     objects = [];
+    bridge = new SceneBridge();
     try {
       if (data == null) {
         addObject("box", "Blue box", -1.5, 0.0, 0.0, 1.6, 1.2, 0.1, 0.22, 0.52, 0.85);
@@ -68,7 +70,7 @@ class EditorScene {
       snapshot = scene.snapshot();
       try spatial = SpatialIndex.create(snapshot)
       catch (error:Dynamic) { snapshot.dispose(); throw error; }
-    } catch (error:Dynamic) { scene.dispose(); throw error; }
+    } catch (error:Dynamic) { bridge.dispose(); throw error; }
   }
 
   function addObject(id:String, label:String, x:Float, y:Float, z:Float,
@@ -85,16 +87,18 @@ class EditorScene {
     scene.setMaterialData(material, MaterialData.opaque(red, green, blue));
     var transaction = scene.beginTransaction();
     try {
-      var occurrence = transaction.createOccurrence();
-      transaction.setName(occurrence, label);
-      transaction.setVisibility(occurrence, visible);
-      transaction.setGeometry(occurrence, geometry);
-      transaction.setMaterial(occurrence, material);
-      transaction.setTransform(occurrence, Transform.identity().translated(x, y, z));
+      var node = transaction.createNode();
+      transaction.setName(node, label);
+      transaction.setVisibility(node, visible);
+      transaction.setGeometry(node, geometry);
+      transaction.setMaterial(node, material);
+      transaction.setTransform(node, Transform.identity().translated(x, y, z));
       transaction.commit();
-      objects.push(new EditorSceneObject(id, label, kind, occurrence, width, height, depth,
-        collisionEnabled,dynamicBody,mass,red,green,blue,cadGraph == null && kind == "cad-plate"
-          ? defaultCadGraph(width, height, depth) : cadGraph));
+      bridge.attach(id, node, geometry, material);
+      objects.push(new EditorSceneObject(id, label, kind, width, height, depth,
+        collisionEnabled,dynamicBody,mass,red,green,blue,
+        cadGraph == null && kind == "cad-plate" ? defaultCadGraph(width, height, depth) : cadGraph,
+        x, y, z, visible));
     } catch (error:Dynamic) {
       transaction.dispose();
       throw error;
@@ -195,26 +199,89 @@ class EditorScene {
       function() replaceObjects(before, previousSelection)));
   }
 
-  // Build before swapping so allocation failures preserve the live scene and history.
-  // Rebuilding also releases removed geometry/materials instead of accumulating tombstones.
+  // Reconcile document records into the runtime scene while preserving stable nodes.
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
     var previousFace=selectedCadFaceFingerprint;
     var previousFaceX=selectedCadFaceX,previousFaceY=selectedCadFaceY;
-    var next = new EditorScene(data);
-    var oldScene = scene;
-    var oldSnapshot = snapshot;
-    var oldSpatial = spatial;
-    var oldSelectionMaterial = selectionMaterial;
-    scene = next.scene;
-    snapshot = next.snapshot;
-    spatial = next.spatial;
-    objects = next.objects;
-    selectionMaterial = next.selectionMaterial;
-    next.scene = oldScene;
-    next.snapshot = oldSnapshot;
-    next.spatial = oldSpatial;
-    next.selectionMaterial = oldSelectionMaterial;
-    next.dispose();
+    var current:Map<String, EditorSceneObject> = new Map();
+    for (item in objects) current.set(item.id, item);
+    var nextObjects:Array<EditorSceneObject> = [];
+    var retained:Map<String, Bool> = new Map();
+    var transaction = scene.beginTransaction();
+    var changed = false;
+    try {
+      for (record in data) {
+        var item = current.get(record.id);
+        if (item == null) {
+          var geometry = scene.createGeometry();
+          var geometryData = record.type == "cad-plate"
+            ? CadSceneGeometry.mountingPlateGraph(record.cadGraph == null
+                ? defaultCadGraph(record.width, record.height, record.depth) : record.cadGraph)
+            : boxGeometry(record.width, record.height, record.depth);
+          scene.setGeometryData(geometry, geometryData);
+          var material = scene.createMaterial();
+          scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue));
+          var node = transaction.createNode();
+          transaction.setName(node, record.label);
+          transaction.setVisibility(node, record.visible);
+          transaction.setGeometry(node, geometry);
+          transaction.setMaterial(node, material);
+          transaction.setTransform(node, Transform.identity().translated(record.x, record.y, record.z));
+          bridge.attach(record.id, node, geometry, material);
+          item = new EditorSceneObject(record.id, record.label, record.type,
+            record.width, record.height, record.depth, record.collisionEnabled,
+            record.dynamicBody, record.mass, record.red, record.green, record.blue,
+            record.cadGraph == null && record.type == "cad-plate"
+              ? defaultCadGraph(record.width, record.height, record.depth) : record.cadGraph,
+            record.x, record.y, record.z, record.visible);
+          changed = true;
+        } else {
+          var runtime = runtimeFor(record.id);
+          if (item.label != record.label) transaction.setName(runtime.node, record.label);
+          if (item.visible != record.visible) transaction.setVisibility(runtime.node, record.visible);
+          if (item.x != record.x || item.y != record.y || item.z != record.z)
+            transaction.setTransform(runtime.node, Transform.identity().translated(record.x, record.y, record.z));
+          if (item.label != record.label || item.visible != record.visible || item.x != record.x ||
+              item.y != record.y || item.z != record.z) changed = true;
+          if (item.width != record.width || item.height != record.height || item.depth != record.depth ||
+              item.kind != record.type || item.cadGraph != record.cadGraph) {
+            var geometryData = record.type == "cad-plate"
+              ? CadSceneGeometry.mountingPlateGraph(record.cadGraph == null
+                  ? defaultCadGraph(record.width, record.height, record.depth) : record.cadGraph)
+              : boxGeometry(record.width, record.height, record.depth);
+            scene.setGeometryData(runtime.geometry, geometryData);
+            changed = true;
+          }
+          if (item.red != record.red || item.green != record.green || item.blue != record.blue) {
+            scene.setMaterialData(runtime.material, MaterialData.opaque(record.red, record.green, record.blue));
+            changed = true;
+          }
+          if (item.collisionEnabled != record.collisionEnabled || item.dynamicBody != record.dynamicBody ||
+              item.mass != record.mass) changed = true;
+          item.label = record.label; item.kind = record.type;
+          item.width = record.width; item.height = record.height; item.depth = record.depth;
+          item.collisionEnabled = record.collisionEnabled; item.dynamicBody = record.dynamicBody;
+          item.mass = record.mass; item.red = record.red; item.green = record.green; item.blue = record.blue;
+          item.cadGraph = record.cadGraph; item.x = record.x; item.y = record.y; item.z = record.z;
+          item.visible = record.visible;
+        }
+        retained.set(record.id, true);
+        nextObjects.push(item);
+      }
+      for (item in objects) if (!retained.exists(item.id)) {
+        transaction.destroyNode(runtimeFor(item.id).node);
+        changed = true;
+      }
+      transaction.commit();
+    } catch (error:Dynamic) { transaction.dispose(); throw error; }
+    // Release resources after nodes no longer reference them.
+    for (item in objects) if (!retained.exists(item.id)) {
+      var runtime = runtimeFor(item.id);
+      runtime.geometry.dispose(); runtime.material.dispose();
+      bridge.detach(item.id);
+    }
+    objects = nextObjects;
+    if (changed) publish();
     selectedId = selection;
     selectedFeatureKey=null;
     selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
@@ -244,7 +311,7 @@ class EditorScene {
     if (item == null) throw "Unknown scene object: " + id;
     var transaction = scene.beginTransaction();
     try {
-      transaction.setName(item.occurrence, label);
+      transaction.setName(runtimeFor(id).node, label);
       transaction.commit();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
     item.label = label;
@@ -258,40 +325,65 @@ class EditorScene {
     return null;
   }
 
-  public function info(id:String):OccurrenceInfo {
+  function runtimeFor(id:String):EditorSceneRuntimeObject {
+    var value = bridge.runtime(id);
+    if (value == null) throw "Missing runtime scene node: " + id;
+    return value;
+  }
+
+  public function info(id:String):SceneNode {
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
-    var value = snapshot.find(item.occurrence);
-    if (value == null) throw "Missing scene occurrence: " + id;
+    var value = snapshot.findNode(runtimeFor(id).node);
+    if (value == null) throw "Missing scene node: " + id;
     return value;
   }
 
   public function renderSnapshot():Snapshot return snapshot;
 
-  /** Applies a runtime-only pose to a disposable presentation scene. */
-  public function setPresentationPose(id:String,position:Array<Float>,rotation:Array<Float>):Void {
-    var item=object(id);
-    if(item==null||position==null||position.length!=3||rotation==null||rotation.length!=4)
+  public function configureRenderView(view:SceneView, viewProjection:Transform,
+      ?poses:Array<SimulationPoseVisual>):SceneView {
+    view.setViewProjection(viewProjection);
+    var selected = object(selectedId);
+    var selection = new SelectionSet();
+    if (selected != null) selection.add(runtimeFor(selected.id).node);
+    view.applySelection(selection, selectionMaterial);
+    if (poses != null) for (pose in poses) {
+      if (object(pose.id) != null)
+        view.setPose(runtimeFor(pose.id).node, poseTransform(pose.position, pose.rotation));
+    }
+    return view;
+  }
+
+  public function selectRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
+      directionX:Float, directionY:Float, directionZ:Float):String {
+    var index = SpatialIndex.create(snapshot, view);
+    try {
+      var hit = index.pickRay(originX, originY, originZ, directionX, directionY, directionZ);
+      index.dispose();
+      return selectHit(hit);
+    } catch (error:Dynamic) { index.dispose(); throw error; }
+  }
+
+  public function pickRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
+      directionX:Float, directionY:Float, directionZ:Float):String {
+    var index = SpatialIndex.create(snapshot, view);
+    try {
+      var hit = index.pickRay(originX, originY, originZ, directionX, directionY, directionZ);
+      index.dispose();
+      return idForHit(hit);
+    } catch (error:Dynamic) { index.dispose(); throw error; }
+  }
+
+  static function poseTransform(position:Array<Float>, rotation:Array<Float>):Transform {
+    if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
       throw "Invalid presentation pose";
     var x=rotation[0],y=rotation[1],z=rotation[2],w=rotation[3];
-    var transform=Transform.identity()
+    return Transform.identity()
       .set(0,1-2*(y*y+z*z)).set(1,2*(x*y+z*w)).set(2,2*(x*z-y*w))
       .set(4,2*(x*y-z*w)).set(5,1-2*(x*x+z*z)).set(6,2*(y*z+x*w))
       .set(8,2*(x*z+y*w)).set(9,2*(y*z-x*w)).set(10,1-2*(x*x+y*y))
       .translated(position[0],position[1],position[2]);
-    var transaction=scene.beginTransaction();
-    try {transaction.setTransform(item.occurrence,transform);transaction.commit();}
-    catch(error:Dynamic){transaction.dispose();throw error;}
-    publish();
-  }
-
-  public function configureRenderView(view:SceneView, viewProjection:Transform):SceneView {
-    view.setViewProjection(viewProjection);
-    var selected = object(selectedId);
-    var selection = new SelectionSet();
-    if (selected != null) selection.add(selected.occurrence);
-    view.applySelection(selection, selectionMaterial);
-    return view;
   }
 
   public function select(id:String):Bool {
@@ -335,8 +427,7 @@ class EditorScene {
 
   function selectHit(hit:PickResult):String {
     var previousFace=selectedCadFaceIndex;
-    var id="scene";
-    for(item in objects)if(hit.occurrence().equals(item.occurrence)){id=item.id;break;}
+    var id=idForHit(hit);
     select(id);
     selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
     var item=object(id);
@@ -346,14 +437,18 @@ class EditorScene {
         var index=hit.subelement();
         selectedCadFaceFingerprint=model.faceFingerprint(index);
         selectedCadFaceIndex=index;
-        var transform=info(id).localTransform();
-        selectedCadFaceX=hit.worldX()-transform.element(12);
-        selectedCadFaceY=hit.worldY()-transform.element(13);
+        selectedCadFaceX=hit.worldX()-item.x;
+        selectedCadFaceY=hit.worldY()-item.y;
         model.close();
       } catch(error:Dynamic){model.close();selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;}
     }
     if(previousFace!=selectedCadFaceIndex){selectionRevision++;nextRevision++;revision=nextRevision;}
     return id;
+  }
+
+  function idForHit(hit:PickResult):String {
+    for (item in objects) if (hit.node().equals(runtimeFor(item.id).node)) return item.id;
+    return "scene";
   }
 
   public function context():CommandContext {
@@ -364,22 +459,22 @@ class EditorScene {
   /** Orthographic world-space picking against the same published geometry. */
   public function pick(x:Float, y:Float):String {
     var hit = spatial.pickRay(x, y, 1000001.0, 0.0, 0.0, -1.0);
-    for (item in objects) if (hit.occurrence().equals(item.occurrence)) return item.id;
+    for (item in objects) if (hit.node().equals(runtimeFor(item.id).node)) return item.id;
     return "scene";
   }
 
   public function pickRay(originX:Float,originY:Float,originZ:Float,
       directionX:Float,directionY:Float,directionZ:Float):String {
     var hit=spatial.pickRay(originX,originY,originZ,directionX,directionY,directionZ);
-    for(item in objects)if(hit.occurrence().equals(item.occurrence))return item.id;
+    for(item in objects)if(hit.node().equals(runtimeFor(item.id).node))return item.id;
     return "scene";
   }
 
   public function setPosition(id:String, axis:Int, value:Float):Void {
     if (axis < 0 || axis > 1 || value != value || value - value != 0.0 || Math.abs(value) > 1000000)
       throw "Position requires a finite X or Y coordinate";
-    var before = info(id).localTransform();
-    setPositionXY(id, axis == 0 ? value : before.element(12), axis == 1 ? value : before.element(13));
+    var item = requiredObject(id);
+    setPositionXY(id, axis == 0 ? value : item.x, axis == 1 ? value : item.y);
   }
 
   /** Updates both planar coordinates atomically; used for live viewport previews. */
@@ -388,13 +483,13 @@ class EditorScene {
       throw "Position requires finite X and Y coordinates";
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
-    var before = info(id).localTransform();
-    var current = Transform.identity().translated(x, y, before.element(14));
+    var current = Transform.identity().translated(x, y, item.z);
     var transaction = scene.beginTransaction();
     try {
-      transaction.setTransform(item.occurrence, current);
+      transaction.setTransform(runtimeFor(id).node, current);
       transaction.commit();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
+    item.x = x; item.y = y;
     publish();
   }
 
@@ -414,9 +509,8 @@ class EditorScene {
     var item = object(selectedId);
     if (item == null || !finiteCoordinate(deltaX) || !finiteCoordinate(deltaY) ||
         (deltaX == 0.0 && deltaY == 0.0)) return false;
-    var transform = info(item.id).localTransform();
-    var fromX = transform.element(12);
-    var fromY = transform.element(13);
+    var fromX = item.x;
+    var fromY = item.y;
     var toX = Math.max(-1000000.0, Math.min(1000000.0, fromX + deltaX));
     var toY = Math.max(-1000000.0, Math.min(1000000.0, fromY + deltaY));
     if (fromX == toX && fromY == toY) return false;
@@ -433,9 +527,10 @@ class EditorScene {
     if (item == null) throw "Unknown scene object: " + id;
     var transaction = scene.beginTransaction();
     try {
-      transaction.setVisibility(item.occurrence, visible);
+      transaction.setVisibility(runtimeFor(id).node, visible);
       transaction.commit();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
+    item.visible = visible;
     publish();
   }
 
@@ -520,7 +615,7 @@ class EditorScene {
     var visibility = new PropertyDescriptorOptions();
     visibility.category = "Rendering";
     result.push(new PropertyDescriptor(prefix + "visible", "Visible", PropertyType.Bool,
-      function(_) return PropertyValue.Bool(info(id).visible()), function(_, value) {
+      function(_) return PropertyValue.Bool(requiredObject(id).visible), function(_, value) {
         switch (value) {
           case PropertyValue.Bool(next): setVisible(id, next);
           default: throw "Visibility requires a boolean";
@@ -583,7 +678,7 @@ class EditorScene {
       result.push(cadProperty(id,CadPlateModel.HOLE_X,"Hole X",true,prefix));
       result.push(cadProperty(id,CadPlateModel.HOLE_Y,"Hole Y",true,prefix));
     }
-    result.push(boolProperty(id,"collision","Collision enabled",function(item)return item.collisionEnabled,
+    result.push(boolProperty(id,"collision","Collision",function(item)return item.collisionEnabled,
       "Physics",prefix));
     result.push(boolProperty(id,"dynamic","Dynamic body",function(item)return item.dynamicBody,
       "Physics",prefix));
@@ -728,7 +823,7 @@ class EditorScene {
     settings.unit = "m";
     settings.step = 0.1;
     return new PropertyDescriptor(prefix + "position-" + axis, axis == 0 ? "Position X" : "Position Y",
-      PropertyType.Float, function(_) return PropertyValue.Float(info(id).localTransform().element(12 + axis)),
+      PropertyType.Float, function(_) return PropertyValue.Float(axis == 0 ? requiredObject(id).x : requiredObject(id).y),
       function(_, value) {
         switch (value) {
           case PropertyValue.Float(next): setPosition(id, axis, next);
@@ -741,13 +836,11 @@ class EditorScene {
   public function records():Array<SceneObjectData> {
     var result:Array<SceneObjectData> = [];
     for (item in objects) {
-      var state = info(item.id);
-      var transform = state.localTransform();
       result.push({id: item.id, label: item.label, type: item.kind,
-        x: transform.element(12), y: transform.element(13), z: transform.element(14),
+        x: item.x, y: item.y, z: item.z,
         width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
-        visible: state.visible(),cadGraph:item.cadGraph});
+        visible: item.visible,cadGraph:item.cadGraph});
     }
     return result;
   }
@@ -755,9 +848,7 @@ class EditorScene {
   public function diagnosticState():Dynamic {
     var values:Array<Dynamic> = [];
     for (item in objects) {
-      var state = info(item.id);
-      values.push({id: item.id, label: item.label, x: state.localTransform().element(12),
-        y: state.localTransform().element(13), visible: state.visible()});
+      values.push({id: item.id, label: item.label, x: item.x, y: item.y, visible: item.visible});
     }
     return {objects: values, selectedId: selectedId, revision: revision,
       canUndo: document.canUndo, canRedo: document.canRedo, dirty: document.isDirty};
@@ -768,8 +859,10 @@ class EditorScene {
     disposed = true;
     spatial.dispose();
     snapshot.dispose();
-    scene.dispose();
+    bridge.dispose();
   }
+
+  function get_scene():Scene return bridge.scene;
 
   static function defaultCadGraph(width:Float,height:Float,depth:Float):String {
     var model=CadPlateModel.create(width,height,depth,Math.min(0.012,Math.min(width,height)*0.5));
@@ -785,24 +878,58 @@ class EditorScene {
 class EditorSceneObject {
   public final id:String;
   public var label:String;
-  public final kind:String;
-  public final occurrence:Occurrence;
-  public final width:Float;
-  public final height:Float;
-  public final depth:Float;
-  public final collisionEnabled:Bool;
-  public final dynamicBody:Bool;
-  public final mass:Float;
-  public final red:Float;
-  public final green:Float;
-  public final blue:Float;
-  public final cadGraph:Null<String>;
-  public function new(id:String,label:String,kind:String,occurrence:Occurrence,width:Float,height:Float,depth:Float,
-      collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float,?cadGraph:String) {
-    this.id = id; this.label = label; this.kind = kind; this.occurrence = occurrence;
+  public var kind:String;
+  public var width:Float;
+  public var height:Float;
+  public var depth:Float;
+  public var collisionEnabled:Bool;
+  public var dynamicBody:Bool;
+  public var mass:Float;
+  public var red:Float;
+  public var green:Float;
+  public var blue:Float;
+  public var cadGraph:Null<String>;
+  public var x:Float;
+  public var y:Float;
+  public var z:Float;
+  public var visible:Bool;
+  public function new(id:String,label:String,kind:String,width:Float,height:Float,depth:Float,
+      collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float,
+      ?cadGraph:String,x:Float=0,y:Float=0,z:Float=0,visible:Bool=true) {
+    this.id = id; this.label = label; this.kind = kind;
     this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;
     this.dynamicBody=dynamicBody;this.mass=mass;
     this.red = red; this.green = green; this.blue = blue;
     this.cadGraph=cadGraph;
+    this.x=x;this.y=y;this.z=z;this.visible=visible;
+  }
+}
+
+/** Runtime-only resources associated with one document object. */
+private class SceneBridge {
+  public final scene:Scene;
+  final objects:Map<String, EditorSceneRuntimeObject> = new Map();
+
+  public function new() scene = Scene.create();
+
+  public function attach(id:String,node:Node,geometry:Geometry,material:Material):Void
+    objects.set(id,new EditorSceneRuntimeObject(node,geometry,material));
+
+  public function runtime(id:String):Null<EditorSceneRuntimeObject>
+    return objects.get(id);
+
+  public function detach(id:String):Void
+    objects.remove(id);
+
+  public function dispose():Void
+    scene.dispose();
+}
+
+private class EditorSceneRuntimeObject {
+  public final node:Node;
+  public final geometry:Geometry;
+  public final material:Material;
+  public function new(node:Node, geometry:Geometry, material:Material) {
+    this.node=node;this.geometry=geometry;this.material=material;
   }
 }

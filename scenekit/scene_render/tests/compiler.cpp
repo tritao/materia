@@ -64,15 +64,15 @@ void geometry_payload_contract_is_validated() {
 
     const auto material = scene->reserve_material_id();
     scene->material_store().create(material);
-    const auto occurrence = scene->reserve_occurrence_id();
+    const auto node = scene->reserve_node_id();
     Transaction create(scene);
-    create.add_create(occurrence);
+    create.add_create(node);
     ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
     Transaction configure(scene);
-    configure.add_geometry(occurrence, invalid_geometry);
-    configure.add_material(occurrence, material);
+    configure.add_geometry(node, invalid_geometry);
+    configure.add_material(node, material);
     assert(scene->commit(configure, changes) == NKS_OK);
     configure.close();
 
@@ -94,15 +94,15 @@ void resource_lifecycle_is_cache_safe() {
 
     const auto material = scene->reserve_material_id();
     scene->material_store().create(material);
-    const auto occurrence = scene->reserve_occurrence_id();
+    const auto node = scene->reserve_node_id();
     Transaction create(scene);
-    create.add_create(occurrence);
+    create.add_create(node);
     ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
     Transaction configure(scene);
-    configure.add_geometry(occurrence, geometry);
-    configure.add_material(occurrence, material);
+    configure.add_geometry(node, geometry);
+    configure.add_material(node, material);
     assert(scene->commit(configure, changes) == NKS_OK);
     configure.close();
 
@@ -194,7 +194,7 @@ void resource_lifecycle_is_cache_safe() {
 
     const auto missing_geometry = scene->reserve_geometry_id();
     Transaction invalid_geometry(scene);
-    invalid_geometry.add_geometry(occurrence, missing_geometry);
+    invalid_geometry.add_geometry(node, missing_geometry);
     assert(scene->commit(invalid_geometry, changes) == NKS_OK);
     invalid_geometry.close();
     update = nkscene::update(plan, scene->snapshot(), changes, view);
@@ -203,7 +203,7 @@ void resource_lifecycle_is_cache_safe() {
     assert(plan.items().empty());
 
     Transaction restore_geometry(scene);
-    restore_geometry.add_geometry(occurrence, geometry);
+    restore_geometry.add_geometry(node, geometry);
     assert(scene->commit(restore_geometry, changes) == NKS_OK);
     restore_geometry.close();
     plan = nkscene::compile(scene->snapshot(), view);
@@ -211,7 +211,7 @@ void resource_lifecycle_is_cache_safe() {
 
     const auto missing_material = scene->reserve_material_id();
     Transaction invalid_material(scene);
-    invalid_material.add_material(occurrence, missing_material);
+    invalid_material.add_material(node, missing_material);
     assert(scene->commit(invalid_material, changes) == NKS_OK);
     invalid_material.close();
     update = nkscene::update(plan, scene->snapshot(), changes, view);
@@ -229,9 +229,9 @@ void scene_views_are_hierarchy_aware() {
     scene->material_store().create(material_one);
     scene->material_store().create(material_two);
 
-    const auto group = scene->reserve_occurrence_id();
-    const auto leaf = scene->reserve_occurrence_id();
-    const auto sibling = scene->reserve_occurrence_id();
+    const auto group = scene->reserve_node_id();
+    const auto leaf = scene->reserve_node_id();
+    const auto sibling = scene->reserve_node_id();
     Transaction create(scene);
     create.add_create(group);
     create.add_create(leaf);
@@ -251,10 +251,10 @@ void scene_views_are_hierarchy_aware() {
 
     const auto before = scene->snapshot();
     const auto find_item = [](const nkscene::RenderPlan &plan,
-                              nkscene::OccurrenceId occurrence) {
+                              nkscene::NodeId node) {
         return std::find_if(plan.items().begin(), plan.items().end(),
-                            [occurrence](const nkscene::RenderItem &item) {
-                                return item.occurrence == occurrence;
+                            [node](const nkscene::RenderItem &item) {
+                                return item.node == node;
                             });
     };
 
@@ -269,7 +269,7 @@ void scene_views_are_hierarchy_aware() {
     subtree_view.root = group;
     plan = nkscene::compile(before, subtree_view);
     assert(plan.items().size() == 1);
-    assert(plan.items().front().occurrence == leaf);
+    assert(plan.items().front().node == leaf);
 
     nkscene::SceneView hidden_view = subtree_view;
     hidden_view.visibility_overrides.push_back({group, false});
@@ -323,7 +323,7 @@ void scene_views_are_hierarchy_aware() {
     update = nkscene::update(plan, hidden_snapshot, no_changes, subtree_view);
     assert(update.plan_rebuilt);
     assert(plan.items().size() == 1);
-    assert(plan.items().front().occurrence == leaf);
+    assert(plan.items().front().node == leaf);
 
     plan = nkscene::compile(hidden_snapshot, full_view);
     Transaction reparent_leaf(scene);
@@ -357,8 +357,8 @@ void scene_view_source_filters_are_incremental() {
     scene->material_store().create(material_one);
     scene->material_store().create(material_two);
 
-    const auto first = scene->reserve_occurrence_id();
-    const auto second = scene->reserve_occurrence_id();
+    const auto first = scene->reserve_node_id();
+    const auto second = scene->reserve_node_id();
     Transaction create(scene);
     create.add_create(first);
     create.add_create(second);
@@ -404,10 +404,10 @@ void scene_view_source_filters_are_incremental() {
     assert(composed_update.patched_materials == 0);
     const auto composed_first_item = std::find_if(
         composed_plan.items().begin(), composed_plan.items().end(),
-        [first](const nkscene::RenderItem &item) { return item.occurrence == first; });
+        [first](const nkscene::RenderItem &item) { return item.node == first; });
     const auto composed_second_item = std::find_if(
         composed_plan.items().begin(), composed_plan.items().end(),
-        [second](const nkscene::RenderItem &item) { return item.occurrence == second; });
+        [second](const nkscene::RenderItem &item) { return item.node == second; });
     assert(composed_first_item != composed_plan.items().end());
     assert(composed_second_item != composed_plan.items().end());
     assert(composed_first_item->material == material_one);
@@ -426,10 +426,10 @@ void scene_view_source_filters_are_incremental() {
     assert(source_update.updated_geometry_resources == 0);
     assert(source_update.updated_material_resources == 0);
 
-    const auto find_item = [&](nkscene::OccurrenceId occurrence) {
+    const auto find_item = [&](nkscene::NodeId node) {
         return std::find_if(plan.items().begin(), plan.items().end(),
-                            [occurrence](const nkscene::RenderItem &item) {
-                                return item.occurrence == occurrence;
+                            [node](const nkscene::RenderItem &item) {
+                                return item.node == node;
                             });
     };
     const auto second_item = find_item(second);
@@ -461,8 +461,8 @@ void scene_view_camera_culling_is_incremental() {
     geometry_resource.bounds.maximum = {0.25f, 0.25f, 0.25f};
     const auto material = scene->reserve_material_id();
     scene->material_store().create(material);
-    const auto inside = scene->reserve_occurrence_id();
-    const auto outside = scene->reserve_occurrence_id();
+    const auto inside = scene->reserve_node_id();
+    const auto outside = scene->reserve_node_id();
 
     Transaction create(scene);
     create.add_create(inside);
@@ -487,10 +487,10 @@ void scene_view_camera_culling_is_incremental() {
     assert(plan.items().size() == 2);
     assert(plan.visible_items() == 1);
     assert(plan.culled_items() == 1);
-    const auto find_item = [&](nkscene::OccurrenceId id) {
+    const auto find_item = [&](nkscene::NodeId id) {
         return std::find_if(plan.items().begin(), plan.items().end(),
                             [id](const nkscene::RenderItem &item) {
-                                return item.occurrence == id;
+                                return item.node == id;
                             });
     };
     assert(!nkscene::has_render_flag(find_item(inside)->flags,
@@ -534,12 +534,12 @@ void scene_resource_camera_is_used_for_render_view() {
     camera_resource.near_plane = 0.1f;
     camera_resource.far_plane = 10.0f;
     camera_resource.aspect_ratio = 1.0f;
-    const auto camera_occurrence = scene->reserve_occurrence_id();
-    const auto visible = scene->reserve_occurrence_id();
-    const auto hidden = scene->reserve_occurrence_id();
+    const auto camera_node = scene->reserve_node_id();
+    const auto visible = scene->reserve_node_id();
+    const auto hidden = scene->reserve_node_id();
 
     Transaction create(scene);
-    create.add_create(camera_occurrence);
+    create.add_create(camera_node);
     create.add_create(visible);
     create.add_create(hidden);
     ChangeSet changes;
@@ -547,7 +547,7 @@ void scene_resource_camera_is_used_for_render_view() {
     create.close();
 
     Transaction configure(scene);
-    configure.add_camera(camera_occurrence, camera);
+    configure.add_camera(camera_node, camera);
     configure.add_geometry(visible, geometry);
     configure.add_material(visible, material);
     configure.add_geometry(hidden, geometry);
@@ -558,14 +558,14 @@ void scene_resource_camera_is_used_for_render_view() {
     configure.close();
 
     nkscene::SceneView view;
-    view.camera_occurrence = camera_occurrence;
+    view.camera_node = camera_node;
     const auto snapshot = scene->snapshot();
     const auto plan = nkscene::compile(snapshot, view);
     assert(plan.view_projection() != nkscene::SceneCamera{}.view_projection);
-    const auto find_item = [&](nkscene::OccurrenceId id) {
+    const auto find_item = [&](nkscene::NodeId id) {
         return std::find_if(plan.items().begin(), plan.items().end(),
                             [id](const nkscene::RenderItem &item) {
-                                return item.occurrence == id;
+                                return item.node == id;
                             });
     };
     assert(!nkscene::has_render_flag(find_item(visible)->flags,
@@ -583,8 +583,8 @@ void scene_view_clip_planes_are_incremental() {
     geometry_resource.bounds.maximum = {0.25f, 0.25f, 0.25f};
     const auto material = scene->reserve_material_id();
     scene->material_store().create(material);
-    const auto inside = scene->reserve_occurrence_id();
-    const auto outside = scene->reserve_occurrence_id();
+    const auto inside = scene->reserve_node_id();
+    const auto outside = scene->reserve_node_id();
 
     Transaction create(scene);
     create.add_create(inside);
@@ -661,23 +661,23 @@ void scene_view_culling_uses_spatial_candidates() {
     const auto material = scene->reserve_material_id();
     scene->material_store().create(material);
 
-    std::vector<nkscene::OccurrenceId> occurrences;
-    occurrences.reserve(100);
+    std::vector<nkscene::NodeId> nodes;
+    nodes.reserve(100);
     Transaction create(scene);
     for (std::size_t index = 0; index < 100; ++index) {
-        const auto occurrence = scene->reserve_occurrence_id();
-        occurrences.push_back(occurrence);
-        create.add_create(occurrence);
+        const auto node = scene->reserve_node_id();
+        nodes.push_back(node);
+        create.add_create(node);
     }
     ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
 
     Transaction configure(scene);
-    for (std::size_t index = 0; index < occurrences.size(); ++index) {
-        configure.add_geometry(occurrences[index], geometry);
-        configure.add_material(occurrences[index], material);
-        configure.add_transform(occurrences[index], translated(static_cast<float>(index * 4)));
+    for (std::size_t index = 0; index < nodes.size(); ++index) {
+        configure.add_geometry(nodes[index], geometry);
+        configure.add_material(nodes[index], material);
+        configure.add_transform(nodes[index], translated(static_cast<float>(index * 4)));
     }
     assert(scene->commit(configure, changes) == NKS_OK);
     configure.close();
@@ -686,7 +686,7 @@ void scene_view_culling_uses_spatial_candidates() {
     first_view.clip_planes.push_back({{1.0f, 0.0f, 0.0f}, -300.0f, true});
     const auto snapshot = scene->snapshot();
     auto plan = nkscene::compile(snapshot, first_view);
-    assert(plan.items().size() == occurrences.size());
+    assert(plan.items().size() == nodes.size());
 
     auto second_view = first_view;
     second_view.clip_planes.front() = {{-1.0f, 0.0f, 0.0f}, 10.0f, true};
@@ -709,10 +709,10 @@ void mixed_hierarchy_and_empty_batches_remain_incremental() {
     const auto material_two = scene->reserve_material_id();
     scene->material_store().create(material_one);
     scene->material_store().create(material_two);
-    const auto root = scene->reserve_occurrence_id();
-    const auto group = scene->reserve_occurrence_id();
-    const auto first = scene->reserve_occurrence_id();
-    const auto second = scene->reserve_occurrence_id();
+    const auto root = scene->reserve_node_id();
+    const auto group = scene->reserve_node_id();
+    const auto first = scene->reserve_node_id();
+    const auto second = scene->reserve_node_id();
 
     Transaction create(scene);
     create.add_create(root);
@@ -784,9 +784,9 @@ void spatial_queries_and_cpu_picking_are_snapshot_bound() {
     const auto material = scene->reserve_material_id();
     scene->material_store().create(material);
 
-    const auto first = scene->reserve_occurrence_id();
-    const auto second = scene->reserve_occurrence_id();
-    const auto hidden = scene->reserve_occurrence_id();
+    const auto first = scene->reserve_node_id();
+    const auto second = scene->reserve_node_id();
+    const auto hidden = scene->reserve_node_id();
     Transaction create(scene);
     create.add_create(first);
     create.add_create(second);
@@ -843,7 +843,7 @@ void spatial_queries_and_cpu_picking_are_snapshot_bound() {
     assert(ray_candidates.size() == 1);
     assert(ray_candidates.front() == first);
     const auto left_pick = index.pick_ray(left_ray);
-    assert(left_pick.occurrence == first);
+    assert(left_pick.node == first);
     assert(left_pick.source == nkscene::EntityId{42});
     assert(left_pick.subelement.value == 42);
     assert(left_pick.worldPosition.x == -2.0f);
@@ -852,7 +852,7 @@ void spatial_queries_and_cpu_picking_are_snapshot_bound() {
 
     const nkscene::Ray hidden_ray{{0.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}};
     assert(index.query_ray(hidden_ray).size() == 1);
-    assert(!index.pick_ray(hidden_ray).occurrence.valid());
+    assert(!index.pick_ray(hidden_ray).node.valid());
 }
 
 void render_snapshots_are_concurrent_reader_safe() {
@@ -866,22 +866,22 @@ void render_snapshots_are_concurrent_reader_safe() {
     const auto material = scene->reserve_material_id();
     scene->material_store().create(material);
 
-    std::vector<nkscene::OccurrenceId> occurrences;
-    occurrences.reserve(count);
+    std::vector<nkscene::NodeId> nodes;
+    nodes.reserve(count);
     Transaction create(scene);
     for (std::size_t index = 0; index < count; ++index) {
-        const auto occurrence = scene->reserve_occurrence_id();
-        occurrences.push_back(occurrence);
-        create.add_create(occurrence);
+        const auto node = scene->reserve_node_id();
+        nodes.push_back(node);
+        create.add_create(node);
     }
     ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
 
     Transaction configure(scene);
-    for (const auto occurrence : occurrences) {
-        configure.add_geometry(occurrence, geometry);
-        configure.add_material(occurrence, material);
+    for (const auto node : nodes) {
+        configure.add_geometry(node, geometry);
+        configure.add_material(node, material);
     }
     assert(scene->commit(configure, changes) == NKS_OK);
     configure.close();
@@ -895,8 +895,8 @@ void render_snapshots_are_concurrent_reader_safe() {
             while (!stop.load(std::memory_order_acquire)) {
                 const auto snapshot = scene->snapshot();
                 const auto plan = nkscene::compile(snapshot, {});
-                if (snapshot.occurrences().size() != count || plan.items().size() != count ||
-                    !snapshot.find(occurrences[count / 2])) {
+                if (snapshot.nodes().size() != count || plan.items().size() != count ||
+                    !snapshot.find(nodes[count / 2])) {
                     failed.store(true, std::memory_order_release);
                     return;
                 }
@@ -909,7 +909,7 @@ void render_snapshots_are_concurrent_reader_safe() {
         nkscene::LocalTransform transform;
         transform.matrix[12] = static_cast<float>(iteration);
         Transaction move(scene);
-        move.add_transform(occurrences[iteration % occurrences.size()], transform);
+        move.add_transform(nodes[iteration % nodes.size()], transform);
         assert(scene->commit(move, changes) == NKS_OK);
         move.close();
     }
@@ -946,13 +946,13 @@ int main() {
         scene->material_store().create(material);
     }
 
-    std::vector<nkscene::OccurrenceId> occurrences;
-    occurrences.reserve(count);
+    std::vector<nkscene::NodeId> nodes;
+    nodes.reserve(count);
     Transaction create(scene);
     for (std::size_t index = 0; index < count; ++index) {
-        const auto occurrence = scene->reserve_occurrence_id();
-        occurrences.push_back(occurrence);
-        create.add_create(occurrence);
+        const auto node = scene->reserve_node_id();
+        nodes.push_back(node);
+        create.add_create(node);
     }
     ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
@@ -960,8 +960,8 @@ int main() {
 
     Transaction configure(scene);
     for (std::size_t index = 0; index < count; ++index) {
-        configure.add_geometry(occurrences[index], geometry);
-        configure.add_material(occurrences[index], materials[index % materials.size()]);
+        configure.add_geometry(nodes[index], geometry);
+        configure.add_material(nodes[index], materials[index % materials.size()]);
     }
     assert(scene->commit(configure, changes) == NKS_OK);
     configure.close();
@@ -972,7 +972,7 @@ int main() {
     assert(plan.items().size() == count);
     assert(plan.batches().size() == materials.size());
     const auto compile_count = plan.compile_count();
-    const auto first = occurrences.front();
+    const auto first = nodes.front();
     const auto first_item = plan.items().front();
     assert(plan.item_index(first) == 0);
     assert(plan.transforms()[first_item.transformIndex].transform.matrix[12] == 0.0f);
@@ -1001,7 +1001,7 @@ int main() {
 
     Transaction hide(scene);
     for (std::size_t index = 0; index < 1000; ++index)
-        hide.add_visibility(occurrences[index], false);
+        hide.add_visibility(nodes[index], false);
     assert(scene->commit(hide, changes) == NKS_OK);
     hide.close();
     update = nkscene::update(plan, scene->snapshot(), changes, view);
@@ -1013,7 +1013,7 @@ int main() {
     const auto scene_revision = scene->revision();
     nkscene::SceneView filtered_view;
     for (std::size_t index = 1000; index < 2000; ++index)
-        filtered_view.visibility_overrides.push_back({occurrences[index], false});
+        filtered_view.visibility_overrides.push_back({nodes[index], false});
     nkscene::ChangeSet no_changes;
     update = nkscene::update(plan, hidden_snapshot, no_changes, filtered_view);
     assert(!update.plan_rebuilt);
@@ -1023,7 +1023,7 @@ int main() {
     assert(scene->revision() == scene_revision);
 
     auto selected_view = filtered_view;
-    selected_view.material_overrides.push_back({occurrences[2000], materials[3]});
+    selected_view.material_overrides.push_back({nodes[2000], materials[3]});
     update = nkscene::update(plan, hidden_snapshot, no_changes, selected_view);
     assert(!update.plan_rebuilt);
     assert(update.patched_materials == 1);
@@ -1046,7 +1046,7 @@ int main() {
 
     const auto pick_result = nkscene::pick(
         plan, scene->snapshot(), 0, nkscene::Vec3{1.0f, 2.0f, 3.0f}, 0.5f);
-    assert(pick_result.occurrence.valid());
+    assert(pick_result.node.valid());
     assert(pick_result.subelement.valid());
     assert(pick_result.worldPosition.x == 1.0f);
     return 0;

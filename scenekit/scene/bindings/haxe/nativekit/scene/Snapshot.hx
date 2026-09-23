@@ -6,12 +6,12 @@ import NativeKitScene;
 class Snapshot {
 	final owner:Ownednkscene_snapshot;
 	var disposed:Bool = false;
-	var occurrenceCache:Null<Array<OccurrenceInfo>> = null;
-	var occurrenceIndex:Null<Map<String, OccurrenceInfo>> = null;
-	var childrenIndex:Null<Map<String, Array<Occurrence>>> = null;
-	var sourceOccurrenceIndex:Null<Map<String, Array<Occurrence>>> = null;
-	var geometryOccurrenceIndex:Null<Map<String, Array<Occurrence>>> = null;
-	var materialOccurrenceIndex:Null<Map<String, Array<Occurrence>>> = null;
+	var nodeCache:Null<Array<SceneNode>> = null;
+	var nodeIndex:Null<Map<String, SceneNode>> = null;
+	var childrenIndex:Null<Map<String, Array<Node>>> = null;
+	var sourceNodeIndex:Null<Map<String, Array<Node>>> = null;
+	var geometryNodeIndex:Null<Map<String, Array<Node>>> = null;
+	var materialNodeIndex:Null<Map<String, Array<Node>>> = null;
 
 	@:allow(Scene)
 	private function new(owner:Ownednkscene_snapshot) {
@@ -30,116 +30,116 @@ class Snapshot {
 		return result.out_revision;
 	}
 
-	public function occurrenceCount():Int {
+	public function nodeCount():Int {
 		ensureLive();
-		var result = NativeKitScene.nkscene_snapshot_get_occurrence_count(owner.borrow());
-		check(result.status, "snapshot.occurrenceCount");
+		var result = NativeKitScene.nkscene_snapshot_get_node_count(owner.borrow());
+		check(result.status, "snapshot.nodeCount");
 		return haxe.Int64.toInt(result.out_count);
 	}
 
-	public function occurrenceAt(index:Int):OccurrenceInfo {
+	public function nodeAt(index:Int):SceneNode {
 		ensureLive();
 		if (index < 0)
-			throw "Snapshot occurrence index cannot be negative";
-		var cached = occurrenceCache;
+			throw "Snapshot node index cannot be negative";
+		var cached = nodeCache;
 		if (cached != null) {
 			if (index >= cached.length)
-				throw "Snapshot occurrence index is out of range";
+				throw "Snapshot node index is out of range";
 			return cached[index];
 		}
-		var value = new nkscene_snapshot_occurrence();
-		value.set_struct_size(nkscene_snapshot_occurrence.size());
-		var result = NativeKitScene.nkscene_snapshot_get_occurrence(owner.borrow(), index, value);
-		check(result.status, "snapshot.occurrenceAt");
-		return new OccurrenceInfo(value);
+		var value = new nkscene_snapshot_node();
+		value.set_struct_size(nkscene_snapshot_node.size());
+		var result = NativeKitScene.nkscene_snapshot_get_node(owner.borrow(), index, value);
+		check(result.status, "snapshot.nodeAt");
+		return new SceneNode(value);
 	}
 
-	public function occurrences():Array<OccurrenceInfo> {
-		return ensureOccurrenceCache();
+	/** Returns all published scene nodes. */
+	public function nodes():Array<SceneNode>
+		return ensureNodeCache();
+
+	public function findNode(node:NodeId):Null<SceneNode> {
+		ensureNodeCache();
+		return nodeIndex.get(key(node));
 	}
 
-	public function find(occurrence:Occurrence):Null<OccurrenceInfo> {
-		ensureOccurrenceCache();
-		return occurrenceIndex.get(key(occurrence));
-	}
-
-	public function children(parent:Occurrence):Array<Occurrence> {
-		ensureOccurrenceCache();
+	public function childrenOf(parent:NodeId):Array<Node> {
+		ensureNodeCache();
 		var result = childrenIndex.get(key(parent));
 		return result == null ? [] : result.copy();
 	}
 
-	/** Returns cached occurrences associated with one source entity. */
-	public function occurrencesForSource(source:haxe.Int64):Array<Occurrence> {
+	/** Returns nodes associated with one source entity. */
+	public function nodesForSource(source:haxe.Int64):Array<Node> {
 		ensureLive();
-		if (sourceOccurrenceIndex == null)
-			sourceOccurrenceIndex = new Map();
+		if (sourceNodeIndex == null)
+			sourceNodeIndex = new Map();
 		var sourceKey = haxe.Int64.toStr(source),
-			cached = sourceOccurrenceIndex.get(sourceKey);
+			cached = sourceNodeIndex.get(sourceKey);
 		if (cached != null)
 			return cached;
 
 		var entity = new nkscene_entity_id();
 		entity.set_value(source);
-		var countResult = NativeKitScene.nkscene_snapshot_get_source_occurrence_count(
+		var countResult = NativeKitScene.nkscene_snapshot_get_source_node_count(
 			owner.borrow(), entity);
-		check(countResult.status, "snapshot.sourceOccurrenceCount");
-		var result:Array<Occurrence> = [];
+		check(countResult.status, "snapshot.sourceNodeCount");
+		var result:Array<Node> = [];
 		for (index in 0...haxe.Int64.toInt(countResult.out_count)) {
-		var value = NativeKitScene.nkscene_snapshot_get_source_occurrence(
+		var value = NativeKitScene.nkscene_snapshot_get_source_node(
 				owner.borrow(), entity, index);
-			check(value.status, "snapshot.sourceOccurrence");
-			result.push(Occurrence.fromNative(value.out_occurrence));
+			check(value.status, "snapshot.sourceNode");
+			result.push(Node.fromNative(value.out_node));
 		}
-		sourceOccurrenceIndex.set(sourceKey, result);
+		sourceNodeIndex.set(sourceKey, result);
 		return result;
 	}
 
-	/** Returns cached occurrences associated with one geometry resource. */
-	public function occurrencesForGeometry(geometry:Geometry):Array<Occurrence> {
+	/** Returns nodes associated with one geometry resource. */
+	public function nodesForGeometry(geometry:Geometry):Array<Node> {
 		ensureLive();
-		if (geometryOccurrenceIndex == null)
-			geometryOccurrenceIndex = new Map();
+		if (geometryNodeIndex == null)
+			geometryNodeIndex = new Map();
 		var geometryKey = haxe.Int64.toStr(geometry.id().get_value()),
-			cached = geometryOccurrenceIndex.get(geometryKey);
+			cached = geometryNodeIndex.get(geometryKey);
 		if (cached != null)
 			return cached;
 
-		var countResult = NativeKitScene.nkscene_snapshot_get_geometry_occurrence_count(
+		var countResult = NativeKitScene.nkscene_snapshot_get_geometry_node_count(
 			owner.borrow(), geometry.id());
-		check(countResult.status, "snapshot.geometryOccurrenceCount");
-		var result:Array<Occurrence> = [];
+		check(countResult.status, "snapshot.geometryNodeCount");
+		var result:Array<Node> = [];
 		for (index in 0...haxe.Int64.toInt(countResult.out_count)) {
-			var value = NativeKitScene.nkscene_snapshot_get_geometry_occurrence(
+			var value = NativeKitScene.nkscene_snapshot_get_geometry_node(
 				owner.borrow(), geometry.id(), index);
-			check(value.status, "snapshot.geometryOccurrence");
-			result.push(Occurrence.fromNative(value.out_occurrence));
+			check(value.status, "snapshot.geometryNode");
+			result.push(Node.fromNative(value.out_node));
 		}
-		geometryOccurrenceIndex.set(geometryKey, result);
+		geometryNodeIndex.set(geometryKey, result);
 		return result;
 	}
 
-	/** Returns cached occurrences associated with one material resource. */
-	public function occurrencesForMaterial(material:Material):Array<Occurrence> {
+	/** Returns nodes associated with one material resource. */
+	public function nodesForMaterial(material:Material):Array<Node> {
 		ensureLive();
-		if (materialOccurrenceIndex == null)
-			materialOccurrenceIndex = new Map();
+		if (materialNodeIndex == null)
+			materialNodeIndex = new Map();
 		var materialKey = haxe.Int64.toStr(material.id().get_value()),
-			cached = materialOccurrenceIndex.get(materialKey);
+			cached = materialNodeIndex.get(materialKey);
 		if (cached != null)
 			return cached;
 
-		var countResult = NativeKitScene.nkscene_snapshot_get_material_occurrence_count(
+		var countResult = NativeKitScene.nkscene_snapshot_get_material_node_count(
 			owner.borrow(), material.id());
-		check(countResult.status, "snapshot.materialOccurrenceCount");
-		var result:Array<Occurrence> = [];
+		check(countResult.status, "snapshot.materialNodeCount");
+		var result:Array<Node> = [];
 		for (index in 0...haxe.Int64.toInt(countResult.out_count)) {
-			var value = NativeKitScene.nkscene_snapshot_get_material_occurrence(
+			var value = NativeKitScene.nkscene_snapshot_get_material_node(
 				owner.borrow(), material.id(), index);
-			check(value.status, "snapshot.materialOccurrence");
-			result.push(Occurrence.fromNative(value.out_occurrence));
+			check(value.status, "snapshot.materialNode");
+			result.push(Node.fromNative(value.out_node));
 		}
-		materialOccurrenceIndex.set(materialKey, result);
+		materialNodeIndex.set(materialKey, result);
 		return result;
 	}
 
@@ -163,30 +163,30 @@ class Snapshot {
 			throw '$operation failed with NativeKit scene status $status';
 	}
 
-	function ensureOccurrenceCache():Array<OccurrenceInfo> {
-		var result = occurrenceCache;
+	function ensureNodeCache():Array<SceneNode> {
+		var result = nodeCache;
 		if (result != null)
 			return result;
 
 		result = [];
-		var byValue:Map<String, OccurrenceInfo> = new Map(),
-			byParent:Map<String, Array<Occurrence>> = new Map(),
-			count = occurrenceCount(),
-			pageSize = NativeKitSceneConstants.NKS_SCENE_SNAPSHOT_OCCURRENCE_PAGE_CAPACITY,
-			page = new nkscene_snapshot_occurrence_page();
-		page.set_struct_size(nkscene_snapshot_occurrence_page.size());
+		var byValue:Map<String, SceneNode> = new Map(),
+			byParent:Map<String, Array<Node>> = new Map(),
+			count = nodeCount(),
+			pageSize = NativeKitSceneConstants.NKS_SCENE_SNAPSHOT_NODE_PAGE_CAPACITY,
+			page = new nkscene_snapshot_node_page();
+		page.set_struct_size(nkscene_snapshot_node_page.size());
 		var offset = 0;
 		while (offset < count) {
-			var pageResult = NativeKitScene.nkscene_snapshot_get_occurrence_page(
+			var pageResult = NativeKitScene.nkscene_snapshot_get_node_page(
 				owner.borrow(), offset, page);
-			check(pageResult.status, "snapshot.occurrencePage");
+			check(pageResult.status, "snapshot.nodePage");
 			var pageCount = page.get_count();
 			if (pageCount <= 0 || pageCount > pageSize || pageCount > count - offset)
-				throw "Snapshot occurrence page returned an invalid count";
+				throw "Snapshot node page returned an invalid count";
 			for (index in 0...pageCount) {
-				var info = new OccurrenceInfo(page.get_occurrences(index));
+				var info = new SceneNode(page.get_nodes(index));
 				result.push(info);
-				byValue.set(key(info.occurrence()), info);
+				byValue.set(key(info.node()), info);
 				var parent = info.parent();
 				if (parent != null) {
 					var children = byParent.get(key(parent));
@@ -194,17 +194,17 @@ class Snapshot {
 						children = [];
 						byParent.set(key(parent), children);
 					}
-					children.push(info.occurrence());
+					children.push(info.node());
 				}
 			}
 			offset += pageCount;
 		}
-		occurrenceCache = result;
-		occurrenceIndex = byValue;
+		nodeCache = result;
+		nodeIndex = byValue;
 		childrenIndex = byParent;
 		return result;
 	}
 
-	static function key(occurrence:Occurrence):String
-		return haxe.Int64.toStr(occurrence.stableValue());
+	static function key(node:Node):String
+		return haxe.Int64.toStr(node.stableValue());
 }

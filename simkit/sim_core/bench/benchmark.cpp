@@ -9,8 +9,8 @@ int main() {
     nkscene_scene_create(&scene);
     nkscene_transaction transaction = 0;
     nkscene_transaction_begin(scene, &transaction);
-    nkscene_occurrence_id occurrence{};
-    nkscene_tx_create_occurrence(transaction, &occurrence);
+    nkscene_node_id node{};
+    nkscene_tx_create_node(transaction, &node);
     nkscene_change_set changes = 0;
     nkscene_transaction_commit_with_changes(transaction, &changes);
     nkscene_change_set_destroy(changes);
@@ -25,7 +25,7 @@ int main() {
     nksim_world_create(&desc, &world);
     nksim_body_desc body_desc{};
     body_desc.struct_size = sizeof(body_desc);
-    body_desc.occurrence = occurrence;
+    body_desc.node = node;
     body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
     body_desc.mass = 1.0;
     nksim_body body = 0;

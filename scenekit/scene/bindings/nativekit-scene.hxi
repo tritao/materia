@@ -12,7 +12,7 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	const NKS_MATERIAL_DOUBLE_SIDED = 2;
 	const NKS_MATERIAL_OPAQUE = 1;
 	const NKS_OK = 0;
-	const NKS_SCENE_SNAPSHOT_OCCURRENCE_PAGE_CAPACITY = 64;
+	const NKS_SCENE_SNAPSHOT_NODE_PAGE_CAPACITY = 64;
 	enum nkscene_camera_projection : c_int {
 		NKS_CAMERA_PERSPECTIVE = 1;
 		NKS_CAMERA_ORTHOGRAPHIC = 2;
@@ -81,26 +81,26 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	extern fn nkscene_scene_destroy(scene: nkscene_scene) -> void;
 	extern fn nkscene_scene_snapshot(scene: nkscene_scene, out_snapshot: ptr<nkscene_snapshot> @out @owned) -> nkscene_result;
 	extern fn nkscene_snapshot_destroy(snapshot: nkscene_snapshot) -> void;
-	extern fn nkscene_snapshot_get_child_occurrence(snapshot: nkscene_snapshot, parent: nkscene_occurrence_id, index: u64, out_occurrence: ptr<nkscene_occurrence_id> @out) -> nkscene_result;
-	extern fn nkscene_snapshot_get_child_occurrence_count(snapshot: nkscene_snapshot, parent: nkscene_occurrence_id, out_count: ptr<u64> @out) -> nkscene_result;
+	extern fn nkscene_snapshot_get_child_node(snapshot: nkscene_snapshot, parent: nkscene_node_id, index: u64, out_node: ptr<nkscene_node_id> @out) -> nkscene_result;
+	extern fn nkscene_snapshot_get_child_node_count(snapshot: nkscene_snapshot, parent: nkscene_node_id, out_count: ptr<u64> @out) -> nkscene_result;
 	/**
 	 * Returns a source-entity name borrowed from the snapshot and valid until it is destroyed.
 	 */
 	extern fn nkscene_snapshot_get_entity_name(snapshot: nkscene_snapshot, entity: nkscene_entity_id, out_name: ptr<ptr<const<c_char>>>) -> nkscene_result;
-	extern fn nkscene_snapshot_get_geometry_occurrence(snapshot: nkscene_snapshot, geometry: nkscene_geometry_id, index: u64, out_occurrence: ptr<nkscene_occurrence_id> @out) -> nkscene_result;
-	extern fn nkscene_snapshot_get_geometry_occurrence_count(snapshot: nkscene_snapshot, geometry: nkscene_geometry_id, out_count: ptr<u64> @out) -> nkscene_result;
-	extern fn nkscene_snapshot_get_material_occurrence(snapshot: nkscene_snapshot, material: nkscene_material_id, index: u64, out_occurrence: ptr<nkscene_occurrence_id> @out) -> nkscene_result;
-	extern fn nkscene_snapshot_get_material_occurrence_count(snapshot: nkscene_snapshot, material: nkscene_material_id, out_count: ptr<u64> @out) -> nkscene_result;
+	extern fn nkscene_snapshot_get_geometry_node(snapshot: nkscene_snapshot, geometry: nkscene_geometry_id, index: u64, out_node: ptr<nkscene_node_id> @out) -> nkscene_result;
+	extern fn nkscene_snapshot_get_geometry_node_count(snapshot: nkscene_snapshot, geometry: nkscene_geometry_id, out_count: ptr<u64> @out) -> nkscene_result;
+	extern fn nkscene_snapshot_get_material_node(snapshot: nkscene_snapshot, material: nkscene_material_id, index: u64, out_node: ptr<nkscene_node_id> @out) -> nkscene_result;
+	extern fn nkscene_snapshot_get_material_node_count(snapshot: nkscene_snapshot, material: nkscene_material_id, out_count: ptr<u64> @out) -> nkscene_result;
 	/**
 	 * Returns a name borrowed from the snapshot and valid until it is destroyed.
 	 */
-	extern fn nkscene_snapshot_get_name(snapshot: nkscene_snapshot, occurrence: nkscene_occurrence_id, out_name: ptr<ptr<const<c_char>>>) -> nkscene_result;
-	extern fn nkscene_snapshot_get_occurrence(snapshot: nkscene_snapshot, index: u64, out_occurrence: ptr<nkscene_snapshot_occurrence> @inout) -> nkscene_result;
-	extern fn nkscene_snapshot_get_occurrence_count(snapshot: nkscene_snapshot, out_count: ptr<u64> @out) -> nkscene_result;
-	extern fn nkscene_snapshot_get_occurrence_page(snapshot: nkscene_snapshot, start_index: u64, out_page: ptr<nkscene_snapshot_occurrence_page> @inout) -> nkscene_result;
+	extern fn nkscene_snapshot_get_name(snapshot: nkscene_snapshot, node: nkscene_node_id, out_name: ptr<ptr<const<c_char>>>) -> nkscene_result;
+	extern fn nkscene_snapshot_get_node(snapshot: nkscene_snapshot, index: u64, out_node: ptr<nkscene_snapshot_node> @inout) -> nkscene_result;
+	extern fn nkscene_snapshot_get_node_count(snapshot: nkscene_snapshot, out_count: ptr<u64> @out) -> nkscene_result;
+	extern fn nkscene_snapshot_get_node_page(snapshot: nkscene_snapshot, start_index: u64, out_page: ptr<nkscene_snapshot_node_page> @inout) -> nkscene_result;
 	extern fn nkscene_snapshot_get_revision(snapshot: nkscene_snapshot, out_revision: ptr<u64> @out) -> nkscene_result;
-	extern fn nkscene_snapshot_get_source_occurrence(snapshot: nkscene_snapshot, source: nkscene_entity_id, index: u64, out_occurrence: ptr<nkscene_occurrence_id> @out) -> nkscene_result;
-	extern fn nkscene_snapshot_get_source_occurrence_count(snapshot: nkscene_snapshot, source: nkscene_entity_id, out_count: ptr<u64> @out) -> nkscene_result;
+	extern fn nkscene_snapshot_get_source_node(snapshot: nkscene_snapshot, source: nkscene_entity_id, index: u64, out_node: ptr<nkscene_node_id> @out) -> nkscene_result;
+	extern fn nkscene_snapshot_get_source_node_count(snapshot: nkscene_snapshot, source: nkscene_entity_id, out_count: ptr<u64> @out) -> nkscene_result;
 	extern fn nkscene_texture_create(scene: nkscene_scene, out_texture: ptr<nkscene_texture_id> @out) -> nkscene_result;
 	extern fn nkscene_texture_destroy(scene: nkscene_scene, texture: nkscene_texture_id) -> void;
 	extern fn nkscene_texture_set_data(scene: nkscene_scene, texture: nkscene_texture_id, data: ptr<const<nkscene_texture_data>>) -> nkscene_result;
@@ -108,19 +108,19 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	extern fn nkscene_transaction_cancel(transaction: nkscene_transaction) -> void;
 	extern fn nkscene_transaction_commit(transaction: nkscene_transaction) -> nkscene_result;
 	extern fn nkscene_transaction_commit_with_changes(transaction: nkscene_transaction, out_changes: ptr<nkscene_change_set> @out @owned) -> nkscene_result;
-	extern fn nkscene_tx_create_occurrence(transaction: nkscene_transaction, out_occurrence: ptr<nkscene_occurrence_id>) -> nkscene_result;
-	extern fn nkscene_tx_destroy_occurrence(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id) -> nkscene_result;
-	extern fn nkscene_tx_set_camera(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id, camera: nkscene_camera_id) -> nkscene_result;
+	extern fn nkscene_tx_create_node(transaction: nkscene_transaction, out_node: ptr<nkscene_node_id>) -> nkscene_result;
+	extern fn nkscene_tx_destroy_node(transaction: nkscene_transaction, node: nkscene_node_id) -> nkscene_result;
+	extern fn nkscene_tx_set_camera(transaction: nkscene_transaction, node: nkscene_node_id, camera: nkscene_camera_id) -> nkscene_result;
 	extern fn nkscene_tx_set_entity_name(transaction: nkscene_transaction, entity: nkscene_entity_id, name: utf8) -> nkscene_result;
-	extern fn nkscene_tx_set_geometry(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id, geometry: nkscene_geometry_id) -> nkscene_result;
-	extern fn nkscene_tx_set_light(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id, light: nkscene_light_id) -> nkscene_result;
-	extern fn nkscene_tx_set_material(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id, material: nkscene_material_id) -> nkscene_result;
-	extern fn nkscene_tx_set_name(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id, name: utf8) -> nkscene_result;
-	extern fn nkscene_tx_set_parent(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id, parent: nkscene_occurrence_id) -> nkscene_result;
-	extern fn nkscene_tx_set_source_entity(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id, source: nkscene_entity_id) -> nkscene_result;
-	extern fn nkscene_tx_set_transform(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id, transform: ptr<const<nkscene_transform>>) -> nkscene_result;
+	extern fn nkscene_tx_set_geometry(transaction: nkscene_transaction, node: nkscene_node_id, geometry: nkscene_geometry_id) -> nkscene_result;
+	extern fn nkscene_tx_set_light(transaction: nkscene_transaction, node: nkscene_node_id, light: nkscene_light_id) -> nkscene_result;
+	extern fn nkscene_tx_set_material(transaction: nkscene_transaction, node: nkscene_node_id, material: nkscene_material_id) -> nkscene_result;
+	extern fn nkscene_tx_set_name(transaction: nkscene_transaction, node: nkscene_node_id, name: utf8) -> nkscene_result;
+	extern fn nkscene_tx_set_parent(transaction: nkscene_transaction, node: nkscene_node_id, parent: nkscene_node_id) -> nkscene_result;
+	extern fn nkscene_tx_set_source_entity(transaction: nkscene_transaction, node: nkscene_node_id, source: nkscene_entity_id) -> nkscene_result;
+	extern fn nkscene_tx_set_transform(transaction: nkscene_transaction, node: nkscene_node_id, transform: ptr<const<nkscene_transform>>) -> nkscene_result;
 	extern fn nkscene_tx_set_transforms(transaction: nkscene_transaction, updates: ptr<const<nkscene_transform_update>> @in_array("update_count"), update_count: u32) -> nkscene_result;
-	extern fn nkscene_tx_set_visibility(transaction: nkscene_transaction, occurrence: nkscene_occurrence_id, visible: u32) -> nkscene_result;
+	extern fn nkscene_tx_set_visibility(transaction: nkscene_transaction, node: nkscene_node_id, visible: u32) -> nkscene_result;
 	struct nkscene_bounds @layout(28, 4) {
 		minimum: array<f32, 3> @offset(0);
 		maximum: array<f32, 3> @offset(12);
@@ -207,7 +207,7 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	struct nkscene_material_id @layout(8, 8) {
 		value: u64 @offset(0);
 	}
-	struct nkscene_occurrence_id @layout(8, 8) {
+	struct nkscene_node_id @layout(8, 8) {
 		value: u64 @offset(0);
 	}
 	struct nkscene_sampler_data @layout(28, 4) {
@@ -223,13 +223,13 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 		value: u64 @offset(0);
 	}
 	/**
-	 * Read-only occurrence state captured by a scene snapshot.
+	 * Read-only node state captured by a scene snapshot.
 	 */
-	struct nkscene_snapshot_occurrence @layout(232, 8) {
+	struct nkscene_snapshot_node @layout(232, 8) {
 		struct_size: u32 @offset(0) @struct_size;
-		occurrence: nkscene_occurrence_id @offset(8);
+		node: nkscene_node_id @offset(8);
 		source: nkscene_entity_id @offset(16);
-		parent: nkscene_occurrence_id @offset(24);
+		parent: nkscene_node_id @offset(24);
 		local_transform: nkscene_transform @offset(32);
 		world_transform: nkscene_transform @offset(96);
 		world_transform_revision: u64 @offset(160);
@@ -241,13 +241,13 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 		light: nkscene_light_id @offset(224);
 	}
 	/**
-	 * Fixed-size page used to transfer snapshot occurrences across the C ABI.
+	 * Fixed-size page used to transfer snapshot nodes across the C ABI.
 	 */
-	struct nkscene_snapshot_occurrence_page @layout(14872, 8) {
+	struct nkscene_snapshot_node_page @layout(14872, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		start_index: u64 @offset(8);
 		count: u32 @offset(16);
-		occurrences: array<nkscene_snapshot_occurrence, 64> @offset(24);
+		nodes: array<nkscene_snapshot_node, 64> @offset(24);
 	}
 	struct nkscene_subelement_range @layout(12, 4) {
 		first_primitive: u32 @offset(0);
@@ -265,7 +265,7 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 		matrix: array<f32, 16> @offset(0);
 	}
 	struct nkscene_transform_update @layout(72, 8) {
-		occurrence: nkscene_occurrence_id @offset(0);
+		node: nkscene_node_id @offset(0);
 		transform: nkscene_transform @offset(8);
 	}
 	struct nkscene_vertex_stream @layout(32, 8) {

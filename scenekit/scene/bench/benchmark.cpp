@@ -37,8 +37,8 @@ TimedChange run(const char *name, const std::shared_ptr<Scene> &scene,
 
 void print(const TimedChange &result) {
     const auto &stats = result.changes.stats;
-    std::printf("%-18s %8.3f ms  occurrences=%zu resources=%zu world=%zu bounds=%zu full=%zu\n",
-                result.name, result.milliseconds, stats.changed_occurrences,
+    std::printf("%-18s %8.3f ms  nodes=%zu resources=%zu world=%zu bounds=%zu full=%zu\n",
+                result.name, result.milliseconds, stats.changed_nodes,
                 stats.changed_resources, stats.dirty_world_transforms, stats.dirty_bounds,
                 stats.full_rebuilds);
 }
@@ -46,9 +46,9 @@ void print(const TimedChange &result) {
 } // namespace
 
 int main() {
-    constexpr std::size_t occurrence_count = 50000;
+    constexpr std::size_t node_count = 50000;
     constexpr std::size_t group_count = 50;
-    constexpr std::size_t leaf_count = occurrence_count - group_count;
+    constexpr std::size_t leaf_count = node_count - group_count;
     auto scene = std::make_shared<Scene>();
     const auto geometry = scene->reserve_geometry_id();
     auto &geometry_resource = scene->geometry_store().create(geometry);
@@ -61,18 +61,18 @@ int main() {
     for (const auto material : materials)
         scene->material_store().create(material);
 
-    std::vector<nkscene::OccurrenceId> groups;
-    std::vector<nkscene::OccurrenceId> leaves;
+    std::vector<nkscene::NodeId> groups;
+    std::vector<nkscene::NodeId> leaves;
     groups.reserve(group_count);
     leaves.reserve(leaf_count);
     Transaction create(scene);
     for (std::size_t index = 0; index < group_count; ++index) {
-        const auto id = scene->reserve_occurrence_id();
+        const auto id = scene->reserve_node_id();
         groups.push_back(id);
         create.add_create(id);
     }
     for (std::size_t index = 0; index < leaf_count; ++index) {
-        const auto id = scene->reserve_occurrence_id();
+        const auto id = scene->reserve_node_id();
         leaves.push_back(id);
         create.add_create(id);
     }
@@ -90,7 +90,7 @@ int main() {
     Transaction move_one(scene);
     move_one.add_transform(leaves[0], translated(1.0f));
     auto result = run("move one", scene, move_one);
-    assert(result.changes.stats.changed_occurrences == 1);
+    assert(result.changes.stats.changed_nodes == 1);
     assert(result.changes.stats.changed_resources == 0);
     assert(result.changes.revisions.hierarchy == hierarchy_revision);
     print(result);

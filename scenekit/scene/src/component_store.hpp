@@ -1,6 +1,6 @@
 #pragma once
 
-#include "occurrence_store.hpp"
+#include "node_store.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -13,21 +13,21 @@ namespace nkscene {
 template<class T>
 class ComponentStore {
 public:
-    bool contains(OccurrenceHandle handle) const noexcept {
+    bool contains(NodeHandle handle) const noexcept {
         return find(handle) != nullptr;
     }
 
-    T *find(OccurrenceHandle handle) noexcept {
+    T *find(NodeHandle handle) noexcept {
         auto *entry = slot(handle);
         return entry && entry->value ? &*entry->value : nullptr;
     }
 
-    const T *find(OccurrenceHandle handle) const noexcept {
+    const T *find(NodeHandle handle) const noexcept {
         const auto *entry = slot(handle);
         return entry && entry->value ? &*entry->value : nullptr;
     }
 
-    T &insert_or_assign(OccurrenceHandle handle, T value) {
+    T &insert_or_assign(NodeHandle handle, T value) {
         auto &entry = ensure_slot(handle);
         const auto was_empty = !entry.value;
         entry.value = std::move(value);
@@ -39,7 +39,7 @@ public:
         return *entry.value;
     }
 
-    bool erase(OccurrenceHandle handle) noexcept {
+    bool erase(NodeHandle handle) noexcept {
         auto *entry = slot(handle);
         if (!entry || !entry->value)
             return false;
@@ -62,7 +62,7 @@ public:
     void for_each(Fn &&fn) const {
         for (const auto index : dense_slots_) {
             const auto &entry = slots[index];
-            fn(OccurrenceHandle{index, entry.generation}, *entry.value);
+            fn(NodeHandle{index, entry.generation}, *entry.value);
         }
     }
 
@@ -72,23 +72,23 @@ private:
         std::optional<T> value;
     };
 
-    Slot *slot(OccurrenceHandle handle) noexcept {
+    Slot *slot(NodeHandle handle) noexcept {
         if (!handle.valid() || handle.slot >= slots.size())
             return nullptr;
         auto &entry = slots[handle.slot];
         return entry.generation == handle.generation ? &entry : nullptr;
     }
 
-    const Slot *slot(OccurrenceHandle handle) const noexcept {
+    const Slot *slot(NodeHandle handle) const noexcept {
         if (!handle.valid() || handle.slot >= slots.size())
             return nullptr;
         const auto &entry = slots[handle.slot];
         return entry.generation == handle.generation ? &entry : nullptr;
     }
 
-    Slot &ensure_slot(OccurrenceHandle handle) {
+    Slot &ensure_slot(NodeHandle handle) {
         if (!handle.valid())
-            throw std::invalid_argument("cannot store a component for an invalid occurrence handle");
+            throw std::invalid_argument("cannot store a component for an invalid node handle");
         if (handle.slot >= slots.size()) {
             const auto new_size = static_cast<std::size_t>(handle.slot) + 1;
             slots.resize(new_size);

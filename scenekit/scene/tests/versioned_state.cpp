@@ -25,11 +25,11 @@ void published_payloads_are_shared_and_snapshot_safe() {
     auto &material_resource = scene->material_store().create(material);
     material_resource.edit_state().base_color = {0.2f, 0.4f, 0.8f, 1.0f};
 
-    const auto occurrence = scene->reserve_occurrence_id();
+    const auto node = scene->reserve_node_id();
     Transaction create(scene);
-    create.add_create(occurrence);
-    create.add_geometry(occurrence, geometry);
-    create.add_material(occurrence, material);
+    create.add_create(node);
+    create.add_geometry(node, geometry);
+    create.add_material(node, material);
     ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
@@ -94,7 +94,7 @@ void published_payloads_are_shared_and_snapshot_safe() {
     Transaction move(scene);
     nkscene::LocalTransform transform;
     transform.matrix[12] = 2.0f;
-    move.add_transform(occurrence, transform);
+    move.add_transform(node, transform);
     assert(scene->commit(move, changes) == NKS_OK);
     move.close();
     const auto after_direct_edit = scene->snapshot();
@@ -113,9 +113,9 @@ void published_payloads_are_shared_and_snapshot_safe() {
 
 void readers_can_hold_old_snapshots_during_commits() {
     auto scene = std::make_shared<Scene>();
-    const auto occurrence = scene->reserve_occurrence_id();
+    const auto node = scene->reserve_node_id();
     Transaction create(scene);
-    create.add_create(occurrence);
+    create.add_create(node);
     ChangeSet changes;
     assert(scene->commit(create, changes) == NKS_OK);
     create.close();
@@ -128,9 +128,9 @@ void readers_can_hold_old_snapshots_during_commits() {
         readers.emplace_back([&] {
             while (!stop.load(std::memory_order_acquire)) {
                 const auto snapshot = scene->snapshot();
-                const auto occurrences = snapshot.occurrences();
-                if (occurrences.size() != 1 || !snapshot.find(occurrence) ||
-                    snapshot.find(occurrence)->occurrence != occurrence)
+                const auto nodes = snapshot.nodes();
+                if (nodes.size() != 1 || !snapshot.find(node) ||
+                    snapshot.find(node)->node != node)
                     failed.store(true, std::memory_order_release);
             }
         });
@@ -140,7 +140,7 @@ void readers_can_hold_old_snapshots_during_commits() {
         Transaction move(scene);
         nkscene::LocalTransform transform;
         transform.matrix[12] = static_cast<float>(index);
-        move.add_transform(occurrence, transform);
+        move.add_transform(node, transform);
         assert(scene->commit(move, changes) == NKS_OK);
         move.close();
     }
@@ -150,17 +150,17 @@ void readers_can_hold_old_snapshots_during_commits() {
         reader.join();
 
     assert(!failed.load(std::memory_order_acquire));
-    assert(initial.find(occurrence)->world_transform.transform.matrix[12] == 0.0f);
-    assert(scene->snapshot().find(occurrence)->world_transform.transform.matrix[12] == 200.0f);
+    assert(initial.find(node)->world_transform.transform.matrix[12] == 0.0f);
+    assert(scene->snapshot().find(node)->world_transform.transform.matrix[12] == 200.0f);
 }
 
 void snapshots_expose_reverse_indexes() {
     auto scene = std::make_shared<Scene>();
     const auto geometry = scene->create_geometry();
     const auto material = scene->create_material();
-    const auto root = scene->reserve_occurrence_id();
-    const auto first = scene->reserve_occurrence_id();
-    const auto second = scene->reserve_occurrence_id();
+    const auto root = scene->reserve_node_id();
+    const auto first = scene->reserve_node_id();
+    const auto second = scene->reserve_node_id();
 
     Transaction transaction(scene);
     transaction.add_create(root);
@@ -180,10 +180,10 @@ void snapshots_expose_reverse_indexes() {
     const auto children = snapshot.children(root);
     assert(children.size() == 2);
     assert(children[0] == first && children[1] == second);
-    const auto geometry_occurrences = snapshot.occurrences_for_geometry(geometry);
-    assert(geometry_occurrences.size() == 2);
-    const auto material_occurrences = snapshot.occurrences_for_material(material);
-    assert(material_occurrences.size() == 2);
+    const auto geometry_nodes = snapshot.nodes_for_geometry(geometry);
+    assert(geometry_nodes.size() == 2);
+    const auto material_nodes = snapshot.nodes_for_material(material);
+    assert(material_nodes.size() == 2);
 }
 
 } // namespace

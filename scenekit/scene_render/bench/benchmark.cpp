@@ -54,7 +54,7 @@ void print(const TimedUpdate &result) {
     std::printf(
         "%-18s %8.3f ms  scene(changes=%zu resources=%zu world=%zu bounds=%zu full=%zu) "
         "render(rebuild=%d geometry=%d instances=%zu visibility=%zu materials=%zu batches=%zu)\n",
-        result.name, result.milliseconds, scene.changed_occurrences, scene.changed_resources,
+        result.name, result.milliseconds, scene.changed_nodes, scene.changed_resources,
         scene.dirty_world_transforms, scene.dirty_bounds, scene.full_rebuilds,
         result.render.plan_rebuilt, result.render.geometry_rebuilt,
         result.render.patched_instances,
@@ -88,9 +88,9 @@ void print(const TimedViewUpdate &result) {
 } // namespace
 
 int main() {
-constexpr std::size_t occurrence_count = 50000;
+constexpr std::size_t node_count = 50000;
 constexpr std::size_t group_count = 50;
-constexpr std::size_t leaf_count = occurrence_count - group_count;
+constexpr std::size_t leaf_count = node_count - group_count;
 constexpr std::size_t source_count = 500;
 
     auto scene = std::make_shared<Scene>();
@@ -112,18 +112,18 @@ constexpr std::size_t source_count = 500;
         scene->material_store().create(material);
     }
 
-    std::vector<nkscene::OccurrenceId> groups;
-    std::vector<nkscene::OccurrenceId> leaves;
+    std::vector<nkscene::NodeId> groups;
+    std::vector<nkscene::NodeId> leaves;
     groups.reserve(group_count);
     leaves.reserve(leaf_count);
     Transaction create(scene);
     for (std::size_t index = 0; index < group_count; ++index) {
-        const auto id = scene->reserve_occurrence_id();
+        const auto id = scene->reserve_node_id();
         groups.push_back(id);
         create.add_create(id);
     }
     for (std::size_t index = 0; index < leaf_count; ++index) {
-        const auto id = scene->reserve_occurrence_id();
+        const auto id = scene->reserve_node_id();
         leaves.push_back(id);
         create.add_create(id);
     }
@@ -153,7 +153,7 @@ constexpr std::size_t source_count = 500;
     Transaction move_one(scene);
     move_one.add_transform(leaves[0], translated(1.0f));
     auto result = run("move one", scene, move_one, plan, view);
-    assert(result.changes.stats.changed_occurrences == 1);
+    assert(result.changes.stats.changed_nodes == 1);
     assert(result.changes.stats.changed_resources == 0);
     assert(result.changes.stats.dirty_world_transforms == 1);
     assert(result.changes.stats.dirty_bounds == 1);
@@ -170,7 +170,7 @@ constexpr std::size_t source_count = 500;
     for (std::size_t index = 0; index < 100; ++index)
         move_hundred.add_transform(leaves[index], translated(static_cast<float>(index)));
     result = run("move 100", scene, move_hundred, plan, view);
-    assert(result.changes.stats.changed_occurrences == 100);
+    assert(result.changes.stats.changed_nodes == 100);
     assert(result.changes.stats.dirty_world_transforms == 100);
     assert(!result.render.plan_rebuilt);
     assert(!result.render.geometry_rebuilt);
@@ -180,7 +180,7 @@ constexpr std::size_t source_count = 500;
     Transaction change_material(scene);
     change_material.add_material(leaves[0], materials[1]);
     result = run("material one", scene, change_material, plan, view);
-    assert(result.changes.stats.changed_occurrences == 1);
+    assert(result.changes.stats.changed_nodes == 1);
     assert(!result.render.plan_rebuilt);
     assert(!result.render.geometry_rebuilt);
     assert(result.render.patched_instances == 0);
@@ -194,7 +194,7 @@ constexpr std::size_t source_count = 500;
     for (std::size_t index = 0; index < 1000; ++index)
         hide.add_visibility(leaves[index], false);
     result = run("hide 1000", scene, hide, plan, view);
-    assert(result.changes.stats.changed_occurrences == 1000);
+    assert(result.changes.stats.changed_nodes == 1000);
     assert(result.changes.stats.dirty_world_transforms == 0);
     assert(result.changes.stats.dirty_bounds == 0);
     assert(!result.render.plan_rebuilt);
@@ -208,7 +208,7 @@ constexpr std::size_t source_count = 500;
     reparent.add_parent(groups[0], groups[1]);
     result = run("reparent subtree", scene, reparent, plan, view);
     constexpr std::size_t group_zero_leaf_count = (leaf_count + group_count - 1) / group_count;
-    assert(result.changes.stats.changed_occurrences == 1);
+    assert(result.changes.stats.changed_nodes == 1);
     assert(result.changes.stats.dirty_world_transforms == group_zero_leaf_count + 1);
     assert(result.changes.stats.dirty_bounds == group_zero_leaf_count);
     assert(!result.render.plan_rebuilt);
@@ -221,7 +221,7 @@ constexpr std::size_t source_count = 500;
     for (std::size_t index = 0; index < 100; ++index)
         destroy.add_destroy(leaves[index]);
     result = run("destroy 100", scene, destroy, plan, view);
-    assert(result.changes.stats.changed_occurrences == 100);
+    assert(result.changes.stats.changed_nodes == 100);
     assert(result.render.plan_rebuilt);
     assert(!result.render.geometry_rebuilt);
     assert(result.render.patched_instances == 0);
@@ -345,10 +345,10 @@ constexpr std::size_t source_count = 500;
     std::size_t material_source_count = 0;
     std::size_t hidden_source_count = 0;
     source_view.set_source_material_override(material_source, materials[2]);
-    material_source_count = presentation_snapshot.occurrences_for_source(material_source).size();
+    material_source_count = presentation_snapshot.nodes_for_source(material_source).size();
     source_view.set_source_visibility_override(hidden_source, false);
-    for (const auto occurrence : presentation_snapshot.occurrences_for_source(hidden_source)) {
-        if (const auto *info = presentation_snapshot.find(occurrence); info && info->visible)
+    for (const auto node : presentation_snapshot.nodes_for_source(hidden_source)) {
+        if (const auto *info = presentation_snapshot.find(node); info && info->visible)
             ++hidden_source_count;
     }
     assert(material_source_count > 0);
@@ -369,11 +369,11 @@ constexpr std::size_t source_count = 500;
     isolation_view.filter.isolated_sources.push_back(material_source);
     std::size_t visible_before_isolation = 0;
     std::size_t retained_by_isolation = 0;
-    for (const auto &occurrence : presentation_snapshot.occurrences()) {
-        if (!occurrence.geometry.valid() || !occurrence.visible)
+    for (const auto &node : presentation_snapshot.nodes()) {
+        if (!node.geometry.valid() || !node.visible)
             continue;
         ++visible_before_isolation;
-        if (occurrence.source == material_source)
+        if (node.source == material_source)
             ++retained_by_isolation;
     }
     auto isolation_plan = nkscene::compile(presentation_snapshot, presentation_view);

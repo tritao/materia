@@ -110,7 +110,7 @@ typedef struct nksim_shape_desc {
 
 typedef struct nksim_body_desc {
     uint32_t struct_size NK_STRUCT_SIZE;
-    nkscene_occurrence_id occurrence;
+    nkscene_node_id node;
     uint32_t motion_type;
     double mass;
     nksim_shape shape;
@@ -122,7 +122,7 @@ typedef struct nksim_body_desc {
 typedef struct nksim_body_state {
     uint32_t struct_size NK_STRUCT_SIZE;
     nksim_body body;
-    nkscene_occurrence_id occurrence;
+    nkscene_node_id node;
     double position[3];
     /* Quaternion in x, y, z, w order. */
     double rotation[4];

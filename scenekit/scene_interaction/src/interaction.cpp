@@ -13,10 +13,10 @@ namespace nkscene {
 
 namespace {
 
-void apply_selection(std::vector<OccurrenceId> &selected, OccurrenceId occurrence,
+void apply_selection(std::vector<NodeId> &selected, NodeId node,
                      SelectionMode mode) {
-    const auto found = std::find(selected.begin(), selected.end(), occurrence);
-    if (!occurrence.valid()) {
+    const auto found = std::find(selected.begin(), selected.end(), node);
+    if (!node.valid()) {
         if (mode == SelectionMode::Replace)
             selected.clear();
         return;
@@ -25,15 +25,15 @@ void apply_selection(std::vector<OccurrenceId> &selected, OccurrenceId occurrenc
     switch (mode) {
     case SelectionMode::Replace:
         selected.clear();
-        selected.push_back(occurrence);
+        selected.push_back(node);
         break;
     case SelectionMode::Add:
         if (found == selected.end())
-            selected.push_back(occurrence);
+            selected.push_back(node);
         break;
     case SelectionMode::Toggle:
         if (found == selected.end())
-            selected.push_back(occurrence);
+            selected.push_back(node);
         else
             selected.erase(found);
         break;
@@ -83,7 +83,7 @@ InteractionHoverState SceneInteraction::poll_hover(NativeKitGpuExecutor &executo
         executor.poll_pick_pixel(*hover_request_, plan, snapshot, &result, &out_error);
     const auto hover_state = static_cast<InteractionHoverState>(state);
     if (hover_state == InteractionHoverState::Ready) {
-        if (result.occurrence.valid())
+        if (result.node.valid())
             hovered_ = result;
         else
             hovered_.reset();
@@ -100,15 +100,15 @@ void SceneInteraction::cancel_hover() noexcept {
 }
 
 void SceneInteraction::apply_pick(const PickResult &pick_result, SelectionMode mode) {
-    if (pick_result.occurrence.valid())
+    if (pick_result.node.valid())
         hovered_ = pick_result;
     else
         hovered_.reset();
-    apply_selection(selected_, pick_result.occurrence, mode);
+    apply_selection(selected_, pick_result.node, mode);
 }
 
-void SceneInteraction::select(OccurrenceId occurrence, SelectionMode mode) {
-    apply_selection(selected_, occurrence, mode);
+void SceneInteraction::select(NodeId node, SelectionMode mode) {
+    apply_selection(selected_, node, mode);
 }
 
 void SceneInteraction::clear_selection() noexcept {
@@ -116,10 +116,10 @@ void SceneInteraction::clear_selection() noexcept {
 }
 
 void SceneInteraction::synchronize(const SceneSnapshot &snapshot) {
-    std::erase_if(selected_, [&snapshot](OccurrenceId occurrence) {
-        return snapshot.find(occurrence) == nullptr;
+    std::erase_if(selected_, [&snapshot](NodeId node) {
+        return snapshot.find(node) == nullptr;
     });
-    if (hovered_ && snapshot.find(hovered_->occurrence) == nullptr)
+    if (hovered_ && snapshot.find(hovered_->node) == nullptr)
         hovered_.reset();
 }
 
@@ -127,12 +127,12 @@ std::optional<PickResult> SceneInteraction::hovered() const {
     return hovered_;
 }
 
-std::span<const OccurrenceId> SceneInteraction::selected() const noexcept {
+std::span<const NodeId> SceneInteraction::selected() const noexcept {
     return selected_;
 }
 
-bool SceneInteraction::is_selected(OccurrenceId occurrence) const noexcept {
-    return std::find(selected_.begin(), selected_.end(), occurrence) != selected_.end();
+bool SceneInteraction::is_selected(NodeId node) const noexcept {
+    return std::find(selected_.begin(), selected_.end(), node) != selected_.end();
 }
 
 } // namespace nkscene
@@ -142,7 +142,7 @@ namespace {
 struct CInteractionState {
     nkscene_render_pick_request hover_request = 0;
     std::optional<nkscene_render_pick_result> hovered;
-    std::vector<nkscene_occurrence_id> selected;
+    std::vector<nkscene_node_id> selected;
 
     ~CInteractionState() {
         if (hover_request)
@@ -241,13 +241,13 @@ std::shared_ptr<CInteractionState> resolve(std::uint32_t handle) {
     return state.interactions.get(unpack_handle(handle));
 }
 
-void apply_selection(std::vector<nkscene_occurrence_id> &selected, nkscene_occurrence_id occurrence,
+void apply_selection(std::vector<nkscene_node_id> &selected, nkscene_node_id node,
                      std::uint32_t mode) {
     const auto found =
-        std::find_if(selected.begin(), selected.end(), [occurrence](nkscene_occurrence_id value) {
-            return value.value == occurrence.value;
+        std::find_if(selected.begin(), selected.end(), [node](nkscene_node_id value) {
+            return value.value == node.value;
         });
-    if (occurrence.value == 0) {
+    if (node.value == 0) {
         if (mode == NKS_INTERACTION_SELECTION_REPLACE)
             selected.clear();
         return;
@@ -256,15 +256,15 @@ void apply_selection(std::vector<nkscene_occurrence_id> &selected, nkscene_occur
     switch (mode) {
     case NKS_INTERACTION_SELECTION_REPLACE:
         selected.clear();
-        selected.push_back(occurrence);
+        selected.push_back(node);
         break;
     case NKS_INTERACTION_SELECTION_ADD:
         if (found == selected.end())
-            selected.push_back(occurrence);
+            selected.push_back(node);
         break;
     case NKS_INTERACTION_SELECTION_TOGGLE:
         if (found == selected.end())
-            selected.push_back(occurrence);
+            selected.push_back(node);
         else
             selected.erase(found);
         break;
@@ -348,7 +348,7 @@ nkscene_result NKS_CALL nkscene_interaction_poll_hover(nkscene_interaction inter
         return result;
     }
     if (*out_state == NKS_INTERACTION_HOVER_READY) {
-        if (out_result->occurrence.value != 0)
+        if (out_result->node.value != 0)
             state->hovered = *out_result;
         else
             state->hovered.reset();
@@ -382,24 +382,24 @@ nkscene_result NKS_CALL nkscene_interaction_apply_pick(nkscene_interaction inter
     const auto state = resolve(interaction);
     if (!state)
         return NKS_ERROR_INVALID_HANDLE;
-    if (pick->occurrence.value != 0)
+    if (pick->node.value != 0)
         state->hovered = *pick;
     else
         state->hovered.reset();
-    apply_selection(state->selected, pick->occurrence, mode);
+    apply_selection(state->selected, pick->node, mode);
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_interaction_select(nkscene_interaction interaction,
-                                                   nkscene_occurrence_id occurrence,
+                                                   nkscene_node_id node,
                                                    uint32_t mode) {
     nkscene::SelectionMode ignored;
-    if (occurrence.value == 0 || !nkscene::selection_mode(mode, ignored))
+    if (node.value == 0 || !nkscene::selection_mode(mode, ignored))
         return NKS_ERROR_INVALID_ARGUMENT;
     const auto state = resolve(interaction);
     if (!state)
         return NKS_ERROR_INVALID_HANDLE;
-    apply_selection(state->selected, occurrence, mode);
+    apply_selection(state->selected, node, mode);
     return NKS_OK;
 }
 
@@ -415,21 +415,21 @@ nkscene_result NKS_CALL nkscene_interaction_synchronize(nkscene_interaction inte
     if (!state)
         return NKS_ERROR_INVALID_HANDLE;
     std::uint64_t count = 0;
-    if (nkscene_snapshot_get_occurrence_count(snapshot, &count) != NKS_OK)
+    if (nkscene_snapshot_get_node_count(snapshot, &count) != NKS_OK)
         return NKS_ERROR_INVALID_HANDLE;
     std::unordered_set<std::uint64_t> live;
     live.reserve(static_cast<std::size_t>(count));
     for (std::uint64_t index = 0; index < count; ++index) {
-        nkscene_snapshot_occurrence value = {};
+        nkscene_snapshot_node value = {};
         value.struct_size = sizeof(value);
-        if (nkscene_snapshot_get_occurrence(snapshot, index, &value) != NKS_OK)
+        if (nkscene_snapshot_get_node(snapshot, index, &value) != NKS_OK)
             return NKS_ERROR_INVALID_HANDLE;
-        live.insert(value.occurrence.value);
+        live.insert(value.node.value);
     }
-    std::erase_if(state->selected, [&live](nkscene_occurrence_id occurrence) {
-        return !live.contains(occurrence.value);
+    std::erase_if(state->selected, [&live](nkscene_node_id node) {
+        return !live.contains(node.value);
     });
-    if (state->hovered && !live.contains(state->hovered->occurrence.value))
+    if (state->hovered && !live.contains(state->hovered->node.value))
         state->hovered.reset();
     return NKS_OK;
 }
@@ -464,20 +464,20 @@ nkscene_result NKS_CALL nkscene_interaction_get_selection_count(nkscene_interact
 
 nkscene_result NKS_CALL nkscene_interaction_get_selected(nkscene_interaction interaction,
                                                          uint64_t index,
-                                                         nkscene_occurrence_id *out_occurrence) {
-    if (!out_occurrence)
+                                                         nkscene_node_id *out_node) {
+    if (!out_node)
         return NKS_ERROR_INVALID_ARGUMENT;
     const auto state = resolve(interaction);
     if (!state)
         return NKS_ERROR_INVALID_HANDLE;
     if (index >= state->selected.size())
         return NKS_ERROR_INVALID_ARGUMENT;
-    *out_occurrence = state->selected[static_cast<std::size_t>(index)];
+    *out_node = state->selected[static_cast<std::size_t>(index)];
     return NKS_OK;
 }
 
 nkscene_result NKS_CALL nkscene_interaction_is_selected(nkscene_interaction interaction,
-                                                        nkscene_occurrence_id occurrence,
+                                                        nkscene_node_id node,
                                                         uint32_t *out_selected) {
     if (!out_selected)
         return NKS_ERROR_INVALID_ARGUMENT;
@@ -485,8 +485,8 @@ nkscene_result NKS_CALL nkscene_interaction_is_selected(nkscene_interaction inte
     if (!state)
         return NKS_ERROR_INVALID_HANDLE;
     *out_selected = std::any_of(state->selected.begin(), state->selected.end(),
-                                [occurrence](nkscene_occurrence_id value) {
-                                    return value.value == occurrence.value;
+                                [node](nkscene_node_id value) {
+                                    return value.value == node.value;
                                 })
                         ? 1u
                         : 0u;

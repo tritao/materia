@@ -79,7 +79,7 @@ struct BatchKeyHash {
 
 struct DesiredBatch {
     BatchKey key;
-    std::vector<OccurrenceId> instances;
+    std::vector<NodeId> instances;
     std::vector<std::uint64_t> transform_revisions;
     std::vector<std::array<float, 16>> transforms;
     std::vector<std::uint32_t> pick_ids;
@@ -185,13 +185,13 @@ bool pack_geometry_vertices(const GeometryResource &resource, std::vector<SceneV
 }
 
 std::array<float, 4> scene_lighting(const SceneSnapshot &snapshot) noexcept {
-    for (const auto &occurrence : snapshot.occurrences()) {
-        if (!occurrence.light.valid())
+    for (const auto &node : snapshot.nodes()) {
+        if (!node.light.valid())
             continue;
-        const auto *light = snapshot.find_light(occurrence.light);
+        const auto *light = snapshot.find_light(node.light);
         if (!light)
             continue;
-        const auto &matrix = occurrence.world_transform.transform.matrix;
+        const auto &matrix = node.world_transform.transform.matrix;
         std::array<float, 3> direction{-matrix[0], -matrix[1], -matrix[2]};
         const auto length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] +
                                       direction[2] * direction[2]);
@@ -215,8 +215,8 @@ ClipUniformData clip_uniform_data(const RenderPlan &plan) {
 DesiredBatch desired_batch(const RenderPlan &plan, const InstanceBatch &batch) {
     DesiredBatch desired{{batch.geometry, batch.material}};
     const auto transforms = plan.transforms();
-    for (const auto occurrence : batch.instances) {
-        const auto item_index = plan.item_index(occurrence);
+    for (const auto node : batch.instances) {
+        const auto item_index = plan.item_index(node);
         const auto *item =
             item_index == static_cast<std::size_t>(-1) ? nullptr : &plan.items()[item_index];
         if (!item || has_render_flag(item->flags, RenderFlags::Hidden) ||
@@ -224,7 +224,7 @@ DesiredBatch desired_batch(const RenderPlan &plan, const InstanceBatch &batch) {
             item->transformIndex >= transforms.size())
             continue;
         const auto &transform = transforms[item->transformIndex];
-        desired.instances.push_back(occurrence);
+        desired.instances.push_back(node);
         desired.transform_revisions.push_back(transform.revision);
         desired.transforms.push_back(transform.transform.matrix);
         desired.pick_ids.push_back(item->pickId);
@@ -270,7 +270,7 @@ struct NativeKitGpuExecutor::State {
     struct BatchGpu {
         BatchKey key;
         nkgpu_buffer buffer{};
-        std::vector<OccurrenceId> instances;
+        std::vector<NodeId> instances;
         std::vector<std::uint64_t> transform_revisions;
         std::vector<std::uint32_t> pick_ids;
     };
@@ -312,9 +312,9 @@ struct NativeKitGpuExecutor::State {
     std::vector<BatchGpu> batches;
     std::unordered_map<BatchKey, std::size_t, BatchKeyHash> batch_by_key;
     std::vector<std::size_t> free_batches;
-    std::unordered_map<OccurrenceId, BatchInstance> batch_instances;
+    std::unordered_map<NodeId, BatchInstance> batch_instances;
     std::vector<GpuCommand> commands;
-    std::unordered_map<OccurrenceId, std::size_t> command_by_occurrence;
+    std::unordered_map<NodeId, std::size_t> command_by_node;
     std::uint64_t plan_identity = 0;
     std::uint64_t plan_revision = 0;
     bool plan_initialized = false;
@@ -387,7 +387,7 @@ struct NativeKitGpuExecutor::State {
         free_batches.clear();
         batch_instances.clear();
         commands.clear();
-        command_by_occurrence.clear();
+        command_by_node.clear();
         plan_identity = 0;
         plan_revision = 0;
         plan_initialized = false;
@@ -1146,54 +1146,54 @@ template <class StateT> void rebuild_batch_index(StateT &state) {
 
 template <class StateT> void rebuild_commands(StateT &state, const RenderPlan &plan) {
     state.commands.clear();
-    state.command_by_occurrence.clear();
+    state.command_by_node.clear();
     state.commands.reserve(plan.items().size());
     for (const auto &item : plan.items()) {
         if (has_render_flag(item.flags, RenderFlags::Hidden) ||
             has_render_flag(item.flags, RenderFlags::Culled))
             continue;
-        state.command_by_occurrence.emplace(item.occurrence, state.commands.size());
+        state.command_by_node.emplace(item.node, state.commands.size());
         state.commands.push_back(
-            {item.occurrence, item.geometry, item.material, item.transformIndex});
+            {item.node, item.geometry, item.material, item.transformIndex});
     }
 }
 
 template <class StateT> void remove_command(StateT &state, std::size_t command_index) {
     const auto last = state.commands.size() - 1;
-    const auto removed = state.commands[command_index].occurrence;
+    const auto removed = state.commands[command_index].node;
     if (command_index != last) {
         state.commands[command_index] = state.commands[last];
-        state.command_by_occurrence[state.commands[command_index].occurrence] = command_index;
+        state.command_by_node[state.commands[command_index].node] = command_index;
     }
     state.commands.pop_back();
-    state.command_by_occurrence.erase(removed);
+    state.command_by_node.erase(removed);
 }
 
 template <class StateT>
 void patch_commands(StateT &state, const RenderPlan &plan,
-                    std::span<const OccurrenceId> affected_occurrences, GpuExecutionStats &stats) {
-    std::unordered_set<OccurrenceId> seen;
-    seen.reserve(affected_occurrences.size());
-    for (const auto occurrence : affected_occurrences) {
-        if (!seen.insert(occurrence).second)
+                    std::span<const NodeId> affected_nodes, GpuExecutionStats &stats) {
+    std::unordered_set<NodeId> seen;
+    seen.reserve(affected_nodes.size());
+    for (const auto node : affected_nodes) {
+        if (!seen.insert(node).second)
             continue;
-        const auto item_index = plan.item_index(occurrence);
+        const auto item_index = plan.item_index(node);
         const auto *item =
             item_index == static_cast<std::size_t>(-1) ? nullptr : &plan.items()[item_index];
         const bool desired = item && !has_render_flag(item->flags, RenderFlags::Hidden) &&
                              !has_render_flag(item->flags, RenderFlags::Culled);
-        const auto found = state.command_by_occurrence.find(occurrence);
+        const auto found = state.command_by_node.find(node);
         if (!desired) {
-            if (found != state.command_by_occurrence.end()) {
+            if (found != state.command_by_node.end()) {
                 remove_command(state, found->second);
                 ++stats.commands_patched;
             }
             continue;
         }
-        const GpuCommand command{item->occurrence, item->geometry, item->material,
+        const GpuCommand command{item->node, item->geometry, item->material,
                                  item->transformIndex};
-        if (found == state.command_by_occurrence.end()) {
-            state.command_by_occurrence.emplace(occurrence, state.commands.size());
+        if (found == state.command_by_node.end()) {
+            state.command_by_node.emplace(node, state.commands.size());
             state.commands.push_back(command);
         } else {
             state.commands[found->second] = command;
@@ -1208,8 +1208,8 @@ template <class StateT> void remove_batch(StateT &state, std::size_t batch_index
     auto &batch = state.batches[batch_index];
     if (!batch.key.geometry.valid())
         return;
-    for (const auto occurrence : batch.instances) {
-        const auto found = state.batch_instances.find(occurrence);
+    for (const auto node : batch.instances) {
+        const auto found = state.batch_instances.find(node);
         if (found != state.batch_instances.end() && found->second.batch == batch_index)
             state.batch_instances.erase(found);
     }
@@ -1268,8 +1268,8 @@ bool update_batch(StateT &state, const DesiredBatch &desired, std::size_t batch_
 
 template <class StateT>
 bool synchronize_batches(StateT &state, const RenderPlan &plan, GpuExecutionStats &stats,
-                         std::span<const OccurrenceId> affected_occurrences = {}) {
-    if (affected_occurrences.empty()) {
+                         std::span<const NodeId> affected_nodes = {}) {
+    if (affected_nodes.empty()) {
         const auto desired = desired_batches(plan);
         bool same_layout = desired.size() == state.batch_by_key.size();
         if (same_layout) {
@@ -1304,14 +1304,14 @@ bool synchronize_batches(StateT &state, const RenderPlan &plan, GpuExecutionStat
     }
 
     std::unordered_set<BatchKey, BatchKeyHash> affected_batches;
-    affected_batches.reserve(affected_occurrences.size() * 2);
-    for (const auto occurrence : affected_occurrences) {
-        const auto old_instance = state.batch_instances.find(occurrence);
+    affected_batches.reserve(affected_nodes.size() * 2);
+    for (const auto node : affected_nodes) {
+        const auto old_instance = state.batch_instances.find(node);
         if (old_instance != state.batch_instances.end() &&
             old_instance->second.batch < state.batches.size())
             affected_batches.insert(state.batches[old_instance->second.batch].key);
 
-        const auto batch_index = plan.batch_index(occurrence);
+        const auto batch_index = plan.batch_index(node);
         if (batch_index != static_cast<std::size_t>(-1)) {
             const auto &batch = plan.batches()[batch_index];
             affected_batches.insert({batch.geometry, batch.material});
@@ -1422,22 +1422,22 @@ bool prepare_changed_resources(StateT &state, const SceneSnapshot &snapshot,
 
 template <class StateT>
 bool patch_instance_records(StateT &state, const RenderPlan &plan,
-                            std::span<const OccurrenceId> occurrences, GpuExecutionStats &stats) {
+                            std::span<const NodeId> nodes, GpuExecutionStats &stats) {
     if (!state.renderer.id)
         return true;
-    std::unordered_set<OccurrenceId> seen;
-    seen.reserve(occurrences.size());
-    for (const auto occurrence : occurrences) {
-        if (!seen.insert(occurrence).second)
+    std::unordered_set<NodeId> seen;
+    seen.reserve(nodes.size());
+    for (const auto node : nodes) {
+        if (!seen.insert(node).second)
             continue;
-        const auto item_index = plan.item_index(occurrence);
+        const auto item_index = plan.item_index(node);
         if (item_index == static_cast<std::size_t>(-1))
             continue;
         const auto &item = plan.items()[item_index];
         if (has_render_flag(item.flags, RenderFlags::Hidden) ||
             has_render_flag(item.flags, RenderFlags::Culled))
             continue;
-        const auto found = state.batch_instances.find(occurrence);
+        const auto found = state.batch_instances.find(node);
         if (found == state.batch_instances.end() || found->second.batch >= state.batches.size())
             return false;
         if (item.transformIndex >= plan.transforms().size())
@@ -1645,8 +1645,8 @@ bool NativeKitGpuExecutor::synchronize(const RenderPlan &plan, const SceneSnapsh
         bool full_rebuild = false;
         bool layout_changed = false;
         bool resource_delta_complete = true;
-        std::vector<OccurrenceId> transforms;
-        std::vector<OccurrenceId> layout_occurrences;
+        std::vector<NodeId> transforms;
+        std::vector<NodeId> layout_nodes;
         std::vector<GeometryId> geometries;
         std::vector<MaterialId> materials;
     } work;
@@ -1657,9 +1657,9 @@ bool NativeKitGpuExecutor::synchronize(const RenderPlan &plan, const SceneSnapsh
             work.resource_delta_complete && delta.resource_delta_complete;
         work.transforms.insert(work.transforms.end(), delta.transforms.begin(),
                                delta.transforms.end());
-        work.layout_occurrences.insert(work.layout_occurrences.end(),
-                                       delta.layout_occurrences.begin(),
-                                       delta.layout_occurrences.end());
+        work.layout_nodes.insert(work.layout_nodes.end(),
+                                       delta.layout_nodes.begin(),
+                                       delta.layout_nodes.end());
         work.geometries.insert(work.geometries.end(), delta.geometries.begin(),
                                delta.geometries.end());
         work.materials.insert(work.materials.end(), delta.materials.begin(), delta.materials.end());
@@ -1711,10 +1711,10 @@ bool NativeKitGpuExecutor::synchronize(const RenderPlan &plan, const SceneSnapsh
     if (work.full_rebuild)
         rebuild_commands(*state_, plan);
     else if (work.layout_changed) {
-        if (work.layout_occurrences.empty())
+        if (work.layout_nodes.empty())
             rebuild_commands(*state_, plan);
         else
-            patch_commands(*state_, plan, work.layout_occurrences, stats);
+            patch_commands(*state_, plan, work.layout_nodes, stats);
     }
     stats.commands = state_->commands.size();
 
@@ -1726,7 +1726,7 @@ bool NativeKitGpuExecutor::synchronize(const RenderPlan &plan, const SceneSnapsh
             return false;
         if (work.layout_changed) {
             if (state_->renderer.id &&
-                !synchronize_batches(*state_, plan, stats, work.layout_occurrences))
+                !synchronize_batches(*state_, plan, stats, work.layout_nodes))
                 return false;
         } else if (!patch_instance_records(*state_, plan, work.transforms, stats)) {
             if (stats.result != NKGPU_OK)

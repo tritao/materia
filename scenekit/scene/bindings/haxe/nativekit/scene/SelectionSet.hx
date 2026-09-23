@@ -1,21 +1,21 @@
 package nativekit.scene;
 
-/** Reusable set of occurrences to highlight through a view material override. */
+/** Reusable set of nodes to highlight through a view material override. */
 class SelectionSet {
-	var entries:Array<Occurrence> = [];
+	var entries:Array<Node> = [];
 
 	public function new() {}
 
-	public function add(occurrence:Occurrence):SelectionSet {
-		if (!contains(occurrence))
-			entries.push(occurrence);
+	public function add(node:Node):SelectionSet {
+		if (!contains(node))
+			entries.push(node);
 		return this;
 	}
 
-	public function remove(occurrence:Occurrence):SelectionSet {
+	public function remove(node:Node):SelectionSet {
 		var index = 0;
 		while (index < entries.length) {
-			if (entries[index].equals(occurrence))
+			if (entries[index].equals(node))
 				entries.splice(index, 1);
 			else
 				index++;
@@ -28,9 +28,9 @@ class SelectionSet {
 		return this;
 	}
 
-	public function contains(occurrence:Occurrence):Bool {
+	public function contains(node:Node):Bool {
 		for (value in entries)
-			if (value.equals(occurrence))
+			if (value.equals(node))
 				return true;
 		return false;
 	}
@@ -40,7 +40,7 @@ class SelectionSet {
 
 	@:allow(SceneView)
 	function apply(view:SceneView, material:Material):Void {
-		for (occurrence in entries)
-			view.setSelectionMaterial(occurrence, material);
+		for (node in entries)
+			view.setSelectionMaterial(node, material);
 	}
 }

@@ -12,10 +12,19 @@ class SpatialIndex {
 		this.owner = owner;
 	}
 
-	public static function create(snapshot:Snapshot):SpatialIndex {
-		var made = NativeKitSceneRender.nkscene_render_spatial_index_create(snapshot.nativeHandle());
-		check(made.status, "spatialIndex.create");
-		return new SpatialIndex(made.out_index);
+	public static function create(snapshot:Snapshot, ?view:SceneView):SpatialIndex {
+		var owner:Ownednkscene_render_spatial_index;
+		if (view == null) {
+			var made = NativeKitSceneRender.nkscene_render_spatial_index_create(snapshot.nativeHandle());
+			check(made.status, "spatialIndex.create");
+			owner = made.out_index;
+		} else {
+			var made = NativeKitSceneRender.nkscene_render_spatial_index_create_with_view(
+				snapshot.nativeHandle(), view.nativeValue());
+			check(made.status, "spatialIndex.create");
+			owner = made.out_index;
+		}
+		return new SpatialIndex(owner);
 	}
 
 	public function sourceRevision():haxe.Int64 {
@@ -25,9 +34,9 @@ class SpatialIndex {
 		return result.out_revision;
 	}
 
-	/** Returns occurrences whose snapshot bounds overlap the supplied box. */
+	/** Returns nodes whose snapshot bounds overlap the supplied box. */
 	public function queryBounds(minX:Float, minY:Float, minZ:Float,
-			maxX:Float, maxY:Float, maxZ:Float):Array<Occurrence> {
+			maxX:Float, maxY:Float, maxZ:Float):Array<Node> {
 		ensureLive();
 		var bounds = new nkscene_bounds();
 		bounds.set_valid(1);
@@ -40,17 +49,17 @@ class SpatialIndex {
 		var result = NativeKitSceneRender.nkscene_render_spatial_index_query_bounds(
 			owner.borrow(), bounds);
 		check(result.status, "spatialIndex.queryBounds");
-		return readOccurrences(result.out_count);
+		return readNodes(result.out_count);
 	}
 
-	/** Returns occurrences whose snapshot bounds intersect the supplied ray. */
+	/** Returns nodes whose snapshot bounds intersect the supplied ray. */
 	public function queryRay(originX:Float, originY:Float, originZ:Float,
-			directionX:Float, directionY:Float, directionZ:Float):Array<Occurrence> {
+			directionX:Float, directionY:Float, directionZ:Float):Array<Node> {
 		ensureLive();
 		var ray = makeRay(originX, originY, originZ, directionX, directionY, directionZ),
 			result = NativeKitSceneRender.nkscene_render_spatial_index_query_ray(owner.borrow(), ray);
 		check(result.status, "spatialIndex.queryRay");
-		return readOccurrences(result.out_count);
+		return readNodes(result.out_count);
 	}
 
 	/** Returns the nearest visible triangle hit, including source and subelement identity. */
@@ -73,14 +82,14 @@ class SpatialIndex {
 	public function isDisposed():Bool
 		return disposed;
 
-	function readOccurrences(count:haxe.Int64):Array<Occurrence> {
-		var result:Array<Occurrence> = [],
+	function readNodes(count:haxe.Int64):Array<Node> {
+		var result:Array<Node> = [],
 			total = haxe.Int64.toInt(count);
 		for (index in 0...total) {
-			var occurrence = NativeKitSceneRender.nkscene_render_spatial_index_get_occurrence(
+			var node = NativeKitSceneRender.nkscene_render_spatial_index_get_node(
 				owner.borrow(), index);
-			check(occurrence.status, "spatialIndex.getOccurrence");
-			result.push(Occurrence.fromNative(occurrence.out_result.get_occurrence()));
+			check(node.status, "spatialIndex.getNode");
+			result.push(Node.fromNative(node.out_result.get_node()));
 		}
 		return result;
 	}
