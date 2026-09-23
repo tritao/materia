@@ -55,55 +55,6 @@ class ScenePresentation {
 		interaction.clearSelection();
 	}
 
-	/** Applies source rules to the view. The view remains their sole owner. */
-	public function setSourceFilter(filter:Null<SceneViewFilter>):ScenePresentation {
-		ensureLive();
-		view.clearIsolation();
-		if (filter == null) {
-			view.clearSourceFilter();
-			return this;
-		}
-	filter.applyTo(view);
-		return this;
-	}
-
-	public function clearSourceFilter():ScenePresentation
-		return setSourceFilter(null);
-
-	public function clearIsolation():ScenePresentation {
-		ensureLive();
-		view.clearIsolation();
-		return this;
-	}
-
-	/** Isolates the source entities represented by the current selection. */
-	public function isolateSelection(snapshot:SceneSnapshot):ScenePresentation {
-		ensureLive();
-		var sources:Array<haxe.Int64> = [];
-		view.clearIsolation();
-		for (node in interaction.selected()) {
-			var info = snapshot.findNode(node);
-			if (info == null)
-				continue;
-			var source = info.sourceValue();
-			if (source == haxe.Int64.ofInt(0)) {
-				view.setIsolatedNode(node, true);
-				continue;
-			}
-			var found = false;
-			for (existing in sources)
-				if (existing == source) {
-					found = true;
-					break;
-				}
-			if (!found)
-				sources.push(source);
-		}
-		for (source in sources)
-			view.setIsolatedSource(source, true);
-		return this;
-	}
-
 	/**
 	 * Advances interaction state and renders one frame from an immutable
 	 * snapshot. The view and render plan are reused across frames.

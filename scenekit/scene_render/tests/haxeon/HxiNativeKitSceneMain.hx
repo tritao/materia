@@ -342,7 +342,7 @@ class Main {
 			|| presentationView.selectionOverrideCount() != 1
 			|| sourcePresentationUpdate != null
 			|| haxe.Int64.toInt(sourcePresentationExecution.get_commands()) != 1) return 32;
-		sourcePresentation.isolateSelection(snapshot);
+		presentationView.setIsolatedSource(haxe.Int64.ofInt(42), true);
 		var selectedIsolationExecution = sourcePresentation.render(presentationRenderer, snapshot),
 			selectedIsolationUpdate = presentationRenderer.lastUpdate();
 		if (presentationView.isolatedSourceCount() != 1
@@ -350,14 +350,14 @@ class Main {
 			|| selectedIsolationUpdate.get_plan_rebuilt() != 0
 			|| haxe.Int64.toInt(selectedIsolationUpdate.get_patched_visibility()) != 0
 			|| haxe.Int64.toInt(selectedIsolationExecution.get_commands()) != 1) return 32;
-		sourcePresentation.clearIsolation();
+		presentationView.clearIsolation();
 		var clearedIsolationExecution = sourcePresentation.render(presentationRenderer, snapshot),
 			clearedIsolationUpdate = presentationRenderer.lastUpdate();
 		if (presentationView.isolatedSourceCount() != 0
 			|| clearedIsolationUpdate == null
 			|| clearedIsolationUpdate.get_plan_rebuilt() != 0
 			|| haxe.Int64.toInt(clearedIsolationExecution.get_commands()) != 1) return 32;
-		sourcePresentation.clearSourceFilter();
+		presentationView.clearSourceFilter();
 		var restoredPresentationExecution = sourcePresentation.render(presentationRenderer, snapshot),
 			restoredPresentationUpdate = presentationRenderer.lastUpdate();
 		if (presentationView.sourceVisibilityOverrideCount() != 0
@@ -367,7 +367,7 @@ class Main {
 			|| haxe.Int64.toInt(restoredPresentationExecution.get_commands()) != 2) return 32;
 		sourcePresentation.clearSelection();
 		sourcePresentation.select(group, SelectionMode.Replace);
-		sourcePresentation.isolateSelection(snapshot);
+		presentationView.setIsolatedNode(group, true);
 		var fallbackIsolationExecution = sourcePresentation.render(presentationRenderer, snapshot),
 			fallbackIsolationUpdate = presentationRenderer.lastUpdate();
 		if (presentationView.isolatedSourceCount() != 0
@@ -375,7 +375,7 @@ class Main {
 			|| fallbackIsolationUpdate == null
 			|| fallbackIsolationUpdate.get_plan_rebuilt() != 0
 			|| haxe.Int64.toInt(fallbackIsolationExecution.get_commands()) != 2) return 33;
-		sourcePresentation.clearIsolation();
+		presentationView.clearIsolation();
 		sourcePresentation.dispose();
 		presentationRenderer.dispose();
 		var clippedView = new SceneView().setRoot(group).setViewProjection(Transform.identity())

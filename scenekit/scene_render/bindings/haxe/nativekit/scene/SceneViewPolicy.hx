@@ -4,9 +4,8 @@ package nativekit.scene;
  * Reusable base presentation rules for a SceneView.
  *
  * Policies are composable: apply them in order and a later rule for the same
- * node replaces an earlier rule in the same layer. Selection and hover are
- * applied by ScenePresentation from SceneInteraction into SceneView's
- * transient layers.
+ * node replaces an earlier rule in the same layer. ScenePresentation applies
+ * selection and hover from SceneInteraction into SceneView's transient layers.
  */
 class SceneViewPolicy {
 	final visibility:VisibilityFilter;
