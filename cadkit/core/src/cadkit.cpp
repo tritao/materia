@@ -126,8 +126,16 @@ std::vector<OperationEntry> g_operations;
 std::vector<std::uint16_t> g_free_operation_slots;
 thread_local std::string g_last_error;
 
+enum class HandleKind : std::uint32_t {
+    Shape = 1,
+    Mesh = 2,
+    Operation = 3
+};
+
 constexpr std::uint32_t kSlotMask = 0xffffu;
 constexpr std::uint32_t kGenerationShift = 16u;
+constexpr std::uint32_t kGenerationMask = 0x3fffu;
+constexpr std::uint32_t kHandleKindShift = 30u;
 
 void clear_error() {
     g_last_error.clear();
@@ -151,20 +159,34 @@ cad_result fail_occt(cad_result result, const Standard_Failure& error) {
     return result;
 }
 
-cad_shape encode_handle(std::uint16_t slot, std::uint16_t generation) {
-    return (static_cast<cad_shape>(generation) << kGenerationShift) | slot;
+std::uint32_t encode_handle(HandleKind kind, std::uint16_t slot, std::uint16_t generation) {
+    return (static_cast<std::uint32_t>(kind) << kHandleKindShift) |
+        (static_cast<std::uint32_t>(generation) << kGenerationShift) | slot;
 }
 
-bool decode_handle(cad_shape handle, std::uint16_t& slot, std::uint16_t& generation) {
+bool decode_handle(
+    std::uint32_t handle,
+    HandleKind expected_kind,
+    std::uint16_t& slot,
+    std::uint16_t& generation) {
     slot = static_cast<std::uint16_t>(handle & kSlotMask);
-    generation = static_cast<std::uint16_t>(handle >> kGenerationShift);
-    return slot != 0 && generation != 0;
+    generation = static_cast<std::uint16_t>((handle >> kGenerationShift) & kGenerationMask);
+    const auto kind = handle >> kHandleKindShift;
+    return kind == static_cast<std::uint32_t>(expected_kind) && slot != 0 && generation != 0;
+}
+
+bool advance_generation(std::uint16_t& generation) {
+    if (generation >= kGenerationMask) {
+        return false;
+    }
+    ++generation;
+    return true;
 }
 
 ShapeEntry* lookup_locked(cad_shape handle) {
     std::uint16_t slot = 0;
     std::uint16_t generation = 0;
-    if (!decode_handle(handle, slot, generation)) {
+    if (!decode_handle(handle, HandleKind::Shape, slot, generation)) {
         return nullptr;
     }
 
@@ -183,7 +205,7 @@ ShapeEntry* lookup_locked(cad_shape handle) {
 MeshEntry* lookup_mesh_locked(cad_mesh handle) {
     std::uint16_t slot = 0;
     std::uint16_t generation = 0;
-    if (!decode_handle(handle, slot, generation)) {
+    if (!decode_handle(handle, HandleKind::Mesh, slot, generation)) {
         return nullptr;
     }
 
@@ -202,7 +224,7 @@ MeshEntry* lookup_mesh_locked(cad_mesh handle) {
 OperationEntry* lookup_operation_locked(cad_operation handle) {
     std::uint16_t slot = 0;
     std::uint16_t generation = 0;
-    if (!decode_handle(handle, slot, generation)) {
+    if (!decode_handle(handle, HandleKind::Operation, slot, generation)) {
         return nullptr;
     }
 
@@ -231,7 +253,7 @@ cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape) {
             g_free_slots.pop_back();
             auto& entry = g_shapes[slot - 1];
             entry.shape.emplace(std::move(shape));
-            *out_shape = encode_handle(slot, entry.generation);
+            *out_shape = encode_handle(HandleKind::Shape, slot, entry.generation);
             return CAD_OK;
         }
 
@@ -243,7 +265,7 @@ cad_result insert_shape(TopoDS_Shape shape, cad_shape* out_shape) {
         auto& entry = g_shapes.back();
         entry.shape.emplace(std::move(shape));
         slot = static_cast<std::uint16_t>(g_shapes.size());
-        *out_shape = encode_handle(slot, entry.generation);
+        *out_shape = encode_handle(HandleKind::Shape, slot, entry.generation);
         return CAD_OK;
     } catch (const std::bad_alloc& error) {
         return fail(CAD_ERROR_OUT_OF_MEMORY, error);
@@ -332,11 +354,9 @@ void release_shape_locked(cad_shape handle) {
 
     const auto slot = static_cast<std::uint16_t>(handle & kSlotMask);
     entry->shape.reset();
-    entry->generation = static_cast<std::uint16_t>(entry->generation + 1);
-    if (entry->generation == 0) {
-        entry->generation = 1;
+    if (advance_generation(entry->generation)) {
+        g_free_slots.push_back(slot);
     }
-    g_free_slots.push_back(slot);
 }
 
 bool shape_kind_to_occt(cad_shape_kind kind, TopAbs_ShapeEnum& out_kind) {
@@ -1198,7 +1218,7 @@ cad_result insert_mesh(MeshData mesh, cad_mesh* out_mesh) {
             g_free_mesh_slots.pop_back();
             auto& entry = g_meshes[slot - 1];
             entry.mesh.emplace(std::move(mesh));
-            *out_mesh = encode_handle(slot, entry.generation);
+            *out_mesh = encode_handle(HandleKind::Mesh, slot, entry.generation);
             return CAD_OK;
         }
 
@@ -1210,7 +1230,7 @@ cad_result insert_mesh(MeshData mesh, cad_mesh* out_mesh) {
         auto& entry = g_meshes.back();
         entry.mesh.emplace(std::move(mesh));
         slot = static_cast<std::uint16_t>(g_meshes.size());
-        *out_mesh = encode_handle(slot, entry.generation);
+        *out_mesh = encode_handle(HandleKind::Mesh, slot, entry.generation);
         return CAD_OK;
     } catch (const std::bad_alloc& error) {
         return fail(CAD_ERROR_OUT_OF_MEMORY, error);
@@ -1232,7 +1252,7 @@ cad_result insert_operation(OperationData operation, cad_operation* out_operatio
             g_free_operation_slots.pop_back();
             auto& entry = g_operations[slot - 1];
             entry.operation.emplace(std::move(operation));
-            *out_operation = encode_handle(slot, entry.generation);
+            *out_operation = encode_handle(HandleKind::Operation, slot, entry.generation);
             return CAD_OK;
         }
 
@@ -1244,7 +1264,7 @@ cad_result insert_operation(OperationData operation, cad_operation* out_operatio
         auto& entry = g_operations.back();
         entry.operation.emplace(std::move(operation));
         slot = static_cast<std::uint16_t>(g_operations.size());
-        *out_operation = encode_handle(slot, entry.generation);
+        *out_operation = encode_handle(HandleKind::Operation, slot, entry.generation);
         return CAD_OK;
     } catch (const std::bad_alloc& error) {
         return fail(CAD_ERROR_OUT_OF_MEMORY, error);
@@ -1261,11 +1281,9 @@ void release_operation_locked(cad_operation handle) {
 
     const auto slot = static_cast<std::uint16_t>(handle & kSlotMask);
     entry->operation.reset();
-    entry->generation = static_cast<std::uint16_t>(entry->generation + 1);
-    if (entry->generation == 0) {
-        entry->generation = 1;
+    if (advance_generation(entry->generation)) {
+        g_free_operation_slots.push_back(slot);
     }
-    g_free_operation_slots.push_back(slot);
 }
 
 cad_result build_mesh(
@@ -2842,11 +2860,9 @@ extern "C" CADKIT_API void cad_mesh_destroy(cad_mesh mesh) {
 
     const auto slot = static_cast<std::uint16_t>(mesh & kSlotMask);
     entry->mesh.reset();
-    entry->generation = static_cast<std::uint16_t>(entry->generation + 1);
-    if (entry->generation == 0) {
-        entry->generation = 1;
+    if (advance_generation(entry->generation)) {
+        g_free_mesh_slots.push_back(slot);
     }
-    g_free_mesh_slots.push_back(slot);
 }
 
 extern "C" CADKIT_API void cad_operation_destroy(cad_operation operation) {

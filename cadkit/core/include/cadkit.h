@@ -64,7 +64,7 @@ typedef struct cad_bounds {
     cad_vec3 max;
 } cad_bounds;
 
-/* Zero is never a valid handle. Handles are generation checked by the core. */
+/* Zero is invalid. Handles are opaque, process-local values with kind and generation checks. */
 typedef uint32_t cad_shape CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_shape_destroy);
 typedef uint32_t cad_mesh CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_mesh_destroy);
 typedef uint32_t cad_operation CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_operation_destroy);

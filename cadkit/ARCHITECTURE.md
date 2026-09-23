@@ -25,13 +25,17 @@ system, a simulator, or the parametric document model.
 
 1. The public ABI is C, never C++.
 2. OCCT classes never cross the ABI.
-3. Public CAD objects are opaque, generation-checked handles.
+3. Public CAD objects are opaque, kind-tagged, generation-checked handles.
 4. Ownership and destruction are explicit.
 5. Native exceptions never escape the C boundary.
 6. Large geometry crosses the ABI in bulk rather than item-by-item.
 7. CAD topology and render meshes are separate concepts.
 8. Parametric documents live above `cadkit-core`.
 9. ABI additions are backwards-compatible once public.
+
+Handle values are process-local and must not be persisted. Slots retire when
+their generation reaches its limit rather than wrapping and making an old
+handle valid again; shape, mesh, and operation handles have distinct tags.
 
 The initial implementation proves the handle table, primitive construction,
 bounds queries, immutable transforms, and bulk tessellation into owned mesh

@@ -166,6 +166,9 @@ int main() {
     assert(cad_operation_history_count(
                translate_operation, CAD_HISTORY_MODIFIED, &modified_count) == CAD_OK);
     assert(modified_count > 0);
+    cad_shape_kind wrong_kind = CAD_SHAPE_UNKNOWN;
+    assert(cad_shape_kind_get(static_cast<cad_shape>(translate_operation), &wrong_kind) ==
+           CAD_ERROR_INVALID_HANDLE);
     cad_shape_destroy(translate_result);
 
     cad_shape_kind shape_kind = CAD_SHAPE_UNKNOWN;
@@ -266,6 +269,9 @@ int main() {
     cad_mesh_options mesh_options{0.1, 0.5};
     cad_mesh mesh = 0;
     assert(cad_shape_tessellate(shape, &mesh_options, &mesh) == CAD_OK);
+    assert(cad_shape_kind_get(static_cast<cad_shape>(mesh), &wrong_kind) == CAD_ERROR_INVALID_HANDLE);
+    assert(cad_mesh_vertex_count(static_cast<cad_mesh>(shape), &vertex_count) ==
+           CAD_ERROR_INVALID_HANDLE);
     assert(cad_shape_subshape_count(shape, CAD_SHAPE_FACE, &face_count) == CAD_OK);
 
     uint32_t index_count = 0;
@@ -621,6 +627,20 @@ int main() {
                translate_operation, CAD_HISTORY_MODIFIED, &modified_count) ==
            CAD_ERROR_INVALID_HANDLE);
     assert(cad_last_error()[0] != '\0');
+
+    cad_shape stale_after_wrap = 0;
+    assert(cad_compound(nullptr, 0, &stale_after_wrap) == CAD_OK);
+    cad_shape_destroy(stale_after_wrap);
+    // Exercise more releases than the former 16-bit generation could survive.
+    for (std::uint32_t index = 0; index <= 65534; ++index) {
+        cad_shape churn = 0;
+        assert(cad_compound(nullptr, 0, &churn) == CAD_OK);
+        if (index == 65534) {
+            cad_shape_kind stale_kind = CAD_SHAPE_UNKNOWN;
+            assert(cad_shape_kind_get(stale_after_wrap, &stale_kind) == CAD_ERROR_INVALID_HANDLE);
+        }
+        cad_shape_destroy(churn);
+    }
 
     return 0;
 }
