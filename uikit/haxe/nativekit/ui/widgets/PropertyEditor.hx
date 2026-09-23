@@ -263,6 +263,8 @@ private class PropertyEditorRow implements View {
 	}
 
 	public function build(context:BuildContext):RenderNode {
+		var observed = context.buildProbe != null;
+		var started = observed ? Sys.time() : 0.0;
 		var value = descriptor.readValue(context.commandContext);
 		var labelStyle = new LayoutStyle();
 		labelStyle.width = LayoutAxis.fixed(owner.labelWidth);
@@ -286,17 +288,24 @@ private class PropertyEditorRow implements View {
 		}
 		var row = new Row("row", children, rowStyle);
 		var error = owner.errorFor(descriptor.id);
-		if (error == null)
-			return row.build(context);
+		if (error == null) {
+			var result = row.build(context);
+			if (observed)
+				context.reportBuild("property:" + descriptor.id, 0.0, Sys.time() - started, result);
+			return result;
+		}
 		var errorStyle = new LayoutStyle();
 		errorStyle.width = LayoutAxis.grow();
 		var columnStyle = new LayoutStyle();
 		columnStyle.width = LayoutAxis.grow();
 		columnStyle.height = LayoutAxis.fit();
 		columnStyle.childGap = 2.0;
-		return new Column("error-row", [
+		var result = new Column("error-row", [
 			new KeyedView("field", row),
 			new KeyedView("message", new Text(error, errorStyle))
 		], columnStyle).build(context);
+		if (observed)
+			context.reportBuild("property:" + descriptor.id, 0.0, Sys.time() - started, result);
+		return result;
 	}
 }
