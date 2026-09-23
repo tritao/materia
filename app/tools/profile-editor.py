@@ -45,8 +45,9 @@ def main():
     parser.add_argument("--no-profile", action="store_true", help="measure without profiler overhead")
     parser.add_argument("--heap-dump", action="store_true",
                         help="save a full GC heap dump and its exact bytecode (headless scenario only)")
-    parser.add_argument("--scenario", choices=["tab-inspector"], help="replay a headless UI interaction")
-    parser.add_argument("--cycles", type=int, default=20, help="headless Hierarchy/Sensors cycles (default: 20)")
+    parser.add_argument("--scenario", choices=["tab-inspector", "tab-matrix"],
+                        help="replay a headless UI interaction")
+    parser.add_argument("--cycles", type=int, default=20, help="headless scenario cycles (default: 20)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the existing compiled editor")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("editor_args", nargs=argparse.REMAINDER)
@@ -113,7 +114,7 @@ def main():
             command += ["--diagnostics", str(port), "--diagnostics-wait"]
         command += [str(binary)]
         if args.scenario is not None:
-            command += [str(output), str(args.cycles)]
+            command += [str(output), str(args.cycles), args.scenario]
             if args.heap_dump:
                 command.append(str(output / "heap.dump"))
         elif args.idle_seconds is None:
@@ -188,6 +189,38 @@ def main():
                 misses = statistics.median(frame["styleCacheMisses"] for frame in action_frames)
                 print(f"{action}: frames={len(action_frames)} median={median:.1f}ms "
                       f"tree/style={tree:.1f}ms nodes={nodes:.0f} cache misses={misses:.0f}")
+            if args.scenario == "tab-matrix":
+                transitions = [frame for frame in frames if "->" in frame.get("action", "")]
+                def latency_ms(frame):
+                    return (frame["frameSeconds"] + frame["inputSeconds"]) * 1000
+                for action in sorted({frame["action"] for frame in transitions}):
+                    group = [frame for frame in transitions if frame["action"] == action]
+                    steady = [frame for frame in group if frame["cycle"] > 0] or group
+                    durations = sorted(latency_ms(frame) for frame in steady)
+                    p95 = durations[int((len(durations) - 1) * .95)]
+                    allocations = statistics.median(frame["allocatedBytes"] for frame in steady)
+                    collections = sum(frame["gcCollections"] for frame in steady)
+                    print(f"{action}: cycles={len(group)} steady median={statistics.median(durations):.1f}ms "
+                          f"p95={p95:.1f}ms max={durations[-1]:.1f}ms "
+                          f"median alloc={allocations / 2**20:.2f}MiB GC={collections:.0f}")
+                spikes = [{"transition": frame["action"], "cycle": frame["cycle"],
+                           "latencyMs": latency_ms(frame),
+                           "inputMs": frame["inputSeconds"] * 1000,
+                           "frameMs": frame["frameSeconds"] * 1000,
+                           "treeAndStyleMs": frame["treeAndStyleSeconds"] * 1000,
+                           "allocatedBytes": frame["allocatedBytes"],
+                           "gcCollections": frame["gcCollections"],
+                           "gcMarkMicros": frame["gcMarkMicros"],
+                           "styleCacheMisses": frame["styleCacheMisses"]}
+                          for frame in sorted(transitions, key=latency_ms, reverse=True)[:20]]
+                (output / "tab-spikes.json").write_text(json.dumps(spikes, indent=2) + "\n")
+                for spike in spikes[:5]:
+                    print(f"spike {spike['transition']} cycle={spike['cycle']} "
+                          f"latency={spike['latencyMs']:.1f}ms "
+                          f"tree/style={spike['treeAndStyleMs']:.1f}ms "
+                          f"alloc={spike['allocatedBytes'] / 2**20:.2f}MiB "
+                          f"GC={spike['gcCollections']:.0f} "
+                          f"cache misses={spike['styleCacheMisses']}")
     if samples:
         start = next((row for row in samples if frames and row["timeSeconds"] >= frames[0]["startedAtSeconds"]), samples[0])
         print(f"RSS start={start['rssBytes'] / 2**20:.1f}MiB "
@@ -230,10 +263,33 @@ def main():
         except (OSError, KeyError, ValueError) as error:
             print(f"scenario verification failed: {error}", file=sys.stderr)
             result = 1
+    elif args.scenario == "tab-matrix":
+        try:
+            actions = [json.loads(line) for line in (output / "actions.jsonl").read_text().splitlines()]
+            groups = (("hierarchy", "sensors"),
+                      ("viewport", "perspective", "console", "telemetry"))
+            expected = {f"{source}->{target}" for group in groups
+                        for source in group for target in group if source != target}
+            counts = {name: sum(row.get("action") == name for row in actions) for name in expected}
+            if any(count != args.cycles for count in counts.values()) or len(actions) != len(expected) * args.cycles:
+                raise ValueError("tab matrix did not complete every ordered transition")
+            measured = [frame for frame in frames if frame.get("action") in expected]
+            frame_counts = {name: sum(frame["action"] == name for frame in measured) for name in expected}
+            if (any(count != args.cycles for count in frame_counts.values()) or
+                    any(frame["allocatedBytes"] is None or frame["allocatedBytes"] < 0 or
+                        frame["gcCollections"] is None or frame["gcCollections"] < 0 or
+                        frame["gcMarkMicros"] is None or frame["gcMarkMicros"] < 0
+                        for frame in measured)):
+                raise ValueError("tab matrix has missing or invalid frame/GC measurements")
+            print(f"scenario=tab-matrix verified transitions={len(expected)} cycles={args.cycles}")
+        except (OSError, KeyError, ValueError) as error:
+            print(f"scenario verification failed: {error}", file=sys.stderr)
+            result = 1
     artifacts = {"bytecode": bytecode_name}
     for name, filename in (("heap", "heap.dump"), ("profile", "editor.hlpc"),
                            ("perfetto", "editor.perfetto.json"), ("memory", "memory.jsonl"),
-                           ("frames", "frame-timeline.jsonl"), ("retained", "retained.jsonl")):
+                           ("frames", "frame-timeline.jsonl"), ("retained", "retained.jsonl"),
+                           ("spikes", "tab-spikes.json")):
         if (output / filename).is_file():
             artifacts[name] = filename
     (output / "capture.json").write_text(json.dumps({"schemaVersion": 1,

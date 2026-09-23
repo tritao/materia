@@ -9,25 +9,27 @@ import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiModifier;
 import nativekit.ui.debug.UiFrameMetrics;
+import nativekit.ui.semantics.AccessibilityRole;
 import sys.FileSystem;
 import sys.io.File;
-
-private extern class ProfileGc {
-  @:hlNative("std", "gc_major") public static function major():Void;
-  @:hlNative("std", "gc_dump_memory") public static function dump(path:hl.Bytes):Void;
-}
 
 /** Replays real editor input through UiContext without a window or X server. */
 class HeadlessEditorProfile {
   static function main():Int {
     try {
-      if (Sys.args().length < 2 || Sys.args().length > 3)
-        throw "Usage: headless-profile OUTPUT_DIR CYCLES [HEAP_DUMP_PATH]";
+      if (Sys.args().length < 2 || Sys.args().length > 4)
+        throw "Usage: headless-profile OUTPUT_DIR CYCLES [tab-inspector|tab-matrix] [HEAP_DUMP_PATH]";
       var output = Sys.args()[0];
       var cycles = Std.parseInt(Sys.args()[1]);
       if (cycles == null || cycles < 1) throw "CYCLES must be positive";
+      var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
+        Sys.args()[2] == "tab-matrix") ? Sys.args()[2] : "tab-inspector";
+      if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
+        throw "Unknown headless scenario: " + Sys.args()[2];
+      var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] :
+        Sys.args().length == 3 && Sys.args()[2] != scenario ? Sys.args()[2] : null;
       if (!FileSystem.exists(output)) FileSystem.createDirectory(output);
-      run(output, cycles, Sys.args().length == 3 ? Sys.args()[2] : null);
+      run(output, cycles, scenario, heapDumpPath);
       return 0;
     } catch (error:Dynamic) {
       Sys.println("Headless editor profile failed: " + Std.string(error));
@@ -35,7 +37,7 @@ class HeadlessEditorProfile {
     }
   }
 
-  static function run(output:String, cycles:Int, heapDumpPath:Null<String>):Void {
+  static function run(output:String, cycles:Int, scenario:String, heapDumpPath:Null<String>):Void {
     var fontPath = "../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
     if (!FileSystem.exists(fontPath)) throw "Benchmark font is unavailable: " + fontPath;
     var fonts = FontCollection.create();
@@ -47,35 +49,56 @@ class HeadlessEditorProfile {
     var retained:Array<String> = [];
     try {
       submit(editor, frame, frames, "initial");
-      for (cycle in 0...cycles) {
-        click(editor, "sensors");
-        if (editor.workspace.activePanelId != "sensors") throw "Sensors tab did not activate";
-        submit(editor, frame, frames, "sensors");
-        action(actions, "sensors", cycle);
-        click(editor, "hierarchy");
-        if (editor.workspace.activePanelId != "hierarchy") throw "Hierarchy tab did not activate";
-        submit(editor, frame, frames, "hierarchy");
-        action(actions, "hierarchy", cycle);
-        if ((cycle + 1) % 20 == 0)
-          retained.push(Json.stringify({cycle: cycle + 1,
-            workspaceListeners: editor.workspace.listenerCount,
-            state: editor.ui.stateStore.diagnosticCounts(),
-            styles: editor.ui.buildContext.styleResolver.diagnosticCounts(),
-            keys: editor.ui.buildContext.diagnosticKeyCounts()}));
+      if (scenario == "tab-matrix") {
+        var groups = [["hierarchy", "sensors"],
+          ["viewport", "perspective", "console", "telemetry"]];
+        for (cycle in 0...cycles) {
+          for (group in groups) for (from in group) for (to in group) {
+            if (from == to) continue;
+            if (editor.workspace.activePanelId != from) {
+              click(editor, from);
+              submit(editor, frame, frames, "setup:" + from, cycle);
+            }
+            var allocatedBefore = hl.Gc.totalAllocated();
+            var collectionsBefore = hl.Gc.collections();
+            var markBefore = hl.Gc.markMicros();
+            var inputStarted = Sys.time();
+            click(editor, to);
+            var inputSeconds = Sys.time() - inputStarted;
+            if (editor.workspace.activePanelId != to) throw "Tab did not activate: " + to;
+            var name = from + "->" + to;
+            submit(editor, frame, frames, name, cycle, inputSeconds,
+              allocatedBefore, collectionsBefore, markBefore);
+            action(actions, name, cycle);
+          }
+          if ((cycle + 1) % 20 == 0) retained.push(retainedCounts(editor, cycle + 1));
+        }
+      } else {
+        for (cycle in 0...cycles) {
+          click(editor, "sensors");
+          if (editor.workspace.activePanelId != "sensors") throw "Sensors tab did not activate";
+          submit(editor, frame, frames, "sensors");
+          action(actions, "sensors", cycle);
+          click(editor, "hierarchy");
+          if (editor.workspace.activePanelId != "hierarchy") throw "Hierarchy tab did not activate";
+          submit(editor, frame, frames, "hierarchy");
+          action(actions, "hierarchy", cycle);
+          if ((cycle + 1) % 20 == 0) retained.push(retainedCounts(editor, cycle + 1));
+        }
+        var nameKey = "editor:" + editor.scene.selectedId + ":" +
+          editor.scene.selectionRevision + ":name";
+        click(editor, nameKey);
+        submit(editor, frame, frames, "inspector-focus");
+        action(actions, "inspector-focus", 0);
+        editor.ui.key(UiEventKind.KeyDown, UiKey.A, UiModifier.Control);
+        editor.ui.text(UiEventKind.TextInput, "Profile box");
+        editor.ui.key(UiEventKind.KeyDown, UiKey.Enter);
+        submit(editor, frame, frames, "rename");
+        action(actions, "rename", 0);
+        var box = editor.scene.object("box");
+        if (box == null || box.label != "Profile box")
+          throw "Inspector rename did not commit";
       }
-      var nameKey = "editor:" + editor.scene.selectedId + ":" +
-        editor.scene.selectionRevision + ":name";
-      click(editor, nameKey);
-      submit(editor, frame, frames, "inspector-focus");
-      action(actions, "inspector-focus", 0);
-      editor.ui.key(UiEventKind.KeyDown, UiKey.A, UiModifier.Control);
-      editor.ui.text(UiEventKind.TextInput, "Profile box");
-      editor.ui.key(UiEventKind.KeyDown, UiKey.Enter);
-      submit(editor, frame, frames, "rename");
-      action(actions, "rename", 0);
-      var box = editor.scene.object("box");
-      if (box == null || box.label != "Profile box")
-        throw "Inspector rename did not commit";
       File.saveContent(output + "/frame-timeline.jsonl", frames.join("\n") + "\n");
       File.saveContent(output + "/actions.jsonl", actions.join("\n") + "\n");
       File.saveContent(output + "/retained.jsonl", retained.join("\n") + "\n");
@@ -84,8 +107,8 @@ class HeadlessEditorProfile {
         frames.resize(0);
         actions.resize(0);
         retained.resize(0);
-        ProfileGc.major();
-        ProfileGc.dump(cast haxe.io.Bytes.ofString(heapDumpPath).getData());
+        hl.Gc.major();
+        hl.Gc.dump(cast haxe.io.Bytes.ofString(heapDumpPath).getData());
       }
     } catch (error:Dynamic) {
       editor.dispose();
@@ -96,8 +119,16 @@ class HeadlessEditorProfile {
     fonts.dispose();
   }
 
+  static function retainedCounts(editor:ReferenceEditorApp, cycle:Int):String {
+    return Json.stringify({cycle: cycle, workspaceListeners: editor.workspace.listenerCount,
+      state: editor.ui.stateStore.diagnosticCounts(),
+      styles: editor.ui.buildContext.styleResolver.diagnosticCounts(),
+      keys: editor.ui.buildContext.diagnosticKeyCounts()});
+  }
+
   static function submit(editor:ReferenceEditorApp, frame:LayoutFrame,
-      output:Array<String>, actionName:String):Void {
+      output:Array<String>, actionName:String, ?cycle:Int, ?inputSeconds:Float,
+      ?allocatedBefore:Float, ?collectionsBefore:Float, ?markBefore:Float):Void {
     var subtrees:Array<Dynamic> = [];
     editor.ui.buildContext.buildProbe = function(name, preparationSeconds, buildSeconds, nodes) {
       subtrees.push({name: name, preparationSeconds: preparationSeconds,
@@ -109,8 +140,15 @@ class HeadlessEditorProfile {
     var elapsed = Sys.time() - started;
     var metrics:UiFrameMetrics = cast editor.ui.frameMetrics;
     if (metrics == null) throw "UI frame metrics are unavailable";
+    var allocatedBytes = allocatedBefore == null ? null : hl.Gc.totalAllocated() - allocatedBefore;
+    var gcCollections = collectionsBefore == null ? null : hl.Gc.collections() - collectionsBefore;
+    var gcMarkMicros = markBefore == null ? null : hl.Gc.markMicros() - markBefore;
     output.push(Json.stringify({
-      frame: metrics.frameNumber, action: actionName, startedAtSeconds: started,
+      frame: metrics.frameNumber, action: actionName, cycle: cycle,
+      inputSeconds: inputSeconds,
+      allocatedBytes: allocatedBytes, gcCollections: gcCollections,
+      gcMarkMicros: gcMarkMicros,
+      startedAtSeconds: started,
       frameSeconds: elapsed, submitSeconds: metrics.submitSeconds,
       viewSeconds: metrics.viewSeconds,
       treeAndStyleSeconds: metrics.treeAndStyleSeconds,
@@ -128,7 +166,7 @@ class HeadlessEditorProfile {
   static function click(editor:ReferenceEditorApp, key:String):Void {
     var root = editor.ui.root;
     if (root == null) throw "UI tree is not ready";
-    var node = findByStyleKey(root, key);
+    var node = findByStyleKey(root, key, key.indexOf("editor:") != 0);
     if (node == null || node.resolved == null)
       throw "Benchmark target is unavailable: " + key;
     var bounds = node.resolved.clippedViewportBounds();
@@ -140,10 +178,11 @@ class HeadlessEditorProfile {
     editor.ui.pointerUp(x, y, 0);
   }
 
-  static function findByStyleKey(node:RenderNode, key:String):Null<RenderNode> {
-    if (node.styleKey == key) return node;
+  static function findByStyleKey(node:RenderNode, key:String, tab:Bool):Null<RenderNode> {
+    if (node.styleKey == key && (!tab || node.semantics != null &&
+        node.semantics.role == AccessibilityRole.Tab)) return node;
     for (child in node.children) {
-      var found = findByStyleKey(child, key);
+      var found = findByStyleKey(child, key, tab);
       if (found != null) return found;
     }
     return null;

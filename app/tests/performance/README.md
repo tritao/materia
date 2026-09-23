@@ -36,3 +36,16 @@ manifest. Inspect it with `haxeon/scripts/haxeon heap inspect --capture
 also accepts explicit bytecode and dump paths when no manifest is available.
 The headless workload releases its saved frame and action JSON buffers before
 the heap snapshot so they do not appear as retained editor memory.
+
+To investigate tab-switch latency without a display server, run
+`python3 app/tools/profile-editor.py --scenario tab-matrix --cycles 50`.
+The workload exercises every ordered pair within the Hierarchy/Sensors group
+and within the Viewport/Perspective/Console/Telemetry group. The report shows
+the median, p95, and maximum input-plus-frame latency for each transition,
+along with allocated bytes and GC collections. Cycle 0 is excluded from the
+steady latency summary; `tab-spikes.json` keeps the 20 slowest transitions,
+including cold switches. Each row also records input dispatch, frame and
+tree/style time, GC mark time, and style cache misses. Run with `--no-profile`
+for lower-overhead timing, or with the default profiler to inspect the matching
+`editor.perfetto.json` trace. The benchmark measures headless input handling
+and frame submission; it does not include desktop presentation latency.
