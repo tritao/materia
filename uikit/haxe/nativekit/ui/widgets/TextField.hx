@@ -114,10 +114,9 @@ class TextField implements View {
 			node.focusable = enabled;
 			node.enabled = enabled;
 			var semantics = new Semantics(semanticRole,
-				label == null ? key : label, editor.text);
+				label == null ? key : label, editor.text, editor.documentLength());
 			semantics.actions = semanticActions;
 			semantics.textStart = 0;
-			semantics.documentLength = Utf8Text.length(editor.text);
 			semantics.selectionStart = editor.selectionStart;
 			semantics.selectionEnd = editor.selectionEnd;
 			if (!enabled)
@@ -130,7 +129,11 @@ class TextField implements View {
 
 			var textNodeStyle = new LayoutStyle();
 			textNodeStyle.width = LayoutAxis.grow();
-			textNodeStyle.height = multiline ? LayoutAxis.fit() : LayoutAxis.grow();
+			// The retained painter uses document-space y coordinates. Keep its node
+			// tall enough for the full document so its local clip includes scrolled text.
+			textNodeStyle.height = multiline && editor.layoutText().length > 0
+				? LayoutAxis.fixed(Math.max(1.0, editor.layout.measure().height))
+				: (multiline ? LayoutAxis.fit() : LayoutAxis.grow());
 			var builtScrollOffset = multiline ? editor.scrollOffsetY : 0.0;
 			textNodeStyle.transform = Transform2D.identity().translated(0.0,
 				-builtScrollOffset);
@@ -206,8 +209,7 @@ class TextField implements View {
 
 			var updateState = function() {
 				value = editor.layoutText();
-				semantics.value = value;
-				semantics.documentLength = Utf8Text.length(value);
+				semantics.setValueWithLength(value, editor.documentLength());
 				semantics.selectionStart = editor.selectionStart;
 				semantics.selectionEnd = editor.selectionEnd;
 				stored.update(editor);
@@ -369,6 +371,7 @@ class TextField implements View {
 				#end
 				var handled = true;
 				var changed = false;
+				var textEdited = false;
 				var previousText = editor.layoutText();
 				if (command && event.key == UiKey.A)
 					changed = editor.selectAll();
@@ -377,6 +380,7 @@ class TextField implements View {
 				else if (command && event.key == UiKey.X) {
 					copySelection(context.clipboard, editor);
 					changed = editor.replace(editor.selectionStart, editor.selectionEnd, "");
+					textEdited = true;
 				} else if (command && event.key == UiKey.V) {
 					context.clipboard.readText(function(pasted) {
 						if (editor.isDisposed() || !editor.focused)
@@ -403,7 +407,7 @@ class TextField implements View {
 				else if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Up)
 					changed = editor.placeCaret(0, extend);
 				else if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Down)
-					changed = editor.placeCaret(Utf8Text.length(editor.text), extend);
+					changed = editor.placeCaret(editor.documentLength(), extend);
 				#end
 				else if (event.key == UiKey.Left)
 					changed = editor.moveCaret(-1, extend);
@@ -414,20 +418,27 @@ class TextField implements View {
 						editor.placeCaret(0, extend);
 				else if (event.key == UiKey.End)
 					changed = multiline && !command ? editor.moveCaretToLineBoundary(true, extend) :
-						editor.placeCaret(Utf8Text.length(editor.text), extend);
-				else if (event.key == UiKey.Backspace)
+						editor.placeCaret(editor.documentLength(), extend);
+				else if (event.key == UiKey.Backspace) {
 					changed = editor.deleteBackward();
-				else if (event.key == UiKey.Delete)
+					textEdited = true;
+				} else if (event.key == UiKey.Delete) {
 					changed = editor.deleteForward();
-				else if (event.key == UiKey.Enter) {
-					if (multiline)
+					textEdited = true;
+				} else if (event.key == UiKey.Enter) {
+					if (multiline) {
 						changed = editor.insert("\n");
-					else if (onSubmit != null)
+						textEdited = true;
+					} else if (onSubmit != null)
 						onSubmit(editor.layoutText());
 				} else
 					handled = false;
-				if (changed)
-					publishTextChange(previousText);
+				if (changed) {
+					if (textEdited)
+						publishTextChange(previousText);
+					else
+						updateState();
+				}
 				if (handled) {
 					editor.resetCaretBlink(context.gestures.timeSeconds());
 					event.preventDefault();
@@ -455,7 +466,7 @@ class TextField implements View {
 			});
 			node.on(UiEventKind.AccessibilitySetValue, function(event) {
 				var previousText = editor.layoutText();
-				if (enabled && editor.replace(0, Utf8Text.length(editor.text), event.text)) {
+				if (enabled && editor.replace(0, editor.documentLength(), event.text)) {
 					editor.resetCaretBlink(context.gestures.timeSeconds());
 					publishTextChange(previousText);
 				}

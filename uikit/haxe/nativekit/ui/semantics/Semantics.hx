@@ -31,17 +31,18 @@ class Semantics {
 	public var hierarchyLevel:Int;
 	public var orientation:AccessibilityOrientation;
 
-	public function new(role:AccessibilityRole, ?label:String, ?value:String) {
+	public function new(role:AccessibilityRole, ?label:String, ?value:String,
+			?knownDocumentLength:Int) {
 		this.role = role;
 		this.label = label;
-		this.value = value;
+		storedValue = value;
 		states = 0;
 		actions = 0;
 		numericValue = 0.0;
 		numericMinimum = 0.0;
 		numericMaximum = 0.0;
 		textStart = 0;
-		documentLength = Utf8Text.length(value);
+		documentLength = knownDocumentLength == null ? Utf8Text.length(value) : knownDocumentLength;
 		selectionStart = -1;
 		selectionEnd = -1;
 		setSize = 0;
@@ -60,6 +61,14 @@ class Semantics {
 		storedValue = next;
 		documentLength = Utf8Text.length(next);
 		return next;
+	}
+
+	/** Sets an editor value when its code-point length is already cached. */
+	public function setValueWithLength(next:Null<String>, length:Int):Void {
+		if (length < 0)
+			throw "Document length cannot be negative";
+		storedValue = next;
+		documentLength = length;
 	}
 
 	function get_value():Null<String>

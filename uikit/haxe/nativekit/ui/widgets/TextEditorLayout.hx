@@ -10,8 +10,9 @@ import Rect;
 import TextLayout;
 import TextStyle;
 
-/** Retained paragraph layouts backing one editor document. */
+/** Retained layouts for bounded groups of paragraphs in one editor document. */
 class TextEditorLayout {
+	static inline var paragraphsPerLayout:Int = 64;
 	public var text(default, null):String;
 	public var width(default, null):Float;
 	public final textStyle:TextStyle;
@@ -21,6 +22,7 @@ class TextEditorLayout {
 	final fonts:FontCollection;
 	var paragraphs:Array<TextEditorParagraphRecord>;
 	var offsets:TextOffsetMap;
+	var paragraphLineCount:Int;
 	var contentWidth:Float;
 	var contentHeight:Float;
 	var firstBaseline:Float;
@@ -38,6 +40,7 @@ class TextEditorLayout {
 		this.paragraphStyle = copyParagraphStyle(paragraphStyle);
 		paragraphs = [];
 		offsets = null;
+		paragraphLineCount = 0;
 		contentWidth = 0.0;
 		contentHeight = 0.0;
 		firstBaseline = 0.0;
@@ -47,7 +50,18 @@ class TextEditorLayout {
 	}
 
 	function get_paragraphCount():Int
-		return paragraphs.length;
+		return paragraphLineCount;
+
+	static function chunkCount(offsetMap:TextOffsetMap):Int
+		return Std.int((offsetMap.paragraphCount() + paragraphsPerLayout - 1) / paragraphsPerLayout);
+
+	static function chunkRangeAt(offsetMap:TextOffsetMap, index:Int):TextRange {
+		var firstParagraph = index * paragraphsPerLayout;
+		var lastParagraph = Std.int(Math.min(offsetMap.paragraphCount() - 1,
+			firstParagraph + paragraphsPerLayout - 1));
+		return new TextRange(offsetMap.paragraphRangeAtIndex(firstParagraph).start,
+			offsetMap.paragraphRangeAtIndex(lastParagraph).end);
+	}
 
 	/** Updates only paragraph resources whose text or shaping inputs changed. */
 	public function update(value:String, nextWidth:Float, nextTextStyle:TextStyle,
@@ -86,9 +100,9 @@ class TextEditorLayout {
 		}
 		var used:Array<TextEditorParagraphRecord> = [];
 		var next:Array<TextEditorParagraphRecord> = [];
-		var nextCount = nextOffsets.paragraphCount();
+		var nextCount = chunkCount(nextOffsets);
 		for (index in 0...nextCount) {
-			var range = nextOffsets.paragraphRangeAtIndex(index);
+			var range = chunkRangeAt(nextOffsets, index);
 			var paragraphText = nextOffsets.sliceCodepoints(range.start, range.end);
 			var previousRecord = index < previous.length ? previous[index] : null;
 			var record:TextEditorParagraphRecord = null;
@@ -132,6 +146,7 @@ class TextEditorLayout {
 		text = actualText;
 		width = nextWidth;
 		offsets = nextOffsets;
+		paragraphLineCount = nextOffsets.paragraphCount();
 		paragraphs = next;
 		recomputeMetrics();
 	}
@@ -156,6 +171,11 @@ class TextEditorLayout {
 			update(value, width, textStyle, paragraphStyle, nextOffsets);
 			return;
 		}
+		if (nextOffsets.paragraphCount() != paragraphLineCount) {
+			setTextAfterParagraphEdit(value, nextOffsets, oldStart, oldEnd,
+				oldDocumentLength);
+			return;
+		}
 
 		var previous = paragraphs;
 		var oldFirst = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);
@@ -163,9 +183,9 @@ class TextEditorLayout {
 		oldFirst = oldFirst > 0 ? oldFirst - 1 : oldFirst;
 		oldLast = oldLast + 1 < previous.length ? oldLast + 1 : oldLast;
 
-		var nextCount = nextOffsets.paragraphCount();
-		var newFirst = nextOffsets.paragraphIndexAtOffset(newStart);
-		var newLast = nextOffsets.paragraphIndexAtOffset(newEnd);
+		var nextCount = chunkCount(nextOffsets);
+		var newFirst = Std.int(nextOffsets.paragraphIndexAtOffset(newStart) / paragraphsPerLayout);
+		var newLast = Std.int(nextOffsets.paragraphIndexAtOffset(newEnd) / paragraphsPerLayout);
 		newFirst = newFirst > 0 ? newFirst - 1 : newFirst;
 		newLast = newLast + 1 < nextCount ? newLast + 1 : newLast;
 
@@ -185,7 +205,7 @@ class TextEditorLayout {
 		var usedDirty:Array<TextEditorParagraphRecord> = [];
 		var next:Array<TextEditorParagraphRecord> = [];
 		for (index in 0...nextCount) {
-			var range = nextOffsets.paragraphRangeAtIndex(index);
+			var range = chunkRangeAt(nextOffsets, index);
 			var record:TextEditorParagraphRecord = null;
 			var paragraphText:Null<String> = null;
 			if (index < newFirst) {
@@ -229,7 +249,85 @@ class TextEditorLayout {
 
 		text = value == null ? "" : value;
 		offsets = nextOffsets;
+		paragraphLineCount = nextOffsets.paragraphCount();
 		paragraphs = next;
+		recomputeMetrics();
+	}
+
+	/** Keeps chunks outside a newline edit and repartitions only its neighborhood. */
+	function setTextAfterParagraphEdit(value:String, nextOffsets:TextOffsetMap,
+			oldStart:Int, oldEnd:Int, oldDocumentLength:Int):Void {
+		var previous = paragraphs;
+		var first = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);
+		var last = paragraphIndexAtOffsetIn(previous, oldEnd, oldDocumentLength);
+		first = first > 0 ? first - 1 : first;
+		last = last + 1 < previous.length ? last + 1 : last;
+		var delta = nextOffsets.codepointCount - oldDocumentLength;
+		var firstOffset = previous[first].start;
+		var lastOffset = clamp(previous[last].end + delta, firstOffset,
+			nextOffsets.codepointCount);
+		var firstParagraph = nextOffsets.paragraphIndexAtOffset(firstOffset);
+		var lastParagraph = nextOffsets.paragraphIndexAtOffset(lastOffset);
+		var result:Array<TextEditorParagraphRecord> = [];
+		for (index in 0...first)
+			result.push(previous[index]);
+		var used:Array<TextEditorParagraphRecord> = [];
+		var paragraph = firstParagraph;
+		while (paragraph <= lastParagraph) {
+			var remaining = lastParagraph - paragraph + 1;
+			var chunksRemaining = Std.int((remaining + paragraphsPerLayout - 1) /
+				paragraphsPerLayout);
+			var chunkSize = Std.int((remaining + chunksRemaining - 1) / chunksRemaining);
+			var paragraphEnd = paragraph + chunkSize - 1;
+			var chunkStart = paragraph == firstParagraph ? firstOffset :
+				nextOffsets.paragraphRangeAtIndex(paragraph).start;
+			var chunkEnd = paragraphEnd == lastParagraph ? lastOffset :
+				nextOffsets.paragraphRangeAtIndex(paragraphEnd).end;
+			var chunkText = nextOffsets.sliceCodepoints(chunkStart, chunkEnd);
+			var record:TextEditorParagraphRecord = null;
+			for (index in first...(last + 1)) {
+				var candidate = previous[index];
+				if (!containsRecord(used, candidate) && candidate.text == chunkText) {
+					record = candidate;
+					break;
+				}
+			}
+			if (record == null)
+				for (index in first...(last + 1)) {
+					var candidate = previous[index];
+					if (!containsRecord(used, candidate)) {
+						record = candidate;
+						break;
+					}
+				}
+			if (record == null)
+				record = new TextEditorParagraphRecord(chunkText,
+					TextLayout.create(fonts, chunkText, width, textStyle, paragraphStyle));
+			else if (record.text != chunkText) {
+				record.layout.update(chunkText, width, textStyle, paragraphStyle);
+				record.text = chunkText;
+			}
+			used.push(record);
+			record.start = chunkStart;
+			record.end = chunkEnd;
+			result.push(record);
+			paragraph = paragraphEnd + 1;
+		}
+		for (index in first...(last + 1)) {
+			var record = previous[index];
+			if (!containsRecord(used, record))
+				record.layout.dispose();
+		}
+		for (index in last + 1...previous.length) {
+			var record = previous[index];
+			record.start += delta;
+			record.end += delta;
+			result.push(record);
+		}
+		text = value == null ? "" : value;
+		offsets = nextOffsets;
+		paragraphLineCount = nextOffsets.paragraphCount();
+		paragraphs = result;
 		recomputeMetrics();
 	}
 
@@ -429,15 +527,17 @@ class TextEditorLayout {
 		var recordIndex = paragraphIndexAtOffset(offset);
 		var record = paragraphs[recordIndex];
 		var local = clamp(offset - record.start, 0, record.end - record.start);
-		var paragraphEnd = macStyle || record.end >= offsets.codepointCount ? record.end : record.end + 1;
-		if (direction < 0) {
-			if (local > 0)
-				return record.start;
-			return recordIndex > 0 ? paragraphs[recordIndex - 1].start : 0;
+		var moved = record.layout.moveParagraph(local, direction, macStyle);
+		if (moved != local)
+			return clamp(record.start + moved, record.start, record.end);
+		if (direction < 0 && local == 0 && recordIndex > 0) {
+			var previousParagraph = offsets.paragraphIndexAtOffset(record.start) - 1;
+			return offsets.paragraphRangeAtIndex(previousParagraph).start;
 		}
-		if (local < record.end - record.start)
-			return paragraphEnd;
-		return recordIndex + 1 < paragraphs.length ? paragraphs[recordIndex + 1].start : record.end;
+		if (direction > 0 && local == record.end - record.start &&
+			recordIndex + 1 < paragraphs.length)
+			return paragraphs[recordIndex + 1].start;
+		return clamp(record.start + moved, record.start, record.end);
 	}
 
 	public function dispose():Void {
