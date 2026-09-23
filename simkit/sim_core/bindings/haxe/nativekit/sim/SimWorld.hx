@@ -2,7 +2,7 @@ package nativekit.sim;
 
 import NativeKitScene;
 import NativeKitSim;
-import nativekit.scene.Node;
+import nativekit.scene.NodeId;
 import nativekit.scene.Scene;
 
 typedef SimWorldOptions = {
@@ -114,7 +114,7 @@ class SimWorld {
         return shape;
     }
 
-    public function createBody(node:Node, motion:MotionType,
+    public function createBody(node:NodeId, motion:MotionType,
             mass:Float, ?shape:Shape):Body {
         ensureLive();
         var desc = new nksim_body_desc();
