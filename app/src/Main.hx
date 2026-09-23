@@ -1078,6 +1078,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (scene.canCreatePocket())
       rows.push(new KeyedView("create-pocket",
         sceneAction("create-pocket", "scene.create-pocket", "Pocket", IconName.Plus)));
+    if (scene.canCreateVerticalFillet())
+      rows.push(new KeyedView("create-vertical-fillet",
+        sceneAction("create-vertical-fillet", "scene.create-vertical-fillet", "Fillet vertical edges", IconName.Plus)));
     if(ownership!=null) {
       rows.push(new KeyedView("origin",textLines("script-object-origins",
         ["Script-owned"].concat(ownership.propertyOrigins(selected.id,["position","dimensions",
@@ -1193,6 +1196,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
       runSceneEdit("Could not create pocket", function() scene.createPocket());
       inspectorSelectionRevision = -1;
     }, null, function() return canEditObjects() && scene.canCreatePocket()));
+    commands.register(new Command("scene.create-vertical-fillet", "Fillet vertical edges", function() {
+      runSceneEdit("Could not fillet vertical edges", function() scene.createVerticalFillet());
+      inspectorSelectionRevision = -1;
+    }, null, function() return canEditObjects() && scene.canCreateVerticalFillet()));
     commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
       runSceneEdit("Could not add mounting plate", function() scene.createMountingPlate());
     }, null, function() return canEditObjects() && scene.canCreate()));

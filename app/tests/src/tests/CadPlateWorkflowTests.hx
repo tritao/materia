@@ -261,6 +261,62 @@ class CadPlateWorkflowTests {
     scene.dispose();
   }
 
+  static function verticalFilletWorkflow():Void {
+    var scene = new EditorScene([]);
+    try {
+      check(scene.createCadPart(), "create an editable part for edge finishing");
+      var id = scene.selectedId;
+      check(scene.createSketch(), "create the base profile for edge finishing");
+      check(scene.applySelectedSketchEdit(), "apply the edge-finishing profile");
+      check(scene.createExtrusion(), "create the solid to fillet");
+      var unfilletedVolume = scene.cadSession(id).document.result().volume();
+      check(scene.canCreateVerticalFillet() && scene.createVerticalFillet(),
+        "the editor creates an explicit vertical-edge fillet query");
+      var fillet:cadkit.parametric.features.FilletFeature = cast scene.cadSession(id).document.featureAt(2);
+      var defaultVolume = scene.cadSession(id).document.result().volume();
+      check(defaultVolume > 0 && defaultVolume < unfilletedVolume,
+        "filleting the outside vertical edges preserves a solid and removes corner material");
+
+      check(edit(scene, "Fillet radius", 1) == PropertyEditResult.Applied,
+        "fillet radius can be edited from the feature inspector");
+      near(fillet.radius.value, 1, "fillet radius edit updates the authored feature");
+      var editedVolume = scene.cadSession(id).document.result().volume();
+      check(editedVolume > 0 && editedVolume < defaultVolume,
+        "a larger fillet recomputes the part");
+      check(scene.document.undo(), "undo fillet radius edit");
+      near(fillet.radius.value, 0.5, "undo restores the starter fillet radius");
+      check(scene.document.redo(), "redo fillet radius edit");
+      near(fillet.radius.value, 1, "redo restores the edited fillet radius");
+
+      check(scene.selectTreeKey(id + ":feature:0") && scene.beginSelectedSketchEdit(),
+        "the sketch remains editable below the fillet");
+      check(edit(scene, "Dimension width", 24) == PropertyEditResult.Applied,
+        "upstream profile dimensions can change below the fillet");
+      check(scene.applySelectedSketchEdit(), "recompute the fillet after the upstream edit");
+      var resizedVolume = scene.cadSession(id).document.result().volume();
+      check(resizedVolume > editedVolume,
+        "the vertical-edge query follows the resized extrusion");
+
+      var reopened = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
+      try {
+        var document = reopened.cadSession(id).document;
+        check(document.featureCount() == 3, "sketch, extrusion, and fillet survive save and reopen");
+        var restored:cadkit.parametric.features.FilletFeature = cast document.featureAt(2);
+        near(restored.radius.value, 1, "fillet radius survives save and reopen");
+        nearWithin(document.result().volume(), resizedVolume, 0.001,
+          "the edge query restores the same finished solid after reopen");
+      } catch (error:Dynamic) {
+        reopened.dispose();
+        throw error;
+      }
+      reopened.dispose();
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
+  }
+
   static function stepImportWorkflow():Void {
     var session = new SceneDocumentSession();
     var root = Sys.getCwd() + "/../build-cad";
@@ -678,6 +734,7 @@ class CadPlateWorkflowTests {
       sketchCreationWorkflow();
       sketchExtrusionWorkflow();
       faceSketchPocketWorkflow();
+      verticalFilletWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();
       bracketWorkflow();

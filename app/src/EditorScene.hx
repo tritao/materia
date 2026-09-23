@@ -30,6 +30,7 @@ import cadkit.parametric.TopologyHistoryMap;
 import cadkit.parametric.TopologyResolver;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.PocketFeature;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
@@ -350,6 +351,82 @@ class EditorScene {
     selectCadFeature(id, pocket);
     refreshSelectionRevision();
     return true;
+  }
+
+  public function canCreateVerticalFillet():Bool {
+    if (activeSketchEdit != null)
+      return false;
+    var item = object(selectedId);
+    if (item == null || item.kind != "cad-part")
+      return false;
+    var output = requireCadSession(selectedId).document.outputFeatureOrNull();
+    var shape = output == null ? null : output.currentShape();
+    return shape != null && shape.subshapeCount(CadKit.ShapeKind.Solid) > 0 &&
+      verticalEdgeCount(shape) > 0;
+  }
+
+  /** Fillet every straight edge parallel to world Z, preserving that query in the feature. */
+  public function createVerticalFillet(radius:Float = 0.5):Bool {
+    if (!canCreateVerticalFillet())
+      return false;
+    if (!Math.isFinite(radius) || radius <= 0)
+      throw "Fillet radius must be finite and positive";
+    var session = requireCadSession(selectedId);
+    var source = session.document.outputFeatureOrNull();
+    if (source == null || source.currentShape() == null)
+      return false;
+    var count = verticalEdgeCount(source.currentShape());
+    if (count == 0)
+      return false;
+    var query = new SelectionRecipe("edge", "line", Vector.Z(), "all", Vector.Z(), count);
+    var feature = new FilletFeature(source, radius, null, null, query);
+    var id = selectedId;
+    if (!addCadFeature(id, "Fillet vertical edges", feature))
+      return false;
+    selectCadFeature(id, feature);
+    refreshSelectionRevision();
+    return true;
+  }
+
+  public function setFilletRadius(id:String, featureId:Int, radius:Float):Void {
+    var session = requireCadSession(id);
+    var candidate = session.document.featureById(featureId);
+    if (candidate == null || !Std.isOfType(candidate, FilletFeature))
+      throw "selected fillet is no longer available";
+    var feature:FilletFeature = cast candidate;
+    var previous = feature.radius.value;
+    if (radius == previous)
+      return;
+    if (!Math.isFinite(radius) || radius <= 0)
+      throw "Fillet radius must be finite and positive";
+    applyCadEdit(id, "Edit fillet radius", function(owner) {
+      var current:FilletFeature = cast owner.document.featureById(featureId);
+      current.radius.set(radius);
+      owner.document.recompute();
+    }, function(owner) {
+      var current:FilletFeature = cast owner.document.featureById(featureId);
+      current.radius.set(previous);
+      owner.document.recompute();
+    });
+  }
+
+  function verticalEdgeCount(shape:Shape):Int {
+    var count = 0;
+    for (index in 0...shape.subshapeCount(CadKit.ShapeKind.Edge)) {
+      var edge = shape.subshape(CadKit.ShapeKind.Edge, index);
+      try {
+        if (edge.curveKind() == CadKit.CurveKind.Line) {
+          var direction = Vector.fromNative(edge.tangentAt()).normalized();
+          if (1.0 - Math.abs(direction.dot(Vector.Z())) <= 0.000001)
+            count++;
+        }
+        edge.close();
+      } catch (error:Dynamic) {
+        edge.close();
+        throw error;
+      }
+    }
+    return count;
   }
 
   function addCadFeature(id:String, label:String, feature:Feature, publishAsOutput:Bool = true):Bool {
@@ -1325,6 +1402,8 @@ class EditorScene {
       if (extrusion.amount != null)
         result.push(extrusionDepthProperty(id, extrusion.id.toInt(), prefix));
     }
+    if (selectedFeature != null && selectedFeature.active && Std.isOfType(selectedFeature, FilletFeature))
+      result.push(filletRadiusProperty(id, selectedFeature.id.toInt(), prefix));
     if (activeSketchEdit != null && activeSketchObjectId == id)
       appendSketchDraftProperties(result, activeSketchEdit, prefix);
     result.push(boolProperty(id,"collision","Collision",function(item)return item.collisionEnabled,
@@ -1533,6 +1612,40 @@ class EditorScene {
           default: throw "Extrusion depth requires a number";
         };
         setExtrusionDepth(id, featureId, depth);
+      }, options);
+  }
+
+  function filletRadiusProperty(id:String, featureId:Int, prefix:String):PropertyDescriptor {
+    var options = new PropertyDescriptorOptions();
+    options.recordHistory = false;
+    options.category = "Feature";
+    options.unit = "mm";
+    options.minimum = 0.000001;
+    options.maximum = 1000000.0;
+    options.step = 0.5;
+    options.validator = function(_, value) {
+      var number:Null<Float> = switch (value) {
+        case PropertyValue.Float(next): next;
+        case PropertyValue.Int(next): next;
+        default: null;
+      };
+      return number == null || !Math.isFinite(number) || number <= 0
+        ? "Fillet radius must be finite and positive" : null;
+    };
+    return new PropertyDescriptor(prefix + "fillet-radius", "Fillet radius", PropertyType.Float,
+      function(_) {
+        var candidate = requireCadSession(id).document.featureById(featureId);
+        if (candidate == null || !Std.isOfType(candidate, FilletFeature))
+          throw "selected fillet is no longer available";
+        var fillet:FilletFeature = cast candidate;
+        return PropertyValue.Float(fillet.radius.value);
+      }, function(_, value) {
+        var radius:Float = switch (value) {
+          case PropertyValue.Float(next): next;
+          case PropertyValue.Int(next): next;
+          default: throw "Fillet radius requires a number";
+        };
+        setFilletRadius(id, featureId, radius);
       }, options);
   }
 
