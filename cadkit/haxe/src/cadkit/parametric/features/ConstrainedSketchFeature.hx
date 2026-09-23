@@ -96,6 +96,19 @@ class ConstrainedSketchFeature extends Feature {
 		edit(function(sketch) sketch.replaceConstraint(constraint));
 	}
 
+	/** Replace the full authored sketch as one undoable document change. */
+	public function replaceSketch(sketch:ConstrainedSketch):Void {
+		if (document == null)
+			throw "constrained sketch edits require an attached document feature";
+		if (sketch == null)
+			throw "replacement sketch must not be null";
+		var before = authored.copy();
+		var after = sketch.copy();
+		validateReferences(after);
+		restoreSketch(after);
+		document.recordDocumentChange(new ConstrainedSketchChange(this, before, after.copy()));
+	}
+
 	public function removePoint(id:String):Void {
 		edit(function(sketch) sketch.removePoint(id));
 	}

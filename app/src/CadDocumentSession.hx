@@ -5,6 +5,7 @@ import cadkit.Shape;
 import cadkit.parametric.Document;
 import cadkit.parametric.EvaluationCancelled;
 import cadkit.parametric.TopologyFingerprint;
+import cadkit.parametric.features.ConstrainedSketchFeature;
 import nativekit.scene.GeometryData;
 
 /** Long-lived editor owner for one authored CadKit document and its published viewport result. */
@@ -50,6 +51,15 @@ class CadDocumentSession {
   public function encode():String {
     ensureOpen();
     return model.encode();
+  }
+
+  /** Open an isolated editable draft for a constrained-sketch feature. */
+  public function beginSketchEdit(featureIndex:Int):CadSketchEditSession {
+    ensureOpen();
+    var candidate = document.featureAt(featureIndex);
+    if (!Std.isOfType(candidate, ConstrainedSketchFeature))
+      throw "selected CAD feature is not a constrained sketch";
+    return new CadSketchEditSession(this, cast candidate);
   }
 
   public function performanceMetrics():CadPerformanceMetrics {

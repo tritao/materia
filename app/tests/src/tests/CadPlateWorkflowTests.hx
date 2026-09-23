@@ -2,9 +2,12 @@ package tests;
 
 import CadKit;
 import cadkit.Shape;
+import app.CadBracketModel;
+import app.CadDocumentSession;
 import app.CadPlateModel;
 import app.CadPlateModel.CadPlateParameters;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.sketch.SketchConstraint;
 import app.EditorScene;
 import app.PerspectiveCamera;
 import app.SceneDocumentSession;
@@ -87,6 +90,44 @@ class CadPlateWorkflowTests {
     if (FileSystem.exists(sourceFile)) FileSystem.deleteFile(sourceFile);
     if (FileSystem.exists(sceneFile)) FileSystem.deleteFile(sceneFile);
     if (FileSystem.exists(exportFile)) FileSystem.deleteFile(exportFile);
+  }
+
+  static function sketchDraftWorkflow():Void {
+    var model = CadBracketModel.create(0.06, 0.04, 0.03);
+    var session = new CadDocumentSession(model);
+    try {
+      var feature:ConstrainedSketchFeature = cast session.document.featureAt(0);
+      var draft = session.beginSketchEdit(0);
+      var originalRevision = session.revision;
+      check(draft.sketch.isSolved && draft.sketch.degreesOfFreedom == 0,
+        "editor opens an isolated draft of a constrained feature");
+      check(draft.edit(function(sketch) {
+        sketch.replaceConstraint(SketchConstraint.distance("width", "p0", "p1", 61));
+      }), "editor draft solves a dimensional change");
+      near(feature.dimension("width").value, 60,
+        "draft edits do not change the authored feature before apply");
+      draft.apply();
+      near(feature.dimension("width").value, 61,
+        "applying the draft updates its named dimension binding");
+      near(model.sceneDimensions().width, 0.061,
+        "applying a sketch draft recomputes and publishes the new body");
+      check(session.revision == originalRevision + 1 && !draft.active,
+        "applying a sketch draft publishes one revision and closes the draft");
+
+      var cancelled = session.beginSketchEdit(0);
+      check(cancelled.edit(function(sketch) {
+        sketch.replaceConstraint(SketchConstraint.distance("width", "p0", "p1", 62));
+      }), "second draft remains independently solvable");
+      cancelled.cancel();
+      near(feature.dimension("width").value, 61,
+        "cancelling a draft leaves the published authored feature unchanged");
+      check(session.revision == originalRevision + 1,
+        "cancelling a draft does not publish another revision");
+    } catch (error:Dynamic) {
+      session.close();
+      throw error;
+    }
+    session.close();
   }
 
   static function run():Void {
@@ -369,6 +410,7 @@ class CadPlateWorkflowTests {
   static function main():Int {
     try {
       stepImportWorkflow();
+      sketchDraftWorkflow();
       run();
       faceHoleWorkflow();
       bracketWorkflow();
