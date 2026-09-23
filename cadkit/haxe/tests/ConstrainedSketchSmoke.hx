@@ -5,6 +5,7 @@ import cadkit.sketch.SketchPoint;
 import cadkit.sketch.SketchSolveError;
 import cadkit.sketch.SketchProfile;
 import cadkit.sketch.ProfileError;
+import cadkit.sketch.SketchSession;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.features.ConstrainedSketchFeature;
@@ -67,6 +68,34 @@ class ConstrainedSketchSmoke {
 		check(loose.solve().diagnostic.status == "under-constrained", "local degrees of freedom");
 		loose.addConstraint(SketchConstraint.horizontal("duplicate", "l"));
 		check(loose.solve().diagnostic.status == "redundant", "redundancy diagnosis");
+
+		var openSketch = new ConstrainedSketch();
+		openSketch.addPoint(new SketchPoint("draft.a", 0, 0)).addPoint(new SketchPoint("draft.b", 4, 1));
+		openSketch.addEntity(SketchEntity.line("draft.edge", "draft.a", "draft.b"));
+		var sketchSession = new SketchSession(openSketch);
+		var underconstrainedSolution:cadkit.sketch.SolvedSketch = cast sketchSession.solution;
+		check(sketchSession.isSolved && sketchSession.degreesOfFreedom == 4
+			&& underconstrainedSolution.diagnostic.status == "under-constrained",
+			"unfinished open sketches expose a solved state and remaining freedom");
+		var openProfileRejected = false;
+		try sketchSession.buildProfile() catch (error:ProfileError) openProfileRejected = error.kind == "open";
+		check(openProfileRejected, "profile construction remains a separate closed-boundary requirement");
+		check(sketchSession.edit(function(draft) {
+			draft.addConstraint(SketchConstraint.fixed("draft.lock-a", "draft.a"));
+			draft.addConstraint(SketchConstraint.fixed("draft.lock-b", "draft.b"));
+		}), "draft accepts a solvable edit");
+		var previousDraftSolution = sketchSession.lastValidSolution;
+		check(!sketchSession.edit(function(draft)
+			draft.addConstraint(SketchConstraint.distance("draft.conflict", "draft.a", "draft.b", 10))),
+			"conflicting draft edit is reported without discarding the authored draft");
+		var conflictDiagnostic:cadkit.sketch.SolveDiagnostic = cast sketchSession.diagnostic;
+		check(!sketchSession.isSolved && conflictDiagnostic.status == "conflicting"
+			&& sketchSession.conflictingConstraintIds.indexOf("draft.conflict") >= 0
+			&& sketchSession.lastValidSolution == previousDraftSolution,
+			"draft conflict exposes implicated constraints and retains the previous valid solution");
+		check(sketchSession.edit(function(draft) draft.removeConstraint("draft.conflict"))
+			&& sketchSession.isSolved && sketchSession.degreesOfFreedom == 0,
+			"draft can recover after a conflicting constraint is removed");
 
 		var conflict = new ConstrainedSketch();
 		conflict.addPoint(new SketchPoint("a", 0, 0)).addPoint(new SketchPoint("b", 1, 0));

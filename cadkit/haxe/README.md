@@ -136,6 +136,9 @@ bounded damped nonlinear least squares and commits a new solution snapshot only
 after convergence. Diagnostics distinguish invalid input, local under- or
 full-constraint rank, redundant constraints, and nonconvergent/conflicting
 constraints; the latter reports the constraint IDs with significant residuals.
+`SketchSession` keeps an editable draft separate from profile construction, so
+open or under-constrained geometry can expose solved points and remaining
+freedom while conflicting edits retain the last valid solution for preview.
 
 The initial constraint set includes fixed points, coincidence, horizontal and
 vertical lines, distance and radius dimensions, equal length/radius, parallel,

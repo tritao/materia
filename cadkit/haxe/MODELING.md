@@ -230,6 +230,11 @@ part in solving but do not produce profile edges. The pure Haxeon solver uses
 bounded damped least squares, seeds edits from the last successful solution,
 and reports convergence, residual, local rank-based degrees of freedom,
 redundancy, nonconvergence, and locally conflicting stationary residuals.
+`SketchSession` applies edits to isolated drafts and solves them without
+requiring a closed profile. It exposes the current diagnostic and remaining
+degrees of freedom; after a conflicting edit, the previous solution remains
+available while the draft can be repaired. Profile construction remains an
+explicit later step.
 
 `SketchProfile.build()` validates line and curved boundaries, rejects overlap,
 and classifies arbitrary nesting by parity so islands within holes become
