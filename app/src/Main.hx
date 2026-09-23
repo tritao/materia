@@ -851,6 +851,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new KeyedView("actions", new Column("scene-object-actions", [
           new KeyedView("create", new Row("scene-create-actions", [
             new KeyedView("rectangle", sceneAction("scene-create", "scene.create", "Rectangle", IconName.Plus)),
+            new KeyedView("cad-part", sceneAction("scene-create-part", "scene.create-part", "Part", IconName.Plus)),
             new KeyedView("plate", sceneAction("scene-create-plate", "scene.create-plate", "Plate", IconName.Plus)),
             new KeyedView("hole", sceneAction("scene-add-face-hole", "scene.add-face-hole", "Hole", IconName.Plus))
           ], actionRowStyle())),
@@ -1160,6 +1161,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       scene.createRectangle();
       updateCommandContext();
       commands.refresh();
+    }, null, function() return canEditObjects() && scene.canCreate()));
+    commands.register(new Command("scene.create-part", "Add empty CAD part", function() {
+      runSceneEdit("Could not add CAD part", function() scene.createCadPart());
     }, null, function() return canEditObjects() && scene.canCreate()));
     commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
       runSceneEdit("Could not add mounting plate", function() scene.createMountingPlate());

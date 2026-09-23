@@ -11,6 +11,7 @@ import cadkit.sketch.SketchConstraint;
 import app.EditorScene;
 import app.PerspectiveCamera;
 import app.SceneDocumentSession;
+import app.SceneCodec;
 import cadkit.parametric.EvaluationCancelled;
 import cadkit.parametric.ParametricError;
 import nativekit.ui.core.PropertyBinding;
@@ -46,6 +47,36 @@ class CadPlateWorkflowTests {
     for (descriptor in scene.properties()) if (descriptor.label == label)
       return new PropertyBinding(descriptor, scene.context()).apply(PropertyValue.Float(value));
     throw "Missing CAD inspector property: " + label;
+  }
+
+  static function emptyCadPartWorkflow():Void {
+    var scene = new EditorScene([]);
+    try {
+      check(scene.createCadPart(), "editor creates a generic empty CAD part");
+      var id = scene.selectedId;
+      check(object(scene, id).kind == "cad-part", "empty CAD part has its own persistent object kind");
+      var session = scene.cadSession(id);
+      check(session.document.featureCount() == 0 && session.document.outputFeatureOrNull() == null,
+        "new CAD part starts with no features or selected output");
+      check(session.geometry().vertexCount() == 0, "empty CAD part publishes an empty render resource");
+
+      var reopened = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
+      try {
+        var restoredId = reopened.selectedId;
+        check(object(reopened, restoredId).kind == "cad-part" &&
+          reopened.cadSession(restoredId).document.featureCount() == 0 &&
+          reopened.cadSession(restoredId).document.outputFeatureOrNull() == null,
+          "empty authored CAD documents survive editor save and reopen");
+      } catch (error:Dynamic) {
+        reopened.dispose();
+        throw error;
+      }
+      reopened.dispose();
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
   }
 
   static function stepImportWorkflow():Void {
@@ -461,6 +492,7 @@ class CadPlateWorkflowTests {
 
   static function main():Int {
     try {
+      emptyCadPartWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();
       bracketWorkflow();

@@ -30,14 +30,14 @@ class CadDocumentSession {
       throw "CAD document sessions require a model";
     this.model = model;
     document = model.getDocument();
-    publishCurrent(beginEvaluation());
+    var output = document.outputFeatureOrNull();
+    if (output != null && output.currentShape() != null)
+      publishCurrent(beginEvaluation());
   }
 
   public function geometry():GeometryData {
     ensureOpen();
-    if (publishedGeometry == null)
-      throw "CAD document has no published geometry";
-    return publishedGeometry;
+    return publishedGeometry == null ? new GeometryData() : publishedGeometry;
   }
 
   /** Return an owning snapshot that remains valid across the next recompute. */
@@ -96,7 +96,11 @@ class CadDocumentSession {
       edit(this);
       authored = true;
       ensureEvaluationCurrent(ticket);
-      publishCurrent(ticket);
+      var output = document.outputFeatureOrNull();
+      if (output == null || output.currentShape() == null)
+        publishEmpty(ticket);
+      else
+        publishCurrent(ticket);
       document.evaluationCancellationCheck = previousCancellationCheck;
       document.clearHistory();
       diagnostics = [];
@@ -195,6 +199,19 @@ class CadDocumentSession {
     publishedShape = nextShape;
     publishedGeometry = cast nextGeometry;
     collisionBounds = nextCollisionBounds;
+    revision++;
+    lastPublicationSeconds = Sys.time() - publicationStarted;
+    if (priorShape != null)
+      priorShape.close();
+  }
+
+  function publishEmpty(ticket:Int):Void {
+    var publicationStarted = Sys.time();
+    ensureEvaluationCurrent(ticket);
+    var priorShape = publishedShape;
+    publishedShape = null;
+    publishedGeometry = null;
+    collisionBounds = null;
     revision++;
     lastPublicationSeconds = Sys.time() - publicationStarted;
     if (priorShape != null)

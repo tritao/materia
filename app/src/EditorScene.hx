@@ -180,6 +180,15 @@ class EditorScene {
     return changeObjects("Create L bracket",data,id);
   }
 
+  public function createCadPart():Bool {
+    if (!canCreate()) return false;
+    var data = records(), id = allocateId("part");
+    data.push({id:id, label:"Part", type:"cad-part", x:0.0, y:0.0, z:0.0,
+      width:0.05, height:0.05, depth:0.01, collisionEnabled:false, dynamicBody:false, mass:1.0,
+      red:0.66, green:0.68, blue:0.72, visible:true});
+    return changeObjects("Create CAD part", data, id);
+  }
+
   public function importStep(path:String):Bool {
     if (!canCreate()) return false;
     var model = CadImportedModel.create(path);
@@ -915,7 +924,8 @@ class EditorScene {
         }
       }, name));
     var importedShape = requiredObject(id).kind == "cad-step";
-    if (!importedShape) {
+    var genericPart = requiredObject(id).kind == "cad-part";
+    if (!importedShape && !genericPart) {
       result.push(dimensionProperty(id, 0, prefix));
       result.push(dimensionProperty(id, 1, prefix));
     }
@@ -949,7 +959,7 @@ class EditorScene {
           default: throw "Colour requires #RRGGBB";
         }
       }, colour));
-    if (!importedShape)
+    if (!importedShape && !genericPart)
       result.push(dimensionProperty(id, 2, prefix));
     if (requiredObject(id).kind == "cad-plate") {
       result.push(cadProperty(id,CadPlateModel.HOLE_DIAMETER,"Hole diameter",false,prefix));
@@ -1287,11 +1297,14 @@ class EditorScene {
     if(kind=="cad-step") {
       if (graph == null) throw "Imported STEP object has no persisted source graph";
       model = CadImportedModel.decode(graph);
-    } else if(kind=="cad-bracket")
+    } else if (kind == "cad-part") {
+      model = graph == null ? CadPartModel.createEmpty() : CadPartModel.decode(graph);
+    } else if(kind=="cad-bracket") {
       model=graph==null?CadBracketModel.create(width,height,depth):CadBracketModel.decode(graph);
-    else
+    } else {
       model=graph==null?CadPlateModel.create(width,height,depth,
         Math.min(0.012,Math.min(width,height)*0.5)):CadPlateModel.decode(graph);
+    }
     try {
       return new CadDocumentSession(model);
     }
@@ -1305,7 +1318,7 @@ class EditorScene {
     return cast requireCadSession(id).model;
 
   static function isCadKind(kind:String):Bool
-    return kind=="cad-plate"||kind=="cad-bracket"||kind=="cad-step";
+    return kind=="cad-plate"||kind=="cad-bracket"||kind=="cad-step"||kind=="cad-part";
 
   function requireCadSession(id:String):CadDocumentSession {
     var result=cadSessions.get(id);
