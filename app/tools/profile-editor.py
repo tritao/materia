@@ -76,8 +76,8 @@ def main():
     profiler = ROOT / "haxeon/.tools/hashlink/hlprof-live"
     with (output / "launch.log").open("w") as log, (output / "memory.jsonl").open("w") as memory:
         headless_binary = APP / "build/host/headless-profile.hl"
+        binary = headless_binary if args.scenario is not None else APP / "build/host/main.hl"
         if args.skip_build:
-            binary = headless_binary if args.scenario is not None else APP / "build/host/main.hl"
             if not binary.exists():
                 parser.error(f"--skip-build requires an existing {binary}")
             log.write(f"Reusing existing {binary}; source changes are not included.\n")
@@ -100,18 +100,18 @@ def main():
         environment["LD_LIBRARY_PATH"] = os.pathsep.join(
             [str(runtime.parent), str(ROOT / "haxeon/out"), *native_dirs,
              environment.get("LD_LIBRARY_PATH", "")])
+        bytecode_name = "headless-profile.hl" if args.scenario is not None else "main.hl"
+        shutil.copy2(binary, output / bytecode_name)
         if args.scenario is not None:
             environment.pop("DISPLAY", None)
             environment.pop("WAYLAND_DISPLAY", None)
-            if args.heap_dump:
-                shutil.copy2(headless_binary, output / "headless-profile.hl")
         with socket.socket() as reservation:
             reservation.bind(("127.0.0.1", 0))
             port = reservation.getsockname()[1]
         command = [str(runtime)]
         if not args.no_profile:
             command += ["--diagnostics", str(port), "--diagnostics-wait"]
-        command += [str(headless_binary if args.scenario is not None else APP / "build/host/main.hl")]
+        command += [str(binary)]
         if args.scenario is not None:
             command += [str(output), str(args.cycles)]
             if args.heap_dump:
@@ -228,6 +228,18 @@ def main():
         except (OSError, KeyError, ValueError) as error:
             print(f"scenario verification failed: {error}", file=sys.stderr)
             result = 1
+    artifacts = {"bytecode": bytecode_name}
+    for name, filename in (("heap", "heap.dump"), ("profile", "editor.hlpc"),
+                           ("perfetto", "editor.perfetto.json"), ("memory", "memory.jsonl"),
+                           ("frames", "frame-timeline.jsonl"), ("retained", "retained.jsonl")):
+        if (output / filename).is_file():
+            artifacts[name] = filename
+    (output / "capture.json").write_text(json.dumps({"schemaVersion": 1,
+                                                       "kind": "haxeon.capture",
+                                                       "artifacts": artifacts,
+                                                       "workload": {"scenario": args.scenario,
+                                                                    "cycles": args.cycles if args.scenario else None}},
+                                                      indent=2) + "\n")
     print(f"capture={output}")
     if result:
         print(f"editor/profile exited with status {result}; see {output / 'launch.log'}", file=sys.stderr)
