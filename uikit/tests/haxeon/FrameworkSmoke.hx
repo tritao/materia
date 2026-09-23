@@ -1912,6 +1912,18 @@ class FrameworkSmoke {
 		var inheritedChild = new StyleResolver().resolve(new StyleTarget("label"), inherited);
 		if (inheritedChild.get(StyleProperty.TextColor).red != 0.7)
 			return 215;
+		var inheritedResolver = new StyleResolver();
+		var inheritedTarget = new StyleTarget("label", "inherited-cache-key");
+		var inheritedFork = inherited.fork();
+		var unchangedFork = inheritedFork.fork();
+		inheritedResolver.resolve(inheritedTarget, inheritedFork);
+		inheritedFork.set(StyleProperty.TextColor, Color.rgba(0.2, 0.2, 0.2, 1.0), null);
+		var changedInherited = inheritedResolver.resolve(inheritedTarget, inheritedFork);
+		var unchangedInherited = inheritedResolver.resolve(inheritedTarget, unchangedFork);
+		if (changedInherited.get(StyleProperty.TextColor).red != 0.2 ||
+			unchangedInherited.get(StyleProperty.TextColor).red != 0.7 ||
+			inheritedResolver.cacheMisses != 2 || inheritedResolver.cacheHits != 1)
+			return 268;
 		var transitionSheet = new StyleSheet("TransitionSheet");
 		transitionSheet.rule(StyleSelector.widget("button"),
 			[StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 1.0))]);

@@ -110,10 +110,11 @@ class Main {
           arg.indexOf("--story=") != 0 &&
           arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0 &&
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
+          arg.indexOf("--capture-seconds=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
-          "[--capture-dir=PATH] [--frames=N] " +
+          "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE]");
         return 2;
       }
@@ -133,6 +134,7 @@ class Main {
     host.height = diagnostics.windowHeight;
     host.captureDirectory = diagnostics.captureDirectory;
     host.frameLimit = diagnostics.frameLimit;
+    host.captureSeconds = diagnostics.captureSeconds;
     var activeEditor:Null<ReferenceEditorApp> = null;
     host.continuousFrames = function() return activeEditor != null &&
       (activeEditor.simulation.isRunning() || diagnostics.robotHost != null);
@@ -161,6 +163,7 @@ class Main {
 private class ReferenceEditorLaunchOptions {
   public final captureDirectory:Null<String>;
   public final frameLimit:Int;
+  public final captureSeconds:Float;
   public final componentLab:Bool;
   public final storyId:Null<String>;
   public final darkTheme:Bool;
@@ -169,12 +172,13 @@ private class ReferenceEditorLaunchOptions {
   public final setupScript:Null<String>;
   public final windowWidth:Int;
   public final windowHeight:Int;
-  public function new(captureDirectory:Null<String>, frameLimit:Int,
+  public function new(captureDirectory:Null<String>, frameLimit:Int, captureSeconds:Float,
       componentLab:Bool, storyId:Null<String>, darkTheme:Bool,
       robotHost:Null<String>, robotPort:Int,setupScript:Null<String>,
       windowWidth:Int, windowHeight:Int) {
     this.captureDirectory = captureDirectory;
     this.frameLimit = frameLimit;
+    this.captureSeconds = captureSeconds;
     this.componentLab = componentLab;
     this.storyId = storyId;
     this.darkTheme = darkTheme;
@@ -188,6 +192,7 @@ private class ReferenceEditorLaunchOptions {
   public static function fromArgs(args:Array<String>):Null<ReferenceEditorLaunchOptions> {
     var directory:Null<String> = null;
     var frames = 0;
+    var captureSeconds = 0.0;
     var lab = args.indexOf("--lab") >= 0;
     var story:Null<String> = null;
     var robotEndpoint:Null<String> = null;
@@ -204,6 +209,13 @@ private class ReferenceEditorLaunchOptions {
           return null;
         }
         frames = parsed;
+      } else if (arg.indexOf("--capture-seconds=") == 0) {
+        var parsed = Std.parseFloat(arg.substr(18));
+        if (!Math.isFinite(parsed) || parsed <= 0.0) {
+          Sys.println("materia: --capture-seconds requires a positive finite number");
+          return null;
+        }
+        captureSeconds = parsed;
       } else if (arg.indexOf("--story=") == 0) {
         story = arg.substr(8);
         lab = true;
@@ -234,7 +246,11 @@ private class ReferenceEditorLaunchOptions {
     if(setupScript!=null&&StringTools.trim(setupScript).length==0){
       Sys.println("materia: --setup-script requires a registered reference");return null;
     }
-    if (directory != null && frames == 0) frames = 3;
+    if (captureSeconds > 0.0 && (directory == null || frames > 0)) {
+      Sys.println("materia: --capture-seconds requires --capture-dir and excludes --frames");
+      return null;
+    }
+    if (directory != null && frames == 0 && captureSeconds == 0.0) frames = 3;
     if (story != null && story.length == 0) {
       Sys.println("materia: --story requires an ID");
       return null;
@@ -255,7 +271,7 @@ private class ReferenceEditorLaunchOptions {
       }
       robotPort = parsedPort;
     }
-    return new ReferenceEditorLaunchOptions(directory, frames, lab, story,
+    return new ReferenceEditorLaunchOptions(directory, frames, captureSeconds, lab, story,
       args.indexOf("--dark") >= 0, robotHost, robotPort,setupScript,
       windowWidth, windowHeight);
   }

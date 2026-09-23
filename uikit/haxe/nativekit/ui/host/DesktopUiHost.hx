@@ -33,6 +33,7 @@ class DesktopUiHost {
 		var session:Null<UiHostSession> = null;
 		var eventHistory:Array<String> = [];
 		var frameHistory:Array<Dynamic> = [];
+		var captureState = {startedAt: -1.0};
 		var result = 0;
 
 		try {
@@ -131,6 +132,8 @@ class DesktopUiHost {
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
 									var frameStartedAt = Sys.time();
 									runtime.render(Sys.time());
+									if (options.captureSeconds > 0.0 && captureState.startedAt < 0.0 && runtime.rendered > 0)
+										captureState.startedAt = frameStartedAt;
 									if (options.captureDirectory != null) {
 										var metrics = runtime.app() == null ? null : runtime.app().context().frameMetrics;
 										frameHistory.push({
@@ -149,13 +152,14 @@ class DesktopUiHost {
 										});
 									}
 									if (session.state == UiHostLifecycle.Failed) active = false;
-									if (options.captureDirectory != null && runtime.rendered >= options.frameLimit) {
+									if (options.captureDirectory != null && options.frameLimit > 0 && runtime.rendered >= options.frameLimit) {
 										writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime, eventHistory, frameHistory);
 										session.stop();
 									}
 									var continueFrames = options.continuousFrames;
 									if (active && session.state == UiHostLifecycle.Running &&
-										(options.captureDirectory != null || runtime.app().context().needsAnimationFrame ||
+										(options.captureDirectory != null && options.frameLimit > 0 ||
+											runtime.app().context().needsAnimationFrame ||
 										(continueFrames != null && continueFrames()))) {
 										scheduleFrame();
 									}
@@ -181,6 +185,12 @@ class DesktopUiHost {
 			while (active) {
 				var hadEvent = pump.poll();
 				if (session.state == UiHostLifecycle.Failed) throw session.error;
+				if (active && captureState.startedAt >= 0.0 && options.captureSeconds > 0.0 &&
+					Sys.time() - captureState.startedAt >= options.captureSeconds) {
+					writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime,
+						eventHistory, frameHistory);
+					session.stop();
+				}
 				if (active && surfaceAvailable && frameRequested && !framePending) {
 					if (NativeKit.nk_surface_request_frame(surface) != Result.Ok)
 						throw "Surface frame request failed";

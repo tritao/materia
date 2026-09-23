@@ -17,24 +17,33 @@ class ComputedProperty<T> {
 	}
 }
 
+private class InheritedKeyCache {
+	public var key:Null<String> = null;
+	public function new() {}
+}
+
 /** Authoritative Haxe-side result of style resolution. */
 class ComputedStyle {
 	var values:Map<String, Dynamic>;
 	var sources:Map<String, StyleSource>;
 	public var matchingRules(default, null):Array<StyleSource>;
 	var shared:Bool;
+	var inheritedKeyCache:Null<InheritedKeyCache>;
 
 	public function new() {
 		values = new Map();
 		sources = new Map();
 		matchingRules = [];
 		shared = false;
+		inheritedKeyCache = null;
 	}
 
 	public function set<T>(property:StyleProperty<T>, value:T, source:Null<StyleSource>):Void {
 		if (property == null)
 			throw "Computed styles require a property";
 		ensureWritable();
+		if (property.inherited)
+			inheritedKeyCache = null;
 		values.set(property.name, value);
 		if (source == null)
 			sources.remove(property.name);
@@ -148,12 +157,25 @@ class ComputedStyle {
 	/** Fast copy used by style caches; map storage is detached only on mutation. */
 	public function fork():ComputedStyle {
 		var result = new ComputedStyle();
+		if (inheritedKeyCache == null)
+			inheritedKeyCache = new InheritedKeyCache();
+		result.inheritedKeyCache = inheritedKeyCache;
 		result.values = values;
 		result.sources = sources;
 		result.matchingRules = matchingRules.copy();
 		shared = true;
 		result.shared = true;
 		return result;
+	}
+
+	/** Shared across style-cache forks; set() detaches it before mutation. */
+	public function cachedInheritedKey():Null<String>
+		return inheritedKeyCache == null ? null : inheritedKeyCache.key;
+
+	public function rememberInheritedKey(key:String):Void {
+		if (inheritedKeyCache == null)
+			inheritedKeyCache = new InheritedKeyCache();
+		inheritedKeyCache.key = key;
 	}
 
 	function ensureWritable():Void {

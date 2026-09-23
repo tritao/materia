@@ -145,6 +145,9 @@ class StyleResolver {
 	function parentKey(parent:Null<ComputedStyle>):String {
 		if (parent == null)
 			return "none";
+		var cached = parent.cachedInheritedKey();
+		if (cached != null)
+			return cached;
 		var result = "";
 		for (property in StyleProperty.all()) {
 			if (!property.inherited)
@@ -153,6 +156,7 @@ class StyleResolver {
 				valueKey(property, parent.get(property)) +
 				"@" + sourceKey(parent.source(property)) + ";";
 		}
+		parent.rememberInheritedKey(result);
 		return result;
 	}
 

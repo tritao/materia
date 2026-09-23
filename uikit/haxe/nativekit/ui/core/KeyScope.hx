@@ -17,9 +17,18 @@ class KeyScope {
 	}
 
 	public function widgetId(localKey:String):WidgetId {
+		return widgetIdForPath(widgetPath(localKey));
+	}
+
+	/** Reuses the exact scoped path for hashing and diagnostic identity. */
+	public function widgetPath(localKey:String):String {
 		if (localKey == null || localKey.length == 0)
 			throw "Local widget keys must not be empty";
-		var bytes = Bytes.ofString(path + localKey.length + ":" + localKey);
+		return path + localKey.length + ":" + localKey;
+	}
+
+	public static function widgetIdForPath(fullPath:String):WidgetId {
+		var bytes = Bytes.ofString(fullPath);
 		var hash = -2128831035;
 		for (index in 0...bytes.length)
 			hash = (hash ^ bytes.get(index)) * 16777619;

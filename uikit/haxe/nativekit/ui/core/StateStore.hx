@@ -22,7 +22,7 @@ class StateStore {
 
 	/** Records the scoped key path used to make a widget ID for diagnostics. */
 	public function rememberPath(id:WidgetId, path:String):Void {
-		if (id != null && path != null)
+		if (id != null && path != null && paths.get(id.value) != path)
 			paths.set(id.value, path);
 	}
 

@@ -37,6 +37,8 @@ class BuildContext {
 	var styleParent:Null<ComputedStyle>;
 	var focusRequester:WidgetId->Bool;
 	final claimed:Map<Int, String>;
+	final idsByPath:Map<String, WidgetId>;
+	var cachedIdCount:Int;
 	var scope:KeyScope;
 	var textStyleStack:Array<ResolvedTextStyle>;
 
@@ -66,6 +68,8 @@ class BuildContext {
 		viewportHeight = 0.0;
 		focusRequester = function(_) { return false; };
 		claimed = new Map();
+		idsByPath = new Map();
+		cachedIdCount = 0;
 		scope = new KeyScope();
 		textStyleStack = [ResolvedTextStyle.fromTheme(this.theme)];
 	}
@@ -198,11 +202,21 @@ class BuildContext {
 	}
 
 	public function id(localKey:String):WidgetId {
-		var id = scope.widgetId(localKey);
-		stateStore.rememberPath(id, scope.pathValue() + localKey.length + ":" + localKey);
+		var path = scope.widgetPath(localKey);
+		var id = idsByPath.get(path);
+		if (id == null) {
+			if (cachedIdCount >= 8192) {
+				idsByPath.clear();
+				cachedIdCount = 0;
+			}
+			id = KeyScope.widgetIdForPath(path);
+			idsByPath.set(path, id);
+			cachedIdCount++;
+		}
+		stateStore.rememberPath(id, path);
 		if (claimed.exists(id.value))
 			throw 'Duplicate widget ID ${id.value}; use distinct keys for sibling views';
-		claimed.set(id.value, scope.pathValue() + localKey);
+		claimed.set(id.value, path);
 		return id;
 	}
 
