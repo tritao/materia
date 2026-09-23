@@ -20,9 +20,17 @@ import nativekit.ui.core.PropertyDescriptorOptions;
 import nativekit.ui.core.PropertyType;
 import nativekit.ui.core.PropertyValue;
 import nativekit.scene.PickResult;
+import CadKit;
+import cadkit.Shape;
+import cadkit.parametric.Feature;
+import cadkit.parametric.ReferenceState;
 import cadkit.parametric.TopologyFingerprint;
+import cadkit.parametric.TopologyHistoryMap;
+import cadkit.parametric.TopologyResolver;
+import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
@@ -51,6 +59,7 @@ class EditorScene {
   public var selectedCadFaceX(default, null):Float = 0.0;
   public var selectedCadFaceY(default, null):Float = 0.0;
   var selectedCadFaceFingerprint:Null<TopologyFingerprint> = null;
+  var selectedCadFace:Null<Shape> = null;
   var selectedFeatureKey:Null<String> = null;
   var activeSketchEdit:Null<CadSketchEditSession> = null;
   var activeSketchObjectId:Null<String> = null;
@@ -203,12 +212,78 @@ class EditorScene {
     var id = selectedId;
     var session = requireCadSession(id);
     var feature = new ConstrainedSketchFeature(starterSketch());
+    var created = addCadFeature(id, "Create constrained sketch", feature);
+    if (!created)
+      return false;
+
+    var featureIndex = selectCadFeature(id, feature);
+    activeSketchEdit = session.beginSketchEdit(featureIndex);
+    activeSketchObjectId = id;
+    refreshSelectionRevision();
+    return true;
+  }
+
+  public function canCreateExtrusion():Bool {
+    if (activeSketchEdit != null)
+      return false;
+    var item = object(selectedId);
+    if (item == null || item.kind != "cad-part")
+      return false;
+    var feature = selectedCadFeature(selectedId);
+    return feature != null && feature.active && feature.currentShape() != null &&
+      Std.isOfType(feature, ConstrainedSketchFeature);
+  }
+
+  /** Add a default Z extrusion from the selected solved sketch. */
+  public function createExtrusion():Bool {
+    if (!canCreateExtrusion())
+      return false;
+    var id = selectedId;
+    var source = selectedCadFeature(id);
+    var feature = ExtrudeFeature.along(cast source, 10, Vector.Z());
+    if (!addCadFeature(id, "Create extrusion", feature))
+      return false;
+    selectCadFeature(id, feature);
+    refreshSelectionRevision();
+    return true;
+  }
+
+  public function setExtrusionDepth(id:String, featureId:Int, depth:Float):Void {
+    var session = requireCadSession(id);
+    var candidate = session.document.featureById(featureId);
+    if (candidate == null || !Std.isOfType(candidate, ExtrudeFeature))
+      throw "selected extrusion is no longer available";
+    var feature:ExtrudeFeature = cast candidate;
+    if (feature.amount == null)
+      throw "extrusion has no editable depth parameter";
+    var previous = feature.amount.value;
+    if (depth == previous)
+      return;
+    if (!Math.isFinite(depth) || depth <= 0)
+      throw "Extrusion depth must be finite and positive";
+    applyCadEdit(id, "Edit extrusion depth", function(owner) {
+      var current:ExtrudeFeature = cast owner.document.featureById(featureId);
+      if (current.amount == null)
+        throw "extrusion has no editable depth parameter";
+      current.amount.set(depth);
+      owner.document.recompute();
+    }, function(owner) {
+      var current:ExtrudeFeature = cast owner.document.featureById(featureId);
+      if (current.amount == null)
+        throw "extrusion has no editable depth parameter";
+      current.amount.set(previous);
+      owner.document.recompute();
+    });
+  }
+
+  function addCadFeature(id:String, label:String, feature:Feature):Bool {
+    var session = requireCadSession(id);
     var previousOutput = session.document.outputFeatureOrNull();
-    var created = applyCadEdit(id, "Create constrained sketch", function(owner) {
+    return applyCadEdit(id, label, function(owner) {
       var transaction = owner.document.beginTransaction();
       try {
         if (feature.document == null) {
-          var attached:ConstrainedSketchFeature = owner.document.add(feature);
+          var attached:Feature = owner.document.add(feature);
           owner.document.trackFeatureCreation(feature);
         } else {
           owner.document.setFeatureActive(feature, true);
@@ -232,20 +307,33 @@ class EditorScene {
         throw error;
       }
     });
-    if (!created)
-      return false;
+  }
 
-    var featureIndex = -1;
-    for (index in 0...session.document.featureCount())
-      if (session.document.featureAt(index) == feature)
-        featureIndex = index;
-    if (featureIndex < 0)
-      throw "created sketch feature is missing from its document";
-    selectedFeatureKey = id + ":feature:" + featureIndex;
-    activeSketchEdit = session.beginSketchEdit(featureIndex);
-    activeSketchObjectId = id;
-    refreshSelectionRevision();
-    return true;
+  function selectedCadFeature(id:String):Null<Feature> {
+    if (selectedId != id || selectedFeatureKey == null)
+      return null;
+    var marker = selectedFeatureKey.indexOf(":feature:");
+    if (marker < 0 || selectedFeatureKey.substr(0, marker) != id)
+      return null;
+    var index = Std.parseInt(selectedFeatureKey.substr(marker + 9));
+    if (index == null)
+      return null;
+    try {
+      return requireCadSession(id).document.featureAt(index);
+    } catch (_:Dynamic) {
+      return null;
+    }
+  }
+
+  function selectCadFeature(id:String, feature:Feature):Int {
+    var session = requireCadSession(id);
+    for (index in 0...session.document.featureCount()) {
+      if (session.document.featureAt(index) != feature)
+        continue;
+      selectedFeatureKey = id + ":feature:" + index;
+      return index;
+    }
+    throw "created CAD feature is missing from its document";
   }
 
   static function starterSketch():ConstrainedSketch {
@@ -314,7 +402,7 @@ class EditorScene {
 
   public function setBracketWallThickness(id:String,value:Float):Void {
     if(requiredObject(id).kind!="cad-bracket")throw "Object is not a CAD bracket";
-    var model=cadBracketModel(id),before=model.wallThickness();
+    var model=cadBracketModel(id),before=model.wallThickness(),beforeHoleRadius=model.holeRadius();
     if(before==value)return;
     applyCadEdit(id,"Edit bracket wall thickness",function(session) {
       var target:CadBracketModel=cast session.model;
@@ -322,6 +410,7 @@ class EditorScene {
     },function(session) {
       var target:CadBracketModel=cast session.model;
       target.setWallThickness(before);
+      target.setHoleRadius(beforeHoleRadius);
     });
   }
 
@@ -439,17 +528,11 @@ class EditorScene {
     item.height = Math.max(Math.abs(values.height), 0.000001);
     item.depth = Math.max(Math.abs(values.depth), 0.000001);
     if (id == selectedId && selectedCadFaceFingerprint != null) {
-      var prior = selectedCadFaceFingerprint;
       var priorIndex = selectedCadFaceIndex;
-      var index = session.model.remapFace(prior);
-      selectedCadFaceIndex = index;
-      if (index >= 0) {
-        selectedCadFaceFingerprint = session.model.faceFingerprint(index);
-        session.selectedTopology = selectedCadFaceFingerprint;
-      } else {
-        selectedCadFaceFingerprint = null;
-        session.selectedTopology = null;
-      }
+      var index = -1;
+      try index = remapSelectedCadFace(session, selectedCadFace, selectedCadFaceFingerprint)
+      catch (_:Dynamic) clearSelectedCadFace();
+      if (index < 0) clearSelectedCadFace();
       if (priorIndex != index) {
         selectionRevision++;
         nextRevision++;
@@ -457,6 +540,91 @@ class EditorScene {
       }
     }
     publish();
+  }
+
+  /** Resolve a selected face through producer history before considering geometry. */
+  function remapSelectedCadFace(session:CadDocumentSession, priorFace:Null<Shape>,
+      fingerprint:TopologyFingerprint):Int {
+    if (priorFace == null)
+      return -1;
+    var output = session.document.outputFeatureOrNull();
+    if (output == null || output.currentShape() == null)
+      return -1;
+    var resultShape = output.currentShape();
+    var index = -1;
+    var provenance = output.provenance;
+    if (provenance != null) {
+      var remap = new TopologyHistoryMap(provenance).remap(priorFace, CadKit.ShapeKind.Face);
+      if (remap.state == ReferenceState.Remapped && remap.shape != null) {
+        index = faceIndexOf(resultShape, remap.shape);
+      }
+      if (remap.shape != null)
+        remap.shape.close();
+    }
+    if (index < 0) {
+      var resolution = TopologyResolver.resolve(resultShape, fingerprint, CadKit.ShapeKind.Face, priorFace);
+      if (resolution.state == ReferenceState.Resolved)
+        index = resolution.index;
+    }
+    if (index < 0)
+      return -1;
+    var currentFace = resultShape.subshape(CadKit.ShapeKind.Face, index);
+    try {
+      var currentFingerprint = session.model.faceFingerprint(index);
+      if (selectedCadFace != null)
+        selectedCadFace.close();
+      selectedCadFace = currentFace;
+      selectedCadFaceIndex = index;
+      selectedCadFaceFingerprint = currentFingerprint;
+      session.selectedTopology = currentFingerprint;
+      return index;
+    } catch (error:Dynamic) {
+      currentFace.close();
+      throw error;
+    }
+  }
+
+  function faceIndexOf(source:Shape, candidate:Shape):Int {
+    var count = source.subshapeCount(CadKit.ShapeKind.Face);
+    for (index in 0...count) {
+      var face = source.subshape(CadKit.ShapeKind.Face, index);
+      var matches = candidate.sameAs(face);
+      face.close();
+      if (matches)
+        return index;
+    }
+    return -1;
+  }
+
+  function installSelectedCadFace(session:CadDocumentSession, face:Shape, index:Int,
+      x:Float, y:Float):Void {
+    try {
+      var fingerprint = session.model.faceFingerprint(index);
+      if (selectedCadFace != null)
+        selectedCadFace.close();
+      selectedCadFace = face;
+      selectedCadFaceIndex = index;
+      selectedCadFaceFingerprint = fingerprint;
+      selectedCadFaceX = x;
+      selectedCadFaceY = y;
+      session.selectedTopology = fingerprint;
+    } catch (error:Dynamic) {
+      face.close();
+      throw error;
+    }
+  }
+
+  function clearSelectedCadFace():Void {
+    var session = cadSessions.get(selectedId);
+    if (session != null)
+      session.selectedTopology = null;
+    if (selectedCadFace != null)
+      selectedCadFace.close();
+    selectedCadFace = null;
+    selectedCadFaceIndex = -1;
+    selectedCadFaceFingerprint = null;
+    selectedCadFaceX = 0.0;
+    selectedCadFaceY = 0.0;
   }
 
   function refreshSelectionRevision():Void {
@@ -468,6 +636,7 @@ class EditorScene {
   // Reconcile document records into the runtime scene while preserving stable nodes.
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
     var previousFace=selectedCadFaceFingerprint;
+    var previousFaceShape=selectedCadFace;
     var previousFaceX=selectedCadFaceX,previousFaceY=selectedCadFaceY;
     var current:Map<String, EditorSceneObject> = new Map();
     for (item in objects) current.set(item.id, item);
@@ -569,19 +738,18 @@ class EditorScene {
     if (changed) publish();
     selectedId = selection;
     selectedFeatureKey=null;
-    selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
+    var restoredFace = -1;
     if(previousFace!=null){
       var selected=object(selection);
       if(selected!=null&&isCadKind(selected.kind)){
         var session=cadSessions.get(selected.id);
         if(session!=null)try {
-          selectedCadFaceIndex=session.model.remapFace(previousFace);
-          if(selectedCadFaceIndex>=0){selectedCadFaceFingerprint=session.model.faceFingerprint(selectedCadFaceIndex);
-            selectedCadFaceX=previousFaceX;selectedCadFaceY=previousFaceY;
-            session.selectedTopology=selectedCadFaceFingerprint;}
-        } catch(error:Dynamic) { selectedCadFaceIndex=-1; selectedCadFaceFingerprint=null; }
+          restoredFace=remapSelectedCadFace(session,previousFaceShape,previousFace);
+          if(restoredFace>=0){selectedCadFaceX=previousFaceX;selectedCadFaceY=previousFaceY;}
+        } catch(error:Dynamic) { restoredFace=-1; }
       }
     }
+    if(restoredFace<0)clearSelectedCadFace();
     selectionRevision++;
     nextRevision++;
     revision = nextRevision;
@@ -676,10 +844,9 @@ class EditorScene {
     if (id == selectedId && selectedFeatureKey==null) return false;
     if (activeSketchEdit != null && (id != activeSketchObjectId || selectedFeatureKey != null))
       cancelSelectedSketchEdit();
-    var previousSession=cadSessions.get(selectedId);
-    if(previousSession!=null)previousSession.selectedTopology=null;
+    clearSelectedCadFace();
     selectedId = id;
-    selectedFeatureKey=null;selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
+    selectedFeatureKey=null;
     selectionRevision++;
     nextRevision++;
     revision = nextRevision;
@@ -697,8 +864,8 @@ class EditorScene {
     if (activeSketchEdit != null && (id != activeSketchObjectId || key != selectedFeatureKey))
       cancelSelectedSketchEdit();
     if(selectedId==id&&selectedFeatureKey==key)return false;
+    clearSelectedCadFace();
     selectedId=id;selectedFeatureKey=key;
-    selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
     selectionRevision++;nextRevision++;revision=nextRevision;
     return true;
   }
@@ -814,18 +981,17 @@ class EditorScene {
     var previousFace=selectedCadFaceIndex;
     var id=idForHit(hit);
     select(id);
-    selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;
+    clearSelectedCadFace();
     var item=object(id);
     if(item!=null&&isCadKind(item.kind)&&hit.subelement()>=0){
       var session=requireCadSession(id);
       try {
         var index=hit.subelement();
-        selectedCadFaceFingerprint=session.model.faceFingerprint(index);
-        selectedCadFaceIndex=index;
-        selectedCadFaceX=hit.worldX()-item.x;
-        selectedCadFaceY=hit.worldY()-item.y;
-        session.selectedTopology=selectedCadFaceFingerprint;
-      } catch(error:Dynamic){selectedCadFaceIndex=-1;selectedCadFaceFingerprint=null;session.selectedTopology=null;}
+        var output=session.document.outputFeatureOrNull();
+        if(output==null||output.currentShape()==null)throw "CAD output has no evaluated faces";
+        var face=output.currentShape().subshape(CadKit.ShapeKind.Face,index);
+        installSelectedCadFace(session,face,index,hit.worldX()-item.x,hit.worldY()-item.y);
+      } catch(error:Dynamic){clearSelectedCadFace();}
     }
     if(previousFace!=selectedCadFaceIndex){selectionRevision++;nextRevision++;revision=nextRevision;}
     return id;
@@ -1075,6 +1241,12 @@ class EditorScene {
       result.push(bracketProperty(id,"hole-radius","Hole radius",function(model)return model.holeRadius(),
         function(value)setBracketHoleRadius(id,value),prefix));
     }
+    var selectedFeature = selectedCadFeature(id);
+    if (selectedFeature != null && selectedFeature.active && Std.isOfType(selectedFeature, ExtrudeFeature)) {
+      var extrusion:ExtrudeFeature = cast selectedFeature;
+      if (extrusion.amount != null)
+        result.push(extrusionDepthProperty(id, extrusion.id.toInt(), prefix));
+    }
     if (activeSketchEdit != null && activeSketchObjectId == id)
       appendSketchDraftProperties(result, activeSketchEdit, prefix);
     result.push(boolProperty(id,"collision","Collision",function(item)return item.collisionEnabled,
@@ -1180,6 +1352,7 @@ class EditorScene {
   function dimensionProperty(id:String, axis:Int, prefix:String):PropertyDescriptor {
     var settings = new PropertyDescriptorOptions();
     settings.category = "Geometry";
+    settings.recordHistory = !isCadKind(requiredObject(id).kind);
     settings.unit = "m";
     settings.minimum = 0.000001;
     settings.maximum = 1000000.0;
@@ -1211,6 +1384,7 @@ class EditorScene {
   function cadProperty(id:String, name:String, label:String, signed:Bool,
       prefix:String):PropertyDescriptor {
     var options = new PropertyDescriptorOptions();
+    options.recordHistory = false;
     options.category = "Geometry"; options.unit = "m"; options.step = 0.001;
     options.minimum = signed ? -1000000.0 : 0.000001; options.maximum = 1000000.0;
     options.validator = function(_, value) {
@@ -1232,6 +1406,7 @@ class EditorScene {
   function bracketProperty(id:String,key:String,label:String,read:CadBracketModel->Float,
       write:Float->Void,prefix:String):PropertyDescriptor {
     var options=new PropertyDescriptorOptions();
+    options.recordHistory=false;
     options.category="Geometry";options.unit="m";options.step=0.001;
     options.minimum=0.000001;options.maximum=1000000.0;
     options.validator=function(_,value) {
@@ -1245,6 +1420,42 @@ class EditorScene {
         var number:Float=switch value {case Float(v):v;case Int(v):v;default:throw label+" requires a number";};
         write(number);
       },options);
+  }
+
+  function extrusionDepthProperty(id:String, featureId:Int, prefix:String):PropertyDescriptor {
+    var options = new PropertyDescriptorOptions();
+    options.recordHistory = false;
+    options.category = "Feature";
+    options.unit = "mm";
+    options.minimum = 0.000001;
+    options.maximum = 1000000.0;
+    options.step = 1.0;
+    options.validator = function(_, value) {
+      var number:Null<Float> = switch (value) {
+        case PropertyValue.Float(next): next;
+        case PropertyValue.Int(next): next;
+        default: null;
+      };
+      return number == null || !Math.isFinite(number) || number <= 0
+        ? "Extrusion depth must be finite and positive" : null;
+    };
+    return new PropertyDescriptor(prefix + "extrusion-depth", "Extrusion depth", PropertyType.Float,
+      function(_) {
+        var candidate = requireCadSession(id).document.featureById(featureId);
+        if (candidate == null || !Std.isOfType(candidate, ExtrudeFeature))
+          throw "selected extrusion is no longer available";
+        var extrusion:ExtrudeFeature = cast candidate;
+        if (extrusion.amount == null)
+          throw "extrusion has no editable depth parameter";
+        return PropertyValue.Float(extrusion.amount.value);
+      }, function(_, value) {
+        var depth:Float = switch (value) {
+          case PropertyValue.Float(next): next;
+          case PropertyValue.Int(next): next;
+          default: throw "Extrusion depth requires a number";
+        };
+        setExtrusionDepth(id, featureId, depth);
+      }, options);
   }
 
   function boolProperty(id:String,key:String,label:String,read:EditorSceneObject->Bool,
@@ -1385,6 +1596,10 @@ class EditorScene {
       try activeSketchEdit.cancel() catch (_:Dynamic) {}
       activeSketchEdit = null;
       activeSketchObjectId = null;
+    }
+    if (selectedCadFace != null) {
+      selectedCadFace.close();
+      selectedCadFace = null;
     }
     for (session in cadSessions) session.close();
     cadSessions = new Map();

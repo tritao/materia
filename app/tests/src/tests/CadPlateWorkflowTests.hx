@@ -7,6 +7,7 @@ import app.CadDocumentSession;
 import app.CadPlateModel;
 import app.CadPlateModel.CadPlateParameters;
 import cadkit.parametric.features.ConstrainedSketchFeature;
+import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.sketch.SketchConstraint;
 import app.EditorScene;
 import app.PerspectiveCamera;
@@ -28,7 +29,17 @@ class CadPlateWorkflowTests {
   static function check(value:Bool, message:String):Void if (!value) throw message;
   static function object(scene:EditorScene, id:String):app.EditorSceneObject return scene.object(id);
   static function near(actual:Float, expected:Float, message:String):Void
-    check(Math.abs(actual - expected) < 0.00001, message);
+    nearWithin(actual, expected, 0.00001, message);
+
+  static function nearWithin(actual:Float, expected:Float, tolerance:Float, message:String):Void
+    check(Math.abs(actual - expected) < tolerance,
+      message + " (expected " + expected + ", got " + actual + ")");
+
+  static function extrusionDepth(feature:ExtrudeFeature):Float {
+    if (feature.amount == null)
+      throw "test extrusion has no depth parameter";
+    return feature.amount.value;
+  }
 
   static function parameter(scene:EditorScene, name:String):Float {
     var values:CadPlateParameters=scene.cadParameters(scene.selectedId);
@@ -118,6 +129,57 @@ class CadPlateWorkflowTests {
       check(scene.treeSelectionKey() == id + ":feature:1" && scene.hasActiveSketchEdit(),
         "tree selection retains stable document indexes across inactive undone nodes");
       scene.cancelSelectedSketchEdit();
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
+  }
+
+  static function sketchExtrusionWorkflow():Void {
+    var scene = new EditorScene([]);
+    try {
+      check(scene.createCadPart(), "create a CAD part for extrusion authoring");
+      var id = scene.selectedId;
+      check(scene.createSketch(), "create a sketch to extrude");
+      check(edit(scene, "Dimension width", 30) == PropertyEditResult.Applied,
+        "edit the sketch before extrusion");
+      check(scene.applySelectedSketchEdit(), "apply the sketch before extrusion");
+      check(scene.canCreateExtrusion(), "a selected solved sketch offers an extrusion action");
+      check(scene.createExtrusion(), "extrude the selected sketch into a solid");
+      var extrusion:ExtrudeFeature = cast scene.cadSession(id).document.featureAt(1);
+      nearWithin(scene.cadSession(id).document.result().volume(), 6000, 0.001,
+        "default extrusion uses the authored sketch dimensions");
+      check(edit(scene, "Extrusion depth", 12) == PropertyEditResult.Applied,
+        "extrusion depth can be edited from its feature inspector");
+      near(extrusionDepth(extrusion), 12, "extrusion depth edit updates the authored feature");
+      nearWithin(scene.cadSession(id).document.result().volume(), 7200, 0.001,
+        "editing extrusion depth recomputes the solid");
+
+      var reopened = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
+      try {
+        check(reopened.cadSession(id).document.featureCount() == 2,
+          "sketch and extrusion survive editor save and reopen");
+        nearWithin(reopened.cadSession(id).document.result().volume(), 7200, 0.001,
+          "reopened extrusion has the same expected solid volume");
+      } catch (error:Dynamic) {
+        reopened.dispose();
+        throw error;
+      }
+      reopened.dispose();
+
+      check(scene.document.undo(), "undo extrusion depth edit");
+      near(extrusionDepth(extrusion), 10, "undo restores the default extrusion depth");
+      check(scene.document.redo(), "redo extrusion depth edit");
+      near(extrusionDepth(extrusion), 12, "redo restores the edited extrusion depth");
+      check(scene.document.undo() && scene.document.undo(), "undo depth edit then extrusion creation");
+      check(!extrusion.active && scene.cadSession(id).document.outputFeatureOrNull() ==
+        scene.cadSession(id).document.featureAt(0),
+        "undoing extrusion restores the sketch as the active output");
+      check(scene.cadFeatureNameAt(id, 1) == "Inactive · extrude",
+        "feature tree keeps the stable index of an undone extrusion");
+      check(scene.document.redo() && scene.document.redo(), "redo extrusion then its depth edit");
+      near(extrusionDepth(extrusion), 12, "redo restores the complete extrusion edit sequence");
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
@@ -540,6 +602,7 @@ class CadPlateWorkflowTests {
     try {
       emptyCadPartWorkflow();
       sketchCreationWorkflow();
+      sketchExtrusionWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();
       bracketWorkflow();
