@@ -1,5 +1,6 @@
 package cadkit.parametric;
 
+import cadkit.Operation;
 import cadkit.Shape;
 import cadkit.parametric.ChangeSet;
 import cadkit.parametric.EvaluationContext;
@@ -24,6 +25,7 @@ import cadkit.parametric.ElementId;
 import cadkit.parametric.LevelElement;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.ElementReference;
+import cadkit.parametric.TopologyReferenceUpdate;
 import cadkit.parametric.ElementChanges.ElementCreateChange;
 import cadkit.parametric.ElementChanges.ElementRemoveChange;
 import cadkit.parametric.ElementChanges.ElementNameChange;
@@ -979,6 +981,13 @@ class Document {
 		}
 		var stagedFeatures:Array<Feature> = [];
 		var stagedResults:Array<EvaluationResult> = [];
+		var stagedByFeature:Map<Int, EvaluationResult> = new Map();
+		var stagedTopologyUpdates:Array<TopologyReferenceUpdate> = [];
+		var preparedRemapReport = new TopologyRemapReport();
+		var retiredFeatureShapes:Array<Shape> = [];
+		var retiredOperations:Array<Operation> = [];
+		var retiredReferences:Array<Shape> = [];
+		var retiredElements:Array<Shape> = [];
 		var evaluatedFeatureCount = 0;
 		var current:Null<Feature> = null;
 		var previousStates:Map<Int, Array<Int>> = new Map();
@@ -1002,19 +1011,38 @@ class Document {
 				var result:EvaluationResult = feature.evaluate(context);
 				stagedFeatures.push(feature);
 				stagedResults.push(result);
+				stagedByFeature.set(feature.id.toInt(), result);
 				context.stage(feature, result);
 			}
 			context.checkCancelled();
 
-			for (index in 0...stagedFeatures.length)
-				stagedFeatures[index].install(stagedResults[index]);
-			for (feature in stagedFeatures)
-				feature.commitEvaluation();
-			lastRemapReport = new TopologyRemapReport();
-			for (feature in stagedFeatures)
-				lastRemapReport.merge(feature.remapTopologyReferences());
-			for (element in elements)
-				element.commitOutput();
+			for (feature in stagedFeatures) {
+				current = feature;
+				var updates = feature.prepareTopologyRemaps(stagedByFeature);
+				for (update in updates) {
+					stagedTopologyUpdates.push(update);
+					preparedRemapReport.add(update.state);
+				}
+			}
+			for (feature in stagedFeatures) {
+				if (feature.shape != null)
+					retiredFeatureShapes.push(feature.shape);
+				if (feature.provenance != null)
+					retiredOperations.push(feature.provenance);
+			}
+			for (update in stagedTopologyUpdates) {
+				var previous = update.skipped ? null : update.reference.currentShape();
+				if (previous != null)
+					retiredReferences.push(previous);
+			}
+			for (element in elements) {
+				var previous = element.cachedPlacedShape();
+				if (previous != null)
+					retiredElements.push(previous);
+			}
+			for (update in stagedTopologyUpdates)
+				update.reference.validateRemapUpdate(update);
+			context.checkCancelled();
 		} catch (error:Dynamic) {
 			for (feature in features)
 				feature.discardEvaluation();
@@ -1036,6 +1064,8 @@ class Document {
 				var reverse = stagedResults.length - index - 1;
 				stagedResults[reverse].dispose();
 			}
+			for (update in stagedTopologyUpdates)
+				try update.dispose() catch (_:Dynamic) {}
 			recordRecomputeMetrics(started, evaluatedFeatureCount, context);
 			if (Std.isOfType(error, EvaluationCancelled))
 				throw error;
@@ -1043,6 +1073,26 @@ class Document {
 				throw recomputeError;
 			throw error;
 		}
+
+		// Everything that can allocate, resolve topology, or report a model error
+		// is prepared. The following section only swaps document-owned references.
+		for (index in 0...stagedFeatures.length)
+			stagedFeatures[index].install(stagedResults[index]);
+		for (feature in stagedFeatures)
+			feature.commitEvaluation();
+		for (update in stagedTopologyUpdates)
+			update.reference.publishRemap(update);
+		for (element in elements)
+			element.commitOutput();
+		lastRemapReport = preparedRemapReport;
+		for (shape in retiredFeatureShapes)
+			try shape.close() catch (_:Dynamic) {}
+		for (operation in retiredOperations)
+			try operation.close() catch (_:Dynamic) {}
+		for (shape in retiredReferences)
+			try shape.close() catch (_:Dynamic) {}
+		for (shape in retiredElements)
+			try shape.close() catch (_:Dynamic) {}
 		recordRecomputeMetrics(started, evaluatedFeatureCount, context);
 
 		// Publication succeeded. Observer failures are reported to the caller, but cannot

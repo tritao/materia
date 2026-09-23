@@ -57,9 +57,13 @@ class Element {
 		clearPlacedShape();
 	}
 
+	public function cachedPlacedShape():Null<Shape>
+		return placedShape;
+
+	/** Publish the authored output pointer; the document retires the old placement cache afterward. */
 	public function commitOutput():Void {
 		committedOutput = output;
-		clearPlacedShape();
+		placedShape = null;
 	}
 
 	public function restorePlacement(value:Placement, parent:Null<ElementReference>):Void {

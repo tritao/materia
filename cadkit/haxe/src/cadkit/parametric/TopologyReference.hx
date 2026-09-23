@@ -11,6 +11,7 @@ import cadkit.parametric.ParametricError;
 import cadkit.parametric.ReferenceState;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyHistoryMap;
+import cadkit.parametric.TopologyReferenceUpdate;
 
 /** A document-owned topology selection that can be remapped after recompute. */
 class TopologyReference {
@@ -113,6 +114,10 @@ class TopologyReference {
 		return fingerprint;
 	}
 
+	/** Feature whose result is used when this reference is refreshed after recompute. */
+	public function remapTargetFeature():Feature
+		return remapFeature;
+
 	/** Rebind this document-owned reference to an explicitly selected topology. */
 	public function rebind(topology:Shape):Void {
 		if (topology == null || topology.kind() != kind)
@@ -192,61 +197,98 @@ class TopologyReference {
 			"topology reference is Unresolved", ReferenceState.Unresolved);
 	}
 
-	public function remap():ReferenceState {
+	public function prepareRemap(result:Null<Shape>, operation:Null<Operation>):TopologyReferenceUpdate {
 		if (state == ReferenceState.Closed)
-			return state;
+			return new TopologyReferenceUpdate(this, null, fingerprint, state, fallbackAmbiguous, true);
 
-		var operation = remapFeature.provenance;
-		if (operation != null && current != null) {
-			var historyResult = new TopologyHistoryMap(operation).remap(current, kind);
-			switch historyResult.state {
-				case ReferenceState.Remapped:
-					if (historyResult.shape != null) {
-						replace(historyResult.shape, ReferenceState.Remapped);
-						return state;
-					}
-				case ReferenceState.Deleted:
-					markDeleted();
-					return state;
-				case ReferenceState.Ambiguous:
-					markAmbiguous();
-					return state;
-				case ReferenceState.Resolved, ReferenceState.Unresolved, ReferenceState.Closed:
-			}
-		}
-
-		var result = remapFeature.currentShape();
-		if (result == null) {
-			markUnresolved();
-			return state;
-		}
-
-		var fallback = findFallback(result);
-		if (fallback == null && fallbackSelection != null) {
-			try {
-				fallback = fallbackSelection.resolve(result)[0];
-			} catch (error:Dynamic) {
-				if (Std.isOfType(error, ParametricError)) {
-					var parametric:ParametricError = cast error;
-					fallbackAmbiguous = parametric.referenceState == ReferenceState.Ambiguous;
-				} else {
-					throw error;
+		var next:Null<Shape> = null;
+		var nextState:ReferenceState = ReferenceState.Unresolved;
+		var nextFingerprint = fingerprint;
+		var nextAmbiguous = false;
+		try {
+			if (operation != null && current != null) {
+				var historyResult = new TopologyHistoryMap(operation).remap(current, kind);
+				switch historyResult.state {
+					case ReferenceState.Remapped:
+						if (historyResult.shape != null) {
+							next = historyResult.shape;
+							nextState = ReferenceState.Remapped;
+						}
+					case ReferenceState.Deleted:
+						nextState = ReferenceState.Deleted;
+					case ReferenceState.Ambiguous:
+						nextState = ReferenceState.Ambiguous;
+					case ReferenceState.Resolved, ReferenceState.Unresolved, ReferenceState.Closed:
 				}
 			}
+
+			if (next == null && nextState != ReferenceState.Deleted && nextState != ReferenceState.Ambiguous && result != null) {
+				var resolution = TopologyResolver.resolve(result, fingerprint, kind, current);
+				if (resolution.state == ReferenceState.Resolved)
+					next = result.subshape(kind, resolution.index);
+				else if (resolution.state == ReferenceState.Ambiguous)
+					nextAmbiguous = true;
+
+				if (next == null && fallbackSelection != null) {
+					try {
+						var selected = fallbackSelection.resolve(result);
+						if (selected.length > 0) {
+							next = selected[0];
+							for (index in 1...selected.length)
+								selected[index].close();
+						}
+					} catch (error:Dynamic) {
+						if (Std.isOfType(error, ParametricError)) {
+							var parametric:ParametricError = cast error;
+							nextAmbiguous = parametric.referenceState == ReferenceState.Ambiguous;
+						} else {
+							throw error;
+						}
+					}
+				}
+			}
+
+			if (next != null) {
+				nextFingerprint = TopologyFingerprint.capture(next);
+				nextState = ReferenceState.Remapped;
+			} else if (nextState != ReferenceState.Deleted && nextState != ReferenceState.Ambiguous) {
+				nextState = nextAmbiguous ? ReferenceState.Ambiguous : ReferenceState.Unresolved;
+			}
+			return new TopologyReferenceUpdate(this, next, nextFingerprint, nextState, nextAmbiguous);
+		} catch (error:Dynamic) {
+			if (next != null)
+				next.close();
+			throw error;
 		}
-		if (fallback != null) {
-			replace(fallback, ReferenceState.Remapped);
-			return state;
-		} else if (fallbackAmbiguous) {
-			markAmbiguous();
-			return state;
-		} else if (current != null) {
-			markUnresolved();
-			return state;
-		} else {
-			markUnresolved();
-			return state;
+	}
+
+	/** Publish a prepared remap without native calls; the document retires the old shape afterward. */
+	public function validateRemapUpdate(update:TopologyReferenceUpdate):Void {
+		if (update.reference != this || update.published)
+			throw new ParametricError("topology remap update does not belong to this reference");
+	}
+
+	public function publishRemap(update:TopologyReferenceUpdate):Void {
+		if (update.skipped) {
+			update.markPublished();
+			return;
 		}
+		current = update.current;
+		fingerprint = update.fingerprint;
+		fallbackAmbiguous = update.fallbackAmbiguous;
+		if (state != update.state)
+			stateGenerationValue++;
+		state = update.state;
+		update.markPublished();
+	}
+
+	public function remap():ReferenceState {
+		var update = prepareRemap(remapFeature.currentShape(), remapFeature.provenance);
+		var previous = current;
+		publishRemap(update);
+		if (previous != null)
+			previous.close();
+		return state;
 	}
 
 	public function close():Void {
@@ -268,15 +310,6 @@ class TopologyReference {
 		if (resolution.state != ReferenceState.Resolved)
 			return null;
 		return result.subshape(kind, resolution.index);
-	}
-
-	private function replace(next:Shape, nextState:ReferenceState):Void {
-		var nextFingerprint = TopologyFingerprint.capture(next);
-		if (current != null)
-			current.close();
-		current = next;
-		fingerprint = nextFingerprint;
-		setState(nextState);
 	}
 
 	private function markUnresolved():Void {

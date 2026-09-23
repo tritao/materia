@@ -8,6 +8,7 @@ import cadkit.parametric.FeatureId;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.Parameter;
 import cadkit.parametric.TopologyReference;
+import cadkit.parametric.TopologyReferenceUpdate;
 
 /** Base class for a document DAG node. */
 class Feature {
@@ -82,7 +83,10 @@ class Feature {
 		throw new ParametricError("feature has no evaluator");
 	}
 
-	/** Commit feature-owned staged state after the complete document evaluation succeeds. */
+	/**
+	 * Commit feature-owned staged state after preparation succeeds. Overrides must be
+	 * assignment-only publication hooks; all fallible work belongs in evaluate().
+	 */
 	public function commitEvaluation():Void {}
 
 	/** Discard feature-owned staged state when any feature in the recompute fails. */
@@ -140,6 +144,24 @@ class Feature {
 		return report;
 	}
 
+	/** Resolve this feature's references against staged producer results without publishing them. */
+	public function prepareTopologyRemaps(staged:Map<Int, EvaluationResult>):Array<TopologyReferenceUpdate> {
+		var updates:Array<TopologyReferenceUpdate> = [];
+		try {
+			for (reference in topologyReferences) {
+				var producer = reference.remapTargetFeature();
+				var result = staged.get(producer.id.toInt());
+				updates.push(reference.prepareRemap(result == null ? producer.currentShape() : result.shape,
+					result == null ? producer.provenance : result.operation));
+			}
+			return updates;
+		} catch (error:Dynamic) {
+			for (update in updates)
+				try update.dispose() catch (_:Dynamic) {}
+			throw error;
+		}
+	}
+
 	/** Reports reference states changed while a staged evaluation was attempted. */
 	public function topologyReferenceReport(previous:Array<Int>):TopologyRemapReport {
 		var report = new TopologyRemapReport();
@@ -161,17 +183,12 @@ class Feature {
 		return topologyReferences[index];
 	}
 
+	/** Swap in a prepared result; the document retires previous resources after publication. */
 	public function install(result:EvaluationResult):Void {
-		var previousShape = shape;
-		var previousProvenance = provenance;
 		shape = result.getShape();
 		provenance = result.getOperation();
 		result.transferOwnership();
 		dirty = false;
-		if (previousShape != null)
-			previousShape.close();
-		if (previousProvenance != null)
-			previousProvenance.close();
 	}
 
 	public function close():Void {
