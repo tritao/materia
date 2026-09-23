@@ -8,6 +8,8 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.FeatureId;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.TopologyFingerprint;
+import cadkit.parametric.TopologyResolver;
+import cadkit.parametric.ReferenceState;
 
 /** Extracts an owning face profile, persisting a fingerprint after first evaluation. */
 class FaceFeature extends Feature {
@@ -58,36 +60,11 @@ class FaceFeature extends Feature {
 			return result;
 		}
 
-		var best:Null<Shape> = null;
-		var bestScore = -1.0e30;
-		var secondBestScore = -1.0e30;
-		var count = sourceShape.subshapeCount(CadKit.ShapeKind.Face);
-		for (faceIndex in 0...count) {
-			var candidate = sourceShape.subshape(CadKit.ShapeKind.Face, faceIndex);
-			var score = fingerprint.score(candidate);
-			if (score > bestScore) {
-				secondBestScore = bestScore;
-				if (best != null)
-					best.close();
-				best = candidate;
-				bestScore = score;
-			} else {
-				if (score > secondBestScore)
-					secondBestScore = score;
-				candidate.close();
-			}
-		}
-
-		if (best == null || bestScore <= -1.0e29) {
-			if (best != null)
-				best.close();
-			throw new ParametricError("face profile could not be remapped");
-		}
-		if (secondBestScore > -1.0e29 &&
-			bestScore - secondBestScore <= 1.0e-6) {
-			best.close();
+		var resolution = TopologyResolver.resolve(sourceShape, fingerprint, CadKit.ShapeKind.Face);
+		if (resolution.state == ReferenceState.Ambiguous)
 			throw new ParametricError("face profile remap is ambiguous");
-		}
-		return best;
+		if (resolution.state != ReferenceState.Resolved)
+			throw new ParametricError("face profile could not be remapped with sufficient confidence");
+		return sourceShape.subshape(CadKit.ShapeKind.Face, resolution.index);
 	}
 }

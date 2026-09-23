@@ -1,5 +1,6 @@
 package app;
 
+import CadKit;
 import cadkit.Geometry;
 import cadkit.Shape;
 import cadkit.modeling.Vector;
@@ -9,6 +10,8 @@ import cadkit.parametric.ParameterKind;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;
+import cadkit.parametric.TopologyResolver;
+import cadkit.parametric.ReferenceState;
 import cadkit.parametric.features.BooleanFeature;
 import cadkit.parametric.features.BooleanOperation;
 import cadkit.parametric.features.BoxFeature;
@@ -104,15 +107,8 @@ class CadPlateModel {
   }
 
   public function remapFace(fingerprint:TopologyFingerprint):Int {
-    var shape=document.result(),best=-1,bestScore=-1e30,second=-1e30;
-    for(index in 0...shape.faces().count()) {
-      var face=shape.faces().at(index),candidate=face.cloneShape();
-      var score=fingerprint.score(candidate);
-      candidate.close();face.close();
-      if(score>bestScore){second=bestScore;bestScore=score;best=index;}
-      else if(score>second)second=score;
-    }
-    return bestScore<=-1e29||bestScore-second<=0.000001?-1:best;
+    var resolution=TopologyResolver.resolve(document.result(),fingerprint,CadKit.ShapeKind.Face);
+    return resolution.state==ReferenceState.Resolved?resolution.index:-1;
   }
 
   /** Adds a through hole on the selected top face. */

@@ -139,9 +139,9 @@ class TopologyReference {
 				"topology reference is Ambiguous", ReferenceState.Ambiguous);
 		}
 		if (current != null) {
-			markDeleted();
+			markUnresolved();
 			throw new ParametricError(
-				"topology reference is Deleted", ReferenceState.Deleted);
+				"topology reference could not be matched with sufficient confidence", ReferenceState.Unresolved);
 		}
 		if (state == ReferenceState.Deleted)
 			throw new ParametricError("topology reference is Deleted", ReferenceState.Deleted);
@@ -189,7 +189,7 @@ class TopologyReference {
 			markAmbiguous();
 			return state;
 		} else if (current != null) {
-			markDeleted();
+			markUnresolved();
 			return state;
 		} else {
 			markUnresolved();
@@ -208,41 +208,14 @@ class TopologyReference {
 
 	private function findFallback(result:Shape):Null<Shape> {
 		fallbackAmbiguous = false;
-		var count = result.subshapeCount(kind);
-		var best:Null<Shape> = null;
-		var bestScore = -1.0e30;
-		var secondBestScore = -1.0e30;
-		for (index in 0...count) {
-			var candidate = result.subshape(kind, index);
-			if (current != null && current.sameAs(candidate)) {
-				if (best != null)
-					best.close();
-				return candidate;
-			}
-			var score = fingerprint.score(candidate);
-			if (score > bestScore) {
-				secondBestScore = bestScore;
-				if (best != null)
-					best.close();
-				best = candidate;
-				bestScore = score;
-			} else {
-				if (score > secondBestScore)
-					secondBestScore = score;
-				candidate.close();
-			}
-		}
-		if (best == null || bestScore <= -1.0e29) {
-			if (best != null)
-				best.close();
-			return null;
-		}
-		if (secondBestScore > -1.0e29 && bestScore - secondBestScore <= 1.0e-6) {
-			best.close();
+		var resolution = TopologyResolver.resolve(result, fingerprint, kind, current);
+		if (resolution.state == ReferenceState.Ambiguous) {
 			fallbackAmbiguous = true;
 			return null;
 		}
-		return best;
+		if (resolution.state != ReferenceState.Resolved)
+			return null;
+		return result.subshape(kind, resolution.index);
 	}
 
 	private function replace(next:Shape, nextState:ReferenceState):Void {

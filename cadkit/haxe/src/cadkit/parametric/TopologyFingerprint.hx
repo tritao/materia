@@ -110,29 +110,51 @@ class TopologyFingerprint {
 		if (candidate.kind() != kind)
 			return -1.0e30;
 
-		var distance = distanceTo(candidate);
+		var distance = Math.sqrt(distanceTo(candidate));
+		var positionScale:Float;
+		var normalizedSizeChange = 0.0;
+		var directionAgreement = 1.0;
 		if (kind == CadKit.ShapeKind.Face) {
 			if (candidate.surfaceKind() != surfaceKind)
 				return -1.0e30;
+			var referenceSize = Math.sqrt(measure);
+			var candidateSize = Math.sqrt(candidate.faceArea());
+			positionScale = Math.max(referenceSize, candidateSize);
+			normalizedSizeChange = relativeSizeChange(referenceSize, candidateSize);
 			var normal = candidate.faceNormal();
 			var dot = dx * normal.get_x() + dy * normal.get_y() + dz * normal.get_z();
 			if (dot < 0.98)
 				return -1.0e30;
-			return dot * 1000.0 - distance - relativeDifference(measure, candidate.faceArea());
+			directionAgreement = dot;
 		} else if (kind == CadKit.ShapeKind.Edge) {
 			if (candidate.curveKind() != curveKind)
 				return -1.0e30;
+			var referenceSize = measure;
+			var candidateSize = candidate.edgeLength();
+			positionScale = Math.max(referenceSize, candidateSize);
+			normalizedSizeChange = relativeSizeChange(referenceSize, candidateSize);
 			var tangent = candidate.tangentAt();
 			var tangentDot = dx * tangent.get_x() + dy * tangent.get_y() + dz * tangent.get_z();
 			if (tangentDot < 0.0)
 				tangentDot = -tangentDot;
 			if (tangentDot < 0.98)
 				return -1.0e30;
-			return tangentDot * 1000.0 - distance - relativeDifference(measure, candidate.edgeLength());
+			directionAgreement = tangentDot;
 		} else if (kind == CadKit.ShapeKind.Vertex) {
-			return -distance;
+			var point = candidate.position();
+			positionScale = Math.max(1.0, Math.max(Math.max(Math.abs(x), Math.abs(y)), Math.max(Math.abs(z),
+				Math.max(Math.max(Math.abs(point.get_x()), Math.abs(point.get_y())), Math.abs(point.get_z())))));
+		} else {
+			return -1.0e30;
 		}
-		return -1.0e30;
+
+		if (positionScale <= 1.0e-12 || normalizedSizeChange > 0.25)
+			return -1.0e30;
+		var normalizedDistance = distance / positionScale;
+		var maximumDistance = kind == CadKit.ShapeKind.Vertex ? 1.0e-5 : 0.15;
+		if (normalizedDistance > maximumDistance)
+			return -1.0e30;
+		return directionAgreement - normalizedDistance - normalizedSizeChange;
 	}
 
 	private function distanceTo(candidate:Shape):Float {
@@ -154,15 +176,9 @@ class TopologyFingerprint {
 		return offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ;
 	}
 
-	private function relativeDifference(oldValue:Float, newValue:Float):Float {
-		var difference = oldValue - newValue;
-		if (difference < 0.0)
-			difference = -difference;
-		var magnitude = oldValue;
-		if (magnitude < 0.0)
-			magnitude = -magnitude;
-		if (magnitude < 1.0)
-			magnitude = 1.0;
-		return difference / magnitude;
+	private function relativeSizeChange(oldValue:Float, newValue:Float):Float {
+		var difference = Math.abs(oldValue - newValue);
+		var magnitude = Math.max(Math.abs(oldValue), Math.abs(newValue));
+		return magnitude <= 1.0e-12 ? 0.0 : difference / magnitude;
 	}
 }

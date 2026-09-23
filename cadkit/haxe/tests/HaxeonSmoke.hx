@@ -22,6 +22,7 @@ import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.TopologyReference;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyHistoryMap;
+import cadkit.parametric.TopologyResolver;
 import sys.FileSystem;
 
 class HaxeonSmoke {
@@ -372,7 +373,7 @@ class HaxeonSmoke {
 		baseFace.close();
 		if (!baseReference.isResolved())
 			return 27;
-		var ambiguousReference = TopologyReference.fromFingerprint(
+		var weakReference = TopologyReference.fromFingerprint(
 			baseFeature,
 			CadKit.ShapeKind.Vertex,
 			TopologyFingerprint.fromData(
@@ -383,10 +384,10 @@ class HaxeonSmoke {
 				0.0, 0.0, 0.0,
 				0.0));
 		baseFeature.remapTopologyReferences();
-		if (ambiguousReference.state != ReferenceState.Ambiguous ||
-			ambiguousReference.isResolved())
+		if (weakReference.state != ReferenceState.Unresolved ||
+			weakReference.isResolved())
 			return 51;
-		ambiguousReference.close();
+		weakReference.close();
 		var resultFace = initialShape.faces().at(0);
 		var resultReference = TopologyReference.fromFace(resultFeature, resultFace);
 		resultFace.close();
@@ -661,19 +662,39 @@ class HaxeonSmoke {
 		deletedDocument.close();
 
 		var ambiguousDocument = new Document();
-		var ambiguousBase = ambiguousDocument.add(new BoxFeature(10.0, 20.0, 30.0));
+		var ambiguousBase = ambiguousDocument.add(new CylinderFeature(10.0, 0.1));
 		ambiguousDocument.recompute();
+		var ambiguousShape = ambiguousBase.currentShape();
+		if (ambiguousShape == null)
+			return 96;
+		var circularEdge:Null<Edge> = null;
+		for (index in 0...ambiguousShape.edges().count()) {
+			var candidate = ambiguousShape.edges().at(index);
+			if (circularEdge == null && candidate.curveKind() == CadKit.CurveKind.Circle)
+				circularEdge = candidate;
+			else
+				candidate.close();
+		}
+		if (circularEdge == null)
+			return 97;
+		var fingerprintShape = circularEdge.cloneShape();
+		var ambiguousFingerprint = TopologyFingerprint.capture(fingerprintShape);
+		fingerprintShape.close();
+		circularEdge.close();
+		var ambiguousResolution = TopologyResolver.resolve(ambiguousShape, ambiguousFingerprint, CadKit.ShapeKind.Edge);
+		if (ambiguousResolution.state != ReferenceState.Ambiguous)
+			return 98;
+		var farFingerprint = TopologyFingerprint.fromData(CadKit.ShapeKind.Edge, CadKit.SurfaceKind.Unknown,
+			CadKit.CurveKind.Circle, 1.0e6, 1.0e6, 1.0e6, ambiguousFingerprint.dx, ambiguousFingerprint.dy,
+			ambiguousFingerprint.dz, ambiguousFingerprint.measure);
+		var farResolution = TopologyResolver.resolve(ambiguousShape, farFingerprint, CadKit.ShapeKind.Edge);
+		if (farResolution.state != ReferenceState.Unresolved)
+			return 99;
 		var ambiguousFillet = ambiguousDocument.add(new FilletFeature(
 			ambiguousBase,
 			1.0,
 			null,
-			[TopologyFingerprint.fromData(
-				CadKit.ShapeKind.Edge,
-				CadKit.SurfaceKind.Unknown,
-				CadKit.CurveKind.Line,
-				0.0, 10.0, 15.0,
-				1.0, 0.0, 0.0,
-				10.0)]));
+			[ambiguousFingerprint]));
 		var ambiguousFailure:Null<RecomputeError> = null;
 		try {
 			ambiguousDocument.recompute();
