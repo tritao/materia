@@ -59,6 +59,14 @@ int main() {
     assert(cad_shape_volume(shape, &volume) == CAD_OK);
     assert_close(area, 2200.0);
     assert_close(volume, 6000.0);
+    cad_mass_properties properties{};
+    assert(cad_shape_mass_properties(shape, &properties) == CAD_OK);
+    assert_close(properties.volume, volume);
+    assert_close(properties.surface_area, area);
+    assert_close(properties.center_of_mass.x, 5.0);
+    assert_close(properties.center_of_mass.y, 10.0);
+    assert_close(properties.center_of_mass.z, 15.0);
+    assert(cad_shape_mass_properties(shape, nullptr) == CAD_ERROR_INVALID_ARGUMENT);
 
     const auto step_path = std::filesystem::temp_directory_path() /
         "cadkit-core-smoke.step";

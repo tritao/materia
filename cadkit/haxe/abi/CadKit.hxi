@@ -79,7 +79,6 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_mesh_face_range_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_mesh_index_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_mesh_vertex_count(mesh: cad_mesh, out_count: ptr<u32> @out) -> cad_result;
-	extern fn cad_resource_counts_get(out_counts: ptr<cad_resource_counts> @out) -> cad_result;
 	extern fn cad_operation_destroy(operation: cad_operation) -> void;
 	extern fn cad_operation_history_count(operation: cad_operation, relation: cad_history_relation, out_count: ptr<u32> @out) -> cad_result;
 	extern fn cad_operation_history_source_at(operation: cad_operation, relation: cad_history_relation, index: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -88,6 +87,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_planar_face(outer: cad_shape, holes: ptr<const<cad_shape_ref>> @in_array("hole_count"), hole_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_polyline(points: ptr<const<cad_vec3>> @in_array("point_count"), point_count: u32, closed: u8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_project(curve: cad_shape, target: cad_shape, direction: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_resource_counts_get(out_counts: ptr<cad_resource_counts> @out) -> cad_result;
 	extern fn cad_shape_area(shape: cad_shape, out_area: ptr<f64> @out) -> cad_result;
 	extern fn cad_shape_bounds(shape: cad_shape, out_bounds: ptr<cad_bounds> @out) -> cad_result;
 	extern fn cad_shape_chamfer(shape: cad_shape, distance: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -104,6 +104,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_fillet_operation(shape: cad_shape, radius: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_is_same(first: cad_shape, second: cad_shape, out_same: ptr<u8> @out) -> cad_result;
 	extern fn cad_shape_kind_get(shape: cad_shape, out_kind: ptr<cad_shape_kind> @out) -> cad_result;
+	extern fn cad_shape_mass_properties(shape: cad_shape, out_properties: ptr<cad_mass_properties> @out) -> cad_result;
 	extern fn cad_shape_mirror(shape: cad_shape, plane_origin: cad_vec3, plane_normal: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_mirror_operation(shape: cad_shape, plane_origin: cad_vec3, plane_normal: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_place(shape: cad_shape, origin: cad_vec3, x_direction: cad_vec3, z_direction: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -135,6 +136,11 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	struct cad_bounds @layout(48, 8) {
 		min: cad_vec3 @offset(0);
 		max: cad_vec3 @offset(24);
+	}
+	struct cad_mass_properties @layout(40, 8) {
+		volume: f64 @offset(0);
+		surface_area: f64 @offset(8);
+		center_of_mass: cad_vec3 @offset(16);
 	}
 	struct cad_mesh_face_range @layout(12, 4) {
 		face_index: u32 @offset(0);

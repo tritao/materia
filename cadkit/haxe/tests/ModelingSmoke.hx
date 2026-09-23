@@ -48,6 +48,19 @@ class ModelingSmoke {
 		near(sketch.shape.area(), 4000 - 36 * Math.PI);
 		var plate = sketch.extrude(6);
 		near(plate.volume(), (4000 - 36 * Math.PI) * 6);
+		var properties = plate.massProperties();
+		near(properties.volume, plate.volume());
+		near(properties.surfaceArea, plate.shape.area());
+		near(properties.centerOfMass.x, 0);
+		near(properties.centerOfMass.y, 0);
+		near(properties.centerOfMass.z, 3);
+		near(properties.mass(2), properties.volume * 2);
+		var invalidDensity = false;
+		try properties.mass(-1) catch (_:Dynamic) invalidDensity = true;
+		check(invalidDensity, "density must be finite and nonnegative");
+		var nonSolidProperties = false;
+		try sketch.shape.massProperties() catch (_:Dynamic) nonSolidProperties = true;
+		check(nonSolidProperties, "mass properties reject shapes without positive volume");
 		check(plate.valid() && plate.solidCount() == 1, "plate topology");
 		var selected = plate.edges().parallel(Axis.Z()).filter(function(s) {
 			return Math.abs(Selection.center(s).x) > 39;

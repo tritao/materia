@@ -2070,6 +2070,51 @@ extern "C" CADKIT_API cad_result cad_shape_volume(
     });
 }
 
+extern "C" CADKIT_API cad_result cad_shape_mass_properties(
+    cad_shape shape,
+    cad_mass_properties* out_properties) {
+    clear_error();
+    if (out_properties == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_properties must not be null");
+    }
+    *out_properties = {};
+
+    TopoDS_Shape source;
+    const auto copy_result = copy_shape(shape, source);
+    if (copy_result != CAD_OK) {
+        return copy_result;
+    }
+
+    try {
+        GProp_GProps volume_properties;
+        GProp_GProps surface_properties;
+        BRepGProp::VolumeProperties(source, volume_properties);
+        BRepGProp::SurfaceProperties(source, surface_properties);
+        const auto volume = volume_properties.Mass();
+        const auto area = surface_properties.Mass();
+        const auto center = volume_properties.CentreOfMass();
+        if (!std::isfinite(volume) || !std::isfinite(area) ||
+            !std::isfinite(center.X()) || !std::isfinite(center.Y()) || !std::isfinite(center.Z())) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "mass properties are not finite");
+        }
+        if (volume <= 0.0) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "mass properties require a shape with positive volume");
+        }
+        out_properties->volume = volume;
+        out_properties->surface_area = area;
+        out_properties->center_of_mass = {center.X(), center.Y(), center.Z()};
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
 extern "C" CADKIT_API cad_result cad_shape_kind_get(
     cad_shape shape,
     cad_shape_kind* out_kind) {

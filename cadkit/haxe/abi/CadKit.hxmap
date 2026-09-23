@@ -17,6 +17,7 @@
     "cad_shape_ref": "ShapeRef",
     "cad_vec3": "Vec3",
     "cad_bounds": "Bounds",
+    "cad_mass_properties": "MassProperties",
     "cad_mesh_options": "MeshOptions",
     "cad_mesh_face_range": "MeshFaceRange",
     "cad_resource_counts": "ResourceCounts"

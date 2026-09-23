@@ -58,6 +58,13 @@ class Shape {
 		return CadKit.shapeVolumeChecked(native.borrow());
 	}
 
+	/** Compute volume, surface area, and the volume-weighted center of mass. */
+	public function massProperties():PhysicalProperties {
+		var nativeProperties = CadKit.shapeMassPropertiesChecked(native.borrow());
+		return new PhysicalProperties(nativeProperties.get_volume(), nativeProperties.get_surfaceArea(),
+			cadkit.modeling.Vector.fromNative(nativeProperties.get_centerOfMass()));
+	}
+
 	public function kind():CadKit.ShapeKind {
 		return CadKit.shapeKindGetChecked(native.borrow());
 	}

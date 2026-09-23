@@ -2,6 +2,7 @@ package cadkit.modeling;
 
 import CadKit;
 import cadkit.Shape;
+import cadkit.PhysicalProperties;
 import cadkit.Edge;
 import cadkit.Operation;
 
@@ -125,6 +126,10 @@ class Part extends Model {
 
 	public function volume():Float {
 		return shape.volume();
+	}
+
+	public function massProperties():PhysicalProperties {
+		return shape.massProperties();
 	}
 
 	public function solidCount():Int {

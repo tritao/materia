@@ -64,6 +64,12 @@ typedef struct cad_bounds {
     cad_vec3 max;
 } cad_bounds;
 
+typedef struct cad_mass_properties {
+    double volume;
+    double surface_area;
+    cad_vec3 center_of_mass;
+} cad_mass_properties;
+
 /* Zero is invalid. Handles are opaque, process-local values with kind and generation checks. */
 typedef uint32_t cad_shape CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_shape_destroy);
 typedef uint32_t cad_mesh CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_mesh_destroy);
@@ -388,6 +394,11 @@ CADKIT_API cad_result cad_shape_area(
 CADKIT_API cad_result cad_shape_volume(
     cad_shape shape,
     double* out_volume CADKIT_HXI_OUT);
+
+/* Volumetric properties for solid shapes; coordinates and measures use kernel units. */
+CADKIT_API cad_result cad_shape_mass_properties(
+    cad_shape shape,
+    cad_mass_properties* out_properties CADKIT_HXI_OUT);
 
 CADKIT_API cad_result cad_shape_kind_get(
     cad_shape shape,
