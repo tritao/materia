@@ -11,6 +11,7 @@ interface CadSessionModel {
   public function encode():String;
   public function close():Void;
   public function geometryFor(source:Shape):GeometryData;
+  public function collisionBoundsFor(source:Shape):CadCollisionBounds;
   public function tessellationSeconds():Float;
   public function geometryConversionSeconds():Float;
   public function sceneDimensions():CadModelDimensions;

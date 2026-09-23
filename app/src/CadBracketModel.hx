@@ -235,6 +235,10 @@ class CadBracketModel implements CadSessionModel {
     }
   }
 
+  public function collisionBoundsFor(source:Shape):CadCollisionBounds
+    return CadCollisionBounds.fromKernelBounds(source.bounds(),
+      CadSceneGeometry.METRES_PER_MILLIMETRE);
+
   public function tessellationSeconds():Float return lastTessellationSeconds;
 
   public function geometryConversionSeconds():Float return lastGeometryConversionSeconds;

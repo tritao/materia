@@ -15,6 +15,7 @@ class CadDocumentSession {
   public var diagnostics(default, null):Array<String> = [];
   public var selectedTopology:Null<TopologyFingerprint> = null;
   public var previewResult(default, null):Null<Shape> = null;
+  public var collisionBounds(default, null):Null<CadCollisionBounds> = null;
   public var lastPublicationSeconds(default, null):Float = 0;
 
   var publishedShape:Null<Shape>;
@@ -165,11 +166,13 @@ class CadDocumentSession {
     var publicationStarted = Sys.time();
     var nextShape:Null<Shape> = null;
     var nextGeometry:Null<GeometryData> = null;
+    var nextCollisionBounds:Null<CadCollisionBounds> = null;
     try {
       ensureEvaluationCurrent(ticket);
       var source = document.result();
       nextShape = source.cloneShape();
       nextGeometry = model.geometryFor(cast nextShape);
+      nextCollisionBounds = model.collisionBoundsFor(cast nextShape);
       ensureEvaluationCurrent(ticket);
     } catch (error:Dynamic) {
       lastPublicationSeconds = Sys.time() - publicationStarted;
@@ -181,6 +184,7 @@ class CadDocumentSession {
     var priorShape = publishedShape;
     publishedShape = nextShape;
     publishedGeometry = cast nextGeometry;
+    collisionBounds = nextCollisionBounds;
     revision++;
     lastPublicationSeconds = Sys.time() - publicationStarted;
     if (priorShape != null)
@@ -206,6 +210,7 @@ class CadDocumentSession {
       publishedShape.close();
     publishedShape = null;
     publishedGeometry = null;
+    collisionBounds = null;
     selectedTopology = null;
     model.close();
   }

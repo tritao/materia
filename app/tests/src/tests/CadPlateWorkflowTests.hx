@@ -53,6 +53,11 @@ class CadPlateWorkflowTests {
       var id = scene.selectedId;
       var plate = object(scene, id);
       var cadSession = scene.cadSession(id);
+      var initialCollision:app.CadCollisionBounds = cast cadSession.collisionBounds;
+      near(initialCollision.center.x, 0.0, "plate collision proxy is centered on the visual origin");
+      near(initialCollision.halfExtents.x, 0.04, "plate collision proxy uses the CAD body's width");
+      near(initialCollision.halfExtents.y, 0.025, "plate collision proxy uses the CAD body's height");
+      near(initialCollision.halfExtents.z, 0.003, "plate collision proxy uses the CAD body's thickness");
       var sessionRevision = cadSession.revision;
       var retainedShape = cadSession.copyPublishedShape();
       var retainedVolume = retainedShape.volume();
@@ -69,6 +74,10 @@ class CadPlateWorkflowTests {
       check(edit(scene, "Hole diameter", 0.01) == PropertyEditResult.Applied, "edit hole diameter");
       check(edit(scene, "Hole X", 0.02) == PropertyEditResult.Applied, "edit hole X");
       check(edit(scene, "Hole Y", 0.01) == PropertyEditResult.Applied, "edit hole Y");
+      var editedCollision:app.CadCollisionBounds = cast cadSession.collisionBounds;
+      near(editedCollision.halfExtents.x, 0.05, "published collision proxy follows changed CAD width");
+      near(editedCollision.halfExtents.y, 0.03, "published collision proxy follows changed CAD height");
+      near(editedCollision.halfExtents.z, 0.004, "published collision proxy follows changed CAD thickness");
       near(parameter(scene, CadPlateModel.WIDTH), 0.1, "width recomputed");
       near(parameter(scene, CadPlateModel.HOLE_X), 0.02, "hole offset recomputed");
       check(scene.pick(0.02, 0.01) == "scene", "moved hole remains pick-through");
@@ -200,8 +209,13 @@ class CadPlateWorkflowTests {
       for(index in 0...expected.length)
         check(actual[index]==expected[index],"bracket feature order includes sketch, extrusion, supported pocket, and fillet");
       var profile:ConstrainedSketchFeature=cast modelSession.document.featureAt(0);
-      check(profile.solvedSketch()!=null&&profile.solvedSketch().diagnostic.degreesOfFreedom==0,
+      var solvedProfile=profile.solvedSketch();
+      check(solvedProfile!=null&&solvedProfile.diagnostic.degreesOfFreedom==0,
         "bracket profile is fully constrained before solid construction");
+      var bracketCollision:app.CadCollisionBounds=cast modelSession.collisionBounds;
+      check(bracketCollision.halfExtents.x>0&&bracketCollision.halfExtents.y>0&&
+        bracketCollision.halfExtents.z>0,
+        "bracket exposes an explicit collision proxy from its published solid bounds");
       var bracketModel:app.CadBracketModel=cast modelSession.model;
       var retained=modelSession.copyPublishedShape();
       var volume=retained.volume();

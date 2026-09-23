@@ -83,8 +83,16 @@ class ApplicationSimulation {
         candidate.teleportRobot(index, editable.position, editable.rotation);
       }
       for (object in scene.records()) if (object.collisionEnabled) {
-        var handle=candidate.spawnBox([object.x, object.y, object.z],
-          [object.width/2.0,object.height/2.0,object.depth/2.0],object.dynamicBody,object.mass);
+        var centerX=object.x,centerY=object.y,centerZ=object.z;
+        var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
+        if(scene.isCadPart(object.id)){
+          var bounds=scene.cadSession(object.id).collisionBounds;
+          if(bounds==null)throw "CAD collision bounds are unavailable for: "+object.id;
+          centerX+=bounds.center.x;centerY+=bounds.center.y;centerZ+=bounds.center.z;
+          halfX=bounds.halfExtents.x;halfY=bounds.halfExtents.y;halfZ=bounds.halfExtents.z;
+        }
+        var handle=candidate.spawnBox([centerX,centerY,centerZ],
+          [halfX,halfY,halfZ],object.dynamicBody,object.mass);
         candidateObjects.push({id:object.id,handle:handle});
       }
       if (running) candidate.start();

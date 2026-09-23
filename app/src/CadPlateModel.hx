@@ -252,6 +252,13 @@ class CadPlateModel implements CadSessionModel {
     }
   }
 
+  public function collisionBoundsFor(source:Shape):CadCollisionBounds {
+    var values = parameters();
+    return CadCollisionBounds.fromKernelBounds(source.bounds(),
+      CadSceneGeometry.METRES_PER_MILLIMETRE,
+      -values.width * 0.5, -values.height * 0.5, -values.thickness * 0.5);
+  }
+
   public function tessellationSeconds():Float return lastTessellationSeconds;
 
   public function geometryConversionSeconds():Float return lastGeometryConversionSeconds;
