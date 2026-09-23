@@ -188,12 +188,19 @@ private class DockPanelView implements View {
 		this.descriptor = descriptor;
 
 	public function build(context:BuildContext):RenderNode {
+		var observed = context.buildProbe != null;
+		var preparationStarted = observed ? Sys.time() : 0.0;
 		var content = descriptor.build(context);
 		if (content == null)
 			content = new Text("Panel returned no content: " + descriptor.id);
-		return context.withScope(new Key("panel:" + descriptor.id), function() {
+		var buildStarted = observed ? Sys.time() : 0.0;
+		var root = context.withScope(new Key("panel:" + descriptor.id), function() {
 			return content.build(context);
 		});
+		if (observed)
+			context.reportBuild("panel:" + descriptor.id, buildStarted - preparationStarted,
+				Sys.time() - buildStarted, root);
+		return root;
 	}
 }
 

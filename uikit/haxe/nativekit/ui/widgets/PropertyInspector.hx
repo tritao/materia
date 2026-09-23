@@ -101,7 +101,9 @@ class PropertyInspector implements View {
 	}
 
 	public function build(context:BuildContext):RenderNode {
-		return context.withScope(new Key(key), function() {
+		var observed = context.buildProbe != null;
+		var started = observed ? Sys.time() : 0.0;
+		var result = context.withScope(new Key(key), function() {
 			var children:Array<KeyedView> = [];
 			for (section in sections) {
 				var editor = editors.get(section.id);
@@ -130,6 +132,9 @@ class PropertyInspector implements View {
 				root.semantics.label = label;
 			return root;
 		});
+		if (observed)
+			context.reportBuild("inspector:" + key, 0.0, Sys.time() - started, result);
+		return result;
 	}
 
 	function findSection(sectionId:String):Null<PropertyInspectorSection> {

@@ -29,6 +29,8 @@ class BuildContext {
 	public var commandContext(default, null):CommandContext;
 	public final styleResolver:StyleResolver;
 	public final environment:StyleEnvironment;
+	/** Optional diagnostic sink for named view builds: name, preparation, build, nodes. */
+	public var buildProbe:Null<String->Float->Float->Int->Void> = null;
 	public var theme(default, null):Theme;
 	public var styleSheet(default, null):StyleSheet;
 	/** Logical viewport dimensions for frame-local placement decisions. */
@@ -167,6 +169,17 @@ class BuildContext {
 		scope = new KeyScope();
 		stateStore.beginFrame();
 		textStyleStack = [ResolvedTextStyle.fromTheme(theme)];
+	}
+
+	/** Reports a measured subtree only when a diagnostic sink is installed. */
+	public function reportBuild(name:String, preparationSeconds:Float,
+			buildSeconds:Float, root:RenderNode):Void {
+		var probe = buildProbe;
+		if (probe == null)
+			return;
+		var nodes = 0;
+		root.walk(function(_) nodes++);
+		probe(name, preparationSeconds, buildSeconds, nodes);
 	}
 
 	/** Returns the concrete typography currently inherited by the build. */

@@ -77,8 +77,14 @@ class HeadlessEditorProfile {
 
   static function submit(editor:ReferenceEditorApp, frame:LayoutFrame,
       output:Array<String>, actionName:String):Void {
+    var subtrees:Array<Dynamic> = [];
+    editor.ui.buildContext.buildProbe = function(name, preparationSeconds, buildSeconds, nodes) {
+      subtrees.push({name: name, preparationSeconds: preparationSeconds,
+        buildSeconds: buildSeconds, nodeCount: nodes});
+    };
     var started = Sys.time();
     editor.submit(frame);
+    editor.ui.buildContext.buildProbe = null;
     var elapsed = Sys.time() - started;
     var metrics:UiFrameMetrics = cast editor.ui.frameMetrics;
     if (metrics == null) throw "UI frame metrics are unavailable";
@@ -93,7 +99,8 @@ class HeadlessEditorProfile {
       styleResolutions: metrics.styleResolutions,
       styleCacheHits: metrics.styleCacheHits,
       styleCacheMisses: metrics.styleCacheMisses,
-      styleChangedNodes: metrics.styleChangedNodes
+      styleChangedNodes: metrics.styleChangedNodes,
+      subtrees: subtrees
     }));
   }
 
