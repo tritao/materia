@@ -305,7 +305,7 @@ class FrameworkSmoke {
 		emptyField.placeholder = "Type a message…";
 		var emptyRoot = context.submit(emptyField, new LayoutFrame(256.0, 192.0));
 		if (emptyRoot.semantics == null || emptyRoot.semantics.value != "" ||
-			emptyRoot.children[0].children[1].layout.text != "Type a message…")
+			emptyRoot.children[0].children[0].layout.text != "Type a message…")
 			return 39;
 		var searchChange = "unchanged";
 		var search = new SearchField("search", "query", function(next) searchChange = next,
@@ -328,7 +328,7 @@ class FrameworkSmoke {
 			return 228;
 		searchRoot = context.submit(search, new LayoutFrame(256.0, 38.0));
 		if (searchRoot.children.length != 2 ||
-			searchRoot.children[1].children[0].children[1].layout.text != "Search components…")
+			searchRoot.children[1].children[0].children[0].layout.text != "Search components…")
 			return 229;
 		var field = new TextField("entry", "hello", function(next) { editedValue = next; },
 			null, "Message");
@@ -338,13 +338,9 @@ class FrameworkSmoke {
 		var fieldRoot = context.submit(field, new LayoutFrame(256.0, 192.0));
 		if (fieldRoot.children.length != 1 ||
 			fieldRoot.children[0].layout.visualKind != LayoutVisualKind.Box ||
-			fieldRoot.children[0].children.length != 3 ||
-			fieldRoot.children[0].children[0].layout.visualKind != LayoutVisualKind.Custom ||
-			fieldRoot.children[0].children[0].layout.style.zIndex != 0 ||
-			fieldRoot.children[0].children[1].layout.visualKind != LayoutVisualKind.Text ||
-			fieldRoot.children[0].children[1].layout.style.zIndex != 1 ||
-			fieldRoot.children[0].children[2].layout.visualKind != LayoutVisualKind.Custom ||
-			fieldRoot.children[0].children[2].layout.style.zIndex != 2)
+			fieldRoot.children[0].children.length != 1 ||
+			fieldRoot.children[0].children[0].layout.visualKind != LayoutVisualKind.Text ||
+			fieldRoot.children[0].children[0].layout.style.zIndex != 1)
 			return 201;
 		if (fieldRoot.semantics == null || fieldRoot.semantics.role != AccessibilityRole.TextField ||
 			fieldRoot.semantics.label != "Message" || !fieldRoot.focusable)
@@ -357,7 +353,17 @@ class FrameworkSmoke {
 			fieldDiagnostics.selectionStart != 5 || fieldDiagnostics.selectionEnd != 5 ||
 			fieldDiagnostics.caretOffset != 5 || fieldDiagnostics.caretRect == null)
 			return 209;
+		fieldRoot = context.submit(field, new LayoutFrame(256.0, 192.0));
+		if (fieldRoot.children[0].children.length != 2 ||
+			fieldRoot.children[0].children[1].layout.visualKind != LayoutVisualKind.Custom ||
+			fieldRoot.children[0].children[1].layout.style.zIndex != 2)
+			return 230;
 		context.key(UiEventKind.KeyDown, UiKey.A, UiModifier.Control);
+		fieldRoot = context.submit(field, new LayoutFrame(256.0, 192.0));
+		if (fieldRoot.children[0].children.length != 3 ||
+			fieldRoot.children[0].children[0].layout.visualKind != LayoutVisualKind.Custom ||
+			fieldRoot.children[0].children[0].layout.style.zIndex != 0)
+			return 231;
 		context.text(UiEventKind.TextInput, "á🙂");
 		if (field.value != "á🙂" || editedValue != "á🙂" || fieldEditor.selectionEnd != 3)
 			return 42;
@@ -486,7 +492,7 @@ class FrameworkSmoke {
 		if (wordRange.start != 4 || wordRange.end != 7)
 			return 191;
 		var wordTextGeometry:ResolvedLayoutItem =
-			cast wordAreaRoot.children[0].children[1].resolved;
+			cast wordAreaRoot.children[0].children[0].resolved;
 		var wordStartCaret = wordEditor.layout.caret(new TextPosition(4, 0));
 		var wordStartX = wordStartCaret.x;
 		var wordNextX = wordEditor.layout.caret(new TextPosition(5, 0)).x;
@@ -563,7 +569,7 @@ class FrameworkSmoke {
 		var lineState:State<TextEditorState> = context.buildContext.existingState(lineRoot.id);
 		var lineEditor:TextEditorState = cast lineState.value;
 		var lineTextGeometry:ResolvedLayoutItem =
-			cast lineRoot.children[0].children[1].resolved;
+			cast lineRoot.children[0].children[0].resolved;
 		lineEditor.updateLayout(lineTextGeometry.width);
 		lineEditor.placeCaret(15, false);
 		if (!lineEditor.moveCaretToLineBoundary(false, false) || lineEditor.selectionFocus != 11)
@@ -2558,14 +2564,14 @@ class FrameworkSmoke {
 		var inheritedField = new TextField("inherited-style-field", "edit");
 		var inheritedFieldRoot = context.submit(new DefaultTextStyle(inheritedField,
 			TextStyleOverride.text(19.0)), new LayoutFrame(320.0, 192.0));
-		if (inheritedFieldRoot.children[0].children[1].layout.textStyle.fontSize != 19.0)
+		if (inheritedFieldRoot.children[0].children[0].layout.textStyle.fontSize != 19.0)
 			return 216;
 		inheritedFieldRoot = context.submit(new DefaultTextStyle(inheritedField,
 			TextStyleOverride.text(23.0)), new LayoutFrame(320.0, 192.0));
 		var inheritedEditorState:State<TextEditorState> =
 			context.buildContext.existingState(inheritedFieldRoot.id);
 		var inheritedEditor:TextEditorState = cast inheritedEditorState.value;
-		if (inheritedFieldRoot.children[0].children[1].layout.textStyle.fontSize != 23.0 ||
+		if (inheritedFieldRoot.children[0].children[0].layout.textStyle.fontSize != 23.0 ||
 			inheritedEditor.textStyle.fontSize != 23.0)
 			return 217;
 		var themedClicks = 0;

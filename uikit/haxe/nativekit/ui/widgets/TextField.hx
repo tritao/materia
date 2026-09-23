@@ -142,19 +142,23 @@ class TextField implements View {
 			editorContentStyle.clipVertical = multiline;
 			var editorContent = new RenderNode(context.id("editor-content"),
 				LayoutVisualKind.Box, editorContentStyle);
-			var selectionStyle = new LayoutStyle();
-			selectionStyle.width = LayoutAxis.grow();
-			selectionStyle.height = LayoutAxis.grow();
-			selectionStyle.positioning = LayoutPositioning.Absolute;
-			selectionStyle.zIndex = 0;
-			var selectionNode = new RenderNode(context.id("editor-selection"),
-				LayoutVisualKind.Custom, selectionStyle);
-			selectionNode.hitTestSelf = false;
-			selectionNode.onPaint(function(canvas, _) {
-				if (!editor.isDisposed())
-					paintSelection(canvas, editor, context.textInput.isOwner(id), context.theme);
-			});
-			editorContent.add(selectionNode);
+			// Unfocused, unselected fields need only their text node. State changes
+			// invalidate the frame before selection or caret decoration is painted.
+			if (editor.selectionStart != editor.selectionEnd) {
+				var selectionStyle = new LayoutStyle();
+				selectionStyle.width = LayoutAxis.grow();
+				selectionStyle.height = LayoutAxis.grow();
+				selectionStyle.positioning = LayoutPositioning.Absolute;
+				selectionStyle.zIndex = 0;
+				var selectionNode = new RenderNode(context.id("editor-selection"),
+					LayoutVisualKind.Custom, selectionStyle);
+				selectionNode.hitTestSelf = false;
+				selectionNode.onPaint(function(canvas, _) {
+					if (!editor.isDisposed())
+						paintSelection(canvas, editor, context.textInput.isOwner(id), context.theme);
+				});
+				editorContent.add(selectionNode);
+			}
 			var textNode = new RenderNode(context.id("text"), LayoutVisualKind.Text, textNodeStyle);
 			var showsPlaceholder = editor.layoutText().length == 0 && placeholder != null &&
 				placeholder.length > 0;
@@ -174,20 +178,22 @@ class TextField implements View {
 		textNode.applyTextStyle(new ResolvedTextStyle(textNodeTextStyle,
 			editor.paragraphStyle, textNodeColor));
 			editorContent.add(textNode);
-			var paintStyle = new LayoutStyle();
-			paintStyle.width = LayoutAxis.grow();
-			paintStyle.height = LayoutAxis.grow();
-			paintStyle.positioning = LayoutPositioning.Absolute;
-			paintStyle.zIndex = 2;
-			var paintNode = new RenderNode(context.id("editor-paint"),
-				LayoutVisualKind.Custom, paintStyle);
-			paintNode.hitTestSelf = false;
-			paintNode.onPaint(function(canvas, _) {
-				if (!editor.isDisposed())
-					paintEditorDecorations(canvas, editor, context.textInput.isOwner(id),
-						context.theme, context.gestures.timeSeconds());
-			});
-			editorContent.add(paintNode);
+			if (editor.focused) {
+				var paintStyle = new LayoutStyle();
+				paintStyle.width = LayoutAxis.grow();
+				paintStyle.height = LayoutAxis.grow();
+				paintStyle.positioning = LayoutPositioning.Absolute;
+				paintStyle.zIndex = 2;
+				var paintNode = new RenderNode(context.id("editor-paint"),
+					LayoutVisualKind.Custom, paintStyle);
+				paintNode.hitTestSelf = false;
+				paintNode.onPaint(function(canvas, _) {
+					if (!editor.isDisposed())
+						paintEditorDecorations(canvas, editor, context.textInput.isOwner(id),
+							context.theme, context.gestures.timeSeconds());
+				});
+				editorContent.add(paintNode);
+			}
 			node.add(editorContent);
 
 			var updateState = function() {
