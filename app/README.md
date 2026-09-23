@@ -246,7 +246,8 @@ options after `--`, for example `-- --perspective`.
 The idle mode stops its isolated editor process after the requested interval;
 it reports RSS and CPU changes over the final five seconds. Captured frames also
 record view, tree/style, native layout, reconciliation, custom paint, and native
-render durations.
+render durations, along with per-frame style resolutions, cache hits and misses,
+and changed-node counts.
 
 The timed capture keeps normal event-driven frame scheduling. The
 `tab-inspector` scenario records its clicks and rename in `actions.jsonl` and
