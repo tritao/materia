@@ -19,6 +19,7 @@ import cadkit.parametric.features.FilletFeature;
 import cadkit.parametric.features.ChamferFeature;
 import cadkit.parametric.features.RevolveFeature;
 import cadkit.parametric.features.TransformFeature;
+import cadkit.parametric.features.ToolCollectionFeature;
 import cadkit.parametric.TopologyReference;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyHistoryMap;
@@ -672,7 +673,10 @@ class HaxeonSmoke {
 		deletedDocument.close();
 
 		var ambiguousDocument = new Document();
-		var ambiguousBase = ambiguousDocument.add(new CylinderFeature(10.0, 0.1));
+		var ambiguousFirst = ambiguousDocument.add(new CylinderFeature(10.0, 100.0));
+		var ambiguousSecond = ambiguousDocument.add(new CylinderFeature(10.0, 100.0));
+		var ambiguousBase = ambiguousDocument.add(new ToolCollectionFeature(
+			[ambiguousFirst, ambiguousSecond], ["first", "second"]));
 		ambiguousDocument.recompute();
 		var ambiguousShape = ambiguousBase.currentShape();
 		if (ambiguousShape == null)
@@ -700,6 +704,30 @@ class HaxeonSmoke {
 		var farResolution = TopologyResolver.resolve(ambiguousShape, farFingerprint, CadKit.ShapeKind.Edge);
 		if (farResolution.state != ReferenceState.Unresolved)
 			return 99;
+		var nearbyShape = Shape.cylinder(10.0, 100.0);
+		var nearbyCircle:Null<Edge> = null;
+		for (index in 0...nearbyShape.edges().count()) {
+			var candidate = nearbyShape.edges().at(index);
+			if (nearbyCircle == null && candidate.curveKind() == CadKit.CurveKind.Circle)
+				nearbyCircle = candidate;
+			else
+				candidate.close();
+		}
+		if (nearbyCircle == null)
+			return 100;
+		var nearbyFingerprintShape = nearbyCircle.cloneShape();
+		var nearbyFingerprint = TopologyFingerprint.capture(nearbyFingerprintShape);
+		nearbyFingerprintShape.close();
+		nearbyCircle.close();
+		var shiftedNearbyFingerprint = TopologyFingerprint.fromData(CadKit.ShapeKind.Edge,
+			CadKit.SurfaceKind.Unknown, CadKit.CurveKind.Circle, nearbyFingerprint.x, nearbyFingerprint.y,
+			nearbyFingerprint.z + 0.01, nearbyFingerprint.dx, nearbyFingerprint.dy, nearbyFingerprint.dz,
+			nearbyFingerprint.measure);
+		var nearbyResolution = TopologyResolver.resolve(nearbyShape, shiftedNearbyFingerprint,
+			CadKit.ShapeKind.Edge);
+		nearbyShape.close();
+		if (nearbyResolution.state != ReferenceState.Unresolved)
+			return 101;
 		var ambiguousFillet = ambiguousDocument.add(new FilletFeature(
 			ambiguousBase,
 			1.0,

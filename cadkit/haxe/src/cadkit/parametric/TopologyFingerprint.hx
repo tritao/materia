@@ -6,6 +6,11 @@ import cadkit.parametric.ParametricError;
 
 /** Small geometric fallback key used when an operation has no direct mapping. */
 class TopologyFingerprint {
+	private static inline var AbsolutePositionTolerance:Float = 0.000001;
+	private static inline var RelativePositionTolerance:Float = 0.00000001;
+	private static inline var RelativeSizeTolerance:Float = 0.000001;
+	private static inline var MinimumDirectionAgreement:Float = 0.999999;
+
 	public final kind:CadKit.ShapeKind;
 	public final surfaceKind:CadKit.SurfaceKind;
 	public final curveKind:CadKit.CurveKind;
@@ -123,7 +128,7 @@ class TopologyFingerprint {
 			normalizedSizeChange = relativeSizeChange(referenceSize, candidateSize);
 			var normal = candidate.faceNormal();
 			var dot = dx * normal.get_x() + dy * normal.get_y() + dz * normal.get_z();
-			if (dot < 0.98)
+			if (dot < MinimumDirectionAgreement)
 				return -1.0e30;
 			directionAgreement = dot;
 		} else if (kind == CadKit.ShapeKind.Edge) {
@@ -137,22 +142,22 @@ class TopologyFingerprint {
 			var tangentDot = dx * tangent.get_x() + dy * tangent.get_y() + dz * tangent.get_z();
 			if (tangentDot < 0.0)
 				tangentDot = -tangentDot;
-			if (tangentDot < 0.98)
+			if (tangentDot < MinimumDirectionAgreement)
 				return -1.0e30;
 			directionAgreement = tangentDot;
 		} else if (kind == CadKit.ShapeKind.Vertex) {
-			var point = candidate.position();
-			positionScale = Math.max(1.0, Math.max(Math.max(Math.abs(x), Math.abs(y)), Math.max(Math.abs(z),
-				Math.max(Math.max(Math.abs(point.get_x()), Math.abs(point.get_y())), Math.abs(point.get_z())))));
+			positionScale = 1.0;
 		} else {
 			return -1.0e30;
 		}
 
-		if (positionScale <= 1.0e-12 || normalizedSizeChange > 0.25)
+		if (positionScale <= 1.0e-12 || normalizedSizeChange > RelativeSizeTolerance)
 			return -1.0e30;
 		var normalizedDistance = distance / positionScale;
-		var maximumDistance = kind == CadKit.ShapeKind.Vertex ? 1.0e-5 : 0.15;
-		if (normalizedDistance > maximumDistance)
+		// Coordinates and measurements use CadKit's canonical millimetre units. Keep
+		// fingerprint matching close enough to absorb numerical noise, not nearby topology.
+		var maximumDistance = Math.max(AbsolutePositionTolerance, positionScale * RelativePositionTolerance);
+		if (distance > maximumDistance)
 			return -1.0e30;
 		return directionAgreement - normalizedDistance - normalizedSizeChange;
 	}
