@@ -11,6 +11,8 @@ class DockWorkspaceModel {
 	public var activePanelId(default, null):Null<String>;
 	public var revision(default, null):Int;
 	final listeners:Array<Void->Void>;
+	public var listenerCount(get, never):Int;
+	inline function get_listenerCount():Int return listeners.length;
 
 	public function new(?defaultRoot:DockNode) {
 		panels = new Map();
@@ -21,9 +23,12 @@ class DockWorkspaceModel {
 		listeners = [];
 	}
 
-	public function listen(callback:Void->Void):Void {
-		if (callback != null && !listeners.contains(callback))
-			listeners.push(callback);
+	/** Registers a change listener and returns a cleanup callback. */
+	public function listen(callback:Void->Void):Void->Void {
+		if (callback == null || listeners.contains(callback))
+			return function() {};
+		listeners.push(callback);
+		return function() { listeners.remove(callback); };
 	}
 
 	public function register(panel:DockPanelDescriptor):Void {

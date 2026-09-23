@@ -9,6 +9,8 @@ class DockWorkspaceInteraction {
 	final targets:Array<DockDropTarget>;
 	final tabTargets:Array<DockTabDropTarget>;
 	final listeners:Array<Void->Void>;
+	public var listenerCount(get, never):Int;
+	inline function get_listenerCount():Int return listeners.length;
 	var pointerId:Int;
 
 	public function new(model:DockWorkspaceModel) {
@@ -24,9 +26,12 @@ class DockWorkspaceInteraction {
 		pointerId = -1;
 	}
 
-	public function listen(callback:Void->Void):Void {
-		if (callback != null && !listeners.contains(callback))
-			listeners.push(callback);
+	/** Registers a change listener and returns a cleanup callback. */
+	public function listen(callback:Void->Void):Void->Void {
+		if (callback == null || listeners.contains(callback))
+			return function() {};
+		listeners.push(callback);
+		return function() { listeners.remove(callback); };
 	}
 
 	/** Replaces render targets after each workspace rebuild. */

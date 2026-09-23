@@ -17,16 +17,16 @@ import nativekit.ui.core.DockWorkspaceInteraction;
 import nativekit.ui.core.DockWorkspaceModel;
 import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.State;
 import nativekit.ui.core.View;
 
 /** Renders a DockWorkspaceModel using split panes, tab groups, and lazy panels. */
 class DockWorkspace implements View {
 	public final key:String;
 	public final model:DockWorkspaceModel;
-	public final interaction:DockWorkspaceInteraction;
+	public var interaction(default, null):DockWorkspaceInteraction;
 	public final style:LayoutStyle;
-	var invalidate:Null<Void->Void>;
-	var subscribed:Bool;
+	final suppliedInteraction:Bool;
 
 	public function new(key:String, model:DockWorkspaceModel, ?style:LayoutStyle,
 			?interaction:DockWorkspaceInteraction) {
@@ -34,25 +34,19 @@ class DockWorkspace implements View {
 			throw "Dock workspaces require a stable key and model";
 		this.key = key;
 		this.model = model;
+		suppliedInteraction = interaction != null;
 		this.interaction = interaction == null ? new DockWorkspaceInteraction(model) : interaction;
 		this.style = style == null ? defaultStyle() : style.copy();
-		invalidate = null;
-		subscribed = false;
 	}
 
 	public function build(context:BuildContext):RenderNode {
-		if (!subscribed) {
-			model.listen(function() {
-				if (invalidate != null)
-					invalidate();
-			});
-			interaction.listen(function() {
-				if (invalidate != null)
-					invalidate();
-			});
-			subscribed = true;
-		}
-		invalidate = function() context.commands.refresh();
+		var mounted:State<DockWorkspaceMount> = context.resourceState(context.id("workspace-mount:" + key),
+			function() { return new DockWorkspaceMount(model, interaction); },
+			function(value) { value.dispose(); });
+		var mount = mounted.value;
+		mount.bind(model, suppliedInteraction ? interaction : null);
+		mount.invalidate = function() context.commands.refresh();
+		interaction = mount.interaction;
 		interaction.beginFrame();
 		var content = buildNode(model.root, context, [], "layout",
 			context.viewportWidth, context.viewportHeight);
@@ -179,6 +173,50 @@ class DockWorkspace implements View {
 
 	static inline function clamp(value:Float, minimum:Float, maximum:Float):Float
 		return value < minimum ? minimum : value > maximum ? maximum : value;
+}
+
+/** One subscription pair per mounted workspace, independent of rebuilt View instances. */
+private class DockWorkspaceMount {
+	public var model(default, null):DockWorkspaceModel;
+	public var interaction(default, null):DockWorkspaceInteraction;
+	public var invalidate:Null<Void->Void>;
+	var stopModel:Null<Void->Void>;
+	var stopInteraction:Null<Void->Void>;
+
+	public function new(model:DockWorkspaceModel, interaction:DockWorkspaceInteraction) {
+		this.model = model;
+		this.interaction = interaction;
+		subscribe();
+	}
+
+	public function bind(nextModel:DockWorkspaceModel,
+			requestedInteraction:Null<DockWorkspaceInteraction>):Void {
+		if (model == nextModel &&
+			(requestedInteraction == null || interaction == requestedInteraction))
+			return;
+		unsubscribe();
+		model = nextModel;
+		interaction = requestedInteraction == null ? new DockWorkspaceInteraction(nextModel) : requestedInteraction;
+		subscribe();
+	}
+
+	public function dispose():Void {
+		unsubscribe();
+		invalidate = null;
+	}
+
+	function subscribe():Void {
+		var notify = function() { if (invalidate != null) invalidate(); };
+		stopModel = model.listen(notify);
+		stopInteraction = interaction.listen(notify);
+	}
+
+	function unsubscribe():Void {
+		if (stopModel != null) stopModel();
+		if (stopInteraction != null) stopInteraction();
+		stopModel = null;
+		stopInteraction = null;
+	}
 }
 
 private class DockPanelView implements View {

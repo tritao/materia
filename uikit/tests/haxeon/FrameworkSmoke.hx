@@ -53,6 +53,7 @@ import nativekit.ui.core.DockPanelDescriptor;
 import nativekit.ui.core.DockSplitAxis;
 import nativekit.ui.core.DockWorkspacePersistence;
 import nativekit.ui.core.DockWorkspaceModel;
+import nativekit.ui.core.DockWorkspaceInteraction;
 import nativekit.ui.core.EditorDocument;
 import nativekit.ui.core.EditHistory;
 import nativekit.ui.core.EditOperation;
@@ -3903,7 +3904,21 @@ class FrameworkSmoke {
 		if (!resetResult.succeeded || !model.isOpen("hierarchy") || !model.isOpen("viewport") ||
 			model.isOpen("console") || !model.isOpen("inspector"))
 			return false;
-		return model.restore(snapshot) && model.isOpen("console");
+		if (!model.restore(snapshot) || !model.isOpen("console"))
+			return false;
+		var retainedInteraction:Null<DockWorkspaceInteraction> = null;
+		for (index in 0...20) {
+			var rebuilt = new DockWorkspace("editor-workspace", model);
+			uiContext.submit(rebuilt, new LayoutFrame(640.0, 480.0));
+			if (index == 0) retainedInteraction = rebuilt.interaction;
+			else if (rebuilt.interaction != retainedInteraction)
+				return false;
+		}
+		if (model.listenerCount != 2 || retainedInteraction == null ||
+			retainedInteraction.listenerCount != 1)
+			return false;
+		uiContext.submit(new Text("workspace unmounted"), new LayoutFrame(640.0, 480.0));
+		return model.listenerCount == 1 && retainedInteraction.listenerCount == 0;
 	}
 
 	/** Covers the shared Haxe scene policy around transforms, clipping, order, and events. */
