@@ -25,6 +25,8 @@ class EventDispatcher {
 	public var lastCommandResult(default, null):Null<CommandResult>;
 	/** Optional host hook for command palettes, status bars, and diagnostics. */
 	public var onCommandResult:Null<CommandResult->Void>;
+	/** Optional elapsed-time probe for pointer release stages. */
+	public var pointerUpProbe:Null<String->Float->Void>;
 
 	public function new(focus:FocusManager, ?interactionStates:InteractionStateStore,
 			?commandRegistry:CommandRegistry, ?commandContext:CommandContext) {
@@ -173,8 +175,15 @@ class EventDispatcher {
 
 	public function pointerUp(x:Float, y:Float, button:Int, modifiers:Int = 0,
 			pointerId:Int = 0, data:Dynamic = null):Void {
+		var probe = pointerUpProbe;
+		var stageStarted = probe == null ? 0.0 : Sys.time();
 		rememberPointer(pointerId, x, y);
 		var releasePath = hitPath(x, y);
+		if (probe != null) {
+			var now = Sys.time();
+			probe("hitTestSeconds", now - stageStarted);
+			stageStarted = now;
+		}
 		var path = capturedPath(pointerId);
 		var pressed = pressedIds.get(pointerId);
 		var clickSuppressed = suppressedClicks.exists(pointerId);
@@ -189,12 +198,24 @@ class EventDispatcher {
 			dispatchPath(path, new UiEvent(UiEventKind.PointerUp, target.id, x, y,
 				0.0, 0.0, button, 0, modifiers, null, data, 0, pointerId));
 		}
+		if (probe != null) {
+			var now = Sys.time();
+			probe("pointerDispatchSeconds", now - stageStarted);
+			stageStarted = now;
+		}
 		if (!clickSuppressed && pressed != null && releasePath.length > 0 &&
 			releasePath[releasePath.length - 1].id.equals(pressed)) {
 			dispatchPath(releasePath, new UiEvent(UiEventKind.Click, pressed, x, y,
 				0.0, 0.0, button, 0, modifiers, null, data, 0, pointerId));
 		}
+		if (probe != null) {
+			var now = Sys.time();
+			probe("clickDispatchSeconds", now - stageStarted);
+			stageStarted = now;
+		}
 		updateHover(pointerId, releasePath, x, y);
+		if (probe != null)
+			probe("hoverSeconds", Sys.time() - stageStarted);
 	}
 
 	public function pointerCancel(pointerId:Int, x:Float, y:Float,
@@ -509,6 +530,8 @@ class EventDispatcher {
 	function dispatchPath(path:Array<RenderNode>, event:UiEvent):Void {
 		if (path.length == 0)
 			return;
+		var clickProbe = event.kind == UiEventKind.Click ? pointerUpProbe : null;
+		var clickStarted = clickProbe == null ? 0.0 : Sys.time();
 		event.phase = "capture";
 		for (index in 0...(path.length - 1)) {
 			event.setCurrentTarget(path[index]);
@@ -516,10 +539,20 @@ class EventDispatcher {
 			if (event.propagationStopped)
 				return;
 		}
+		if (clickProbe != null) {
+			var now = Sys.time();
+			clickProbe("clickCaptureSeconds", now - clickStarted);
+			clickStarted = now;
+		}
 		var targetIndex = path.length - 1;
 		event.phase = "target";
 		event.setCurrentTarget(path[targetIndex]);
 		path[targetIndex].invoke(event);
+		if (clickProbe != null) {
+			var now = Sys.time();
+			clickProbe("clickTargetSeconds", now - clickStarted);
+			clickStarted = now;
+		}
 		if (event.propagationStopped)
 			return;
 		event.phase = "bubble";
@@ -531,6 +564,8 @@ class EventDispatcher {
 				return;
 			index--;
 		}
+		if (clickProbe != null)
+			clickProbe("clickBubbleSeconds", Sys.time() - clickStarted);
 	}
 }
 

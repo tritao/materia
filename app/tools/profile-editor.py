@@ -43,17 +43,23 @@ def main():
     parser.add_argument("--seconds", type=float, help="capture normal event-driven frames for this interval")
     parser.add_argument("--idle-seconds", type=float, help="sample an unbounded editor, then stop it")
     parser.add_argument("--no-profile", action="store_true", help="measure without profiler overhead")
+    parser.add_argument("--sample-rate", type=int, help="profiler samples per second")
+    parser.add_argument("--allocation-interval", type=int, help="allocation sampling interval in bytes; 0 disables it")
     parser.add_argument("--heap-dump", action="store_true",
                         help="save a full GC heap dump and its exact bytecode (headless scenario only)")
     parser.add_argument("--scenario", choices=["tab-inspector", "tab-matrix"],
                         help="replay a headless UI interaction")
     parser.add_argument("--cycles", type=int, default=20, help="headless scenario cycles (default: 20)")
-    parser.add_argument("--skip-build", action="store_true", help="reuse the existing compiled editor")
+    parser.add_argument("--skip-build", action="store_true", help="reuse the compiled editor; still ensure the Release HashLink runtime")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("editor_args", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.frames < 1:
         parser.error("--frames must be positive")
+    if args.sample_rate is not None and args.sample_rate < 1:
+        parser.error("--sample-rate must be positive")
+    if args.allocation_interval is not None and args.allocation_interval < 0:
+        parser.error("--allocation-interval must be nonnegative")
     if args.seconds is not None and args.seconds <= 0:
         parser.error("--seconds must be positive")
     if args.idle_seconds is not None and args.idle_seconds <= 0:
@@ -76,6 +82,16 @@ def main():
     runtime = ROOT / "haxeon/.tools/hashlink/hl"
     profiler = ROOT / "haxeon/.tools/hashlink/hlprof-live"
     with (output / "launch.log").open("w") as log, (output / "memory.jsonl").open("w") as memory:
+        configure = subprocess.run(["cmake", "--preset", "release", "-S", str(ROOT / "haxeon")],
+                                   cwd=ROOT / "haxeon", stdout=log, stderr=subprocess.STDOUT)
+        if configure.returncode:
+            print(f"release runtime configure failed; see {output / 'launch.log'}", file=sys.stderr)
+            return configure.returncode
+        native = subprocess.run(["cmake", "--build", "--preset", "release"],
+                                cwd=ROOT / "haxeon", stdout=log, stderr=subprocess.STDOUT)
+        if native.returncode:
+            print(f"release runtime build failed; see {output / 'launch.log'}", file=sys.stderr)
+            return native.returncode
         headless_binary = APP / "build/host/headless-profile.hl"
         binary = headless_binary if args.scenario is not None else APP / "build/host/main.hl"
         if args.skip_build:
@@ -98,6 +114,8 @@ def main():
                     return build.returncode
         native_dirs = sorted({str(path.parent) for path in (APP / "build/host/native").rglob("*.so")})
         environment = os.environ.copy()
+        if args.scenario == "tab-matrix" and not args.no_profile:
+            environment["HAXEON_PROFILE_SPANS"] = "1"
         environment["LD_LIBRARY_PATH"] = os.pathsep.join(
             [str(runtime.parent), str(ROOT / "haxeon/out"), *native_dirs,
              environment.get("LD_LIBRARY_PATH", "")])
@@ -125,14 +143,19 @@ def main():
         process = subprocess.Popen(command, cwd=APP, env=environment,
                                    stdout=log, stderr=subprocess.STDOUT)
         with (output / "profiler.log").open("w") as profile_log:
+            sample_rate = args.sample_rate or (50 if args.scenario == "tab-matrix" else 500)
+            allocation_interval = (args.allocation_interval if args.allocation_interval is not None else
+                                   0 if args.scenario == "tab-matrix" else 65536)
             capture = None if args.no_profile else subprocess.Popen(
-                [str(profiler), "--connect-timeout", "15", "--rate", "500",
-                 "--alloc-interval", "65536", "--interval", "2000",
+                [str(profiler), "--connect-timeout", "15", "--rate", str(sample_rate),
+                 "--alloc-interval", str(allocation_interval), "--interval",
+                 "20" if args.scenario == "tab-matrix" else "2000",
                  "--output", str(output / "editor.hlpc"), str(port)],
                 cwd=APP, stdout=profile_log, stderr=subprocess.STDOUT)
             try:
                 run_timeout = (args.idle_seconds if args.idle_seconds is not None else
-                               args.seconds + 30 if args.seconds is not None else 60)
+                               args.seconds + 30 if args.seconds is not None else
+                               max(60, args.cycles * 0.5 + 30) if args.scenario is not None else 60)
                 deadline = time.monotonic() + run_timeout
                 while process.poll() is None and time.monotonic() < deadline:
                     rss = rss_kb(process.pid)
@@ -145,7 +168,7 @@ def main():
                     time.sleep(0.1)
                 if process.poll() is None:
                     if args.idle_seconds is None:
-                        raise TimeoutError("editor did not finish within 60 seconds")
+                        raise TimeoutError(f"editor did not finish within {run_timeout:g} seconds")
                     process.terminate()
                 result = process.wait(timeout=5)
                 if args.idle_seconds is not None and result == -15:
@@ -174,6 +197,16 @@ def main():
          str(output / "editor.hlpc")], capture_output=True, text=True)
     if export is not None and export.returncode:
         print(f"Perfetto export failed: {export.stderr.strip()}", file=sys.stderr)
+    if args.scenario == "tab-matrix" and export is not None and export.returncode == 0:
+        span_report = subprocess.run(
+            [sys.executable, str(ROOT / "haxeon/scripts/hlprof-spans.py"),
+             "--min-ms", "20", "--top", "20", "--output", str(output / "span-spikes.json"),
+             str(output / "editor.perfetto.json")], capture_output=True, text=True)
+        if span_report.returncode:
+            print(f"Span report failed: {span_report.stderr.strip()}", file=sys.stderr)
+            result = 1
+        else:
+            print(span_report.stdout, end="")
     if frames:
         durations = sorted(frame["frameSeconds"] * 1000 for frame in frames)
         print(f"frames={len(frames)} median={statistics.median(durations):.1f}ms "
@@ -206,6 +239,15 @@ def main():
                 spikes = [{"transition": frame["action"], "cycle": frame["cycle"],
                            "latencyMs": latency_ms(frame),
                            "inputMs": frame["inputSeconds"] * 1000,
+                           "inputPhasesMs": {name: seconds * 1000 for name, seconds in
+                                             (frame.get("inputPhases") or {}).items()
+                                             if isinstance(seconds, (int, float))},
+                           "pointerUpPhasesMs": {name: seconds * 1000 for name, seconds in
+                                                 ((frame.get("inputPhases") or {}).get("eventPhases") or {}).items()},
+                           "inputGcCollections": frame.get("inputGcCollections"),
+                           "inputGcMarkMicros": frame.get("inputGcMarkMicros"),
+                           "submitGcCollections": frame.get("submitGcCollections"),
+                           "submitGcMarkMicros": frame.get("submitGcMarkMicros"),
                            "frameMs": frame["frameSeconds"] * 1000,
                            "treeAndStyleMs": frame["treeAndStyleSeconds"] * 1000,
                            "allocatedBytes": frame["allocatedBytes"],
@@ -215,11 +257,16 @@ def main():
                           for frame in sorted(transitions, key=latency_ms, reverse=True)[:20]]
                 (output / "tab-spikes.json").write_text(json.dumps(spikes, indent=2) + "\n")
                 for spike in spikes[:5]:
+                    phases = spike["pointerUpPhasesMs"] or spike["inputPhasesMs"]
+                    phase_text = (" ".join(f"{name}={seconds:.1f}ms" for name, seconds in phases.items())
+                                  if phases else "input phases unavailable")
                     print(f"spike {spike['transition']} cycle={spike['cycle']} "
                           f"latency={spike['latencyMs']:.1f}ms "
+                          f"input={spike['inputMs']:.1f}ms {phase_text} "
                           f"tree/style={spike['treeAndStyleMs']:.1f}ms "
                           f"alloc={spike['allocatedBytes'] / 2**20:.2f}MiB "
                           f"GC={spike['gcCollections']:.0f} "
+                          f"input GC={spike['inputGcCollections']} "
                           f"cache misses={spike['styleCacheMisses']}")
     if samples:
         start = next((row for row in samples if frames and row["timeSeconds"] >= frames[0]["startedAtSeconds"]), samples[0])
