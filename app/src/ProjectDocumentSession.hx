@@ -5,12 +5,12 @@ import sys.io.AtomicFile;
 import haxe.io.Path as FilePath;
 import app.ScriptOwnership.ScriptMaterialization;
 import nativekit.ui.core.EditorDocument;
-import nativekit.ui.core.EditOperation;
 import bimkit.BimDocument;
 
 /** Owns the current document; unsuccessful I/O leaves it and its history intact. */
 class ProjectDocumentSession {
   public var document(default, null):EditorDocument;
+  public var edits(default, null):ProjectEditCoordinator;
   public var scene(default, null):EditorScene;
   public var sensors(default, null):SensorConfiguration;
   public var bim(default, null):BimDocument;
@@ -22,6 +22,7 @@ class ProjectDocumentSession {
 
   public function new(?initialBim:BimDocument) {
     document = new EditorDocument("project");
+    edits = new ProjectEditCoordinator(document);
     scene = new EditorScene(null, document);
     sensors = new SensorConfiguration(null, document);
     bim = initialBim == null ? new BimDocument() : initialBim;
@@ -119,6 +120,7 @@ class ProjectDocumentSession {
     var previousOwnership=scriptOwnership;
     var previousBim=bim;
     document = nextDocument;
+    edits = new ProjectEditCoordinator(nextDocument);
     scene = next;
     sensors = nextSensors;
     scriptOwnership=nextOwnership;
@@ -134,18 +136,22 @@ class ProjectDocumentSession {
   /** Applies a BIM mutation and places its CAD undo record in project order. */
   public function applyBimEdit(label:String, change:Void->Void):Bool {
     if (label == null || label.length == 0 || change == null) throw "BIM edits require a label and mutation";
-    change();
+    var firstApplication = true;
     try {
-      document.record(new EditOperation(label, function() {
-        if (!bim.redo()) throw "BIM redo history is out of sync with project history";
+      return edits.apply(label, function() {
+        if (firstApplication) {
+          change();
+          firstApplication = false;
+        } else if (!bim.redo()) {
+          throw "BIM redo history is out of sync with project history";
+        }
       }, function() {
         if (!bim.undo()) throw "BIM undo history is out of sync with project history";
-      }));
+      });
     } catch (error:Dynamic) {
-      bim.undo();
+      if (!firstApplication) bim.undo();
       throw error;
     }
-    return true;
   }
 
   static function checkedPath(value:String):String {
