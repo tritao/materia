@@ -82,13 +82,21 @@ class ScrollView implements View {
 			});
 			translatedContent.add(content);
 			viewport.add(translatedContent);
-			if (showScrollbar && axis != ScrollAxis.Horizontal && controller.maxScrollY > 0.0 &&
-				controller.viewportHeight > 0.0)
-				addVerticalScrollbar(context, viewport, stored);
+			var scrollbar = showScrollbar && axis != ScrollAxis.Horizontal
+				? addVerticalScrollbar(context, viewport, stored) : null;
 
 			viewport.onResolved(function(geometry) {
 				controller.updateMetrics(geometry.width, geometry.height,
 					geometry.contentBounds.width, geometry.contentBounds.height);
+				var nextTransform = Transform2D.identity().translated(-controller.offsetX,
+					-controller.offsetY);
+				var transform = translatedContent.layout.style.transform;
+				if (transform.tx != nextTransform.tx || transform.ty != nextTransform.ty) {
+					translatedContent.layout.style.transform = nextTransform;
+					context.requestLayoutFeedback();
+				}
+				if (scrollbar != null && updateVerticalScrollbar(scrollbar))
+					context.requestLayoutFeedback();
 			});
 			viewport.on(UiEventKind.Scroll, function(event) {
 				if (onScroll != null)
@@ -132,11 +140,11 @@ class ScrollView implements View {
 	}
 
 	function addVerticalScrollbar(context:BuildContext, viewport:RenderNode,
-			stored:State<ScrollController>):Void {
+			stored:State<ScrollController>):RenderNode {
 		var trackWidth = 10.0;
 		var inset = 2.0;
 		var trackHeight = Math.max(0.0, controller.viewportHeight - inset * 2.0);
-		var thumbHeight = Math.max(24.0,
+		var thumbHeight = controller.contentHeight <= 0.0 ? 0.0 : Math.max(24.0,
 			trackHeight * controller.viewportHeight / controller.contentHeight);
 		if (thumbHeight > trackHeight)
 			thumbHeight = trackHeight;
@@ -149,6 +157,7 @@ class ScrollView implements View {
 		trackStyle.positionY = inset;
 		trackStyle.width = LayoutAxis.fixed(trackWidth);
 		trackStyle.height = LayoutAxis.fixed(trackHeight);
+		trackStyle.visible = controller.maxScrollY > 0.0 && controller.viewportHeight > 0.0;
 		trackStyle.background = context.theme.controlUnselected;
 		trackStyle.radiusTopLeft = trackStyle.radiusTopRight = trackWidth * 0.5;
 		trackStyle.radiusBottomLeft = trackStyle.radiusBottomRight = trackWidth * 0.5;
@@ -163,6 +172,7 @@ class ScrollView implements View {
 		thumbStyle.positionY = thumbY - inset;
 		thumbStyle.width = LayoutAxis.fixed(trackWidth - 2.0);
 		thumbStyle.height = LayoutAxis.fixed(thumbHeight);
+		thumbStyle.visible = trackStyle.visible;
 		thumbStyle.background = context.theme.accent;
 		thumbStyle.radiusTopLeft = thumbStyle.radiusTopRight = (trackWidth - 2.0) * 0.5;
 		thumbStyle.radiusBottomLeft = thumbStyle.radiusBottomRight = (trackWidth - 2.0) * 0.5;
@@ -171,7 +181,7 @@ class ScrollView implements View {
 		var thumb = new RenderNode(thumbId, LayoutVisualKind.Box, thumbStyle);
 		thumb.setStyleIdentity("scrollbar-thumb", key.value, key.value, null,
 			["scrollbar", "vertical"]);
-		thumb.focusable = true;
+		thumb.focusable = trackStyle.visible;
 		var semantics = new Semantics(AccessibilityRole.Slider, "Vertical scroll position");
 		semantics.actions = AccessibilityAction.Increment | AccessibilityAction.Decrement;
 		semantics.numericMinimum = 0.0;
@@ -193,6 +203,8 @@ class ScrollView implements View {
 			event.preventDefault();
 		});
 		thumb.on(UiEventKind.PointerMove, function(event) {
+			var travel = Math.max(0.0, track.layout.style.height.value -
+				thumb.layout.style.height.value);
 			if (!dragState.value.dragging || travel <= 0.0)
 				return;
 			controller.jumpTo(controller.offsetX, dragState.value.offsetY +
@@ -220,6 +232,8 @@ class ScrollView implements View {
 		track.on(UiEventKind.PointerDown, function(event) {
 			if (event.button != 0 || track.resolved == null)
 				return;
+			var thumbHeight = thumb.layout.style.height.value;
+			var travel = Math.max(0.0, track.layout.style.height.value - thumbHeight);
 			var geometry:ResolvedLayoutItem = cast track.resolved;
 			var local = geometry.viewportToLayout(event.x, event.y);
 			var pointerY = local.y - geometry.y;
@@ -231,6 +245,37 @@ class ScrollView implements View {
 		});
 		track.add(thumb);
 		viewport.add(track);
+		return track;
+	}
+
+	function updateVerticalScrollbar(track:RenderNode):Bool {
+		var thumb = track.children[0];
+		var trackStyle = track.layout.style;
+		var thumbStyle = thumb.layout.style;
+		var inset = 2.0;
+		var trackHeight = Math.max(0.0, controller.viewportHeight - inset * 2.0);
+		var thumbHeight = controller.contentHeight <= 0.0 ? 0.0 : Math.max(24.0,
+			trackHeight * controller.viewportHeight / controller.contentHeight);
+		thumbHeight = Math.min(thumbHeight, trackHeight);
+		var travel = Math.max(0.0, trackHeight - thumbHeight);
+		var thumbY = controller.maxScrollY <= 0.0 ? 0.0 :
+			controller.offsetY / controller.maxScrollY * travel;
+		var visible = controller.maxScrollY > 0.0 && controller.viewportHeight > 0.0;
+		var trackX = Math.max(0.0, controller.viewportWidth - 12.0);
+		var changed = trackStyle.positionX != trackX ||
+			trackStyle.height.value != trackHeight || thumbStyle.height.value != thumbHeight ||
+			thumbStyle.positionY != thumbY || trackStyle.visible != visible;
+		trackStyle.positionX = trackX;
+		trackStyle.height = LayoutAxis.fixed(trackHeight);
+		trackStyle.visible = visible;
+		thumbStyle.height = LayoutAxis.fixed(thumbHeight);
+		thumbStyle.positionY = thumbY;
+		thumbStyle.visible = visible;
+		thumb.focusable = visible;
+		var semantics:Semantics = cast thumb.semantics;
+		semantics.numericMaximum = controller.maxScrollY;
+		semantics.numericValue = controller.offsetY;
+		return changed;
 	}
 }
 

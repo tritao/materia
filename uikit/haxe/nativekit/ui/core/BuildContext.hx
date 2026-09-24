@@ -36,6 +36,8 @@ class BuildContext {
 	/** Logical viewport dimensions for frame-local placement decisions. */
 	public var viewportWidth(default, null):Float;
 	public var viewportHeight(default, null):Float;
+	/** A resolved widget can request another native layout pass in this submit. */
+	public var layoutFeedbackRequested(default, null):Bool = false;
 	var styleParent:Null<ComputedStyle>;
 	var focusRequester:WidgetId->Bool;
 	final claimed:Map<Int, String>;
@@ -167,12 +169,22 @@ class BuildContext {
 	}
 
 	public function beginFrame():Void {
+		layoutFeedbackRequested = false;
 		claimed.clear();
 		if (rootScope.cachedEntries() >= 8192)
 			rootScope = new KeyScope();
 		scope = rootScope;
 		stateStore.beginFrame();
 		textStyleStack = [ResolvedTextStyle.fromTheme(theme)];
+	}
+
+	public function requestLayoutFeedback():Void
+		layoutFeedbackRequested = true;
+
+	public function consumeLayoutFeedback():Bool {
+		var requested = layoutFeedbackRequested;
+		layoutFeedbackRequested = false;
+		return requested;
 	}
 
 	/** Bounded-run diagnostics for retained key path caches. */

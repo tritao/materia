@@ -55,6 +55,8 @@ class UiContext {
 	var submittedGestureRevision:Int;
 	var submittedCommandRevision:Int;
 	var submittedNodeCount:Int;
+	var submittedFrameWidth:Float;
+	var submittedFrameHeight:Float;
 	var submittedBuildKey:Null<String>;
 	var submittedTheme:Null<Theme>;
 	var submittedStyleSheet:Null<StyleSheet>;
@@ -110,6 +112,8 @@ class UiContext {
 		submittedGestureRevision = -1;
 		submittedCommandRevision = -1;
 		submittedNodeCount = 0;
+		submittedFrameWidth = -1.0;
+		submittedFrameHeight = -1.0;
 		submittedBuildKey = null;
 		submittedTheme = null;
 		submittedStyleSheet = null;
@@ -235,7 +239,7 @@ class UiContext {
 		animations.advance(frame.deltaSeconds);
 		buildContext.setViewport(frame.width, frame.height);
 		buildContext.setEnvironmentViewport(frame.width, frame.height);
-		if (cacheKey != null && canReuseSubmittedFrame(cacheKey)) {
+		if (cacheKey != null && canReuseSubmittedFrame(cacheKey, frame)) {
 			frameNumber++;
 			lastFrameMetrics = new UiFrameMetrics(frameNumber, submittedNodeCount, 0, 0, 0,
 				buildContext.styleResolver.cachedStyleCount, 0, submittedNodeCount, UiDirtyFlag.None,
@@ -262,7 +266,8 @@ class UiContext {
 		var previousById = new Map<Int, RenderNode>();
 		if (root != null)
 			root.walk(function(node) previousById.set(node.id.value, node));
-		var nativeLayoutReused = !styleInvalidation.nativeLayoutRequired;
+		var nativeLayoutReused = !styleInvalidation.nativeLayoutRequired &&
+			submittedFrameWidth == frame.width && submittedFrameHeight == frame.height;
 		if (nativeLayoutReused)
 			next.walk(function(node) {
 				var previous = previousById.get(node.id.value);
@@ -281,44 +286,65 @@ class UiContext {
 			});
 		} else
 			resolved = session.submit(next.layout, frame);
-		var nativeLayoutEndedAt = Sys.time();
 		diagnosticStage = 6;
-		var byId = new Map<Int, ResolvedLayoutItem>();
 		var nodesById = new Map<Int, RenderNode>();
-		for (item in resolved)
-			byId.set(item.id, item);
 		var resolvedStateRevision = stateStore.revision;
 		var missing = false;
+		var missingNode:Null<RenderNode> = null;
 		var nodeCount = 0;
 		var resolvedGeometryChangedNodes = 0;
 		var resolvedGeometryReusedNodes = 0;
-		diagnosticStage = 7;
-		next.walk(function(node) {
-			nodeCount++;
-			nodesById.set(node.id.value, node);
-			// Geometry is keyed by the exact LayoutNode ID serialized to NativeUI.
-			var item = byId.get(node.layout.id);
-			if (item == null) {
-				missing = true;
-				return;
+		var layoutPass = 0;
+		while (true) {
+			var passById = new Map<Int, ResolvedLayoutItem>();
+			for (item in resolved)
+				passById.set(item.id, item);
+			missing = false;
+			missingNode = null;
+			nodeCount = 0;
+			resolvedGeometryChangedNodes = 0;
+			resolvedGeometryReusedNodes = 0;
+			diagnosticStage = 7;
+			next.walk(function(node) {
+				nodeCount++;
+				nodesById.set(node.id.value, node);
+				// Geometry is keyed by the exact LayoutNode ID serialized to NativeUI.
+				var item = passById.get(node.layout.id);
+				if (item == null) {
+					missing = true;
+					if (missingNode == null) missingNode = node;
+					return;
+				}
+				var previous = previousById.get(node.id.value);
+				var previousResolved:Null<ResolvedLayoutItem> = previous == null ? null : previous.resolved;
+				var geometryChanged = previousResolved == null || !sameGeometry(previousResolved, item);
+				if (!geometryChanged && previousResolved != null) {
+					item = previousResolved;
+					resolvedGeometryReusedNodes++;
+				} else
+					resolvedGeometryChangedNodes++;
+				// Resolved callbacks still run when geometry is retained.
+				node.setResolved(item);
+			});
+			if (missing) {
+				diagnosticStage = 8;
+				throw "Native layout did not return geometry for render node " +
+					Std.string(missingNode == null ? -1 : missingNode.id.value) + " (" +
+					(missingNode == null ? "unknown" : missingNode.styleType) + ")" +
+					" pass=" + layoutPass + " reused=" + nativeLayoutReused +
+					" resolved=" + resolved.length + " nodes=" + nodeCount +
+					" firstResolved=" + (resolved.length == 0 ? -1 : resolved[0].id) +
+					" visible=" + (missingNode == null ? "?" : Std.string(missingNode.layout.style.visible)) +
+					" parent=" + (missingNode == null || missingNode.parent == null ? "?" : missingNode.parent.styleType) +
+					" parentVisible=" + (missingNode == null || missingNode.parent == null ? "?" : Std.string(missingNode.parent.layout.style.visible));
 			}
-			var previous = previousById.get(node.id.value);
-			var previousResolved:Null<ResolvedLayoutItem> = previous == null ? null : previous.resolved;
-			var geometryChanged = previousResolved == null || !sameGeometry(previousResolved, item);
-			if (!geometryChanged && previousResolved != null) {
-				item = previousResolved;
-				resolvedGeometryReusedNodes++;
-			} else
-				resolvedGeometryChangedNodes++;
-			// Geometry objects are retained when unchanged, but resolved callbacks
-			// remain per-submit because widgets use them for same-geometry state
-			// such as caret and composition synchronization.
-			node.setResolved(item);
-		});
-		if (missing) {
-			diagnosticStage = 8;
-			throw "Native layout did not return geometry for every render node";
+			if (!buildContext.consumeLayoutFeedback() || layoutPass == 1)
+				break;
+			resolved = session.submit(next.layout, frame);
+			layoutPass++;
 		}
+		var nativeLayoutEndedAt = Sys.time();
+		if (layoutPass > 0) styleInvalidation = UiStyleInvalidationMetrics.compare(root, next);
 		syncWindowDecorations(next);
 		diagnosticStage = 9;
 		var previousFocus = focus.focusedId;
@@ -356,6 +382,8 @@ class UiContext {
 		submittedGestureRevision = gestures.revision;
 		submittedCommandRevision = commands.revision;
 		submittedNodeCount = nodeCount;
+		submittedFrameWidth = frame.width;
+		submittedFrameHeight = frame.height;
 		submittedBuildKey = cacheKey;
 		submittedTheme = buildContext.theme;
 		submittedStyleSheet = buildContext.styleSheet;
@@ -731,8 +759,9 @@ class UiContext {
 		events.text(kind, value, data);
 	}
 
-	function canReuseSubmittedFrame(cacheKey:String):Bool {
+	function canReuseSubmittedFrame(cacheKey:String, frame:LayoutFrame):Bool {
 		return root != null && submittedBuildKey == cacheKey && dirtyFlags == UiDirtyFlag.None &&
+			submittedFrameWidth == frame.width && submittedFrameHeight == frame.height &&
 			animations.revision == submittedAnimationRevision && gestures.revision == submittedGestureRevision &&
 			commands.revision == submittedCommandRevision &&
 			buildContext.theme == submittedTheme &&

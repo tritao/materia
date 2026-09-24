@@ -1351,6 +1351,22 @@ class FrameworkSmoke {
 		if (scrollView.controller.maxScrollY != 320.0 || contentGeometry == null ||
 			contentGeometry.clipBounds.height != 80.0)
 			return 25;
+		// Scrollbar geometry must match the new viewport on the first resize frame.
+		scrollRoot = context.submit(scrollView, scrollFrame);
+		scrollView.style.height = LayoutAxis.fixed(160.0);
+		scrollRoot = context.submit(scrollView, new LayoutFrame(256.0, 160.0));
+		var resizedTrack:ResolvedLayoutItem = cast scrollRoot.children[1].resolved;
+		if (scrollView.controller.viewportHeight != 160.0 || resizedTrack.height != 156.0)
+			return 249;
+		// A changed window frame must also invalidate native layout without a style edit.
+		scrollView.style.height = LayoutAxis.grow();
+		scrollRoot = context.submit(scrollView, scrollFrame);
+		scrollRoot = context.submit(scrollView, new LayoutFrame(256.0, 160.0));
+		resizedTrack = cast scrollRoot.children[1].resolved;
+		if (scrollView.controller.viewportHeight != 160.0 || resizedTrack.height != 156.0)
+			return 250;
+		scrollView.style.height = LayoutAxis.fixed(80.0);
+		scrollRoot = context.submit(scrollView, scrollFrame);
 		context.scroll(4.0, 4.0, 0.0, 50.0);
 		if (scrollView.controller.offsetY != 50.0 || !context.isDirty())
 			return 26;
