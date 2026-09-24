@@ -18,6 +18,24 @@ bool valid_motion_type(std::uint32_t motion_type) noexcept {
         motion_type == NKSIM_MOTION_DYNAMIC;
 }
 
+bool valid_inertial_properties(const nksim_body_desc &desc) noexcept {
+    if (desc.has_inertial_properties > 1) return false;
+    if (!desc.has_inertial_properties) return true;
+    for (double value : desc.center_of_mass) if (!std::isfinite(value)) return false;
+    const double *m = desc.inertia_tensor;
+    for (double value : desc.inertia_tensor) if (!std::isfinite(value)) return false;
+    const double scale = std::max({std::abs(m[0]), std::abs(m[1]), std::abs(m[2]),
+        std::abs(m[3]), std::abs(m[4]), std::abs(m[5]), std::abs(m[6]),
+        std::abs(m[7]), std::abs(m[8])});
+    if (scale == 0.0) return false;
+    const double epsilon = scale * 1e-10;
+    return std::abs(m[1]-m[3]) <= epsilon && std::abs(m[2]-m[6]) <= epsilon &&
+        std::abs(m[5]-m[7]) <= epsilon && m[0] > epsilon &&
+        m[0]*m[4]-m[1]*m[3] > epsilon*epsilon &&
+        m[0]*(m[4]*m[8]-m[5]*m[7])-m[1]*(m[3]*m[8]-m[5]*m[6])+
+            m[2]*(m[3]*m[7]-m[4]*m[6]) > epsilon*epsilon*epsilon;
+}
+
 bool valid_joint_type(std::uint32_t type) noexcept {
     return type == NKSIM_JOINT_FIXED || type == NKSIM_JOINT_REVOLUTE ||
         type == NKSIM_JOINT_PRISMATIC;
@@ -119,16 +137,10 @@ World::World(const nksim_world_desc &desc, std::unique_ptr<PhysicsBackend> backe
     clock.fixed_timestep = desc.fixed_timestep;
 }
 
-World::~World() {
-    joints.for_each([&](nksim_joint, const Joint &joint) {
-        if (backend)
-            backend->joint_destroy(joint.backend_joint);
-    });
-    bodies.for_each([&](nksim_body, const Body &body) {
-        if (backend)
-            backend->body_destroy(body.backend_body);
-    });
-}
+// Backend destruction releases the complete world. Calling per-joint and
+// per-body destroy here would repeatedly rebuild whole-model backends such as
+// MuJoCo while the world itself is already being discarded.
+World::~World() = default;
 
 nksim_result World::initialize() {
     nkscene_snapshot scene_snapshot = 0;
@@ -146,6 +158,24 @@ nksim_result World::get_clock(nksim_clock *out_clock) const noexcept {
         return NKSIM_ERROR_WRONG_THREAD;
     clock.write(*out_clock);
     return NKSIM_OK;
+}
+
+nksim_result World::begin_topology_update() {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (topology_update_open || clock.step_index != 0)
+        return NKSIM_ERROR_INVALID_STATE;
+    const auto result = backend->begin_topology_update();
+    if (result == NKSIM_OK)
+        topology_update_open = true;
+    return result;
+}
+
+nksim_result World::end_topology_update() {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!topology_update_open)
+        return NKSIM_ERROR_INVALID_STATE;
+    topology_update_open = false;
+    return backend->end_topology_update();
 }
 
 nksim_result World::node_pose(nkscene_node_id node,
@@ -285,6 +315,8 @@ nksim_result World::step(nksim_step_result *out_result) {
     out_result->scene_changes = 0;
     if (!owns_thread())
         return NKSIM_ERROR_WRONG_THREAD;
+    if (topology_update_open)
+        return NKSIM_ERROR_INVALID_STATE;
     auto result = refresh_kinematic_bodies();
     if (result != NKSIM_OK)
         return result;
@@ -395,7 +427,8 @@ nksim_result World::destroy_shape(nksim_shape shape) {
 nksim_result World::create_body(const nksim_body_desc &desc, nksim_body *out_body) {
     if (!owns_thread() || !out_body)
         return !owns_thread() ? NKSIM_ERROR_WRONG_THREAD : NKSIM_ERROR_INVALID_ARGUMENT;
-    if (!valid_struct_size(desc.struct_size, sizeof(desc)) || !valid_motion_type(desc.motion_type))
+    if (!valid_struct_size(desc.struct_size, sizeof(desc)) || !valid_motion_type(desc.motion_type) ||
+        !valid_inertial_properties(desc))
         return NKSIM_ERROR_INVALID_ARGUMENT;
     if (desc.motion_type == NKSIM_MOTION_DYNAMIC && !finite_positive(desc.mass))
         return NKSIM_ERROR_INVALID_ARGUMENT;
@@ -424,6 +457,9 @@ nksim_result World::create_body(const nksim_body_desc &desc, nksim_body *out_bod
     backend_desc.rotation = rotation;
     backend_desc.collision_layer = desc.collision_layer;
     backend_desc.collision_mask = desc.collision_mask;
+    backend_desc.has_inertial_properties = desc.has_inertial_properties != 0;
+    std::copy_n(desc.center_of_mass, 3, backend_desc.center_of_mass.begin());
+    std::copy_n(desc.inertia_tensor, 9, backend_desc.inertia_tensor.begin());
     if (shape) {
         backend_desc.shape_type = shape->desc.type;
         std::copy(std::begin(shape->desc.parameters), std::end(shape->desc.parameters),
@@ -640,6 +676,16 @@ void NKSIM_CALL nksim_world_destroy(nksim_world world) {
 nksim_result NKSIM_CALL nksim_world_step(nksim_world world, nksim_step_result *out_result) {
     const auto value = nksim::resolve_world(world);
     return value ? value->step(out_result) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_CALL nksim_world_begin_topology_update(nksim_world world) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->begin_topology_update() : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_CALL nksim_world_end_topology_update(nksim_world world) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->end_topology_update() : NKSIM_ERROR_INVALID_HANDLE;
 }
 
 nksim_result NKSIM_CALL nksim_world_apply_forces(nksim_world world,

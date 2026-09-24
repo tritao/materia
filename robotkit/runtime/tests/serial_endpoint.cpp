@@ -14,16 +14,16 @@ struct WireCommand {
     std::uint64_t sequence;
     std::uint32_t target_count;
     std::uint32_t reserved;
-    struct Target { std::uint32_t mode; double value; } targets[RK_MAX_JOINTS];
+    struct Target { std::uint32_t mode; double value; } targets[RK_MAX_SERIAL_JOINTS];
 };
 struct WireState {
     std::uint8_t magic[4];
     std::uint32_t joint_count;
     std::uint64_t source_timestamp_ns;
     std::uint32_t mode;
-    double position[RK_MAX_JOINTS];
-    double velocity[RK_MAX_JOINTS];
-    double effort[RK_MAX_JOINTS];
+    double position[RK_MAX_SERIAL_JOINTS];
+    double velocity[RK_MAX_SERIAL_JOINTS];
+    double effort[RK_MAX_SERIAL_JOINTS];
 };
 #pragma pack(pop)
 }
@@ -44,6 +44,8 @@ int main() {
     assert(::read(sockets[1], &received, sizeof(received)) == sizeof(received));
     assert(received.sequence == 7 && received.target_count == 1);
     assert(received.targets[0].value == 0.5);
+    command.targets[0].joint = RK_MAX_SERIAL_JOINTS;
+    assert(endpoint->apply(command) == RK_ERROR_LIMIT);
 
     WireState state_packet{};
     state_packet.magic[0] = 'R'; state_packet.magic[1] = 'K';

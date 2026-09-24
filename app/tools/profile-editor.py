@@ -340,13 +340,13 @@ def main():
             actions = [json.loads(line) for line in (output / "actions.jsonl").read_text().splitlines()]
             expected = {"cad-parameter-edits", "bim-opening-edits", "load-10k-scene",
                         "single-object-nudge", "move-500-objects", "undo-1000-edits",
-                        "simulation-presentation-64-links"}
+                        "simulation-presentation-500-links"}
             completed = {row.get("action") for row in actions}
             if (not expected.issubset(completed) or summary.get("sceneObjects") != 10000 or
-                    summary.get("movingObjects") != 500 or summary.get("articulatedLinks") != 64 or
+                    summary.get("movingObjects") != 500 or summary.get("articulatedLinks") != 500 or
                     summary.get("undo1000Seconds") is None):
                 raise ValueError("architecture workload did not complete all requested phases")
-            print("scenario=architecture verified phases=7 sceneObjects=10000 movingObjects=500 links=64")
+            print("scenario=architecture verified phases=7 sceneObjects=10000 movingObjects=500 links=500")
         except (OSError, KeyError, ValueError) as error:
             print(f"scenario verification failed: {error}", file=sys.stderr)
             result = 1

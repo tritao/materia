@@ -13,6 +13,7 @@ import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiModifier;
 import nativekit.ui.debug.UiFrameMetrics;
 import nativekit.ui.semantics.AccessibilityRole;
+import robotkit.model.CollisionApproximation;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -216,24 +217,27 @@ class HeadlessEditorProfile {
     candidate.dispose();
     action(actions, "undo-1000-edits", 0);
 
-    for (index in 1...64) {
+    editor.sensors.model.collisionApproximation = CollisionApproximation.None;
+    for (index in 1...500) {
       var link = editor.sensors.model.addLink(new robotkit.model.Link("Profile link " + index,
         "profile/link-" + index));
-      editor.sensors.model.addJoint(new robotkit.model.Joint("Profile joint " + index,
+      var joint = new robotkit.model.Joint("Profile joint " + index,
         robotkit.model.JointType.Fixed, editor.sensors.model.links[index - 1], link,
-        "profile/joint-" + index));
+        "profile/joint-" + index);
+      joint.childFramePosition = [0.1, 0.0, 0.0];
+      editor.sensors.model.addJoint(joint);
     }
     if (!editor.simulation.rebuild(editor.sensors, editor.scene))
-      throw "64-link simulation profile could not build";
+      throw "500-link simulation profile could not build";
     for (cycle in 0...cycles) {
       editor.simulation.step();
       editor.simulation.capturePresentationSnapshot();
       submit(editor, frame, frames, "architecture:simulation-presentation", cycle);
     }
-    action(actions, "simulation-presentation-64-links", 0);
+    action(actions, "simulation-presentation-500-links", 0);
     editor.simulation.stop();
     File.saveContent(output + "/architecture-summary.json", haxe.Json.stringify({
-      sceneObjects: records.length, movingObjects: 500, articulatedLinks: 64,
+      sceneObjects: records.length, movingObjects: 500, articulatedLinks: 500,
       cycles: cycles, cadParameterSeconds: cadSeconds, bimOpeningSeconds: bimSeconds,
       sceneLoadSeconds: sceneLoadSeconds,
       singleObjectNudgeSeconds: nudgeSeconds, movingObjectEditsSeconds: movingSeconds,

@@ -19,8 +19,8 @@ namespace {
 
 constexpr std::array<std::uint8_t, 4> command_magic{'R', 'K', 'C', '1'};
 constexpr std::array<std::uint8_t, 4> state_magic{'R', 'K', 'S', '1'};
-constexpr std::size_t command_bytes = 4 + 4 + 8 + 4 + 4 + RK_MAX_JOINTS * (4 + 8);
-constexpr std::size_t state_bytes = 4 + 4 + 8 + 4 + RK_MAX_JOINTS * 8 * 3;
+constexpr std::size_t command_bytes = 4 + 4 + 8 + 4 + 4 + RK_MAX_SERIAL_JOINTS * (4 + 8);
+constexpr std::size_t state_bytes = 4 + 4 + 8 + 4 + RK_MAX_SERIAL_JOINTS * 8 * 3;
 
 #pragma pack(push, 1)
 struct WireCommand {
@@ -29,16 +29,16 @@ struct WireCommand {
     std::uint64_t sequence;
     std::uint32_t target_count;
     std::uint32_t reserved;
-    struct Target { std::uint32_t mode; double value; } targets[RK_MAX_JOINTS];
+    struct Target { std::uint32_t mode; double value; } targets[RK_MAX_SERIAL_JOINTS];
 };
 struct WireState {
     std::uint8_t magic[4];
     std::uint32_t joint_count;
     std::uint64_t source_timestamp_ns;
     std::uint32_t mode;
-    double position[RK_MAX_JOINTS];
-    double velocity[RK_MAX_JOINTS];
-    double effort[RK_MAX_JOINTS];
+    double position[RK_MAX_SERIAL_JOINTS];
+    double velocity[RK_MAX_SERIAL_JOINTS];
+    double effort[RK_MAX_SERIAL_JOINTS];
 };
 #pragma pack(pop)
 
@@ -124,6 +124,11 @@ rk_result SerialRobotEndpoint::reconnect(int descriptor, bool take_ownership) no
 rk_result SerialRobotEndpoint::apply(const rk_robot_command &command) {
     if (descriptor_ < 0)
         return RK_ERROR_BACKEND;
+    if (command.target_count > RK_MAX_SERIAL_JOINTS)
+        return RK_ERROR_LIMIT;
+    for (uint32_t index = 0; index < command.target_count; ++index)
+        if (command.targets[index].joint >= RK_MAX_SERIAL_JOINTS)
+            return RK_ERROR_LIMIT;
     WireCommand packet{};
     std::copy(command_magic.begin(), command_magic.end(), packet.magic);
     packet.kind = command.kind;
@@ -160,7 +165,7 @@ rk_result SerialRobotEndpoint::sample(uint64_t timestamp_ns, rk_robot_state &sta
         WireState packet{};
         std::memcpy(&packet, input_.data(), sizeof(packet));
         input_.erase(input_.begin(), input_.begin() + sizeof(packet));
-        if (packet.joint_count > RK_MAX_JOINTS)
+        if (packet.joint_count > RK_MAX_SERIAL_JOINTS)
             return RK_ERROR_BACKEND;
         if (has_source_timestamp_ && packet.source_timestamp_ns <= last_source_timestamp_ns_) {
             saw_stale = true;

@@ -116,7 +116,10 @@ typedef struct nksim_body_desc {
     nksim_shape shape;
     uint32_t collision_layer;
     uint32_t collision_mask;
-    uint64_t reserved[4];
+    uint32_t has_inertial_properties;
+    double center_of_mass[3];
+    double inertia_tensor[9]; /**< Row-major symmetric tensor in kg m². */
+    uint64_t reserved[2];
 } nksim_body_desc;
 
 typedef struct nksim_body_state {
@@ -193,6 +196,10 @@ NKSIM_API nksim_result NKSIM_CALL nksim_world_create(
 NKSIM_API void NKSIM_CALL nksim_world_destroy(nksim_world world);
 NKSIM_API nksim_result NKSIM_CALL nksim_world_get_clock(nksim_world world,
                                                          nksim_clock *out_clock NK_INOUT);
+/** Stages body and joint additions before the first world step. */
+NKSIM_API nksim_result NKSIM_CALL nksim_world_begin_topology_update(nksim_world world);
+/** Commits a staged topology update with one backend rebuild. */
+NKSIM_API nksim_result NKSIM_CALL nksim_world_end_topology_update(nksim_world world);
 NKSIM_API nksim_result NKSIM_CALL nksim_world_step(nksim_world world,
                                                    nksim_step_result *out_result NK_INOUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_world_apply_forces(

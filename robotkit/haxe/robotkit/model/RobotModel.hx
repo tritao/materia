@@ -46,7 +46,8 @@ class RobotModel {
     var errors:Array<String> = [];
     if (name.length == 0) errors.push("robot name is empty");
     if (links.length == 0) errors.push("robot has no links");
-    if (joints.length > 64) errors.push("robot exceeds the native joint limit");
+    if (links.length > 1024) errors.push("robot exceeds the native link limit");
+    if (joints.length > 512) errors.push("robot exceeds the native joint limit");
     for (joint in joints) {
       var limitError = joint.limits.validate();
       if (limitError != null) errors.push('joint ${joint.name}: $limitError');

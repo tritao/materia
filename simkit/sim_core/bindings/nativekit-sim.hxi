@@ -27,6 +27,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_body_create(world: nksim_world, desc: ptr<const<nksim_body_desc>>, out_body: ptr<nksim_body> @out) -> nksim_result;
 	extern fn nksim_body_destroy(world: nksim_world, body: nksim_body) -> void;
 	extern fn nksim_body_get_state(world: nksim_world, body: nksim_body, out_state: ptr<nksim_body_state> @inout) -> nksim_result;
+	extern fn nksim_body_reset(world: nksim_world, body: nksim_body) -> nksim_result;
+	/**
+	 * Replaces a body's pose and velocities on the world owner thread.
+	 */
+	extern fn nksim_body_set_state(world: nksim_world, body: nksim_body, state: ptr<const<nksim_body_state>>) -> nksim_result;
 	extern fn nksim_joint_create(world: nksim_world, desc: ptr<const<nksim_joint_desc>>, out_joint: ptr<nksim_joint> @out) -> nksim_result;
 	extern fn nksim_joint_destroy(world: nksim_world, joint: nksim_joint) -> void;
 	extern fn nksim_joint_get_state(world: nksim_world, joint: nksim_joint, out_state: ptr<nksim_joint_state> @inout) -> nksim_result;
@@ -45,13 +50,25 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_snapshot_get_joint_count(snapshot: nksim_snapshot, out_count: ptr<u64> @out) -> nksim_result;
 	extern fn nksim_snapshot_get_joint_page(snapshot: nksim_snapshot, start_index: u64, out_page: ptr<nksim_snapshot_joint_page> @inout) -> nksim_result;
 	extern fn nksim_world_apply_forces(world: nksim_world, forces: ptr<const<nksim_body_force>> @in_array("count"), count: u32) -> nksim_result;
+	/**
+	 * Stages body and joint additions before the first world step.
+	 */
+	extern fn nksim_world_begin_topology_update(world: nksim_world) -> nksim_result;
 	extern fn nksim_world_create(desc: ptr<const<nksim_world_desc>>, out_world: ptr<nksim_world> @out @owned) -> nksim_result;
 	extern fn nksim_world_destroy(world: nksim_world) -> void;
+	/**
+	 * Commits a staged topology update with one backend rebuild.
+	 */
+	extern fn nksim_world_end_topology_update(world: nksim_world) -> nksim_result;
 	extern fn nksim_world_get_clock(world: nksim_world, out_clock: ptr<nksim_clock> @inout) -> nksim_result;
+	/**
+	 * Restores body state and the fixed-step clock to their initial values.
+	 */
+	extern fn nksim_world_reset(world: nksim_world) -> nksim_result;
 	extern fn nksim_world_set_joint_targets(world: nksim_world, targets: ptr<const<nksim_joint_target>> @in_array("count"), count: u32) -> nksim_result;
 	extern fn nksim_world_snapshot(world: nksim_world, out_snapshot: ptr<nksim_snapshot> @out @owned) -> nksim_result;
 	extern fn nksim_world_step(world: nksim_world, out_result: ptr<nksim_step_result> @inout) -> nksim_result;
-	struct nksim_body_desc @layout(80, 8) {
+	struct nksim_body_desc @layout(160, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		node: nkscene_node_id @offset(8);
 		motion_type: u32 @offset(16);
@@ -59,7 +76,13 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		shape: nksim_shape @offset(32);
 		collision_layer: u32 @offset(36);
 		collision_mask: u32 @offset(40);
-		reserved: array<u64, 4> @offset(48);
+		has_inertial_properties: u32 @offset(44);
+		center_of_mass: array<f64, 3> @offset(48);
+		/**
+		 * < Row-major symmetric tensor in kg m².
+		 */
+		inertia_tensor: array<f64, 9> @offset(72);
+		reserved: array<u64, 2> @offset(144);
 	}
 	struct nksim_body_force @layout(56, 8) {
 		struct_size: u32 @offset(0) @struct_size;

@@ -82,6 +82,7 @@ Simulation::~Simulation() {
 rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                                 rk_robot_runtime &out_runtime) {
     std::lock_guard tick_lock(tick_mutex_);
+    bool topology_update = false;
     {
         std::lock_guard state_lock(state_mutex_);
         if (sealed_ || running_)
@@ -123,12 +124,18 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         if (changes != 0)
             nkscene_change_set_destroy(changes);
 
+        require_sim(nksim_world_begin_topology_update(world_),
+                    "nksim_world_begin_topology_update");
+        topology_update = true;
         for (uint32_t index = 0; index < blueprint.link_count; ++index) {
             nksim_body_desc desc{};
             desc.struct_size = sizeof(desc);
             desc.node = binding->nodes_[index];
             desc.motion_type = index == root ? NKSIM_MOTION_KINEMATIC : NKSIM_MOTION_DYNAMIC;
             desc.mass = blueprint.links[index].mass;
+            desc.has_inertial_properties = 1;
+            std::copy_n(blueprint.links[index].center_of_mass, 3, desc.center_of_mass);
+            std::copy_n(blueprint.links[index].inertia_tensor, 9, desc.inertia_tensor);
             desc.shape = shape_;
             desc.collision_layer = 1;
             desc.collision_mask = blueprint.collision_approximation == RK_COLLISION_APPROXIMATION_NONE ? 0 : 1;
@@ -164,6 +171,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             binding->joints_.push_back(joint);
             joints_.push_back(joint);
         }
+        const auto topology_result = nksim_world_end_topology_update(world_);
+        topology_update = false;
+        require_sim(topology_result, "nksim_world_end_topology_update");
         bindings_.push_back(binding);
         binding->base_body_ = binding->bodies_[root];
         robot_base_bodies_.push_back(binding->base_body_);
@@ -192,8 +202,12 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         out_runtime = handle;
         return RK_OK;
     } catch (const std::bad_alloc &) {
+        if (topology_update)
+            (void)nksim_world_end_topology_update(world_);
         return RK_ERROR_OUT_OF_MEMORY;
     } catch (...) {
+        if (topology_update)
+            (void)nksim_world_end_topology_update(world_);
         return RK_ERROR_BACKEND;
     }
 }
@@ -722,10 +736,9 @@ void Simulation::cleanup() noexcept {
         nksim_snapshot_destroy(snapshot_);
     snapshot_ = 0;
     if (world_ != 0) {
-        for (auto joint : joints_)
-            nksim_joint_destroy(world_, joint);
-        for (auto body : bodies_)
-            nksim_body_destroy(world_, body);
+        // Destroying the world tears down the complete backend at once. Per-
+        // handle destruction here recompiles whole-model backends for every
+        // link immediately before the model itself is discarded.
         if (shape_ != 0)
             nksim_shape_destroy(world_, shape_);
         nksim_world_destroy(world_);
