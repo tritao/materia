@@ -46,7 +46,12 @@ class SceneAtomicityTests {
     scene.failureInjection = function(current) {
       if (current == point) throw 'injected failure at $point';
     };
-    rejects(function() scene.createRectangle(), 'creation fails at ' + point);
+    var cachePublicationFailure = StringTools.startsWith(point, "publish.");
+    if (cachePublicationFailure) {
+      check(scene.createRectangle(), 'cache failure keeps the committed edit at ' + point);
+    } else {
+      rejects(function() scene.createRectangle(), 'creation fails at ' + point);
+    }
     scene.failureInjection = null;
 
     var present = scene.object("rectangle-1") != null;
@@ -56,6 +61,11 @@ class SceneAtomicityTests {
         point + ": committed object has its undo entry");
       check(runtimeNodeCount(scene) == oldNodes + 1,
         point + ": committed object has its SceneKit node");
+      check(scene.renderSnapshot().nodeCount() == oldNodes + 1,
+        point + ": stale render snapshot rebuilds from the committed edit");
+      if (cachePublicationFailure)
+        check(scene.pick(0.0, 0.0) == "rectangle-1",
+          point + ": stale spatial index rebuilds before picking");
       check(scene.document.undo(), point + ": committed object can be undone");
       check(scene.object("rectangle-1") == null && runtimeNodeCount(scene) == oldNodes,
         point + ": undo removes the object and SceneKit node together");
