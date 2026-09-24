@@ -365,7 +365,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     session.beforeReplace=simulation.clear;
     if(setupScript!=null){var scripted=session.openScript(setupScript);
       simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
-    if(projectPath!=null)session.openGeneratedScene(MateriaProjectRunner.load(projectPath));
+    if(projectPath!=null)session.openGeneratedScene(MateriaProjectRunner.load(projectPath), projectPath);
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);
     documents = new SceneDocumentController(session, function(save, path, complete) {
       var chooser = files;

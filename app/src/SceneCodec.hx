@@ -9,18 +9,69 @@ class SceneCodec {
   public static inline var VERSION:Int = 1;
 
   public static function encode(scene:EditorScene,
-    ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument):String return Json.stringify(
+    ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument,
+    ?project:ProjectSceneRecord, ?authoredObjects:Array<SceneObjectData>):String return Json.stringify(
       {
     format: FORMAT,
     version: VERSION,
-    objects: script == null ? scene.recordsForSave() :[],
+    objects: script == null ? (authoredObjects == null ? scene.recordsForSave() : authoredObjects) :[],
     sensors : script == null && sensors != null ? sensors.records() : null,
     script : script,
+    project: project,
     bim : bim == null ? null : Json.parse(BimCodec.encode(bim))
   },
     null,
     "  "
   ) + "\n";
+
+  public static function decodeProject(text:String):Null<ProjectSceneRecord> {
+    var root:Dynamic = Json.parse(text);
+    if (stringField(root, "format") != FORMAT || numberField(root, "version") != VERSION)
+      throw "Unsupported scene document";
+    var value:Dynamic = Reflect.field(root, "project");
+    if (value == null) return null;
+    if (Reflect.field(root, "script") != null) throw "A scene cannot have both script and project owners";
+    if (numberField(value, "version") != 1) throw "Unsupported generated project record version";
+    var reference = stringField(value, "reference");
+    var overrides:Dynamic = field(value, "overrides");
+    var removed:Dynamic = field(value, "removed");
+    var instances:Dynamic = field(value, "instances");
+    if (!Std.isOfType(overrides, Array) || !Std.isOfType(removed, Array) ||
+        !Std.isOfType(instances, Array)) throw "Invalid generated project edits";
+    var overrideValues:Array<Dynamic> = cast overrides;
+    var removedValues:Array<Dynamic> = cast removed;
+    var instanceValues:Array<Dynamic> = cast instances;
+    if (overrideValues.length > 10000 || removedValues.length > 10000 || instanceValues.length > 10000)
+      throw "Generated project has too many edits";
+    var seen = new Map<String, Bool>();
+    for (item in overrideValues) {
+      var id = stringField(item, "id");
+      if (seen.exists(id) || Reflect.hasField(item, "meshSnapshot") || Reflect.hasField(item, "cadGraph"))
+        throw "Invalid generated project override";
+      seen.set(id, true);
+    }
+    var removedIds:Array<String> = [];
+    for (item in removedValues) {
+      if (!Std.isOfType(item, String) || StringTools.trim(cast item).length == 0 || containsNul(cast item))
+        throw "Invalid generated project removal ID";
+      var id:String = cast item;
+      if (seen.exists(id)) throw "Duplicate generated project edit ID";
+      seen.set(id, true);
+      removedIds.push(id);
+    }
+    var instanceRecords:Array<app.ProjectSceneRecord.ProjectSceneInstance> = [];
+    for (item in instanceValues) {
+      var sourceId = stringField(item, "sourceId");
+      var object = field(item, "object");
+      var id = stringField(object, "id");
+      if (seen.exists(id) || Reflect.hasField(object, "meshSnapshot") || Reflect.hasField(object, "cadGraph"))
+        throw "Invalid generated project instance";
+      seen.set(id, true);
+      instanceRecords.push({sourceId: sourceId, object: object});
+    }
+    return {version: 1, reference: reference, overrides: cast overrides,
+      removed: removedIds, instances: instanceRecords};
+  }
 
   public static function decodeScript(text:String):Null < ScriptOwnershipRecord > {
     var root:Dynamic = Json.parse(text);

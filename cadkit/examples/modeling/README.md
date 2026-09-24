@@ -118,11 +118,24 @@ the B-rep components with CadKit and writes a versioned scene artifact. The
 artifact declares metres per coordinate and stable IDs for all 13 components.
 Materia loads them as independent preview objects. STEP is never an input.
 
+Saving this view as a Materia scene keeps a relative reference to the project
+manifest, plus authored transforms, appearance, removals, linked copies, and
+ordinary scene objects. It does not embed the generated mesh snapshots.
+Opening the saved scene runs the manifest again and applies those edits to the
+new geometry, so the manifest and its Haxeon sources must remain available.
+
 From the repository root, launch the app with:
 
 ```sh
 ./haxeon/scripts/haxeon run --project=app/haxeon.json -- \
   --project=../cadkit/examples/modeling/materia.project.json
+```
+
+The save/reopen integration check uses the app's native build:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/haxeon.project-source.json \
+  --output="$PWD/app/build/host/project-source.hl"
 ```
 
 The same `materia.project.json` structure can later select other entrypoint
