@@ -314,6 +314,12 @@ class EventDispatcher {
 	}
 
 	public function clearPointer(pointerId:Int = 0):Void {
+		if (capturedIds.exists(pointerId) && !nativeCapturedIds.exists(pointerId)) {
+			var location = pointerLocations.get(pointerId);
+			pointerCancel(pointerId, location == null ? 0.0 : location.x,
+				location == null ? 0.0 : location.y);
+			return;
+		}
 		updateHover(pointerId, [], 0.0, 0.0);
 		clearPointerCapture(pointerId);
 		pressedIds.remove(pointerId);

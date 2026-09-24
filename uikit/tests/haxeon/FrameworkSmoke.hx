@@ -4010,6 +4010,48 @@ class FrameworkSmoke {
 			targetBounds.y + targetBounds.height * 0.5, 0);
 		if (singletonDock.activePanelId != "single-target")
 			return false;
+		singletonRoot = uiContext.submit(singletonWorkspace, new LayoutFrame(640.0, 480.0));
+		singletonSourceTab = null;
+		singletonTargetTab = null;
+		if (singletonRoot != null)
+			singletonRoot.walk(function(node) {
+				if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab) {
+					if (node.semantics.label == "single-source") singletonSourceTab = node;
+					if (node.semantics.label == "single-target") singletonTargetTab = node;
+				}
+			});
+		if (singletonSourceTab == null || singletonTargetTab == null)
+			return false;
+		sourceBounds = singletonSourceTab.globalBounds();
+		targetBounds = singletonTargetTab.globalBounds();
+		sourceX = sourceBounds.x + sourceBounds.width * 0.5;
+		sourceY = sourceBounds.y + sourceBounds.height * 0.5;
+		targetX = targetBounds.x + targetBounds.width * 0.5;
+		targetY = targetBounds.y + targetBounds.height * 0.5;
+		uiContext.pointerDown(sourceX, sourceY, 0);
+		uiContext.pointerMove(targetX, targetY);
+		if (singletonWorkspace.interaction.preview == null)
+			return false;
+		uiContext.pointerLeave();
+		if (singletonWorkspace.interaction.preview != null ||
+			uiContext.events.hasPointerCapture(singletonSourceTab.id))
+			return false;
+		singletonRoot = uiContext.submit(singletonWorkspace, new LayoutFrame(640.0, 480.0));
+		singletonTargetTab = null;
+		if (singletonRoot != null)
+			singletonRoot.walk(function(node) {
+				if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab &&
+					node.semantics.label == "single-target") singletonTargetTab = node;
+			});
+		if (singletonTargetTab == null)
+			return false;
+		targetBounds = singletonTargetTab.globalBounds();
+		uiContext.pointerDown(targetBounds.x + targetBounds.width * 0.5,
+			targetBounds.y + targetBounds.height * 0.5, 0);
+		uiContext.pointerUp(targetBounds.x + targetBounds.width * 0.5,
+			targetBounds.y + targetBounds.height * 0.5, 0);
+		if (singletonDock.activePanelId != "single-target")
+			return false;
 		uiContext.setPointerCaptureHandler(null);
 		var changes = 0;
 		model.listen(function() changes++);
