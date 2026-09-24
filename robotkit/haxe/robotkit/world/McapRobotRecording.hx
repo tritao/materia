@@ -4,7 +4,7 @@ import RobotKitRuntime;
 import haxe.Int64;
 
 /** File-backed recording facade. MCAP types and threading stay below this boundary. */
-class McapRobotRecording {
+class McapRobotRecording implements RobotRecordingSink {
   /** Null when file-only recording was requested. */
   public final memory:Null<RobotRecording>;
   final staging:RobotRecording;

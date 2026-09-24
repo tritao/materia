@@ -3,7 +3,7 @@ package robotkit.world;
 import haxe.Int64;
 
 /** In-memory deterministic log used by tests, diagnostics, and replay tools. */
-class RobotRecording {
+class RobotRecording implements RobotRecordingSink {
   public final commands:Array<RobotCommand> = [];
   public final snapshots:Array<RobotSnapshot> = [];
   public final faults:Array<RobotFault> = [];

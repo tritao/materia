@@ -210,6 +210,14 @@ Terminal status is persisted beside the recording and can be inspected after
 restart with `McapRecordingReader.status(path)`. Files are currently
 uncompressed for straightforward inspection.
 
+`RecordingRobot` decorates any `Robot` with a `RobotRecordingSink`. It records
+each returned observation and each accepted `JointTargets` batch while
+delegating status, transport, and lifecycle to the wrapped adapter. Both the
+in-memory and MCAP writers implement the sink, so a control client can record a
+simulation or remote robot without changing its skill code. Logging failures
+are reported through `recordingError` without changing the wrapped robot's
+command or observation results.
+
 Every message carries a recording-wide 64-bit ordinal. It is the sole replay
 ordering key: robot and sensor source timestamps retain their clock-domain IDs
 and are never compared across domains. Wide sequences and timestamps are JSON
