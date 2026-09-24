@@ -1,5 +1,6 @@
 package app;
 
+import app.EditorToolbarLayout.EditorToolbarDensity;
 import Canvas;
 import Color;
 import LayoutAxis;
@@ -311,6 +312,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var paletteVisible:Bool;
   var toolbarMenuVisible:Bool;
   var viewportWidth:Float = 1320.0;
+  var toolbarDensity:EditorToolbarDensity = Full;
   var contextMenuVisible:Bool;
   var contextMenuX:Float;
   var contextMenuY:Float;
@@ -446,6 +448,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var saveError = workspaceSaves.takeError();
     if (saveError != null) log("Workspace save failed: " + saveError);
     viewportWidth = frame.width;
+    toolbarDensity = EditorToolbarLayout.forWidth(toolbarDensity, frame.width);
     if (scene.advanceCadMeshRefinement()) {
       if (hostContext != null)
         hostContext.requestFrame();
@@ -548,8 +551,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function topBar():View {
-    var compact = viewportWidth < 1040.0;
-    var minimal = viewportWidth < 800.0;
+    var compact = toolbarDensity != Full;
+    var minimal = toolbarDensity == Minimal;
     var barStyle = fillStyle();
     barStyle.height = LayoutAxis.fixed(44.0);
     barStyle.direction = LayoutDirection.LeftToRight;
