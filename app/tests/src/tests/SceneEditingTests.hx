@@ -28,6 +28,9 @@ import robotkit.model.Frame;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
+import robotkit.model.RobotModel;
+import robotkit.model.CollisionApproximation;
+import robotkit.runtime.RobotRuntimeCompiler;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -544,8 +547,11 @@ class SceneEditingTests {
     check(session.sensors.selectRobot("materia/robot-b"),"sensor workflow adds a second robot target");
     new PropertyBinding(session.sensors.properties()[2],session.sensors.context()).apply(PropertyValue.Float(10.0));
     var arm=session.sensors.model.addLink(new Link("Arm","arm"));
+    arm.mass=2.5;arm.centerOfMass=[0.1,0.2,0.3];arm.inertiaTensor=[2.0,0.0,0.0,0.0,3.0,0.0,0.0,0.0,4.0];
+    arm.visualGeometry="geometry/arm-visual";arm.collisionGeometry="geometry/arm-collision";
     var joint=new Joint("Arm joint",JointType.Revolute,session.sensors.model.links[0],arm,"joint/arm");
     joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=3.0;
+    joint.parentFramePosition=[0.25,0.0,0.0];joint.childFramePosition=[0.0,0.1,0.0];joint.axis=[1.0,0.0,0.0];
     joint.drive=new Actuator("Arm drive",3.0,2.0);session.sensors.model.addJoint(joint);
     var armMount=session.sensors.model.addFrame(new Frame("Arm LiDAR mount",arm,"arm/lidar"));
     armMount.position=[0.4,0.0,0.0];session.sensors.model.sensors[0].frame=armMount;
@@ -565,6 +571,32 @@ class SceneEditingTests {
       session.sensors.robotPosition("materia/robot-b")[1]==3.0&&
       session.sensors.robotPosition("materia/robot")[1]==0.0,
       "joint topology, actuator settings, and robot pose survive reload");
+    check(session.sensors.model.links[1].mass==2.5&&
+      session.sensors.model.links[1].centerOfMass[2]==0.3&&
+      session.sensors.model.links[1].inertiaTensor[8]==4.0&&
+      session.sensors.model.links[1].visualGeometry=="geometry/arm-visual"&&
+      session.sensors.model.links[1].collisionGeometry=="geometry/arm-collision"&&
+      restoredJoint.parentFramePosition[0]==0.25&&restoredJoint.childFramePosition[1]==0.1&&
+      restoredJoint.axis[0]==1.0,
+      "RobotModel v2 physical properties, geometry references, joint frames, and axis survive reload");
+    var compiled=RobotRuntimeCompiler.compile(session.sensors.model);
+    check(compiled.links.length==2&&compiled.links[1].mass==2.5&&
+      compiled.joints[0].axis[0]==1.0&&compiled.identity.visualGeometry(1)=="geometry/arm-visual"&&
+      compiled.identity.collisionGeometry(1)=="geometry/arm-collision",
+      "runtime compiler lowers physical properties and retains geometry asset references");
+    var emptyLegacyFrames:Array<Dynamic> = [];
+    var emptyLegacySensors:Array<Dynamic> = [];
+    var legacyLinks:Array<Dynamic> = [{id:"base",name:"Base"},{id:"arm",name:"Arm"}];
+    var legacyJoints:Array<Dynamic> = [{id:"joint/arm",name:"Arm joint",type:"revolute",
+      parentId:"base",childId:"arm",limits:{lower:-1.0,upper:1.0,velocity:2.0,effort:3.0},drive:null}];
+    var legacyRecord:Dynamic={robotId:"legacy/robot",name:"Legacy robot",
+      links:legacyLinks,joints:legacyJoints,
+      frames:emptyLegacyFrames,sensors:emptyLegacySensors};
+    var migrated=new SensorConfiguration(legacyRecord);
+    check(migrated.model.schemaVersion==RobotModel.CURRENT_VERSION&&migrated.model.links[0].mass==1.0&&
+      migrated.model.links[0].inertiaTensor[0]==1.0&&migrated.model.joints[0].axis[2]==1.0&&
+      migrated.model.collisionApproximation==CollisionApproximation.BoundsBox,
+      "version 1 robot records migrate to version 2 physical defaults");
     session.sensors.selectRobot("materia/robot");
     var restoredFrame = session.sensors.model.sensors[0].frame;
     check(restoredFrame != null && session.sensors.model.sensors[0].updateRate == 20.0 &&

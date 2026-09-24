@@ -14,9 +14,17 @@ rk_robot_runtime_blueprint blueprint(uint64_t revision) {
     value.revision = revision;
     value.joint_count = 1;
     value.link_count = 2;
+    value.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    for (uint32_t i = 0; i < value.link_count; ++i) {
+        value.links[i].mass = 1.0;
+        value.links[i].inertia_tensor[0] = value.links[i].inertia_tensor[4] = value.links[i].inertia_tensor[8] = 1.0;
+    }
     value.joints[0] = {
         0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0,
     };
+    value.joints[0].parent_frame_rotation[3] = 1.0;
+    value.joints[0].child_frame_rotation[3] = 1.0;
+    value.joints[0].axis[2] = 1.0;
     assert(rk_robot_runtime_blueprint_validate(&value) == RK_OK);
     return value;
 }

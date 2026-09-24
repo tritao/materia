@@ -8,6 +8,11 @@ class Joint {
   public final child:Link;
   public var limits:JointLimits;
   public var drive:Null<Actuator>;
+  public var parentFramePosition:Array<Float> = [0.0, 0.0, 0.0];
+  public var parentFrameRotation:Array<Float> = [0.0, 0.0, 0.0, 1.0];
+  public var childFramePosition:Array<Float> = [0.0, 0.0, 0.0];
+  public var childFrameRotation:Array<Float> = [0.0, 0.0, 0.0, 1.0];
+  public var axis:Array<Float> = [0.0, 0.0, 1.0];
 
   public function new(name:String, type:JointType, parent:Link, child:Link, ?id:JointId) {
     // Legacy callers use the initial name once; imports pass the stored ID.
