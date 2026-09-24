@@ -9,6 +9,7 @@ class GeometryData {
 	final vertices:Array<nkscene_geometry_vertex> = [];
 	final subelements:Array<nkscene_subelement_range> = [];
 	final streams:Array<nkscene_vertex_stream> = [];
+	final strokeSegments:Array<nkscene_stroke_segment> = [];
 	final streamData:Array<Bytes> = [];
 	final indexValues:Array<Int> = [];
 	var indices:Bytes = Bytes.alloc(0);
@@ -80,6 +81,20 @@ class GeometryData {
 		return this;
 	}
 
+	/** Adds one object-space centerline segment for the analytic GPU stroke pass. */
+	public function addStrokeSegment(startX:Float, startY:Float, startZ:Float,
+			endX:Float, endY:Float, endZ:Float):GeometryData {
+		var segment = new nkscene_stroke_segment();
+		segment.set_start(0, startX);
+		segment.set_start(1, startY);
+		segment.set_start(2, startZ);
+		segment.set_end(0, endX);
+		segment.set_end(1, endY);
+		segment.set_end(2, endZ);
+		strokeSegments.push(segment);
+		return this;
+	}
+
 	public function vertexCount():Int
 		return vertices.length;
 
@@ -97,6 +112,8 @@ class GeometryData {
 			value.set_index_count(indexValues.length);
 		}
 		value.set_subelements(subelements);
+		value.set_stroke_segment_count(strokeSegments.length);
+		value.set_stroke_segments(strokeSegments);
 		if (streams.length != 0) {
 			value.set_streams(streams);
 			value.set_stream_count(streams.length);

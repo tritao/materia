@@ -146,6 +146,12 @@ typedef struct nkscene_vertex_stream {
     uint32_t count;
 } nkscene_vertex_stream;
 
+/** One object-space CAD edge segment attached to its face geometry. */
+typedef struct nkscene_stroke_segment {
+    float start[3];
+    float end[3];
+} nkscene_stroke_segment;
+
 typedef struct nkscene_subelement_range {
     uint32_t first_primitive;
     uint32_t primitive_count;
@@ -165,6 +171,8 @@ typedef struct nkscene_geometry_data {
     nkscene_primitive_type primitive_type;
     const nkscene_vertex_stream *streams NK_BORROWED_ARRAY(stream_count);
     uint32_t stream_count;
+    const nkscene_stroke_segment *stroke_segments NK_BORROWED_ARRAY(stroke_segment_count);
+    uint32_t stroke_segment_count;
 } nkscene_geometry_data;
 
 enum { NKS_MATERIAL_OPAQUE = 1u << 0, NKS_MATERIAL_DOUBLE_SIDED = 1u << 1 };

@@ -2639,6 +2639,55 @@ extern "C" CADKIT_API cad_result cad_edge_tangent_at(
     }
 }
 
+extern "C" CADKIT_API cad_result cad_edge_position_at(
+    cad_shape edge,
+    double parameter,
+    cad_vec3* out_position) {
+    clear_error();
+    if (out_position == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_position must not be null");
+    }
+    *out_position = {};
+    if (!std::isfinite(parameter) || parameter < 0.0 || parameter > 1.0) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "edge parameter must be finite and in [0, 1]");
+    }
+
+    TopoDS_Shape source;
+    const auto copy_result = copy_shape(edge, source);
+    if (copy_result != CAD_OK) {
+        return copy_result;
+    }
+    if (source.ShapeType() != TopAbs_EDGE) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "shape must be an edge");
+    }
+
+    try {
+        const BRepAdaptor_Curve curve(TopoDS::Edge(source));
+        const auto first = curve.FirstParameter();
+        const auto last = curve.LastParameter();
+        if (!std::isfinite(first) || !std::isfinite(last) || last < first) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "edge parameter range is invalid");
+        }
+        const auto value = first + (last - first) * parameter;
+        gp_Pnt point;
+        curve.D0(value, point);
+        if (!std::isfinite(point.X()) || !std::isfinite(point.Y()) ||
+            !std::isfinite(point.Z())) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "edge position is not finite");
+        }
+        *out_position = {point.X(), point.Y(), point.Z()};
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
 extern "C" CADKIT_API cad_result cad_vertex_position(
     cad_shape vertex,
     cad_vec3* out_position) {

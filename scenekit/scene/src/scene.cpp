@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <limits>
@@ -1961,13 +1962,18 @@ nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene, nkscene_g
         offsetof(nkscene_geometry_data, subelement_count) + sizeof(data->subelement_count);
     if (!data || data->struct_size < minimum_size)
         return NKS_ERROR_INVALID_ARGUMENT;
-    const auto has_stream_fields = data->struct_size >= sizeof(nkscene_geometry_data);
+    const auto has_stream_fields = data->struct_size >=
+        offsetof(nkscene_geometry_data, stream_count) + sizeof(data->stream_count);
+    const auto has_stroke_fields = data->struct_size >=
+        offsetof(nkscene_geometry_data, stroke_segment_count) + sizeof(data->stroke_segment_count);
     const auto stream_count = has_stream_fields ? data->stream_count : 0;
+    const auto stroke_segment_count = has_stroke_fields ? data->stroke_segment_count : 0;
     auto primitive = NKS_PRIMITIVE_TRIANGLES;
     if (has_stream_fields && data->primitive_type != 0)
         primitive = data->primitive_type;
     const auto width = nkscene::primitive_width(primitive);
     if (!width || (stream_count != 0 && !data->streams) ||
+        (stroke_segment_count != 0 && !data->stroke_segments) ||
         (stream_count == 0 && data->vertex_count != 0 && !data->vertices) ||
         (data->index_count != 0 && !data->indices) ||
         (data->subelement_count != 0 && !data->subelements))
@@ -2055,6 +2061,21 @@ nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene, nkscene_g
         if (static_cast<uint64_t>(range.first_primitive) + range.primitive_count > primitive_count)
             return NKS_ERROR_INVALID_ARGUMENT;
     }
+    std::vector<nkscene::GeometryPayload::StrokeSegment> stroke_segments;
+    stroke_segments.reserve(stroke_segment_count);
+    for (std::uint32_t index = 0; index < stroke_segment_count; ++index) {
+        const auto &segment = data->stroke_segments[index];
+        nkscene::GeometryPayload::StrokeSegment copied;
+        std::copy(std::begin(segment.start), std::end(segment.start), copied.start.begin());
+        std::copy(std::begin(segment.end), std::end(segment.end), copied.end.begin());
+        for (const auto coordinate : copied.start)
+            if (!std::isfinite(coordinate))
+                return NKS_ERROR_INVALID_ARGUMENT;
+        for (const auto coordinate : copied.end)
+            if (!std::isfinite(coordinate))
+                return NKS_ERROR_INVALID_ARGUMENT;
+        stroke_segments.push_back(copied);
+    }
 
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -2067,6 +2088,7 @@ nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene, nkscene_g
     auto &payload = resource.edit_payload();
     payload.vertices = std::move(vertices);
     payload.streams = std::move(streams);
+    payload.stroke_segments = std::move(stroke_segments);
     payload.primitive_type = static_cast<nkscene::PrimitiveType>(primitive);
     payload.indices.clear();
     if (data->index_count != 0)

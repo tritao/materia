@@ -463,6 +463,12 @@ CADKIT_API cad_result cad_edge_tangent_at(
     double parameter,
     cad_vec3* out_tangent CADKIT_HXI_OUT);
 
+/* Returns the position at normalized edge parameter t in [0, 1]. */
+CADKIT_API cad_result cad_edge_position_at(
+    cad_shape edge,
+    double parameter,
+    cad_vec3* out_position CADKIT_HXI_OUT);
+
 CADKIT_API cad_result cad_vertex_position(
     cad_shape vertex,
     cad_vec3* out_position CADKIT_HXI_OUT);

@@ -142,7 +142,7 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	struct nkscene_entity_id @layout(8, 8) {
 		value: u64 @offset(0);
 	}
-	struct nkscene_geometry_data @layout(96, 8) {
+	struct nkscene_geometry_data @layout(112, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		vertices: ptr<const<nkscene_geometry_vertex>> @offset(8) @borrowed @length_field("vertex_count");
 		vertex_count: u32 @offset(16);
@@ -157,6 +157,8 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 		primitive_type: nkscene_primitive_type @offset(76);
 		streams: ptr<const<nkscene_vertex_stream>> @offset(80) @borrowed @length_field("stream_count");
 		stream_count: u32 @offset(88);
+		stroke_segments: ptr<const<nkscene_stroke_segment>> @offset(96) @borrowed @length_field("stroke_segment_count");
+		stroke_segment_count: u32 @offset(104);
 	}
 	struct nkscene_geometry_id @layout(8, 8) {
 		value: u64 @offset(0);
@@ -254,6 +256,10 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 		first_primitive: u32 @offset(0);
 		primitive_count: u32 @offset(4);
 		subelement: u32 @offset(8);
+	}
+	struct nkscene_stroke_segment @layout(24, 4) {
+		start: array<f32, 3> @offset(0);
+		end: array<f32, 3> @offset(12);
 	}
 	struct nkscene_texture_data @layout(16, 8) {
 		struct_size: u32 @offset(0) @struct_size;

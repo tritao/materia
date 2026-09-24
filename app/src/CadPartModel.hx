@@ -43,7 +43,7 @@ class CadPartModel implements CadSessionModel {
     }
     var conversionStarted = Sys.time();
     try {
-      var result = CadSceneGeometry.fromMesh(mesh);
+      var result = CadSceneGeometry.fromMesh(mesh, source);
       lastGeometryConversionSeconds = Sys.time() - conversionStarted;
       return result;
     } catch (error:Dynamic) {

@@ -25,10 +25,24 @@ struct SceneVertex {
     std::array<float, 4> color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
+struct StrokeVertex {
+    std::array<float, 3> start{};
+    std::array<float, 3> end{};
+    std::array<float, 2> coordinate{};
+};
+
 constexpr std::uint32_t vertex_stride = sizeof(SceneVertex);
+constexpr std::uint32_t stroke_vertex_stride = sizeof(StrokeVertex);
 constexpr std::uint32_t instance_stride = sizeof(float) * 20;
+constexpr std::uint32_t default_viewport_width = 1024;
+constexpr std::uint32_t default_viewport_height = 768;
 
 static_assert(sizeof(SceneVertex) == sizeof(float) * 12);
+static_assert(sizeof(StrokeVertex) == sizeof(float) * 8);
+
+struct StrokeUniformData {
+    std::array<float, 4> viewport_width_height_half_width{};
+};
 
 struct InstanceData {
     std::array<float, 16> transform;
@@ -249,11 +263,13 @@ struct NativeKitGpuExecutor::State {
     struct GeometryGpu {
         nkgpu_buffer buffer{};
         nkgpu_buffer index_buffer{};
+        nkgpu_buffer stroke_buffer{};
         std::uint64_t revision = 0;
         std::uint32_t byte_size = 0;
         std::uint32_t index_byte_size = 0;
         std::uint32_t vertex_count = 0;
         std::uint32_t index_count = 0;
+        std::uint32_t stroke_vertex_count = 0;
         bool indexed = false;
     };
 
@@ -284,6 +300,8 @@ struct NativeKitGpuExecutor::State {
     nkgpu_shader shader{};
     nkgpu_pipeline pipeline{};
     nkgpu_pipeline indexed_pipeline{};
+    nkgpu_shader stroke_shader{};
+    nkgpu_pipeline stroke_pipeline{};
     nkgpu_shader pick_shader{};
     nkgpu_pipeline pick_pipeline{};
     nkgpu_pipeline pick_indexed_pipeline{};
@@ -302,6 +320,8 @@ struct NativeKitGpuExecutor::State {
     nkgpu_sampler default_sampler{};
     std::uint32_t capture_width = 0;
     std::uint32_t capture_height = 0;
+    std::uint32_t viewport_width = default_viewport_width;
+    std::uint32_t viewport_height = default_viewport_height;
     std::uint32_t postprocess_width = 0;
     std::uint32_t postprocess_height = 0;
     std::uint32_t pick_width = 0;
@@ -329,6 +349,8 @@ struct NativeKitGpuExecutor::State {
                 (void)nkgpu_buffer_destroy(renderer, resource.buffer);
             if (renderer.id && resource.index_buffer.id)
                 (void)nkgpu_buffer_destroy(renderer, resource.index_buffer);
+            if (renderer.id && resource.stroke_buffer.id)
+                (void)nkgpu_buffer_destroy(renderer, resource.stroke_buffer);
         }
         for (auto &[id, resource] : material_resources) {
             (void)id;
@@ -365,6 +387,10 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_pipeline_destroy(renderer, pipeline);
         if (renderer.id && indexed_pipeline.id)
             (void)nkgpu_pipeline_destroy(renderer, indexed_pipeline);
+        if (renderer.id && stroke_pipeline.id)
+            (void)nkgpu_pipeline_destroy(renderer, stroke_pipeline);
+        if (renderer.id && stroke_shader.id)
+            (void)nkgpu_shader_destroy(renderer, stroke_shader);
         if (renderer.id && shader.id)
             (void)nkgpu_shader_destroy(renderer, shader);
         if (renderer.id && pick_pipeline.id)
@@ -393,6 +419,8 @@ struct NativeKitGpuExecutor::State {
         plan_initialized = false;
         pipeline = {};
         indexed_pipeline = {};
+        stroke_pipeline = {};
+        stroke_shader = {};
         shader = {};
         pick_pipeline = {};
         pick_indexed_pipeline = {};
@@ -412,6 +440,8 @@ struct NativeKitGpuExecutor::State {
         default_sampler = {};
         capture_width = 0;
         capture_height = 0;
+        viewport_width = default_viewport_width;
+        viewport_height = default_viewport_height;
         postprocess_width = 0;
         postprocess_height = 0;
         pick_width = 0;
@@ -573,6 +603,153 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
         (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK ||
         (result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
         return set_failure(state, stats, result);
+    return true;
+}
+
+template <class StateT>
+bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats) {
+    if (state.stroke_pipeline.id)
+        return true;
+    const auto sources = render_internal::stroke_shader_sources(
+        nkgpu_query_backend(state.renderer));
+    if (!sources.vertex || !sources.fragment)
+        return set_failure(state, stats, NKGPU_ERROR_UNSUPPORTED);
+    nkgpu_shader_builder shader_builder{};
+    auto result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex,
+                                     sources.fragment, &shader_builder);
+    if (result != NKGPU_OK)
+        return set_failure(state, stats, result);
+    const auto attribute = [&](std::uint32_t location, const char *name) {
+        return nkgpu_shader_attribute(shader_builder, location, name, "TEXCOORD", location);
+    };
+    if ((result = nkgpu_shader_attribute(shader_builder, 0, "start_position", "POSITION", 0)) != NKGPU_OK ||
+        (result = nkgpu_shader_attribute(shader_builder, 1, "end_position", "TEXCOORD", 1)) != NKGPU_OK ||
+        (result = nkgpu_shader_attribute(shader_builder, 2, "stroke_coordinate", "TEXCOORD", 2)) != NKGPU_OK ||
+        (result = attribute(3, "transform0")) != NKGPU_OK ||
+        (result = attribute(4, "transform1")) != NKGPU_OK ||
+        (result = attribute(5, "transform2")) != NKGPU_OK ||
+        (result = attribute(6, "transform3")) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform_block(shader_builder, 1, NKGPU_SHADERSTAGE_VERTEX,
+                                             sizeof(float) * 16)) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_projection",
+                                       NKGPU_UNIFORMTYPE_MAT4, 1)) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_VERTEX,
+                                             sizeof(StrokeUniformData))) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform(shader_builder, 3, 0, "stroke_view",
+                                       NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                             sizeof(float) * 4)) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform(shader_builder, 0, 0, "stroke_color",
+                                       NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform_block(shader_builder, 2, NKGPU_SHADERSTAGE_FRAGMENT,
+                                             sizeof(ClipUniformData))) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform(shader_builder, 2, 0, "clip_planes",
+                                       NKGPU_UNIFORMTYPE_FLOAT4,
+                                       RenderPlan::max_clip_planes)) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform(shader_builder, 2, 1, "clip_plane_count",
+                                       NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+        (result = nkgpu_shader_end(shader_builder, &state.stroke_shader)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+
+    nkgpu_pipeline_builder pipeline_builder{};
+    if ((result = nkgpu_pipeline_begin(state.renderer, state.stroke_shader, stroke_vertex_stride,
+                                       &pipeline_builder)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    if ((result = nkgpu_pipeline_attribute(pipeline_builder, 0, 0, 0,
+                                           NKGPU_VERTEXFORMAT_FLOAT3)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_attribute(pipeline_builder, 1, 0, sizeof(float) * 3,
+                                           NKGPU_VERTEXFORMAT_FLOAT3)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_attribute(pipeline_builder, 2, 0, sizeof(float) * 6,
+                                           NKGPU_VERTEXFORMAT_FLOAT2)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_attribute(pipeline_builder, 3, 1, 0,
+                                           NKGPU_VERTEXFORMAT_FLOAT4)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_attribute(pipeline_builder, 4, 1, sizeof(float) * 4,
+                                           NKGPU_VERTEXFORMAT_FLOAT4)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_attribute(pipeline_builder, 5, 1, sizeof(float) * 8,
+                                           NKGPU_VERTEXFORMAT_FLOAT4)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_attribute(pipeline_builder, 6, 1, sizeof(float) * 12,
+                                           NKGPU_VERTEXFORMAT_FLOAT4)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 0, stroke_vertex_stride,
+                                               NKGPU_VERTEXSTEP_PER_VERTEX, 1)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 1, instance_stride,
+                                               NKGPU_VERTEXSTEP_PER_INSTANCE, 1)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_primitive_type(pipeline_builder,
+                                                NKGPU_PRIMITIVETYPE_TRIANGLES)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+
+    if ((result = nkgpu_pipeline_cull_mode(pipeline_builder, NKGPU_CULLMODE_NONE,
+                                           NKGPU_FACEWINDING_CCW)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+
+    nkgpu_depth_state depth{};
+    depth.enabled = 1;
+    depth.compare = NKGPU_COMPAREFUNC_LESS_EQUAL;
+    depth.write_enabled = 0;
+    depth.bias = -0.00002f;
+    nkgpu_blend_state blend{};
+    blend.enabled = 1;
+    blend.src_rgb = NKGPU_BLENDFACTOR_ONE;
+    blend.dst_rgb = NKGPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    blend.op_rgb = NKGPU_BLENDOP_ADD;
+    blend.src_alpha = NKGPU_BLENDFACTOR_ONE;
+    blend.dst_alpha = NKGPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    blend.op_alpha = NKGPU_BLENDOP_ADD;
+    if ((result = nkgpu_pipeline_depth(pipeline_builder, &depth)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_end(pipeline_builder, &state.stroke_pipeline)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    return true;
+}
+
+template <class StateT>
+bool draw_stroke_batches(StateT &state, const RenderPlan &plan, GpuExecutionStats &stats) {
+    const auto has_strokes = std::any_of(state.batches.begin(), state.batches.end(),
+        [&](const auto &batch) {
+            const auto found = state.geometry_resources.find(batch.key.geometry);
+            return found != state.geometry_resources.end() && found->second.stroke_buffer.id &&
+                   found->second.stroke_vertex_count != 0;
+        });
+    if (!has_strokes)
+        return true;
+    if (!ensure_stroke_pipeline(state, stats))
+        return false;
+    const auto width = std::max(state.viewport_width, 1u);
+    const auto height = std::max(state.viewport_height, 1u);
+    const StrokeUniformData viewport{{static_cast<float>(width), static_cast<float>(height),
+                                       0.85f, 0.0f}};
+    const std::array<float, 4> color{0.035f, 0.045f, 0.055f, 1.0f};
+    const auto clip_data = clip_uniform_data(plan);
+    for (const auto &batch : state.batches) {
+        const auto geometry = state.geometry_resources.find(batch.key.geometry);
+        if (geometry == state.geometry_resources.end() || !geometry->second.stroke_buffer.id ||
+            !geometry->second.stroke_vertex_count)
+            continue;
+        auto result = nkgpu_apply_pipeline(state.renderer, state.stroke_pipeline);
+        if (result == NKGPU_OK)
+            result = nkgpu_apply_uniform_data(state.renderer, 1,
+                reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
+                sizeof(float) * 16);
+        if (result == NKGPU_OK)
+            result = nkgpu_apply_uniform_data(state.renderer, 3,
+                reinterpret_cast<const std::uint8_t *>(&viewport), sizeof(viewport));
+        if (result == NKGPU_OK)
+            result = nkgpu_apply_uniform_data(state.renderer, 0,
+                reinterpret_cast<const std::uint8_t *>(color.data()), sizeof(color));
+        if (result == NKGPU_OK)
+            result = nkgpu_apply_uniform_data(state.renderer, 2,
+                reinterpret_cast<const std::uint8_t *>(&clip_data), sizeof(clip_data));
+        if (result == NKGPU_OK)
+            result = nkgpu_apply_vertex_buffer(state.renderer, 0,
+                                               geometry->second.stroke_buffer, 0);
+        if (result == NKGPU_OK)
+            result = nkgpu_apply_vertex_buffer(state.renderer, 1, batch.buffer, 0);
+        if (result == NKGPU_OK)
+            result = nkgpu_draw(state.renderer, 0, geometry->second.stroke_vertex_count,
+                                static_cast<std::uint32_t>(batch.instances.size()));
+        if (result != NKGPU_OK)
+            return set_failure(state, stats, result);
+        ++stats.draw_calls;
+    }
     return true;
 }
 
@@ -938,6 +1115,19 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
     auto &cached = found->second;
     const auto byte_size = packed_vertices.size() * sizeof(SceneVertex);
     const auto index_byte_size = index_count * sizeof(std::uint32_t);
+    if (resource.payload->stroke_segments.size() >
+        std::numeric_limits<std::uint32_t>::max() / (6 * sizeof(StrokeVertex)))
+        return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
+    std::vector<StrokeVertex> stroke_vertices;
+    stroke_vertices.reserve(resource.payload->stroke_segments.size() * 6);
+    constexpr std::array<std::array<float, 2>, 6> stroke_corners{{
+        {{0.0f, -1.0f}}, {{0.0f, 1.0f}}, {{1.0f, 1.0f}},
+        {{0.0f, -1.0f}}, {{1.0f, 1.0f}}, {{1.0f, -1.0f}}}};
+    for (const auto &segment : resource.payload->stroke_segments) {
+        for (const auto &corner : stroke_corners)
+            stroke_vertices.push_back({segment.start, segment.end, corner});
+    }
+    const auto stroke_byte_size = stroke_vertices.size() * sizeof(StrokeVertex);
     const bool revision_changed = inserted || cached.revision != resource.revision;
     if (!revision_changed)
         return true;
@@ -998,11 +1188,40 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
         if (result != NKGPU_OK)
             return set_failure(state, stats, result);
     }
+    if (cached.stroke_buffer.id) {
+        if (cached.stroke_vertex_count * sizeof(StrokeVertex) == stroke_byte_size &&
+            stroke_byte_size != 0) {
+            const auto result = nkgpu_buffer_update(
+                state.renderer, cached.stroke_buffer, 0,
+                reinterpret_cast<const std::uint8_t *>(stroke_vertices.data()),
+                static_cast<std::uint32_t>(stroke_byte_size));
+            if (result != NKGPU_OK)
+                return set_failure(state, stats, result);
+        } else {
+            (void)nkgpu_buffer_destroy(state.renderer, cached.stroke_buffer);
+            cached.stroke_buffer = {};
+            cached.stroke_vertex_count = 0;
+        }
+    }
+    if (stroke_byte_size != 0 && !cached.stroke_buffer.id) {
+        nkgpu_buffer_desc descriptor{};
+        descriptor.struct_size = sizeof(descriptor);
+        descriptor.size = static_cast<std::uint32_t>(stroke_byte_size);
+        descriptor.usage = NKGPU_BUFFER_VERTEX;
+        descriptor.data = reinterpret_cast<const std::uint8_t *>(stroke_vertices.data());
+        descriptor.data_size = descriptor.size;
+        descriptor.dynamic_update = 1;
+        const auto result = nkgpu_buffer_create_desc(state.renderer, &descriptor,
+                                                     &cached.stroke_buffer);
+        if (result != NKGPU_OK)
+            return set_failure(state, stats, result);
+    }
     cached.revision = resource.revision;
     cached.byte_size = static_cast<std::uint32_t>(byte_size);
     cached.index_byte_size = static_cast<std::uint32_t>(index_byte_size);
     cached.vertex_count = static_cast<std::uint32_t>(vertex_count);
     cached.index_count = static_cast<std::uint32_t>(index_count);
+    cached.stroke_vertex_count = static_cast<std::uint32_t>(stroke_vertices.size());
     cached.indexed = !resource.payload->indices.empty();
     if (inserted)
         ++stats.geometry_resources_created;
@@ -1374,6 +1593,8 @@ template <class StateT> void remove_geometry_resource(StateT &state, GeometryId 
         (void)nkgpu_buffer_destroy(state.renderer, found->second.buffer);
     if (state.renderer.id && found->second.index_buffer.id)
         (void)nkgpu_buffer_destroy(state.renderer, found->second.index_buffer);
+    if (state.renderer.id && found->second.stroke_buffer.id)
+        (void)nkgpu_buffer_destroy(state.renderer, found->second.stroke_buffer);
     state.geometry_resources.erase(found);
 }
 
@@ -1490,6 +1711,8 @@ bool prepare_resources(StateT &state, const RenderPlan &plan, const SceneSnapsho
             (void)nkgpu_buffer_destroy(state.renderer, found->second.buffer);
         if (state.renderer.id && found->second.index_buffer.id)
             (void)nkgpu_buffer_destroy(state.renderer, found->second.index_buffer);
+        if (state.renderer.id && found->second.stroke_buffer.id)
+            (void)nkgpu_buffer_destroy(state.renderer, found->second.stroke_buffer);
         found = state.geometry_resources.erase(found);
     }
     for (auto found = state.material_revisions.begin(); found != state.material_revisions.end();) {
@@ -1759,11 +1982,15 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
     }
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+        if (geometry == state_->geometry_resources.end())
             continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
-        if (element_count && !ensure_pipeline(*state_, stats, geometry->second.indexed))
+        if (geometry->second.buffer.id) {
+            const auto element_count = geometry->second.indexed ? geometry->second.index_count
+                                                                 : geometry->second.vertex_count;
+            if (element_count && !ensure_pipeline(*state_, stats, geometry->second.indexed))
+                return stats;
+        }
+        if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(*state_, stats))
             return stats;
     }
 
@@ -1832,6 +2059,10 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
         }
         ++stats.draw_calls;
     }
+    if (!draw_stroke_batches(*state_, plan, stats)) {
+        (void)nkgpu_end_frame(state_->renderer);
+        return stats;
+    }
     result = nkgpu_end_frame(state_->renderer);
     if (result != NKGPU_OK)
         set_failure(*state_, stats, result);
@@ -1863,6 +2094,9 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         }
     }
 
+    state_->viewport_width = width;
+    state_->viewport_height = height;
+
     GpuExecutionStats stats;
     if (!synchronize(plan, snapshot, stats))
         return state_->last_result;
@@ -1875,11 +2109,15 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         return state_->last_result;
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+        if (geometry == state_->geometry_resources.end())
             continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
-        if (element_count && !ensure_pipeline(*state_, stats, geometry->second.indexed))
+        if (geometry->second.buffer.id) {
+            const auto element_count = geometry->second.indexed ? geometry->second.index_count
+                                                                 : geometry->second.vertex_count;
+            if (element_count && !ensure_pipeline(*state_, stats, geometry->second.indexed))
+                return state_->last_result;
+        }
+        if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(*state_, stats))
             return state_->last_result;
     }
 
@@ -1971,6 +2209,8 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
                                  static_cast<std::uint32_t>(batch.instances.size()))) != NKGPU_OK)
             return fail_frame(result);
     }
+    if (!draw_stroke_batches(*state_, plan, stats))
+        return fail_frame(stats.result);
     if ((result = nkgpu_end_pass(state_->renderer)) != NKGPU_OK) {
         pass_active = false;
         (void)nkgpu_end_frame(state_->renderer);

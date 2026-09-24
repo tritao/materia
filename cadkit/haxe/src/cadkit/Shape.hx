@@ -126,6 +126,10 @@ class Shape {
 		return CadKit.edgeTangentAtChecked(native.borrow(), parameter);
 	}
 
+	public function positionAt(parameter:Float):CadKit.Vec3 {
+		return CadKit.edgePositionAtChecked(native.borrow(), parameter);
+	}
+
 	public function position():CadKit.Vec3 {
 		return CadKit.vertexPositionChecked(native.borrow());
 	}

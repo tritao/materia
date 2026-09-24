@@ -241,7 +241,7 @@ class CadPlateModel implements CadSessionModel {
     }
     var conversionStarted = Sys.time();
     try {
-      var result = CadSceneGeometry.fromMesh(mesh);
+      var result = CadSceneGeometry.fromMesh(mesh, source);
       lastGeometryConversionSeconds = Sys.time() - conversionStarted;
       centred.close();
       return result;

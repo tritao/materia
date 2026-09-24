@@ -1,6 +1,8 @@
 package app;
 
 import cadkit.Mesh;
+import cadkit.Shape;
+import CadKit;
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 
@@ -21,7 +23,7 @@ class CadSceneGeometry {
     catch (error:Dynamic) { plate.close(); throw error; }
   }
 
-  public static function fromMesh(mesh:Mesh):GeometryData {
+  public static function fromMesh(mesh:Mesh, ?source:Shape):GeometryData {
     var vertexBytes:Bytes = mesh.vertices;
     var normalBytes:Bytes = mesh.normals;
     var indexBytes:Bytes = mesh.indices;
@@ -58,7 +60,49 @@ class CadSceneGeometry {
     geometry.addStream(2, 2, normals, mesh.vertexCount, 12);
     for (range in mesh.faceRanges)
       geometry.addSubelement(Std.int(range.firstIndex / 3), Std.int(range.indexCount / 3), range.faceIndex);
+    if (source != null) {
+      appendBrepEdges(geometry, source);
+      var kernelBounds = source.bounds();
+      var minimum = kernelBounds.get_min();
+      var maximum = kernelBounds.get_max();
+      minX = Math.min(minX, minimum.get_x() * METRES_PER_MILLIMETRE);
+      minY = Math.min(minY, minimum.get_y() * METRES_PER_MILLIMETRE);
+      minZ = Math.min(minZ, minimum.get_z() * METRES_PER_MILLIMETRE);
+      maxX = Math.max(maxX, maximum.get_x() * METRES_PER_MILLIMETRE);
+      maxY = Math.max(maxY, maximum.get_y() * METRES_PER_MILLIMETRE);
+      maxZ = Math.max(maxZ, maximum.get_z() * METRES_PER_MILLIMETRE);
+    }
     geometry.setBounds(minX, minY, minZ, maxX, maxY, maxZ);
     return geometry;
+  }
+
+  static function appendBrepEdges(geometry:GeometryData, source:Shape):Void {
+    var edgeCount = source.subshapeCount(CadKit.ShapeKind.Edge);
+    for (edgeIndex in 0...edgeCount) {
+      var edge = source.subshape(CadKit.ShapeKind.Edge, edgeIndex);
+      try {
+        if (edge.edgeLength() > 1e-9) {
+          var curve = edge.curveKind();
+          var steps = curve == CadKit.CurveKind.Line ? 1 :
+            (curve == CadKit.CurveKind.Circle || curve == CadKit.CurveKind.Ellipse ? 48 : 64);
+          var prior = edge.positionAt(0.0);
+          for (step in 1...(steps + 1)) {
+            var next = edge.positionAt(step / steps);
+            geometry.addStrokeSegment(
+              prior.get_x() * METRES_PER_MILLIMETRE,
+              prior.get_y() * METRES_PER_MILLIMETRE,
+              prior.get_z() * METRES_PER_MILLIMETRE,
+              next.get_x() * METRES_PER_MILLIMETRE,
+              next.get_y() * METRES_PER_MILLIMETRE,
+              next.get_z() * METRES_PER_MILLIMETRE);
+            prior = next;
+          }
+        }
+      } catch (error:Dynamic) {
+        edge.close();
+        throw error;
+      }
+      edge.close();
+    }
   }
 }

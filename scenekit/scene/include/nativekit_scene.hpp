@@ -185,6 +185,11 @@ struct GeometryPayload {
     /** Positions are object-local and use a tightly packed float3 layout. */
     std::vector<GeometryVertex> vertices;
     std::vector<GeometryVertexStream> streams;
+    struct StrokeSegment {
+        std::array<float, 3> start{};
+        std::array<float, 3> end{};
+    };
+    std::vector<StrokeSegment> stroke_segments;
     /** Optional uint32 triangle indices. Empty means sequential triangles. */
     std::vector<std::uint32_t> indices;
     PrimitiveType primitive_type = PrimitiveType::Triangles;

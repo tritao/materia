@@ -56,6 +56,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_cylinder(radius: f64, height: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_edge_curve_kind(edge: cad_shape, out_kind: ptr<cad_curve_kind> @out) -> cad_result;
 	extern fn cad_edge_length(edge: cad_shape, out_length: ptr<f64> @out) -> cad_result;
+	extern fn cad_edge_position_at(edge: cad_shape, parameter: f64, out_position: ptr<cad_vec3> @out) -> cad_result;
 	extern fn cad_edge_tangent_at(edge: cad_shape, parameter: f64, out_tangent: ptr<cad_vec3> @out) -> cad_result;
 	extern fn cad_face_area(face: cad_shape, out_area: ptr<f64> @out) -> cad_result;
 	extern fn cad_face_center(face: cad_shape, out_center: ptr<cad_vec3> @out) -> cad_result;
