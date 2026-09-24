@@ -70,6 +70,8 @@ private class Ifc4Document {
 	}
 
 	public function encode(timestamp:Null<String>):String {
+		var fileDate = timestamp == null ? "1970-01-01T00:00:00" : timestamp;
+		var ownerHistoryTimestamp = timestampToUnix(fileDate);
 		var projects:Array<Element> = [];
 		for (element in document.allElements())
 			if (elementClass(element) == BimSchema.Project)
@@ -77,7 +79,7 @@ private class Ifc4Document {
 		if (projects.length != 1)
 			throw new BimError("IFC4 export requires exactly one BIM Project");
 
-		createOwnerHistory();
+		createOwnerHistory(ownerHistoryTimestamp);
 		createProjectUnitsAndContext();
 		createProject(projects[0]);
 		createTypes();
@@ -85,13 +87,10 @@ private class Ifc4Document {
 		createProducts();
 		createRelationships();
 		createPropertySets();
-		var fileDate = timestamp == null ? "1970-01-01T00:00:00" : timestamp;
-		if (!~/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.match(fileDate))
-			throw new BimError("IFC timestamp must use YYYY-MM-DDTHH:MM:SS");
 		return step.render(fileDate);
 	}
 
-	function createOwnerHistory():Void {
+	function createOwnerHistory(creationTimestamp:String):Void {
 		var organization = step.add("IFCORGANIZATION", [
 			"$", IfcStepWriter.string("CadKit"), IfcStepWriter.string("CadKit BIM export"), "$", "$"
 		]);
@@ -102,15 +101,66 @@ private class Ifc4Document {
 		]);
 		ownerHistory = step.add("IFCOWNERHISTORY", [
 			"#" + user, "#" + application, "$", ".ADDED.", "$", "$", "$",
-			Std.string(Std.int(Date.now().getTime() / 1000))
+			creationTimestamp
 		]);
 	}
 
+	static function timestampToUnix(value:String):String {
+		var pattern = ~/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/;
+		if (!pattern.match(value))
+			throw new BimError("IFC timestamp must use YYYY-MM-DDTHH:MM:SS");
+		var year = Std.parseInt(pattern.matched(1));
+		var month = Std.parseInt(pattern.matched(2));
+		var day = Std.parseInt(pattern.matched(3));
+		var hour = Std.parseInt(pattern.matched(4));
+		var minute = Std.parseInt(pattern.matched(5));
+		var second = Std.parseInt(pattern.matched(6));
+		if (year == null || month == null || day == null || hour == null || minute == null || second == null
+			|| year < 1 || month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)
+			|| hour > 23 || minute > 59 || second > 59)
+			throw new BimError("IFC timestamp contains an invalid calendar date or time");
+
+		// Convert the validated Gregorian date to Unix seconds without local-timezone
+		// APIs, so the STEP header and OwnerHistory remain reproducible on every host.
+		var adjustedYear:Float = year - (month <= 2 ? 1 : 0);
+		var era = Math.floor(adjustedYear / 400);
+		var yearOfEra = adjustedYear - era * 400;
+		var shiftedMonth = month + (month > 2 ? -3 : 9);
+		var dayOfYear = Math.floor((153 * shiftedMonth + 2) / 5) + day - 1;
+		var dayOfEra = yearOfEra * 365 + Math.floor(yearOfEra / 4) - Math.floor(yearOfEra / 100) + dayOfYear;
+		var daysSinceEpoch = era * 146097 + dayOfEra - 719468;
+		var secondsSinceEpoch = daysSinceEpoch * 86400 + hour * 3600 + minute * 60 + second;
+		return integerString(secondsSinceEpoch);
+	}
+
+	static function daysInMonth(year:Int, month:Int):Int {
+		return switch month {
+			case 4, 6, 9, 11: 30;
+			case 2: (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) ? 29 : 28;
+			default: 31;
+		};
+	}
+
+	static function integerString(value:Float):String {
+		if (!Math.isFinite(value) || value != Math.floor(value))
+			throw new BimError("IFC timestamp cannot be represented as whole seconds");
+		var negative = value < 0;
+		var remaining = Math.abs(value);
+		var result = "";
+		do {
+			var quotient = Math.floor(remaining / 10);
+			var digit = Std.int(remaining - quotient * 10);
+			result = Std.string(digit) + result;
+			remaining = quotient;
+		} while (remaining >= 1);
+		return negative ? "-" + result : result;
+	}
+
 	function createProjectUnitsAndContext():Void {
-		var length = step.add("IFCSIUNIT", ["$", ".LENGTHUNIT.", "$", ".METRE."]);
-		var area = step.add("IFCSIUNIT", ["$", ".AREAUNIT.", "$", ".SQUARE_METRE."]);
-		var volume = step.add("IFCSIUNIT", ["$", ".VOLUMEUNIT.", "$", ".CUBIC_METRE."]);
-		var angle = step.add("IFCSIUNIT", ["$", ".PLANEANGLEUNIT.", "$", ".RADIAN."]);
+		var length = step.add("IFCSIUNIT", ["*", ".LENGTHUNIT.", "$", ".METRE."]);
+		var area = step.add("IFCSIUNIT", ["*", ".AREAUNIT.", "$", ".SQUARE_METRE."]);
+		var volume = step.add("IFCSIUNIT", ["*", ".VOLUMEUNIT.", "$", ".CUBIC_METRE."]);
+		var angle = step.add("IFCSIUNIT", ["*", ".PLANEANGLEUNIT.", "$", ".RADIAN."]);
 		var units = step.add("IFCUNITASSIGNMENT", ["(#" + length + ",#" + area + ",#" + volume + ",#" + angle + ")"]);
 		var world = addAxisPlacement(Placement.identity().location.plane);
 		representationContext = step.add("IFCGEOMETRICREPRESENTATIONCONTEXT", [
@@ -282,6 +332,7 @@ private class Ifc4Document {
 			if (relationship.typeName == BimSchema.Hosts)
 				createOpeningRelations(relationship);
 
+		var instancesByDefinition = new Map<String, Array<Int>>();
 		for (element in document.allElements()) {
 			var instance:InstanceElement = Std.isOfType(element, InstanceElement) ? cast element : null;
 			if (instance == null || !productIds.exists(element.id.value))
@@ -293,9 +344,19 @@ private class Ifc4Document {
 			var typeEntity = typeIds.get(definition.id.value);
 			if (typeEntity == null)
 				throw new BimError("IFC type is missing for BIM instance: " + element.id.value);
+			var related = instancesByDefinition.get(definition.id.value);
+			if (related == null) {
+				related = [];
+				instancesByDefinition.set(definition.id.value, related);
+			}
+			related.push(cast productIds.get(element.id.value));
+		}
+		for (definitionId in sortedKeys(instancesByDefinition)) {
+			var related:Array<Int> = cast instancesByDefinition.get(definitionId);
+			related.sort(function(a, b) return a - b);
 			step.add("IFCRELDEFINESBYTYPE", [
-				IfcStepWriter.string(derivedGlobalId("relationship:type:" + element.id.value)), "#" + ownerHistory, "$", "$",
-				"(#" + productIds.get(element.id.value) + ")", "#" + typeEntity
+				IfcStepWriter.string(derivedGlobalId("relationship:type:" + definitionId)), "#" + ownerHistory, "$", "$",
+				idSet(related), "#" + typeIds.get(definitionId)
 			]);
 		}
 	}
@@ -492,7 +553,7 @@ private class Ifc4Document {
 			case QuantityKind.Length:
 				"IFCLENGTHMEASURE(" + real(toMeters(cast value, property.unit)) + ")";
 			case QuantityKind.Angle:
-				"IFCPLANEANGLEMEASURE(" + real(cast value) + ")";
+				"IFCPLANEANGLEMEASURE(" + real(UnitConversion.toCanonical(cast value, QuantityKind.Angle, property.unit)) + ")";
 			case QuantityKind.Area:
 				"IFCAREAMEASURE(" + real(toSquareMeters(cast value, property.unit)) + ")";
 			case QuantityKind.Volume:

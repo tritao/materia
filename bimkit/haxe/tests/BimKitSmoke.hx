@@ -210,11 +210,18 @@ class BimKitSmoke {
 			"ifc.identifier", {wrappedValue: "LOCAL-17"}, null, null,
 			{propertySet: "Pset_ProjectCommon", sourceType: "IfcIdentifier"}));
 		model.cad.element(fixture.groundWalls[0].id).setProperty(TypedProperty.boolean("bim.loadBearing", true));
+		model.cad.element(fixture.groundWalls[0].id).setProperty(TypedProperty.quantity("ifc.Pset_WallCommon.ReferenceAngle",
+			cadkit.parametric.QuantityKind.Angle, 90, "deg"));
 		fixture.windowType.setProperty(TypedProperty.text("ifc.Pset_WindowCommon.Family", "Timber"));
 		var ifc = model.exportIfc();
 		var ifcAgain = model.exportIfc();
+		var typeRelationshipCount = 0;
+		for (line in ifc.split("\n"))
+			if (line.indexOf("=IFCRELDEFINESBYTYPE(") >= 0)
+				typeRelationshipCount++;
 		check(ifc == ifcAgain
 			&& ifc.indexOf("FILE_SCHEMA(('IFC4'))") >= 0
+			&& ifc.indexOf("=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.)") >= 0
 			&& ifc.indexOf("=IFCPROJECT('0abcdefghijklmnopqrstu'") >= 0
 			&& ifc.indexOf("=IFCSITE(") >= 0 && ifc.indexOf("=IFCBUILDING(") >= 0
 			&& ifc.indexOf("=IFCBUILDINGSTOREY(") >= 0 && ifc.indexOf("=IFCSPACE(") >= 0
@@ -223,13 +230,25 @@ class BimKitSmoke {
 			&& ifc.indexOf("=IFCWINDOWTYPE(") >= 0 && ifc.indexOf("=IFCDOORTYPE(") >= 0
 			&& ifc.indexOf("=IFCRELAGGREGATES(") >= 0 && ifc.indexOf("=IFCRELCONTAINEDINSPATIALSTRUCTURE(") >= 0
 			&& ifc.indexOf("=IFCRELDEFINESBYTYPE(") >= 0
+			&& typeRelationshipCount == 2
 			&& ifc.indexOf("=IFCRELVOIDSELEMENT(") >= 0 && ifc.indexOf("=IFCRELFILLSELEMENT(") >= 0
 			&& ifc.indexOf("=IFCLOCALPLACEMENT(#") >= 0
 			&& ifc.indexOf("Pset_ProjectCommon") >= 0 && ifc.indexOf("Pset_WindowCommon") >= 0
 			&& ifc.indexOf("CadKitProperties") >= 0
 			&& ifc.indexOf("IFCIDENTIFIER('LOCAL-17')") >= 0 && ifc.indexOf("IFCBOOLEAN(.T.)") >= 0
+			&& new EReg("IFCPLANEANGLEMEASURE\\(1\\.570796", "").match(ifc)
 			&& model.cad.outputFeatureOrNull() == null,
-			"IFC4 export maps spatial structure, types, hosted openings, typed Psets, and stable GlobalIds without mutating the document");
+			"IFC4 export maps spatial structure, types, hosted openings, unit-aware typed Psets, and stable GlobalIds without mutating the document");
+		var datedIfc = model.exportIfc("2024-01-02T03:04:05");
+		var datedIfcAgain = model.exportIfc("2024-01-02T03:04:05");
+		check(datedIfc == datedIfcAgain && datedIfc.indexOf(".ADDED.,$,$,$,1704164645)") >= 0,
+			"IFC header and OwnerHistory timestamps are deterministic and use the same UTC instant");
+		var invalidTimestamp = false;
+		try
+			model.exportIfc("2024-02-30T03:04:05")
+		catch (error:Dynamic)
+			invalidTimestamp = true;
+		check(invalidTimestamp, "IFC export rejects impossible calendar dates");
 		var rootGuidPattern = new EReg("^#[0-9]+=(IFCPROJECT|IFCSITE|IFCBUILDING|IFCBUILDINGSTOREY|IFCSPACE|IFCWALL|IFCSLAB|IFCWINDOW|IFCDOOR|IFCWINDOWTYPE|IFCDOORTYPE|IFCOPENINGELEMENT|IFCPROPERTYSET|IFCREL[A-Z]+)\\('([^']+)'", "");
 		var globalIds = new Map<String, Bool>();
 		var globalIdCount = 0;
