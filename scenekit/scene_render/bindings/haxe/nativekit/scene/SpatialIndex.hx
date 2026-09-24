@@ -43,6 +43,17 @@ class SpatialIndex {
 		return result.out_updated != 0;
 	}
 
+	/** Refits all changed bounds, or advances a metadata-only snapshot with an empty array. */
+	public function updateNodes(snapshot:SceneSnapshot, nodes:Array<NodeId>):Bool {
+		ensureLive();
+		var values:Array<nkscene_node_id> = [];
+		for (node in nodes) values.push(node.nativeValue());
+		var result = NativeKitSceneRender.nkscene_render_spatial_index_update_nodes(
+			owner.borrow(), snapshot.nativeHandle(), values);
+		check(result.status, "spatialIndex.updateNodes");
+		return result.out_updated != 0;
+	}
+
 	/** Returns nodes whose snapshot bounds overlap the supplied box. */
 	public function queryBounds(minX:Float, minY:Float, minZ:Float,
 			maxX:Float, maxY:Float, maxZ:Float):Array<NodeId> {
@@ -78,6 +89,17 @@ class SpatialIndex {
 		var ray = makeRay(originX, originY, originZ, directionX, directionY, directionZ),
 			result = NativeKitSceneRender.nkscene_render_spatial_index_pick_ray(owner.borrow(), ray);
 		check(result.status, "spatialIndex.pickRay");
+		return new PickResult(result.out_result);
+	}
+
+	/** Picks the presented view using this retained scene index and its current pose overrides. */
+	public function pickRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
+			directionX:Float, directionY:Float, directionZ:Float):PickResult {
+		ensureLive();
+		var ray = makeRay(originX, originY, originZ, directionX, directionY, directionZ),
+			result = NativeKitSceneRender.nkscene_render_spatial_index_pick_ray_with_view(
+				owner.borrow(), view.nativeValue(), ray);
+		check(result.status, "spatialIndex.pickRayWithView");
 		return new PickResult(result.out_result);
 	}
 

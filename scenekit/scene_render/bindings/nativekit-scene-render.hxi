@@ -53,11 +53,14 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	 */
 	extern fn nkscene_render_spatial_index_create(snapshot: nkscene_snapshot, out_index: ptr<nkscene_render_spatial_index> @out @owned) -> nkscene_result;
 	extern fn nkscene_render_spatial_index_create_with_view(snapshot: nkscene_snapshot, view: ptr<const<nkscene_render_view>>, out_index: ptr<nkscene_render_spatial_index> @out @owned) -> nkscene_result;
-	extern fn nkscene_render_spatial_index_update_node(index: nkscene_render_spatial_index, snapshot: nkscene_snapshot, node: nkscene_node_id, out_updated: ptr<u32> @out) -> nkscene_result;
 	extern fn nkscene_render_spatial_index_destroy(index: nkscene_render_spatial_index) -> void;
 	extern fn nkscene_render_spatial_index_get_node(index: nkscene_render_spatial_index, result_index: u64, out_result: ptr<nkscene_render_spatial_node> @out) -> nkscene_result;
 	extern fn nkscene_render_spatial_index_get_revision(index: nkscene_render_spatial_index, out_revision: ptr<u64> @out) -> nkscene_result;
 	extern fn nkscene_render_spatial_index_pick_ray(index: nkscene_render_spatial_index, ray: ptr<const<nkscene_render_ray>>, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
+	/**
+	 * Picks against one view using the index's retained scene bounds and its pose overrides.
+	 */
+	extern fn nkscene_render_spatial_index_pick_ray_with_view(index: nkscene_render_spatial_index, view: ptr<const<nkscene_render_view>>, ray: ptr<const<nkscene_render_ray>>, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
 	/**
 	 * Performs nearest-hit picking for a batch of rays against one immutable snapshot.
 	 * `rays` and `out_results` must each reference `ray_count` elements.
@@ -65,6 +68,17 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	extern fn nkscene_render_spatial_index_pick_rays(index: nkscene_render_spatial_index, rays: ptr<const<nkscene_render_ray>> @in_array("ray_count"), ray_count: u64, out_results: ptr<nkscene_render_pick_result> @out_array("ray_count")) -> nkscene_result;
 	extern fn nkscene_render_spatial_index_query_bounds(index: nkscene_render_spatial_index, bounds: ptr<const<nkscene_bounds>>, out_count: ptr<u64> @out) -> nkscene_result;
 	extern fn nkscene_render_spatial_index_query_ray(index: nkscene_render_spatial_index, ray: ptr<const<nkscene_render_ray>>, out_count: ptr<u64> @out) -> nkscene_result;
+	/**
+	 * Refit an existing no-view index after one transform-only node update.
+	 * Returns NKS_OK with out_updated=0 when a full rebuild is required.
+	 */
+	extern fn nkscene_render_spatial_index_update_node(index: nkscene_render_spatial_index, snapshot: nkscene_snapshot, node: nkscene_node_id, out_updated: ptr<u32> @out) -> nkscene_result;
+	/**
+	 * Advances the index across a compatible snapshot and refits the supplied nodes.
+	 * The array must contain every node whose world bounds changed. Empty arrays advance
+	 * metadata-only revisions. Returns out_updated=0 when a rebuild is required.
+	 */
+	extern fn nkscene_render_spatial_index_update_nodes(index: nkscene_render_spatial_index, snapshot: nkscene_snapshot, nodes: ptr<const<nkscene_node_id>> @in_array("node_count"), node_count: u64, out_updated: ptr<u32> @out) -> nkscene_result;
 	struct nkscene_render_camera @layout(68, 4) {
 		enabled: u32 @offset(0);
 		view_projection: nkscene_transform @offset(4);
@@ -97,6 +111,9 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		world_position: array<f32, 3> @offset(20);
 		depth: f32 @offset(32);
 	}
+	/**
+	 * One runtime world-space pose override for a scene node.
+	 */
 	struct nkscene_render_pose_override @layout(72, 8) {
 		node: nkscene_node_id @offset(0);
 		world_transform: nkscene_transform @offset(8);
@@ -154,12 +171,12 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		source_material_override_count: u32 @offset(208);
 		isolated_nodes: ptr<const<nkscene_node_id>> @offset(216) @borrowed @length_field("isolated_node_count");
 		isolated_node_count: u32 @offset(224);
-		pose_overrides: ptr<const<nkscene_render_pose_override>> @offset(240) @borrowed @length_field("pose_override_count");
-		pose_override_count: u32 @offset(248);
 		/**
 		 * Optional scene camera node used when camera.enabled is zero.
 		 */
 		camera_node: nkscene_node_id @offset(232);
+		pose_overrides: ptr<const<nkscene_render_pose_override>> @offset(240) @borrowed @length_field("pose_override_count");
+		pose_override_count: u32 @offset(248);
 	}
 	struct nkscene_render_visibility_override @layout(16, 8) {
 		node: nkscene_node_id @offset(0);

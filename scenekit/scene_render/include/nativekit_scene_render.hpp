@@ -330,6 +330,8 @@ class NKSRENDER_API SceneSpatialIndex {
     std::uint64_t source_revision() const noexcept;
     /** Refit one existing node after a transform-only snapshot update. */
     bool update_node_bounds(const SceneSnapshot &snapshot, NodeId node) noexcept;
+    /** Advance a snapshot and refit every changed bound without rebuilding topology. */
+    bool update_node_bounds(const SceneSnapshot &snapshot, std::span<const NodeId> nodes) noexcept;
     std::span<const NodeId> query_bounds(const Bounds &) const;
     /** Returns snapshot nodes whose bounds intersect all supplied planes. */
     std::span<const NodeId> query_frustum(std::span<const std::array<float, 4>> planes) const;
@@ -337,6 +339,8 @@ class NKSRENDER_API SceneSpatialIndex {
     std::size_t query_result_count() const noexcept;
     NodeId query_result(std::size_t index) const noexcept;
     PickResult pick_ray(const Ray &) const;
+    /** Pick the effective presentation without constructing a second spatial index. */
+    PickResult pick_ray(const Ray &, const SceneView &) const;
     std::vector<PickResult> pick_rays(std::span<const Ray>) const;
 
   private:

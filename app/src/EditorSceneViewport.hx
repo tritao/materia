@@ -38,6 +38,7 @@ class EditorSceneViewport implements ViewportContent {
     if (!simulationActive) return scene.pick(point.x, point.y);
     var view = scene.configureRenderView(new nativekit.scene.SceneView(),
       nativekit.scene.Transform.identity(), simulationPoseList());
+    view.clearViewProjection();
     return scene.pickRayWithView(view, point.x, point.y, 1000001.0, 0.0, 0.0, -1.0);
   }
 
@@ -46,6 +47,7 @@ class EditorSceneViewport implements ViewportContent {
     if (simulationActive) {
       var view = scene.configureRenderView(new nativekit.scene.SceneView(),
         nativekit.scene.Transform.identity(), simulationPoseList());
+      view.clearViewProjection();
       return scene.selectRayWithView(view, point.x, point.y, 1000001.0, 0.0, 0.0, -1.0);
     }
     return scene.selectAtXY(point.x,point.y);

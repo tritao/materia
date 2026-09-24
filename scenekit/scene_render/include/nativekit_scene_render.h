@@ -221,6 +221,14 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_create_with_v
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_update_node(
     nkscene_render_spatial_index index, nkscene_snapshot snapshot, nkscene_node_id node,
     uint32_t *out_updated NK_OUT);
+/** Advances the index across a compatible snapshot and refits the supplied nodes.
+ * The array must contain every node whose world bounds changed. Empty arrays advance
+ * metadata-only revisions. Returns out_updated=0 when a rebuild is required.
+ */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_update_nodes(
+    nkscene_render_spatial_index index, nkscene_snapshot snapshot,
+    const nkscene_node_id *nodes NK_IN_ARRAY(node_count), uint64_t node_count,
+    uint32_t *out_updated NK_OUT);
 NKSRENDER_API void NKS_CALL
 nkscene_render_spatial_index_destroy(nkscene_render_spatial_index index);
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_get_revision(
@@ -235,6 +243,10 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_get_node(
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray(
     nkscene_render_spatial_index index, const nkscene_render_ray *ray,
     nkscene_render_pick_result *out_result NK_OUT);
+/** Picks against one view using the index's retained scene bounds and its pose overrides. */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray_with_view(
+    nkscene_render_spatial_index index, const nkscene_render_view *view,
+    const nkscene_render_ray *ray, nkscene_render_pick_result *out_result NK_OUT);
 /** Performs nearest-hit picking for a batch of rays against one immutable snapshot.
  * `rays` and `out_results` must each reference `ray_count` elements.
  */
