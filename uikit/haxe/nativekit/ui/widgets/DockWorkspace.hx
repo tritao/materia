@@ -260,14 +260,25 @@ private class DockDropTargetView implements View {
 		var node = child.build(context);
 		interaction.registerTarget(new DockDropTarget(targetPanelId, node));
 		var activePreview = interaction.preview;
-		if (activePreview != null && activePreview.targetPanelId == targetPanelId)
-			node.onPaint(function(canvas, geometry) {
+		if (activePreview != null && activePreview.targetPanelId == targetPanelId) {
+			var previewStyle = new LayoutStyle();
+			previewStyle.width = LayoutAxis.grow();
+			previewStyle.height = LayoutAxis.grow();
+			previewStyle.positioning = LayoutPositioning.Absolute;
+			previewStyle.zIndex = 2;
+			var previewNode = new RenderNode(context.id("drop-preview:" + targetPanelId),
+				LayoutVisualKind.Custom, previewStyle);
+			previewNode.setStyleIdentity("dock-drop-preview", targetPanelId);
+			previewNode.hitTestSelf = false;
+			previewNode.onPaint(function(canvas, geometry) {
 				var preview = interaction.preview;
 				if (preview == null || preview.targetPanelId != targetPanelId)
 					return;
 				canvas.fillRectIfPositive(previewRect(preview.zone, geometry.width, geometry.height),
 					Color.rgba(0.18, 0.52, 0.95, 0.22));
 			});
+			node.add(previewNode);
+		}
 		return node;
 	}
 

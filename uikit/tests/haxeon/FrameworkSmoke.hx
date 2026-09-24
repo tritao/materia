@@ -3927,7 +3927,19 @@ class FrameworkSmoke {
 		var centerY = tabsBounds.y + tabsBounds.height * 0.5;
 		if (!workspace.interaction.beginTabDrag("inspector", 11, centerX, centerY) ||
 			!workspace.interaction.moveTabDrag("inspector", 11, centerX, centerY) ||
-			workspace.interaction.preview == null ||
+			workspace.interaction.preview == null)
+			return false;
+		// The drag preview must submit while the pointer is held, including when
+		// the target panel's own root is a Text or Box render node.
+		workspaceRoot = uiContext.submit(workspace, new LayoutFrame(640.0, 480.0));
+		var sawDropPreview = false;
+		if (workspaceRoot != null)
+			workspaceRoot.walk(function(node) {
+				if (node.styleType == "dock-drop-preview" &&
+					node.layout.visualKind == LayoutVisualKind.Custom)
+					sawDropPreview = true;
+			});
+		if (!sawDropPreview ||
 			!workspace.interaction.endTabDrag("inspector", 11, centerX, centerY))
 			return false;
 		if (!model.restore(snapshot))
