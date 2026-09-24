@@ -614,6 +614,14 @@ class SceneEditingTests {
       "runtime visualization exposes robot poses and sensor mounts without editing the document");
     check(visual[1].links.length==2&&visual[1].sensors[0].linkId=="arm",
       "articulated visualization exposes the link owning each sensor mount");
+    var presentation=simulation.capturePresentationSnapshot();
+    var publishedRobot=presentation.world.robot("materia/robot");
+    if(publishedRobot==null)throw "Application presentation lost its RobotWorld publication";
+    check(presentation.revision>0&&presentation.robots.length==2&&presentation.environment.length>0&&
+      publishedRobot.sensors.length==firstRobot.sensors.length,
+      "one application presentation snapshot combines a physics revision with world publications");
+    check(publishedRobot.sensors.get(0).sourceTimestampNs==firstRobot.sensors.get(0).sourceTimestampNs,
+      "presentation keeps each sensor's actual source timestamp");
     var writer = new McapRobotRecording(recordingPath);
     for(robotId in observation.robotIds()) {
       var robot=observation.robot(robotId);

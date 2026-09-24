@@ -326,6 +326,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var dragPointerY:Float = 0.0;
   var sceneInspector:Null<PropertyInspector> = null;
   var inspectorSelectionRevision:Int = -1;
+  var framePresentation:Null<ApplicationPresentationSnapshot> = null;
   public var sensors(get, never):SensorConfiguration;
   function get_sensors():SensorConfiguration return session.sensors;
 
@@ -380,7 +381,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Build the shared view tree for one host frame. */
   public function view():View {
+    framePresentation = null;
     if (componentLab != null) return componentLab.view(ui);
+    framePresentation = simulation.capturePresentationSnapshot();
     var workspaceView = new DockWorkspace("reference-workspace", workspace);
     var layers:Array<StackChild> = [new StackChild(
       "workspace",
@@ -920,8 +923,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function viewportPanel():View {
-    viewportContent.setSimulationState(simulation.isActive(),simulation.environmentVisualState(),
-      simulation.visualRevision());
+    var frame = framePresentation;
+    viewportContent.setSimulationState(simulation.isActive(),frame == null ? [] : frame.environment,
+      frame == null ? 0 : frame.revision);
     if (sceneViewport != null) {
       sceneViewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0),
         Color.rgba(0.16, 0.24, 0.36, 0.75), viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
@@ -1002,7 +1006,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function paintSimulationOverlay(canvas:Canvas):Void {
-    for(robot in simulation.visualState()) {
+    var frame = framePresentation;
+    if (frame == null) return;
+    for(robot in frame.robots) {
       var base=simulationPoint(robot.position[0],robot.position[1]);
       canvas.fillRect(new Rect(base.x-5,base.y-5,10,10),Color.rgba(0.3,1.0,0.65,0.95));
       for(link in robot.links){var linkPoint=simulationPoint(link.position[0],link.position[1]);
@@ -1044,8 +1050,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function perspectivePanel():View {
     if (perspectiveViewport != null) {
       perspectiveViewport.setPlacementOptions(gridSnapEnabled, gridSpacing);
-      perspectiveViewport.setSimulationState(simulation.isActive(),simulation.environmentVisualState(),
-        simulation.visualRevision(),simulation.visualState());
+      var frame = framePresentation;
+      perspectiveViewport.setSimulationState(simulation.isActive(),frame == null ? [] : frame.environment,
+        frame == null ? 0 : frame.revision,frame == null ? [] : frame.robots);
     }
     return perspectiveViewport == null
       ? new Text("Perspective rendering requires the desktop GPU host.")
@@ -1180,6 +1187,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var plotStyle = fillStyle();
     plotStyle.height = LayoutAxis.grow();
     var plot = new PlotView("frame-telemetry", telemetry, plotStyle, "Frame telemetry");
+    var frame = framePresentation;
+    var physicsStatus = frame == null ? "Physics snapshot unavailable" :
+      "Physics step " + frame.revision + " · time " + Std.string(frame.simulationTime) + " s";
     return new Column(
       "telemetry-panel",
       [
@@ -1191,7 +1201,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new KeyedView(
           "caption",
           new Text("Frame time · GPU submission · layout cost")
-        )
+        ),
+        new KeyedView("physics-revision", new Text(physicsStatus))
       ],
       style
     );
