@@ -211,6 +211,7 @@ class DocumentCodec {
 			format: FORMAT,
 			version: VERSION,
 			documentId: document.id.value,
+			implicitOutput: document.implicitOutputEnabled,
 			features: encodedFeatures,
 			parameters: encodedParameters,
 			definitions: encodedDefinitions,
@@ -229,11 +230,12 @@ class DocumentCodec {
 			var version = intField(root, "version");
 			if (version < 1 || version > VERSION)
 				throw new ParametricError("unsupported document version");
+			var implicitOutput = version >= 5 ? optionalBool(root, "implicitOutput", true) : true;
 
 			var records:Array<Dynamic> = cast requiredField(root, "features");
 			var sourceDocumentId = optionalString(root, "documentId");
-			var targetDocument:Document = version == 1 || clone ? new Document()
-				: new Document(new DocumentId(stringField(root, "documentId")));
+			var targetDocument:Document = version == 1 || clone ? new Document(null, implicitOutput)
+				: new Document(new DocumentId(stringField(root, "documentId")), implicitOutput);
 			document = targetDocument;
 			var decodeElementReferenceInDocument = function(value:Dynamic) {
 				var reference = decodeElementReference(value);

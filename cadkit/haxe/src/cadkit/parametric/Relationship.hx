@@ -5,8 +5,8 @@ class Relationship {
 	public final document:Document;
 	public final id:RelationshipId;
 	public final typeName:String;
-	public final source:ElementReference;
-	public final target:ElementReference;
+	public var source(default, null):ElementReference;
+	public var target(default, null):ElementReference;
 
 	private final propertyValues:Map<String, TypedProperty>;
 
@@ -28,6 +28,12 @@ class Relationship {
 
 	public function targetElement():Element
 		return document.resolveElement(target);
+
+	/** Internal document history path. */
+	public function restoreEndpoints(source:ElementReference, target:ElementReference):Void {
+		this.source = source;
+		this.target = target;
+	}
 
 	public function property(name:String):Null<TypedProperty>
 		return propertyValues.get(name);

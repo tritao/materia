@@ -4,9 +4,12 @@ import bimkit.BimError;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.Placement;
+import cadkit.parametric.Document;
+import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.Feature;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
+import cadkit.parametric.features.BoxFeature;
 import haxe.Json;
 
 private class FailingBimFeature extends Feature {
@@ -35,18 +38,29 @@ class BimKitSmoke {
 		return parent.elementId.value;
 	}
 
+	static function encodePlacement(value:Placement):Dynamic {
+		var plane = value.location.plane;
+		return {
+			origin: {x: plane.origin.x, y: plane.origin.y, z: plane.origin.z},
+			xDirection: {x: plane.xDirection.x, y: plane.xDirection.y, z: plane.xDirection.z},
+			normal: {x: plane.normal.x, y: plane.normal.y, z: plane.normal.z}
+		};
+	}
+
 	public static function run():Void {
 		var creation = new BimDocument();
 		var created = creation.createWall("Temporary wall", 2000, 200, 2500);
 		check(creation.undo() && creation.allWallRoles().length == 0 && creation.cad.findElement(created.id) == null,
 			"wall creation undo removes its role, element, and active feature");
 		check(creation.redo()
-			&& creation.wallRole(created.id).elementId.value == created.id.value, "wall creation redo restores the same identity");
+			&& creation.wallRole(created.id).elementId.value == created.id.value
+			&& creation.cad.outputFeatureOrNull() == null, "wall creation redo restores the same identity without selecting document output");
 		creation.close();
 
 		var model = new BimDocument();
 		var firstWall = model.createWall("Wall A", 6000, 200, 3000);
 		var secondWall = model.createWall("Wall B", 5000, 250, 3000);
+		check(model.cad.outputFeatureOrNull() == null, "BIM elements publish their own geometry without a document output");
 		secondWall.setPlacement(new Placement(new Plane(new Vector(8000, 0, 0), Vector.X(), Vector.Z())));
 		var definition = model.createWindowDefinition("Window", 1200, 1500, 80, 200);
 		var first = model.cad.createInstance("Window A", definition);
@@ -87,7 +101,7 @@ class BimKitSmoke {
 		}
 		check(failed && firstWall.shape().volume() == committed && model.relationship(second.id).along == 3000,
 			"overlap diagnostics identify the opening and preserve committed state");
-		var outputBeforeFailure = model.cad.outputFeature();
+		var outputBeforeFailure = model.cad.outputFeatureOrNull();
 		var featuresBeforeFailure = model.cad.featureCount();
 		var validator = model.cad.beforeRecompute;
 		var validationCalls = 0;
@@ -109,14 +123,55 @@ class BimKitSmoke {
 		model.cad.recompute();
 		check(failed
 			&& model.relationship(first.id).wallId.value == firstWall.id.value
-			&& model.cad.outputFeature() == outputBeforeFailure
-			&& model.cad.outputFeature().active
+			&& model.cad.outputFeatureOrNull() == outputBeforeFailure
 			&& model.cad.featureCount() == featuresBeforeFailure
 			&& firstWall.shape().volume() == committed,
 			"failed graph update restores relationships, selected output, and recompute viability");
 		var failedReload = BimCodec.decode(BimCodec.encode(model));
 		check(failedReload.relationship(first.id).wallId.value == firstWall.id.value, "a failed graph update leaves a reloadable document");
 		failedReload.close();
+
+		var legacyGraph:Dynamic = Json.parse(DocumentCodec.encode(model.cad));
+		Reflect.setField(legacyGraph, "version", 3);
+		Reflect.setField(legacyGraph, "implicitOutput", null);
+		Reflect.setField(legacyGraph, "relationships", null);
+		var legacyElements:Array<Dynamic> = cast Reflect.field(legacyGraph, "elements");
+		for (record in legacyElements)
+			Reflect.setField(record, "properties", null);
+		var legacyDefinitions:Array<Dynamic> = cast Reflect.field(legacyGraph, "definitions");
+		for (record in legacyDefinitions)
+			Reflect.setField(record, "properties", null);
+		var legacyWalls:Array<Dynamic> = [];
+		for (role in model.allWallRoles())
+			legacyWalls.push({element: role.elementId.value, uncutOutput: role.uncutOutput.id.toInt()});
+		var legacyRelationships:Array<Dynamic> = [];
+		for (value in model.allRelationships())
+			legacyRelationships.push({
+				opening: value.openingId.value,
+				wall: value.wallId.value,
+				along: value.along,
+				sill: value.sill,
+				output: value.outputName,
+				unhostPlacement: encodePlacement(value.unhostPlacement),
+				unhostParent: value.unhostParent == null ? null : {
+					document: value.unhostParent.documentId.value,
+					element: value.unhostParent.elementId.value
+				},
+				unhostDepth: value.unhostDepth
+			});
+		var legacyText = Json.stringify({
+			format: BimCodec.LEGACY_FORMAT,
+			version: BimCodec.LEGACY_VERSION,
+			cadkit: Json.stringify(legacyGraph),
+			walls: legacyWalls,
+			relationships: legacyRelationships
+		});
+		var migratedLegacy = BimCodec.decode(legacyText);
+		check(migratedLegacy.cad.implicitOutputEnabled == false
+			&& migratedLegacy.wallRole(firstWall.id).uncutOutput.id.toInt() == model.wallRole(firstWall.id).uncutOutput.id.toInt()
+			&& migratedLegacy.relationship(first.id).wallId.value == firstWall.id.value,
+			"legacy BimKit v2 data migrates into typed document properties and relationships");
+		migratedLegacy.close();
 
 		model.rehostOpening(first.id, secondWall.id, 500, 700);
 		near(firstWall.shape().volume(), 6000.0 * 200 * 3000 - 1200.0 * 200 * 1500, "rehosting rebuilds the old wall cut graph");
@@ -162,15 +217,14 @@ class BimKitSmoke {
 		}
 		check(restored.relationship(first.id).wallId.value == secondWall.id.value, "hosting relationships survive reload");
 		check(restored.openingsForWall(secondWall.id).length == 1, "wall opening index survives reload by derivation");
+		check(restored.cad.outputFeatureOrNull() == null, "single-document BIM persistence keeps the output unset");
 		var altered:Dynamic = Json.parse(BimCodec.encode(model));
-		var alteredCad:Dynamic = Json.parse(Reflect.field(altered, "cadkit"));
-		var alteredElements:Array<Dynamic> = cast Reflect.field(alteredCad, "elements");
+		var alteredElements:Array<Dynamic> = cast Reflect.field(altered, "elements");
 		for (record in alteredElements)
 			if (Reflect.field(record, "id") == first.id.value) {
 				var placement:Dynamic = Reflect.field(record, "placement");
 				Reflect.setField(Reflect.field(placement, "origin"), "x", 1000000000);
 			}
-		Reflect.setField(altered, "cadkit", Json.stringify(alteredCad));
 		var repaired = BimCodec.decode(Json.stringify(altered));
 		near(repaired.cad.element(first.id).localPlacement.location.plane.origin.x, 500, "host coordinates derive placement again during reload");
 		repaired.close();
@@ -190,14 +244,14 @@ class BimKitSmoke {
 		check(afterDeletion.allWallRoles().length == 1, "empty wall removal updates the BIM registry");
 		check(afterDeletion.undo() && afterDeletion.allWallRoles().length == 2, "wall removal undo preserves its identity and role");
 		var duplicateRoot:Dynamic = Json.parse(BimCodec.encode(afterDeletion));
-		var wallRecords:Array<Dynamic> = cast Reflect.field(duplicateRoot, "walls");
-		wallRecords.push(wallRecords[0]);
+		var relationshipRecords:Array<Dynamic> = cast Reflect.field(duplicateRoot, "relationships");
+		relationshipRecords.push(Json.parse(Json.stringify(relationshipRecords[0])));
 		failed = false;
 		try
 			BimCodec.decode(Json.stringify(duplicateRoot))
 		catch (error:Dynamic)
 			failed = true;
-		check(failed, "duplicate BIM wall roles are rejected during reload");
+		check(failed, "duplicate persistent relationship identities are rejected during reload");
 		afterDeletion.close();
 		restored.close();
 		model.close();

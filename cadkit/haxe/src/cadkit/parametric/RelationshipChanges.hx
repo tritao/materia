@@ -32,6 +32,28 @@ class RelationshipRemoveChange implements DocumentChange {
 	public function redo():Void document.restoreRelationshipRemoval(relationship);
 }
 
+class RelationshipEndpointsChange implements DocumentChange {
+	final document:Document;
+	final relationship:Relationship;
+	final beforeSource:ElementReference;
+	final beforeTarget:ElementReference;
+	final afterSource:ElementReference;
+	final afterTarget:ElementReference;
+
+	public function new(document:Document, relationship:Relationship, beforeSource:ElementReference, beforeTarget:ElementReference,
+		afterSource:ElementReference, afterTarget:ElementReference) {
+		this.document = document;
+		this.relationship = relationship;
+		this.beforeSource = beforeSource;
+		this.beforeTarget = beforeTarget;
+		this.afterSource = afterSource;
+		this.afterTarget = afterTarget;
+	}
+
+	public function undo():Void document.restoreRelationshipEndpoints(relationship, beforeSource, beforeTarget);
+	public function redo():Void document.restoreRelationshipEndpoints(relationship, afterSource, afterTarget);
+}
+
 class RelationshipPropertyChange implements DocumentChange {
 	final document:Document;
 	final relationship:Relationship;

@@ -51,6 +51,7 @@ import cadkit.parametric.Relationship;
 import cadkit.parametric.RelationshipId;
 import cadkit.parametric.RelationshipChanges.RelationshipCreateChange;
 import cadkit.parametric.RelationshipChanges.RelationshipRemoveChange;
+import cadkit.parametric.RelationshipChanges.RelationshipEndpointsChange;
 import cadkit.parametric.RelationshipChanges.RelationshipPropertyChange;
 
 /** Haxeon-owned parametric feature document. */
@@ -74,6 +75,7 @@ class Document {
 	private var issuedRelationshipIds:Map<String, Bool>;
 
 	public var definitionEvaluationCount(default, null):Int;
+	public var implicitOutputEnabled(default, null):Bool;
 	public var recomputeAttemptCount(default, null):Int;
 	public var lastRecomputeSeconds(default, null):Float;
 	public var lastRecomputeFeatureCount(default, null):Int;
@@ -105,8 +107,9 @@ class Document {
 	/** Checked between feature evaluations and by cooperative sketch solving. */
 	public var evaluationCancellationCheck:Null<Void->Bool>;
 
-	public function new(?id:DocumentId) {
+	public function new(?id:DocumentId, implicitOutputEnabled:Bool = true) {
 		this.id = id == null ? new DocumentId() : id;
+		this.implicitOutputEnabled = implicitOutputEnabled;
 		token = nextToken;
 		nextToken++;
 		nextId = 1;
@@ -581,6 +584,28 @@ class Document {
 		relationships.remove(relationship);
 		relationshipsById.remove(relationship.id.value);
 	}
+
+	public function setRelationshipEndpoints(relationship:Relationship, source:ElementReference, target:ElementReference):Void {
+		validateOwnedRelationship(relationship);
+		validateRelationshipEndpoint(source);
+		validateRelationshipEndpoint(target);
+		var beforeSource = relationship.source;
+		var beforeTarget = relationship.target;
+		if (sameElementReference(beforeSource, source) && sameElementReference(beforeTarget, target))
+			return;
+		relationship.restoreEndpoints(source, target);
+		recordDocumentChange(new RelationshipEndpointsChange(this, relationship, beforeSource, beforeTarget, source, target));
+	}
+
+	public function restoreRelationshipEndpoints(relationship:Relationship, source:ElementReference, target:ElementReference):Void {
+		validateOwnedRelationship(relationship);
+		validateRelationshipEndpoint(source);
+		validateRelationshipEndpoint(target);
+		relationship.restoreEndpoints(source, target);
+	}
+
+	private function sameElementReference(first:ElementReference, second:ElementReference):Bool
+		return first != null && second != null && first.documentId.value == second.documentId.value && first.elementId.value == second.elementId.value;
 
 	private function validateOwnedRelationship(relationship:Relationship):Void {
 		if (relationship == null || relationship.document != this || relationshipsById.get(relationship.id.value) != relationship)
@@ -1181,6 +1206,14 @@ class Document {
 		selectedOutput = feature;
 	}
 
+	/** Control whether the last active feature is the implicit document result. */
+	public function setImplicitOutputEnabled(value:Bool):Void {
+		ensureOpen();
+		implicitOutputEnabled = value;
+		if (!value)
+			selectedOutput = null;
+	}
+
 	public function setOutputTracked(feature:Null<Feature>):Void {
 		if (activeTransaction == null)
 			throw new ParametricError("tracked output selection requires an active document transaction");
@@ -1201,6 +1234,8 @@ class Document {
 		ensureOpen();
 		if (selectedOutput != null && selectedOutput.active)
 			return selectedOutput;
+		if (!implicitOutputEnabled)
+			return null;
 		for (index in 0...features.length) {
 			var feature = features[features.length - index - 1];
 			if (feature.active)
