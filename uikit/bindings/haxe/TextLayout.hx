@@ -6,12 +6,10 @@ class TextLayout extends NativeKitUIResource {
 	public var width(default, null):Float;
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
-	var rangeGeometryCache:Array<TextRangeGeometryCache>;
 
 	private function new(value:nkui_resource, text:String, width:Float, textStyle:TextStyle,
 			paragraphStyle:ParagraphStyle) {
 		super(value);
-		rangeGeometryCache = [];
 		this.text = text;
 		this.width = width;
 		this.textStyle = textStyle;
@@ -41,7 +39,6 @@ class TextLayout extends NativeKitUIResource {
 		var actualText = value == null ? "" : value;
 		UiResult.check(NativeKitUI.nkui_text_layout_set_text(nativeHandle(), actualText), "textLayout.setText");
 		text = actualText;
-		rangeGeometryCache = [];
 	}
 
 	/** Sets the color used when this retained layout is drawn. */
@@ -71,7 +68,6 @@ class TextLayout extends NativeKitUIResource {
 		paragraphStyle.alignment = ownedParagraphStyle.alignment;
 		paragraphStyle.lineHeight = ownedParagraphStyle.lineHeight;
 		paragraphStyle.direction = ownedParagraphStyle.direction;
-		rangeGeometryCache = [];
 	}
 
 	static function copyTextStyle(style:TextStyle):TextStyle
@@ -184,10 +180,6 @@ class TextLayout extends NativeKitUIResource {
 			return [];
 		var firstAffinity = forward ? start.affinity : end.affinity;
 		var lastAffinity = forward ? end.affinity : start.affinity;
-		for (entry in rangeGeometryCache)
-			if (entry.start == first && entry.end == last &&
-				entry.startAffinity == firstAffinity && entry.endAffinity == lastAffinity)
-				return entry.rectangles.copy();
 		var result:Array<TextRangeRect> = [];
 		var cursor = first;
 		while (cursor < last) {
@@ -212,10 +204,6 @@ class TextLayout extends NativeKitUIResource {
 					startCaret.direction != TextDirection.Rtl));
 			cursor = next;
 		}
-		rangeGeometryCache.push(new TextRangeGeometryCache(first, last, firstAffinity, lastAffinity,
-			result.copy()));
-		if (rangeGeometryCache.length > 2)
-			rangeGeometryCache.shift();
 		return result;
 	}
 
@@ -358,24 +346,6 @@ class TextRangeRect {
 		this.width = width;
 		this.height = height;
 		this.visualLeftIsStart = visualLeftIsStart;
-	}
-}
-
-/** Small per-layout cache for the editor's active selection and composition geometry. */
-class TextRangeGeometryCache {
-	public final start:Int;
-	public final end:Int;
-	public final startAffinity:Int;
-	public final endAffinity:Int;
-	public final rectangles:Array<TextRangeRect>;
-
-	public function new(start:Int, end:Int, startAffinity:Int, endAffinity:Int,
-			rectangles:Array<TextRangeRect>) {
-		this.start = start;
-		this.end = end;
-		this.startAffinity = startAffinity;
-		this.endAffinity = endAffinity;
-		this.rectangles = rectangles;
 	}
 }
 

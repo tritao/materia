@@ -22,6 +22,7 @@ class TextEditorLayout {
 
 	final fonts:FontCollection;
 	var paragraphs:Array<TextEditorParagraphRecord>;
+	var rangeGeometryCache:Array<TextEditorRangeGeometryCache>;
 	var offsets:TextDocument;
 	var paragraphLineCount:Int;
 	var contentWidth:Float;
@@ -40,6 +41,7 @@ class TextEditorLayout {
 		this.textStyle = copyTextStyle(textStyle);
 		this.paragraphStyle = copyParagraphStyle(paragraphStyle);
 		paragraphs = [];
+		rangeGeometryCache = [];
 		offsets = null;
 		paragraphLineCount = 0;
 		contentWidth = 0.0;
@@ -162,6 +164,7 @@ class TextEditorLayout {
 		width = nextWidth;
 		offsets = nextOffsets;
 		paragraphLineCount = nextOffsets.paragraphCount();
+		clearRangeGeometryCache();
 		paragraphs = next;
 		recomputeMetrics();
 	}
@@ -262,6 +265,7 @@ class TextEditorLayout {
 
 		offsets = nextOffsets;
 		paragraphLineCount = nextOffsets.paragraphCount();
+		clearRangeGeometryCache();
 		paragraphs = next;
 		recomputeMetrics();
 	}
@@ -338,6 +342,7 @@ class TextEditorLayout {
 		}
 		offsets = nextOffsets;
 		paragraphLineCount = nextOffsets.paragraphCount();
+		clearRangeGeometryCache();
 		paragraphs = result;
 		recomputeMetrics();
 	}
@@ -472,8 +477,15 @@ class TextEditorLayout {
 		var lastPosition = forward ? end : start;
 		var first = clamp(firstPosition.offset, 0, offsets.codepointCount);
 		var last = clamp(lastPosition.offset, 0, offsets.codepointCount);
+		var firstAffinity = firstPosition.affinity;
+		var lastAffinity = lastPosition.affinity;
 		if (first == last)
 			return [];
+		for (entry in rangeGeometryCache)
+			if (entry.start == first && entry.end == last &&
+				entry.startAffinity == firstAffinity && entry.endAffinity == lastAffinity &&
+				entry.minY == minY && entry.maxY == maxY)
+				return entry.rectangles.copy();
 		var result:Array<TextRangeRect> = [];
 		var low = 0;
 		var high = paragraphs.length;
@@ -524,12 +536,16 @@ class TextEditorLayout {
 				continue;
 			for (rect in record.layout.selectionRangeRects(
 				new TextPosition(localStart - record.start,
-					localStart == first ? firstPosition.affinity : 0),
+					localStart == first ? firstAffinity : 0),
 				new TextPosition(localEnd - record.start,
-					localEnd == last ? lastPosition.affinity : 0)))
+					localEnd == last ? lastAffinity : 0)))
 				result.push(new TextRangeRect(rect.start + record.start, rect.end + record.start,
 					rect.x, rect.y + record.y, rect.width, rect.height, rect.visualLeftIsStart));
 		}
+		rangeGeometryCache.push(new TextEditorRangeGeometryCache(first, last, firstAffinity,
+			lastAffinity, minY, maxY, result.copy()));
+		if (rangeGeometryCache.length > 2)
+			rangeGeometryCache.shift();
 		return result;
 	}
 
@@ -630,6 +646,7 @@ class TextEditorLayout {
 			return;
 		for (record in paragraphs)
 			record.layout.dispose();
+		clearRangeGeometryCache();
 		paragraphs = [];
 		disposed = true;
 	}
@@ -697,6 +714,9 @@ class TextEditorLayout {
 			throw "Editor layout has been disposed";
 	}
 
+	function clearRangeGeometryCache():Void
+		rangeGeometryCache = [];
+
 	static function containsRecord(records:Array<TextEditorParagraphRecord>,
 			value:TextEditorParagraphRecord):Bool {
 		for (record in records)
@@ -732,5 +752,27 @@ class TextEditorParagraphRecord {
 		y = 0.0;
 		height = 0.0;
 		renderColor = null;
+	}
+}
+
+/** Cached selection geometry for one active editor range and viewport. */
+class TextEditorRangeGeometryCache {
+	public final start:Int;
+	public final end:Int;
+	public final startAffinity:Int;
+	public final endAffinity:Int;
+	public final minY:Float;
+	public final maxY:Float;
+	public final rectangles:Array<TextRangeRect>;
+
+	public function new(start:Int, end:Int, startAffinity:Int, endAffinity:Int,
+			minY:Float, maxY:Float, rectangles:Array<TextRangeRect>) {
+		this.start = start;
+		this.end = end;
+		this.startAffinity = startAffinity;
+		this.endAffinity = endAffinity;
+		this.minY = minY;
+		this.maxY = maxY;
+		this.rectangles = rectangles;
 	}
 }
