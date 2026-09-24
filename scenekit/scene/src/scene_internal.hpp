@@ -21,12 +21,23 @@ namespace nkscene {
 
 constexpr std::size_t published_node_page_capacity = 256;
 constexpr std::size_t published_direct_lookup_limit = 16384;
+// Bound both linked history and the total changed IDs stored by that history.
+constexpr std::size_t published_resource_delta_max_entries = 4096;
+constexpr std::size_t published_resource_delta_max_ids = 65536;
 
 struct SnapshotMaterialization;
 
 struct PublishedResourceDelta {
     std::uint64_t geometry_revision = 0;
     std::uint64_t material_revision = 0;
+    std::uint64_t geometry_base_revision = 0;
+    std::uint64_t material_base_revision = 0;
+    // Include this delta; used to trim the chain without walking it on publication.
+    std::size_t retained_entries = 1;
+    std::size_t retained_ids = 0;
+    // False when this publication deliberately omitted an oversized resource ID list.
+    bool geometry_complete = true;
+    bool material_complete = true;
     std::vector<GeometryId> geometries;
     std::vector<MaterialId> materials;
     std::shared_ptr<const PublishedResourceDelta> previous;
