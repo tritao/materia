@@ -262,6 +262,9 @@ class EventDispatcher {
 		var event = new UiEvent(kind, node.id, 0.0, 0.0, 0.0, 0.0, 0, key,
 			modifiers, null, null, scancode);
 		dispatchPath(path, event);
+		if (!event.defaultPrevented && kind == UiEventKind.KeyDown && key == UiKey.Escape &&
+			cancelCapturedPointerFor(node.id))
+			event.preventDefault();
 		if (event.defaultPrevented)
 			return;
 		if (kind == UiEventKind.KeyDown && routeCommand(key, modifiers, path)) {
@@ -274,6 +277,25 @@ class EventDispatcher {
 		else if (kind == UiEventKind.KeyDown && (key == UiKey.Enter || key == UiKey.Space))
 				dispatchPath(path, new UiEvent(UiEventKind.Activate, node.id, 0.0, 0.0,
 				0.0, 0.0, 0, key, modifiers, null, null, scancode));
+	}
+
+	/** Cancels a pointer drag owned by the currently focused widget. */
+	function cancelCapturedPointerFor(id:WidgetId):Bool {
+		if (id == null)
+			return false;
+		var active:Array<Int> = [];
+		for (pointerId in capturedIds.keys()) {
+			var captured = capturedIds.get(pointerId);
+			if (captured != null && captured.equals(id))
+				active.push(pointerId);
+		}
+		if (active.length == 0)
+			return false;
+		var pointerId = active[0];
+		var location = pointerLocations.get(pointerId);
+		pointerCancel(pointerId, location == null ? 0.0 : location.x,
+			location == null ? 0.0 : location.y);
+		return true;
 	}
 
 	function routeCommand(key:Int, modifiers:Int, path:Array<RenderNode>):Bool {
