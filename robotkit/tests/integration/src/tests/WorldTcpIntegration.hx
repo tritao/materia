@@ -10,6 +10,15 @@ import robotkit.behavior.WorldBehaviorRunner;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
 import robotkit.world.ReplayRobot;
+import robotkit.mobile.DifferentialDrive;
+import robotkit.mobile.MobileBase;
+import robotkit.mobile.MotionLimits;
+import robotkit.mobile.Pose2;
+import robotkit.localization.WheelOdometryLocalization;
+import robotkit.navigation.Navigation;
+import robotkit.navigation.NavigationGoal;
+import robotkit.navigation.Path;
+import robotkit.skill.GoTo;
 
 /** End-to-end assertion of the world adapter against a real robotd TCP peer. */
 class WorldTcpIntegration {
@@ -174,7 +183,24 @@ class WorldTcpIntegration {
         return state.positions.length == 3 && state.positions.get(0) == 0.25
           && state.velocities.get(1) > 0.0 && state.efforts.get(2) != 0.0;
       }, "atomic mixed-mode target batch did not reach robotd runtime");
-      Sys.println("Shared behavior parity passed: three targets, local simulation and robotd TCP");
+      var mobileBase = new MobileBase(remote,
+        new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(0.5, 1.0));
+      var localization = new WheelOdometryLocalization(mobileBase);
+      var current = remote.snapshot();
+      var estimate = localization.update(current);
+      var goalPose = new Pose2(estimate.pose.x + 0.1, estimate.pose.y, estimate.pose.yaw);
+      var path = new Path([estimate.pose, goalPose], "odom");
+      var goTo = new GoTo(new Navigation(mobileBase, localization, 0.2, 0.2, 0.8), path,
+        new NavigationGoal(goalPose, "odom", 0.01, 0.05));
+      goTo.start();
+      goTo.update(current, 0.02);
+      waitUntil(runtime, function() {
+        var state = remote.snapshot();
+        return state.velocities.length == 3 && state.velocities.get(0) > 0.0
+          && state.velocities.get(1) > 0.0;
+      }, "GoTo did not send an atomic two-wheel velocity target through robotd");
+      goTo.cancel();
+      Sys.println("Shared behavior and GoTo passed: local simulation and robotd TCP");
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();
