@@ -107,8 +107,41 @@ class PerspectiveCamera {
     var matrix=viewProjection(width/Math.max(1.0,height)),source=[x,y,z,1.0],clip:Array<Float> = [];
     for(row in 0...4){var value=0.0;for(column in 0...4)value+=matrix.element(column*4+row)*source[column];clip.push(value);}
     if(clip[3]<=0.000001)return null;
-    return new PerspectiveScreenPoint((clip[0]/clip[3]*0.5+0.5)*width,
-      (0.5-clip[1]/clip[3]*0.5)*height,clip[2]/clip[3]);
+    return screenPoint(clip, width, height);
+  }
+
+  /** Projects the visible part of a world-space line after clipping it to the camera frustum. */
+  public function projectSegment(x0:Float, y0:Float, z0:Float, x1:Float, y1:Float, z1:Float,
+      width:Float, height:Float):Null<Array<PerspectiveScreenPoint>> {
+    width = Math.max(1.0, width);
+    height = Math.max(1.0, height);
+    return projectSegmentWithMatrix(viewProjection(width / height),
+      x0, y0, z0, x1, y1, z1, width, height);
+  }
+
+  /** Uses one frame's projection for multiple lines in the same viewport. */
+  public function projectSegmentWithMatrix(matrix:Transform,
+      x0:Float, y0:Float, z0:Float, x1:Float, y1:Float, z1:Float,
+      width:Float, height:Float):Null<Array<PerspectiveScreenPoint>> {
+    width = Math.max(1.0, width);
+    height = Math.max(1.0, height);
+    var start = clipPoint(matrix, x0, y0, z0);
+    var end = clipPoint(matrix, x1, y1, z1);
+    var first = 0.0, last = 1.0;
+    for (plane in 0...6) {
+      var startDistance = clipPlaneDistance(start, plane);
+      var endDistance = clipPlaneDistance(end, plane);
+      if (startDistance < 0.0 && endDistance < 0.0) return null;
+      if (startDistance < 0.0 || endDistance < 0.0) {
+        var crossing = startDistance / (startDistance - endDistance);
+        if (startDistance < 0.0) first = Math.max(first, crossing);
+        else last = Math.min(last, crossing);
+      }
+    }
+    if (first > last) return null;
+    var clippedStart = interpolateClip(start, end, first);
+    var clippedEnd = interpolateClip(start, end, last);
+    return [screenPoint(clippedStart, width, height), screenPoint(clippedEnd, width, height)];
   }
 
   public function intersectPlaneZ(x:Float, y:Float, width:Float, height:Float,
@@ -125,6 +158,35 @@ class PerspectiveCamera {
     var cosPitch = Math.cos(pitch);
     return [targetX + distance * cosPitch * Math.cos(yaw),
       targetY + distance * cosPitch * Math.sin(yaw), targetZ + distance * Math.sin(pitch)];
+  }
+
+  static function clipPoint(matrix:Transform, x:Float, y:Float, z:Float):Array<Float> {
+    var source = [x, y, z, 1.0], clip:Array<Float> = [];
+    for (row in 0...4) {
+      var value = 0.0;
+      for (column in 0...4) value += matrix.element(column * 4 + row) * source[column];
+      clip.push(value);
+    }
+    return clip;
+  }
+
+  static inline function clipPlaneDistance(point:Array<Float>, plane:Int):Float
+    return switch plane {
+      case 0: point[3] + point[0];
+      case 1: point[3] - point[0];
+      case 2: point[3] + point[1];
+      case 3: point[3] - point[1];
+      case 4: point[3] + point[2];
+      default: point[3] - point[2];
+    }
+
+  static function interpolateClip(start:Array<Float>, end:Array<Float>, amount:Float):Array<Float> {
+    return [for (index in 0...4) start[index] + (end[index] - start[index]) * amount];
+  }
+
+  static function screenPoint(clip:Array<Float>, width:Float, height:Float):PerspectiveScreenPoint {
+    return new PerspectiveScreenPoint((clip[0] / clip[3] * 0.5 + 0.5) * width,
+      (0.5 - clip[1] / clip[3] * 0.5) * height, clip[2] / clip[3]);
   }
 
   static inline function clamp(value:Float, low:Float, high:Float):Float

@@ -8,6 +8,7 @@ import LayoutStyle;
 import LayoutVisualKind;
 import Rect;
 import ResolvedLayoutItem;
+import GradientStop;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.CachePolicy;
 import nativekit.ui.core.GraphicsSurfaceViewportContent;
@@ -35,6 +36,8 @@ class GpuViewport implements View {
 	public final camera:ViewportCamera;
 	public final style:LayoutStyle;
 	public var background(default, null):Color;
+	public var backgroundTop(default, null):Color;
+	public var backgroundBottom(default, null):Color;
 	public var gridColor(default, null):Color;
 	public var gridSize(default, null):Float;
 	public var gridEnabled(default, null):Bool;
@@ -58,6 +61,8 @@ class GpuViewport implements View {
 		this.camera = camera == null ? new ViewportCamera() : camera;
 		this.style = style == null ? defaultStyle() : style.copy();
 		this.background = Color.rgba(0.055, 0.065, 0.08, 1.0);
+		this.backgroundTop = Color.rgba(0.894, 0.910, 0.922, 1.0);
+		this.backgroundBottom = Color.rgba(0.847, 0.867, 0.882, 1.0);
 		this.gridColor = Color.rgba(0.18, 0.21, 0.26, 0.7);
 		this.gridSize = 1.0;
 		this.gridEnabled = true;
@@ -96,9 +101,19 @@ class GpuViewport implements View {
 		if (background == null || gridColor == null || !finite(gridSize) || gridSize <= 0.0)
 			throw "Viewport appearance values are invalid";
 		this.background = background;
+		this.backgroundTop = background;
+		this.backgroundBottom = background;
 		this.gridColor = gridColor;
 		this.gridSize = gridSize;
 		this.gridEnabled = gridEnabled;
+	}
+
+	/** Sets a vertical top-to-bottom viewport background gradient. */
+	public function setBackgroundGradient(top:Color, bottom:Color):Void {
+		if (top == null || bottom == null)
+			throw "Viewport gradient colors are required";
+		backgroundTop = top;
+		backgroundBottom = bottom;
 	}
 
 	public function setOverlay(overlay:Null<Canvas->ResolvedLayoutItem->Void>):Void {
@@ -164,7 +179,9 @@ class GpuViewport implements View {
 	}
 
 	function paint(canvas:Canvas, geometry:ResolvedLayoutItem):Void {
-		canvas.fillRect(new Rect(0.0, 0.0, geometry.width, geometry.height), background);
+		canvas.fillLinearGradientRect(new Rect(0.0, 0.0, geometry.width, geometry.height),
+			0.0, 0.0, 0.0, geometry.height,
+			[new GradientStop(0.0, backgroundTop), new GradientStop(1.0, backgroundBottom)]);
 		canvas.withState(function(viewCanvas) {
 			viewCanvas.translate(-camera.panX * camera.zoom, -camera.panY * camera.zoom);
 			viewCanvas.scale(camera.zoom, camera.zoom);
@@ -217,6 +234,8 @@ class GpuViewport implements View {
 
 	function appearanceKey():String
 		return background.red + ":" + background.green + ":" + background.blue + ":" + background.alpha +
+			":" + backgroundTop.red + ":" + backgroundTop.green + ":" + backgroundTop.blue +
+			":" + backgroundBottom.red + ":" + backgroundBottom.green + ":" + backgroundBottom.blue +
 			":" + gridColor.red + ":" + gridColor.green + ":" + gridColor.blue + ":" + gridColor.alpha +
 			":" + gridSize + ":" + (gridEnabled ? "1" : "0");
 }

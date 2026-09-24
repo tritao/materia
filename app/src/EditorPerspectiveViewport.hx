@@ -3,6 +3,7 @@ package app;
 import Canvas;
 import Color;
 import GraphicsSurface;
+import GradientStop;
 import LayoutAxis;
 import LayoutStyle;
 import LayoutVisualKind;
@@ -53,6 +54,7 @@ class EditorPerspectiveViewport implements View {
   var sketchRectangleDrag:Null<PerspectiveSketchRectangleDrag> = null;
   var gridSnapEnabled:Bool = false;
   var gridStep:Float = EditorSceneViewport.GRID_STEP;
+  var gridVisible:Bool = true;
   var simulationActive:Bool=false;
   var runtimeRevision:Int=0;
   var simulationPoses:Array<SimulationPoseVisual> = [];
@@ -74,7 +76,7 @@ class EditorPerspectiveViewport implements View {
         "Scene perspective GPU view");
       node.onPaint(paint, "perspective:" + scene.revision + ":" + runtimeRevision + ":" +
         sketchDragRevision + ":" + camera.revision + ":" +
-        renderedWidth + "x" + renderedHeight);
+        renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep);
       installNavigation(node);
       return node;
     });
@@ -91,7 +93,10 @@ class EditorPerspectiveViewport implements View {
       var started = Sys.time();
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
         simulationActive ? simulationPoses : null);
-      var rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height);
+      // Keep the scene image transparent so the UI gradient shows through
+      // wherever the renderer has no geometry.
+      var rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height,
+        0.0, 0.0, 0.0, 0.0);
       var next = GraphicsSurface.fromImage(rendered);
       rendered.dispose();
       if (surface != null) surface.dispose();
@@ -104,9 +109,13 @@ class EditorPerspectiveViewport implements View {
       totalRenderSeconds += lastRenderSeconds;
       renderCount++;
     }
-    canvas.fillRect(new Rect(0, 0, geometry.width, geometry.height),
-      Color.rgba(0.025, 0.035, 0.055, 1.0));
+    canvas.fillLinearGradientRect(new Rect(0, 0, geometry.width, geometry.height),
+      0.0, 0.0, 0.0, geometry.height,
+      [new GradientStop(0.0, ViewportBackground.top()),
+        new GradientStop(1.0, ViewportBackground.bottom())]);
+    paintWorkplane(canvas, geometry.width, geometry.height);
     if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
+    paintBoxEdges(canvas, geometry.width, geometry.height);
     paintSensors(canvas,geometry.width,geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
   }
@@ -150,9 +159,10 @@ class EditorPerspectiveViewport implements View {
 
   public function resetView():Void camera.reset();
 
-  public function setPlacementOptions(snap:Bool, step:Float):Void {
+  public function setPlacementOptions(snap:Bool, step:Float, ?visible:Bool = true):Void {
     gridSnapEnabled = snap;
     gridStep = step;
+    gridVisible = visible;
   }
   public function setSimulationState(active:Bool,poses:Array<SimulationPoseVisual>,revision:Int,
       ?robots:Array<SimulationRobotVisual>):Void {
@@ -243,6 +253,98 @@ class EditorPerspectiveViewport implements View {
     surface = null;
     if (renderer != null) renderer.dispose();
     renderer = null;
+  }
+
+  function paintWorkplane(canvas:Canvas, width:Float, height:Float):Void {
+    if (!gridVisible || gridStep <= 0.0) return;
+    var projection = camera.viewProjection(width / Math.max(1.0, height));
+    var extent = Math.max(gridStep * 8.0, Math.min(500.0, camera.distance * 1.5));
+    var spacing = gridStep;
+    while (extent / spacing > 48.0) spacing *= 2.0;
+    var minX = Math.floor((camera.targetX - extent) / spacing) * spacing;
+    var maxX = Math.ceil((camera.targetX + extent) / spacing) * spacing;
+    var minY = Math.floor((camera.targetY - extent) / spacing) * spacing;
+    var maxY = Math.ceil((camera.targetY + extent) / spacing) * spacing;
+    var grid = new PathBuilder();
+    var x = minX;
+    while (x <= maxX) {
+      appendWorldSegment(grid, projection, x, minY, 0.0, x, maxY, 0.0, width, height);
+      x += spacing;
+    }
+    var y = minY;
+    while (y <= maxY) {
+      appendWorldSegment(grid, projection, minX, y, 0.0, maxX, y, 0.0, width, height);
+      y += spacing;
+    }
+    canvas.strokeTransient(grid.build(), Color.rgba(0.15, 0.22, 0.28, 0.22), 1.0);
+
+    var xAxis = new PathBuilder();
+    if (appendWorldSegment(xAxis, projection, -extent, 0.0, 0.0, extent, 0.0, 0.0, width, height)) {
+      canvas.strokeTransient(xAxis.build(), Color.rgba(0.72, 0.25, 0.22, 0.72), 1.5);
+    }
+    var yAxis = new PathBuilder();
+    if (appendWorldSegment(yAxis, projection, 0.0, -extent, 0.0, 0.0, extent, 0.0, width, height)) {
+      canvas.strokeTransient(yAxis.build(), Color.rgba(0.18, 0.52, 0.35, 0.72), 1.5);
+    }
+    var zAxis = new PathBuilder();
+    if (appendWorldSegment(zAxis, projection, 0.0, 0.0, 0.0, 0.0, 0.0,
+        Math.min(extent, Math.max(1.0, camera.distance)), width, height)) {
+      canvas.strokeTransient(zAxis.build(), Color.rgba(0.22, 0.39, 0.78, 0.82), 1.5);
+    }
+  }
+
+  function appendWorldSegment(path:PathBuilder, projection:Transform, x0:Float, y0:Float, z0:Float,
+      x1:Float, y1:Float, z1:Float, width:Float, height:Float):Bool {
+    var projected = camera.projectSegmentWithMatrix(projection,
+      x0, y0, z0, x1, y1, z1, width, height);
+    if (projected == null) return false;
+    path.moveTo(projected[0].x, projected[0].y).lineTo(projected[1].x, projected[1].y);
+    return true;
+  }
+
+  function paintBoxEdges(canvas:Canvas, width:Float, height:Float):Void {
+    var projection = camera.viewProjection(width / Math.max(1.0, height));
+    var eyeX = camera.targetX + camera.distance * Math.cos(camera.pitch) * Math.cos(camera.yaw);
+    var eyeY = camera.targetY + camera.distance * Math.cos(camera.pitch) * Math.sin(camera.yaw);
+    var eyeZ = camera.targetZ + camera.distance * Math.sin(camera.pitch);
+    var path = new PathBuilder();
+    var hasEdges = false;
+    for (item in scene.items()) {
+      if (!item.visible || scene.isCadPart(item.id)) continue;
+      var faces = BoxGeometry.faces(item.width, item.height, item.depth);
+      var transform = displayTransform(item);
+      var centerX = transform.element(12), centerY = transform.element(13), centerZ = transform.element(14);
+      var toEyeX = eyeX - centerX, toEyeY = eyeY - centerY, toEyeZ = eyeZ - centerZ;
+      for (face in faces) {
+        var nx = transform.element(0) * face.normal[0] + transform.element(4) * face.normal[1] +
+          transform.element(8) * face.normal[2];
+        var ny = transform.element(1) * face.normal[0] + transform.element(5) * face.normal[1] +
+          transform.element(9) * face.normal[2];
+        var nz = transform.element(2) * face.normal[0] + transform.element(6) * face.normal[1] +
+          transform.element(10) * face.normal[2];
+        if (nx * toEyeX + ny * toEyeY + nz * toEyeZ <= 0.0) continue;
+        var previous = transformPoint(transform, face.corners[3][0],
+          face.corners[3][1], face.corners[3][2]);
+        for (corner in face.corners) {
+          var point = transformPoint(transform, corner[0], corner[1], corner[2]);
+          var projected = camera.projectSegmentWithMatrix(projection,
+            previous[0], previous[1], previous[2], point[0], point[1], point[2], width, height);
+          if (projected != null) {
+            path.moveTo(projected[0].x, projected[0].y)
+              .lineTo(projected[1].x, projected[1].y);
+            hasEdges = true;
+          }
+          previous = point;
+        }
+      }
+    }
+    if (hasEdges) canvas.strokeTransient(path.build(), Color.rgba(0.075, 0.11, 0.14, 0.45), 1.0);
+  }
+
+  static function transformPoint(transform:Transform, x:Float, y:Float, z:Float):Array<Float> {
+    return [transform.element(0) * x + transform.element(4) * y + transform.element(8) * z + transform.element(12),
+      transform.element(1) * x + transform.element(5) * y + transform.element(9) * z + transform.element(13),
+      transform.element(2) * x + transform.element(6) * y + transform.element(10) * z + transform.element(14)];
   }
   function paintSensors(canvas:Canvas,width:Float,height:Float):Void {
     if(!simulationActive)return;

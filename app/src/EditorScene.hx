@@ -2316,22 +2316,7 @@ class EditorScene {
   }
 
   static function boxGeometry(width:Float, height:Float, depth:Float):GeometryData {
-    var mesh = new GeometryData();
-    var halfWidth = width / 2, halfHeight = height / 2, halfDepth = depth / 2;
-    mesh.addVertex(-halfWidth, -halfHeight, -halfDepth);
-    mesh.addVertex(halfWidth, -halfHeight, -halfDepth);
-    mesh.addVertex(halfWidth, halfHeight, -halfDepth);
-    mesh.addVertex(-halfWidth, halfHeight, -halfDepth);
-    mesh.addVertex(-halfWidth, -halfHeight, halfDepth);
-    mesh.addVertex(halfWidth, -halfHeight, halfDepth);
-    mesh.addVertex(halfWidth, halfHeight, halfDepth);
-    mesh.addVertex(-halfWidth, halfHeight, halfDepth);
-    for (triangle in [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7],
-        [0, 1, 5], [0, 5, 4], [3, 7, 6], [3, 6, 2],
-        [0, 4, 7], [0, 7, 3], [1, 2, 6], [1, 6, 5]])
-      mesh.addTriangle(triangle[0], triangle[1], triangle[2]);
-    mesh.setBounds(-halfWidth, -halfHeight, -halfDepth, halfWidth, halfHeight, halfDepth);
-    return mesh;
+    return BoxGeometry.create(width, height, depth);
   }
 
   static inline function validDimension(value:Float):Bool

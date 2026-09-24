@@ -85,6 +85,27 @@ class SceneEditingTests {
     scene.dispose();
     camera.reset();
     var centerRay = camera.screenRay(400, 300, 800, 600);
+    var clipped = camera.projectSegment(
+      centerRay.originX - centerRay.directionX,
+      centerRay.originY - centerRay.directionY,
+      centerRay.originZ - centerRay.directionZ,
+      centerRay.originX + centerRay.directionX * 4.0,
+      centerRay.originY + centerRay.directionY * 4.0,
+      centerRay.originZ + centerRay.directionZ * 4.0, 800, 600);
+    check(clipped != null, "perspective line clipping retains the visible segment");
+    check(Math.abs(clipped[0].x - 400.0) < 1.0 &&
+      Math.abs(clipped[0].y - 300.0) < 1.0 &&
+      Math.abs(clipped[1].x - 400.0) < 1.0 &&
+      Math.abs(clipped[1].y - 300.0) < 1.0,
+      "clipped line stays within a pixel of the viewport center");
+    check(camera.projectSegment(
+      centerRay.originX - centerRay.directionX * 2.0,
+      centerRay.originY - centerRay.directionY * 2.0,
+      centerRay.originZ - centerRay.directionZ * 2.0,
+      centerRay.originX - centerRay.directionX,
+      centerRay.originY - centerRay.directionY,
+      centerRay.originZ - centerRay.directionZ, 800, 600) == null,
+      "perspective line clipping rejects segments behind the camera");
     var boxes:Array<app.SceneObjectData> = [];
     for (entry in [{id:"near", distance:4.0}, {id:"far", distance:6.0}]) boxes.push({
       id:entry.id, label:entry.id, type:"rectangle",

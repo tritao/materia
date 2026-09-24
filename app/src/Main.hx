@@ -139,7 +139,7 @@ class Main {
     var diagnostics = ReferenceEditorLaunchOptions.fromArgs(args);
     if (diagnostics == null) return 2;
     var host = new DesktopUiHostOptions();
-    host.title = "Materia Reference Editor";
+    host.title = "Materia";
     host.width = diagnostics.windowWidth;
     host.height = diagnostics.windowHeight;
     host.captureDirectory = diagnostics.captureDirectory;
@@ -949,6 +949,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (sceneViewport != null) {
       sceneViewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0),
         Color.rgba(0.16, 0.24, 0.36, 0.75), viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
+      sceneViewport.setBackgroundGradient(ViewportBackground.top(), ViewportBackground.bottom());
       return sceneViewport;
     }
     var viewportStyle = fillStyle();
@@ -968,6 +969,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     });
     viewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0), Color.rgba(0.16, 0.24, 0.36, 0.75),
       viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
+    viewport.setBackgroundGradient(ViewportBackground.top(), ViewportBackground.bottom());
     viewport.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (event.button == 0) {
         var hit = viewportContent.pick(viewportCamera, event.localX, event.localY);
@@ -1069,7 +1071,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function perspectivePanel():View {
     if (perspectiveViewport != null) {
-      perspectiveViewport.setPlacementOptions(gridSnapEnabled, gridSpacing);
+      perspectiveViewport.setPlacementOptions(gridSnapEnabled, gridSpacing, gridVisible);
       var frame = framePresentation;
       perspectiveViewport.setSimulationState(simulation.isActive(),frame == null ? [] : frame.environment,
         frame == null ? 0 : frame.revision,frame == null ? [] : frame.robots);
