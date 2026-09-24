@@ -39,6 +39,15 @@ import robotkit.world.RobotRecordingEntry;
 import robotkit.behavior.HoldJointBehavior;
 import robotkit.behavior.WorldBehaviorRunner;
 import robotkit.worldd.WorldHost;
+import robotkit.mobile.Pose2;
+import robotkit.mobile.Twist2;
+import robotkit.mobile.MotionLimits;
+import robotkit.mobile.Footprint;
+import robotkit.mobile.FootprintPoint;
+import robotkit.mobile.MobileBase;
+import robotkit.mobile.DifferentialDrive;
+import robotkit.mobile.AckermannDrive;
+import robotkit.mobile.DifferentialOdometry;
 
 class RobotWorldTests {
   static var assertions = 0;
@@ -51,6 +60,7 @@ class RobotWorldTests {
     testRecordingEventLog();
     testReplayCorrectness();
     testJointTargetBatches();
+    testMobileLayer();
     testMcapRoundTrip();
     testMcapRobustness();
     testForwardingAndLifecycle();
@@ -236,6 +246,128 @@ class RobotWorldTests {
       robotkit.world.JointTarget.position(0, 0.0),
       robotkit.world.JointTarget.effort(0, 1.0)
     ]), "duplicate joints rejected within one atomic batch");
+  }
+
+  static function testMobileLayer():Void {
+    var origin = new Pose2(1.0, 2.0, Math.PI * 0.5);
+    var composed = origin.compose(new Pose2(1.0, 0.0, 0.0));
+    check(Math.abs(composed.x - 1.0) < 1e-9 && Math.abs(composed.y - 3.0) < 1e-9,
+      "Pose2 composes local translation in the parent frame");
+    var roundTrip = composed.relativeTo(origin);
+    check(Math.abs(roundTrip.x - 1.0) < 1e-9 && Math.abs(roundTrip.y) < 1e-9,
+      "Pose2 computes frame-relative poses");
+    var straight = new Pose2().integrate(new Twist2(1.0, 0.0), 2.0);
+    check(Math.abs(straight.x - 2.0) < 1e-9 && Math.abs(straight.y) < 1e-9,
+      "Pose2 integrates straight body motion");
+    var curve = new Pose2().integrate(new Twist2(1.0, 1.0), Math.PI * 0.5);
+    check(Math.abs(curve.x - 1.0) < 1e-9 && Math.abs(curve.y - 1.0) < 1e-9,
+      "Pose2 integrates constant-curvature motion");
+
+    var footprint = Footprint.rectangle(2.0, 1.0);
+    equal(footprint.vertices().length, 4, "rectangular footprint exposes copied vertices");
+    check(Math.abs(footprint.radius - 1.118033988749895) < 1e-9,
+      "footprint radius encloses its corners");
+    var vertices = footprint.vertices();
+    vertices.pop();
+    equal(footprint.vertices().length, 4, "footprint vertex list is immutable to callers");
+    throws(function() new Footprint([
+      new FootprintPoint(0.0, 0.0), new FootprintPoint(1.0, 0.0), new FootprintPoint(2.0, 0.0)
+    ]), "degenerate footprint polygons are rejected");
+
+    var differentialRobot = new FakeRobot("diff-base");
+    differentialRobot.positions = [0.0, 0.0];
+    var differential = new MobileBase(differentialRobot,
+      new DifferentialDrive(0, 1, 0.2, 0.6),
+      new MotionLimits(1.0, 2.0, 0.5, 1.0), footprint);
+    var bounded = differential.command(new Twist2(2.0, 4.0), 1.0);
+    check(Math.abs(bounded.linear - 0.5) < 1e-9 && Math.abs(bounded.angular - 1.0) < 1e-9,
+      "mobile command applies acceleration limits after speed limits");
+    check(switch differentialRobot.lastCommand {
+      case JointTargets(targets, _):
+        targets.length == 2 && targets[0].joint == 0 && targets[1].joint == 1 &&
+          targets[0].mode == robotkit.world.JointTargetMode.Velocity &&
+          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+          Math.abs(targets[0].target - 1.0) < 1e-9 &&
+          Math.abs(targets[1].target - 4.0) < 1e-9;
+      case _: false;
+    }, "differential drive submits both wheel velocities as one atomic command");
+
+    var mobileBlueprint = new RobotRuntimeBlueprint(1, 2, 3);
+    mobileBlueprint.addJoint(new RobotRuntimeJointBlueprint(0,
+      RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -100.0, 100.0, 100.0, 50.0));
+    mobileBlueprint.addJoint(new RobotRuntimeJointBlueprint(1,
+      RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, 2, -100.0, 100.0, 100.0, 50.0));
+    var mobileSimulation = new Simulation(0.01);
+    var simulatedRobot = new SimulatedRobot("mobile-sim",
+      mobileSimulation.addRobot(mobileBlueprint), "mobile simulation",
+      ["base", "left-wheel", "right-wheel"], ["left-wheel-joint", "right-wheel-joint"]);
+    var simulatedBase = new MobileBase(simulatedRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    simulatedBase.command(new Twist2(0.2, 0.0));
+    mobileSimulation.step(Int64.ofInt(100));
+    var simulatedState = simulatedRobot.snapshot();
+    check(Math.abs(simulatedState.velocities.get(0) - 2.0) < 1e-9 &&
+      Math.abs(simulatedState.velocities.get(1) - 2.0) < 1e-9,
+      "mobile base drives both simulated wheels through the shared Simulation runtime");
+    simulatedRobot.close();
+    mobileSimulation.dispose();
+
+    var speedLimited = differential.command(new Twist2(10.0, 0.0));
+    check(Math.abs(speedLimited.linear - 1.0) < 1e-9,
+      "mobile command applies configured body speed limits");
+    differential.stop();
+    check(switch differentialRobot.lastStop {
+      case Normal: true;
+      case _: false;
+    },
+      "mobile base forwards stop through the wrapped robot");
+
+    var ackermannRobot = new FakeRobot("ackermann-base");
+    ackermannRobot.positions = [0.0, 0.0];
+    var ackermann = new MobileBase(ackermannRobot,
+      new AckermannDrive(0, 1, 1.2, 0.25, 0.5), new MotionLimits(2.0, 2.0));
+    var ackermannCommand = ackermann.command(new Twist2(1.0, 1.0));
+    check(ackermannCommand.angular < 1.0 && ackermannCommand.angular > 0.0,
+      "Ackermann drive limits yaw rate to the configured steering angle");
+    check(switch ackermannRobot.lastCommand {
+      case JointTargets(targets, _):
+        targets.length == 2 && targets[0].mode == robotkit.world.JointTargetMode.Position &&
+          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+          Math.abs(targets[0].target) <= 0.5 && targets[1].target > 0.0;
+      case _: false;
+    }, "Ackermann drive submits steering position and wheel velocity together");
+    throws(function() ackermann.command(new Twist2(0.0, 1.0)),
+      "Ackermann drive rejects a turn-in-place request");
+    ackermann.command(Twist2.zero());
+    check(switch ackermannRobot.lastCommand {
+      case JointTargets(targets, _): targets[0].target == 0.0 && targets[1].target == 0.0;
+      case _: false;
+    }, "Ackermann drive safely emits zero steering and wheel targets at rest");
+    var wideAckermann = new AckermannDrive(0, 1, 1.2, 0.25, 1.2);
+    var wideTargets = wideAckermann.targets(new Twist2(1.0, 2.0));
+    check(wideTargets[0].target > 1.1 && wideTargets[0].target < 1.2,
+      "Ackermann curvature mapping handles steering ratios above one");
+
+    var odometry = new DifferentialOdometry(0, 1, 0.1, 0.5);
+    function sample(time:Int, left:Float, right:Float, clock:String):RobotSnapshot
+      return new RobotSnapshot("odom", Int64.ofInt(time), Int64.ofInt(time),
+        [left, right], [], [], 1, 0, null, [], clock, "host");
+    var initial = odometry.update(sample(10, 0.0, 0.0, "source-A"));
+    var forward = odometry.update(sample(20, 1.0, 1.0, "source-A"));
+    check(Math.abs(initial.x) < 1e-9 && Math.abs(forward.x - 0.1) < 1e-9,
+      "wheel odometry integrates straight wheel travel");
+    var turning = odometry.update(sample(30, 1.0, 2.0, "source-A"));
+    check(Math.abs(turning.yaw - 0.2) < 1e-9 && turning.y > forward.y,
+      "wheel odometry integrates differential wheel displacement");
+    odometry.update(sample(1, 4.0, 4.0, "source-B"));
+    var afterClockReset = odometry.update(sample(2, 4.2, 4.2, "source-B"));
+    check(Math.abs(afterClockReset.yaw - turning.yaw) < 1e-9 &&
+      Math.abs(afterClockReset.x - turning.x) < 0.03,
+      "wheel odometry resets its encoder baseline when the source clock changes");
+    odometry.update(sample(1, 20.0, 20.0, "source-B"));
+    var afterStale = odometry.update(sample(3, 4.3, 4.3, "source-B"));
+    check(Math.abs(afterStale.x - afterClockReset.x) < 0.03,
+      "wheel odometry ignores stale timestamps without moving its baseline");
   }
 
   static function testMcapRoundTrip():Void {
@@ -890,8 +1022,8 @@ private class FakeRobot implements Robot {
     logicalId,
     positions.length,
     true,
-    false,
-    false,
+    true,
+    true,
     false
   );
   public function snapshot():RobotSnapshot return new RobotSnapshot(

@@ -215,6 +215,22 @@ without changing their source observations. The runtime owns position bounds,
 velocity-rate bounds, and effort limits. This boundary intentionally contains
 joint targets rather than mobile-base or forklift-specific commands.
 
+## Mobile kinematics
+
+`robotkit.mobile.MobileBase` composes a `Robot`, `DriveModel`, motion limits,
+and optional footprint. It is a view over the existing robot contract, not a
+new robot subclass. A drive model translates one `Twist2` into a complete joint
+target batch: differential drive emits both wheel rates, while Ackermann drive
+emits steering position and drive-wheel rate together. Runtime joint limits and
+safety remain authoritative below this application-level mapping.
+
+`Pose2` and `Twist2` describe planar geometry and body velocity. The initial
+wheel odometry utility consumes immutable snapshots and uses source clock IDs
+to avoid integrating across a reboot or clock reset. Its pose is derived state;
+it is not inserted into `RobotSnapshot`. The localization package can later
+wrap this odometry with explicit frames, covariance, and source/receive clock
+metadata.
+
 ## One simulation tick
 
 Applications advance a shared simulation with `Simulation.step(timestamp)`:

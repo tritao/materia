@@ -125,6 +125,26 @@ are rejected. `RemoteRobot` sends one `JointTargets` protocol frame and
 `ReplayRobot` retains generated batches separately from the source recording.
 The runtime applies configured position, velocity, and effort limits.
 
+`robotkit.mobile` adds planar motion as a configured view over a normal `Robot`.
+`MobileBase` applies `MotionLimits` and sends the selected `DriveModel`'s joint
+targets as one batch. `DifferentialDrive` maps forward/yaw velocity to left and
+right wheel rates; `AckermannDrive` maps them to steering position and drive
+wheel rate. `Pose2`, `Twist2`, and `Footprint` are transport-neutral values.
+`DifferentialOdometry` integrates wheel-position changes from `RobotSnapshot`
+and resets its encoder baseline when the source clock identity changes.
+
+```haxe
+var base = new MobileBase(robot,
+  new DifferentialDrive(leftWheelJoint, rightWheelJoint, wheelRadius, trackWidth),
+  new MotionLimits(1.5, 1.2, 0.8, 1.5),
+  Footprint.rectangle(0.8, 0.55));
+base.command(new Twist2(0.6, 0.2), 0.02);
+```
+
+The optional duration applies acceleration limits relative to the previous
+command. Joint indices follow the robot description, and the wrapped robot
+continues to own status, snapshots, transport, and lifecycle.
+
 ### Persistent recordings
 
 `McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing
