@@ -101,10 +101,9 @@ class EditorScene {
     var phases = loadProfilePhases;
     if (phases == null) return {};
     return {
-      geometryHandleSeconds: phases.get("geometryHandle"),
       geometryDataSeconds: phases.get("geometryData"),
-      geometryPublicationSeconds: phases.get("geometryPublication"),
-      materialSetupSeconds: phases.get("materialSetup"),
+      geometryBatchCreatePublishSeconds: phases.get("geometryBatchCreatePublish"),
+      materialBatchCreatePublishSeconds: phases.get("materialBatchCreatePublish"),
       transactionPrepareSeconds: phases.get("transactionPrepare"),
       transactionCommitSeconds: phases.get("transactionCommit"),
       applicationBookkeepingSeconds: phases.get("applicationBookkeeping"),
@@ -130,9 +129,7 @@ class EditorScene {
         addObject("box", "Blue box", -1.5, 0.0, 0.0, 1.6, 1.2, 0.1, 0.22, 0.52, 0.85);
         addObject("tower", "Orange tower", 1.1, 0.0, 0.1, 1.2, 1.8, 0.2, 0.92, 0.48, 0.22);
       } else {
-        for (item in data) addObject(item.id, item.label, item.x, item.y, item.z,
-          item.width, item.height, item.depth, item.red, item.green, item.blue, item.visible,
-          item.collisionEnabled,item.dynamicBody,item.mass,item.type,item.cadGraph);
+        addObjects(data);
         selectedId = data.length == 0 ? "scene" : data[0].id;
         var savedDraft:Null<SceneObjectData> = null;
         for (item in data) if (item.sketchDraft != null) {
@@ -221,6 +218,74 @@ class EditorScene {
         session.close();
       throw error;
     }
+  }
+
+  /** Builds loaded resources in bulk, then publishes all loaded nodes in one transaction. */
+  function addObjects(data:Array<SceneObjectData>):Void {
+    if (data.length == 0) return;
+    var geometryData:Array<GeometryData> = [];
+    var materialData:Array<MaterialData> = [];
+    var candidates:Array<EditorSceneObject> = [];
+    var preparationStarted = profileLoadStart();
+    for (item in data) {
+      var session:Null<CadDocumentSession> = null;
+      var storedCadGraph = item.cadGraph;
+      var geometry:GeometryData;
+      if (isCadKind(item.type)) {
+        session = createCadSession(storedCadGraph, item.width, item.height, item.depth, item.type);
+        if (storedCadGraph == null)
+          storedCadGraph = session.encode();
+        geometry = session.geometry();
+        cadSessions.set(item.id, session);
+      } else {
+        geometry = boxGeometry(item.width, item.height, item.depth);
+      }
+      geometryData.push(geometry);
+      materialData.push(MaterialData.opaque(item.red, item.green, item.blue));
+      candidates.push(new EditorSceneObject(item.id, item.label, item.type,
+        item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
+        item.mass, item.red, item.green, item.blue, storedCadGraph,
+        item.x, item.y, item.z, item.visible));
+    }
+    profileLoadEnd("geometryData", preparationStarted);
+
+    var geometryStarted = profileLoadStart();
+    var geometries = scene.createGeometryBatch(geometryData);
+    profileLoadEnd("geometryBatchCreatePublish", geometryStarted);
+    var materialStarted = profileLoadStart();
+    var materials = scene.createMaterialBatch(materialData);
+    profileLoadEnd("materialBatchCreatePublish", materialStarted);
+
+    var transaction = scene.beginTransaction();
+    var nodes:Array<NodeId> = [];
+    preparationStarted = profileLoadStart();
+    try {
+      for (index in 0...data.length) {
+        var item = data[index];
+        var node = transaction.createNode();
+        transaction.setName(node, item.label);
+        transaction.setVisibility(node, item.visible);
+        transaction.setGeometry(node, geometries[index]);
+        transaction.setMaterial(node, materials[index]);
+        transaction.setTransform(node, Transform.identity().translated(item.x, item.y, item.z));
+        nodes.push(node);
+      }
+      profileLoadEnd("transactionPrepare", preparationStarted);
+      var commitStarted = profileLoadStart();
+      transaction.commit();
+      profileLoadEnd("transactionCommit", commitStarted);
+    } catch (error:Dynamic) {
+      transaction.dispose();
+      throw error;
+    }
+
+    var bookkeepingStarted = profileLoadStart();
+    for (index in 0...data.length) {
+      var item = data[index];
+      bridge.attach(item.id, nodes[index], geometries[index], materials[index]);
+      objects.push(candidates[index]);
+    }
+    profileLoadEnd("applicationBookkeeping", bookkeepingStarted);
   }
 
   public function canCreate():Bool return objects.length < 10000;

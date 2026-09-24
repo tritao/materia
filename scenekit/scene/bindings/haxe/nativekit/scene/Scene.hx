@@ -45,11 +45,47 @@ class Scene {
 		return new Geometry(this, made.out_geometry);
 	}
 
+	/** Creates geometry resources from one batch and publishes them together. */
+	public function createGeometryBatch(data:Array<GeometryData>):Array<Geometry> {
+		ensureLive();
+		if (data.length == 0) return [];
+		var values:Array<nkscene_geometry_data> = [];
+		for (item in data) values.push(item.nativeValue());
+		var made = NativeKitScene.nkscene_geometry_create_batch(owner.borrow(), values);
+		check(made.status, "scene.createGeometryBatch");
+		var first = made.out_first_geometry.get_value();
+		var result:Array<Geometry> = [];
+		for (index in 0...data.length) {
+			var id = new nkscene_geometry_id();
+			id.set_value(haxe.Int64.add(first, haxe.Int64.ofInt(index)));
+			result.push(new Geometry(this, id));
+		}
+		return result;
+	}
+
 	public function createMaterial():Material {
 		ensureLive();
 		var made = NativeKitScene.nkscene_material_create(owner.borrow());
 		check(made.status, "scene.createMaterial");
 		return new Material(this, made.out_material);
+	}
+
+	/** Creates material resources from one batch and publishes them together. */
+	public function createMaterialBatch(data:Array<MaterialData>):Array<Material> {
+		ensureLive();
+		if (data.length == 0) return [];
+		var values:Array<nkscene_material_data> = [];
+		for (item in data) values.push(item.nativeValue());
+		var made = NativeKitScene.nkscene_material_create_batch(owner.borrow(), values);
+		check(made.status, "scene.createMaterialBatch");
+		var first = made.out_first_material.get_value();
+		var result:Array<Material> = [];
+		for (index in 0...data.length) {
+			var id = new nkscene_material_id();
+			id.set_value(haxe.Int64.add(first, haxe.Int64.ofInt(index)));
+			result.push(new Material(this, id));
+		}
+		return result;
 	}
 
 	public function createImage():SceneImage {

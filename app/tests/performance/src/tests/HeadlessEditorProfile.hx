@@ -188,6 +188,8 @@ class HeadlessEditorProfile {
     var candidate = new EditorScene(records, null, sceneLoadPhases);
     var sceneLoadSeconds = Sys.time() - started;
     var sceneLoadPhaseSummary = candidate.loadProfileSummary();
+    if (candidate.objects.length != records.length)
+      throw 'Loaded ${candidate.objects.length} scene objects from ${records.length} records';
     action(actions, "load-10k-scene", 0);
 
     started = Sys.time();

@@ -443,9 +443,17 @@ NKS_API nkscene_result NKS_CALL nkscene_change_set_get_revision(nkscene_change_s
 
 NKS_API nkscene_result NKS_CALL nkscene_geometry_create(nkscene_scene scene,
                                                         nkscene_geometry_id *out_geometry NK_OUT);
+/** Creates initialized geometry resources in one publication; the output is the first ID. */
+NKS_API nkscene_result NKS_CALL nkscene_geometry_create_batch(
+    nkscene_scene scene, const nkscene_geometry_data *data NK_IN_ARRAY(count), uint32_t count,
+    nkscene_geometry_id *out_first_geometry NK_OUT);
 NKS_API void NKS_CALL nkscene_geometry_destroy(nkscene_scene scene, nkscene_geometry_id geometry);
 NKS_API nkscene_result NKS_CALL nkscene_material_create(nkscene_scene scene,
                                                         nkscene_material_id *out_material NK_OUT);
+/** Creates initialized material resources in one publication; the output is the first ID. */
+NKS_API nkscene_result NKS_CALL nkscene_material_create_batch(
+    nkscene_scene scene, const nkscene_material_data *data NK_IN_ARRAY(count), uint32_t count,
+    nkscene_material_id *out_first_material NK_OUT);
 NKS_API void NKS_CALL nkscene_material_destroy(nkscene_scene scene, nkscene_material_id material);
 NKS_API nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene,
                                                           nkscene_geometry_id geometry,

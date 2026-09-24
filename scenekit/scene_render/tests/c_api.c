@@ -3,7 +3,81 @@
 #include <assert.h>
 #include <stddef.h>
 
+static void resource_batches_publish_complete_data(void) {
+    nkscene_scene scene = NKS_INVALID_SCENE;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+
+    const nkscene_geometry_vertex vertices[] = {
+        {{0.0f, 0.0f, 0.0f}}, {{1.0f, 0.0f, 0.0f}}, {{0.0f, 1.0f, 0.0f}}};
+    nkscene_geometry_data geometry_data[2] = {{0}};
+    for (size_t index = 0; index < 2; ++index) {
+        geometry_data[index].struct_size = sizeof(geometry_data[index]);
+        geometry_data[index].vertices = vertices;
+        geometry_data[index].vertex_count = 3;
+        geometry_data[index].bounds.valid = 1;
+        geometry_data[index].bounds.maximum[0] = (float)index + 1.0f;
+        geometry_data[index].bounds.maximum[1] = 1.0f;
+    }
+
+    nkscene_geometry_data invalid_geometry[2] = {geometry_data[0], geometry_data[1]};
+    invalid_geometry[1].struct_size = 0;
+    nkscene_geometry_id first_geometry = {77};
+    assert(nkscene_geometry_create_batch(scene, invalid_geometry, 2, &first_geometry) ==
+           NKS_ERROR_INVALID_ARGUMENT);
+    assert(first_geometry.value == 77);
+    assert(nkscene_geometry_create_batch(scene, geometry_data, 2, &first_geometry) == NKS_OK);
+    assert(first_geometry.value == 1);
+    nkscene_geometry_id next_geometry = NKS_INVALID_GEOMETRY;
+    assert(nkscene_geometry_create(scene, &next_geometry) == NKS_OK);
+    assert(next_geometry.value == first_geometry.value + 2);
+
+    nkscene_material_data material_data[2] = {{0}};
+    for (size_t index = 0; index < 2; ++index) {
+        material_data[index].struct_size = sizeof(material_data[index]);
+        material_data[index].base_color[0] = 0.2f + (float)index * 0.2f;
+        material_data[index].base_color[1] = 0.4f;
+        material_data[index].base_color[2] = 0.8f;
+        material_data[index].base_color[3] = 1.0f;
+        material_data[index].opacity = 1.0f;
+        material_data[index].flags = NKS_MATERIAL_OPAQUE;
+    }
+    nkscene_material_data invalid_material[2] = {material_data[0], material_data[1]};
+    invalid_material[1].struct_size = 0;
+    nkscene_material_id first_material = {77};
+    assert(nkscene_material_create_batch(scene, invalid_material, 2, &first_material) ==
+           NKS_ERROR_INVALID_ARGUMENT);
+    assert(first_material.value == 77);
+    assert(nkscene_material_create_batch(scene, material_data, 2, &first_material) == NKS_OK);
+    assert(first_material.value == 1);
+    nkscene_material_id next_material = NKS_INVALID_MATERIAL;
+    assert(nkscene_material_create(scene, &next_material) == NKS_OK);
+    assert(next_material.value == first_material.value + 2);
+
+    nkscene_transaction transaction = NKS_INVALID_TRANSACTION;
+    assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
+    nkscene_node_id node = NKS_INVALID_NODE;
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
+    assert(nkscene_tx_set_geometry(transaction, node, first_geometry) == NKS_OK);
+    assert(nkscene_tx_set_material(transaction, node, first_material) == NKS_OK);
+    assert(nkscene_transaction_commit(transaction) == NKS_OK);
+
+    nkscene_snapshot snapshot = {0};
+    assert(nkscene_scene_snapshot(scene, &snapshot) == NKS_OK);
+    nkscene_snapshot_node node_data = {0};
+    node_data.struct_size = sizeof(node_data);
+    assert(nkscene_snapshot_get_node(snapshot, 0, &node_data) == NKS_OK);
+    assert(node_data.node.value == node.value);
+    assert(node_data.geometry.value == first_geometry.value);
+    assert(node_data.material.value == first_material.value);
+    assert(node_data.bounds.valid == 1);
+    assert(node_data.bounds.maximum[0] == 1.0f);
+
+    nkscene_snapshot_destroy(snapshot);
+    nkscene_scene_destroy(scene);
+}
+
 int main(void) {
+    resource_batches_publish_complete_data();
     nkscene_scene scene = NKS_INVALID_SCENE;
     assert(nkscene_scene_create(&scene) == NKS_OK);
 
