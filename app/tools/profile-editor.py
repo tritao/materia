@@ -344,9 +344,16 @@ def main():
             completed = {row.get("action") for row in actions}
             if (not expected.issubset(completed) or summary.get("sceneObjects") != 10000 or
                     summary.get("movingObjects") != 500 or summary.get("articulatedLinks") != 500 or
-                    summary.get("undo1000Seconds") is None):
+                    summary.get("undo1000Seconds") is None or
+                    summary.get("spatialCacheSamples") != 5 or
+                    summary.get("spatialSnapshotMedianSeconds") is None or
+                    summary.get("spatialIndexMedianSeconds") is None):
                 raise ValueError("architecture workload did not complete all requested phases")
-            print("scenario=architecture verified phases=7 sceneObjects=10000 movingObjects=500 links=500")
+            snapshot_ms = summary["spatialSnapshotMedianSeconds"] * 1000
+            index_ms = summary["spatialIndexMedianSeconds"] * 1000
+            print(f"scenario=architecture verified phases=7 sceneObjects=10000 "
+                  f"movingObjects=500 links=500 snapshotMedian={snapshot_ms:.3f}ms "
+                  f"spatialIndexMedian={index_ms:.3f}ms")
         except (OSError, KeyError, ValueError) as error:
             print(f"scenario verification failed: {error}", file=sys.stderr)
             result = 1
