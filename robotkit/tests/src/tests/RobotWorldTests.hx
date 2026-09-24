@@ -24,6 +24,7 @@ import robotkit.world.RobotSnapshot;
 import robotkit.world.RobotStatus;
 import robotkit.world.RemoteRobot;
 import robotkit.world.SimulatedRobot;
+import robotkit.world.RecordingRobot;
 import robotkit.world.StopMode;
 import robotkit.world.RobotWorld;
 import robotkit.world.RobotWorldEvent;
@@ -652,8 +653,10 @@ class RobotWorldTests {
         RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, index + 1,
         -1000.0, 1000.0, 1000.0, 1000.0));
     var simulation = new Simulation(0.01);
-    var simulatedRobot = new SimulatedRobot("forklift", simulation.addRobot(blueprint),
-      "simulated forklift", linkNames, jointNames);
+    var recordingPath = '/tmp/robotkit-${Sys.getPid()}-forklift-skills.mcap';
+    var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
+    var simulatedRobot = new RecordingRobot(new SimulatedRobot("forklift",
+      simulation.addRobot(blueprint), "simulated forklift", linkNames, jointNames), writer);
     var motionLimits = new MotionLimits(0.5, 1.0);
     var base = new MobileBase(simulatedRobot, new DifferentialDrive(0, 1, 0.1, 0.5),
       motionLimits);
@@ -666,13 +669,11 @@ class RobotWorldTests {
     var forks = new Forks(simulatedRobot, forkConfig);
     var path = new Path([new Pose2(0.0, 0.0, 0.0), new Pose2(0.18, 0.0, 0.0)], "odom");
     var goTo = new GoTo(navigation, path, new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
-    var recording = new RobotRecording();
     goTo.start();
     var liveStatus = goTo.status();
     var ticks = 0;
     while (switch liveStatus { case Running: true; case _: false; } && ticks < 300) {
       var observation = simulatedRobot.snapshot();
-      recording.recordSnapshot(observation);
       liveStatus = goTo.update(observation, 0.01);
       if (switch liveStatus { case Running: true; case _: false; })
         simulation.step(Int64.ofInt((ticks + 1) * 10000000));
@@ -681,7 +682,6 @@ class RobotWorldTests {
     check(switch liveStatus { case Succeeded: true; case _: false; } && ticks < 300,
       "GoTo drives a simulated forklift along its path");
     var liveSnapshot = simulatedRobot.snapshot();
-    recording.recordSnapshot(liveSnapshot);
     var liveEstimate = localization.state();
     var liveEstimateValue:robotkit.localization.LocalizationState = cast liveEstimate;
     var dockPose = new Pose2(liveEstimateValue.pose.x + 0.02,
@@ -711,7 +711,6 @@ class RobotWorldTests {
       "PickPallet approaches and commands its simulated fork mechanism");
     simulation.step(Int64.ofInt((ticks + 1) * 10000000));
     liveSnapshot = simulatedRobot.snapshot();
-    recording.recordSnapshot(liveSnapshot);
     var forkObservation = forks.state();
     check(Math.abs(forkObservation.lift.position - 0.5) < 1e-9 &&
       Math.abs(cast(forkObservation.tilt, robotkit.material.ForkAxisState).position - 0.1) < 1e-9,
@@ -733,7 +732,6 @@ class RobotWorldTests {
     var travelTicks = 0;
     while (switch travelStatus { case Running: true; case _: false; } && travelTicks < 300) {
       var observation = simulatedRobot.snapshot();
-      recording.recordSnapshot(observation);
       travelStatus = travel.update(observation, 0.01);
       if (switch travelStatus { case Running: true; case _: false; })
         simulation.step(Int64.ofInt((ticks + travelTicks + 2) * 10000000));
@@ -742,7 +740,6 @@ class RobotWorldTests {
     check(switch travelStatus { case Succeeded: true; case _: false; } && travelTicks < 300,
       "GoTo drives the loaded forklift to a second location");
     liveSnapshot = simulatedRobot.snapshot();
-    recording.recordSnapshot(liveSnapshot);
 
     var placePose = new Pose2(travelPose.x + 0.02, travelPose.y, travelPose.yaw);
     var place = new PlacePallet(navigation, forks, payload, placePose, 0.0, 0.0, 0.35);
@@ -753,7 +750,6 @@ class RobotWorldTests {
       "PlacePallet commands the forks and waits for release confirmation");
     simulation.step(Int64.ofInt((ticks + travelTicks + 2) * 10000000));
     liveSnapshot = simulatedRobot.snapshot();
-    recording.recordSnapshot(liveSnapshot);
     forks.setLoadState(LoadState.empty());
     placeStatus = place.update(liveSnapshot, 0.01);
     check(switch placeStatus { case Succeeded: true; case _: false; },
@@ -781,6 +777,15 @@ class RobotWorldTests {
       liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
     check(switch charge.update(liveSnapshot, 0.01) { case Succeeded: true; case _: false; },
       "Charge completes when the battery reaches its target fraction");
+
+    check(simulatedRobot.recordingError == null,
+      "recording adapter preserves an error-free forklift run");
+    check(Int64.compare(writer.status().dropped, Int64.ofInt(0)) == 0,
+      "MCAP recording accepts the complete forklift run");
+    writer.close();
+    var recording = McapRecordingReader.load(recordingPath);
+    check(recording.commands.length > 3 && recording.snapshots.length > 3,
+      "MCAP stores forklift target batches and the observation stream");
 
     var replayDescription = new RobotDescription("forklift", "recorded forklift",
       linkNames, jointNames);
@@ -831,6 +836,11 @@ class RobotWorldTests {
       case _: false;
     }, "PickPallet confirms the same load during replay");
 
+    check(replay.advance() && replay.advance() && replay.advance(),
+      "replay consumes the duplicated goal samples and the recorded fork-actuation tick");
+    replaySnapshot = replay.snapshot();
+    replayLocalization.update(replaySnapshot);
+
     var replayTravelStart = replayLocalization.state();
     var replayTravelStartValue:robotkit.localization.LocalizationState = cast replayTravelStart;
     var replayTravelPose = new Pose2(travelPose.x, travelPose.y, travelPose.yaw);
@@ -840,7 +850,7 @@ class RobotWorldTests {
     replayTravel.start();
     var replayTravelStatus = replayTravel.update(replay.snapshot(), 0.01);
     var replayTravelTicks = 0;
-    while (switch replayTravelStatus { case Running: true; case _: false; } && replay.advance() &&
+    while (switch replayTravelStatus { case Running: true; case _: false; } && advanceReplaySample(replay) &&
         replayTravelTicks < 300) {
       replaySnapshot = replay.snapshot();
       replayTravelStatus = replayTravel.update(replaySnapshot, 0.01);
@@ -894,9 +904,60 @@ class RobotWorldTests {
       case JointTargets(targets, _): targets.length == 3 && targets[0].joint == 2;
       case _: false;
     }, "ReplayRobot captures pick and place fork commands without altering source history");
+    var forkliftCommandsMatch = generated.length == recording.commands.length;
+    var firstMismatch = -1;
+    for (commandIndex in 0...recording.commands.length) {
+      if (commandIndex >= generated.length) break;
+      switch recording.commands[commandIndex] {
+        case JointTargets(sourceTargets, _):
+          switch generated[commandIndex] {
+            case JointTargets(replayTargets, _):
+              if (sourceTargets.length != replayTargets.length) {
+                forkliftCommandsMatch = false;
+                if (firstMismatch < 0) firstMismatch = commandIndex;
+              }
+              else for (targetIndex in 0...sourceTargets.length) {
+                var sourceTarget = sourceTargets[targetIndex];
+                var replayTarget = replayTargets[targetIndex];
+                if (sourceTarget.joint != replayTarget.joint ||
+                    Std.string(sourceTarget.mode) != Std.string(replayTarget.mode) ||
+                    Math.abs(sourceTarget.target - replayTarget.target) > 1e-9) {
+                  forkliftCommandsMatch = false;
+                  if (firstMismatch < 0) firstMismatch = commandIndex;
+                }
+              }
+            case _:
+              forkliftCommandsMatch = false;
+              if (firstMismatch < 0) firstMismatch = commandIndex;
+          }
+        case _:
+          forkliftCommandsMatch = false;
+          if (firstMismatch < 0) firstMismatch = commandIndex;
+      }
+    }
+    if (firstMismatch < 0 && generated.length != recording.commands.length)
+      firstMismatch = generated.length < recording.commands.length ? generated.length : recording.commands.length;
+    if (!forkliftCommandsMatch) {
+      Sys.println('forklift command batches: live=${recording.commands.length}, replay=${generated.length}, first mismatch=$firstMismatch');
+      var start = firstMismatch > 2 ? firstMismatch - 2 : 0;
+      var end = Std.int(Math.min(firstMismatch + 3,
+        Math.max(recording.commands.length, generated.length)));
+      for (commandIndex in start...end) {
+        var liveCommand = commandIndex < recording.commands.length
+          ? commandSummary(recording.commands[commandIndex]) : "<missing>";
+        var replayCommand = commandIndex < generated.length
+          ? commandSummary(generated[commandIndex]) : "<missing>";
+        Sys.println('command $commandIndex live=[$liveCommand] replay=[$replayCommand]');
+      }
+    }
+    check(forkliftCommandsMatch,
+      "forklift MCAP replay reproduces every recorded joint target batch");
     replay.close();
     simulatedRobot.close();
     simulation.dispose();
+    if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);
+    if (sys.FileSystem.exists(recordingPath + ".incomplete.status"))
+      sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
   }
 
   static function testMcapRoundTrip():Void {
@@ -1520,6 +1581,23 @@ class RobotWorldTests {
   static function check(value:Bool, message:String):Void {
     assertions++;
     if (!value) throw 'assertion failed: $message';
+  }
+
+  static function commandSummary(command:RobotCommand):String return switch command {
+    case JointTargets(targets, _): [for (target in targets)
+      '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
+  };
+
+  static function advanceReplaySample(replay:ReplayRobot):Bool {
+    var current = replay.snapshot();
+    while (replay.advance()) {
+      var next = replay.snapshot();
+      if (Int64.compare(next.sourceSequence, current.sourceSequence) != 0 ||
+          Int64.compare(next.sourceTimestampNs, current.sourceTimestampNs) != 0 ||
+          next.sourceClockId != current.sourceClockId)
+        return true;
+    }
+    return false;
   }
 
   static function equal(actual:Dynamic, expected:Dynamic, message:String):Void check(

@@ -272,10 +272,11 @@ behavior; native `RobotRuntime` remains responsible for actuator limits and
 hard safety.
 
 The same skill objects work above `RemoteRobot`, `SimulatedRobot`, and
-`ReplayRobot`. Simulated and replay integration scenarios exercise a forklift
-through approach, pickup confirmation, a second drive, placement confirmation,
-and charging. Recording retains robot observations and commands so application
-skills can be replayed against the same observation stream.
+`ReplayRobot`. The forklift regression records the simulated approach, pickup,
+second drive, placement, and charging sequence to MCAP, then replays the skills
+against those observations and checks every emitted joint target batch.
+Recording retains robot observations and commands so application skills can be
+replayed against the same observation stream.
 
 ## One simulation tick
 
