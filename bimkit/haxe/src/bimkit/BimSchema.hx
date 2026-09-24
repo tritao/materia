@@ -15,6 +15,8 @@ class BimSchema {
 	public static inline var Window:String = "window";
 	public static inline var Door:String = "door";
 	public static inline var Slab:String = "slab";
+	public static inline var WindowType:String = "window-type";
+	public static inline var DoorType:String = "door-type";
 
 	public static inline var Aggregates:String = "bim.aggregates";
 	public static inline var Contains:String = "bim.contains";

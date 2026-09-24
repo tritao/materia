@@ -1,6 +1,7 @@
 package bimkit;
 
 import bimkit.BimWindowDefinition;
+import bimkit.BimDoorDefinition;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.Document;
@@ -44,17 +45,29 @@ class BimDocument {
 	public function createWindowDefinition(name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition
 		return BimWindowDefinition.create(cad, name, width, height, frameThickness, depth);
 
+	public function createDoorDefinition(name:String, width:Float, height:Float, depth:Float):Definition
+		return BimDoorDefinition.create(cad, name, width, height, depth);
+
 	public function createWindow(name:String, definition:Definition):InstanceElement {
+		return createOpeningInstance(name, definition, BimSchema.WindowType, BimSchema.Window, "Window");
+	}
+
+	public function createDoor(name:String, definition:Definition):InstanceElement {
+		return createOpeningInstance(name, definition, BimSchema.DoorType, BimSchema.Door, "Door");
+	}
+
+	private function createOpeningInstance(name:String, definition:Definition, expectedType:String, elementClass:String,
+		label:String):InstanceElement {
 		if (definition.document != cad)
-			throw new BimError("window definition belongs to another document");
+			throw new BimError(label + " definition belongs to another document");
 		var typeClass = definition.property("bim.class");
 		if (typeClass == null || typeClass.type != TypedProperty.TypeToken || typeClass.tokenDomain != BimSchema.DefinitionClass
-			|| typeClass.value != "window-type")
-			throw new BimError("definition is not a BIM Window Type: " + definition.id.value);
+			|| typeClass.value != expectedType)
+			throw new BimError("definition is not a BIM " + label + " Type: " + definition.id.value);
 		var transaction = cad.beginTransaction();
 		try {
 			var result = cad.createInstance(name, definition);
-			result.setProperty(TypedProperty.token("bim.class", BimSchema.Window, BimSchema.ElementClass));
+			result.setProperty(TypedProperty.token("bim.class", elementClass, BimSchema.ElementClass));
 			transaction.commit();
 			return result;
 		} catch (error:Dynamic) {
@@ -652,7 +665,7 @@ class BimDocument {
 			var source = new ElementReference(cad.id, opening.id);
 			var parent = new ElementReference(cad.id, target.elementId);
 			if (opening.property("bim.class") == null)
-				opening.setProperty(TypedProperty.token("bim.class", "window", "bim.element-class"));
+				opening.setProperty(TypedProperty.token("bim.class", BimSchema.Window, BimSchema.ElementClass));
 			if (coreRelationship == null)
 				coreRelationship = cad.createRelationship("bim.host", source, parent);
 			else
@@ -796,7 +809,7 @@ class BimDocument {
 		var relation = cad.installRelationship(new RelationshipId(), "bim.host", new ElementReference(cad.id, value.openingId),
 			new ElementReference(cad.id, value.wallId));
 		if (opening.property("bim.class") == null)
-			opening.restoreProperty("bim.class", TypedProperty.token("bim.class", "window", "bim.element-class"));
+			opening.restoreProperty("bim.class", TypedProperty.token("bim.class", BimSchema.Window, BimSchema.ElementClass));
 		storeHostRelationship(relation, value);
 		opening.restorePlacementDerived(true);
 		cad.restoreElementPlacement(opening, new Placement(new Plane(new Vector(value.along, 0, value.sill), Vector.X(), Vector.Z())),

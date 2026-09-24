@@ -2,7 +2,7 @@
 
 BimKit is a typed façade over a normal CadKit `Document`. BIM classification and a wall's uncut authored feature live in typed element properties. Hosting lives in a core `bim.host` relationship with typed along, sill, output, and unhost-state properties. `DocumentCodec` persists BIM data together with geometry, definitions, and other document state; `BimCodec.encode()` delegates to it, while `BimCodec.decode()` also imports legacy BimKit format v2 files.
 
-Window Types are authored CadKit subgraph definitions with typed length inputs and named body/opening outputs. Window instances use CadKit's existing instance machinery, so type edits update shared instances and `makeUnique()` detaches one instance while copying the type's BIM properties.
+Window and Door Types are authored CadKit subgraph definitions with typed length inputs and named body/opening outputs. Their instances use CadKit's existing instance machinery and the same hosted-opening validation path, so type edits update shared instances and `makeUnique()` detaches one instance while copying the type's BIM properties.
 
 The first supported host adapter is deliberately narrow: straight vertical walls whose local baseline follows +X, with rectangular definition outputs placed by distance along the baseline and sill height. The hosted instance placement is derived from those coordinates and parented to the wall. Opening resolution always uses the wall's uncut feature.
 

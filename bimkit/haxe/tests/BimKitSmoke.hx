@@ -83,9 +83,30 @@ class BimKitSmoke {
 		check(windowDefinition.subgraph != null && windowDefinition.recipe == cadkit.parametric.Definition.SubgraphRecipe
 			&& windowDefinition.output("body").purpose == cadkit.parametric.DefinitionOutput.Geometry
 			&& windowDefinition.output("opening").purpose == cadkit.parametric.DefinitionOutput.Tool
-			&& windowTypeClass != null && windowTypeClass.value == "window-type"
-			&& uniqueWindowType.subgraph != null && uniqueTypeClass != null && uniqueTypeClass.value == "window-type",
+			&& windowTypeClass != null && windowTypeClass.value == BimSchema.WindowType
+			&& uniqueWindowType.subgraph != null && uniqueTypeClass != null && uniqueTypeClass.value == BimSchema.WindowType,
 			"Window Types use authored CadKit definitions and makeUnique copies BIM type properties");
+		var doorDefinition = model.createDoorDefinition("Shared door type", 900, 2100, 200);
+		var firstDoor = model.createDoor("Ground door", doorDefinition);
+		var secondDoor = model.createDoor("Upper door", doorDefinition);
+		var upperWall = model.createWall("Upper interior wall", 5000, 200, 3000);
+		upperWall.setPlacement(new Placement(new Plane(new Vector(0, 5000, 3200), Vector.X(), Vector.Z())));
+		model.addToStorey(ground.id, firstDoor.id);
+		model.addToStorey(upperStorey.id, upperWall.id);
+		model.addToStorey(upperStorey.id, secondDoor.id);
+		model.hostOpening(firstDoor, wall.id, 3000, 0);
+		model.hostOpening(secondDoor, upperWall.id, 1200, 0);
+		var firstDoorVolume = firstDoor.shape().volume();
+		doorDefinition.setDefault("width", 1000);
+		check(firstDoor.definitionId.value == secondDoor.definitionId.value
+			&& firstDoor.shape().volume() > firstDoorVolume
+			&& propertyValue(firstDoor, "bim.class") == BimSchema.Door,
+			"Door Type edits update shared instances through the same hosted-instance machinery");
+		var uniqueDoorType = secondDoor.makeUnique();
+		var uniqueDoorTypeClass = uniqueDoorType.property("bim.class");
+		check(uniqueDoorType.subgraph != null && uniqueDoorTypeClass != null && uniqueDoorTypeClass.value == BimSchema.DoorType
+			&& secondDoor.definitionId.value == uniqueDoorType.id.value,
+			"Door instances use the same authored definition and makeUnique behavior as Windows");
 
 		check(project.kind == "object" && site.kind == "object" && building.kind == "object" && ground.kind == "object"
 			&& upperStorey.kind == "object" && project.output == null && ground.output == null,
@@ -98,7 +119,8 @@ class BimKitSmoke {
 			"Project, Site, Building and Storey hierarchy is relationship based");
 		var groundBase = model.storeyBaseLevel(ground.id);
 		var groundTop = model.storeyTopLevel(ground.id);
-		check(model.containedElements(ground.id).length == 3 && groundBase != null && groundTop != null
+		check(model.containedElements(ground.id).length == 4 && model.containedElements(upperStorey.id).length == 2
+			&& groundBase != null && groundTop != null
 			&& groundBase.elementId.value == base.id.value && groundTop.elementId.value == upper.id.value,
 			"Storey contents and Level datums are persistent relationships and references");
 		var invalidAggregate = false;
@@ -128,20 +150,28 @@ class BimKitSmoke {
 		var restoredWindow:cadkit.parametric.InstanceElement = cast restored.cad.element(window.id);
 		var restoredWindowType = restored.cad.definition(restoredWindow.definitionId);
 		var restoredTypeClass = restoredWindowType.property("bim.class");
-		check(restored.cad.implicitOutputEnabled == false && restored.containedElements(ground.id).length == 3
+		var restoredDoor:cadkit.parametric.InstanceElement = cast restored.cad.element(firstDoor.id);
+		var restoredDoorType = restored.cad.definition(restoredDoor.definitionId);
+		var restoredDoorTypeClass = restoredDoorType.property("bim.class");
+		check(restored.cad.implicitOutputEnabled == false && restored.containedElements(ground.id).length == 4
+			&& restored.containedElements(upperStorey.id).length == 2
 			&& restored.aggregateChildren(building.id).length == 2
 			&& restoredBase != null && restoredBase.elementId.value == base.id.value
-			&& restoredWindowType.subgraph != null && restoredTypeClass != null && restoredTypeClass.value == "window-type"
+			&& restoredWindowType.subgraph != null && restoredTypeClass != null && restoredTypeClass.value == BimSchema.WindowType
+			&& restoredDoorType.subgraph != null && restoredDoorTypeClass != null && restoredDoorTypeClass.value == BimSchema.DoorType
+			&& restored.relationship(firstDoor.id).wallId.value == wall.id.value
 			&& propertyValue(restored.cad.element(space.id), "bim.class") == BimSchema.Space,
-			"the unified document codec round-trips BIM spatial data and authored Window Types");
+			"the unified document codec round-trips spatial data, authored types, and hosted doors");
 		restored.removeOpening(window.id);
-		check(restored.cad.findElement(window.id) == null && restored.containedElements(ground.id).length == 2,
+		check(restored.cad.findElement(window.id) == null && restored.containedElements(ground.id).length == 3,
 			"opening deletion removes its host and spatial containment edges together");
-		check(restored.undo() && restored.cad.findElement(window.id) != null && restored.containedElements(ground.id).length == 3
+		check(restored.undo() && restored.cad.findElement(window.id) != null && restored.containedElements(ground.id).length == 4
 			&& restored.relationship(window.id).wallId.value == wall.id.value,
 			"opening deletion undo restores identity, host and containment relationships");
 		check(restored.redo() && restored.cad.findElement(window.id) == null,
 			"opening deletion redo removes all BIM edges again");
+		restored.removeOpening(firstDoor.id);
+		check(restored.containedElements(ground.id).length == 2, "hosted Door deletion removes its type instance and spatial edge");
 		restored.removeWall(wall.id);
 		check(restored.containedElements(ground.id).length == 1, "wall deletion removes its Storey containment edge");
 		check(restored.undo() && restored.containedElements(ground.id).length == 2,
