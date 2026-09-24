@@ -58,6 +58,13 @@ import robotkit.navigation.TrajectorySample;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationStatus;
+import robotkit.material.ForkAxisConfig;
+import robotkit.material.ForkConfig;
+import robotkit.material.ForkState;
+import robotkit.material.Forks;
+import robotkit.material.LoadLimits;
+import robotkit.material.LoadState;
+import robotkit.material.Payload;
 
 class RobotWorldTests {
   static var assertions = 0;
@@ -73,6 +80,7 @@ class RobotWorldTests {
     testMobileLayer();
     testLocalization();
     testNavigation();
+    testForkMechanisms();
     testMcapRoundTrip();
     testMcapRobustness();
     testForwardingAndLifecycle();
@@ -512,6 +520,51 @@ class RobotWorldTests {
       case Failed(_): true;
       case _: false;
     }, "Navigation fails explicitly when path and localization frames differ");
+  }
+
+  static function testForkMechanisms():Void {
+    var robot = new FakeRobot("fork-test");
+    robot.jointNames = ["mast-lift", "fork-tilt", "fork-spread"];
+    robot.positions = [0.5, 0.1, 0.3];
+    robot.velocities = [0.0, -0.02, 0.0];
+    robot.efforts = [2.0, 0.5, 0.25];
+    var config = new ForkConfig(new ForkAxisConfig("mast-lift", 0.0, 2.0),
+      new LoadLimits(1000.0, 600.0, 1.8),
+      new ForkAxisConfig("fork-tilt", -0.5, 0.7),
+      new ForkAxisConfig("fork-spread", 0.0, 0.8));
+    var forks = new Forks(robot, config);
+    var state = forks.state();
+    check(Math.abs(state.lift.position - 0.5) < 1e-9 &&
+      Math.abs(cast(state.tilt, robotkit.material.ForkAxisState).velocity + 0.02) < 1e-9 &&
+      Math.abs(cast(state.spread, robotkit.material.ForkAxisState).effort - 0.25) < 1e-9,
+      "ForkState maps named axes to robot snapshot position, velocity, and effort");
+    equal(state.sourceClockId, "unspecified", "ForkState retains source clock identity");
+
+    var payload = new Payload(500.0, 1.0, 0.8, 0.7, 0.6, 0.0, 0.35);
+    forks.setLoadState(LoadState.carried(payload));
+    forks.command(1.5, 0.2, 0.4);
+    check(switch robot.lastCommand {
+      case JointTargets(targets, _):
+        targets.length == 3 && targets[0].joint == 0 && targets[1].joint == 1 &&
+          targets[2].joint == 2 && targets[0].target == 1.5 &&
+          targets[1].target == 0.2 && targets[2].target == 0.4 &&
+          targets[0].mode == robotkit.world.JointTargetMode.Position &&
+          targets[1].mode == robotkit.world.JointTargetMode.Position &&
+          targets[2].mode == robotkit.world.JointTargetMode.Position;
+      case _: false;
+    }, "Forks sends lift, tilt, and spread targets as one atomic batch");
+
+    forks.setLoadState(LoadState.carried(new Payload(1200.0, 1.0, 0.8, 0.7, 0.4)));
+    throws(function() forks.raise(1.0), "Forks rejects payloads above the configured mass envelope");
+    forks.setLoadState(LoadState.carried(payload));
+    throws(function() forks.raise(2.0), "Forks enforces the configured maximum lift height");
+    throws(function() forks.spreadTo(1.0), "Forks enforces configured axis position limits");
+    throws(function() new Forks(robot, new ForkConfig(
+      new ForkAxisConfig("missing-lift", 0.0, 1.0), new LoadLimits(100.0, 100.0, 1.0))),
+      "Forks requires configured joint names to exist in the robot description");
+    throws(function() LoadState.detected(null), "detected load state requires a payload value");
+    check(!LoadState.unknown().observed && LoadState.empty().observed,
+      "load state distinguishes unknown from confirmed empty");
   }
 
   static function testMcapRoundTrip():Void {
@@ -1152,6 +1205,9 @@ class RobotWorldTests {
 private class FakeRobot implements Robot {
   final logicalId:RobotId;
   public var positions:Array<Float> = [0.0];
+  public var velocities:Array<Float> = [0.0];
+  public var efforts:Array<Float> = [0.0];
+  public var jointNames:Array<String> = [];
   public var listener:Null < RobotId -> Void > = null;
   public var lastCommand:Null<RobotCommand> = null;
   public var lastStop:Null<StopMode> = null;
@@ -1161,7 +1217,8 @@ private class FakeRobot implements Robot {
   public function new(id:RobotId) logicalId = id;
   public function id():RobotId return logicalId;
   public function status():RobotStatus return Ready;
-  public function description():RobotDescription return new RobotDescription(logicalId, logicalId, [], []);
+  public function description():RobotDescription return new RobotDescription(
+    logicalId, logicalId, [], jointNames);
   public function capabilities():RobotCapabilities return new RobotCapabilities(
     logicalId,
     positions.length,
@@ -1175,8 +1232,8 @@ private class FakeRobot implements Robot {
     Int64.ofInt(1),
     Int64.ofInt(10),
     positions,
-    [],
-    [],
+    velocities,
+    efforts,
     1,
     0
   );

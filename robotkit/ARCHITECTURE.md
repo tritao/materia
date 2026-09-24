@@ -245,6 +245,12 @@ pure-pursuit controller at application update frequency. It obtains a fresh
 first controller does not require a trajectory planner. Native `RobotRuntime`
 continues to own joint limits and hard safety enforcement.
 
+`robotkit.material.Forks` is another explicit view over `Robot`. Its named axis
+configuration is resolved against `RobotDescription` once, then each lift,
+tilt, or spread request is validated and submitted as one `JointTargets` batch.
+Payload and load-limit values describe application policy and current knowledge;
+they do not replace enforcement in the native runtime.
+
 ## One simulation tick
 
 Applications advance a shared simulation with `Simulation.step(timestamp)`:

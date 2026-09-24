@@ -163,6 +163,12 @@ navigation.follow(new Path([startPose, stagingPose, goalPose], "odom"));
 navigation.updateObservation(robot.snapshot(), 0.02);
 ```
 
+`robotkit.material.Forks` maps configured lift, tilt, and spread joint names to
+atomic position batches. `ForkState` reads their positions, velocities, efforts,
+and source/receive clocks. `Payload`, `LoadState`, and `LoadLimits` represent
+load knowledge and a configured mass, load-moment, and lift-height envelope;
+runtime joint limits remain authoritative.
+
 ### Persistent recordings
 
 `McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing
