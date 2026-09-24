@@ -34,7 +34,6 @@ class BimDocument {
 	private var afterHookId:Int;
 
 	public function new(?cad:Document) {
-		BimWindowDefinition.registerEvaluator();
 		this.cad = cad == null ? new Document(null, false) : cad;
 		this.cad.setImplicitOutputEnabled(false);
 		beforeHookId = this.cad.addBeforeRecomputeHook(validateAllOpenings);
@@ -48,11 +47,14 @@ class BimDocument {
 	public function createWindow(name:String, definition:Definition):InstanceElement {
 		if (definition.document != cad)
 			throw new BimError("window definition belongs to another document");
+		var typeClass = definition.property("bim.class");
+		if (typeClass == null || typeClass.type != TypedProperty.TypeToken || typeClass.tokenDomain != BimSchema.DefinitionClass
+			|| typeClass.value != "window-type")
+			throw new BimError("definition is not a BIM Window Type: " + definition.id.value);
 		var transaction = cad.beginTransaction();
 		try {
 			var result = cad.createInstance(name, definition);
 			result.setProperty(TypedProperty.token("bim.class", BimSchema.Window, BimSchema.ElementClass));
-			result.setProperty(TypedProperty.definitionReference("bim.type", PersistentReference.definition(cad, definition.id)));
 			transaction.commit();
 			return result;
 		} catch (error:Dynamic) {

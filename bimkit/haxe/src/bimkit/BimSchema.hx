@@ -3,6 +3,7 @@ package bimkit;
 /** Stable names for the BIM domain vocabulary stored in generic CadKit data. */
 class BimSchema {
 	public static inline var ElementClass:String = "bim.element-class";
+	public static inline var DefinitionClass:String = "bim.definition-class";
 	public static inline var HostOutput:String = "bim.host-output";
 
 	public static inline var Project:String = "project";

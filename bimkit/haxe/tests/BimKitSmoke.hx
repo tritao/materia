@@ -77,6 +77,15 @@ class BimKitSmoke {
 		var window = model.createWindow("Lobby window", windowDefinition);
 		model.addToStorey(ground.id, window.id);
 		model.hostOpening(window, wall.id, 900, 900);
+		var windowTypeClass = windowDefinition.property("bim.class");
+		var uniqueWindowType = window.makeUnique();
+		var uniqueTypeClass = uniqueWindowType.property("bim.class");
+		check(windowDefinition.subgraph != null && windowDefinition.recipe == cadkit.parametric.Definition.SubgraphRecipe
+			&& windowDefinition.output("body").purpose == cadkit.parametric.DefinitionOutput.Geometry
+			&& windowDefinition.output("opening").purpose == cadkit.parametric.DefinitionOutput.Tool
+			&& windowTypeClass != null && windowTypeClass.value == "window-type"
+			&& uniqueWindowType.subgraph != null && uniqueTypeClass != null && uniqueTypeClass.value == "window-type",
+			"Window Types use authored CadKit definitions and makeUnique copies BIM type properties");
 
 		check(project.kind == "object" && site.kind == "object" && building.kind == "object" && ground.kind == "object"
 			&& upperStorey.kind == "object" && project.output == null && ground.output == null,
@@ -116,11 +125,15 @@ class BimKitSmoke {
 		var restored = BimCodec.decode(BimCodec.encode(model));
 		var restoredGround = restored.cad.element(ground.id);
 		var restoredBase = restored.storeyBaseLevel(ground.id);
+		var restoredWindow:cadkit.parametric.InstanceElement = cast restored.cad.element(window.id);
+		var restoredWindowType = restored.cad.definition(restoredWindow.definitionId);
+		var restoredTypeClass = restoredWindowType.property("bim.class");
 		check(restored.cad.implicitOutputEnabled == false && restored.containedElements(ground.id).length == 3
 			&& restored.aggregateChildren(building.id).length == 2
 			&& restoredBase != null && restoredBase.elementId.value == base.id.value
+			&& restoredWindowType.subgraph != null && restoredTypeClass != null && restoredTypeClass.value == "window-type"
 			&& propertyValue(restored.cad.element(space.id), "bim.class") == BimSchema.Space,
-			"the unified document codec round-trips the BIM spatial backbone");
+			"the unified document codec round-trips BIM spatial data and authored Window Types");
 		restored.removeOpening(window.id);
 		check(restored.cad.findElement(window.id) == null && restored.containedElements(ground.id).length == 2,
 			"opening deletion removes its host and spatial containment edges together");
