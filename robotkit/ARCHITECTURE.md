@@ -238,6 +238,13 @@ clock IDs from its input observation. `WheelOdometryLocalization` supplies an
 owned base pose and supplies a `map` to `base` estimate without changing the
 simulation state.
 
+`robotkit.navigation.Navigation` follows a frame-tagged `Path` using a
+pure-pursuit controller at application update frequency. It obtains a fresh
+`LocalizationState`, computes a body twist, and sends that through `MobileBase`.
+`Trajectory` stores time-stamped references for consumers that need them; the
+first controller does not require a trajectory planner. Native `RobotRuntime`
+continues to own joint limits and hard safety enforcement.
+
 ## One simulation tick
 
 Applications advance a shared simulation with `Simulation.step(timestamp)`:

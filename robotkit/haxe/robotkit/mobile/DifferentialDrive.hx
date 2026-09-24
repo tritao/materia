@@ -27,6 +27,8 @@ class DifferentialDrive implements DriveModel {
   public function createOdometry():Null<DifferentialOdometry>
     return new DifferentialOdometry(leftWheelJoint, rightWheelJoint, wheelRadius, trackWidth);
 
+  public function supportsInPlaceRotation():Bool return true;
+
   public function targets(twist:Twist2):Array<JointTarget> {
     if (twist == null) throw "Differential drive requires a twist";
     var halfTurnSpeed = twist.angular * trackWidth * 0.5;

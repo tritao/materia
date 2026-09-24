@@ -41,6 +41,8 @@ class AckermannDrive implements DriveModel {
 
   public function createOdometry():Null<DifferentialOdometry> return null;
 
+  public function supportsInPlaceRotation():Bool return false;
+
   public function targets(twist:Twist2):Array<JointTarget> {
     if (twist == null) throw "Ackermann drive requires a twist";
     var limited = constrain(twist);

@@ -52,6 +52,12 @@ import robotkit.localization.WheelOdometryLocalization;
 import robotkit.localization.SimulationTruthLocalization;
 import robotkit.localization.LocalizationQuality;
 import robotkit.localization.PoseCovariance2;
+import robotkit.navigation.Path;
+import robotkit.navigation.Trajectory;
+import robotkit.navigation.TrajectorySample;
+import robotkit.navigation.NavigationGoal;
+import robotkit.navigation.Navigation;
+import robotkit.navigation.NavigationStatus;
 
 class RobotWorldTests {
   static var assertions = 0;
@@ -66,6 +72,7 @@ class RobotWorldTests {
     testJointTargetBatches();
     testMobileLayer();
     testLocalization();
+    testNavigation();
     testMcapRoundTrip();
     testMcapRobustness();
     testForwardingAndLifecycle();
@@ -432,6 +439,79 @@ class RobotWorldTests {
     throws(function() truth.reset(new Pose2(9.0, 9.0, 0.0)),
       "simulation truth cannot be reset to a fabricated pose");
     simulation.dispose();
+  }
+
+  static function testNavigation():Void {
+    var points = [new Pose2(0.0, 0.0, 0.0), new Pose2(1.0, 0.0, 0.0)];
+    var path = new Path(points, "odom");
+    points[1] = new Pose2(9.0, 9.0, 1.0);
+    check(Math.abs(path.length - 1.0) < 1e-9 &&
+      Math.abs(path.poseAt(0.5).x - 0.5) < 1e-9,
+      "Path owns waypoints and interpolates by arc length");
+    equal(path.count(), 2, "Path exposes a stable waypoint count");
+    throws(function() new Path([new Pose2(), new Pose2()], ""),
+      "Path requires an explicit frame ID");
+
+    var trajectory = new Trajectory([
+      new TrajectorySample(0.0, new Pose2(), new Twist2()),
+      new TrajectorySample(2.0, new Pose2(2.0, 0.0, 1.0), new Twist2(1.0, 0.5))
+    ], "odom");
+    var midway = trajectory.sampleAt(1.0);
+    check(Math.abs(trajectory.durationSeconds - 2.0) < 1e-9 &&
+      Math.abs(midway.pose.x - 1.0) < 1e-9 &&
+      Math.abs(midway.pose.yaw - 0.5) < 1e-9 &&
+      Math.abs(midway.twist.angular - 0.25) < 1e-9,
+      "Trajectory interpolates pose and velocity samples");
+    throws(function() new Trajectory([
+      new TrajectorySample(0.0, new Pose2(), Twist2.zero()),
+      new TrajectorySample(0.0, new Pose2(), Twist2.zero())
+    ]), "Trajectory requires strictly increasing sample times");
+
+    var robot = new FakeRobot("nav-base");
+    robot.positions = [0.0, 0.0];
+    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(1.0, 2.0));
+    var localization = new WheelOdometryLocalization(base);
+    var navigation = new Navigation(base, localization, 0.25, 0.4, 0.8);
+    var goal = new NavigationGoal(path.goal(), "odom", 0.15, 0.1);
+    navigation.follow(path, goal);
+    function navSnapshot(sequence:Int, time:Int, left:Float, right:Float):RobotSnapshot
+      return new RobotSnapshot("nav-base", Int64.ofInt(sequence), Int64.ofInt(time),
+        [left, right], [], [], 1, 0, Int64.ofInt(time + 5), [], "nav-boot", "host");
+    var firstStatus = navigation.updateObservation(navSnapshot(1, 10, 0.0, 0.0), 0.1);
+    check(switch firstStatus {
+      case Following: true;
+      case _: false;
+    }, "Navigation starts and updates a path-following request");
+    check(switch robot.lastCommand {
+      case JointTargets(targets, _):
+        targets.length == 2 && targets[0].mode == robotkit.world.JointTargetMode.Velocity &&
+          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+          Math.abs(targets[0].target - targets[1].target) < 1e-9;
+      case _: false;
+    }, "path follower commands both differential wheels through MobileBase");
+    var finalStatus = navigation.updateObservation(navSnapshot(2, 20, 9.0, 9.0), 0.1);
+    check(switch finalStatus {
+      case Succeeded: true;
+      case _: false;
+    }, "Navigation succeeds when localized pose enters the goal tolerances");
+    check(switch robot.lastStop {
+      case Normal: true;
+      case _: false;
+    }, "Navigation stops the robot on successful arrival");
+
+    navigation.follow(path);
+    navigation.cancel();
+    check(switch navigation.status {
+      case Cancelled: true;
+      case _: false;
+    }, "Navigation supports cancellation");
+    navigation.follow(new Path([new Pose2(), new Pose2(1.0, 0.0, 0.0)], "map"));
+    var mismatch = navigation.update(0.1);
+    check(switch mismatch {
+      case Failed(_): true;
+      case _: false;
+    }, "Navigation fails explicitly when path and localization frames differ");
   }
 
   static function testMcapRoundTrip():Void {

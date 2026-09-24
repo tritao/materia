@@ -152,6 +152,17 @@ covariance, quality, and both source and receive clock identities.
 differential `MobileBase`; `SimulationTruthLocalization` projects a
 simulation-owned robot pose into `map` to `base` for deterministic scenarios.
 
+`robotkit.navigation.Navigation` follows a framed `Path` using the latest
+localization state and an application-supplied update duration. `Trajectory`
+stores time-parameterized pose/twist samples, and `NavigationGoal` defines final
+position and heading tolerances. The controller commands `MobileBase`; runtime
+limits and native safety checks remain active underneath it.
+
+```haxe
+navigation.follow(new Path([startPose, stagingPose, goalPose], "odom"));
+navigation.updateObservation(robot.snapshot(), 0.02);
+```
+
 ### Persistent recordings
 
 `McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing
