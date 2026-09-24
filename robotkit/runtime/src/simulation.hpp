@@ -49,6 +49,8 @@ public:
     rk_result remove_object(rk_simulation_object object);
     rk_result teleport_object(rk_simulation_object object, const rk_simulation_pose &pose);
     rk_result get_object_pose(rk_simulation_object object, rk_simulation_pose &out_pose) const;
+    rk_result capture_presentation(rk_simulation_presentation_info &out_info,
+        std::vector<rk_simulation_presentation_pose> &out_poses) const;
     /** Returns the number of completed shared physics steps. */
     uint64_t step_index() const;
     /** Returns the fixed-step simulation time in seconds. */

@@ -47,7 +47,7 @@ def main():
     parser.add_argument("--allocation-interval", type=int, help="allocation sampling interval in bytes; 0 disables it")
     parser.add_argument("--heap-dump", action="store_true",
                         help="save a full GC heap dump and its exact bytecode (headless scenario only)")
-    parser.add_argument("--scenario", choices=["tab-inspector", "tab-matrix"],
+    parser.add_argument("--scenario", choices=["tab-inspector", "tab-matrix", "architecture"],
                         help="replay a headless UI interaction")
     parser.add_argument("--cycles", type=int, default=20, help="headless scenario cycles (default: 20)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the compiled editor; still ensure the Release HashLink runtime")
@@ -143,9 +143,10 @@ def main():
         process = subprocess.Popen(command, cwd=APP, env=environment,
                                    stdout=log, stderr=subprocess.STDOUT)
         with (output / "profiler.log").open("w") as profile_log:
-            sample_rate = args.sample_rate or (50 if args.scenario == "tab-matrix" else 500)
+            sample_rate = args.sample_rate or (50 if args.scenario == "tab-matrix" else
+                                               100 if args.scenario == "architecture" else 500)
             allocation_interval = (args.allocation_interval if args.allocation_interval is not None else
-                                   0 if args.scenario == "tab-matrix" else 65536)
+                                   0 if args.scenario in ("tab-matrix", "architecture") else 65536)
             capture = None if args.no_profile else subprocess.Popen(
                 [str(profiler), "--connect-timeout", "15", "--rate", str(sample_rate),
                  "--alloc-interval", str(allocation_interval), "--interval",
@@ -155,6 +156,7 @@ def main():
             try:
                 run_timeout = (args.idle_seconds if args.idle_seconds is not None else
                                args.seconds + 30 if args.seconds is not None else
+                               max(180, args.cycles * 5 + 30) if args.scenario == "architecture" else
                                max(60, args.cycles * 0.5 + 30) if args.scenario is not None else 60)
                 deadline = time.monotonic() + run_timeout
                 while process.poll() is None and time.monotonic() < deadline:
@@ -332,11 +334,61 @@ def main():
         except (OSError, KeyError, ValueError) as error:
             print(f"scenario verification failed: {error}", file=sys.stderr)
             result = 1
+    elif args.scenario == "architecture":
+        try:
+            summary = json.loads((output / "architecture-summary.json").read_text())
+            actions = [json.loads(line) for line in (output / "actions.jsonl").read_text().splitlines()]
+            expected = {"cad-parameter-edits", "bim-opening-edits", "load-10k-scene",
+                        "single-object-nudge", "move-500-objects", "undo-1000-edits",
+                        "structural-history-40-edits", "simulation-presentation-500-links",
+                        "perspective-picking-500-moving", "project-history-budget"}
+            completed = {row.get("action") for row in actions}
+            if (not expected.issubset(completed) or summary.get("sceneObjects") != 10000 or
+                    summary.get("movingObjects") != 500 or summary.get("articulatedLinks") != 500 or
+                    summary.get("undo1000Seconds") is None or
+                    summary.get("structuralHistoryOperations") != 40 or
+                    summary.get("structuralHistorySeconds") is None or
+                    summary.get("structuralAllocatedBytes") is None or
+                    summary.get("structuralHistoryEstimatedBytes") is None or
+                    summary.get("structuralHistoryEstimatedBytes") > 100000 or
+                    summary.get("staticPickMedianSeconds") is None or
+                    summary.get("viewBuildMedianSeconds") is None or
+                    summary.get("viewPickMedianSeconds") is None or
+                    summary.get("budgetedOperationCount") != 1000 or
+                    summary.get("budgetedFinalOperationCount") is None or
+                    summary.get("budgetedFinalOperationCount") != 1 or
+                    summary.get("budgetedEstimatedBytes") is None or
+                    summary.get("budgetedEstimatedBytes") > 64 * 1024 * 1024 or
+                    not isinstance(summary.get("sceneLoadPhases"), dict) or
+                    summary.get("spatialCacheSamples") != 5 or
+                    summary.get("spatialSnapshotMedianSeconds") is None or
+                    summary.get("spatialIndexMedianSeconds") is None):
+                raise ValueError("architecture workload did not complete all requested phases")
+            snapshot_ms = summary["spatialSnapshotMedianSeconds"] * 1000
+            index_ms = summary["spatialIndexMedianSeconds"] * 1000
+            phase_seconds = summary["sceneLoadPhases"]
+            phase_total = sum(value for value in phase_seconds.values() if isinstance(value, (int, float)))
+            phase_top = sorted(phase_seconds.items(), key=lambda item: item[1] or 0, reverse=True)[:3]
+            phase_text = ", ".join(f"{name}={value * 1000:.0f}ms" for name, value in phase_top)
+            structural_mb = summary["structuralAllocatedBytes"] / (1024 * 1024)
+            print(f"scenario=architecture verified phases=10 sceneObjects=10000 "
+                  f"movingObjects=500 links=500 snapshotMedian={snapshot_ms:.3f}ms "
+                  f"spatialIndexMedian={index_ms:.3f}ms loadPhases={phase_total * 1000:.0f}ms "
+                  f"topLoadPhases=[{phase_text}] structuralHistory="
+                  f"{summary['structuralHistorySeconds']:.2f}s/{structural_mb:.1f}MiB allocated, "
+                  f"{summary['structuralHistoryEstimatedBytes']}B retained estimate "
+                  f"emptyViewMedian={summary['emptyViewMedianSeconds'] * 1000:.3f}ms "
+                  f"viewBuildMedian={summary['viewBuildMedianSeconds'] * 1000:.3f}ms "
+                  f"viewPickMedian={summary['viewPickMedianSeconds'] * 1000:.3f}ms")
+        except (OSError, KeyError, ValueError) as error:
+            print(f"scenario verification failed: {error}", file=sys.stderr)
+            result = 1
     artifacts = {"bytecode": bytecode_name}
     for name, filename in (("heap", "heap.dump"), ("profile", "editor.hlpc"),
                            ("perfetto", "editor.perfetto.json"), ("memory", "memory.jsonl"),
                            ("frames", "frame-timeline.jsonl"), ("retained", "retained.jsonl"),
-                           ("spikes", "tab-spikes.json")):
+                           ("spikes", "tab-spikes.json"),
+                           ("architecture", "architecture-summary.json")):
         if (output / filename).is_file():
             artifacts[name] = filename
     (output / "capture.json").write_text(json.dumps({"schemaVersion": 1,

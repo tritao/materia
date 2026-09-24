@@ -958,6 +958,79 @@ void geometry_edits_refresh_bounds_and_picking_for_new_snapshots() {
     assert(after_index.pick_ray(moved_ray).node == node);
 }
 
+void spatial_index_refits_transform_changes_and_requests_rebuilds() {
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    auto &geometry_resource = scene->geometry_store().create(geometry);
+    geometry_resource.bounds.valid = true;
+    geometry_resource.bounds.minimum = {-0.5f, -0.5f, -0.5f};
+    geometry_resource.bounds.maximum = {0.5f, 0.5f, 0.5f};
+    geometry_resource.edit_payload().vertices = {
+        nkscene::GeometryVertex{{-0.5f, -0.5f, 0.0f}},
+        nkscene::GeometryVertex{{0.5f, -0.5f, 0.0f}},
+        nkscene::GeometryVertex{{0.0f, 0.5f, 0.0f}}};
+    geometry_resource.edit_payload().indices = {0, 1, 2};
+    const auto material = scene->reserve_material_id();
+    scene->material_store().create(material);
+    const auto node = scene->reserve_node_id();
+
+    Transaction create(scene);
+    create.add_create(node);
+    create.add_geometry(node, geometry);
+    create.add_material(node, material);
+    ChangeSet changes;
+    assert(scene->commit(create, changes) == NKS_OK);
+    create.close();
+
+    const auto original = scene->snapshot();
+    nkscene::SceneSpatialIndex index(original);
+
+    const auto added = scene->reserve_node_id();
+    Transaction add(scene);
+    add.add_create(added);
+    assert(scene->commit(add, changes) == NKS_OK);
+    add.close();
+    const auto structural = scene->snapshot();
+    assert(!index.update_node_bounds(structural, node));
+    assert(index.source_revision() == original.revision());
+
+    nkscene::SceneSpatialIndex refitted(structural);
+    for (std::uint32_t update = 1; update <= 128; ++update) {
+        Transaction move(scene);
+        move.add_transform(node, translated(static_cast<float>(update)));
+        assert(scene->commit(move, changes) == NKS_OK);
+        move.close();
+
+        const auto current = scene->snapshot();
+        assert(refitted.update_node_bounds(current, node));
+        assert(refitted.source_revision() == current.revision());
+    }
+
+    nkscene::Bounds old_bounds;
+    old_bounds.valid = true;
+    old_bounds.minimum = {-1.0f, -1.0f, -1.0f};
+    old_bounds.maximum = {1.0f, 1.0f, 1.0f};
+    assert(refitted.query_bounds(old_bounds).empty());
+    nkscene::Bounds moved_bounds;
+    moved_bounds.valid = true;
+    moved_bounds.minimum = {127.0f, -1.0f, -1.0f};
+    moved_bounds.maximum = {129.0f, 1.0f, 1.0f};
+    const auto moved_nodes = refitted.query_bounds(moved_bounds);
+    assert(moved_nodes.size() == 1 && moved_nodes.front() == node);
+    const nkscene::Ray moved_ray{{128.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}};
+    assert(refitted.pick_ray(moved_ray).node == node);
+
+    Transaction over_budget(scene);
+    over_budget.add_transform(node, translated(129.0f));
+    assert(scene->commit(over_budget, changes) == NKS_OK);
+    over_budget.close();
+    const auto next = scene->snapshot();
+    assert(!refitted.update_node_bounds(next, node));
+    assert(refitted.source_revision() != next.revision());
+    nkscene::SceneSpatialIndex rebuilt(next);
+    assert(rebuilt.pick_ray({{129.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}}).node == node);
+}
+
 void render_snapshots_are_concurrent_reader_safe() {
     constexpr std::size_t count = 256;
     constexpr std::size_t reader_count = 3;
@@ -1039,6 +1112,7 @@ int main() {
     spatial_queries_and_cpu_picking_are_snapshot_bound();
     runtime_pose_overrides_render_and_pick_without_mutating_snapshot();
     geometry_edits_refresh_bounds_and_picking_for_new_snapshots();
+    spatial_index_refits_transform_changes_and_requests_rebuilds();
     render_snapshots_are_concurrent_reader_safe();
     constexpr std::size_t count = 50000;
     auto scene = std::make_shared<Scene>();

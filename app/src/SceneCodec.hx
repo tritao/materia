@@ -1,19 +1,22 @@
 package app;
 
 import haxe.Json;
+import bimkit.BimCodec;
+import bimkit.BimDocument;
 
 class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
   public static inline var VERSION:Int = 1;
 
   public static function encode(scene:EditorScene,
-    ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord):String return Json.stringify(
+    ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument):String return Json.stringify(
       {
     format: FORMAT,
     version: VERSION,
     objects: script == null ? scene.recordsForSave() :[],
     sensors : script == null && sensors != null ? sensors.records() : null,
-    script : script
+    script : script,
+    bim : bim == null ? null : Json.parse(BimCodec.encode(bim))
   },
     null,
     "  "
@@ -53,13 +56,47 @@ class SceneCodec {
         overrideValue
       ));
     }
+    var identityFields = ["identityVersion", "packageId", "packageVersion",
+      "sourceSha256", "configurationSha256"];
+    var identityCount = 0;
+    for (name in identityFields) if (Reflect.hasField(value, name)) identityCount++;
+    if (identityCount != 0 && identityCount != identityFields.length)
+      throw "Incomplete setup script identity";
+    var packageId:Null<String> = null, packageVersion:Null<String> = null;
+    var sourceSha256:Null<String> = null, configurationSha256:Null<String> = null;
+    var identityVersion:Null<Int> = null;
+    if (identityCount != 0) {
+      identityVersion = Std.int(numberField(value, "identityVersion"));
+      if (identityVersion != 1) throw "Unsupported setup script identity version";
+      packageId = stringField(value, "packageId");
+      packageVersion = stringField(value, "packageVersion");
+      sourceSha256 = stringField(value, "sourceSha256");
+      configurationSha256 = stringField(value, "configurationSha256");
+      if (!~/^[0-9a-f]{64}$/.match(sourceSha256)
+        || !~/^[0-9a-f]{64}$/.match(configurationSha256))
+        throw "Invalid setup script digest";
+    }
     return {
       reference: reference,
       version: version,
+      identityVersion: identityVersion,
+      packageId: packageId,
+      packageVersion: packageVersion,
+      sourceSha256: sourceSha256,
+      configurationSha256: configurationSha256,
       overrideVersion: ScriptOwnership.OVERRIDE_VERSION,
       overridesEnabled: overridesEnabled,
       overrides: overrides
     };
+  }
+
+  /** Optional versioned BimKit section; absent sections migrate to an empty BIM model. */
+  public static function decodeBim(text:String):BimDocument {
+    var root:Dynamic = Json.parse(text);
+    if (stringField(root, "format") != FORMAT || numberField(root, "version") != VERSION)
+      throw "Unsupported scene document";
+    var value:Dynamic = Reflect.field(root, "bim");
+    return value == null ? new BimDocument() : BimCodec.decode(Json.stringify(value));
   }
 
   static function validateOverrideValue(kind:String, value:Dynamic):Void switch kind {

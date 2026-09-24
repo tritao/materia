@@ -22,7 +22,14 @@ int main() {
     model.struct_size = sizeof(model);
     model.link_count = 2;
     model.joint_count = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    for (uint32_t i = 0; i < model.link_count; ++i) {
+        model.links[i].mass = 1.0;
+        model.links[i].inertia_tensor[0] = model.links[i].inertia_tensor[4] = model.links[i].inertia_tensor[8] = 1.0;
+    }
     model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
+    model.joints[0].axis[2] = 1.0;
     model.sensor_count = 2;
     model.sensors[0].kind = RK_SENSOR_IMU;
     model.sensors[0].link = 1; // Articulated link, not the static base.

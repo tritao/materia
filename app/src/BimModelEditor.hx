@@ -1,6 +1,7 @@
 package app;
 
 import bimkit.BimDocument;
+import nativekit.ui.core.EditorDocument;
 import cadkit.parametric.Definition;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
@@ -22,17 +23,21 @@ import nativekit.ui.widgets.TreeView;
 class BimModelEditor implements View {
 	public final key:String;
 	public final model:BimDocument;
+	final projectDocument:Null<EditorDocument>;
+	final applyEdit:Null<BimProjectEdit>;
 	public final spatialTree:BimSpatialTree;
 	public final typeTree:BimTypeTree;
 	public var showingTypes(default, null):Bool;
 	private var selectedElementId:Null<String>;
 	private var selectedDefinitionId:Null<String>;
 
-	public function new(key:String, model:BimDocument) {
+	public function new(key:String, model:BimDocument, ?projectDocument:EditorDocument, ?applyEdit:BimProjectEdit) {
 		if (key == null || key.length == 0 || model == null)
 			throw "BIM editor requires a stable key and a document";
 		this.key = key;
 		this.model = model;
+		this.projectDocument = projectDocument;
+		this.applyEdit = applyEdit;
 		spatialTree = new BimSpatialTree(model);
 		typeTree = new BimTypeTree(model);
 		showingTypes = false;
@@ -55,11 +60,11 @@ class BimModelEditor implements View {
 			new KeyedView("spatial", modeButton("Spatial", false, context)),
 			new KeyedView("types", modeButton("Types", true, context)),
 			new KeyedView("undo", new Button("Undo BIM", null, function() {
-				model.undo();
+				if (projectDocument == null) model.undo(); else projectDocument.undo();
 				context.commands.refresh();
 			}, key + ":undo")),
 			new KeyedView("redo", new Button("Redo BIM", null, function() {
-				model.redo();
+				if (projectDocument == null) model.redo(); else projectDocument.redo();
 				context.commands.refresh();
 			}, key + ":redo"))
 		]);
@@ -121,7 +126,7 @@ class BimModelEditor implements View {
 		if (selectedDefinitionId != null) {
 			var definition = findDefinition(selectedDefinitionId);
 			if (definition != null)
-				result = BimInspectorDescriptors.forDefinition(definition);
+				result = BimInspectorDescriptors.forDefinition(definition, applyEdit);
 			return result;
 		}
 		if (selectedElementId == null)
@@ -129,10 +134,10 @@ class BimModelEditor implements View {
 		var element = model.cad.findElement(new ElementId(selectedElementId));
 		if (element == null)
 			return result;
-		result = BimInspectorDescriptors.forElement(element);
+		result = BimInspectorDescriptors.forElement(element, applyEdit);
 		if (element.kind == "instance") {
 			var instance:InstanceElement = cast element;
-			result = result.concat(BimInspectorDescriptors.forDefinition(model.cad.definition(instance.definitionId)));
+			result = result.concat(BimInspectorDescriptors.forDefinition(model.cad.definition(instance.definitionId), applyEdit));
 		}
 		return result;
 	}

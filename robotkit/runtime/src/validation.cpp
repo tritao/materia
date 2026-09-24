@@ -1,6 +1,7 @@
 #include "robotkit_runtime.h"
 
 #include <cmath>
+#include <algorithm>
 #include <cstddef>
 
 namespace {
@@ -35,8 +36,23 @@ extern "C" {
 
 rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blueprint *blueprint) {
     if (!has_full_struct(blueprint) || blueprint->joint_count > RK_MAX_JOINTS ||
-        blueprint->link_count == 0 || blueprint->sensor_count > RK_MAX_SENSORS)
+        blueprint->link_count == 0 || blueprint->link_count > RK_MAX_LINKS ||
+        blueprint->sensor_count > RK_MAX_SENSORS ||
+        blueprint->collision_approximation > RK_COLLISION_APPROXIMATION_BOUNDS_BOX)
         return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < blueprint->link_count; ++i) {
+        const auto &link = blueprint->links[i];
+        if (!is_finite(link.mass) || link.mass <= 0.0) return RK_ERROR_INVALID_ARGUMENT;
+        for (double value : link.center_of_mass) if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT;
+        for (double value : link.inertia_tensor) if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT;
+        const auto *m = link.inertia_tensor;
+        const double scale = std::max({1.0, std::abs(m[0]), std::abs(m[4]), std::abs(m[8])});
+        const double eps = scale * 1e-10;
+        if (std::abs(m[1]-m[3]) > eps || std::abs(m[2]-m[6]) > eps || std::abs(m[5]-m[7]) > eps ||
+            m[0] <= eps || m[0]*m[4]-m[1]*m[3] <= eps*eps ||
+            m[0]*(m[4]*m[8]-m[5]*m[7])-m[1]*(m[3]*m[8]-m[5]*m[6])+m[2]*(m[3]*m[7]-m[4]*m[6]) <= eps*eps*eps)
+            return RK_ERROR_INVALID_ARGUMENT;
+    }
     for (uint32_t i = 0; i < blueprint->sensor_count; ++i) {
         const auto &sensor = blueprint->sensors[i];
         if (sensor.kind < RK_SENSOR_ENCODER || sensor.kind > RK_SENSOR_LIDAR ||
@@ -58,6 +74,14 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             !is_finite(joint.lower_limit) || !is_finite(joint.upper_limit) ||
             !is_finite(joint.max_effort) || joint.lower_limit > joint.upper_limit ||
             joint.max_effort < 0.0)
+            return RK_ERROR_INVALID_ARGUMENT;
+        for (double value : joint.parent_frame_position) if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT;
+        for (double value : joint.child_frame_position) if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT;
+        double parent_norm = 0.0, child_norm = 0.0, axis_norm = 0.0;
+        for (double value : joint.parent_frame_rotation) { if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT; parent_norm += value*value; }
+        for (double value : joint.child_frame_rotation) { if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT; child_norm += value*value; }
+        for (double value : joint.axis) { if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT; axis_norm += value*value; }
+        if (std::abs(parent_norm-1.0)>1e-6 || std::abs(child_norm-1.0)>1e-6 || std::abs(axis_norm-1.0)>1e-6)
             return RK_ERROR_INVALID_ARGUMENT;
     }
     return RK_OK;

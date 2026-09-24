@@ -8,7 +8,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace robotkit {
 namespace {
@@ -80,6 +82,7 @@ Simulation::~Simulation() {
 rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                                 rk_robot_runtime &out_runtime) {
     std::lock_guard tick_lock(tick_mutex_);
+    bool topology_update = false;
     {
         std::lock_guard state_lock(state_mutex_);
         if (sealed_ || running_)
@@ -121,14 +124,21 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         if (changes != 0)
             nkscene_change_set_destroy(changes);
 
+        require_sim(nksim_world_begin_topology_update(world_),
+                    "nksim_world_begin_topology_update");
+        topology_update = true;
         for (uint32_t index = 0; index < blueprint.link_count; ++index) {
             nksim_body_desc desc{};
             desc.struct_size = sizeof(desc);
             desc.node = binding->nodes_[index];
             desc.motion_type = index == root ? NKSIM_MOTION_KINEMATIC : NKSIM_MOTION_DYNAMIC;
-            desc.mass = 1.0;
+            desc.mass = blueprint.links[index].mass;
+            desc.has_inertial_properties = 1;
+            std::copy_n(blueprint.links[index].center_of_mass, 3, desc.center_of_mass);
+            std::copy_n(blueprint.links[index].inertia_tensor, 9, desc.inertia_tensor);
             desc.shape = shape_;
-            desc.collision_layer = desc.collision_mask = 1;
+            desc.collision_layer = 1;
+            desc.collision_mask = blueprint.collision_approximation == RK_COLLISION_APPROXIMATION_NONE ? 0 : 1;
             nksim_body body = 0;
             require_sim(nksim_body_create(world_, &desc, &body), "nksim_body_create");
             binding->bodies_.push_back(body);
@@ -141,7 +151,18 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.type = source.type;
             desc.body_a = binding->bodies_[source.parent_link];
             desc.body_b = binding->bodies_[source.child_link];
-            desc.axis_a[2] = 1.0;
+            std::copy_n(source.parent_frame_position, 3, desc.anchor_a);
+            std::copy_n(source.child_frame_position, 3, desc.anchor_b);
+            const auto *q = source.parent_frame_rotation;
+            const auto *a = source.axis;
+            const double t[3] = {
+                2.0 * (q[1]*a[2] - q[2]*a[1]),
+                2.0 * (q[2]*a[0] - q[0]*a[2]),
+                2.0 * (q[0]*a[1] - q[1]*a[0])
+            };
+            desc.axis_a[0] = a[0] + q[3]*t[0] + q[1]*t[2] - q[2]*t[1];
+            desc.axis_a[1] = a[1] + q[3]*t[1] + q[2]*t[0] - q[0]*t[2];
+            desc.axis_a[2] = a[2] + q[3]*t[2] + q[0]*t[1] - q[1]*t[0];
             desc.lower_limit = source.lower_limit;
             desc.upper_limit = source.upper_limit;
             desc.max_force = source.max_effort;
@@ -150,6 +171,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             binding->joints_.push_back(joint);
             joints_.push_back(joint);
         }
+        const auto topology_result = nksim_world_end_topology_update(world_);
+        topology_update = false;
+        require_sim(topology_result, "nksim_world_end_topology_update");
         bindings_.push_back(binding);
         binding->base_body_ = binding->bodies_[root];
         robot_base_bodies_.push_back(binding->base_body_);
@@ -178,8 +202,12 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         out_runtime = handle;
         return RK_OK;
     } catch (const std::bad_alloc &) {
+        if (topology_update)
+            (void)nksim_world_end_topology_update(world_);
         return RK_ERROR_OUT_OF_MEMORY;
     } catch (...) {
+        if (topology_update)
+            (void)nksim_world_end_topology_update(world_);
         return RK_ERROR_BACKEND;
     }
 }
@@ -229,6 +257,7 @@ rk_result Simulation::reset_robot(uint32_t robot_index) {
         robot_initial_poses_[robot_index].rotation)!=RK_OK)return RK_ERROR_BACKEND;
     binding->reset();
     runtimes_[robot_index]->reset_state();
+    if (snapshot_ != 0) { nksim_snapshot_destroy(snapshot_); snapshot_ = 0; }
     return RK_OK;
 }
 
@@ -410,6 +439,7 @@ rk_result Simulation::spawn_object(const rk_simulation_object_desc &desc,
     object.active = true;
     objects_.push_back(object);
     out_object = static_cast<rk_simulation_object>(objects_.size());
+    if (snapshot_ != 0) { nksim_snapshot_destroy(snapshot_); snapshot_ = 0; }
     return RK_OK;
 }
 
@@ -434,6 +464,7 @@ rk_result Simulation::remove_object(rk_simulation_object object) {
         return RK_ERROR_BACKEND;
     if (changes != 0) nkscene_change_set_destroy(changes);
     value.active = false;
+    if (snapshot_ != 0) { nksim_snapshot_destroy(snapshot_); snapshot_ = 0; }
     return RK_OK;
 }
 
@@ -461,6 +492,94 @@ rk_result Simulation::get_object_pose(rk_simulation_object object,
         return RK_ERROR_INVALID_ARGUMENT;
     const auto &value=objects_[object-1];
     return value.active?read_body_pose(value.body,out_pose):RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result Simulation::capture_presentation(rk_simulation_presentation_info &out_info,
+        std::vector<rk_simulation_presentation_pose> &out_poses) const {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (out_info.struct_size < sizeof(out_info)) return RK_ERROR_INVALID_ARGUMENT;
+    std::unordered_map<nksim_body, rk_simulation_pose> body_poses;
+    if (snapshot_ != 0) {
+        uint64_t count = 0;
+        if (nksim_snapshot_get_body_count(snapshot_, &count) != NKSIM_OK)
+            return RK_ERROR_BACKEND;
+        body_poses.reserve(static_cast<std::size_t>(count));
+        for (uint64_t index = 0; index < count; ++index) {
+            nksim_body_state state{};
+            state.struct_size = sizeof(state);
+            if (nksim_snapshot_get_body(snapshot_, index, &state) != NKSIM_OK)
+                return RK_ERROR_BACKEND;
+            rk_simulation_pose pose{};
+            pose.struct_size = sizeof(pose);
+            std::copy_n(state.position, 3, pose.position);
+            std::copy_n(state.rotation, 4, pose.rotation);
+            body_poses.emplace(state.body, pose);
+        }
+    }
+    auto readPose = [&](nksim_body body, rk_simulation_pose &pose) -> rk_result {
+        if (snapshot_ == 0) return read_body_pose(body, pose);
+        const auto found = body_poses.find(body);
+        if (found == body_poses.end()) return RK_ERROR_BACKEND;
+        pose = found->second;
+        return RK_OK;
+    };
+    std::size_t pose_count = robot_base_bodies_.size();
+    for (const auto &binding : bindings_) {
+        const auto robot = binding.lock();
+        if (robot) pose_count += robot->bodies_.size();
+    }
+    for (const auto &object : objects_) if (object.active) ++pose_count;
+    if (pose_count > std::numeric_limits<uint32_t>::max()) return RK_ERROR_OUT_OF_MEMORY;
+    out_poses.clear();
+    out_poses.reserve(pose_count);
+    for (uint32_t robot_index = 0; robot_index < robot_base_bodies_.size(); ++robot_index) {
+        rk_simulation_presentation_pose item{};
+        item.struct_size = sizeof(item);
+        item.kind = RK_SIMULATION_PRESENTATION_ROBOT_BASE;
+        item.robot_index = robot_index;
+        rk_simulation_pose pose{};
+        pose.struct_size = sizeof(pose);
+        auto result = readPose(robot_base_bodies_[robot_index], pose);
+        if (result != RK_OK) return result;
+        std::copy_n(pose.position, 3, item.position);
+        std::copy_n(pose.rotation, 4, item.rotation);
+        out_poses.push_back(item);
+        const auto binding = bindings_[robot_index].lock();
+        if (!binding) return RK_ERROR_INVALID_HANDLE;
+        for (uint32_t link_index = 0; link_index < binding->bodies_.size(); ++link_index) {
+            item = {};
+            item.struct_size = sizeof(item);
+            item.kind = RK_SIMULATION_PRESENTATION_ROBOT_LINK;
+            item.robot_index = robot_index;
+            item.link_index = link_index;
+            pose = {};
+            pose.struct_size = sizeof(pose);
+            result = readPose(binding->bodies_[link_index], pose);
+            if (result != RK_OK) return result;
+            std::copy_n(pose.position, 3, item.position);
+            std::copy_n(pose.rotation, 4, item.rotation);
+            out_poses.push_back(item);
+        }
+    }
+    for (uint32_t index = 0; index < objects_.size(); ++index) {
+        const auto &object = objects_[index];
+        if (!object.active) continue;
+        rk_simulation_presentation_pose item{};
+        item.struct_size = sizeof(item);
+        item.kind = RK_SIMULATION_PRESENTATION_ENVIRONMENT;
+        item.object_id = index + 1;
+        rk_simulation_pose pose{};
+        pose.struct_size = sizeof(pose);
+        const auto result = readPose(object.body, pose);
+        if (result != RK_OK) return result;
+        std::copy_n(pose.position, 3, item.position);
+        std::copy_n(pose.rotation, 4, item.rotation);
+        out_poses.push_back(item);
+    }
+    out_info.step_index = step_index_;
+    out_info.simulation_time = simulation_time_;
+    out_info.pose_count = static_cast<uint32_t>(out_poses.size());
+    return RK_OK;
 }
 
 rk_result Simulation::step(uint64_t timestamp_ns) {
@@ -617,10 +736,9 @@ void Simulation::cleanup() noexcept {
         nksim_snapshot_destroy(snapshot_);
     snapshot_ = 0;
     if (world_ != 0) {
-        for (auto joint : joints_)
-            nksim_joint_destroy(world_, joint);
-        for (auto body : bodies_)
-            nksim_body_destroy(world_, body);
+        // Destroying the world tears down the complete backend at once. Per-
+        // handle destruction here recompiles whole-model backends for every
+        // link immediately before the model itself is discarded.
         if (shape_ != 0)
             nksim_shape_destroy(world_, shape_);
         nksim_world_destroy(world_);

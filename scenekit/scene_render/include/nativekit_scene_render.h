@@ -215,6 +215,12 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_create(
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_create_with_view(
     nkscene_snapshot snapshot, const nkscene_render_view *view,
     nkscene_render_spatial_index *out_index NK_OUT NK_OWNED);
+/** Refit an existing no-view index after one transform-only node update.
+ * Returns NKS_OK with out_updated=0 when a full rebuild is required.
+ */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_update_node(
+    nkscene_render_spatial_index index, nkscene_snapshot snapshot, nkscene_node_id node,
+    uint32_t *out_updated NK_OUT);
 NKSRENDER_API void NKS_CALL
 nkscene_render_spatial_index_destroy(nkscene_render_spatial_index index);
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_get_revision(

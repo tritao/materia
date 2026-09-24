@@ -7,13 +7,22 @@ class EditHistory {
 	var activeTransaction:Null<EditTransaction>;
 	var nextStateToken:Int;
 	var coalescingAllowed:Bool = true;
+	public final maxOperations:Int;
+	public final maxEstimatedBytes:Int;
+	public var estimatedRetainedBytes(default, null):Int;
 	public var stateToken(default, null):Int;
 	public var revision(default, null):Int;
 
-	public function new() {
+	/** A zero limit means unlimited. Project documents opt into explicit limits. */
+	public function new(?maxOperations:Int = 0, ?maxEstimatedBytes:Int = 0) {
+		if (maxOperations < 0 || maxEstimatedBytes < 0)
+			throw "Edit history limits cannot be negative";
 		undoStack = [];
 		redoStack = [];
 		activeTransaction = null;
+		this.maxOperations = maxOperations;
+		this.maxEstimatedBytes = maxEstimatedBytes;
+		estimatedRetainedBytes = 0;
 		nextStateToken = 1;
 		stateToken = 0;
 		revision = 0;
@@ -46,6 +55,8 @@ class EditHistory {
 		ensureNoActiveTransaction();
 		if (operation == null)
 			throw "Edit history cannot apply null operations";
+		if (exceedsSingleOperationBudget(operation))
+			return false;
 		operation.apply();
 		pushApplied(operation, coalesceKey == null ? operation.coalesceKey : coalesceKey);
 		return true;
@@ -56,6 +67,11 @@ class EditHistory {
 		ensureNoActiveTransaction();
 		if (operation == null)
 			throw "Edit history cannot record null operations";
+		if (exceedsSingleOperationBudget(operation)) {
+			// record() follows a caller mutation, so roll it back when it cannot be retained.
+			operation.undo();
+			return false;
+		}
 		pushApplied(operation, coalesceKey == null ? operation.coalesceKey : coalesceKey);
 		return true;
 	}
@@ -108,6 +124,7 @@ class EditHistory {
 		ensureNoActiveTransaction();
 		undoStack.resize(0);
 		redoStack.resize(0);
+		estimatedRetainedBytes = 0;
 		revision++;
 	}
 
@@ -119,6 +136,18 @@ class EditHistory {
 		var operations = transaction.operationList();
 		if (operations.length == 0)
 			return false;
+		var estimatedBytes = 64;
+		for (operation in operations)
+			estimatedBytes = saturatedAdd(estimatedBytes, operation.estimatedRetainedBytes);
+		if (maxEstimatedBytes > 0 && estimatedBytes > maxEstimatedBytes) {
+			var rollbackIndex = operations.length - 1;
+			while (rollbackIndex >= 0) {
+				operations[rollbackIndex].undo();
+				rollbackIndex--;
+			}
+			revision++;
+			return false;
+		}
 		var composite = new EditOperation(transaction.label,
 			function() {
 				for (operation in operations)
@@ -135,7 +164,7 @@ class EditHistory {
 				for (operation in next.transactionOperations)
 					operations.push(operation);
 				return true;
-			}, operations);
+			}, operations, estimatedBytes);
 		composite.transactionOperations = operations;
 		pushApplied(composite, composite.coalesceKey);
 		return true;
@@ -160,12 +189,25 @@ class EditHistory {
 	function pushApplied(operation:EditOperation, coalesceKey:Null<String>):Void {
 		if (coalescingAllowed && coalesceKey != null && undoStack.length > 0) {
 			var previous = undoStack[undoStack.length - 1];
-			if (previous.coalesceKey == coalesceKey && previous.mergeFrom(operation)) {
-				previous.afterStateToken = nextStateToken++;
-				stateToken = previous.afterStateToken;
-				redoStack.resize(0);
-				revision++;
-				return;
+			if (previous.coalesceKey == coalesceKey) {
+				var previousBytes = previous.estimatedRetainedBytes;
+				var transactionMergeOverBudget = maxEstimatedBytes > 0 &&
+					previous.transactionOperations != null && operation.transactionOperations != null &&
+					saturatedAdd(previousBytes, operation.estimatedRetainedBytes) > maxEstimatedBytes;
+				if (!transactionMergeOverBudget && previous.mergeFrom(operation)) {
+					var mergedBytes = previous.transactionOperations != null && operation.transactionOperations != null
+						? saturatedAdd(previousBytes, operation.estimatedRetainedBytes)
+						: (previousBytes > operation.estimatedRetainedBytes
+							? previousBytes : operation.estimatedRetainedBytes);
+					previous.setEstimatedRetainedBytes(mergedBytes);
+					estimatedRetainedBytes = saturatedAdd(estimatedRetainedBytes - previousBytes, mergedBytes);
+					previous.afterStateToken = nextStateToken++;
+					stateToken = previous.afterStateToken;
+					clearRedoStack();
+					revision++;
+					trimToBudget();
+					return;
+				}
 			}
 		}
 		coalescingAllowed = true;
@@ -173,8 +215,41 @@ class EditHistory {
 		operation.afterStateToken = nextStateToken++;
 		stateToken = operation.afterStateToken;
 		undoStack.push(operation);
-		redoStack.resize(0);
+		estimatedRetainedBytes = saturatedAdd(estimatedRetainedBytes, operation.estimatedRetainedBytes);
+		clearRedoStack();
 		revision++;
+		trimToBudget();
+	}
+
+	function exceedsSingleOperationBudget(operation:EditOperation):Bool
+		return maxEstimatedBytes > 0 && operation.estimatedRetainedBytes > maxEstimatedBytes;
+
+	function clearRedoStack():Void {
+		for (operation in redoStack)
+			estimatedRetainedBytes -= operation.estimatedRetainedBytes;
+		redoStack.resize(0);
+	}
+
+	function trimToBudget():Void {
+		var removeCount = 0;
+		var remainingBytes = estimatedRetainedBytes;
+		var remainingOperations = undoStack.length + redoStack.length;
+		while (removeCount < undoStack.length - 1 &&
+			((maxOperations > 0 && remainingOperations > maxOperations) ||
+			 (maxEstimatedBytes > 0 && remainingBytes > maxEstimatedBytes))) {
+			remainingBytes -= undoStack[removeCount].estimatedRetainedBytes;
+			remainingOperations--;
+			removeCount++;
+		}
+		if (removeCount == 0) return;
+		for (index in 0...removeCount)
+			estimatedRetainedBytes -= undoStack[index].estimatedRetainedBytes;
+		undoStack.splice(0, removeCount);
+	}
+
+	static function saturatedAdd(lhs:Int, rhs:Int):Int {
+		var sum = lhs + rhs;
+		return sum < lhs ? 0x7fffffff : sum;
 	}
 
 	function ensureNoActiveTransaction():Void {

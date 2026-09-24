@@ -28,6 +28,9 @@ import robotkit.model.Frame;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
+import robotkit.model.RobotModel;
+import robotkit.model.CollisionApproximation;
+import robotkit.runtime.RobotRuntimeCompiler;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -442,17 +445,23 @@ class SceneEditingTests {
     historySensors.add("imu");
     historySensors.selectRobot("robot/history-b");
     var secondCount=historySensors.model.sensors.length;
-    check(historySensors.document.undo()&&historySensors.model.sensors.length==secondCount,
-      "undo after switching robots leaves the selected robot unchanged");
+    check(historySensors.document.undo()&&historySensors.robotId=="materia/robot"&&
+      historySensors.model.sensors.length==2,
+      "undo removes a newly added robot configuration from shared history");
+    check(historySensors.document.redo()&&historySensors.robotId=="robot/history-b"&&
+      historySensors.model.sensors.length==secondCount,
+      "redo restores the new robot configuration and its selection");
     historySensors.selectRobot("materia/robot");
-    check(historySensors.model.sensors.length==1,
+    check(historySensors.document.undo()&&historySensors.robotId=="materia/robot"&&
+      historySensors.model.sensors.length==2,
+      "undo after switching robots removes its creation while preserving the active robot");
+    check(historySensors.document.undo()&&historySensors.model.sensors.length==1,
       "cross-robot undo removes the sensor from its owning model");
-    historySensors.selectRobot("robot/history-b");
-    check(historySensors.document.redo()&&historySensors.model.sensors.length==secondCount,
-      "redo after switching robots leaves the selected robot unchanged");
-    historySensors.selectRobot("materia/robot");
-    check(historySensors.model.sensors.length==2,
+    check(historySensors.document.redo()&&historySensors.model.sensors.length==2,
       "cross-robot redo restores the sensor to its owning model");
+    check(historySensors.document.redo()&&historySensors.robotId=="robot/history-b"&&
+      historySensors.model.sensors.length==secondCount,
+      "cross-robot redo restores the new robot configuration");
     historySensors.dispose();
 
     var sensors=new SensorConfiguration();
@@ -461,8 +470,8 @@ class SceneEditingTests {
     var selectionRevision=sensors.document.revision;
     check(sensors.selectRobot("robot/selected")&&sensors.robotId=="robot/selected",
       "sensor configuration selects an explicit robot target");
-    check(sensors.document.revision==selectionRevision,
-      "robot selection does not create a configuration edit");
+    check(sensors.document.revision==selectionRevision+1,
+      "creating a robot configuration creates one shared history entry");
     sensors.selectRobot("materia/robot");
     var properties=sensors.properties();
     var rays=new PropertyBinding(properties[3],sensors.context());
@@ -538,8 +547,11 @@ class SceneEditingTests {
     check(session.sensors.selectRobot("materia/robot-b"),"sensor workflow adds a second robot target");
     new PropertyBinding(session.sensors.properties()[2],session.sensors.context()).apply(PropertyValue.Float(10.0));
     var arm=session.sensors.model.addLink(new Link("Arm","arm"));
+    arm.mass=2.5;arm.centerOfMass=[0.1,0.2,0.3];arm.inertiaTensor=[2.0,0.0,0.0,0.0,3.0,0.0,0.0,0.0,4.0];
+    arm.visualGeometry="geometry/arm-visual";arm.collisionGeometry="geometry/arm-collision";
     var joint=new Joint("Arm joint",JointType.Revolute,session.sensors.model.links[0],arm,"joint/arm");
     joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=3.0;
+    joint.parentFramePosition=[0.25,0.0,0.0];joint.childFramePosition=[0.0,0.1,0.0];joint.axis=[1.0,0.0,0.0];
     joint.drive=new Actuator("Arm drive",3.0,2.0);session.sensors.model.addJoint(joint);
     var armMount=session.sensors.model.addFrame(new Frame("Arm LiDAR mount",arm,"arm/lidar"));
     armMount.position=[0.4,0.0,0.0];session.sensors.model.sensors[0].frame=armMount;
@@ -559,6 +571,32 @@ class SceneEditingTests {
       session.sensors.robotPosition("materia/robot-b")[1]==3.0&&
       session.sensors.robotPosition("materia/robot")[1]==0.0,
       "joint topology, actuator settings, and robot pose survive reload");
+    check(session.sensors.model.links[1].mass==2.5&&
+      session.sensors.model.links[1].centerOfMass[2]==0.3&&
+      session.sensors.model.links[1].inertiaTensor[8]==4.0&&
+      session.sensors.model.links[1].visualGeometry=="geometry/arm-visual"&&
+      session.sensors.model.links[1].collisionGeometry=="geometry/arm-collision"&&
+      restoredJoint.parentFramePosition[0]==0.25&&restoredJoint.childFramePosition[1]==0.1&&
+      restoredJoint.axis[0]==1.0,
+      "RobotModel v2 physical properties, geometry references, joint frames, and axis survive reload");
+    var compiled=RobotRuntimeCompiler.compile(session.sensors.model);
+    check(compiled.links.length==2&&compiled.links[1].mass==2.5&&
+      compiled.joints[0].axis[0]==1.0&&compiled.identity.visualGeometry(1)=="geometry/arm-visual"&&
+      compiled.identity.collisionGeometry(1)=="geometry/arm-collision",
+      "runtime compiler lowers physical properties and retains geometry asset references");
+    var emptyLegacyFrames:Array<Dynamic> = [];
+    var emptyLegacySensors:Array<Dynamic> = [];
+    var legacyLinks:Array<Dynamic> = [{id:"base",name:"Base"},{id:"arm",name:"Arm"}];
+    var legacyJoints:Array<Dynamic> = [{id:"joint/arm",name:"Arm joint",type:"revolute",
+      parentId:"base",childId:"arm",limits:{lower:-1.0,upper:1.0,velocity:2.0,effort:3.0},drive:null}];
+    var legacyRecord:Dynamic={robotId:"legacy/robot",name:"Legacy robot",
+      links:legacyLinks,joints:legacyJoints,
+      frames:emptyLegacyFrames,sensors:emptyLegacySensors};
+    var migrated=new SensorConfiguration(legacyRecord);
+    check(migrated.model.schemaVersion==RobotModel.CURRENT_VERSION&&migrated.model.links[0].mass==1.0&&
+      migrated.model.links[0].inertiaTensor[0]==1.0&&migrated.model.joints[0].axis[2]==1.0&&
+      migrated.model.collisionApproximation==CollisionApproximation.BoundsBox,
+      "version 1 robot records migrate to version 2 physical defaults");
     session.sensors.selectRobot("materia/robot");
     var restoredFrame = session.sensors.model.sensors[0].frame;
     check(restoredFrame != null && session.sensors.model.sensors[0].updateRate == 20.0 &&
@@ -608,6 +646,14 @@ class SceneEditingTests {
       "runtime visualization exposes robot poses and sensor mounts without editing the document");
     check(visual[1].links.length==2&&visual[1].sensors[0].linkId=="arm",
       "articulated visualization exposes the link owning each sensor mount");
+    var presentation=simulation.capturePresentationSnapshot();
+    var publishedRobot=presentation.world.robot("materia/robot");
+    if(publishedRobot==null)throw "Application presentation lost its RobotWorld publication";
+    check(presentation.revision>0&&presentation.robots.length==2&&presentation.environment.length>0&&
+      publishedRobot.sensors.length==firstRobot.sensors.length,
+      "one application presentation snapshot combines a physics revision with world publications");
+    check(publishedRobot.sensors.get(0).sourceTimestampNs==firstRobot.sensors.get(0).sourceTimestampNs,
+      "presentation keeps each sensor's actual source timestamp");
     var writer = new McapRobotRecording(recordingPath);
     for(robotId in observation.robotIds()) {
       var robot=observation.robot(robotId);

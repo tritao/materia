@@ -69,6 +69,13 @@ void falling_body_updates_scene_and_snapshot() {
     world_desc.gravity[2] = -9.81;
     nksim_world world = 0;
     assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    assert(nksim_world_begin_topology_update(world) == NKSIM_OK);
+    assert(nksim_world_begin_topology_update(world) == NKSIM_ERROR_INVALID_STATE);
+    nksim_step_result blocked_step{};
+    blocked_step.struct_size = sizeof(blocked_step);
+    assert(nksim_world_step(world, &blocked_step) == NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_world_end_topology_update(world) == NKSIM_OK);
+    assert(nksim_world_end_topology_update(world) == NKSIM_ERROR_INVALID_STATE);
 
     const double half_extents[] = {0.5, 0.5, 0.5};
     nksim_shape shape = 0;
@@ -81,8 +88,24 @@ void falling_body_updates_scene_and_snapshot() {
     body_desc.shape = shape;
     body_desc.collision_layer = 1;
     body_desc.collision_mask = 1;
+    body_desc.has_inertial_properties = 1;
+    body_desc.center_of_mass[0] = 0.1;
+    body_desc.inertia_tensor[0] = 1.0;
+    body_desc.inertia_tensor[4] = 2.0;
+    body_desc.inertia_tensor[8] = 3.0;
     nksim_body body = 0;
     assert(nksim_body_create(world, &body_desc, &body) == NKSIM_OK);
+    auto invalid_inertia = body_desc;
+    invalid_inertia.inertia_tensor[8] = 0.0;
+    nksim_body invalid_body = 0;
+    assert(nksim_body_create(world, &invalid_inertia, &invalid_body) == NKSIM_ERROR_INVALID_ARGUMENT);
+    auto small_robot_inertia = body_desc;
+    small_robot_inertia.inertia_tensor[0] = 1e-12;
+    small_robot_inertia.inertia_tensor[4] = 2e-12;
+    small_robot_inertia.inertia_tensor[8] = 3e-12;
+    nksim_body small_inertia_body = 0;
+    assert(nksim_body_create(world, &small_robot_inertia, &small_inertia_body) == NKSIM_OK);
+    nksim_body_destroy(world, small_inertia_body);
 
     nksim_body_force force{};
     force.struct_size = sizeof(force);

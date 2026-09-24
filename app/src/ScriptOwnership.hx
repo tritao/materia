@@ -4,6 +4,7 @@ import nativekit.ui.core.EditOperation;
 import nativekit.ui.core.EditorDocument;
 import robotkit.runtime.RobotRuntimeCompiler;
 import haxe.Json;
+import haxe.crypto.Sha256;
 
 typedef ScriptMaterialization = {var scene: EditorScene;
 var sensors:SensorConfiguration;
@@ -18,9 +19,10 @@ var timestep:Float;
 class ScriptOwnership {
   public static inline var OVERRIDE_VERSION:Int = 2;
   public static inline var SIMULATION_TARGET:String = "simulation";
-  public final document:EditorDocument = new EditorDocument("script-overrides");
+  public final document:EditorDocument;
   public var reference(default, null):String;
   public var configurationVersion(default, null):Int;
+  public var configurationSha256(default, null):String;
   public var savedVersion(default, null):Int;
   public var overridesEnabled(default, null):Bool;
   public var diagnostics(default, null):Array<String> = [];
@@ -28,7 +30,9 @@ class ScriptOwnership {
   var baseline:ScriptedSetup;
   final overrides:Map<String, ScriptOverrideRecord> = new Map();
 
-  public function new(reference:String, ? record:ScriptOwnershipRecord) {
+  public function new(reference:String, ? record:ScriptOwnershipRecord,
+      ?sharedDocument:EditorDocument) {
+    document = sharedDocument == null ? new EditorDocument("script-overrides") : sharedDocument;
     this.reference = reference;
     if (record == null) {
       overridesEnabled = false;
@@ -50,6 +54,11 @@ class ScriptOwnership {
       throw error;
     }
     configurationVersion = baseline.version;
+    configurationSha256 = contentHash(baseline);
+    if (record != null) try verifyIdentity(record) catch (error:Dynamic) {
+      baseline.dispose();
+      throw error;
+    }
     if (record != null) refreshDiagnostics();
     document.markSaved();
   }
@@ -66,6 +75,7 @@ class ScriptOwnership {
     }
     baseline = candidate;
     configurationVersion = candidate.version;
+    configurationSha256 = contentHash(candidate);
     refreshDiagnostics();
     try {
       var result = materialize();
@@ -74,6 +84,7 @@ class ScriptOwnership {
     } catch (error:Dynamic) {
       baseline = previous;
       configurationVersion = previous.version;
+      configurationSha256 = contentHash(previous);
       candidate.dispose();
       refreshDiagnostics();
       throw error;
@@ -82,7 +93,7 @@ class ScriptOwnership {
   public function materialize():ScriptMaterialization {
     var source:SensorConfiguration = baseline.sensors;
     var record:Dynamic = Json.parse(Json.stringify(source.records()));
-    var sensors = new SensorConfiguration(record);
+    var sensors = new SensorConfiguration(record, document);
     try {
       var objects = cloneObjects();
       var settings:ScriptSettings = {backend: baseline.backend, timestep: baseline.timestep};
@@ -90,7 +101,7 @@ class ScriptOwnership {
       validateSensors(sensors);
       if ((settings.backend != ApplicationSimulation.DETERMINISTIC && settings.backend != ApplicationSimulation.MUJOCO)
         || !Math.isFinite(settings.timestep) || settings.timestep <= 0) throw "Invalid overridden simulation settings";
-      var scene = new EditorScene(objects);
+      var scene = new EditorScene(objects, document);
       return {scene: scene, sensors: sensors, backend: settings.backend, timestep: settings.timestep};
     } catch (error:Dynamic) {
       sensors.dispose();
@@ -210,16 +221,39 @@ class ScriptOwnership {
     refreshDiagnostics();
   }
   public function record():ScriptOwnershipRecord {
+    var packageIdentity = SetupScriptRegistry.identity(reference);
     var values:Array<ScriptOverrideRecord> = [];
     for (k in overrides.keys()) values.push(copyOverride(overrides.get(k)));
     values.sort(function(a, b) return Reflect.compare(a.targetId + "/" + a.property, b.targetId + "/" + b.property));
     return {
       reference: reference,
       version: configurationVersion,
+      identityVersion: 1,
+      packageId: packageIdentity.packageId,
+      packageVersion: packageIdentity.packageVersion,
+      sourceSha256: packageIdentity.sourceSha256,
+      configurationSha256: configurationSha256,
       overrideVersion: OVERRIDE_VERSION,
       overridesEnabled: overridesEnabled,
       overrides: values
     };
+  }
+  static function contentHash(value:ScriptedSetup):String {
+    var normalized:Dynamic = Json.parse(Json.stringify({version: value.version,
+      sensors: value.sensors.records(), objects: value.objects,
+      backend: value.backend, timestep: value.timestep}));
+    return Sha256.encode(ScriptCanonicalJson.encode(normalized));
+  }
+  function verifyIdentity(record:ScriptOwnershipRecord):Void {
+    var packageIdentity = SetupScriptRegistry.identity(reference);
+    // Earlier files have no identity. They acquire one on their next save.
+    if (record.identityVersion == null && record.packageId == null && record.packageVersion == null
+      && record.sourceSha256 == null && record.configurationSha256 == null) return;
+    if (record.identityVersion != 1 || record.packageId != packageIdentity.packageId
+      || record.packageVersion != packageIdentity.packageVersion
+      || record.sourceSha256 != packageIdentity.sourceSha256
+      || record.configurationSha256 != configurationSha256)
+      throw 'Setup script identity mismatch: $reference';
   }
   function applyOverrides(sensors:SensorConfiguration, objects:Array<SceneObjectData>, settings:ScriptSettings):Void {
     var found = new Map<String, Bool>();

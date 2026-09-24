@@ -9,8 +9,17 @@ int main() {
     blueprint.revision = 7;
     blueprint.joint_count = 2;
     blueprint.link_count = 3;
+    blueprint.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    for (uint32_t i = 0; i < blueprint.link_count; ++i) {
+        blueprint.links[i].mass = 1.0;
+        blueprint.links[i].inertia_tensor[0] = blueprint.links[i].inertia_tensor[4] = blueprint.links[i].inertia_tensor[8] = 1.0;
+    }
     blueprint.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -1.0, 1.0, 3.0};
     blueprint.joints[1] = {1, RK_RUNTIME_JOINT_REVOLUTE, 1, 2, -1.0, 1.0, 3.0};
+    for (auto &joint : blueprint.joints) {
+        joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
+        joint.axis[2] = 1.0;
+    }
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
 
     rk_robot_command command{};

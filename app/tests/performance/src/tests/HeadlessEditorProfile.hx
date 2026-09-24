@@ -1,15 +1,23 @@
 package tests;
 
 import app.Main.ReferenceEditorApp;
+import app.EditorScene;
+import app.ProjectDocumentSession;
+import app.SceneObjectData;
 import haxe.Json;
 import LayoutFrame;
 import FontCollection;
+import nativekit.scene.SpatialIndex;
+import nativekit.scene.SceneView;
+import nativekit.scene.Transform;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.EditOperation;
 import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiModifier;
 import nativekit.ui.debug.UiFrameMetrics;
 import nativekit.ui.semantics.AccessibilityRole;
+import robotkit.model.CollisionApproximation;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -43,6 +51,7 @@ private typedef InputProbe = {
 }
 
 /** Replays real editor input through UiContext without a window or X server. */
+@:access(app.EditorScene)
 class HeadlessEditorProfile {
   static var profileSpans = false;
   static function main():Int {
@@ -53,7 +62,7 @@ class HeadlessEditorProfile {
       var cycles = Std.parseInt(Sys.args()[1]);
       if (cycles == null || cycles < 1) throw "CYCLES must be positive";
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
-        Sys.args()[2] == "tab-matrix") ? Sys.args()[2] : "tab-inspector";
+        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture") ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
         throw "Unknown headless scenario: " + Sys.args()[2];
       var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] :
@@ -98,6 +107,8 @@ class HeadlessEditorProfile {
           }
           if ((cycle + 1) % 20 == 0) retained.push(retainedCounts(editor, cycle + 1));
         }
+      } else if (scenario == "architecture") {
+        runArchitectureScenario(editor, frame, output, cycles, frames, actions);
       } else {
         for (cycle in 0...cycles) {
           click(editor, "sensors");
@@ -142,6 +153,225 @@ class HeadlessEditorProfile {
     }
     editor.dispose();
     fonts.dispose();
+  }
+
+  /** Exercises the expensive editor boundaries called out in the architecture plan. */
+  static function runArchitectureScenario(editor:ReferenceEditorApp, frame:LayoutFrame,
+      output:String, cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+    var started = Sys.time();
+    editor.scene.createBracket();
+    var bracketId = editor.scene.selectedId;
+    for (cycle in 0...cycles)
+      editor.scene.setBracketWallThickness(bracketId, 0.003 + (cycle % 7) * 0.0001);
+    action(actions, "cad-parameter-edits", 0);
+    submit(editor, frame, frames, "architecture:cad-parameter-edits", 0);
+    var cadSeconds = Sys.time() - started;
+
+    started = Sys.time();
+    var relationships = editor.bimModel.allRelationships();
+    if (relationships.length > 0) {
+      var opening = relationships[0];
+      for (cycle in 0...cycles) editor.session.applyBimEdit("Profile opening move", function() {
+        editor.bimModel.moveOpening(opening.openingId, 800 + cycle * 2, 900);
+      });
+    }
+    action(actions, "bim-opening-edits", 0);
+    submit(editor, frame, frames, "architecture:bim-opening-edits", 0);
+    var bimSeconds = Sys.time() - started;
+    var records:Array<SceneObjectData> = [];
+    for (index in 0...10000) {
+      var moving = index < 500;
+      records.push({id:"stress-" + index, label:"Stress object " + index,
+        type:"rectangle", x:(index % 100) * 0.15, y:Std.int(index / 100) * 0.15, z:0.0,
+        width:0.1, height:0.1, depth:0.1, collisionEnabled:true,
+        dynamicBody:moving, mass:1.0, red:0.3, green:0.5, blue:0.7, visible:true});
+    }
+    started = Sys.time();
+    var sceneLoadPhases = new Map<String, Float>();
+    var candidate = new EditorScene(records, null, sceneLoadPhases);
+    var sceneLoadSeconds = Sys.time() - started;
+    var sceneLoadPhaseSummary = candidate.loadProfileSummary();
+    if (candidate.objects.length != records.length)
+      throw 'Loaded ${candidate.objects.length} scene objects from ${records.length} records';
+    action(actions, "load-10k-scene", 0);
+
+    started = Sys.time();
+    candidate.setPosition("stress-9999", 0, 0.25);
+    var nudgeSeconds = Sys.time() - started;
+    action(actions, "single-object-nudge", 0);
+
+    started = Sys.time();
+    for (cycle in 0...cycles) for (index in 0...500)
+      candidate.setPositionXY("stress-" + index,
+        (index % 100) * 0.15 + cycle * 0.001, Std.int(index / 100) * 0.15);
+    var movingSeconds = Sys.time() - started;
+    action(actions, "move-500-objects", 0);
+
+    var position = candidate.object("stress-9999");
+    if (position == null) throw "Architecture scenario lost its selected stress object";
+    var previousX = position.x;
+    for (cycle in 0...1000) {
+      var fromX = previousX;
+      var nextX = 0.25 + (cycle % 2) * 0.01;
+      candidate.document.apply(new EditOperation("Stress move " + cycle,
+        function() candidate.setPositionXY("stress-9999", nextX, position.y),
+        function() candidate.setPositionXY("stress-9999", fromX, position.y)));
+      previousX = nextX;
+    }
+    if (candidate.document.history.undoCount < 1000)
+      throw 'Expected 1,000 distinct moves, found ${candidate.document.history.undoCount}';
+    started = Sys.time();
+    for (_ in 0...1000) if (!candidate.document.undo()) throw "Undo history ended during stress scenario";
+    var undo1000Seconds = Sys.time() - started;
+
+    // Repeated add/remove edits expose the retained payload cost of structural history.
+    var structuralAllocatedBefore = hl.Gc.totalAllocated();
+    started = Sys.time();
+    for (_ in 0...20) {
+      if (!candidate.deleteSelected()) throw "Structural history could not delete an object";
+      if (!candidate.createRectangle()) throw "Structural history could not recreate an object";
+    }
+    var structuralHistorySeconds = Sys.time() - started;
+    var structuralAllocatedBytes = hl.Gc.totalAllocated() - structuralAllocatedBefore;
+    var structuralHistoryOperations = candidate.document.history.undoCount;
+    if (structuralHistoryOperations != 40)
+      throw 'Expected 40 structural history entries, found $structuralHistoryOperations';
+    for (_ in 0...40) if (!candidate.document.undo()) throw "Structural history ended before undo";
+    if (candidate.objects.length != 10000)
+      throw "Structural history undo did not restore the 10,000-object scene";
+    for (_ in 0...40) if (!candidate.document.redo()) throw "Structural history ended before redo";
+    if (candidate.objects.length != 10000)
+      throw "Structural history redo did not restore the 10,000-object scene";
+    var structuralHistoryEstimatedBytes = candidate.document.history.estimatedRetainedBytes;
+    action(actions, "structural-history-40-edits", 0);
+
+    var staticPickSamples:Array<Float> = [];
+    var emptyViewSamples:Array<Float> = [];
+    var viewBuildSamples:Array<Float> = [];
+    var viewPickSamples:Array<Float> = [];
+    var movingPoses:Array<app.ApplicationSimulation.SimulationPoseVisual> = [];
+    for (index in 1...501) {
+      var id = "stress-" + index;
+      var item = candidate.object(id);
+      if (item == null) throw "Moving profile object is missing: " + id;
+      movingPoses.push({id: id, position: [item.x, item.y, item.z], rotation: [0.0, 0.0, 0.0, 1.0]});
+    }
+    for (sample in 0...6) {
+      started = Sys.time();
+      var staticHit = candidate.pickRay(0.15, 0.0, 10.0, 0.0, 0.0, -1.0);
+      var staticPickSeconds = Sys.time() - started;
+      started = Sys.time();
+      candidate.configureRenderView(new SceneView(), Transform.identity());
+      var emptyViewSeconds = Sys.time() - started;
+      started = Sys.time();
+      var view = new SceneView();
+      candidate.configureRenderView(view, Transform.identity(), movingPoses);
+      var viewBuildSeconds = Sys.time() - started;
+      started = Sys.time();
+      var viewHit = candidate.pickRayWithView(view, 0.15, 0.0, 10.0, 0.0, 0.0, -1.0);
+      var viewPickSeconds = Sys.time() - started;
+      if (staticHit != viewHit) throw "View picking disagrees with the authored scene";
+      if (sample > 0) {
+        staticPickSamples.push(staticPickSeconds);
+        emptyViewSamples.push(emptyViewSeconds);
+        viewBuildSamples.push(viewBuildSeconds);
+        viewPickSamples.push(viewPickSeconds);
+      }
+    }
+    var staticPickMedianSeconds = medianDuration(staticPickSamples);
+    var emptyViewMedianSeconds = medianDuration(emptyViewSamples);
+    var viewBuildMedianSeconds = medianDuration(viewBuildSamples);
+    var viewPickMedianSeconds = medianDuration(viewPickSamples);
+    action(actions, "perspective-picking-500-moving", 0);
+
+    // Separate snapshot capture from BVH construction after the end-to-end timings.
+    // Ignore the first sample to exclude one-time allocator and code-path warmup.
+    var snapshotSamples:Array<Float> = [];
+    var spatialSamples:Array<Float> = [];
+    for (sample in 0...6) {
+      started = Sys.time();
+      var measuredSnapshot = candidate.scene.snapshot();
+      var snapshotSeconds = Sys.time() - started;
+      measuredSnapshot.dispose();
+
+      started = Sys.time();
+      var measuredSpatial = SpatialIndex.create(candidate.snapshot);
+      var spatialSeconds = Sys.time() - started;
+      measuredSpatial.dispose();
+
+      if (sample > 0) {
+        snapshotSamples.push(snapshotSeconds);
+        spatialSamples.push(spatialSeconds);
+      }
+    }
+    var spatialSnapshotMedianSeconds = medianDuration(snapshotSamples);
+    var spatialIndexMedianSeconds = medianDuration(spatialSamples);
+    candidate.dispose();
+    action(actions, "undo-1000-edits", 0);
+
+    editor.sensors.model.collisionApproximation = CollisionApproximation.None;
+    for (index in 1...500) {
+      var link = editor.sensors.model.addLink(new robotkit.model.Link("Profile link " + index,
+        "profile/link-" + index));
+      var joint = new robotkit.model.Joint("Profile joint " + index,
+        robotkit.model.JointType.Fixed, editor.sensors.model.links[index - 1], link,
+        "profile/joint-" + index);
+      joint.childFramePosition = [0.1, 0.0, 0.0];
+      editor.sensors.model.addJoint(joint);
+    }
+    if (!editor.simulation.rebuild(editor.sensors, editor.scene))
+      throw "500-link simulation profile could not build";
+    for (cycle in 0...cycles) {
+      editor.simulation.step();
+      editor.simulation.capturePresentationSnapshot();
+      submit(editor, frame, frames, "architecture:simulation-presentation", cycle);
+    }
+    action(actions, "simulation-presentation-500-links", 0);
+    editor.simulation.stop();
+
+    var projectHistory = editor.session.document.history;
+    for (_ in 0...1100)
+      editor.session.document.apply(new EditOperation("History operation limit", function() {}, function() {}));
+    var budgetedOperationCount = projectHistory.undoCount;
+    for (_ in 0...3) editor.session.document.apply(new EditOperation("History byte limit",
+      function() {}, function() {}, null, null, null,
+      Std.int(ProjectDocumentSession.MAX_HISTORY_ESTIMATED_BYTES * 3 / 4)));
+    var budgetedEstimatedBytes = projectHistory.estimatedRetainedBytes;
+    if (budgetedOperationCount != ProjectDocumentSession.MAX_HISTORY_OPERATIONS ||
+        projectHistory.undoCount > ProjectDocumentSession.MAX_HISTORY_OPERATIONS ||
+        projectHistory.undoCount != 1 ||
+        budgetedEstimatedBytes > ProjectDocumentSession.MAX_HISTORY_ESTIMATED_BYTES)
+      throw "Project edit history exceeded its configured budget";
+    if (!projectHistory.undo() || !projectHistory.redo() ||
+        projectHistory.estimatedRetainedBytes != budgetedEstimatedBytes)
+      throw "Project history budget accounting changed across undo/redo";
+    action(actions, "project-history-budget", 0);
+    File.saveContent(output + "/architecture-summary.json", haxe.Json.stringify({
+      sceneObjects: records.length, movingObjects: 500, articulatedLinks: 500,
+      cycles: cycles, cadParameterSeconds: cadSeconds, bimOpeningSeconds: bimSeconds,
+      sceneLoadSeconds: sceneLoadSeconds,
+      sceneLoadPhases: sceneLoadPhaseSummary,
+      singleObjectNudgeSeconds: nudgeSeconds, movingObjectEditsSeconds: movingSeconds,
+      undo1000Seconds: undo1000Seconds,
+      structuralHistoryOperations: structuralHistoryOperations,
+      structuralHistorySeconds: structuralHistorySeconds,
+      structuralAllocatedBytes: structuralAllocatedBytes,
+      structuralHistoryEstimatedBytes: structuralHistoryEstimatedBytes,
+      staticPickMedianSeconds: staticPickMedianSeconds,
+      emptyViewMedianSeconds: emptyViewMedianSeconds,
+      viewBuildMedianSeconds: viewBuildMedianSeconds,
+      viewPickMedianSeconds: viewPickMedianSeconds,
+      budgetedOperationCount: budgetedOperationCount,
+      budgetedFinalOperationCount: projectHistory.undoCount,
+      budgetedEstimatedBytes: budgetedEstimatedBytes,
+      spatialSnapshotMedianSeconds: spatialSnapshotMedianSeconds,
+      spatialIndexMedianSeconds: spatialIndexMedianSeconds,
+      spatialCacheSamples: snapshotSamples.length}));
+  }
+
+  static function medianDuration(samples:Array<Float>):Float {
+    samples.sort(function(lhs, rhs) return lhs < rhs ? -1 : (lhs > rhs ? 1 : 0));
+    return samples[Std.int(samples.length / 2)];
   }
 
   static function retainedCounts(editor:ReferenceEditorApp, cycle:Int):String {

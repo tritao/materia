@@ -55,12 +55,21 @@ class ScriptedSetupTests {
       "script attaches LiDAR to its articulated link"
     );
     var ownership:ScriptOwnership = session.scriptOwnership;
+    check(ownership != null && ownership.document == session.document &&
+      setup.scene.document == session.document && setup.sensors.document == session.document,
+      "script overrides, scene and sensors share the project history instance");
     check(
       ownership != null && ownership.sensorRateOrigin(setup.sensors.robotId, lidar.id) == "script",
       "inspector reports the script value origin"
     );
     ownership.setOverridesEnabled(true);
     ownership.setSensorRate(setup.sensors.robotId, lidar.id, 33.0);
+    check(session.document.undo(), "project undo reaches the script sensor override");
+    var undoneOverride = session.refreshScriptOverrides();
+    var restoredSensor:Sensor = undoneOverride.sensors.selected();
+    check(restoredSensor != null && restoredSensor.updateRate != 33.0,
+      "undo rematerializes the script baseline without its last override");
+    check(session.document.redo(), "project redo restores the script sensor override");
     var overridden = session.refreshScriptOverrides();
     var overriddenLidar:Sensor = overridden.sensors.selected();
     check(
@@ -113,6 +122,17 @@ class ScriptedSetupTests {
     var path = directory + "/scene.materia";
     session.save(path);
     var encoded:Dynamic = Json.parse(File.getContent(path));
+    check(haxe.crypto.Sha256.encode("abc") ==
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+      "script content hash matches SHA-256 known vector");
+    check(app.ScriptCanonicalJson.encode({b: 1, a: 2})
+      == app.ScriptCanonicalJson.encode({a: 2, b: 1}),
+      "script content identity ignores object key order");
+    var identity:Dynamic = Reflect.field(encoded, "script");
+    check(Reflect.field(identity, "packageId") == "materia.examples"
+      && Reflect.field(identity, "sourceSha256") == SetupScriptRegistry.TWO_ROBOT_SOURCE_SHA256
+      && StringTools.trim(Reflect.field(identity, "configurationSha256")).length == 64,
+      "script documents persist package, source, and configuration identities");
     var encodedObjects:Array<Dynamic> = Reflect.field(encoded, "objects");
     check(
       encodedObjects.length == 0 && Reflect.field(encoded, "sensors") == null,
@@ -129,6 +149,17 @@ class ScriptedSetupTests {
     check(reopenedLidar.frame != null && reopenedLidar.frame.link.id == "arm"
       && reopenedLidar.frame.position[0] == 0.6 && reopenedLidar.rayCount == 17,
       "scripted sensor identity, link mount, and ray count survive reopen");
+    var incompatible:Dynamic = Json.parse(File.getContent(path));
+    Reflect.setField(Reflect.field(incompatible, "script"), "configurationSha256",
+      "0000000000000000000000000000000000000000000000000000000000000000");
+    var incompatiblePath = directory + "/incompatible.materia";
+    File.saveContent(incompatiblePath, Json.stringify(incompatible));
+    var generationBeforeMismatch = reopened.generation;
+    var rejectedMismatch = false;
+    try reopened.open(incompatiblePath) catch (_:Dynamic) rejectedMismatch = true;
+    check(rejectedMismatch && reopened.generation == generationBeforeMismatch
+      && reopenedLidar.updateRate == 33.0,
+      "script identity mismatch preserves the open project");
 
     var legacy = '{"format":"materia.scene","version":1,"objects":[],"sensors":null,"script":{'
       + '"reference":"${TwoRobotSetupScript.REFERENCE}","version":1,"overridesEnabled":true,'
@@ -222,14 +253,16 @@ class ScriptedSetupTests {
     }
     simulation.start();
     var generation = session.generation;
-    SetupScriptRegistry.register(TwoRobotSetupScript.REFERENCE, function() return new FailingReloadScript());
+    SetupScriptRegistry.register(TwoRobotSetupScript.REFERENCE, function() return new FailingReloadScript(),
+      SetupScriptRegistry.identity(TwoRobotSetupScript.REFERENCE));
     var failed = false;
     try session.reloadScript() catch (_:Dynamic) failed = true;
     check(
       failed && session.generation == generation && simulation.isRunning(),
       "failed reload preserves both published configuration and running simulation"
     );
-    SetupScriptRegistry.register(TwoRobotSetupScript.REFERENCE, function() return new TwoRobotSetupScript());
+    SetupScriptRegistry.register(TwoRobotSetupScript.REFERENCE, function() return new TwoRobotSetupScript(),
+      SetupScriptRegistry.identity(TwoRobotSetupScript.REFERENCE));
 
     simulation.dispose();
     world.close();
