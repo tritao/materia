@@ -6,6 +6,7 @@ import cadkit.modeling.Vector;
 import cadkit.parametric.Document;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
+import cadkit.parametric.ElementKind;
 import cadkit.parametric.Definition;
 import cadkit.parametric.DocumentId;
 import cadkit.parametric.ElementReference;
@@ -43,6 +44,299 @@ class BimDocument {
 
 	public function createWindowDefinition(name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition
 		return BimWindowDefinition.create(cad, name, width, height, frameThickness, depth);
+
+	public function createWindow(name:String, definition:Definition):InstanceElement {
+		if (definition.document != cad)
+			throw new BimError("window definition belongs to another document");
+		var transaction = cad.beginTransaction();
+		try {
+			var result = cad.createInstance(name, definition);
+			result.setProperty(TypedProperty.token("bim.class", BimSchema.Window, BimSchema.ElementClass));
+			result.setProperty(TypedProperty.definitionReference("bim.type", PersistentReference.definition(cad, definition.id)));
+			transaction.commit();
+			return result;
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	/** Create a BIM project as a generic persistent CadKit object. */
+	public function createProject(name:String):Element
+		return createClassifiedObject(name, BimSchema.Project);
+
+	public function createSite(name:String, projectId:ElementId):Element
+		return createAggregatedObject(name, BimSchema.Site, projectId, BimSchema.Project);
+
+	public function createBuilding(name:String, siteId:ElementId):Element
+		return createAggregatedObject(name, BimSchema.Building, siteId, BimSchema.Site);
+
+	public function createStorey(name:String, buildingId:ElementId, ?baseLevel:ElementReference,
+		?topLevel:ElementReference):Element {
+		validateStoreyLevels(baseLevel, topLevel);
+		return createAggregatedObject(name, BimSchema.Storey, buildingId, BimSchema.Building, function(storey) {
+			if (baseLevel != null)
+				storey.setProperty(TypedProperty.elementReference(BimSchema.BaseLevel, baseLevel));
+			if (topLevel != null)
+				storey.setProperty(TypedProperty.elementReference(BimSchema.TopLevel, topLevel));
+		});
+	}
+
+	public function createSpace(name:String, storeyId:ElementId):Element
+		return createContainedObject(name, BimSchema.Space, storeyId);
+
+	/** Remove an empty spatial container and detach its one incoming aggregate edge. */
+	public function removeSpatialContainer(elementId:ElementId):Void {
+		var element = cad.element(elementId);
+		var classification = bimClass(element);
+		if (classification != BimSchema.Project && classification != BimSchema.Site && classification != BimSchema.Building
+			&& classification != BimSchema.Storey)
+			throw new BimError("element is not a BIM spatial container: " + elementId.value);
+		for (relationship in cad.relationshipsForElement(elementId))
+			if ((relationship.typeName == BimSchema.Aggregates || relationship.typeName == BimSchema.Contains)
+				&& relationship.source.documentId.value == cad.id.value && relationship.source.elementId.value == elementId.value)
+				throw new BimError("spatial container still has children: " + elementId.value);
+		var transaction = cad.beginTransaction();
+		try {
+			removeIncomingSpatialEdges(elementId);
+			cad.removeElement(elementId);
+			transaction.commit();
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	public function removeSpace(elementId:ElementId):Void {
+		if (bimClass(cad.element(elementId)) != BimSchema.Space)
+			throw new BimError("element is not a Space: " + elementId.value);
+		var transaction = cad.beginTransaction();
+		try {
+			removeContainmentFor(elementId);
+			cad.removeElement(elementId);
+			transaction.commit();
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	private function createClassifiedObject(name:String, classification:String):Element {
+		var transaction = cad.beginTransaction();
+		try {
+			var result = cad.createObject(name);
+			result.setProperty(TypedProperty.token("bim.class", classification, BimSchema.ElementClass));
+			transaction.commit();
+			return result;
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	private function createAggregatedObject(name:String, classification:String, parentId:ElementId, parentClass:String,
+		?configure:Element->Void):Element {
+		var parent = cad.element(parentId);
+		if (bimClass(parent) != parentClass)
+			throw new BimError("expected " + parentClass + " aggregate parent: " + parentId.value);
+		var transaction = cad.beginTransaction();
+		try {
+			var result = cad.createObject(name);
+			result.setProperty(TypedProperty.token("bim.class", classification, BimSchema.ElementClass));
+			if (configure != null)
+				configure(result);
+			cad.createRelationship(BimSchema.Aggregates, new ElementReference(cad.id, parentId), new ElementReference(cad.id, result.id));
+			transaction.commit();
+			return result;
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	private function createContainedObject(name:String, classification:String, storeyId:ElementId):Element {
+		var storey = cad.element(storeyId);
+		if (bimClass(storey) != BimSchema.Storey)
+			throw new BimError("expected a Storey container: " + storeyId.value);
+		var transaction = cad.beginTransaction();
+		try {
+			var result = cad.createObject(name);
+			result.setProperty(TypedProperty.token("bim.class", classification, BimSchema.ElementClass));
+			cad.createRelationship(BimSchema.Contains, new ElementReference(cad.id, storeyId), new ElementReference(cad.id, result.id));
+			transaction.commit();
+			return result;
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	/** Add an existing BIM object directly to a Storey's spatial contents. */
+	public function addToStorey(storeyId:ElementId, elementId:ElementId):Relationship {
+		var storey = cad.element(storeyId);
+		var child = cad.element(elementId);
+		if (bimClass(storey) != BimSchema.Storey || !isContainable(bimClass(child)))
+			throw new BimError("bim.contains requires a Storey and a spatial BIM element");
+		if (storeyId.value == elementId.value)
+			throw new BimError("a Storey cannot contain itself");
+		ensureNoSpatialParent(elementId, BimSchema.Contains);
+		var transaction = cad.beginTransaction();
+		try {
+			var result = cad.createRelationship(BimSchema.Contains, new ElementReference(cad.id, storeyId), new ElementReference(cad.id, elementId));
+			transaction.commit();
+			return result;
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	public function removeFromStorey(storeyId:ElementId, elementId:ElementId):Void {
+		var found:Null<Relationship> = null;
+		for (relationship in cad.relationshipsForElement(elementId))
+			if (relationship.typeName == BimSchema.Contains && relationship.source.documentId.value == cad.id.value
+				&& relationship.source.elementId.value == storeyId.value && relationship.target.documentId.value == cad.id.value
+				&& relationship.target.elementId.value == elementId.value) {
+				found = relationship;
+				break;
+			}
+		if (found == null)
+			throw new BimError("element is not contained by Storey " + storeyId.value + ": " + elementId.value);
+		var transaction = cad.beginTransaction();
+		try {
+			cad.removeRelationship(found.id);
+			transaction.commit();
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	/** Add an existing child to the spatial aggregate hierarchy. */
+	public function aggregate(parentId:ElementId, childId:ElementId):Relationship {
+		var parent = cad.element(parentId);
+		var child = cad.element(childId);
+		if (!canAggregate(bimClass(parent), bimClass(child)))
+			throw new BimError("invalid BIM spatial aggregation: " + bimClass(parent) + " -> " + bimClass(child));
+		ensureNoSpatialParent(childId, BimSchema.Aggregates);
+		var transaction = cad.beginTransaction();
+		try {
+			var result = cad.createRelationship(BimSchema.Aggregates, new ElementReference(cad.id, parentId), new ElementReference(cad.id, childId));
+			transaction.commit();
+			return result;
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	public function setStoreyLevels(storeyId:ElementId, ?baseLevel:ElementReference, ?topLevel:ElementReference):Void {
+		var storey = cad.element(storeyId);
+		if (bimClass(storey) != BimSchema.Storey)
+			throw new BimError("element is not a Storey: " + storeyId.value);
+		validateStoreyLevels(baseLevel, topLevel);
+		var transaction = cad.beginTransaction();
+		try {
+			if (baseLevel == null)
+				storey.removeProperty(BimSchema.BaseLevel);
+			else
+				storey.setProperty(TypedProperty.elementReference(BimSchema.BaseLevel, baseLevel));
+			if (topLevel == null)
+				storey.removeProperty(BimSchema.TopLevel);
+			else
+				storey.setProperty(TypedProperty.elementReference(BimSchema.TopLevel, topLevel));
+			transaction.commit();
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
+	public function storeyBaseLevel(storeyId:ElementId):Null<ElementReference>
+		return storeyLevel(storeyId, BimSchema.BaseLevel);
+
+	public function storeyTopLevel(storeyId:ElementId):Null<ElementReference>
+		return storeyLevel(storeyId, BimSchema.TopLevel);
+
+	private function storeyLevel(storeyId:ElementId, propertyName:String):Null<ElementReference> {
+		var storey = cad.element(storeyId);
+		if (bimClass(storey) != BimSchema.Storey)
+			throw new BimError("element is not a Storey: " + storeyId.value);
+		var property = storey.property(propertyName);
+		if (property == null)
+			return null;
+		if (property.type != TypedProperty.TypeElementReference)
+			throw new BimError("Storey level property has the wrong type: " + propertyName);
+		var reference:PersistentReference = cast property.value;
+		if (reference.documentId != cad.id.value || reference.targetType != PersistentReference.ElementTarget)
+			throw new BimError("Storey level reference is invalid: " + propertyName);
+		return new ElementReference(new cadkit.parametric.DocumentId(reference.documentId), new ElementId(reference.targetId));
+	}
+
+	public function aggregateChildren(parentId:ElementId):Array<Element>
+		return relationshipTargets(parentId, BimSchema.Aggregates);
+
+	public function containedElements(storeyId:ElementId):Array<Element> {
+		if (bimClass(cad.element(storeyId)) != BimSchema.Storey)
+			throw new BimError("element is not a Storey: " + storeyId.value);
+		return relationshipTargets(storeyId, BimSchema.Contains);
+	}
+
+	private function relationshipTargets(sourceId:ElementId, typeName:String):Array<Element> {
+		var result:Array<Element> = [];
+		for (relationship in cad.relationshipsForElement(sourceId))
+			if (relationship.typeName == typeName && relationship.source.documentId.value == cad.id.value
+				&& relationship.source.elementId.value == sourceId.value)
+				result.push(cad.element(relationship.target.elementId));
+		result.sort(function(a, b) return Reflect.compare(a.id.value, b.id.value));
+		return result;
+	}
+
+	private function validateStoreyLevels(baseLevel:Null<ElementReference>, topLevel:Null<ElementReference>):Void {
+		if (baseLevel != null)
+			cad.resolveElement(baseLevel, ElementKind.Level);
+		if (topLevel != null)
+			cad.resolveElement(topLevel, ElementKind.Level);
+		if (baseLevel != null && topLevel != null && cad.levelElevation(topLevel) <= cad.levelElevation(baseLevel))
+			throw new BimError("Storey top Level must be above its base Level");
+	}
+
+	private function bimClass(element:Element):String {
+		var property = element.property("bim.class");
+		if (property == null || property.type != TypedProperty.TypeToken || property.tokenDomain != BimSchema.ElementClass)
+			return "";
+		return cast property.value;
+	}
+
+	private function isContainable(classification:String):Bool
+		return classification == BimSchema.Space || classification == BimSchema.Wall || classification == BimSchema.Window
+			|| classification == BimSchema.Door || classification == BimSchema.Slab;
+
+	private function canAggregate(parent:String, child:String):Bool
+		return (parent == BimSchema.Project && child == BimSchema.Site)
+			|| (parent == BimSchema.Site && child == BimSchema.Building)
+			|| (parent == BimSchema.Building && child == BimSchema.Storey);
+
+	private function ensureNoSpatialParent(childId:ElementId, relationshipType:String):Void {
+		for (relationship in cad.relationshipsForElement(childId))
+			if (relationship.typeName == relationshipType && relationship.target.documentId.value == cad.id.value
+				&& relationship.target.elementId.value == childId.value)
+				throw new BimError("BIM spatial object already has a " + relationshipType + " parent: " + childId.value);
+	}
+
+	private function removeContainmentFor(elementId:ElementId):Void {
+		for (relationship in cad.relationshipsForElement(elementId))
+			if (relationship.typeName == BimSchema.Contains && relationship.target.documentId.value == cad.id.value
+				&& relationship.target.elementId.value == elementId.value)
+				cad.removeRelationship(relationship.id);
+	}
+
+	private function removeIncomingSpatialEdges(elementId:ElementId):Void {
+		for (relationship in cad.relationshipsForElement(elementId))
+			if ((relationship.typeName == BimSchema.Aggregates || relationship.typeName == BimSchema.Contains)
+				&& relationship.target.documentId.value == cad.id.value && relationship.target.elementId.value == elementId.value)
+				cad.removeRelationship(relationship.id);
+	}
 
 	public function createWall(name:String, length:Float, thickness:Float, height:Float):Element {
 		var transaction = cad.beginTransaction();
@@ -296,6 +590,7 @@ class BimDocument {
 		try {
 			if (hostRelationshipForOpening(openingId) != null)
 				unhostInTransaction(openingId);
+			removeContainmentFor(openingId);
 			cad.removeElement(openingId);
 			cad.recompute();
 			transaction.commit();
@@ -316,6 +611,7 @@ class BimDocument {
 				throw new BimError("wall still has placement child: " + element.id.value);
 		var transaction = cad.beginTransaction();
 		try {
+			removeContainmentFor(wallId);
 			cad.removeElement(wallId);
 			cad.recompute();
 			transaction.commit();

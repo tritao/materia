@@ -1,6 +1,7 @@
 import bimkit.BimCodec;
 import bimkit.BimDocument;
 import bimkit.BimError;
+import bimkit.BimSchema;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.Placement;
@@ -38,6 +39,13 @@ class BimKitSmoke {
 		return parent.elementId.value;
 	}
 
+	static function propertyValue(element:cadkit.parametric.Element, name:String):Dynamic {
+		var property = element.property(name);
+		if (property == null)
+			throw "missing property " + name;
+		return property.value;
+	}
+
 	static function encodePlacement(value:Placement):Dynamic {
 		var plane = value.location.plane;
 		return {
@@ -47,7 +55,94 @@ class BimKitSmoke {
 		};
 	}
 
+	static function spatialBackbone():Void {
+		var model = new BimDocument();
+		var project = model.createProject("Project");
+		var site = model.createSite("Site", project.id);
+		var building = model.createBuilding("Building", site.id);
+		var base = model.cad.createLevel("Ground datum", 0);
+		var upper = model.cad.createLevel("Upper datum", 3200);
+		var ground = model.createStorey("Ground Storey", building.id,
+			new cadkit.parametric.ElementReference(model.cad.id, base.id),
+			new cadkit.parametric.ElementReference(model.cad.id, upper.id));
+		var secondBase = model.cad.createLevel("Upper base datum", 3200);
+		var roof = model.cad.createLevel("Roof datum", 6200);
+		var upperStorey = model.createStorey("Upper Storey", building.id,
+			new cadkit.parametric.ElementReference(model.cad.id, secondBase.id),
+			new cadkit.parametric.ElementReference(model.cad.id, roof.id));
+		var space = model.createSpace("Lobby", ground.id);
+		var wall = model.createWall("Exterior wall", 5000, 200, 3200);
+		model.addToStorey(ground.id, wall.id);
+		var windowDefinition = model.createWindowDefinition("Shared window type", 1200, 1400, 80, 200);
+		var window = model.createWindow("Lobby window", windowDefinition);
+		model.addToStorey(ground.id, window.id);
+		model.hostOpening(window, wall.id, 900, 900);
+
+		check(project.kind == "object" && site.kind == "object" && building.kind == "object" && ground.kind == "object"
+			&& upperStorey.kind == "object" && project.output == null && ground.output == null,
+			"BIM spatial classes use generic geometry-free CadKit objects");
+		check(propertyValue(ground, "bim.class") == BimSchema.Storey && propertyValue(wall, "bim.class") == BimSchema.Wall,
+			"BIM classification stays in domain properties");
+		check(model.aggregateChildren(project.id)[0].id.value == site.id.value
+			&& model.aggregateChildren(site.id)[0].id.value == building.id.value
+			&& model.aggregateChildren(building.id).length == 2,
+			"Project, Site, Building and Storey hierarchy is relationship based");
+		var groundBase = model.storeyBaseLevel(ground.id);
+		var groundTop = model.storeyTopLevel(ground.id);
+		check(model.containedElements(ground.id).length == 3 && groundBase != null && groundTop != null
+			&& groundBase.elementId.value == base.id.value && groundTop.elementId.value == upper.id.value,
+			"Storey contents and Level datums are persistent relationships and references");
+		var invalidAggregate = false;
+		try
+			model.aggregate(project.id, building.id)
+		catch (error:Dynamic)
+			invalidAggregate = true;
+		check(invalidAggregate, "spatial aggregation validates its BIM class hierarchy");
+		var invalidLevels = false;
+		try
+			model.setStoreyLevels(ground.id, new cadkit.parametric.ElementReference(model.cad.id, upper.id),
+				new cadkit.parametric.ElementReference(model.cad.id, base.id))
+		catch (error:Dynamic)
+			invalidLevels = true;
+		check(invalidLevels, "Storey base and top Levels retain vertical ordering validation");
+		var deletionBlocked = false;
+		try
+			model.cad.removeElement(wall.id)
+		catch (error:Dynamic)
+			deletionBlocked = true;
+		check(deletionBlocked && model.cad.findElement(wall.id) != null,
+			"core element deletion refuses a live spatial relationship endpoint");
+
+		var restored = BimCodec.decode(BimCodec.encode(model));
+		var restoredGround = restored.cad.element(ground.id);
+		var restoredBase = restored.storeyBaseLevel(ground.id);
+		check(restored.cad.implicitOutputEnabled == false && restored.containedElements(ground.id).length == 3
+			&& restored.aggregateChildren(building.id).length == 2
+			&& restoredBase != null && restoredBase.elementId.value == base.id.value
+			&& propertyValue(restored.cad.element(space.id), "bim.class") == BimSchema.Space,
+			"the unified document codec round-trips the BIM spatial backbone");
+		restored.removeOpening(window.id);
+		check(restored.cad.findElement(window.id) == null && restored.containedElements(ground.id).length == 2,
+			"opening deletion removes its host and spatial containment edges together");
+		check(restored.undo() && restored.cad.findElement(window.id) != null && restored.containedElements(ground.id).length == 3
+			&& restored.relationship(window.id).wallId.value == wall.id.value,
+			"opening deletion undo restores identity, host and containment relationships");
+		check(restored.redo() && restored.cad.findElement(window.id) == null,
+			"opening deletion redo removes all BIM edges again");
+		restored.removeWall(wall.id);
+		check(restored.containedElements(ground.id).length == 1, "wall deletion removes its Storey containment edge");
+		check(restored.undo() && restored.containedElements(ground.id).length == 2,
+			"wall deletion undo restores its Storey containment edge");
+		restored.removeSpace(space.id);
+		check(restored.undo() && restored.containedElements(ground.id).length == 2,
+			"Space deletion undo restores its persistent containment");
+		check(restored.cad.findElement(restoredGround.id) != null, "spatial edits preserve the geometry-free Storey identity");
+		restored.close();
+		model.close();
+	}
+
 	public static function run():Void {
+		spatialBackbone();
 		var creation = new BimDocument();
 		var created = creation.createWall("Temporary wall", 2000, 200, 2500);
 		check(creation.undo() && creation.allWallRoles().length == 0 && creation.cad.findElement(created.id) == null,
