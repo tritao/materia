@@ -47,7 +47,11 @@ import app.SketchDraftCodec.SketchDraftRecord;
 import haxe.io.Path as FilePath;
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
+@:allow(tests.SceneAtomicityTests)
 class EditorScene {
+  /** Test-only synchronous fault injection for scene edit publication boundaries. */
+  @:allow(tests.SceneAtomicityTests)
+  var failureInjection:Null<String->Void> = null;
   // Retained UI caches survive document replacement, so revisions must too.
   static var nextRevision:Int = 0;
   static var nextEnvironmentRevision:Int = 0;
@@ -1016,6 +1020,7 @@ class EditorScene {
         if (isCadKind(record.type) && session == null) {
           session = createCadSession(storedGraph, record.width, record.height, record.depth, record.type);
           stagedCadSessions.push(session);
+          failIfInjected("prepare.cad-session");
           storedGraph = session.encode();
         }
         if (session != null)
@@ -1026,8 +1031,10 @@ class EditorScene {
             ? session.geometry()
             : boxGeometry(record.width, record.height, record.depth);
           scene.setGeometryData(geometry, geometryData);
+          failIfInjected("prepare.new-geometry");
           var material = scene.createMaterial();
           scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue));
+          failIfInjected("prepare.new-material");
           var node = transaction.createNode();
           transaction.setName(node, record.label);
           transaction.setVisibility(node, record.visible);
@@ -1035,11 +1042,13 @@ class EditorScene {
           transaction.setMaterial(node, material);
           transaction.setTransform(node, Transform.identity().translated(record.x, record.y, record.z));
           bridge.attach(record.id, node, geometry, material);
+          failIfInjected("prepare.bridge-attach");
           item = new EditorSceneObject(record.id, record.label, record.type,
             record.width, record.height, record.depth, record.collisionEnabled,
             record.dynamicBody, record.mass, record.red, record.green, record.blue,
             storedGraph,
             record.x, record.y, record.z, record.visible);
+          failIfInjected("prepare.new-object");
           changed = true;
         } else {
           var runtime = runtimeFor(record.id);
@@ -1055,10 +1064,12 @@ class EditorScene {
               ? session.geometry()
               : boxGeometry(record.width, record.height, record.depth);
             scene.setGeometryData(runtime.geometry, geometryData);
+            failIfInjected("prepare.existing-geometry");
             changed = true;
           }
           if (item.red != record.red || item.green != record.green || item.blue != record.blue) {
             scene.setMaterialData(runtime.material, MaterialData.opaque(record.red, record.green, record.blue));
+            failIfInjected("prepare.existing-material");
             changed = true;
           }
           if (item.collisionEnabled != record.collisionEnabled || item.dynamicBody != record.dynamicBody ||
@@ -1069,6 +1080,7 @@ class EditorScene {
           item.mass = record.mass; item.red = record.red; item.green = record.green; item.blue = record.blue;
           item.cadGraph = storedGraph; item.x = record.x; item.y = record.y; item.z = record.z;
           item.visible = record.visible;
+          failIfInjected("prepare.existing-object");
         }
         retained.set(record.id, true);
         nextObjects.push(item);
@@ -1077,6 +1089,7 @@ class EditorScene {
         transaction.destroyNode(runtimeFor(item.id).node);
         changed = true;
       }
+      failIfInjected("transaction.before-commit");
       transaction.commit();
     } catch (error:Dynamic) {
       transaction.dispose();
@@ -1601,8 +1614,10 @@ class EditorScene {
   }
 
   function publish():Void {
+    failIfInjected("publish.snapshot");
     var next = scene.snapshot();
     var nextSpatial:SpatialIndex;
+    failIfInjected("publish.spatial-index");
     try nextSpatial = SpatialIndex.create(next)
     catch (error:Dynamic) { next.dispose(); throw error; }
     spatial.dispose();
@@ -1613,6 +1628,11 @@ class EditorScene {
     revision = nextRevision;
     nextEnvironmentRevision++;
     environmentRevision = nextEnvironmentRevision;
+  }
+
+  function failIfInjected(point:String):Void {
+    var injector = failureInjection;
+    if (injector != null) injector(point);
   }
 
   public function properties():Array<PropertyDescriptor> {
