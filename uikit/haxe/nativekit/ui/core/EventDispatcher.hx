@@ -315,9 +315,17 @@ class EventDispatcher {
 
 	public function clearPointer(pointerId:Int = 0):Void {
 		if (capturedIds.exists(pointerId) && !nativeCapturedIds.exists(pointerId)) {
-			var location = pointerLocations.get(pointerId);
-			pointerCancel(pointerId, location == null ? 0.0 : location.x,
-				location == null ? 0.0 : location.y);
+			// Keep logical drags alive across a native window boundary. Deliver a
+			// final outside move so clients clear transient drop previews; re-entry
+			// continues routing through the same captured node.
+			var path = capturedPath(pointerId);
+			if (path.length > 0) {
+				var target = path[path.length - 1];
+				var event = new UiEvent(UiEventKind.PointerMove, target.id, -1.0, -1.0,
+					0.0, 0.0, 0, 0, 0, null, null, 0, pointerId);
+				dispatchPath(path, event);
+			}
+			updateHover(pointerId, [], -1.0, -1.0);
 			return;
 		}
 		updateHover(pointerId, [], 0.0, 0.0);

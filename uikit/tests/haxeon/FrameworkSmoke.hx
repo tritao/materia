@@ -4034,8 +4034,25 @@ class FrameworkSmoke {
 			return false;
 		uiContext.pointerLeave();
 		if (singletonWorkspace.interaction.preview != null ||
+			!uiContext.events.hasPointerCapture(singletonSourceTab.id))
+			return false;
+		singletonRoot = uiContext.submit(singletonWorkspace, new LayoutFrame(640.0, 480.0));
+		if (!uiContext.events.hasPointerCapture(singletonSourceTab.id))
+			return false;
+		uiContext.pointerMove(targetX, targetY);
+		if (singletonWorkspace.interaction.preview == null)
+			return false;
+		uiContext.pointerUp(targetX, targetY, 0);
+		if (singletonWorkspace.interaction.preview != null ||
 			uiContext.events.hasPointerCapture(singletonSourceTab.id))
 			return false;
+		switch (singletonDock.root) {
+			case DockNode.Tabs(ids, active):
+				if (ids.length != 2 || !ids.contains("single-source") || !ids.contains("single-target") ||
+					active != "single-source")
+					return false;
+			default: return false;
+		}
 		singletonRoot = uiContext.submit(singletonWorkspace, new LayoutFrame(640.0, 480.0));
 		singletonTargetTab = null;
 		if (singletonRoot != null)
