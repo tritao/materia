@@ -1,0 +1,17 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Procedural excavator",
+	"defaultEntrypoint": "viewport",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"viewport": {
+			"kind": "cad-preview",
+			"module": "ProceduralExcavatorPreview",
+			"function": "preview"
+		}
+	}
+}

@@ -109,3 +109,23 @@ and output `editable-mounting-plate.hl`. Running it writes
 checks the undo/redo path, reloads the saved document, and exports it again.
 Both examples are exercised by `./scripts/test-haxeon`, including shared named
 dimensions, direct bound-feature edits, failed-builder cleanup, and persistence.
+
+## Open the generated assembly in Materia
+
+`materia.project.json` describes this as a generic Materia project. It points
+to the Haxeon package manifest and names a viewport entrypoint; the code builds
+the B-rep components with CadKit, tessellates them at runtime, and returns a
+versioned geometry snapshot. Materia loads each of the 13 components as an
+independent preview object. The snapshot is derived from the CAD script and
+does not use STEP as an input.
+
+From the repository root, launch the app with:
+
+```sh
+./haxeon/scripts/haxeon run --project=app/haxeon.json -- \
+  --project=../cadkit/examples/modeling/materia.project.json
+```
+
+The same `materia.project.json` structure can later select other entrypoint
+kinds, such as a robot simulation, while each runtime continues to use its own
+Haxeon package manifest.

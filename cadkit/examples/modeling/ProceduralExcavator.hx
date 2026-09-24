@@ -37,16 +37,32 @@ class ExcavatorComponent {
 class ProceduralExcavator {
 	static final SIDE_PLANE_NORMAL:Vector = Vector.Y().scale(-1);
 
-	public static function build():Array<ExcavatorComponent> {
+	public static function build(?progress:String->Void):Array<ExcavatorComponent> {
+		var report = progress == null ? function(message:String) {} : progress;
 		var result:Array<ExcavatorComponent> = [];
 		try {
+			report("Building Base");
 			result.push(new ExcavatorComponent("Base", buildBase()));
+			report("Built Base");
+			report("Building BasePin");
 			result.push(new ExcavatorComponent("BasePin", buildBasePin()));
+			report("Built BasePin");
+			report("Building Boom");
 			result.push(new ExcavatorComponent("Boom", buildBoom()));
+			report("Built Boom");
+			report("Building Stick");
 			result.push(new ExcavatorComponent("Stick", buildStick()));
+			report("Built Stick");
+			report("Building Bucket");
 			result.push(new ExcavatorComponent("Bucket", buildBucket()));
+			report("Built Bucket");
+			report("Building BucketLink1");
 			result.push(new ExcavatorComponent("BucketLink1", buildBucketLink(true)));
+			report("Built BucketLink1");
+			report("Building BucketLink2");
 			result.push(new ExcavatorComponent("BucketLink2", buildBucketLink(false)));
+			report("Built BucketLink2");
+			report("Building hydraulic cylinders");
 			result.push(new ExcavatorComponent("BoomCylinderOuter", buildCylinderOuter(
 				new Vector(-14, 0, 53), extendLine(new Vector(-14, 0, 53), new Vector(11, 0, 128), 2.15),
 				10.1, 6.2, 30)));
@@ -60,6 +76,7 @@ class ProceduralExcavator {
 				new Vector(87, 0, 150), new Vector(245, 0, 83), 6.2, 3.6, 15)));
 			result.push(new ExcavatorComponent("BucketCylinderInner", buildCylinderInner(
 				new Vector(128, 0, 119), new Vector(291, 0, 52), 3.8, 6.0, 15)));
+			report("Built hydraulic cylinders");
 			if (result.length != 13)
 				throw "procedural excavator component inventory must contain 13 occurrences";
 			return result;

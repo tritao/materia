@@ -1,0 +1,12 @@
+{
+	"version": 1,
+	"package": { "name": "procedural-excavator-example" },
+	"entry": "ProceduralExcavatorPreview",
+	"sources": ["ProceduralExcavator.hx", "ProceduralExcavatorPreview.hx"],
+	"sourceRoots": ["."],
+	"dependencies": {
+		"cadkit": { "path": "../.." }
+	},
+	"target": "host",
+	"outputDir": "build"
+}
