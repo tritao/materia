@@ -211,7 +211,9 @@ class Tabs implements View {
 			drag.startX = event.x;
 			drag.startY = event.y;
 			dragState.update(drag);
-			event.capturePointer();
+			// Dock targets stay inside the workspace. Logical capture keeps the
+			// drag routed to this tab without grabbing the native window pointer.
+			event.capturePointer(false);
 		});
 		buttonNode.on(UiEventKind.PointerMove, function(event) {
 			var drag = dragState.value;

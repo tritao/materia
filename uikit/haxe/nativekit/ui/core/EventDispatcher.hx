@@ -17,6 +17,7 @@ class EventDispatcher {
 	final pointerLocations:Map<Int, PointerLocation>;
 	final pressedIds:Map<Int, WidgetId>;
 	final capturedIds:Map<Int, WidgetId>;
+	final nativeCapturedIds:Map<Int, Bool>;
 	final suppressedClicks:Map<Int, Bool>;
 	var hitTestProvider:Null<Float->Float->Array<RenderNode>>;
 	var pointerCaptureHandler:Null<Bool->Void>;
@@ -39,6 +40,7 @@ class EventDispatcher {
 		pointerLocations = new Map();
 		pressedIds = new Map();
 		capturedIds = new Map();
+		nativeCapturedIds = new Map();
 		suppressedClicks = new Map();
 		hitTestProvider = null;
 		pointerCaptureHandler = null;
@@ -424,11 +426,16 @@ class EventDispatcher {
 		if (event.pointerReleaseRequested)
 			clearPointerCapture(pointerId);
 		else if (event.pointerCaptureTarget != null)
-			setPointerCapture(pointerId, event.pointerCaptureTarget);
+			setPointerCapture(pointerId, event.pointerCaptureTarget,
+				event.pointerNativeCaptureRequested);
 	}
 
-	function setPointerCapture(pointerId:Int, id:WidgetId):Void {
+	function setPointerCapture(pointerId:Int, id:WidgetId, requestNativeCapture:Bool):Void {
 		capturedIds.set(pointerId, id);
+		if (requestNativeCapture)
+			nativeCapturedIds.set(pointerId, true);
+		else
+			nativeCapturedIds.remove(pointerId);
 		syncPlatformPointerCapture();
 	}
 
@@ -436,6 +443,7 @@ class EventDispatcher {
 		if (!capturedIds.exists(pointerId))
 			return;
 		capturedIds.remove(pointerId);
+		nativeCapturedIds.remove(pointerId);
 		syncPlatformPointerCapture();
 	}
 
@@ -445,7 +453,7 @@ class EventDispatcher {
 			return;
 		}
 		var requested = false;
-		for (_ in capturedIds.keys()) {
+		for (_ in nativeCapturedIds.keys()) {
 			requested = true;
 			break;
 		}

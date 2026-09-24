@@ -30,6 +30,7 @@ class UiEvent {
 	public var propagationStopped(default, null):Bool;
 	public var immediatePropagationStopped(default, null):Bool;
 	public var pointerCaptureTarget(default, null):Null<WidgetId>;
+	public var pointerNativeCaptureRequested(default, null):Bool;
 	public var pointerReleaseRequested(default, null):Bool;
 
 	public function new(kind:String, target:WidgetId, x:Float = 0.0, y:Float = 0.0,
@@ -60,6 +61,7 @@ class UiEvent {
 		propagationStopped = false;
 		immediatePropagationStopped = false;
 		pointerCaptureTarget = null;
+		pointerNativeCaptureRequested = false;
 		pointerReleaseRequested = false;
 	}
 
@@ -97,9 +99,10 @@ class UiEvent {
 	public function preventDefault():Void
 		defaultPrevented = true;
 
-	/** Routes this pointer sequence to the current handler until release or cancellation. */
-	public function capturePointer():Void {
+	/** Routes this pointer sequence to the current handler; native capture is optional. */
+	public function capturePointer(requestNativeCapture:Bool = true):Void {
 		pointerCaptureTarget = currentTarget == null ? target : currentTarget;
+		pointerNativeCaptureRequested = requestNativeCapture;
 		pointerReleaseRequested = false;
 	}
 

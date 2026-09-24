@@ -3936,20 +3936,56 @@ class FrameworkSmoke {
 		var singletonWorkspace = new DockWorkspace("singleton-dock-workspace", singletonDock);
 		var singletonRoot = uiContext.submit(singletonWorkspace, new LayoutFrame(640.0, 480.0));
 		var singletonTabs:Array<RenderNode> = [];
+		var singletonSourceTab:Null<RenderNode> = null;
+		var singletonTargetTab:Null<RenderNode> = null;
 		if (singletonRoot != null)
 			singletonRoot.walk(function(node) {
 				if (node.styleType == "tabs") singletonTabs.push(node);
+				if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab) {
+					if (node.semantics.label == "single-source") singletonSourceTab = node;
+					if (node.semantics.label == "single-target") singletonTargetTab = node;
+				}
 			});
-		if (singletonTabs.length != 2)
+		if (singletonTabs.length != 2 || singletonSourceTab == null || singletonTargetTab == null)
 			return false;
-		var sourceBounds = singletonTabs[0].globalBounds(), targetBounds = singletonTabs[1].globalBounds();
+		var sourceBounds = singletonSourceTab.globalBounds(), targetBounds = singletonTargetTab.globalBounds();
 		var sourceX = sourceBounds.x + sourceBounds.width * 0.5;
 		var sourceY = sourceBounds.y + sourceBounds.height * 0.5;
 		var targetX = targetBounds.x + targetBounds.width * 0.5;
 		var targetY = targetBounds.y + targetBounds.height * 0.5;
-		if (!singletonWorkspace.interaction.beginTabDrag("single-source", 91, sourceX, sourceY) ||
-			!singletonWorkspace.interaction.moveTabDrag("single-source", 91, targetX, targetY) ||
-			!singletonWorkspace.interaction.endTabDrag("single-source", 91, targetX, targetY))
+		var ownPaneBounds = singletonTabs[0].globalBounds();
+		var ownPaneX = ownPaneBounds.x + ownPaneBounds.width * 0.5;
+		var ownPaneY = ownPaneBounds.y + ownPaneBounds.height * 0.5;
+		var tabPlatformCaptureStates:Array<Bool> = [];
+		uiContext.setPointerCaptureHandler(function(captured) tabPlatformCaptureStates.push(captured));
+		uiContext.pointerDown(sourceX, sourceY, 0);
+		if (tabPlatformCaptureStates.length != 0)
+			return false;
+		uiContext.pointerMove(ownPaneX, ownPaneY);
+		if (singletonWorkspace.interaction.preview == null)
+			return false;
+		singletonRoot = uiContext.submit(singletonWorkspace, new LayoutFrame(640.0, 480.0));
+		if (!uiContext.events.hasPointerCapture(singletonSourceTab.id))
+			return false;
+		uiContext.pointerUp(ownPaneX, ownPaneY, 0);
+		if (singletonWorkspace.interaction.preview != null || uiContext.events.hasPointerCapture(singletonSourceTab.id) ||
+			tabPlatformCaptureStates.length != 0)
+			return false;
+		switch (singletonDock.root) {
+			case DockNode.Split(_, _, DockNode.Panel("single-source"), DockNode.Panel("single-target")):
+			default: return false;
+		}
+		uiContext.pointerDown(sourceX, sourceY, 0);
+		if (!uiContext.events.hasPointerCapture(singletonSourceTab.id))
+			return false;
+		uiContext.pointerMove(targetX, targetY);
+		if (singletonWorkspace.interaction.preview == null)
+			return false;
+		singletonRoot = uiContext.submit(singletonWorkspace, new LayoutFrame(640.0, 480.0));
+		if (!uiContext.events.hasPointerCapture(singletonSourceTab.id))
+			return false;
+		uiContext.pointerUp(targetX, targetY, 0);
+		if (singletonWorkspace.interaction.preview != null || uiContext.events.hasPointerCapture(singletonSourceTab.id))
 			return false;
 		switch (singletonDock.root) {
 			case DockNode.Tabs(ids, active):
@@ -3958,6 +3994,23 @@ class FrameworkSmoke {
 					return false;
 			default: return false;
 		}
+		singletonRoot = uiContext.submit(singletonWorkspace, new LayoutFrame(640.0, 480.0));
+		singletonTargetTab = null;
+		if (singletonRoot != null)
+			singletonRoot.walk(function(node) {
+				if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab &&
+					node.semantics.label == "single-target") singletonTargetTab = node;
+			});
+		if (singletonTargetTab == null)
+			return false;
+		targetBounds = singletonTargetTab.globalBounds();
+		uiContext.pointerDown(targetBounds.x + targetBounds.width * 0.5,
+			targetBounds.y + targetBounds.height * 0.5, 0);
+		uiContext.pointerUp(targetBounds.x + targetBounds.width * 0.5,
+			targetBounds.y + targetBounds.height * 0.5, 0);
+		if (singletonDock.activePanelId != "single-target")
+			return false;
+		uiContext.setPointerCaptureHandler(null);
 		var changes = 0;
 		model.listen(function() changes++);
 		var workspace = new DockWorkspace("editor-workspace", model);
