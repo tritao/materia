@@ -65,6 +65,16 @@ import robotkit.material.Forks;
 import robotkit.material.LoadLimits;
 import robotkit.material.LoadState;
 import robotkit.material.Payload;
+import robotkit.perception.Detection;
+import robotkit.perception.DockingTarget;
+import robotkit.perception.LidarObstaclePerception;
+import robotkit.perception.Pallet;
+import robotkit.perception.PerceptionSnapshot;
+import robotkit.safety.SafetyPhase;
+import robotkit.safety.SafetyRestriction;
+import robotkit.safety.SafetyState;
+import robotkit.safety.StoppingEnvelope;
+import robotkit.power.BatteryState;
 
 class RobotWorldTests {
   static var assertions = 0;
@@ -81,6 +91,7 @@ class RobotWorldTests {
     testLocalization();
     testNavigation();
     testForkMechanisms();
+    testPerceptionSafetyPower();
     testMcapRoundTrip();
     testMcapRobustness();
     testForwardingAndLifecycle();
@@ -565,6 +576,63 @@ class RobotWorldTests {
     throws(function() LoadState.detected(null), "detected load state requires a payload value");
     check(!LoadState.unknown().observed && LoadState.empty().observed,
       "load state distinguishes unknown from confirmed empty");
+  }
+
+  static function testPerceptionSafetyPower():Void {
+    var lidar = new SensorFrame("front-lidar", "lidar", "base", Int64.ofInt(8),
+      Int64.ofInt(100), [1.0, 10.0, 0.5, 0.0], Int64.ofInt(120), "base-link",
+      null, null, "robot-boot", "host-clock");
+    var imu = new SensorFrame("imu", "imu", "base", Int64.ofInt(2),
+      Int64.ofInt(100), [0.0, 0.0, 0.0], Int64.ofInt(120), "base-link",
+      null, null, "robot-boot", "host-clock");
+    var perception = new LidarObstaclePerception(10.0, 0.2, 0.05, 0.85);
+    var observed = perception.observe([lidar, imu]);
+    var obstacles = observed.obstacles();
+    equal(obstacles.length, 2, "LiDAR perception emits hits and ignores max-range and zero rays");
+    check(Math.abs(obstacles[0].detection.pose.x - 1.0) < 1e-9 &&
+      Math.abs(obstacles[1].detection.pose.x + 0.5) < 1e-9 &&
+      obstacles[1].detection.frameId == "base",
+      "LiDAR obstacle values retain planar coordinates and source frame");
+    equal(obstacles[0].detection.sourceClockId, "robot-boot",
+      "semantic obstacle preserves source clock identity");
+    var detections = observed.detections();
+    detections.pop();
+    equal(observed.detections().length, 2, "perception snapshot returns owned collections");
+
+    var palletDetection = new Detection("pallet-1", "pallet", 0.95,
+      new Pose2(2.0, 1.0, 0.2), "map", Int64.ofInt(1), Int64.ofInt(200),
+      Int64.ofInt(220), "camera-boot", "host-clock");
+    var pallet = new Pallet(palletDetection, 1.2, 0.8, 0.15);
+    var dock = new DockingTarget(new Detection("dock-1", "dock", 0.9,
+      new Pose2(4.0, 0.0, 0.0), "map", Int64.ofInt(2), Int64.ofInt(210),
+      Int64.ofInt(230), "camera-boot", "host-clock"), new Pose2(3.0, 0.0, 0.0));
+    var semantic = new PerceptionSnapshot([palletDetection], [], [pallet], [dock]);
+    check(semantic.pallets()[0].lengthMeters == 1.2 &&
+      semantic.dockingTargets()[0].approachPose.x == 3.0,
+      "perception values represent pallet and docking targets");
+
+    var envelope = new StoppingEnvelope(2.0, 0.5, 2.0);
+    check(Math.abs(envelope.distanceMeters - 2.0) < 1e-9,
+      "stopping envelope includes reaction distance and braking distance");
+    var restrictions:Array<SafetyRestriction> = [SpeedLimited(0.4), StopRequired("aisle blocked")];
+    var safety = new SafetyState(SafetyPhase.Restricted, 0.4, envelope, restrictions,
+      Int64.ofInt(300), Int64.ofInt(320), "robot-boot", "host-clock");
+    restrictions.pop();
+    equal(safety.restrictions().length, 2, "safety state owns active restrictions");
+    check(safety.speedLimitMetersPerSecond == 0.4 &&
+      safety.stoppingEnvelope.distanceMeters == 2.0,
+      "safety state exposes current speed limit and stopping envelope");
+    throws(function() new StoppingEnvelope(1.0, 0.0, 0.0),
+      "stopping envelope requires positive deceleration");
+
+    var battery = new BatteryState("traction-pack", 0.75, 48.0, 12.0, 31.0,
+      Int64.ofInt(400), Int64.ofInt(420), "battery-boot", "host-clock", 720.0);
+    check(battery.chargeFraction == 0.75 && battery.currentAmps > 0.0 &&
+      battery.remainingEnergyWattHours == 720.0,
+      "battery state exposes charge, electrical state, and remaining energy");
+    throws(function() new BatteryState("bad-pack", 1.1, 48.0, 0.0, 20.0,
+      Int64.ofInt(0), Int64.ofInt(0), "battery", "host"),
+      "battery state rejects invalid charge fractions");
   }
 
   static function testMcapRoundTrip():Void {

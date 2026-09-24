@@ -169,6 +169,14 @@ and source/receive clocks. `Payload`, `LoadState`, and `LoadLimits` represent
 load knowledge and a configured mass, load-moment, and lift-height envelope;
 runtime joint limits remain authoritative.
 
+`robotkit.perception` provides timestamped `Detection`, `Obstacle`, `Pallet`,
+and `DockingTarget` values. `LidarObstaclePerception` turns finite in-range
+LiDAR returns into planar obstacle observations in the sensor frame.
+`robotkit.safety` exposes operator-facing phase, active restrictions, speed
+limit, and stopping envelope values; the native runtime continues to enforce
+hard safety. `robotkit.power` defines `BatteryState` and a `Power` view for
+charge, voltage, current, temperature, energy, and clock provenance.
+
 ### Persistent recordings
 
 `McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing

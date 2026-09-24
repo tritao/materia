@@ -251,6 +251,13 @@ tilt, or spread request is validated and submitted as one `JointTargets` batch.
 Payload and load-limit values describe application policy and current knowledge;
 they do not replace enforcement in the native runtime.
 
+Perception values carry their own source and receive clock identities. The
+initial LiDAR adapter maps valid range returns into obstacles in the sensor's
+declared frame; pallet and docking-target values can be produced by higher
+level perception algorithms. Safety and battery state are descriptive service
+boundaries. Safety policy can report restrictions and a stopping envelope, but
+hard stops and joint limits remain enforced in `RobotRuntime`.
+
 ## One simulation tick
 
 Applications advance a shared simulation with `Simulation.step(timestamp)`:
