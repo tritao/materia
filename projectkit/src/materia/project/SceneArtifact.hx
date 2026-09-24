@@ -91,8 +91,7 @@ class SceneArtifact {
 			throw "Scene artifact has invalid units or part count";
 		var ids = new Map<String, Bool>();
 		for (part in data.parts) {
-			if (part.id == null || StringTools.trim(part.id).length == 0 ||
-				containsNul(part.id) || ids.exists(part.id))
+			if (part.id == null || StringTools.trim(part.id).length == 0 || ids.exists(part.id))
 				throw "Scene artifact has a duplicate or empty part ID";
 			ids.set(part.id, true);
 		}
@@ -128,10 +127,6 @@ class SceneArtifact {
 	}
 
 	static inline function finite(value:Float):Bool return value == value && value - value == 0.0;
-	public static function containsNul(value:String):Bool {
-		for (index in 0...value.length) if (value.charCodeAt(index) == 0) return true;
-		return false;
-	}
 
 	static function putInt(bytes:Bytes, offset:Int, value:Int):Int {
 		bytes.set(offset, value); bytes.set(offset + 1, value >>> 8);
@@ -182,8 +177,7 @@ private class SceneArtifactReader {
 		var length = readInt();
 		if (length <= 0 || length > 4096) throw "Scene artifact has an invalid part ID or name";
 		var value = readBytes(length).getString(0, length);
-		if (StringTools.trim(value).length == 0 || SceneArtifact.containsNul(value))
-			throw "Scene artifact has an invalid part ID or name";
+		if (StringTools.trim(value).length == 0) throw "Scene artifact has an empty part ID or name";
 		return value;
 	}
 
