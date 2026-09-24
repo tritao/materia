@@ -293,6 +293,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final bimEditor:BimModelEditor;
 
   final storage:FileDockWorkspacePersistence;
+  final workspaceSaves:WorkspaceSaveWorker;
   public final session:SceneDocumentSession;
   public final documents:SceneDocumentController;
   public var scene(get, never):EditorScene;
@@ -370,7 +371,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
     workspace = makeWorkspace();
     workspace.restoreFromOrDefault(storage, WORKSPACE_KEY);
-    workspace.listen(function() saveWorkspace());
+    workspaceSaves = new WorkspaceSaveWorker(storage, WORKSPACE_KEY);
+    workspace.listen(queueWorkspaceSave);
     installCommands();
   }
 
@@ -441,6 +443,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Convenience entry point for a NativeKit host's layout phase. */
   public function submit(frame:LayoutFrame):RenderNode {
+    var saveError = workspaceSaves.takeError();
+    if (saveError != null) log("Workspace save failed: " + saveError);
     viewportWidth = frame.width;
     if (scene.advanceCadMeshRefinement()) {
       if (hostContext != null)
@@ -454,10 +458,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function context():UiContext return ui;
 
   public function dispose():Void {
+    var saveError = workspaceSaves.close();
+    if (saveError != null) log("Workspace save failed: " + saveError);
+    bimModel.close();
     simulation.dispose();
     world.close();
     if (files != null) files.dispose();
-    bimModel.close();
     if (perspectiveViewport != null) perspectiveViewport.dispose();
     session.dispose();
     ui.dispose();
@@ -497,7 +503,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   public function resetWorkspace():Void {
     workspace.reset();
-    saveWorkspace();
     log("Workspace reset");
     commands.refresh();
   }
@@ -1520,7 +1525,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function saveWorkspace():Void {
-    try workspace.saveTo(storage, WORKSPACE_KEY);
+    try {
+      var error = workspaceSaves.saveNow(workspace.snapshot());
+      if (error != null) log("Workspace save failed: " + error);
+    }
+    catch (error:Dynamic) log("Workspace save failed: " + Std.string(error));
+  }
+
+  function queueWorkspaceSave():Void {
+    try workspaceSaves.schedule(workspace.snapshot());
     catch (error:Dynamic) log("Workspace save failed: " + Std.string(error));
   }
 
@@ -1559,6 +1572,8 @@ private class FileDockWorkspacePersistence implements DockWorkspacePersistence {
     var directory = separator < 0 ? "" : path.substr(0, separator);
     if (directory != null
       && directory.length > 0 && !FileSystem.exists(directory)) FileSystem.createDirectory(directory);
-    File.saveContent(path, value);
+    var temporary = path + ".tmp";
+    File.saveContent(temporary, value);
+    FileSystem.rename(temporary, path);
   }
 }
