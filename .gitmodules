@@ -28,4 +28,4 @@
 	url = https://github.com/memononen/budouxc.git
 [submodule "simkit/vendor/mujoco"]
 	path = simkit/vendor/mujoco
-	url = https://github.com/google-deepmind/mujoco.git
+	url = https://github.com/tritao/mujoco.git
