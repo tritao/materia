@@ -65,6 +65,18 @@ This launches the existing build without checking the native and Haxe build
 graph. Rebuild with the command above after source changes. To open a CAD
 project, pass `--project=PATH` to the same launcher.
 
+For an edit and relaunch loop, run:
+
+```sh
+./haxeon/scripts/haxeon run --watch --project app/haxeon.json -- \
+  --project=../cadkit/examples/modeling/materia.project.json
+```
+
+Haxeon watches the app and its dependency sources, builds after source edits,
+and relaunches only when the build succeeds. A failed build leaves the running
+app open. This currently restarts the desktop process, so unsaved in-memory
+edits do not survive a code reload.
+
 The host supports a headless workspace snapshot and deterministic diagnostics:
 
 ```sh
