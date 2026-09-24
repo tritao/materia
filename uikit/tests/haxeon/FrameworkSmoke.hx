@@ -1412,6 +1412,21 @@ class FrameworkSmoke {
 		context.key(UiEventKind.KeyDown, UiKey.Home);
 		if (scrollView.controller.offsetY != 0.0)
 			return 245;
+		var shortViewportStyle = new LayoutStyle();
+		shortViewportStyle.width = LayoutAxis.fixed(256.0);
+		shortViewportStyle.height = LayoutAxis.fixed(300.0);
+		var shortContentStyle = new LayoutStyle();
+		shortContentStyle.width = LayoutAxis.fixed(256.0);
+		shortContentStyle.height = LayoutAxis.fixed(100.0);
+		var shortScroll = new ScrollView("short-scroll", new Column("short-content", [
+			new KeyedView("message", new Text("Short content"))
+		], shortContentStyle), shortViewportStyle);
+		context.submit(shortScroll, new LayoutFrame(256.0, 300.0));
+		shortScroll.style.height = LayoutAxis.fixed(200.0);
+		var shortRoot = context.submit(shortScroll, new LayoutFrame(256.0, 200.0));
+		var shortTrack:ResolvedLayoutItem = cast shortRoot.children[1].resolved;
+		if (shortScroll.controller.maxScrollY != 0.0 || shortTrack.visible)
+			return 269;
 		var emptyViewport = new VirtualViewport(0, 32.0, 350.0, 0.0);
 		var topViewport = new VirtualViewport(100000, 32.0, 350.0, 0.0);
 		var middleViewport = new VirtualViewport(100000, 32.0, 350.0, 414.0 * 32.0);

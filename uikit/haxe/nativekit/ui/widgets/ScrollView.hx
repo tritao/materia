@@ -85,9 +85,16 @@ class ScrollView implements View {
 			var scrollbar = showScrollbar && axis != ScrollAxis.Horizontal
 				? addVerticalScrollbar(context, viewport, stored) : null;
 
-			viewport.onResolved(function(geometry) {
-				controller.updateMetrics(geometry.width, geometry.height,
-					geometry.contentBounds.width, geometry.contentBounds.height);
+			translatedContent.onResolved(function(geometry) {
+				var viewportGeometry:ResolvedLayoutItem = cast viewport.resolved;
+				// The viewport's content bounds include the overlay scrollbar. Its
+				// previous track height can otherwise look like content overflow.
+				var contentWidth = Math.max(geometry.width,
+					geometry.contentBounds.x + geometry.contentBounds.width);
+				var contentHeight = Math.max(geometry.height,
+					geometry.contentBounds.y + geometry.contentBounds.height);
+				controller.updateMetrics(viewportGeometry.width, viewportGeometry.height,
+					contentWidth, contentHeight);
 				var nextTransform = Transform2D.identity().translated(-controller.offsetX,
 					-controller.offsetY);
 				var transform = translatedContent.layout.style.transform;
