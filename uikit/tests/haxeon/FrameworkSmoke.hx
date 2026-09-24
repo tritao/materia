@@ -380,6 +380,22 @@ class FrameworkSmoke {
 		if (sharedSemantics == null || sharedSemantics.value != "á🙂" ||
 			sharedSemantics.documentLength != 3)
 			return 294;
+		context.text(UiEventKind.TextEdit, null,
+			new NativeKitTextEdit(TextEditAction.Compose, "x", 2, 2, 3, 3, 2, 3));
+		if (sharedDocument.text != "áx🙂" || sharedEdit == null ||
+			sharedEdit.replacementStart != 2 || sharedEdit.replacementEnd != 2 ||
+			sharedEdit.replacementText != "x" || sharedEdit.replacedText != "" ||
+			!sharedEdit.hasComposition || sharedEdit.compositionStart != 2 ||
+			sharedEdit.compositionEnd != 3)
+			return 214;
+		sharedRoot = context.submit(sharedField, new LayoutFrame(256.0, 192.0));
+		if (sharedEditor.layout.text != sharedDocument.text ||
+			sharedEditor.compositionStart != 2 || sharedEditor.compositionEnd != 3)
+			return 215;
+		context.text(UiEventKind.TextEdit, null,
+			new NativeKitTextEdit(TextEditAction.Commit, "x", 2, 3, 3, 3, -1, -1));
+		if (sharedDocument.text != "áx🙂" || sharedEditor.compositionStart != -1)
+			return 216;
 		sharedDocument.replace(0, sharedDocument.codepointCount, "external update");
 		context.submit(sharedField, new LayoutFrame(256.0, 192.0));
 		if (sharedEditor.text != "external update" || sharedEditor.selectionEnd >
