@@ -21,6 +21,7 @@ start.
 | [`simkit/`](simkit/) | Deterministic simulation orchestration and physics integration |
 | [`sensorkit/`](sensorkit/) | Backend-independent sensor scheduling and measurement models |
 | [`robotkit/`](robotkit/) | Complete robotics layer: runtime, protocol, world orchestration, and hosts |
+| [`automationkit/`](automationkit/) | Facility, mission, task, fleet, and traffic models above RobotKit |
 | [`cadkit/`](cadkit/) | Headless CAD core and C ABI above Open CASCADE |
 
 The native components are kept as sibling projects so they can be built and

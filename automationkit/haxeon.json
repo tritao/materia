@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"package": { "name": "materia-automation" },
+	"sourceRoots": ["haxe"],
+	"dependencies": {
+		"robotkit": { "path": "../robotkit" }
+	},
+	"target": "host"
+}

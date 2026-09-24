@@ -4,5 +4,6 @@
 /app/*.dump
 /robotkit/robotd/build/
 /robotkit/tests/build/
+/automationkit/tests/build/
 
 /app/tests/build/

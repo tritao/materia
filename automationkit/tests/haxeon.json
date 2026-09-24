@@ -1,0 +1,26 @@
+{
+	"version": 1,
+	"package": { "name": "materia-automation-tests" },
+	"entry": "tests.AutomationTests",
+	"sourceRoots": ["src"],
+	"dependencies": {
+		"nativekit": { "path": "../../nativekit" },
+		"materia-automation": { "path": ".." }
+	},
+	"native": {
+		"cmake": {
+			"source": "../../robotkit/robotd/native",
+			"target": "robotd_native",
+			"inputs": [
+				"../../robotkit/robotd/native/CMakeLists.txt",
+				"../../robotkit/CMakeLists.txt",
+				"../../robotkit/runtime/CMakeLists.txt",
+				"../../robotkit/runtime/include/robotkit_runtime.h",
+				"../../nativekit/CMakeLists.txt",
+				"../../simkit/CMakeLists.txt"
+			]
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}
