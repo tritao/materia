@@ -46,6 +46,13 @@ class BimKitSmoke {
 		return property.value;
 	}
 
+	static function definitionPropertyValue(definition:cadkit.parametric.Definition, name:String):Dynamic {
+		var property = definition.property(name);
+		if (property == null)
+			throw "missing definition property " + name;
+		return property.value;
+	}
+
 	static function encodePlacement(value:Placement):Dynamic {
 		var plane = value.location.plane;
 		return {
@@ -184,8 +191,97 @@ class BimKitSmoke {
 		model.close();
 	}
 
+	static function completeBuildingFixture():Void {
+		var fixture = new BimBuildingFixture();
+		var model = fixture.model;
+		check(model.aggregateChildren(fixture.project.id)[0].id.value == fixture.site.id.value
+			&& model.aggregateChildren(fixture.site.id)[0].id.value == fixture.building.id.value
+			&& model.aggregateChildren(fixture.building.id).length == 2
+			&& model.containedElements(fixture.groundStorey.id).length == 9
+			&& model.containedElements(fixture.upperStorey.id).length == 5
+			&& fixture.windows.length == 2 && fixture.doors.length == 2 && fixture.slabs.length == 2
+			&& fixture.spaces.length == 3 && model.cad.outputFeatureOrNull() == null,
+			"the integration fixture builds a complete two-storey BIM model with shared types");
+		check(fixture.groundWalls[0].shape().volume() > 0 && fixture.slabs[0].shape().volume() == 6000.0 * 5000 * 200,
+			"authored walls and slabs publish per-element geometry");
+		var saved = BimCodec.encode(model);
+		var restored = BimCodec.decode(saved);
+		var restoredWindow:cadkit.parametric.InstanceElement = cast restored.cad.element(fixture.windows[0].id);
+		var restoredWindowType = restored.cad.definition(restoredWindow.definitionId);
+		var restoredDoor:cadkit.parametric.InstanceElement = cast restored.cad.element(fixture.doors[0].id);
+		check(restored.aggregateChildren(fixture.building.id).length == 2
+			&& restored.containedElements(fixture.groundStorey.id).length == 9
+			&& restored.openingsForWall(fixture.groundWalls[0].id).length == 2
+			&& restored.openingsForWall(fixture.groundWalls[2].id).length == 1
+			&& definitionPropertyValue(restored.cad.definition(restoredDoor.definitionId), "bim.class") == BimSchema.DoorType,
+			"the complete spatial, type, and host graph survives a single document save and reopen");
+
+		var sharedWindowVolume = restoredWindow.shape().volume();
+		var otherWindow:cadkit.parametric.InstanceElement = cast restored.cad.element(fixture.windows[1].id);
+		var otherWindowVolume = otherWindow.shape().volume();
+		restoredWindowType.setDefault("width", 1300);
+		check(restoredWindow.shape().volume() != sharedWindowVolume && otherWindow.shape().volume() != otherWindowVolume,
+			"editing a shared Window Type updates both instances");
+		check(restored.undo() && restoredWindowType.input("width").defaultValue == 1200,
+			"shared Window Type edits undo");
+		check(restored.redo() && restoredWindowType.input("width").defaultValue == 1300, "shared Window Type edits redo");
+		check(restored.undo(), "shared Window Type edit returns to the saved dimensions");
+
+		var sharedTypeId = restoredWindow.definitionId.value;
+		var uniqueType = restoredWindow.makeUnique();
+		var uniqueClass = uniqueType.property("bim.class");
+		check(restoredWindow.definitionId.value == uniqueType.id.value && uniqueType.id.value != sharedTypeId
+			&& uniqueType.subgraph != null && uniqueClass != null && uniqueClass.value == BimSchema.WindowType,
+			"makeUnique preserves authored geometry and BIM type properties");
+		check(restored.undo() && restoredWindow.definitionId.value == sharedTypeId, "makeUnique undo restores shared type identity");
+		check(restored.redo() && restoredWindow.definitionId.value == uniqueType.id.value, "makeUnique redo restores unique type identity");
+		check(restored.undo(), "makeUnique returns to the shared building type");
+
+		var upperHeight = restored.wallRole(fixture.upperWalls[0].id).height;
+		var restoredUpperLevel:cadkit.parametric.LevelElement = cast restored.cad.element(fixture.upperLevel.id);
+		restoredUpperLevel.setElevation(3300);
+		restored.cad.recompute();
+		check(restored.wallRole(fixture.upperWalls[0].id).height < upperHeight,
+			"Storey Level datum edits update level-driven walls");
+		check(restored.undo() && restored.wallRole(fixture.upperWalls[0].id).height == upperHeight,
+			"Storey Level changes undo with geometry");
+		check(restored.redo() && restored.wallRole(fixture.upperWalls[0].id).height < upperHeight,
+			"Storey Level changes redo with geometry");
+		check(restored.undo(), "Storey Level changes return to the saved building elevations");
+
+		var doorHost = restored.relationship(restoredDoor.id).wallId.value;
+		restored.rehostOpening(restoredDoor.id, fixture.groundWalls[1].id, 4200, 0);
+		check(restored.relationship(restoredDoor.id).wallId.value == fixture.groundWalls[1].id.value,
+			"Door rehosting uses the same host relationship API as Window");
+		check(restored.undo() && restored.relationship(restoredDoor.id).wallId.value == doorHost,
+			"host reparenting undo restores the original wall");
+		check(restored.redo() && restored.relationship(restoredDoor.id).wallId.value == fixture.groundWalls[1].id.value,
+			"host reparenting redo restores the new wall");
+		check(restored.undo(), "host reparenting returns to the saved building");
+
+		var removedWindowId = otherWindow.id;
+		restored.removeOpening(removedWindowId);
+		check(restored.cad.findElement(removedWindowId) == null
+			&& restored.openingsForWall(fixture.groundWalls[0].id).length == 1,
+			"opening deletion updates containment and host projections");
+		check(restored.undo() && restored.cad.findElement(removedWindowId) != null
+			&& restored.openingsForWall(fixture.groundWalls[0].id).length == 2,
+			"opening deletion undo restores the full relationship graph");
+		check(restored.redo() && restored.cad.findElement(removedWindowId) == null,
+			"opening deletion redo restores the deleted state");
+		check(restored.undo(), "opening deletion returns to the complete saved building");
+		var reopenedAgain = BimCodec.decode(BimCodec.encode(restored));
+		check(reopenedAgain.containedElements(fixture.groundStorey.id).length == 9
+			&& reopenedAgain.openingsForWall(fixture.groundWalls[0].id).length == 2,
+			"the fully undone integration model remains saveable and reloadable");
+		reopenedAgain.close();
+		restored.close();
+		fixture.close();
+	}
+
 	public static function run():Void {
 		spatialBackbone();
+		completeBuildingFixture();
 		var creation = new BimDocument();
 		var created = creation.createWall("Temporary wall", 2000, 200, 2500);
 		check(creation.undo() && creation.allWallRoles().length == 0 && creation.cad.findElement(created.id) == null,

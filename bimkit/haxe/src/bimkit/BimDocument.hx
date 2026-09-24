@@ -100,6 +100,22 @@ class BimDocument {
 	public function createSpace(name:String, storeyId:ElementId):Element
 		return createContainedObject(name, BimSchema.Space, storeyId);
 
+	public function createSlab(name:String, width:Float, depth:Float, thickness:Float):Element {
+		var transaction = cad.beginTransaction();
+		try {
+			var body = cad.add(new BoxFeature(width, depth, thickness));
+			cad.trackFeatureCreation(body);
+			var slab = cad.createElement(name, body);
+			slab.setProperty(TypedProperty.token("bim.class", BimSchema.Slab, BimSchema.ElementClass));
+			cad.recompute();
+			transaction.commit();
+			return slab;
+		} catch (error:Dynamic) {
+			transaction.cancel();
+			throw error;
+		}
+	}
+
 	/** Remove an empty spatial container and detach its one incoming aggregate edge. */
 	public function removeSpatialContainer(elementId:ElementId):Void {
 		var element = cad.element(elementId);
