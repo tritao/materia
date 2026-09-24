@@ -1,19 +1,22 @@
 package app;
 
 import haxe.Json;
+import bimkit.BimCodec;
+import bimkit.BimDocument;
 
 class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
   public static inline var VERSION:Int = 1;
 
   public static function encode(scene:EditorScene,
-    ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord):String return Json.stringify(
+    ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument):String return Json.stringify(
       {
     format: FORMAT,
     version: VERSION,
     objects: script == null ? scene.recordsForSave() :[],
     sensors : script == null && sensors != null ? sensors.records() : null,
-    script : script
+    script : script,
+    bim : bim == null ? null : Json.parse(BimCodec.encode(bim))
   },
     null,
     "  "
@@ -60,6 +63,15 @@ class SceneCodec {
       overridesEnabled: overridesEnabled,
       overrides: overrides
     };
+  }
+
+  /** Optional versioned BimKit section; absent sections migrate to an empty BIM model. */
+  public static function decodeBim(text:String):BimDocument {
+    var root:Dynamic = Json.parse(text);
+    if (stringField(root, "format") != FORMAT || numberField(root, "version") != VERSION)
+      throw "Unsupported scene document";
+    var value:Dynamic = Reflect.field(root, "bim");
+    return value == null ? new BimDocument() : BimCodec.decode(Json.stringify(value));
   }
 
   static function validateOverrideValue(kind:String, value:Dynamic):Void switch kind {

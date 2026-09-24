@@ -290,8 +290,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public final workspacePath:String;
   public final world:RobotWorld;
   public final simulation:ApplicationSimulation;
-  public final bimModel:BimDocument;
-  final bimEditor:BimModelEditor;
+  public var bimModel(get, never):BimDocument;
+  function get_bimModel():BimDocument return session.bim;
+  var bimEditor:BimModelEditor;
 
   final storage:FileDockWorkspacePersistence;
   final workspaceSaves:WorkspaceSaveWorker;
@@ -336,11 +337,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands = ui.commands;
     this.world = world == null ? new RobotWorld() : world;
     simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
-    bimModel = BimEditorDemo.create();
-    bimEditor = new BimModelEditor("bim-model-editor", bimModel);
+    session = new ProjectDocumentSession(BimEditorDemo.create());
+    bimEditor = makeBimEditor();
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
-    session = new ProjectDocumentSession();
     session.beforeReplace=simulation.clear;
     if(setupScript!=null){var scripted=session.openScript(setupScript);
       simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
@@ -463,7 +463,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function dispose():Void {
     var saveError = workspaceSaves.close();
     if (saveError != null) log("Workspace save failed: " + saveError);
-    bimModel.close();
     simulation.dispose();
     world.close();
     if (files != null) files.dispose();
@@ -1412,6 +1411,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function documentChanged():Void {
+    if (bimEditor.model != session.bim) bimEditor = makeBimEditor();
     cancelActiveDrag();
     if (sceneGeneration != session.generation) {
       var ownership=session.scriptOwnership;
@@ -1435,6 +1435,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     contextMenuVisible = false;
     commands.refresh();
   }
+
+  function makeBimEditor():BimModelEditor return new BimModelEditor("bim-model-editor", session.bim,
+    session.document, function(label, change) session.applyBimEdit(label, change));
 
   function refreshScriptMaterialization(message:String):Void {
     try {var result=session.refreshScriptOverrides();simulation.setBackend(result.backend);

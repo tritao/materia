@@ -2,6 +2,9 @@ package tests;
 
 import app.CadPlateModel;
 import app.ProjectDocumentSession;
+import app.BimInspectorDescriptors;
+import nativekit.ui.core.CommandContext;
+import nativekit.ui.core.PropertyValue;
 import sys.FileSystem;
 
 class ProjectDocumentTests {
@@ -40,8 +43,25 @@ class ProjectDocumentTests {
       "scene undo restores its original position");
     check(!session.document.canUndo, "all four project edits were undone");
 
-    check(session.scene.nudgeSelected(0.2, 0.0), "savepoint fixture scene edit applies");
+    check(session.scene.nudgeSelected(0.05, 0.0), "BIM ordering fixture scene edit applies");
     session.sensors.add("imu");
+    check(session.scene.createMountingPlate(), "BIM ordering fixture CAD edit applies");
+    session.applyBimEdit("Add BIM project", function() { session.bim.createProject("Project"); });
+    var bimProject = session.bim.cad.allElements()[0];
+    var bimName = BimInspectorDescriptors.forElement(bimProject,
+      function(label, change) session.applyBimEdit(label, change))[2];
+    bimName.write(new CommandContext(), PropertyValue.Text("Renamed Project"));
+    check(session.document.history.undoCount == 5 && session.isDirty(),
+      "BIM mutation joins scene, sensor and CAD edits in project history");
+    check(bimProject.name == "Renamed Project", "BIM inspector edit is published");
+    check(session.document.undo() && bimProject.name == "Project",
+      "global undo reverses a BIM inspector edit");
+    check(session.document.undo() && session.bim.cad.allElements().length == 0,
+      "global undo reverses BIM creation after CAD, sensor and scene edits");
+    check(session.document.redo() && session.document.redo() &&
+      session.bim.cad.allElements()[0].name == "Renamed Project",
+      "global redo reapplies BIM creation and the inspector edit in order");
+
     if (!FileSystem.exists("build")) FileSystem.createDirectory("build");
     var path = "build/project-document-" + Std.random(100000000) + ".materia.json";
     session.save(path);
@@ -50,17 +70,21 @@ class ProjectDocumentTests {
     check(session.isDirty(), "undo away from the shared savepoint marks the project dirty");
     check(session.document.redo() && !session.isDirty(),
       "redo returns the entire project to the saved state");
+    var bimElementCount = session.bim.cad.allElements().length;
 
     var previousDocument = session.document;
     session.open(path);
     check(session.document != previousDocument && session.scene.document == session.document &&
       session.sensors.document == session.document && !session.document.canUndo && !session.isDirty(),
       "Open replaces scene, sensors and project history together");
+    check(session.bim.cad.allElements().length == bimElementCount,
+      "Open restores the versioned BIM project section");
     previousDocument = session.document;
     session.newDocument();
     check(session.document != previousDocument && session.scene.document == session.document &&
       session.sensors.document == session.document && !session.document.canUndo,
       "New replaces every project-owned history together");
+    check(session.bim.cad.allElements().length == 0, "New clears project-owned BIM state");
     session.dispose();
   }
 
