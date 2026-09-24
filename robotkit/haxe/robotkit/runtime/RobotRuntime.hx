@@ -13,6 +13,7 @@ import RobotKitRuntime;
 class RobotRuntime {
   final owner:Ownedrk_robot_runtime;
   final defaultMaxRates:Array<Float>;
+  final defaultMaxEfforts:Array<Float>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
   var disposed:Bool = false;
 
@@ -20,6 +21,7 @@ class RobotRuntime {
   private function new(owner:Ownedrk_robot_runtime, blueprint:RobotRuntimeBlueprint) {
     this.owner = owner;
     defaultMaxRates = [for (joint in blueprint.joints) joint.maxRate];
+    defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
     sensorLayout = blueprint.sensorLayout();
   }
 
@@ -43,53 +45,51 @@ class RobotRuntime {
     check(RobotKitRuntime.rk_robot_runtime_stop(owner.borrow()), "runtime.stop");
   }
 
-  /** Submits all position targets in one native call. */
-  public function submitPositions(positions:Array<Float>, sequence:Int,
+  /** Submits a complete heterogeneous joint-target batch in one native call. */
+  public function submitTargets(targets:Array<robotkit.world.JointTarget>, sequence:Int,
       ?timestampNs:haxe.Int64):Void {
     ensureLive();
-    if (positions.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
-      throw "Too many RobotKit position targets";
+    var batch = robotkit.world.JointTarget.copyBatch(targets);
     var command = new rk_robot_command();
     command.set_struct_size(rk_robot_command.size());
     command.set_sequence(haxe.Int64.ofInt(sequence));
     command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_JOINT_TARGETS);
-    command.set_target_count(positions.length);
-    for (index in 0...positions.length) {
+    command.set_target_count(batch.length);
+    for (index in 0...batch.length) {
+      var targetValue = batch[index];
       var target = new rk_joint_target();
-      target.set_joint(index);
-      target.set_mode(RobotKitRuntimeConstants.RK_TARGET_POSITION);
-      target.set_target(positions[index]);
-      target.set_max_rate(index < defaultMaxRates.length ? defaultMaxRates[index] : 0.0);
-      target.set_max_effort(0.0);
+      target.set_joint(targetValue.joint);
+      target.set_mode(switch targetValue.mode {
+        case robotkit.world.JointTargetMode.Position: RobotKitRuntimeConstants.RK_TARGET_POSITION;
+        case robotkit.world.JointTargetMode.Velocity: RobotKitRuntimeConstants.RK_TARGET_VELOCITY;
+        case robotkit.world.JointTargetMode.Effort: RobotKitRuntimeConstants.RK_TARGET_EFFORT;
+      });
+      target.set_target(targetValue.target);
+      target.set_max_rate(targetValue.joint < defaultMaxRates.length
+        ? defaultMaxRates[targetValue.joint] : 0.0);
+      target.set_max_effort(targetValue.joint < defaultMaxEfforts.length
+        ? defaultMaxEfforts[targetValue.joint] : 0.0);
       command.set_targets(index, target);
     }
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
-      "runtime.submitPositions");
+      "runtime.submitTargets");
+  }
+
+  /** Submits all position targets in one native call. */
+  public function submitPositions(positions:Array<Float>, sequence:Int,
+      ?timestampNs:haxe.Int64):Void {
+    var targets:Array<robotkit.world.JointTarget> = [];
+    for (index in 0...positions.length)
+      targets.push(robotkit.world.JointTarget.position(index, positions[index]));
+    submitTargets(targets, sequence, timestampNs);
   }
 
   /** Submits one position target without implying ownership of a simulation tick. */
   public function submitPosition(joint:Int, targetValue:Float, sequence:Int,
       ?timestampNs:haxe.Int64):Void {
-    ensureLive();
-    if (joint < 0 || joint >= RobotKitRuntimeConstants.RK_MAX_JOINTS)
-      throw "Invalid RobotKit joint target";
-    var command = new rk_robot_command();
-    command.set_struct_size(rk_robot_command.size());
-    command.set_sequence(haxe.Int64.ofInt(sequence));
-    command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
-    command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_JOINT_TARGETS);
-    command.set_target_count(1);
-    var target = new rk_joint_target();
-    target.set_joint(joint);
-    target.set_mode(RobotKitRuntimeConstants.RK_TARGET_POSITION);
-    target.set_target(targetValue);
-    target.set_max_rate(joint >= 0 && joint < defaultMaxRates.length
-      ? defaultMaxRates[joint] : 0.0);
-    target.set_max_effort(0.0);
-    command.set_targets(0, target);
-    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
-      "runtime.submitPosition");
+    submitTargets([robotkit.world.JointTarget.position(joint, targetValue)], sequence,
+      timestampNs);
   }
 
   /** Submits a stop to the owner thread; it never steps synchronously. */

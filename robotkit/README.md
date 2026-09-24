@@ -106,6 +106,25 @@ objects. It does not introduce a second world model. `ReplayRobot`, recording,
 and `WorldBehaviorRunner` use the same `Robot`/snapshot/command boundary for
 offline debugging and behavior reuse.
 
+World commands use `RobotCommand.JointTargets` to submit a heterogeneous batch
+as one operation. `JointTargetMode` distinguishes position, velocity, and
+effort values, so wheel pairs and steering-plus-drive setpoints share the same
+transport-neutral API:
+
+```haxe
+world.submit("amr-17", JointTargets([
+  JointTarget.velocity(leftWheel, leftSpeed),
+  JointTarget.velocity(rightWheel, rightSpeed)
+], null));
+```
+
+Adapters copy and validate a batch before submitting it. Repeated joint indices
+are rejected. `RemoteRobot` sends one `JointTargets` protocol frame and
+`robotd` queues one native runtime command, preserving the batch sequence.
+`SimulatedRobot` submits the same target array through one runtime mailbox call;
+`ReplayRobot` retains generated batches separately from the source recording.
+The runtime applies configured position, velocity, and effort limits.
+
 ### Persistent recordings
 
 `McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing
@@ -123,8 +142,10 @@ ordering key: robot and sensor source timestamps retain their clock-domain IDs
 and are never compared across domains. Wide sequences and timestamps are JSON
 decimal strings, avoiding precision loss in generic JSON tools. Payload schemas
 cover commands, robot snapshots, individual sensor frames, faults, world
-snapshots, and world lifecycle events. Recorded commands are history only;
-loading a file never forwards them to a live adapter.
+snapshots, and world lifecycle events. Schema v2 records complete joint target
+batches; readers also load v1 single-position commands as one-target batches.
+Recorded commands are history only; loading a file never forwards them to a
+live adapter.
 
 Recording timestamps are captured separately from event ordinals and stored in
 both MCAP time fields; the ordinal remains a full-width decimal string in the
@@ -152,9 +173,10 @@ cross-check.
 
 `robotkit/tests/world-tcp.sh` exercises the same `HoldJointBehavior` against a
 local `SimulatedRobot` and a TCP-connected `RemoteRobot` hosted by `robotd`.
-Three successive targets check command counts, unchanged-snapshot suppression,
-settled joint positions, and encoder/IMU/LiDAR identities, mounts, and values.
-The fixture uses the deterministic simulation backend; independent clocks and
+An atomic position/velocity/effort batch is checked before three successive
+behavior targets test command counts, unchanged-snapshot suppression, settled
+joint positions, and encoder/IMU/LiDAR identities, mounts, and values. The
+fixture uses the deterministic simulation backend; independent clocks and
 sample sequences are deliberately not compared for equality. Run with
 `ROBOTKIT_TEST_SESSIONS=1` to check controller leases, observers, and reconnects.
 

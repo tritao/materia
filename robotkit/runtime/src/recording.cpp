@@ -22,7 +22,8 @@
 
 namespace {
 constexpr const char* Names[] = {"", "command", "snapshot", "sensor", "fault", "world", "world_event"};
-constexpr const char* Schema = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload v1","type":"object","additionalProperties":true,"required":["version","ordinal","recordingTimestampNs","robotId","sourceSequence","sourceTimestampNs","sourceClockId","type","payload"],"properties":{"version":{"const":1},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"recordingTimestampNs":{"type":"string","pattern":"^[0-9]+$"},"robotId":{"type":"string"},"sourceSequence":{"type":"string"},"sourceTimestampNs":{"type":"string"},"sourceClockId":{"type":"string"},"type":{"type":"string"},"payload":{"type":"object"}}})";
+constexpr const char* SchemaV1 = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload v1","type":"object","additionalProperties":true,"required":["version","ordinal","recordingTimestampNs","robotId","sourceSequence","sourceTimestampNs","sourceClockId","type","payload"],"properties":{"version":{"const":1},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"recordingTimestampNs":{"type":"string","pattern":"^[0-9]+$"},"robotId":{"type":"string"},"sourceSequence":{"type":"string"},"sourceTimestampNs":{"type":"string"},"sourceClockId":{"type":"string"},"type":{"type":"string"},"payload":{"type":"object"}}})";
+constexpr const char* SchemaV2 = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload v2","type":"object","additionalProperties":true,"required":["version","ordinal","recordingTimestampNs","robotId","sourceSequence","sourceTimestampNs","sourceClockId","type","payload"],"properties":{"version":{"const":2},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"recordingTimestampNs":{"type":"string","pattern":"^[0-9]+$"},"robotId":{"type":"string"},"sourceSequence":{"type":"string"},"sourceTimestampNs":{"type":"string"},"sourceClockId":{"type":"string"},"type":{"type":"string"},"payload":{"type":"object"}}})";
 
 struct Item {
   uint32_t kind = 0;
@@ -63,9 +64,9 @@ template<class T> std::shared_ptr<T> lookup(std::unordered_map<uint32_t,std::sha
   return found == values.end() ? nullptr : found->second;
 }
 bool validKind(uint32_t kind) { return kind >= RK_RECORDING_COMMAND && kind <= RK_RECORDING_WORLD_EVENT; }
-bool validSchemaData(const mcap::ByteArray& data) {
-  const auto size = std::strlen(Schema);
-  return data.size() == size && std::memcmp(data.data(), Schema, size) == 0;
+bool validSchemaData(const mcap::ByteArray& data, const char* schema) {
+  const auto size = std::strlen(schema);
+  return data.size() == size && std::memcmp(data.data(), schema, size) == 0;
 }
 bool payloadOrdinal(const std::byte* data, size_t size, uint64_t& ordinal) {
   const std::string_view text(reinterpret_cast<const char*>(data), size);
@@ -105,10 +106,10 @@ void writerMain(const std::shared_ptr<Writer>& writer, const std::string& path) 
   if (!result.ok()) { fail(writer, result.message); writeStatus(writer); return; }
   std::array<mcap::ChannelId, 7> channels{};
   for (uint32_t kind = 1; kind <= 6; ++kind) {
-    mcap::Schema schema(std::string("robotkit.") + Names[kind] + ".v1", "jsonschema", Schema);
+    mcap::Schema schema(std::string("robotkit.") + Names[kind] + ".v2", "jsonschema", SchemaV2);
     output.addSchema(schema);
     mcap::Channel channel(std::string("robotkit/") + Names[kind], "json", schema.id);
-    channel.metadata["robotkit.schema_version"] = "1";
+    channel.metadata["robotkit.schema_version"] = "2";
     output.addChannel(channel);
     channels[kind] = channel.id;
   }
@@ -152,12 +153,18 @@ rk_result validateAndCache(const std::shared_ptr<Reader>& reader) {
     if (topic == std::string("robotkit/") + Names[index]) kind = index;
   auto version = view.channel->metadata.find("robotkit.schema_version");
   if (!kind || !view.schema || view.schema->encoding != "jsonschema" ||
-      view.schema->name != std::string("robotkit.") + Names[kind] + ".v1" ||
-      version == view.channel->metadata.end() || version->second != "1" ||
-      !validSchemaData(view.schema->data))
+      version == view.channel->metadata.end())
     return RK_ERROR_UNSUPPORTED;
+  const auto expected_v1 = std::string("robotkit.") + Names[kind] + ".v1";
+  const auto expected_v2 = std::string("robotkit.") + Names[kind] + ".v2";
+  const bool schema_v1 = version->second == "1" && view.schema->name == expected_v1 &&
+      validSchemaData(view.schema->data, SchemaV1);
+  const bool schema_v2 = version->second == "2" && view.schema->name == expected_v2 &&
+      validSchemaData(view.schema->data, SchemaV2);
+  if (!schema_v1 && !schema_v2) return RK_ERROR_UNSUPPORTED;
   Item item;
   item.kind = kind;
+  item.version = schema_v1 ? 1 : 2;
   if (!payloadOrdinal(view.message.data, view.message.dataSize, item.ordinal))
     return RK_ERROR_INVALID_ARGUMENT;
   item.timestamp = view.message.logTime;
@@ -184,7 +191,7 @@ rk_result rk_recording_writer_enqueue(rk_recording_writer_handle handle, rk_reco
     uint32_t version, uint64_t ordinal, uint64_t timestamp, const uint8_t* payload, uint32_t size) {
   auto writer = lookup(Writers, handle.id);
   if (!writer) return RK_ERROR_INVALID_HANDLE;
-  if (!validKind(kind) || version != 1 || (!payload && size)) return RK_ERROR_INVALID_ARGUMENT;
+  if (!validKind(kind) || version != 2 || (!payload && size)) return RK_ERROR_INVALID_ARGUMENT;
   std::lock_guard lock(writer->mutex);
   if (writer->state != RK_RECORDING_OPEN) return RK_ERROR_INVALID_STATE;
   if (size > writer->capacityBytes || writer->queuedBytes > writer->capacityBytes - size) {

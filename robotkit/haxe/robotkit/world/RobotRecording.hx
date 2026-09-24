@@ -16,8 +16,8 @@ class RobotRecording {
 
   public function recordCommand(command:RobotCommand, ?robotId:RobotId = ""):Void {
     switch command {
-      case JointPosition(joint, target, expiryNs):
-        var copy = RobotCommand.JointPosition(joint, target, expiryNs);
+      case JointTargets(targets, expiryNs):
+        var copy = RobotCommand.JointTargets(JointTarget.copyBatch(targets), expiryNs);
         commands.push(copy);
         events.push(RobotRecordingEvent.Command(copy));
         append(RobotRecordingEvent.Command(copy), robotId);

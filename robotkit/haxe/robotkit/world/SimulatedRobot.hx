@@ -35,8 +35,8 @@ class SimulatedRobot implements Robot {
       id,
       joints == null ? 0 : joints.length,
       true,
-      false,
-      false,
+      true,
+      true,
       false
     );
   }
@@ -85,11 +85,11 @@ class SimulatedRobot implements Robot {
   public function submit(command:RobotCommand):Void {
     ensureOpen();
     switch command {
-      case JointPosition(joint, target, expiryNs):
+      case JointTargets(targets, expiryNs):
         if (expiryNs != null && haxe.Int64.compare(expiryNs, haxe.Int64.ofInt(0)) != 0)
           throw "Runtime command deadlines are not supported; use bounded local intents";
         commandSequence++;
-        runtime.submitPosition(joint, target, commandSequence);
+        runtime.submitTargets(targets, commandSequence);
     }
   }
 

@@ -30,6 +30,11 @@ class RobotProtocol {
     return message(RobotMessageType.JointTarget, MessagePack.encode(value), sessionId,
       sequence, timestampNs);
 
+  public static function jointTargets(value:JointTargets, ?sessionId:haxe.Int64 = null,
+      ?sequence:haxe.Int64 = null, ?timestampNs:haxe.Int64 = null):RobotFrame
+    return message(RobotMessageType.JointTargets, MessagePack.encode(value), sessionId,
+      sequence, timestampNs);
+
   public static function stop(value:Stop, ?sessionId:haxe.Int64 = null,
       ?sequence:haxe.Int64 = null, ?timestampNs:haxe.Int64 = null):RobotFrame
     return message(RobotMessageType.Stop, MessagePack.encode(value), sessionId,
@@ -49,6 +54,9 @@ class RobotProtocol {
 
   public static function decodeJointTarget(frame:RobotFrame):JointTarget
     return decodeJointTargetPayload(frame);
+
+  public static function decodeJointTargets(frame:RobotFrame):JointTargets
+    return decodeJointTargetsPayload(frame);
 
   public static function decodeStop(frame:RobotFrame):Stop
     return decodeStopPayload(frame);
@@ -80,6 +88,11 @@ class RobotProtocol {
 
   static function decodeJointTargetPayload(frame:RobotFrame):JointTarget {
     expect(frame, RobotMessageType.JointTarget);
+    return MessagePack.decode(frame.payload);
+  }
+
+  static function decodeJointTargetsPayload(frame:RobotFrame):JointTargets {
+    expect(frame, RobotMessageType.JointTargets);
     return MessagePack.decode(frame.payload);
   }
 

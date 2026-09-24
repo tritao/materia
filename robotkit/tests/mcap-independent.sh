@@ -24,9 +24,11 @@ expected = [
 assert [channel.topic for _, channel, _ in messages] == expected
 for schema, channel, message in messages:
     assert schema.encoding == "jsonschema"
+    assert schema.name.endswith(".v2")
     assert channel.message_encoding == "json"
+    assert channel.metadata["robotkit.schema_version"] == "2"
     payload = json.loads(message.data)
-    assert payload["version"] == 1
+    assert payload["version"] == 2
     assert int(payload["recordingTimestampNs"]) == message.log_time
     assert message.publish_time == message.log_time
 print(f"independent MCAP reader validated {len(messages)} typed messages")

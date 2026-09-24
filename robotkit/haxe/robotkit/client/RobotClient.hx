@@ -10,6 +10,8 @@ import haxe.Int64;
 import robotkit.protocol.Fault;
 import robotkit.protocol.Hello;
 import robotkit.protocol.JointTarget;
+import robotkit.protocol.JointTargetValue;
+import robotkit.protocol.JointTargets;
 import robotkit.protocol.RobotCapabilities;
 import robotkit.protocol.RobotDescription;
 import robotkit.protocol.RobotFrame;
@@ -169,17 +171,38 @@ class RobotClient {
   public function hasControlLease():Bool
     return isReady() && welcome != null && welcome.controlGranted;
 
-  /** Sends one position/velocity/effort-independent joint target. */
+  /** Sends one joint target through the batch command protocol. */
   public function sendJointTarget(joint:Int, mode:Int, target:Float,
+      ?expiryNs:Int64):Int64 {
+    var targetMode = switch mode {
+      case 1: robotkit.world.JointTargetMode.Position;
+      case 2: robotkit.world.JointTargetMode.Velocity;
+      case 3: robotkit.world.JointTargetMode.Effort;
+      case _: throw 'Unsupported joint target mode $mode';
+    };
+    return sendJointTargets([new robotkit.world.JointTarget(joint, targetMode, target)],
+      expiryNs);
+  }
+
+  /** Sends a complete position/velocity/effort batch as one protocol frame. */
+  public function sendJointTargets(targets:Array<robotkit.world.JointTarget>,
       ?expiryNs:Int64):Int64 {
     ensureReady();
     // Monotonic clocks on different hosts have no shared epoch.
     if (expiryNs != null && Int64.compare(expiryNs, Int64.ofInt(0)) != 0)
       throw "Remote absolute deadlines require clock synchronization";
+    var batch = robotkit.world.JointTarget.copyBatch(targets);
     var sequence = nextCommandSequence();
-    var value = new JointTarget(robotId(), joint, mode, target,
-      sequence, expiryNs == null ? Int64.ofInt(0) : expiryNs);
-    send(RobotProtocol.jointTarget(value, sessionId, sequence,
+    var wireTargets:Array<JointTargetValue> = [];
+    for (target in batch) wireTargets.push(new JointTargetValue(target.joint,
+      switch target.mode {
+        case robotkit.world.JointTargetMode.Position: 1;
+        case robotkit.world.JointTargetMode.Velocity: 2;
+        case robotkit.world.JointTargetMode.Effort: 3;
+      }, target.target));
+    var value = new JointTargets(robotId(), wireTargets, sequence,
+      expiryNs == null ? Int64.ofInt(0) : expiryNs);
+    send(RobotProtocol.jointTargets(value, sessionId, sequence,
       NativeKit.nk_time_now_ns()));
     return sequence;
   }

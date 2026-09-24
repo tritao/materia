@@ -96,8 +96,8 @@ class RemoteRobot implements Robot {
   public function fault():Null < RobotFault > return currentFault;
 
   public function submit(command:RobotCommand):Void switch command {
-    case JointPosition(joint, target, expiryNs):
-      client.sendJointTarget(joint, 1, target, expiryNs);
+    case JointTargets(targets, expiryNs):
+      client.sendJointTargets(targets, expiryNs);
   }
 
   public function stop(mode:StopMode):Void {

@@ -17,7 +17,7 @@ if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" == "1" ]]; then
   client_mode="--sessions"
 fi
 setsid "$repo_dir/haxeon/scripts/haxeon" run --project "$server_project" -- \
-  $server_mode --robot-id=42 --port="$port" >"$server_log" 2>&1 &
+  $server_mode --multi-joint --robot-id=42 --port="$port" >"$server_log" 2>&1 &
 server_pid=$!
 cleanup() {
   if kill -0 "$server_pid" 2>/dev/null; then

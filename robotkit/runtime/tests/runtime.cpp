@@ -213,6 +213,30 @@ int main() {
     }
     assert(physical_endpoint->apply_count == 3);
 
+    auto mixed_blueprint = blueprint;
+    mixed_blueprint.joint_count = 3;
+    mixed_blueprint.link_count = 4;
+    mixed_blueprint.joints[2] = {2, RK_RUNTIME_JOINT_REVOLUTE, 2, 3, -1.0, 1.0, 3.0};
+    auto mixed_endpoint = std::make_shared<robotkit::InMemoryRobot>(3);
+    robotkit::RobotRuntime mixed_control(mixed_blueprint, mixed_endpoint,
+                                         std::chrono::milliseconds(100));
+    rk_robot_command mixed_targets{};
+    mixed_targets.struct_size = sizeof(mixed_targets);
+    mixed_targets.sequence = 1;
+    mixed_targets.kind = RK_COMMAND_JOINT_TARGETS;
+    mixed_targets.target_count = 3;
+    mixed_targets.targets[0] = {0, RK_TARGET_POSITION, 0.8, 1.0, 3.0};
+    mixed_targets.targets[1] = {1, RK_TARGET_VELOCITY, 2.0, 0.25, 3.0};
+    mixed_targets.targets[2] = {2, RK_TARGET_EFFORT, -2.0, 0.0, 3.0};
+    assert(mixed_control.submit(mixed_targets) == RK_OK);
+    assert(mixed_control.apply_pending_commands() == RK_OK);
+    assert(mixed_control.publish_sample(100'000'000) == RK_OK);
+    rk_robot_state mixed_state{};
+    assert(mixed_control.snapshot(mixed_state) == RK_OK);
+    assert(std::abs(mixed_state.position[0] - 0.1) < 1e-9);
+    assert(std::abs(mixed_state.velocity[1] - 0.25) < 1e-9);
+    assert(std::abs(mixed_state.effort[2] + 2.0) < 1e-9);
+
     rk_robot_command normal_stop{};
     normal_stop.struct_size = sizeof(normal_stop);
     normal_stop.sequence = 2;

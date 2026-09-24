@@ -20,7 +20,7 @@ class RobotHost {
   public function run():Void {
     if (args.indexOf("--help") >= 0) {
       Sys.println("Usage: robotd [--server [--once]] [--port=N] "
-        + "[--robot-id=N] [--behavior=oscillate] [--in-memory] [--help]");
+        + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] [--help]");
       return;
     }
     var port = parsePort();
@@ -33,6 +33,22 @@ class RobotHost {
     shoulder.limits.lower = -3.14;
     shoulder.limits.upper = 3.14;
     shoulder.limits.effort = 100.0;
+    if (args.indexOf("--multi-joint") >= 0) {
+      var wheel = robot.addLink(new Link("wheel"));
+      var carriage = robot.addLink(new Link("carriage"));
+      var wheelJoint = robot.addJoint(new Joint("wheel-joint", JointType.Revolute,
+        tool, wheel));
+      wheelJoint.limits.lower = -100.0;
+      wheelJoint.limits.upper = 100.0;
+      wheelJoint.limits.velocity = 10.0;
+      wheelJoint.limits.effort = 100.0;
+      var liftJoint = robot.addJoint(new Joint("lift", JointType.Prismatic,
+        tool, carriage));
+      liftJoint.limits.lower = -1.0;
+      liftJoint.limits.upper = 1.0;
+      liftJoint.limits.velocity = 2.0;
+      liftJoint.limits.effort = 100.0;
+    }
     var mount = robot.addFrame(new robotkit.model.Frame("sensor mount", base, "demo/sensor-mount"));
     mount.position = [0.2, 0.0, 0.0];
     for (kind in ["joint_encoder", "imu", "lidar"]) {

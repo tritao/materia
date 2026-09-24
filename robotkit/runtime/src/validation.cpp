@@ -73,12 +73,16 @@ rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command) {
          command->kind == RK_COMMAND_RESET_SAFETY) && command->target_count != 0)
         return RK_ERROR_INVALID_ARGUMENT;
 
+    bool targeted[RK_MAX_JOINTS]{};
     for (uint32_t index = 0; index < command->target_count; ++index) {
         const auto &target = command->targets[index];
         if (target.joint >= RK_MAX_JOINTS || !valid_target_mode(target.mode) ||
             !is_finite(target.target) || !is_finite(target.max_rate) ||
             !is_finite(target.max_effort) || target.max_rate < 0.0 || target.max_effort < 0.0)
             return RK_ERROR_INVALID_ARGUMENT;
+        if (targeted[target.joint])
+            return RK_ERROR_INVALID_ARGUMENT;
+        targeted[target.joint] = true;
     }
     return RK_OK;
 }

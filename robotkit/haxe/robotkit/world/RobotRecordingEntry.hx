@@ -4,7 +4,7 @@ import haxe.Int64;
 
 /** Versioned payload envelope with a recording-wide deterministic ordinal. */
 class RobotRecordingEntry {
-  public static inline final VERSION:Int = 1;
+  public static inline final VERSION:Int = 2;
   public final ordinal:Int64;
   public final robotId:RobotId;
   public final event:RobotRecordingEvent;
@@ -12,10 +12,12 @@ class RobotRecordingEntry {
   public final sourceTimestampNs:Int64;
   public final sourceClockId:String;
   public final recordingTimestampNs:Int64;
+  /** Payload schema used when this entry was loaded, or the current schema for new entries. */
+  public final schemaVersion:Int;
 
   public function new(ordinal:Int64, robotId:RobotId, event:RobotRecordingEvent,
       ?sourceSequence:Int64, ?sourceTimestampNs:Int64, ?sourceClockId:String = "unspecified",
-      ?recordingTimestampNs:Int64) {
+      ?recordingTimestampNs:Int64, ?schemaVersion:Int = 2) {
     this.ordinal = ordinal;
     this.robotId = robotId;
     this.event = event;
@@ -24,5 +26,6 @@ class RobotRecordingEntry {
     this.sourceClockId = sourceClockId;
     this.recordingTimestampNs = recordingTimestampNs == null
       ? Int64.fromFloat(Sys.time() * 1000000000.0) : recordingTimestampNs;
+    this.schemaVersion = schemaVersion;
   }
 }

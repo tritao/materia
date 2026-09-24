@@ -198,6 +198,23 @@ Simulation
 The internal `SimulationRobot` maps one runtime's joints and bodies into the
 shared world. It is not a second public endpoint abstraction.
 
+## Joint command batches
+
+`RobotCommand.JointTargets` is the transport-neutral command boundary. Each
+`JointTarget` names one joint, a position/velocity/effort interpretation, and
+one SI target value. A command can contain several different modes at once.
+Joint indices must be unique within a batch, and adapters validate the whole
+batch before queuing it. `RobotWorld` routes the command without expanding it
+into per-joint submissions.
+
+The remote protocol carries a batch in one `JointTargets` frame. `robotd`
+validates its session, sequence, deadline, joint indices, and target modes, then
+submits one native `rk_robot_command` to the runtime mailbox. Simulated robots
+use that same mailbox batch directly; replay records newly generated batches
+without changing their source observations. The runtime owns position bounds,
+velocity-rate bounds, and effort limits. This boundary intentionally contains
+joint targets rather than mobile-base or forklift-specific commands.
+
 ## One simulation tick
 
 Applications advance a shared simulation with `Simulation.step(timestamp)`:

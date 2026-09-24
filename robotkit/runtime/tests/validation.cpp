@@ -22,6 +22,10 @@ int main() {
     command.targets[1] = {1, RK_TARGET_POSITION, -0.5, 2.0, 3.0};
     assert(rk_robot_command_validate_for_blueprint(&command, &blueprint) == RK_OK);
 
+    command.targets[1].joint = 0;
+    assert(rk_robot_command_validate(&command) == RK_ERROR_INVALID_ARGUMENT);
+    command.targets[1].joint = 1;
+
     command.targets[1].joint = 2;
     assert(rk_robot_command_validate_for_blueprint(&command, &blueprint) == RK_ERROR_INVALID_ARGUMENT);
     command.targets[1].joint = 1;

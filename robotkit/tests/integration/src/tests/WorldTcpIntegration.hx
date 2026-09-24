@@ -31,6 +31,20 @@ class WorldTcpIntegration {
       joint.limits.lower = -3.14;
       joint.limits.upper = 3.14;
       joint.limits.effort = 100;
+      var wheel = model.addLink(new robotkit.model.Link("wheel"));
+      var wheelJoint = model.addJoint(new robotkit.model.Joint("wheel-joint",
+        robotkit.model.JointType.Revolute, tool, wheel));
+      wheelJoint.limits.lower = -100.0;
+      wheelJoint.limits.upper = 100.0;
+      wheelJoint.limits.velocity = 10.0;
+      wheelJoint.limits.effort = 100.0;
+      var carriage = model.addLink(new robotkit.model.Link("carriage"));
+      var liftJoint = model.addJoint(new robotkit.model.Joint("lift",
+        robotkit.model.JointType.Prismatic, tool, carriage));
+      liftJoint.limits.lower = -1.0;
+      liftJoint.limits.upper = 1.0;
+      liftJoint.limits.velocity = 2.0;
+      liftJoint.limits.effort = 100.0;
       var mount = model.addFrame(new robotkit.model.Frame("sensor mount", base, "demo/sensor-mount"));
       mount.position = [0.2, 0.0, 0.0];
       for (kind in ["joint_encoder", "imu", "lidar"]) {
@@ -38,7 +52,8 @@ class WorldTcpIntegration {
         sensor.frame = mount;
       }
       var local = new robotkit.world.SimulatedRobot("local", simulation.addRobot(
-        robotkit.runtime.RobotRuntimeCompiler.compile(model)), model.name, ["base", "tool"], ["shoulder"]);
+        robotkit.runtime.RobotRuntimeCompiler.compile(model)), model.name,
+        ["base", "tool", "wheel", "carriage"], ["shoulder", "wheel-joint", "lift"]);
       world.attach(local);
       simulation.step(Int64.ofInt(1));
       simulation.step(Int64.ofInt(2));
@@ -48,13 +63,19 @@ class WorldTcpIntegration {
       var protocolId = remote.protocolRobotId();
       if (protocolId == null || Int64.compare(protocolId,
         Int64.ofInt(42)) != 0) throw 'expected protocol robot ID 42, got ${Std.string(protocolId)}';
+      var remoteCapabilities = remote.capabilities();
+      if (remoteCapabilities.jointCount != 3 || !remoteCapabilities.supportsPosition
+          || !remoteCapabilities.supportsVelocity || !remoteCapabilities.supportsEffort)
+        throw "robotd did not advertise all joint target modes";
 
       waitUntil(runtime, function() {
         var state = world.snapshot().robot(LOGICAL_ID);
         return state != null && state.positions.length > 0;
       }, "remote robot did not publish its initial state");
       var deadlineRejected = false;
-      try remote.submit(robotkit.world.RobotCommand.JointPosition(0, 0.9, Int64.ofInt(123)))
+      try remote.submit(robotkit.world.RobotCommand.JointTargets([
+        robotkit.world.JointTarget.position(0, 0.9)
+      ], Int64.ofInt(123)))
       catch (_:Dynamic) deadlineRejected = true;
       if (!deadlineRejected) throw "remote adapter forwarded an unmapped absolute deadline";
       var behavior = new WorldBehaviorRunner(new HoldJointBehavior(0, 0.5));
@@ -93,14 +114,16 @@ class WorldTcpIntegration {
         var remoteRunner = new WorldBehaviorRunner(shared);
         if (localRunner.update(local) != 1 || remoteRunner.update(remote) != 1)
           throw "shared behavior did not emit one command on each adapter";
-        recording.recordCommand(robotkit.world.RobotCommand.JointPosition(0,target,null), LOGICAL_ID);
+        recording.recordCommand(robotkit.world.RobotCommand.JointTargets([
+          robotkit.world.JointTarget.position(0, target)
+        ], null), LOGICAL_ID);
         if (localRunner.update(local) != 0 || remoteRunner.update(remote) != 0)
           throw "runner emitted duplicate commands for an unchanged snapshot";
         simulation.step(Int64.ofInt(tick++));
         simulation.step(Int64.ofInt(tick++));
         waitUntil(runtime, function() {
           var value = remote.snapshot();
-          if (value.positions.length != 1 || value.positions.get(0) != target) return false;
+          if (value.positions.length != 3 || value.positions.get(0) != target) return false;
           for (sensor in value.sensors.toArray())
             if (sensor.kind == "joint_encoder" && sensor.values.get(0) == target) return true;
           return false;
@@ -141,6 +164,16 @@ class WorldTcpIntegration {
           throw "replayed observation changed behavior output";
       }
       replay.close(); sys.FileSystem.deleteFile(recordingPath);
+      remote.submit(robotkit.world.RobotCommand.JointTargets([
+        robotkit.world.JointTarget.position(0, 0.25),
+        robotkit.world.JointTarget.velocity(1, 0.5),
+        robotkit.world.JointTarget.effort(2, 2.0)
+      ], null));
+      waitUntil(runtime, function() {
+        var state = remote.snapshot();
+        return state.positions.length == 3 && state.positions.get(0) == 0.25
+          && state.velocities.get(1) > 0.0 && state.efforts.get(2) != 0.0;
+      }, "atomic mixed-mode target batch did not reach robotd runtime");
       Sys.println("Shared behavior parity passed: three targets, local simulation and robotd TCP");
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;

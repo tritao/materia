@@ -20,6 +20,8 @@ import robotkit.behavior.RobotBehaviorRunner;
 import robotkit.protocol.Fault;
 import robotkit.protocol.Hello;
 import robotkit.protocol.JointTarget;
+import robotkit.protocol.JointTargetValue;
+import robotkit.protocol.JointTargets;
 import robotkit.protocol.RobotCapabilities;
 import robotkit.protocol.RobotDescription;
 import robotkit.protocol.RobotFrame;
@@ -215,7 +217,9 @@ class RobotServer {
     case RobotMessageType.Hello:
       handleHello(RobotProtocol.decodeHello(frame));
     case RobotMessageType.JointTarget:
-      handleJointTarget(frame, RobotProtocol.decodeJointTarget(frame));
+      handleLegacyJointTarget(frame, RobotProtocol.decodeJointTarget(frame));
+    case RobotMessageType.JointTargets:
+      handleJointTargets(frame, RobotProtocol.decodeJointTargets(frame));
     case RobotMessageType.Stop:
       var value:Stop = RobotProtocol.decodeStop(frame);
       if (!controllerGranted || !sameRobot(value.robotId) || !validSession(frame)
@@ -253,7 +257,7 @@ class RobotServer {
       Int64.ofInt(robotId), robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), observerSession));
     sendTo(transport, observerSession, RobotProtocol.capabilities(new RobotCapabilities(
-      Int64.ofInt(robotId), blueprint.jointCount, true, false, false, false), observerSession));
+      Int64.ofInt(robotId), blueprint.jointCount, true, true, true, false), observerSession));
     observerHello.set(transport.rawValue(), true);
     var latest = runtime.snapshot().withRobotId(Int64.ofInt(robotId));
     sendStateTo(transport, observerSession, latest);
@@ -272,7 +276,7 @@ class RobotServer {
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
     send(RobotProtocol.capabilities(new RobotCapabilities(Int64.ofInt(robotId),
-      blueprint.jointCount, true, false, false, false), sessionId));
+      blueprint.jointCount, true, true, true, false), sessionId));
     helloComplete = true;
     publishSnapshot(true);
     if (value.requestedRole == "observer")
@@ -300,7 +304,13 @@ class RobotServer {
     lastSentSnapshotSequence = Int64.ofInt(-1);
   }
 
-  function handleJointTarget(frame:RobotFrame, value:JointTarget):Void {
+  function handleLegacyJointTarget(frame:RobotFrame, value:JointTarget):Void {
+    handleJointTargets(frame, new JointTargets(value.robotId,
+      [new JointTargetValue(value.joint, value.mode, value.target)],
+      value.sequence, value.expiryNs));
+  }
+
+  function handleJointTargets(frame:RobotFrame, value:JointTargets):Void {
     if (!controllerGranted) {
       sendFault(403, "control lease not granted", false);
       return;
@@ -318,16 +328,38 @@ class RobotServer {
       sendFault(422, "absolute deadlines require clock synchronization", false);
       return;
     }
-    if (value.joint != 0 || value.mode != 1) {
-      sendFault(422, "demo endpoint accepts position target joint 0 only", false);
+    if (value.targets == null || value.targets.length == 0 ||
+        value.targets.length > blueprint.jointCount) {
+      sendFault(422, "joint target batch has an invalid size", false);
       return;
     }
     try {
-      runtime.submitPositions([value.target], Int64.toInt(value.sequence));
+      var targets:Array<robotkit.world.JointTarget> = [];
+      var seen = new Map<Int, Bool>();
+      for (target in value.targets) {
+        if (target == null || target.joint < 0 || target.joint >= blueprint.jointCount
+            || seen.exists(target.joint) || !Math.isFinite(target.target)) {
+          sendFault(422, "joint target batch contains an invalid target", false);
+          return;
+        }
+        seen.set(target.joint, true);
+        var mode = switch target.mode {
+          case 1: robotkit.world.JointTargetMode.Position;
+          case 2: robotkit.world.JointTargetMode.Velocity;
+          case 3: robotkit.world.JointTargetMode.Effort;
+          case _: null;
+        };
+        if (mode == null) {
+          sendFault(422, "joint target batch contains an unsupported mode", false);
+          return;
+        }
+        targets.push(new robotkit.world.JointTarget(target.joint, mode, target.target));
+      }
+      runtime.submitTargets(targets, Int64.toInt(value.sequence));
       lastRequestSequence = value.sequence;
       servedState = true;
     } catch (error:Dynamic) {
-      sendFault(422, 'command rejected: $error', false);
+      sendFault(422, 'command batch rejected: $error', false);
     }
   }
 

@@ -25,6 +25,8 @@ class McapRecordingReader {
     if(result.status!=RobotKitRuntimeConstants.RK_OK)
       throw 'Read recording failed with RobotKit status ${result.status}';
     var entry=RobotRecordingCodec.decode(result.payload);
+    if (entry.schemaVersion != message.get_schema_version())
+      throw "Recording payload schema does not match its MCAP channel";
     if(Int64.compare(entry.ordinal,message.get_ordinal()) != 0)
       throw "Recording ordinal does not match its MCAP envelope";
     if(Int64.compare(entry.recordingTimestampNs,message.get_recording_timestamp_ns()) != 0)

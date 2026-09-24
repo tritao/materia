@@ -132,8 +132,8 @@ rk_result RK_CALL rk_robot_runtime_capabilities(rk_robot_runtime runtime,
         return RK_ERROR_INVALID_HANDLE;
     out_capabilities->joint_count = 0;
     out_capabilities->supports_position_targets = 1;
-    out_capabilities->supports_velocity_targets = 0;
-    out_capabilities->supports_effort_targets = 0;
+    out_capabilities->supports_velocity_targets = 1;
+    out_capabilities->supports_effort_targets = 1;
     out_capabilities->supports_prediction = 0;
     for (auto &reserved : out_capabilities->reserved)
         reserved = 0;

@@ -89,7 +89,7 @@ public:
 
 private:
     uint32_t joint_count_ = 0;
-    double targets_[RK_MAX_JOINTS]{};
+    rk_joint_target targets_[RK_MAX_JOINTS]{};
     bool has_target_[RK_MAX_JOINTS]{};
     bool stopped_ = false;
     uint64_t last_sample_timestamp_ns_ = 0;

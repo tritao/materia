@@ -72,9 +72,13 @@ rk_result InMemoryRobot::apply(const rk_robot_command &command) {
 
     for (uint32_t index = 0; index < command.target_count; ++index) {
         const auto &target = command.targets[index];
-        if (target.joint >= joint_count_ || target.mode != RK_TARGET_POSITION)
+        if (target.joint >= joint_count_ || target.mode < RK_TARGET_POSITION ||
+            target.mode > RK_TARGET_EFFORT)
             return RK_ERROR_UNSUPPORTED;
-        targets_[target.joint] = target.target;
+    }
+    for (uint32_t index = 0; index < command.target_count; ++index) {
+        const auto &target = command.targets[index];
+        targets_[target.joint] = target;
         has_target_[target.joint] = true;
     }
     return RK_OK;
@@ -91,12 +95,23 @@ rk_result InMemoryRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
     state.joint_count = joint_count_;
     for (uint32_t index = 0; index < joint_count_; ++index) {
         const double old_position = state.position[index];
-        if (!stopped_ && has_target_[index])
-            state.position[index] = targets_[index];
-        state.velocity[index] = elapsed_seconds > 0.0
-            ? (state.position[index] - old_position) / elapsed_seconds
-            : 0.0;
+        state.velocity[index] = 0.0;
         state.effort[index] = 0.0;
+        if (!stopped_ && has_target_[index]) {
+            const auto &target = targets_[index];
+            if (target.mode == RK_TARGET_POSITION) {
+                state.position[index] = target.target;
+                state.velocity[index] = elapsed_seconds > 0.0
+                    ? (state.position[index] - old_position) / elapsed_seconds
+                    : 0.0;
+            } else if (target.mode == RK_TARGET_VELOCITY) {
+                state.velocity[index] = target.target;
+                if (elapsed_seconds > 0.0)
+                    state.position[index] += target.target * elapsed_seconds;
+            } else if (target.mode == RK_TARGET_EFFORT) {
+                state.effort[index] = target.target;
+            }
+        }
     }
     last_sample_timestamp_ns_ = timestamp_ns;
     has_sample_timestamp_ = true;
@@ -323,6 +338,8 @@ rk_result RobotRuntime::apply_pending_commands() {
             if (!control_.active[joint])
                 continue;
             auto target = control_.targets[joint];
+            if (target.mode == RK_TARGET_VELOCITY && target.max_rate > 0.0)
+                target.target = std::clamp(target.target, -target.max_rate, target.max_rate);
             if (target.mode == RK_TARGET_POSITION) {
                 if (!control_.reference_initialized[joint]) {
                     control_.position_reference[joint] = current.position[joint];

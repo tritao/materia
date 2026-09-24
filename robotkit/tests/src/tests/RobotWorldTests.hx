@@ -50,6 +50,7 @@ class RobotWorldTests {
     testImmutableSnapshots();
     testRecordingEventLog();
     testReplayCorrectness();
+    testJointTargetBatches();
     testMcapRoundTrip();
     testMcapRobustness();
     testForwardingAndLifecycle();
@@ -115,7 +116,7 @@ class RobotWorldTests {
     var opened=RobotKitRuntime.rk_recording_writer_create(mismatchPath,Int64.ofInt(4096));
     equal(opened.status,RobotKitRuntimeConstants.RK_OK,"schema mismatch fixture opens");
     var payload=RobotRecordingCodec.encode(mismatchEntry);
-    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,1,
+    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,2,
       mismatchEntry.ordinal,mismatchEntry.recordingTimestampNs,payload),RobotKitRuntimeConstants.RK_OK,
       "schema mismatch fixture writes payload to wrong channel");
     equal(RobotKitRuntime.rk_recording_writer_finish(opened.out_writer.borrow()),RobotKitRuntimeConstants.RK_OK,
@@ -129,7 +130,9 @@ class RobotWorldTests {
 
   static function testReplayCorrectness():Void {
     var recording = new RobotRecording();
-    recording.recordCommand(RobotCommand.JointPosition(0, 99.0, null), "robot-a");
+    recording.recordCommand(RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(0, 99.0)
+    ], null), "robot-a");
     recording.recordSnapshot(new RobotSnapshot("robot-a", Int64.ofInt(7), Int64.ofInt(100),
       [1.0], [], [], 1, 0, Int64.ofInt(200), [], "robot-a.boot-1", "host"));
     recording.recordSnapshot(new RobotSnapshot("robot-b", Int64.ofInt(7), Int64.ofInt(100),
@@ -169,6 +172,72 @@ class RobotWorldTests {
     replay.close();
   }
 
+  static function testJointTargetBatches():Void {
+    var source = [
+      robotkit.world.JointTarget.position(0, 0.4),
+      robotkit.world.JointTarget.velocity(1, -0.25),
+      robotkit.world.JointTarget.effort(2, 3.5)
+    ];
+    var recording = new RobotRecording();
+    recording.recordCommand(RobotCommand.JointTargets(source, null), "batch-robot");
+    source[0] = robotkit.world.JointTarget.position(0, 9.0);
+    source.pop();
+    var recorded = recording.commands[0];
+    switch recorded {
+      case JointTargets(targets, _):
+        equal(targets.length, 3, "recording owns the full command batch");
+        equal(targets[0].target, 0.4, "recording copies immutable target values");
+        equal(Std.string(targets[1].mode), Std.string(robotkit.world.JointTargetMode.Velocity),
+          "recording preserves velocity interpretation");
+        equal(Std.string(targets[2].mode), Std.string(robotkit.world.JointTargetMode.Effort),
+          "recording preserves effort interpretation");
+      case _:
+        check(false, "recording retains a joint target batch");
+    }
+
+    var decoded = RobotRecordingCodec.decode(RobotRecordingCodec.encode(recording.entries[0]));
+    switch decoded.event {
+      case Command(JointTargets(targets, _)):
+        equal(targets.length, 3, "recording codec round-trips every target in a batch");
+        equal(Std.string(targets[0].mode), Std.string(robotkit.world.JointTargetMode.Position),
+          "recording codec preserves position mode");
+        equal(targets[1].target, -0.25, "recording codec preserves velocity values");
+        equal(targets[2].target, 3.5, "recording codec preserves effort values");
+      case _:
+        check(false, "recording codec decodes a command batch");
+    }
+
+    var legacy = RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
+      '{"version":1,"ordinal":"0","recordingTimestampNs":"1","robotId":"old","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"unspecified","type":"command","payload":{"kind":"jointPosition","joint":2,"target":0.75,"expiryNs":null}}'));
+    switch legacy.event {
+      case Command(JointTargets(targets, _)):
+        equal(targets.length, 1, "legacy single-target command becomes a one-target batch");
+        equal(Std.string(targets[0].mode), Std.string(robotkit.world.JointTargetMode.Position),
+          "legacy recording defaults to position mode");
+      case _:
+        check(false, "legacy command recording remains replayable");
+    }
+
+    var replay = new ReplayRobot("batch-robot", recording);
+    replay.submit(RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(0, -0.1),
+      robotkit.world.JointTarget.velocity(1, 0.5)
+    ], null));
+    switch replay.generatedCommands.commands[0] {
+      case JointTargets(targets, _):
+        equal(targets.length, 2, "replay captures generated commands as one batch");
+        equal(Std.string(targets[1].mode), Std.string(robotkit.world.JointTargetMode.Velocity),
+          "replay preserves generated target modes");
+      case _:
+        check(false, "replay generated command keeps batch form");
+    }
+    replay.close();
+    throws(function() robotkit.world.JointTarget.copyBatch([
+      robotkit.world.JointTarget.position(0, 0.0),
+      robotkit.world.JointTarget.effort(0, 1.0)
+    ]), "duplicate joints rejected within one atomic batch");
+  }
+
   static function testMcapRoundTrip():Void {
     var path = '/tmp/robotkit-${Sys.getPid()}-roundtrip.mcap';
     var writer = new McapRobotRecording(path, 1024 * 1024);
@@ -181,7 +250,11 @@ class RobotWorldTests {
       Int64.parseString("9223372036854775002"), [sensor], "robot-a.reset-2", "host.monotonic");
     var second = new RobotSnapshot("robot-b", Int64.ofInt(3), Int64.ofInt(10),
       [0.75], [], [], 1, 0, Int64.ofInt(20), [], "robot-b.boot-1", "host.monotonic");
-    writer.recordCommand(RobotCommand.JointPosition(0, 0.75, Int64.parseString("9223372036854775003")), "robot-a");
+    writer.recordCommand(RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(0, 0.75),
+      robotkit.world.JointTarget.velocity(1, -0.25),
+      robotkit.world.JointTarget.effort(2, 3.5)
+    ], Int64.parseString("9223372036854775003")), "robot-a");
     writer.recordSnapshot(first);
     writer.recordSensor("robot-a", sensor);
     writer.recordFault(new RobotFault("robot-b", 42, "recorded fault", false));
@@ -192,6 +265,17 @@ class RobotWorldTests {
 
     var loaded = McapRecordingReader.load(path);
     equal(loaded.entries.length, 6, "MCAP reload preserves every event type");
+    switch loaded.commands[0] {
+      case JointTargets(targets, expiry):
+        equal(targets.length, 3, "MCAP preserves batched target count");
+        equal(Std.string(targets[1].mode), Std.string(robotkit.world.JointTargetMode.Velocity),
+          "MCAP preserves velocity mode");
+        equal(targets[2].target, 3.5, "MCAP preserves effort target value");
+        equal(expiry, Int64.parseString("9223372036854775003"),
+          "MCAP preserves command deadline integer");
+      case _:
+        check(false, "MCAP preserves command batch variant");
+    }
     equal(loaded.snapshots[0].sourceTimestampNs, first.sourceTimestampNs, "MCAP preserves exact 64-bit timestamps");
     equal(loaded.snapshots[0].sourceSequence, first.sourceSequence, "MCAP preserves exact 64-bit sequences");
     equal(loaded.snapshots[0].sourceClockId, "robot-a.reset-2", "MCAP preserves reset clock identity");
@@ -205,7 +289,7 @@ class RobotWorldTests {
     replay.close();
     if (Sys.getEnv("ROBOTKIT_KEEP_MCAP") == null) sys.FileSystem.deleteFile(path);
     else Sys.println('RobotKit MCAP fixture: $path');
-    var unsupported = haxe.io.Bytes.ofString('{"version":2,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
+    var unsupported = haxe.io.Bytes.ofString('{"version":3,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
     throws(function() RobotRecordingCodec.decode(unsupported), "unsupported recording schema rejected");
     throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString("{")), "malformed recording payload rejected");
     var invalidMount:Dynamic = haxe.Json.parse(RobotRecordingCodec.encode(loaded.entries[2]).toString());
@@ -213,7 +297,9 @@ class RobotWorldTests {
     throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(invalidMount))),
       "recording rejects malformed sensor mount shapes");
     var invalidNumber:Dynamic = haxe.Json.parse(RobotRecordingCodec.encode(loaded.entries[0]).toString());
-    Reflect.setField(Reflect.field(invalidNumber, "payload"), "target", 1e400);
+    var commandTargets:Array<Dynamic> = cast Reflect.field(
+      Reflect.field(invalidNumber, "payload"), "targets");
+    Reflect.setField(commandTargets[0], "target", 1e400);
     throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(invalidNumber))),
       "recording rejects non-finite numeric payloads");
   }
@@ -301,7 +387,9 @@ class RobotWorldTests {
     simulation.step(Int64.ofInt(200));
     equal(robot.snapshot().sensors.length, 3, "second sample publishes measured IMU");
     var rejected = false;
-    try robot.submit(RobotCommand.JointPosition(0, 0.0, Int64.ofInt(100)))
+    try robot.submit(RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(0, 0.0)
+    ], Int64.ofInt(100)))
     catch (_:Dynamic) rejected = true;
     check(rejected, "simulation never silently ignores an unsupported deadline");
     robot.close();
@@ -568,7 +656,9 @@ class RobotWorldTests {
     var world = new RobotWorld();
     var robot = new FakeRobot("arm");
     world.attach(robot);
-    var command = RobotCommand.JointPosition(3, 1.25, Int64.ofInt(99));
+    var command = RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(3, 1.25)
+    ], Int64.ofInt(99));
     world.submit("arm", command);
     equal(Std.string(robot.lastCommand), Std.string(command), "command forwarded to selected robot");
     world.stop("arm", StopMode.Emergency);
@@ -603,7 +693,9 @@ class RobotWorldTests {
     equal(recording.events.length, 2, "recording captures queued adapter changes");
     var snapshot = world.snapshot().robot("recorded-arm");
     check(snapshot != null, "recording test has a robot snapshot");
-    recording.recordCommand(RobotCommand.JointPosition(0, 0.5, null));
+    recording.recordCommand(RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(0, 0.5)
+    ], null));
     recording.recordSnapshot(cast snapshot);
     recording.recordFault(new RobotFault("fault-1", 7, "test fault", false));
     recording.recordWorld(world.snapshot());
@@ -619,7 +711,7 @@ class RobotWorldTests {
   }
 
   static function testMixedSimulatedAndRemoteWorld():Void {
-    var blueprint = new RobotRuntimeBlueprint(1, 1, 2);
+    var blueprint = new RobotRuntimeBlueprint(1, 2, 3);
     blueprint.addJoint(new RobotRuntimeJointBlueprint(
       0,
       RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE,
@@ -629,20 +721,29 @@ class RobotWorldTests {
       3.14,
       100.0
     ));
+    blueprint.addJoint(new RobotRuntimeJointBlueprint(
+      1,
+      RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE,
+      1,
+      2,
+      -3.14,
+      3.14,
+      100.0
+    ));
     var simulation = new Simulation();
     var first = new SimulatedRobot(
       "sim-a",
       simulation.addRobot(blueprint),
       "simulated A",
-      ["base", "tool"],
-      ["shoulder"]
+      ["base", "tool", "wrist"],
+      ["shoulder", "wrist"]
     );
     var second = new SimulatedRobot(
       "sim-b",
       simulation.addRobot(blueprint),
       "simulated B",
-      ["base", "tool"],
-      ["shoulder"]
+      ["base", "tool", "wrist"],
+      ["shoulder", "wrist"]
     );
     var remote = new RemoteRobot("remote-c");
     var world = new RobotWorld();
@@ -650,8 +751,19 @@ class RobotWorldTests {
     world.attach(second);
     world.attach(remote);
 
-    world.submit("sim-a", RobotCommand.JointPosition(0, 0.4, null));
-    world.submit("sim-b", RobotCommand.JointPosition(0, -0.3, null));
+    var duplicateRejected = false;
+    try world.submit("sim-a", RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(0, 0.1),
+      robotkit.world.JointTarget.effort(0, 2.0)
+    ], null)) catch (_:Dynamic) duplicateRejected = true;
+    check(duplicateRejected, "simulated adapter rejects an ambiguous atomic batch");
+    world.submit("sim-a", RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(0, 0.4),
+      robotkit.world.JointTarget.position(1, -0.2)
+    ], null));
+    world.submit("sim-b", RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(0, -0.3)
+    ], null));
     simulation.step(Int64.ofInt(1000));
 
     var value = world.snapshot();
@@ -666,6 +778,8 @@ class RobotWorldTests {
     var remoteValue:RobotSnapshot = cast remoteState;
     check(Math.abs(firstValue.positions.get(0) - 0.4) < 0.000000001,
       "first simulated command routed independently");
+    check(Math.abs(firstValue.positions.get(1) + 0.2) < 0.000000001,
+      "simulated adapter applies both targets in one batch");
     check(Math.abs(secondValue.positions.get(0) + 0.3) < 0.000000001,
       "second simulated command routed independently");
     equal(firstValue.sourceTimestampNs, Int64.ofInt(10000000), "simulation clock reaches first robot");

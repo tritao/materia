@@ -6,7 +6,7 @@ import haxe.io.Bytes;
 
 /** Stable JSON payload contract stored inside MCAP messages. Wide integers are strings. */
 class RobotRecordingCodec {
-  public static inline final VERSION:Int = 1;
+  public static inline final VERSION:Int = 2;
 
   public static function encode(entry:RobotRecordingEntry):Bytes {
     var root:Dynamic = {
@@ -21,8 +21,10 @@ class RobotRecordingCodec {
     switch entry.event {
       case Command(value):
         Reflect.setField(root, "type", "command");
-        switch value { case JointPosition(joint, target, expiryNs):
-          Reflect.setField(root, "payload", {kind:"jointPosition", joint:joint, target:target,
+        switch value { case JointTargets(targets, expiryNs):
+          Reflect.setField(root, "payload", {kind:"jointTargets",
+            targets:[for (target in targets) {joint:target.joint,
+              mode:jointTargetMode(target.mode), target:target.target}],
             expiryNs:expiryNs == null ? null : Int64.toStr(expiryNs)});
         }
       case RobotSnapshot(value): Reflect.setField(root, "type", "snapshot"); Reflect.setField(root, "payload", snapshot(value));
@@ -43,14 +45,26 @@ class RobotRecordingCodec {
   public static function decode(bytes:Bytes):RobotRecordingEntry {
     var root:Dynamic;
     try root = Json.parse(bytes.toString()) catch (_:Dynamic) throw "Malformed RobotKit recording payload";
-    if (fieldInt(root, "version") != VERSION) throw "Unsupported RobotKit recording schema";
+    var version = fieldInt(root, "version");
+    if (version != 1 && version != VERSION) throw "Unsupported RobotKit recording schema";
     var ordinal = wide(root, "ordinal"), robotId = string(root, "robotId");
     var sequence = wide(root, "sourceSequence"), timestamp = wide(root, "sourceTimestampNs");
     var clock = string(root, "sourceClockId"), payload:Dynamic = Reflect.field(root, "payload");
     var event:RobotRecordingEvent = switch string(root, "type") {
       case "command":
-        if (string(payload,"kind") != "jointPosition") throw "Unsupported RobotKit command payload";
-        Command(JointPosition(fieldInt(payload,"joint"), fieldFloat(payload,"target"), nullableWide(payload,"expiryNs")));
+        var expiry = nullableWide(payload, "expiryNs");
+        switch string(payload, "kind") {
+          case "jointPosition" if (version == 1):
+            Command(JointTargets([JointTarget.position(fieldInt(payload,"joint"),
+              fieldFloat(payload,"target"))], expiry));
+          case "jointTargets" if (version == VERSION):
+            var targets:Array<JointTarget> = [];
+            for (item in array(payload, "targets"))
+              targets.push(new JointTarget(fieldInt(item, "joint"),
+                readJointTargetMode(string(item, "mode")), fieldFloat(item, "target")));
+            Command(JointTargets(JointTarget.copyBatch(targets), expiry));
+          case _: throw "Unsupported RobotKit command payload";
+        }
       case "snapshot": RobotSnapshot(readSnapshot(payload));
       case "sensor": Sensor(robotId, readSensor(payload));
       case "fault": Fault(new RobotFault(string(payload,"id"),fieldInt(payload,"code"),string(payload,"message"),fieldBool(payload,"fatal")));
@@ -64,7 +78,7 @@ class RobotRecordingCodec {
       case _: throw "Unsupported RobotKit recording event type";
     };
     return new RobotRecordingEntry(ordinal, robotId, event, sequence, timestamp, clock,
-      wide(root, "recordingTimestampNs"));
+      wide(root, "recordingTimestampNs"), version);
   }
 
   static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,sensors:[for(s in v.sensors.toArray()) sensor(s)]};
@@ -84,6 +98,17 @@ class RobotRecordingCodec {
       wide(v,"receivedTimestampNs"),string(v,"linkId"),position,rotation,
       string(v,"sourceClockId"),string(v,"receivedClockId"));
   }
+  static function jointTargetMode(value:JointTargetMode):String return switch value {
+    case Position: "position";
+    case Velocity: "velocity";
+    case Effort: "effort";
+  };
+  static function readJointTargetMode(value:String):JointTargetMode return switch value {
+    case "position": Position;
+    case "velocity": Velocity;
+    case "effort": Effort;
+    case _: throw "Unsupported RobotKit joint target mode";
+  };
   static function string(v:Dynamic,n:String):String {var x=Reflect.field(v,n);if(!Std.isOfType(x,String))throw 'Invalid recording field $n';return x;}
   static function wide(v:Dynamic,n:String):Int64 {
     try {

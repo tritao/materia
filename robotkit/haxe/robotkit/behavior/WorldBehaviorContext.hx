@@ -22,6 +22,8 @@ class WorldBehaviorContext {
     // A world behavior cannot assume that source and endpoint clocks share an
     // epoch. A concrete adapter assigns its local default deadline; callers
     // may still provide an explicit endpoint-clock deadline.
-    commands.push(RobotCommand.JointPosition(joint, target, expiryNs));
+    commands.push(RobotCommand.JointTargets([
+      robotkit.world.JointTarget.position(joint, target)
+    ], expiryNs));
   }
 }
