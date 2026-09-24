@@ -56,8 +56,7 @@ To capture the architecture workloads, run `python3 app/tools/profile-editor.py
 --scenario architecture --cycles 1`. This records CAD parameter recomputes, BIM
 opening edits, construction of a 10,000 object scene, a single object nudge,
 500 moving object updates, 1,000 ordered undo operations, and presentation
-captures for a 64 link robot. The 64 link size follows the current native
-runtime limit of 64 joints; the capture writes phase timings to
+captures for a 500 link robot. The capture writes phase timings to
 `architecture-summary.json` and the usual frame, action, memory, and profiler
 artifacts beside it. Increase `--cycles` to extend repeated movement, CAD,
 BIM, and simulation measurements. The scenario is intentionally not part of

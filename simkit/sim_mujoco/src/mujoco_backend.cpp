@@ -122,6 +122,42 @@ public:
         return rebuild();
     }
 
+    nksim_result begin_topology_update() override {
+        if (topology_update)
+            return NKSIM_ERROR_INVALID_STATE;
+        try {
+            saved_bodies = bodies;
+            saved_body_order = body_order;
+            saved_joints = joints;
+            saved_joint_order = joint_order;
+            saved_next_body = next_body;
+            saved_next_joint = next_joint;
+        } catch (const std::bad_alloc &) {
+            clear_topology_backup();
+            return NKSIM_ERROR_OUT_OF_MEMORY;
+        }
+        topology_update = true;
+        return NKSIM_OK;
+    }
+
+    nksim_result end_topology_update() override {
+        if (!topology_update)
+            return NKSIM_ERROR_INVALID_STATE;
+        topology_update = false;
+        const auto result = rebuild();
+        if (result != NKSIM_OK) {
+            bodies.swap(saved_bodies);
+            body_order.swap(saved_body_order);
+            joints.swap(saved_joints);
+            joint_order.swap(saved_joint_order);
+            next_body = saved_next_body;
+            next_joint = saved_next_joint;
+            (void)rebuild();
+        }
+        clear_topology_backup();
+        return result;
+    }
+
     nksim_result body_create(const nksim::BackendBodyDesc &desc,
                              std::uint64_t *out_body) override {
         if (!out_body)
@@ -136,6 +172,11 @@ public:
         record.state.rotation = normalize(desc.rotation);
         bodies.emplace(id, std::move(record));
         body_order.push_back(id);
+
+        if (topology_update) {
+            *out_body = id;
+            return NKSIM_OK;
+        }
 
         const auto result = rebuild();
         if (result != NKSIM_OK) {
@@ -160,7 +201,7 @@ public:
         }
         bodies.erase(found);
         body_order.erase(std::remove(body_order.begin(), body_order.end(), id), body_order.end());
-        return rebuild();
+        return topology_update ? NKSIM_OK : rebuild();
     }
 
     nksim_result body_set_state(std::uint64_t id,
@@ -243,6 +284,11 @@ public:
         joints.emplace(id, std::move(record));
         joint_order.push_back(id);
 
+        if (topology_update) {
+            *out_joint = id;
+            return NKSIM_OK;
+        }
+
         const auto result = rebuild();
         if (result != NKSIM_OK) {
             joints.erase(id);
@@ -261,7 +307,7 @@ public:
             return NKSIM_ERROR_INVALID_HANDLE;
         joints.erase(found);
         joint_order.erase(std::remove(joint_order.begin(), joint_order.end(), id), joint_order.end());
-        return rebuild();
+        return topology_update ? NKSIM_OK : rebuild();
     }
 
     nksim_result set_joint_targets(const nksim::BackendJointTarget *targets,
@@ -358,6 +404,13 @@ public:
     }
 
 private:
+    void clear_topology_backup() noexcept {
+        saved_bodies.clear();
+        saved_body_order.clear();
+        saved_joints.clear();
+        saved_joint_order.clear();
+    }
+
     const JointRecord *parent_joint(std::uint64_t body_id) const {
         for (const auto joint_id : joint_order) {
             const auto &joint = joints.at(joint_id);
@@ -592,7 +645,18 @@ private:
         body.mass = desc.mass;
         if (desc.motion_type != NKSIM_MOTION_STATIC && desc.mass > 0.0) {
             body.explicitinertial = 1;
-            body.inertia[0] = body.inertia[1] = body.inertia[2] = 1.0;
+            if (desc.has_inertial_properties) {
+                std::copy(desc.center_of_mass.begin(), desc.center_of_mass.end(), body.ipos);
+                const auto &m = desc.inertia_tensor;
+                body.fullinertia[0] = m[0];
+                body.fullinertia[1] = m[4];
+                body.fullinertia[2] = m[8];
+                body.fullinertia[3] = m[1];
+                body.fullinertia[4] = m[2];
+                body.fullinertia[5] = m[5];
+            } else {
+                body.inertia[0] = body.inertia[1] = body.inertia[2] = 1.0;
+            }
         }
 
         if (!incoming) {
@@ -781,8 +845,15 @@ private:
     std::vector<std::uint64_t> body_order;
     std::unordered_map<std::uint64_t, JointRecord> joints;
     std::vector<std::uint64_t> joint_order;
+    std::unordered_map<std::uint64_t, BodyRecord> saved_bodies;
+    std::vector<std::uint64_t> saved_body_order;
+    std::unordered_map<std::uint64_t, JointRecord> saved_joints;
+    std::vector<std::uint64_t> saved_joint_order;
     std::uint64_t next_body = 1;
     std::uint64_t next_joint = 1;
+    std::uint64_t saved_next_body = 1;
+    std::uint64_t saved_next_joint = 1;
+    bool topology_update = false;
 };
 
 std::unique_ptr<nksim::PhysicsBackend> make_backend() {

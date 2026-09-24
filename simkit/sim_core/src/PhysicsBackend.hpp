@@ -17,6 +17,9 @@ struct BackendBodyDesc {
     std::array<double, 4> rotation{0.0, 0.0, 0.0, 1.0};
     std::uint32_t collision_layer = 0;
     std::uint32_t collision_mask = 0;
+    bool has_inertial_properties = false;
+    std::array<double, 3> center_of_mass{};
+    std::array<double, 9> inertia_tensor{};
 };
 
 struct BackendBodyState {
@@ -80,6 +83,11 @@ public:
     virtual nksim_result joint_destroy(std::uint64_t joint) = 0;
     virtual nksim_result set_joint_targets(const BackendJointTarget *targets,
                                            std::uint32_t count) = 0;
+
+    // Runtime owners can stage a connected topology and ask backends that
+    // compile whole models (such as MuJoCo) to rebuild only once.
+    virtual nksim_result begin_topology_update() { return NKSIM_OK; }
+    virtual nksim_result end_topology_update() { return NKSIM_OK; }
 
     virtual nksim_result step(double dt, std::uint32_t substeps) = 0;
     virtual nksim_result read_body_states(BackendBodyState *states,

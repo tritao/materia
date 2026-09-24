@@ -73,8 +73,9 @@ extern "C" {
 
 /** API-wide limits and version identifiers. */
 enum {
-    RK_MAX_JOINTS = 64, /**< Maximum joints carried by one fixed-size ABI value. */
-    RK_MAX_LINKS = 128,
+    RK_MAX_JOINTS = 512, /**< Maximum joints carried by one fixed-size ABI value. */
+    RK_MAX_LINKS = 1024,
+    RK_MAX_SERIAL_JOINTS = 64, /**< Capacity of the current serial wire protocol. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
     RK_API_VERSION = 4 /**< Version of the RobotKit C data contract (physical model v2). */
