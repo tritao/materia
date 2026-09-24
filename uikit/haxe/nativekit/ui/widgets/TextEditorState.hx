@@ -685,12 +685,13 @@ class TextEditorState {
 	}
 
 	/** Returns active composition rectangles paired with absolute document ranges. */
-	public function compositionRangeRects():Array<TextRangeRect> {
+	public function compositionRangeRects(minY:Float = -1.0e30,
+			maxY:Float = 1.0e30):Array<TextRangeRect> {
 		ensureLive();
 		if (compositionStart < 0 || compositionEnd <= compositionStart)
 			return [];
 		return layout.selectionRangeRects(new TextPosition(compositionStart, 0),
-			new TextPosition(compositionEnd, 0));
+			new TextPosition(compositionEnd, 0), minY, maxY);
 	}
 
 	/** Selects the word under a pointer position using the shaped text engine's boundaries. */

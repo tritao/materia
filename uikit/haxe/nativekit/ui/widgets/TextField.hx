@@ -271,13 +271,18 @@ class TextField implements View {
 				if (!editor.focused || !context.textInput.isOwner(id) || context.platformSurface == null ||
 					context.platformSurface.isDisposed())
 					return;
+				var viewportHeight = editorContent.resolved == null ? geometry.height :
+					editorContent.resolved.height;
+				var visibleTop = editor.scrollOffsetY;
+				var visibleBottom = visibleTop + viewportHeight;
 				var selectionGeometry:Array<TextRangeRect> = [];
 				if (editor.selectionStart != editor.selectionEnd)
-					for (rect in editor.layout.selectionRangeRects(editor.anchorPosition(), editor.focusPosition()))
+					for (rect in editor.layout.selectionRangeRects(editor.anchorPosition(),
+						editor.focusPosition(), visibleTop, visibleBottom))
 						selectionGeometry.push(transformTextRangeRect(rect, geometry, transform,
 							editor.scrollOffsetY));
 				var compositionGeometry:Array<TextRangeRect> = [];
-				for (rect in editor.compositionRangeRects())
+				for (rect in editor.compositionRangeRects(visibleTop, visibleBottom))
 					compositionGeometry.push(transformTextRangeRect(rect, geometry, transform,
 						editor.scrollOffsetY));
 				context.textInput.update(editor.surroundingText(2048, 2048), editor.documentLength(),

@@ -460,28 +460,73 @@ class TextEditorLayout {
 	}
 
 	/** Returns shaped grapheme rectangles paired with absolute document ranges. */
-	public function selectionRangeRects(start:TextPosition, end:TextPosition):Array<TextRangeRect> {
+	public function selectionRangeRects(start:TextPosition, end:TextPosition,
+			minY:Float = -1.0e30, maxY:Float = 1.0e30):Array<TextRangeRect> {
 		ensureLive();
 		if (start == null || end == null)
 			throw "Text selection endpoints cannot be null";
-		var first = clamp(start.offset, 0, offsets.codepointCount);
-		var last = clamp(end.offset, 0, offsets.codepointCount);
-		if (last < first) {
-			var swap = first;
-			first = last;
-			last = swap;
-		}
+		if (!Math.isFinite(minY) || !Math.isFinite(maxY) || maxY < minY)
+			throw "Text selection geometry bounds are invalid";
+		var forward = start.offset <= end.offset;
+		var firstPosition = forward ? start : end;
+		var lastPosition = forward ? end : start;
+		var first = clamp(firstPosition.offset, 0, offsets.codepointCount);
+		var last = clamp(lastPosition.offset, 0, offsets.codepointCount);
 		if (first == last)
 			return [];
 		var result:Array<TextRangeRect> = [];
-		for (record in paragraphs) {
+		var low = 0;
+		var high = paragraphs.length;
+		while (low < high) {
+			var middle = (low + high) >> 1;
+			if (paragraphs[middle].y + paragraphs[middle].height <= minY)
+				low = middle + 1;
+			else
+				high = middle;
+		}
+		for (index in low...paragraphs.length) {
+			var record = paragraphs[index];
+			if (record.y >= maxY)
+				break;
 			var localStart = first > record.start ? first : record.start;
 			var localEnd = last < record.end ? last : record.end;
 			if (localEnd <= localStart)
 				continue;
+			if (minY > record.y || maxY < record.y + record.height) {
+				var visibleTop = Math.max(0.0, minY - record.y);
+				var visibleBottom = Math.min(record.height, maxY - record.y);
+				if (visibleBottom <= visibleTop)
+					continue;
+				var sampleTop = Math.min(visibleBottom, visibleTop + 1.0);
+				var sampleBottom = Math.max(visibleTop, visibleBottom - 1.0);
+				var topLeft = record.layout.hitTest(0.0, sampleTop).offset;
+				var topRight = record.layout.hitTest(record.layout.width, sampleTop).offset;
+				var bottomLeft = record.layout.hitTest(0.0, sampleBottom).offset;
+				var bottomRight = record.layout.hitTest(record.layout.width, sampleBottom).offset;
+				var visibleStart = clamp(Std.int(Math.min(Math.min(topLeft, topRight),
+					Math.min(bottomLeft, bottomRight))), 0, record.end - record.start);
+				var visibleEnd = clamp(Std.int(Math.max(Math.max(topLeft, topRight),
+					Math.max(bottomLeft, bottomRight))), 0, record.end - record.start);
+				for (_ in 0...2) {
+					if (visibleStart > 0)
+						visibleStart = record.layout.previousGrapheme(visibleStart);
+					if (visibleEnd < record.end - record.start)
+						visibleEnd = record.layout.nextGrapheme(visibleEnd);
+				}
+				var clippedStart = record.start + visibleStart;
+				var clippedEnd = record.start + visibleEnd;
+				if (localStart < clippedStart)
+					localStart = clippedStart;
+				if (localEnd > clippedEnd)
+					localEnd = clippedEnd;
+			}
+			if (localEnd <= localStart)
+				continue;
 			for (rect in record.layout.selectionRangeRects(
-				new TextPosition(localStart - record.start, localStart == first ? start.affinity : 0),
-				new TextPosition(localEnd - record.start, localEnd == last ? end.affinity : 0)))
+				new TextPosition(localStart - record.start,
+					localStart == first ? firstPosition.affinity : 0),
+				new TextPosition(localEnd - record.start,
+					localEnd == last ? lastPosition.affinity : 0)))
 				result.push(new TextRangeRect(rect.start + record.start, rect.end + record.start,
 					rect.x, rect.y + record.y, rect.width, rect.height, rect.visualLeftIsStart));
 		}

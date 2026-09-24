@@ -269,6 +269,18 @@ class FrameworkSmoke {
 			return 276;
 		}
 		rtlLayout.dispose();
+		var longText = new StringBuf();
+		for (_ in 0...1000)
+			longText.add("x");
+		var clippingEditor = new TextEditorState(fonts, longText.toString());
+		clippingEditor.updateLayout(100.0);
+		var visibleGeometry = clippingEditor.layout.selectionRangeRects(
+			new TextPosition(0, 0), new TextPosition(1000, 0), 0.0, 24.0);
+		if (visibleGeometry.length == 0 || visibleGeometry.length >= 1000) {
+			clippingEditor.dispose();
+			return 277;
+		}
+		clippingEditor.dispose();
 		var session = LayoutSession.create();
 		var context = new UiContext(session, fonts);
 		if (context.buildContext.fonts != fonts)
