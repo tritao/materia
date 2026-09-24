@@ -213,7 +213,8 @@ class DesktopUiHost {
 				if (message != null) detail = hostError.stage + ": " + Std.string(message);
 			}
 			Sys.println(options.title + ": " + detail);
-			var stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
+			var stack = session != null && session.error != null && session.error.stack.length > 0
+				? session.error.stack : haxe.CallStack.toString(haxe.CallStack.exceptionStack());
 			if (stack.length > 0) Sys.println(stack);
 			result = 1;
 		}

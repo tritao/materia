@@ -14,11 +14,13 @@ class UiHostError {
 	public final stage:String;
 	public final message:String;
 	public final cause:Dynamic;
+	public final stack:String;
 
 	public function new(stage:String, cause:Dynamic) {
 		this.stage = stage;
 		this.cause = cause;
 		this.message = Std.string(cause);
+		this.stack = haxe.CallStack.toString(haxe.CallStack.exceptionStack());
 	}
 
 	public function toString():String return stage + ": " + message;

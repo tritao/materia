@@ -3175,7 +3175,8 @@ class FrameworkSmoke {
 			return new SmokeHostApplication(false);
 		});
 		var retainedError:nativekit.ui.host.UiHostSession.UiHostError = cast failedSession.error;
-		if (factoryCalls != 1 || retainedError.message != originalFailure) return false;
+		if (factoryCalls != 1 || retainedError.message != originalFailure ||
+			originalError.stack.length == 0) return false;
 
 		var stoppedRuntime:Null<UiHostRuntime> = null;
 		var stoppedSession = new UiHostSession(function() {
