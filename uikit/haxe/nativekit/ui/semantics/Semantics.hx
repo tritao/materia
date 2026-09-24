@@ -8,6 +8,7 @@ class Semantics {
 	public var label:Null<String>;
 	public var value(get, set):Null<String>;
 	var storedValue:Null<String>;
+	var valueProvider:Null<Void->String>;
 	public var states:Int;
 	public var actions:Int;
 	public var numericValue:Float;
@@ -36,6 +37,7 @@ class Semantics {
 		this.role = role;
 		this.label = label;
 		storedValue = value;
+		valueProvider = null;
 		states = 0;
 		actions = 0;
 		numericValue = 0.0;
@@ -59,6 +61,7 @@ class Semantics {
 
 	function set_value(next:Null<String>):Null<String> {
 		storedValue = next;
+		valueProvider = null;
 		documentLength = Utf8Text.length(next);
 		return next;
 	}
@@ -68,9 +71,22 @@ class Semantics {
 		if (length < 0)
 			throw "Document length cannot be negative";
 		storedValue = next;
+		valueProvider = null;
 		documentLength = length;
 	}
 
-	function get_value():Null<String>
+	/** Defers assembling an editable document until a consumer reads its value. */
+	public function setValueProvider(provider:Void->String, length:Int):Void {
+		if (length < 0)
+			throw "Document length cannot be negative";
+		storedValue = null;
+		valueProvider = provider;
+		documentLength = length;
+	}
+
+	function get_value():Null<String> {
+		if (storedValue == null && valueProvider != null)
+			storedValue = valueProvider();
 		return storedValue;
+	}
 }

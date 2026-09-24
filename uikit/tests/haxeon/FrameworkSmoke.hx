@@ -137,6 +137,8 @@ import nativekit.ui.widgets.TextEditorState;
 import nativekit.ui.widgets.TextEditorDiagnostics;
 import nativekit.ui.widgets.TextArea;
 import nativekit.ui.widgets.TextField;
+import nativekit.ui.widgets.EditTransaction;
+import nativekit.editorkit.TextDocument;
 import nativekit.ui.widgets.Spacer;
 import nativekit.ui.widgets.Slider;
 import nativekit.ui.widgets.Stack;
@@ -354,7 +356,45 @@ class FrameworkSmoke {
 			fieldDiagnostics.selectionStart != 5 || fieldDiagnostics.selectionEnd != 5 ||
 			fieldDiagnostics.caretOffset != 5 || fieldDiagnostics.caretRect == null)
 			return 209;
+		var sharedDocument = new TextDocument("start");
+		var sharedEdit:Null<EditTransaction> = null;
+		var sharedField = TextField.withDocument("shared-document-field", sharedDocument,
+			function(edit) sharedEdit = edit);
+		var sharedRoot = context.submit(sharedField, new LayoutFrame(256.0, 192.0));
+		var sharedEditorState:State<TextEditorState> =
+			context.buildContext.existingState(sharedRoot.id);
+		var sharedEditor:TextEditorState = cast sharedEditorState.value;
+		if (sharedEditor.text != "start" || sharedEditor.layout.text != "start")
+			return 298;
+		if (!context.focusWidget(sharedRoot.id))
+			return 292;
+		context.key(UiEventKind.KeyDown, UiKey.A, UiModifier.Control);
+		context.text(UiEventKind.TextInput, "á🙂");
+		if (sharedDocument.text != "á🙂" || sharedField.value != "" || sharedEdit == null ||
+			sharedEdit.replacementStart != 0 || sharedEdit.replacementEnd != 5 ||
+			sharedEdit.replacementText != "á🙂" || sharedEdit.replacedText != "start" ||
+			sharedEdit.selectionEnd != 3)
+			return 293;
+		sharedRoot = context.submit(sharedField, new LayoutFrame(256.0, 192.0));
+		var sharedSemantics:Semantics = cast sharedRoot.semantics;
+		if (sharedSemantics == null || sharedSemantics.value != "á🙂" ||
+			sharedSemantics.documentLength != 3)
+			return 294;
+		sharedDocument.replace(0, sharedDocument.codepointCount, "external update");
+		context.submit(sharedField, new LayoutFrame(256.0, 192.0));
+		if (sharedEditor.text != "external update" || sharedEditor.selectionEnd >
+			sharedDocument.codepointCount)
+			return 295;
+		var sharedArea = TextArea.withDocument("shared-document-area",
+			new TextDocument("multiline"));
+		if (!sharedArea.multiline)
+			return 296;
 		fieldRoot = context.submit(field, new LayoutFrame(256.0, 192.0));
+		if (!context.focusWidget(fieldRoot.id))
+			return 297;
+		fieldRoot = context.submit(field, new LayoutFrame(256.0, 192.0));
+		fieldState = context.buildContext.existingState(fieldRoot.id);
+		fieldEditor = cast fieldState.value;
 		if (fieldRoot.children[0].children.length != 2 ||
 			fieldRoot.children[0].children[1].layout.visualKind != LayoutVisualKind.Custom ||
 			fieldRoot.children[0].children[1].layout.style.zIndex != 2)

@@ -14,7 +14,7 @@ import nativekit.editorkit.TextDocument;
 /** Retained layouts for bounded groups of paragraphs in one editor document. */
 class TextEditorLayout {
 	static inline var paragraphsPerLayout:Int = 64;
-	public var text(default, null):String;
+	public var text(get, never):String;
 	public var width(default, null):Float;
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
@@ -47,11 +47,17 @@ class TextEditorLayout {
 		firstBaseline = 0.0;
 		hasBaseline = false;
 		disposed = false;
-		update(value, width, this.textStyle, this.paragraphStyle, offsetMap);
+		if (offsetMap == null)
+			update(value, width, this.textStyle, this.paragraphStyle);
+		else
+			updateDocument(offsetMap, width, this.textStyle, this.paragraphStyle);
 	}
 
 	function get_paragraphCount():Int
 		return paragraphLineCount;
+
+	function get_text():String
+		return offsets == null ? "" : offsets.text;
 
 	static function chunkCount(offsetMap:TextDocument):Int
 		return Std.int((offsetMap.paragraphCount() + paragraphsPerLayout - 1) / paragraphsPerLayout);
@@ -74,6 +80,15 @@ class TextEditorLayout {
 		var nextOffsets = offsetMap == null ? new TextDocument(actualText) : offsetMap;
 		if (nextOffsets.text != actualText)
 			nextOffsets = new TextDocument(actualText);
+		updateDocument(nextOffsets, nextWidth, nextTextStyle, nextParagraphStyle);
+	}
+
+	/** Updates retained paragraph layouts directly from the segmented document. */
+	public function updateDocument(nextOffsets:TextDocument, nextWidth:Float,
+			nextTextStyle:TextStyle, nextParagraphStyle:ParagraphStyle):Void {
+		ensureLive();
+		if (nextOffsets == null || nextWidth <= 0.0 || nextTextStyle == null || nextParagraphStyle == null)
+			throw "Editor layout update arguments are invalid";
 		var styleChanged = textStyle.font != nextTextStyle.font ||
 			textStyle.fontSize != nextTextStyle.fontSize ||
 			textStyle.letterSpacing != nextTextStyle.letterSpacing ||
@@ -144,7 +159,6 @@ class TextEditorLayout {
 			if (!containsRecord(used, record))
 				record.layout.dispose();
 
-		text = actualText;
 		width = nextWidth;
 		offsets = nextOffsets;
 		paragraphLineCount = nextOffsets.paragraphCount();
@@ -160,20 +174,18 @@ class TextEditorLayout {
 	 * records are carried by paragraph index, so a keystroke does not rebuild a
 	 * document-wide text-to-record lookup table or reslice every paragraph.
 	 */
-	public function setTextAfterEdit(value:String, nextOffsets:TextDocument,
+	public function setTextAfterEdit(nextOffsets:TextDocument,
 			oldStart:Int, oldEnd:Int, newStart:Int, newEnd:Int,
 			oldDocumentLength:Int):Void {
 		ensureLive();
-		if (nextOffsets == null || nextOffsets.text != (value == null ? "" : value)) {
-			update(value, width, textStyle, paragraphStyle, nextOffsets);
-			return;
-		}
+		if (nextOffsets == null)
+			throw "Editor layout update requires a document";
 		if (paragraphs.length == 0) {
-			update(value, width, textStyle, paragraphStyle, nextOffsets);
+			updateDocument(nextOffsets, width, textStyle, paragraphStyle);
 			return;
 		}
 		if (nextOffsets.paragraphCount() != paragraphLineCount) {
-			setTextAfterParagraphEdit(value, nextOffsets, oldStart, oldEnd,
+			setTextAfterParagraphEdit(nextOffsets, oldStart, oldEnd,
 				oldDocumentLength);
 			return;
 		}
@@ -248,7 +260,6 @@ class TextEditorLayout {
 				oldRecord.layout.dispose();
 		}
 
-		text = value == null ? "" : value;
 		offsets = nextOffsets;
 		paragraphLineCount = nextOffsets.paragraphCount();
 		paragraphs = next;
@@ -256,7 +267,7 @@ class TextEditorLayout {
 	}
 
 	/** Keeps chunks outside a newline edit and repartitions only its neighborhood. */
-	function setTextAfterParagraphEdit(value:String, nextOffsets:TextDocument,
+	function setTextAfterParagraphEdit(nextOffsets:TextDocument,
 			oldStart:Int, oldEnd:Int, oldDocumentLength:Int):Void {
 		var previous = paragraphs;
 		var first = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);
@@ -325,7 +336,6 @@ class TextEditorLayout {
 			record.end += delta;
 			result.push(record);
 		}
-		text = value == null ? "" : value;
 		offsets = nextOffsets;
 		paragraphLineCount = nextOffsets.paragraphCount();
 		paragraphs = result;

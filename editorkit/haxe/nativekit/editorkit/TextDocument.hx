@@ -5,6 +5,8 @@ import haxe.io.Bytes;
 /** Editable UTF-8 text with code-point, UTF-16, and paragraph indexes per segment. */
 class TextDocument {
 	static inline var targetBytes:Int = 2048;
+	/** Incremented after each non-no-op replacement. */
+	public var revision(default, null):Int;
 	public var codepointCount(default, null):Int;
 	public var utf8ByteLength(default, null):Int;
 	public var utf16Length(default, null):Int;
@@ -18,6 +20,7 @@ class TextDocument {
 	var cachedText:Null<String>;
 
 	public function new(value:String) {
+		revision = 0;
 		segments = split(value == null ? "" : value);
 		codepointStarts = [];
 		byteStarts = [];
@@ -65,6 +68,7 @@ class TextDocument {
 			result.push(segments[index]);
 		segments = result;
 		cachedText = null;
+		revision++;
 		reindex();
 		return true;
 	}
