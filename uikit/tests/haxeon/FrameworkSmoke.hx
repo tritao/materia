@@ -3911,6 +3911,38 @@ class FrameworkSmoke {
 					return false;
 			default: return false;
 		}
+		var singletonDock = new DockWorkspaceModel();
+		for (panelId in ["single-source", "single-target"])
+			singletonDock.register(new DockPanelDescriptor(panelId, panelId, function(_) {
+				return new Text(panelId);
+			}));
+		singletonDock.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.5,
+			DockNode.Panel("single-source"), DockNode.Panel("single-target")));
+		var singletonWorkspace = new DockWorkspace("singleton-dock-workspace", singletonDock);
+		var singletonRoot = uiContext.submit(singletonWorkspace, new LayoutFrame(640.0, 480.0));
+		var singletonTabs:Array<RenderNode> = [];
+		if (singletonRoot != null)
+			singletonRoot.walk(function(node) {
+				if (node.styleType == "tabs") singletonTabs.push(node);
+			});
+		if (singletonTabs.length != 2)
+			return false;
+		var sourceBounds = singletonTabs[0].globalBounds(), targetBounds = singletonTabs[1].globalBounds();
+		var sourceX = sourceBounds.x + sourceBounds.width * 0.5;
+		var sourceY = sourceBounds.y + sourceBounds.height * 0.5;
+		var targetX = targetBounds.x + targetBounds.width * 0.5;
+		var targetY = targetBounds.y + targetBounds.height * 0.5;
+		if (!singletonWorkspace.interaction.beginTabDrag("single-source", 91, sourceX, sourceY) ||
+			!singletonWorkspace.interaction.moveTabDrag("single-source", 91, targetX, targetY) ||
+			!singletonWorkspace.interaction.endTabDrag("single-source", 91, targetX, targetY))
+			return false;
+		switch (singletonDock.root) {
+			case DockNode.Tabs(ids, active):
+				if (ids.length != 2 || !ids.contains("single-source") || !ids.contains("single-target") ||
+					active != "single-source")
+					return false;
+			default: return false;
+		}
 		var changes = 0;
 		model.listen(function() changes++);
 		var workspace = new DockWorkspace("editor-workspace", model);

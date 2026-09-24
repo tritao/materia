@@ -60,7 +60,8 @@ class DockWorkspace implements View {
 			return new Text("No dock layout");
 		switch (node) {
 			case DockNode.Empty: return new Text("No panels");
-			case DockNode.Panel(panelId): return targetView(panelId, panelView(panelId));
+			case DockNode.Panel(panelId):
+				return targetView(panelId, buildTabs([panelId], panelId, context, nodeKey));
 			case DockNode.Tabs(panelIds, activePanelId):
 				var targetPanelId = activePanelId == null && panelIds != null && panelIds.length > 0
 					? panelIds[0] : activePanelId;
