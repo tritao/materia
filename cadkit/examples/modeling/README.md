@@ -25,6 +25,74 @@ LD_LIBRARY_PATH="$repo_root/build/debug/core:$repo_root/build/debug/lin64/gcc/li
 See [the modeling API](../../haxe/MODELING.md) for ownership, selections,
 workplanes, additional operations, and document integration.
 
+## Procedural excavator geometry
+
+`ProceduralExcavator.hx` is the code-authored geometry example for the
+FreeCAD `AssemblyExample`-style excavator. It generates 13 separate OCCT
+components: the base and base pin, boom, stick, bucket, two bucket links, and
+the inner and outer members of three hydraulic cylinders. The plates use
+polygonal CAD profiles with bored pivots; the bucket includes a cutting lip and
+teeth; cylinder bodies are hollow and their pin eyes are bored. No source
+geometry is imported.
+
+Running the example prints JSON with solid, face, edge, volume, surface-area,
+and bounding-box metrics for every component. It also writes each generated
+B-rep as a STEP file for external inspection; those files are diagnostic
+outputs, not model inputs. To capture the matching inventory from FreeCAD, open
+`AssemblyExample.FCStd` and run `assembly_example_baseline.py` in its Python
+console. Compare the per-part metrics and fixed-view silhouettes when refining
+geometry. Component placement and authored joints follow refinement of the full
+component inventory; the current solids share a provisional mechanism
+coordinate space and do not yet have separate assembly placements.
+
+The refined geometry pass produces one solid per occurrence. The boom, stick,
+and bucket profiles now use dimensions scaled from the captured reference
+bounds, with the bucket built from paired cheeks, a cross barrel, a shell web,
+a cutting edge, and five teeth. This face/edge comparison tracks the remaining
+topology differences:
+
+| Component | Generated faces/edges | FreeCAD reference |
+| --- | ---: | ---: |
+| Base | 63 / 137 | 44 / 122 |
+| Base pin | 3 / 3 | 3 / 3 |
+| Boom | 29 / 81 | 31 / 87 |
+| Stick | 28 / 62 | 24 / 66 |
+| Bucket | 92 / 272 | 97 / 247 |
+| Bucket link 1 | 22 / 51 | 22 / 54 |
+| Bucket link 2 | 18 / 45 | 23 / 57 |
+| Boom cylinder outer/inner | 13 / 34; 8 / 13 | 8 / 12; 6 / 9 |
+| Stick cylinder outer/inner | 10 / 20; 13 / 22 | 8 / 12; 6 / 9 |
+| Bucket cylinder outer/inner | 11 / 22; 13 / 22 | 10 / 18; 6 / 9 |
+
+Across all 13 components, generated volume is 2,030,373 mm³ versus 2,066,341
+mm³ in FreeCAD (1.7% lower). Face and edge totals are 323/784 versus 288/705;
+the remaining topology gap is concentrated in the base and hydraulic details.
+The boom is 1,170,459 mm³ versus 1,204,575 mm³, the stick is 331,043 mm³ versus
+333,942 mm³, and the bucket is 59,986 mm³ versus 58,312 mm³. Their sorted
+bounding dimensions are 61.0 × 206.7 × 436.6, 32.0 × 119.8 × 379.6, and 101.5
+× 103.4 × 118.0 mm; the references are 60.9 × 203.7 × 436.3, 31.8 × 121.2 ×
+379.8, and 101.5 × 103.4 × 117.6 mm. Next, align the pin centers and author
+explicit assembly placements and joints.
+
+Run it after building CadKit and Haxeon:
+
+```sh
+repo_root="$PWD"
+haxeon_root="$repo_root/../haxeon"
+"$haxeon_root/.tools/haxe/haxe" --cwd "$haxeon_root" -cp src \
+  --run compiler.tools.HaxeonCompiler --target=hl \
+  "--output=$repo_root/build/haxeon/procedural-excavator.hl" \
+  --entry=ProceduralExcavator \
+  "--root=$repo_root/haxe/src" \
+  "--root=$repo_root/examples/modeling" \
+  "--ffi-interface=$repo_root/haxe/abi/CadKit.hxi" \
+  "--ffi-projection=$repo_root/haxe/abi/CadKit.hxmap" \
+  "$repo_root/examples/modeling/ProceduralExcavator.hx"
+LD_LIBRARY_PATH="$repo_root/build/debug/core:$repo_root/build/debug/lin64/gcc/libd:$haxeon_root/out:$haxeon_root/.tools/hashlink" \
+  "$haxeon_root/.tools/hashlink/hl" \
+  "$repo_root/build/haxeon/procedural-excavator.hl"
+```
+
 ## Editable mounting plate
 
 `EditableMountingPlate.hx` builds the same design with the explicit recording
