@@ -14,6 +14,7 @@ class Definition {
 	private final orderedInputs:Array<DefinitionInput>;
 	private final outputsByName:Map<String, DefinitionOutput>;
 	private final orderedOutputs:Array<DefinitionOutput>;
+	private final propertyValues:Map<String, TypedProperty>;
 
 	public function new(document:Document, id:DefinitionId, name:String, recipe:String, inputs:Array<DefinitionInput>,
 		outputs:Array<DefinitionOutput>, ?subgraph:DefinitionSubgraph) {
@@ -29,6 +30,7 @@ class Definition {
 		orderedInputs = [];
 		outputsByName = new Map();
 		orderedOutputs = [];
+		propertyValues = new Map();
 		for (input in inputs) {
 			if (inputsByName.exists(input.name))
 				throw new ParametricError("duplicate definition input: " + input.name);
@@ -62,6 +64,29 @@ class Definition {
 
 	public function outputs():Array<DefinitionOutput>
 		return orderedOutputs.copy();
+
+	public function property(name:String):Null<TypedProperty>
+		return propertyValues.get(name);
+
+	public function properties():Array<TypedProperty> {
+		var names = [for (name in propertyValues.keys()) name];
+		names.sort(Reflect.compare);
+		return [for (name in names) propertyValues.get(name)];
+	}
+
+	/** Internal document history and codec path. */
+	public function restoreProperty(name:String, value:Null<TypedProperty>):Void {
+		if (value == null)
+			propertyValues.remove(name);
+		else
+			propertyValues.set(name, value);
+	}
+
+	public function setProperty(value:TypedProperty):Void
+		document.setDefinitionProperty(this, value);
+
+	public function removeProperty(name:String):Void
+		document.removeDefinitionProperty(this, name);
 
 	public function primaryGeometryOutput():DefinitionOutput {
 		for (output in orderedOutputs)

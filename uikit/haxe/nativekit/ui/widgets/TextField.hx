@@ -35,6 +35,7 @@ import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.AccessibilityState;
 import nativekit.ui.semantics.Semantics;
 import nativekit.ui.theme.TextRole;
+import nativekit.editorkit.TextDocument;
 
 /** Text editor composed from a Haxe box and NativeUI text primitive. */
 class TextField implements View {
@@ -51,6 +52,10 @@ class TextField implements View {
 	public var classes:Array<String>;
 	public var enabled:Bool;
 	public var onChange:Null<String->Void>;
+	/** Applied edit notifications for a caller-owned EditorKit document. */
+	public var onEdit:Null<EditTransaction->Void>;
+	/** Optional mutable EditorKit model shared with the persistent editor state. */
+	public var document:Null<TextDocument>;
 	public var onSubmit:Null<String->Void>;
 	public var onDiagnostics:Null<TextEditorDiagnostics->Void>;
 	/** Semantic role override used by composite editable controls. */
@@ -60,12 +65,17 @@ class TextField implements View {
 
 	public function new(key:String, value:String = "", ?onChange:String->Void,
 			?style:LayoutStyle, ?label:String, ?textStyle:TextStyle, ?textColor:Color,
-			multiline:Bool = false) {
+			multiline:Bool = false, ?document:TextDocument,
+			?onEdit:EditTransaction->Void) {
 		if (key == null || key.length == 0)
 			throw "Text fields require a stable key";
+		if (onEdit != null && document == null)
+			throw "Transaction callbacks require a shared EditorKit document";
 		this.key = key;
 		this.value = value == null ? "" : value;
 		this.onChange = onChange;
+		this.onEdit = onEdit;
+		this.document = document;
 		this.onSubmit = null;
 		this.label = label;
 		this.placeholder = null;
@@ -81,6 +91,13 @@ class TextField implements View {
 		semanticActions = AccessibilityAction.SetValue | AccessibilityAction.SetSelection;
 	}
 
+	/** Creates a field backed by a shared document and edit transaction stream. */
+	public static function withDocument(key:String, document:TextDocument,
+			?onEdit:EditTransaction->Void, ?style:LayoutStyle, ?label:String,
+			?textStyle:TextStyle, ?textColor:Color, multiline:Bool = false):TextField
+		return new TextField(key, "", null, style, label, textStyle, textColor,
+			multiline, document, onEdit);
+
 	public function build(context:BuildContext):RenderNode {
 		return context.withScope(new Key(key), function() {
 			var id = context.id("field");
@@ -93,11 +110,14 @@ class TextField implements View {
 				resolved.paragraphStyle.direction);
 			paragraph.wrap = multiline ? TextWrap.WordCharacter : TextWrap.None;
 			resolved = new ResolvedTextStyle(resolved.textStyle, paragraph, resolved.textColor);
-			var stored:State<TextEditorState> = acquireState(context, id, value, resolved);
+			var stored:State<TextEditorState> = acquireState(context, id, value, resolved, document);
 			var editor:TextEditorState = stored.value;
-			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
-			if (editor.syncExternal(value))
+			var documentChanged = document != null
+				? editor.syncDocument(document)
+				: editor.syncExternal(value);
+			if (documentChanged)
 				editor.resetCaretBlink(context.gestures.timeSeconds());
+			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
 
 			var flags = context.interactionStates.get(id);
 			flags = StyleStateUtil.withState(flags, StyleState.Disabled, !enabled);
@@ -114,7 +134,8 @@ class TextField implements View {
 			node.focusable = enabled;
 			node.enabled = enabled;
 			var semantics = new Semantics(semanticRole,
-				label == null ? key : label, editor.text, editor.documentLength());
+				label == null ? key : label, null, editor.documentLength());
+			semantics.setValueProvider(function() return editor.text, editor.documentLength());
 			semantics.actions = semanticActions;
 			semantics.textStart = 0;
 			semantics.selectionStart = editor.selectionStart;
@@ -155,7 +176,7 @@ class TextField implements View {
 				});
 				editorContent.add(selectionNode);
 			}
-			var showsPlaceholder = editor.layoutText().length == 0 && placeholder != null &&
+			var showsPlaceholder = editor.documentLength() == 0 && placeholder != null &&
 				placeholder.length > 0;
 			var textNode = new RenderNode(context.id("text"),
 				showsPlaceholder ? LayoutVisualKind.Text : LayoutVisualKind.Custom, textNodeStyle);
@@ -201,8 +222,9 @@ class TextField implements View {
 			node.add(editorContent);
 
 			var updateState = function() {
-				value = editor.layoutText();
-				semantics.setValueWithLength(value, editor.documentLength());
+				if (document == null || onChange != null)
+					value = editor.layoutText();
+				semantics.setValueProvider(function() return editor.text, editor.documentLength());
 				semantics.selectionStart = editor.selectionStart;
 				semantics.selectionEnd = editor.selectionEnd;
 				stored.update(editor);
@@ -210,9 +232,12 @@ class TextField implements View {
 					editor.ensureCaretVisible(editorContent.resolved.height))
 					stored.update(editor);
 			};
-			var publishTextChange = function(previous:String) {
+			var publishTextChange = function(previousRevision:Int) {
 				updateState();
-				if (previous != value && onChange != null)
+				if (editor.documentRevision() != previousRevision &&
+					editor.lastEditTransaction != null && onEdit != null)
+					onEdit(editor.lastEditTransaction);
+				if (editor.documentRevision() != previousRevision && onChange != null)
 					onChange(value);
 			};
 			var publishDiagnostics = function(caretRect:Null<Rect>) {
@@ -220,7 +245,8 @@ class TextField implements View {
 					return;
 				var compositionText = editor.compositionStart >= 0 &&
 					editor.compositionEnd >= editor.compositionStart
-					? Utf8Text.slice(editor.layoutText(), editor.compositionStart, editor.compositionEnd) : "";
+					? editor.documentOffsets().sliceCodepoints(editor.compositionStart,
+						editor.compositionEnd) : "";
 				onDiagnostics(new TextEditorDiagnostics(key, label == null ? key : label,
 					editor.focused, editor.selectionStart, editor.selectionEnd,
 					editor.selectionFocus, editor.compositionStart, editor.compositionEnd,
@@ -245,11 +271,25 @@ class TextField implements View {
 				if (!editor.focused || !context.textInput.isOwner(id) || context.platformSurface == null ||
 					context.platformSurface.isDisposed())
 					return;
+				var viewportHeight = editorContent.resolved == null ? geometry.height :
+					editorContent.resolved.height;
+				var visibleTop = editor.scrollOffsetY;
+				var visibleBottom = visibleTop + viewportHeight;
+				var selectionGeometry:Array<TextRangeRect> = [];
+				if (editor.selectionStart != editor.selectionEnd)
+					for (rect in editor.layout.selectionRangeRects(editor.anchorPosition(),
+						editor.focusPosition(), visibleTop, visibleBottom))
+						selectionGeometry.push(transformTextRangeRect(rect, geometry, transform,
+							editor.scrollOffsetY));
+				var compositionGeometry:Array<TextRangeRect> = [];
+				for (rect in editor.compositionRangeRects(visibleTop, visibleBottom))
+					compositionGeometry.push(transformTextRangeRect(rect, geometry, transform,
+						editor.scrollOffsetY));
 				context.textInput.update(editor.surroundingText(2048, 2048), editor.documentLength(),
 					editor.selectionStart, editor.selectionEnd, editor.compositionStart,
 					editor.compositionEnd, 0,
 					multiline ? 1 : 0,
-					caretRect);
+					caretRect, selectionGeometry, compositionGeometry);
 			};
 			editorContent.onResolved(function(geometry) {
 				if (multiline) {
@@ -358,7 +398,7 @@ class TextField implements View {
 				var handled = true;
 				var changed = false;
 				var textEdited = false;
-				var previousText = editor.layoutText();
+				var previousRevision = editor.documentRevision();
 				if (command && event.key == UiKey.A)
 					changed = editor.selectAll();
 				else if (command && event.key == UiKey.C)
@@ -371,7 +411,7 @@ class TextField implements View {
 					context.clipboard.readText(function(pasted) {
 						if (editor.isDisposed() || !editor.focused)
 							return;
-						var beforePaste = editor.layoutText();
+						var beforePaste = editor.documentRevision();
 						if (editor.insert(pasted)) {
 							editor.resetCaretBlink(context.gestures.timeSeconds());
 							publishTextChange(beforePaste);
@@ -421,7 +461,7 @@ class TextField implements View {
 					handled = false;
 				if (changed) {
 					if (textEdited)
-						publishTextChange(previousText);
+						publishTextChange(previousRevision);
 					else
 						updateState();
 				}
@@ -434,27 +474,27 @@ class TextField implements View {
 			node.on(UiEventKind.KeyRepeat, handleKey);
 
 			node.on(UiEventKind.TextInput, function(event) {
-				var previousText = editor.layoutText();
+				var previousRevision = editor.documentRevision();
 				if (enabled && editor.insert(event.text)) {
 					editor.resetCaretBlink(context.gestures.timeSeconds());
-					publishTextChange(previousText);
+					publishTextChange(previousRevision);
 				}
 			});
 			node.on(UiEventKind.TextEdit, function(event) {
 				if (!enabled || event.data == null)
 					return;
 				var edit:NativeKitTextEdit = cast event.data;
-				var previousText = editor.layoutText();
+				var previousRevision = editor.documentRevision();
 				if (editor.applyTextEdit(edit)) {
 					editor.resetCaretBlink(context.gestures.timeSeconds());
-					publishTextChange(previousText);
+					publishTextChange(previousRevision);
 				}
 			});
 			node.on(UiEventKind.AccessibilitySetValue, function(event) {
-				var previousText = editor.layoutText();
+				var previousRevision = editor.documentRevision();
 				if (enabled && editor.replace(0, editor.documentLength(), event.text)) {
 					editor.resetCaretBlink(context.gestures.timeSeconds());
-					publishTextChange(previousText);
+					publishTextChange(previousRevision);
 				}
 			});
 			node.on(UiEventKind.AccessibilitySetSelection, function(event) {
@@ -471,14 +511,15 @@ class TextField implements View {
 	}
 
 	static function acquireState(context:BuildContext, id:nativekit.ui.core.WidgetId,
-			value:String, resolved:ResolvedTextStyle):State<TextEditorState> {
+			value:String, resolved:ResolvedTextStyle,
+			document:Null<TextDocument>):State<TextEditorState> {
 		if (context.fonts == null || context.fonts.isDisposed())
 			throw "Text fields require fonts on their build context";
 		var fonts = context.fonts;
 		return context.resourceState(id,
 			function() {
 				return new TextEditorState(cast fonts, value, resolved.textStyle,
-					resolved.paragraphStyle);
+				resolved.paragraphStyle, document);
 			},
 			function(editor:TextEditorState) { editor.dispose(); });
 	}
@@ -486,7 +527,7 @@ class TextField implements View {
 	static function copySelection(clipboard:nativekit.ui.core.ClipboardService,
 			editor:TextEditorState):Void {
 		if (editor.selectionStart != editor.selectionEnd)
-			clipboard.writeText(Utf8Text.slice(editor.layoutText(), editor.selectionStart,
+			clipboard.writeText(editor.documentOffsets().sliceCodepoints(editor.selectionStart,
 				editor.selectionEnd));
 	}
 
@@ -525,6 +566,28 @@ class TextField implements View {
 
 	static inline function absolute(value:Float):Float
 		return value < 0.0 ? -value : value;
+
+	static function transformTextRangeRect(rect:TextRangeRect, geometry:ResolvedLayoutItem,
+			transform:Transform2D, scrollOffsetY:Float):TextRangeRect {
+		var left = geometry.x + rect.x;
+		var top = geometry.y + rect.y - scrollOffsetY;
+		var right = left + rect.width;
+		var bottom = top + rect.height;
+		var x0 = transform.a * left + transform.c * top + transform.tx;
+		var y0 = transform.b * left + transform.d * top + transform.ty;
+		var x1 = transform.a * right + transform.c * top + transform.tx;
+		var y1 = transform.b * right + transform.d * top + transform.ty;
+		var x2 = transform.a * left + transform.c * bottom + transform.tx;
+		var y2 = transform.b * left + transform.d * bottom + transform.ty;
+		var x3 = transform.a * right + transform.c * bottom + transform.tx;
+		var y3 = transform.b * right + transform.d * bottom + transform.ty;
+		var minX = Math.min(Math.min(x0, x1), Math.min(x2, x3));
+		var minY = Math.min(Math.min(y0, y1), Math.min(y2, y3));
+		var maxX = Math.max(Math.max(x0, x1), Math.max(x2, x3));
+		var maxY = Math.max(Math.max(y0, y1), Math.max(y2, y3));
+		return new TextRangeRect(rect.start, rect.end, minX, minY, maxX - minX, maxY - minY,
+			rect.visualLeftIsStart);
+	}
 
 	static function defaultStyle(multiline:Bool):LayoutStyle {
 		var result = new LayoutStyle();

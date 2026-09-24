@@ -224,8 +224,14 @@ bool SceneSnapshot::resource_changes_since(std::uint64_t geometry_revision,
                 material_reached = true;
         }
         if (!delta->previous) {
-            geometry_reached = geometry_reached || geometry_revision == 0;
-            material_reached = material_reached || material_revision == 0;
+            if (!geometry_reached)
+                geometry_reached = geometry_revision >= delta->geometry_base_revision &&
+                                   (delta->geometry_complete ||
+                                    geometry_revision >= delta->geometry_revision);
+            if (!material_reached)
+                material_reached = material_revision >= delta->material_base_revision &&
+                                   (delta->material_complete ||
+                                    material_revision >= delta->material_revision);
         }
     }
     return geometry_reached && material_reached;
@@ -632,11 +638,50 @@ void Scene::publish_state(const ChangeSet *changes,
         auto resource_delta = std::make_shared<PublishedResourceDelta>();
         resource_delta->geometry_revision = state->geometry_resources_revision;
         resource_delta->material_revision = state->material_resources_revision;
+        resource_delta->geometry_base_revision =
+            previous ? previous->geometry_resources_revision : 0;
+        resource_delta->material_base_revision =
+            previous ? previous->material_resources_revision : 0;
         resource_delta->previous = previous ? previous->resource_delta : nullptr;
         geometries.changes_since(previous ? previous->geometry_store_revision : 0,
                                  resource_delta->geometries);
         materials.changes_since(previous ? previous->material_store_revision : 0,
                                 resource_delta->materials);
+        const auto compact_ids = []<class Id>(std::vector<Id> &ids) {
+            std::sort(ids.begin(), ids.end(),
+                      [](Id lhs, Id rhs) { return lhs.value < rhs.value; });
+            ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+            std::vector<Id> compacted(ids.begin(), ids.end());
+            ids.swap(compacted);
+        };
+        compact_ids(resource_delta->geometries);
+        compact_ids(resource_delta->materials);
+
+        const auto delta_ids = resource_delta->geometries.size() +
+                               resource_delta->materials.size();
+        const auto previous_delta = previous ? previous->resource_delta : nullptr;
+        const auto previous_entries = previous_delta ? previous_delta->retained_entries : 0;
+        const auto previous_ids = previous_delta ? previous_delta->retained_ids : 0;
+        if (delta_ids > published_resource_delta_max_ids) {
+            // A single unusually large update is cheaper to apply as a full rebuild.
+            std::vector<GeometryId>().swap(resource_delta->geometries);
+            std::vector<MaterialId>().swap(resource_delta->materials);
+            resource_delta->geometry_complete =
+                state->geometry_resources_revision == resource_delta->geometry_base_revision;
+            resource_delta->material_complete =
+                state->material_resources_revision == resource_delta->material_base_revision;
+            resource_delta->previous.reset();
+            resource_delta->retained_ids = 0;
+        } else if (previous_entries >= published_resource_delta_max_entries ||
+                   previous_ids > published_resource_delta_max_ids - delta_ids) {
+            // Preserve this publication for a reader at the exact base revisions,
+            // while making older readers use the renderer's full-rebuild fallback.
+            resource_delta->previous.reset();
+            resource_delta->retained_ids = delta_ids;
+        } else {
+            resource_delta->retained_entries = previous_entries + 1;
+            resource_delta->retained_ids = previous_ids + delta_ids;
+        }
         state->resource_delta = std::move(resource_delta);
     } else {
         state->resource_delta = previous->resource_delta;

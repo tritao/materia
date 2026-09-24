@@ -168,6 +168,14 @@ that recording with an independent Python MCAP reader, run:
 app/tests/scripted-mcap-independent.sh
 ```
 
+The scripted inspector layout and override → Apply → Run → Pause → Reset interaction
+are checked headlessly by `app/tests/scripted-inspector/haxeon.json`. To capture the
+1320×900 desktop view on an isolated display, run:
+
+```sh
+app/tests/scripted-inspector-visual.sh
+```
+
 `Main` is a complete desktop host. It initializes NativeKit, creates a resizable
 window and GPU surface, routes typed native input into the shared `UiContext`,
 and renders from the surface's request-driven frame callback. The main thread
@@ -186,6 +194,13 @@ Use `--snapshot` after `--` for the headless workspace JSON path, or
 `--reset-workspace` to discard the persisted panel arrangement before startup.
 Use `--perspective` to activate the GPU perspective tab at launch, including for
 deterministic frame captures.
+
+Workspace layout changes are saved by a background worker after 150 ms without
+another change. It keeps the latest snapshot when changes arrive quickly and
+flushes pending changes before the editor closes. Explicit Save waits for its
+workspace snapshot to reach storage. The worker writes a temporary file and
+renames it over the workspace file so an interrupted write cannot leave a
+partial layout.
 
 Perspective diagnostics report render dimensions, GPU composition mode, CPU
 transfer bytes, and render latency in `app-state.json`. SceneKit renders into a

@@ -6,7 +6,7 @@ class InstanceElement extends Element {
 	private final overrides:Map<String, Float>;
 
 	public function new(document:Document, id:ElementId, name:String, definitionId:DefinitionId) {
-		super(document, id, name, "instance");
+		super(document, id, name, ElementKind.Instance);
 		this.definitionId = definitionId;
 		overrides = new Map();
 	}

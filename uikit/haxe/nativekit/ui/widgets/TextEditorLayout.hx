@@ -14,7 +14,7 @@ import nativekit.editorkit.TextDocument;
 /** Retained layouts for bounded groups of paragraphs in one editor document. */
 class TextEditorLayout {
 	static inline var paragraphsPerLayout:Int = 64;
-	public var text(default, null):String;
+	public var text(get, never):String;
 	public var width(default, null):Float;
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
@@ -22,6 +22,7 @@ class TextEditorLayout {
 
 	final fonts:FontCollection;
 	var paragraphs:Array<TextEditorParagraphRecord>;
+	var rangeGeometryCache:Array<TextEditorRangeGeometryCache>;
 	var offsets:TextDocument;
 	var paragraphLineCount:Int;
 	var contentWidth:Float;
@@ -40,6 +41,7 @@ class TextEditorLayout {
 		this.textStyle = copyTextStyle(textStyle);
 		this.paragraphStyle = copyParagraphStyle(paragraphStyle);
 		paragraphs = [];
+		rangeGeometryCache = [];
 		offsets = null;
 		paragraphLineCount = 0;
 		contentWidth = 0.0;
@@ -47,11 +49,17 @@ class TextEditorLayout {
 		firstBaseline = 0.0;
 		hasBaseline = false;
 		disposed = false;
-		update(value, width, this.textStyle, this.paragraphStyle, offsetMap);
+		if (offsetMap == null)
+			update(value, width, this.textStyle, this.paragraphStyle);
+		else
+			updateDocument(offsetMap, width, this.textStyle, this.paragraphStyle);
 	}
 
 	function get_paragraphCount():Int
 		return paragraphLineCount;
+
+	function get_text():String
+		return offsets == null ? "" : offsets.text;
 
 	static function chunkCount(offsetMap:TextDocument):Int
 		return Std.int((offsetMap.paragraphCount() + paragraphsPerLayout - 1) / paragraphsPerLayout);
@@ -74,6 +82,15 @@ class TextEditorLayout {
 		var nextOffsets = offsetMap == null ? new TextDocument(actualText) : offsetMap;
 		if (nextOffsets.text != actualText)
 			nextOffsets = new TextDocument(actualText);
+		updateDocument(nextOffsets, nextWidth, nextTextStyle, nextParagraphStyle);
+	}
+
+	/** Updates retained paragraph layouts directly from the segmented document. */
+	public function updateDocument(nextOffsets:TextDocument, nextWidth:Float,
+			nextTextStyle:TextStyle, nextParagraphStyle:ParagraphStyle):Void {
+		ensureLive();
+		if (nextOffsets == null || nextWidth <= 0.0 || nextTextStyle == null || nextParagraphStyle == null)
+			throw "Editor layout update arguments are invalid";
 		var styleChanged = textStyle.font != nextTextStyle.font ||
 			textStyle.fontSize != nextTextStyle.fontSize ||
 			textStyle.letterSpacing != nextTextStyle.letterSpacing ||
@@ -144,10 +161,10 @@ class TextEditorLayout {
 			if (!containsRecord(used, record))
 				record.layout.dispose();
 
-		text = actualText;
 		width = nextWidth;
 		offsets = nextOffsets;
 		paragraphLineCount = nextOffsets.paragraphCount();
+		clearRangeGeometryCache();
 		paragraphs = next;
 		recomputeMetrics();
 	}
@@ -160,20 +177,18 @@ class TextEditorLayout {
 	 * records are carried by paragraph index, so a keystroke does not rebuild a
 	 * document-wide text-to-record lookup table or reslice every paragraph.
 	 */
-	public function setTextAfterEdit(value:String, nextOffsets:TextDocument,
+	public function setTextAfterEdit(nextOffsets:TextDocument,
 			oldStart:Int, oldEnd:Int, newStart:Int, newEnd:Int,
 			oldDocumentLength:Int):Void {
 		ensureLive();
-		if (nextOffsets == null || nextOffsets.text != (value == null ? "" : value)) {
-			update(value, width, textStyle, paragraphStyle, nextOffsets);
-			return;
-		}
+		if (nextOffsets == null)
+			throw "Editor layout update requires a document";
 		if (paragraphs.length == 0) {
-			update(value, width, textStyle, paragraphStyle, nextOffsets);
+			updateDocument(nextOffsets, width, textStyle, paragraphStyle);
 			return;
 		}
 		if (nextOffsets.paragraphCount() != paragraphLineCount) {
-			setTextAfterParagraphEdit(value, nextOffsets, oldStart, oldEnd,
+			setTextAfterParagraphEdit(nextOffsets, oldStart, oldEnd,
 				oldDocumentLength);
 			return;
 		}
@@ -248,15 +263,15 @@ class TextEditorLayout {
 				oldRecord.layout.dispose();
 		}
 
-		text = value == null ? "" : value;
 		offsets = nextOffsets;
 		paragraphLineCount = nextOffsets.paragraphCount();
+		clearRangeGeometryCache();
 		paragraphs = next;
 		recomputeMetrics();
 	}
 
 	/** Keeps chunks outside a newline edit and repartitions only its neighborhood. */
-	function setTextAfterParagraphEdit(value:String, nextOffsets:TextDocument,
+	function setTextAfterParagraphEdit(nextOffsets:TextDocument,
 			oldStart:Int, oldEnd:Int, oldDocumentLength:Int):Void {
 		var previous = paragraphs;
 		var first = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);
@@ -325,9 +340,9 @@ class TextEditorLayout {
 			record.end += delta;
 			result.push(record);
 		}
-		text = value == null ? "" : value;
 		offsets = nextOffsets;
 		paragraphLineCount = nextOffsets.paragraphCount();
+		clearRangeGeometryCache();
 		paragraphs = result;
 		recomputeMetrics();
 	}
@@ -449,6 +464,91 @@ class TextEditorLayout {
 		return result;
 	}
 
+	/** Returns shaped grapheme rectangles paired with absolute document ranges. */
+	public function selectionRangeRects(start:TextPosition, end:TextPosition,
+			minY:Float = -1.0e30, maxY:Float = 1.0e30):Array<TextRangeRect> {
+		ensureLive();
+		if (start == null || end == null)
+			throw "Text selection endpoints cannot be null";
+		if (!Math.isFinite(minY) || !Math.isFinite(maxY) || maxY < minY)
+			throw "Text selection geometry bounds are invalid";
+		var forward = start.offset <= end.offset;
+		var firstPosition = forward ? start : end;
+		var lastPosition = forward ? end : start;
+		var first = clamp(firstPosition.offset, 0, offsets.codepointCount);
+		var last = clamp(lastPosition.offset, 0, offsets.codepointCount);
+		var firstAffinity = firstPosition.affinity;
+		var lastAffinity = lastPosition.affinity;
+		if (first == last)
+			return [];
+		for (entry in rangeGeometryCache)
+			if (entry.start == first && entry.end == last &&
+				entry.startAffinity == firstAffinity && entry.endAffinity == lastAffinity &&
+				entry.minY == minY && entry.maxY == maxY)
+				return entry.rectangles.copy();
+		var result:Array<TextRangeRect> = [];
+		var low = 0;
+		var high = paragraphs.length;
+		while (low < high) {
+			var middle = (low + high) >> 1;
+			if (paragraphs[middle].y + paragraphs[middle].height <= minY)
+				low = middle + 1;
+			else
+				high = middle;
+		}
+		for (index in low...paragraphs.length) {
+			var record = paragraphs[index];
+			if (record.y >= maxY)
+				break;
+			var localStart = first > record.start ? first : record.start;
+			var localEnd = last < record.end ? last : record.end;
+			if (localEnd <= localStart)
+				continue;
+			if (minY > record.y || maxY < record.y + record.height) {
+				var visibleTop = Math.max(0.0, minY - record.y);
+				var visibleBottom = Math.min(record.height, maxY - record.y);
+				if (visibleBottom <= visibleTop)
+					continue;
+				var sampleTop = Math.min(visibleBottom, visibleTop + 1.0);
+				var sampleBottom = Math.max(visibleTop, visibleBottom - 1.0);
+				var topLeft = record.layout.hitTest(0.0, sampleTop).offset;
+				var topRight = record.layout.hitTest(record.layout.width, sampleTop).offset;
+				var bottomLeft = record.layout.hitTest(0.0, sampleBottom).offset;
+				var bottomRight = record.layout.hitTest(record.layout.width, sampleBottom).offset;
+				var visibleStart = clamp(Std.int(Math.min(Math.min(topLeft, topRight),
+					Math.min(bottomLeft, bottomRight))), 0, record.end - record.start);
+				var visibleEnd = clamp(Std.int(Math.max(Math.max(topLeft, topRight),
+					Math.max(bottomLeft, bottomRight))), 0, record.end - record.start);
+				for (_ in 0...2) {
+					if (visibleStart > 0)
+						visibleStart = record.layout.previousGrapheme(visibleStart);
+					if (visibleEnd < record.end - record.start)
+						visibleEnd = record.layout.nextGrapheme(visibleEnd);
+				}
+				var clippedStart = record.start + visibleStart;
+				var clippedEnd = record.start + visibleEnd;
+				if (localStart < clippedStart)
+					localStart = clippedStart;
+				if (localEnd > clippedEnd)
+					localEnd = clippedEnd;
+			}
+			if (localEnd <= localStart)
+				continue;
+			for (rect in record.layout.selectionRangeRects(
+				new TextPosition(localStart - record.start,
+					localStart == first ? firstAffinity : 0),
+				new TextPosition(localEnd - record.start,
+					localEnd == last ? lastAffinity : 0)))
+				result.push(new TextRangeRect(rect.start + record.start, rect.end + record.start,
+					rect.x, rect.y + record.y, rect.width, rect.height, rect.visualLeftIsStart));
+		}
+		rangeGeometryCache.push(new TextEditorRangeGeometryCache(first, last, firstAffinity,
+			lastAffinity, minY, maxY, result.copy()));
+		if (rangeGeometryCache.length > 2)
+			rangeGeometryCache.shift();
+		return result;
+	}
+
 	public function nextGrapheme(offset:Int):Int {
 		ensureLive();
 		var recordIndex = paragraphIndexAtOffset(offset);
@@ -546,6 +646,7 @@ class TextEditorLayout {
 			return;
 		for (record in paragraphs)
 			record.layout.dispose();
+		clearRangeGeometryCache();
 		paragraphs = [];
 		disposed = true;
 	}
@@ -613,6 +714,9 @@ class TextEditorLayout {
 			throw "Editor layout has been disposed";
 	}
 
+	function clearRangeGeometryCache():Void
+		rangeGeometryCache = [];
+
 	static function containsRecord(records:Array<TextEditorParagraphRecord>,
 			value:TextEditorParagraphRecord):Bool {
 		for (record in records)
@@ -648,5 +752,27 @@ class TextEditorParagraphRecord {
 		y = 0.0;
 		height = 0.0;
 		renderColor = null;
+	}
+}
+
+/** Cached selection geometry for one active editor range and viewport. */
+class TextEditorRangeGeometryCache {
+	public final start:Int;
+	public final end:Int;
+	public final startAffinity:Int;
+	public final endAffinity:Int;
+	public final minY:Float;
+	public final maxY:Float;
+	public final rectangles:Array<TextRangeRect>;
+
+	public function new(start:Int, end:Int, startAffinity:Int, endAffinity:Int,
+			minY:Float, maxY:Float, rectangles:Array<TextRangeRect>) {
+		this.start = start;
+		this.end = end;
+		this.startAffinity = startAffinity;
+		this.endAffinity = endAffinity;
+		this.minY = minY;
+		this.maxY = maxY;
+		this.rectangles = rectangles;
 	}
 }

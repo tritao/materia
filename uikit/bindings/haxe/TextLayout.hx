@@ -169,6 +169,44 @@ class TextLayout extends NativeKitUIResource {
 		return rectangles;
 	}
 
+	/** Returns range-aware rectangles for each grapheme covered by a selection. */
+	public function selectionRangeRects(start:TextPosition, end:TextPosition):Array<TextRangeRect> {
+		if (start == null || end == null)
+			throw "Text selection endpoints cannot be null";
+		var forward = start.offset <= end.offset;
+		var first = forward ? start.offset : end.offset;
+		var last = forward ? end.offset : start.offset;
+		if (first == last)
+			return [];
+		var firstAffinity = forward ? start.affinity : end.affinity;
+		var lastAffinity = forward ? end.affinity : start.affinity;
+		var result:Array<TextRangeRect> = [];
+		var cursor = first;
+		while (cursor < last) {
+			var next = nextGrapheme(cursor);
+			if (next <= cursor)
+				next = cursor + 1;
+			if (next > last)
+				next = last;
+			var startCaret = caret(new TextPosition(cursor, cursor == first ? firstAffinity : 0));
+			var endCaret = caret(new TextPosition(next, next == last ? lastAffinity : 0));
+			var startTopX = startCaret.x + startCaret.ascender * startCaret.slope;
+			var startBottomX = startCaret.x + startCaret.descender * startCaret.slope;
+			var endTopX = endCaret.x + endCaret.ascender * endCaret.slope;
+			var endBottomX = endCaret.x + endCaret.descender * endCaret.slope;
+			var left = Math.min(Math.min(startTopX, startBottomX), Math.min(endTopX, endBottomX));
+			var right = Math.max(Math.max(startTopX, startBottomX), Math.max(endTopX, endBottomX));
+			var top = Math.min(startCaret.y + startCaret.ascender, endCaret.y + endCaret.ascender);
+			var bottom = Math.max(startCaret.y + startCaret.descender, endCaret.y + endCaret.descender);
+			if (Math.isFinite(left) && Math.isFinite(top) && Math.isFinite(right) &&
+				Math.isFinite(bottom) && right > left && bottom > top)
+				result.push(new TextRangeRect(cursor, next, left, top, right - left, bottom - top,
+					startCaret.direction != TextDirection.Rtl));
+			cursor = next;
+		}
+		return result;
+	}
+
 	/** Returns the next grapheme boundary at or after a code-point offset. */
 	public function nextGrapheme(offset:Int):Int {
 		if (offset < 0)
@@ -285,6 +323,29 @@ class TextRange {
 	public function new(start:Int, end:Int) {
 		this.start = start;
 		this.end = end;
+	}
+}
+
+/** Visual rectangle associated with an absolute code-point range. */
+class TextRangeRect {
+	public final start:Int;
+	public final end:Int;
+	public final x:Float;
+	public final y:Float;
+	public final width:Float;
+	public final height:Float;
+	/** Whether the visual left edge corresponds to the range start. */
+	public final visualLeftIsStart:Bool;
+
+	public function new(start:Int, end:Int, x:Float, y:Float, width:Float, height:Float,
+			visualLeftIsStart:Bool = true) {
+		this.start = start;
+		this.end = end;
+		this.x = x;
+		this.y = y;
+		this.width = width;
+		this.height = height;
+		this.visualLeftIsStart = visualLeftIsStart;
 	}
 }
 

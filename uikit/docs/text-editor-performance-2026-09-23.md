@@ -78,6 +78,24 @@ it does not shift offsets for the whole document. Initial UI load stayed near
 a complete string for each edit, and a paragraph without newlines can still
 form one large segment. GPU presentation and IME behavior remain unmeasured.
 
+The measurements above predate the shared-document UIKit API. A field backed by
+`TextField.withDocument` now updates retained paragraph layouts from document
+slices and can publish `EditTransaction`s without assembling the full string.
+The compatibility `onChange(String)` callback and consumers that request the
+semantic value still materialize it.
+
+A separate headless paired run compared string-backed and shared-document
+`TextArea`s with 10,000 distinct 70–74-byte lines, an 800×600 frame, and IBM
+Plex Sans. Each case alternated eight inserts and backspaces, submitting a frame
+after each edit; the first two samples were discarded. Across three process
+runs, insert-plus-submit medians were 4.24 ms for the string-backed field and
+4.19 ms for the shared document. That 0.05 ms gap is within run-to-run noise,
+so this workload shows no meaningful speedup. The shared model removes the
+required full-string copy for clients that use transactions, while paragraph
+shaping and frame submission still dominate this measurement. Long-paragraph
+shaping remains linear in paragraph length. These timings exclude GPU
+presentation.
+
 ## Viewport-local custom content (2026-09-24)
 
 UIKit custom content now receives a conservative visible rectangle in node-local
@@ -116,3 +134,14 @@ at 26.5 KB, and 50.5 ms at 53 KB. Each edit reshapes the entire paragraph.
 The Xvfb captures verify renderer output in a virtual display, but they do
 not exercise an operating-system IME session or compare every rendered pixel
 with a golden image.
+
+## Long-paragraph document segments (2026-09-24)
+
+EditorKit now splits storage segments at code-point boundaries inside long
+paragraphs, while preferring a nearby newline. Paragraph range lookup joins
+the ranges from those segments. Repeating the same headless UI workload gave
+about 10 ms insert plus frame at 26.5 KB and 19 ms at 53 KB, down from about
+25 ms and 50 ms in the earlier run. The native shaper still receives and
+reshapes the complete logical paragraph, so that cost continues to grow with
+paragraph length. Splitting native shaping and layout while preserving
+wrapping, ligatures, bidirectional text, and caret geometry remains open.

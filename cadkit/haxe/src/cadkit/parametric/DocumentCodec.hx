@@ -51,11 +51,16 @@ import cadkit.parametric.DefinitionId;
 import cadkit.parametric.DefinitionInput;
 import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.InstanceElement;
+import cadkit.parametric.ElementKind;
+import cadkit.parametric.TypedProperty;
+import cadkit.parametric.PersistentReference;
+import cadkit.parametric.Relationship;
+import cadkit.parametric.RelationshipId;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 3;
+	public static inline var VERSION:Int = 5;
 
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
@@ -94,7 +99,8 @@ class DocumentCodec {
 					kind: element.kind,
 					output: geometry.id.toInt(),
 					placement: placement,
-					parent: parent
+					parent: parent,
+					properties: encodeProperties(element.properties())
 				});
 			} else if (element.kind == "instance") {
 				var instance:InstanceElement = cast element;
@@ -108,7 +114,8 @@ class DocumentCodec {
 					definition: instance.definitionId.value,
 					overrides: overrides,
 					placement: placement,
-					parent: parent
+					parent: parent,
+					properties: encodeProperties(element.properties())
 				});
 			} else if (element.kind == "level") {
 				var level:LevelElement = cast element;
@@ -120,9 +127,10 @@ class DocumentCodec {
 					offset: level.offset,
 					relativeTo: level.relativeTo == null ? null : encodeElementReference(level.relativeTo),
 					placement: placement,
-					parent: parent
+					parent: parent,
+					properties: encodeProperties(element.properties())
 				});
-			} else {
+			} else if (element.kind == ElementKind.ReferencePlane) {
 				var datum:ReferencePlaneElement = cast element;
 				encodedElements.push({
 					id: datum.id.value,
@@ -134,8 +142,20 @@ class DocumentCodec {
 						normal: encodeVector(datum.plane.normal)
 					},
 					placement: placement,
-					parent: parent
+					parent: parent,
+					properties: encodeProperties(element.properties())
 				});
+			} else if (element.kind == ElementKind.Object) {
+				encodedElements.push({
+					id: element.id.value,
+					name: element.name,
+					kind: element.kind,
+					placement: placement,
+					parent: parent,
+					properties: encodeProperties(element.properties())
+				});
+			} else {
+				throw new ParametricError("unsupported structural element kind: " + element.kind);
 			}
 		}
 		var encodedDefinitions:Array<Dynamic> = [];
@@ -173,18 +193,30 @@ class DocumentCodec {
 				revision: definition.revision,
 				inputs: inputs,
 				outputs: outputs,
-				subgraph: subgraph
+				subgraph: subgraph,
+				properties: encodeProperties(definition.properties())
 			});
 		}
 		var output = document.outputFeatureOrNull();
+		var encodedRelationships:Array<Dynamic> = [];
+		for (relationship in document.allRelationships())
+			encodedRelationships.push({
+				id: relationship.id.value,
+				type: relationship.typeName,
+				source: encodeElementReference(relationship.source),
+				target: encodeElementReference(relationship.target),
+				properties: encodeProperties(relationship.properties())
+			});
 		return Json.stringify({
 			format: FORMAT,
 			version: VERSION,
 			documentId: document.id.value,
+			implicitOutput: document.implicitOutputEnabled,
 			features: encodedFeatures,
 			parameters: encodedParameters,
 			definitions: encodedDefinitions,
 			elements: encodedElements,
+			relationships: encodedRelationships,
 			output: output == null ? null : output.id.toInt()
 		});
 	}
@@ -196,19 +228,23 @@ class DocumentCodec {
 			if (stringField(root, "format") != FORMAT)
 				throw new ParametricError("unsupported document format");
 			var version = intField(root, "version");
-			if (version != 1 && version != 2 && version != VERSION)
+			if (version < 1 || version > VERSION)
 				throw new ParametricError("unsupported document version");
+			var implicitOutput = version >= 5 ? optionalBool(root, "implicitOutput", true) : true;
 
 			var records:Array<Dynamic> = cast requiredField(root, "features");
 			var sourceDocumentId = optionalString(root, "documentId");
-			var targetDocument:Document = version == 1 || clone ? new Document()
-				: new Document(new DocumentId(stringField(root, "documentId")));
+			var targetDocument:Document = version == 1 || clone ? new Document(null, implicitOutput)
+				: new Document(new DocumentId(stringField(root, "documentId")), implicitOutput);
 			document = targetDocument;
 			var decodeElementReferenceInDocument = function(value:Dynamic) {
 				var reference = decodeElementReference(value);
 				if (clone && sourceDocumentId != null && reference.documentId.value == sourceDocumentId)
 					return new ElementReference(targetDocument.id, reference.elementId);
 				return reference;
+			};
+			var remapDocumentId = function(value:String) {
+				return clone && sourceDocumentId != null && value == sourceDocumentId ? targetDocument.id.value : value;
 			};
 			var pendingReferences:Array<Dynamic> = [];
 			for (record in records) {
@@ -383,6 +419,10 @@ class DocumentCodec {
 					var definition = document.installDefinition(new DefinitionId(stringField(definitionRecord, "id")), stringField(definitionRecord, "name"),
 						stringField(definitionRecord, "recipe"), inputs, outputs, subgraph);
 					definition.restoreRevision(intField(definitionRecord, "revision"));
+					for (propertyRecord in optionalPropertyRecords(definitionRecord)) {
+						var property = decodeTypedProperty(propertyRecord, remapDocumentId);
+						definition.restoreProperty(property.name, property);
+					}
 				}
 				var elementRecords:Array<Dynamic> = cast requiredField(root, "elements");
 				for (elementRecord in elementRecords) {
@@ -406,6 +446,8 @@ class DocumentCodec {
 						document.installReferencePlane(ename, eid,
 							new Plane(decodeVector(requiredField(p, "origin")), decodeVector(requiredField(p, "xDirection")),
 								decodeVector(requiredField(p, "normal"))));
+					} else if (kind == ElementKind.Object) {
+						document.installObject(ename, eid);
 					} else
 						throw new ParametricError("unsupported element kind: " + kind);
 				}
@@ -414,8 +456,26 @@ class DocumentCodec {
 					var rawParent:Dynamic = Reflect.field(elementRecord, "parent");
 					document.restoreElementPlacement(loaded, decodePlacement(requiredField(elementRecord, "placement")),
 						rawParent == null ? null : decodeElementReferenceInDocument(rawParent));
+					for (propertyRecord in optionalPropertyRecords(elementRecord)) {
+						var property = decodeTypedProperty(propertyRecord, remapDocumentId);
+						loaded.restoreProperty(property.name, property);
+					}
 					document.worldPlacement(loaded);
 				}
+			var rawRelationshipRecords:Dynamic = Reflect.field(root, "relationships");
+			if (rawRelationshipRecords != null && !Std.isOfType(rawRelationshipRecords, Array))
+				throw new ParametricError("document relationships field is not an array");
+			var relationshipRecords:Array<Dynamic> = rawRelationshipRecords == null ? [] : cast rawRelationshipRecords;
+			for (relationshipRecord in relationshipRecords) {
+				var relationship = document.installRelationship(new RelationshipId(stringField(relationshipRecord, "id")),
+					stringField(relationshipRecord, "type"), decodeElementReferenceInDocument(requiredField(relationshipRecord, "source")),
+					decodeElementReferenceInDocument(requiredField(relationshipRecord, "target")));
+				for (propertyRecord in optionalPropertyRecords(relationshipRecord)) {
+					var property = decodeTypedProperty(propertyRecord, remapDocumentId);
+					relationship.restoreProperty(property.name, property);
+				}
+			}
+				document.validatePersistentReferences();
 			}
 
 			if (evaluate)
@@ -693,6 +753,75 @@ class DocumentCodec {
 	private static function decodePlacement(value:Dynamic):Placement
 		return new Placement(new Plane(decodeVector(requiredField(value, "origin")), decodeVector(requiredField(value, "xDirection")),
 			decodeVector(requiredField(value, "normal"))));
+
+	private static function encodeProperties(values:Array<TypedProperty>):Array<Dynamic> {
+		var result:Array<Dynamic> = [];
+		for (property in values) {
+			var value:Dynamic = property.value;
+			if (Std.isOfType(value, PersistentReference)) {
+				var reference:PersistentReference = cast value;
+				value = {document: reference.documentId, targetType: reference.targetType, targetId: reference.targetId};
+			} else if (Std.isOfType(value, Placement)) {
+				value = encodePlacement(cast value);
+			}
+			result.push({
+				name: property.name,
+				type: property.type,
+				unit: property.unit,
+				tokenDomain: property.tokenDomain,
+				metadata: property.metadata,
+				value: value
+			});
+		}
+		return result;
+	}
+
+	private static function optionalPropertyRecords(record:Dynamic):Array<Dynamic> {
+		var raw:Dynamic = Reflect.field(record, "properties");
+		if (raw == null)
+			return [];
+		if (!Std.isOfType(raw, Array))
+			throw new ParametricError("document properties field is not an array");
+		return cast raw;
+	}
+
+	private static function decodeTypedProperty(record:Dynamic, remapDocumentId:String->String):TypedProperty {
+		var name = stringField(record, "name");
+		var type = stringField(record, "type");
+		var unit = optionalString(record, "unit");
+		var tokenDomain = optionalString(record, "tokenDomain");
+		var metadata:Dynamic = Reflect.field(record, "metadata");
+		if (!Reflect.hasField(record, "value"))
+			throw new ParametricError("property record has no value field: " + name);
+		var rawValue:Dynamic = Reflect.field(record, "value");
+		var value:Dynamic = switch type {
+			case TypedProperty.TypeBoolean:
+				if (!Std.isOfType(rawValue, Bool)) throw new ParametricError("boolean property value is malformed: " + name);
+				rawValue;
+			case TypedProperty.TypeInteger:
+				integerValue(cast rawValue, name);
+			case TypedProperty.TypeText, TypedProperty.TypeToken:
+				if (!Std.isOfType(rawValue, String)) throw new ParametricError("text property value is malformed: " + name);
+				rawValue;
+			case QuantityKind.Scalar, QuantityKind.Length, QuantityKind.Angle, QuantityKind.Area, QuantityKind.Volume:
+				finiteNumber(rawValue, name);
+			case TypedProperty.TypeElementReference, TypedProperty.TypeDefinitionReference, TypedProperty.TypeFeatureReference:
+				var targetType = switch type {
+					case TypedProperty.TypeElementReference: PersistentReference.ElementTarget;
+					case TypedProperty.TypeDefinitionReference: PersistentReference.DefinitionTarget;
+					default: PersistentReference.FeatureTarget;
+				};
+				if (stringField(rawValue, "targetType") != targetType)
+					throw new ParametricError("property reference target type does not match its property type: " + name);
+				new PersistentReference(remapDocumentId(stringField(rawValue, "document")), targetType,
+					stringField(rawValue, "targetId"));
+			case TypedProperty.TypePlacement:
+				decodePlacement(rawValue);
+			default:
+				rawValue;
+		};
+		return new TypedProperty(name, type, value, unit, tokenDomain, metadata);
+	}
 
 	private static function encodeConstrainedSketch(feature:ConstrainedSketchFeature, references:Array<Dynamic>):Dynamic {
 		var sketch = feature.sketch();

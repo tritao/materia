@@ -17,6 +17,7 @@ class Element {
 	public var placementParent(default, null):Null<ElementReference>;
 	public var placementDerived(default, null):Bool;
 
+	private final propertyValues:Map<String, TypedProperty>;
 	private var committedOutput:Null<Feature>;
 	private var directShape:Null<Shape>;
 	private var placedShape:Null<Shape>;
@@ -31,6 +32,7 @@ class Element {
 		localPlacement = Placement.identity();
 		placementParent = null;
 		placementDerived = false;
+		propertyValues = new Map();
 		placedShape = null;
 		directShape = null;
 	}
@@ -51,6 +53,29 @@ class Element {
 
 	public function restoreName(value:String):Void
 		name = value;
+
+	public function property(name:String):Null<TypedProperty>
+		return propertyValues.get(name);
+
+	public function properties():Array<TypedProperty> {
+		var names = [for (name in propertyValues.keys()) name];
+		names.sort(Reflect.compare);
+		return [for (name in names) propertyValues.get(name)];
+	}
+
+	/** Internal document history and codec path. */
+	public function restoreProperty(name:String, value:Null<TypedProperty>):Void {
+		if (value == null)
+			propertyValues.remove(name);
+		else
+			propertyValues.set(name, value);
+	}
+
+	public function setProperty(value:TypedProperty):Void
+		document.setElementProperty(this, value);
+
+	public function removeProperty(name:String):Void
+		document.removeElementProperty(this, name);
 
 	public function restoreOutput(value:Feature):Void {
 		output = value;

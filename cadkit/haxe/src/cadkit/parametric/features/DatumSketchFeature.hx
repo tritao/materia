@@ -10,6 +10,7 @@ class DatumSketchFeature extends Feature {
 	public function new(profile:String,width:Float,height:Float,datum:ElementReference,offset:Float=0) { super();this.profile=profile;this.datum=datum;this.offset=new Parameter(this,"datum-sketch.offset",offset,-1e300,false,1e300,ParameterKind.Length);this.width=new Parameter(this,"datum-sketch.width",width,0,false,1e300,ParameterKind.Length);this.height=new Parameter(this,"datum-sketch.height",height,0,false,1e300,ParameterKind.Length); }
 	override public function serializationType():String return "datum-sketch";
 	override public function datumDependencies():Array<String> return [datum.elementId.value];
+	override public function elementReferences():Array<ElementReference> return [datum];
 	override public function evaluate(context:EvaluationContext):EvaluationResult {
 		var element=context.owner().resolveElement(datum); var plane:Plane;
 		if(element.kind=="level") plane=new Plane(new Vector(0,0,context.owner().levelElevation(datum)+offset.value),Vector.X(),Vector.Z());

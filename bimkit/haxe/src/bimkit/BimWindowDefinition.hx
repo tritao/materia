@@ -1,80 +1,81 @@
 package bimkit;
 
-import cadkit.Geometry;
-import cadkit.Shape;
 import cadkit.parametric.Definition;
-import cadkit.parametric.DefinitionEvaluator;
-import cadkit.parametric.DefinitionEvaluatorRegistry;
 import cadkit.parametric.DefinitionInput;
 import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.Document;
-import cadkit.parametric.InstanceElement;
 import cadkit.parametric.ParameterKind;
-import cadkit.parametric.ParametricError;
+import cadkit.parametric.QuantityKind;
+import cadkit.parametric.TypedProperty;
+import cadkit.parametric.features.BooleanFeature;
+import cadkit.parametric.features.BooleanOperation;
+import cadkit.parametric.features.BoxFeature;
+import cadkit.parametric.features.TransformFeature;
 
-/** BIM-owned reusable window recipe and its named geometry outputs. */
-class BimWindowDefinition implements DefinitionEvaluator {
-	private static var evaluatorRegistered:Bool = false;
-
-	public static function registerEvaluator():Void {
-		if (evaluatorRegistered)
-			return;
-		var evaluator = new BimWindowDefinition();
-		DefinitionEvaluatorRegistry.register("bimkit.window", evaluator);
-		DefinitionEvaluatorRegistry.register("window", evaluator);
-		evaluatorRegistered = true;
-	}
-
-	public static function create(document:Document, name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition {
-		registerEvaluator();
-		return document.createDefinition(name, "bimkit.window", [
-			new DefinitionInput("width", ParameterKind.Length, "mm", width),
-			new DefinitionInput("height", ParameterKind.Length, "mm", height),
-			new DefinitionInput("frameThickness", ParameterKind.Length, "mm", frameThickness),
-			new DefinitionInput("depth", ParameterKind.Length, "mm", depth)
-		], [
-			new DefinitionOutput("body", DefinitionOutput.Geometry),
-			new DefinitionOutput("opening", DefinitionOutput.Tool)
-		]);
-	}
-
-	public function new() {}
-
-	public function evaluate(_definition:Definition, instance:InstanceElement, output:String):Shape {
-		var width = instance.resolved("width");
-		var height = instance.resolved("height");
-		var frame = instance.resolved("frameThickness");
-		var depth = instance.resolved("depth");
-		if (width <= 2 * frame || height <= 2 * frame || depth <= 0 || frame <= 0)
-			throw new ParametricError("window dimensions do not define a valid frame");
-		if (output == "opening") {
-			var opening = Shape.box(width, depth + 2, height);
-			try {
-				var result = opening.translate(Geometry.vec3(0, -1, 0));
-				opening.close();
-				return result;
-			} catch (error:Dynamic) {
-				opening.close();
-				throw error;
-			}
-		}
-		if (output != "body")
-			throw new ParametricError("unsupported window output: " + output);
-
-		var outer = Shape.box(width, depth, height);
-		var inner = Shape.box(width - 2 * frame, depth + 2, height - 2 * frame);
+/** Factory for an authored reusable window type built from a CadKit feature subgraph. */
+class BimWindowDefinition {
+	public static function create(document:Document, name:String, width:Float, height:Float, frameThickness:Float,
+		depth:Float):Definition {
+		var transaction = document.beginTransaction();
+		var graph = new Document(null, false);
 		try {
-			var positioned = inner.translate(Geometry.vec3(frame, -1, frame));
-			inner.close();
-			inner = positioned;
-			var result = outer.cut(inner);
-			outer.close();
-			inner.close();
-			return result;
+			var outer = graph.add(new BoxFeature(width, depth, height));
+			var cavity = graph.add(new BoxFeature(width - 2 * frameThickness, depth + 2, height - 2 * frameThickness));
+			var positionedCavity = graph.add(new TransformFeature(cavity, frameThickness, -1, frameThickness));
+			var body = graph.add(new BooleanFeature(outer, positionedCavity, BooleanOperation.Cut));
+			var openingBox = graph.add(new BoxFeature(width, depth + 2, height));
+			var opening = graph.add(new TransformFeature(openingBox, 0, -1, 0));
+
+			var bindings = new Map<String, String>();
+			bindInput(graph, bindings, "width", width, outer.width);
+			bindInput(graph, bindings, "height", height, outer.height);
+			bindInput(graph, bindings, "frameThickness", frameThickness, positionedCavity.x);
+			graph.parameter("frameThickness").bind(positionedCavity.z);
+			bindInput(graph, bindings, "depth", depth, outer.depth);
+			graph.parameter("width").bind(openingBox.width);
+			graph.parameter("height").bind(openingBox.height);
+
+			graph.defineTypedParameter("cut.overlap", 1, QuantityKind.Length, "mm");
+			bindExpression(graph, "cavity.width", QuantityKind.Length, "width - 2 * frameThickness", cavity.width);
+			bindExpression(graph, "cavity.height", QuantityKind.Length, "height - 2 * frameThickness", cavity.height);
+			bindExpression(graph, "cavity.depth", QuantityKind.Length, "depth + 2 * cut.overlap", cavity.depth);
+			bindExpression(graph, "cavity.y", QuantityKind.Length, "-cut.overlap", positionedCavity.y);
+			bindExpression(graph, "opening.depth", QuantityKind.Length, "depth + 2 * cut.overlap", openingBox.depth);
+			bindExpression(graph, "opening.y", QuantityKind.Length, "-cut.overlap", opening.y);
+
+			var outputFeatures = new Map<String, Int>();
+			outputFeatures.set("body", body.id.toInt());
+			outputFeatures.set("opening", opening.id.toInt());
+			var definition = document.createSubgraphDefinition(name, graph, [
+				new DefinitionInput("width", ParameterKind.Length, "mm", width),
+				new DefinitionInput("height", ParameterKind.Length, "mm", height),
+				new DefinitionInput("frameThickness", ParameterKind.Length, "mm", frameThickness),
+				new DefinitionInput("depth", ParameterKind.Length, "mm", depth)
+			], [
+				new DefinitionOutput("body", DefinitionOutput.Geometry),
+				new DefinitionOutput("opening", DefinitionOutput.Tool)
+			], bindings, outputFeatures);
+			definition.setProperty(TypedProperty.token("bim.class", "window-type", BimSchema.DefinitionClass));
+			definition.setProperty(TypedProperty.token("bim.element-class", BimSchema.Window, BimSchema.ElementClass));
+			graph.close();
+			transaction.commit();
+			return definition;
 		} catch (error:Dynamic) {
-			outer.close();
-			inner.close();
+			graph.close();
+			transaction.cancel();
 			throw error;
 		}
+	}
+
+	private static function bindInput(graph:Document, bindings:Map<String, String>, name:String, value:Float,
+		parameter:cadkit.parametric.Parameter):Void {
+		var named = graph.defineTypedParameter(name, value, QuantityKind.Length, "mm");
+		named.bind(parameter);
+		bindings.set(name, name);
+	}
+
+	private static function bindExpression(graph:Document, name:String, kind:String, expression:String,
+		parameter:cadkit.parametric.Parameter):Void {
+		graph.defineExpression(name, kind, "mm", expression).bind(parameter);
 	}
 }

@@ -22,6 +22,7 @@ import cadkit.parametric.UnitConversion;
 import cadkit.parametric.DocumentId;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
+import cadkit.parametric.ElementKind;
 import cadkit.parametric.LevelElement;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.ElementReference;
@@ -30,6 +31,7 @@ import cadkit.parametric.ElementChanges.ElementCreateChange;
 import cadkit.parametric.ElementChanges.ElementRemoveChange;
 import cadkit.parametric.ElementChanges.ElementNameChange;
 import cadkit.parametric.ElementChanges.ElementOutputChange;
+import cadkit.parametric.ElementChanges.ElementPropertyChange;
 import cadkit.parametric.DatumChanges.LevelElevationChange;
 import cadkit.parametric.DatumChanges.ReferencePlaneChange;
 import cadkit.modeling.Plane;
@@ -43,7 +45,14 @@ import cadkit.parametric.InstanceElement;
 import cadkit.parametric.DefinitionChanges.DefinitionDefaultChange;
 import cadkit.parametric.DefinitionChanges.InstanceOverrideChange;
 import cadkit.parametric.DefinitionChanges.DefinitionCreateChange;
+import cadkit.parametric.DefinitionChanges.DefinitionPropertyChange;
 import cadkit.parametric.DefinitionChanges.InstanceDefinitionChange;
+import cadkit.parametric.Relationship;
+import cadkit.parametric.RelationshipId;
+import cadkit.parametric.RelationshipChanges.RelationshipCreateChange;
+import cadkit.parametric.RelationshipChanges.RelationshipRemoveChange;
+import cadkit.parametric.RelationshipChanges.RelationshipEndpointsChange;
+import cadkit.parametric.RelationshipChanges.RelationshipPropertyChange;
 
 /** Haxeon-owned parametric feature document. */
 class Document {
@@ -61,8 +70,12 @@ class Document {
 	private var definitionsById:Map<String, Definition>;
 	private final definitionCache:Map<String, Shape>;
 	private final issuedDefinitionIds:Map<String, Bool>;
+	private final relationships:Array<Relationship>;
+	private var relationshipsById:Map<String, Relationship>;
+	private var issuedRelationshipIds:Map<String, Bool>;
 
 	public var definitionEvaluationCount(default, null):Int;
+	public var implicitOutputEnabled(default, null):Bool;
 	public var recomputeAttemptCount(default, null):Int;
 	public var lastRecomputeSeconds(default, null):Float;
 	public var lastRecomputeFeatureCount(default, null):Int;
@@ -79,19 +92,24 @@ class Document {
 	private var activeTransaction:Null<Transaction>;
 	private final undoStack:Array<ChangeSet>;
 	private final redoStack:Array<ChangeSet>;
+	private final beforeHooks:Array<{id:Int, callback:Void->Void}>;
+	private final afterHooks:Array<{id:Int, callback:Void->Void}>;
+	private var nextHookId:Int;
 
 	public var lastRemapReport(default, null):TopologyRemapReport;
 
-	/** Optional layer-owned validation run before any staged feature evaluation. */
+	/** Legacy single callback, retained as a compatibility adapter. Prefer hook registration. */
 	public var beforeRecompute:Null<Void->Void>;
 
+	/** Legacy single callback, retained as a compatibility adapter. Prefer hook registration. */
 	public var afterRecompute:Null<Void->Void>;
 
 	/** Checked between feature evaluations and by cooperative sketch solving. */
 	public var evaluationCancellationCheck:Null<Void->Bool>;
 
-	public function new(?id:DocumentId) {
+	public function new(?id:DocumentId, implicitOutputEnabled:Bool = true) {
 		this.id = id == null ? new DocumentId() : id;
+		this.implicitOutputEnabled = implicitOutputEnabled;
 		token = nextToken;
 		nextToken++;
 		nextId = 1;
@@ -100,6 +118,9 @@ class Document {
 		definitionsById = new Map();
 		definitionCache = new Map();
 		issuedDefinitionIds = new Map();
+		relationships = [];
+		relationshipsById = new Map();
+		issuedRelationshipIds = new Map();
 		definitionEvaluationCount = 0;
 		recomputeAttemptCount = 0;
 		lastRecomputeSeconds = 0;
@@ -118,6 +139,9 @@ class Document {
 		activeTransaction = null;
 		undoStack = [];
 		redoStack = [];
+		beforeHooks = [];
+		afterHooks = [];
+		nextHookId = 1;
 		lastRemapReport = new TopologyRemapReport();
 		beforeRecompute = null;
 		afterRecompute = null;
@@ -281,6 +305,8 @@ class Document {
 
 		var name = definitionName == null ? instance.name + " definition" : definitionName;
 		var unique = installDefinition(new DefinitionId(), name, source.recipe, inputs, outputs, subgraph);
+		for (property in source.properties())
+			unique.restoreProperty(property.name, property);
 		var previousDefinition = instance.definitionId;
 		try {
 			restoreInstanceDefinition(instance, unique.id);
@@ -364,8 +390,7 @@ class Document {
 			return;
 		definition.restoreDefault(name, canonical, revision + 1);
 		try {
-			if (beforeRecompute != null)
-				beforeRecompute();
+			runBeforeRecomputeHooks();
 			refreshDefinition(definition);
 		} catch (e:Dynamic) {
 			definition.restoreDefault(name, before, revision);
@@ -386,8 +411,7 @@ class Document {
 		var before = instance.overrideValue(name);
 		instance.restoreOverride(name, canonical);
 		try {
-			if (beforeRecompute != null)
-				beforeRecompute();
+			runBeforeRecomputeHooks();
 			instance.restoreDirectShape(resolveInstanceShape(instance));
 		} catch (e:Dynamic) {
 			instance.restoreOverride(name, before);
@@ -404,8 +428,7 @@ class Document {
 			return;
 		instance.restoreOverride(name, null);
 		try {
-			if (beforeRecompute != null)
-				beforeRecompute();
+			runBeforeRecomputeHooks();
 			instance.restoreDirectShape(resolveInstanceShape(instance));
 		} catch (error:Dynamic) {
 			instance.restoreOverride(name, before);
@@ -427,6 +450,21 @@ class Document {
 			identity = new ElementId();
 		var result = installElement(name, output, identity);
 		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
+		return result;
+	}
+
+	/** Create an addressable, placeable object that does not publish feature geometry. */
+	public function createObject(name:String):Element {
+		var result = installObject(name, newElementId());
+		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
+		return result;
+	}
+
+	/** Codec path for a geometry-free persistent object. */
+	public function installObject(name:String, id:ElementId):Element {
+		ensureOpen();
+		var result = new Element(this, id, name, ElementKind.Object);
+		installRecord(result);
 		return result;
 	}
 
@@ -460,6 +498,155 @@ class Document {
 		installRecord(result);
 		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
 		return result;
+	}
+
+	/** Create a persistent typed edge between two elements owned by this document. */
+	public function createRelationship(typeName:String, source:ElementReference, target:ElementReference):Relationship {
+		var result = installRelationship(newRelationshipId(), typeName, source, target);
+		recordDocumentChange(new RelationshipCreateChange(this, result, relationships.length - 1));
+		return result;
+	}
+
+	/** Codec path for a persisted relationship. */
+	public function installRelationship(id:RelationshipId, typeName:String, source:ElementReference, target:ElementReference):Relationship {
+		ensureOpen();
+		if (id == null)
+			throw new ParametricError("relationship ID must not be null");
+		validateRelationshipEndpoint(source);
+		validateRelationshipEndpoint(target);
+		if (issuedRelationshipIds.exists(id.value))
+			throw new ParametricError("duplicate or previously issued relationship ID: " + id.value);
+		var result = new Relationship(this, id, typeName, source, target);
+		relationships.push(result);
+		relationshipsById.set(id.value, result);
+		issuedRelationshipIds.set(id.value, true);
+		return result;
+	}
+
+	private function newRelationshipId():RelationshipId {
+		var value = new RelationshipId();
+		while (issuedRelationshipIds.exists(value.value))
+			value = new RelationshipId();
+		return value;
+	}
+
+	public function relationship(id:RelationshipId):Relationship {
+		ensureOpen();
+		var result = relationshipsById.get(id.value);
+		if (result == null)
+			throw new ParametricError("unresolved relationship: " + id.value);
+		return result;
+	}
+
+	public function findRelationship(id:RelationshipId):Null<Relationship> {
+		ensureOpen();
+		return relationshipsById.get(id.value);
+	}
+
+	public function allRelationships():Array<Relationship> {
+		ensureOpen();
+		return relationships.copy();
+	}
+
+	public function relationshipCount():Int {
+		ensureOpen();
+		return relationships.length;
+	}
+
+	public function relationshipsForElement(id:ElementId):Array<Relationship> {
+		ensureOpen();
+		return [for (relationship in relationships)
+			if ((relationship.source.documentId.value == this.id.value && relationship.source.elementId.value == id.value)
+				|| (relationship.target.documentId.value == this.id.value && relationship.target.elementId.value == id.value)) relationship];
+	}
+
+	public function removeRelationship(id:RelationshipId):Void {
+		var target = relationship(id);
+		var index = relationships.indexOf(target);
+		restoreRelationshipRemoval(target);
+		recordDocumentChange(new RelationshipRemoveChange(this, target, index));
+	}
+
+	public function restoreRelationshipInsertion(relationship:Relationship, index:Int):Void {
+		if (relationship == null || relationship.document != this || relationshipsById.exists(relationship.id.value))
+			throw new ParametricError("cannot restore relationship");
+		validateRelationshipEndpoint(relationship.source);
+		validateRelationshipEndpoint(relationship.target);
+		var insertion = index < 0 ? 0 : (index > relationships.length ? relationships.length : index);
+		relationships.insert(insertion, relationship);
+		relationshipsById.set(relationship.id.value, relationship);
+		for (property in relationship.properties())
+			validatePropertyReferences(property);
+	}
+
+	public function restoreRelationshipRemoval(relationship:Relationship):Void {
+		validateOwnedRelationship(relationship);
+		relationships.remove(relationship);
+		relationshipsById.remove(relationship.id.value);
+	}
+
+	public function setRelationshipEndpoints(relationship:Relationship, source:ElementReference, target:ElementReference):Void {
+		validateOwnedRelationship(relationship);
+		validateRelationshipEndpoint(source);
+		validateRelationshipEndpoint(target);
+		var beforeSource = relationship.source;
+		var beforeTarget = relationship.target;
+		if (sameElementReference(beforeSource, source) && sameElementReference(beforeTarget, target))
+			return;
+		relationship.restoreEndpoints(source, target);
+		recordDocumentChange(new RelationshipEndpointsChange(this, relationship, beforeSource, beforeTarget, source, target));
+	}
+
+	public function restoreRelationshipEndpoints(relationship:Relationship, source:ElementReference, target:ElementReference):Void {
+		validateOwnedRelationship(relationship);
+		validateRelationshipEndpoint(source);
+		validateRelationshipEndpoint(target);
+		relationship.restoreEndpoints(source, target);
+	}
+
+	private function sameElementReference(first:ElementReference, second:ElementReference):Bool
+		return first != null && second != null && first.documentId.value == second.documentId.value && first.elementId.value == second.elementId.value;
+
+	private function validateOwnedRelationship(relationship:Relationship):Void {
+		if (relationship == null || relationship.document != this || relationshipsById.get(relationship.id.value) != relationship)
+			throw new ParametricError("relationship belongs to another document or has been removed");
+	}
+
+	private function validateRelationshipEndpoint(reference:ElementReference):Void {
+		if (reference == null)
+			throw new ParametricError("relationship endpoint must not be null");
+		if (reference.documentId.value == id.value && elementsById.get(reference.elementId.value) == null)
+			throw new ParametricError("relationship endpoint is unresolved: " + reference.elementId.value);
+	}
+
+	public function setRelationshipProperty(target:Relationship, property:TypedProperty):Void {
+		validateOwnedRelationship(target);
+		validateProperty(property);
+		validatePropertyReferences(property);
+		var before = target.property(property.name);
+		if (property.sameValue(before))
+			return;
+		target.restoreProperty(property.name, property);
+		recordDocumentChange(new RelationshipPropertyChange(this, target, property.name, before, property));
+	}
+
+	public function removeRelationshipProperty(target:Relationship, name:String):Void {
+		validateOwnedRelationship(target);
+		var before = target.property(name);
+		if (before == null)
+			return;
+		target.restoreProperty(name, null);
+		recordDocumentChange(new RelationshipPropertyChange(this, target, name, before, null));
+	}
+
+	public function restoreRelationshipProperty(target:Relationship, name:String, value:Null<TypedProperty>):Void {
+		validateOwnedRelationship(target);
+		if (value != null) {
+			if (value.name != name)
+				throw new ParametricError("property key and value name do not match");
+			validatePropertyReferences(value);
+		}
+		target.restoreProperty(name, value);
 	}
 
 	public function installLevel(name:String, id:ElementId, elevation:Float, offset:Float = 0, ?relativeTo:ElementReference):LevelElement {
@@ -567,7 +754,7 @@ class Document {
 	}
 
 	private function isPlaceable(element:Element):Bool
-		return element.kind == "geometry" || element.kind == "instance";
+		return element.kind == ElementKind.Geometry || element.kind == ElementKind.Instance || element.kind == ElementKind.Object;
 
 	private function validatePlacementParent(element:Element, parent:Null<ElementReference>):Void {
 		var cursor = parent;
@@ -592,6 +779,13 @@ class Document {
 
 	public function duplicateElement(source:Element, ?name:String):Element {
 		validateOwnedElement(source);
+		if (source.kind == ElementKind.Object) {
+			var result = createObject(name == null ? source.name + " copy" : name);
+			result.restorePlacement(source.localPlacement, null);
+			for (property in source.properties())
+				result.restoreProperty(property.name, property);
+			return result;
+		}
 		if (source.output == null)
 			throw new ParametricError("datum duplication requires its typed API");
 		return createElement(name == null ? source.name + " copy" : name, cast source.output);
@@ -689,10 +883,170 @@ class Document {
 
 	public function restoreElementRemoval(element:Element):Void {
 		validateOwnedElement(element);
+		validateNoElementPropertyReferences(element);
 		datumChanged(element);
 		element.clearPlacedShape();
 		elements.remove(element);
 		elementsById.remove(element.id.value);
+	}
+
+	public function setElementProperty(target:Element, property:TypedProperty):Void {
+		validateOwnedElement(target);
+		validateProperty(property);
+		validatePropertyReferences(property);
+		var before = target.property(property.name);
+		if (property.sameValue(before))
+			return;
+		target.restoreProperty(property.name, property);
+		recordDocumentChange(new ElementPropertyChange(this, target, property.name, before, property));
+	}
+
+	public function removeElementProperty(target:Element, name:String):Void {
+		validateOwnedElement(target);
+		var before = target.property(name);
+		if (before == null)
+			return;
+		target.restoreProperty(name, null);
+		recordDocumentChange(new ElementPropertyChange(this, target, name, before, null));
+	}
+
+	public function restoreElementProperty(target:Element, name:String, value:Null<TypedProperty>):Void {
+		validateOwnedElement(target);
+		if (value != null) {
+			if (value.name != name)
+				throw new ParametricError("property key and value name do not match");
+			validatePropertyReferences(value);
+		}
+		target.restoreProperty(name, value);
+	}
+
+	public function setDefinitionProperty(target:Definition, property:TypedProperty):Void {
+		validateOwnedDefinition(target);
+		validateProperty(property);
+		validatePropertyReferences(property);
+		var before = target.property(property.name);
+		if (property.sameValue(before))
+			return;
+		target.restoreProperty(property.name, property);
+		recordDocumentChange(new DefinitionPropertyChange(this, target, property.name, before, property));
+	}
+
+	public function removeDefinitionProperty(target:Definition, name:String):Void {
+		validateOwnedDefinition(target);
+		var before = target.property(name);
+		if (before == null)
+			return;
+		target.restoreProperty(name, null);
+		recordDocumentChange(new DefinitionPropertyChange(this, target, name, before, null));
+	}
+
+	public function restoreDefinitionProperty(target:Definition, name:String, value:Null<TypedProperty>):Void {
+		validateOwnedDefinition(target);
+		if (value != null) {
+			if (value.name != name)
+				throw new ParametricError("property key and value name do not match");
+			validatePropertyReferences(value);
+		}
+		target.restoreProperty(name, value);
+	}
+
+	private function validateProperty(property:TypedProperty):Void {
+		if (property == null)
+			throw new ParametricError("property must not be null");
+		if (property.name == null || StringTools.trim(property.name) == "")
+			throw new ParametricError("property name must not be empty");
+	}
+
+	private function validateOwnedDefinition(definition:Definition):Void {
+		if (definition == null || definition.document != this || definitionsById.get(definition.id.value) != definition)
+			throw new ParametricError("definition belongs to another document or has been removed");
+	}
+
+	private function validatePropertyReferences(property:TypedProperty):Void {
+		if (!Std.isOfType(property.value, PersistentReference))
+			return;
+		var reference:PersistentReference = cast property.value;
+		if (reference.documentId != id.value)
+			return;
+		switch reference.targetType {
+			case PersistentReference.ElementTarget:
+				if (elementsById.get(reference.targetId) == null)
+					throw new ParametricError("property references a missing element: " + reference.targetId);
+			case PersistentReference.DefinitionTarget:
+				if (definitionsById.get(reference.targetId) == null)
+					throw new ParametricError("property references a missing definition: " + reference.targetId);
+			case PersistentReference.FeatureTarget:
+				var featureId = Std.parseInt(reference.targetId);
+				if (featureId == null || byId.get(featureId) == null)
+					throw new ParametricError("property references a missing feature: " + reference.targetId);
+			default:
+				throw new ParametricError("unsupported property reference target: " + reference.targetType);
+		}
+	}
+
+	/** Codec verification after every referenced document record has been installed. */
+	public function validatePersistentReferences():Void {
+		for (element in elements)
+			for (property in element.properties()) {
+				validateProperty(property);
+				validatePropertyReferences(property);
+			}
+		for (definition in definitions)
+			for (property in definition.properties()) {
+				validateProperty(property);
+				validatePropertyReferences(property);
+			}
+		for (relationship in relationships) {
+			validateRelationshipEndpoint(relationship.source);
+			validateRelationshipEndpoint(relationship.target);
+			for (property in relationship.properties()) {
+				validateProperty(property);
+				validatePropertyReferences(property);
+			}
+		}
+	}
+
+	private function validateNoElementPropertyReferences(target:Element):Void {
+		for (element in elements) {
+			if (element == target)
+				continue;
+			if (element.placementParent != null && element.placementParent.documentId.value == id.value
+				&& element.placementParent.elementId.value == target.id.value)
+				throw new ParametricError("element is still referenced as a placement parent: " + target.id.value);
+			for (property in element.properties())
+				if (propertyReferencesElement(property, target.id.value))
+					throw new ParametricError("element is still referenced by property " + property.name + ": " + target.id.value);
+			if (element.kind == ElementKind.Level) {
+				var level:LevelElement = cast element;
+				if (level.relativeTo != null && level.relativeTo.documentId.value == id.value && level.relativeTo.elementId.value == target.id.value)
+					throw new ParametricError("element is still referenced by a level: " + target.id.value);
+			}
+		}
+		for (definition in definitions)
+			for (property in definition.properties())
+				if (propertyReferencesElement(property, target.id.value))
+					throw new ParametricError("element is still referenced by definition property " + property.name + ": " + target.id.value);
+		for (relationship in relationships) {
+			if (relationship.source.documentId.value == id.value && relationship.source.elementId.value == target.id.value)
+				throw new ParametricError("element is still the source of relationship " + relationship.id.value);
+			if (relationship.target.documentId.value == id.value && relationship.target.elementId.value == target.id.value)
+				throw new ParametricError("element is still the target of relationship " + relationship.id.value);
+			for (property in relationship.properties())
+				if (propertyReferencesElement(property, target.id.value))
+					throw new ParametricError("element is still referenced by relationship property " + property.name + ": " + target.id.value);
+		}
+		for (feature in features)
+			if (feature.active)
+				for (reference in feature.elementReferences())
+					if (reference.documentId.value == id.value && reference.elementId.value == target.id.value)
+						throw new ParametricError("element is still referenced by feature " + feature.id.toInt() + ": " + target.id.value);
+	}
+
+	private function propertyReferencesElement(property:TypedProperty, elementId:String):Bool {
+		if (!Std.isOfType(property.value, PersistentReference))
+			return false;
+		var reference:PersistentReference = cast property.value;
+		return reference.documentId == id.value && reference.targetType == PersistentReference.ElementTarget && reference.targetId == elementId;
 	}
 
 	private function validateOwnedElement(element:Element):Void {
@@ -852,6 +1206,14 @@ class Document {
 		selectedOutput = feature;
 	}
 
+	/** Control whether the last active feature is the implicit document result. */
+	public function setImplicitOutputEnabled(value:Bool):Void {
+		ensureOpen();
+		implicitOutputEnabled = value;
+		if (!value)
+			selectedOutput = null;
+	}
+
 	public function setOutputTracked(feature:Null<Feature>):Void {
 		if (activeTransaction == null)
 			throw new ParametricError("tracked output selection requires an active document transaction");
@@ -872,6 +1234,8 @@ class Document {
 		ensureOpen();
 		if (selectedOutput != null && selectedOutput.active)
 			return selectedOutput;
+		if (!implicitOutputEnabled)
+			return null;
 		for (index in 0...features.length) {
 			var feature = features[features.length - index - 1];
 			if (feature.active)
@@ -964,14 +1328,68 @@ class Document {
 		return byId.get(featureId);
 	}
 
+	/** Register a validation or observer that runs before staged recompute work. */
+	public function addBeforeRecomputeHook(callback:Void->Void):Int {
+		ensureOpen();
+		if (callback == null)
+			throw new ParametricError("before-recompute hook must not be null");
+		var hookId = nextHookId++;
+		beforeHooks.push({id: hookId, callback: callback});
+		return hookId;
+	}
+
+	/** Register an observer that runs after recompute publication succeeds. */
+	public function addAfterRecomputeHook(callback:Void->Void):Int {
+		ensureOpen();
+		if (callback == null)
+			throw new ParametricError("after-recompute hook must not be null");
+		var hookId = nextHookId++;
+		afterHooks.push({id: hookId, callback: callback});
+		return hookId;
+	}
+
+	public function removeBeforeRecomputeHook(hookId:Int):Bool
+		return removeHook(beforeHooks, hookId);
+
+	public function removeAfterRecomputeHook(hookId:Int):Bool
+		return removeHook(afterHooks, hookId);
+
+	private function removeHook(hooks:Array<{id:Int, callback:Void->Void}>, hookId:Int):Bool {
+		for (index in 0...hooks.length)
+			if (hooks[index].id == hookId) {
+				hooks.splice(index, 1);
+				return true;
+			}
+		return false;
+	}
+
+	private function runBeforeRecomputeHooks():Void {
+		var failure:Dynamic = null;
+		if (beforeRecompute != null)
+			try beforeRecompute() catch (error:Dynamic) failure = error;
+		for (hook in beforeHooks.copy())
+			try hook.callback() catch (error:Dynamic) if (failure == null) failure = error;
+		if (failure != null)
+			throw failure;
+	}
+
+	private function runAfterRecomputeHooks():Void {
+		var failure:Dynamic = null;
+		if (afterRecompute != null)
+			try afterRecompute() catch (error:Dynamic) failure = error;
+		for (hook in afterHooks.copy())
+			try hook.callback() catch (error:Dynamic) if (failure == null) failure = error;
+		if (failure != null)
+			throw failure;
+	}
+
 	public function recompute():Void {
 		ensureOpen();
 		var started = Sys.time();
 		var context = new EvaluationContext(this);
 		var order:Array<Feature>;
 		try {
-			if (beforeRecompute != null)
-				beforeRecompute();
+			runBeforeRecomputeHooks();
 			context.checkCancelled();
 			synchronizeExpressions();
 			order = topologicalOrder();
@@ -1097,8 +1515,7 @@ class Document {
 
 		// Publication succeeded. Observer failures are reported to the caller, but cannot
 		// roll back or dispose resources that are now owned by committed features.
-		if (afterRecompute != null)
-			afterRecompute();
+		runAfterRecomputeHooks();
 	}
 
 	public function isEvaluationCancelled():Bool
@@ -1216,6 +1633,11 @@ class Document {
 		definitions.resize(0);
 		for (element in elements)
 			element.clearPlacedShape();
+		relationships.resize(0);
+		relationshipsById = new Map<String, Relationship>();
+		issuedRelationshipIds = new Map<String, Bool>();
+		beforeHooks.resize(0);
+		afterHooks.resize(0);
 		for (shape in definitionCache)
 			shape.close();
 		elements.resize(0);
@@ -1223,6 +1645,8 @@ class Document {
 		issuedElementIds = new Map<String, Bool>();
 		undoStack.resize(0);
 		redoStack.resize(0);
+		beforeRecompute = null;
+		afterRecompute = null;
 		selectedOutput = null;
 		closed = true;
 	}

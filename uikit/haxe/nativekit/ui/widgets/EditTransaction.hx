@@ -22,6 +22,8 @@ class EditTransaction {
 	public final compositionAttributes:Null<Array<TextCompositionSpan>>;
 	/** History grouping policy for this transaction. */
 	public final historyKind:TextEditorHistoryKind;
+	/** Text removed by an applied transaction; null for an unannotated request. */
+	public final replacedText:Null<String>;
 
 	public function new(replacementStart:CodepointOffset, replacementEnd:CodepointOffset,
 			replacementText:Null<String>, selectionStart:CodepointOffset,
@@ -29,7 +31,8 @@ class EditTransaction {
 			?compositionStart:CodepointOffset = -1, ?compositionEnd:CodepointOffset = -1,
 			?selectionAffinity:Int = 0,
 			?compositionAttributes:Array<TextCompositionSpan> = null,
-			?historyKind:TextEditorHistoryKind = TextEditorHistoryKind.Generic) {
+			?historyKind:TextEditorHistoryKind = TextEditorHistoryKind.Generic,
+			?replacedText:Null<String> = null) {
 		this.replacementStart = replacementStart;
 		this.replacementEnd = replacementEnd;
 		this.replacementText = replacementText;
@@ -41,5 +44,6 @@ class EditTransaction {
 		this.selectionAffinity = selectionAffinity;
 		this.compositionAttributes = compositionAttributes;
 		this.historyKind = historyKind == null ? TextEditorHistoryKind.Generic : historyKind;
+		this.replacedText = replacedText;
 	}
 }

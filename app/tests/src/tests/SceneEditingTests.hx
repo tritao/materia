@@ -10,6 +10,7 @@ import nativekit.ui.core.ViewportCamera;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import app.SceneDocumentSession;
+import app.SceneCodec;
 import app.SensorConfiguration;
 import app.ApplicationSimulation;
 import app.PerspectiveCamera;
@@ -77,7 +78,7 @@ class SceneEditingTests {
     scene.dispose();
     camera.reset();
     var centerRay = camera.screenRay(400, 300, 800, 600);
-    var boxes:Array<app.SceneCodec.SceneObjectData> = [];
+    var boxes:Array<app.SceneObjectData> = [];
     for (entry in [{id:"near", distance:4.0}, {id:"far", distance:6.0}]) boxes.push({
       id:entry.id, label:entry.id, type:"rectangle",
       x:centerRay.originX + centerRay.directionX * entry.distance,
@@ -122,6 +123,22 @@ class SceneEditingTests {
       "cancel restores the perspective drag origin");
     check(scene.document.history.undoCount == 1, "cancel adds no undo entry");
     scene.dispose();
+  }
+
+  static function cadPlateMesh():Void {
+    var scene = new EditorScene();
+    check(scene.createMountingPlate(), "CAD mounting plate creation succeeds");
+    var plate:app.EditorSceneObject = scene.object(scene.selectedId);
+    check(plate != null && plate.kind == "cad-plate", "CAD plate retains its stable document kind");
+    near(plate.width, 0.08, "CadKit millimetres convert to scene metres");
+    check(scene.pick(0.0, 0.0) == "scene", "mesh picking passes through the CAD hole");
+    check(scene.pick(0.03, 0.0) == plate.id, "mesh picking selects CAD material around the hole");
+    var restored = new EditorScene(SceneCodec.decode(SceneCodec.encode(scene)));
+    var restoredPlate:app.EditorSceneObject = restored.object(plate.id);
+    check(restoredPlate != null && restoredPlate.kind == "cad-plate", "CAD object kind survives scene encoding");
+    check(restored.pick(0.0, 0.0) == "scene" && restored.pick(0.03, 0.0) == plate.id,
+      "reopened CAD geometry retains its through-hole mesh");
+    restored.dispose(); scene.dispose();
   }
 
   static function simulationViewportSemantics():Void {
@@ -753,6 +770,7 @@ class SceneEditingTests {
       renderingParity();
       perspectiveCameraMath();
       perspectiveDragging();
+      cadPlateMesh();
       simulationViewportSemantics();
       sensorConfiguration();
       sensorWorkflow();

@@ -13,8 +13,38 @@ import nativekit.ui.semantics.AccessibilityRole;
 import sys.FileSystem;
 import sys.io.File;
 
+private typedef ClickPhases = {
+  final lookupSeconds:Float;
+  final boundsSeconds:Float;
+  final pointerDownSeconds:Float;
+  final pointerUpSeconds:Float;
+  final eventPhases:PointerUpPhases;
+}
+
+private typedef PointerUpPhases = {
+  var hitTestSeconds:Float;
+  var pointerDispatchSeconds:Float;
+  var clickDispatchSeconds:Float;
+  var clickCaptureSeconds:Float;
+  var clickTargetSeconds:Float;
+  var clickBubbleSeconds:Float;
+  var hoverSeconds:Float;
+}
+
+private typedef InputProbe = {
+  final seconds:Float;
+  final phases:ClickPhases;
+  final allocatedBefore:Float;
+  final allocatedAfter:Float;
+  final collectionsBefore:Float;
+  final collectionsAfter:Float;
+  final markBefore:Float;
+  final markAfter:Float;
+}
+
 /** Replays real editor input through UiContext without a window or X server. */
 class HeadlessEditorProfile {
+  static var profileSpans = false;
   static function main():Int {
     try {
       if (Sys.args().length < 2 || Sys.args().length > 4)
@@ -38,6 +68,7 @@ class HeadlessEditorProfile {
   }
 
   static function run(output:String, cycles:Int, scenario:String, heapDumpPath:Null<String>):Void {
+    profileSpans = Sys.getEnv("HAXEON_PROFILE_SPANS") == "1";
     var fontPath = "../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf";
     if (!FileSystem.exists(fontPath)) throw "Benchmark font is unavailable: " + fontPath;
     var fonts = FontCollection.create();
@@ -59,16 +90,10 @@ class HeadlessEditorProfile {
               click(editor, from);
               submit(editor, frame, frames, "setup:" + from, cycle);
             }
-            var allocatedBefore = hl.Gc.totalAllocated();
-            var collectionsBefore = hl.Gc.collections();
-            var markBefore = hl.Gc.markMicros();
-            var inputStarted = Sys.time();
-            click(editor, to);
-            var inputSeconds = Sys.time() - inputStarted;
+            var input = measuredClick(editor, to, from + "->" + to);
             if (editor.workspace.activePanelId != to) throw "Tab did not activate: " + to;
             var name = from + "->" + to;
-            submit(editor, frame, frames, name, cycle, inputSeconds,
-              allocatedBefore, collectionsBefore, markBefore);
+            submit(editor, frame, frames, name, cycle, input);
             action(actions, name, cycle);
           }
           if ((cycle + 1) % 20 == 0) retained.push(retainedCounts(editor, cycle + 1));
@@ -127,27 +152,55 @@ class HeadlessEditorProfile {
   }
 
   static function submit(editor:ReferenceEditorApp, frame:LayoutFrame,
-      output:Array<String>, actionName:String, ?cycle:Int, ?inputSeconds:Float,
-      ?allocatedBefore:Float, ?collectionsBefore:Float, ?markBefore:Float):Void {
+      output:Array<String>, actionName:String, ?cycle:Int, ?input:InputProbe):Void {
     var subtrees:Array<Dynamic> = [];
     editor.ui.buildContext.buildProbe = function(name, preparationSeconds, buildSeconds, nodes) {
       subtrees.push({name: name, preparationSeconds: preparationSeconds,
         buildSeconds: buildSeconds, nodeCount: nodes});
     };
+    if (profileSpans && input != null) haxeon.ProfileSpan.begin("tab/" + actionName + "/frame");
     var started = Sys.time();
     editor.submit(frame);
     editor.ui.buildContext.buildProbe = null;
     var elapsed = Sys.time() - started;
+    if (profileSpans && input != null) haxeon.ProfileSpan.end("tab/" + actionName + "/frame");
     var metrics:UiFrameMetrics = cast editor.ui.frameMetrics;
     if (metrics == null) throw "UI frame metrics are unavailable";
-    var allocatedBytes = allocatedBefore == null ? null : hl.Gc.totalAllocated() - allocatedBefore;
-    var gcCollections = collectionsBefore == null ? null : hl.Gc.collections() - collectionsBefore;
-    var gcMarkMicros = markBefore == null ? null : hl.Gc.markMicros() - markBefore;
+    var allocatedBytes:Null<Float> = null;
+    var gcCollections:Null<Float> = null;
+    var gcMarkMicros:Null<Float> = null;
+    var inputAllocatedBytes:Null<Float> = null;
+    var inputGcCollections:Null<Float> = null;
+    var inputGcMarkMicros:Null<Float> = null;
+    var submitAllocatedBytes:Null<Float> = null;
+    var submitGcCollections:Null<Float> = null;
+    var submitGcMarkMicros:Null<Float> = null;
+    if (input != null) {
+      var allocatedAfter = hl.Gc.totalAllocated();
+      var collectionsAfter = hl.Gc.collections();
+      var markAfter = hl.Gc.markMicros();
+      allocatedBytes = allocatedAfter - input.allocatedBefore;
+      gcCollections = collectionsAfter - input.collectionsBefore;
+      gcMarkMicros = markAfter - input.markBefore;
+      inputAllocatedBytes = input.allocatedAfter - input.allocatedBefore;
+      inputGcCollections = input.collectionsAfter - input.collectionsBefore;
+      inputGcMarkMicros = input.markAfter - input.markBefore;
+      submitAllocatedBytes = allocatedAfter - input.allocatedAfter;
+      submitGcCollections = collectionsAfter - input.collectionsAfter;
+      submitGcMarkMicros = markAfter - input.markAfter;
+    }
     output.push(Json.stringify({
       frame: metrics.frameNumber, action: actionName, cycle: cycle,
-      inputSeconds: inputSeconds,
+      inputSeconds: input == null ? null : input.seconds,
+      inputPhases: input == null ? null : input.phases,
       allocatedBytes: allocatedBytes, gcCollections: gcCollections,
       gcMarkMicros: gcMarkMicros,
+      inputAllocatedBytes: inputAllocatedBytes,
+      inputGcCollections: inputGcCollections,
+      inputGcMarkMicros: inputGcMarkMicros,
+      submitAllocatedBytes: submitAllocatedBytes,
+      submitGcCollections: submitGcCollections,
+      submitGcMarkMicros: submitGcMarkMicros,
       startedAtSeconds: started,
       frameSeconds: elapsed, submitSeconds: metrics.submitSeconds,
       viewSeconds: metrics.viewSeconds,
@@ -163,19 +216,60 @@ class HeadlessEditorProfile {
     }));
   }
 
-  static function click(editor:ReferenceEditorApp, key:String):Void {
+  static function measuredClick(editor:ReferenceEditorApp, key:String, actionName:String):InputProbe {
+    var allocatedBefore = hl.Gc.totalAllocated();
+    var collectionsBefore = hl.Gc.collections();
+    var markBefore = hl.Gc.markMicros();
+    if (profileSpans) haxeon.ProfileSpan.begin("tab/" + actionName + "/input");
+    var started = Sys.time();
+    var phases = click(editor, key);
+    var seconds = Sys.time() - started;
+    if (profileSpans) haxeon.ProfileSpan.end("tab/" + actionName + "/input");
+    return {seconds: seconds, phases: phases,
+      allocatedBefore: allocatedBefore, allocatedAfter: hl.Gc.totalAllocated(),
+      collectionsBefore: collectionsBefore, collectionsAfter: hl.Gc.collections(),
+      markBefore: markBefore, markAfter: hl.Gc.markMicros()};
+  }
+
+  static function click(editor:ReferenceEditorApp, key:String):ClickPhases {
+    var lookupStarted = Sys.time();
     var root = editor.ui.root;
     if (root == null) throw "UI tree is not ready";
     var node = findByStyleKey(root, key, key.indexOf("editor:") != 0);
     if (node == null || node.resolved == null)
       throw "Benchmark target is unavailable: " + key;
+    var lookupDone = Sys.time();
     var bounds = node.resolved.clippedViewportBounds();
     if (bounds.width <= 0 || bounds.height <= 0)
       throw "Benchmark target is outside the viewport: " + key;
     var x = bounds.x + bounds.width / 2;
     var y = bounds.y + bounds.height / 2;
+    var boundsDone = Sys.time();
     editor.ui.pointerDown(x, y, 0);
+    var downDone = Sys.time();
+    var eventPhases:PointerUpPhases = {hitTestSeconds: 0.0,
+      pointerDispatchSeconds: 0.0, clickDispatchSeconds: 0.0,
+      clickCaptureSeconds: 0.0, clickTargetSeconds: 0.0,
+      clickBubbleSeconds: 0.0,
+      hoverSeconds: 0.0};
+    editor.ui.events.pointerUpProbe = function(stage, seconds) {
+      switch (stage) {
+        case "hitTestSeconds": eventPhases.hitTestSeconds = seconds;
+        case "pointerDispatchSeconds": eventPhases.pointerDispatchSeconds = seconds;
+        case "clickDispatchSeconds": eventPhases.clickDispatchSeconds = seconds;
+        case "clickCaptureSeconds": eventPhases.clickCaptureSeconds = seconds;
+        case "clickTargetSeconds": eventPhases.clickTargetSeconds = seconds;
+        case "clickBubbleSeconds": eventPhases.clickBubbleSeconds = seconds;
+        case "hoverSeconds": eventPhases.hoverSeconds = seconds;
+      }
+    };
     editor.ui.pointerUp(x, y, 0);
+    editor.ui.events.pointerUpProbe = null;
+    var upDone = Sys.time();
+    return {lookupSeconds: lookupDone - lookupStarted,
+      boundsSeconds: boundsDone - lookupDone,
+      pointerDownSeconds: downDone - boundsDone,
+      pointerUpSeconds: upDone - downDone, eventPhases: eventPhases};
   }
 
   static function findByStyleKey(node:RenderNode, key:String, tab:Bool):Null<RenderNode> {

@@ -134,9 +134,12 @@ import nativekit.ui.widgets.SizedBox;
 import nativekit.ui.widgets.Text;
 import nativekit.ui.core.TextStyleOverride;
 import nativekit.ui.widgets.TextEditorState;
+import nativekit.ui.widgets.TextEditorHistoryKind;
 import nativekit.ui.widgets.TextEditorDiagnostics;
 import nativekit.ui.widgets.TextArea;
 import nativekit.ui.widgets.TextField;
+import nativekit.ui.widgets.EditTransaction;
+import nativekit.editorkit.TextDocument;
 import nativekit.ui.widgets.Spacer;
 import nativekit.ui.widgets.Slider;
 import nativekit.ui.widgets.Stack;
@@ -258,6 +261,26 @@ class FrameworkSmoke {
 		fonts.add(fontPath);
 		if (!hostRuntimeLifecycleValid(fonts))
 			return 272;
+		var rtlLayout = TextLayout.create(fonts, "א", 80.0, null,
+			new ParagraphStyle(TextWrap.Word, TextAlignment.Start, null, TextDirection.Rtl));
+		var rtlGeometry = rtlLayout.selectionRangeRects(new TextPosition(0, 0), new TextPosition(1, 0));
+		if (rtlGeometry.length != 1 || rtlGeometry[0].visualLeftIsStart) {
+			rtlLayout.dispose();
+			return 276;
+		}
+		rtlLayout.dispose();
+		var longText = new StringBuf();
+		for (_ in 0...1000)
+			longText.add("x");
+		var clippingEditor = new TextEditorState(fonts, longText.toString());
+		clippingEditor.updateLayout(100.0);
+		var visibleGeometry = clippingEditor.layout.selectionRangeRects(
+			new TextPosition(0, 0), new TextPosition(1000, 0), 0.0, 24.0);
+		if (visibleGeometry.length == 0 || visibleGeometry.length >= 1000) {
+			clippingEditor.dispose();
+			return 277;
+		}
+		clippingEditor.dispose();
 		var session = LayoutSession.create();
 		var context = new UiContext(session, fonts);
 		if (context.buildContext.fonts != fonts)
@@ -283,10 +306,26 @@ class FrameworkSmoke {
 			return 37;
 		editor.insert("hi");
 		var composition = new NativeKitTextEdit(TextEditAction.Compose, "á", 2, 2,
-			4, 4, 2, 4);
+			4, 4, 2, 4, 1, 6);
 		if (!editor.applyTextEdit(composition) || editor.text != "hiá" ||
-			editor.selectionEnd != 4 || editor.compositionStart != 2 || editor.compositionEnd != 4)
+			editor.selectionEnd != 4 || editor.selectionFocusAffinity != 1 ||
+			editor.compositionStart != 2 || editor.compositionEnd != 4 ||
+			editor.lastEditTransaction == null ||
+			editor.lastEditTransaction.historyKind != TextEditorHistoryKind.Composition)
 			return 33;
+		var compositionGeometry = editor.compositionRangeRects();
+		if (compositionGeometry.length != 1 || compositionGeometry[0].start != 2 ||
+			compositionGeometry[0].end != 4)
+			return 275;
+		var nativeDeleteEditor = new TextEditorState(fonts, "ab");
+		var nativeDelete = new NativeKitTextEdit(TextEditAction.Delete, null, 1, 2,
+			1, 1, -1, -1, 1, 2);
+		if (!nativeDeleteEditor.applyTextEdit(nativeDelete) || nativeDeleteEditor.text != "a" ||
+			nativeDeleteEditor.selectionFocusAffinity != 1 ||
+			nativeDeleteEditor.lastEditTransaction == null ||
+			nativeDeleteEditor.lastEditTransaction.historyKind != TextEditorHistoryKind.DeleteBackward)
+			return 274;
+		nativeDeleteEditor.dispose();
 		editor.dispose();
 		var blinkEditor = new TextEditorState(fonts, "caret");
 		blinkEditor.focused = true;
@@ -354,7 +393,61 @@ class FrameworkSmoke {
 			fieldDiagnostics.selectionStart != 5 || fieldDiagnostics.selectionEnd != 5 ||
 			fieldDiagnostics.caretOffset != 5 || fieldDiagnostics.caretRect == null)
 			return 209;
+		var sharedDocument = new TextDocument("start");
+		var sharedEdit:Null<EditTransaction> = null;
+		var sharedField = TextField.withDocument("shared-document-field", sharedDocument,
+			function(edit) sharedEdit = edit);
+		var sharedRoot = context.submit(sharedField, new LayoutFrame(256.0, 192.0));
+		var sharedEditorState:State<TextEditorState> =
+			context.buildContext.existingState(sharedRoot.id);
+		var sharedEditor:TextEditorState = cast sharedEditorState.value;
+		if (sharedEditor.text != "start" || sharedEditor.layout.text != "start")
+			return 298;
+		if (!context.focusWidget(sharedRoot.id))
+			return 292;
+		context.key(UiEventKind.KeyDown, UiKey.A, UiModifier.Control);
+		context.text(UiEventKind.TextInput, "á🙂");
+		if (sharedDocument.text != "á🙂" || sharedField.value != "" || sharedEdit == null ||
+			sharedEdit.replacementStart != 0 || sharedEdit.replacementEnd != 5 ||
+			sharedEdit.replacementText != "á🙂" || sharedEdit.replacedText != "start" ||
+			sharedEdit.selectionEnd != 3)
+			return 293;
+		sharedRoot = context.submit(sharedField, new LayoutFrame(256.0, 192.0));
+		var sharedSemantics:Semantics = cast sharedRoot.semantics;
+		if (sharedSemantics == null || sharedSemantics.value != "á🙂" ||
+			sharedSemantics.documentLength != 3)
+			return 294;
+		context.text(UiEventKind.TextEdit, null,
+			new NativeKitTextEdit(TextEditAction.Compose, "x", 2, 2, 3, 3, 2, 3));
+		if (sharedDocument.text != "áx🙂" || sharedEdit == null ||
+			sharedEdit.replacementStart != 2 || sharedEdit.replacementEnd != 2 ||
+			sharedEdit.replacementText != "x" || sharedEdit.replacedText != "" ||
+			!sharedEdit.hasComposition || sharedEdit.compositionStart != 2 ||
+			sharedEdit.compositionEnd != 3)
+			return 214;
+		sharedRoot = context.submit(sharedField, new LayoutFrame(256.0, 192.0));
+		if (sharedEditor.layout.text != sharedDocument.text ||
+			sharedEditor.compositionStart != 2 || sharedEditor.compositionEnd != 3)
+			return 215;
+		context.text(UiEventKind.TextEdit, null,
+			new NativeKitTextEdit(TextEditAction.Commit, "x", 2, 3, 3, 3, -1, -1));
+		if (sharedDocument.text != "áx🙂" || sharedEditor.compositionStart != -1)
+			return 216;
+		sharedDocument.replace(0, sharedDocument.codepointCount, "external update");
+		context.submit(sharedField, new LayoutFrame(256.0, 192.0));
+		if (sharedEditor.text != "external update" || sharedEditor.selectionEnd >
+			sharedDocument.codepointCount)
+			return 295;
+		var sharedArea = TextArea.withDocument("shared-document-area",
+			new TextDocument("multiline"));
+		if (!sharedArea.multiline)
+			return 296;
 		fieldRoot = context.submit(field, new LayoutFrame(256.0, 192.0));
+		if (!context.focusWidget(fieldRoot.id))
+			return 297;
+		fieldRoot = context.submit(field, new LayoutFrame(256.0, 192.0));
+		fieldState = context.buildContext.existingState(fieldRoot.id);
+		fieldEditor = cast fieldState.value;
 		if (fieldRoot.children[0].children.length != 2 ||
 			fieldRoot.children[0].children[1].layout.visualKind != LayoutVisualKind.Custom ||
 			fieldRoot.children[0].children[1].layout.style.zIndex != 2)

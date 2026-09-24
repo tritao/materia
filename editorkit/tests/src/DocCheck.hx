@@ -40,6 +40,20 @@ class DocCheck {
    expected=next;
    validate(doc,expected,step);
   }
-  Sys.println("PASS Unicode document coordinates and 80 edits");
+  var longParagraph=new StringBuf();
+  for (_ in 0...1800) longParagraph.add("Cafe\u0301 🧑‍💻 漢字 שלום ");
+  expected=longParagraph.toString();
+  doc=new TextDocument(expected);
+  validate(doc,expected,100);
+  for (step in 1...41) {
+   var map=new TextOffsetMap(expected);
+   var start=(step*2053)%doc.codepointCount;
+   var end=Std.int(Math.min(doc.codepointCount,start+step%4));
+   var insert=switch(step%4) {case 0:"\n";case 1:"🧑‍💻";case 2:"e\u0301";case _:"漢🙂";};
+   expected=map.replaceCodepoints(start,end,insert);
+   doc.replace(start,end,insert);
+   validate(doc,expected,100+step);
+  }
+  Sys.println("PASS Unicode document coordinates, 120 edits, and long-paragraph segment seams");
  }
 }

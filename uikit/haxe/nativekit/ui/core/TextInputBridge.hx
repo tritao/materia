@@ -70,7 +70,8 @@ class TextInputBridge {
 	/** Publishes the active document, selection, composition and screen caret. */
 	public function update(window:TextInputWindow, documentLength:Int, selectionStart:Int,
 			selectionEnd:Int, compositionStart:Int, compositionEnd:Int,
-			inputType:Int, flags:Int, cursor:Rect):Void {
+			inputType:Int, flags:Int, cursor:Rect,
+			selectionRects:Array<TextRangeRect>, compositionRects:Array<TextRangeRect>):Void {
 		ensureLive();
 		if (surface == null || surface.isDisposed() || !requestedActive || cursor == null ||
 			(platformChecked && !platformSupported))
@@ -79,7 +80,12 @@ class TextInputBridge {
 			documentLength, selectionStart,
 			selectionEnd, compositionStart, compositionEnd, cast inputType, cast flags,
 			null, cursor.x, cursor.y, cursor.width, cursor.height);
-		checkPlatformResult(result, "text-input update");
+		if (!checkPlatformResult(result, "text-input update"))
+			return;
+		result = NativeKitTextInput.updateGeometryResult(surface, selectionStart, selectionEnd,
+			compositionStart, compositionEnd, encodeRangeRects(selectionRects),
+			encodeRangeRects(compositionRects));
+		checkPlatformResult(result, "text-input geometry update");
 	}
 
 	public function dispose():Void {
@@ -126,4 +132,32 @@ class TextInputBridge {
 		if (disposed)
 			throw "Text input bridge has been disposed";
 	}
+
+	static function encodeRangeRects(rects:Null<Array<TextRangeRect>>):haxe.io.Bytes {
+		if (rects == null || rects.length == 0)
+			return haxe.io.Bytes.alloc(0);
+		if (rects.length > Std.int(0x7fffffff / 32))
+			throw "Text input geometry contains too many rectangles";
+		var bytes = haxe.io.Bytes.alloc(rects.length * 32);
+		for (index in 0...rects.length) {
+			var rect = rects[index];
+			if (rect == null || rect.start < 0 || rect.end < rect.start || !finite(rect.x) ||
+				!finite(rect.y) || !finite(rect.width) || !finite(rect.height) ||
+				rect.width < 0.0 || rect.height < 0.0)
+				throw "Text input range geometry contains an invalid rectangle";
+			var offset = index * 32;
+			bytes.setInt32(offset, 32);
+			bytes.setFloat(offset + 4, rect.x);
+			bytes.setFloat(offset + 8, rect.y);
+			bytes.setFloat(offset + 12, rect.width);
+			bytes.setFloat(offset + 16, rect.height);
+			bytes.setInt32(offset + 20, rect.start);
+			bytes.setInt32(offset + 24, rect.end);
+			bytes.setInt32(offset + 28, rect.visualLeftIsStart ? 1 : 0);
+		}
+		return bytes;
+	}
+
+	static inline function finite(value:Float):Bool
+		return value == value && value - value == 0.0;
 }

@@ -460,6 +460,9 @@ public:
     std::span<const LightResource> lights() const noexcept;
     std::uint64_t geometry_resources_revision() const noexcept;
     std::uint64_t material_resources_revision() const noexcept;
+    /** Returns false for future or unretained revisions.
+     * Callers should rebuild from the snapshot in that case.
+     */
     bool resource_changes_since(std::uint64_t geometry_revision,
                                 std::uint64_t material_revision,
                                 ResourceChanges &changes) const;

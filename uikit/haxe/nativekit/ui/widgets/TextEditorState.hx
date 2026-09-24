@@ -18,7 +18,7 @@ import nativekit.editorkit.TextOffsetMap;
 class TextEditorState {
 	static inline var caretBlinkHalfPeriod:Float = 0.5;
 
-	public var text(default, null):String;
+	public var text(get, never):String;
 	public var selectionStart(default, null):Int;
 	public var selectionEnd(default, null):Int;
 	public var compositionStart(default, null):Int;
@@ -29,6 +29,7 @@ class TextEditorState {
 	public var selectionFocusLayoutOffset(default, null):Int;
 	public var selectionAnchorAffinity(default, null):Int;
 	public var selectionFocusAffinity(default, null):Int;
+	public var lastEditTransaction(default, null):Null<EditTransaction>;
 	/** Vertical scroll offset in the editor's content coordinate space. */
 	public var scrollOffsetY(default, null):Float;
 	public var focused:Bool;
@@ -38,11 +39,11 @@ class TextEditorState {
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
 	/** Cached conversions between document code points, UTF-8 bytes and UTF-16 units. */
-	final offsets:TextDocument;
+	var offsets:TextDocument;
 	final renderMeasurement:LayoutMeasuredContent;
 	var renderColor:Color;
 	var lastLayoutWidth:Float;
-	var lastLayoutText:String;
+	var lastLayoutRevision:Int;
 	var lastPointerClickTime:Float;
 	var lastPointerClickX:Float;
 	var lastPointerClickY:Float;
@@ -58,11 +59,11 @@ class TextEditorState {
 	var disposed:Bool;
 
 	public function new(fonts:FontCollection, text:String, ?textStyle:TextStyle,
-			?paragraphStyle:ParagraphStyle) {
+			?paragraphStyle:ParagraphStyle, ?document:TextDocument) {
 		if (fonts == null || fonts.isDisposed())
 			throw "Text editor requires a live font collection";
-		this.text = text == null ? "" : text;
-		offsets = new TextDocument(this.text);
+		var initialText = text == null ? "" : text;
+		offsets = document == null ? new TextDocument(initialText) : document;
 		this.textStyle = copyTextStyle(textStyle == null ? new TextStyle() : textStyle);
 		this.paragraphStyle = copyParagraphStyle(paragraphStyle == null ? new ParagraphStyle() : paragraphStyle);
 		var end = offsets.codepointCount;
@@ -74,12 +75,13 @@ class TextEditorState {
 		selectionFocusLayoutOffset = end;
 		selectionAnchorAffinity = 0;
 		selectionFocusAffinity = 0;
+		lastEditTransaction = null;
 		scrollOffsetY = 0.0;
 		compositionStart = -1;
 		compositionEnd = -1;
 		focused = false;
 		draggingSelection = false;
-		layout = new TextEditorLayout(fonts, layoutText(), 1.0, this.textStyle,
+		layout = new TextEditorLayout(fonts, initialText, 1.0, this.textStyle,
 			this.paragraphStyle, offsets);
 		renderColor = Color.rgba(1.0, 1.0, 1.0, 1.0);
 		renderMeasurement = new LayoutMeasuredContent(function(constraints:LayoutMeasureConstraints) {
@@ -94,7 +96,7 @@ class TextEditorState {
 				scrollOffsetY + visible.y + visible.height);
 		});
 		lastLayoutWidth = 1.0;
-		lastLayoutText = layoutText();
+		lastLayoutRevision = offsets.revision;
 		lastPointerClickTime = -1.0;
 		lastPointerClickX = 0.0;
 		lastPointerClickY = 0.0;
@@ -113,10 +115,9 @@ class TextEditorState {
 	public function syncExternal(value:String):Bool {
 		ensureLive();
 		var next = value == null ? "" : value;
-		if (next == text)
+		if (next == offsets.text)
 			return false;
 		cancelPointerClick();
-		text = next;
 		offsets.replace(0, offsets.codepointCount, next);
 		var caret = offsets.codepointCount;
 		selectionStart = caret;
@@ -129,21 +130,45 @@ class TextEditorState {
 		selectionFocusAffinity = 0;
 		resetVerticalNavigation();
 		clearComposition();
-		layout.setText(layoutText(), offsets);
+		layout.updateDocument(offsets, Math.max(1.0, lastLayoutWidth), textStyle, paragraphStyle);
 		renderMeasurement.invalidate();
-		lastLayoutText = layoutText();
+		lastLayoutRevision = offsets.revision;
+		return true;
+	}
+
+	/** Uses a caller-owned document as the source of truth for this editor. */
+	public function syncDocument(document:TextDocument):Bool {
+		ensureLive();
+		if (document == null)
+			throw "Text editor document cannot be null";
+		if (offsets == document && offsets.revision == lastLayoutRevision)
+			return false;
+		cancelPointerClick();
+		if (offsets != document) {
+			offsets = document;
+			var caret = offsets.codepointCount;
+			setSelection(caret, caret);
+			clearComposition();
+		} else {
+			setSelection(clamp(selectionStart, 0, offsets.codepointCount),
+				clamp(selectionEnd, 0, offsets.codepointCount));
+			clearComposition();
+		}
+		layout.updateDocument(offsets, Math.max(1.0, lastLayoutWidth), textStyle, paragraphStyle);
+		renderMeasurement.invalidate();
+		lastLayoutRevision = offsets.revision;
+		clampScrollOffset();
 		return true;
 	}
 
 	public function updateLayout(width:Float):Void {
 		ensureLive();
 		var nextWidth = Math.max(1.0, width);
-		var value = layoutText();
-		if (nextWidth != lastLayoutWidth || value != lastLayoutText) {
-			layout.update(value, nextWidth, textStyle, paragraphStyle, offsets);
+		if (nextWidth != lastLayoutWidth || offsets.revision != lastLayoutRevision) {
+			layout.updateDocument(offsets, nextWidth, textStyle, paragraphStyle);
 			renderMeasurement.invalidate();
 			lastLayoutWidth = nextWidth;
-			lastLayoutText = value;
+			lastLayoutRevision = offsets.revision;
 		}
 		clampScrollOffset();
 	}
@@ -169,9 +194,9 @@ class TextEditorState {
 		paragraphStyle.alignment = nextParagraphStyle.alignment;
 		paragraphStyle.lineHeight = nextParagraphStyle.lineHeight;
 		paragraphStyle.direction = nextParagraphStyle.direction;
-		layout.update(layoutText(), Math.max(1.0, lastLayoutWidth), textStyle, paragraphStyle, offsets);
+		layout.updateDocument(offsets, Math.max(1.0, lastLayoutWidth), textStyle, paragraphStyle);
 		renderMeasurement.invalidate();
-		lastLayoutText = layoutText();
+		lastLayoutRevision = offsets.revision;
 		clampScrollOffset();
 		return true;
 	}
@@ -202,6 +227,7 @@ class TextEditorState {
 	public function applyTransaction(transaction:EditTransaction):Bool {
 		ensureLive();
 		if (transaction == null) return false;
+		lastEditTransaction = null;
 		var count = offsets.codepointCount;
 		var first = clamp(transaction.replacementStart, 0, count);
 		var last = clamp(transaction.replacementEnd, 0, count);
@@ -211,29 +237,39 @@ class TextEditorState {
 			last = swap;
 		}
 		var replacement = transaction.replacementText == null ? "" : transaction.replacementText;
-		var textChanged = offsets.sliceCodepoints(first, last) != replacement;
+		var replacedText = offsets.sliceCodepoints(first, last);
+		var textChanged = replacedText != replacement;
 		var previousStart = selectionStart;
 		var previousEnd = selectionEnd;
 		var previousCompositionStart = compositionStart;
 		var previousCompositionEnd = compositionEnd;
+		var previousAnchorAffinity = selectionAnchorAffinity;
+		var previousFocusAffinity = selectionFocusAffinity;
 		if (textChanged) {
 			var oldDocumentLength = offsets.codepointCount;
 			cancelPointerClick();
 			offsets.replace(first, last, replacement);
-			text = offsets.text;
 			var newEnd = first + TextOffsetMap.countCodepoints(replacement);
-			layout.setTextAfterEdit(layoutText(), offsets, first, last, first, newEnd,
+			layout.setTextAfterEdit(offsets, first, last, first, newEnd,
 				oldDocumentLength);
 			renderMeasurement.invalidate();
-			lastLayoutText = layoutText();
+			lastLayoutRevision = offsets.revision;
 		}
-		setSelection(transaction.selectionStart, transaction.selectionEnd);
+		setSelection(transaction.selectionStart, transaction.selectionEnd,
+			transaction.selectionAffinity);
 		if (transaction.hasComposition && transaction.compositionStart >= 0 &&
 			transaction.compositionEnd >= transaction.compositionStart)
 			setComposition(transaction.compositionStart, transaction.compositionEnd);
 		else
 			clearComposition();
+		if (textChanged)
+			lastEditTransaction = new EditTransaction(first, last, replacement,
+				selectionStart, selectionEnd, compositionStart >= 0, compositionStart,
+				compositionEnd, selectionFocusAffinity, transaction.compositionAttributes,
+				transaction.historyKind, replacedText);
 		return textChanged || previousStart != selectionStart || previousEnd != selectionEnd ||
+			previousAnchorAffinity != selectionAnchorAffinity ||
+			previousFocusAffinity != selectionFocusAffinity ||
 			previousCompositionStart != compositionStart || previousCompositionEnd != compositionEnd;
 	}
 
@@ -258,6 +294,11 @@ class TextEditorState {
 		return offsets.codepointCount;
 	}
 
+	public function documentRevision():Int {
+		ensureLive();
+		return offsets.revision;
+	}
+
 	/** Returns surrounding text while keeping selection and composition in the window. */
 	public function surroundingText(maxBefore:Int, maxAfter:Int):TextInputWindow {
 		ensureLive();
@@ -277,32 +318,42 @@ class TextEditorState {
 		ensureLive();
 		if (edit == null)
 			return false;
+		var historyKind = textEditHistoryKind(edit.historyKind);
+		if (historyKind == TextEditorHistoryKind.Generic &&
+			(edit.action == TextEditAction.Compose ||
+				(edit.action == TextEditAction.Commit && compositionStart >= 0)))
+			historyKind = TextEditorHistoryKind.Composition;
 		var previousStart = selectionStart;
 		var previousEnd = selectionEnd;
 		var previousCompositionStart = compositionStart;
 		var previousCompositionEnd = compositionEnd;
+		var previousAnchorAffinity = selectionAnchorAffinity;
+		var previousFocusAffinity = selectionFocusAffinity;
 		switch (edit.action) {
 			case TextEditAction.Compose | TextEditAction.Commit | TextEditAction.Delete:
 				return applyTransaction(new EditTransaction(edit.replaceStart, edit.replaceEnd,
 					edit.action == TextEditAction.Delete ? "" : edit.text,
 					edit.selectionStart, edit.selectionEnd, edit.action == TextEditAction.Compose,
-					edit.compositionStart, edit.compositionEnd));
+					edit.compositionStart, edit.compositionEnd, edit.selectionAffinity,
+					null, historyKind));
 			case TextEditAction.SetSelection:
-				setSelection(edit.selectionStart, edit.selectionEnd);
+				setSelection(edit.selectionStart, edit.selectionEnd, edit.selectionAffinity);
 				setComposition(edit.compositionStart, edit.compositionEnd);
 			case TextEditAction.SetComposition:
 				setComposition(edit.compositionStart, edit.compositionEnd);
 			case TextEditAction.FinishComposition:
 				clearComposition();
-				setSelection(edit.selectionStart, edit.selectionEnd);
+				setSelection(edit.selectionStart, edit.selectionEnd, edit.selectionAffinity);
 			case _:
 				return false;
 		}
 		return previousStart != selectionStart || previousEnd != selectionEnd ||
+			previousAnchorAffinity != selectionAnchorAffinity ||
+			previousFocusAffinity != selectionFocusAffinity ||
 			previousCompositionStart != compositionStart || previousCompositionEnd != compositionEnd;
 	}
 
-	public function setSelection(start:Int, end:Int):Bool {
+	public function setSelection(start:Int, end:Int, ?focusAffinity:Int = 0):Bool {
 		ensureLive();
 		var count = offsets.codepointCount;
 		var first = clamp(start, 0, count);
@@ -315,17 +366,30 @@ class TextEditorState {
 		var changed = first != selectionStart || last != selectionEnd ||
 			selectionAnchor != first || selectionFocus != last ||
 			selectionAnchorLayoutOffset != first || selectionFocusLayoutOffset != last ||
-			selectionAnchorAffinity != 0 || selectionFocusAffinity != 0;
+			selectionAnchorAffinity != (first == last ? focusAffinity : 0) ||
+			selectionFocusAffinity != focusAffinity;
 		selectionStart = first;
 		selectionEnd = last;
 		selectionAnchor = first;
 		selectionFocus = last;
 		selectionAnchorLayoutOffset = first;
 		selectionFocusLayoutOffset = last;
-		selectionAnchorAffinity = 0;
-		selectionFocusAffinity = 0;
+		selectionAnchorAffinity = first == last ? focusAffinity : 0;
+		selectionFocusAffinity = focusAffinity;
 		resetVerticalNavigation();
 		return changed;
+	}
+
+	static function textEditHistoryKind(value:Int):TextEditorHistoryKind {
+		return switch (value) {
+			case 1: TextEditorHistoryKind.Typing;
+			case 2: TextEditorHistoryKind.DeleteBackward;
+			case 3: TextEditorHistoryKind.DeleteForward;
+			case 4: TextEditorHistoryKind.Paste;
+			case 5: TextEditorHistoryKind.Autocorrect;
+			case 6: TextEditorHistoryKind.Composition;
+			case _: TextEditorHistoryKind.Generic;
+		};
 	}
 
 	public function selectAll():Bool {
@@ -620,6 +684,16 @@ class TextEditorState {
 			new TextPosition(compositionEnd, 0));
 	}
 
+	/** Returns active composition rectangles paired with absolute document ranges. */
+	public function compositionRangeRects(minY:Float = -1.0e30,
+			maxY:Float = 1.0e30):Array<TextRangeRect> {
+		ensureLive();
+		if (compositionStart < 0 || compositionEnd <= compositionStart)
+			return [];
+		return layout.selectionRangeRects(new TextPosition(compositionStart, 0),
+			new TextPosition(compositionEnd, 0), minY, maxY);
+	}
+
 	/** Selects the word under a pointer position using the shaped text engine's boundaries. */
 	public function selectWordAt(position:TextPosition):Bool {
 		ensureLive();
@@ -736,7 +810,7 @@ class TextEditorState {
 	function trimLineBreak(offset:Int, lineStart:Int):Int {
 		var result = offset;
 		while (result > lineStart) {
-			var value = Utf8Text.slice(text, result - 1, result);
+			var value = offsets.sliceCodepoints(result - 1, result);
 			if (value != "\n" && value != "\r")
 				break;
 			result--;
@@ -765,6 +839,9 @@ class TextEditorState {
 	/** Native text services interpret Haxeon's null representation of empty strings as empty UTF-8. */
 	public function layoutText():String
 		return text == null ? "" : text;
+
+	function get_text():String
+		return offsets.text;
 
 	static function copyTextStyle(value:TextStyle):TextStyle
 		return new TextStyle(value.fontSize, value.font, value.letterSpacing);

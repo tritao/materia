@@ -10,5 +10,6 @@ class LevelExtrudeFeature extends Feature {
 	override public function dependencies():Array<FeatureId> return [source.id];
 	override public function dependencyFeatures():Array<Feature> return [source];
 	override public function datumDependencies():Array<String> return [base.elementId.value,top.elementId.value];
+	override public function elementReferences():Array<ElementReference> return [base, top];
 	override public function evaluate(context:EvaluationContext):EvaluationResult { var low=context.owner().levelElevation(base)+baseOffset.value;var high=context.owner().levelElevation(top)+topOffset.value;if(high<=low)throw new ParametricError("top level must be above base level");var moved=context.shape(source).translate(Geometry.vec3(0,0,low));try{var result=EvaluationResult.fromOperation(moved.extrudeOperation(Geometry.vec3(0,0,high-low)));moved.close();return result;}catch(e:Dynamic){moved.close();throw e;} }
 }

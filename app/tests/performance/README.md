@@ -44,8 +44,17 @@ and within the Viewport/Perspective/Console/Telemetry group. The report shows
 the median, p95, and maximum input-plus-frame latency for each transition,
 along with allocated bytes and GC collections. Cycle 0 is excluded from the
 steady latency summary; `tab-spikes.json` keeps the 20 slowest transitions,
-including cold switches. Each row also records input dispatch, frame and
-tree/style time, GC mark time, and style cache misses. Run with `--no-profile`
+including cold switches. Each row records target lookup, bounds calculation,
+pointer down and up, click capture/target/bubble dispatch, frame and tree/style
+time, GC activity during input and submission, and style cache misses. Headless
+scenario timeouts scale with the requested cycle count. Run with `--no-profile`
 for lower-overhead timing, or with the default profiler to inspect the matching
-`editor.perfetto.json` trace. The benchmark measures headless input handling
+`editor.perfetto.json` trace and `span-spikes.json` report. The benchmark measures headless input handling
 and frame submission; it does not include desktop presentation latency.
+
+The tab matrix uses 50 Hz CPU sampling with allocation sampling disabled. The
+500 Hz setting saturated the profiler on this workload. Use `--sample-rate` and
+`--allocation-interval` to tune a capture; compare latency with `--no-profile`.
+The capture command builds the Release HashLink runtime before each run, even
+with `--skip-build`, so timing comparisons use the same optimized VM. Haxeon's
+Debug CMake preset writes its VM to its own build tree.

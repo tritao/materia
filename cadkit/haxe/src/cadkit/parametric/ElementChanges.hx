@@ -4,6 +4,7 @@ import cadkit.parametric.Document;
 import cadkit.parametric.DocumentChange;
 import cadkit.parametric.Element;
 import cadkit.parametric.Feature;
+import cadkit.parametric.TypedProperty;
 
 class ElementCreateChange implements DocumentChange {
 	final document:Document; final element:Element; final index:Int;
@@ -31,4 +32,14 @@ class ElementOutputChange implements DocumentChange {
 	public function new(element, oldOutput, newOutput) { this.element=element; this.oldOutput=oldOutput; this.newOutput=newOutput; }
 	public function undo():Void element.restoreOutput(oldOutput);
 	public function redo():Void element.restoreOutput(newOutput);
+}
+
+class ElementPropertyChange implements DocumentChange {
+	final document:Document; final element:Element; final name:String;
+	final before:Null<TypedProperty>; final after:Null<TypedProperty>;
+	public function new(document, element, name, before, after) {
+		this.document=document; this.element=element; this.name=name; this.before=before; this.after=after;
+	}
+	public function undo():Void document.restoreElementProperty(element, name, before);
+	public function redo():Void document.restoreElementProperty(element, name, after);
 }

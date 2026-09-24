@@ -68,6 +68,8 @@ class HaxeonSmoke {
 		PatternSmoke.run();
 		HoleSmoke.run();
 		TypedParameterSmoke.run();
+		TypedPropertySmoke.run();
+		RelationshipSmoke.run();
 		ElementSmoke.run();
 		BimKitSmoke.run();
 		ModelingSmoke.run();

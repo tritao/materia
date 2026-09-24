@@ -1,0 +1,10 @@
+{
+	"version": 1,
+	"package": { "name": "bimkit" },
+	"sourceRoots": ["haxe/src"],
+	"scopeSourceRoots": false,
+	"dependencies": {
+		"cadkit": { "path": "../cadkit" }
+	},
+	"target": "host"
+}
