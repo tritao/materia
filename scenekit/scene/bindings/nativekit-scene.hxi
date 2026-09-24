@@ -63,6 +63,10 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	extern fn nkscene_change_set_destroy(changes: nkscene_change_set) -> void;
 	extern fn nkscene_change_set_get_revision(changes: nkscene_change_set, out_revision: ptr<u64> @out) -> nkscene_result;
 	extern fn nkscene_geometry_create(scene: nkscene_scene, out_geometry: ptr<nkscene_geometry_id> @out) -> nkscene_result;
+	/**
+	 * Creates initialized geometry resources in one publication; the output is the first ID.
+	 */
+	extern fn nkscene_geometry_create_batch(scene: nkscene_scene, data: ptr<const<nkscene_geometry_data>> @in_array("count"), count: u32, out_first_geometry: ptr<nkscene_geometry_id> @out) -> nkscene_result;
 	extern fn nkscene_geometry_destroy(scene: nkscene_scene, geometry: nkscene_geometry_id) -> void;
 	extern fn nkscene_geometry_set_data(scene: nkscene_scene, geometry: nkscene_geometry_id, data: ptr<const<nkscene_geometry_data>>) -> nkscene_result;
 	extern fn nkscene_image_create(scene: nkscene_scene, out_image: ptr<nkscene_image_id> @out) -> nkscene_result;
@@ -72,6 +76,10 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	extern fn nkscene_light_destroy(scene: nkscene_scene, light: nkscene_light_id) -> void;
 	extern fn nkscene_light_set_data(scene: nkscene_scene, light: nkscene_light_id, data: ptr<const<nkscene_light_data>>) -> nkscene_result;
 	extern fn nkscene_material_create(scene: nkscene_scene, out_material: ptr<nkscene_material_id> @out) -> nkscene_result;
+	/**
+	 * Creates initialized material resources in one publication; the output is the first ID.
+	 */
+	extern fn nkscene_material_create_batch(scene: nkscene_scene, data: ptr<const<nkscene_material_data>> @in_array("count"), count: u32, out_first_material: ptr<nkscene_material_id> @out) -> nkscene_result;
 	extern fn nkscene_material_destroy(scene: nkscene_scene, material: nkscene_material_id) -> void;
 	extern fn nkscene_material_set_data(scene: nkscene_scene, material: nkscene_material_id, data: ptr<const<nkscene_material_data>>) -> nkscene_result;
 	extern fn nkscene_sampler_create(scene: nkscene_scene, out_sampler: ptr<nkscene_sampler_id> @out) -> nkscene_result;
@@ -81,6 +89,7 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	extern fn nkscene_scene_destroy(scene: nkscene_scene) -> void;
 	extern fn nkscene_scene_snapshot(scene: nkscene_scene, out_snapshot: ptr<nkscene_snapshot> @out @owned) -> nkscene_result;
 	extern fn nkscene_snapshot_destroy(snapshot: nkscene_snapshot) -> void;
+	extern fn nkscene_snapshot_find_node(snapshot: nkscene_snapshot, node: nkscene_node_id, out_node: ptr<nkscene_snapshot_node> @inout) -> nkscene_result;
 	extern fn nkscene_snapshot_get_child_node(snapshot: nkscene_snapshot, parent: nkscene_node_id, index: u64, out_node: ptr<nkscene_node_id> @out) -> nkscene_result;
 	extern fn nkscene_snapshot_get_child_node_count(snapshot: nkscene_snapshot, parent: nkscene_node_id, out_count: ptr<u64> @out) -> nkscene_result;
 	/**
@@ -96,7 +105,6 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	 */
 	extern fn nkscene_snapshot_get_name(snapshot: nkscene_snapshot, node: nkscene_node_id, out_name: ptr<ptr<const<c_char>>>) -> nkscene_result;
 	extern fn nkscene_snapshot_get_node(snapshot: nkscene_snapshot, index: u64, out_node: ptr<nkscene_snapshot_node> @inout) -> nkscene_result;
-	extern fn nkscene_snapshot_find_node(snapshot: nkscene_snapshot, node: nkscene_node_id, out_node: ptr<nkscene_snapshot_node> @inout) -> nkscene_result;
 	extern fn nkscene_snapshot_get_node_count(snapshot: nkscene_snapshot, out_count: ptr<u64> @out) -> nkscene_result;
 	extern fn nkscene_snapshot_get_node_page(snapshot: nkscene_snapshot, start_index: u64, out_page: ptr<nkscene_snapshot_node_page> @inout) -> nkscene_result;
 	extern fn nkscene_snapshot_get_revision(snapshot: nkscene_snapshot, out_revision: ptr<u64> @out) -> nkscene_result;

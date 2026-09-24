@@ -422,6 +422,147 @@ std::uint32_t primitive_width(nkscene_primitive_type primitive) noexcept {
     }
 }
 
+struct PreparedGeometryData {
+    GeometryPayload payload;
+    Bounds bounds;
+    SubelementTable subelements;
+};
+
+bool valid_vertex_semantic(nkscene_vertex_semantic semantic) noexcept;
+
+nkscene_result prepare_geometry_data(const nkscene_geometry_data *data,
+                                     PreparedGeometryData &prepared) {
+    constexpr auto minimum_size =
+        offsetof(nkscene_geometry_data, subelement_count) + sizeof(data->subelement_count);
+    if (!data || data->struct_size < minimum_size)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    const auto has_stream_fields = data->struct_size >= sizeof(nkscene_geometry_data);
+    const auto stream_count = has_stream_fields ? data->stream_count : 0;
+    auto primitive = NKS_PRIMITIVE_TRIANGLES;
+    if (has_stream_fields && data->primitive_type != 0)
+        primitive = data->primitive_type;
+    const auto width = primitive_width(primitive);
+    if (!width || (stream_count != 0 && !data->streams) ||
+        (stream_count == 0 && data->vertex_count != 0 && !data->vertices) ||
+        (data->index_count != 0 && !data->indices) ||
+        (data->subelement_count != 0 && !data->subelements))
+        return NKS_ERROR_INVALID_ARGUMENT;
+
+    auto &streams = prepared.payload.streams;
+    auto &vertices = prepared.payload.vertices;
+    std::uint32_t vertex_count = data->vertex_count;
+    if (stream_count != 0) {
+        std::unordered_set<nkscene_vertex_semantic> semantics;
+        streams.reserve(stream_count);
+        vertex_count = 0;
+        bool position_found = false;
+        for (uint32_t index = 0; index < stream_count; ++index) {
+            const auto &input = data->streams[index];
+            if (input.struct_size < sizeof(nkscene_vertex_stream) ||
+                !valid_vertex_semantic(input.semantic))
+                return NKS_ERROR_INVALID_ARGUMENT;
+            const auto element_size = vertex_format_size(input.format);
+            if (!element_size || !semantics.insert(input.semantic).second)
+                return NKS_ERROR_INVALID_ARGUMENT;
+            const auto stride = input.stride == 0 ? element_size : input.stride;
+            if (stride < element_size || (input.count != 0 && !input.data) ||
+                input.count > std::numeric_limits<std::size_t>::max() / stride)
+                return NKS_ERROR_INVALID_ARGUMENT;
+            if (input.semantic == NKS_VERTEX_SEMANTIC_POSITION) {
+                if (input.format != NKS_VERTEX_FORMAT_FLOAT32X3)
+                    return NKS_ERROR_INVALID_ARGUMENT;
+                vertex_count = input.count;
+                position_found = true;
+            }
+            GeometryVertexStream output;
+            output.semantic = static_cast<VertexSemantic>(input.semantic);
+            output.format = static_cast<VertexFormat>(input.format);
+            output.stride = stride;
+            output.count = input.count;
+            output.data.resize(static_cast<std::size_t>(stride) * input.count);
+            if (!output.data.empty())
+                std::memcpy(output.data.data(), input.data, output.data.size());
+            streams.push_back(std::move(output));
+        }
+        if (!position_found)
+            return NKS_ERROR_INVALID_ARGUMENT;
+        for (const auto &stream : streams)
+            if (stream.count != vertex_count)
+                return NKS_ERROR_INVALID_ARGUMENT;
+
+        vertices.resize(vertex_count);
+        const auto position = std::find_if(streams.begin(), streams.end(), [](const auto &stream) {
+            return stream.semantic == VertexSemantic::Position;
+        });
+        for (std::uint32_t index = 0; index < vertex_count; ++index) {
+            std::memcpy(vertices[index].position.data(),
+                        position->data.data() + static_cast<std::size_t>(index) * position->stride,
+                        sizeof(vertices[index].position));
+        }
+    } else {
+        vertices.resize(vertex_count);
+        for (uint32_t index = 0; index < vertex_count; ++index)
+            std::copy(std::begin(data->vertices[index].position),
+                      std::end(data->vertices[index].position), vertices[index].position.begin());
+        GeometryVertexStream position;
+        position.semantic = VertexSemantic::Position;
+        position.format = VertexFormat::Float32x3;
+        position.stride = sizeof(GeometryVertex);
+        position.count = vertex_count;
+        position.data.resize(static_cast<std::size_t>(position.stride) * vertex_count);
+        if (!position.data.empty())
+            std::memcpy(position.data.data(), vertices.data(), position.data.size());
+        streams.push_back(std::move(position));
+    }
+
+    const auto element_count = data->index_count != 0 ? data->index_count : vertex_count;
+    if (element_count % width != 0)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    const auto *indices = static_cast<const uint32_t *>(data->indices);
+    if (data->index_count != 0) {
+        for (uint32_t index = 0; index < data->index_count; ++index)
+            if (indices[index] >= vertex_count)
+                return NKS_ERROR_INVALID_ARGUMENT;
+        prepared.payload.indices.assign(indices, indices + data->index_count);
+    }
+    const auto primitive_count = element_count / width;
+    prepared.subelements.ranges.reserve(data->subelement_count);
+    for (uint32_t index = 0; index < data->subelement_count; ++index) {
+        const auto &range = data->subelements[index];
+        if (static_cast<uint64_t>(range.first_primitive) + range.primitive_count > primitive_count)
+            return NKS_ERROR_INVALID_ARGUMENT;
+        prepared.subelements.ranges.push_back(
+            {range.first_primitive, range.primitive_count, range.subelement});
+    }
+    prepared.payload.primitive_type = static_cast<PrimitiveType>(primitive);
+    prepared.bounds.valid = data->bounds.valid != 0;
+    std::copy(std::begin(data->bounds.minimum), std::end(data->bounds.minimum),
+              prepared.bounds.minimum.begin());
+    std::copy(std::begin(data->bounds.maximum), std::end(data->bounds.maximum),
+              prepared.bounds.maximum.begin());
+    return NKS_OK;
+}
+
+MaterialState prepare_material_data(const nkscene_material_data &data) {
+    MaterialState material;
+    std::copy(std::begin(data.base_color), std::end(data.base_color), material.base_color.begin());
+    material.opacity = data.opacity;
+    material.flags = data.flags;
+    material.metallic = data.metallic;
+    material.roughness = data.roughness;
+    std::copy(std::begin(data.emissive), std::end(data.emissive), material.emissive.begin());
+    material.alpha_cutoff = data.alpha_cutoff;
+    material.alpha_mode = static_cast<AlphaMode>(
+        data.alpha_mode == 0 ? NKS_MATERIAL_ALPHA_OPAQUE : data.alpha_mode);
+    material.base_color_texture = {data.base_color_texture.value};
+    material.metallic_roughness_texture = {data.metallic_roughness_texture.value};
+    material.normal_texture = {data.normal_texture.value};
+    material.emissive_texture = {data.emissive_texture.value};
+    material.occlusion_texture = {data.occlusion_texture.value};
+    material.sampler = {data.sampler.value};
+    return material;
+}
+
 bool valid_vertex_semantic(nkscene_vertex_semantic semantic) noexcept {
     return semantic >= NKS_VERTEX_SEMANTIC_POSITION && semantic <= NKS_VERTEX_SEMANTIC_COLOR0;
 }
@@ -1926,6 +2067,45 @@ nkscene_result NKS_CALL nkscene_geometry_create(nkscene_scene scene,
     return NKS_OK;
 }
 
+nkscene_result NKS_CALL nkscene_geometry_create_batch(
+    nkscene_scene scene, const nkscene_geometry_data *data, uint32_t count,
+    nkscene_geometry_id *out_first_geometry) {
+    if (!out_first_geometry || (count != 0 && !data))
+        return NKS_ERROR_INVALID_ARGUMENT;
+    std::vector<nkscene::PreparedGeometryData> prepared;
+    prepared.reserve(count);
+    for (uint32_t index = 0; index < count; ++index) {
+        prepared.emplace_back();
+        const auto result = nkscene::prepare_geometry_data(&data[index], prepared.back());
+        if (result != NKS_OK)
+            return result;
+    }
+
+    auto &state = nkscene::registry();
+    std::lock_guard lock(state.mutex);
+    auto owner = state.scenes.get(nkscene::unpack_handle(scene));
+    if (!owner)
+        return NKS_ERROR_INVALID_HANDLE;
+    if (count == 0) {
+        out_first_geometry->value = 0;
+        return NKS_OK;
+    }
+
+    const auto first = owner->reserve_geometry_id();
+    out_first_geometry->value = first.value;
+    for (uint32_t index = 0; index < count; ++index) {
+        const auto id = index == 0 ? first : owner->reserve_geometry_id();
+        auto &resource = owner->geometry_store().create(id);
+        resource.bounds = prepared[index].bounds;
+        resource.payload = std::make_shared<nkscene::GeometryPayload>(
+            std::move(prepared[index].payload));
+        resource.subelements = std::make_shared<nkscene::SubelementTable>(
+            std::move(prepared[index].subelements));
+    }
+    owner->publish();
+    return NKS_OK;
+}
+
 void NKS_CALL nkscene_geometry_destroy(nkscene_scene scene, nkscene_geometry_id geometry) {
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
@@ -1944,6 +2124,52 @@ nkscene_result NKS_CALL nkscene_material_create(nkscene_scene scene,
     if (!owner)
         return NKS_ERROR_INVALID_HANDLE;
     out_material->value = owner->create_material().value;
+    return NKS_OK;
+}
+
+nkscene_result NKS_CALL nkscene_material_create_batch(
+    nkscene_scene scene, const nkscene_material_data *data, uint32_t count,
+    nkscene_material_id *out_first_material) {
+    if (!out_first_material || (count != 0 && !data))
+        return NKS_ERROR_INVALID_ARGUMENT;
+    std::vector<nkscene::MaterialState> prepared;
+    prepared.reserve(count);
+    for (uint32_t index = 0; index < count; ++index) {
+        if (data[index].struct_size < sizeof(nkscene_material_data))
+            return NKS_ERROR_INVALID_ARGUMENT;
+        prepared.push_back(nkscene::prepare_material_data(data[index]));
+    }
+
+    auto &state = nkscene::registry();
+    std::lock_guard lock(state.mutex);
+    auto owner = state.scenes.get(nkscene::unpack_handle(scene));
+    if (!owner)
+        return NKS_ERROR_INVALID_HANDLE;
+    if (count == 0) {
+        out_first_material->value = 0;
+        return NKS_OK;
+    }
+    const auto textures_exist = [&](const nkscene::MaterialState &material) {
+        const nkscene::TextureId textures[] = {
+            material.base_color_texture, material.metallic_roughness_texture,
+            material.normal_texture, material.emissive_texture, material.occlusion_texture};
+        for (const auto texture : textures)
+            if (texture.valid() && !owner->texture_store().find(texture))
+                return false;
+        return !material.sampler.valid() || owner->sampler_store().find(material.sampler);
+    };
+    if (std::any_of(prepared.begin(), prepared.end(),
+                    [&](const auto &material) { return !textures_exist(material); }))
+        return NKS_ERROR_STALE_ID;
+
+    const auto first = owner->reserve_material_id();
+    out_first_material->value = first.value;
+    for (uint32_t index = 0; index < count; ++index) {
+        const auto id = index == 0 ? first : owner->reserve_material_id();
+        auto &resource = owner->material_store().create(id);
+        resource.state = std::make_shared<nkscene::MaterialState>(std::move(prepared[index]));
+    }
+    owner->publish();
     return NKS_OK;
 }
 
