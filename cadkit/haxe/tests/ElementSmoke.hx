@@ -258,15 +258,12 @@ class ElementSmoke {
 		check(failed && between.currentShape() == committed, "crossed levels preserve committed geometry");
 		check(datumDocument.undo(), "crossed level undo");
 		datumDocument.recompute();
-		datumDocument.removeElement(topLevel.id);
 		failed = false;
 		try
-			datumDocument.recompute()
+			datumDocument.removeElement(topLevel.id)
 		catch (e:Dynamic)
 			failed = true;
-		check(failed && topRef.state(datumDocument) == ElementReference.UnresolvedElement, "deleted level fails explicitly");
-		check(datumDocument.undo(), "deleted level undo");
-		datumDocument.recompute();
+		check(failed && topRef.state(datumDocument) == ElementReference.Resolved, "deleting a level referenced by a feature is rejected");
 		var datumReload = DocumentCodec.decode(DocumentCodec.encode(datumDocument));
 		near(datumReload.result().volume(), 800000);
 		datumReload.close();
@@ -354,14 +351,18 @@ class ElementSmoke {
 		catch (e:Dynamic)
 			failed = true;
 		check(failed, "placement parent cycles are rejected");
-		hierarchy.removeElement(otherParent.id);
 		failed = false;
 		try
-			childElement.shape()
+			hierarchy.removeElement(otherParent.id)
 		catch (e:Dynamic)
 			failed = true;
-		check(failed, "missing placement parent is explicit");
-		check(hierarchy.undo(), "placement parent removal undo");
+		check(failed, "deleting a referenced placement parent is rejected");
+		childElement.reparent(null, true);
+		near(childElement.shape().bounds().get_min().get_x(), 22);
+		hierarchy.removeElement(otherParent.id);
+		near(childElement.shape().bounds().get_min().get_x(), 22);
+		check(hierarchy.undo(), "placement parent deletion undo");
+		check(hierarchy.redo(), "placement parent deletion redo");
 		var restoredHierarchy = DocumentCodec.decode(DocumentCodec.encode(hierarchy));
 		near(restoredHierarchy.elementAt(1).shape().bounds().get_min().get_x(), 22);
 		restoredHierarchy.close();
@@ -396,14 +397,11 @@ class ElementSmoke {
 			new ElementReference(parts.id, firstPart.id), "body"));
 		parts.setOutput(instanceOutput);
 		parts.recompute();
-		parts.removeElement(firstPart.id);
-		check(instanceOutput.dirty, "removing a referenced instance invalidates element-dependent features");
 		failed = false;
-		try parts.recompute() catch (_:Dynamic) failed = true;
-		check(failed, "a removed instance cannot leave its old published output looking current");
-		check(parts.undo(), "referenced instance removal undo");
+		try parts.removeElement(firstPart.id) catch (_:Dynamic) failed = true;
+		check(failed && !instanceOutput.dirty, "deleting an instance referenced by a feature is rejected");
 		parts.recompute();
-		check(!instanceOutput.dirty, "restoring a referenced instance recomputes its dependent feature");
+		check(!instanceOutput.dirty, "rejected deletion leaves the referenced output current");
 		var committedPart = firstPart.shape();
 		failed = false;
 		try

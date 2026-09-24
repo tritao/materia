@@ -28,6 +28,9 @@ class DefinitionOutputFeature extends Feature {
 	override public function elementDependencies():Array<String>
 		return [instance.elementId.value];
 
+	override public function elementReferences():Array<ElementReference>
+		return [instance];
+
 	override public function evaluate(context:EvaluationContext):EvaluationResult {
 		var resolved = context.owner().resolveElement(instance);
 		if (resolved.kind != "instance")

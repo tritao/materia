@@ -22,6 +22,7 @@ import cadkit.parametric.UnitConversion;
 import cadkit.parametric.DocumentId;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
+import cadkit.parametric.ElementKind;
 import cadkit.parametric.LevelElement;
 import cadkit.parametric.ReferencePlaneElement;
 import cadkit.parametric.ElementReference;
@@ -30,6 +31,7 @@ import cadkit.parametric.ElementChanges.ElementCreateChange;
 import cadkit.parametric.ElementChanges.ElementRemoveChange;
 import cadkit.parametric.ElementChanges.ElementNameChange;
 import cadkit.parametric.ElementChanges.ElementOutputChange;
+import cadkit.parametric.ElementChanges.ElementPropertyChange;
 import cadkit.parametric.DatumChanges.LevelElevationChange;
 import cadkit.parametric.DatumChanges.ReferencePlaneChange;
 import cadkit.modeling.Plane;
@@ -43,6 +45,7 @@ import cadkit.parametric.InstanceElement;
 import cadkit.parametric.DefinitionChanges.DefinitionDefaultChange;
 import cadkit.parametric.DefinitionChanges.InstanceOverrideChange;
 import cadkit.parametric.DefinitionChanges.DefinitionCreateChange;
+import cadkit.parametric.DefinitionChanges.DefinitionPropertyChange;
 import cadkit.parametric.DefinitionChanges.InstanceDefinitionChange;
 
 /** Haxeon-owned parametric feature document. */
@@ -281,6 +284,8 @@ class Document {
 
 		var name = definitionName == null ? instance.name + " definition" : definitionName;
 		var unique = installDefinition(new DefinitionId(), name, source.recipe, inputs, outputs, subgraph);
+		for (property in source.properties())
+			unique.restoreProperty(property.name, property);
 		var previousDefinition = instance.definitionId;
 		try {
 			restoreInstanceDefinition(instance, unique.id);
@@ -430,6 +435,21 @@ class Document {
 		return result;
 	}
 
+	/** Create an addressable, placeable object that does not publish feature geometry. */
+	public function createObject(name:String):Element {
+		var result = installObject(name, newElementId());
+		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
+		return result;
+	}
+
+	/** Codec path for a geometry-free persistent object. */
+	public function installObject(name:String, id:ElementId):Element {
+		ensureOpen();
+		var result = new Element(this, id, name, ElementKind.Object);
+		installRecord(result);
+		return result;
+	}
+
 	/** Codec path: installs a persisted record without creating undo history. */
 	public function installElement(name:String, output:Feature, id:ElementId):Element {
 		ensureOpen();
@@ -567,7 +587,7 @@ class Document {
 	}
 
 	private function isPlaceable(element:Element):Bool
-		return element.kind == "geometry" || element.kind == "instance";
+		return element.kind == ElementKind.Geometry || element.kind == ElementKind.Instance || element.kind == ElementKind.Object;
 
 	private function validatePlacementParent(element:Element, parent:Null<ElementReference>):Void {
 		var cursor = parent;
@@ -592,6 +612,13 @@ class Document {
 
 	public function duplicateElement(source:Element, ?name:String):Element {
 		validateOwnedElement(source);
+		if (source.kind == ElementKind.Object) {
+			var result = createObject(name == null ? source.name + " copy" : name);
+			result.restorePlacement(source.localPlacement, null);
+			for (property in source.properties())
+				result.restoreProperty(property.name, property);
+			return result;
+		}
 		if (source.output == null)
 			throw new ParametricError("datum duplication requires its typed API");
 		return createElement(name == null ? source.name + " copy" : name, cast source.output);
@@ -689,10 +716,153 @@ class Document {
 
 	public function restoreElementRemoval(element:Element):Void {
 		validateOwnedElement(element);
+		validateNoElementPropertyReferences(element);
 		datumChanged(element);
 		element.clearPlacedShape();
 		elements.remove(element);
 		elementsById.remove(element.id.value);
+	}
+
+	public function setElementProperty(target:Element, property:TypedProperty):Void {
+		validateOwnedElement(target);
+		validateProperty(property);
+		validatePropertyReferences(property);
+		var before = target.property(property.name);
+		if (property.sameValue(before))
+			return;
+		target.restoreProperty(property.name, property);
+		recordDocumentChange(new ElementPropertyChange(this, target, property.name, before, property));
+	}
+
+	public function removeElementProperty(target:Element, name:String):Void {
+		validateOwnedElement(target);
+		var before = target.property(name);
+		if (before == null)
+			return;
+		target.restoreProperty(name, null);
+		recordDocumentChange(new ElementPropertyChange(this, target, name, before, null));
+	}
+
+	public function restoreElementProperty(target:Element, name:String, value:Null<TypedProperty>):Void {
+		validateOwnedElement(target);
+		if (value != null) {
+			if (value.name != name)
+				throw new ParametricError("property key and value name do not match");
+			validatePropertyReferences(value);
+		}
+		target.restoreProperty(name, value);
+	}
+
+	public function setDefinitionProperty(target:Definition, property:TypedProperty):Void {
+		validateOwnedDefinition(target);
+		validateProperty(property);
+		validatePropertyReferences(property);
+		var before = target.property(property.name);
+		if (property.sameValue(before))
+			return;
+		target.restoreProperty(property.name, property);
+		recordDocumentChange(new DefinitionPropertyChange(this, target, property.name, before, property));
+	}
+
+	public function removeDefinitionProperty(target:Definition, name:String):Void {
+		validateOwnedDefinition(target);
+		var before = target.property(name);
+		if (before == null)
+			return;
+		target.restoreProperty(name, null);
+		recordDocumentChange(new DefinitionPropertyChange(this, target, name, before, null));
+	}
+
+	public function restoreDefinitionProperty(target:Definition, name:String, value:Null<TypedProperty>):Void {
+		validateOwnedDefinition(target);
+		if (value != null) {
+			if (value.name != name)
+				throw new ParametricError("property key and value name do not match");
+			validatePropertyReferences(value);
+		}
+		target.restoreProperty(name, value);
+	}
+
+	private function validateProperty(property:TypedProperty):Void {
+		if (property == null)
+			throw new ParametricError("property must not be null");
+		if (property.name == null || StringTools.trim(property.name) == "")
+			throw new ParametricError("property name must not be empty");
+	}
+
+	private function validateOwnedDefinition(definition:Definition):Void {
+		if (definition == null || definition.document != this || definitionsById.get(definition.id.value) != definition)
+			throw new ParametricError("definition belongs to another document or has been removed");
+	}
+
+	private function validatePropertyReferences(property:TypedProperty):Void {
+		if (!Std.isOfType(property.value, PersistentReference))
+			return;
+		var reference:PersistentReference = cast property.value;
+		if (reference.documentId != id.value)
+			return;
+		switch reference.targetType {
+			case PersistentReference.ElementTarget:
+				if (elementsById.get(reference.targetId) == null)
+					throw new ParametricError("property references a missing element: " + reference.targetId);
+			case PersistentReference.DefinitionTarget:
+				if (definitionsById.get(reference.targetId) == null)
+					throw new ParametricError("property references a missing definition: " + reference.targetId);
+			case PersistentReference.FeatureTarget:
+				var featureId = Std.parseInt(reference.targetId);
+				if (featureId == null || byId.get(featureId) == null)
+					throw new ParametricError("property references a missing feature: " + reference.targetId);
+			default:
+				throw new ParametricError("unsupported property reference target: " + reference.targetType);
+		}
+	}
+
+	/** Codec verification after every referenced document record has been installed. */
+	public function validatePersistentReferences():Void {
+		for (element in elements)
+			for (property in element.properties()) {
+				validateProperty(property);
+				validatePropertyReferences(property);
+			}
+		for (definition in definitions)
+			for (property in definition.properties()) {
+				validateProperty(property);
+				validatePropertyReferences(property);
+			}
+	}
+
+	private function validateNoElementPropertyReferences(target:Element):Void {
+		for (element in elements) {
+			if (element == target)
+				continue;
+			if (element.placementParent != null && element.placementParent.documentId.value == id.value
+				&& element.placementParent.elementId.value == target.id.value)
+				throw new ParametricError("element is still referenced as a placement parent: " + target.id.value);
+			for (property in element.properties())
+				if (propertyReferencesElement(property, target.id.value))
+					throw new ParametricError("element is still referenced by property " + property.name + ": " + target.id.value);
+			if (element.kind == ElementKind.Level) {
+				var level:LevelElement = cast element;
+				if (level.relativeTo != null && level.relativeTo.documentId.value == id.value && level.relativeTo.elementId.value == target.id.value)
+					throw new ParametricError("element is still referenced by a level: " + target.id.value);
+			}
+		}
+		for (definition in definitions)
+			for (property in definition.properties())
+				if (propertyReferencesElement(property, target.id.value))
+					throw new ParametricError("element is still referenced by definition property " + property.name + ": " + target.id.value);
+		for (feature in features)
+			if (feature.active)
+				for (reference in feature.elementReferences())
+					if (reference.documentId.value == id.value && reference.elementId.value == target.id.value)
+						throw new ParametricError("element is still referenced by feature " + feature.id.toInt() + ": " + target.id.value);
+	}
+
+	private function propertyReferencesElement(property:TypedProperty, elementId:String):Bool {
+		if (!Std.isOfType(property.value, PersistentReference))
+			return false;
+		var reference:PersistentReference = cast property.value;
+		return reference.documentId == id.value && reference.targetType == PersistentReference.ElementTarget && reference.targetId == elementId;
 	}
 
 	private function validateOwnedElement(element:Element):Void {

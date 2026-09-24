@@ -79,6 +79,10 @@ class Feature {
 	public function elementDependencies():Array<String>
 		return [];
 
+	/** Persistent document elements referenced by this feature outside the feature DAG. */
+	public function elementReferences():Array<ElementReference>
+		return [];
+
 	public function evaluate(context:EvaluationContext):EvaluationResult {
 		throw new ParametricError("feature has no evaluator");
 	}

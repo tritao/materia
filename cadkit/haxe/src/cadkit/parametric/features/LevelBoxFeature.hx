@@ -34,6 +34,9 @@ class LevelBoxFeature extends Feature {
 	override public function datumDependencies():Array<String>
 		return [base.elementId.value, top.elementId.value];
 
+	override public function elementReferences():Array<ElementReference>
+		return [base, top];
+
 	public function baseElevation(document:cadkit.parametric.Document):Float
 		return document.levelElevation(base) + baseOffset.value;
 

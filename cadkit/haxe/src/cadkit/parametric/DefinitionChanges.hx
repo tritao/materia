@@ -1,5 +1,7 @@
 package cadkit.parametric;
 
+import cadkit.parametric.TypedProperty;
+
 class DefinitionCreateChange implements DocumentChange {
 	final document:Document;
 	final definition:Definition;
@@ -84,4 +86,26 @@ class InstanceDefinitionChange implements DocumentChange {
 
 	public function redo():Void
 		document.restoreInstanceDefinition(instance, after);
+}
+
+class DefinitionPropertyChange implements DocumentChange {
+	final document:Document;
+	final definition:Definition;
+	final name:String;
+	final before:Null<TypedProperty>;
+	final after:Null<TypedProperty>;
+
+	public function new(document:Document, definition:Definition, name:String, before:Null<TypedProperty>, after:Null<TypedProperty>) {
+		this.document = document;
+		this.definition = definition;
+		this.name = name;
+		this.before = before;
+		this.after = after;
+	}
+
+	public function undo():Void
+		document.restoreDefinitionProperty(definition, name, before);
+
+	public function redo():Void
+		document.restoreDefinitionProperty(definition, name, after);
 }
