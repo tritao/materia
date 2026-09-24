@@ -8,6 +8,8 @@ import haxe.Json;
 import LayoutFrame;
 import FontCollection;
 import nativekit.scene.SpatialIndex;
+import nativekit.scene.SceneView;
+import nativekit.scene.Transform;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.EditOperation;
 import nativekit.ui.core.UiEventKind;
@@ -243,6 +245,45 @@ class HeadlessEditorProfile {
     var structuralHistoryEstimatedBytes = candidate.document.history.estimatedRetainedBytes;
     action(actions, "structural-history-40-edits", 0);
 
+    var staticPickSamples:Array<Float> = [];
+    var emptyViewSamples:Array<Float> = [];
+    var viewBuildSamples:Array<Float> = [];
+    var viewPickSamples:Array<Float> = [];
+    var movingPoses:Array<app.ApplicationSimulation.SimulationPoseVisual> = [];
+    for (index in 1...501) {
+      var id = "stress-" + index;
+      var item = candidate.object(id);
+      if (item == null) throw "Moving profile object is missing: " + id;
+      movingPoses.push({id: id, position: [item.x, item.y, item.z], rotation: [0.0, 0.0, 0.0, 1.0]});
+    }
+    for (sample in 0...6) {
+      started = Sys.time();
+      var staticHit = candidate.pickRay(0.15, 0.0, 10.0, 0.0, 0.0, -1.0);
+      var staticPickSeconds = Sys.time() - started;
+      started = Sys.time();
+      candidate.configureRenderView(new SceneView(), Transform.identity());
+      var emptyViewSeconds = Sys.time() - started;
+      started = Sys.time();
+      var view = new SceneView();
+      candidate.configureRenderView(view, Transform.identity(), movingPoses);
+      var viewBuildSeconds = Sys.time() - started;
+      started = Sys.time();
+      var viewHit = candidate.pickRayWithView(view, 0.15, 0.0, 10.0, 0.0, 0.0, -1.0);
+      var viewPickSeconds = Sys.time() - started;
+      if (staticHit != viewHit) throw "View picking disagrees with the authored scene";
+      if (sample > 0) {
+        staticPickSamples.push(staticPickSeconds);
+        emptyViewSamples.push(emptyViewSeconds);
+        viewBuildSamples.push(viewBuildSeconds);
+        viewPickSamples.push(viewPickSeconds);
+      }
+    }
+    var staticPickMedianSeconds = medianDuration(staticPickSamples);
+    var emptyViewMedianSeconds = medianDuration(emptyViewSamples);
+    var viewBuildMedianSeconds = medianDuration(viewBuildSamples);
+    var viewPickMedianSeconds = medianDuration(viewPickSamples);
+    action(actions, "perspective-picking-500-moving", 0);
+
     // Separate snapshot capture from BVH construction after the end-to-end timings.
     // Ignore the first sample to exclude one-time allocator and code-path warmup.
     var snapshotSamples:Array<Float> = [];
@@ -316,6 +357,10 @@ class HeadlessEditorProfile {
       structuralHistorySeconds: structuralHistorySeconds,
       structuralAllocatedBytes: structuralAllocatedBytes,
       structuralHistoryEstimatedBytes: structuralHistoryEstimatedBytes,
+      staticPickMedianSeconds: staticPickMedianSeconds,
+      emptyViewMedianSeconds: emptyViewMedianSeconds,
+      viewBuildMedianSeconds: viewBuildMedianSeconds,
+      viewPickMedianSeconds: viewPickMedianSeconds,
       budgetedOperationCount: budgetedOperationCount,
       budgetedFinalOperationCount: projectHistory.undoCount,
       budgetedEstimatedBytes: budgetedEstimatedBytes,

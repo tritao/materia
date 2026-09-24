@@ -131,6 +131,22 @@ class SceneView {
 		return this;
 	}
 
+	/** Replaces all world-space poses with one native publication. */
+	public function replacePoses(nodes:Array<NodeId>, transforms:Array<Transform>):SceneView {
+		if (nodes.length != transforms.length) throw "Pose node/transform count mismatch";
+		var replacements:Array<nkscene_render_pose_override> = [];
+		for (index in 0...nodes.length) {
+			var override = new nkscene_render_pose_override();
+			override.set_node(nodes[index].nativeValue());
+			override.set_world_transform(transforms[index].nativeValue());
+			replacements.push(override);
+		}
+		poseOverrides = replacements;
+		value.set_pose_overrides(poseOverrides);
+		value.set_pose_override_count(poseOverrides.length);
+		return this;
+	}
+
 	public function clearPoses():SceneView {
 		poseOverrides.resize(0);
 		value.set_pose_overrides(poseOverrides);

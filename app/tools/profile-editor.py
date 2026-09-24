@@ -341,7 +341,7 @@ def main():
             expected = {"cad-parameter-edits", "bim-opening-edits", "load-10k-scene",
                         "single-object-nudge", "move-500-objects", "undo-1000-edits",
                         "structural-history-40-edits", "simulation-presentation-500-links",
-                        "project-history-budget"}
+                        "perspective-picking-500-moving", "project-history-budget"}
             completed = {row.get("action") for row in actions}
             if (not expected.issubset(completed) or summary.get("sceneObjects") != 10000 or
                     summary.get("movingObjects") != 500 or summary.get("articulatedLinks") != 500 or
@@ -351,6 +351,9 @@ def main():
                     summary.get("structuralAllocatedBytes") is None or
                     summary.get("structuralHistoryEstimatedBytes") is None or
                     summary.get("structuralHistoryEstimatedBytes") > 100000 or
+                    summary.get("staticPickMedianSeconds") is None or
+                    summary.get("viewBuildMedianSeconds") is None or
+                    summary.get("viewPickMedianSeconds") is None or
                     summary.get("budgetedOperationCount") != 1000 or
                     summary.get("budgetedFinalOperationCount") is None or
                     summary.get("budgetedFinalOperationCount") != 1 or
@@ -368,12 +371,15 @@ def main():
             phase_top = sorted(phase_seconds.items(), key=lambda item: item[1] or 0, reverse=True)[:3]
             phase_text = ", ".join(f"{name}={value * 1000:.0f}ms" for name, value in phase_top)
             structural_mb = summary["structuralAllocatedBytes"] / (1024 * 1024)
-            print(f"scenario=architecture verified phases=9 sceneObjects=10000 "
+            print(f"scenario=architecture verified phases=10 sceneObjects=10000 "
                   f"movingObjects=500 links=500 snapshotMedian={snapshot_ms:.3f}ms "
                   f"spatialIndexMedian={index_ms:.3f}ms loadPhases={phase_total * 1000:.0f}ms "
                   f"topLoadPhases=[{phase_text}] structuralHistory="
                   f"{summary['structuralHistorySeconds']:.2f}s/{structural_mb:.1f}MiB allocated, "
-                  f"{summary['structuralHistoryEstimatedBytes']}B retained estimate")
+                  f"{summary['structuralHistoryEstimatedBytes']}B retained estimate "
+                  f"emptyViewMedian={summary['emptyViewMedianSeconds'] * 1000:.3f}ms "
+                  f"viewBuildMedian={summary['viewBuildMedianSeconds'] * 1000:.3f}ms "
+                  f"viewPickMedian={summary['viewPickMedianSeconds'] * 1000:.3f}ms")
         except (OSError, KeyError, ValueError) as error:
             print(f"scenario verification failed: {error}", file=sys.stderr)
             result = 1

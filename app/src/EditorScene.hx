@@ -1227,6 +1227,8 @@ class EditorScene {
 
   // Reconcile document records into the runtime scene while preserving stable nodes.
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
+    var existingById:Map<String, EditorSceneObject> = new Map();
+    for (item in objects) existingById.set(item.id, item);
     var prepared = new PreparedSceneEdit(scene.beginTransaction(), [],
       bridge.copyEntries(), cadSessions.copy());
     var previousFace=selectedCadFaceFingerprint;
@@ -1235,7 +1237,7 @@ class EditorScene {
     var retained:Map<String, Bool> = new Map();
     try {
       for (record in data) {
-        var item = object(record.id);
+        var item = existingById.get(record.id);
         var session = item == null || !isCadKind(item.kind) || item.kind != record.type || item.cadGraph != record.cadGraph
           ? null : cadSessions.get(record.id);
         var storedGraph = record.cadGraph;
@@ -1436,9 +1438,17 @@ class EditorScene {
     var selection = new SelectionSet();
     if (selected != null) selection.add(runtimeFor(selected.id).node);
     view.applySelection(selection, selectionMaterial);
-    if (poses != null) for (pose in poses) {
-      if (object(pose.id) != null)
-        view.setPose(runtimeFor(pose.id).node, poseTransform(pose.position, pose.rotation));
+    if (poses != null) {
+      var poseNodes:Array<NodeId> = [];
+      var poseTransforms:Array<Transform> = [];
+      for (pose in poses) {
+        var runtime = bridge.runtime(pose.id);
+        if (runtime != null) {
+          poseNodes.push(runtime.node);
+          poseTransforms.push(poseTransform(pose.position, pose.rotation));
+        }
+      }
+      view.replacePoses(poseNodes, poseTransforms);
     }
     return view;
   }
