@@ -55,12 +55,21 @@ class ScriptedSetupTests {
       "script attaches LiDAR to its articulated link"
     );
     var ownership:ScriptOwnership = session.scriptOwnership;
+    check(ownership != null && ownership.document == session.document &&
+      setup.scene.document == session.document && setup.sensors.document == session.document,
+      "script overrides, scene and sensors share the project history instance");
     check(
       ownership != null && ownership.sensorRateOrigin(setup.sensors.robotId, lidar.id) == "script",
       "inspector reports the script value origin"
     );
     ownership.setOverridesEnabled(true);
     ownership.setSensorRate(setup.sensors.robotId, lidar.id, 33.0);
+    check(session.document.undo(), "project undo reaches the script sensor override");
+    var undoneOverride = session.refreshScriptOverrides();
+    var restoredSensor:Sensor = undoneOverride.sensors.selected();
+    check(restoredSensor != null && restoredSensor.updateRate != 33.0,
+      "undo rematerializes the script baseline without its last override");
+    check(session.document.redo(), "project redo restores the script sensor override");
     var overridden = session.refreshScriptOverrides();
     var overriddenLidar:Sensor = overridden.sensors.selected();
     check(
