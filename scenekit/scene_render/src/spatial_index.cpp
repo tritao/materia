@@ -16,6 +16,8 @@ namespace {
 
 constexpr std::uint32_t invalid_slot = std::numeric_limits<std::uint32_t>::max();
 constexpr std::size_t leaf_capacity = 8;
+// Periodically rebuild after refits so long drags cannot leave a poorly partitioned BVH.
+constexpr std::uint32_t max_incremental_refits = 128;
 
 struct Entry {
     NodeId node;
@@ -26,6 +28,7 @@ struct BvhNode {
     Bounds bounds;
     std::uint32_t left = invalid_slot;
     std::uint32_t right = invalid_slot;
+    std::uint32_t parent = invalid_slot;
     std::uint32_t first = 0;
     std::uint32_t count = 0;
 
@@ -240,8 +243,11 @@ struct SceneSpatialIndex::State {
 
     SceneSnapshot snapshot;
     std::uint64_t revision = 0;
+    std::uint32_t incremental_refits = 0;
     std::vector<Entry> entries;
     std::vector<BvhNode> nodes;
+    std::vector<std::uint32_t> entry_leaves;
+    std::unordered_map<NodeId, std::size_t> entry_indices;
     std::unordered_map<NodeId, LocalTransform> pose_transforms;
     mutable std::vector<NodeId> results;
 };
@@ -279,9 +285,11 @@ SceneSpatialIndex::SceneSpatialIndex(const SceneSnapshot &snapshot, const SceneV
         bounds.valid = true;
         state_->entries.push_back({node.node, bounds});
     }
-    const auto build_node = [&](auto &&self, std::size_t first, std::size_t last) -> std::uint32_t {
+    const auto build_node = [&](auto &&self, std::size_t first, std::size_t last,
+                                std::uint32_t parent) -> std::uint32_t {
         const auto node_index = static_cast<std::uint32_t>(state_->nodes.size());
         state_->nodes.emplace_back();
+        state_->nodes[node_index].parent = parent;
         Bounds node_bounds;
         for (std::size_t index = first; index < last; ++index)
             node_bounds = merge_bounds(node_bounds, state_->entries[index].bounds);
@@ -290,6 +298,8 @@ SceneSpatialIndex::SceneSpatialIndex(const SceneSnapshot &snapshot, const SceneV
         if (count <= leaf_capacity) {
             state_->nodes[node_index].first = static_cast<std::uint32_t>(first);
             state_->nodes[node_index].count = static_cast<std::uint32_t>(count);
+            for (std::size_t index = first; index < last; ++index)
+                state_->entry_leaves[index] = node_index;
             return node_index;
         }
 
@@ -301,12 +311,17 @@ SceneSpatialIndex::SceneSpatialIndex(const SceneSnapshot &snapshot, const SceneV
                          [axis](const Entry &lhs, const Entry &rhs) {
                              return centroid(lhs.bounds, axis) < centroid(rhs.bounds, axis);
                          });
-        state_->nodes[node_index].left = self(self, first, middle);
-        state_->nodes[node_index].right = self(self, middle, last);
+        state_->nodes[node_index].left = self(self, first, middle, node_index);
+        state_->nodes[node_index].right = self(self, middle, last, node_index);
         return node_index;
     };
-    if (!state_->entries.empty())
-        build_node(build_node, 0, state_->entries.size());
+    if (!state_->entries.empty()) {
+        state_->entry_leaves.resize(state_->entries.size(), invalid_slot);
+        build_node(build_node, 0, state_->entries.size(), invalid_slot);
+        state_->entry_indices.reserve(state_->entries.size());
+        for (std::size_t index = 0; index < state_->entries.size(); ++index)
+            state_->entry_indices.emplace(state_->entries[index].node, index);
+    }
 }
 
 SceneSpatialIndex::~SceneSpatialIndex() = default;
@@ -315,6 +330,50 @@ SceneSpatialIndex &SceneSpatialIndex::operator=(SceneSpatialIndex &&) noexcept =
 
 std::uint64_t SceneSpatialIndex::source_revision() const noexcept {
     return state_ ? state_->revision : 0;
+}
+
+bool SceneSpatialIndex::update_node_bounds(const SceneSnapshot &snapshot, NodeId node) noexcept {
+    if (!state_ || !node.valid() || !state_->pose_transforms.empty() ||
+        state_->incremental_refits >= max_incremental_refits)
+        return false;
+    const auto &before = state_->snapshot.revisions();
+    const auto &after = snapshot.revisions();
+    if (after.transform < before.transform || after.transform - before.transform > 1)
+        return false;
+    if (before.hierarchy != after.hierarchy || before.geometry != after.geometry ||
+        before.material != after.material || before.visibility != after.visibility ||
+        before.source != after.source || before.name != after.name ||
+        before.camera != after.camera || before.light != after.light)
+        return false;
+    const auto entry = state_->entry_indices.find(node);
+    if (entry == state_->entry_indices.end())
+        return false;
+    const auto *updated = snapshot.find_node(node);
+    if (!updated || !updated->bounds.valid)
+        return false;
+
+    auto &entry_value = state_->entries[entry->second];
+    entry_value.bounds = updated->bounds;
+    auto node_index = state_->entry_leaves[entry->second];
+    while (node_index != invalid_slot) {
+        auto &branch = state_->nodes[node_index];
+        Bounds bounds;
+        if (branch.leaf()) {
+            for (std::uint32_t index = 0; index < branch.count; ++index)
+                bounds = merge_bounds(bounds,
+                                      state_->entries[branch.first + index].bounds);
+        } else {
+            bounds = merge_bounds(state_->nodes[branch.left].bounds,
+                                  state_->nodes[branch.right].bounds);
+        }
+        branch.bounds = bounds;
+        node_index = branch.parent;
+    }
+    state_->snapshot = snapshot;
+    state_->revision = snapshot.revision();
+    ++state_->incremental_refits;
+    state_->results.clear();
+    return true;
 }
 
 std::span<const NodeId> SceneSpatialIndex::query_bounds(const Bounds &bounds) const {

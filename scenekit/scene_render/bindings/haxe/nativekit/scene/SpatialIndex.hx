@@ -34,6 +34,15 @@ class SpatialIndex {
 		return result.out_revision;
 	}
 
+	/** Refit this index after a transform-only update to one existing node. */
+	public function updateNode(snapshot:SceneSnapshot, node:NodeId):Bool {
+		ensureLive();
+		var result = NativeKitSceneRender.nkscene_render_spatial_index_update_node(
+			owner.borrow(), snapshot.nativeHandle(), node.nativeValue());
+		check(result.status, "spatialIndex.updateNode");
+		return result.out_updated != 0;
+	}
+
 	/** Returns nodes whose snapshot bounds overlap the supplied box. */
 	public function queryBounds(minX:Float, minY:Float, minZ:Float,
 			maxX:Float, maxY:Float, maxZ:Float):Array<NodeId> {

@@ -1544,14 +1544,15 @@ class EditorScene {
       throw "Position requires finite X and Y coordinates";
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
+    var runtime = runtimeFor(id);
     var current = Transform.identity().translated(x, y, item.z);
     var transaction = scene.beginTransaction();
     try {
-      transaction.setTransform(runtimeFor(id).node, current);
+      transaction.setTransform(runtime.node, current);
       transaction.commit();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
     item.x = x; item.y = y;
-    publish();
+    publish(runtime.node);
   }
 
   /** Records a move whose final position has already been applied as a drag preview. */
@@ -1653,12 +1654,12 @@ class EditorScene {
     replaceObjects(data, selectedId);
   }
 
-  function publish():Void {
+  function publish(?updatedNode:NodeId):Void {
     nextRevision++;
     revision = nextRevision;
     nextEnvironmentRevision++;
     environmentRevision = nextEnvironmentRevision;
-    rebuildPresentation();
+    rebuildPresentation(updatedNode);
   }
 
   /** Derived presentation caches may lag a committed edit and retry on the next access/frame. */
@@ -1666,14 +1667,15 @@ class EditorScene {
     if (presentationStale) rebuildPresentation();
   }
 
-  function rebuildPresentation():Void {
+  function rebuildPresentation(?updatedNode:NodeId):Void {
     var next:Null<SceneSnapshot> = null;
     var nextSpatial:Null<SpatialIndex> = null;
     try {
       failIfInjected("publish.snapshot");
       next = scene.snapshot();
       failIfInjected("publish.spatial-index");
-      nextSpatial = SpatialIndex.create(next);
+      if (updatedNode == null || !spatial.updateNode(next, updatedNode))
+        nextSpatial = SpatialIndex.create(next);
     } catch (_:Dynamic) {
       if (nextSpatial != null) try nextSpatial.dispose() catch (_:Dynamic) {}
       if (next != null) try next.dispose() catch (_:Dynamic) {}
@@ -1683,9 +1685,9 @@ class EditorScene {
     var previousSnapshot = snapshot;
     var previousSpatial = spatial;
     snapshot = next;
-    spatial = nextSpatial;
+    if (nextSpatial != null) spatial = nextSpatial;
     presentationStale = false;
-    try previousSpatial.dispose() catch (_:Dynamic) {}
+    if (nextSpatial != null) try previousSpatial.dispose() catch (_:Dynamic) {}
     try previousSnapshot.dispose() catch (_:Dynamic) {}
   }
 

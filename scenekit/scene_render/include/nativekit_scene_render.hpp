@@ -328,6 +328,8 @@ class NKSRENDER_API SceneSpatialIndex {
     SceneSpatialIndex &operator=(const SceneSpatialIndex &) = delete;
 
     std::uint64_t source_revision() const noexcept;
+    /** Refit one existing node after a transform-only snapshot update. */
+    bool update_node_bounds(const SceneSnapshot &snapshot, NodeId node) noexcept;
     std::span<const NodeId> query_bounds(const Bounds &) const;
     /** Returns snapshot nodes whose bounds intersect all supplied planes. */
     std::span<const NodeId> query_frustum(std::span<const std::array<float, 4>> planes) const;
