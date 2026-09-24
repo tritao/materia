@@ -56,9 +56,34 @@ class SceneCodec {
         overrideValue
       ));
     }
+    var identityFields = ["identityVersion", "packageId", "packageVersion",
+      "sourceSha256", "configurationSha256"];
+    var identityCount = 0;
+    for (name in identityFields) if (Reflect.hasField(value, name)) identityCount++;
+    if (identityCount != 0 && identityCount != identityFields.length)
+      throw "Incomplete setup script identity";
+    var packageId:Null<String> = null, packageVersion:Null<String> = null;
+    var sourceSha256:Null<String> = null, configurationSha256:Null<String> = null;
+    var identityVersion:Null<Int> = null;
+    if (identityCount != 0) {
+      identityVersion = Std.int(numberField(value, "identityVersion"));
+      if (identityVersion != 1) throw "Unsupported setup script identity version";
+      packageId = stringField(value, "packageId");
+      packageVersion = stringField(value, "packageVersion");
+      sourceSha256 = stringField(value, "sourceSha256");
+      configurationSha256 = stringField(value, "configurationSha256");
+      if (!~/^[0-9a-f]{64}$/.match(sourceSha256)
+        || !~/^[0-9a-f]{64}$/.match(configurationSha256))
+        throw "Invalid setup script digest";
+    }
     return {
       reference: reference,
       version: version,
+      identityVersion: identityVersion,
+      packageId: packageId,
+      packageVersion: packageVersion,
+      sourceSha256: sourceSha256,
+      configurationSha256: configurationSha256,
       overrideVersion: ScriptOwnership.OVERRIDE_VERSION,
       overridesEnabled: overridesEnabled,
       overrides: overrides

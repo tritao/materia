@@ -46,8 +46,16 @@ class ProjectDocumentSession {
     if(script!=null){
       var nextBim = SceneCodec.decodeBim(text);
       var nextDocument = createDocument();
-      var ownership=new ScriptOwnership(script.reference,script,nextDocument),materialized:ScriptMaterialization;
-      try materialized=ownership.materialize() catch(error:Dynamic){ownership.dispose();nextBim.close();throw error;}
+      var ownership:Null<ScriptOwnership> = null;
+      var materialized:ScriptMaterialization;
+      try {
+        ownership = new ScriptOwnership(script.reference,script,nextDocument);
+        materialized = ownership.materialize();
+      } catch(error:Dynamic) {
+        if (ownership != null) ownership.dispose();
+        nextBim.close();
+        throw error;
+      }
       replace(materialized.scene,materialized.sensors,absolute,ownership,nextBim,nextDocument);return;
     }
     var data = SceneCodec.decode(text);

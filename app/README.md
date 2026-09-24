@@ -127,6 +127,13 @@ robots or environment. Renamed or removed IDs are reported as stale overrides.
 They can be removed explicitly, while all override changes and reversions remain undoable.
 Older numeric rate overrides migrate to the current typed contract when opened;
 unsupported future contracts are rejected before replacing the document.
+New files also store a versioned package ID, package version, SHA-256 source digest,
+and SHA-256 digest of the canonical evaluated configuration. Opening a file with
+different compiled script content rejects the replacement and leaves the current
+project open. Legacy files acquire these identities when saved. After editing the
+bundled example source, regenerate its committed source manifest with
+`python3 app/tools/check-script-identity.py --write`; the scripted test command
+checks that the manifest matches the source.
 
 The same registry and validation/rebuild path has a headless entry point:
 
