@@ -9,6 +9,7 @@ import nativekit.ui.core.PropertyOption;
 import nativekit.ui.core.PropertyType;
 import nativekit.ui.core.PropertyValue;
 import robotkit.model.Frame;
+import robotkit.model.CollisionApproximation;
 import robotkit.model.Actuator;
 import robotkit.model.Joint;
 import robotkit.model.JointLimits;
@@ -187,10 +188,18 @@ class SensorConfiguration {
   function singleRecordFor(id:String,value:RobotModel):Dynamic return {
     robotId: id,
     name: value.name,
+    modelVersion: RobotModel.CURRENT_VERSION,
+    collisionApproximation: value.collisionApproximation,
     pose: {position:robotPosition(id), rotation:robotRotation(id)},
-    links: [for (link in value.links) {id:link.id, name:link.name}],
+    links: [for (link in value.links) {id:link.id, name:link.name, mass:link.mass,
+      centerOfMass:link.centerOfMass.copy(), inertiaTensor:link.inertiaTensor.copy(),
+      visualGeometry:link.visualGeometry, collisionGeometry:link.collisionGeometry}],
     joints: [for (joint in value.joints) {id:joint.id, name:joint.name, type:joint.type,
       parentId:joint.parent.id, childId:joint.child.id,
+      parentFramePosition:joint.parentFramePosition.copy(),
+      parentFrameRotation:joint.parentFrameRotation.copy(),
+      childFramePosition:joint.childFramePosition.copy(),
+      childFrameRotation:joint.childFrameRotation.copy(), axis:joint.axis.copy(),
       limits:{lower:joint.limits.lower,upper:joint.limits.upper,
         velocity:joint.limits.velocity,effort:joint.limits.effort},
       drive:joint.drive==null?null:{name:joint.drive.name,maxEffort:joint.drive.maxEffort,
@@ -242,9 +251,19 @@ class SensorConfiguration {
 
   function loadRobot(data:Dynamic):Void {
     robotId = requiredString(data, "robotId");
+    var rawVersion:Dynamic = Reflect.field(data, "modelVersion");
+    var modelVersion = rawVersion == null ? 1 : requiredInteger(data, "modelVersion");
+    if (modelVersion < 1 || modelVersion > RobotModel.CURRENT_VERSION)
+      throw 'Unsupported RobotModel version $modelVersion';
     var modelName:Dynamic=Reflect.field(data,"name");
     model = new RobotModel(Std.isOfType(modelName,String)&&StringTools.trim(cast modelName).length>0
       ? cast modelName : "Materia robot");
+    if (modelVersion >= 2) {
+      var approximation = requiredString(data, "collisionApproximation");
+      if (approximation != CollisionApproximation.BoundsBox && approximation != CollisionApproximation.None)
+        throw "Unsupported collision approximation policy";
+      model.collisionApproximation = cast approximation;
+    }
     var pose:Dynamic=Reflect.field(data,"pose");
     var loadedPosition=pose==null?[0.0,0.0,0.0]:vector(pose,"position",3);
     var loadedRotation=pose==null?[0.0,0.0,0.0,1.0]:vector(pose,"rotation",4);
@@ -254,6 +273,13 @@ class SensorConfiguration {
     var links = new Map<String, Link>();
     for (value in requiredArray(data, "links")) {
       var link = model.addLink(new Link(requiredString(value, "name"), requiredString(value, "id")));
+      if (modelVersion >= 2) {
+        link.mass = finite(value, "mass");
+        link.centerOfMass = vector(value, "centerOfMass", 3);
+        link.inertiaTensor = vector(value, "inertiaTensor", 9);
+        link.visualGeometry = optionalString(value, "visualGeometry");
+        link.collisionGeometry = optionalString(value, "collisionGeometry");
+      }
       if (links.exists(link.id)) throw "Duplicate sensor document link ID";
       links.set(link.id, link);
     }
@@ -265,6 +291,13 @@ class SensorConfiguration {
       if(parent==null||child==null)throw "Sensor joint references an unknown link";
       var kind:String=requiredString(value,"type");
       var joint=new Joint(requiredString(value,"name"),cast kind,parent,child,requiredString(value,"id"));
+      if (modelVersion >= 2) {
+        joint.parentFramePosition = vector(value, "parentFramePosition", 3);
+        joint.parentFrameRotation = vector(value, "parentFrameRotation", 4);
+        joint.childFramePosition = vector(value, "childFramePosition", 3);
+        joint.childFrameRotation = vector(value, "childFrameRotation", 4);
+        joint.axis = vector(value, "axis", 3);
+      }
       var limits:Dynamic=Reflect.field(value,"limits");
       if(limits==null)throw "Sensor joint requires limits";
       joint.limits=new JointLimits(finite(limits,"lower"),finite(limits,"upper"),
@@ -317,6 +350,13 @@ class SensorConfiguration {
   }
   static function requiredString(value:Dynamic, name:String):String {
     var field = Reflect.field(value, name); if (!Std.isOfType(field, String) || StringTools.trim(field).length == 0) throw 'Invalid sensor document field $name'; return cast field;
+  }
+  static function optionalString(value:Dynamic, name:String):Null<String> {
+    var field:Dynamic = Reflect.field(value, name);
+    if (field == null) return null;
+    if (!Std.isOfType(field, String) || SceneCodec.containsNul(cast field))
+      throw 'Invalid sensor document field $name';
+    return cast field;
   }
   static function finite(value:Dynamic, name:String):Float {
     var field = Reflect.field(value, name); if (!Std.isOfType(field, Float) && !Std.isOfType(field, Int)) throw 'Invalid sensor document field $name';

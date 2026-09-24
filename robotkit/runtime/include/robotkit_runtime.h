@@ -74,9 +74,10 @@ extern "C" {
 /** API-wide limits and version identifiers. */
 enum {
     RK_MAX_JOINTS = 64, /**< Maximum joints carried by one fixed-size ABI value. */
+    RK_MAX_LINKS = 128,
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 3 /**< Version of the RobotKit C data contract (configured sensors). */
+    RK_API_VERSION = 4 /**< Version of the RobotKit C data contract (physical model v2). */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -237,7 +238,19 @@ typedef struct rk_robot_runtime_joint {
     double lower_limit; /**< Inclusive lower position limit, in SI units. */
     double upper_limit; /**< Inclusive upper position limit, in SI units. */
     double max_effort; /**< Maximum supported effort, in SI units. */
+    double parent_frame_position[3];
+    double parent_frame_rotation[4]; /**< Unit quaternion xyzw. */
+    double child_frame_position[3];
+    double child_frame_rotation[4]; /**< Unit quaternion xyzw. */
+    double axis[3]; /**< Unit vector in the parent joint frame. */
 } rk_robot_runtime_joint;
+
+enum { RK_COLLISION_APPROXIMATION_NONE = 0, RK_COLLISION_APPROXIMATION_BOUNDS_BOX = 1 };
+typedef struct rk_robot_runtime_link {
+    double mass;
+    double center_of_mass[3];
+    double inertia_tensor[9]; /**< Row-major, symmetric kg m² tensor. */
+} rk_robot_runtime_link;
 
 enum { RK_SENSOR_ENCODER = 1, RK_SENSOR_IMU = 2, RK_SENSOR_LIDAR = 3 };
 
@@ -276,9 +289,10 @@ typedef struct rk_robot_runtime_blueprint {
     uint32_t joint_count; /**< Number of valid entries in joints. */
     uint32_t link_count; /**< Number of links referenced by the joints. */
     uint32_t frame_count; /**< Number of compiled reference frames. */
-    uint32_t reserved0;
+    uint32_t collision_approximation;
     uint64_t reserved[2];
     rk_robot_runtime_joint joints[RK_MAX_JOINTS];
+    rk_robot_runtime_link links[RK_MAX_LINKS];
     uint32_t sensor_count; /**< Zero selects the default base-mounted simulation sensors. */
     rk_sensor_config sensors[RK_MAX_SENSORS];
 } rk_robot_runtime_blueprint;

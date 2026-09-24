@@ -17,6 +17,8 @@ class RobotRuntimeBlueprint {
   public final frameCount:Int;
   public final joints:Array<RobotRuntimeJointBlueprint> = [];
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
+  public final links:Array<RobotRuntimeLinkBlueprint> = [];
+  public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
 
   public function sensorLayout():Array<RobotRuntimeSensorBlueprint> {
     if (sensors.length > 0) return sensors.copy();
@@ -29,13 +31,16 @@ class RobotRuntimeBlueprint {
   public function new(revision:Int, jointCount:Int, linkCount:Int,
       ?frameCount:Int = 0, ?identity:RobotRuntimeIdentity) {
     if (revision < 0 || jointCount < 0 || jointCount > RobotKitRuntimeConstants.RK_MAX_JOINTS ||
-        linkCount < 1 || frameCount < 0)
+        linkCount < 1 || linkCount > RobotKitRuntimeConstants.RK_MAX_LINKS || frameCount < 0)
       throw "Invalid RobotKit runtime blueprint";
     this.identity = identity;
     this.revision = revision;
     this.jointCount = jointCount;
     this.linkCount = linkCount;
     this.frameCount = frameCount;
+    for (_ in 0...linkCount)
+      links.push(new RobotRuntimeLinkBlueprint(1.0, [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]));
   }
 
   public function addJoint(value:RobotRuntimeJointBlueprint):Void {
@@ -54,12 +59,15 @@ class RobotRuntimeBlueprint {
     value.set_joint_count(jointCount);
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);
+    value.set_collision_approximation(collisionApproximation);
     var layout = sensorLayout();
     if (layout.length > RobotKitRuntimeConstants.RK_MAX_SENSORS) throw "Too many sensors";
     value.set_sensor_count(layout.length);
     for (i in 0...layout.length) value.set_sensors(i, layout[i].nativeValue());
     for (index in 0...joints.length)
       value.set_joints(index, joints[index].nativeValue());
+    if (links.length != linkCount) throw "RobotKit runtime blueprint is missing link physical properties";
+    for (index in 0...links.length) value.set_links(index, links[index].nativeValue());
     return value;
   }
 

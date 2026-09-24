@@ -128,9 +128,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.struct_size = sizeof(desc);
             desc.node = binding->nodes_[index];
             desc.motion_type = index == root ? NKSIM_MOTION_KINEMATIC : NKSIM_MOTION_DYNAMIC;
-            desc.mass = 1.0;
+            desc.mass = blueprint.links[index].mass;
             desc.shape = shape_;
-            desc.collision_layer = desc.collision_mask = 1;
+            desc.collision_layer = 1;
+            desc.collision_mask = blueprint.collision_approximation == RK_COLLISION_APPROXIMATION_NONE ? 0 : 1;
             nksim_body body = 0;
             require_sim(nksim_body_create(world_, &desc, &body), "nksim_body_create");
             binding->bodies_.push_back(body);
@@ -143,7 +144,18 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.type = source.type;
             desc.body_a = binding->bodies_[source.parent_link];
             desc.body_b = binding->bodies_[source.child_link];
-            desc.axis_a[2] = 1.0;
+            std::copy_n(source.parent_frame_position, 3, desc.anchor_a);
+            std::copy_n(source.child_frame_position, 3, desc.anchor_b);
+            const auto *q = source.parent_frame_rotation;
+            const auto *a = source.axis;
+            const double t[3] = {
+                2.0 * (q[1]*a[2] - q[2]*a[1]),
+                2.0 * (q[2]*a[0] - q[0]*a[2]),
+                2.0 * (q[0]*a[1] - q[1]*a[0])
+            };
+            desc.axis_a[0] = a[0] + q[3]*t[0] + q[1]*t[2] - q[2]*t[1];
+            desc.axis_a[1] = a[1] + q[3]*t[1] + q[2]*t[0] - q[0]*t[2];
+            desc.axis_a[2] = a[2] + q[3]*t[2] + q[0]*t[1] - q[1]*t[0];
             desc.lower_limit = source.lower_limit;
             desc.upper_limit = source.upper_limit;
             desc.max_force = source.max_effort;

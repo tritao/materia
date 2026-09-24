@@ -2,6 +2,7 @@ package robotkit.runtime;
 
 import robotkit.model.RobotModel;
 import robotkit.model.JointType;
+import robotkit.model.CollisionApproximation;
 import RobotKitRuntime;
 
 /** Compiles the editable semantic robot model into an execution blueprint. */
@@ -22,7 +23,18 @@ class RobotRuntimeCompiler {
         [for (joint in robot.joints) joint.id],
         robot.sensors.length == 0 ? ["joint_encoders", "imu", "lidar"] : [for (sensor in robot.sensors) sensor.id],
         [for (frame in robot.frames) frame.id],
-        [for (frame in robot.frames) frame.link.id]));
+        [for (frame in robot.frames) frame.link.id],
+        [for (link in robot.links) link.visualGeometry],
+        [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation));
+    result.collisionApproximation = switch (robot.collisionApproximation) {
+      case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
+      case CollisionApproximation.BoundsBox: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+      default: throw 'Unknown collision approximation ${robot.collisionApproximation}';
+    };
+    for (index in 0...robot.links.length) {
+      var link = robot.links[index];
+      result.links[index] = new RobotRuntimeLinkBlueprint(link.mass, link.centerOfMass, link.inertiaTensor);
+    }
     for (index in 0...robot.joints.length) {
       var joint:robotkit.model.Joint = robot.joints[index];
       var parent = robot.links.indexOf(joint.parent);
@@ -48,7 +60,9 @@ class RobotRuntimeCompiler {
           maxRate = drive.maxRate;
       }
       result.addJoint(new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
-        joint.limits.lower, joint.limits.upper, maxEffort, maxRate));
+        joint.limits.lower, joint.limits.upper, maxEffort, maxRate,
+        joint.parentFramePosition, joint.parentFrameRotation,
+        joint.childFramePosition, joint.childFrameRotation, joint.axis));
     }
     var children = [for (joint in robot.joints) joint.child];
     var root = robot.links[0];
@@ -88,6 +102,11 @@ class RobotRuntimeCompiler {
     if (robot.joints.length > RobotKitRuntimeConstants.RK_MAX_JOINTS)
       diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_LIMIT", "joints",
         'robot contains ${robot.joints.length} joints, but the runtime supports at most ${RobotKitRuntimeConstants.RK_MAX_JOINTS}'));
+    if (robot.links.length > RobotKitRuntimeConstants.RK_MAX_LINKS)
+      diagnostics.push(new RobotCompileDiagnostic("RK_LINK_LIMIT", "links",
+        'robot contains ${robot.links.length} links, but the runtime supports at most ${RobotKitRuntimeConstants.RK_MAX_LINKS}'));
+    if (robot.collisionApproximation != CollisionApproximation.None && robot.collisionApproximation != CollisionApproximation.BoundsBox)
+      diagnostics.push(new RobotCompileDiagnostic("RK_COLLISION_APPROXIMATION", "collisionApproximation", "unsupported collision approximation"));
 
     var linkIds = new Map<String, Bool>();
     var linkNames = new Map<String, Bool>();
@@ -115,6 +134,14 @@ class RobotRuntimeCompiler {
           'duplicate link name "${link.name}"'));
       else
         linkNames.set(link.name, true);
+      if (!Math.isFinite(link.mass) || link.mass <= 0.0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_MASS", '$path.mass', "link mass must be finite and positive"));
+      if (!validVector(link.centerOfMass, 3))
+        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_COM", '$path.centerOfMass', "center of mass requires three finite values"));
+      if (!validInertia(link.inertiaTensor))
+        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_INERTIA", '$path.inertiaTensor', "inertia tensor must be finite, symmetric, and positive definite"));
+      if (!validGeometryReference(link.visualGeometry) || !validGeometryReference(link.collisionGeometry))
+        diagnostics.push(new RobotCompileDiagnostic("RK_LINK_GEOMETRY", path, "geometry reference must be null or a non-empty string"));
     }
 
     var jointIds = new Map<String, Bool>();
@@ -183,6 +210,11 @@ class RobotRuntimeCompiler {
         if (limitError != null)
           diagnostics.push(new RobotCompileDiagnostic("RK_LIMITS", '$path.limits', limitError));
       }
+      if (!validVector(joint.parentFramePosition, 3) || !validRotation(joint.parentFrameRotation)
+          || !validVector(joint.childFramePosition, 3) || !validRotation(joint.childFrameRotation))
+        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_FRAME", path, "joint frames require finite translations and unit xyzw quaternions"));
+      if (!validUnitVector(joint.axis))
+        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_AXIS", '$path.axis', "joint axis must be a finite unit vector"));
       // Cache the mutable nullable field before checking it. This makes the
       // narrowing explicit and keeps all actuator checks on one value.
       var drive = joint.drive;
@@ -331,4 +363,25 @@ class RobotRuntimeCompiler {
     for (v in value) norm += v*v;
     return Math.abs(norm - 1.0) < 0.000001;
   }
+
+  static function validUnitVector(value:Array<Float>):Bool {
+    if (!validVector(value, 3)) return false;
+    var norm = 0.0;
+    for (v in value) norm += v*v;
+    return Math.abs(norm - 1.0) < 0.000001;
+  }
+
+  static function validInertia(value:Array<Float>):Bool {
+    if (!validVector(value, 9)) return false;
+    var scale = 1.0;
+    for (v in value) if (Math.abs(v) > scale) scale = Math.abs(v);
+    var epsilon = scale * 1e-10;
+    if (Math.abs(value[1]-value[3]) > epsilon || Math.abs(value[2]-value[6]) > epsilon || Math.abs(value[5]-value[7]) > epsilon) return false;
+    var minor2 = value[0]*value[4]-value[1]*value[3];
+    var det = value[0]*(value[4]*value[8]-value[5]*value[7])-value[1]*(value[3]*value[8]-value[5]*value[6])+value[2]*(value[3]*value[7]-value[4]*value[6]);
+    return value[0] > epsilon && minor2 > epsilon*epsilon && det > epsilon*epsilon*epsilon;
+  }
+
+  static function validGeometryReference(value:Null<String>):Bool
+    return value == null || value.length > 0;
 }
