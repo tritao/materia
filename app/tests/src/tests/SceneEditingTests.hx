@@ -22,6 +22,7 @@ import robotkit.world.McapRecordingReader;
 import robotkit.world.ReplayRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.RobotCommand;
+import robotkit.world.JointTarget;
 import robotkit.model.Actuator;
 import robotkit.model.Frame;
 import robotkit.model.Joint;
@@ -648,7 +649,9 @@ class SceneEditingTests {
     for(value in mountedLidar.values.toArray())if(value<10.0)initialHit=true;
     check(mountedLidar.linkId=="arm"&&initialHit,
       "joint-mounted LiDAR observes the dynamic obstacle in MuJoCo");
-    mujocoWorld.submit("materia/robot-b",RobotCommand.JointPosition(0,0.6,null));
+    mujocoWorld.submit("materia/robot-b",RobotCommand.JointTargets([
+      JointTarget.position(0,0.6)
+    ],null));
     for(index in 0...8)mujocoObservation=mujocoSimulation.step();
     var mujocoRobot=mujocoObservation.robot("materia/robot");
     if(mujocoRobot==null)throw "MuJoCo world lost the configured robot";
