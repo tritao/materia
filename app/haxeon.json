@@ -6,6 +6,7 @@
 	"dependencies": {
 		"nativekit": { "path": "../nativekit" },
 		"cadkit": { "path": "../cadkit" },
+		"bimkit": { "path": "../bimkit" },
 		"uikit": { "path": "../uikit" },
 		"robotkit": { "path": "../robotkit" },
 		"scenekit": { "path": "../scenekit" }
