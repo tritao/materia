@@ -10,6 +10,7 @@ import nativekit.ui.editing.EditorDocument;
 import nativekit.ui.editing.EditHistory;
 import bimkit.BimDocument;
 import app.ProjectSceneRecord.ProjectSceneInstance;
+import materia.project.AssemblyRecord;
 
 /** Owns the current document; unsuccessful I/O leaves it and its history intact. */
 class ProjectDocumentSession {
@@ -25,6 +26,7 @@ class ProjectDocumentSession {
   public var generation(default, null):Int = 0;
   public var scriptOwnership(default,null):Null<ScriptOwnership> = null;
   public var projectReference(default,null):Null<String> = null;
+  public var projectAssembly(default,null):Null<AssemblyRecord> = null;
   var projectBaseline:Null<Array<SceneObjectData>> = null;
   /** Application-owned runtime cleanup invoked only after replacement data validates. */
   public var beforeReplace:Null<Void->Void> = null;
@@ -90,7 +92,8 @@ class ProjectDocumentSession {
   }
 
   /** Open generated geometry while retaining its source manifest. */
-  public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String):Void {
+  public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
+      ?assembly:AssemblyRecord):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -108,6 +111,7 @@ class ProjectDocumentSession {
       throw error;
     }
     replace(next, nextSensors, null, null, nextBim, nextDocument);
+    projectAssembly = assembly;
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -118,7 +122,8 @@ class ProjectDocumentSession {
     var reference = FilePath.isAbsolute(project.reference) ? project.reference
       : FilePath.join([FilePath.directory(absolute), project.reference]);
     reference = FileSystem.fullPath(reference);
-    var baseline = MateriaProjectRunner.load(reference);
+    var generated = MateriaProjectRunner.loadProject(reference);
+    var baseline = generated.objects;
     var data = materializeProject(baseline, project, SceneCodec.decode(text));
     var nextDocument = createDocument();
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
@@ -135,6 +140,7 @@ class ProjectDocumentSession {
     replace(next, nextSensors, absolute, null, nextBim, nextDocument);
     projectReference = reference;
     projectBaseline = baseline;
+    projectAssembly = generated.assembly;
   }
 
   /** Publishes a validated candidate without touching the currently running simulation. */
@@ -199,6 +205,7 @@ class ProjectDocumentSession {
     scriptOwnership=nextOwnership;
     projectReference = null;
     projectBaseline = null;
+    projectAssembly = null;
     bim=nextBim;
     path = file;
     generation++;
@@ -316,11 +323,11 @@ class ProjectDocumentSession {
     var value:Dynamic = withoutMesh(source);
     Reflect.setField(value, "id", id);
     for (field in ["label", "x", "y", "z", "width", "height", "depth",
-        "collisionEnabled", "dynamicBody", "mass", "red", "green", "blue", "visible"])
+        "collisionEnabled", "dynamicBody", "mass", "red", "green", "blue", "visible", "rotation"])
       if (Reflect.hasField(edit, field)) Reflect.setField(value, field, Reflect.field(edit, field));
     for (field in Reflect.fields(edit)) if (field != "id" && field != "type" &&
         ["label", "x", "y", "z", "width", "height", "depth", "collisionEnabled",
-          "dynamicBody", "mass", "red", "green", "blue", "visible"].indexOf(field) < 0)
+          "dynamicBody", "mass", "red", "green", "blue", "visible", "rotation"].indexOf(field) < 0)
       throw 'Project part "$id" has an unsupported edit';
     // Validate authored fields without serializing generated mesh data.
     Reflect.setField(value, "meshSnapshot", "_");
@@ -335,7 +342,8 @@ class ProjectDocumentSession {
       x: item.x, y: item.y, z: item.z,
       width: item.width, height: item.height, depth: item.depth,
       collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-      red: item.red, green: item.green, blue: item.blue, visible: item.visible};
+      red: item.red, green: item.green, blue: item.blue, visible: item.visible,
+      rotation: item.rotation};
   }
 
   static function sameAppearance(left:SceneObjectData, right:SceneObjectData):Bool
@@ -343,7 +351,14 @@ class ProjectDocumentSession {
       left.width == right.width && left.height == right.height && left.depth == right.depth &&
       left.collisionEnabled == right.collisionEnabled && left.dynamicBody == right.dynamicBody &&
       left.mass == right.mass && left.red == right.red && left.green == right.green &&
-      left.blue == right.blue && left.visible == right.visible;
+      left.blue == right.blue && left.visible == right.visible && sameRotation(left.rotation, right.rotation);
+
+  static function sameRotation(left:Null<Array<Float>>, right:Null<Array<Float>>):Bool {
+    if (left == null || right == null) return left == right;
+    if (left.length != 4 || right.length != 4) return false;
+    for (index in 0...4) if (left[index] != right[index]) return false;
+    return true;
+  }
 
   static function relativeReference(destination:String, target:String):String {
     var from = FilePath.normalize(FileSystem.fullPath(FilePath.directory(destination))).split("/");

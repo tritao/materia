@@ -5,6 +5,9 @@ import haxe.io.Bytes;
 import haxe.io.Path as ProjectPath;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactPart;
+import materia.project.AssemblyFrames;
+import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.project.AssemblyRecord;
 import sys.FileSystem;
 import sys.io.File;
 import sys.io.Process;
@@ -16,7 +19,9 @@ class MateriaProjectRunner {
   static final MAX_OUTPUT_BYTES:Int = 150000000;
   static var temporarySequence:Int = 0;
 
-  public static function load(projectPath:String):Array<SceneObjectData> {
+  public static function load(projectPath:String):Array<SceneObjectData> return loadProject(projectPath).objects;
+
+  public static function loadProject(projectPath:String):GeneratedAssemblyScene {
     var manifestPath = FileSystem.fullPath(projectPath);
     if (!FileSystem.exists(manifestPath) || FileSystem.isDirectory(manifestPath))
       throw 'Materia project file not found: $manifestPath';
@@ -49,7 +54,7 @@ class MateriaProjectRunner {
       "materia-project-" + Sys.getPid() + "-" + temporarySequence]);
     FileSystem.createDirectory(temporaryRoot);
     var outputPrefix = ProjectPath.join([temporaryRoot, "preview"]);
-    var records:Array<SceneObjectData>;
+    var records:GeneratedAssemblyScene;
     try {
       Sys.println("Materia project: compiling its entrypoint");
       buildModule(haxe, home, tools, haxeonManifest, fieldText(entry, "module"),
@@ -68,7 +73,7 @@ class MateriaProjectRunner {
       Sys.println('Materia project: received binary geometry artifact (${result.length} bytes)');
       if (result.length > MAX_OUTPUT_BYTES) throw "Project geometry preview exceeds the 150 MB limit";
       records = previewRecords(result);
-      Sys.println('Materia project: decoded ${records.length} component records');
+      Sys.println('Materia project: decoded ${records.objects.length} component records');
     } catch (error:Dynamic) {
       cleanupArtifacts(outputPrefix, temporaryRoot);
       throw error;
@@ -132,10 +137,13 @@ class MateriaProjectRunner {
     }
   }
 
-  static function previewRecords(snapshot:Bytes):Array<SceneObjectData> {
+  static function previewRecords(snapshot:Bytes):GeneratedAssemblyScene {
     var artifact = SceneArtifact.decode(snapshot);
     var records:Array<SceneObjectData> = [];
     var scale = artifact.metresPerUnit;
+    var poses = new Map<String, AssemblyFrame>();
+    if (artifact.assembly != null)
+      for (instance in artifact.assembly.instances) poses.set(instance.id, instance.pose);
     for (component in artifact.parts) {
       var label = component.name;
       var minimum = [1e300, 1e300, 1e300], maximum = [-1e300, -1e300, -1e300];
@@ -147,18 +155,25 @@ class MateriaProjectRunner {
       }
       var componentSnapshot = encodeSnapshot(component, minimum, maximum, scale);
       if (componentSnapshot.length > 50000000) throw 'Project component "$label" exceeds the 50 MB mesh limit';
+      var centerX = (minimum[0] + maximum[0]) * 0.5;
+      var centerY = (minimum[1] + maximum[1]) * 0.5;
+      var centerZ = (minimum[2] + maximum[2]) * 0.5;
+      var pose = poses.get(component.id);
+      var center = pose == null ? {x: centerX, y: centerY, z: centerZ}
+        : AssemblyFrames.transformPoint(pose, centerX, centerY, centerZ);
       records.push({id: "project:" + component.id, label: label, type: "cad-preview",
-        x: (minimum[0] + maximum[0]) * scale * 0.5,
-        y: (minimum[1] + maximum[1]) * scale * 0.5,
-        z: (minimum[2] + maximum[2]) * scale * 0.5,
+        x: center.x * scale,
+        y: center.y * scale,
+        z: center.z * scale,
         width: Math.max(0.000001, (maximum[0] - minimum[0]) * scale),
         height: Math.max(0.000001, (maximum[1] - minimum[1]) * scale),
         depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
         collisionEnabled: false, dynamicBody: false, mass: 1.0,
         red: component.red, green: component.green, blue: component.blue,
-        visible: true, meshSnapshot: componentSnapshot});
+        visible: true, meshSnapshot: componentSnapshot,
+        rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]});
     }
-    return records;
+    return {objects: records, assembly: artifact.assembly};
   }
 
   static function encodeSnapshot(component:SceneArtifactPart, minimum:Array<Float>,
@@ -211,4 +226,9 @@ class MateriaProjectRunner {
     return cast result;
   }
 
+}
+
+typedef GeneratedAssemblyScene = {
+  var objects:Array<SceneObjectData>;
+  var assembly:Null<AssemblyRecord>;
 }

@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "procedural-excavator-example" },
 	"entry": "ProceduralExcavatorPreview",
-	"sources": ["ProceduralExcavator.hx", "ProceduralExcavatorPreview.hx"],
+	"sources": ["ProceduralExcavator.hx", "ProceduralExcavatorAssembly.hx", "ProceduralExcavatorPreview.hx"],
 	"sourceRoots": ["."],
 	"dependencies": {
 		"projectkit": { "path": "../../../projectkit" },

@@ -112,7 +112,7 @@ class ProceduralExcavator {
 	}
 
 	static function buildBasePin():Part {
-		return Part.cylinder(10, 100);
+		return cylinderBetween(new Vector(-1, 50, 85), new Vector(-1, -50, 85), 10);
 	}
 
 	static function buildBoom():Part {
@@ -159,7 +159,9 @@ class ProceduralExcavator {
 				hole(mapProfilePoint(144, 124, anchorX, anchorZ, scaleX, scaleZ).x,
 					mapProfilePoint(144, 124, anchorX, anchorZ, scaleX, scaleZ).z, 9.75),
 				hole(mapProfilePoint(85, 157, anchorX, anchorZ, scaleX, scaleZ).x,
-					mapProfilePoint(85, 157, anchorX, anchorZ, scaleX, scaleZ).z, 6.3)
+					mapProfilePoint(85, 157, anchorX, anchorZ, scaleX, scaleZ).z, 6.3),
+				hole(320, 108, 5),
+				hole(290, 116, 4)
 			]));
 			var eye = scope.own(pinEye(anchorX, anchorZ, 16.5, 9.75, 32));
 			var result = scope.own(plate.combine(eye));

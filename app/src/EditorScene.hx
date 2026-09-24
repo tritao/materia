@@ -263,7 +263,7 @@ class EditorScene {
       candidates.push(new EditorSceneObject(item.id, item.label, item.type,
         item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
         item.mass, item.red, item.green, item.blue, storedCadGraph,
-        item.x, item.y, item.z, item.visible, item.meshSnapshot));
+        item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation));
     }
     profileLoadEnd("geometryData", preparationStarted);
 
@@ -285,7 +285,7 @@ class EditorScene {
         transaction.setVisibility(node, item.visible);
         transaction.setGeometry(node, geometries[index]);
         transaction.setMaterial(node, materials[index]);
-        transaction.setTransform(node, Transform.identity().translated(item.x, item.y, item.z));
+        transaction.setTransform(node, objectTransform(item.x, item.y, item.z, item.rotation));
         nodes.push(node);
       }
       profileLoadEnd("transactionPrepare", preparationStarted);
@@ -941,7 +941,7 @@ class EditorScene {
       width: source.width, height: source.height, red: source.red, green: source.green,
       blue: source.blue, visible: source.visible,depth:source.depth,
       collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass,
-      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot});
+      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot,rotation:source.rotation});
     return changeObjects("Duplicate object", data, id);
   }
 
@@ -1280,7 +1280,7 @@ class EditorScene {
           prepared.transaction.setVisibility(node, record.visible);
           prepared.transaction.setGeometry(node, geometry);
           prepared.transaction.setMaterial(node, material);
-          prepared.transaction.setTransform(node, Transform.identity().translated(record.x, record.y, record.z));
+          prepared.transaction.setTransform(node, objectTransform(record.x, record.y, record.z, record.rotation));
           prepared.bridgeEntries.set(record.id, new EditorSceneRuntimeObject(node, geometry, material));
           prepared.nodeEntries.set(SceneBridge.nodeKey(node), record.id);
           failIfInjected("prepare.bridge-attach");
@@ -1288,7 +1288,7 @@ class EditorScene {
             record.width, record.height, record.depth, record.collisionEnabled,
             record.dynamicBody, record.mass, record.red, record.green, record.blue,
             storedGraph,
-            record.x, record.y, record.z, record.visible, record.meshSnapshot);
+            record.x, record.y, record.z, record.visible, record.meshSnapshot, record.rotation);
           prepared.objects.push(item);
           failIfInjected("prepare.new-object");
           prepared.changed = true;
@@ -1300,19 +1300,21 @@ class EditorScene {
             item.x != record.x || item.y != record.y || item.z != record.z ||
             item.width != record.width || item.height != record.height || item.depth != record.depth ||
             item.kind != record.type || item.cadGraph != storedGraph ||
-            item.meshSnapshot != record.meshSnapshot ||
+            item.meshSnapshot != record.meshSnapshot || !sameRotation(item.rotation, record.rotation) ||
             item.collisionEnabled != record.collisionEnabled || item.dynamicBody != record.dynamicBody ||
             item.mass != record.mass || item.red != record.red || item.green != record.green ||
             item.blue != record.blue;
           if (objectChanged) candidate = copyEditorSceneObject(item);
           if (item.label != record.label) prepared.transaction.setName(runtime.node, record.label);
           if (item.visible != record.visible) prepared.transaction.setVisibility(runtime.node, record.visible);
-          if (item.x != record.x || item.y != record.y || item.z != record.z) {
-            prepared.transaction.setTransform(runtime.node, Transform.identity().translated(record.x, record.y, record.z));
+          if (item.x != record.x || item.y != record.y || item.z != record.z ||
+              !sameRotation(item.rotation, record.rotation)) {
+            prepared.transaction.setTransform(runtime.node,
+              objectTransform(record.x, record.y, record.z, record.rotation));
             prepared.changedBounds.push(runtime.node);
           }
           if (item.label != record.label || item.visible != record.visible || item.x != record.x ||
-              item.y != record.y || item.z != record.z) prepared.changed = true;
+              item.y != record.y || item.z != record.z || !sameRotation(item.rotation, record.rotation)) prepared.changed = true;
           if (item.width != record.width || item.height != record.height || item.depth != record.depth ||
               item.kind != record.type || item.cadGraph != storedGraph || item.meshSnapshot != record.meshSnapshot) {
             var geometryData = session != null
@@ -1349,6 +1351,7 @@ class EditorScene {
           candidate.mass = record.mass; candidate.red = record.red; candidate.green = record.green; candidate.blue = record.blue;
           candidate.cadGraph = storedGraph; candidate.x = record.x; candidate.y = record.y; candidate.z = record.z;
           candidate.meshSnapshot = record.meshSnapshot;
+          candidate.rotation = record.rotation;
           candidate.visible = record.visible;
           if (objectChanged) prepared.changed = true;
           prepared.objects.push(candidate);
@@ -1407,7 +1410,7 @@ class EditorScene {
   static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
     return new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
       item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
-      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot);
+      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation);
   }
 
   public function setName(id:String, label:String):Void {
@@ -1496,6 +1499,18 @@ class EditorScene {
       .set(4,2*(x*y-z*w)).set(5,1-2*(x*x+z*z)).set(6,2*(y*z+x*w))
       .set(8,2*(x*z+y*w)).set(9,2*(y*z-x*w)).set(10,1-2*(x*x+y*y))
       .translated(position[0],position[1],position[2]);
+  }
+
+  static function objectTransform(x:Float, y:Float, z:Float,
+      rotation:Null<Array<Float>>):Transform
+    return rotation == null ? Transform.identity().translated(x, y, z)
+      : poseTransform([x, y, z], rotation);
+
+  static function sameRotation(left:Null<Array<Float>>, right:Null<Array<Float>>):Bool {
+    if (left == null || right == null) return left == right;
+    if (left.length != 4 || right.length != 4) return false;
+    for (index in 0...4) if (left[index] != right[index]) return false;
+    return true;
   }
 
   public function select(id:String):Bool {
@@ -1794,7 +1809,7 @@ class EditorScene {
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
     var runtime = runtimeFor(id);
-    var current = Transform.identity().translated(x, y, item.z);
+    var current = objectTransform(x, y, item.z, item.rotation);
     var transaction = scene.beginTransaction();
     try {
       transaction.setTransform(runtime.node, current);
@@ -2368,7 +2383,8 @@ class EditorScene {
         x: item.x, y: item.y, z: item.z,
         width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
-        visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot});
+        visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
+        rotation:item.rotation});
     }
     return result;
   }
@@ -2496,19 +2512,22 @@ class EditorSceneObject {
   public var blue:Float;
   public var cadGraph:Null<String>;
   public var meshSnapshot:Null<String>;
+  public var rotation:Null<Array<Float>>;
   public var x:Float;
   public var y:Float;
   public var z:Float;
   public var visible:Bool;
   public function new(id:String,label:String,kind:String,width:Float,height:Float,depth:Float,
       collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float,
-      ?cadGraph:String,x:Float=0,y:Float=0,z:Float=0,visible:Bool=true,?meshSnapshot:String) {
+      ?cadGraph:String,x:Float=0,y:Float=0,z:Float=0,visible:Bool=true,?meshSnapshot:String,
+      ?rotation:Array<Float>) {
     this.id = id; this.label = label; this.kind = kind;
     this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;
     this.dynamicBody=dynamicBody;this.mass=mass;
     this.red = red; this.green = green; this.blue = blue;
     this.cadGraph=cadGraph;
     this.meshSnapshot=meshSnapshot;
+    this.rotation=rotation;
     this.x=x;this.y=y;this.z=z;this.visible=visible;
   }
 }

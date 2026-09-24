@@ -365,7 +365,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     session.beforeReplace=simulation.clear;
     if(setupScript!=null){var scripted=session.openScript(setupScript);
       simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
-    if(projectPath!=null)session.openGeneratedScene(MateriaProjectRunner.load(projectPath), projectPath);
+    if(projectPath!=null){
+      var generated=MateriaProjectRunner.loadProject(projectPath);
+      session.openGeneratedScene(generated.objects, projectPath, generated.assembly);
+    }
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);
     documents = new SceneDocumentController(session, function(save, path, complete) {
       var chooser = files;
@@ -373,7 +376,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       else chooser.choose(save, path, complete);
     }, documentChanged, commitActiveDrag, cancelActiveDrag);
     if (hostContext != null) hostContext.onCloseRequested = function(close) documents.requestClose(close);
-    treeModel = new EditorSceneTree(scene);
+    treeModel = new EditorSceneTree(scene, session.projectAssembly);
     viewportCamera = new ViewportCamera();
     viewportContent = new EditorSceneViewport(scene);
     if (hostContext != null) {
@@ -1102,6 +1105,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     inspector.enabled = ownership==null&&!simulation.isActive() && !viewportContent.dragging() &&
       (perspectiveViewport == null || !perspectiveViewport.dragging());
     var rows:Array<KeyedView> = [new KeyedView("heading",sectionHeading(selected.label))];
+    var assembly = session.projectAssembly;
+    if (assembly != null && StringTools.startsWith(selected.id, "project:")) {
+      var instanceId = selected.id.substr(8);
+      var jointLines:Array<String> = [];
+      for (joint in assembly.joints) if (joint.parent == instanceId || joint.child == instanceId)
+        jointLines.push(joint.id + " · " + joint.kind + " · " +
+          joint.parentConnector + " → " + joint.childConnector);
+      if (jointLines.length > 0)
+        rows.push(new KeyedView("assembly-joints", textLines("assembly-joint-lines", jointLines)));
+    }
     if (scene.hasActiveSketchEdit()) {
       var summary = scene.sketchEditSummary();
       if (summary != null)
@@ -1451,7 +1464,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if(ownership!=null){simulation.setBackend(ownership.backend());simulation.setTimestep(ownership.timestep());}
       log("Document configuration replaced");
       sceneGeneration = session.generation;
-      treeModel = new EditorSceneTree(scene);
+      treeModel = new EditorSceneTree(scene, session.projectAssembly);
       viewportContent = new EditorSceneViewport(scene);
       viewportContent.setGridStep(gridSpacing);
       if (perspectiveViewport != null) perspectiveViewport.dispose();

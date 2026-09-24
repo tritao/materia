@@ -18,6 +18,7 @@ typedef SceneObjectData = {
   var green:Float;
   var blue:Float;
   var visible:Bool;
+  @:optional var rotation:Array<Float>;
   @:optional var cadGraph:String;
   @:optional var meshSnapshot:String;
   @:optional var sketchDraft:String;

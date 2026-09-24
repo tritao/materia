@@ -3,6 +3,9 @@
   "package": { "name": "cadkit" },
   "sourceRoots": ["haxe/src"],
   "scopeSourceRoots": false,
+  "dependencies": {
+    "projectkit": { "path": "../projectkit" }
+  },
   "ffi": {
     "interfaces": ["haxe/abi/CadKit.hxi"],
     "projections": ["haxe/abi/CadKit.hxmap"]

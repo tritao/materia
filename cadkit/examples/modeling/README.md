@@ -33,7 +33,9 @@ components: the base and base pin, boom, stick, bucket, two bucket links, and
 the inner and outer members of three hydraulic cylinders. The plates use
 polygonal CAD profiles with bored pivots; the bucket includes a cutting lip and
 teeth; cylinder bodies are hollow and their pin eyes are bored. No source
-geometry is imported.
+geometry is imported. `ProceduralExcavatorAssembly.hx` places the parts using
+named pin frames, revolute mates, prismatic cylinder slides, and checked
+linkage closures.
 
 Running the example prints JSON with solid, face, edge, volume, surface-area,
 and bounding-box metrics for every component. It also writes each generated
@@ -41,9 +43,8 @@ B-rep as a STEP file for external inspection; those files are diagnostic
 outputs, not model inputs. To capture the matching inventory from FreeCAD, open
 `AssemblyExample.FCStd` and run `assembly_example_baseline.py` in its Python
 console. Compare the per-part metrics and fixed-view silhouettes when refining
-geometry. Component placement and authored joints follow refinement of the full
-component inventory; the current solids share a provisional mechanism
-coordinate space and do not yet have separate assembly placements.
+geometry. The source solids retain their CAD coordinates. The preview artifact
+records instance poses separately, so placement is not baked into the B-reps.
 
 The refined geometry pass produces one solid per occurrence. The boom, stick,
 and bucket profiles now use dimensions scaled from the captured reference
@@ -71,8 +72,8 @@ The boom is 1,170,459 mm³ versus 1,204,575 mm³, the stick is 331,043 mm³ vers
 333,942 mm³, and the bucket is 59,986 mm³ versus 58,312 mm³. Their sorted
 bounding dimensions are 61.0 × 206.7 × 436.6, 32.0 × 119.8 × 379.6, and 101.5
 × 103.4 × 118.0 mm; the references are 60.9 × 203.7 × 436.3, 31.8 × 121.2 ×
-379.8, and 101.5 × 103.4 × 117.6 mm. Next, align the pin centers and author
-explicit assembly placements and joints.
+379.8, and 101.5 × 103.4 × 117.6 mm. These figures predate the two additional
+stick linkage bores; the geometry inventory needs a refreshed comparison.
 
 Run it after building CadKit and Haxeon:
 
@@ -116,7 +117,10 @@ dimensions, direct bound-feature edits, failed-builder cleanup, and persistence.
 entrypoint. Materia compiles that entrypoint as a separate program, which builds
 the B-rep components with CadKit and writes a versioned scene artifact. The
 artifact declares metres per coordinate and stable IDs for all 13 components.
-Materia loads them as independent preview objects. STEP is never an input.
+Materia loads them as posed CAD preview objects, retaining the assembly's named
+connectors and joints for the hierarchy and inspector. STEP is never an input.
+The recorded joint values describe the generated pose; interactive motion and
+constraint solving are separate work.
 
 Saving this view as a Materia scene keeps a relative reference to the project
 manifest, plus authored transforms, appearance, removals, linked copies, and

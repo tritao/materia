@@ -285,6 +285,7 @@ class SceneCodec {
           1
         ),
         visible: visibleValue,
+        rotation: optionalRotation(value),
         cadGraph: cadGraph,
         meshSnapshot: meshSnapshot,
         sketchDraft: sketchDraft
@@ -343,5 +344,23 @@ class SceneCodec {
     var result = Reflect.field(value, name);
     if (!Std.isOfType(result, String)) throw 'Scene field must be text: $name';
     return cast result;
+  }
+
+  static function optionalRotation(value:Dynamic):Null<Array<Float>> {
+    if (!Reflect.hasField(value, "rotation") || Reflect.field(value, "rotation") == null) return null;
+    var raw:Dynamic = Reflect.field(value, "rotation");
+    if (!Std.isOfType(raw, Array)) throw "Object rotation must be a quaternion";
+    var items:Array<Dynamic> = cast raw;
+    if (items.length != 4) throw "Object rotation must have four components";
+    var result:Array<Float> = [];
+    for (item in items) {
+      if ((!Std.isOfType(item, Float) && !Std.isOfType(item, Int)) || !Math.isFinite(cast item))
+        throw "Object rotation must be finite";
+      result.push(cast item);
+    }
+    var length = result[0] * result[0] + result[1] * result[1] +
+      result[2] * result[2] + result[3] * result[3];
+    if (Math.abs(length - 1) > 1e-4) throw "Object rotation must be normalized";
+    return result;
   }
 }
