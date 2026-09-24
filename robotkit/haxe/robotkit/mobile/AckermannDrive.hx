@@ -39,6 +39,8 @@ class AckermannDrive implements DriveModel {
       (twist.angular < -maxYawRate ? -maxYawRate : twist.angular));
   }
 
+  public function createOdometry():Null<DifferentialOdometry> return null;
+
   public function targets(twist:Twist2):Array<JointTarget> {
     if (twist == null) throw "Ackermann drive requires a twist";
     var limited = constrain(twist);
@@ -46,7 +48,7 @@ class AckermannDrive implements DriveModel {
       return [JointTarget.position(steeringJoint, 0.0),
         JointTarget.velocity(driveWheelJoint, 0.0)];
     var curvatureRatio = wheelBase * limited.angular / limited.linear;
-    var steering = inverseTangent(curvatureRatio);
+    var steering = PlanarMath.atan(curvatureRatio);
     if (steering > maxSteeringAngle) steering = maxSteeringAngle;
     if (steering < -maxSteeringAngle) steering = -maxSteeringAngle;
     var wheelLinearSpeed = Math.pow(limited.linear * limited.linear +
@@ -58,29 +60,4 @@ class AckermannDrive implements DriveModel {
     ];
   }
 
-  function inverseTangent(value:Float):Float {
-    var sign = value < 0.0 ? -1.0 : 1.0;
-    var x = Math.abs(value);
-    var outerOffset = 0.0;
-    var outerSign = 1.0;
-    var localOffset = 0.0;
-    if (x > 1.0) {
-      x = 1.0 / x;
-      outerOffset = Math.PI * 0.5;
-      outerSign = -1.0;
-    }
-    if (x > 0.5) {
-      x = (x - 1.0) / (x + 1.0);
-      localOffset = Math.PI * 0.25;
-    }
-    // Range reduction keeps the alternating series within |x| <= 0.5.
-    var squared = x * x;
-    var power = x;
-    var result = x;
-    for (index in 1...13) {
-      power *= -squared;
-      result += power / (index * 2.0 + 1.0);
-    }
-    return sign * (outerOffset + outerSign * (localOffset + result));
-  }
 }

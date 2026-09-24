@@ -9,6 +9,8 @@ class DifferentialOdometry {
   public final rightWheelJoint:Int;
   public final wheelRadius:Float;
   public final trackWidth:Float;
+  public var lastDistance(default, null):Float = 0.0;
+  public var lastHeadingChange(default, null):Float = 0.0;
   var pose:Pose2;
   var previousLeft:Null<Float> = null;
   var previousRight:Null<Float> = null;
@@ -37,6 +39,8 @@ class DifferentialOdometry {
       throw "Wheel odometry joint index is outside the robot snapshot";
     var left = positions.get(leftWheelJoint);
     var right = positions.get(rightWheelJoint);
+    lastDistance = 0.0;
+    lastHeadingChange = 0.0;
     var clockChanged = previousClock != null && previousClock != snapshot.sourceClockId;
     var timestampRegressed = previousTimestamp != null &&
       Int64.compare(snapshot.sourceTimestampNs, previousTimestamp) <= 0;
@@ -50,6 +54,8 @@ class DifferentialOdometry {
     var rightDistance = (right - previousRight) * wheelRadius;
     var distance = (leftDistance + rightDistance) * 0.5;
     var headingChange = (rightDistance - leftDistance) / trackWidth;
+    lastDistance = distance;
+    lastHeadingChange = headingChange;
     pose = pose.integrateDisplacement(distance, headingChange);
     setBaseline(snapshot, left, right);
     return pose;
@@ -63,6 +69,8 @@ class DifferentialOdometry {
     previousRight = null;
     previousTimestamp = null;
     previousClock = null;
+    lastDistance = 0.0;
+    lastHeadingChange = 0.0;
   }
 
   function setBaseline(snapshot:RobotSnapshot, left:Float, right:Float):Void {

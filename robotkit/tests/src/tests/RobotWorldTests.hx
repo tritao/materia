@@ -48,6 +48,10 @@ import robotkit.mobile.MobileBase;
 import robotkit.mobile.DifferentialDrive;
 import robotkit.mobile.AckermannDrive;
 import robotkit.mobile.DifferentialOdometry;
+import robotkit.localization.WheelOdometryLocalization;
+import robotkit.localization.SimulationTruthLocalization;
+import robotkit.localization.LocalizationQuality;
+import robotkit.localization.PoseCovariance2;
 
 class RobotWorldTests {
   static var assertions = 0;
@@ -61,6 +65,7 @@ class RobotWorldTests {
     testReplayCorrectness();
     testJointTargetBatches();
     testMobileLayer();
+    testLocalization();
     testMcapRoundTrip();
     testMcapRobustness();
     testForwardingAndLifecycle();
@@ -368,6 +373,65 @@ class RobotWorldTests {
     var afterStale = odometry.update(sample(3, 4.3, 4.3, "source-B"));
     check(Math.abs(afterStale.x - afterClockReset.x) < 0.03,
       "wheel odometry ignores stale timestamps without moving its baseline");
+  }
+
+  static function testLocalization():Void {
+    var robot = new FakeRobot("localized-base");
+    robot.positions = [0.0, 0.0];
+    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(1.0, 2.0));
+    var localization = new WheelOdometryLocalization(base);
+    function observation(sequence:Int, timestamp:Int, left:Float, right:Float,
+        sourceClock:String):RobotSnapshot
+      return new RobotSnapshot("localized-base", Int64.ofInt(sequence), Int64.ofInt(timestamp),
+        [left, right], [], [], 1, 0, Int64.ofInt(timestamp + 10), [], sourceClock, "host-clock");
+
+    var initial = localization.update(observation(1, 100, 0.0, 0.0, "boot-A"));
+    equal(initial.referenceFrame, "odom", "wheel localization labels its reference frame");
+    equal(initial.bodyFrame, "base", "wheel localization labels its body frame");
+    equal(initial.sourceClockId, "boot-A", "localization preserves source clock identity");
+    equal(initial.receivedClockId, "host-clock", "localization preserves receive clock identity");
+    var moved = localization.update(observation(2, 200, 1.0, 1.0, "boot-A"));
+    check(Math.abs(moved.pose.x - 0.1) < 1e-9 && moved.covariance.xx > 0.0 &&
+      moved.covariance.yawYaw == 0.0,
+      "wheel localization integrates pose and accumulates covariance");
+    check(switch moved.quality {
+      case Degraded: true;
+      case _: false;
+    }, "wheel odometry marks its estimate degraded");
+    var afterReset = localization.update(observation(1, 1, 4.0, 4.0, "boot-B"));
+    check(Math.abs(afterReset.pose.x - moved.pose.x) < 1e-9,
+      "wheel localization avoids a pose jump across source clock changes");
+    localization.update(observation(2, 2, 4.5, 4.5, "boot-B"));
+    check(localization.state() != null, "localization retains its latest immutable state");
+    localization.reset();
+    equal(localization.state(), null, "localization reset clears its published state");
+    throws(function() new PoseCovariance2(-1.0),
+      "pose covariance rejects negative variances");
+
+    var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
+    var simulation = new Simulation();
+    simulation.addRobot(blueprint);
+    var yaw = Math.PI * 0.5;
+    simulation.teleportRobot(0, [2.0, 3.0, 0.0],
+      [0.0, 0.0, Math.sin(yaw * 0.5), Math.cos(yaw * 0.5)]);
+    var truth = new SimulationTruthLocalization(simulation, 0);
+    var source = new RobotSnapshot("truth", Int64.ofInt(5), Int64.ofInt(500),
+      [], [], [], 1, 0, Int64.ofInt(700), [], "simulation-clock", "host-clock");
+    var trueState = truth.update(source);
+    check(Math.abs(trueState.pose.x - 2.0) < 1e-9 &&
+      Math.abs(trueState.pose.y - 3.0) < 1e-9 &&
+      Math.abs(trueState.pose.yaw - yaw) < 1e-8,
+      "simulation truth localization projects a 3D simulation pose into Pose2");
+    equal(trueState.referenceFrame, "map", "simulation truth uses an explicit map frame");
+    check(switch trueState.quality {
+      case Good: true;
+      case _: false;
+    } && trueState.covariance.xx == 0.0,
+      "simulation truth publishes exact quality and zero truth covariance");
+    throws(function() truth.reset(new Pose2(9.0, 9.0, 0.0)),
+      "simulation truth cannot be reset to a fabricated pose");
+    simulation.dispose();
   }
 
   static function testMcapRoundTrip():Void {

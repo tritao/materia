@@ -145,6 +145,13 @@ The optional duration applies acceleration limits relative to the previous
 command. Joint indices follow the robot description, and the wrapped robot
 continues to own status, snapshots, transport, and lifecycle.
 
+`robotkit.localization` represents estimates separately from robot snapshots.
+Each `LocalizationState` carries a pose, reference/body frame IDs, planar
+covariance, quality, and both source and receive clock identities.
+`WheelOdometryLocalization` derives an `odom` to `base` estimate from a
+differential `MobileBase`; `SimulationTruthLocalization` projects a
+simulation-owned robot pose into `map` to `base` for deterministic scenarios.
+
 ### Persistent recordings
 
 `McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing

@@ -6,4 +6,5 @@ import robotkit.world.JointTarget;
 interface DriveModel {
   function constrain(twist:Twist2):Twist2;
   function targets(twist:Twist2):Array<JointTarget>;
+  function createOdometry():Null<DifferentialOdometry>;
 }

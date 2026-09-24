@@ -227,9 +227,16 @@ safety remain authoritative below this application-level mapping.
 `Pose2` and `Twist2` describe planar geometry and body velocity. The initial
 wheel odometry utility consumes immutable snapshots and uses source clock IDs
 to avoid integrating across a reboot or clock reset. Its pose is derived state;
-it is not inserted into `RobotSnapshot`. The localization package can later
-wrap this odometry with explicit frames, covariance, and source/receive clock
-metadata.
+it is not inserted into `RobotSnapshot`. The localization package wraps this
+odometry with explicit frames, covariance, and source/receive clock metadata.
+
+`robotkit.localization.LocalizationState` keeps that derived pose outside the
+robot snapshot boundary. It names the reference and body frames, carries a
+planar covariance and quality, and preserves source/receive timestamps and
+clock IDs from its input observation. `WheelOdometryLocalization` supplies an
+`odom` to `base` estimate; `SimulationTruthLocalization` reads the simulation's
+owned base pose and supplies a `map` to `base` estimate without changing the
+simulation state.
 
 ## One simulation tick
 
