@@ -12,7 +12,7 @@ import build.Target;
 import sys.FileSystem;
 import sys.io.File;
 
-/** Build one Materia project entrypoint as an isolated Haxeon runtime module. */
+/** Build a project entrypoint as a separate HashLink artifact generator. */
 class MateriaProjectModuleBuild {
 	static function main():Void {
 		var args = Sys.args();
@@ -22,6 +22,10 @@ class MateriaProjectModuleBuild {
 		var moduleName = args[1];
 		var functionName = args[2];
 		var outputPrefix = args[3];
+		var identifier = ~/^[A-Za-z_][A-Za-z0-9_]*$/;
+		for (part in moduleName.split("."))
+			if (!identifier.match(part)) throw "Project entrypoint has an invalid module name";
+		if (!identifier.match(functionName)) throw "Project entrypoint has an invalid function name";
 		var project = new PackageResolver(new PathSourceAcquirer()).resolve(manifestPath, null, false, Target.parse("host"));
 		var interfaces:Array<FfiInterfaceSource> = [];
 		var projections:Array<FfiProjectionSource> = [];
@@ -56,16 +60,15 @@ class MateriaProjectModuleBuild {
 		if (entryPath == null)
 			throw 'Project entrypoint module "$moduleName" is not under a package source root';
 		compiler.update(modulePath, File.getContent(entryPath));
-		var result = compiler.compile(moduleName);
-		var functionId = result.functionIds.get(moduleName + "." + functionName);
-		if (functionId == null) {
-			var moduleLeaf = moduleName.substr(moduleName.lastIndexOf(".") + 1);
-			functionId = result.functionIds.get(moduleName + "." + moduleLeaf + "." + functionName);
-		}
-		if (functionId == null)
-			throw 'Project entrypoint function "$moduleName.$functionName" was not exported by the compiled module';
+		var wrapper = "class MateriaGeneratedEntrypoint {\n"
+			+ "  static function main():Void {\n"
+			+ "    var args = Sys.args();\n"
+			+ "    if (args.length != 1) throw \"Project generator requires one output path\";\n"
+			+ "    sys.io.File.saveBytes(args[0], " + moduleName + "." + functionName + "());\n"
+			+ "  }\n"
+			+ "}\n";
+		compiler.update("MateriaGeneratedEntrypoint.hx", wrapper);
+		var result = compiler.compile("MateriaGeneratedEntrypoint");
 		File.saveBytes(outputPrefix + ".hl", HlWriter.encode(result.module));
-		File.saveBytes(outputPrefix + ".hli", result.runtimeIdentity);
-		File.saveContent(outputPrefix + ".entry", Std.string(functionId));
 	}
 }

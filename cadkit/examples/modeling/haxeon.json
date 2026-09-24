@@ -5,6 +5,7 @@
 	"sources": ["ProceduralExcavator.hx", "ProceduralExcavatorPreview.hx"],
 	"sourceRoots": ["."],
 	"dependencies": {
+		"projectkit": { "path": "../../../projectkit" },
 		"cadkit": { "path": "../.." }
 	},
 	"target": "host",

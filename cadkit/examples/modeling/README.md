@@ -112,12 +112,11 @@ dimensions, direct bound-feature edits, failed-builder cleanup, and persistence.
 
 ## Open the generated assembly in Materia
 
-`materia.project.json` describes this as a generic Materia project. It points
-to the Haxeon package manifest and names a viewport entrypoint; the code builds
-the B-rep components with CadKit, tessellates them at runtime, and returns a
-versioned geometry snapshot. Materia loads each of the 13 components as an
-independent preview object. The snapshot is derived from the CAD script and
-does not use STEP as an input.
+`materia.project.json` points to the Haxeon package and names a viewport
+entrypoint. Materia compiles that entrypoint as a separate program, which builds
+the B-rep components with CadKit and writes a versioned scene artifact. The
+artifact declares metres per coordinate and stable IDs for all 13 components.
+Materia loads them as independent preview objects. STEP is never an input.
 
 From the repository root, launch the app with:
 

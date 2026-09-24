@@ -13,21 +13,26 @@ class CadPreviewGeometry {
     if (snapshot == null || snapshot.length == 0 || snapshot.length > 50000000)
       throw "CAD preview snapshot is empty or too large";
     var fields = snapshot.split("|");
-    if (fields.length != 9 || fields[0] != "materia.geometry-preview/2")
+    var legacy = fields.length == 9 && fields[0] == "materia.geometry-preview/2";
+    var current = fields.length == 10 && fields[0] == "materia.geometry-preview/3";
+    if (!legacy && !current)
       throw "Unsupported CAD preview snapshot format";
-    var vertexCount = parseInt(fields[1]), totalIndexCount = parseInt(fields[2]);
+    var shift = legacy ? 0 : 1;
+    var scale = legacy ? METRES_PER_MILLIMETRE : Std.parseFloat(fields[1]);
+    if (!finite(scale) || scale <= 0.0) throw "CAD preview snapshot has invalid units";
+    var vertexCount = parseInt(fields[1 + shift]), totalIndexCount = parseInt(fields[2 + shift]);
     if (vertexCount <= 0 || vertexCount > MAX_VERTICES || totalIndexCount <= 0 || totalIndexCount % 3 != 0 ||
         totalIndexCount / 3 > MAX_TRIANGLES)
       throw "CAD preview snapshot has inconsistent mesh streams";
-    var vertices = MateriaBase64.decode(fields[6], MAX_VERTICES * 24);
-    var normals = MateriaBase64.decode(fields[7], MAX_VERTICES * 24);
-    var indices = MateriaBase64.decode(fields[8], MAX_TRIANGLES * 12);
+    var vertices = MateriaBase64.decode(fields[6 + shift], MAX_VERTICES * 24);
+    var normals = MateriaBase64.decode(fields[7 + shift], MAX_VERTICES * 24);
+    var indices = MateriaBase64.decode(fields[8 + shift], MAX_TRIANGLES * 12);
     if (vertices.length != vertexCount * 24 || normals.length != vertexCount * 24 ||
         indices.length != totalIndexCount * 4)
       throw "CAD preview snapshot has inconsistent mesh streams";
 
     var triangleCount = Std.int(totalIndexCount / 3);
-    var minimum = numberTriple(fields[3]), maximum = numberTriple(fields[4]);
+    var minimum = numberTriple(fields[3 + shift]), maximum = numberTriple(fields[4 + shift]);
     for (axis in 0...3) if (minimum[axis] > maximum[axis])
       throw "CAD preview snapshot has invalid bounds";
     var centerX = (minimum[0] + maximum[0]) / 2.0;
@@ -48,9 +53,9 @@ class CadPreviewGeometry {
       actualMaximum[0] = Math.max(actualMaximum[0], rawX);
       actualMaximum[1] = Math.max(actualMaximum[1], rawY);
       actualMaximum[2] = Math.max(actualMaximum[2], rawZ);
-      var x = (rawX - centerX) * METRES_PER_MILLIMETRE;
-      var y = (rawY - centerY) * METRES_PER_MILLIMETRE;
-      var z = (rawZ - centerZ) * METRES_PER_MILLIMETRE;
+      var x = (rawX - centerX) * scale;
+      var y = (rawY - centerY) * scale;
+      var z = (rawZ - centerZ) * scale;
       var nx = normals.getDouble(offset), ny = normals.getDouble(offset + 8), nz = normals.getDouble(offset + 16);
       if (!finite(x) || !finite(y) || !finite(z) || !finite(nx) || !finite(ny) || !finite(nz))
         throw "CAD preview snapshot contains a non-finite vertex or normal";
@@ -73,7 +78,7 @@ class CadPreviewGeometry {
     geometry.addStream(1, 2, positionStream, vertexCount, 12);
     geometry.addStream(2, 2, normalStream, vertexCount, 12);
     geometry.setIndexBuffer(indices, totalIndexCount);
-    var faceRanges:Array<String> = fields[5].length == 0 ? [] : fields[5].split(";");
+    var faceRanges:Array<String> = fields[5 + shift].length == 0 ? [] : fields[5 + shift].split(";");
     if (faceRanges.length > 100000) throw "CAD preview snapshot has invalid face ranges";
     for (range in faceRanges) {
       var values = range.split(",");
@@ -84,12 +89,12 @@ class CadPreviewGeometry {
         throw "CAD preview snapshot has an invalid face range";
       geometry.addSubelement(Std.int(firstIndex / 3), Std.int(indexCount / 3), faceIndex);
     }
-    geometry.setBounds((minimum[0] - centerX) * METRES_PER_MILLIMETRE,
-      (minimum[1] - centerY) * METRES_PER_MILLIMETRE,
-      (minimum[2] - centerZ) * METRES_PER_MILLIMETRE,
-      (maximum[0] - centerX) * METRES_PER_MILLIMETRE,
-      (maximum[1] - centerY) * METRES_PER_MILLIMETRE,
-      (maximum[2] - centerZ) * METRES_PER_MILLIMETRE);
+    geometry.setBounds((minimum[0] - centerX) * scale,
+      (minimum[1] - centerY) * scale,
+      (minimum[2] - centerZ) * scale,
+      (maximum[0] - centerX) * scale,
+      (maximum[1] - centerY) * scale,
+      (maximum[2] - centerZ) * scale);
     return geometry;
   }
 

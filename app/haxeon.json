@@ -4,6 +4,7 @@
 	"entry": "app.Main",
 	"sourceRoots": ["src"],
 	"dependencies": {
+		"projectkit": { "path": "../projectkit" },
 		"nativekit": { "path": "../nativekit" },
 		"cadkit": { "path": "../cadkit" },
 		"bimkit": { "path": "../bimkit" },

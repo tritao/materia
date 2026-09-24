@@ -1,0 +1,6 @@
+{
+	"version": 1,
+	"package": { "name": "projectkit" },
+	"sourceRoots": ["src"],
+	"target": "host"
+}
