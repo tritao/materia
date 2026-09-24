@@ -11,7 +11,8 @@
 		"viewport": {
 			"kind": "cad-preview",
 			"module": "ProceduralExcavatorPreview",
-			"function": "preview"
+			"function": "preview",
+			"cache": { "inputs": [] }
 		}
 	}
 }

@@ -122,18 +122,30 @@ connectors and joints for the hierarchy and inspector. STEP is never an input.
 The recorded joint values describe the generated pose; interactive motion and
 constraint solving are separate work.
 
+The viewport entrypoint opts into a generated artifact cache. Materia reuses the
+artifact when its Haxeon source graph, compiler sources, and native runtime build
+have not changed. Scripts that read additional data files must list those files
+in the entrypoint's `cache.inputs` array, relative to `materia.project.json`.
+Entrypoints without a `cache` declaration execute on every open. The cache is
+stored under `$XDG_CACHE_HOME/materia/generated-artifacts`, or `~/.cache/materia`
+when `XDG_CACHE_HOME` is unset. Only deterministic entrypoints should opt in;
+omit `cache` when output depends on the clock, environment, or undeclared inputs.
+
 Saving this view as a Materia scene keeps a relative reference to the project
 manifest, plus authored transforms, appearance, removals, linked copies, and
 ordinary scene objects. It does not embed the generated mesh snapshots.
 Opening the saved scene runs the manifest again and applies those edits to the
 new geometry, so the manifest and its Haxeon sources must remain available.
 
-From the repository root, launch the app with:
+Build the app once, then launch the built app with:
 
 ```sh
-./haxeon/scripts/haxeon run --project=app/haxeon.json -- \
-  --project=../cadkit/examples/modeling/materia.project.json
+./haxeon/scripts/haxeon build --project=app/haxeon.json
+./app/run-built.sh --project=./cadkit/examples/modeling/materia.project.json
 ```
+
+`run-built.sh` accepts the normal Materia arguments and skips rebuilding the
+app. Use the build command again after changing app or native sources.
 
 The save/reopen integration check uses the app's native build:
 

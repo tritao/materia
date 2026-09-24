@@ -3,6 +3,7 @@ package app;
 import haxe.Json;
 import haxe.io.Bytes;
 import haxe.io.Path as ProjectPath;
+import sys.io.AtomicFile;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactPart;
 import materia.project.AssemblyFrames;
@@ -48,6 +49,19 @@ class MateriaProjectRunner {
     var haxe = ProjectPath.join([home, ".tools", "haxe", "haxe"]);
     if (!FileSystem.exists(haxe)) throw 'Pinned Haxe compiler was not found at $haxe';
     var tools = projectToolsDirectory();
+    var cache = cachePath(entry, projectRoot, manifestPath, haxeonManifest,
+      fieldText(entry, "module"), fieldText(entry, "function"), haxe, home, tools);
+    if (cache != null && FileSystem.exists(cache)) {
+      try {
+        var metadata = FileSystem.metadata(cache);
+        if (metadata == null || metadata.size > MAX_OUTPUT_BYTES) throw "Cached artifact is too large";
+        var cached = previewRecords(File.getBytes(cache));
+        Sys.println('Materia project: loaded ${cached.objects.length} components from cache');
+        return cached;
+      } catch (_:Dynamic) {
+        try FileSystem.deleteFile(cache) catch (_:Dynamic) {}
+      }
+    }
     var tempRootValue = Sys.getEnv("TMPDIR");
     temporarySequence++;
     var temporaryRoot = ProjectPath.join([tempRootValue == null ? "/tmp" : tempRootValue,
@@ -74,12 +88,54 @@ class MateriaProjectRunner {
       if (result.length > MAX_OUTPUT_BYTES) throw "Project geometry preview exceeds the 150 MB limit";
       records = previewRecords(result);
       Sys.println('Materia project: decoded ${records.objects.length} component records');
+      if (cache != null) try AtomicFile.writeBytes(cache, result)
+        catch (error:Dynamic) Sys.println("Materia project: could not save cache: " + Std.string(error));
     } catch (error:Dynamic) {
       cleanupArtifacts(outputPrefix, temporaryRoot);
       throw error;
     }
     cleanupArtifacts(outputPrefix, temporaryRoot);
     return records;
+  }
+
+  static function cachePath(entry:Dynamic, projectRoot:String, manifestPath:String,
+      haxeonManifest:String, module:String, functionName:String, haxe:String,
+      home:String, tools:String):Null<String> {
+    if (entry == null || !Reflect.hasField(entry, "cache")) return null;
+    var declaration = field(entry, "cache");
+    var rawInputs = field(declaration, "inputs");
+    if (!Std.isOfType(rawInputs, Array)) throw "Project cache inputs must be an array of file paths";
+    var inputs:Array<String> = [manifestPath];
+    var declaredInputs:Array<Dynamic> = rawInputs;
+    for (input in declaredInputs) {
+      if (!Std.isOfType(input, String))
+        throw "Project cache input must be a file path";
+      var path:String = input;
+      if (StringTools.trim(path).length == 0) throw "Project cache input must be a file path";
+      inputs.push(resolveProjectPath(projectRoot, path));
+    }
+    var cacheRoot = Sys.getEnv("XDG_CACHE_HOME");
+    if (cacheRoot == null || cacheRoot.length == 0) {
+      var userHome = Sys.getEnv("HOME");
+      if (userHome == null || userHome.length == 0) return null;
+      cacheRoot = ProjectPath.join([userHome, ".cache"]);
+    }
+    var cacheDirectory = ProjectPath.join([cacheRoot, "materia", "generated-artifacts"]);
+    if (!ensureCacheDirectory(cacheDirectory)) return null;
+    var arguments = ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools,
+      "--run", "MateriaProjectFingerprint", haxeonManifest, module, functionName, tools].concat(inputs);
+    var fingerprint = StringTools.trim(runCommand(haxe, arguments,
+      "Could not fingerprint Materia project entrypoint"));
+    if (!~/^[0-9a-f]{64}$/.match(fingerprint)) throw "Project fingerprint has an invalid result";
+    return ProjectPath.join([cacheDirectory, fingerprint + ".mtrg"]);
+  }
+
+  static function ensureCacheDirectory(path:String):Bool {
+    if (FileSystem.exists(path)) return FileSystem.isDirectory(path);
+    var parent = ProjectPath.directory(path);
+    if (parent == path || parent.length == 0 || !ensureCacheDirectory(parent)) return false;
+    try FileSystem.createDirectory(path) catch (_:Dynamic) return false;
+    return FileSystem.exists(path) && FileSystem.isDirectory(path);
   }
 
   static function cleanupArtifacts(outputPrefix:String, temporaryRoot:String):Void {
@@ -97,7 +153,7 @@ class MateriaProjectRunner {
     runCommand(haxe, arguments, "Could not compile Materia project entrypoint");
   }
 
-  static function runCommand(command:String, arguments:Array<String>, description:String):Void {
+  static function runCommand(command:String, arguments:Array<String>, description:String):String {
     var process:Process;
     try process = Process.run(command, arguments)
     catch (error:Dynamic) throw description + ": " + Std.string(error);
@@ -135,6 +191,7 @@ class MateriaProjectRunner {
       if (details.length > 6000) details = details.substr(details.length - 6000);
       throw '$description (exit $status):\n$details';
     }
+    return stdout;
   }
 
   static function previewRecords(snapshot:Bytes):GeneratedAssemblyScene {
@@ -215,15 +272,19 @@ class MateriaProjectRunner {
 
   static function fieldText(value:Dynamic, name:String):String {
     var result:Dynamic = field(value, name);
-    if (!Std.isOfType(result, String) || StringTools.trim(cast result).length == 0)
+    if (!Std.isOfType(result, String))
       throw 'Project field "$name" must be non-empty text';
-    return cast result;
+    var text:String = result;
+    if (StringTools.trim(text).length == 0)
+      throw 'Project field "$name" must be non-empty text';
+    return text;
   }
 
   static function fieldInt(value:Dynamic, name:String):Int {
     var result:Dynamic = field(value, name);
     if (!Std.isOfType(result, Int)) throw 'Project field "$name" must be an integer';
-    return cast result;
+    var number:Int = result;
+    return number;
   }
 
 }

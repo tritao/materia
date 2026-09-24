@@ -58,8 +58,12 @@ Git.
 ## Run the reference editor
 
 ```sh
-./haxeon/scripts/haxeon run --project app/haxeon.json
+./app/run-built.sh
 ```
+
+This launches the existing build without checking the native and Haxe build
+graph. Rebuild with the command above after source changes. To open a CAD
+project, pass `--project=PATH` to the same launcher.
 
 The host supports a headless workspace snapshot and deterministic diagnostics:
 
