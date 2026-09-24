@@ -29,6 +29,16 @@ rk_robot_command target(double position, uint64_t sequence) {
     return value;
 }
 
+rk_robot_command velocity_target(double velocity, uint64_t sequence) {
+    rk_robot_command value{};
+    value.struct_size = sizeof(value);
+    value.sequence = sequence;
+    value.kind = RK_COMMAND_JOINT_TARGETS;
+    value.target_count = 1;
+    value.targets[0] = {0, RK_TARGET_VELOCITY, velocity, 0.0, 0.0};
+    return value;
+}
+
 rk_robot_state snapshot(rk_robot_runtime runtime) {
     rk_robot_state value{};
     value.struct_size = sizeof(value);
@@ -178,6 +188,28 @@ void failed_command_phase_does_not_advance() {
     rk_simulation_destroy(simulation);
 }
 
+void velocity_targets_advance_joint_coordinates() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    rk_simulation simulation = RK_INVALID_SIMULATION;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    const auto model = blueprint(31);
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    const auto command = velocity_target(2.0, 1);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    assert(rk_simulation_step(simulation, 100) == RK_OK);
+    auto state = snapshot(robot);
+    assert(std::abs(state.velocity[0] - 2.0) < 1e-12);
+    assert(std::abs(state.position[0] - 0.02) < 1e-12);
+    assert(rk_simulation_step(simulation, 200) == RK_OK);
+    state = snapshot(robot);
+    assert(std::abs(state.position[0] - 0.04) < 1e-12);
+    rk_simulation_destroy(simulation);
+}
+
 void sensor_geometry_and_reset() {
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
@@ -250,6 +282,7 @@ void sensor_geometry_and_reset() {
 int main() {
     shared_world_steps_once();
     failed_command_phase_does_not_advance();
+    velocity_targets_advance_joint_coordinates();
     sensor_geometry_and_reset();
     return 0;
 }

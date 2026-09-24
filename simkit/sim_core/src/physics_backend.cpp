@@ -143,6 +143,10 @@ public:
                     body.state.position[axis] += body.state.linear_velocity[axis] * substep;
                 }
             }
+            // This backend is intentionally kinematic, but velocity targets must
+            // still advance joint coordinates for runtime and odometry tests.
+            for (auto &joint : joints)
+                joint.state.position += joint.state.velocity * substep;
         }
         for (auto &body : bodies) {
             body.force.fill(0.0);
