@@ -54,11 +54,13 @@ import cadkit.parametric.InstanceElement;
 import cadkit.parametric.ElementKind;
 import cadkit.parametric.TypedProperty;
 import cadkit.parametric.PersistentReference;
+import cadkit.parametric.Relationship;
+import cadkit.parametric.RelationshipId;
 
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 4;
+	public static inline var VERSION:Int = 5;
 
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
@@ -196,6 +198,15 @@ class DocumentCodec {
 			});
 		}
 		var output = document.outputFeatureOrNull();
+		var encodedRelationships:Array<Dynamic> = [];
+		for (relationship in document.allRelationships())
+			encodedRelationships.push({
+				id: relationship.id.value,
+				type: relationship.typeName,
+				source: encodeElementReference(relationship.source),
+				target: encodeElementReference(relationship.target),
+				properties: encodeProperties(relationship.properties())
+			});
 		return Json.stringify({
 			format: FORMAT,
 			version: VERSION,
@@ -204,6 +215,7 @@ class DocumentCodec {
 			parameters: encodedParameters,
 			definitions: encodedDefinitions,
 			elements: encodedElements,
+			relationships: encodedRelationships,
 			output: output == null ? null : output.id.toInt()
 		});
 	}
@@ -448,6 +460,19 @@ class DocumentCodec {
 					}
 					document.worldPlacement(loaded);
 				}
+			var rawRelationshipRecords:Dynamic = Reflect.field(root, "relationships");
+			if (rawRelationshipRecords != null && !Std.isOfType(rawRelationshipRecords, Array))
+				throw new ParametricError("document relationships field is not an array");
+			var relationshipRecords:Array<Dynamic> = rawRelationshipRecords == null ? [] : cast rawRelationshipRecords;
+			for (relationshipRecord in relationshipRecords) {
+				var relationship = document.installRelationship(new RelationshipId(stringField(relationshipRecord, "id")),
+					stringField(relationshipRecord, "type"), decodeElementReferenceInDocument(requiredField(relationshipRecord, "source")),
+					decodeElementReferenceInDocument(requiredField(relationshipRecord, "target")));
+				for (propertyRecord in optionalPropertyRecords(relationshipRecord)) {
+					var property = decodeTypedProperty(propertyRecord, remapDocumentId);
+					relationship.restoreProperty(property.name, property);
+				}
+			}
 				document.validatePersistentReferences();
 			}
 

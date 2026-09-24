@@ -134,11 +134,15 @@ instance, datum, and object; domain classes are represented by typed
 quantities with units, text and token values, booleans, integers, placements,
 and persistent references to elements, definitions, and features. Their type,
 unit, token domain, metadata, and JSON-compatible value are stored directly in
-`DocumentCodec` version 4, including values whose domain schema is not loaded.
-Property edits participate in document transactions and undo/redo, and cloning
-remaps references that point back into the cloned document. Removing an element
-with a live placement, feature, or property reference is rejected; an owning
-transaction must remove those references first.
+`DocumentCodec`, including values whose domain schema is not loaded. Property
+edits participate in document transactions and undo/redo, and cloning remaps
+references that point back into the cloned document. Removing an element with a
+live placement, feature, property, or relationship reference is rejected; an
+owning transaction must remove those references first. Typed relationships have
+their own persistent identity, type name, source and target element references,
+and typed properties, and are serialized with the rest of the document. Layers
+can register multiple before and after recompute hooks; the former callback
+fields remain as compatibility adapters.
 
 ## Constrained sketches
 

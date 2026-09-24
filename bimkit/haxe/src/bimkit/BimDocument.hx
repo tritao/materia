@@ -27,14 +27,16 @@ class BimDocument {
 
 	private final walls:Map<String, WallRole>;
 	private final relationships:Map<String, HostRelationship>;
+	private var beforeHookId:Int;
+	private var afterHookId:Int;
 
 	public function new(?cad:Document) {
 		BimWindowDefinition.registerEvaluator();
 		this.cad = cad == null ? new Document() : cad;
 		walls = new Map();
 		relationships = new Map();
-		this.cad.beforeRecompute = validateAllOpenings;
-		this.cad.afterRecompute = synchronizeLevelPlacements;
+		beforeHookId = this.cad.addBeforeRecomputeHook(validateAllOpenings);
+		afterHookId = this.cad.addAfterRecomputeHook(synchronizeLevelPlacements);
 	}
 
 	public function createWindowDefinition(name:String, width:Float, height:Float, frameThickness:Float, depth:Float):Definition
@@ -152,8 +154,6 @@ class BimDocument {
 	public function resizeWall(wallId:ElementId, length:Float, thickness:Float, ?height:Float):Void {
 		var role = wallRole(wallId);
 		var transaction = cad.beginTransaction();
-		var validator = cad.beforeRecompute;
-		cad.beforeRecompute = null;
 		try {
 			if (role.body != null) {
 				var body:BoxFeature = cast role.body;
@@ -172,11 +172,9 @@ class BimDocument {
 				var opening:InstanceElement = cast cad.element(relationship.openingId);
 				opening.setOverride("depth", thickness);
 			}
-			cad.beforeRecompute = validator;
 			cad.recompute();
 			transaction.commit();
 		} catch (error:Dynamic) {
-			cad.beforeRecompute = validator;
 			transaction.cancel();
 			throw error;
 		}
@@ -417,8 +415,8 @@ class BimDocument {
 	}
 
 	public function close():Void {
-		cad.beforeRecompute = null;
-		cad.afterRecompute = null;
+		cad.removeBeforeRecomputeHook(beforeHookId);
+		cad.removeAfterRecomputeHook(afterHookId);
 		cad.close();
 	}
 }
