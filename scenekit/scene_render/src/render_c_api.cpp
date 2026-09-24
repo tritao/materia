@@ -355,6 +355,24 @@ nkscene_result NKS_CALL nkscene_render_spatial_index_create_with_view(
     return NKS_OK;
 }
 
+nkscene_result NKS_CALL nkscene_render_spatial_index_update_node(
+    nkscene_render_spatial_index index_handle, nkscene_snapshot snapshot_handle,
+    nkscene_node_id node, uint32_t *out_updated) {
+    if (!out_updated)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    *out_updated = 0;
+    const auto snapshot = nkscene::resolve_snapshot_handle(snapshot_handle);
+    if (!snapshot)
+        return NKS_ERROR_INVALID_HANDLE;
+    auto &state = registry();
+    std::lock_guard lock(state.mutex);
+    const auto index = state.spatial_indices.get(nkscene::unpack_handle(index_handle));
+    if (!index)
+        return NKS_ERROR_INVALID_HANDLE;
+    *out_updated = index->update_node_bounds(*snapshot, {node.value}) ? 1u : 0u;
+    return NKS_OK;
+}
+
 void NKS_CALL nkscene_render_spatial_index_destroy(nkscene_render_spatial_index index) {
     auto &state = registry();
     std::lock_guard lock(state.mutex);
