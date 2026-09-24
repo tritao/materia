@@ -106,7 +106,8 @@ class SceneCodec {
       if (id == "scene" || ids.exists(id)) throw "Duplicate or reserved object ID: " + id;
       ids.set(id, true);
       var kind = stringField(value, "type");
-      if (kind != "rectangle" && kind != "cad-plate" && kind != "cad-bracket" && kind != "cad-step" && kind != "cad-part")
+      if (kind != "rectangle" && kind != "cad-plate" && kind != "cad-bracket" && kind != "cad-step" &&
+          kind != "cad-part" && kind != "cad-preview")
         throw "Unsupported scene object type: " + kind;
       var visible:Dynamic = field(value, "visible");
       if (!Std.isOfType(visible, Bool)) throw "Object visibility must be a boolean";
@@ -114,9 +115,14 @@ class SceneCodec {
       var collisionEnabled = optionalBool(value, "collisionEnabled", visibleValue);
       var dynamicBody = optionalBool(value, "dynamicBody", false);
       var cadGraph = optionalText(value, "cadGraph");
+      var meshSnapshot = optionalText(value, "meshSnapshot");
       var sketchDraft = optionalText(value, "sketchDraft");
       if ((kind == "cad-plate" || kind == "cad-bracket" || kind == "cad-step" || kind == "cad-part")
           && cadGraph != null && cadGraph.length > 10000000) throw "CAD feature graph is too large";
+      if (kind == "cad-preview" && (meshSnapshot == null || meshSnapshot.length > 50000000))
+        throw "CAD preview object requires a bounded mesh snapshot";
+      if (kind != "cad-preview" && meshSnapshot != null)
+        throw "Mesh snapshots are only valid on CAD preview objects";
       if (sketchDraft != null) {
         sketchDraftCount++;
         if (sketchDraftCount > 1) throw "Scene documents can contain only one active sketch draft";
@@ -192,6 +198,7 @@ class SceneCodec {
         ),
         visible: visibleValue,
         cadGraph: cadGraph,
+        meshSnapshot: meshSnapshot,
         sketchDraft: sketchDraft
       }
       );

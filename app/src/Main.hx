@@ -113,11 +113,12 @@ class Main {
           arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0 &&
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
           arg.indexOf("--capture-seconds=") != 0 &&
-          arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0) {
+          arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
+          arg.indexOf("--project=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
-          "[--robot=HOST:PORT] [--setup-script=REFERENCE]");
+          "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH]");
         return 2;
       }
 
@@ -152,7 +153,7 @@ class Main {
         remote.connect(robotHost, diagnostics.robotPort, context.events);
       }
       var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context,
-        diagnostics.setupScript);
+        diagnostics.setupScript, diagnostics.projectPath);
       activeEditor = editor;
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
@@ -172,11 +173,12 @@ private class ReferenceEditorLaunchOptions {
   public final robotHost:Null<String>;
   public final robotPort:Int;
   public final setupScript:Null<String>;
+  public final projectPath:Null<String>;
   public final windowWidth:Int;
   public final windowHeight:Int;
   public function new(captureDirectory:Null<String>, frameLimit:Int, captureSeconds:Float,
       componentLab:Bool, storyId:Null<String>, darkTheme:Bool,
-      robotHost:Null<String>, robotPort:Int,setupScript:Null<String>,
+      robotHost:Null<String>, robotPort:Int,setupScript:Null<String>,projectPath:Null<String>,
       windowWidth:Int, windowHeight:Int) {
     this.captureDirectory = captureDirectory;
     this.frameLimit = frameLimit;
@@ -187,6 +189,7 @@ private class ReferenceEditorLaunchOptions {
     this.robotHost = robotHost;
     this.robotPort = robotPort;
     this.setupScript=setupScript;
+    this.projectPath=projectPath;
     this.windowWidth = windowWidth;
     this.windowHeight = windowHeight;
   }
@@ -199,6 +202,7 @@ private class ReferenceEditorLaunchOptions {
     var story:Null<String> = null;
     var robotEndpoint:Null<String> = null;
     var setupScript:Null<String> = null;
+    var projectPath:Null<String> = null;
     var windowWidth = 1320;
     var windowHeight = 900;
     for (arg in args) {
@@ -239,6 +243,8 @@ private class ReferenceEditorLaunchOptions {
         robotEndpoint = arg.substr(8);
       } else if(arg.indexOf("--setup-script=")==0) {
         setupScript=arg.substr(15);
+      } else if (arg.indexOf("--project=") == 0) {
+        projectPath = arg.substr(10);
       }
     }
     if (directory != null && directory.length == 0) {
@@ -247,6 +253,12 @@ private class ReferenceEditorLaunchOptions {
     }
     if(setupScript!=null&&StringTools.trim(setupScript).length==0){
       Sys.println("materia: --setup-script requires a registered reference");return null;
+    }
+    if(projectPath!=null&&StringTools.trim(projectPath).length==0){
+      Sys.println("materia: --project requires a path");return null;
+    }
+    if(setupScript!=null&&projectPath!=null){
+      Sys.println("materia: --project cannot be combined with --setup-script");return null;
     }
     if (captureSeconds > 0.0 && (directory == null || frames > 0)) {
       Sys.println("materia: --capture-seconds requires --capture-dir and excludes --frames");
@@ -274,7 +286,7 @@ private class ReferenceEditorLaunchOptions {
       robotPort = parsedPort;
     }
     return new ReferenceEditorLaunchOptions(directory, frames, captureSeconds, lab, story,
-      args.indexOf("--dark") >= 0, robotHost, robotPort,setupScript,
+      args.indexOf("--dark") >= 0, robotHost, robotPort,setupScript,projectPath,
       windowWidth, windowHeight);
   }
 }
@@ -329,7 +341,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function get_sensors():SensorConfiguration return session.sensors;
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
-      ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String) {
+      ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String,?projectPath:String) {
     this.hostContext = hostContext;
     appearance = new EditorAppearance(theme);
     ui = new UiContext(null, fonts, appearance.theme);
@@ -344,6 +356,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     session.beforeReplace=simulation.clear;
     if(setupScript!=null){var scripted=session.openScript(setupScript);
       simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
+    if(projectPath!=null)session.openGeneratedScene(MateriaProjectRunner.load(projectPath));
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);
     documents = new SceneDocumentController(session, function(save, path, complete) {
       var chooser = files;
@@ -373,6 +386,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
     workspace = makeWorkspace();
     workspace.restoreFromOrDefault(storage, WORKSPACE_KEY);
+    if(projectPath!=null&&perspectiveViewport!=null){
+      workspace.activate("perspective");
+      scene.select("scene");
+      perspectiveViewport.frameSelected();
+    }
     workspaceSaves = new WorkspaceSaveWorker(storage, WORKSPACE_KEY);
     workspace.listen(queueWorkspaceSave);
     installCommands();

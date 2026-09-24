@@ -95,7 +95,7 @@ class EditorScene {
       } else {
         for (item in data) addObject(item.id, item.label, item.x, item.y, item.z,
           item.width, item.height, item.depth, item.red, item.green, item.blue, item.visible,
-          item.collisionEnabled,item.dynamicBody,item.mass,item.type,item.cadGraph);
+          item.collisionEnabled,item.dynamicBody,item.mass,item.type,item.cadGraph,item.meshSnapshot);
         selectedId = data.length == 0 ? "scene" : data[0].id;
         var savedDraft:Null<SceneObjectData> = null;
         for (item in data) if (item.sketchDraft != null) {
@@ -122,7 +122,7 @@ class EditorScene {
   function addObject(id:String, label:String, x:Float, y:Float, z:Float,
       width:Float, height:Float, depth:Float, red:Float, green:Float, blue:Float,
       visible:Bool = true,collisionEnabled:Bool=true,dynamicBody:Bool=false,mass:Float=1.0,
-      kind:String="rectangle",?cadGraph:String):Void {
+      kind:String="rectangle",?cadGraph:String,?meshSnapshot:String):Void {
     var geometry = scene.createGeometry();
     var session:Null<CadDocumentSession> = null;
     var storedCadGraph = cadGraph;
@@ -132,6 +132,9 @@ class EditorScene {
       if (storedCadGraph == null)
         storedCadGraph = session.encode();
       geometryData = session.geometry();
+    } else if (kind == "cad-preview") {
+      if (meshSnapshot == null) throw "CAD preview object has no mesh snapshot";
+      geometryData = CadPreviewGeometry.geometry(meshSnapshot);
     } else {
       geometryData = boxGeometry(width, height, depth);
     }
@@ -152,7 +155,7 @@ class EditorScene {
         objects.push(new EditorSceneObject(id, label, kind, width, height, depth,
           collisionEnabled,dynamicBody,mass,red,green,blue,
           storedCadGraph,
-          x, y, z, visible));
+          x, y, z, visible, meshSnapshot));
         if (session != null)
           cadSessions.set(id, session);
       } catch (error:Dynamic) {
@@ -801,7 +804,7 @@ class EditorScene {
       width: source.width, height: source.height, red: source.red, green: source.green,
       blue: source.blue, visible: source.visible,depth:source.depth,
       collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass,
-      cadGraph:cadGraph});
+      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot});
     return changeObjects("Duplicate object", data, id);
   }
 
@@ -1024,7 +1027,9 @@ class EditorScene {
           var geometry = scene.createGeometry();
           var geometryData = session != null
             ? session.geometry()
-            : boxGeometry(record.width, record.height, record.depth);
+            : (record.type == "cad-preview"
+              ? CadPreviewGeometry.geometry(record.meshSnapshot)
+              : boxGeometry(record.width, record.height, record.depth));
           scene.setGeometryData(geometry, geometryData);
           var material = scene.createMaterial();
           scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue));
@@ -1039,7 +1044,7 @@ class EditorScene {
             record.width, record.height, record.depth, record.collisionEnabled,
             record.dynamicBody, record.mass, record.red, record.green, record.blue,
             storedGraph,
-            record.x, record.y, record.z, record.visible);
+            record.x, record.y, record.z, record.visible, record.meshSnapshot);
           changed = true;
         } else {
           var runtime = runtimeFor(record.id);
@@ -1050,10 +1055,12 @@ class EditorScene {
           if (item.label != record.label || item.visible != record.visible || item.x != record.x ||
               item.y != record.y || item.z != record.z) changed = true;
           if (item.width != record.width || item.height != record.height || item.depth != record.depth ||
-              item.kind != record.type || item.cadGraph != storedGraph) {
+              item.kind != record.type || item.cadGraph != storedGraph || item.meshSnapshot != record.meshSnapshot) {
             var geometryData = session != null
               ? session.geometry()
-              : boxGeometry(record.width, record.height, record.depth);
+              : (record.type == "cad-preview"
+                ? CadPreviewGeometry.geometry(record.meshSnapshot)
+                : boxGeometry(record.width, record.height, record.depth));
             scene.setGeometryData(runtime.geometry, geometryData);
             changed = true;
           }
@@ -1068,6 +1075,7 @@ class EditorScene {
           item.collisionEnabled = record.collisionEnabled; item.dynamicBody = record.dynamicBody;
           item.mass = record.mass; item.red = record.red; item.green = record.green; item.blue = record.blue;
           item.cadGraph = storedGraph; item.x = record.x; item.y = record.y; item.z = record.z;
+          item.meshSnapshot = record.meshSnapshot;
           item.visible = record.visible;
         }
         retained.set(record.id, true);
@@ -2052,7 +2060,7 @@ class EditorScene {
         x: item.x, y: item.y, z: item.z,
         width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
-        visible: item.visible,cadGraph:item.cadGraph});
+        visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot});
     }
     return result;
   }
@@ -2179,18 +2187,20 @@ class EditorSceneObject {
   public var green:Float;
   public var blue:Float;
   public var cadGraph:Null<String>;
+  public var meshSnapshot:Null<String>;
   public var x:Float;
   public var y:Float;
   public var z:Float;
   public var visible:Bool;
   public function new(id:String,label:String,kind:String,width:Float,height:Float,depth:Float,
       collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float,
-      ?cadGraph:String,x:Float=0,y:Float=0,z:Float=0,visible:Bool=true) {
+      ?cadGraph:String,x:Float=0,y:Float=0,z:Float=0,visible:Bool=true,?meshSnapshot:String) {
     this.id = id; this.label = label; this.kind = kind;
     this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;
     this.dynamicBody=dynamicBody;this.mass=mass;
     this.red = red; this.green = green; this.blue = blue;
     this.cadGraph=cadGraph;
+    this.meshSnapshot=meshSnapshot;
     this.x=x;this.y=y;this.z=z;this.visible=visible;
   }
 }

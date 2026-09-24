@@ -43,6 +43,16 @@ class SceneDocumentSession {
     return materialized;
   }
 
+  /** Open a generated project preview as a normal, saveable Materia scene. */
+  public function openGeneratedScene(data:Array<SceneObjectData>):Void {
+    if (data == null || data.length == 0)
+      throw "Generated project preview contains no scene objects";
+    var next = new EditorScene(data), nextSensors:SensorConfiguration;
+    try nextSensors = new SensorConfiguration()
+    catch (error:Dynamic) { next.dispose(); throw error; }
+    replace(next, nextSensors, null, null);
+  }
+
   /** Publishes a validated candidate without touching the currently running simulation. */
   public function reloadScript():ScriptMaterialization {
     var ownership=scriptOwnership;if(ownership==null)throw "This document is not script-owned";

@@ -13,6 +13,9 @@ class GeometryData {
 	final streamData:Array<Bytes> = [];
 	final indexValues:Array<Int> = [];
 	var indices:Bytes = Bytes.alloc(0);
+	var packedIndices:Null<Bytes>;
+	var packedIndexCount:Int = 0;
+	var positionStreamCount:Null<Int>;
 
 	public function new() {
 		value = new nkscene_geometry_data();
@@ -29,6 +32,8 @@ class GeometryData {
 	}
 
 	public function addTriangle(first:Int, second:Int, third:Int):GeometryData {
+		if (packedIndices != null)
+			throw "Cannot append triangles after setting a packed index buffer";
 		appendIndex(first);
 		appendIndex(second);
 		appendIndex(third);
@@ -54,6 +59,11 @@ class GeometryData {
 		stream.set_count(count);
 		streams.push(stream);
 		streamData.push(data);
+		if (semantic == 1) {
+			if (positionStreamCount != null)
+				throw "Geometry data can contain only one position stream";
+			positionStreamCount = count;
+		}
 		return this;
 	}
 
@@ -95,16 +105,33 @@ class GeometryData {
 		return this;
 	}
 
-	public function vertexCount():Int
-		return vertices.length;
+	public function vertexCount():Int {
+		if (vertices.length != 0)
+			return vertices.length;
+		return positionStreamCount == null ? 0 : cast positionStreamCount;
+	}
 
 	public function triangleCount():Int
-		return Std.int(indexValues.length / 3);
+		return Std.int((packedIndices == null ? indexValues.length : packedIndexCount) / 3);
+
+	/** Supplies a tightly packed uint32 index stream without per-index Haxe allocations. */
+	public function setIndexBuffer(data:Bytes, count:Int):GeometryData {
+		if (data == null || count < 0 || count % 3 != 0 || data.length != count * 4 || indexValues.length != 0)
+			throw "Packed triangle index buffer has an invalid size";
+		packedIndices = data;
+		packedIndexCount = count;
+		return this;
+	}
 
 	@:allow(Scene)
 	function nativeValue():nkscene_geometry_data {
-		value.set_vertices(vertices);
-		if (indexValues.length != 0) {
+		if (vertices.length != 0)
+			value.set_vertices(vertices);
+		if (packedIndices != null) {
+			indices = packedIndices;
+			value.set_indices_bytes(indices);
+			value.set_index_count(packedIndexCount);
+		} else if (indexValues.length != 0) {
 			indices = Bytes.alloc(indexValues.length * 4);
 			for (index in 0...indexValues.length)
 				indices.setInt32(index * 4, indexValues[index]);
@@ -115,8 +142,8 @@ class GeometryData {
 		value.set_stroke_segment_count(strokeSegments.length);
 		value.set_stroke_segments(strokeSegments);
 		if (streams.length != 0) {
-			value.set_streams(streams);
 			value.set_stream_count(streams.length);
+			value.set_streams(streams);
 		}
 		return value;
 	}
