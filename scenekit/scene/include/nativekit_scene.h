@@ -134,7 +134,9 @@ typedef enum nkscene_vertex_format {
 typedef enum nkscene_primitive_type {
     NKS_PRIMITIVE_TRIANGLES = 1,
     NKS_PRIMITIVE_LINES = 2,
-    NKS_PRIMITIVE_POINTS = 3
+    NKS_PRIMITIVE_POINTS = 3,
+    /** Input-only box primitive; SceneKit generates triangles, normals, and edges from bounds. */
+    NKS_PRIMITIVE_BOX = 4
 } nkscene_primitive_type;
 
 typedef struct nkscene_vertex_stream {

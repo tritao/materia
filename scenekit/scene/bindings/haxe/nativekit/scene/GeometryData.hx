@@ -22,6 +22,17 @@ class GeometryData {
 		value.set_struct_size(nkscene_geometry_data.size());
 	}
 
+	/** Describes a box primitive; native SceneKit generates its faces, normals, and edges. */
+	public static function box(width:Float, height:Float, depth:Float):GeometryData {
+		if (!Math.isFinite(width) || !Math.isFinite(height) || !Math.isFinite(depth) ||
+			width <= 0.0 || height <= 0.0 || depth <= 0.0)
+			throw "Box dimensions must be positive finite values";
+		return new GeometryData()
+			.setPrimitiveType(NkscenePrimitiveType.Box)
+			.setBounds(-width / 2.0, -height / 2.0, -depth / 2.0,
+				width / 2.0, height / 2.0, depth / 2.0);
+	}
+
 	public function addVertex(x:Float, y:Float, z:Float):Int {
 		var vertex = new nkscene_geometry_vertex();
 		vertex.set_position(0, x);

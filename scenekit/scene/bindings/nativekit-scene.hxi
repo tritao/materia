@@ -32,6 +32,10 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 		NKS_PRIMITIVE_TRIANGLES = 1;
 		NKS_PRIMITIVE_LINES = 2;
 		NKS_PRIMITIVE_POINTS = 3;
+		/**
+		 * Input-only box primitive; SceneKit generates triangles, normals, and edges from bounds.
+		 */
+		NKS_PRIMITIVE_BOX = 4;
 	}
 	enum nkscene_sampler_filter : c_int {
 		NKS_SAMPLER_FILTER_NEAREST = 1;
@@ -260,14 +264,17 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 		count: u32 @offset(16);
 		nodes: array<nkscene_snapshot_node, 64> @offset(24);
 	}
+	/**
+	 * One object-space CAD edge segment attached to its face geometry.
+	 */
+	struct nkscene_stroke_segment @layout(24, 4) {
+		start: array<f32, 3> @offset(0);
+		end: array<f32, 3> @offset(12);
+	}
 	struct nkscene_subelement_range @layout(12, 4) {
 		first_primitive: u32 @offset(0);
 		primitive_count: u32 @offset(4);
 		subelement: u32 @offset(8);
-	}
-	struct nkscene_stroke_segment @layout(24, 4) {
-		start: array<f32, 3> @offset(0);
-		end: array<f32, 3> @offset(12);
 	}
 	struct nkscene_texture_data @layout(16, 8) {
 		struct_size: u32 @offset(0) @struct_size;

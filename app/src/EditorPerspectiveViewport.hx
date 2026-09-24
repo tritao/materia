@@ -115,7 +115,6 @@ class EditorPerspectiveViewport implements View {
         new GradientStop(1.0, ViewportBackground.bottom())]);
     paintWorkplane(canvas, geometry.width, geometry.height);
     if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
-    paintBoxEdges(canvas, geometry.width, geometry.height);
     paintSensors(canvas,geometry.width,geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
   }
@@ -302,50 +301,6 @@ class EditorPerspectiveViewport implements View {
     return true;
   }
 
-  function paintBoxEdges(canvas:Canvas, width:Float, height:Float):Void {
-    var projection = camera.viewProjection(width / Math.max(1.0, height));
-    var eyeX = camera.targetX + camera.distance * Math.cos(camera.pitch) * Math.cos(camera.yaw);
-    var eyeY = camera.targetY + camera.distance * Math.cos(camera.pitch) * Math.sin(camera.yaw);
-    var eyeZ = camera.targetZ + camera.distance * Math.sin(camera.pitch);
-    var path = new PathBuilder();
-    var hasEdges = false;
-    for (item in scene.items()) {
-      if (!item.visible || scene.isCadPart(item.id)) continue;
-      var faces = BoxGeometry.faces(item.width, item.height, item.depth);
-      var transform = displayTransform(item);
-      var centerX = transform.element(12), centerY = transform.element(13), centerZ = transform.element(14);
-      var toEyeX = eyeX - centerX, toEyeY = eyeY - centerY, toEyeZ = eyeZ - centerZ;
-      for (face in faces) {
-        var nx = transform.element(0) * face.normal[0] + transform.element(4) * face.normal[1] +
-          transform.element(8) * face.normal[2];
-        var ny = transform.element(1) * face.normal[0] + transform.element(5) * face.normal[1] +
-          transform.element(9) * face.normal[2];
-        var nz = transform.element(2) * face.normal[0] + transform.element(6) * face.normal[1] +
-          transform.element(10) * face.normal[2];
-        if (nx * toEyeX + ny * toEyeY + nz * toEyeZ <= 0.0) continue;
-        var previous = transformPoint(transform, face.corners[3][0],
-          face.corners[3][1], face.corners[3][2]);
-        for (corner in face.corners) {
-          var point = transformPoint(transform, corner[0], corner[1], corner[2]);
-          var projected = camera.projectSegmentWithMatrix(projection,
-            previous[0], previous[1], previous[2], point[0], point[1], point[2], width, height);
-          if (projected != null) {
-            path.moveTo(projected[0].x, projected[0].y)
-              .lineTo(projected[1].x, projected[1].y);
-            hasEdges = true;
-          }
-          previous = point;
-        }
-      }
-    }
-    if (hasEdges) canvas.strokeTransient(path.build(), Color.rgba(0.075, 0.11, 0.14, 0.45), 1.0);
-  }
-
-  static function transformPoint(transform:Transform, x:Float, y:Float, z:Float):Array<Float> {
-    return [transform.element(0) * x + transform.element(4) * y + transform.element(8) * z + transform.element(12),
-      transform.element(1) * x + transform.element(5) * y + transform.element(9) * z + transform.element(13),
-      transform.element(2) * x + transform.element(6) * y + transform.element(10) * z + transform.element(14)];
-  }
   function paintSensors(canvas:Canvas,width:Float,height:Float):Void {
     if(!simulationActive)return;
     for(robot in robotVisuals){

@@ -429,6 +429,78 @@ struct PreparedGeometryData {
     SubelementTable subelements;
 };
 
+/** Lower an authored box to the same retained mesh and stroke resources as other geometry. */
+nkscene_result prepare_box_geometry(const nkscene_geometry_data *data,
+                                    PreparedGeometryData &prepared) {
+    const auto has_stroke_fields = data->struct_size >=
+        offsetof(nkscene_geometry_data, stroke_segment_count) + sizeof(data->stroke_segment_count);
+    if (!data->bounds.valid || data->vertex_count || data->index_count ||
+        data->subelement_count || data->stream_count ||
+        (has_stroke_fields && data->stroke_segment_count))
+        return NKS_ERROR_INVALID_ARGUMENT;
+    for (int axis = 0; axis < 3; ++axis) {
+        const auto minimum = data->bounds.minimum[axis];
+        const auto maximum = data->bounds.maximum[axis];
+        if (!std::isfinite(minimum) || !std::isfinite(maximum) || maximum <= minimum)
+            return NKS_ERROR_INVALID_ARGUMENT;
+        prepared.bounds.minimum[axis] = minimum;
+        prepared.bounds.maximum[axis] = maximum;
+    }
+    prepared.bounds.valid = true;
+    const auto x0 = data->bounds.minimum[0], x1 = data->bounds.maximum[0];
+    const auto y0 = data->bounds.minimum[1], y1 = data->bounds.maximum[1];
+    const auto z0 = data->bounds.minimum[2], z1 = data->bounds.maximum[2];
+    auto &payload = prepared.payload;
+    payload.vertices.reserve(24);
+    payload.indices.reserve(36);
+    payload.stroke_segments.reserve(12);
+    std::vector<std::array<float, 3>> normals;
+    normals.reserve(24);
+    const auto face = [&](std::array<std::array<float, 3>, 4> corners,
+                          std::array<float, 3> normal) {
+        const auto first = static_cast<std::uint32_t>(payload.vertices.size());
+        for (const auto &corner : corners) {
+            payload.vertices.push_back({corner});
+            normals.push_back(normal);
+        }
+        payload.indices.insert(payload.indices.end(),
+                               {first, first + 1, first + 2, first, first + 2, first + 3});
+    };
+    face({{{x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}, {x1, y0, z0}}}, {0, 0, -1});
+    face({{{x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}}}, {0, 0, 1});
+    face({{{x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1}, {x0, y0, z1}}}, {0, -1, 0});
+    face({{{x0, y1, z0}, {x0, y1, z1}, {x1, y1, z1}, {x1, y1, z0}}}, {0, 1, 0});
+    face({{{x0, y0, z0}, {x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}}}, {-1, 0, 0});
+    face({{{x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}, {x1, y0, z1}}}, {1, 0, 0});
+    GeometryVertexStream positions;
+    positions.semantic = VertexSemantic::Position;
+    positions.format = VertexFormat::Float32x3;
+    positions.stride = sizeof(GeometryVertex);
+    positions.count = static_cast<std::uint32_t>(payload.vertices.size());
+    positions.data.resize(payload.vertices.size() * sizeof(GeometryVertex));
+    std::memcpy(positions.data.data(), payload.vertices.data(), positions.data.size());
+    GeometryVertexStream normal_stream;
+    normal_stream.semantic = VertexSemantic::Normal;
+    normal_stream.format = VertexFormat::Float32x3;
+    normal_stream.stride = sizeof(std::array<float, 3>);
+    normal_stream.count = positions.count;
+    normal_stream.data.resize(normals.size() * sizeof(std::array<float, 3>));
+    std::memcpy(normal_stream.data.data(), normals.data(), normal_stream.data.size());
+    payload.streams.push_back(std::move(positions));
+    payload.streams.push_back(std::move(normal_stream));
+    for (const auto y : {y0, y1})
+        for (const auto z : {z0, z1})
+            payload.stroke_segments.push_back({{x0, y, z}, {x1, y, z}});
+    for (const auto x : {x0, x1})
+        for (const auto z : {z0, z1})
+            payload.stroke_segments.push_back({{x, y0, z}, {x, y1, z}});
+    for (const auto x : {x0, x1})
+        for (const auto y : {y0, y1})
+            payload.stroke_segments.push_back({{x, y, z0}, {x, y, z1}});
+    payload.primitive_type = PrimitiveType::Triangles;
+    return NKS_OK;
+}
+
 bool valid_vertex_semantic(nkscene_vertex_semantic semantic) noexcept;
 
 nkscene_result prepare_geometry_data(const nkscene_geometry_data *data,
@@ -442,6 +514,8 @@ nkscene_result prepare_geometry_data(const nkscene_geometry_data *data,
     auto primitive = NKS_PRIMITIVE_TRIANGLES;
     if (has_stream_fields && data->primitive_type != 0)
         primitive = data->primitive_type;
+    if (primitive == NKS_PRIMITIVE_BOX)
+        return prepare_box_geometry(data, prepared);
     const auto width = primitive_width(primitive);
     if (!width || (stream_count != 0 && !data->streams) ||
         (stream_count == 0 && data->vertex_count != 0 && !data->vertices) ||
@@ -534,6 +608,25 @@ nkscene_result prepare_geometry_data(const nkscene_geometry_data *data,
             return NKS_ERROR_INVALID_ARGUMENT;
         prepared.subelements.ranges.push_back(
             {range.first_primitive, range.primitive_count, range.subelement});
+    }
+    const auto has_stroke_fields = data->struct_size >=
+        offsetof(nkscene_geometry_data, stroke_segment_count) + sizeof(data->stroke_segment_count);
+    const auto stroke_segment_count = has_stroke_fields ? data->stroke_segment_count : 0;
+    if (stroke_segment_count && !data->stroke_segments)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    prepared.payload.stroke_segments.reserve(stroke_segment_count);
+    for (uint32_t index = 0; index < stroke_segment_count; ++index) {
+        const auto &segment = data->stroke_segments[index];
+        GeometryPayload::StrokeSegment copied;
+        std::copy(std::begin(segment.start), std::end(segment.start), copied.start.begin());
+        std::copy(std::begin(segment.end), std::end(segment.end), copied.end.begin());
+        for (const auto coordinate : copied.start)
+            if (!std::isfinite(coordinate))
+                return NKS_ERROR_INVALID_ARGUMENT;
+        for (const auto coordinate : copied.end)
+            if (!std::isfinite(coordinate))
+                return NKS_ERROR_INVALID_ARGUMENT;
+        prepared.payload.stroke_segments.push_back(copied);
     }
     prepared.payload.primitive_type = static_cast<PrimitiveType>(primitive);
     prepared.bounds.valid = data->bounds.valid != 0;
@@ -2188,6 +2281,27 @@ nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene, nkscene_g
         offsetof(nkscene_geometry_data, subelement_count) + sizeof(data->subelement_count);
     if (!data || data->struct_size < minimum_size)
         return NKS_ERROR_INVALID_ARGUMENT;
+    if (data->struct_size >=
+            offsetof(nkscene_geometry_data, stream_count) + sizeof(data->stream_count) &&
+        data->primitive_type == NKS_PRIMITIVE_BOX) {
+        nkscene::PreparedGeometryData prepared;
+        const auto result = nkscene::prepare_geometry_data(data, prepared);
+        if (result != NKS_OK)
+            return result;
+        auto &state = nkscene::registry();
+        std::lock_guard lock(state.mutex);
+        auto owner = state.scenes.get(nkscene::unpack_handle(scene));
+        if (!owner)
+            return NKS_ERROR_INVALID_HANDLE;
+        if (!owner->geometry_store().find({geometry.value}))
+            return NKS_ERROR_STALE_ID;
+        auto &resource = owner->geometry_store().create({geometry.value});
+        resource.edit_payload() = std::move(prepared.payload);
+        resource.edit_subelements() = std::move(prepared.subelements);
+        resource.bounds = prepared.bounds;
+        owner->publish();
+        return NKS_OK;
+    }
     const auto has_stream_fields = data->struct_size >=
         offsetof(nkscene_geometry_data, stream_count) + sizeof(data->stream_count);
     const auto has_stroke_fields = data->struct_size >=

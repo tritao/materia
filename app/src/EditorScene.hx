@@ -2316,7 +2316,7 @@ class EditorScene {
   }
 
   static function boxGeometry(width:Float, height:Float, depth:Float):GeometryData {
-    return BoxGeometry.create(width, height, depth);
+    return GeometryData.box(width, height, depth);
   }
 
   static inline function validDimension(value:Float):Bool
