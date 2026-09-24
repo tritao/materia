@@ -52,6 +52,17 @@ for lower-overhead timing, or with the default profiler to inspect the matching
 `editor.perfetto.json` trace and `span-spikes.json` report. The benchmark measures headless input handling
 and frame submission; it does not include desktop presentation latency.
 
+To capture the architecture workloads, run `python3 app/tools/profile-editor.py
+--scenario architecture --cycles 1`. This records CAD parameter recomputes, BIM
+opening edits, construction of a 10,000 object scene, a single object nudge,
+500 moving object updates, 1,000 ordered undo operations, and presentation
+captures for a 64 link robot. The 64 link size follows the current native
+runtime limit of 64 joints; the capture writes phase timings to
+`architecture-summary.json` and the usual frame, action, memory, and profiler
+artifacts beside it. Increase `--cycles` to extend repeated movement, CAD,
+BIM, and simulation measurements. The scenario is intentionally not part of
+the default regression gate because it exercises large workloads.
+
 The tab matrix uses 50 Hz CPU sampling with allocation sampling disabled. The
 500 Hz setting saturated the profiler on this workload. Use `--sample-rate` and
 `--allocation-interval` to tune a capture; compare latency with `--no-profile`.
