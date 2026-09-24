@@ -3,6 +3,7 @@ package app;
 import haxe.Int64;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationPresentationSnapshot;
 import robotkit.world.Robot;
 import robotkit.world.RobotWorld;
 import robotkit.world.SimulatedRobot;
@@ -151,27 +152,65 @@ class ApplicationSimulation {
   /** True in both running and paused simulation modes. */
   public function isActive():Bool return simulation!=null;
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
-  public function visualRevision():Int return simulation==null?0:Int64.toInt(simulation.stepIndex());
-  /** Read-only runtime state for overlays; never mutates the editable document. */
-  public function visualState():Array<SimulationRobotVisual> {
-    if(simulation==null)return [];
-    var snapshot=world.snapshot();var result:Array<SimulationRobotVisual> = [];
-    for(index in 0...simulatedIds.length){
-      var id=simulatedIds[index],robot=snapshot.robot(id),pose=simulation.robotPose(index);
-      result.push({id:id,position:pose.position,rotation:pose.rotation,
-        sensors:robot==null?[]:robot.sensors.toArray(),links:[for(linkIndex in 0...simulatedLinks[index].length) {
-          var linkPose=simulation.linkPose(index,linkIndex);
-          {id:simulatedLinks[index][linkIndex],position:linkPose.position,rotation:linkPose.rotation};
-        }]});
+  /** Captures physics poses once, then combines the matching frame's world publications. */
+  public function capturePresentationSnapshot():ApplicationPresentationSnapshot {
+    var physics = simulation == null ? null : simulation.capturePresentation();
+    var publication:WorldSnapshot;
+    try publication = world.snapshot() catch (error:Dynamic) {
+      if (physics != null) physics.dispose();
+      throw error;
     }
+    var robots:Array<SimulationRobotVisual> = [];
+    for (index in 0...simulatedIds.length) {
+      var id = simulatedIds[index];
+      var robot = publication.robot(id);
+      robots.push({id:id,position:[0.0,0.0,0.0],rotation:[0.0,0.0,0.0,1.0],
+        sensors:robot==null?[]:robot.sensors.toArray(),links:[for (linkId in simulatedLinks[index])
+          {id:linkId,position:[0.0,0.0,0.0],rotation:[0.0,0.0,0.0,1.0]}]});
+    }
+    var environment = new Map<String, SimulationPoseVisual>();
+    if (physics != null) for (pose in physics.poses) switch pose.kind {
+      case SimulationPresentationSnapshot.ROBOT_BASE:
+        if (pose.robotIndex < robots.length) {
+          robots[pose.robotIndex].position = pose.position;
+          robots[pose.robotIndex].rotation = pose.rotation;
+        }
+      case SimulationPresentationSnapshot.ROBOT_LINK:
+        if (pose.robotIndex < robots.length && pose.linkIndex < robots[pose.robotIndex].links.length) {
+          var link = robots[pose.robotIndex].links[pose.linkIndex];
+          link.position = pose.position;
+          link.rotation = pose.rotation;
+        }
+      case SimulationPresentationSnapshot.ENVIRONMENT:
+        for (object in simulatedObjects) if (object.handle == pose.objectId) {
+          environment.set(object.id, {id:object.id,position:pose.position,rotation:pose.rotation});
+          break;
+        }
+      default:
+    }
+    var orderedEnvironment:Array<SimulationPoseVisual> = [];
+    for (object in simulatedObjects) {
+      var pose = environment.get(object.id);
+      if (pose != null) orderedEnvironment.push(pose);
+    }
+    return new ApplicationPresentationSnapshot(publication, physics, robots, orderedEnvironment);
+  }
+
+  public function visualRevision():Int {
+    var snapshot = capturePresentationSnapshot();
+    var result = snapshot.revision;
+    return result;
+  }
+  /** Compatibility helper; frame consumers should share capturePresentationSnapshot(). */
+  public function visualState():Array<SimulationRobotVisual> {
+    var snapshot = capturePresentationSnapshot();
+    var result = snapshot.robots;
     return result;
   }
   public function environmentVisualState():Array<SimulationPoseVisual> {
-    if(simulation==null)return [];
-    return [for(object in simulatedObjects){
-      var pose=simulation.objectPose(object.handle);
-      {id:object.id,position:pose.position,rotation:pose.rotation};
-    }];
+    var snapshot = capturePresentationSnapshot();
+    var result = snapshot.environment;
+    return result;
   }
   public function clear():Void {
     stop();

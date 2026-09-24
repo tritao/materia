@@ -108,6 +108,19 @@ class Simulation {
     return poseValue(pose);
   }
 
+  /** Copies every presentation body pose under one native simulation lock. */
+  public function capturePresentation():SimulationPresentationSnapshot {
+    ensureLive();
+    var result = RobotKitSimKit.rk_simulation_capture_presentation(owner.borrow());
+    check(result.status, "simulation.capturePresentation");
+    try {
+      return new SimulationPresentationSnapshot(result.out_presentation);
+    } catch (error:Dynamic) {
+      result.out_presentation.close();
+      throw error;
+    }
+  }
+
   static function poseValue(pose:rk_simulation_pose):{position:Array<Float>,rotation:Array<Float>}
     return {position:[for(index in 0...3) pose.get_position(index)],
       rotation:[for(index in 0...4) pose.get_rotation(index)]};

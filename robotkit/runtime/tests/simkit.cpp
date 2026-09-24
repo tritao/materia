@@ -3,6 +3,8 @@
 
 #include <cassert>
 #include <cmath>
+#include <chrono>
+#include <thread>
 
 namespace {
 
@@ -102,6 +104,26 @@ void shared_world_steps_once() {
     assert(snapshot(first).sensors[1].sequence == 1);
     assert(std::abs(snapshot(first).sensors[1].values[5] - 9.81) < 1e-9);
 
+    rk_simulation_presentation presentation = RK_INVALID_SIMULATION_PRESENTATION;
+    assert(rk_simulation_capture_presentation(simulation, &presentation) == RK_OK);
+    rk_simulation_presentation_info presentation_info{};
+    presentation_info.struct_size = sizeof(presentation_info);
+    assert(rk_simulation_presentation_get_info(presentation, &presentation_info) == RK_OK);
+    assert(presentation_info.step_index == 2 && presentation_info.pose_count == 6);
+    assert(std::abs(presentation_info.simulation_time - 0.02) < 1e-12);
+    bool found_first_base = false;
+    for (uint32_t index = 0; index < presentation_info.pose_count; ++index) {
+        rk_simulation_presentation_pose item{};
+        item.struct_size = sizeof(item);
+        assert(rk_simulation_presentation_get_pose(presentation, index, &item) == RK_OK);
+        if (item.kind == RK_SIMULATION_PRESENTATION_ROBOT_BASE && item.robot_index == 0) {
+            found_first_base = true;
+            assert(std::abs(item.position[0]) < 1e-6);
+        }
+    }
+    assert(found_first_base);
+    rk_simulation_presentation_destroy(presentation);
+
     assert(rk_simulation_stop(simulation) == RK_OK);
     rk_simulation_pose pose{};
     pose.struct_size = sizeof(pose);
@@ -128,6 +150,23 @@ void shared_world_steps_once() {
     assert(rk_simulation_teleport_object(simulation, object, &pose) == RK_OK);
     assert(rk_simulation_get_object_pose(simulation, object, &observed_pose) == RK_OK);
     assert(std::abs(observed_pose.position[2] - 2.0) < 1e-6);
+    assert(rk_simulation_capture_presentation(simulation, &presentation) == RK_OK);
+    presentation_info = {};
+    presentation_info.struct_size = sizeof(presentation_info);
+    assert(rk_simulation_presentation_get_info(presentation, &presentation_info) == RK_OK);
+    assert(presentation_info.pose_count == 7);
+    bool found_environment = false;
+    for (uint32_t index = 0; index < presentation_info.pose_count; ++index) {
+        rk_simulation_presentation_pose item{};
+        item.struct_size = sizeof(item);
+        assert(rk_simulation_presentation_get_pose(presentation, index, &item) == RK_OK);
+        if (item.kind == RK_SIMULATION_PRESENTATION_ENVIRONMENT && item.object_id == object) {
+            found_environment = true;
+            assert(std::abs(item.position[2] - 2.0) < 1e-6);
+        }
+    }
+    assert(found_environment);
+    rk_simulation_presentation_destroy(presentation);
     assert(rk_simulation_remove_object(simulation, object) == RK_OK);
     assert(rk_simulation_reset(simulation) == RK_OK);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
@@ -185,6 +224,42 @@ void failed_command_phase_does_not_advance() {
     assert(rk_robot_runtime_submit(second, &clear_stop) == RK_OK);
     assert(rk_simulation_step(simulation, 200) == RK_OK);
     assert(std::abs(snapshot(first).position[0] - 0.04) < 1e-12);
+    rk_simulation_destroy(simulation);
+}
+
+void realtime_presentation_keeps_one_revision() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.005;
+    desc.physics_substeps = 1;
+    rk_simulation simulation = RK_INVALID_SIMULATION;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    const auto model = blueprint(21);
+    rk_robot_runtime runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(simulation, &model, &runtime) == RK_OK);
+    assert(rk_simulation_start(simulation) == RK_OK);
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+
+    rk_simulation_presentation presentation = RK_INVALID_SIMULATION_PRESENTATION;
+    assert(rk_simulation_capture_presentation(simulation, &presentation) == RK_OK);
+    rk_simulation_presentation_info captured{};
+    captured.struct_size = sizeof(captured);
+    assert(rk_simulation_presentation_get_info(presentation, &captured) == RK_OK);
+    assert(captured.step_index > 0 && captured.pose_count == 3);
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    rk_simulation_presentation_info reread{};
+    reread.struct_size = sizeof(reread);
+    assert(rk_simulation_presentation_get_info(presentation, &reread) == RK_OK);
+    assert(reread.step_index == captured.step_index &&
+           reread.simulation_time == captured.simulation_time &&
+           reread.pose_count == captured.pose_count);
+    rk_simulation_clock live{};
+    live.struct_size = sizeof(live);
+    assert(rk_simulation_get_clock(simulation, &live) == RK_OK);
+    assert(live.step_index > captured.step_index);
+
+    rk_simulation_presentation_destroy(presentation);
+    assert(rk_simulation_stop(simulation) == RK_OK);
     rk_simulation_destroy(simulation);
 }
 
@@ -281,6 +356,7 @@ void sensor_geometry_and_reset() {
 
 int main() {
     shared_world_steps_once();
+    realtime_presentation_keeps_one_revision();
     failed_command_phase_does_not_advance();
     velocity_targets_advance_joint_coordinates();
     sensor_geometry_and_reset();

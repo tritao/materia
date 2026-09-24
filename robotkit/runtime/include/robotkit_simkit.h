@@ -81,6 +81,32 @@ typedef struct rk_simulation_pose {
     double rotation[4];
 } rk_simulation_pose;
 
+/** Immutable copied presentation snapshot captured under one simulation lock. */
+typedef uint32_t rk_simulation_presentation RK_HANDLE RK_HANDLE_DESTROY(rk_simulation_presentation_destroy);
+#define RK_INVALID_SIMULATION_PRESENTATION ((rk_simulation_presentation)0)
+typedef struct rk_simulation_presentation_info {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint64_t step_index;
+    double simulation_time;
+    uint32_t pose_count;
+    uint32_t reserved[3];
+} rk_simulation_presentation_info;
+typedef enum rk_simulation_presentation_pose_kind {
+    RK_SIMULATION_PRESENTATION_ROBOT_BASE = 1,
+    RK_SIMULATION_PRESENTATION_ROBOT_LINK = 2,
+    RK_SIMULATION_PRESENTATION_ENVIRONMENT = 3
+} rk_simulation_presentation_pose_kind;
+typedef struct rk_simulation_presentation_pose {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t kind;
+    uint32_t robot_index;
+    uint32_t link_index;
+    uint32_t object_id;
+    uint32_t reserved[3];
+    double position[3];
+    double rotation[4];
+} rk_simulation_presentation_pose;
+
 /**
  * Creates one shared simulated universe and its fixed-step clock.
  *
@@ -191,6 +217,21 @@ RK_API rk_result RK_CALL rk_simulation_teleport_object(
 RK_API rk_result RK_CALL rk_simulation_get_object_pose(
     rk_simulation simulation, rk_simulation_object object,
     rk_simulation_pose *out_pose RK_INOUT);
+/** Copies the complete clock and every presentation pose under one simulation lock. */
+RK_API rk_result RK_CALL rk_simulation_capture_presentation(
+    rk_simulation simulation,
+    rk_simulation_presentation *out_presentation RK_OUT RK_OWNED);
+/** Reads immutable metadata from a captured presentation snapshot. */
+RK_API rk_result RK_CALL rk_simulation_presentation_get_info(
+    rk_simulation_presentation presentation,
+    rk_simulation_presentation_info *out_info RK_INOUT);
+/** Reads one pose from the immutable presentation snapshot, without locking the simulation. */
+RK_API rk_result RK_CALL rk_simulation_presentation_get_pose(
+    rk_simulation_presentation presentation, uint32_t index,
+    rk_simulation_presentation_pose *out_pose RK_INOUT);
+/** Destroys a captured presentation snapshot. */
+RK_API void RK_CALL rk_simulation_presentation_destroy(
+    rk_simulation_presentation presentation);
 
 #ifdef __cplusplus
 }
