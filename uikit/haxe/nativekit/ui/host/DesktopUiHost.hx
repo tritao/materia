@@ -18,6 +18,13 @@ import sys.io.File;
 class DesktopUiHost {
 	public static function run(options:DesktopUiHostOptions,
 			create:DesktopUiHostContext->DesktopUiApplication):Int {
+		var host = open(options, create);
+		while (host.tick()) {}
+		return host.close();
+	}
+
+	public static function open(options:DesktopUiHostOptions,
+			create:DesktopUiHostContext->DesktopUiApplication):DesktopUiHostSession {
 		if (options == null || create == null)
 			throw "Desktop UI host requires options and an application factory";
 		options.validate();
@@ -35,6 +42,7 @@ class DesktopUiHost {
 		var frameHistory:Array<Dynamic> = [];
 		var captureState = {startedAt: -1.0};
 		var result = 0;
+		var step:Void->Bool = function() return false;
 
 		try {
 			var init = new InitOptions();
@@ -186,7 +194,9 @@ class DesktopUiHost {
 				}
 			});
 
-			while (active) {
+			step = function() {
+				if (!active) return false;
+				try {
 				var hadEvent = pump.poll();
 				if (session.state == UiHostLifecycle.Failed) throw session.error;
 				if (active && captureState.startedAt >= 0.0 && options.captureSeconds > 0.0 &&
@@ -201,8 +211,17 @@ class DesktopUiHost {
 					framePending = true;
 				}
 				if (active && !hadEvent) pump.wait(1.0 / options.targetFps);
-			}
-			if (session.state == UiHostLifecycle.Failed) throw session.error;
+					if (session.state == UiHostLifecycle.Failed) throw session.error;
+				} catch (error:Dynamic) {
+					session.fail("desktop-host", error);
+					Sys.println(options.title + ": " + Std.string(error));
+					if (session.error != null && session.error.stack.length > 0)
+						Sys.println(session.error.stack);
+					active = false;
+					result = 1;
+				}
+				return active;
+			};
 		} catch (error:Dynamic) {
 			if (session != null && session.state != UiHostLifecycle.Failed)
 				session.fail("desktop-host", error);
@@ -220,6 +239,7 @@ class DesktopUiHost {
 			result = 1;
 		}
 
+		var finish = function() {
 		var ownedFrameSubscription = frameSubscription;
 		frameSubscription = null;
 		if (ownedFrameSubscription != null)
@@ -261,6 +281,8 @@ class DesktopUiHost {
 			session.transition(UiHostLifecycle.Stopped);
 		}
 		return result;
+		};
+		return new DesktopUiHostSession(step, finish);
 	}
 
 	static function writeDiagnostics(options:DesktopUiHostOptions,

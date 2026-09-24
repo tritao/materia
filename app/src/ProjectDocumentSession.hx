@@ -49,6 +49,33 @@ class ProjectDocumentSession {
   public function open(file:String):Void {
     var absolute = checkedPath(file);
     var text = File.getContent(absolute);
+    openContent(absolute, text);
+  }
+
+  /** Transfer an unsaved document across a development module reload. */
+  public function liveState():String {
+    var destination = path != null ? path : projectReference != null
+      ? projectReference + ".materia" : Sys.getCwd() + "/untitled.materia";
+    var project = projectReference == null ? null : projectSaveData(destination);
+    return Json.stringify({path: path, destination: destination,
+      content: SceneCodec.encode(scene, sensors,
+        scriptOwnership == null ? null : scriptOwnership.record(), bim,
+        project == null ? null : project.record,
+        project == null ? null : project.authored),
+      dirty: isDirty()});
+  }
+
+  public function restoreLiveState(value:String):Void {
+    var state:Dynamic = Json.parse(value);
+    var destination:String = Reflect.field(state, "destination");
+    var content:String = Reflect.field(state, "content");
+    var oldPath:Null<String> = Reflect.field(state, "path");
+    openContent(destination, content);
+    path = oldPath;
+    if (Reflect.field(state, "dirty") == true) document.markExternallyDirty();
+  }
+
+  function openContent(absolute:String, text:String):Void {
     var project = SceneCodec.decodeProject(text);
     if (project != null) {
       openProjectDocument(absolute, text, project);

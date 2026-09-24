@@ -1,0 +1,24 @@
+{
+	"version": 1,
+	"package": { "name": "app" },
+	"entry": "app.DevEntry",
+	"sourceRoots": ["src"],
+	"dependencies": {
+		"projectkit": { "path": "../projectkit" },
+		"nativekit": { "path": "../nativekit" },
+		"cadkit": { "path": "../cadkit" },
+		"bimkit": { "path": "../bimkit" },
+		"uikit": { "path": "../uikit" },
+		"robotkit": { "path": "../robotkit" },
+		"scenekit": { "path": "../scenekit" }
+	},
+	"native": {
+		"cmake": {
+			"source": "native",
+			"target": "haxeon_app_native",
+			"inputs": ["native/CMakeLists.txt", "../nativekit/CMakeLists.txt", "../nativekit/modules/gpu/CMakeLists.txt", "../uikit/CMakeLists.txt", "../scenekit/scene/CMakeLists.txt", "../scenekit/scene_render/CMakeLists.txt", "../simkit/sim_core/CMakeLists.txt", "../simkit/sim_mujoco/CMakeLists.txt", "../cadkit/CMakeLists.txt", "../cadkit/core/CMakeLists.txt", "../robotkit/CMakeLists.txt", "../robotkit/runtime/CMakeLists.txt"]
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

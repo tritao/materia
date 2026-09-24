@@ -102,6 +102,7 @@ import nativekit.ui.host.DesktopUiApplication;
 import nativekit.ui.host.DesktopUiHost;
 import nativekit.ui.host.DesktopUiHostOptions;
 import nativekit.ui.host.DesktopUiHostContext;
+import nativekit.ui.host.DesktopUiHostSession;
 import nativekit.ui.widgets.overlays.Dialog;
 
 /**
@@ -111,6 +112,20 @@ import nativekit.ui.widgets.overlays.Dialog;
 	diagnostics lifecycle; this executable only configures the editor.
 */
 class Main {
+  static var liveEditor:Null<ReferenceEditorApp>;
+
+  public static function liveState():String {
+    var editor = liveEditor;
+    return editor == null ? "" : editor.liveState();
+  }
+
+  public static function restoreLiveState(state:String):Void {
+    var editor = liveEditor;
+    if (editor != null && state.length > 0) editor.restoreLiveState(state);
+  }
+
+  public static function clearLiveEditor():Void liveEditor = null;
+
   public static function main():Int {
     var args = Sys.args();
     for (arg in args)
@@ -136,8 +151,15 @@ class Main {
       editor.dispose();
       return 0;
     }
+    var live = open(args);
+    while (live.tick()) {}
+    return live.close();
+  }
+
+  /** Open the same editor as main(), while letting an embedding host pump it. */
+  public static function open(args:Array<String>):DesktopUiHostSession {
     var diagnostics = ReferenceEditorLaunchOptions.fromArgs(args);
-    if (diagnostics == null) return 2;
+    if (diagnostics == null) throw "Invalid editor launch options";
     var host = new DesktopUiHostOptions();
     host.title = "Materia";
     host.width = diagnostics.windowWidth;
@@ -148,7 +170,7 @@ class Main {
     var activeEditor:Null<ReferenceEditorApp> = null;
     host.continuousFrames = function() return activeEditor != null &&
       (activeEditor.simulation.isRunning() || diagnostics.robotHost != null);
-    return DesktopUiHost.run(host, function(context) {
+    return DesktopUiHost.open(host, function(context) {
       var activeTheme = Theme.light();
       if (diagnostics.darkTheme) activeTheme = Theme.dark();
       var world:Null<RobotWorld> = null;
@@ -162,6 +184,7 @@ class Main {
       var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context,
         diagnostics.setupScript, diagnostics.projectPath);
       activeEditor = editor;
+      liveEditor = editor;
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
@@ -502,6 +525,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (perspectiveViewport != null) perspectiveViewport.dispose();
     session.dispose();
     ui.dispose();
+  }
+
+  public function liveState():String return Json.stringify({
+    document: session.liveState(),
+    selected: scene.selectedId,
+    workspace: workspace.snapshotJson()
+  });
+
+  public function restoreLiveState(source:String):Void {
+    var state:Dynamic = Json.parse(source);
+    var document:String = Reflect.field(state, "document");
+    var selected:String = Reflect.field(state, "selected");
+    var layout:String = Reflect.field(state, "workspace");
+    session.restoreLiveState(document);
+    documentChanged();
+    if (selected != null) scene.select(selected);
+    if (layout != null) workspace.restoreJson(layout);
+    if (hostContext != null) hostContext.requestFrame();
   }
 
   public function enableComponentLab(?storyId:String):Void {

@@ -77,6 +77,18 @@ and relaunches only when the build succeeds. A failed build leaves the running
 app open. This currently restarts the desktop process, so unsaved in-memory
 edits do not survive a code reload.
 
+For in-process Haxe code updates, use the development entry point:
+
+```sh
+./haxeon/scripts/haxeon run --watch --live --project app/haxeon.live.json \
+  --output build/host/live.hl -- \
+  --project=../cadkit/examples/modeling/materia.project.json
+```
+
+Compatible function edits patch the running module between event pump steps.
+Changes to its structure reload the module and transfer the open document,
+selection, and workspace. Native or manifest changes still restart the process.
+
 The host supports a headless workspace snapshot and deterministic diagnostics:
 
 ```sh
