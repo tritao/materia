@@ -359,7 +359,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     this.world = world == null ? new RobotWorld() : world;
     simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
     session = new ProjectDocumentSession(BimEditorDemo.create());
-    bimEditor = makeBimEditor();
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
     session.beforeReplace=simulation.clear;
@@ -369,6 +368,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var generated=MateriaProjectRunner.loadProject(projectPath);
       session.openGeneratedScene(generated.objects, projectPath, generated.assembly);
     }
+    bimEditor = makeBimEditor();
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);
     documents = new SceneDocumentController(session, function(save, path, complete) {
       var chooser = files;

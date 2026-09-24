@@ -202,6 +202,7 @@ class DesktopUiHost {
 				}
 				if (active && !hadEvent) pump.wait(1.0 / options.targetFps);
 			}
+			if (session.state == UiHostLifecycle.Failed) throw session.error;
 		} catch (error:Dynamic) {
 			if (session != null && session.state != UiHostLifecycle.Failed)
 				session.fail("desktop-host", error);
