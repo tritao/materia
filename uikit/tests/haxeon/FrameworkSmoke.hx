@@ -134,6 +134,7 @@ import nativekit.ui.widgets.SizedBox;
 import nativekit.ui.widgets.Text;
 import nativekit.ui.core.TextStyleOverride;
 import nativekit.ui.widgets.TextEditorState;
+import nativekit.ui.widgets.TextEditorHistoryKind;
 import nativekit.ui.widgets.TextEditorDiagnostics;
 import nativekit.ui.widgets.TextArea;
 import nativekit.ui.widgets.TextField;
@@ -285,10 +286,22 @@ class FrameworkSmoke {
 			return 37;
 		editor.insert("hi");
 		var composition = new NativeKitTextEdit(TextEditAction.Compose, "á", 2, 2,
-			4, 4, 2, 4);
+			4, 4, 2, 4, 1, 6);
 		if (!editor.applyTextEdit(composition) || editor.text != "hiá" ||
-			editor.selectionEnd != 4 || editor.compositionStart != 2 || editor.compositionEnd != 4)
+			editor.selectionEnd != 4 || editor.selectionFocusAffinity != 1 ||
+			editor.compositionStart != 2 || editor.compositionEnd != 4 ||
+			editor.lastEditTransaction == null ||
+			editor.lastEditTransaction.historyKind != TextEditorHistoryKind.Composition)
 			return 33;
+		var nativeDeleteEditor = new TextEditorState(fonts, "ab");
+		var nativeDelete = new NativeKitTextEdit(TextEditAction.Delete, null, 1, 2,
+			1, 1, -1, -1, 1, 2);
+		if (!nativeDeleteEditor.applyTextEdit(nativeDelete) || nativeDeleteEditor.text != "a" ||
+			nativeDeleteEditor.selectionFocusAffinity != 1 ||
+			nativeDeleteEditor.lastEditTransaction == null ||
+			nativeDeleteEditor.lastEditTransaction.historyKind != TextEditorHistoryKind.DeleteBackward)
+			return 274;
+		nativeDeleteEditor.dispose();
 		editor.dispose();
 		var blinkEditor = new TextEditorState(fonts, "caret");
 		blinkEditor.focused = true;
