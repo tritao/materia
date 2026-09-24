@@ -31,6 +31,11 @@ executor owns sequencing and lifecycle propagation, while route planning,
 perception, and robot-specific mechanism configuration remain explicit
 application inputs.
 
+The integration test executes a facility transport mission on a simulated
+RobotKit robot, captures its observations and joint batches through
+`RecordingRobot` into MCAP, then executes the same mission through `ReplayRobot`
+and compares the generated target batches.
+
 ```haxe
 var assignment = dispatcher.dispatch(mission);
 var executor = new MissionExecutor(fleet, assignment, facility, skillFactory);
