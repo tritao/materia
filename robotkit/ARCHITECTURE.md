@@ -258,6 +258,25 @@ level perception algorithms. Safety and battery state are descriptive service
 boundaries. Safety policy can report restrictions and a stopping envelope, but
 hard stops and joint limits remain enforced in `RobotRuntime`.
 
+## Skills
+
+`robotkit.skill` composes navigation, perception, mechanism, and power views
+without adding a robot subclass or capability registry. A skill is advanced by
+the application loop through `start()`, `update(snapshot, dt)`, and
+`cancel()`; it exposes terminal `status()` and `result()` values. The first
+compositions are `GoTo`, `Dock`, `PickPallet`, `PlacePallet`, and `Charge`.
+Pick and place skills issue atomic fork batches, then wait for observed load
+state changes. Charging waits for the configured battery fraction after the
+docking approach succeeds. These lifecycle operations coordinate application
+behavior; native `RobotRuntime` remains responsible for actuator limits and
+hard safety.
+
+The same skill objects work above `RemoteRobot`, `SimulatedRobot`, and
+`ReplayRobot`. Simulated and replay integration scenarios exercise a forklift
+through approach, pickup confirmation, a second drive, placement confirmation,
+and charging. Recording retains robot observations and commands so application
+skills can be replayed against the same observation stream.
+
 ## One simulation tick
 
 Applications advance a shared simulation with `Simulation.step(timestamp)`:

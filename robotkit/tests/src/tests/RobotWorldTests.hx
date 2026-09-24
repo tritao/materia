@@ -75,6 +75,13 @@ import robotkit.safety.SafetyRestriction;
 import robotkit.safety.SafetyState;
 import robotkit.safety.StoppingEnvelope;
 import robotkit.power.BatteryState;
+import robotkit.power.Power;
+import robotkit.skill.Charge;
+import robotkit.skill.Dock;
+import robotkit.skill.GoTo;
+import robotkit.skill.PickPallet;
+import robotkit.skill.PlacePallet;
+import robotkit.skill.SkillStatus;
 
 class RobotWorldTests {
   static var assertions = 0;
@@ -92,6 +99,7 @@ class RobotWorldTests {
     testNavigation();
     testForkMechanisms();
     testPerceptionSafetyPower();
+    testForkliftSkillsOnSimulationAndReplay();
     testMcapRoundTrip();
     testMcapRobustness();
     testForwardingAndLifecycle();
@@ -633,6 +641,262 @@ class RobotWorldTests {
     throws(function() new BatteryState("bad-pack", 1.1, 48.0, 0.0, 20.0,
       Int64.ofInt(0), Int64.ofInt(0), "battery", "host"),
       "battery state rejects invalid charge fractions");
+  }
+
+  static function testForkliftSkillsOnSimulationAndReplay():Void {
+    var jointNames = ["left-wheel", "right-wheel", "lift", "tilt", "spread"];
+    var linkNames = ["base", "left-wheel-link", "right-wheel-link", "mast", "fork-carriage", "forks"];
+    var blueprint = new RobotRuntimeBlueprint(1, 5, 6);
+    for (index in 0...5)
+      blueprint.addJoint(new RobotRuntimeJointBlueprint(index,
+        RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, index + 1,
+        -1000.0, 1000.0, 1000.0, 1000.0));
+    var simulation = new Simulation(0.01);
+    var simulatedRobot = new SimulatedRobot("forklift", simulation.addRobot(blueprint),
+      "simulated forklift", linkNames, jointNames);
+    var motionLimits = new MotionLimits(0.5, 1.0);
+    var base = new MobileBase(simulatedRobot, new DifferentialDrive(0, 1, 0.1, 0.5),
+      motionLimits);
+    var localization = new WheelOdometryLocalization(base);
+    var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
+    var forkConfig = new ForkConfig(new ForkAxisConfig("lift", 0.0, 1.5),
+      new LoadLimits(1000.0, 700.0, 1.5),
+      new ForkAxisConfig("tilt", -0.5, 0.5),
+      new ForkAxisConfig("spread", 0.0, 0.8));
+    var forks = new Forks(simulatedRobot, forkConfig);
+    var path = new Path([new Pose2(0.0, 0.0, 0.0), new Pose2(0.18, 0.0, 0.0)], "odom");
+    var goTo = new GoTo(navigation, path, new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
+    var recording = new RobotRecording();
+    goTo.start();
+    var liveStatus = goTo.status();
+    var ticks = 0;
+    while (switch liveStatus { case Running: true; case _: false; } && ticks < 300) {
+      var observation = simulatedRobot.snapshot();
+      recording.recordSnapshot(observation);
+      liveStatus = goTo.update(observation, 0.01);
+      if (switch liveStatus { case Running: true; case _: false; })
+        simulation.step(Int64.ofInt((ticks + 1) * 10000000));
+      ticks++;
+    }
+    check(switch liveStatus { case Succeeded: true; case _: false; } && ticks < 300,
+      "GoTo drives a simulated forklift along its path");
+    var liveSnapshot = simulatedRobot.snapshot();
+    recording.recordSnapshot(liveSnapshot);
+    var liveEstimate = localization.state();
+    var liveEstimateValue:robotkit.localization.LocalizationState = cast liveEstimate;
+    var dockPose = new Pose2(liveEstimateValue.pose.x + 0.02,
+      liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
+    var dockDetection = new Detection("charger-dock", "dock", 0.95, dockPose,
+      "odom", liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
+      liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
+    var dock = new Dock(navigation, new DockingTarget(dockDetection, dockPose));
+    dock.start();
+    var dockStatus = dock.update(liveSnapshot, 0.01);
+    check(switch dockStatus { case Succeeded: true; case _: false; },
+      "Dock aligns the simulated base with a detected approach pose");
+    var pickPose = new Pose2(liveEstimateValue.pose.x + 0.02,
+      liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
+    var palletDetection = new Detection("pallet-17", "pallet", 0.98,
+      new Pose2(pickPose.x + 0.5, pickPose.y, pickPose.yaw), "odom",
+      liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
+      liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
+    var pallet = new Pallet(palletDetection, 1.2, 0.8, 0.15);
+    var payload = new Payload(500.0, 1.2, 0.8, 0.15, 0.6, 0.0, 0.35);
+    var pick = new PickPallet(navigation, forks, pallet, payload, pickPose,
+      0.5, 0.1, 0.45, 0.05, 0.1);
+    pick.start();
+    var pickStatus = pick.update(liveSnapshot, 0.01);
+    check(switch pickStatus { case Running: true; case _: false; } &&
+      forks.loadState.payload == payload && !forks.loadState.secured,
+      "PickPallet approaches and commands its simulated fork mechanism");
+    simulation.step(Int64.ofInt((ticks + 1) * 10000000));
+    liveSnapshot = simulatedRobot.snapshot();
+    recording.recordSnapshot(liveSnapshot);
+    var forkObservation = forks.state();
+    check(Math.abs(forkObservation.lift.position - 0.5) < 1e-9 &&
+      Math.abs(cast(forkObservation.tilt, robotkit.material.ForkAxisState).position - 0.1) < 1e-9,
+      "simulated runtime applies the fork position batch");
+    forks.setLoadState(LoadState.carried(payload));
+    pickStatus = pick.update(liveSnapshot, 0.01);
+    check(switch pickStatus { case Succeeded: true; case _: false; } && pick.result() != null,
+      "PickPallet completes only after secured-load confirmation");
+
+    var travelStart = localization.state();
+    var travelStartValue:robotkit.localization.LocalizationState = cast travelStart;
+    var travelPose = new Pose2(travelStartValue.pose.x + 0.12,
+      travelStartValue.pose.y, travelStartValue.pose.yaw);
+    var travelPath = new Path([travelStartValue.pose, travelPose], "odom");
+    var travel = new GoTo(navigation, travelPath,
+      new NavigationGoal(travelPose, "odom", 0.02, 0.1));
+    travel.start();
+    var travelStatus = travel.status();
+    var travelTicks = 0;
+    while (switch travelStatus { case Running: true; case _: false; } && travelTicks < 300) {
+      var observation = simulatedRobot.snapshot();
+      recording.recordSnapshot(observation);
+      travelStatus = travel.update(observation, 0.01);
+      if (switch travelStatus { case Running: true; case _: false; })
+        simulation.step(Int64.ofInt((ticks + travelTicks + 2) * 10000000));
+      travelTicks++;
+    }
+    check(switch travelStatus { case Succeeded: true; case _: false; } && travelTicks < 300,
+      "GoTo drives the loaded forklift to a second location");
+    liveSnapshot = simulatedRobot.snapshot();
+    recording.recordSnapshot(liveSnapshot);
+
+    var placePose = new Pose2(travelPose.x + 0.02, travelPose.y, travelPose.yaw);
+    var place = new PlacePallet(navigation, forks, payload, placePose, 0.0, 0.0, 0.35);
+    place.start();
+    var placeStatus = place.update(liveSnapshot, 0.01);
+    check(switch placeStatus { case Running: true; case _: false; } &&
+      forks.loadState.secured && forks.loadState.payload == payload,
+      "PlacePallet commands the forks and waits for release confirmation");
+    simulation.step(Int64.ofInt((ticks + travelTicks + 2) * 10000000));
+    liveSnapshot = simulatedRobot.snapshot();
+    recording.recordSnapshot(liveSnapshot);
+    forks.setLoadState(LoadState.empty());
+    placeStatus = place.update(liveSnapshot, 0.01);
+    check(switch placeStatus { case Succeeded: true; case _: false; },
+      "PlacePallet completes only after empty-load confirmation");
+
+    var chargeEstimate = localization.state();
+    var chargeEstimateValue:robotkit.localization.LocalizationState = cast chargeEstimate;
+    var chargePose = new Pose2(chargeEstimateValue.pose.x + 0.01,
+      chargeEstimateValue.pose.y, chargeEstimateValue.pose.yaw);
+    var chargeDetection = new Detection("charger-1", "charger", 0.95, chargePose,
+      "odom", liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
+      liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
+    var livePower = new FakePower();
+    livePower.battery = new BatteryState("traction-pack", 0.6, 48.0, -4.0, 25.0,
+      liveSnapshot.sourceTimestampNs, liveSnapshot.receivedTimestampNs,
+      liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
+    var charge = new Charge(navigation, new DockingTarget(chargeDetection, chargePose),
+      livePower, 0.8);
+    charge.start();
+    var chargeStatus = charge.update(liveSnapshot, 0.01);
+    check(switch chargeStatus { case Running: true; case _: false; },
+      "Charge docks and waits while the battery is below its target");
+    livePower.battery = new BatteryState("traction-pack", 0.85, 48.0, -4.0, 25.0,
+      liveSnapshot.sourceTimestampNs, liveSnapshot.receivedTimestampNs,
+      liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
+    check(switch charge.update(liveSnapshot, 0.01) { case Succeeded: true; case _: false; },
+      "Charge completes when the battery reaches its target fraction");
+
+    var replayDescription = new RobotDescription("forklift", "recorded forklift",
+      linkNames, jointNames);
+    var replayCapabilities = new RobotCapabilities("forklift", 5, true, true, true, false);
+    var replay = new ReplayRobot("forklift", recording, replayDescription, replayCapabilities);
+    var replayBase = new MobileBase(replay, new DifferentialDrive(0, 1, 0.1, 0.5),
+      motionLimits);
+    var replayLocalization = new WheelOdometryLocalization(replayBase);
+    var replayNavigation = new Navigation(replayBase, replayLocalization, 0.2, 0.2, 0.8);
+    var replayGoTo = new GoTo(replayNavigation, path,
+      new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
+    replayGoTo.start();
+    var replayStatus = replayGoTo.update(replay.snapshot(), 0.01);
+    while (switch replayStatus { case Running: true; case _: false; } && replay.advance())
+      replayStatus = replayGoTo.update(replay.snapshot(), 0.01);
+    check(switch replayStatus { case Succeeded: true; case _: false; },
+      "GoTo reaches the same recorded path through ReplayRobot");
+    var replaySnapshot = replay.snapshot();
+    var replayEstimate = replayLocalization.state();
+    var replayEstimateValue:robotkit.localization.LocalizationState = cast replayEstimate;
+    var replayDockPose = new Pose2(replayEstimateValue.pose.x + 0.02,
+      replayEstimateValue.pose.y, replayEstimateValue.pose.yaw);
+    var replayDockDetection = new Detection("charger-dock", "dock", 0.95, replayDockPose,
+      "odom", replaySnapshot.sourceSequence, replaySnapshot.sourceTimestampNs,
+      replaySnapshot.receivedTimestampNs, replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
+    var replayDock = new Dock(replayNavigation,
+      new DockingTarget(replayDockDetection, replayDockPose));
+    replayDock.start();
+    check(switch replayDock.update(replaySnapshot, 0.01) {
+      case Succeeded: true;
+      case _: false;
+    }, "Dock replays the same recorded approach");
+    var replayForks = new Forks(replay, forkConfig);
+    var replayPickPose = new Pose2(replayEstimateValue.pose.x + 0.02,
+      replayEstimateValue.pose.y, replayEstimateValue.pose.yaw);
+    var replayPallet = new Pallet(new Detection("pallet-17", "pallet", 0.98,
+      new Pose2(replayPickPose.x + 0.5, replayPickPose.y, replayPickPose.yaw), "odom",
+      replaySnapshot.sourceSequence, replaySnapshot.sourceTimestampNs,
+      replaySnapshot.receivedTimestampNs, replaySnapshot.sourceClockId,
+      replaySnapshot.receivedClockId), 1.2, 0.8, 0.15);
+    var replayPick = new PickPallet(replayNavigation, replayForks, replayPallet,
+      payload, replayPickPose, 0.5, 0.1, 0.45, 0.05, 0.1);
+    replayPick.start();
+    replayPick.update(replaySnapshot, 0.01);
+    replayForks.setLoadState(LoadState.carried(payload));
+    check(switch replayPick.update(replaySnapshot, 0.01) {
+      case Succeeded: true;
+      case _: false;
+    }, "PickPallet confirms the same load during replay");
+
+    var replayTravelStart = replayLocalization.state();
+    var replayTravelStartValue:robotkit.localization.LocalizationState = cast replayTravelStart;
+    var replayTravelPose = new Pose2(travelPose.x, travelPose.y, travelPose.yaw);
+    var replayTravelPath = new Path([replayTravelStartValue.pose, replayTravelPose], "odom");
+    var replayTravel = new GoTo(replayNavigation, replayTravelPath,
+      new NavigationGoal(replayTravelPose, "odom", 0.02, 0.1));
+    replayTravel.start();
+    var replayTravelStatus = replayTravel.update(replay.snapshot(), 0.01);
+    var replayTravelTicks = 0;
+    while (switch replayTravelStatus { case Running: true; case _: false; } && replay.advance() &&
+        replayTravelTicks < 300) {
+      replaySnapshot = replay.snapshot();
+      replayTravelStatus = replayTravel.update(replaySnapshot, 0.01);
+      replayTravelTicks++;
+    }
+    check(switch replayTravelStatus { case Succeeded: true; case _: false; },
+      "GoTo reaches the second recorded location through ReplayRobot");
+    replaySnapshot = replay.snapshot();
+    var replayPlacePose = new Pose2(placePose.x, placePose.y, placePose.yaw);
+    var replayPlace = new PlacePallet(replayNavigation, replayForks, payload,
+      replayPlacePose, 0.0, 0.0, 0.35);
+    replayPlace.start();
+    var replayPlaceStatus = replayPlace.update(replaySnapshot, 0.01);
+    check(switch replayPlaceStatus { case Running: true; case _: false; } &&
+      replayForks.loadState.secured,
+      "PlacePallet replays the same fork command and awaits release");
+    replayForks.setLoadState(LoadState.empty());
+    check(switch replayPlace.update(replaySnapshot, 0.01) {
+      case Succeeded: true;
+      case _: false;
+    }, "PlacePallet confirms release during replay");
+
+    var replayChargeEstimate = replayLocalization.state();
+    var replayChargeEstimateValue:robotkit.localization.LocalizationState = cast replayChargeEstimate;
+    var replayChargePose = new Pose2(replayChargeEstimateValue.pose.x + 0.01,
+      replayChargeEstimateValue.pose.y, replayChargeEstimateValue.pose.yaw);
+    var replayChargeDetection = new Detection("charger-1", "charger", 0.95,
+      replayChargePose, "odom", replaySnapshot.sourceSequence,
+      replaySnapshot.sourceTimestampNs, replaySnapshot.receivedTimestampNs,
+      replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
+    var replayPower = new FakePower();
+    replayPower.battery = new BatteryState("traction-pack", 0.6, 48.0, -4.0, 25.0,
+      replaySnapshot.sourceTimestampNs, replaySnapshot.receivedTimestampNs,
+      replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
+    var replayCharge = new Charge(replayNavigation,
+      new DockingTarget(replayChargeDetection, replayChargePose), replayPower, 0.8);
+    replayCharge.start();
+    check(switch replayCharge.update(replaySnapshot, 0.01) {
+      case Running: true;
+      case _: false;
+    }, "Charge waits for recorded robot to reach the battery target");
+    replayPower.battery = new BatteryState("traction-pack", 0.85, 48.0, -4.0, 25.0,
+      replaySnapshot.sourceTimestampNs, replaySnapshot.receivedTimestampNs,
+      replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
+    check(switch replayCharge.update(replaySnapshot, 0.01) {
+      case Succeeded: true;
+      case _: false;
+    }, "Charge completes deterministically against ReplayRobot");
+    var generated = replay.generatedCommands.commands;
+    check(generated.length >= 3 && switch generated[generated.length - 1] {
+      case JointTargets(targets, _): targets.length == 3 && targets[0].joint == 2;
+      case _: false;
+    }, "ReplayRobot captures pick and place fork commands without altering source history");
+    replay.close();
+    simulatedRobot.close();
+    simulation.dispose();
   }
 
   static function testMcapRoundTrip():Void {
@@ -1315,4 +1579,12 @@ private class FakeRobot implements Robot {
     closed = true;
     closeCount++;
   }
+}
+
+private class FakePower implements Power {
+  public var battery:Null<BatteryState> = null;
+
+  public function new() {}
+
+  public function batteryState():Null<BatteryState> return battery;
 }

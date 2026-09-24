@@ -177,6 +177,27 @@ limit, and stopping envelope values; the native runtime continues to enforce
 hard safety. `robotkit.power` defines `BatteryState` and a `Power` view for
 charge, voltage, current, temperature, energy, and clock provenance.
 
+`robotkit.skill` composes these explicit views into task-sized operations. Each
+`Skill` has `start`, `update`, `cancel`, `status`, and `result` methods. `GoTo`
+follows a path, `Dock` approaches a detected target, `PickPallet` and
+`PlacePallet` combine navigation with fork commands and load confirmation, and
+`Charge` docks before waiting for a battery threshold. Skills run at the
+application's update frequency and use the same `Robot` boundary, so the same
+scenario can run with `SimulatedRobot`, `RemoteRobot`, or `ReplayRobot`.
+
+```haxe
+var base = new MobileBase(robot,
+  new DifferentialDrive(leftWheelJoint, rightWheelJoint, wheelRadius, trackWidth),
+  motionLimits);
+var localization = new WheelOdometryLocalization(base);
+var navigation = new Navigation(base, localization);
+var forks = new Forks(robot, forkConfig);
+
+var pick = new PickPallet(navigation, forks, pallet, payload, approachPose, 0.5);
+pick.start();
+// Call update(robot.snapshot(), dt) until the load sensor confirms pickup.
+```
+
 ### Persistent recordings
 
 `McapRobotRecording` can preserve an in-memory `RobotRecording` while enqueueing
