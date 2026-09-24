@@ -1,10 +1,13 @@
 package tests;
 
 import app.Main.ReferenceEditorApp;
+import app.EditorScene;
+import app.SceneObjectData;
 import haxe.Json;
 import LayoutFrame;
 import FontCollection;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.EditOperation;
 import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiModifier;
@@ -53,7 +56,7 @@ class HeadlessEditorProfile {
       var cycles = Std.parseInt(Sys.args()[1]);
       if (cycles == null || cycles < 1) throw "CYCLES must be positive";
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
-        Sys.args()[2] == "tab-matrix") ? Sys.args()[2] : "tab-inspector";
+        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture") ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
         throw "Unknown headless scenario: " + Sys.args()[2];
       var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] :
@@ -98,6 +101,8 @@ class HeadlessEditorProfile {
           }
           if ((cycle + 1) % 20 == 0) retained.push(retainedCounts(editor, cycle + 1));
         }
+      } else if (scenario == "architecture") {
+        runArchitectureScenario(editor, frame, output, cycles, frames, actions);
       } else {
         for (cycle in 0...cycles) {
           click(editor, "sensors");
@@ -142,6 +147,97 @@ class HeadlessEditorProfile {
     }
     editor.dispose();
     fonts.dispose();
+  }
+
+  /** Exercises the expensive editor boundaries called out in the architecture plan. */
+  static function runArchitectureScenario(editor:ReferenceEditorApp, frame:LayoutFrame,
+      output:String, cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+    var started = Sys.time();
+    editor.scene.createBracket();
+    var bracketId = editor.scene.selectedId;
+    for (cycle in 0...cycles)
+      editor.scene.setBracketWallThickness(bracketId, 0.003 + (cycle % 7) * 0.0001);
+    action(actions, "cad-parameter-edits", 0);
+    submit(editor, frame, frames, "architecture:cad-parameter-edits", 0);
+    var cadSeconds = Sys.time() - started;
+
+    started = Sys.time();
+    var relationships = editor.bimModel.allRelationships();
+    if (relationships.length > 0) {
+      var opening = relationships[0];
+      for (cycle in 0...cycles) editor.session.applyBimEdit("Profile opening move", function() {
+        editor.bimModel.moveOpening(opening.openingId, 800 + cycle * 2, 900);
+      });
+    }
+    action(actions, "bim-opening-edits", 0);
+    submit(editor, frame, frames, "architecture:bim-opening-edits", 0);
+    var bimSeconds = Sys.time() - started;
+    var records:Array<SceneObjectData> = [];
+    for (index in 0...10000) {
+      var moving = index < 500;
+      records.push({id:"stress-" + index, label:"Stress object " + index,
+        type:"rectangle", x:(index % 100) * 0.15, y:Std.int(index / 100) * 0.15, z:0.0,
+        width:0.1, height:0.1, depth:0.1, collisionEnabled:true,
+        dynamicBody:moving, mass:1.0, red:0.3, green:0.5, blue:0.7, visible:true});
+    }
+    started = Sys.time();
+    var candidate = new EditorScene(records);
+    var sceneLoadSeconds = Sys.time() - started;
+    action(actions, "load-10k-scene", 0);
+
+    started = Sys.time();
+    candidate.setPosition("stress-9999", 0, 0.25);
+    var nudgeSeconds = Sys.time() - started;
+    action(actions, "single-object-nudge", 0);
+
+    started = Sys.time();
+    for (cycle in 0...cycles) for (index in 0...500)
+      candidate.setPositionXY("stress-" + index,
+        (index % 100) * 0.15 + cycle * 0.001, Std.int(index / 100) * 0.15);
+    var movingSeconds = Sys.time() - started;
+    action(actions, "move-500-objects", 0);
+
+    var position = candidate.object("stress-9999");
+    if (position == null) throw "Architecture scenario lost its selected stress object";
+    var previousX = position.x;
+    for (cycle in 0...1000) {
+      var fromX = previousX;
+      var nextX = 0.25 + (cycle % 2) * 0.01;
+      candidate.document.apply(new EditOperation("Stress move " + cycle,
+        function() candidate.setPositionXY("stress-9999", nextX, position.y),
+        function() candidate.setPositionXY("stress-9999", fromX, position.y)));
+      previousX = nextX;
+    }
+    if (candidate.document.history.undoCount < 1000)
+      throw 'Expected 1,000 distinct moves, found ${candidate.document.history.undoCount}';
+    started = Sys.time();
+    for (_ in 0...1000) if (!candidate.document.undo()) throw "Undo history ended during stress scenario";
+    var undo1000Seconds = Sys.time() - started;
+    candidate.dispose();
+    action(actions, "undo-1000-edits", 0);
+
+    for (index in 1...64) {
+      var link = editor.sensors.model.addLink(new robotkit.model.Link("Profile link " + index,
+        "profile/link-" + index));
+      editor.sensors.model.addJoint(new robotkit.model.Joint("Profile joint " + index,
+        robotkit.model.JointType.Fixed, editor.sensors.model.links[index - 1], link,
+        "profile/joint-" + index));
+    }
+    if (!editor.simulation.rebuild(editor.sensors, editor.scene))
+      throw "64-link simulation profile could not build";
+    for (cycle in 0...cycles) {
+      editor.simulation.step();
+      editor.simulation.capturePresentationSnapshot();
+      submit(editor, frame, frames, "architecture:simulation-presentation", cycle);
+    }
+    action(actions, "simulation-presentation-64-links", 0);
+    editor.simulation.stop();
+    File.saveContent(output + "/architecture-summary.json", haxe.Json.stringify({
+      sceneObjects: records.length, movingObjects: 500, articulatedLinks: 64,
+      cycles: cycles, cadParameterSeconds: cadSeconds, bimOpeningSeconds: bimSeconds,
+      sceneLoadSeconds: sceneLoadSeconds,
+      singleObjectNudgeSeconds: nudgeSeconds, movingObjectEditsSeconds: movingSeconds,
+      undo1000Seconds: undo1000Seconds}));
   }
 
   static function retainedCounts(editor:ReferenceEditorApp, cycle:Int):String {
