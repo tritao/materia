@@ -58,8 +58,12 @@ opening edits, construction of a 10,000 object scene, a single object nudge,
 500 moving object updates, 1,000 ordered undo operations, and presentation
 captures for a 500 link robot. The capture writes phase timings to
 `architecture-summary.json` and the usual frame, action, memory, and profiler
-artifacts beside it. The summary also separates SceneKit snapshot capture from
-spatial-index construction using five warmed samples after the workload.
+artifacts beside it. Scene construction breaks the load into geometry-handle
+creation, geometry-data generation, geometry publication, material setup,
+transaction preparation and commit, application bookkeeping, and final snapshot
+and spatial-index creation. Timers are enabled only for this profile run. The
+summary also separates SceneKit snapshot capture from spatial-index construction
+using five warmed samples after the workload.
 Increase `--cycles` to extend repeated movement, CAD, BIM, and simulation
 measurements. The scenario is intentionally not part of the default regression
 gate because it exercises large workloads.
