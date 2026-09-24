@@ -442,17 +442,23 @@ class SceneEditingTests {
     historySensors.add("imu");
     historySensors.selectRobot("robot/history-b");
     var secondCount=historySensors.model.sensors.length;
-    check(historySensors.document.undo()&&historySensors.model.sensors.length==secondCount,
-      "undo after switching robots leaves the selected robot unchanged");
+    check(historySensors.document.undo()&&historySensors.robotId=="materia/robot"&&
+      historySensors.model.sensors.length==2,
+      "undo removes a newly added robot configuration from shared history");
+    check(historySensors.document.redo()&&historySensors.robotId=="robot/history-b"&&
+      historySensors.model.sensors.length==secondCount,
+      "redo restores the new robot configuration and its selection");
     historySensors.selectRobot("materia/robot");
-    check(historySensors.model.sensors.length==1,
+    check(historySensors.document.undo()&&historySensors.robotId=="materia/robot"&&
+      historySensors.model.sensors.length==2,
+      "undo after switching robots removes its creation while preserving the active robot");
+    check(historySensors.document.undo()&&historySensors.model.sensors.length==1,
       "cross-robot undo removes the sensor from its owning model");
-    historySensors.selectRobot("robot/history-b");
-    check(historySensors.document.redo()&&historySensors.model.sensors.length==secondCount,
-      "redo after switching robots leaves the selected robot unchanged");
-    historySensors.selectRobot("materia/robot");
-    check(historySensors.model.sensors.length==2,
+    check(historySensors.document.redo()&&historySensors.model.sensors.length==2,
       "cross-robot redo restores the sensor to its owning model");
+    check(historySensors.document.redo()&&historySensors.robotId=="robot/history-b"&&
+      historySensors.model.sensors.length==secondCount,
+      "cross-robot redo restores the new robot configuration");
     historySensors.dispose();
 
     var sensors=new SensorConfiguration();
@@ -461,8 +467,8 @@ class SceneEditingTests {
     var selectionRevision=sensors.document.revision;
     check(sensors.selectRobot("robot/selected")&&sensors.robotId=="robot/selected",
       "sensor configuration selects an explicit robot target");
-    check(sensors.document.revision==selectionRevision,
-      "robot selection does not create a configuration edit");
+    check(sensors.document.revision==selectionRevision+1,
+      "creating a robot configuration creates one shared history entry");
     sensors.selectRobot("materia/robot");
     var properties=sensors.properties();
     var rays=new PropertyBinding(properties[3],sensors.context());

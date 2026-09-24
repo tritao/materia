@@ -295,7 +295,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   final storage:FileDockWorkspacePersistence;
   final workspaceSaves:WorkspaceSaveWorker;
-  public final session:SceneDocumentSession;
+  public final session:ProjectDocumentSession;
   public final documents:SceneDocumentController;
   public var scene(get, never):EditorScene;
   function get_scene():EditorScene return session.scene;
@@ -340,7 +340,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     bimEditor = new BimModelEditor("bim-model-editor", bimModel);
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
-    session = new SceneDocumentSession();
+    session = new ProjectDocumentSession();
     session.beforeReplace=simulation.clear;
     if(setupScript!=null){var scripted=session.openScript(setupScript);
       simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
@@ -713,10 +713,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var runtimeActions=new Column("sensor-runtime-actions",[
       new KeyedView("configuration",new Row("sensor-configuration-actions",[
       new KeyedView("undo",new Button("Undo",null,function(){
-        if(ownership==null)sensors.document.undo();else {ownership.document.undo();refreshScriptMaterialization("Override undone");}
+        session.document.undo();
+        if(ownership!=null)refreshScriptMaterialization("Override undone");
         commands.refresh();},"sensor-undo")),
       new KeyedView("redo",new Button("Redo",null,function(){
-        if(ownership==null)sensors.document.redo();else {ownership.document.redo();refreshScriptMaterialization("Override redone");}
+        session.document.redo();
+        if(ownership!=null)refreshScriptMaterialization("Override redone");
         commands.refresh();},"sensor-redo")),
       new KeyedView("apply",new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild",null,function(){
         log(simulation.rebuild(sensors,scene) ? "Shared simulation configuration applied" : "Simulation rebuild rejected: "+simulation.error);
@@ -1320,11 +1322,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }, null, function() return canEditObjects() && scene.object(scene.selectedId) != null));
     commands.register(new Command("editor.undo", "Undo", function() {
       if (scene.hasActiveSketchEdit()) scene.cancelSelectedSketchEdit();
-      runSceneEdit("Could not undo", function() scene.document.undo());
-    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return canEditObjects() && scene.document.canUndo));
+      runSceneEdit("Could not undo", function() session.document.undo());
+      if (session.scriptOwnership != null) refreshScriptMaterialization("Override undone");
+    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return !documents.blocked() && session.document.canUndo));
     commands.register(new Command("editor.redo", "Redo", function() {
-      runSceneEdit("Could not redo", function() scene.document.redo());
-    }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return canEditObjects() && scene.document.canRedo));
+      runSceneEdit("Could not redo", function() session.document.redo());
+      if (session.scriptOwnership != null) refreshScriptMaterialization("Override redone");
+    }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return !documents.blocked() && session.document.canRedo));
     commands.register(new Command("editor.new", "New", function() documents.requestNew(),
       new Shortcut(78, UiModifier.Control), function() return !documents.blocked()));
     commands.register(new Command("editor.open", "Open", function() documents.requestOpen(),

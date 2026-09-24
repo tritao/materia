@@ -33,8 +33,8 @@ class SensorConfiguration {
   final rotations:Map<String, Array<Float>> = new Map();
   final readOnlyRobots:Map<String, Bool> = new Map();
 
-  public function new(?data:Dynamic) {
-    document = new EditorDocument("sensors");
+  public function new(?data:Dynamic, ?sharedDocument:EditorDocument) {
+    document = sharedDocument == null ? new EditorDocument("sensors") : sharedDocument;
     model=new RobotModel("Materia robot");
     var base=model.addLink(new Link("Base","base"));
     model.addFrame(new Frame("Base sensor mount",base,"base/sensors"));
@@ -55,7 +55,7 @@ class SensorConfiguration {
     }
     configurations.set(robotId, singleRecord());
     liveModels.set(robotId, model); selections.set(robotId, selectedIndex);
-    document.markSaved();
+    if (sharedDocument == null) document.markSaved();
   }
 
   public function selected():Null<Sensor>
@@ -70,7 +70,22 @@ class SensorConfiguration {
     captureCurrent();
     var nextRecord = configurations.get(id);
     if (nextRecord == null) {
-      configurationRevision++; document.markExternallyDirty(); createDefault(id); return true;
+      var previousId = robotId;
+      document.apply(new EditOperation("Add robot configuration", function() {
+        var activeId = robotId;
+        createDefault(id);
+        if (activeId != previousId && activeId != id)
+          activate(activeId, configurations.get(activeId));
+        configurationRevision++;
+      }, function() {
+        var activeId = robotId;
+        configurations.remove(id); liveModels.remove(id); selections.remove(id);
+        nextIds.remove(id); positions.remove(id); rotations.remove(id);
+        if (activeId == id)
+          activate(previousId, configurations.get(previousId));
+        configurationRevision++;
+      }));
+      return true;
     }
     activate(id,nextRecord);
     return true;

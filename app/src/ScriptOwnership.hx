@@ -18,7 +18,7 @@ var timestep:Float;
 class ScriptOwnership {
   public static inline var OVERRIDE_VERSION:Int = 2;
   public static inline var SIMULATION_TARGET:String = "simulation";
-  public final document:EditorDocument = new EditorDocument("script-overrides");
+  public final document:EditorDocument;
   public var reference(default, null):String;
   public var configurationVersion(default, null):Int;
   public var savedVersion(default, null):Int;
@@ -28,7 +28,9 @@ class ScriptOwnership {
   var baseline:ScriptedSetup;
   final overrides:Map<String, ScriptOverrideRecord> = new Map();
 
-  public function new(reference:String, ? record:ScriptOwnershipRecord) {
+  public function new(reference:String, ? record:ScriptOwnershipRecord,
+      ?sharedDocument:EditorDocument) {
+    document = sharedDocument == null ? new EditorDocument("script-overrides") : sharedDocument;
     this.reference = reference;
     if (record == null) {
       overridesEnabled = false;
@@ -82,7 +84,7 @@ class ScriptOwnership {
   public function materialize():ScriptMaterialization {
     var source:SensorConfiguration = baseline.sensors;
     var record:Dynamic = Json.parse(Json.stringify(source.records()));
-    var sensors = new SensorConfiguration(record);
+    var sensors = new SensorConfiguration(record, document);
     try {
       var objects = cloneObjects();
       var settings:ScriptSettings = {backend: baseline.backend, timestep: baseline.timestep};
@@ -90,7 +92,7 @@ class ScriptOwnership {
       validateSensors(sensors);
       if ((settings.backend != ApplicationSimulation.DETERMINISTIC && settings.backend != ApplicationSimulation.MUJOCO)
         || !Math.isFinite(settings.timestep) || settings.timestep <= 0) throw "Invalid overridden simulation settings";
-      var scene = new EditorScene(objects);
+      var scene = new EditorScene(objects, document);
       return {scene: scene, sensors: sensors, backend: settings.backend, timestep: settings.timestep};
     } catch (error:Dynamic) {
       sensors.dispose();

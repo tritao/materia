@@ -85,12 +85,12 @@ class EditorScene {
   public var selectionRevision(default, null):Int = 1;
   var disposed:Bool = false;
 
-  public function new(?data:Array<SceneObjectData>) {
+  public function new(?data:Array<SceneObjectData>, ?sharedDocument:EditorDocument) {
     nextRevision++;
     revision = nextRevision;
     nextEnvironmentRevision++;
     environmentRevision = nextEnvironmentRevision;
-    document = new EditorDocument("scene");
+    document = sharedDocument == null ? new EditorDocument("scene") : sharedDocument;
     objects = [];
     cadSessions = new Map();
     bridge = new SceneBridge();

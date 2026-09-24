@@ -2,7 +2,7 @@ package app;
 
 /** Document workflow shared by commands, native close requests and confirmation UI. */
 class SceneDocumentController {
-  public final session:SceneDocumentSession;
+  public final session:ProjectDocumentSession;
   final choosePath:Bool->Null<String>->(Null<String>->Null<String>->Void)->Void;
   final changed:Void->Void;
   final commitPendingEdit:Void->Void;
@@ -11,7 +11,7 @@ class SceneDocumentController {
   public var choosing(default, null):Bool = false;
   public var error(default, null):Null<String> = null;
 
-  public function new(session:SceneDocumentSession,
+  public function new(session:ProjectDocumentSession,
       choosePath:Bool->Null<String>->(Null<String>->Null<String>->Void)->Void, changed:Void->Void,
       ?commitPendingEdit:Void->Void, ?cancelPendingEdit:Void->Void) {
     this.session = session;
