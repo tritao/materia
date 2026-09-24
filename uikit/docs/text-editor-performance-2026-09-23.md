@@ -78,6 +78,14 @@ it does not shift offsets for the whole document. Initial UI load stayed near
 a complete string for each edit, and a paragraph without newlines can still
 form one large segment. GPU presentation and IME behavior remain unmeasured.
 
+The measurements above predate the shared-document UIKit API. A field backed by
+`TextField.withDocument` now updates retained paragraph layouts from document
+slices and can publish `EditTransaction`s without assembling the full string.
+The compatibility `onChange(String)` callback and consumers that request the
+semantic value still materialize it. This shared-document path has not yet had a
+separate 10,000-line UI benchmark; long-paragraph shaping remains linear in the
+paragraph length.
+
 ## Viewport-local custom content (2026-09-24)
 
 UIKit custom content now receives a conservative visible rectangle in node-local
