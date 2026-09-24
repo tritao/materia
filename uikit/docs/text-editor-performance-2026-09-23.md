@@ -82,9 +82,19 @@ The measurements above predate the shared-document UIKit API. A field backed by
 `TextField.withDocument` now updates retained paragraph layouts from document
 slices and can publish `EditTransaction`s without assembling the full string.
 The compatibility `onChange(String)` callback and consumers that request the
-semantic value still materialize it. This shared-document path has not yet had a
-separate 10,000-line UI benchmark; long-paragraph shaping remains linear in the
-paragraph length.
+semantic value still materialize it.
+
+A separate headless paired run compared string-backed and shared-document
+`TextArea`s with 10,000 distinct 70–74-byte lines, an 800×600 frame, and IBM
+Plex Sans. Each case alternated eight inserts and backspaces, submitting a frame
+after each edit; the first two samples were discarded. Across three process
+runs, insert-plus-submit medians were 4.24 ms for the string-backed field and
+4.19 ms for the shared document. That 0.05 ms gap is within run-to-run noise,
+so this workload shows no meaningful speedup. The shared model removes the
+required full-string copy for clients that use transactions, while paragraph
+shaping and frame submission still dominate this measurement. Long-paragraph
+shaping remains linear in paragraph length. These timings exclude GPU
+presentation.
 
 ## Viewport-local custom content (2026-09-24)
 
