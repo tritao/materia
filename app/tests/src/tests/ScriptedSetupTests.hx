@@ -4,11 +4,15 @@ import app.ApplicationSimulation;
 import app.SceneDocumentSession;
 import app.ScriptOwnership;
 import app.SceneCodec;
+import app.Main.ReferenceEditorApp;
 import app.SetupScript;
 import app.ScriptedSetup;
 import app.SetupScriptRegistry;
 import app.examples.TwoRobotSetupScript;
 import haxe.Json;
+import LayoutFrame;
+import FontCollection;
+import nativekit.ui.core.RenderNode;
 import robotkit.world.RobotWorld;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
@@ -103,6 +107,7 @@ class ScriptedSetupTests {
       "origin is reported per property"
     );
 
+    if (!FileSystem.exists("build")) FileSystem.createDirectory("build");
     var directory = "build/scripted-setup-" + Std.random(100000000);
     FileSystem.createDirectory(directory);
     var path = directory + "/scene.materia";
@@ -230,7 +235,103 @@ class ScriptedSetupTests {
     world.close();
     reopened.dispose();
     session.dispose();
+    inspectorInteraction(directory);
     FileSystem.deleteFile(path);
-    if (!keepRecording) FileSystem.deleteDirectory(directory);
+    if (!keepRecording && Sys.getEnv("MATERIA_KEEP_INSPECTOR_WORKSPACE") != "1")
+      FileSystem.deleteDirectory(directory);
+  }
+
+  static function inspectorInteraction(directory:String):Void {
+    var workspacePath = directory + "/workspace.json";
+    var fontPath:Null<String> = null;
+    for (candidate in ["../../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf",
+      "../../../uikit/vendor/skribidi/example/data/IBMPlexSans-Regular.ttf"])
+      if (FileSystem.exists(candidate)) fontPath = candidate;
+    check(fontPath != null, "scripted inspector test font is available");
+    var fonts = FontCollection.create();
+    fonts.add(cast fontPath);
+    var editor = new ReferenceEditorApp(fonts, workspacePath, null, null, null,
+      TwoRobotSetupScript.REFERENCE);
+    editor.workspace.activate("sensors");
+    var frame = new LayoutFrame(1320.0, 900.0);
+    var root = editor.submit(frame);
+    var sensorPanel:RenderNode = cast findByStyleKey(root, "sensor-panel");
+    check(sensorPanel != null && sensorPanel.resolved != null, "Sensors pane is laid out");
+    var sensorBounds:ResolvedLayoutItem = cast sensorPanel.resolved;
+    var sensorRight = sensorBounds.x + sensorBounds.width;
+    check(checkTextFieldsFit(root, sensorRight, frame.width) >= 3,
+      "scripted scene property fields are present and fit the inspector");
+    for (key in ["script-reload", "script-overrides", "script-revert-simulation",
+      "script-remove-stale", "sensor-undo", "sensor-redo", "sensor-apply",
+      "sensor-run", "sensor-pause", "sensor-reset", "sensor-design"]) {
+      var button:RenderNode = findByStyleKey(root, key);
+      check(button != null && button.resolved != null && button.resolved.x >= 0
+        && button.resolved.x + button.resolved.width <= sensorRight + 0.01,
+        "scripted inspector actions fit the default Sensors pane: " + key);
+    }
+    click(editor, frame, "script-overrides");
+    var ownership:ScriptOwnership = cast editor.session.scriptOwnership;
+    check(ownership.overridesEnabled, "inspector enables stable-ID overrides");
+    click(editor, frame, "script-rate-increase");
+    var selected:Sensor = cast editor.sensors.selected();
+    check(selected.updateRate == 21.0 && ownership.sensorRateOrigin("materia/robot", selected.id)
+      == "override", "inspector changes one scripted sensor rate");
+    click(editor, frame, "sensor-apply");
+    check(editor.simulation.isActive() && editor.simulation.simulatedRobotIds().length == 2,
+      "inspector applies both scripted robots to the shared simulation");
+    click(editor, frame, "sensor-run");
+    check(editor.simulation.isRunning(), "inspector starts the scripted simulation");
+    click(editor, frame, "sensor-pause");
+    check(editor.simulation.isActive() && !editor.simulation.isRunning(),
+      "inspector pause preserves the current simulation");
+    click(editor, frame, "sensor-reset");
+    check(editor.simulation.isActive() && !editor.simulation.isRunning(),
+      "inspector reset restores the simulation without returning to design mode");
+    editor.dispose();
+    fonts.dispose();
+    if (Sys.getEnv("MATERIA_KEEP_INSPECTOR_WORKSPACE") == "1")
+      Sys.println("Materia scripted inspector workspace: " + FileSystem.fullPath(workspacePath));
+    else if (FileSystem.exists(workspacePath)) FileSystem.deleteFile(workspacePath);
+  }
+
+  static function click(editor:ReferenceEditorApp, frame:LayoutFrame, key:String):Void {
+    var button:RenderNode = cast findByStyleKey(editor.submit(frame), key);
+    check(button != null && button.resolved != null, "inspector action exists: " + key);
+    var bounds = button.resolved.clippedViewportBounds();
+    for (attempt in 0...8) {
+      if (bounds.width > 0 && bounds.height > 0) break;
+      var location:ResolvedLayoutItem = cast button.resolved;
+      editor.ui.scroll(120.0, 500.0, 0.0,
+        location.y >= frame.height ? 250.0 : -250.0);
+      button = cast findByStyleKey(editor.submit(frame), key);
+      bounds = button.resolved.clippedViewportBounds();
+    }
+    check(bounds.width > 0 && bounds.height > 0, "inspector action is visible: " + key);
+    var x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height / 2;
+    editor.ui.pointerDown(x, y, 0);
+    editor.ui.pointerUp(x, y, 0);
+    editor.submit(frame);
+  }
+
+  static function findByStyleKey(node:RenderNode, key:String):Null<RenderNode> {
+    if (node.styleKey == key) return node;
+    for (child in node.children) {
+      var found = findByStyleKey(child, key);
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  static function checkTextFieldsFit(node:RenderNode, sensorRight:Float, viewportWidth:Float):Int {
+    var bounds = node.resolved;
+    var count = 0;
+    if (node.styleType == "text-field" && bounds != null && bounds.visible && bounds.width > 0) {
+      var paneRight = bounds.x < sensorRight ? sensorRight : viewportWidth;
+      check(bounds.x >= 0.0 && bounds.x + bounds.width <= paneRight + 0.01,
+        "scripted inspector field fits its pane: " + node.styleKey);
+      count++;
+    }
+    for (child in node.children) count += checkTextFieldsFit(child, sensorRight, viewportWidth);
+    return count;
   }
 }

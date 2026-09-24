@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": { "name": "scripted-inspector-tests" },
+  "entry": "tests.ScriptedSetupTests",
+  "sourceRoots": ["../src"],
+  "scopeSourceRoots": false,
+  "dependencies": { "app": { "path": "../.." } },
+  "target": "host",
+  "outputDir": "../build"
+}
