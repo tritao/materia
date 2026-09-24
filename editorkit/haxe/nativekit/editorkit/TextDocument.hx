@@ -123,10 +123,23 @@ class TextDocument {
 	public function paragraphRangeAtIndex(number:Int):TextRange {
 		if (number < 0 || number >= paragraphCount())
 			throw "Paragraph index is outside the document";
-		var index = segmentAtPrefix(paragraphStarts, number);
-		var range = segments[index].paragraphRangeAtIndex(number - paragraphStarts[index]);
-		return new TextRange(codepointStarts[index] + range.start,
-			codepointStarts[index] + range.end);
+		var first = segmentAtPrefix(paragraphStarts, number);
+		while (first > 0 && paragraphStarts[first - 1] +
+			segments[first - 1].paragraphCount() - 1 >= number)
+			first--;
+		var firstRange = segments[first].paragraphRangeAtIndex(number - paragraphStarts[first]);
+		var start = codepointStarts[first] + firstRange.start;
+		var end = codepointStarts[first] + firstRange.end;
+		for (index in (first + 1)...segments.length) {
+			if (paragraphStarts[index] > number)
+				break;
+			var localParagraph = number - paragraphStarts[index];
+			if (localParagraph < segments[index].paragraphCount()) {
+				var range = segments[index].paragraphRangeAtIndex(localParagraph);
+				end = codepointStarts[index] + range.end;
+			}
+		}
+		return new TextRange(start, end);
 	}
 
 	function segmentAt(position:Int):Int
@@ -173,11 +186,25 @@ class TextDocument {
 		var bytes = Bytes.ofString(value);
 		var result:Array<TextOffsetMap> = [];
 		var start = 0;
-		for (index in 0...bytes.length)
-			if (bytes.get(index) == 10 && index + 1 - start >= targetBytes) {
-				result.push(new TextOffsetMap(bytes.sub(start, index + 1 - start).toString()));
-				start = index + 1;
+		while (bytes.length - start > targetBytes) {
+			var boundary = start + targetBytes;
+			var searchEnd = Std.int(Math.min(bytes.length, boundary + targetBytes));
+			var end = -1;
+			for (index in boundary...searchEnd)
+				if (bytes.get(index) == 10) {
+					end = index + 1;
+					break;
+				}
+			if (end < 0) {
+				end = boundary;
+				while (end > start && (bytes.get(end) & 0xc0) == 0x80)
+					end--;
 			}
+			if (end <= start)
+				throw "Document segment boundary did not advance";
+			result.push(new TextOffsetMap(bytes.sub(start, end - start).toString()));
+			start = end;
+		}
 		if (start < bytes.length || result.length == 0)
 			result.push(new TextOffsetMap(bytes.sub(start, bytes.length - start).toString()));
 		else

@@ -116,3 +116,14 @@ at 26.5 KB, and 50.5 ms at 53 KB. Each edit reshapes the entire paragraph.
 The Xvfb captures verify renderer output in a virtual display, but they do
 not exercise an operating-system IME session or compare every rendered pixel
 with a golden image.
+
+## Long-paragraph document segments (2026-09-24)
+
+EditorKit now splits storage segments at code-point boundaries inside long
+paragraphs, while preferring a nearby newline. Paragraph range lookup joins
+the ranges from those segments. Repeating the same headless UI workload gave
+about 10 ms insert plus frame at 26.5 KB and 19 ms at 53 KB, down from about
+25 ms and 50 ms in the earlier run. The native shaper still receives and
+reshapes the complete logical paragraph, so that cost continues to grow with
+paragraph length. Splitting native shaping and layout while preserving
+wrapping, ligatures, bidirectional text, and caret geometry remains open.
