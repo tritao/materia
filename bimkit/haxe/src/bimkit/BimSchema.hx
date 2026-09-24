@@ -5,6 +5,7 @@ class BimSchema {
 	public static inline var ElementClass:String = "bim.element-class";
 	public static inline var DefinitionClass:String = "bim.definition-class";
 	public static inline var HostOutput:String = "bim.host-output";
+	public static inline var GlobalId:String = "bim.globalId";
 
 	public static inline var Project:String = "project";
 	public static inline var Site:String = "site";

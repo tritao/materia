@@ -2,6 +2,7 @@ package bimkit;
 
 import bimkit.BimWindowDefinition;
 import bimkit.BimDoorDefinition;
+import bimkit.IfcExporter;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.parametric.Document;
@@ -47,6 +48,13 @@ class BimDocument {
 
 	public function createDoorDefinition(name:String, width:Float, height:Float, depth:Float):Definition
 		return BimDoorDefinition.create(cad, name, width, height, depth);
+
+	/** Export the supported BIM subset as an IFC4 STEP file. */
+	public function exportIfc(?timestamp:String):String
+		return IfcExporter.encode(cad, timestamp);
+
+	public function saveIfc(path:String, ?timestamp:String):Void
+		IfcExporter.save(cad, path, timestamp);
 
 	public function createWindow(name:String, definition:Definition):InstanceElement {
 		return createOpeningInstance(name, definition, BimSchema.WindowType, BimSchema.Window, "Window");

@@ -8,6 +8,7 @@ import cadkit.parametric.Placement;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.Feature;
+import cadkit.parametric.TypedProperty;
 import cadkit.parametric.EvaluationContext;
 import cadkit.parametric.EvaluationResult;
 import cadkit.parametric.features.BoxFeature;
@@ -204,6 +205,47 @@ class BimKitSmoke {
 			"the integration fixture builds a complete two-storey BIM model with shared types");
 		check(fixture.groundWalls[0].shape().volume() > 0 && fixture.slabs[0].shape().volume() == 6000.0 * 5000 * 200,
 			"authored walls and slabs publish per-element geometry");
+		model.cad.element(fixture.project.id).setProperty(TypedProperty.text(BimSchema.GlobalId, "0abcdefghijklmnopqrstu"));
+		model.cad.element(fixture.project.id).setProperty(new TypedProperty("ifc.Pset_ProjectCommon.BuildingPermitID",
+			"ifc.identifier", {wrappedValue: "LOCAL-17"}, null, null,
+			{propertySet: "Pset_ProjectCommon", sourceType: "IfcIdentifier"}));
+		model.cad.element(fixture.groundWalls[0].id).setProperty(TypedProperty.boolean("bim.loadBearing", true));
+		fixture.windowType.setProperty(TypedProperty.text("ifc.Pset_WindowCommon.Family", "Timber"));
+		var ifc = model.exportIfc();
+		var ifcAgain = model.exportIfc();
+		check(ifc == ifcAgain
+			&& ifc.indexOf("FILE_SCHEMA(('IFC4'))") >= 0
+			&& ifc.indexOf("=IFCPROJECT('0abcdefghijklmnopqrstu'") >= 0
+			&& ifc.indexOf("=IFCSITE(") >= 0 && ifc.indexOf("=IFCBUILDING(") >= 0
+			&& ifc.indexOf("=IFCBUILDINGSTOREY(") >= 0 && ifc.indexOf("=IFCSPACE(") >= 0
+			&& ifc.indexOf("=IFCWALL(") >= 0 && ifc.indexOf("=IFCSLAB(") >= 0
+			&& ifc.indexOf("=IFCWINDOW(") >= 0 && ifc.indexOf("=IFCDOOR(") >= 0
+			&& ifc.indexOf("=IFCWINDOWTYPE(") >= 0 && ifc.indexOf("=IFCDOORTYPE(") >= 0
+			&& ifc.indexOf("=IFCRELAGGREGATES(") >= 0 && ifc.indexOf("=IFCRELCONTAINEDINSPATIALSTRUCTURE(") >= 0
+			&& ifc.indexOf("=IFCRELDEFINESBYTYPE(") >= 0
+			&& ifc.indexOf("=IFCRELVOIDSELEMENT(") >= 0 && ifc.indexOf("=IFCRELFILLSELEMENT(") >= 0
+			&& ifc.indexOf("=IFCLOCALPLACEMENT(#") >= 0
+			&& ifc.indexOf("Pset_ProjectCommon") >= 0 && ifc.indexOf("Pset_WindowCommon") >= 0
+			&& ifc.indexOf("CadKitProperties") >= 0
+			&& ifc.indexOf("IFCIDENTIFIER('LOCAL-17')") >= 0 && ifc.indexOf("IFCBOOLEAN(.T.)") >= 0
+			&& model.cad.outputFeatureOrNull() == null,
+			"IFC4 export maps spatial structure, types, hosted openings, typed Psets, and stable GlobalIds without mutating the document");
+		var rootGuidPattern = new EReg("^#[0-9]+=(IFCPROJECT|IFCSITE|IFCBUILDING|IFCBUILDINGSTOREY|IFCSPACE|IFCWALL|IFCSLAB|IFCWINDOW|IFCDOOR|IFCWINDOWTYPE|IFCDOORTYPE|IFCOPENINGELEMENT|IFCPROPERTYSET|IFCREL[A-Z]+)\\('([^']+)'", "");
+		var globalIds = new Map<String, Bool>();
+		var globalIdCount = 0;
+		for (line in ifc.split("\n"))
+			if (rootGuidPattern.match(line)) {
+				var globalId = rootGuidPattern.matched(2);
+				if (!new EReg("^[0-3][0-9A-Za-z_$]{21}$", "").match(globalId))
+					throw "invalid IFC GlobalId: " + globalId + " (length " + globalId.length + ")";
+				if (globalIds.exists(globalId))
+					throw "duplicate IFC GlobalId: " + globalId;
+				globalIds.set(globalId, true);
+				globalIdCount++;
+			}
+		if (!globalIds.exists("0abcdefghijklmnopqrstu") || globalIdCount <= 20)
+			throw "IFC root identity scan failed: supplied=" + globalIds.exists("0abcdefghijklmnopqrstu")
+				+ ", count=" + globalIdCount;
 		var saved = BimCodec.encode(model);
 		var restored = BimCodec.decode(saved);
 		var restoredWindow:cadkit.parametric.InstanceElement = cast restored.cad.element(fixture.windows[0].id);
