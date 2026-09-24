@@ -256,6 +256,13 @@ class Tabs implements View {
 			dragState.update(drag);
 			event.releasePointer();
 		});
+		buttonNode.on(UiEventKind.KeyDown, function(event) {
+			var drag = dragState.value;
+			if (event.key != UiKey.Escape || !drag.active)
+				return;
+			event.cancelPointerCapture();
+			event.preventDefault();
+		});
 	}
 }
 

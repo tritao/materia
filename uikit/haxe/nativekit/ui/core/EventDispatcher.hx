@@ -262,9 +262,8 @@ class EventDispatcher {
 		var event = new UiEvent(kind, node.id, 0.0, 0.0, 0.0, 0.0, 0, key,
 			modifiers, null, null, scancode);
 		dispatchPath(path, event);
-		if (!event.defaultPrevented && kind == UiEventKind.KeyDown && key == UiKey.Escape &&
-			cancelCapturedPointerFor(node.id))
-			event.preventDefault();
+		if (event.pointerCancelRequested)
+			cancelCapturedPointerFor(node.id);
 		if (event.defaultPrevented)
 			return;
 		if (kind == UiEventKind.KeyDown && routeCommand(key, modifiers, path)) {
@@ -279,7 +278,7 @@ class EventDispatcher {
 				0.0, 0.0, 0, key, modifiers, null, null, scancode));
 	}
 
-	/** Cancels a pointer drag owned by the currently focused widget. */
+	/** Cancels a pointer drag when the focused widget explicitly requests it. */
 	function cancelCapturedPointerFor(id:WidgetId):Bool {
 		if (id == null)
 			return false;

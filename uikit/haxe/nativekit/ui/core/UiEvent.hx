@@ -32,6 +32,7 @@ class UiEvent {
 	public var pointerCaptureTarget(default, null):Null<WidgetId>;
 	public var pointerNativeCaptureRequested(default, null):Bool;
 	public var pointerReleaseRequested(default, null):Bool;
+	public var pointerCancelRequested(default, null):Bool;
 
 	public function new(kind:String, target:WidgetId, x:Float = 0.0, y:Float = 0.0,
 			deltaX:Float = 0.0, deltaY:Float = 0.0, button:Int = 0, key:Int = 0,
@@ -63,6 +64,7 @@ class UiEvent {
 		pointerCaptureTarget = null;
 		pointerNativeCaptureRequested = false;
 		pointerReleaseRequested = false;
+		pointerCancelRequested = false;
 	}
 
 	inline function get_globalX():Float
@@ -111,4 +113,8 @@ class UiEvent {
 		pointerCaptureTarget = null;
 		pointerReleaseRequested = true;
 	}
+
+	/** Requests cancellation of pointer capture owned by this event's target. */
+	public function cancelPointerCapture():Void
+		pointerCancelRequested = true;
 }
