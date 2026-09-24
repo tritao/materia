@@ -4,6 +4,8 @@ package nativekit.ui.core;
 class EditOperation {
 	public final label:String;
 	public final coalesceKey:Null<String>;
+	/** Approximate bytes retained by this operation and its captured undo data. */
+	public var estimatedRetainedBytes(default, null):Int;
 	/** Optional caller-owned value used by a coalescing callback. */
 	public final mergeData:Dynamic;
 	var applyAction:Void->Void;
@@ -17,7 +19,8 @@ class EditOperation {
 	var afterStateToken:Int;
 
 	public function new(label:String, apply:Void->Void, undo:Void->Void,
-			?coalesceKey:String, ?merge:EditOperation->Bool, ?mergeData:Dynamic) {
+			?coalesceKey:String, ?merge:EditOperation->Bool, ?mergeData:Dynamic,
+			?estimatedRetainedBytes:Int = 256) {
 		if (label == null || label.length == 0 || apply == null || undo == null)
 			throw "Edit operations require a label, apply action, and undo action";
 		if (coalesceKey != null && coalesceKey.length == 0)
@@ -28,6 +31,9 @@ class EditOperation {
 		this.coalesceKey = coalesceKey;
 		this.mergeAction = merge;
 		this.mergeData = mergeData;
+		if (estimatedRetainedBytes < 0)
+			throw "Edit operation retained-byte estimates cannot be negative";
+		this.estimatedRetainedBytes = estimatedRetainedBytes;
 		transactionOperations = null;
 		beforeStateToken = -1;
 		afterStateToken = -1;
@@ -49,6 +55,12 @@ class EditOperation {
 			throw "Merged edit actions cannot be null";
 		applyAction = apply;
 		undoAction = undo;
+	}
+
+	@:allow(nativekit.ui.core.EditHistory)
+	function setEstimatedRetainedBytes(bytes:Int):Void {
+		if (bytes < 0) throw "Edit operation retained-byte estimates cannot be negative";
+		estimatedRetainedBytes = bytes;
 	}
 
 	@:allow(nativekit.ui.core.EditHistory)
