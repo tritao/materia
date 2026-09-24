@@ -12,15 +12,20 @@ class ProjectEditCoordinator {
 		this.document = document;
 	}
 
-	public function apply(label:String, redo:Void->Void, undo:Void->Void):Bool
-		return document.apply(new EditOperation(label, redo, undo));
+	public function apply(label:String, redo:Void->Void, undo:Void->Void,
+			?estimatedRetainedBytes:Int):Bool
+		return document.apply(new EditOperation(label, redo, undo, null, null, null,
+			estimatedRetainedBytes == null ? 256 : estimatedRetainedBytes));
 
 	/** Runs a sequence as one history entry and compensates if any component fails. */
 	public function applyCompound(label:String, steps:Array<EditOperation>):Bool {
 		if (steps == null || steps.length == 0) throw "Compound project edits require at least one step";
 		var captured = steps.copy();
 		for (step in captured) if (step == null) throw "Compound project edit steps cannot be null";
-		return apply(label, function() runForward(captured), function() runBackward(captured));
+		var estimatedBytes = 64;
+		for (step in captured)
+			estimatedBytes += step.estimatedRetainedBytes;
+		return apply(label, function() runForward(captured), function() runBackward(captured), estimatedBytes);
 	}
 
 	function runForward(steps:Array<EditOperation>):Void {

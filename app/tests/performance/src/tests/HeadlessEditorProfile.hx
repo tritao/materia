@@ -2,6 +2,7 @@ package tests;
 
 import app.Main.ReferenceEditorApp;
 import app.EditorScene;
+import app.ProjectDocumentSession;
 import app.SceneObjectData;
 import haxe.Json;
 import LayoutFrame;
@@ -221,6 +222,27 @@ class HeadlessEditorProfile {
     for (_ in 0...1000) if (!candidate.document.undo()) throw "Undo history ended during stress scenario";
     var undo1000Seconds = Sys.time() - started;
 
+    // Repeated add/remove edits expose the retained payload cost of structural history.
+    var structuralAllocatedBefore = hl.Gc.totalAllocated();
+    started = Sys.time();
+    for (_ in 0...20) {
+      if (!candidate.deleteSelected()) throw "Structural history could not delete an object";
+      if (!candidate.createRectangle()) throw "Structural history could not recreate an object";
+    }
+    var structuralHistorySeconds = Sys.time() - started;
+    var structuralAllocatedBytes = hl.Gc.totalAllocated() - structuralAllocatedBefore;
+    var structuralHistoryOperations = candidate.document.history.undoCount;
+    if (structuralHistoryOperations != 40)
+      throw 'Expected 40 structural history entries, found $structuralHistoryOperations';
+    for (_ in 0...40) if (!candidate.document.undo()) throw "Structural history ended before undo";
+    if (candidate.objects.length != 10000)
+      throw "Structural history undo did not restore the 10,000-object scene";
+    for (_ in 0...40) if (!candidate.document.redo()) throw "Structural history ended before redo";
+    if (candidate.objects.length != 10000)
+      throw "Structural history redo did not restore the 10,000-object scene";
+    var structuralHistoryEstimatedBytes = candidate.document.history.estimatedRetainedBytes;
+    action(actions, "structural-history-40-edits", 0);
+
     // Separate snapshot capture from BVH construction after the end-to-end timings.
     // Ignore the first sample to exclude one-time allocator and code-path warmup.
     var snapshotSamples:Array<Float> = [];
@@ -265,6 +287,24 @@ class HeadlessEditorProfile {
     }
     action(actions, "simulation-presentation-500-links", 0);
     editor.simulation.stop();
+
+    var projectHistory = editor.session.document.history;
+    for (_ in 0...1100)
+      editor.session.document.apply(new EditOperation("History operation limit", function() {}, function() {}));
+    var budgetedOperationCount = projectHistory.undoCount;
+    for (_ in 0...3) editor.session.document.apply(new EditOperation("History byte limit",
+      function() {}, function() {}, null, null, null,
+      Std.int(ProjectDocumentSession.MAX_HISTORY_ESTIMATED_BYTES * 3 / 4)));
+    var budgetedEstimatedBytes = projectHistory.estimatedRetainedBytes;
+    if (budgetedOperationCount != ProjectDocumentSession.MAX_HISTORY_OPERATIONS ||
+        projectHistory.undoCount > ProjectDocumentSession.MAX_HISTORY_OPERATIONS ||
+        projectHistory.undoCount != 1 ||
+        budgetedEstimatedBytes > ProjectDocumentSession.MAX_HISTORY_ESTIMATED_BYTES)
+      throw "Project edit history exceeded its configured budget";
+    if (!projectHistory.undo() || !projectHistory.redo() ||
+        projectHistory.estimatedRetainedBytes != budgetedEstimatedBytes)
+      throw "Project history budget accounting changed across undo/redo";
+    action(actions, "project-history-budget", 0);
     File.saveContent(output + "/architecture-summary.json", haxe.Json.stringify({
       sceneObjects: records.length, movingObjects: 500, articulatedLinks: 500,
       cycles: cycles, cadParameterSeconds: cadSeconds, bimOpeningSeconds: bimSeconds,
@@ -272,6 +312,13 @@ class HeadlessEditorProfile {
       sceneLoadPhases: sceneLoadPhaseSummary,
       singleObjectNudgeSeconds: nudgeSeconds, movingObjectEditsSeconds: movingSeconds,
       undo1000Seconds: undo1000Seconds,
+      structuralHistoryOperations: structuralHistoryOperations,
+      structuralHistorySeconds: structuralHistorySeconds,
+      structuralAllocatedBytes: structuralAllocatedBytes,
+      structuralHistoryEstimatedBytes: structuralHistoryEstimatedBytes,
+      budgetedOperationCount: budgetedOperationCount,
+      budgetedFinalOperationCount: projectHistory.undoCount,
+      budgetedEstimatedBytes: budgetedEstimatedBytes,
       spatialSnapshotMedianSeconds: spatialSnapshotMedianSeconds,
       spatialIndexMedianSeconds: spatialIndexMedianSeconds,
       spatialCacheSamples: snapshotSamples.length}));

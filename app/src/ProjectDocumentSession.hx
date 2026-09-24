@@ -5,10 +5,14 @@ import sys.io.AtomicFile;
 import haxe.io.Path as FilePath;
 import app.ScriptOwnership.ScriptMaterialization;
 import nativekit.ui.core.EditorDocument;
+import nativekit.ui.core.EditHistory;
 import bimkit.BimDocument;
 
 /** Owns the current document; unsuccessful I/O leaves it and its history intact. */
 class ProjectDocumentSession {
+  public static inline var MAX_HISTORY_OPERATIONS:Int = 1000;
+  public static inline var MAX_HISTORY_ESTIMATED_BYTES:Int = 64 * 1024 * 1024;
+
   public var document(default, null):EditorDocument;
   public var edits(default, null):ProjectEditCoordinator;
   public var scene(default, null):EditorScene;
@@ -21,7 +25,7 @@ class ProjectDocumentSession {
   public var beforeReplace:Null<Void->Void> = null;
 
   public function new(?initialBim:BimDocument) {
-    document = new EditorDocument("project");
+    document = createDocument();
     edits = new ProjectEditCoordinator(document);
     scene = new EditorScene(null, document);
     sensors = new SensorConfiguration(null, document);
@@ -30,7 +34,7 @@ class ProjectDocumentSession {
   }
 
   public function newDocument():Void {
-    var nextDocument = new EditorDocument("project");
+    var nextDocument = createDocument();
     replace(new EditorScene(null, nextDocument), new SensorConfiguration(null, nextDocument),
       null, null, new BimDocument(), nextDocument);
   }
@@ -41,13 +45,13 @@ class ProjectDocumentSession {
     var script=SceneCodec.decodeScript(text);
     if(script!=null){
       var nextBim = SceneCodec.decodeBim(text);
-      var nextDocument = new EditorDocument("project");
+      var nextDocument = createDocument();
       var ownership=new ScriptOwnership(script.reference,script,nextDocument),materialized:ScriptMaterialization;
       try materialized=ownership.materialize() catch(error:Dynamic){ownership.dispose();nextBim.close();throw error;}
       replace(materialized.scene,materialized.sensors,absolute,ownership,nextBim,nextDocument);return;
     }
     var data = SceneCodec.decode(text);
-    var nextDocument = new EditorDocument("project");
+    var nextDocument = createDocument();
     var next = new EditorScene(data, nextDocument);
     var nextSensors:SensorConfiguration = null;
     var nextBim:BimDocument;
@@ -60,7 +64,7 @@ class ProjectDocumentSession {
   }
 
   public function openScript(reference:String):ScriptMaterialization {
-    var nextDocument = new EditorDocument("project");
+    var nextDocument = createDocument();
     var ownership=new ScriptOwnership(reference,null,nextDocument),materialized:ScriptMaterialization;
     try materialized=ownership.materialize() catch(error:Dynamic){ownership.dispose();throw error;}
     replace(materialized.scene,materialized.sensors,null,ownership,new BimDocument(),nextDocument);
@@ -162,4 +166,8 @@ class ProjectDocumentSession {
   }
 
   public function dispose():Void { scene.dispose(); sensors.dispose();if(scriptOwnership!=null)scriptOwnership.dispose();bim.close(); }
+
+  static function createDocument():EditorDocument
+    return new EditorDocument("project", new EditHistory(MAX_HISTORY_OPERATIONS,
+      MAX_HISTORY_ESTIMATED_BYTES));
 }
