@@ -345,15 +345,21 @@ def main():
             if (not expected.issubset(completed) or summary.get("sceneObjects") != 10000 or
                     summary.get("movingObjects") != 500 or summary.get("articulatedLinks") != 500 or
                     summary.get("undo1000Seconds") is None or
+                    not isinstance(summary.get("sceneLoadPhases"), dict) or
                     summary.get("spatialCacheSamples") != 5 or
                     summary.get("spatialSnapshotMedianSeconds") is None or
                     summary.get("spatialIndexMedianSeconds") is None):
                 raise ValueError("architecture workload did not complete all requested phases")
             snapshot_ms = summary["spatialSnapshotMedianSeconds"] * 1000
             index_ms = summary["spatialIndexMedianSeconds"] * 1000
+            phase_seconds = summary["sceneLoadPhases"]
+            phase_total = sum(value for value in phase_seconds.values() if isinstance(value, (int, float)))
+            phase_top = sorted(phase_seconds.items(), key=lambda item: item[1] or 0, reverse=True)[:3]
+            phase_text = ", ".join(f"{name}={value * 1000:.0f}ms" for name, value in phase_top)
             print(f"scenario=architecture verified phases=7 sceneObjects=10000 "
                   f"movingObjects=500 links=500 snapshotMedian={snapshot_ms:.3f}ms "
-                  f"spatialIndexMedian={index_ms:.3f}ms")
+                  f"spatialIndexMedian={index_ms:.3f}ms loadPhases={phase_total * 1000:.0f}ms "
+                  f"topLoadPhases=[{phase_text}]")
         except (OSError, KeyError, ValueError) as error:
             print(f"scenario verification failed: {error}", file=sys.stderr)
             result = 1

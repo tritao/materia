@@ -50,6 +50,8 @@ import haxe.io.Path as FilePath;
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 @:allow(tests.SceneAtomicityTests)
 class EditorScene {
+  /** Opt-in constructor phase timings used by the headless architecture profile. */
+  var loadProfilePhases:Null<Map<String, Float>>;
   /** Test-only synchronous fault injection for scene edit publication boundaries. */
   @:allow(tests.SceneAtomicityTests)
   var failureInjection:Null<String->Void> = null;
@@ -85,7 +87,36 @@ class EditorScene {
   public var selectionRevision(default, null):Int = 1;
   var disposed:Bool = false;
 
-  public function new(?data:Array<SceneObjectData>, ?sharedDocument:EditorDocument) {
+  function profileLoadStart():Float
+    return loadProfilePhases == null ? -1.0 : Sys.time();
+
+  function profileLoadEnd(phase:String, started:Float):Void {
+    if (started < 0.0 || loadProfilePhases == null) return;
+    var previous:Null<Float> = loadProfilePhases.get(phase);
+    if (previous == null) previous = 0.0;
+    loadProfilePhases.set(phase, previous + Sys.time() - started);
+  }
+
+  function loadProfileSummary():Dynamic {
+    var phases = loadProfilePhases;
+    if (phases == null) return {};
+    return {
+      geometryHandleSeconds: phases.get("geometryHandle"),
+      geometryDataSeconds: phases.get("geometryData"),
+      geometryPublicationSeconds: phases.get("geometryPublication"),
+      materialSetupSeconds: phases.get("materialSetup"),
+      transactionPrepareSeconds: phases.get("transactionPrepare"),
+      transactionCommitSeconds: phases.get("transactionCommit"),
+      applicationBookkeepingSeconds: phases.get("applicationBookkeeping"),
+      finalMaterialSeconds: phases.get("finalMaterial"),
+      snapshotSeconds: phases.get("snapshot"),
+      spatialIndexSeconds: phases.get("spatialIndex")
+    };
+  }
+
+  public function new(?data:Array<SceneObjectData>, ?sharedDocument:EditorDocument,
+      ?loadProfilePhases:Map<String, Float>) {
+    this.loadProfilePhases = loadProfilePhases;
     nextRevision++;
     revision = nextRevision;
     nextEnvironmentRevision++;
@@ -112,11 +143,17 @@ class EditorScene {
         if (savedDraft != null)
           restoreSketchDraft(savedDraft);
       }
+      var phaseStarted = profileLoadStart();
       selectionMaterial = scene.createMaterial();
       scene.setMaterialData(selectionMaterial, MaterialData.opaque(1.0, 0.88, 0.35));
+      profileLoadEnd("finalMaterial", phaseStarted);
+      phaseStarted = profileLoadStart();
       snapshot = scene.snapshot();
+      profileLoadEnd("snapshot", phaseStarted);
+      phaseStarted = profileLoadStart();
       try spatial = SpatialIndex.create(snapshot)
       catch (error:Dynamic) { snapshot.dispose(); throw error; }
+      profileLoadEnd("spatialIndex", phaseStarted);
     } catch (error:Dynamic) {
       for (session in cadSessions) session.close();
       cadSessions = new Map();
@@ -129,10 +166,13 @@ class EditorScene {
       width:Float, height:Float, depth:Float, red:Float, green:Float, blue:Float,
       visible:Bool = true,collisionEnabled:Bool=true,dynamicBody:Bool=false,mass:Float=1.0,
       kind:String="rectangle",?cadGraph:String):Void {
+    var phaseStarted = profileLoadStart();
     var geometry = scene.createGeometry();
+    profileLoadEnd("geometryHandle", phaseStarted);
     var session:Null<CadDocumentSession> = null;
     var storedCadGraph = cadGraph;
     var geometryData:GeometryData;
+    phaseStarted = profileLoadStart();
     if (isCadKind(kind)) {
       session = createCadSession(storedCadGraph, width, height, depth, kind);
       if (storedCadGraph == null)
@@ -141,10 +181,16 @@ class EditorScene {
     } else {
       geometryData = boxGeometry(width, height, depth);
     }
+    profileLoadEnd("geometryData", phaseStarted);
     try {
+      phaseStarted = profileLoadStart();
       scene.setGeometryData(geometry, geometryData);
+      profileLoadEnd("geometryPublication", phaseStarted);
+      phaseStarted = profileLoadStart();
       var material = scene.createMaterial();
       scene.setMaterialData(material, MaterialData.opaque(red, green, blue));
+      profileLoadEnd("materialSetup", phaseStarted);
+      phaseStarted = profileLoadStart();
       var transaction = scene.beginTransaction();
       try {
         var node = transaction.createNode();
@@ -153,7 +199,11 @@ class EditorScene {
         transaction.setGeometry(node, geometry);
         transaction.setMaterial(node, material);
         transaction.setTransform(node, Transform.identity().translated(x, y, z));
+        profileLoadEnd("transactionPrepare", phaseStarted);
+        phaseStarted = profileLoadStart();
         transaction.commit();
+        profileLoadEnd("transactionCommit", phaseStarted);
+        phaseStarted = profileLoadStart();
         bridge.attach(id, node, geometry, material);
         objects.push(new EditorSceneObject(id, label, kind, width, height, depth,
           collisionEnabled,dynamicBody,mass,red,green,blue,
@@ -161,6 +211,7 @@ class EditorScene {
           x, y, z, visible));
         if (session != null)
           cadSessions.set(id, session);
+        profileLoadEnd("applicationBookkeeping", phaseStarted);
       } catch (error:Dynamic) {
         transaction.dispose();
         throw error;

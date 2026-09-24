@@ -184,8 +184,10 @@ class HeadlessEditorProfile {
         dynamicBody:moving, mass:1.0, red:0.3, green:0.5, blue:0.7, visible:true});
     }
     started = Sys.time();
-    var candidate = new EditorScene(records);
+    var sceneLoadPhases = new Map<String, Float>();
+    var candidate = new EditorScene(records, null, sceneLoadPhases);
     var sceneLoadSeconds = Sys.time() - started;
+    var sceneLoadPhaseSummary = candidate.loadProfileSummary();
     action(actions, "load-10k-scene", 0);
 
     started = Sys.time();
@@ -265,6 +267,7 @@ class HeadlessEditorProfile {
       sceneObjects: records.length, movingObjects: 500, articulatedLinks: 500,
       cycles: cycles, cadParameterSeconds: cadSeconds, bimOpeningSeconds: bimSeconds,
       sceneLoadSeconds: sceneLoadSeconds,
+      sceneLoadPhases: sceneLoadPhaseSummary,
       singleObjectNudgeSeconds: nudgeSeconds, movingObjectEditsSeconds: movingSeconds,
       undo1000Seconds: undo1000Seconds,
       spatialSnapshotMedianSeconds: spatialSnapshotMedianSeconds,
