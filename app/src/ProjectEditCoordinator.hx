@@ -1,7 +1,7 @@
 package app;
 
-import nativekit.ui.core.EditOperation;
-import nativekit.ui.core.EditorDocument;
+import nativekit.ui.editing.EditOperation;
+import nativekit.ui.editing.EditorDocument;
 
 /** One project history boundary for edits that may span several domain models. */
 class ProjectEditCoordinator {

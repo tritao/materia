@@ -17,4 +17,12 @@ enum abstract IconName(Int) from Int to Int {
 	var Save = 12;
 	var Undo = 13;
 	var Redo = 14;
+	var Hierarchy = 15;
+	var Building = 16;
+	var Grid = 17;
+	var Cube = 18;
+	var Sliders = 19;
+	var Radar = 20;
+	var Terminal = 21;
+	var Activity = 22;
 }

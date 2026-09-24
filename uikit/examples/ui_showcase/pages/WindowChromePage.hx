@@ -5,7 +5,7 @@ import LayoutDirection;
 import LayoutStyle;
 import UiExplorer;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Row;
+import nativekit.ui.widgets.layout.Row;
 
 /** Explains and launches the interactive multi-window custom chrome demo. */
 class WindowChromePage {

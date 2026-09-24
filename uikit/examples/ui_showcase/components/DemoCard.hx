@@ -1,9 +1,9 @@
 package components;
 
 import LayoutStyle;
-import nativekit.ui.widgets.Column;
+import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Text;
+import nativekit.ui.widgets.text.Text;
 import nativekit.ui.theme.TextRole;
 
 /** Overview card composed from ordinary NativeKit layout and text widgets. */

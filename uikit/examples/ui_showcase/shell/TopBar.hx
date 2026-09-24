@@ -9,10 +9,10 @@ import LayoutStyle;
 import Insets;
 import UiExplorer;
 import nativekit.ui.icons.IconName;
-import nativekit.ui.widgets.Button;
+import nativekit.ui.widgets.controls.Button;
 import nativekit.ui.core.View;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Row;
+import nativekit.ui.widgets.layout.Row;
 import nativekit.ui.widgets.WindowChrome;
 
 /** Top-level branding and global Explorer actions. */

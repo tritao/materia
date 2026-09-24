@@ -1,5 +1,8 @@
 package nativekit.ui.core;
 
+import nativekit.ui.editing.EditorDocument;
+
+
 /** Stable invocation data shared by menus, shortcuts, palettes, and scripts. */
 class CommandContext {
 	public final document:Null<EditorDocument>;

@@ -18,12 +18,12 @@ import cadkit.parametric.ParametricError;
 import cadkit.parametric.ReferenceState;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyReference;
-import nativekit.ui.core.PropertyBinding;
-import nativekit.ui.core.PropertyDescriptor;
-import nativekit.ui.core.PropertyDescriptorOptions;
-import nativekit.ui.core.PropertyEditResult;
-import nativekit.ui.core.PropertyType;
-import nativekit.ui.core.PropertyValue;
+import nativekit.ui.properties.PropertyBinding;
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.properties.PropertyDescriptorOptions;
+import nativekit.ui.properties.PropertyEditResult;
+import nativekit.ui.properties.PropertyType;
+import nativekit.ui.properties.PropertyValue;
 import sys.FileSystem;
 import sys.io.File;
 

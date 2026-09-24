@@ -1,10 +1,10 @@
 package tests;
 
 import app.WorkspaceSaveWorker;
-import nativekit.ui.core.DockNode;
-import nativekit.ui.core.DockWorkspacePersistence;
-import nativekit.ui.core.DockWorkspaceSnapshot;
-import nativekit.ui.core.DockWorkspaceSnapshotCodec;
+import nativekit.ui.docking.DockNode;
+import nativekit.ui.docking.DockWorkspacePersistence;
+import nativekit.ui.docking.DockWorkspaceSnapshot;
+import nativekit.ui.docking.DockWorkspaceSnapshotCodec;
 import sys.thread.Condition;
 
 class WorkspaceSaveWorkerTests {

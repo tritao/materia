@@ -1,5 +1,28 @@
 package inspector;
 
+import nativekit.ui.widgets.collections.ListView;
+import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.Checkbox;
+import nativekit.ui.widgets.controls.ComboBox;
+import nativekit.ui.widgets.controls.ProgressBar;
+import nativekit.ui.widgets.controls.ProgressMode;
+import nativekit.ui.widgets.controls.Radio;
+import nativekit.ui.widgets.controls.RadioGroup;
+import nativekit.ui.widgets.controls.Slider;
+import nativekit.ui.widgets.controls.Tabs;
+import nativekit.ui.widgets.controls.Toggle;
+import nativekit.ui.widgets.controls.Toolbar;
+import nativekit.ui.widgets.layout.Column;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.overlays.Dialog;
+import nativekit.ui.widgets.overlays.Menu;
+import nativekit.ui.widgets.overlays.MenuItem;
+import nativekit.ui.widgets.scroll.ScrollAxis;
+import nativekit.ui.widgets.scroll.ScrollView;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.text.TextField;
+
+
 import Rect;
 import nativekit.ui.semantics.AccessibilityAction;
 import nativekit.ui.semantics.AccessibilityRole;

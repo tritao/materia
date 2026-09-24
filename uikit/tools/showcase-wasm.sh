@@ -104,6 +104,7 @@ compiler_args=(
 	--wasm-memory-contract="$memory_contract"
 	--root="$module_dir/examples/ui_showcase"
 	--root="$module_dir/haxe"
+	--root="$materia_dir/editorkit/haxe"
 	--root="$module_dir/bindings/haxe"
 	--root="$repo_dir/bindings/haxe"
 	--ffi-interface="$repo_dir/bindings/haxe/nativekit-wasm.hxi"
@@ -118,8 +119,23 @@ compiler_args=(
 	"$module_dir/examples/ui_showcase/UiExplorer.hx"
 	"$module_dir/examples/ui_showcase/ShowcaseCube.hx"
 	"$module_dir/haxe/nativekit/ui/core/"*.hx
+	"$materia_dir/editorkit/haxe/nativekit/editorkit/"*.hx
 	"$module_dir/haxe/nativekit/ui/style/"*.hx
 	"$module_dir/haxe/nativekit/ui/widgets/"*.hx
+	"$module_dir/haxe/nativekit/ui/docking/"*.hx
+	"$module_dir/haxe/nativekit/ui/editing/"*.hx
+	"$module_dir/haxe/nativekit/ui/plotting/"*.hx
+	"$module_dir/haxe/nativekit/ui/properties/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/collections/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/commands/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/controls/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/docking/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/layout/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/overlays/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/plotting/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/properties/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/scroll/"*.hx
+	"$module_dir/haxe/nativekit/ui/widgets/text/"*.hx
 	"$module_dir/haxe/nativekit/ui/theme/"*.hx
 	"$module_dir/haxe/nativekit/ui/semantics/"*.hx
 	"$module_dir/haxe/nativekit/ui/debug/"*.hx

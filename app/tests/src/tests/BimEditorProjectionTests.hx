@@ -1,5 +1,8 @@
 package tests;
 
+import nativekit.ui.widgets.text.Text;
+
+
 import app.BimInspectorDescriptors;
 import app.BimEditorDemo;
 import app.BimModelEditor;
@@ -11,12 +14,12 @@ import cadkit.parametric.ElementReference;
 import cadkit.parametric.QuantityKind;
 import cadkit.parametric.TypedProperty;
 import nativekit.ui.core.CommandContext;
-import nativekit.ui.core.EditorDocument;
-import nativekit.ui.core.PropertyBinding;
-import nativekit.ui.core.PropertyDescriptor;
-import nativekit.ui.core.PropertyEditResult;
-import nativekit.ui.core.PropertyType;
-import nativekit.ui.core.PropertyValue;
+import nativekit.ui.editing.EditorDocument;
+import nativekit.ui.properties.PropertyBinding;
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.properties.PropertyEditResult;
+import nativekit.ui.properties.PropertyType;
+import nativekit.ui.properties.PropertyValue;
 
 class BimEditorProjectionTests {
 	static function check(value:Bool, message:String):Void {

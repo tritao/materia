@@ -1,5 +1,20 @@
 package nativekit.ui.semantics;
 
+import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.Checkbox;
+import nativekit.ui.widgets.controls.ComboBox;
+import nativekit.ui.widgets.controls.ProgressBar;
+import nativekit.ui.widgets.controls.Radio;
+import nativekit.ui.widgets.controls.Slider;
+import nativekit.ui.widgets.controls.Toolbar;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.overlays.Dialog;
+import nativekit.ui.widgets.overlays.Menu;
+import nativekit.ui.widgets.overlays.MenuItem;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.text.TextField;
+
+
 /** Roles already understood by NativeKit's virtual accessibility tree. */
 enum abstract AccessibilityRole(Int) from Int to Int {
 	var Group = 0;

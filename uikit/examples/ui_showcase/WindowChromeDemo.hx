@@ -20,14 +20,14 @@ import nativekit.ui.core.NativeInputAdapter;
 import nativekit.ui.core.UiContext;
 import nativekit.ui.core.View;
 import nativekit.ui.theme.Theme;
-import nativekit.ui.widgets.Column;
+import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Row;
-import nativekit.ui.widgets.SizedBox;
-import nativekit.ui.widgets.Stack;
-import nativekit.ui.widgets.StackChild;
-import nativekit.ui.widgets.Text;
-import nativekit.ui.widgets.Button;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.layout.SizedBox;
+import nativekit.ui.widgets.layout.Stack;
+import nativekit.ui.widgets.layout.StackChild;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.controls.Button;
 import nativekit.ui.widgets.WindowChrome;
 
 /** Owns the second native window used by the custom window-chrome showcase. */

@@ -4,9 +4,9 @@ import app.CadPlateModel;
 import app.ProjectDocumentSession;
 import app.BimInspectorDescriptors;
 import nativekit.ui.core.CommandContext;
-import nativekit.ui.core.EditOperation;
-import nativekit.ui.core.EditorDocument;
-import nativekit.ui.core.PropertyValue;
+import nativekit.ui.editing.EditOperation;
+import nativekit.ui.editing.EditorDocument;
+import nativekit.ui.properties.PropertyValue;
 import sys.FileSystem;
 
 class ProjectDocumentTests {

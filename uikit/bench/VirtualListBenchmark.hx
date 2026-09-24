@@ -6,14 +6,14 @@ import LayoutStyle;
 import nativekit.ui.core.UiContext;
 import nativekit.ui.debug.UiFrameMetrics;
 import nativekit.ui.core.View;
-import nativekit.ui.widgets.ListView;
-import nativekit.ui.widgets.ListViewModel;
-import nativekit.ui.widgets.ScrollController;
-import nativekit.ui.widgets.Text;
-import nativekit.ui.widgets.TreeView;
-import nativekit.ui.widgets.TreeViewModel;
-import nativekit.ui.widgets.TreeRootMetadata;
-import nativekit.ui.widgets.VirtualList;
+import nativekit.ui.widgets.collections.ListView;
+import nativekit.ui.widgets.collections.ListViewModel;
+import nativekit.ui.widgets.scroll.ScrollController;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.collections.TreeView;
+import nativekit.ui.widgets.collections.TreeViewModel;
+import nativekit.ui.widgets.collections.TreeRootMetadata;
+import nativekit.ui.widgets.collections.VirtualList;
 
 /** Measures the Haxe virtual-list boundary without materializing the dataset. */
 class VirtualListBenchmark {

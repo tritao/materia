@@ -1,7 +1,7 @@
 package app;
 
-import nativekit.ui.core.EditOperation;
-import nativekit.ui.core.EditorDocument;
+import nativekit.ui.editing.EditOperation;
+import nativekit.ui.editing.EditorDocument;
 import robotkit.runtime.RobotRuntimeCompiler;
 import haxe.Json;
 import haxe.crypto.Sha256;

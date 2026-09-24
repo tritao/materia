@@ -1,15 +1,19 @@
 package pages;
 
+import nativekit.ui.widgets.controls.Select;
+import nativekit.ui.widgets.text.Text;
+
+
 import Insets;
 import LayoutAxis;
 import LayoutStyle;
 import UiExplorer;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Row;
-import nativekit.ui.widgets.TextArea;
-import nativekit.ui.widgets.TextEditorDiagnostics;
-import nativekit.ui.widgets.TextField;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.text.TextArea;
+import nativekit.ui.widgets.text.TextEditorDiagnostics;
+import nativekit.ui.widgets.text.TextField;
 
 /** Interactive text editing, multilingual shaping, selection and IME diagnostics. */
 class TextPage {

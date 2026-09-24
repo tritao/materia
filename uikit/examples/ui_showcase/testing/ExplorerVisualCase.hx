@@ -1,5 +1,11 @@
 package testing;
 
+import nativekit.ui.widgets.overlays.Dialog;
+import nativekit.ui.widgets.overlays.Menu;
+import nativekit.ui.widgets.overlays.Popup;
+import nativekit.ui.widgets.text.Text;
+
+
 /** Stable numeric identities retained for the ShowcaseWeb screenshot ABI. */
 enum abstract ExplorerVisualCase(Int) from Int to Int {
 	var Overview = 0;

@@ -1,7 +1,11 @@
 package app;
 
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.widgets.controls.Select;
+
+
 import bimkit.BimDocument;
-import nativekit.ui.core.EditorDocument;
+import nativekit.ui.editing.EditorDocument;
 import cadkit.parametric.Definition;
 import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
@@ -11,13 +15,13 @@ import LayoutStyle;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.View;
-import nativekit.ui.widgets.Button;
-import nativekit.ui.widgets.Column;
+import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.PropertyInspector;
-import nativekit.ui.widgets.Row;
-import nativekit.ui.widgets.Text;
-import nativekit.ui.widgets.TreeView;
+import nativekit.ui.widgets.properties.PropertyInspector;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.collections.TreeView;
 
 /** Reusable editor surface combining spatial/type trees with the generic inspector. */
 class BimModelEditor implements View {
@@ -121,8 +125,8 @@ class BimModelEditor implements View {
 			showingTypes ? "BIM Type Properties" : "BIM Object Properties");
 	}
 
-	private function inspectorDescriptors():Array<nativekit.ui.core.PropertyDescriptor> {
-		var result:Array<nativekit.ui.core.PropertyDescriptor> = [];
+	private function inspectorDescriptors():Array<nativekit.ui.properties.PropertyDescriptor> {
+		var result:Array<nativekit.ui.properties.PropertyDescriptor> = [];
 		if (selectedDefinitionId != null) {
 			var definition = findDefinition(selectedDefinitionId);
 			if (definition != null)

@@ -26,24 +26,24 @@ import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.AccessibilitySnapshotNode;
 import nativekit.ui.semantics.AccessibilityState;
 import nativekit.ui.semantics.Semantics;
-import nativekit.ui.widgets.Button;
-import nativekit.ui.widgets.ComboBox;
-import nativekit.ui.widgets.Column;
-import nativekit.ui.widgets.Dialog;
+import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.ComboBox;
+import nativekit.ui.widgets.layout.Column;
+import nativekit.ui.widgets.overlays.Dialog;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Menu;
-import nativekit.ui.widgets.MenuItem;
-import nativekit.ui.widgets.ProgressBar;
-import nativekit.ui.widgets.Select;
-import nativekit.ui.widgets.SelectOption;
-import nativekit.ui.widgets.Stack;
-import nativekit.ui.widgets.StackChild;
-import nativekit.ui.widgets.TabItem;
-import nativekit.ui.widgets.Tabs;
-import nativekit.ui.widgets.Text;
-import nativekit.ui.widgets.Toggle;
-import nativekit.ui.widgets.Utf8Text;
-import nativekit.ui.widgets.VirtualList;
+import nativekit.ui.widgets.overlays.Menu;
+import nativekit.ui.widgets.overlays.MenuItem;
+import nativekit.ui.widgets.controls.ProgressBar;
+import nativekit.ui.widgets.controls.Select;
+import nativekit.ui.widgets.controls.SelectOption;
+import nativekit.ui.widgets.layout.Stack;
+import nativekit.ui.widgets.layout.StackChild;
+import nativekit.ui.widgets.controls.TabItem;
+import nativekit.ui.widgets.controls.Tabs;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.controls.Toggle;
+import nativekit.ui.widgets.text.Utf8Text;
+import nativekit.ui.widgets.collections.VirtualList;
 
 /** Headless deterministic contract checks for the Haxe accessibility layer. */
 class AccessibilityContract {
@@ -252,7 +252,7 @@ class AccessibilityContract {
 		var listStyle = new LayoutStyle();
 		listStyle.width = LayoutAxis.fixed(256.0);
 		listStyle.height = LayoutAxis.fixed(320.0);
-		var controller = new nativekit.ui.widgets.ScrollController();
+		var controller = new nativekit.ui.widgets.scroll.ScrollController();
 		var logicalRows = new VirtualList("accessibility-large-list", 10000, 20.0,
 			function(index) return new Text('Row $index'), listStyle, null, controller, 320.0);
 		context.submit(logicalRows, new LayoutFrame(256.0, 320.0));

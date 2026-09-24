@@ -1,6 +1,6 @@
 package nativekit.ui.semantics;
 
-import nativekit.ui.widgets.Utf8Text;
+import nativekit.ui.widgets.text.Utf8Text;
 
 /** Haxe-owned accessible name, value, role, state, and supported actions. */
 class Semantics {

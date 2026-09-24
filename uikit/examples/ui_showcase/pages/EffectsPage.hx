@@ -19,9 +19,9 @@ import nativekit.ui.style.SaturateEffect;
 import nativekit.ui.style.StyleSelector;
 import nativekit.ui.style.StyleValue;
 import nativekit.ui.widgets.CanvasView;
-import nativekit.ui.widgets.Column;
+import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Row;
+import nativekit.ui.widgets.layout.Row;
 
 /** Showcase for post-layout effects and their stylesheet-facing contracts. */
 class EffectsPage {

@@ -1,10 +1,13 @@
 package nativekit.ui.core;
 
+import nativekit.ui.widgets.text.Text;
+
+
 import nativekit.ffi.NativeKitTypes.Result;
 import NativeKitSurface;
 import NativeKitTextInput;
 import Rect;
-import nativekit.ui.widgets.TextInputWindow;
+import nativekit.ui.widgets.text.TextInputWindow;
 
 /** Synchronizes Haxe editor state with NativeKit's custom-surface IME API. */
 class TextInputBridge {

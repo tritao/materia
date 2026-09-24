@@ -13,7 +13,7 @@ import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.WidgetId;
 import nativekit.ui.debug.UiNodeSnapshot;
 import nativekit.ui.widgets.CanvasView;
-import nativekit.ui.widgets.StackChild;
+import nativekit.ui.widgets.layout.StackChild;
 
 /** Pointer selection, focus tracking, and clipped render-node highlighting. */
 class InspectionOverlay {

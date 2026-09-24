@@ -1,5 +1,9 @@
 package app;
 
+import nativekit.ui.widgets.controls.Select;
+import nativekit.ui.widgets.text.Text;
+
+
 import nativekit.scene.Scene;
 import nativekit.scene.SceneSnapshot;
 import nativekit.scene.SpatialIndex;
@@ -13,13 +17,13 @@ import nativekit.scene.Transaction;
 import nativekit.scene.SceneView;
 import nativekit.scene.SelectionSet;
 import nativekit.scene.Transform;
-import nativekit.ui.core.EditorDocument;
-import nativekit.ui.core.EditOperation;
+import nativekit.ui.editing.EditorDocument;
+import nativekit.ui.editing.EditOperation;
 import nativekit.ui.core.CommandContext;
-import nativekit.ui.core.PropertyDescriptor;
-import nativekit.ui.core.PropertyDescriptorOptions;
-import nativekit.ui.core.PropertyType;
-import nativekit.ui.core.PropertyValue;
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.properties.PropertyDescriptorOptions;
+import nativekit.ui.properties.PropertyType;
+import nativekit.ui.properties.PropertyValue;
 import nativekit.scene.PickResult;
 import CadKit;
 import cadkit.Shape;

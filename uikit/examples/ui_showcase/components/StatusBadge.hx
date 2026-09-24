@@ -2,7 +2,7 @@ package components;
 
 import Color;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Text;
+import nativekit.ui.widgets.text.Text;
 
 /** Colored status line used for visible-range and live demo feedback. */
 class StatusBadge {

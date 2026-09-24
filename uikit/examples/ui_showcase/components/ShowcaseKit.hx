@@ -10,16 +10,16 @@ import nativekit.ui.core.View;
 import nativekit.ui.theme.Theme;
 import nativekit.ui.theme.ThemeTokens;
 import nativekit.ui.theme.TextRole;
-import nativekit.ui.widgets.Button;
-import nativekit.ui.widgets.Column;
+import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Padding;
-import nativekit.ui.widgets.Slider;
-import nativekit.ui.widgets.Stack;
-import nativekit.ui.widgets.StackChild;
-import nativekit.ui.widgets.Text;
-import nativekit.ui.widgets.TextArea;
-import nativekit.ui.widgets.TextField;
+import nativekit.ui.widgets.layout.Padding;
+import nativekit.ui.widgets.controls.Slider;
+import nativekit.ui.widgets.layout.Stack;
+import nativekit.ui.widgets.layout.StackChild;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.text.TextArea;
+import nativekit.ui.widgets.text.TextField;
 
 /** Showcase-only styling and small compositions built from framework widgets. */
 @:allow(UiExplorer)

@@ -4,8 +4,8 @@ import sys.io.File;
 import sys.io.AtomicFile;
 import haxe.io.Path as FilePath;
 import app.ScriptOwnership.ScriptMaterialization;
-import nativekit.ui.core.EditorDocument;
-import nativekit.ui.core.EditHistory;
+import nativekit.ui.editing.EditorDocument;
+import nativekit.ui.editing.EditHistory;
 import bimkit.BimDocument;
 
 /** Owns the current document; unsuccessful I/O leaves it and its history intact. */

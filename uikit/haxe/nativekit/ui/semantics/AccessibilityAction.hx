@@ -1,5 +1,9 @@
 package nativekit.ui.semantics;
 
+import nativekit.ui.widgets.controls.Select;
+import nativekit.ui.widgets.controls.Toggle;
+
+
 /** Action capability bits shared with NativeKit's accessibility backend. */
 class AccessibilityAction {
 	public static inline var Activate = 1;

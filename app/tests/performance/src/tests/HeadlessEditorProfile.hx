@@ -11,7 +11,7 @@ import nativekit.scene.SpatialIndex;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import nativekit.ui.core.RenderNode;
-import nativekit.ui.core.EditOperation;
+import nativekit.ui.editing.EditOperation;
 import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiModifier;

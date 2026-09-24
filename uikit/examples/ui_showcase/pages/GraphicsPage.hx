@@ -1,5 +1,8 @@
 package pages;
 
+import nativekit.ui.widgets.text.Text;
+
+
 import UiExplorer;
 import Color;
 import Insets;
@@ -16,14 +19,14 @@ import Transform2D;
 import nativekit.ui.core.View;
 import nativekit.ui.core.CachePolicy;
 import nativekit.ui.widgets.CanvasView;
-import nativekit.ui.widgets.Column;
+import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.KeyedView;
 import nativekit.ui.widgets.ImageFit;
 import nativekit.ui.widgets.ImageView;
 import nativekit.ui.widgets.LayeredImageView;
 import nativekit.ui.widgets.LayeredImageView.ImageLayer;
 import nativekit.ui.widgets.NineSliceView;
-import nativekit.ui.widgets.Row;
+import nativekit.ui.widgets.layout.Row;
 import RendererStats;
 import components.CubeView;
 

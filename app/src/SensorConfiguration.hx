@@ -1,13 +1,16 @@
 package app;
 
+import nativekit.ui.widgets.text.Text;
+
+
 import nativekit.ui.core.CommandContext;
-import nativekit.ui.core.EditorDocument;
-import nativekit.ui.core.EditOperation;
-import nativekit.ui.core.PropertyDescriptor;
-import nativekit.ui.core.PropertyDescriptorOptions;
-import nativekit.ui.core.PropertyOption;
-import nativekit.ui.core.PropertyType;
-import nativekit.ui.core.PropertyValue;
+import nativekit.ui.editing.EditorDocument;
+import nativekit.ui.editing.EditOperation;
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.properties.PropertyDescriptorOptions;
+import nativekit.ui.properties.PropertyOption;
+import nativekit.ui.properties.PropertyType;
+import nativekit.ui.properties.PropertyValue;
 import robotkit.model.Frame;
 import robotkit.model.CollisionApproximation;
 import robotkit.model.Actuator;

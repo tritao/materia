@@ -8,14 +8,14 @@ import shell.CatalogSidebar;
 import shell.TopBar;
 import nativekit.ui.core.TextStyleOverride;
 import nativekit.ui.core.View;
-import nativekit.ui.widgets.AppShell;
-import nativekit.ui.widgets.Column;
-import nativekit.ui.widgets.DefaultTextStyle;
-import nativekit.ui.widgets.SplitSide;
-import nativekit.ui.widgets.SplitView;
-import nativekit.ui.widgets.SplitViewOptions;
-import nativekit.ui.widgets.ScrollAxis;
-import nativekit.ui.widgets.ScrollView;
+import nativekit.ui.widgets.layout.AppShell;
+import nativekit.ui.widgets.layout.Column;
+import nativekit.ui.widgets.text.DefaultTextStyle;
+import nativekit.ui.widgets.layout.SplitSide;
+import nativekit.ui.widgets.layout.SplitView;
+import nativekit.ui.widgets.layout.SplitViewOptions;
+import nativekit.ui.widgets.scroll.ScrollAxis;
+import nativekit.ui.widgets.scroll.ScrollView;
 
 /** Persistent resizable catalog/content/inspector shell around Explorer pages. */
 class ExplorerShell {

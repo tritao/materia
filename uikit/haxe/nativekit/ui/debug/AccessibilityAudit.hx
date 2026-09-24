@@ -1,11 +1,26 @@
 package nativekit.ui.debug;
 
+import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.Checkbox;
+import nativekit.ui.widgets.controls.ComboBox;
+import nativekit.ui.widgets.controls.ProgressBar;
+import nativekit.ui.widgets.controls.Radio;
+import nativekit.ui.widgets.controls.Select;
+import nativekit.ui.widgets.controls.Slider;
+import nativekit.ui.widgets.controls.Tabs;
+import nativekit.ui.widgets.controls.Toggle;
+import nativekit.ui.widgets.overlays.Dialog;
+import nativekit.ui.widgets.overlays.MenuItem;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.text.TextField;
+
+
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.semantics.AccessibilityAction;
 import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.AccessibilityState;
 import nativekit.ui.semantics.Semantics;
-import nativekit.ui.widgets.Utf8Text;
+import nativekit.ui.widgets.text.Utf8Text;
 
 /** Small deterministic audit for common accessibility mistakes in resolved trees. */
 class AccessibilityAudit {

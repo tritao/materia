@@ -1,5 +1,9 @@
 package pages;
 
+import nativekit.ui.widgets.layout.Padding;
+import nativekit.ui.widgets.layout.Stack;
+
+
 import LayoutAlignmentX;
 import LayoutAlignmentY;
 import LayoutAxis;
@@ -9,10 +13,10 @@ import LayoutStyle;
 import LayoutWrapMode;
 import UiExplorer;
 import nativekit.ui.core.View;
-import nativekit.ui.widgets.Align;
-import nativekit.ui.widgets.Column;
+import nativekit.ui.widgets.layout.Align;
+import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Row;
+import nativekit.ui.widgets.layout.Row;
 
 /** Demonstrations of the framework's compositional layout widgets. */
 class LayoutPage {

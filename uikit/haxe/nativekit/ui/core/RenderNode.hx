@@ -1,5 +1,8 @@
 package nativekit.ui.core;
 
+import nativekit.ui.widgets.text.Text;
+
+
 import nativekit.ffi.NativeKitTypes.WindowDecorationRegionKind;
 import LayoutNode;
 import LayoutStyle;

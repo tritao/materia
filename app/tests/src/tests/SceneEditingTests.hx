@@ -1,11 +1,14 @@
 package tests;
 
+import nativekit.ui.widgets.text.Text;
+
+
 import app.EditorScene;
 import app.EditorSceneTree;
 import app.EditorSceneViewport;
-import nativekit.ui.core.PropertyBinding;
-import nativekit.ui.core.PropertyValue;
-import nativekit.ui.core.PropertyEditResult;
+import nativekit.ui.properties.PropertyBinding;
+import nativekit.ui.properties.PropertyValue;
+import nativekit.ui.properties.PropertyEditResult;
 import nativekit.ui.core.ViewportCamera;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;

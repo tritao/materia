@@ -46,31 +46,34 @@ import nativekit.ui.core.CommandContext;
 import nativekit.ui.core.CommandParameters;
 import nativekit.ui.core.CommandRegistry;
 import nativekit.ui.core.CommandResult;
-import nativekit.ui.core.DockDropZone;
-import nativekit.ui.core.DockDropTarget;
-import nativekit.ui.core.DockNode;
-import nativekit.ui.core.DockPanelDescriptor;
-import nativekit.ui.core.DockSplitAxis;
-import nativekit.ui.core.DockWorkspacePersistence;
-import nativekit.ui.core.DockWorkspaceModel;
-import nativekit.ui.core.DockWorkspaceInteraction;
-import nativekit.ui.core.EditorDocument;
-import nativekit.ui.core.EditHistory;
-import nativekit.ui.core.EditOperation;
-import nativekit.ui.core.PropertyDescriptor;
-import nativekit.ui.core.PropertyDescriptorOptions;
-import nativekit.ui.core.PropertyBinding;
-import nativekit.ui.core.PropertyEditResult;
-import nativekit.ui.core.PropertyEditorExtension;
-import nativekit.ui.core.PropertyEditorRegistry;
-import nativekit.ui.core.PropertyInspectorSection;
-import nativekit.ui.core.PropertyOption;
-import nativekit.ui.core.PropertyType;
-import nativekit.ui.core.PropertyValue;
-import nativekit.ui.core.PropertyValueTools;
-import nativekit.ui.core.PlotModel;
-import nativekit.ui.core.PlotPoint;
-import nativekit.ui.core.PlotSeries;
+import nativekit.ui.docking.DockDropZone;
+import nativekit.ui.widgets.docking.DockDropTarget;
+import nativekit.ui.docking.DockNode;
+import nativekit.ui.docking.DockPanelDescriptor;
+import nativekit.ui.docking.DockWorkspaceStorage;
+import nativekit.ui.docking.DockWorkspaceCommands;
+import nativekit.ui.widgets.docking.DockPanelContent;
+import nativekit.ui.docking.DockSplitAxis;
+import nativekit.ui.docking.DockWorkspacePersistence;
+import nativekit.ui.docking.DockWorkspaceModel;
+import nativekit.ui.widgets.docking.DockWorkspaceInteraction;
+import nativekit.ui.editing.EditorDocument;
+import nativekit.ui.editing.EditHistory;
+import nativekit.ui.editing.EditOperation;
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.properties.PropertyDescriptorOptions;
+import nativekit.ui.properties.PropertyBinding;
+import nativekit.ui.properties.PropertyEditResult;
+import nativekit.ui.properties.PropertyEditorExtension;
+import nativekit.ui.properties.PropertyEditorRegistry;
+import nativekit.ui.properties.PropertyInspectorSection;
+import nativekit.ui.properties.PropertyOption;
+import nativekit.ui.properties.PropertyType;
+import nativekit.ui.properties.PropertyValue;
+import nativekit.ui.properties.PropertyValueTools;
+import nativekit.ui.plotting.PlotModel;
+import nativekit.ui.plotting.PlotPoint;
+import nativekit.ui.plotting.PlotSeries;
 import nativekit.ui.core.ViewportCamera;
 import nativekit.ui.core.ViewportContent;
 import nativekit.ui.core.EventDispatcher;
@@ -95,77 +98,77 @@ import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.AccessibilityState;
 import nativekit.ui.semantics.AccessibilityRequest;
 import nativekit.ui.semantics.Semantics;
-import nativekit.ui.widgets.Button;
-import nativekit.ui.widgets.ButtonVariant;
-import nativekit.ui.widgets.CommandButton;
-import nativekit.ui.widgets.CommandMenu;
-import nativekit.ui.widgets.CommandPalette;
-import nativekit.ui.widgets.Column;
-import nativekit.ui.widgets.Align;
-import nativekit.ui.widgets.AppShell;
+import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.ButtonVariant;
+import nativekit.ui.widgets.commands.CommandButton;
+import nativekit.ui.widgets.commands.CommandMenu;
+import nativekit.ui.widgets.commands.CommandPalette;
+import nativekit.ui.widgets.layout.Column;
+import nativekit.ui.widgets.layout.Align;
+import nativekit.ui.widgets.layout.AppShell;
 import nativekit.ui.widgets.CanvasView;
 import nativekit.ui.widgets.Shape;
-import nativekit.ui.widgets.Checkbox;
+import nativekit.ui.widgets.controls.Checkbox;
 import nativekit.ui.widgets.ImageView;
 import nativekit.ui.widgets.LayeredImageView;
 import nativekit.ui.widgets.LayeredImageView.ImageLayer;
 import nativekit.ui.widgets.NineSliceView;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.ListView;
-import nativekit.ui.widgets.ListViewModel;
-import nativekit.ui.widgets.Padding;
-import nativekit.ui.widgets.ProgressBar;
-import nativekit.ui.widgets.PropertyEditor;
-import nativekit.ui.widgets.PropertyInspector;
+import nativekit.ui.widgets.collections.ListView;
+import nativekit.ui.widgets.collections.ListViewModel;
+import nativekit.ui.widgets.layout.Padding;
+import nativekit.ui.widgets.controls.ProgressBar;
+import nativekit.ui.widgets.properties.PropertyEditor;
+import nativekit.ui.widgets.properties.PropertyInspector;
 import nativekit.ui.widgets.GpuViewport;
-import nativekit.ui.widgets.PlotView;
-import nativekit.ui.widgets.Dialog;
-import nativekit.ui.widgets.DockWorkspace;
-import nativekit.ui.widgets.DefaultTextStyle;
-import nativekit.ui.widgets.Menu;
-import nativekit.ui.widgets.MenuItem;
-import nativekit.ui.widgets.Popup;
-import nativekit.ui.widgets.Row;
-import nativekit.ui.widgets.ScrollAxis;
-import nativekit.ui.widgets.ScrollController;
-import nativekit.ui.widgets.ScrollView;
-import nativekit.ui.widgets.SearchField;
-import nativekit.ui.widgets.SizedBox;
-import nativekit.ui.widgets.Text;
+import nativekit.ui.widgets.plotting.PlotView;
+import nativekit.ui.widgets.overlays.Dialog;
+import nativekit.ui.widgets.docking.DockWorkspace;
+import nativekit.ui.widgets.text.DefaultTextStyle;
+import nativekit.ui.widgets.overlays.Menu;
+import nativekit.ui.widgets.overlays.MenuItem;
+import nativekit.ui.widgets.overlays.Popup;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.scroll.ScrollAxis;
+import nativekit.ui.widgets.scroll.ScrollController;
+import nativekit.ui.widgets.scroll.ScrollView;
+import nativekit.ui.widgets.controls.SearchField;
+import nativekit.ui.widgets.layout.SizedBox;
+import nativekit.ui.widgets.text.Text;
 import nativekit.ui.core.TextStyleOverride;
-import nativekit.ui.widgets.TextEditorState;
-import nativekit.ui.widgets.TextEditorHistoryKind;
-import nativekit.ui.widgets.TextEditorDiagnostics;
-import nativekit.ui.widgets.TextArea;
-import nativekit.ui.widgets.TextField;
-import nativekit.ui.widgets.EditTransaction;
+import nativekit.ui.widgets.text.TextEditorState;
+import nativekit.ui.widgets.text.TextEditorHistoryKind;
+import nativekit.ui.widgets.text.TextEditorDiagnostics;
+import nativekit.ui.widgets.text.TextArea;
+import nativekit.ui.widgets.text.TextField;
+import nativekit.ui.widgets.text.EditTransaction;
 import nativekit.editorkit.TextDocument;
-import nativekit.ui.widgets.Spacer;
-import nativekit.ui.widgets.Slider;
-import nativekit.ui.widgets.Stack;
-import nativekit.ui.widgets.StackChild;
-import nativekit.ui.widgets.Spinner;
-import nativekit.ui.widgets.SpinnerPainter;
-import nativekit.ui.widgets.SpinnerKind;
-import nativekit.ui.widgets.SplitOrientation;
-import nativekit.ui.widgets.SplitSide;
-import nativekit.ui.widgets.SplitView;
-import nativekit.ui.widgets.SplitViewOptions;
-import nativekit.ui.widgets.TableColumn;
-import nativekit.ui.widgets.TableView;
-import nativekit.ui.widgets.Toggle;
-import nativekit.ui.widgets.Tooltip;
-import nativekit.ui.widgets.Toolbar;
-import nativekit.ui.widgets.TreeView;
-import nativekit.ui.widgets.TreeViewModel;
-import nativekit.ui.widgets.TreeRootMetadata;
-import nativekit.ui.widgets.Utf8Text;
-import nativekit.ui.widgets.VirtualGrid;
-import nativekit.ui.widgets.VirtualList;
-import nativekit.ui.widgets.VirtualExtentViewport;
-import nativekit.ui.widgets.VirtualExtentIndex;
-import nativekit.ui.widgets.VirtualizationPolicy;
-import nativekit.ui.widgets.VirtualViewport;
+import nativekit.ui.widgets.layout.Spacer;
+import nativekit.ui.widgets.controls.Slider;
+import nativekit.ui.widgets.layout.Stack;
+import nativekit.ui.widgets.layout.StackChild;
+import nativekit.ui.widgets.controls.Spinner;
+import nativekit.ui.widgets.controls.SpinnerPainter;
+import nativekit.ui.widgets.controls.SpinnerKind;
+import nativekit.ui.widgets.layout.SplitOrientation;
+import nativekit.ui.widgets.layout.SplitSide;
+import nativekit.ui.widgets.layout.SplitView;
+import nativekit.ui.widgets.layout.SplitViewOptions;
+import nativekit.ui.widgets.collections.TableColumn;
+import nativekit.ui.widgets.collections.TableView;
+import nativekit.ui.widgets.controls.Toggle;
+import nativekit.ui.widgets.overlays.Tooltip;
+import nativekit.ui.widgets.controls.Toolbar;
+import nativekit.ui.widgets.collections.TreeView;
+import nativekit.ui.widgets.collections.TreeViewModel;
+import nativekit.ui.widgets.collections.TreeRootMetadata;
+import nativekit.ui.widgets.text.Utf8Text;
+import nativekit.ui.widgets.collections.VirtualGrid;
+import nativekit.ui.widgets.collections.VirtualList;
+import nativekit.ui.widgets.collections.VirtualExtentViewport;
+import nativekit.ui.widgets.collections.VirtualExtentIndex;
+import nativekit.ui.widgets.collections.VirtualizationPolicy;
+import nativekit.ui.widgets.collections.VirtualViewport;
 import nativekit.ui.widgets.WindowChrome;
 import nativekit.ui.theme.Theme;
 import nativekit.ui.theme.ThemeTokens;
@@ -214,10 +217,10 @@ import nativekit.ui.gestures.DoubleTapRecognizer;
 import nativekit.ui.gestures.LongPressRecognizer;
 import nativekit.ui.gestures.DragRecognizer;
 import nativekit.ui.widgets.GestureDetector;
-import nativekit.ui.widgets.RadioGroup;
-import nativekit.ui.widgets.RadioOption;
-import nativekit.ui.widgets.Tabs;
-import nativekit.ui.widgets.TabItem;
+import nativekit.ui.widgets.controls.RadioGroup;
+import nativekit.ui.widgets.controls.RadioOption;
+import nativekit.ui.widgets.controls.Tabs;
+import nativekit.ui.widgets.controls.TabItem;
 import nativekit.ui.animation.AnimationController;
 import nativekit.ui.animation.AnimationScheduler;
 import nativekit.ui.animation.SpringController;
@@ -893,7 +896,7 @@ class FrameworkSmoke {
 			return 61;
 		var indeterminateProgress = new ProgressBar("indeterminate-progress-smoke", 0.0,
 			0.0, 1.0, "Loading");
-		indeterminateProgress.mode = nativekit.ui.widgets.ProgressMode.Indeterminate;
+		indeterminateProgress.mode = nativekit.ui.widgets.controls.ProgressMode.Indeterminate;
 		var indeterminateRoot = context.submit(indeterminateProgress,
 			new LayoutFrame(256.0, 192.0));
 		var indeterminateSemantics:Semantics = cast indeterminateRoot.semantics;
@@ -3892,30 +3895,34 @@ class FrameworkSmoke {
 		var inspectorBuilds = 0;
 		var consoleBuilds = 0;
 		var model = new DockWorkspaceModel();
-		model.register(new DockPanelDescriptor("hierarchy", "Hierarchy", function(_) {
-			hierarchyBuilds++;
-			return new Text("Hierarchy");
-		}, false));
-		model.register(new DockPanelDescriptor("viewport", "Viewport", function(_) {
-			viewportBuilds++;
-			return new Text("Viewport");
-		}));
-		model.register(new DockPanelDescriptor("inspector", "Inspector", function(_) {
-			inspectorBuilds++;
-			return new Text("Inspector");
-		}));
-		model.register(new DockPanelDescriptor("console", "Console", function(_) {
-			consoleBuilds++;
-			return new Text("Console");
-		}));
+		model.register(new DockPanelDescriptor("hierarchy", "Hierarchy", false));
+		model.register(new DockPanelDescriptor("viewport", "Viewport"));
+		model.register(new DockPanelDescriptor("inspector", "Inspector"));
+		model.register(new DockPanelDescriptor("console", "Console"));
+		var panelContents = [
+			new DockPanelContent("hierarchy", function(_) {
+				hierarchyBuilds++;
+				return new Text("Hierarchy");
+			}),
+			new DockPanelContent("viewport", function(_) {
+				viewportBuilds++;
+				return new Text("Viewport");
+			}),
+			new DockPanelContent("inspector", function(_) {
+				inspectorBuilds++;
+				return new Text("Inspector");
+			}),
+			new DockPanelContent("console", function(_) {
+				consoleBuilds++;
+				return new Text("Console");
+			})
+		];
 		var defaultLayout = DockNode.Split(DockSplitAxis.Horizontal, 0.3,
 			DockNode.Panel("hierarchy"), DockNode.Tabs(["viewport", "inspector"], "viewport"));
 		model.setDefaultLayout(defaultLayout);
 		var reorder = new DockWorkspaceModel();
 		for (panelId in ["a", "b", "c"])
-			reorder.register(new DockPanelDescriptor(panelId, panelId, function(_) {
-				return new Text(panelId);
-			}, false));
+			reorder.register(new DockPanelDescriptor(panelId, panelId, false));
 		reorder.setDefaultLayout(DockNode.Tabs(["a", "b", "c"], "a"));
 		if (!reorder.dock("a", "c", DockDropZone.TabAfter))
 			return false;
@@ -3928,9 +3935,7 @@ class FrameworkSmoke {
 		}
 		var singletonDock = new DockWorkspaceModel();
 		for (panelId in ["single-source", "single-target"])
-			singletonDock.register(new DockPanelDescriptor(panelId, panelId, function(_) {
-				return new Text(panelId);
-			}));
+			singletonDock.register(new DockPanelDescriptor(panelId, panelId));
 		singletonDock.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.5,
 			DockNode.Panel("single-source"), DockNode.Panel("single-target")));
 		var singletonWorkspace = new DockWorkspace("singleton-dock-workspace", singletonDock);
@@ -4100,7 +4105,7 @@ class FrameworkSmoke {
 		uiContext.setPointerCaptureHandler(null);
 		var changes = 0;
 		model.listen(function() changes++);
-		var workspace = new DockWorkspace("editor-workspace", model);
+		var workspace = new DockWorkspace("editor-workspace", model, panelContents);
 		var workspaceRoot = uiContext.submit(workspace, new LayoutFrame(640.0, 480.0));
 		if (workspaceRoot == null || hierarchyBuilds != 1 || viewportBuilds != 1 ||
 			inspectorBuilds != 0 || consoleBuilds != 0 || model.activePanelId != "hierarchy")
@@ -4151,16 +4156,12 @@ class FrameworkSmoke {
 		if (snapshotJson == null || snapshotJson.length == 0 || !model.restoreJson(snapshotJson))
 			return false;
 		var storage = new SmokeDockStorage();
-		model.saveTo(storage, "editor");
-		if (!model.restoreFrom(storage, "editor") || model.restoreFrom(storage, "missing"))
+		DockWorkspaceStorage.save(model, storage, "editor");
+		if (!DockWorkspaceStorage.restore(model, storage, "editor") || DockWorkspaceStorage.restore(model, storage, "missing"))
 			return false;
 		var persisted = new DockWorkspaceModel();
-		persisted.register(new DockPanelDescriptor("known", "Known", function(_) {
-			return new Text("Known");
-		}, false));
-		persisted.register(new DockPanelDescriptor("removed", "Removed", function(_) {
-			return new Text("Removed");
-		}));
+		persisted.register(new DockPanelDescriptor("known", "Known", false));
+		persisted.register(new DockPanelDescriptor("removed", "Removed"));
 		persisted.setDefaultLayout(DockNode.Tabs(["known", "removed"], "removed"));
 		var persistedJson = persisted.snapshotJson();
 		persisted.unregister("removed");
@@ -4168,12 +4169,10 @@ class FrameworkSmoke {
 			!persisted.isOpen("known") || persisted.activePanelId != "known")
 			return false;
 		var fallback = new DockWorkspaceModel();
-		fallback.register(new DockPanelDescriptor("fallback", "Fallback", function(_) {
-			return new Text("Fallback");
-		}, false));
+		fallback.register(new DockPanelDescriptor("fallback", "Fallback", false));
 		fallback.setDefaultLayout(DockNode.Panel("fallback"));
 		storage.save("broken", "not-json");
-		if (fallback.restoreFromOrDefault(storage, "broken") || !fallback.isOpen("fallback") ||
+		if (DockWorkspaceStorage.restoreOrDefault(fallback, storage, "broken") || !fallback.isOpen("fallback") ||
 			fallback.activePanelId != "fallback")
 			return false;
 		workspaceRoot = uiContext.submit(workspace, new LayoutFrame(640.0, 480.0));
@@ -4209,7 +4208,7 @@ class FrameworkSmoke {
 			!model.isOpen("inspector"))
 			return false;
 		var commandRegistry = new CommandRegistry();
-		model.installCommands(commandRegistry, "workspace");
+		DockWorkspaceCommands.install(model, commandRegistry, "workspace");
 		var parameters = new CommandParameters();
 		parameters.setString("panel", "console");
 		var commandContext = new CommandContext(null, [], null, parameters, "dock-smoke");
@@ -4224,7 +4223,7 @@ class FrameworkSmoke {
 			return false;
 		var retainedInteraction:Null<DockWorkspaceInteraction> = null;
 		for (index in 0...20) {
-			var rebuilt = new DockWorkspace("editor-workspace", model);
+			var rebuilt = new DockWorkspace("editor-workspace", model, panelContents);
 			uiContext.submit(rebuilt, new LayoutFrame(640.0, 480.0));
 			if (index == 0) retainedInteraction = rebuilt.interaction;
 			else if (rebuilt.interaction != retainedInteraction)

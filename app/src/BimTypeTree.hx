@@ -7,9 +7,9 @@ import cadkit.parametric.Element;
 import cadkit.parametric.InstanceElement;
 import cadkit.parametric.TypedProperty;
 import nativekit.ui.core.View;
-import nativekit.ui.widgets.Text;
-import nativekit.ui.widgets.TreeRootMetadata;
-import nativekit.ui.widgets.TreeViewModel;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.collections.TreeRootMetadata;
+import nativekit.ui.widgets.collections.TreeViewModel;
 
 /** Type-centric tree projection from reusable definitions to their instances. */
 class BimTypeTree implements TreeViewModel {

@@ -1,5 +1,8 @@
 package nativekit.ui.debug;
 
+import nativekit.ui.widgets.text.Text;
+
+
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.WidgetId;
 import nativekit.ui.semantics.Semantics;

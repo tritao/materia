@@ -1,11 +1,14 @@
 package pages;
 
+import nativekit.ui.widgets.layout.Stack;
+
+
 import UiExplorer;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Row;
-import nativekit.ui.widgets.TabItem;
-import nativekit.ui.widgets.Tabs;
-import nativekit.ui.widgets.Tooltip;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.controls.TabItem;
+import nativekit.ui.widgets.controls.Tabs;
+import nativekit.ui.widgets.overlays.Tooltip;
 
 /** Tabs and transient overlay demonstrations. */
 class OverlaysPage {

@@ -1,15 +1,18 @@
 package app;
 
+import nativekit.ui.widgets.text.Text;
+
+
 import cadkit.parametric.Definition;
 import cadkit.parametric.Element;
 import cadkit.parametric.DefinitionInput;
 import cadkit.parametric.QuantityKind;
 import cadkit.parametric.TypedProperty;
 import cadkit.parametric.UnitConversion;
-import nativekit.ui.core.PropertyDescriptor;
-import nativekit.ui.core.PropertyDescriptorOptions;
-import nativekit.ui.core.PropertyType;
-import nativekit.ui.core.PropertyValue;
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.properties.PropertyDescriptorOptions;
+import nativekit.ui.properties.PropertyType;
+import nativekit.ui.properties.PropertyValue;
 
 /** Adapts persistent CadKit values into the shared typed property inspector. */
 class BimInspectorDescriptors {

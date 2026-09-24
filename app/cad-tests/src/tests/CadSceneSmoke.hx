@@ -9,10 +9,10 @@ import app.SceneCodec;
 import cadkit.Shape;
 import nativekit.scene.Scene;
 import nativekit.ui.core.CommandContext;
-import nativekit.ui.core.PropertyBinding;
-import nativekit.ui.core.PropertyDescriptor;
-import nativekit.ui.core.PropertyEditResult;
-import nativekit.ui.core.PropertyValue;
+import nativekit.ui.properties.PropertyBinding;
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.properties.PropertyEditResult;
+import nativekit.ui.properties.PropertyValue;
 
 class CadSceneSmoke {
   static function main():Int {

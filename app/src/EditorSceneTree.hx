@@ -1,9 +1,9 @@
 package app;
 
 import nativekit.ui.core.View;
-import nativekit.ui.widgets.Text;
-import nativekit.ui.widgets.TreeRootMetadata;
-import nativekit.ui.widgets.TreeViewModel;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.collections.TreeRootMetadata;
+import nativekit.ui.widgets.collections.TreeViewModel;
 
 class EditorSceneTree implements TreeViewModel {
   final scene:EditorScene;

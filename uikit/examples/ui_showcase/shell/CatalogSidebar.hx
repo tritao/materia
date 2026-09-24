@@ -7,13 +7,13 @@ import UiExplorer;
 import ExplorerCatalog;
 import ExplorerPage;
 import components.SectionHeader;
-import nativekit.ui.widgets.Button;
-import nativekit.ui.widgets.ButtonVariant;
-import nativekit.ui.widgets.Column;
+import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.ButtonVariant;
+import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.ScrollAxis;
-import nativekit.ui.widgets.ScrollView;
-import nativekit.ui.widgets.SearchField;
+import nativekit.ui.widgets.scroll.ScrollAxis;
+import nativekit.ui.widgets.scroll.ScrollView;
+import nativekit.ui.widgets.controls.SearchField;
 
 /** Search and navigation surface for the Explorer's page catalog. */
 class CatalogSidebar {

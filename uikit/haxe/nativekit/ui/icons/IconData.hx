@@ -12,6 +12,14 @@ class IconData {
 			case IconName.Sun: sun();
 			case IconName.Moon: moon();
 			case IconName.Inspect: inspect();
+			case IconName.Hierarchy: hierarchy();
+			case IconName.Building: building();
+			case IconName.Grid: grid();
+			case IconName.Cube: cube();
+			case IconName.Sliders: sliders();
+			case IconName.Radar: radar();
+			case IconName.Terminal: terminal();
+			case IconName.Activity: activity();
 			case IconName.ChevronDown: new PathBuilder().moveTo(6, 9).lineTo(12, 15).lineTo(18, 9).build();
 			case IconName.ChevronRight: new PathBuilder().moveTo(9, 6).lineTo(15, 12).lineTo(9, 18).build();
 			case IconName.Plus: new PathBuilder().moveTo(12, 5).lineTo(12, 19)
@@ -93,4 +101,60 @@ class IconData {
 			.moveTo(15.0, 21.0).lineTo(19.0, 21.0).lineTo(19.0, 17.0)
 			.moveTo(12.0, 8.0).lineTo(12.0, 16.0)
 			.moveTo(8.0, 12.0).lineTo(16.0, 12.0).build();
+
+	static function hierarchy():Path
+		return new PathBuilder()
+			.moveTo(12.0, 4.0).lineTo(12.0, 9.0).moveTo(5.0, 9.0).lineTo(19.0, 9.0)
+			.moveTo(5.0, 9.0).lineTo(5.0, 13.0).moveTo(12.0, 9.0).lineTo(12.0, 13.0)
+			.moveTo(19.0, 9.0).lineTo(19.0, 13.0)
+			.moveTo(2.0, 13.0).lineTo(8.0, 13.0).lineTo(8.0, 19.0).lineTo(2.0, 19.0).lineTo(2.0, 13.0)
+			.moveTo(9.0, 13.0).lineTo(15.0, 13.0).lineTo(15.0, 19.0).lineTo(9.0, 19.0).lineTo(9.0, 13.0)
+			.moveTo(16.0, 13.0).lineTo(22.0, 13.0).lineTo(22.0, 19.0).lineTo(16.0, 19.0).lineTo(16.0, 13.0).build();
+
+	static function building():Path
+		return new PathBuilder()
+			.moveTo(3.0, 21.0).lineTo(3.0, 8.0).lineTo(12.0, 3.0).lineTo(21.0, 8.0).lineTo(21.0, 21.0)
+			.moveTo(2.0, 21.0).lineTo(22.0, 21.0).moveTo(8.0, 21.0).lineTo(8.0, 12.0)
+			.lineTo(16.0, 12.0).lineTo(16.0, 21.0).moveTo(6.0, 9.0).lineTo(6.0, 10.0)
+			.moveTo(12.0, 7.0).lineTo(12.0, 9.0).moveTo(18.0, 9.0).lineTo(18.0, 10.0).build();
+
+	static function grid():Path
+		return new PathBuilder()
+			.moveTo(3.0, 3.0).lineTo(10.0, 3.0).lineTo(10.0, 10.0).lineTo(3.0, 10.0).lineTo(3.0, 3.0)
+			.moveTo(14.0, 3.0).lineTo(21.0, 3.0).lineTo(21.0, 10.0).lineTo(14.0, 10.0).lineTo(14.0, 3.0)
+			.moveTo(3.0, 14.0).lineTo(10.0, 14.0).lineTo(10.0, 21.0).lineTo(3.0, 21.0).lineTo(3.0, 14.0)
+			.moveTo(14.0, 14.0).lineTo(21.0, 14.0).lineTo(21.0, 21.0).lineTo(14.0, 21.0).lineTo(14.0, 14.0).build();
+
+	static function cube():Path
+		return new PathBuilder()
+			.moveTo(12.0, 3.0).lineTo(21.0, 8.0).lineTo(21.0, 17.0).lineTo(12.0, 22.0)
+			.lineTo(3.0, 17.0).lineTo(3.0, 8.0).lineTo(12.0, 3.0)
+			.moveTo(3.0, 8.0).lineTo(12.0, 13.0).lineTo(21.0, 8.0)
+			.moveTo(12.0, 13.0).lineTo(12.0, 22.0).moveTo(12.0, 3.0).lineTo(12.0, 13.0).build();
+
+	static function sliders():Path
+		return new PathBuilder()
+			.moveTo(4.0, 6.0).lineTo(20.0, 6.0).moveTo(4.0, 12.0).lineTo(20.0, 12.0)
+			.moveTo(4.0, 18.0).lineTo(20.0, 18.0).moveTo(9.0, 3.0).lineTo(9.0, 9.0)
+			.moveTo(15.0, 9.0).lineTo(15.0, 15.0).moveTo(7.0, 15.0).lineTo(7.0, 21.0).build();
+
+	static function radar():Path
+		return new PathBuilder()
+			.moveTo(12.0, 12.0).lineTo(19.0, 5.0).moveTo(12.0, 12.0).lineTo(21.0, 12.0)
+			.moveTo(12.0, 12.0).lineTo(12.0, 3.0)
+			.moveTo(5.64, 5.64).cubicTo(2.13, 9.15, 2.13, 14.85, 5.64, 18.36)
+			.moveTo(18.36, 5.64).cubicTo(21.87, 9.15, 21.87, 14.85, 18.36, 18.36)
+			.moveTo(8.46, 8.46).cubicTo(6.51, 10.41, 6.51, 13.59, 8.46, 15.54)
+			.moveTo(12.0, 12.0).lineTo(12.0, 12.1).build();
+
+	static function terminal():Path
+		return new PathBuilder()
+			.moveTo(3.0, 4.0).lineTo(21.0, 4.0).lineTo(21.0, 20.0).lineTo(3.0, 20.0).lineTo(3.0, 4.0)
+			.moveTo(7.0, 9.0).lineTo(10.0, 12.0).lineTo(7.0, 15.0)
+			.moveTo(12.0, 15.0).lineTo(17.0, 15.0).build();
+
+	static function activity():Path
+		return new PathBuilder()
+			.moveTo(3.0, 12.0).lineTo(7.0, 12.0).lineTo(10.0, 5.0).lineTo(14.0, 19.0)
+			.lineTo(17.0, 12.0).lineTo(21.0, 12.0).build();
 }

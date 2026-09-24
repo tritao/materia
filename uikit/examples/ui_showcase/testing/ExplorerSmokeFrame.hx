@@ -1,5 +1,12 @@
 package testing;
 
+import nativekit.ui.widgets.controls.Select;
+import nativekit.ui.widgets.overlays.Dialog;
+import nativekit.ui.widgets.overlays.Menu;
+import nativekit.ui.widgets.overlays.Popup;
+import nativekit.ui.widgets.text.Text;
+
+
 /** Stable identities for the desktop Explorer smoke rotation. */
 enum abstract ExplorerSmokeFrame(Int) from Int to Int {
 	var Overview = 0;

@@ -1,7 +1,7 @@
 package components;
 
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Text;
+import nativekit.ui.widgets.text.Text;
 import nativekit.ui.theme.TextRole;
 
 /** Small muted label for catalog groups and demo sections. */

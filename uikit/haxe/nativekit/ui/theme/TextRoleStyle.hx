@@ -1,5 +1,8 @@
 package nativekit.ui.theme;
 
+import nativekit.ui.widgets.text.Text;
+
+
 import Color;
 import ParagraphStyle;
 import TextStyle;

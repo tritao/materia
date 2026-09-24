@@ -7,3 +7,5 @@
 /automationkit/tests/build/
 
 /app/tests/build/
+/build/
+/uikit/build-web/

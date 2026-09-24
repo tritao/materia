@@ -2,7 +2,7 @@ package components;
 
 import LayoutStyle;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Row;
+import nativekit.ui.widgets.layout.Row;
 
 /** Simple responsive row container for peer demo cards. */
 class DemoGrid {

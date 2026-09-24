@@ -2,7 +2,7 @@ package components;
 
 import Color;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Text;
+import nativekit.ui.widgets.text.Text;
 
 /** Syntax-colored snippet line for the inspector's API documentation view. */
 class CodeSample {

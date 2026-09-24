@@ -6,9 +6,9 @@ import cadkit.parametric.Element;
 import cadkit.parametric.ElementId;
 import cadkit.parametric.TypedProperty;
 import nativekit.ui.core.View;
-import nativekit.ui.widgets.Text;
-import nativekit.ui.widgets.TreeRootMetadata;
-import nativekit.ui.widgets.TreeViewModel;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.collections.TreeRootMetadata;
+import nativekit.ui.widgets.collections.TreeViewModel;
 
 /** Editor tree projection over BIM aggregate, containment, and host relationships. */
 class BimSpatialTree implements TreeViewModel {

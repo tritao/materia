@@ -1,5 +1,9 @@
 package app;
 
+import nativekit.ui.widgets.controls.Select;
+import nativekit.ui.widgets.controls.Toggle;
+
+
 import app.EditorToolbarLayout.EditorToolbarDensity;
 import Canvas;
 import Color;
@@ -20,19 +24,21 @@ import nativekit.ui.core.Command;
 import nativekit.ui.core.CommandContext;
 import nativekit.ui.core.CommandRegistry;
 import nativekit.ui.core.CommandResult;
-import nativekit.ui.core.DockNode;
-import nativekit.ui.core.DockPanelDescriptor;
-import nativekit.ui.core.DockSplitAxis;
-import nativekit.ui.core.DockWorkspaceModel;
-import nativekit.ui.core.DockWorkspacePersistence;
-import nativekit.ui.core.PlotModel;
-import nativekit.ui.core.PlotPoint;
-import nativekit.ui.core.PlotSeries;
-import nativekit.ui.core.PropertyDescriptor;
-import nativekit.ui.core.PropertyDescriptorOptions;
-import nativekit.ui.core.PropertyInspectorSection;
-import nativekit.ui.core.PropertyType;
-import nativekit.ui.core.PropertyValue;
+import nativekit.ui.docking.DockNode;
+import nativekit.ui.docking.DockPanelDescriptor;
+import nativekit.ui.docking.DockSplitAxis;
+import nativekit.ui.docking.DockWorkspaceCommands;
+import nativekit.ui.docking.DockWorkspaceModel;
+import nativekit.ui.docking.DockWorkspacePersistence;
+import nativekit.ui.docking.DockWorkspaceStorage;
+import nativekit.ui.plotting.PlotModel;
+import nativekit.ui.plotting.PlotPoint;
+import nativekit.ui.plotting.PlotSeries;
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.properties.PropertyDescriptorOptions;
+import nativekit.ui.properties.PropertyInspectorSection;
+import nativekit.ui.properties.PropertyType;
+import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.Shortcut;
 import nativekit.ui.core.UiContext;
@@ -44,45 +50,46 @@ import nativekit.ui.core.TextStyleOverride;
 import nativekit.ui.core.View;
 import nativekit.ui.core.ViewportCamera;
 import nativekit.ui.core.ViewportContent;
-import nativekit.ui.widgets.Align;
-import nativekit.ui.widgets.AppShell;
-import nativekit.ui.widgets.Button;
-import nativekit.ui.widgets.ButtonVariant;
-import nativekit.ui.widgets.Column;
-import nativekit.ui.widgets.CommandButton;
-import nativekit.ui.widgets.CommandMenu;
-import nativekit.ui.widgets.CommandPalette;
-import nativekit.ui.widgets.DockWorkspace;
+import nativekit.ui.widgets.layout.Align;
+import nativekit.ui.widgets.layout.AppShell;
+import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.ButtonVariant;
+import nativekit.ui.widgets.layout.Column;
+import nativekit.ui.widgets.commands.CommandButton;
+import nativekit.ui.widgets.commands.CommandMenu;
+import nativekit.ui.widgets.commands.CommandPalette;
+import nativekit.ui.widgets.docking.DockWorkspace;
+import nativekit.ui.widgets.docking.DockPanelContent;
 import nativekit.ui.widgets.GpuViewport;
 import nativekit.ui.widgets.Icon;
-import nativekit.ui.widgets.IconButton;
+import nativekit.ui.widgets.controls.IconButton;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.ListView;
-import nativekit.ui.widgets.ListViewModel;
-import nativekit.ui.widgets.Menu;
-import nativekit.ui.widgets.MenuItem;
-import nativekit.ui.widgets.Popup;
-import nativekit.ui.widgets.PlotView;
-import nativekit.ui.widgets.PropertyInspector;
-import nativekit.ui.widgets.Row;
-import nativekit.ui.widgets.ScrollController;
-import nativekit.ui.widgets.ScrollView;
-import nativekit.ui.widgets.SearchField;
-import nativekit.ui.widgets.SizedBox;
-import nativekit.ui.widgets.Stack;
-import nativekit.ui.widgets.StackChild;
-import nativekit.ui.widgets.Spacer;
-import nativekit.ui.widgets.SplitOrientation;
-import nativekit.ui.widgets.SplitSide;
-import nativekit.ui.widgets.SplitView;
-import nativekit.ui.widgets.SplitViewOptions;
-import nativekit.ui.widgets.TabItem;
-import nativekit.ui.widgets.Tabs;
-import nativekit.ui.widgets.Text;
-import nativekit.ui.widgets.TextField;
-import nativekit.ui.widgets.TreeRootMetadata;
-import nativekit.ui.widgets.TreeView;
-import nativekit.ui.widgets.TreeViewModel;
+import nativekit.ui.widgets.collections.ListView;
+import nativekit.ui.widgets.collections.ListViewModel;
+import nativekit.ui.widgets.overlays.Menu;
+import nativekit.ui.widgets.overlays.MenuItem;
+import nativekit.ui.widgets.overlays.Popup;
+import nativekit.ui.widgets.plotting.PlotView;
+import nativekit.ui.widgets.properties.PropertyInspector;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.scroll.ScrollController;
+import nativekit.ui.widgets.scroll.ScrollView;
+import nativekit.ui.widgets.controls.SearchField;
+import nativekit.ui.widgets.layout.SizedBox;
+import nativekit.ui.widgets.layout.Stack;
+import nativekit.ui.widgets.layout.StackChild;
+import nativekit.ui.widgets.layout.Spacer;
+import nativekit.ui.widgets.layout.SplitOrientation;
+import nativekit.ui.widgets.layout.SplitSide;
+import nativekit.ui.widgets.layout.SplitView;
+import nativekit.ui.widgets.layout.SplitViewOptions;
+import nativekit.ui.widgets.controls.TabItem;
+import nativekit.ui.widgets.controls.Tabs;
+import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.text.TextField;
+import nativekit.ui.widgets.collections.TreeRootMetadata;
+import nativekit.ui.widgets.collections.TreeView;
+import nativekit.ui.widgets.collections.TreeViewModel;
 import FontCollection;
 import cadkit.parametric.ParametricError;
 import bimkit.BimDocument;
@@ -95,7 +102,7 @@ import nativekit.ui.host.DesktopUiApplication;
 import nativekit.ui.host.DesktopUiHost;
 import nativekit.ui.host.DesktopUiHostOptions;
 import nativekit.ui.host.DesktopUiHostContext;
-import nativekit.ui.widgets.Dialog;
+import nativekit.ui.widgets.overlays.Dialog;
 
 /**
 	Small executable driver for the shared reference-editor shell.
@@ -299,6 +306,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final appearance:EditorAppearance;
   public final commands:CommandRegistry;
   public final workspace:DockWorkspaceModel;
+  var workspacePanelContents:Array<DockPanelContent>;
   public final workspacePath:String;
   public final world:RobotWorld;
   public final simulation:ApplicationSimulation;
@@ -386,7 +394,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     updateCommandContext();
 
     workspace = makeWorkspace();
-    workspace.restoreFromOrDefault(storage, WORKSPACE_KEY);
+    DockWorkspaceStorage.restoreOrDefault(workspace, storage, WORKSPACE_KEY);
     if(projectPath!=null&&perspectiveViewport!=null){
       workspace.activate("perspective");
       scene.select("scene");
@@ -402,7 +410,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     framePresentation = null;
     if (componentLab != null) return componentLab.view(ui);
     framePresentation = simulation.capturePresentationSnapshot();
-    var workspaceView = new DockWorkspace("reference-workspace", workspace);
+    var workspaceView = new DockWorkspace("reference-workspace", workspace,
+      workspacePanelContents);
     var layers:Array<StackChild> = [new StackChild(
       "workspace",
       workspaceView,
@@ -662,32 +671,25 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function makeWorkspace():DockWorkspaceModel {
     var result = new DockWorkspaceModel();
-    result.register(new DockPanelDescriptor("hierarchy", "Hierarchy", function(_) {
-      return hierarchyPanel();
-    }, false));
-    result.register(new DockPanelDescriptor("bim", "BIM", function(_) {
-      return bimEditor;
-    }, false));
-    result.register(new DockPanelDescriptor("viewport", "Viewport", function(_) {
-      return viewportPanel();
-    }, false));
-    result.register(new DockPanelDescriptor("perspective", "Perspective", function(_) {
-      return perspectivePanel();
-    }, false));
-    result.register(new DockPanelDescriptor("inspector", "Inspector", function(_) {
-      return inspectorPanel();
-    }, false));
-    result.register(new DockPanelDescriptor("sensors", "Sensors", function(_) {
-      return sensorPanel();
-    }, false));
-    result.register(new DockPanelDescriptor("console", "Console", function(_) {
-      return consolePanel();
-    }
-    ));
-    result.register(new DockPanelDescriptor("telemetry", "Telemetry", function(_) {
-      return telemetryPanel();
-    }
-    ));
+    result.register(new DockPanelDescriptor("hierarchy", "Hierarchy", false, true, IconName.Hierarchy));
+    result.register(new DockPanelDescriptor("bim", "BIM", false, true, IconName.Building));
+    result.register(new DockPanelDescriptor("viewport", "Viewport", false, true, IconName.Grid));
+    result.register(new DockPanelDescriptor("perspective", "Perspective", false, true, IconName.Cube));
+    result.register(new DockPanelDescriptor("inspector", "Inspector", false, true, IconName.Sliders));
+    result.register(new DockPanelDescriptor("sensors", "Sensors", false, true, IconName.Radar));
+    result.register(new DockPanelDescriptor("console", "Console", true, true, IconName.Terminal));
+    result.register(new DockPanelDescriptor("telemetry", "Telemetry", true, true, IconName.Activity));
+
+    workspacePanelContents = [
+      new DockPanelContent("hierarchy", function(_) return hierarchyPanel()),
+      new DockPanelContent("bim", function(_) return bimEditor),
+      new DockPanelContent("viewport", function(_) return viewportPanel()),
+      new DockPanelContent("perspective", function(_) return perspectivePanel()),
+      new DockPanelContent("inspector", function(_) return inspectorPanel()),
+      new DockPanelContent("sensors", function(_) return sensorPanel()),
+      new DockPanelContent("console", function(_) return consolePanel()),
+      new DockPanelContent("telemetry", function(_) return telemetryPanel())
+    ];
 
     var centerTabs = DockNode.Tabs(["viewport", "perspective", "console", "telemetry"], "viewport");
     var editorArea = DockNode.Split(DockSplitAxis.Horizontal, 0.68, centerTabs, DockNode.Panel("inspector"));
@@ -1241,7 +1243,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function installCommands():Void {
-    workspace.installCommands(commands, "workspace");
+    DockWorkspaceCommands.install(workspace, commands, "workspace");
     commands.register(new Command("scene.create", "Add rectangle", function() {
       scene.createRectangle();
       updateCommandContext();

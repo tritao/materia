@@ -1,5 +1,8 @@
 package nativekit.ui.core;
 
+import nativekit.ui.widgets.text.Text;
+
+
 /** Platform-independent cursor intent for a render node. */
 enum abstract CursorShape(Int) from Int to Int {
 	var Arrow = 0;

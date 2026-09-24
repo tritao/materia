@@ -6,9 +6,9 @@ import Insets;
 import LayoutAxis;
 import LayoutStyle;
 import nativekit.ui.core.View;
-import nativekit.ui.widgets.ListView;
-import nativekit.ui.widgets.ListViewModel;
-import nativekit.ui.widgets.Text;
+import nativekit.ui.widgets.collections.ListView;
+import nativekit.ui.widgets.collections.ListViewModel;
+import nativekit.ui.widgets.text.Text;
 import nativekit.ui.widgets.KeyedView;
 
 /** Model-backed virtualized scrolling and visible-range reporting. */

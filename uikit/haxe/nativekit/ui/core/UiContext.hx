@@ -1,4 +1,7 @@
 package nativekit.ui.core;
+
+import nativekit.ui.widgets.text.Text;
+
 import nativekit.ffi.NativeKitTypes;
 
 import LayoutFrame;

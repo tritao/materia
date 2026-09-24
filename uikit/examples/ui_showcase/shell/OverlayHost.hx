@@ -3,13 +3,13 @@ package shell;
 import LayoutAxis;
 import LayoutStyle;
 import UiExplorer;
-import nativekit.ui.widgets.Column;
-import nativekit.ui.widgets.Dialog;
+import nativekit.ui.widgets.layout.Column;
+import nativekit.ui.widgets.overlays.Dialog;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Menu;
-import nativekit.ui.widgets.MenuItem;
-import nativekit.ui.widgets.Popup;
-import nativekit.ui.widgets.StackChild;
+import nativekit.ui.widgets.overlays.Menu;
+import nativekit.ui.widgets.overlays.MenuItem;
+import nativekit.ui.widgets.overlays.Popup;
+import nativekit.ui.widgets.layout.StackChild;
 
 /** Builds global popup, menu and dialog layers above the Explorer shell. */
 class OverlayHost {

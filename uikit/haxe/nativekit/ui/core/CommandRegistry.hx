@@ -1,5 +1,9 @@
 package nativekit.ui.core;
 
+import nativekit.ui.editing.EditHistory;
+import nativekit.ui.editing.EditorDocument;
+
+
 /**
  * Ordered application command registry. The last active scope wins, making
  * viewport, text-editor, and modal scopes able to override global shortcuts.

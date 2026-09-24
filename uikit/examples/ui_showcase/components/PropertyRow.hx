@@ -3,7 +3,7 @@ package components;
 import Color;
 import nativekit.ui.theme.TextRole;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.Text;
+import nativekit.ui.widgets.text.Text;
 
 /** Compact inspector line for a resolved property or runtime state value. */
 class PropertyRow {

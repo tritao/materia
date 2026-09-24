@@ -1,5 +1,11 @@
 package testing;
 
+import nativekit.ui.widgets.overlays.Dialog;
+import nativekit.ui.widgets.overlays.Menu;
+import nativekit.ui.widgets.overlays.Popup;
+import nativekit.ui.widgets.text.Text;
+
+
 import UiExplorer;
 import testing.ExplorerVisualCase;
 

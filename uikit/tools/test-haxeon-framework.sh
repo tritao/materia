@@ -45,6 +45,20 @@ fi
 	"$module_dir/haxe/nativekit/ui/core/"*.hx \
 	"$module_dir/haxe/nativekit/ui/style/"*.hx \
 	"$module_dir/haxe/nativekit/ui/widgets/"*.hx \
+	"$module_dir/haxe/nativekit/ui/docking/"*.hx \
+	"$module_dir/haxe/nativekit/ui/editing/"*.hx \
+	"$module_dir/haxe/nativekit/ui/plotting/"*.hx \
+	"$module_dir/haxe/nativekit/ui/properties/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/collections/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/commands/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/controls/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/docking/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/layout/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/overlays/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/plotting/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/properties/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/scroll/"*.hx \
+	"$module_dir/haxe/nativekit/ui/widgets/text/"*.hx \
 	"$module_dir/haxe/nativekit/ui/host/"*.hx \
 	"$module_dir/bindings/haxe/"*.hx)
 

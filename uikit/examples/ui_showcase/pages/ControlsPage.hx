@@ -1,26 +1,29 @@
 package pages;
 
+import nativekit.ui.widgets.controls.Button;
+
+
 import Insets;
 import LayoutAxis;
 import LayoutStyle;
 import UiExplorer;
 import nativekit.ui.icons.IconName;
-import nativekit.ui.widgets.Align;
-import nativekit.ui.widgets.Checkbox;
-import nativekit.ui.widgets.Column;
-import nativekit.ui.widgets.ComboBox;
+import nativekit.ui.widgets.layout.Align;
+import nativekit.ui.widgets.controls.Checkbox;
+import nativekit.ui.widgets.layout.Column;
+import nativekit.ui.widgets.controls.ComboBox;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.IconButton;
-import nativekit.ui.widgets.ProgressBar;
-import nativekit.ui.widgets.ProgressMode;
-import nativekit.ui.widgets.RadioGroup;
-import nativekit.ui.widgets.RadioOption;
-import nativekit.ui.widgets.Row;
-import nativekit.ui.widgets.Spinner;
-import nativekit.ui.widgets.SpinnerKind;
-import nativekit.ui.widgets.Select;
-import nativekit.ui.widgets.SelectOption;
-import nativekit.ui.widgets.Toggle;
+import nativekit.ui.widgets.controls.IconButton;
+import nativekit.ui.widgets.controls.ProgressBar;
+import nativekit.ui.widgets.controls.ProgressMode;
+import nativekit.ui.widgets.controls.RadioGroup;
+import nativekit.ui.widgets.controls.RadioOption;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.controls.Spinner;
+import nativekit.ui.widgets.controls.SpinnerKind;
+import nativekit.ui.widgets.controls.Select;
+import nativekit.ui.widgets.controls.SelectOption;
+import nativekit.ui.widgets.controls.Toggle;
 
 /** Interactive primitive controls and their common input states. */
 class ControlsPage {
@@ -119,7 +122,7 @@ class ControlsPage {
 		return new IconButton("search-action", IconName.Search, "Search", function() {}, buttonStyle);
 	}
 
-	static function labeledIconButton(explorer:UiExplorer):nativekit.ui.widgets.Button {
+	static function labeledIconButton(explorer:UiExplorer):nativekit.ui.widgets.controls.Button {
 		var button = explorer.button("Search", "labeled-search-action", function() {});
 		button.leadingIcon = IconName.Search;
 		return button;
