@@ -6,6 +6,7 @@ import app.SceneObjectData;
 import haxe.Json;
 import LayoutFrame;
 import FontCollection;
+import nativekit.scene.SpatialIndex;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.EditOperation;
 import nativekit.ui.core.UiEventKind;
@@ -47,6 +48,7 @@ private typedef InputProbe = {
 }
 
 /** Replays real editor input through UiContext without a window or X server. */
+@:access(app.EditorScene)
 class HeadlessEditorProfile {
   static var profileSpans = false;
   static function main():Int {
@@ -214,6 +216,29 @@ class HeadlessEditorProfile {
     started = Sys.time();
     for (_ in 0...1000) if (!candidate.document.undo()) throw "Undo history ended during stress scenario";
     var undo1000Seconds = Sys.time() - started;
+
+    // Separate snapshot capture from BVH construction after the end-to-end timings.
+    // Ignore the first sample to exclude one-time allocator and code-path warmup.
+    var snapshotSamples:Array<Float> = [];
+    var spatialSamples:Array<Float> = [];
+    for (sample in 0...6) {
+      started = Sys.time();
+      var measuredSnapshot = candidate.scene.snapshot();
+      var snapshotSeconds = Sys.time() - started;
+      measuredSnapshot.dispose();
+
+      started = Sys.time();
+      var measuredSpatial = SpatialIndex.create(candidate.snapshot);
+      var spatialSeconds = Sys.time() - started;
+      measuredSpatial.dispose();
+
+      if (sample > 0) {
+        snapshotSamples.push(snapshotSeconds);
+        spatialSamples.push(spatialSeconds);
+      }
+    }
+    var spatialSnapshotMedianSeconds = medianDuration(snapshotSamples);
+    var spatialIndexMedianSeconds = medianDuration(spatialSamples);
     candidate.dispose();
     action(actions, "undo-1000-edits", 0);
 
@@ -241,7 +266,15 @@ class HeadlessEditorProfile {
       cycles: cycles, cadParameterSeconds: cadSeconds, bimOpeningSeconds: bimSeconds,
       sceneLoadSeconds: sceneLoadSeconds,
       singleObjectNudgeSeconds: nudgeSeconds, movingObjectEditsSeconds: movingSeconds,
-      undo1000Seconds: undo1000Seconds}));
+      undo1000Seconds: undo1000Seconds,
+      spatialSnapshotMedianSeconds: spatialSnapshotMedianSeconds,
+      spatialIndexMedianSeconds: spatialIndexMedianSeconds,
+      spatialCacheSamples: snapshotSamples.length}));
+  }
+
+  static function medianDuration(samples:Array<Float>):Float {
+    samples.sort(function(lhs, rhs) return lhs < rhs ? -1 : (lhs > rhs ? 1 : 0));
+    return samples[Std.int(samples.length / 2)];
   }
 
   static function retainedCounts(editor:ReferenceEditorApp, cycle:Int):String {

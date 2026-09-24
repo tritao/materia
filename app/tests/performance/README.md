@@ -58,9 +58,11 @@ opening edits, construction of a 10,000 object scene, a single object nudge,
 500 moving object updates, 1,000 ordered undo operations, and presentation
 captures for a 500 link robot. The capture writes phase timings to
 `architecture-summary.json` and the usual frame, action, memory, and profiler
-artifacts beside it. Increase `--cycles` to extend repeated movement, CAD,
-BIM, and simulation measurements. The scenario is intentionally not part of
-the default regression gate because it exercises large workloads.
+artifacts beside it. The summary also separates SceneKit snapshot capture from
+spatial-index construction using five warmed samples after the workload.
+Increase `--cycles` to extend repeated movement, CAD, BIM, and simulation
+measurements. The scenario is intentionally not part of the default regression
+gate because it exercises large workloads.
 
 The tab matrix uses 50 Hz CPU sampling with allocation sampling disabled. The
 500 Hz setting saturated the profiler on this workload. Use `--sample-rate` and
