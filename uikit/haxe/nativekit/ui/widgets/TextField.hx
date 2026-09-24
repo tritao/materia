@@ -271,11 +271,20 @@ class TextField implements View {
 				if (!editor.focused || !context.textInput.isOwner(id) || context.platformSurface == null ||
 					context.platformSurface.isDisposed())
 					return;
+				var selectionGeometry:Array<TextRangeRect> = [];
+				if (editor.selectionStart != editor.selectionEnd)
+					for (rect in editor.layout.selectionRangeRects(editor.anchorPosition(), editor.focusPosition()))
+						selectionGeometry.push(transformTextRangeRect(rect, geometry, transform,
+							editor.scrollOffsetY));
+				var compositionGeometry:Array<TextRangeRect> = [];
+				for (rect in editor.compositionRangeRects())
+					compositionGeometry.push(transformTextRangeRect(rect, geometry, transform,
+						editor.scrollOffsetY));
 				context.textInput.update(editor.surroundingText(2048, 2048), editor.documentLength(),
 					editor.selectionStart, editor.selectionEnd, editor.compositionStart,
 					editor.compositionEnd, 0,
 					multiline ? 1 : 0,
-					caretRect);
+					caretRect, selectionGeometry, compositionGeometry);
 			};
 			editorContent.onResolved(function(geometry) {
 				if (multiline) {
@@ -552,6 +561,28 @@ class TextField implements View {
 
 	static inline function absolute(value:Float):Float
 		return value < 0.0 ? -value : value;
+
+	static function transformTextRangeRect(rect:TextRangeRect, geometry:ResolvedLayoutItem,
+			transform:Transform2D, scrollOffsetY:Float):TextRangeRect {
+		var left = geometry.x + rect.x;
+		var top = geometry.y + rect.y - scrollOffsetY;
+		var right = left + rect.width;
+		var bottom = top + rect.height;
+		var x0 = transform.a * left + transform.c * top + transform.tx;
+		var y0 = transform.b * left + transform.d * top + transform.ty;
+		var x1 = transform.a * right + transform.c * top + transform.tx;
+		var y1 = transform.b * right + transform.d * top + transform.ty;
+		var x2 = transform.a * left + transform.c * bottom + transform.tx;
+		var y2 = transform.b * left + transform.d * bottom + transform.ty;
+		var x3 = transform.a * right + transform.c * bottom + transform.tx;
+		var y3 = transform.b * right + transform.d * bottom + transform.ty;
+		var minX = Math.min(Math.min(x0, x1), Math.min(x2, x3));
+		var minY = Math.min(Math.min(y0, y1), Math.min(y2, y3));
+		var maxX = Math.max(Math.max(x0, x1), Math.max(x2, x3));
+		var maxY = Math.max(Math.max(y0, y1), Math.max(y2, y3));
+		return new TextRangeRect(rect.start, rect.end, minX, minY, maxX - minX, maxY - minY,
+			rect.visualLeftIsStart);
+	}
 
 	static function defaultStyle(multiline:Bool):LayoutStyle {
 		var result = new LayoutStyle();

@@ -261,6 +261,14 @@ class FrameworkSmoke {
 		fonts.add(fontPath);
 		if (!hostRuntimeLifecycleValid(fonts))
 			return 272;
+		var rtlLayout = TextLayout.create(fonts, "א", 80.0, null,
+			new ParagraphStyle(TextWrap.Word, TextAlignment.Start, null, TextDirection.Rtl));
+		var rtlGeometry = rtlLayout.selectionRangeRects(new TextPosition(0, 0), new TextPosition(1, 0));
+		if (rtlGeometry.length != 1 || rtlGeometry[0].visualLeftIsStart) {
+			rtlLayout.dispose();
+			return 276;
+		}
+		rtlLayout.dispose();
 		var session = LayoutSession.create();
 		var context = new UiContext(session, fonts);
 		if (context.buildContext.fonts != fonts)
@@ -293,6 +301,10 @@ class FrameworkSmoke {
 			editor.lastEditTransaction == null ||
 			editor.lastEditTransaction.historyKind != TextEditorHistoryKind.Composition)
 			return 33;
+		var compositionGeometry = editor.compositionRangeRects();
+		if (compositionGeometry.length != 1 || compositionGeometry[0].start != 2 ||
+			compositionGeometry[0].end != 4)
+			return 275;
 		var nativeDeleteEditor = new TextEditorState(fonts, "ab");
 		var nativeDelete = new NativeKitTextEdit(TextEditAction.Delete, null, 1, 2,
 			1, 1, -1, -1, 1, 2);

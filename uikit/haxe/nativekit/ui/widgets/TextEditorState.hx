@@ -684,6 +684,15 @@ class TextEditorState {
 			new TextPosition(compositionEnd, 0));
 	}
 
+	/** Returns active composition rectangles paired with absolute document ranges. */
+	public function compositionRangeRects():Array<TextRangeRect> {
+		ensureLive();
+		if (compositionStart < 0 || compositionEnd <= compositionStart)
+			return [];
+		return layout.selectionRangeRects(new TextPosition(compositionStart, 0),
+			new TextPosition(compositionEnd, 0));
+	}
+
 	/** Selects the word under a pointer position using the shaped text engine's boundaries. */
 	public function selectWordAt(position:TextPosition):Bool {
 		ensureLive();
