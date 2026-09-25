@@ -71,6 +71,7 @@ import robotkit.localization.PoseFusionLocalization;
 import robotkit.navigation.Path;
 import robotkit.navigation.Trajectory;
 import robotkit.navigation.TrajectorySample;
+import robotkit.navigation.PathSpeedLimit;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationStatus;
@@ -877,6 +878,30 @@ class RobotWorldTests {
     var nearSpeed = commandedSpeedAt(0.98, "nav-speed-near");
     check(farSpeed > nearSpeed && nearSpeed > 0.0,
       "Navigation profiles speed down using braking distance near the goal");
+
+    var zoneRobot = new FakeRobot("nav-speed-zone");
+    zoneRobot.positions = [0.0, 0.0];
+    var zoneBase = new MobileBase(zoneRobot, new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(1.0, 2.0, 1.0, 10.0));
+    zoneBase.command(new Twist2(0.6, 0.0));
+    var zoneLocalization = new WheelOdometryLocalization(zoneBase);
+    zoneLocalization.reset(new Pose2());
+    var zoneNavigation = new Navigation(zoneBase, zoneLocalization,
+      0.2, 0.8, 1.0);
+    var zonePath = new Path([new Pose2(), new Pose2(2.0, 0.0, 0.0)], "odom");
+    zoneNavigation.follow(zonePath, null, [new PathSpeedLimit(0.01, 2.0, 0.05)]);
+    zoneNavigation.updateObservation(new RobotSnapshot("nav-speed-zone",
+      Int64.ofInt(1), Int64.ofInt(1), [0.0, 0.0], [], [], 1, 0,
+      Int64.ofInt(2), [], "speed-zone-clock", "host"), 1.0);
+    var zoneSpeed = switch zoneRobot.lastCommand {
+      case JointTargets(targets, _): (targets[0].target + targets[1].target) * 0.05;
+      case _: 0.0;
+    };
+    check(zoneSpeed > 0.14 && zoneSpeed <= 0.151,
+      "Navigation brakes before an upcoming lane speed limit");
+    throws(function() zoneNavigation.follow(zonePath, null,
+      [new PathSpeedLimit(1.0, 2.1, 0.2)]),
+      "Navigation rejects speed-limit intervals beyond the path");
 
     navigation.follow(path);
     navigation.cancel();

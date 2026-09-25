@@ -4,6 +4,7 @@ import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.NavigationStatus;
 import robotkit.navigation.Path;
+import robotkit.navigation.PathSpeedLimit;
 import robotkit.world.RobotSnapshot;
 
 /** Follows a supplied path and reports a terminal goal result. */
@@ -11,19 +12,23 @@ class GoTo implements Skill {
   public final navigation:Navigation;
   public final path:Path;
   public final goal:Null<NavigationGoal>;
+  final speedLimits:Null<Array<PathSpeedLimit>>;
   final lifecycle:SkillLifecycle = new SkillLifecycle();
 
-  public function new(navigation:Navigation, path:Path, ?goal:NavigationGoal) {
+  public function new(navigation:Navigation, path:Path, ?goal:NavigationGoal,
+      ?speedLimits:Array<PathSpeedLimit>) {
     if (navigation == null || path == null)
       throw "GoTo requires navigation and a path";
     this.navigation = navigation;
     this.path = path;
     this.goal = goal;
+    this.speedLimits = speedLimits == null ? null : speedLimits.copy();
   }
 
   public function start():Void {
     lifecycle.begin();
-    try navigation.follow(path, goal) catch (error:Dynamic) lifecycle.fail(Std.string(error));
+    try navigation.follow(path, goal, speedLimits)
+    catch (error:Dynamic) lifecycle.fail(Std.string(error));
   }
 
   public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus {

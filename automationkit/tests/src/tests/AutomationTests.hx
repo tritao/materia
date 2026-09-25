@@ -95,7 +95,7 @@ class AutomationTests {
       facility.addLane(new Lane("inbound-rack", inbound.id, rack.id,
         new Path([inbound.pose, new Pose2(2.0, 0.0), rack.pose], "map"), 1.5, 1.5));
       facility.addLane(new Lane("rack-outbound", rack.id, outbound.id,
-        new Path([rack.pose, new Pose2(3.0, 1.0), outbound.pose], "map"), 1.5, 1.5));
+        new Path([rack.pose, new Pose2(3.0, 1.0), outbound.pose], "map"), 1.5, 0.3));
       var lane:Lane = cast facility.lane("inbound-outbound");
       var storedRack:Rack = cast facility.rack("rack-4");
       equal(facility.stations().length, 4, "facility indexes stations and specialized locations");
@@ -111,9 +111,16 @@ class AutomationTests {
       var route = router.route(inbound.id, outbound.id);
       var routeLegs = route.legs();
       check(routeLegs.length == 2 && routeLegs[0].lane.id == "inbound-rack" &&
-        route.maximumSpeedMetersPerSecond == 1.5 && route.path.frameId == "map" &&
+        route.maximumSpeedMetersPerSecond == 0.3 && route.path.frameId == "map" &&
         route.path.start().x == inbound.pose.x && route.path.goal().x == outbound.pose.x,
         "facility router chooses the fastest lane sequence and composes its framed path");
+      var routeSpeedLimits = route.speedLimits();
+      check(routeSpeedLimits.length == 2 &&
+        routeSpeedLimits[0].maximumSpeedMetersPerSecond == 1.5 &&
+        routeSpeedLimits[1].maximumSpeedMetersPerSecond == 0.3 &&
+        Math.abs(routeSpeedLimits[0].endDistanceMeters -
+          routeSpeedLimits[1].startDistanceMeters) < 1e-9,
+        "facility route preserves each lane speed interval along the composed path");
       var reverseRoute = router.route(outbound.id, inbound.id);
       var reverseLegs = reverseRoute.legs();
       check(reverseLegs.length == 2 && reverseLegs[0].reversed && reverseLegs[1].reversed,
@@ -619,7 +626,7 @@ private class FacilityTransportSkillFactory implements TaskSkillFactory {
         var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
         var route = new FacilityRouter(facility).route(pickup.id, destination.id);
         new GoTo(navigation, route.path,
-          new NavigationGoal(destination.pose, destination.frameId));
+          new NavigationGoal(destination.pose, destination.frameId), route.speedLimits());
       case _: throw 'unsupported task kind ${Std.string(task.kind)}';
     }
   }
@@ -662,7 +669,8 @@ private class MobileTransportSkillFactory implements TaskSkillFactory {
         lastNavigation = navigation;
         var route = new FacilityRouter(facility).route(pickup.id, destination.id);
         new GoTo(navigation, route.path,
-          new NavigationGoal(destination.pose, destination.frameId, 0.02, 0.1));
+          new NavigationGoal(destination.pose, destination.frameId, 0.02, 0.1),
+          route.speedLimits());
       case _: throw 'unsupported task kind ${Std.string(task.kind)}';
     }
   }

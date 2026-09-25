@@ -38,6 +38,13 @@ class Path {
 
   public function count():Int return waypoints.length;
 
+  /** Returns the accumulated arc length at one authored waypoint. */
+  public function distanceAtWaypoint(index:Int):Float {
+    if (index < 0 || index >= distances.length)
+      throw "Path waypoint index is out of range";
+    return distances[index];
+  }
+
   public function start():Pose2 {
     var point = waypoints[0];
     return new Pose2(point.x, point.y, point.yaw);

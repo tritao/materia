@@ -2,6 +2,7 @@ package materia.automation.facility;
 
 import robotkit.mobile.Pose2;
 import robotkit.navigation.Path;
+import robotkit.navigation.PathSpeedLimit;
 
 /** Plans the minimum-travel-time lane route between named facility stations. */
 class FacilityRouter {
@@ -89,6 +90,7 @@ class FacilityRouter {
     }
     legs.reverse();
     var poses:Array<Pose2> = [];
+    var legPoseRanges:Array<FacilityRoutePoseRange> = [];
     var maximumSpeed = 1.0e300;
     for (leg in legs) {
       var from = facility.station(leg.fromStationId);
@@ -100,14 +102,20 @@ class FacilityRouter {
       requireEndpoint(lanePoses[lanePoses.length - 1], to.pose, leg.lane.id);
       lanePoses[0] = new Pose2(from.pose.x, from.pose.y, from.pose.yaw);
       lanePoses[lanePoses.length - 1] = new Pose2(to.pose.x, to.pose.y, to.pose.yaw);
+      var startIndex = poses.length == 0 ? 0 : poses.length - 1;
       if (poses.length == 0) poses.push(lanePoses[0]);
       else poses[poses.length - 1] = lanePoses[0];
       for (index in 1...lanePoses.length) poses.push(lanePoses[index]);
+      legPoseRanges.push(new FacilityRoutePoseRange(startIndex, poses.length - 1,
+        leg.lane.maximumSpeedMetersPerSecond));
       maximumSpeed = Math.min(maximumSpeed, leg.lane.maximumSpeedMetersPerSecond);
     }
     var routePath = new Path(poses, start.frameId);
+    var speedLimits:Array<PathSpeedLimit> = [for (range in legPoseRanges)
+      new PathSpeedLimit(routePath.distanceAtWaypoint(range.startIndex),
+        routePath.distanceAtWaypoint(range.endIndex), range.maximumSpeed)];
     return new FacilityRoute(facility.id, fromStationId, toStationId, legs,
-      routePath, maximumSpeed);
+      routePath, speedLimits, maximumSpeed);
   }
 
   function requireEndpoint(pathPose:Pose2, stationPose:Pose2, laneId:String):Void {
@@ -121,5 +129,17 @@ class FacilityRouter {
     var dx = left.x - right.x;
     var dy = left.y - right.y;
     return Math.pow(dx * dx + dy * dy, 0.5) <= endpointToleranceMeters;
+  }
+}
+
+private class FacilityRoutePoseRange {
+  public final startIndex:Int;
+  public final endIndex:Int;
+  public final maximumSpeed:Float;
+
+  public function new(startIndex:Int, endIndex:Int, maximumSpeed:Float) {
+    this.startIndex = startIndex;
+    this.endIndex = endIndex;
+    this.maximumSpeed = maximumSpeed;
   }
 }

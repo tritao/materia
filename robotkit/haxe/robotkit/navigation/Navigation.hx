@@ -26,6 +26,7 @@ class Navigation {
   public var crossTrackError(default, null):Float = 0.0;
 
   var currentPath:Null<Path> = null;
+  var currentSpeedLimits:Array<PathSpeedLimit> = [];
   var currentTrajectory:Null<Trajectory> = null;
   var currentGoal:Null<NavigationGoal> = null;
   var commandedLinearSpeed:Float = 0.0;
@@ -53,14 +54,25 @@ class Navigation {
   }
 
   /** Starts following a framed polyline; the final waypoint supplies the default goal. */
-  public function follow(path:Path, ?goal:NavigationGoal):Void {
+  public function follow(path:Path, ?goal:NavigationGoal,
+      ?speedLimits:Array<PathSpeedLimit>):Void {
     if (path == null) throw "Navigation.follow requires a path";
     var target = goal == null
       ? new NavigationGoal(path.goal(), path.frameId)
       : goal;
     if (target.frameId != path.frameId)
       throw "Navigation goal and path frames must match";
+    var configuredSpeedLimits:Array<PathSpeedLimit> =
+      speedLimits == null ? [] : speedLimits.copy();
+    var previousEnd = 0.0;
+    for (limit in configuredSpeedLimits) {
+      if (limit == null || limit.startDistanceMeters < previousEnd - 1e-9 ||
+          limit.endDistanceMeters > path.length + 1e-9)
+        throw "Navigation path speed limits must be ordered and fit within the path";
+      previousEnd = limit.endDistanceMeters;
+    }
     currentPath = path;
+    currentSpeedLimits = configuredSpeedLimits;
     currentTrajectory = null;
     currentGoal = target;
     progressDistance = 0.0;
@@ -79,6 +91,7 @@ class Navigation {
     if (target.frameId != trajectory.frameId)
       throw "Navigation goal and trajectory frames must match";
     currentPath = null;
+    currentSpeedLimits = [];
     currentTrajectory = trajectory;
     currentGoal = target;
     trajectoryElapsedSeconds = 0.0;
@@ -168,8 +181,20 @@ class Navigation {
     var direction = allowReverse && pathDirection < 0.0 ? -1.0 : 1.0;
     var remainingDistance = Math.max(path.length - progressDistance,
       Math.max(0.0, goalDistance - goal.positionTolerance));
-    var speed = Math.min(cruiseSpeed,
+    var speed = Math.min(Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed),
       Math.pow(2.0 * base.motionLimits.maxLinearAcceleration * remainingDistance, 0.5));
+    for (limit in currentSpeedLimits) {
+      if (progressDistance >= limit.startDistanceMeters - 1e-9 &&
+          progressDistance <= limit.endDistanceMeters + 1e-9) {
+        speed = Math.min(speed, limit.maximumSpeedMetersPerSecond);
+      } else if (progressDistance < limit.startDistanceMeters) {
+        var distanceToLimit = limit.startDistanceMeters - progressDistance;
+        var brakingSpeed = Math.pow(limit.maximumSpeedMetersPerSecond *
+          limit.maximumSpeedMetersPerSecond +
+          2.0 * base.motionLimits.maxLinearAcceleration * distanceToLimit, 0.5);
+        speed = Math.min(speed, brakingSpeed);
+      }
+    }
     if (Math.abs(curvature) > 1e-9) {
       speed = Math.min(speed, maxAngularSpeed / Math.abs(curvature));
       speed = Math.min(speed,
@@ -194,6 +219,7 @@ class Navigation {
   public function reset():Void {
     if (isFollowing()) base.stop(StopMode.Normal);
     currentPath = null;
+    currentSpeedLimits = [];
     currentTrajectory = null;
     currentGoal = null;
     progressDistance = 0.0;

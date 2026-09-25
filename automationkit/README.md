@@ -18,7 +18,8 @@ The first domain model includes:
 Facility lanes retain a `robotkit.navigation.Path` and enforce frame agreement
 with their endpoint stations. `FacilityRouter` plans the least-travel-time lane
 sequence using lane speed and direction, then composes its centerlines into one
-framed path suitable for `Navigation` or a `GoTo` skill. Rack slot IDs and
+framed path with per-lane speed intervals. Pass `route.speedLimits()` to
+`GoTo` so `Navigation` brakes before entering a slower lane. Rack slot IDs and
 facility entity IDs are validated at insertion. Fleet assignments require an attached, ready robot;
 mission completion releases that robot for the next assignment. `TrafficManager`
 allows one fleet member to own a lane or intersection at a time, supports
@@ -34,6 +35,10 @@ adapter can resolve a rack task into `PickPallet` or `PlacePallet`. The
 executor owns sequencing and lifecycle propagation, while route planning,
 perception, and robot-specific mechanism configuration remain explicit
 application inputs.
+
+An optional `TrafficManager` on `MissionExecutor` reserves a transport's full
+route before starting its skill. The executor leaves the skill idle while the
+route is queued, then releases the reservation on success, failure, or cancel.
 
 The integration test executes a facility transport mission on a simulated
 RobotKit robot, captures its observations and joint batches through
