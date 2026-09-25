@@ -9,8 +9,8 @@ enum EditorToolbarDensity {
 /** Responsive toolbar policy, with room around each content-fit breakpoint. */
 class EditorToolbarLayout {
   // Preferred widths of the full and compact toolbar compositions.
-  static inline var FULL_FIT_WIDTH:Float = 1040.0;
-  static inline var COMPACT_FIT_WIDTH:Float = 800.0;
+  static inline var FULL_FIT_WIDTH:Float = 960.0;
+  static inline var COMPACT_FIT_WIDTH:Float = 650.0;
   static inline var RESIZE_MARGIN:Float = 24.0;
 
   public static function forWidth(previous:EditorToolbarDensity, width:Float):EditorToolbarDensity {

@@ -6,6 +6,7 @@ class AppTests {
 		if (SceneAtomicityTests.main() != 0) return 1;
 		if (ProjectDocumentTests.main() != 0) return 1;
 		if (EditorToolbarLayoutTests.main() != 0) return 1;
+		if (EditorWorkspaceLayoutTests.main() != 0) return 1;
 		if (BimEditorProjectionTests.main() != 0) return 1;
 		if (WorkspaceSaveWorkerTests.main() != 0) return 1;
     if (SceneEditingTests.main() != 0) return 1;

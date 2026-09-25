@@ -7,16 +7,18 @@ import nativekit.ui.core.View;
 class TabItem {
 	public final key:String;
 	public final label:String;
+	public final displayLabel:Null<String>;
 	public final content:View;
 	public final enabled:Bool;
 	public final icon:Null<IconName>;
 
 	public function new(key:String, label:String, content:View, enabled:Bool = true,
-			?icon:IconName) {
+			?icon:IconName, ?displayLabel:String) {
 		if (key == null || key.length == 0 || content == null)
 			throw "Tabs require stable keys and content views";
 		this.key = key;
 		this.label = label == null ? "" : label;
+		this.displayLabel = displayLabel;
 		this.content = content;
 		this.enabled = enabled;
 		this.icon = icon;

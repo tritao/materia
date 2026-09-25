@@ -24,9 +24,7 @@ import nativekit.ui.core.Command;
 import nativekit.ui.core.CommandContext;
 import nativekit.ui.core.CommandRegistry;
 import nativekit.ui.core.CommandResult;
-import nativekit.ui.docking.DockNode;
 import nativekit.ui.docking.DockPanelDescriptor;
-import nativekit.ui.docking.DockSplitAxis;
 import nativekit.ui.docking.DockWorkspaceCommands;
 import nativekit.ui.docking.DockWorkspaceModel;
 import nativekit.ui.docking.DockWorkspacePersistence;
@@ -325,6 +323,7 @@ private class ReferenceEditorLaunchOptions {
 /** Shared/app integration object passed to a platform frame loop. */
 class ReferenceEditorApp implements DesktopUiApplication {
   public static inline var WORKSPACE_KEY:String = "reference-editor";
+  static inline var TOOLBAR_HEIGHT:Float = 44.0;
 
   public final ui:UiContext;
   final appearance:EditorAppearance;
@@ -357,6 +356,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var paletteVisible:Bool;
   var toolbarMenuVisible:Bool;
   var viewportWidth:Float = 1320.0;
+  var viewportHeight:Float = 900.0;
   var toolbarDensity:EditorToolbarDensity = Full;
   var contextMenuVisible:Bool;
   var contextMenuX:Float;
@@ -440,6 +440,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     framePresentation = simulation.capturePresentationSnapshot();
     var workspaceView = new DockWorkspace("reference-workspace", workspace,
       workspacePanelContents);
+    workspaceView.availableHeight = Math.max(0.0, viewportHeight - TOOLBAR_HEIGHT);
     var layers:Array<StackChild> = [new StackChild(
       "workspace",
       workspaceView,
@@ -497,7 +498,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.frame-selected", "scene.reset-perspective", "scene.show-perspective",
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
         "scene.toggle-grid", "editor.command-palette", "workspace.reset"
-      ], Math.max(8.0, viewportWidth - 228.0), 44.0, commands, ui.commandContext,
+      ], Math.max(8.0, viewportWidth - 228.0), TOOLBAR_HEIGHT, commands, ui.commandContext,
         function() { toolbarMenuVisible = false; commands.refresh(); },
         function(_) { toolbarMenuVisible = false; commands.refresh(); });
       windowLayers.push(new StackChild("editor-more-menu", toolbarMenu, 0.0, 0.0, 25));
@@ -510,6 +511,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var saveError = workspaceSaves.takeError();
     if (saveError != null) log("Workspace save failed: " + saveError);
     viewportWidth = frame.width;
+    viewportHeight = frame.height;
     toolbarDensity = EditorToolbarLayout.forWidth(toolbarDensity, frame.width);
     if (scene.advanceCadMeshRefinement()) {
       if (hostContext != null)
@@ -633,45 +635,32 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var compact = toolbarDensity != Full;
     var minimal = toolbarDensity == Minimal;
     var barStyle = fillStyle();
-    barStyle.height = LayoutAxis.fixed(44.0);
+    barStyle.height = LayoutAxis.fixed(TOOLBAR_HEIGHT);
     barStyle.direction = LayoutDirection.LeftToRight;
     barStyle.childAlignY = LayoutAlignmentY.Center;
-    barStyle.childGap = compact ? 6.0 : 10.0;
+    barStyle.childGap = 6.0;
     barStyle.padding = new Insets(10.0, 5.0, 10.0, 5.0);
     barStyle.background = appearance.toolbar;
 
     var titleStyle = new LayoutStyle();
-    titleStyle.width = LayoutAxis.fixed(compact ? 78.0 : 92.0);
-    var fileActions = new Row("toolbar-file", [
-      new KeyedView("new", toolbarAction("toolbar-new", "editor.new", "New", IconName.NewFile, compact)),
-      new KeyedView("open", toolbarAction("toolbar-open", "editor.open", "Open", IconName.FolderOpen, compact)),
-      new KeyedView("save", toolbarAction("toolbar-save", "editor.save", "Save", IconName.Save, compact, true))
-    ], toolbarGroupStyle());
+    titleStyle.width = LayoutAxis.fixed(compact ? 72.0 : 84.0);
     var items:Array<KeyedView> = [
       new KeyedView("brand", new Text("MATERIA", titleStyle, appearance.theme.text,
         TextStyleOverride.text(13.0, 0.5))),
-      new KeyedView("file", toolbarGroup("file-group", "FILE", fileActions, compact))
+      new KeyedView("new", toolbarAction("toolbar-new", "editor.new", "New", IconName.NewFile, compact)),
+      new KeyedView("open", toolbarAction("toolbar-open", "editor.open", "Open", IconName.FolderOpen, compact)),
+      new KeyedView("save", toolbarAction("toolbar-save", "editor.save", "Save", IconName.Save, compact, true))
     ];
     if (!minimal) {
-      items.push(new KeyedView("file-edit-divider", toolbarDivider("file-edit-divider")));
-      var editActions = new Row("toolbar-edit", [
-        new KeyedView("undo", toolbarAction("toolbar-undo", "editor.undo", "Undo", IconName.Undo, compact)),
-        new KeyedView("redo", toolbarAction("toolbar-redo", "editor.redo", "Redo", IconName.Redo, compact))
-      ], toolbarGroupStyle());
-      items.push(new KeyedView("edit", toolbarGroup("edit-group", "EDIT", editActions, compact)));
-      items.push(new KeyedView("edit-view-divider", toolbarDivider("edit-view-divider")));
-      var viewActions = new Row("toolbar-view", [
-        new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected",
-          "Frame", IconName.Inspect, compact))
-      ], toolbarGroupStyle());
-      items.push(new KeyedView("view", toolbarGroup("view-group", "VIEW", viewActions, compact)));
+      items.push(new KeyedView("undo", toolbarAction("toolbar-undo", "editor.undo", "Undo", IconName.Undo, compact)));
+      items.push(new KeyedView("redo", toolbarAction("toolbar-redo", "editor.redo", "Redo", IconName.Redo, compact)));
+      items.push(new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected",
+        "Frame", IconName.Inspect, compact)));
     }
     items.push(new KeyedView("space", new Spacer("toolbar-space", LayoutAxis.grow(),
       LayoutAxis.fixed(1.0))));
     var documentLabel = shortenLabel(session.label(), compact ? 18 : 30);
-    var status = minimal ? documentLabel : documentLabel + "  ·  World: " +
-      (world == null ? "offline" : Std.string(world.status()));
-    items.push(new KeyedView("status", new Text(status, null, appearance.theme.tokens.textSecondary,
+    items.push(new KeyedView("status", new Text(documentLabel, null, appearance.theme.tokens.textSecondary,
       TextStyleOverride.text(12.0))));
     var more = new Button(compact ? "" : "More", null, function() {
       toolbarMenuVisible = !toolbarMenuVisible;
@@ -692,28 +681,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     action.leadingIcon = icon;
     action.variant = primary ? ButtonVariant.Primary : ButtonVariant.Secondary;
     return action;
-  }
-
-  function toolbarGroup(key:String, label:String, actions:View, compact:Bool):View {
-    if (compact) return actions;
-    return new Row(key, [
-      new KeyedView("label", new Text(label, null, appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(10.0, 0.8))),
-      new KeyedView("actions", actions)
-    ], toolbarGroupStyle());
-  }
-
-  static function toolbarGroupStyle():LayoutStyle {
-    var style = new LayoutStyle();
-    style.childAlignY = LayoutAlignmentY.Center;
-    style.childGap = 3.0;
-    return style;
-  }
-
-  function toolbarDivider(key:String):View {
-    var divider = new Spacer(key, LayoutAxis.fixed(1.0), LayoutAxis.fixed(20.0));
-    divider.style.background = appearance.theme.tokens.border;
-    return divider;
   }
 
   static function shortenLabel(value:String, maximum:Int):String
@@ -741,10 +708,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new DockPanelContent("telemetry", function(_) return telemetryPanel())
     ];
 
-    var centerTabs = DockNode.Tabs(["viewport", "perspective", "console", "telemetry"], "viewport");
-    var editorArea = DockNode.Split(DockSplitAxis.Horizontal, 0.68, centerTabs, DockNode.Panel("inspector"));
-    result.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.25,
-      DockNode.Tabs(["hierarchy", "bim", "sensors"], "hierarchy"), editorArea));
+    result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());
     return result;
   }
 
@@ -1149,7 +1113,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = sceneInspector;
-    inspector.labelWidth = viewportWidth < 820.0 ? 76.0 : 116.0;
+    inspector.labelWidth = viewportWidth < 760.0 ? 56.0 :
+      viewportWidth < 1180.0 ? 76.0 : 108.0;
     var ownership=session.scriptOwnership;
     inspector.enabled = ownership==null&&!simulation.isActive() && !viewportContent.dragging() &&
       (perspectiveViewport == null || !perspectiveViewport.dragging());

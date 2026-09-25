@@ -118,7 +118,9 @@ class Tabs implements View {
 				onTabDragCancel != null)
 				tabDragState = context.state(context.id("tab-drag"), new TabDragState());
 			for (item in items) {
-				var button = new Button(item.label, null, function() { select(item.key); }, item.key);
+				var button = new Button(item.displayLabel == null ? item.label : item.displayLabel,
+					null, function() { select(item.key); }, item.key);
+				button.accessibilityLabel = item.label;
 				button.variant = ButtonVariant.Navigation;
 				button.classes = ["tab-header"];
 				button.leadingIcon = item.icon;

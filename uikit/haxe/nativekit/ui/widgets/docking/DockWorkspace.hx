@@ -37,6 +37,8 @@ class DockWorkspace implements View {
 	public final model:DockWorkspaceModel;
 	public var interaction(default, null):DockWorkspaceInteraction;
 	public final style:LayoutStyle;
+	/** Available content height when the workspace sits below application chrome. */
+	public var availableHeight:Null<Float> = null;
 	final suppliedInteraction:Bool;
 	final panelContents:Map<String, DockPanelContent>;
 
@@ -69,7 +71,7 @@ class DockWorkspace implements View {
 		interaction = mount.interaction;
 		interaction.beginFrame();
 		var content = buildNode(model.root, context, [], "layout",
-			context.viewportWidth, context.viewportHeight);
+			context.viewportWidth, availableHeight == null ? context.viewportHeight : availableHeight);
 		var layout = new SizedBox("layout", content, LayoutAxis.grow(), LayoutAxis.grow());
 		return new Column(key, [new KeyedView("content", layout)], style).build(context);
 	}
@@ -81,12 +83,12 @@ class DockWorkspace implements View {
 		switch (node) {
 			case DockNode.Empty: return new Text("No panels");
 			case DockNode.Panel(panelId):
-				return targetView(panelId, buildTabs([panelId], panelId, context, nodeKey));
+				return targetView(panelId, buildTabs([panelId], panelId, context, nodeKey, availableWidth));
 			case DockNode.Tabs(panelIds, activePanelId):
 				var targetPanelId = activePanelId == null && panelIds != null && panelIds.length > 0
 					? panelIds[0] : activePanelId;
-				return targetPanelId == null ? buildTabs(panelIds, activePanelId, context, nodeKey) :
-					targetView(targetPanelId, buildTabs(panelIds, activePanelId, context, nodeKey));
+				return targetPanelId == null ? buildTabs(panelIds, activePanelId, context, nodeKey, availableWidth) :
+					targetView(targetPanelId, buildTabs(panelIds, activePanelId, context, nodeKey, availableWidth));
 			case DockNode.Split(axis, ratio, first, second):
 				return buildSplit(axis, ratio, first, second, context, path, nodeKey,
 					availableWidth, availableHeight);
@@ -94,14 +96,16 @@ class DockWorkspace implements View {
 	}
 
 	function buildTabs(panelIds:Array<String>, activePanelId:String,
-		context:BuildContext, nodeKey:String):View {
+		context:BuildContext, nodeKey:String, availableWidth:Float):View {
 		var items:Array<TabItem> = [];
+		var compact = panelIds != null && panelIds.length > 1 &&
+			availableWidth < panelIds.length * 100.0;
 		if (panelIds != null)
 			for (panelId in panelIds) {
 				var descriptor = model.get(panelId);
 				if (descriptor != null)
 					items.push(new TabItem(panelId, descriptor.title, panelView(panelId),
-						descriptor.enabled, descriptor.icon));
+						descriptor.enabled, descriptor.icon, compact && descriptor.icon != null ? "" : null));
 			}
 		var tabsStyle = new LayoutStyle();
 		tabsStyle.width = LayoutAxis.grow();
