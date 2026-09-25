@@ -6,11 +6,11 @@ runtime/control and endpoint adapters behind the versioned protocol exposed to
 editor clients.
 
 The executable builds a small Haxeon robot document into a bulk RobotKit
-runtime blueprint and runs it through the SimKit-backed endpoint. The normal
-process-boundary path is the NativeKit TCP server/client on loopback. The
-server owns one deployed runtime, a unique session for each connection, one
-controller lease, and any number of read-only observers; it does not become a
-multi-robot world:
+runtime blueprint. By default it uses the SimKit-backed endpoint; `--serial`
+selects the POSIX serial endpoint while preserving the same runtime and
+NativeKit TCP process boundary. The server owns one deployed runtime, a unique
+session for each connection, one controller lease, and any number of read-only
+observers; it does not become a multi-robot world:
 
 Run the current skeleton with:
 
@@ -19,6 +19,10 @@ Run the current skeleton with:
 
 # Start the authoritative robot process
 ../../haxeon/scripts/haxeon run --project haxeon.json -- --server
+
+# Host the compiled robot model through a serial device
+../../haxeon/scripts/haxeon run --project haxeon.json -- \
+  --server --serial=/dev/serial/by-id/robot-controller --baud=115200
 
 # Optionally host a Haxeon behavior inside robotd
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
@@ -30,6 +34,18 @@ Run the current skeleton with:
 
 The protocol and world TCP clients are integration tests rather than robotd
 runtime modes. Run them through `../tests/world-tcp.sh`.
+
+Run the TCP client against a pseudo-terminal device emulator to exercise the
+serial server path without motor hardware:
+
+```sh
+python3 ../tests/serial-tcp.py
+```
+
+Before connecting actual hardware, implement the device side of
+[`../runtime/SERIAL_PROTOCOL.md`](../runtime/SERIAL_PROTOCOL.md). The device
+must enforce a local actuator watchdog; a disconnected cable cannot receive a
+host emergency-stop frame.
 
 The same runtime command/controller boundary is used by simulation and by the
 first native physical endpoint (`SerialRobotEndpoint`). Sensor state is carried

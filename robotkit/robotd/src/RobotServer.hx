@@ -39,7 +39,7 @@ class RobotServer {
   final robot:RobotModel;
   final blueprint:RobotRuntimeBlueprint;
   final runtime:RobotRuntime;
-  final simulation:Simulation;
+  final simulation:Null<Simulation>;
   final nativeRuntime:NativeKitRuntime;
   final listener:OwnedListenerHandle;
   final port:Int;
@@ -67,7 +67,7 @@ class RobotServer {
   var disposed:Bool = false;
 
   public function new(robot:RobotModel, blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
-      simulation:Simulation, port:Int, robotId:Int, ?behavior:RobotBehavior) {
+      simulation:Null<Simulation>, port:Int, robotId:Int, ?behavior:RobotBehavior) {
     this.robot = robot;
     this.blueprint = blueprint;
     this.runtime = runtime;
@@ -77,12 +77,16 @@ class RobotServer {
     behaviorRunner = behavior == null ? null : new RobotBehaviorRunner(behavior);
     nativeRuntime = NativeKitRuntime.start();
     try {
-      simulation.start();
+      if (simulation != null) simulation.start();
+      else runtime.start();
       listener = NativeTransport.listen(port);
       stream = new RobotFrameStream();
       subscription = nativeRuntime.events.listen(onEvent);
     } catch (error:Dynamic) {
-      try { simulation.stop(); } catch (_:Dynamic) {}
+      try {
+        if (simulation != null) simulation.stop();
+        else runtime.stop();
+      } catch (_:Dynamic) {}
       nativeRuntime.dispose();
       throw error;
     }
@@ -138,7 +142,8 @@ class RobotServer {
     observerSessions.clear();
     observerHello.clear();
     listener.close();
-    simulation.stop();
+    if (simulation != null) simulation.stop();
+    else runtime.stop();
     nativeRuntime.dispose();
   }
 

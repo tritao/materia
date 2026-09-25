@@ -20,11 +20,20 @@ class RobotHost {
   public function run():Void {
     if (args.indexOf("--help") >= 0) {
       Sys.println("Usage: robotd [--server [--once]] [--port=N] "
-        + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] [--help]");
+        + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] "
+        + "[--serial=DEVICE [--baud=BAUD]] [--help]");
       return;
     }
     var port = parsePort();
     var robotId = parseRobotId();
+    var serialPath = parseSerialPath();
+    var baud = parseBaud();
+    var hasBaud = false;
+    for (arg in args) if (arg.indexOf("--baud=") == 0) hasBaud = true;
+    if (serialPath == null && hasBaud)
+      throw "robotd: --baud requires --serial";
+    if (serialPath != null && args.indexOf("--in-memory") >= 0)
+      throw "robotd: --serial cannot be combined with --in-memory";
     var behavior = parseBehavior();
     var robot = new RobotModel("demo-arm");
     var base = robot.addLink(new Link("base"));
@@ -57,24 +66,36 @@ class RobotHost {
     }
     var blueprint = RobotRuntimeCompiler.compile(robot);
     if (args.indexOf("--server") >= 0) {
-      var serverSimulation = new Simulation();
+      var serverSimulation:Null<Simulation> = null;
+      var serverRuntime:Null<RobotRuntime> = null;
       try {
-        var serverRuntime = serverSimulation.addRobot(blueprint);
-        var server = new RobotServer(robot, blueprint, serverRuntime, serverSimulation,
+        if (serialPath != null)
+          serverRuntime = RobotRuntime.createSerial(blueprint, serialPath, baud);
+        else {
+          serverSimulation = new Simulation();
+          serverRuntime = serverSimulation.addRobot(blueprint);
+        }
+        if (serverRuntime == null) throw "robotd: failed to create runtime";
+        var hostedRuntime:RobotRuntime = serverRuntime;
+        var server = new RobotServer(robot, blueprint, hostedRuntime, serverSimulation,
           port, robotId, behavior);
         server.run(args.indexOf("--once") >= 0);
       } catch (error:Dynamic) {
-        serverSimulation.dispose();
+        if (serverSimulation != null) serverSimulation.dispose();
+        else if (serverRuntime != null) serverRuntime.dispose();
         throw error;
       }
-      serverSimulation.dispose();
+      if (serverRuntime != null) serverRuntime.dispose();
+      if (serverSimulation != null) serverSimulation.dispose();
       return;
     }
     var inMemory = args.indexOf("--in-memory") >= 0;
-    var simulation:Null<Simulation> = inMemory ? null : new Simulation();
-    var runtime = inMemory
-      ? RobotRuntime.create(blueprint)
-      : simulation.addRobot(blueprint);
+    var simulation:Null<Simulation> = inMemory || serialPath != null ? null : new Simulation();
+    var runtime = serialPath != null
+      ? RobotRuntime.createSerial(blueprint, serialPath, baud)
+      : inMemory
+        ? RobotRuntime.create(blueprint)
+        : simulation.addRobot(blueprint);
     runtime.submitPositions([0.5], 1);
     if (simulation == null) {
       runtime.start();
@@ -84,7 +105,8 @@ class RobotHost {
       simulation.step(haxe.Int64.ofInt(1));
     }
     var snapshot = runtime.snapshot();
-    var endpoint = args.indexOf("--in-memory") >= 0 ? "in-memory" : "simkit";
+    var endpoint = serialPath != null ? "serial"
+      : inMemory ? "in-memory" : "simkit";
     Sys.println('robotd: compiled ${robot.name} with ${blueprint.jointCount} joints via $endpoint; '
       + 'native position=${snapshot.q.get(0)}');
     runtime.dispose();
@@ -112,6 +134,27 @@ class RobotHost {
       }
     }
     return 1;
+  }
+
+  function parseSerialPath():Null<String> {
+    for (arg in args) {
+      if (arg.indexOf("--serial=") != 0) continue;
+      var value = StringTools.trim(arg.substr(9));
+      if (value.length == 0) throw "robotd: --serial requires a device path";
+      return value;
+    }
+    return null;
+  }
+
+  function parseBaud():Int {
+    for (arg in args) {
+      if (arg.indexOf("--baud=") != 0) continue;
+      var value = Std.parseInt(arg.substr(7));
+      if (value == null || [9600, 19200, 38400, 57600, 115200].indexOf(value) < 0)
+        throw "robotd: --baud supports 9600, 19200, 38400, 57600, or 115200";
+      return value;
+    }
+    return 115200;
   }
 
   function parseBehavior():Null < RobotBehavior > {

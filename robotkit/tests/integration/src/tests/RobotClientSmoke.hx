@@ -36,7 +36,7 @@ class RobotClientSmoke {
         throw "robotd TCP smoke exchange timed out";
       if (stateCount < 3)
         throw "robotd TCP smoke exchange did not receive periodic snapshots";
-      Sys.println('robotd client: received simulated state q0=0.5 over TCP ($stateCount snapshots)');
+      Sys.println('robotd client: received state q0=0.5 over TCP ($stateCount snapshots)');
     } catch (error:Dynamic) {
       Sys.println('robotd client error: ${Std.string(error)}');
       client.close();

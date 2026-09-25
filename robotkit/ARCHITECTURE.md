@@ -126,6 +126,8 @@ lifecycle ownership to another layer.
 `RobotRuntime` supplied by an externally owned `Simulation`; it never creates,
 steps, stops, or disposes that simulation. `SerialRobot` compiles a model,
 creates and starts a serial-backed `RobotRuntime`, and disposes it on close.
+`robotd --server --serial=DEVICE` owns the same serial-backed runtime behind
+the existing remote protocol; without `--serial`, the server uses Simulation.
 
 The ownership matrix is deliberately boring:
 
