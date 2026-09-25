@@ -1297,6 +1297,12 @@ class RobotWorldTests {
       "costmap clears removed dynamic obstacles");
   }
 
+  static function requireLocalizationState(localization:Localization):LocalizationState {
+    var estimate = localization.state();
+    if (estimate == null) throw "Simulation scenario has no localization state";
+    return estimate;
+  }
+
   static function testNavigator():Void {
     var recoveryRobot = new FakeRobot("navigator-recovery");
     recoveryRobot.positions = [0.0, 0.0];
@@ -1363,13 +1369,15 @@ class RobotWorldTests {
     var base = MobileBase.fromBlueprint(robot, blueprint);
     var localization = new SimulationTruthLocalization(simulation, 0,
       "map", baseLink.id);
+    var scenarioLocalization = new QualityOverrideLocalization(localization);
     var lidarPerception = LidarObstaclePerception.fromBlueprint(blueprint,
       "sensor/front-lidar", 0.12, 0.05, 0.25, 0.4);
     var framedPerception = new FrameAwarePerception(lidarPerception, localization);
-    var navigation = new Navigation(base, localization, 0.25, 0.55, 1.2);
+    var navigation = new Navigation(base, scenarioLocalization, 0.25, 0.55, 1.2);
     var grid = new OccupancyGrid2(0.2, new Pose2(-2.0, -2.5),
       50, 25, "map", OccupancyCell.Free);
-    var footprint:Footprint = cast base.footprint;
+    var footprint = base.footprint;
+    if (footprint == null) throw "Simulation scenario requires a robot footprint";
     var costmap = new Costmap2(grid, footprint.radius, true, 0.3, 1.5);
     var planner = new AStarPlanner(costmap);
     var guard = new MotionGuard(navigation, footprint, 0.2, 1.5, 0.1, 0.4);
@@ -1391,29 +1399,49 @@ class RobotWorldTests {
     var initialPerception = observe(1);
     equal(initialPerception.obstacles().length, 0,
       "simulated navigation starts with a clear LiDAR observation");
-    var initialState:LocalizationState = cast localization.state();
-    var goalPose = new Pose2(initialState.pose.x + 3.5, initialState.pose.y, 0.0);
-    var goal = new NavigationGoal(goalPose, "map", 0.12, 0.15);
-    check(switch navigator.navigateTo(goal) {
+    var initialState = requireLocalizationState(localization);
+    var offPathGoalPose = new Pose2(initialState.pose.x + 1.0,
+      initialState.pose.y, initialState.pose.yaw);
+    var offPathGoal = new NavigationGoal(offPathGoalPose, "map", 0.12, 0.15);
+    check(switch navigator.navigateTo(offPathGoal) {
       case NavigatorStatus.Navigating: true;
       case _: false;
     }, "Navigator plans and starts a goal from current localization");
 
-    var status:NavigatorStatus = NavigatorStatus.Navigating;
-    for (tick in 2...42) {
-      var perception = observe(tick);
-      status = navigator.update(perception, 0.02);
+    simulatedPose = new Pose2(simulatedPose.x, simulatedPose.y + 0.6,
+      simulatedPose.yaw);
+    var tick = 2;
+    var status = navigator.update(observe(tick++), 0.02);
+    var initialOffPathError = Math.abs(navigation.crossTrackError);
+    while (tick < 1000 && status != NavigatorStatus.Succeeded) {
+      status = navigator.update(observe(tick++), 0.02);
     }
-    var movingState:LocalizationState = cast localization.state();
-    check(movingState.pose.x > initialState.pose.x + 0.05,
+    var offPathFinal = requireLocalizationState(localization);
+    check(initialOffPathError >= 0.45 && status == NavigatorStatus.Succeeded &&
+      Math.abs(offPathFinal.pose.x - offPathGoalPose.x) <= 0.16 &&
+      Math.abs(offPathFinal.pose.y - offPathGoalPose.y) <= 0.16,
+      "simulated Navigator rejoins and completes a goal after an off-path start");
+
+    var goalPose = new Pose2(initialState.pose.x + 4.0,
+      initialState.pose.y, initialState.pose.yaw);
+    var goal = new NavigationGoal(goalPose, "map", 0.12, 0.15);
+    check(switch navigator.navigateTo(goal) {
+      case NavigatorStatus.Navigating: true;
+      case _: false;
+    }, "Navigator starts a second simulated goal before an obstacle appears");
+    for (_ in 0...40) {
+      status = navigator.update(observe(tick++), 0.02);
+    }
+    var movingState = requireLocalizationState(localization);
+    check(movingState.pose.x > offPathFinal.pose.x + 0.05,
       "Navigator advances the simulated robot before an obstacle appears");
     var obstaclePose = movingState.pose.compose(new Pose2(1.3, 0.0));
     simulation.spawnBox([obstaclePose.x, obstaclePose.y, 0.2], [0.12, 0.12, 0.3]);
 
     var detectedObstacle = false;
     var pathDetoured = false;
-    for (tick in 42...1242) {
-      var perception = observe(tick);
+    for (_ in 0...1200) {
+      var perception = observe(tick++);
       if (perception.obstacles().length > 0) detectedObstacle = true;
       status = navigator.update(perception, 0.02);
       var currentPath:Null<Path> = navigator.activePath;
@@ -1427,7 +1455,7 @@ class RobotWorldTests {
       "simulated LiDAR perception detects an obstacle during navigation");
     check(navigator.replanCount > 0 && pathDetoured,
       "Navigator replans onto a route around the detected obstacle");
-    var finalState:LocalizationState = cast localization.state();
+    var finalState = requireLocalizationState(localization);
     var routeSummary:Array<String> = [];
     var finalPath:Null<Path> = navigator.activePath;
     if (finalPath != null) {
@@ -1443,6 +1471,74 @@ class RobotWorldTests {
     var finalDy = finalState.pose.y - goalPose.y;
     check(Math.sqrt(finalDx * finalDx + finalDy * finalDy) <= 0.16,
       "replanned simulated route ends inside the goal position tolerance");
+
+    var resumeGoal = new NavigationGoal(new Pose2(finalState.pose.x + 0.8,
+      finalState.pose.y, finalState.pose.yaw), "map", 0.12, 0.15);
+    check(switch navigator.navigateTo(resumeGoal) {
+      case NavigatorStatus.Navigating: true;
+      case _: false;
+    }, "Navigator accepts a follow-up goal before localization dropout");
+    scenarioLocalization.setQualityOverride(Invalid);
+    status = navigator.update(observe(tick++), 0.02);
+    check(switch status { case NavigatorStatus.Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9 &&
+      Math.abs(base.currentCommand().angular) < 1e-9,
+      "simulated Navigator stops and blocks when localization becomes invalid");
+    scenarioLocalization.setQualityOverride(Good);
+    for (_ in 0...1000) {
+      if (status == NavigatorStatus.Succeeded) break;
+      status = navigator.update(observe(tick++), 0.02);
+    }
+    check(status == NavigatorStatus.Succeeded && navigator.replanCount > 0,
+      "simulated Navigator replans and reaches its goal after localization recovers");
+
+    navigator.cancel();
+    var reverseStart = requireLocalizationState(localization);
+    var reverseGoalPose = new Pose2(reverseStart.pose.x - 0.65,
+      reverseStart.pose.y, reverseStart.pose.yaw);
+    var reverseGoal = new NavigationGoal(reverseGoalPose, "map", 0.12, 0.2);
+    navigation.follow(new Path([reverseStart.pose, reverseGoalPose], "map"),
+      reverseGoal);
+    var reverseStatus = navigation.update(0.02);
+    var commandedReverse = base.currentCommand().linear < 0.0;
+    for (_ in 0...500) {
+      if (reverseStatus == NavigationStatus.Succeeded) break;
+      observe(tick++);
+      reverseStatus = navigation.update(0.02);
+    }
+    var reverseFinal = requireLocalizationState(localization);
+    check(commandedReverse && reverseStatus == NavigationStatus.Succeeded &&
+      Math.abs(reverseFinal.pose.x - reverseGoalPose.x) <= 0.16,
+      "simulated path follower executes and completes a reverse section");
+
+    var wallColumn = 36;
+    for (y in 0...grid.height)
+      if (y < 7 || y > 17) grid.setCell(wallColumn, y, OccupancyCell.Occupied);
+    costmap.refresh();
+    var narrowGoalPose = new Pose2(7.0, 0.0, 0.0);
+    status = navigator.navigateTo(new NavigationGoal(narrowGoalPose,
+      "map", 0.14, 0.2));
+    check(switch status {
+      case NavigatorStatus.Navigating: true;
+      case _: false;
+    }, "Navigator plans through a footprint-inflated narrow passage");
+    var usedNarrowGap = false;
+    var narrowPath = navigator.activePath;
+    if (narrowPath != null) {
+      for (point in narrowPath.poses()) {
+        var cell = grid.worldToCell(point);
+        if (cell != null && cell.x == wallColumn && cell.y >= 7 && cell.y <= 17)
+          usedNarrowGap = true;
+      }
+    }
+    for (_ in 0...1200) {
+      if (status == NavigatorStatus.Succeeded) break;
+      status = navigator.update(observe(tick++), 0.02);
+    }
+    var narrowFinal = requireLocalizationState(localization);
+    check(usedNarrowGap && status == NavigatorStatus.Succeeded &&
+      Math.abs(narrowFinal.pose.x - narrowGoalPose.x) <= 0.18,
+      "simulated Navigator traverses the narrow passage and reaches its goal");
     navigator.cancel();
     robot.close();
     simulation.dispose();
@@ -2882,4 +2978,43 @@ private class FixedLocalization implements Localization {
   public function state():Null<LocalizationState> return current;
 
   public function reset(?pose:Pose2):Void current = null;
+}
+
+/** Test adapter for simulating temporary loss and recovery of localization quality. */
+private class QualityOverrideLocalization implements Localization {
+  public final source:Localization;
+  var hasQualityOverride = false;
+  var qualityOverride:LocalizationQuality = Good;
+
+  public function new(source:Localization) {
+    if (source == null) throw "Quality override requires a localization source";
+    this.source = source;
+  }
+
+  public function setQualityOverride(value:LocalizationQuality):Void {
+    hasQualityOverride = true;
+    qualityOverride = value;
+  }
+
+  public function update(snapshot:RobotSnapshot):LocalizationState {
+    return applyOverride(source.update(snapshot));
+  }
+
+  public function state():Null<LocalizationState> {
+    var estimate:Null<LocalizationState> = source.state();
+    if (estimate == null) return null;
+    return applyOverride(estimate);
+  }
+
+  function applyOverride(value:LocalizationState):LocalizationState {
+    var quality = hasQualityOverride ? qualityOverride : value.quality;
+    return new LocalizationState(value.sequence, value.pose, value.referenceFrame,
+      value.bodyFrame, value.covariance, quality, value.sourceTimestampNs,
+      value.receivedTimestampNs, value.sourceClockId, value.receivedClockId);
+  }
+
+  public function reset(?pose:Pose2):Void {
+    hasQualityOverride = false;
+    source.reset(pose);
+  }
 }
