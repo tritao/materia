@@ -26,8 +26,10 @@ class Navigation {
   public var crossTrackError(default, null):Float = 0.0;
 
   var currentPath:Null<Path> = null;
+  var currentTrajectory:Null<Trajectory> = null;
   var currentGoal:Null<NavigationGoal> = null;
   var commandedLinearSpeed:Float = 0.0;
+  var trajectoryElapsedSeconds:Float = 0.0;
 
   public function new(base:MobileBase, localization:Localization,
       ?lookaheadDistance:Float = 0.5, ?cruiseSpeed:Float = 0.5,
@@ -59,7 +61,27 @@ class Navigation {
     if (target.frameId != path.frameId)
       throw "Navigation goal and path frames must match";
     currentPath = path;
+    currentTrajectory = null;
     currentGoal = target;
+    progressDistance = 0.0;
+    crossTrackError = 0.0;
+    commandedLinearSpeed = 0.0;
+    status = Following;
+  }
+
+  /** Starts tracking a time-parameterized trajectory with pose feedback. */
+  public function followTrajectory(trajectory:Trajectory,
+      ?goal:NavigationGoal):Void {
+    if (trajectory == null) throw "Navigation.followTrajectory requires a trajectory";
+    var target = goal == null
+      ? new NavigationGoal(trajectory.goal(), trajectory.frameId)
+      : goal;
+    if (target.frameId != trajectory.frameId)
+      throw "Navigation goal and trajectory frames must match";
+    currentPath = null;
+    currentTrajectory = trajectory;
+    currentGoal = target;
+    trajectoryElapsedSeconds = 0.0;
     progressDistance = 0.0;
     crossTrackError = 0.0;
     commandedLinearSpeed = 0.0;
@@ -87,21 +109,41 @@ class Navigation {
     var state:LocalizationState = cast estimate;
     if (switch state.quality { case LocalizationQuality.Invalid: true; case _: false; })
       return fail("Localization quality is invalid");
-    var path:Path = cast currentPath;
     var goal:NavigationGoal = cast currentGoal;
-    if (state.referenceFrame != path.frameId || state.referenceFrame != goal.frameId)
-      return fail('Navigation frame mismatch: state=${state.referenceFrame}, path=${path.frameId}');
+    var frameId:String;
+    if (currentTrajectory != null) frameId = currentTrajectory.frameId;
+    else {
+      var activePath:Path = cast currentPath;
+      frameId = activePath.frameId;
+    }
+    if (state.referenceFrame != frameId || state.referenceFrame != goal.frameId)
+      return fail('Navigation frame mismatch: state=${state.referenceFrame}, target=$frameId');
 
     var dx = goal.pose.x - state.pose.x;
     var dy = goal.pose.y - state.pose.y;
     var goalDistance = Math.pow(dx * dx + dy * dy, 0.5);
     var headingError = Pose2.wrapAngle(goal.pose.yaw - state.pose.yaw);
-    if (goalDistance <= goal.positionTolerance) {
-      if (Math.abs(headingError) <= goal.headingTolerance) {
-        base.stop(StopMode.Normal);
-        status = Succeeded;
-        return status;
+    if (goalDistance <= goal.positionTolerance &&
+        Math.abs(headingError) <= goal.headingTolerance) {
+      base.stop(StopMode.Normal);
+      status = Succeeded;
+      return status;
+    }
+    if (currentTrajectory != null) {
+      var trajectory:Trajectory = cast currentTrajectory;
+      if (goalDistance <= goal.positionTolerance &&
+          trajectoryElapsedSeconds >= trajectory.durationSeconds) {
+        if (!base.driveModel.supportsInPlaceRotation())
+          return fail("Drive model cannot align final heading in place; include a final approach in the path");
+        var angular = headingError * 2.0;
+        if (angular > maxAngularSpeed) angular = maxAngularSpeed;
+        if (angular < -maxAngularSpeed) angular = -maxAngularSpeed;
+        return command(new Twist2(0.0, angular), durationSeconds);
       }
+      return updateTrajectory(state, cast currentTrajectory, durationSeconds);
+    }
+
+    if (goalDistance <= goal.positionTolerance) {
       if (!base.driveModel.supportsInPlaceRotation())
         return fail("Drive model cannot align final heading in place; include a final approach in the path");
       var angular = headingError * 2.0;
@@ -110,6 +152,7 @@ class Navigation {
       return command(new Twist2(0.0, angular), durationSeconds);
     }
 
+    var path:Path = cast currentPath;
     var projection = path.project(state.pose, progressDistance);
     progressDistance = projection.distanceAlongPath;
     crossTrackError = projection.crossTrackError;
@@ -143,6 +186,7 @@ class Navigation {
     if (isFollowing()) {
       base.stop(StopMode.Normal);
       commandedLinearSpeed = 0.0;
+      trajectoryElapsedSeconds = 0.0;
       status = Cancelled;
     }
   }
@@ -150,11 +194,33 @@ class Navigation {
   public function reset():Void {
     if (isFollowing()) base.stop(StopMode.Normal);
     currentPath = null;
+    currentTrajectory = null;
     currentGoal = null;
     progressDistance = 0.0;
     crossTrackError = 0.0;
     commandedLinearSpeed = 0.0;
+    trajectoryElapsedSeconds = 0.0;
     status = Idle;
+  }
+
+  function updateTrajectory(state:LocalizationState, trajectory:Trajectory,
+      durationSeconds:Float):NavigationStatus {
+    trajectoryElapsedSeconds = Math.min(trajectory.durationSeconds,
+      trajectoryElapsedSeconds + durationSeconds);
+    var target = trajectory.sampleAt(trajectoryElapsedSeconds);
+    var localTarget = target.pose.relativeTo(state.pose);
+    var distanceSquared = localTarget.x * localTarget.x + localTarget.y * localTarget.y;
+    var linear = target.twist.linear + 1.5 * localTarget.x;
+    if (linear > Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed))
+      linear = Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed);
+    if (linear < -Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed))
+      linear = -Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed);
+    var angular = target.twist.angular +
+      2.0 * linear * localTarget.y / Math.max(distanceSquared, 1e-6) +
+      2.0 * Pose2.wrapAngle(target.pose.yaw - state.pose.yaw);
+    if (angular > maxAngularSpeed) angular = maxAngularSpeed;
+    if (angular < -maxAngularSpeed) angular = -maxAngularSpeed;
+    return command(new Twist2(linear, angular), durationSeconds);
   }
 
   function command(twist:Twist2, durationSeconds:Float):NavigationStatus {

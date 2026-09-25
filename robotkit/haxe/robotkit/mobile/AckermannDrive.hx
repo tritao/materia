@@ -39,6 +39,8 @@ class AckermannDrive implements DriveModel {
       (twist.angular < -maxYawRate ? -maxYawRate : twist.angular));
   }
 
+  public function maxCurvature():Float return Math.tan(maxSteeringAngle) / wheelBase;
+
   public function createOdometry():Null<DifferentialOdometry> return null;
 
   public function supportsInPlaceRotation():Bool return false;

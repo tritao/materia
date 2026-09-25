@@ -174,6 +174,12 @@ to the remaining braking distance. Path waypoint yaw describes the robot body
 heading; when it faces opposite the segment tangent, the follower drives that
 segment in reverse.
 
+`Trajectory.fromPath` converts a geometric path into timed pose and body-velocity
+samples. It applies the mobile base's linear and angular speed and acceleration
+limits, a lateral acceleration limit, and the drive model's steering curvature
+limit. `Navigation.followTrajectory` tracks those samples with pose feedback;
+`follow` remains available for online geometric path following.
+
 ```haxe
 navigation.follow(new Path([startPose, stagingPose, goalPose], "odom"));
 navigation.updateObservation(robot.snapshot(), 0.02);

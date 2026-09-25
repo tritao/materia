@@ -24,6 +24,8 @@ class DifferentialDrive implements DriveModel {
 
   public function constrain(twist:Twist2):Twist2 return twist;
 
+  public function maxCurvature():Float return 1.0e300;
+
   public function createOdometry():Null<DifferentialOdometry>
     return new DifferentialOdometry(leftWheelJoint, rightWheelJoint, wheelRadius, trackWidth);
 

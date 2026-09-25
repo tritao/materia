@@ -644,6 +644,71 @@ class RobotWorldTests {
       new TrajectorySample(0.0, new Pose2(), Twist2.zero())
     ]), "Trajectory requires strictly increasing sample times");
 
+    var profileRobot = new FakeRobot("trajectory-profile");
+    profileRobot.positions = [0.0, 0.0];
+    var profileBase = new MobileBase(profileRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 1.0, 0.8, 0.5));
+    var profilePath = new Path([new Pose2(), new Pose2(2.0, 0.0, 0.0)], "odom");
+    var profiled = Trajectory.fromPath(profilePath, profileBase, 1.0, 0.5, 0.1);
+    var profiledSamples = profiled.samples();
+    var respectsLimits = profiledSamples.length > 10 &&
+      profiledSamples[0].twist.linear == 0.0 &&
+      profiledSamples[profiledSamples.length - 1].twist.linear == 0.0 &&
+      Math.abs(profiled.goal().x - 2.0) < 1e-9;
+    for (index in 0...profiledSamples.length - 1) {
+      var from = profiledSamples[index];
+      var to = profiledSamples[index + 1];
+      var interval = to.timeFromStartSeconds - from.timeFromStartSeconds;
+      var acceleration = Math.abs(to.twist.linear - from.twist.linear) / interval;
+      respectsLimits = respectsLimits && Math.abs(to.twist.linear) <= 1.0 + 1e-9 &&
+        acceleration <= 0.801;
+    }
+    check(respectsLimits,
+      "Trajectory parameterization preserves the path and profiles speed under acceleration limits");
+    var arcPoses:Array<Pose2> = [];
+    for (index in 0...9) {
+      var angle = index * 0.125;
+      arcPoses.push(new Pose2(2.0 * Math.sin(angle),
+        2.0 * (1.0 - Math.cos(angle)), angle));
+    }
+    var arcTrajectory = Trajectory.fromPath(new Path(arcPoses, "odom"),
+      profileBase, 1.0, 0.125, 0.1);
+    var maxArcSpeed = 0.0;
+    for (sample in arcTrajectory.samples())
+      maxArcSpeed = Math.max(maxArcSpeed, Math.abs(sample.twist.linear));
+    check(maxArcSpeed <= 0.51 && maxArcSpeed > 0.0,
+      "Trajectory speed obeys lateral acceleration through a curved path");
+    var trajectoryLocalization = new WheelOdometryLocalization(profileBase);
+    trajectoryLocalization.reset(new Pose2());
+    var trajectoryNavigation = new Navigation(profileBase, trajectoryLocalization,
+      0.2, 1.0, 1.0);
+    trajectoryNavigation.followTrajectory(profiled);
+    var trajectoryStatus = trajectoryNavigation.updateObservation(new RobotSnapshot(
+      "trajectory-profile", Int64.ofInt(1), Int64.ofInt(1), [0.0, 0.0], [], [],
+      1, 0, Int64.ofInt(2), [], "trajectory-clock", "host"), 0.1);
+    check(switch trajectoryStatus { case Following: true; case _: false; } &&
+      switch profileRobot.lastCommand {
+        case JointTargets(targets, _): targets.length == 2 && targets[0].target > 0.0 &&
+          targets[1].target > 0.0;
+        case _: false;
+      }, "Navigation tracks a time-parameterized trajectory through MobileBase");
+
+    var reverseTrajectory = Trajectory.fromPath(new Path([
+      new Pose2(), new Pose2(-1.0, 0.0, 0.0)
+    ], "odom"), profileBase, 0.5, 0.5, 0.1);
+    check(reverseTrajectory.sampleAt(reverseTrajectory.durationSeconds * 0.5).twist.linear < 0.0,
+      "Trajectory parameterization preserves reverse body velocity");
+    var ackermannProfileBase = new MobileBase(new FakeRobot("ackermann-profile"),
+      new AckermannDrive(0, 1, 1.0, 0.1, 0.2), new MotionLimits(1.0, 1.0));
+    throws(function() Trajectory.fromPath(new Path([
+      new Pose2(), new Pose2(1.0, 0.0, 1.0)
+    ], "odom"), ackermannProfileBase, 0.5, 0.5, 0.1),
+      "Trajectory rejects curvature beyond the authored Ackermann steering range");
+    throws(function() Trajectory.fromPath(new Path([
+      new Pose2(), new Pose2(0.0, 0.0, 1.0), new Pose2(1.0, 0.0, 1.0)
+    ], "odom"), profileBase),
+      "Trajectory rejects zero-distance pose changes that require an in-place rotation");
+
     var cornerPath = new Path([
       new Pose2(0.0, 0.0, 0.0),
       new Pose2(1.0, 0.0, 0.0),
