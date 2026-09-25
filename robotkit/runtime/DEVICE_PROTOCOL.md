@@ -1,20 +1,18 @@
-# RobotKit device protocol v5 (draft)
+# RobotKit device protocol (RKD5)
 
 This is the UART byte-stream protocol between a Linux host and a device MCU.
-Version 4 remains the active `SerialRobotEndpoint` protocol during migration.
 The fixed payload records come from `robotkit/schema/device_wire.wire.idl`.
 The hardware-independent Rust `robotkit-device-protocol` crate implements the
 device parser, session and watchdog state, and outgoing ACK/STATE encoding.
-The POSIX `HostLink` implements v5 negotiation, commands, and state sampling
-beside the v4 endpoint. Its PTY test runs the Rust device core in a separate
+The POSIX `HostLink` implements session negotiation, commands, and state sampling.
+Its PTY test runs the Rust device core in a separate
 process against the C++ host, covering session negotiation, commands, a
 simulated watchdog expiry, restart, and model rejection. It uses a virtual
 serial port; physical UART timing and MCU integration remain untested.
-`DeviceSerialEndpointV5` adapts the link to `RobotRuntime` when supplied an
+`DeviceSerialEndpoint` adapts the link to `RobotRuntime` when supplied an
 explicit fingerprint and target conversion budget. It verifies and caches the
-initial safe state before opening. The existing C ABI serial constructor still
-selects v4. `rk_robot_runtime_create_serial_v5`,
-`RobotRuntime.createSerialV5`, and `SerialRobot.createV5` opt into v5 with a
+initial safe state before opening. `rk_robot_runtime_create_serial`,
+`RobotRuntime.createSerial`, and `SerialRobot.new` require a
 32-digit deployment fingerprint and a finite nonnegative absolute target error
 budget in SI units. A device fingerprint mismatch returns
 `RK_ERROR_MODEL_MISMATCH` through the C API. An explicit runtime no-op heartbeat
@@ -72,6 +70,10 @@ The device sends an initial latched-safe `STATE` immediately after the
 `SESSION_ACK`, so the host can publish a complete joint snapshot before its
 first command. If the application cannot produce a valid state, it must remain
 safe; the host's initial sample will fail rather than invent joint values.
+After that, the device must publish `STATE` periodically, including when no
+commands arrive. The host samples an independent state stream and treats a
+silent device as a fault. The desktop PTY adapter sends state every 25 ms;
+the hardware cadence must fit the configured baud and host response deadline.
 
 Sequence numbers must start above zero and
 increase strictly within the session. Only a fully validated command accepted
@@ -100,14 +102,13 @@ joints, command is at most 544 bytes including framing and state is at most
 | 460,800 | 11.81 ms | 17.53 ms | 29.34 ms |
 | 921,600 | 5.90 ms | 8.77 ms | 14.67 ms |
 
-Supported v5 UART rates begin at 115,200 baud. A response deadline should be
+Supported UART rates begin at 115,200 baud. A response deadline should be
 derived as the full command-plus-state transmission time at the configured
 baud plus measured device processing allowance and host scheduling margin.
 For the initial implementation, reserve 10 ms processing and 20 ms scheduling;
 at 115,200 baud this yields a minimum 148 ms deadline after rounding up.
 The device watchdog period must exceed the command period plus worst-case
-command transmission and processing time, with explicit margin. Do not inherit
-v4's 9,600 baud support or its fixed 250 ms response constant by accident.
+command transmission and processing time, with explicit margin.
 
 The `f32` target/state values and 16-byte model fingerprint are draft choices.
 At magnitudes of 1, 100, and 1,000 SI units, adjacent `f32` values are about

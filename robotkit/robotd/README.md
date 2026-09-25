@@ -12,6 +12,13 @@ NativeKit TCP process boundary. The server owns one deployed runtime, a unique
 session for each connection, one controller lease, and any number of read-only
 observers; it does not become a multi-robot world:
 
+`robotd` has one control owner. Without `--behavior`, the first valid remote
+controller takes ownership. With `--behavior`, local behavior owns control and
+remote connections are observers. Controller disconnect submits an emergency
+stop and clears ownership; a new controller must explicitly reset safety.
+Client sequence numbers are checked per session, while `robotd` assigns a
+separate 64-bit sequence to the runtime command stream.
+
 Run the current skeleton with:
 
 ```sh
@@ -22,7 +29,9 @@ Run the current skeleton with:
 
 # Host the compiled robot model through a serial device
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
-  --server --serial=/dev/serial/by-id/robot-controller --baud=115200
+  --server --serial=/dev/serial/by-id/robot-controller \
+  --fingerprint=000102030405060708090a0b0c0d0e0f --target-error=0.000001 \
+  --baud=115200
 
 # Optionally host a Haxeon behavior inside robotd
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
@@ -35,23 +44,17 @@ Run the current skeleton with:
 The protocol and world TCP clients are integration tests rather than robotd
 runtime modes. Run them through `../tests/world-tcp.sh`.
 
-Run the model-driven `MobileBase`, `GoTo`, sensor, and recording parity checks
-against a pseudo-terminal device emulator to exercise the serial server path
-without motor hardware:
+The complete RobotClient → robotd → RKD5 → Rust device path runs without
+hardware through `python3 ../tests/device-tcp.py`.
 
-```sh
-python3 ../tests/serial-tcp.py
-```
-
-[`../runtime/SERIAL_PROTOCOL.md`](../runtime/SERIAL_PROTOCOL.md) describes the
-device contract, and `robotkit_serial_protocol.hpp` provides a tested RKH4/RKC4
-session and command decoder. A platform still needs firmware that connects
+[`../runtime/DEVICE_PROTOCOL.md`](../runtime/DEVICE_PROTOCOL.md) describes the
+RKD5 device contract. The Rust device protocol crate implements its session,
+command, frame, and watchdog core. A platform still needs firmware that connects
 decoded commands to its motor and sensor drivers and enforces the local
 actuator watchdog; a disconnected cable cannot receive a host emergency-stop
 frame. Each new host session begins with the device latched in emergency-stop,
 and the application must explicitly reset safety before moving.
 
-The same runtime command/controller boundary is used by simulation and by the
-first native physical endpoint (`SerialRobotEndpoint`). Sensor state is carried
-as `SensorFrameMsg` values with sensor identity, frame ID, sequence, source
-timestamp, and receive timestamp.
+The same runtime command/controller boundary is used by simulation and the
+physical endpoint (`DeviceSerialEndpoint`). Sensor data stays outside RKD5
+control acknowledgements.

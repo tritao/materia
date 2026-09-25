@@ -82,18 +82,17 @@ Select it with `new Simulation(0.01, 2, 1)`; backend `0` remains the test backen
 `Robot` interface used by `RemoteRobot`. `robotkit.world.SerialRobot` compiles
 an authored `RobotModel`, opens a POSIX serial device, and owns its standalone
 runtime. Both can be attached to `RobotWorld` and used through the same command
-and snapshot interfaces. The serial protocol carries indexed target batches,
-joint positions/velocities/efforts, and sensor samples in compiled model slot
+and snapshot interfaces. The serial protocol carries indexed target batches and
+joint positions/velocities/efforts in compiled model slot
 order. `robotd --server --serial=DEVICE` hosts that same endpoint behind the
-existing remote protocol; see the serial protocol document before implementing
-device firmware.
+existing remote protocol; see [the device protocol](runtime/DEVICE_PROTOCOL.md)
+before implementing device firmware.
 
-The serial constructors above still use v4. For an explicit v5 connection,
-use `SerialRobot.createV5(id, model, devicePath, fingerprintHex,
-maxTargetError)` or `RobotRuntime.createSerialV5(...)`. The fingerprint comes
+Use `new SerialRobot(id, model, devicePath, fingerprintHex, maxTargetError)`
+or `RobotRuntime.createSerial(...)`. The fingerprint comes
 from `robotkit/tools/device_fingerprint.py`; the error budget is the largest
 allowed `double` to `f32` target rounding error in the target's SI units.
-V5 state packets contain joint/control state only, with no bulk sensors.
+RKD5 state packets contain joint/control state only, with no bulk sensors.
 
 The complete ownership and tick model is documented in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).

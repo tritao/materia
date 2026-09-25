@@ -1,5 +1,5 @@
-#include "robotkit_device_host_v5.hpp"
-#include "robotkit_device_serial_endpoint_v5.hpp"
+#include "robotkit_device_host.hpp"
+#include "robotkit_device_serial_endpoint.hpp"
 
 #include <array>
 #include <chrono>
@@ -13,7 +13,7 @@
 
 #define CHECK(condition) do { if (!(condition)) { std::fprintf(stderr, "check failed at line %d: %s\n", __LINE__, #condition); std::abort(); } } while (false)
 
-namespace v5 = robotkit::v5;
+namespace device = robotkit::device;
 
 rk_robot_runtime_blueprint blueprint() {
     rk_robot_runtime_blueprint value{};
@@ -57,32 +57,32 @@ int main(int argc, char **argv) {
     }
     ::close(control[0]);
     std::array<std::uint8_t, 16> fingerprint{};
-    CHECK(!v5::HostLink::open(slave, 115200, fingerprint, 1));
+    CHECK(!device::HostLink::open(slave, 115200, fingerprint, 1));
     for (std::size_t i = 0; i < fingerprint.size(); ++i)
         fingerprint[i] = static_cast<std::uint8_t>(i);
     {
-        auto link = v5::HostLink::open(slave, 115200, fingerprint, 1);
+        auto link = device::HostLink::open(slave, 115200, fingerprint, 1);
         CHECK(link && link->ready() && link->last_session_status() == 1);
-        v5::HostState state{};
+        device::HostState state{};
         CHECK(link->read_state(state));
         CHECK(state.header.safety == 2 && state.header.accepted_sequence == 0 && state.header.timestamp_ns == 0);
         CHECK(link->send_command(4));
         CHECK(link->read_state(state));
         CHECK(state.header.safety == 0 && state.header.accepted_sequence == 1);
-        const std::array<v5::HostTarget, 1> lossy{{{0, 2, 1.1}}};
+        const std::array<device::HostTarget, 1> lossy{{{0, 2, 1.1}}};
         CHECK(!link->send_targets(lossy, 1e-9));
         CHECK(!link->send_targets(lossy, -1.0));
-        const std::array<v5::HostTarget, 1> too_large{{{0, 2, std::numeric_limits<double>::max()}}};
+        const std::array<device::HostTarget, 1> too_large{{{0, 2, std::numeric_limits<double>::max()}}};
         CHECK(!link->send_targets(too_large, 1.0));
-        const std::array<v5::HostTarget, 1> not_finite{{{0, 2, std::numeric_limits<double>::quiet_NaN()}}};
+        const std::array<device::HostTarget, 1> not_finite{{{0, 2, std::numeric_limits<double>::quiet_NaN()}}};
         CHECK(!link->send_targets(not_finite, 1.0));
-        const std::array<v5::HostTarget, 1> too_small{{{0, 2, std::numeric_limits<double>::denorm_min()}}};
+        const std::array<device::HostTarget, 1> too_small{{{0, 2, std::numeric_limits<double>::denorm_min()}}};
         CHECK(!link->send_targets(too_small, 1.0));
         CHECK(link->last_sent_sequence() == 1);
         CHECK(link->send_targets(lossy, 1e-6));
         CHECK(link->read_state(state));
         CHECK(state.header.accepted_sequence == 2 && state.joints[0].velocity == -2.0f);
-        const std::array<v5::HostTarget, 1> rejected_target{{{0, 2, 2.0}}};
+        const std::array<device::HostTarget, 1> rejected_target{{{0, 2, 2.0}}};
         CHECK(link->send_targets(rejected_target, 0.0));
         CHECK(::write(control[1], "F", 1) == 1);
         CHECK(link->read_state(state));
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
         CHECK(previous_session != 0 && link->last_sent_sequence() == 3);
         CHECK(link->begin_session());
         CHECK(link->session_id() != previous_session && link->last_sent_sequence() == 0);
-        auto endpoint = robotkit::DeviceSerialEndpointV5::attach(std::move(link), 1, 1e-6);
+        auto endpoint = robotkit::DeviceSerialEndpoint::attach(std::move(link), 1, 1e-6);
         CHECK(endpoint && endpoint->initial_safety_state() == RK_SAFETY_EMERGENCY_STOP);
         robotkit::RobotRuntime runtime(blueprint(), endpoint, std::chrono::milliseconds(10));
         rk_robot_state runtime_state{};
@@ -129,18 +129,18 @@ int main(int argc, char **argv) {
     constexpr char fingerprint_hex[] = "000102030405060708090a0b0c0d0e0f";
     auto layout = blueprint();
     rk_robot_runtime handle = RK_INVALID_ROBOT_RUNTIME;
-    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+    CHECK(rk_robot_runtime_create_serial(&layout, slave, 115200,
         "00000000000000000000000000000000", 1e-6, &handle) == RK_ERROR_INVALID_ARGUMENT);
-    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+    CHECK(rk_robot_runtime_create_serial(&layout, slave, 115200,
         "not-a-fingerprint", 1e-6, &handle) == RK_ERROR_INVALID_ARGUMENT);
-    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+    CHECK(rk_robot_runtime_create_serial(&layout, slave, 115200,
         fingerprint_hex, -1.0, &handle) == RK_ERROR_INVALID_ARGUMENT);
-    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+    CHECK(rk_robot_runtime_create_serial(&layout, slave, 115200,
         fingerprint_hex, 1e-6, &handle) == RK_OK);
     CHECK(handle != RK_INVALID_ROBOT_RUNTIME);
     rk_robot_runtime_destroy(handle);
     handle = RK_INVALID_ROBOT_RUNTIME;
-    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+    CHECK(rk_robot_runtime_create_serial(&layout, slave, 115200,
         "010102030405060708090a0b0c0d0e0f", 1e-6, &handle) == RK_ERROR_MODEL_MISMATCH);
     CHECK(handle == RK_INVALID_ROBOT_RUNTIME);
     ::close(control[1]);

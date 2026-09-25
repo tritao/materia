@@ -16,6 +16,10 @@ if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" == "1" ]]; then
   server_mode="--server"
   client_mode="--sessions"
 fi
+if [[ "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" == "1" ]]; then
+  server_mode="--server --behavior=oscillate"
+  client_mode="--local-owner"
+fi
 setsid "$repo_dir/haxeon/scripts/haxeon" run --project "$server_project" -- \
   $server_mode --multi-joint --robot-id=42 --port="$port" >"$server_log" 2>&1 &
 server_pid=$!
@@ -62,7 +66,7 @@ fi
 sleep 0.1
 "$repo_dir/haxeon/scripts/haxeon" run --project "$client_project" -- \
   --port="$port" $client_mode
-if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" ]]; then
+if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" && "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" != "1" ]]; then
   wait "$server_pid"
   trap - EXIT
 fi

@@ -13,7 +13,7 @@ RobotWorld
     ├── RemoteRobot
     │   └── RobotClient ── RobotProtocol ── robotd / physical process
     ├── SerialRobot
-    │   └── RuntimeRobotAdapter ── RobotRuntime ── SerialRobotEndpoint
+    │   └── RuntimeRobotAdapter ── RobotRuntime ── DeviceSerialEndpoint
     └── SimulatedRobot
         └── RuntimeRobotAdapter ── RobotRuntime ──┐
                                                    ▼
@@ -182,12 +182,11 @@ positions are checked against the compiled envelope. Stale/malformed samples,
 limit violations, and endpoint failures latch a runtime fault and trigger a
 best-effort emergency-stop command through the same endpoint boundary.
 
-The first concrete physical backend is `SerialRobotEndpoint`: a framed POSIX
-command/state stream with bounded variable payloads, CRC-32, and sensor slot
-transport. It is intentionally a specific endpoint, not a universal driver
-hierarchy. It waits for a fresh state frame and faults on a disconnected or
-silent device, keeping stale sensor data visible to the same safety boundary
-used by simulation. The serial protocol document defines the firmware contract.
+The physical backend is `DeviceSerialEndpoint`: a framed POSIX command/state
+stream with bounded payloads and CRC-32. It waits for fresh control state and
+faults on a disconnected or silent device. Sensor traffic stays outside its
+control acknowledgement path. The device protocol document defines the
+firmware contract.
 
 `Simulation` is the shared ownership boundary for local physics. It owns the
 SceneKit scene, SimKit world and host, physics resources, simulation clock,

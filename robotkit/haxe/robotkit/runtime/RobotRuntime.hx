@@ -32,33 +32,21 @@ class RobotRuntime {
     return new RobotRuntime(result.out_runtime, blueprint);
   }
 
-  /** Creates a standalone runtime over a POSIX serial robot endpoint. */
+  /** Creates a serial runtime using a deployed layout fingerprint and SI-unit error budget. */
   public static function createSerial(blueprint:RobotRuntimeBlueprint,
-      devicePath:String, ?baud:Int = 115200):RobotRuntime {
+      devicePath:String, fingerprintHex:String, maxTargetError:Float,
+      ?baud:Int = 115200):RobotRuntime {
     if (blueprint == null) throw "Serial runtime requires a compiled blueprint";
     if (devicePath == null || StringTools.trim(devicePath).length == 0)
       throw "Serial runtime requires a device path";
-    var result = RobotKitRuntime.rk_robot_runtime_create_serial(
-      blueprint.nativeValue(), devicePath, baud);
-    check(result.status, "runtime.createSerial");
-    return new RobotRuntime(result.out_runtime, blueprint);
-  }
-
-  /** Creates a v5 serial runtime using a deployed layout fingerprint and SI-unit error budget. */
-  public static function createSerialV5(blueprint:RobotRuntimeBlueprint,
-      devicePath:String, fingerprintHex:String, maxTargetError:Float,
-      ?baud:Int = 115200):RobotRuntime {
-    if (blueprint == null) throw "Serial v5 runtime requires a compiled blueprint";
-    if (devicePath == null || StringTools.trim(devicePath).length == 0)
-      throw "Serial v5 runtime requires a device path";
     if (fingerprintHex == null || !~/^[0-9a-fA-F]{32}$/.match(fingerprintHex) ||
         fingerprintHex.toLowerCase() == "00000000000000000000000000000000")
-      throw "Serial v5 runtime requires a nonzero 32-digit fingerprint";
+      throw "Serial runtime requires a nonzero 32-digit fingerprint";
     if (!Math.isFinite(maxTargetError) || maxTargetError < 0.0)
-      throw "Serial v5 runtime requires a finite nonnegative target error budget";
-    var result = RobotKitRuntime.rk_robot_runtime_create_serial_v5(
+      throw "Serial runtime requires a finite nonnegative target error budget";
+    var result = RobotKitRuntime.rk_robot_runtime_create_serial(
       blueprint.nativeValue(), devicePath, baud, fingerprintHex, maxTargetError);
-    check(result.status, "runtime.createSerialV5");
+    check(result.status, "runtime.createSerial");
     return new RobotRuntime(result.out_runtime, blueprint);
   }
 
@@ -78,11 +66,16 @@ class RobotRuntime {
   /** Submits a complete heterogeneous joint-target batch in one native call. */
   public function submitTargets(targets:Array<robotkit.world.JointTarget>, sequence:Int,
       ?timestampNs:haxe.Int64):Void {
+    submitTargets64(targets, haxe.Int64.ofInt(sequence), timestampNs);
+  }
+
+  public function submitTargets64(targets:Array<robotkit.world.JointTarget>, sequence:haxe.Int64,
+      ?timestampNs:haxe.Int64):Void {
     ensureLive();
     var batch = robotkit.world.JointTarget.copyBatch(targets);
     var command = new rk_robot_command();
     command.set_struct_size(rk_robot_command.size());
-    command.set_sequence(haxe.Int64.ofInt(sequence));
+    command.set_sequence(sequence);
     command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_JOINT_TARGETS);
     command.set_target_count(batch.length);
@@ -109,10 +102,15 @@ class RobotRuntime {
   /** Submits all position targets in one native call. */
   public function submitPositions(positions:Array<Float>, sequence:Int,
       ?timestampNs:haxe.Int64):Void {
+    submitPositions64(positions, haxe.Int64.ofInt(sequence), timestampNs);
+  }
+
+  public function submitPositions64(positions:Array<Float>, sequence:haxe.Int64,
+      ?timestampNs:haxe.Int64):Void {
     var targets:Array<robotkit.world.JointTarget> = [];
     for (index in 0...positions.length)
       targets.push(robotkit.world.JointTarget.position(index, positions[index]));
-    submitTargets(targets, sequence, timestampNs);
+    submitTargets64(targets, sequence, timestampNs);
   }
 
   /** Submits one position target without implying ownership of a simulation tick. */
@@ -124,10 +122,14 @@ class RobotRuntime {
 
   /** Submits a stop to the owner thread; it never steps synchronously. */
   public function submitStop(sequence:Int, emergency:Bool):Void {
+    submitStop64(haxe.Int64.ofInt(sequence), emergency);
+  }
+
+  public function submitStop64(sequence:haxe.Int64, emergency:Bool):Void {
     ensureLive();
     var command = new rk_robot_command();
     command.set_struct_size(rk_robot_command.size());
-    command.set_sequence(haxe.Int64.ofInt(sequence));
+    command.set_sequence(sequence);
     command.set_timestamp_ns(haxe.Int64.ofInt(0));
     command.set_kind(emergency
       ? RobotKitRuntimeConstants.RK_COMMAND_EMERGENCY_STOP
@@ -139,10 +141,14 @@ class RobotRuntime {
 
   /** Clears a latched safety stop only after the application has acknowledged it. */
   public function resetSafety(sequence:Int):Void {
+    resetSafety64(haxe.Int64.ofInt(sequence));
+  }
+
+  public function resetSafety64(sequence:haxe.Int64):Void {
     ensureLive();
     var command = new rk_robot_command();
     command.set_struct_size(rk_robot_command.size());
-    command.set_sequence(haxe.Int64.ofInt(sequence));
+    command.set_sequence(sequence);
     command.set_timestamp_ns(haxe.Int64.ofInt(0));
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_RESET_SAFETY);
     command.set_target_count(0);

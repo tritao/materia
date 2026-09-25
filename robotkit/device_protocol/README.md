@@ -13,7 +13,9 @@ safety reset is allowed, and return a bounded joint snapshot. After a session
 begin, `feed` emits `SESSION_ACK` followed by an initial latched-safe `STATE`
 through a callback; that callback must copy or queue each borrowed frame
 before returning. `encode_state` writes later `STATE` frames into a
-caller-owned buffer.
+caller-owned buffer. The adapter must call it periodically even without new
+commands; the host runtime faults if state stops arriving. The desktop PTY
+adapter uses a 25 ms state interval.
 
 Call `poll_watchdog` from a device-local clock task with the configured timeout
 even when no bytes arrive. On expiry it calls `stop_all`, latches safety, and
@@ -21,5 +23,5 @@ clears watchdog credit. The physical safety circuit and RTIC scheduling remain
 the responsibility of the MCU adapter.
 
 The host-side POSIX `HostLink` and PTY exchange test live under
-`robotkit/runtime`. Version 4 remains the active `SerialRobotEndpoint` until
-the v5 endpoint is integrated into RobotRuntime and hardware validation passes.
+`robotkit/runtime`. The host runtime uses RKD5; physical UART and MCU validation
+remain to be done.

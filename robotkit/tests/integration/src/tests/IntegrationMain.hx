@@ -5,6 +5,10 @@ class IntegrationMain {
     var arguments = Sys.args();
     var port = parsePort(arguments);
     if (arguments.indexOf("--smoke") >= 0) RobotClientSmoke.run("127.0.0.1", port);
+    else if (arguments.indexOf("--device") >= 0)
+      RobotSessionIntegration.runDevice("127.0.0.1", port);
+    else if (arguments.indexOf("--local-owner") >= 0)
+      RobotSessionIntegration.runLocalOwner("127.0.0.1", port);
     else if (arguments.indexOf("--sessions") >= 0) RobotSessionIntegration.run("127.0.0.1", port);
     else if (arguments.indexOf("--restart-check") >= 0)
       WorldTcpIntegration.runRestartCheck("127.0.0.1", port);

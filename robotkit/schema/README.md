@@ -1,9 +1,9 @@
-# RobotKit device payload schema (draft v5)
+# RobotKit device payload schema (RKD5)
 
 `device_wire.wire.idl` defines fixed binary payload records only. The generated
 C++ and Rust codecs have no MessagePack or transport dependency. `wire.json`
 selects the packed backends; the lock records published field order and sizes.
-The [v5 device protocol](../runtime/DEVICE_PROTOCOL_V5.md) specifies framing,
+The [v5 device protocol](../runtime/DEVICE_PROTOCOL.md) specifies framing,
 session behavior, limits, and timing around these records.
 
 The hardware-independent Rust device core in `device_protocol/src/runtime.rs`
@@ -25,6 +25,5 @@ protocol decoder. The outer frame supplies the message type and payload size.
 
 The `f32` joint values are a proposed wire precision. The host's double-to-f32
 target path now requires an explicit absolute error budget; physical resolution
-and state range still need validation before freezing the v5 schema. The
-current v4 serial endpoint remains active until v5 conformance and safety
+and state range still need validation before freezing the schema. Safety
 tests pass.

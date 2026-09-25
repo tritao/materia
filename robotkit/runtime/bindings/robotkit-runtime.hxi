@@ -223,13 +223,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_robot_runtime_create(blueprint: ptr<const<rk_robot_runtime_blueprint>>, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
 	/**
-	 * Creates a standalone runtime over RobotKit's framed POSIX serial endpoint.
+	 * Creates a serial runtime; fingerprint is 32 hex digits and error is in target SI units.
 	 */
-	extern fn rk_robot_runtime_create_serial(blueprint: ptr<const<rk_robot_runtime_blueprint>>, device_path: utf8, baud: u32, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
-	/**
-	 * Explicit v5 runtime; fingerprint is 32 hex digits and error is in target SI units.
-	 */
-	extern fn rk_robot_runtime_create_serial_v5(blueprint: ptr<const<rk_robot_runtime_blueprint>>, device_path: utf8, baud: u32, fingerprint_hex: utf8, max_target_error: f64, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
+	extern fn rk_robot_runtime_create_serial(blueprint: ptr<const<rk_robot_runtime_blueprint>>, device_path: utf8, baud: u32, fingerprint_hex: utf8, max_target_error: f64, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
 	/**
 	 * Stops and releases a standalone runtime handle.
 	 *

@@ -1,5 +1,5 @@
-#include "robotkit_device_host_v5.hpp"
-#include "robotkit_device_protocol_v5.hpp"
+#include "robotkit_device_host.hpp"
+#include "robotkit_device_protocol.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -9,7 +9,7 @@
 #include <random>
 
 #if defined(_WIN32)
-#error "RobotKit v5 HostLink currently targets POSIX serial devices"
+#error "RobotKit HostLink currently targets POSIX serial devices"
 #else
 #include <fcntl.h>
 #include <poll.h>
@@ -17,7 +17,7 @@
 #include <unistd.h>
 #endif
 
-namespace robotkit::v5 {
+namespace robotkit::device {
 namespace {
 
 speed_t baud_value(unsigned baud) {
@@ -271,4 +271,4 @@ bool HostLink::read_state(HostState &state) {
     return false;
 }
 
-} // namespace robotkit::v5
+} // namespace robotkit::device

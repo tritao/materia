@@ -24,13 +24,28 @@ class RobotHost {
     if (args.indexOf("--help") >= 0) {
       Sys.println("Usage: robotd [--server [--once]] [--port=N] "
         + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] "
-        + "[--serial=DEVICE [--baud=BAUD]] [--help]");
+        + "[--serial=DEVICE --fingerprint=32_HEX --target-error=SI_VALUE "
+        + "[--baud=BAUD]] [--help]");
       return;
     }
     var port = parsePort();
     var robotId = parseRobotId();
     var serialPath = parseSerialPath();
     var baud = parseBaud();
+    var fingerprint = optionValue("--fingerprint=");
+    var targetErrorText = optionValue("--target-error=");
+    if (serialPath != null) {
+      if (fingerprint == null || !~/^[0-9a-fA-F]{32}$/.match(fingerprint) ||
+          fingerprint.toLowerCase() == "00000000000000000000000000000000")
+        throw "robotd: --serial requires a nonzero 32-digit --fingerprint";
+      if (targetErrorText == null)
+        throw "robotd: --serial requires --target-error in SI units";
+    } else if (fingerprint != null || targetErrorText != null) {
+      throw "robotd: --fingerprint and --target-error require --serial";
+    }
+    var targetError = targetErrorText == null ? 0.0 : Std.parseFloat(targetErrorText);
+    if (!Math.isFinite(targetError) || targetError < 0.0)
+      throw "robotd: --target-error must be finite and nonnegative";
     var hasBaud = false;
     for (arg in args) if (arg.indexOf("--baud=") == 0) hasBaud = true;
     if (serialPath == null && hasBaud)
@@ -85,7 +100,8 @@ class RobotHost {
       var serverRuntime:Null<RobotRuntime> = null;
       try {
         if (serialPath != null)
-          serverRuntime = RobotRuntime.createSerial(blueprint, serialPath, baud);
+          serverRuntime = RobotRuntime.createSerial(blueprint, serialPath,
+            fingerprint, targetError, baud);
         else {
           serverSimulation = new Simulation();
           serverRuntime = serverSimulation.addRobot(blueprint);
@@ -107,7 +123,7 @@ class RobotHost {
     var inMemory = args.indexOf("--in-memory") >= 0;
     var simulation:Null<Simulation> = inMemory || serialPath != null ? null : new Simulation();
     var runtime = serialPath != null
-      ? RobotRuntime.createSerial(blueprint, serialPath, baud)
+      ? RobotRuntime.createSerial(blueprint, serialPath, fingerprint, targetError, baud)
       : inMemory
         ? RobotRuntime.create(blueprint)
         : simulation.addRobot(blueprint);
@@ -161,12 +177,17 @@ class RobotHost {
     return null;
   }
 
+  function optionValue(prefix:String):Null<String> {
+    for (arg in args) if (arg.indexOf(prefix) == 0) return StringTools.trim(arg.substr(prefix.length));
+    return null;
+  }
+
   function parseBaud():Int {
     for (arg in args) {
       if (arg.indexOf("--baud=") != 0) continue;
       var value = Std.parseInt(arg.substr(7));
-      if (value == null || [9600, 19200, 38400, 57600, 115200].indexOf(value) < 0)
-        throw "robotd: --baud supports 9600, 19200, 38400, 57600, or 115200";
+      if (value == null || [115200, 230400, 460800, 921600].indexOf(value) < 0)
+        throw "robotd: --baud supports 115200, 230400, 460800, or 921600";
       return value;
     }
     return 115200;

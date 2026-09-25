@@ -3,10 +3,8 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/runtime.cpp
     src/runtime_c_api.cpp
     src/recording.cpp
-    src/device_host_v5.cpp
-    src/device_serial_endpoint_v5.cpp
-    src/serial_protocol.cpp
-    src/serial_endpoint.cpp)
+    src/device_host.cpp
+    src/device_serial_endpoint.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
@@ -53,13 +51,13 @@ if(RK_BUILD_TESTS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../schema/device_wire_vectors.tsv)
     set_tests_properties(robotkit_device_wire PROPERTIES LABELS "robot;wire;codegen" TIMEOUT 30)
 
-    add_executable(robotkit_device_protocol_v5_tests tests/device_protocol_v5.cpp)
-    target_compile_features(robotkit_device_protocol_v5_tests PRIVATE cxx_std_20)
-    target_include_directories(robotkit_device_protocol_v5_tests PRIVATE
+    add_executable(robotkit_device_protocol_tests tests/device_protocol.cpp)
+    target_compile_features(robotkit_device_protocol_tests PRIVATE cxx_std_20)
+    target_include_directories(robotkit_device_protocol_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/generated)
-    add_test(NAME robotkit_device_protocol_v5 COMMAND robotkit_device_protocol_v5_tests
+    add_test(NAME robotkit_device_protocol COMMAND robotkit_device_protocol_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/../schema/device_frame_vectors.tsv)
-    set_tests_properties(robotkit_device_protocol_v5 PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
+    set_tests_properties(robotkit_device_protocol PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
 
     add_executable(robotkit_validation_tests tests/validation.cpp)
     target_compile_features(robotkit_validation_tests PRIVATE cxx_std_20)
@@ -102,28 +100,15 @@ if(RK_BUILD_TESTS)
                     ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/device_wire.rs
                 VERBATIM)
             add_custom_target(robotkit_pty_device DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device)
-            add_executable(robotkit_device_host_v5_pty_tests tests/device_host_v5_pty.cpp)
-            target_compile_features(robotkit_device_host_v5_pty_tests PRIVATE cxx_std_20)
-            target_link_libraries(robotkit_device_host_v5_pty_tests PRIVATE RobotKit::runtime)
-            add_dependencies(robotkit_device_host_v5_pty_tests robotkit_pty_device)
-            add_test(NAME robotkit_device_host_v5_pty COMMAND robotkit_device_host_v5_pty_tests
+            add_executable(robotkit_device_host_pty_tests tests/device_host_pty.cpp)
+            target_compile_features(robotkit_device_host_pty_tests PRIVATE cxx_std_20)
+            target_link_libraries(robotkit_device_host_pty_tests PRIVATE RobotKit::runtime)
+            add_dependencies(robotkit_device_host_pty_tests robotkit_pty_device)
+            add_test(NAME robotkit_device_host_pty COMMAND robotkit_device_host_pty_tests
                 ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device)
-            set_tests_properties(robotkit_device_host_v5_pty PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
+            set_tests_properties(robotkit_device_host_pty PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
         endif()
 
-        add_executable(robotkit_serial_protocol_tests tests/serial_protocol.cpp)
-        target_compile_features(robotkit_serial_protocol_tests PRIVATE cxx_std_20)
-        target_link_libraries(robotkit_serial_protocol_tests PRIVATE RobotKit::runtime)
-        add_test(NAME robotkit_serial_protocol COMMAND robotkit_serial_protocol_tests)
-        set_tests_properties(robotkit_serial_protocol PROPERTIES LABELS "robot;runtime;hardware"
-            TIMEOUT 30)
-
-        add_executable(robotkit_serial_endpoint_tests tests/serial_endpoint.cpp)
-        target_compile_features(robotkit_serial_endpoint_tests PRIVATE cxx_std_20)
-        target_link_libraries(robotkit_serial_endpoint_tests PRIVATE RobotKit::runtime)
-        add_test(NAME robotkit_serial_endpoint COMMAND robotkit_serial_endpoint_tests)
-        set_tests_properties(robotkit_serial_endpoint PROPERTIES LABELS "robot;runtime;hardware"
-            TIMEOUT 30)
     endif()
 endif()
 

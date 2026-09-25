@@ -424,12 +424,8 @@ typedef uint32_t rk_robot_runtime RK_HANDLE RK_HANDLE_DESTROY(rk_robot_runtime_d
  */
 RK_API rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprint *blueprint,
                                            rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
-/** Creates a standalone runtime over RobotKit's framed POSIX serial endpoint. */
+/** Creates a serial runtime; fingerprint is 32 hex digits and error is in target SI units. */
 RK_API rk_result RK_CALL rk_robot_runtime_create_serial(
-    const rk_robot_runtime_blueprint *blueprint, const char *device_path RK_UTF8,
-    uint32_t baud, rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
-/** Explicit v5 runtime; fingerprint is 32 hex digits and error is in target SI units. */
-RK_API rk_result RK_CALL rk_robot_runtime_create_serial_v5(
     const rk_robot_runtime_blueprint *blueprint, const char *device_path RK_UTF8,
     uint32_t baud, const char *fingerprint_hex RK_UTF8,
     double max_target_error, rk_robot_runtime *out_runtime RK_OUT RK_OWNED);

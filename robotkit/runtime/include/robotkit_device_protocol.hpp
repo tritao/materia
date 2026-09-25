@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <span>
 
-namespace robotkit::v5 {
+namespace robotkit::device {
 
 namespace wire = robotkit::device_wire;
 inline constexpr std::array<std::uint8_t, 4> magic{'R', 'K', 'D', '5'};
@@ -230,4 +230,4 @@ private:
     Statistics statistics_{};
 };
 
-} // namespace robotkit::v5
+} // namespace robotkit::device

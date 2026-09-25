@@ -10,7 +10,7 @@
 #include <span>
 #include <vector>
 
-namespace robotkit::v5 {
+namespace robotkit::device {
 
 struct HostState {
     device_wire::StateHeader header{};
@@ -24,7 +24,7 @@ struct HostTarget {
     double value;
 };
 
-/** POSIX v5 link used beside the active v4 SerialRobotEndpoint. */
+/** POSIX link for the RKD5 device protocol. */
 class RK_API HostLink final {
 public:
     HostLink(int descriptor, bool take_ownership, unsigned baud,
@@ -65,4 +65,4 @@ private:
     bool ready_ = false;
 };
 
-} // namespace robotkit::v5
+} // namespace robotkit::device

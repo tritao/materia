@@ -35,6 +35,12 @@ import robotkit.protocol.SensorFrameMsg;
 import robotkit.transport.NativeTransport;
 import robotkit.world.RobotSensorFrames;
 
+private enum ControlOwner {
+  None;
+  LocalBehavior;
+  RemoteController(session:Int64);
+}
+
 /** Authoritative robot process boundary. RobotRuntime ownership stays off the network path. */
 class RobotServer {
   final robot:RobotModel;
@@ -56,14 +62,16 @@ class RobotServer {
   final snapshots = new RobotSnapshotMailbox();
   var sessionId:haxe.Int64 = haxe.Int64.ofInt(0);
   var nextSessionId:haxe.Int64 = haxe.Int64.ofInt(1);
-  var controllerGranted:Bool = true;
+  var controllerGranted:Bool = false;
   var lastRequestSequence:haxe.Int64 = haxe.Int64.ofInt(0);
   var lastSentSnapshotSequence:haxe.Int64 = haxe.Int64.ofInt(-1);
+  var lastPublishedSnapshotSequence:haxe.Int64 = haxe.Int64.ofInt(-1);
   var helloComplete:Bool = false;
   var servedState:Bool = false;
   var onceMode:Bool = false;
   var behaviorPositions:Null<Array<Float>> = null;
-  var behaviorSequence:Int = 0;
+  var controlOwner:ControlOwner = None;
+  var runtimeSequence:Int64 = Int64.ofInt(0);
   var behaviorStopped:Bool = false;
   var disposed:Bool = false;
 
@@ -76,6 +84,7 @@ class RobotServer {
     this.port = port;
     this.robotId = robotId;
     behaviorRunner = behavior == null ? null : new RobotBehaviorRunner(behavior);
+    if (behaviorRunner != null) controlOwner = LocalBehavior;
     nativeRuntime = NativeKitRuntime.start();
     try {
       if (simulation != null) simulation.start();
@@ -130,6 +139,7 @@ class RobotServer {
     disposed = true;
     subscription.dispose();
     var currentClient = client;
+    releaseRemoteOwner();
     client = null;
     helloComplete = false;
     if (currentClient != null) {
@@ -184,7 +194,7 @@ class RobotServer {
       stream = new RobotFrameStream();
       servedState = false;
       helloComplete = false;
-      controllerGranted = true;
+      controllerGranted = false;
       sessionId = nextSessionId;
       nextSessionId = haxe.Int64.add(nextSessionId, haxe.Int64.ofInt(1));
       lastRequestSequence = haxe.Int64.ofInt(0);
@@ -231,7 +241,8 @@ class RobotServer {
     }
   }
 
-  function handleFrame(frame:RobotFrame):Void switch frame.messageType {
+  function handleFrame(frame:RobotFrame):Void {
+    switch frame.messageType {
     case RobotMessageType.Hello:
       handleHello(RobotProtocol.decodeHello(frame));
     case RobotMessageType.JointTarget:
@@ -240,12 +251,12 @@ class RobotServer {
       handleJointTargets(frame, RobotProtocol.decodeJointTargets(frame));
     case RobotMessageType.Stop:
       var value:Stop = RobotProtocol.decodeStop(frame);
-      if (!controllerGranted || !sameRobot(value.robotId) || !validSession(frame)
+      if (!remoteOwnsControl() || !sameRobot(value.robotId) || !validSession(frame)
           || !validCommandSequence(frame.sequence)) {
         sendFault(400, "invalid stop session", false);
       } else {
         try {
-          runtime.submitStop(Int64.toInt(frame.sequence), value.emergency);
+          runtime.submitStop64(nextRuntimeSequence(), value.emergency);
           lastRequestSequence = frame.sequence;
         } catch (error:Dynamic) {
           sendFault(422, 'stop rejected: $error', false);
@@ -253,12 +264,12 @@ class RobotServer {
       }
     case RobotMessageType.SafetyReset:
       var value:SafetyReset = RobotProtocol.decodeSafetyReset(frame);
-      if (!controllerGranted || !sameRobot(value.robotId) || !validSession(frame)
+      if (!remoteOwnsControl() || !sameRobot(value.robotId) || !validSession(frame)
           || !validCommandSequence(frame.sequence)) {
         sendFault(400, "invalid safety reset session", false);
       } else {
         try {
-          runtime.resetSafety(Int64.toInt(frame.sequence));
+          runtime.resetSafety64(nextRuntimeSequence());
           lastRequestSequence = frame.sequence;
           servedState = true;
         } catch (error:Dynamic) {
@@ -267,6 +278,7 @@ class RobotServer {
       }
     case _:
       sendFault(404, "unsupported RobotKit message", false);
+    }
   }
 
   function handleObserverFrame(transport:TransportHandle, frame:RobotFrame):Void {
@@ -296,11 +308,17 @@ class RobotServer {
   }
 
   function handleHello(value:Hello):Void {
+    if (helloComplete) {
+      sendFault(409, "session already established", false);
+      return;
+    }
     if (value.protocolVersion != 1) {
       sendFault(426, "unsupported RobotKit protocol version", true);
       return;
     }
-    controllerGranted = value.requestedRole != "observer";
+    controllerGranted = value.requestedRole == "controller" &&
+      switch controlOwner { case None: true; case _: false; };
+    if (controllerGranted) controlOwner = RemoteController(sessionId);
     send(RobotProtocol.welcome(new robotkit.protocol.Welcome(1, "robotd",
       sessionId, Int64.ofInt(robotId), controllerGranted,
       controllerGranted ? sessionId : Int64.ofInt(0)), sessionId));
@@ -311,7 +329,7 @@ class RobotServer {
       blueprint.jointCount, true, true, true, false), sessionId));
     helloComplete = true;
     publishSnapshot(true);
-    if (value.requestedRole == "observer")
+    if (!controllerGranted)
       moveCurrentClientToObserver();
   }
 
@@ -330,7 +348,7 @@ class RobotServer {
     observerHello.set(current.rawValue(), true);
     client = null;
     helloComplete = false;
-    controllerGranted = true;
+    controllerGranted = false;
     sessionId = Int64.ofInt(0);
     lastRequestSequence = Int64.ofInt(0);
     lastSentSnapshotSequence = Int64.ofInt(-1);
@@ -343,7 +361,7 @@ class RobotServer {
   }
 
   function handleJointTargets(frame:RobotFrame, value:JointTargets):Void {
-    if (!controllerGranted) {
+    if (!controllerGranted || !remoteOwnsControl()) {
       sendFault(403, "control lease not granted", false);
       return;
     }
@@ -387,7 +405,7 @@ class RobotServer {
         }
         targets.push(new robotkit.world.JointTarget(target.joint, mode, target.target));
       }
-      runtime.submitTargets(targets, Int64.toInt(value.sequence));
+      runtime.submitTargets64(targets, nextRuntimeSequence());
       lastRequestSequence = value.sequence;
       servedState = true;
     } catch (error:Dynamic) {
@@ -402,6 +420,24 @@ class RobotServer {
     return Int64.compare(sequence, Int64.ofInt(0)) > 0
       && Int64.compare(sequence, lastRequestSequence) > 0;
 
+  function nextRuntimeSequence():Int64 {
+    runtimeSequence = Int64.add(runtimeSequence, Int64.ofInt(1));
+    return runtimeSequence;
+  }
+
+  function remoteOwnsControl():Bool return switch controlOwner {
+    case RemoteController(ownerSession): Int64.compare(ownerSession, sessionId) == 0;
+    case _: false;
+  }
+
+  function releaseRemoteOwner():Void {
+    if (!remoteOwnsControl()) return;
+    controlOwner = None;
+    behaviorPositions = null;
+    if (behaviorRunner != null) behaviorRunner.reset();
+    runtime.submitStop64(nextRuntimeSequence(), true);
+  }
+
   function sameRobot(value:haxe.Int64):Bool
     return Int64.compare(value, Int64.ofInt(robotId)) == 0;
 
@@ -412,12 +448,14 @@ class RobotServer {
     if (latest == null)
       return;
     applyBehavior(latest);
-    if (!helloComplete || client == null)
+    if (!forceSend && Int64.compare(latest.sequence, lastPublishedSnapshotSequence) <= 0)
       return;
-    if (!forceSend && Int64.compare(latest.sequence, lastSentSnapshotSequence) <= 0)
-      return;
-    lastSentSnapshotSequence = latest.sequence;
-    sendState(latest);
+    lastPublishedSnapshotSequence = latest.sequence;
+    if (helloComplete && client != null &&
+        (forceSend || Int64.compare(latest.sequence, lastSentSnapshotSequence) > 0)) {
+      lastSentSnapshotSequence = latest.sequence;
+      sendState(latest);
+    }
     for (observer in observers) {
       var key = observer.rawValue();
       var observerSession = observerSessions.get(key);
@@ -428,7 +466,7 @@ class RobotServer {
 
   function applyBehavior(snapshot:RobotSnapshot):Void {
     var runner = behaviorRunner;
-    if (runner == null)
+    if (runner == null || switch controlOwner { case LocalBehavior: false; case _: true; })
       return;
     var intent = runner.update(snapshot, NativeKit.nk_time_now_ns());
     if (intent == null) {
@@ -451,16 +489,14 @@ class RobotServer {
         positions[index] = snapshot.q.get(index);
     }
     positions[intent.joint] = intent.target;
-    behaviorSequence++;
-    runtime.submitPositions(positions, behaviorSequence, snapshot.sourceTimestampNs);
+    runtime.submitPositions64(positions, nextRuntimeSequence(), snapshot.sourceTimestampNs);
     behaviorStopped = false;
   }
 
   function stopBehavior():Void {
     if (behaviorStopped)
       return;
-    behaviorSequence++;
-    runtime.submitStop(behaviorSequence, false);
+    runtime.submitStop64(nextRuntimeSequence(), false);
     behaviorStopped = true;
   }
 
@@ -511,6 +547,7 @@ class RobotServer {
 
   function closeClient(currentClient:TransportHandle):Void {
     if (client != null && client.rawValue() == currentClient.rawValue()) {
+      releaseRemoteOwner();
       client = null;
       helloComplete = false;
     }

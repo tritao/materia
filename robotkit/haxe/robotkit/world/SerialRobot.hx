@@ -9,23 +9,14 @@ import robotkit.runtime.RobotRuntimeCompiler;
 class SerialRobot implements Robot {
   final adapter:RuntimeRobotAdapter;
 
-  /** Opens an explicit v5 device using a deployment fingerprint and target error budget. */
-  public static function createV5(id:RobotId, model:RobotModel, devicePath:String,
-      fingerprintHex:String, maxTargetError:Float, ?baud:Int = 115200):SerialRobot {
-    return new SerialRobot(id, model, devicePath, baud,
-      {fingerprintHex: fingerprintHex, maxTargetError: maxTargetError});
-  }
-
   public function new(id:RobotId, model:RobotModel, devicePath:String,
-      ?baud:Int = 115200, ?v5:{fingerprintHex:String, maxTargetError:Float}) {
+      fingerprintHex:String, maxTargetError:Float, ?baud:Int = 115200) {
     if (id == null || id.length == 0)
       throw "SerialRobot requires a non-empty logical ID";
     if (model == null) throw "SerialRobot requires a robot model";
     var blueprint:RobotRuntimeBlueprint = RobotRuntimeCompiler.compile(model);
-    var runtime = v5 == null
-      ? RobotRuntime.createSerial(blueprint, devicePath, baud)
-      : RobotRuntime.createSerialV5(blueprint, devicePath, v5.fingerprintHex,
-          v5.maxTargetError, baud);
+    var runtime = RobotRuntime.createSerial(blueprint, devicePath, fingerprintHex,
+      maxTargetError, baud);
     adapter = new RuntimeRobotAdapter(id, runtime, model.name,
       [for (link in model.links) link.id], [for (joint in model.joints) joint.id],
       true, true, "serial endpoint fault");

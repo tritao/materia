@@ -1,7 +1,6 @@
 #include "robotkit_runtime.h"
 #include "robotkit_runtime.hpp"
-#include "robotkit_serial_endpoint.hpp"
-#include "robotkit_device_serial_endpoint_v5.hpp"
+#include "robotkit_device_serial_endpoint.hpp"
 #include "runtime_registry.hpp"
 
 #include <algorithm>
@@ -90,28 +89,6 @@ rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprint *blue
 }
 
 rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprint *blueprint,
-                                                 const char *device_path, uint32_t baud,
-                                                 rk_robot_runtime *out_runtime) {
-    if (!out_runtime || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
-        !device_path)
-        return RK_ERROR_INVALID_ARGUMENT;
-    *out_runtime = RK_INVALID_ROBOT_RUNTIME;
-    try {
-        auto endpoint = robotkit::SerialRobotEndpoint::open(device_path, baud);
-        if (!endpoint)
-            return RK_ERROR_BACKEND;
-        auto runtime = std::make_shared<robotkit::RobotRuntime>(*blueprint,
-            std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint));
-        *out_runtime = robotkit::internal::register_runtime(std::move(runtime));
-        return RK_OK;
-    } catch (const std::bad_alloc &) {
-        return RK_ERROR_OUT_OF_MEMORY;
-    } catch (...) {
-        return RK_ERROR_BACKEND;
-    }
-}
-
-rk_result RK_CALL rk_robot_runtime_create_serial_v5(const rk_robot_runtime_blueprint *blueprint,
                                                     const char *device_path, uint32_t baud,
                                                     const char *fingerprint_hex,
                                                     double max_target_error,
@@ -125,7 +102,7 @@ rk_result RK_CALL rk_robot_runtime_create_serial_v5(const rk_robot_runtime_bluep
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     try {
         std::uint8_t session_status = 0;
-        auto endpoint = robotkit::DeviceSerialEndpointV5::open(device_path, baud, fingerprint,
+        auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, fingerprint,
             static_cast<std::uint8_t>(blueprint->joint_count), max_target_error, &session_status);
         if (!endpoint)
             return session_status == 2 ? RK_ERROR_MODEL_MISMATCH : RK_ERROR_BACKEND;
