@@ -117,6 +117,12 @@ typedef struct nkscene_render_view {
     nkscene_node_id camera_node;
     const nkscene_render_pose_override *pose_overrides NK_BORROWED_ARRAY(pose_override_count);
     uint32_t pose_override_count;
+    /** Optional world-space CAD viewport lighting; zero keeps authored scene lighting. */
+    uint32_t studio_lighting_enabled NK_BOOL32;
+    float studio_light_directions[12]; /* three xyzw values; xyz points toward light */
+    float studio_ambient_sky[4];
+    float studio_ambient_ground[4];
+    float studio_light_colors[12]; /* three RGB values, padded to vec4 */
 } nkscene_render_view;
 
 /* ------------------------------------------------------------------------- */

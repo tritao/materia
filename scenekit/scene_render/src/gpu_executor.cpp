@@ -60,10 +60,23 @@ struct MaterialUniformData {
     std::array<float, 4> base_color{};
     std::array<float, 4> surface_params{};
     std::array<float, 4> emissive{};
-    std::array<float, 4> lighting{0.35f, 0.45f, 0.82f, 1.0f};
 };
 
-static_assert(sizeof(MaterialUniformData) == sizeof(float) * 16);
+static_assert(sizeof(MaterialUniformData) == sizeof(float) * 12);
+
+struct LightingUniformData {
+    // Fits the minimum GLES3 fragment uniform budget alongside materials and clip planes.
+    static constexpr std::size_t max_lights = 32;
+    std::array<std::array<float, 4>, max_lights> light_position_type{};
+    std::array<std::array<float, 4>, max_lights> light_direction_range{};
+    std::array<std::array<float, 4>, max_lights> light_color_intensity{};
+    std::array<std::array<float, 4>, max_lights> light_cones{};
+    std::array<float, 4> ambient_sky{0.35f, 0.35f, 0.35f, 0.0f};
+    std::array<float, 4> ambient_ground{0.35f, 0.35f, 0.35f, 0.0f};
+    std::array<float, 4> lighting_mode{}; // x = studio shading, y = light count
+};
+
+static_assert(sizeof(LightingUniformData) == sizeof(float) * (32 * 4 * 4 + 12));
 
 struct PostProcessUniformData {
     std::array<float, 4> color_params{};
@@ -198,23 +211,56 @@ bool pack_geometry_vertices(const GeometryResource &resource, std::vector<SceneV
     return true;
 }
 
-std::array<float, 4> scene_lighting(const SceneSnapshot &snapshot) noexcept {
+LightingUniformData lighting_uniform_data(const RenderPlan &plan,
+                                          const SceneSnapshot &snapshot) noexcept {
+    LightingUniformData result;
+    if (plan.studio_lighting().enabled) {
+        result.lighting_mode = {1.0f, 3.0f, 0.0f, 0.0f};
+        for (std::size_t index = 0; index < 3; ++index) {
+            const auto &direction = plan.studio_lighting().directions[index];
+            const auto &color = plan.studio_lighting().colors[index];
+            result.light_position_type[index] = {direction[0], direction[1], direction[2], 1.0f};
+            result.light_color_intensity[index] = {color[0], color[1], color[2], direction[3]};
+        }
+        result.ambient_sky = plan.studio_lighting().ambient_sky;
+        result.ambient_ground = plan.studio_lighting().ambient_ground;
+        return result;
+    }
+    std::size_t count = 0;
     for (const auto &node : snapshot.nodes()) {
         if (!node.light.valid())
             continue;
         const auto *light = snapshot.find_light(node.light);
-        if (!light)
+        if (!light || count == LightingUniformData::max_lights)
             continue;
         const auto &matrix = node.world_transform.transform.matrix;
-        std::array<float, 3> direction{-matrix[0], -matrix[1], -matrix[2]};
-        const auto length = std::sqrt(direction[0] * direction[0] + direction[1] * direction[1] +
-                                      direction[2] * direction[2]);
-        if (length > 1.0e-6f)
-            for (auto &component : direction)
-                component /= length;
-        return {direction[0], direction[1], direction[2], light->intensity};
+        std::array<float, 3> travel{-matrix[0], -matrix[1], -matrix[2]};
+        const auto length = std::sqrt(travel[0] * travel[0] + travel[1] * travel[1] +
+                                      travel[2] * travel[2]);
+        if (length <= 1.0e-6f || !std::isfinite(length))
+            continue;
+        for (auto &component : travel)
+            component /= length;
+        const auto type = static_cast<float>(static_cast<std::uint32_t>(light->type));
+        result.light_position_type[count] = light->type == LightType::Directional
+                                                ? std::array<float, 4>{travel[0], travel[1],
+                                                                       travel[2], type}
+                                                : std::array<float, 4>{matrix[12], matrix[13],
+                                                                       matrix[14], type};
+        result.light_direction_range[count] = {travel[0], travel[1], travel[2], light->range};
+        result.light_color_intensity[count] = {light->color[0], light->color[1],
+                                               light->color[2], light->intensity * 0.65f};
+        result.light_cones[count] = {std::cos(light->inner_cone_angle),
+                                     std::cos(light->outer_cone_angle), 0.0f, 0.0f};
+        ++count;
     }
-    return {0.35f, 0.45f, 0.82f, 1.0f};
+    if (count == 0) {
+        result.light_position_type[0] = {0.35f, 0.45f, 0.82f, 1.0f};
+        result.light_color_intensity[0] = {1.0f, 1.0f, 1.0f, 0.65f};
+        count = 1;
+    }
+    result.lighting_mode[1] = static_cast<float>(count);
+    return result;
 }
 
 ClipUniformData clip_uniform_data(const RenderPlan &plan) {
@@ -550,14 +596,28 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
             (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_projection",
                                            NKGPU_UNIFORMTYPE_MAT4, 1)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                                 sizeof(float) * 16)) != NKGPU_OK ||
+                                                 sizeof(MaterialUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 0, 0, "base_color",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 0, 1, "material_params",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 0, 2, "emissive",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 3, "lighting",
+            (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_FRAGMENT,
+                                                 sizeof(LightingUniformData))) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 0, "light_position_type",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 32)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 1, "light_direction_range",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 32)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 2, "light_color_intensity",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 32)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 3, "light_cones",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 32)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 4, "ambient_sky",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 5, "ambient_ground",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 6, "lighting_mode",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                            "base_color_texture")) != NKGPU_OK ||
@@ -2000,6 +2060,7 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
         return stats;
     }
     const auto clip_data = clip_uniform_data(plan);
+    const auto lighting_data = lighting_uniform_data(plan, snapshot);
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
         if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
@@ -2022,7 +2083,6 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
             material_data.emissive = {material->state->emissive[0], material->state->emissive[1],
                                       material->state->emissive[2], 1.0f};
         }
-        material_data.lighting = scene_lighting(snapshot);
         const auto material_gpu = state_->material_resources.find(batch.key.material);
         if (material_gpu == state_->material_resources.end()) {
             set_failure(*state_, stats, NKGPU_ERROR_INVALID_HANDLE);
@@ -2048,6 +2108,9 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
             (result = nkgpu_apply_uniform_data(
                  state_->renderer, 0, reinterpret_cast<const std::uint8_t *>(&material_data),
                  sizeof(material_data))) != NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(
+                 state_->renderer, 3, reinterpret_cast<const std::uint8_t *>(&lighting_data),
+                 sizeof(lighting_data))) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(state_->renderer, 2,
                                                reinterpret_cast<const std::uint8_t *>(&clip_data),
                                                sizeof(clip_data))) != NKGPU_OK ||
@@ -2157,6 +2220,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         return fail_frame(result);
 
     const auto clip_data = clip_uniform_data(plan);
+    const auto lighting_data = lighting_uniform_data(plan, snapshot);
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
         if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
@@ -2179,7 +2243,6 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
             material_data.emissive = {material->state->emissive[0], material->state->emissive[1],
                                       material->state->emissive[2], 1.0f};
         }
-        material_data.lighting = scene_lighting(snapshot);
         const auto material_gpu = state_->material_resources.find(batch.key.material);
         if (material_gpu == state_->material_resources.end())
             return fail_frame(NKGPU_ERROR_INVALID_HANDLE);
@@ -2202,6 +2265,9 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
             (result = nkgpu_apply_uniform_data(
                  state_->renderer, 0, reinterpret_cast<const std::uint8_t *>(&material_data),
                  sizeof(material_data))) != NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(
+                 state_->renderer, 3, reinterpret_cast<const std::uint8_t *>(&lighting_data),
+                 sizeof(lighting_data))) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(state_->renderer, 2,
                                                reinterpret_cast<const std::uint8_t *>(&clip_data),
                                                sizeof(clip_data))) != NKGPU_OK ||

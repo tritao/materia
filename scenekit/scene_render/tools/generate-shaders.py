@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Embed scene-render GLSL templates as portable C++ string constants."""
+"""Embed SceneKit shader files as portable C++ string constants."""
 
 from __future__ import annotations
 
@@ -42,9 +42,11 @@ def generate() -> bytes:
             source = source.replace("{{FRAGMENT_PRECISION}}", fragment_precision)
             symbols.append((f"{name}_{variant}", source))
 
-    for name in ("stroke_vertex", "stroke_fragment"):
+    for name in ("scene_vertex", "scene_fragment", "scene_pick_vertex", "scene_pick_fragment",
+                 "stroke_vertex", "stroke_fragment"):
         for language, extension in (("hlsl", "hlsl"), ("metal", "metal")):
-            source = (SHADER_DIR / f"{name}.{extension}").read_text(encoding="utf-8")
+            filename = name.replace("scene_pick", "pick")
+            source = (SHADER_DIR / f"{filename}.{extension}").read_text(encoding="utf-8")
             symbols.append((f"{name}_{language}", source))
 
     lines = [

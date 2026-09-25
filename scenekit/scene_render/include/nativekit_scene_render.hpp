@@ -139,6 +139,17 @@ struct PoseOverride {
     LocalTransform world_transform;
 };
 
+/** World-space directions are computed from the presentation camera by the caller. */
+struct StudioLighting {
+    bool enabled = false;
+    std::array<std::array<float, 4>, 3> directions{};
+    std::array<std::array<float, 4>, 3> colors{{
+        {1.0f, 1.0f, 1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 0.0f},
+        {1.0f, 1.0f, 1.0f, 0.0f}}};
+    std::array<float, 4> ambient_sky{0.23f, 0.24f, 0.26f, 0.0f};
+    std::array<float, 4> ambient_ground{0.16f, 0.16f, 0.17f, 0.0f};
+};
+
 struct SceneView {
     /** Invalid means that the view contains every node. */
     NodeId root;
@@ -162,6 +173,7 @@ struct SceneView {
     std::vector<PoseOverride> pose_overrides;
     /** Conservative node-level sectioning planes. */
     std::vector<ClipPlane> clip_planes;
+    StudioLighting studio_lighting;
 
     void set_visibility_override(NodeId node, bool visible) {
         const auto found = std::find_if(
@@ -414,6 +426,7 @@ class RenderPlan {
     std::size_t visible_items() const noexcept { return visible_items_; }
     std::size_t culled_items() const noexcept { return culled_items_; }
     const std::array<float, 16> &view_projection() const noexcept { return view_projection_; }
+    const StudioLighting &studio_lighting() const noexcept { return studio_lighting_; }
     std::span<const std::array<float, 4>> clip_planes() const noexcept {
         return {clip_planes_.data(), clip_plane_count_};
     }
@@ -480,6 +493,7 @@ class RenderPlan {
     NodeId view_root_;
     std::array<float, 16> view_projection_ = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                                               0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    StudioLighting studio_lighting_;
     bool camera_enabled_ = false;
     std::array<std::array<float, 4>, max_clip_planes> clip_planes_{};
     std::uint32_t clip_plane_count_ = 0;

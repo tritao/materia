@@ -388,6 +388,19 @@ std::uint64_t view_signature(const SceneView &view) noexcept {
     add(view.camera_node.value);
     for (const auto value : view.camera.view_projection)
         add(std::hash<float>{}(value));
+    add(view.studio_lighting.enabled ? 1 : 0);
+    if (view.studio_lighting.enabled) {
+        for (const auto &light : view.studio_lighting.directions)
+            for (const auto value : light)
+                add(std::hash<float>{}(value));
+        for (const auto &color : view.studio_lighting.colors)
+            for (const auto value : color)
+                add(std::hash<float>{}(value));
+        for (const auto value : view.studio_lighting.ambient_sky)
+            add(std::hash<float>{}(value));
+        for (const auto value : view.studio_lighting.ambient_ground)
+            add(std::hash<float>{}(value));
+    }
     add(view.clip_planes.size());
     for (const auto &plane : view.clip_planes) {
         for (const auto value : plane.normal)

@@ -18,7 +18,10 @@ out vec4 vertex_color;
 void main() {
     mat4 transform = mat4(transform0, transform1, transform2, transform3);
     world_position = (transform * vec4(position, 1.0)).xyz;
-    vertex_normal = normalize((transform * vec4(normal, 0.0)).xyz);
+    vec3 c0 = transform0.xyz, c1 = transform1.xyz, c2 = transform2.xyz;
+    vec3 corrected = normal.x * cross(c1, c2) + normal.y * cross(c2, c0) +
+                     normal.z * cross(c0, c1);
+    vertex_normal = normalize(corrected * sign(dot(c0, cross(c1, c2))));
     vertex_texcoord = texcoord0;
     vertex_color = color0;
     gl_Position = view_projection * vec4(world_position, 1.0);

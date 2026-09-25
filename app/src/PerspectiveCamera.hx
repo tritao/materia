@@ -86,6 +86,17 @@ class PerspectiveCamera {
     return result;
   }
 
+  /** Rotate a camera-space direction toward a light into world coordinates. */
+  public function studioDirection(x:Float, y:Float, z:Float):Array<Float> {
+    var eye = eyePosition();
+    var forward = normalize([targetX - eye[0], targetY - eye[1], targetZ - eye[2]]);
+    var right = normalize(cross(forward, [0.0, 0.0, 1.0]));
+    var up = cross(right, forward);
+    return [right[0] * x + up[0] * y - forward[0] * z,
+      right[1] * x + up[1] * y - forward[1] * z,
+      right[2] * x + up[2] * y - forward[2] * z];
+  }
+
   /** Builds a world-space camera ray through a viewport pixel. */
   public function screenRay(x:Float, y:Float, width:Float, height:Float):PerspectiveRay {
     width = Math.max(1.0, width); height = Math.max(1.0, height);

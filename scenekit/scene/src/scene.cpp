@@ -942,15 +942,14 @@ void Scene::publish_state(const ChangeSet *changes,
         state->images = previous->images;
         state->textures = previous->textures;
         state->samplers = previous->samplers;
-        state->cameras = previous->cameras;
-        state->lights = previous->lights;
     } else {
         state->images = collect.template operator()<ImageStore, ImageResource>(images);
         state->textures = collect.template operator()<TextureStore, TextureResource>(textures);
         state->samplers = collect.template operator()<SamplerStore, SamplerResource>(samplers);
-        state->cameras = collect.template operator()<CameraStore, CameraResource>(cameras);
-        state->lights = collect.template operator()<LightStore, LightResource>(lights);
     }
+    // Camera and light stores have no aggregate revision yet; publish their current values.
+    state->cameras = collect.template operator()<CameraStore, CameraResource>(cameras);
+    state->lights = collect.template operator()<LightStore, LightResource>(lights);
 
     auto node_state = previous && previous->nodes
                                 ? std::make_shared<PublishedNodeState>(*previous->nodes)
@@ -2680,6 +2679,7 @@ nkscene_result NKS_CALL nkscene_light_create(nkscene_scene scene, nkscene_light_
     if (!owner)
         return NKS_ERROR_INVALID_HANDLE;
     out_light->value = owner->create_light().value;
+    owner->publish();
     return NKS_OK;
 }
 
@@ -2687,8 +2687,10 @@ void NKS_CALL nkscene_light_destroy(nkscene_scene scene, nkscene_light_id light)
     auto &state = nkscene::registry();
     std::lock_guard lock(state.mutex);
     auto owner = state.scenes.get(nkscene::unpack_handle(scene));
-    if (owner)
+    if (owner) {
         owner->destroy_light({light.value});
+        owner->publish();
+    }
 }
 
 nkscene_result NKS_CALL nkscene_light_set_data(nkscene_scene scene, nkscene_light_id light,
@@ -2713,6 +2715,7 @@ nkscene_result NKS_CALL nkscene_light_set_data(nkscene_scene scene, nkscene_ligh
     resource.range = data->range;
     resource.inner_cone_angle = data->inner_cone_angle;
     resource.outer_cone_angle = data->outer_cone_angle;
+    owner->publish();
     return NKS_OK;
 }
 

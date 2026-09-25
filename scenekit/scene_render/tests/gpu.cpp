@@ -125,6 +125,7 @@ int main() {
         const auto material = scene->reserve_material_id();
         auto &material_resource = scene->material_store().create(material);
         material_resource.edit_state().base_color = {0.2f, 0.7f, 1.0f, 1.0f};
+        material_resource.edit_state().roughness = 0.0f;
         material_resource.edit_state().base_color_texture = texture;
         material_resource.edit_state().sampler = sampler;
 
@@ -177,6 +178,28 @@ int main() {
             }
         }
         assert(found_color);
+
+        // View lighting changes the image without changing scene resources or picking.
+        nkscene::SceneView studio_view = view;
+        studio_view.studio_lighting.enabled = true;
+        studio_view.studio_lighting.directions = {{{0.0f, 0.0f, 1.0f, 0.0f},
+                                                   {1.0f, 0.0f, 0.0f, 0.0f},
+                                                   {0.0f, 1.0f, 0.0f, 0.0f}}};
+        studio_view.studio_lighting.ambient_sky = {0.9f, 0.9f, 0.9f, 0.0f};
+        studio_view.studio_lighting.ambient_ground = {0.9f, 0.9f, 0.9f, 0.0f};
+        auto studio_plan = nkscene::compile(scene->snapshot(), studio_view);
+        assert(studio_plan.view_signature() != plan.view_signature());
+        std::vector<std::uint8_t> studio_pixels;
+        assert(executor.capture_rgba8(studio_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, studio_pixels) == NKGPU_OK);
+        assert(studio_pixels != color_pixels);
+        studio_view.studio_lighting.directions[2] = {0.0f, 0.0f, 1.0f, 0.5f};
+        studio_view.studio_lighting.colors[2] = {1.0f, 0.0f, 0.0f, 0.0f};
+        studio_plan = nkscene::compile(scene->snapshot(), studio_view);
+        std::vector<std::uint8_t> rim_pixels;
+        assert(executor.capture_rgba8(studio_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, rim_pixels) == NKGPU_OK);
+        assert(rim_pixels != studio_pixels);
 
         nkscene::PickResult picked;
         assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
@@ -466,6 +489,116 @@ int main() {
                                   80, options.height / 2, &visible) == NKGPU_OK);
         assert(visible.node == node);
         assert(visible.subelement.value == 7);
+    }
+
+    {
+        auto scene = std::make_shared<Scene>();
+        const auto geometry = scene->reserve_geometry_id();
+        auto &mesh = scene->geometry_store().create(geometry);
+        mesh.edit_payload().vertices = {{{-0.65f, -0.65f, 0.0f}},
+                                        {{0.65f, -0.65f, 0.0f}},
+                                        {{0.0f, 0.65f, 0.0f}}};
+        mesh.bounds = {{-0.65f, -0.65f, -0.01f}, {0.65f, 0.65f, 0.01f}, true};
+        const auto material = scene->reserve_material_id();
+        scene->material_store().create(material);
+        const auto mesh_node = scene->reserve_node_id();
+        Transaction create(scene);
+        create.add_create(mesh_node);
+        ChangeSet changes;
+        assert(scene->commit(create, changes) == NKS_OK);
+        create.close();
+        Transaction configure(scene);
+        configure.add_geometry(mesh_node, geometry);
+        configure.add_material(mesh_node, material);
+        assert(scene->commit(configure, changes) == NKS_OK);
+        configure.close();
+
+        nkscene::NativeKitGpuExecutor executor(renderer);
+        nkscene::SceneView authored_view;
+        const auto capture = [&](const nkscene::SceneView &view) {
+            auto plan = nkscene::compile(scene->snapshot(), view);
+            std::vector<std::uint8_t> pixels;
+            assert(executor.capture_rgba8(plan, scene->snapshot(), options.width, options.height,
+                       {0.0f, 0.0f, 0.0f, 1.0f}, pixels) == NKGPU_OK);
+            return pixels;
+        };
+        const auto attach_light = [&](nkscene::LightType type, std::array<float, 3> color,
+                                      float intensity, float range,
+                                      nkscene::LocalTransform transform) {
+            const auto id = scene->reserve_light_id();
+            auto &light = scene->light_store().create(id);
+            light.type = type;
+            light.color = color;
+            light.intensity = intensity;
+            light.range = range;
+            scene->publish();
+            const auto node = scene->reserve_node_id();
+            Transaction add(scene);
+            add.add_create(node);
+            assert(scene->commit(add, changes) == NKS_OK);
+            add.close();
+            Transaction set(scene);
+            set.add_light(node, id);
+            set.add_transform(node, transform);
+            assert(scene->commit(set, changes) == NKS_OK);
+            set.close();
+            return std::pair{id, node};
+        };
+        nkscene::LocalTransform toward_surface;
+        toward_surface.matrix[0] = 0.0f;
+        toward_surface.matrix[2] = -1.0f;
+        toward_surface.matrix[8] = 1.0f;
+        toward_surface.matrix[10] = 0.0f;
+        const auto red = attach_light(nkscene::LightType::Directional, {1.0f, 0.0f, 0.0f},
+                                      0.4f, 10.0f, toward_surface);
+        const auto red_pixels = capture(authored_view);
+        const auto green = attach_light(nkscene::LightType::Directional, {0.0f, 1.0f, 0.0f},
+                                        0.4f, 10.0f, toward_surface);
+        const auto two_directional_pixels = capture(authored_view);
+        assert(two_directional_pixels != red_pixels);
+        (void)red;
+        (void)green;
+
+        nkscene::SceneView studio_view;
+        studio_view.studio_lighting.enabled = true;
+        studio_view.studio_lighting.directions = {{{0.0f, 0.0f, 1.0f, 0.5f},
+                                                   {1.0f, 0.0f, 0.0f, 0.0f},
+                                                   {0.0f, 1.0f, 0.0f, 0.0f}}};
+        const auto studio_before = capture(studio_view);
+
+        nkscene::LocalTransform point_transform;
+        point_transform.matrix[14] = 2.0f;
+        const auto [point_id, point_node] =
+            attach_light(nkscene::LightType::Point, {0.0f, 0.0f, 1.0f},
+                         0.8f, 0.5f, point_transform);
+        assert(capture(authored_view) == two_directional_pixels);
+        scene->light_store().create(point_id).range = 4.0f;
+        scene->publish();
+        const auto point_pixels = capture(authored_view);
+        assert(point_pixels != two_directional_pixels);
+        (void)point_node;
+
+        nkscene::LocalTransform spot_transform;
+        spot_transform.matrix[0] = 0.0f;
+        spot_transform.matrix[2] = 1.0f;
+        spot_transform.matrix[8] = -1.0f;
+        spot_transform.matrix[10] = 0.0f;
+        spot_transform.matrix[14] = 2.0f;
+        const auto [spot_id, spot_node] =
+            attach_light(nkscene::LightType::Spot, {1.0f, 1.0f, 1.0f},
+                         0.8f, 4.0f, spot_transform);
+        scene->light_store().create(spot_id).inner_cone_angle = 0.1f;
+        scene->light_store().find(spot_id)->outer_cone_angle = 0.5f;
+        scene->publish();
+        const auto spot_pixels = capture(authored_view);
+        assert(spot_pixels != point_pixels);
+        spot_transform.matrix[12] = 4.0f;
+        Transaction move_spot(scene);
+        move_spot.add_transform(spot_node, spot_transform);
+        assert(scene->commit(move_spot, changes) == NKS_OK);
+        move_spot.close();
+        assert(capture(authored_view) == point_pixels);
+        assert(capture(studio_view) == studio_before);
     }
 
 cleanup:

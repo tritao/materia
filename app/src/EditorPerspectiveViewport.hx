@@ -93,6 +93,16 @@ class EditorPerspectiveViewport implements View {
       var started = Sys.time();
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
         simulationActive ? simulationPoses : null);
+      var directions:Array<Float> = [];
+      // Coin directions point from each light into the scene; the shader needs the reverse.
+      for (light in [[0.6841049, -0.12062616, -0.7193398, 0.76],
+          [-0.6403416, 0.7631294, 0.087155744, 0.34],
+          [-0.7544065, -0.63302225, -0.17364818, 0.50]]) {
+        var direction = camera.studioDirection(-light[0], -light[1], -light[2]);
+        directions.push(direction[0]); directions.push(direction[1]);
+        directions.push(direction[2]); directions.push(light[3]);
+      }
+      view.setStudioLighting(directions, [0.22, 0.23, 0.24], [0.16, 0.16, 0.17]);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
       var rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height,

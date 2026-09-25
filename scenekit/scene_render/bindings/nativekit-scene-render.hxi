@@ -148,7 +148,7 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		visible_items: u64 @offset(80);
 		culled_items: u64 @offset(88);
 	}
-	struct nkscene_render_view @layout(256, 8) {
+	struct nkscene_render_view @layout(384, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		root: nkscene_node_id @offset(8);
 		include_invisible: u32 @offset(16);
@@ -177,6 +177,11 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		camera_node: nkscene_node_id @offset(232);
 		pose_overrides: ptr<const<nkscene_render_pose_override>> @offset(240) @borrowed @length_field("pose_override_count");
 		pose_override_count: u32 @offset(248);
+		studio_lighting_enabled: u32 @offset(252);
+		studio_light_directions: array<f32, 12> @offset(256);
+		studio_ambient_sky: array<f32, 4> @offset(304);
+		studio_ambient_ground: array<f32, 4> @offset(320);
+		studio_light_colors: array<f32, 12> @offset(336);
 	}
 	struct nkscene_render_visibility_override @layout(16, 8) {
 		node: nkscene_node_id @offset(0);

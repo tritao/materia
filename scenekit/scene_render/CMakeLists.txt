@@ -3,8 +3,16 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(NKSCENE_RENDER_SHADER_INPUTS
     shaders/scene_vertex.glsl
     shaders/scene_fragment.glsl
+    shaders/scene_vertex.hlsl
+    shaders/scene_fragment.hlsl
+    shaders/scene_vertex.metal
+    shaders/scene_fragment.metal
     shaders/pick_vertex.glsl
     shaders/pick_fragment.glsl
+    shaders/pick_vertex.hlsl
+    shaders/pick_fragment.hlsl
+    shaders/pick_vertex.metal
+    shaders/pick_fragment.metal
     shaders/postprocess_vertex.glsl
     shaders/postprocess_fragment.glsl
     shaders/stroke_vertex.glsl
@@ -116,6 +124,7 @@ if(NK_BUILD_TESTS)
                 ENVIRONMENT "LIBGL_ALWAYS_SOFTWARE=1")
 
             add_executable(nativekit_scene_render_gpu_benchmark tests/gpu_benchmark.cpp)
+
             target_compile_features(nativekit_scene_render_gpu_benchmark PRIVATE cxx_std_20)
             target_include_directories(nativekit_scene_render_gpu_benchmark PRIVATE
                 src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")
@@ -127,6 +136,13 @@ if(NK_BUILD_TESTS)
                 LABELS "scene;render;graphics;gpu;benchmark"
                 TIMEOUT 60
                 ENVIRONMENT "LIBGL_ALWAYS_SOFTWARE=1")
+
+            add_executable(nativekit_scene_render_lighting_gallery tests/lighting_gallery.cpp)
+            target_compile_features(nativekit_scene_render_lighting_gallery PRIVATE cxx_std_20)
+            target_include_directories(nativekit_scene_render_lighting_gallery PRIVATE
+                src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")
+            target_link_libraries(nativekit_scene_render_lighting_gallery PRIVATE
+                NativeKit::scene_render NativeKit::scene NativeKit::gpu NativeKit::nativekit)
         endif()
     endif()
 endif()

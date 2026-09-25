@@ -52,6 +52,23 @@ class SceneView {
 		return this;
 	}
 
+	/** Sets three world-space directions, intensities, and optional RGB light colors. */
+	public function setStudioLighting(directions:Array<Float>, sky:Array<Float>, ground:Array<Float>,
+			?colors:Array<Float>):SceneView {
+		if (directions.length != 12 || sky.length != 3 || ground.length != 3)
+			throw "invalid studio lighting data";
+		if (colors != null && colors.length != 12) throw "invalid studio light colors";
+		value.set_studio_lighting_enabled(1);
+		for (index in 0...12) value.set_studio_light_directions(index, directions[index]);
+		for (index in 0...12) value.set_studio_light_colors(index,
+			colors == null ? (index % 4 == 3 ? 0.0 : 1.0) : colors[index]);
+		for (index in 0...3) {
+			value.set_studio_ambient_sky(index, sky[index]);
+			value.set_studio_ambient_ground(index, ground[index]);
+		}
+		return this;
+	}
+
 	/** Selects a scene camera node when no explicit matrix is set. */
 	public function setCameraNode(node:NodeId):SceneView {
 		value.set_camera_node(node.nativeValue());

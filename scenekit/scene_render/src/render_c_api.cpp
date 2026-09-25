@@ -57,6 +57,12 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
     const bool has_pose_overrides =
         input->struct_size >= offsetof(nkscene_render_view, pose_override_count) +
                                   sizeof(input->pose_override_count);
+    const bool has_studio_lighting =
+        input->struct_size >= offsetof(nkscene_render_view, studio_ambient_ground) +
+                                  sizeof(input->studio_ambient_ground);
+    const bool has_studio_colors =
+        input->struct_size >= offsetof(nkscene_render_view, studio_light_colors) +
+                                  sizeof(input->studio_light_colors);
     if ((input->visibility_override_count != 0 && !input->visibility_overrides) ||
         (input->material_override_count != 0 && !input->material_overrides) ||
         (input->clip_plane_count != 0 && !input->clip_planes) ||
@@ -154,6 +160,22 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
     output.camera.enabled = input->camera.enabled != 0;
     for (uint32_t index = 0; index < 16; ++index)
         output.camera.view_projection[index] = input->camera.view_projection.matrix[index];
+    if (has_studio_lighting && input->studio_lighting_enabled) {
+        output.studio_lighting.enabled = true;
+        for (uint32_t light = 0; light < 3; ++light)
+            for (uint32_t axis = 0; axis < 4; ++axis)
+                output.studio_lighting.directions[light][axis] =
+                    input->studio_light_directions[light * 4 + axis];
+        for (uint32_t axis = 0; axis < 4; ++axis) {
+            output.studio_lighting.ambient_sky[axis] = input->studio_ambient_sky[axis];
+            output.studio_lighting.ambient_ground[axis] = input->studio_ambient_ground[axis];
+        }
+        if (has_studio_colors)
+            for (uint32_t light = 0; light < 3; ++light)
+                for (uint32_t axis = 0; axis < 4; ++axis)
+                    output.studio_lighting.colors[light][axis] =
+                        input->studio_light_colors[light * 4 + axis];
+    }
     return NKS_OK;
 }
 
