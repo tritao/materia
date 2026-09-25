@@ -3,6 +3,9 @@ package materia.project;
 import haxe.io.Bytes;
 import materia.project.AssemblyCodec;
 import materia.project.AssemblyRecord;
+import materia.project.AssemblyDefinition;
+import materia.project.AssemblyDefinition.AssemblyStateRecord;
+import materia.project.AssemblyDefinitionCodec;
 
 typedef SceneArtifactFaceRange = {
 	var faceIndex:Int;
@@ -31,11 +34,14 @@ typedef SceneArtifactData = {
 	var metresPerUnit:Float;
 	var parts:Array<SceneArtifactPart>;
 	@:optional var assembly:AssemblyRecord;
+	/** Geometry definitions are parts; occurrences live in this separate kinematic definition. */
+	@:optional var assemblyDefinition:AssemblyDefinition;
+	@:optional var assemblyState:AssemblyStateRecord;
 }
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 5;
+	public static inline var VERSION:Int = 6;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -45,8 +51,13 @@ class SceneArtifact {
 		validateHeader(data);
 		var names:Array<{id:Bytes, name:Bytes}> = [];
 		var assembly = data.assembly == null ? Bytes.alloc(0) : Bytes.ofString(AssemblyCodec.encode(data.assembly));
-		if (assembly.length > 2000000) throw "Scene artifact assembly metadata is too large";
-		var length = 24 + assembly.length; // Signature, version, scale, part count, assembly length.
+		var assemblyDefinition = data.assemblyDefinition == null ? Bytes.alloc(0)
+			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
+		var assemblyState = data.assemblyState == null ? Bytes.alloc(0)
+			: Bytes.ofString(AssemblyDefinitionCodec.encodeState(data.assemblyDefinition, data.assemblyState));
+		if (assembly.length > 2000000 || assemblyDefinition.length > 2000000 || assemblyState.length > 2000000)
+			throw "Scene artifact assembly metadata is too large";
+		var length = 32 + assembly.length + assemblyDefinition.length + assemblyState.length;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -96,6 +107,10 @@ class SceneArtifact {
 		}
 		offset = putInt(result, offset, assembly.length);
 		result.blit(offset, assembly, 0, assembly.length); offset += assembly.length;
+		offset = putInt(result, offset, assemblyDefinition.length);
+		result.blit(offset, assemblyDefinition, 0, assemblyDefinition.length); offset += assemblyDefinition.length;
+		offset = putInt(result, offset, assemblyState.length);
+		result.blit(offset, assemblyState, 0, assemblyState.length); offset += assemblyState.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -122,6 +137,15 @@ class SceneArtifact {
 				throw "Assembly must place every scene artifact part";
 			for (instance in assembly.instances) if (!ids.exists(instance.id))
 				throw 'Assembly instance "${instance.id}" has no geometry part';
+		}
+		if (data.assemblyState != null && data.assemblyDefinition == null)
+			throw "Scene artifact assembly state has no definition";
+		if (data.assemblyDefinition != null) {
+			AssemblyDefinitionCodec.validate(data.assemblyDefinition);
+			for (definition in data.assemblyDefinition.definitions) if (!ids.exists(definition.id))
+				throw 'Assembly component definition "${definition.id}" has no geometry part';
+			if (data.assemblyState != null)
+				AssemblyDefinitionCodec.validateState(data.assemblyDefinition, data.assemblyState);
 		}
 	}
 
@@ -183,7 +207,7 @@ private class SceneArtifactReader {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != 2 && version != 3 && version != 4 && version != SceneArtifact.VERSION)
+		if (version != 2 && version != 3 && version != 4 && version != 5 && version != SceneArtifact.VERSION)
 			throw "Unsupported scene artifact version";
 		var metresPerUnit = readDouble();
 		var count = readInt();
@@ -220,8 +244,25 @@ private class SceneArtifactReader {
 			if (length < 0 || length > 2000000) throw "Scene artifact assembly metadata is too large";
 			if (length > 0) assembly = AssemblyCodec.decode(readBytes(length).getString(0, length));
 		}
+		var assemblyDefinition:Null<AssemblyDefinition> = null, assemblyState:Null<AssemblyStateRecord> = null;
+		if (version >= 6) {
+			var definitionLength = readInt();
+			if (definitionLength < 0 || definitionLength > 2000000)
+				throw "Scene artifact assembly definition is too large";
+			if (definitionLength > 0)
+				assemblyDefinition = AssemblyDefinitionCodec.decode(readBytes(definitionLength).getString(0, definitionLength));
+			var stateLength = readInt();
+			if (stateLength < 0 || stateLength > 2000000)
+				throw "Scene artifact assembly state is too large";
+			if (stateLength > 0) {
+				if (assemblyDefinition == null) throw "Scene artifact assembly state has no definition";
+				assemblyState = AssemblyDefinitionCodec.decodeState(assemblyDefinition,
+					readBytes(stateLength).getString(0, stateLength));
+			}
+		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
-		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, parts: parts, assembly: assembly};
+		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, parts: parts, assembly: assembly,
+			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

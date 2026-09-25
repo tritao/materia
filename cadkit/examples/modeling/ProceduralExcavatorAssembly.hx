@@ -1,12 +1,21 @@
 import cadkit.modeling.AssemblyModel;
 import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord;
+import materia.project.AssemblyDefinition;
+import materia.project.AssemblyDefinition.AssemblyStateRecord;
 
 /** A posed excavator mechanism. Coordinates are millimetres in each part's CAD frame. */
 class ProceduralExcavatorAssembly {
 	static inline var DEG:Float = Math.PI / 180;
 
-	public static function build():AssemblyRecord {
+	public static function build():AssemblyRecord return buildModel().record();
+
+	public static function buildDefinition():AssemblyDefinition return buildModel().definition("excavator");
+
+	public static function buildState():AssemblyStateRecord
+		return buildModel().initialState("excavator").record();
+
+	static function buildModel():AssemblyModel {
 		var model = new AssemblyModel();
 		for (name in ["Base", "BasePin", "Boom", "Stick", "Bucket", "BucketLink1", "BucketLink2",
 			"BoomCylinderOuter", "BoomCylinderInner", "StickCylinderOuter", "StickCylinderInner",
@@ -64,7 +73,7 @@ class ProceduralExcavatorAssembly {
 			"BucketCylinderOuter", "BucketCylinderInner", 87, 150, 245, 83,
 			128, 119, 291, 52);
 
-		return model.record();
+		return model;
 	}
 
 	static function point(model:AssemblyModel, part:String, name:String, x:Float, z:Float):Void

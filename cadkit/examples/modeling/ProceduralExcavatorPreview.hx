@@ -28,7 +28,9 @@ class ProceduralExcavatorPreview {
 				});
 			}
 			var result = SceneArtifact.encode({metresPerUnit: 0.001, parts: parts,
-				assembly: ProceduralExcavatorAssembly.build()});
+				assembly: ProceduralExcavatorAssembly.build(),
+				assemblyDefinition: ProceduralExcavatorAssembly.buildDefinition(),
+				assemblyState: ProceduralExcavatorAssembly.buildState()});
 			for (component in components) component.close();
 			return result;
 		} catch (error:Dynamic) {

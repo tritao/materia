@@ -1,6 +1,8 @@
 package materia.project;
 
 import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.project.AssemblyDefinition.AssemblyJointType;
+import materia.project.AssemblyDefinition.AssemblyVector;
 
 /** Rigid-frame arithmetic shared by CAD generators and project consumers. */
 class AssemblyFrames {
@@ -14,6 +16,24 @@ class AssemblyFrames {
 		if (!Math.isFinite(radians)) throw "Assembly angle must be finite";
 		return {x: 0, y: 0, z: 0, qx: 0, qy: Math.sin(radians / 2), qz: 0,
 			qw: Math.cos(radians / 2)};
+	}
+
+	/** Motion transform for a joint axis expressed in its parent connector frame. */
+	public static function axisMotion(type:AssemblyJointType, axis:AssemblyVector,
+			coordinate:Float):AssemblyFrame {
+		if (axis == null || !Math.isFinite(axis.x) || !Math.isFinite(axis.y) || !Math.isFinite(axis.z) ||
+			!Math.isFinite(coordinate)) throw "Assembly joint motion must be finite";
+		var length = Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
+		if (!Math.isFinite(length) || length < 1e-9) throw "Assembly joint axis has zero length";
+		var x = axis.x / length, y = axis.y / length, z = axis.z / length;
+		if (type == AssemblyJointType.Fixed) return identity();
+		if (type == AssemblyJointType.Prismatic) return translation(x * coordinate, y * coordinate, z * coordinate);
+		if (type == AssemblyJointType.Revolute || type == AssemblyJointType.Continuous) {
+			var sine = Math.sin(coordinate / 2);
+			return {x: 0, y: 0, z: 0, qx: x * sine, qy: y * sine, qz: z * sine,
+				qw: Math.cos(coordinate / 2)};
+		}
+		throw 'Unsupported assembly joint type "$type"';
 	}
 
 	/** Frame whose local Y axis points along the supplied vector. */
@@ -52,5 +72,10 @@ class AssemblyFrames {
 		return {x: x + frame.qw * tx + frame.qy * tz - frame.qz * ty + frame.x,
 			y: y + frame.qw * ty + frame.qz * tx - frame.qx * tz + frame.y,
 			z: z + frame.qw * tz + frame.qx * ty - frame.qy * tx + frame.z};
+	}
+
+	public static function transformVector(frame:AssemblyFrame, x:Float, y:Float, z:Float):{x:Float, y:Float, z:Float} {
+		var transformed = transformPoint(frame, x, y, z);
+		return {x: transformed.x - frame.x, y: transformed.y - frame.y, z: transformed.z - frame.z};
 	}
 }

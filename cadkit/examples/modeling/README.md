@@ -119,8 +119,22 @@ the B-rep components with CadKit and writes a versioned scene artifact. The
 artifact declares metres per coordinate and stable IDs for all 13 components.
 Materia loads them as posed CAD preview objects, retaining the assembly's named
 connectors and joints for the hierarchy and inspector. STEP is never an input.
-The recorded joint values describe the generated pose; interactive motion and
-constraint solving are separate work.
+The compatibility `AssemblyRecord` still carries those preview poses.
+
+CadKit also exposes a versioned definition/state path. `AssemblyModel.definition()`
+converts an existing assembly to component definitions, occurrences, explicit
+tree/closure roles, axes, limits, and default joint coordinates;
+`AssemblyModel.initialState()` creates a separate runtime state. A state can
+change a tree coordinate with `setJoint()`, recompute placements with
+`forwardKinematics()`, and read a derived pose with `worldPose()`. Closure edges
+are not used for FK; `closureResiduals()` reports their current geometric error
+until the joint-coordinate loop solver is added. `AssemblyBuilder` can author
+repeated occurrences that reference the same component definition directly.
+
+The generated artifact writes both the new definition/state payload and the
+compatibility record. Existing scene artifact readers remain supported, and the
+current editor continues to use the compatibility record until its hierarchy
+and preview path switches to occurrence instancing.
 
 The viewport entrypoint opts into a generated artifact cache. Materia reuses the
 artifact when its Haxeon source graph, compiler sources, and native runtime build

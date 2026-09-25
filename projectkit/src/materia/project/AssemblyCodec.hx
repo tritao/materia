@@ -54,7 +54,8 @@ class AssemblyCodec {
 		}
 		for (joint in record.joints) {
 			if (joint == null || !validText(joint.id) || joints.exists(joint.id) ||
-				(joint.kind != "fixed" && joint.kind != "revolute" && joint.kind != "prismatic") ||
+				(joint.kind != "fixed" && joint.kind != "revolute" && joint.kind != "continuous" &&
+					joint.kind != "prismatic") ||
 				joint.parent == joint.child || !Math.isFinite(joint.value))
 				throw "Assembly has an invalid joint";
 			joints.set(joint.id, true);

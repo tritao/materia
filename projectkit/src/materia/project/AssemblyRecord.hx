@@ -22,7 +22,7 @@ typedef AssemblyInstance = {
 	var connectors:Array<AssemblyConnector>;
 }
 
-/** Joint frames coincide at value zero; the joint axis is local Y. */
+/** Legacy assembly snapshot record. New kinematic definitions use AssemblyDefinition. */
 typedef AssemblyJoint = {
 	var id:String;
 	var kind:String;
