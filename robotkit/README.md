@@ -215,7 +215,13 @@ var forks = Forks.fromBlueprint(robot, blueprint);
 `robotkit.perception` provides timestamped `Detection`, `Obstacle`, `Pallet`,
 and `DockingTarget` values. `LidarObstaclePerception.fromSensor()` uses the
 compiled sensor's range and angular coverage to turn finite LiDAR returns into
-planar obstacle observations in the sensor frame.
+planar obstacle observations in the sensor frame. `FrameAwarePerception` wraps
+a perception source and transforms detections, pallets, obstacles, and docking
+approach poses through `FrameTree2` and the latest valid localization estimate
+into one reference frame. Sensor-to-body transforms must be present in that
+planar frame tree; disconnected frames and invalid localization are rejected.
+Update localization from the matching robot observation before calling
+`observe()` so the dynamic robot pose corresponds to the sensor data.
 `robotkit.safety` exposes operator-facing phase, active restrictions, speed
 limit, and stopping envelope values; the native runtime continues to enforce
 hard safety. `LoadSafetyPolicy.refresh()` reduces `MobileBase` speed and

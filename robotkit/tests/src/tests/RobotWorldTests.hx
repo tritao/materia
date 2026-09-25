@@ -68,6 +68,7 @@ import robotkit.localization.PoseCovariance2;
 import robotkit.localization.FrameTransform2;
 import robotkit.localization.FrameTree2;
 import robotkit.localization.PoseFusionLocalization;
+import robotkit.localization.Localization;
 import robotkit.navigation.Path;
 import robotkit.navigation.Trajectory;
 import robotkit.navigation.TrajectorySample;
@@ -87,6 +88,7 @@ import robotkit.perception.Detection;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.LidarObstaclePerception;
 import robotkit.perception.GroundTruthPerception;
+import robotkit.perception.FrameAwarePerception;
 import robotkit.perception.Pallet;
 import robotkit.perception.PerceptionSnapshot;
 import robotkit.safety.SafetyPhase;
@@ -979,6 +981,28 @@ class RobotWorldTests {
       "LiDAR obstacle values retain planar coordinates and source frame");
     equal(obstacles[0].detection.sourceClockId, "robot-boot",
       "semantic obstacle preserves source clock identity");
+    var mapEstimate = new LocalizationState(Int64.ofInt(4),
+      new Pose2(5.0, 2.0, Math.PI * 0.5), "map", "base",
+      PoseCovariance2.zero(), Good, Int64.ofInt(140), Int64.ofInt(150),
+      "robot-boot", "host-clock");
+    var perceptionFrames = new FrameTree2();
+    perceptionFrames.add(new FrameTransform2("base", "laser",
+      new Pose2(0.2, 0.0, Math.PI * 0.5)));
+    var framed = new FrameAwarePerception(perception,
+      new FixedLocalization(mapEstimate), perceptionFrames);
+    var framedLidar = framed.observe([new SensorFrame("front-lidar", "lidar",
+      "laser", Int64.ofInt(9), Int64.ofInt(140), [1.0, 10.0, 10.0, 10.0],
+      Int64.ofInt(150), "base-link", null, null, "robot-boot", "host-clock")]);
+    var framedObstacle = framedLidar.obstacles()[0];
+    check(framedObstacle.detection.frameId == "map" &&
+      Math.abs(framedObstacle.detection.pose.x - 4.0) < 1e-9 &&
+      Math.abs(framedObstacle.detection.pose.y - 2.2) < 1e-9 &&
+      Math.abs(Pose2.wrapAngle(framedObstacle.detection.pose.yaw - Math.PI)) < 1e-9,
+      "frame-aware perception composes localization and sensor mount transforms");
+    equal(framedObstacle.radiusMeters, obstacles[0].radiusMeters,
+      "frame-aware perception retains obstacle geometry");
+    equal(lidar.frameId, "base", "frame-aware perception does not mutate input sensor frames");
+
     var detections = observed.detections();
     detections.pop();
     var scanRanges = [for (_ in 0...64) 10.0];
@@ -1006,11 +1030,11 @@ class RobotWorldTests {
     equal(observed.detections().length, 2, "perception snapshot returns owned collections");
 
     var palletDetection = new Detection("pallet-1", "pallet", 0.95,
-      new Pose2(2.0, 1.0, 0.2), "map", Int64.ofInt(1), Int64.ofInt(200),
+      new Pose2(2.0, 1.0, 0.2), "laser", Int64.ofInt(1), Int64.ofInt(200),
       Int64.ofInt(220), "camera-boot", "host-clock");
     var pallet = new Pallet(palletDetection, 1.2, 0.8, 0.15);
     var dock = new DockingTarget(new Detection("dock-1", "dock", 0.9,
-      new Pose2(4.0, 0.0, 0.0), "map", Int64.ofInt(2), Int64.ofInt(210),
+      new Pose2(4.0, 0.0, 0.0), "laser", Int64.ofInt(2), Int64.ofInt(210),
       Int64.ofInt(230), "camera-boot", "host-clock"), new Pose2(3.0, 0.0, 0.0));
     var semantic = new PerceptionSnapshot([palletDetection], [], [pallet], [dock]);
     check(semantic.pallets()[0].lengthMeters == 1.2 &&
@@ -1022,6 +1046,28 @@ class RobotWorldTests {
     check(truthObservation.pallets()[0].detection.id == "pallet-1" &&
       truthObservation.dockingTargets()[0].detection.id == "dock-1",
       "ground-truth perception supplies semantic scene values through the perception API");
+    var framedTruth = new FrameAwarePerception(truthPerception,
+      new FixedLocalization(mapEstimate), perceptionFrames).observe([]);
+    var framedPallet = framedTruth.pallets()[0];
+    var framedDock = framedTruth.dockingTargets()[0];
+    check(framedPallet.detection.frameId == "map" &&
+      Math.abs(framedPallet.detection.pose.x - 3.0) < 1e-9 &&
+      framedDock.detection.frameId == "map" &&
+      Math.abs(framedDock.approachPose.x - 2.0) < 1e-9 &&
+      Math.abs(framedDock.approachPose.y - 2.2) < 1e-9,
+      "frame-aware perception transforms pallet poses and docking approach poses");
+    var invalidEstimate = new FixedLocalization(new LocalizationState(
+      Int64.ofInt(5), new Pose2(), "map", "base", PoseCovariance2.zero(),
+      Invalid, Int64.ofInt(150), Int64.ofInt(160), "robot-boot", "host-clock"));
+    throws(function() new FrameAwarePerception(perception, invalidEstimate,
+      perceptionFrames).observe([lidar]),
+      "frame-aware perception refuses to project detections from invalid localization");
+    throws(function() new FrameAwarePerception(perception,
+      new FixedLocalization(mapEstimate), new FrameTree2()).observe([
+        new SensorFrame("unframed-lidar", "lidar", "unconnected-laser",
+          Int64.ofInt(10), Int64.ofInt(160), [1.0], Int64.ofInt(170),
+          "base-link", null, null, "robot-boot", "host-clock")]),
+      "frame-aware perception refuses disconnected sensor frames");
     sceneTruth = new PerceptionSnapshot([], [obstacles[0]], [], []);
     check(truthPerception.observe([lidar]).obstacles()[0].detection.id ==
       obstacles[0].detection.id && truthPerception.observe([]).pallets().length == 0,
@@ -2218,4 +2264,19 @@ private class FakePower implements Power {
   public function new() {}
 
   public function batteryState():Null<BatteryState> return battery;
+}
+
+private class FixedLocalization implements Localization {
+  var current:Null<LocalizationState>;
+
+  public function new(state:LocalizationState) current = state;
+
+  public function update(snapshot:RobotSnapshot):LocalizationState {
+    if (current == null) throw "Fixed test localization has no state";
+    return cast current;
+  }
+
+  public function state():Null<LocalizationState> return current;
+
+  public function reset(?pose:Pose2):Void current = null;
 }
