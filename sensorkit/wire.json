@@ -1,13 +1,13 @@
 {
-  "schema": "schema/sensor_wire.nkw",
+  "schema": "schema/sensor_wire.wire.idl",
   "lock": "schema/sensor_wire.lock.json",
-  "generator": "sensorkit.wire_generate",
+  "vectors_module": "sensorkit.wire_vectors",
   "haxe": {
     "root": "sensor_io/haxe/materia/sensor/wire",
     "package": "materia.sensor.wire",
     "codec_name": "SensorWireCodec",
     "constants_name": "SensorWireConstants",
-    "schema_label": "schema/sensor_wire.nkw",
+    "schema_label": "schema/sensor_wire.wire.idl",
     "codec_comment": "/** Generated MessagePack-payload entry points; wrap or unwrap HMPK separately. */"
   },
   "cpp": {
@@ -24,7 +24,7 @@
   },
   "markdown": {
     "title": "SensorKit wire schema",
-    "intro": "Generated from `schema/sensor_wire.nkw`. MessagePack fields use integer map keys; the HMPK envelope is version 1."
+    "intro": "Generated from `schema/sensor_wire.wire.idl`. MessagePack fields use integer map keys; the HMPK envelope is version 1."
   },
   "outputs": {
     "cpp_types": "sensor_io/include/nativekit_sensor_wire_generated.hpp",

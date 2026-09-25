@@ -29,7 +29,7 @@ versioned `HMPK` envelope and encodes image-like sensor data as one
 integer-keyed MessagePack map whose payload is a packed binary field. Camera,
 depth, and segmentation share this `PackedFrame` wire shape; `messageType` and
 `pixelFormat` select the interpretation of the data. The canonical definitions
-and field tables live in [`schema/sensor_wire.nkw`](schema/sensor_wire.nkw) and
+and field tables live in [`schema/sensor_wire.wire.idl`](schema/sensor_wire.wire.idl) and
 the generated [wire reference](sensor_io/generated/sensor_wire.md). The C++
 decoder provides a generic `PackedFrameView` whose data span points directly
 into the encoded message, an owning `PackedFrame`, and typed camera, depth, and

@@ -3,7 +3,7 @@ package materia.sensor.wire;
 import haxe.Int64;
 import haxe.io.Bytes;
 
-/** Generated from schema/sensor_wire.nkw. Do not edit by hand. */
+/** Generated from schema/sensor_wire.wire.idl. Do not edit by hand. */
 @:wire
 class LidarScanMessage {
 	@:id(1)

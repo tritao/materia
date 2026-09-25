@@ -1,6 +1,6 @@
 # SensorKit wire schema
 
-Generated from `schema/sensor_wire.nkw`. MessagePack fields use integer map keys; the HMPK envelope is version 1.
+Generated from `schema/sensor_wire.wire.idl`. MessagePack fields use integer map keys; the HMPK envelope is version 1.
 
 Integer ranges follow the declared primitive. Haxe `u32` fields use `Int64` so the full unsigned 32-bit range is representable; message fields cannot use `u64` because Haxe `Int64` cannot represent its full range. `i64 nonnegative` fields match Haxe `Int64` and restrict the protocol value to `0..2^63-1`. Use the generated `SensorWireCodec` entry points in Haxe to enforce required fields, duplicates, constants, and integer ranges.
 

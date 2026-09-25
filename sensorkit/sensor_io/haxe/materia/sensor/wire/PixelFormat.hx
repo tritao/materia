@@ -1,6 +1,6 @@
 package materia.sensor.wire;
 
-/** Generated from schema/sensor_wire.nkw. Do not edit by hand. */
+/** Generated from schema/sensor_wire.wire.idl. Do not edit by hand. */
 class PixelFormat {
 	public static inline var rgba8:Int = 1;
 	public static inline var r32fLe:Int = 2;

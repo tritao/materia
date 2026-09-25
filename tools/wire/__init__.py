@@ -1,1 +1,1 @@
-"""Shared Materia .nkw wire IDL tooling."""
+"""Shared Materia .wire.idl wire IDL tooling."""

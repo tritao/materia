@@ -183,8 +183,8 @@ def normalized(schema: Schema) -> dict[str, Any]:
             raise ValidationError(f"packed struct {packed.name} has zero size")
         result["packed_structs"][packed.name] = {"endian": packed.endian, "fields": fields, "size": size}
 
-    if not message_names or len(message_names) != len(schema.messages):
-        raise ValidationError("schema must declare uniquely named messages")
+    if not schema.messages and not schema.packed_structs:
+        raise ValidationError("schema must declare a message or packed struct")
     return result
 
 

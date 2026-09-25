@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class SensorWireSchemaTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.schema = parse_file(ROOT / "sensorkit/schema/sensor_wire.nkw")
+        self.schema = parse_file(ROOT / "sensorkit/schema/sensor_wire.wire.idl")
 
     def test_canonical_schema_has_expected_message_and_packed_sizes(self) -> None:
         result = normalized(self.schema)

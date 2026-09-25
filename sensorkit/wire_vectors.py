@@ -96,7 +96,7 @@ def hmpk_message(fields: list[dict[str, Any]], example: dict[str, Any], *,
 
 def vector_fixture(norm: dict[str, Any]) -> str:
     examples = json.loads(EXAMPLES.read_text(encoding="utf-8"))
-    lines = ["# Generated from schema/sensor_wire.nkw and sensor_wire_examples.json; complete HMPK frames."]
+    lines = ["# Generated from schema/sensor_wire.wire.idl and sensor_wire_examples.json; complete HMPK frames."]
     for message_name, example in examples.items():
         message = norm["messages"][message_name]
         fields = message["fields"]
