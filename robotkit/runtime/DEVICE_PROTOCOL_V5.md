@@ -114,7 +114,13 @@ that round to zero are rejected. A deployed robot must set that budget from
 its encoder resolution, gearing, travel range, and control accuracy. Validate
 state precision over the same physical range before freezing the schema.
 
-The fingerprint must be derived from a deployed model/device layout artifact,
-including the ordered joint-to-channel map and safety-relevant calibration.
-RobotKit does not yet have that artifact, so tests use explicit fingerprints.
-Do not derive it from a mutable model name or process-local hash.
+The fingerprint is the first 16 bytes of SHA-256 over a domain separator,
+the canonical JSON form of `device_wire.lock.json`, and the exact bytes of the
+immutable deployed device layout file. Each block is prefixed by its byte
+length as a little-endian `u64`. `robotkit/tools/device_fingerprint.py` emits
+matching C++ and Rust constants from that file. The file must cover the
+ordered joint-to-channel map and safety-relevant calibration; this tool hashes
+the supplied bytes but cannot verify that a deployment omitted nothing.
+RobotKit does not yet have a physical deployment layout, so tests use explicit
+fingerprints. Do not derive the fingerprint from a mutable model name or a
+process-local hash.

@@ -11,6 +11,11 @@ now owns framing, CRC, session state, command validation, and watchdog state.
 The device adapter still owns physical stop outputs, safety inputs, and joint
 I/O. The MCU must compare the 16-byte `SessionBegin.model_fingerprint` with
 its compiled model identity and stay latched safe on mismatch.
+Use `python3 robotkit/tools/device_fingerprint.py <deployed-layout-file>
+--cpp <host-header> --rust <firmware-module>` to derive the same constant for
+both sides from the locked wire schema and exact deployment file bytes. The
+deployment file must include all safety-relevant joint mapping and calibration;
+the example PTY test still uses a synthetic fingerprint.
 
 `COMMAND` payloads will be `CommandHeader` followed by exactly
 `target_count * JointTarget::SIZE` bytes. `STATE` payloads will be `StateHeader`
