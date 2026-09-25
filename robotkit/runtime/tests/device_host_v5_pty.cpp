@@ -1,4 +1,5 @@
 #include "robotkit_device_host_v5.hpp"
+#include "robotkit_device_serial_endpoint_v5.hpp"
 
 #include <array>
 #include <cstdio>
@@ -66,10 +67,31 @@ int main(int argc, char **argv) {
         CHECK(previous_session != 0 && link->last_sent_sequence() == 2);
         CHECK(link->begin_session());
         CHECK(link->session_id() != previous_session && link->last_sent_sequence() == 0);
-        CHECK(link->read_state(state));
-        CHECK(state.header.safety == 2 && state.header.accepted_sequence == 0);
-        CHECK(link->send_command(4) && link->read_state(state));
-        CHECK(state.header.accepted_sequence == 1 && state.header.session == link->session_id());
+        auto endpoint = robotkit::DeviceSerialEndpointV5::attach(std::move(link), 1, 1e-6);
+        CHECK(endpoint && endpoint->initial_safety_state() == RK_SAFETY_EMERGENCY_STOP);
+        rk_robot_state runtime_state{};
+        CHECK(endpoint->sample(0, runtime_state) == RK_OK);
+        CHECK(runtime_state.safety == RK_SAFETY_EMERGENCY_STOP && runtime_state.joint_count == 1);
+        rk_robot_command command{};
+        command.struct_size = sizeof(command);
+        command.sequence = 1;
+        command.kind = RK_COMMAND_RESET_SAFETY;
+        CHECK(endpoint->apply(command) == RK_OK);
+        CHECK(endpoint->sample(0, runtime_state) == RK_OK && runtime_state.safety == RK_SAFETY_READY);
+        command.sequence = 2;
+        command.kind = RK_COMMAND_JOINT_TARGETS;
+        command.target_count = 1;
+        command.targets[0] = {0, RK_TARGET_VELOCITY, 1.1, 0.0, 0.0};
+        CHECK(endpoint->apply(command) == RK_OK);
+        CHECK(endpoint->sample(0, runtime_state) == RK_OK);
+        CHECK(runtime_state.source_timestamp_ns > 0 && runtime_state.velocity[0] == -2.0);
+        CHECK(endpoint->apply(command) == RK_ERROR_STALE_COMMAND);
+        command.sequence = 3;
+        command.kind = RK_COMMAND_NONE;
+        command.target_count = 0;
+        CHECK(endpoint->apply(command) == RK_OK);
+        CHECK(endpoint->sample(0, runtime_state) == RK_OK);
+        CHECK(runtime_state.safety == RK_SAFETY_READY);
     }
     auto wrong = fingerprint;
     wrong[0] ^= 1;

@@ -100,9 +100,9 @@ fn main() {
         }
         std::thread::sleep(Duration::from_millis(1));
     }
-    assert_eq!(device.stops, 4); // Three sessions and one watchdog expiry.
+    assert_eq!(device.stops, 5); // Three sessions, watchdog expiry, and one normal stop.
     assert_eq!(device.resets, 2);
-    assert_eq!(device.targets, 1);
+    assert_eq!(device.targets, 2);
     assert_eq!(protocol.last_sequence(), 0); // Mismatched final session is safe.
     assert!(!protocol.model_matches());
 }

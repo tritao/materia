@@ -4,6 +4,7 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/runtime_c_api.cpp
     src/recording.cpp
     src/device_host_v5.cpp
+    src/device_serial_endpoint_v5.cpp
     src/serial_protocol.cpp
     src/serial_endpoint.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)

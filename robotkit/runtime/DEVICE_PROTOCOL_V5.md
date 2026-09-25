@@ -10,6 +10,12 @@ beside the v4 endpoint. Its PTY test runs the Rust device core in a separate
 process against the C++ host, covering session negotiation, commands, a
 simulated watchdog expiry, restart, and model rejection. It uses a virtual
 serial port; physical UART timing and MCU integration remain untested.
+`DeviceSerialEndpointV5` adapts the link to `RobotRuntime` when supplied an
+explicit fingerprint and target conversion budget. It verifies and caches the
+initial safe state before opening. The existing C ABI serial constructor still
+selects v4. An explicit runtime no-op heartbeat maps to v5 normal stop, since
+v5 has no no-op command kind and a stopped device may safely refresh its
+watchdog.
 
 ## Frame
 
