@@ -167,6 +167,13 @@ stores time-parameterized pose/twist samples, and `NavigationGoal` defines final
 position and heading tolerances. The controller commands `MobileBase`; runtime
 limits and native safety checks remain active underneath it.
 
+`Path.project` returns monotonic arc-length progress, signed cross-track error,
+and the active segment tangent. `Navigation` adapts lookahead to commanded
+speed, limits speed by curvature and lateral acceleration, and slows according
+to the remaining braking distance. Path waypoint yaw describes the robot body
+heading; when it faces opposite the segment tangent, the follower drives that
+segment in reverse.
+
 ```haxe
 navigation.follow(new Path([startPose, stagingPose, goalPose], "odom"));
 navigation.updateObservation(robot.snapshot(), 0.02);

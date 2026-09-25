@@ -1,6 +1,7 @@
 package robotkit.navigation;
 
 import robotkit.mobile.Pose2;
+import robotkit.mobile.PlanarMath;
 
 /** Immutable polyline of planar poses expressed in one named frame. */
 class Path {
@@ -70,14 +71,18 @@ class Path {
     return goal();
   }
 
-  /** Projects a pose onto the not-yet-traversed path and returns monotonic arc length. */
-  public function nearestDistance(pose:Pose2, minimumDistance:Float):Float {
+  /** Projects a pose onto the not-yet-traversed path. Progress never moves backwards. */
+  public function project(pose:Pose2, minimumDistance:Float):PathProjection {
     if (pose == null || !Math.isFinite(minimumDistance))
       throw "Path projection requires a pose and finite progress";
     var minimum = minimumDistance < 0.0 ? 0.0 : minimumDistance;
     if (minimum > length) minimum = length;
     var bestDistance = 1.0e300;
     var bestProgress = minimum;
+    var bestSegment = -1;
+    var bestPose:Null<Pose2> = null;
+    var bestTangent = 0.0;
+    var bestCrossTrack = 0.0;
     for (index in 0...waypoints.length - 1) {
       var startDistance = distances[index];
       var endDistance = distances[index + 1];
@@ -89,10 +94,10 @@ class Path {
       var dy = to.y - from.y;
       var alpha = ((pose.x - from.x) * dx + (pose.y - from.y) * dy) /
         (segmentLength * segmentLength);
-      if (alpha < 0.0) alpha = 0.0;
+      var minimumAlpha = Math.max(0.0, (minimum - startDistance) / segmentLength);
+      if (alpha < minimumAlpha) alpha = minimumAlpha;
       if (alpha > 1.0) alpha = 1.0;
       var candidate = startDistance + alpha * segmentLength;
-      if (candidate < minimum) continue;
       var px = from.x + alpha * dx;
       var py = from.y + alpha * dy;
       var errorX = pose.x - px;
@@ -101,8 +106,20 @@ class Path {
       if (squaredError < bestDistance) {
         bestDistance = squaredError;
         bestProgress = candidate;
+        bestSegment = index;
+        var yawDelta = Pose2.wrapAngle(to.yaw - from.yaw);
+        bestPose = new Pose2(px, py, from.yaw + yawDelta * alpha);
+        bestTangent = PlanarMath.atan2(dy, dx);
+        bestCrossTrack = (dx * errorY - dy * errorX) / segmentLength;
       }
     }
-    return bestProgress;
+    if (bestPose == null)
+      throw "Path projection could not find a non-degenerate segment";
+    return new PathProjection(bestProgress, bestSegment, cast bestPose,
+      bestTangent, bestCrossTrack, Math.pow(bestDistance, 0.5));
   }
+
+  /** Compatibility helper returning only the projected arc length. */
+  public function nearestDistance(pose:Pose2, minimumDistance:Float):Float
+    return project(pose, minimumDistance).distanceAlongPath;
 }

@@ -644,6 +644,21 @@ class RobotWorldTests {
       new TrajectorySample(0.0, new Pose2(), Twist2.zero())
     ]), "Trajectory requires strictly increasing sample times");
 
+    var cornerPath = new Path([
+      new Pose2(0.0, 0.0, 0.0),
+      new Pose2(1.0, 0.0, 0.0),
+      new Pose2(1.0, 1.0, Math.PI * 0.5)
+    ], "map");
+    var firstProjection = cornerPath.project(new Pose2(0.6, 0.2, 0.0), 0.0);
+    check(Math.abs(firstProjection.distanceAlongPath - 0.6) < 1e-9 &&
+      Math.abs(firstProjection.crossTrackError - 0.2) < 1e-9 &&
+      Math.abs(firstProjection.distanceToPath - 0.2) < 1e-9,
+      "Path projection returns arc length and signed cross-track error");
+    var forwardProjection = cornerPath.project(new Pose2(0.2, 0.3, 0.0), 1.2);
+    check(forwardProjection.distanceAlongPath >= 1.2 &&
+      Math.abs(forwardProjection.crossTrackError - 0.8) < 1e-9,
+      "Path projection stays monotonic and signs cross-track relative to the active segment");
+
     var robot = new FakeRobot("nav-base");
     robot.positions = [0.0, 0.0];
     var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
@@ -676,6 +691,48 @@ class RobotWorldTests {
       case Normal: true;
       case _: false;
     }, "Navigation stops the robot on successful arrival");
+
+    localization.reset(new Pose2(0.0, 0.1, 0.0));
+    navigation.follow(path);
+    var offPathStatus = navigation.updateObservation(navSnapshot(3, 30, 0.0, 0.0), 0.1);
+    check(switch offPathStatus { case Following: true; case _: false; } &&
+      Math.abs(navigation.crossTrackError - 0.1) < 1e-9,
+      "Navigation exposes left-positive cross-track error from localization");
+
+    localization.reset(new Pose2(0.0, 0.0, 0.0));
+    var reversePath = new Path([
+      new Pose2(0.0, 0.0, 0.0), new Pose2(-1.0, 0.0, 0.0)
+    ], "odom");
+    navigation.follow(reversePath);
+    var reverseStatus = navigation.updateObservation(navSnapshot(4, 40, 0.0, 0.0), 0.1);
+    check(switch reverseStatus { case Following: true; case _: false; } &&
+      switch robot.lastCommand {
+        case JointTargets(targets, _): targets.length == 2 &&
+          targets[0].target < 0.0 && targets[1].target < 0.0;
+        case _: false;
+      }, "Navigation reverses along a path whose authored body heading faces opposite its tangent");
+
+    function commandedSpeedAt(x:Float, id:String):Float {
+      var speedRobot = new FakeRobot(id);
+      speedRobot.positions = [0.0, 0.0];
+      var speedBase = new MobileBase(speedRobot,
+        new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0, 2.0, 10.0));
+      var speedLocalization = new WheelOdometryLocalization(speedBase);
+      speedLocalization.reset(new Pose2(x, 0.0, 0.0));
+      var speedNavigation = new Navigation(speedBase, speedLocalization,
+        0.2, 0.5, 1.0);
+      speedNavigation.follow(path, new NavigationGoal(path.goal(), "odom", 0.005, 0.1));
+      speedNavigation.updateObservation(new RobotSnapshot(id, Int64.ofInt(1), Int64.ofInt(1),
+        [0.0, 0.0], [], [], 1, 0, Int64.ofInt(2), [], "speed-clock", "host"), 1.0);
+      return switch speedRobot.lastCommand {
+        case JointTargets(targets, _): (targets[0].target + targets[1].target) * 0.05;
+        case _: 0.0;
+      };
+    }
+    var farSpeed = commandedSpeedAt(0.0, "nav-speed-far");
+    var nearSpeed = commandedSpeedAt(0.98, "nav-speed-near");
+    check(farSpeed > nearSpeed && nearSpeed > 0.0,
+      "Navigation profiles speed down using braking distance near the goal");
 
     navigation.follow(path);
     navigation.cancel();

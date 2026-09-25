@@ -14,27 +14,40 @@ class Navigation {
   public final base:MobileBase;
   public final localization:Localization;
   public final lookaheadDistance:Float;
+  /** Additional lookahead seconds; distance grows with the recent commanded speed. */
+  public final lookaheadTime:Float;
   public final cruiseSpeed:Float;
   public final maxAngularSpeed:Float;
+  public final maxLateralAcceleration:Float;
+  public final allowReverse:Bool;
   public var status(default, null):NavigationStatus = Idle;
+  public var progressDistance(default, null):Float = 0.0;
+  /** Signed cross-track error, positive to the left of the path direction. */
+  public var crossTrackError(default, null):Float = 0.0;
 
   var currentPath:Null<Path> = null;
   var currentGoal:Null<NavigationGoal> = null;
-  var progressDistance:Float = 0.0;
+  var commandedLinearSpeed:Float = 0.0;
 
   public function new(base:MobileBase, localization:Localization,
       ?lookaheadDistance:Float = 0.5, ?cruiseSpeed:Float = 0.5,
-      ?maxAngularSpeed:Float = 1.0) {
+      ?maxAngularSpeed:Float = 1.0, ?allowReverse:Bool = true,
+      ?lookaheadTime:Float = 0.0, ?maxLateralAcceleration:Float = 1.0) {
     if (base == null || localization == null ||
         !Math.isFinite(lookaheadDistance) || lookaheadDistance <= 0.0 ||
         !Math.isFinite(cruiseSpeed) || cruiseSpeed <= 0.0 ||
-        !Math.isFinite(maxAngularSpeed) || maxAngularSpeed <= 0.0)
+        !Math.isFinite(maxAngularSpeed) || maxAngularSpeed <= 0.0 ||
+        !Math.isFinite(lookaheadTime) || lookaheadTime < 0.0 ||
+        !Math.isFinite(maxLateralAcceleration) || maxLateralAcceleration <= 0.0)
       throw "Navigation requires mobile and localization services with positive limits";
     this.base = base;
     this.localization = localization;
     this.lookaheadDistance = lookaheadDistance;
+    this.lookaheadTime = lookaheadTime;
     this.cruiseSpeed = cruiseSpeed;
     this.maxAngularSpeed = maxAngularSpeed;
+    this.maxLateralAcceleration = maxLateralAcceleration;
+    this.allowReverse = allowReverse;
   }
 
   /** Starts following a framed polyline; the final waypoint supplies the default goal. */
@@ -48,6 +61,8 @@ class Navigation {
     currentPath = path;
     currentGoal = target;
     progressDistance = 0.0;
+    crossTrackError = 0.0;
+    commandedLinearSpeed = 0.0;
     status = Following;
   }
 
@@ -95,24 +110,39 @@ class Navigation {
       return command(new Twist2(0.0, angular), durationSeconds);
     }
 
-    progressDistance = path.nearestDistance(state.pose, progressDistance);
-    var target = path.poseAt(Math.min(path.length, progressDistance + lookaheadDistance));
+    var projection = path.project(state.pose, progressDistance);
+    progressDistance = projection.distanceAlongPath;
+    crossTrackError = projection.crossTrackError;
+    var lookahead = Math.max(lookaheadDistance,
+      Math.abs(commandedLinearSpeed) * lookaheadTime);
+    var target = path.poseAt(Math.min(path.length, progressDistance + lookahead));
     var localTarget = target.relativeTo(state.pose);
     var distanceSquared = localTarget.x * localTarget.x + localTarget.y * localTarget.y;
     if (distanceSquared < 1e-9) return fail("Path lookahead collapsed at the robot pose");
     var curvature = 2.0 * localTarget.y / distanceSquared;
-    var speed = Math.min(cruiseSpeed, Math.max(0.05, goalDistance * 1.5));
-    if (Math.abs(curvature) > 1e-9)
+    var pathHeading = projection.pose.yaw;
+    var pathDirection = Math.cos(Pose2.wrapAngle(projection.tangentYaw - pathHeading));
+    var direction = allowReverse && pathDirection < 0.0 ? -1.0 : 1.0;
+    var remainingDistance = Math.max(path.length - progressDistance,
+      Math.max(0.0, goalDistance - goal.positionTolerance));
+    var speed = Math.min(cruiseSpeed,
+      Math.pow(2.0 * base.motionLimits.maxLinearAcceleration * remainingDistance, 0.5));
+    if (Math.abs(curvature) > 1e-9) {
       speed = Math.min(speed, maxAngularSpeed / Math.abs(curvature));
-    var angularRate = speed * curvature;
+      speed = Math.min(speed,
+        Math.pow(maxLateralAcceleration / Math.abs(curvature), 0.5));
+    }
+    var linearSpeed = direction * speed;
+    var angularRate = linearSpeed * curvature;
     if (angularRate > maxAngularSpeed) angularRate = maxAngularSpeed;
     if (angularRate < -maxAngularSpeed) angularRate = -maxAngularSpeed;
-    return command(new Twist2(speed, angularRate), durationSeconds);
+    return command(new Twist2(linearSpeed, angularRate), durationSeconds);
   }
 
   public function cancel():Void {
     if (isFollowing()) {
       base.stop(StopMode.Normal);
+      commandedLinearSpeed = 0.0;
       status = Cancelled;
     }
   }
@@ -122,12 +152,15 @@ class Navigation {
     currentPath = null;
     currentGoal = null;
     progressDistance = 0.0;
+    crossTrackError = 0.0;
+    commandedLinearSpeed = 0.0;
     status = Idle;
   }
 
   function command(twist:Twist2, durationSeconds:Float):NavigationStatus {
     try {
-      base.command(twist, durationSeconds);
+      var accepted = base.command(twist, durationSeconds);
+      commandedLinearSpeed = accepted.linear;
       return status;
     } catch (error:Dynamic) {
       return fail(Std.string(error));
@@ -136,6 +169,7 @@ class Navigation {
 
   function fail(message:String):NavigationStatus {
     try base.stop(StopMode.Normal) catch (_:Dynamic) {}
+    commandedLinearSpeed = 0.0;
     status = Failed(message == null || message.length == 0 ? "Navigation failed" : message);
     return status;
   }
