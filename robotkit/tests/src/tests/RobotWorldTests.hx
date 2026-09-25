@@ -71,6 +71,7 @@ import robotkit.localization.PoseCovariance2;
 import robotkit.localization.FrameTransform2;
 import robotkit.localization.FrameTree2;
 import robotkit.localization.PoseFusionLocalization;
+import robotkit.localization.PoseFusionOptions;
 import robotkit.localization.RobotFrameTree2;
 import robotkit.localization.Localization;
 import robotkit.navigation.Path;
@@ -739,7 +740,9 @@ class RobotWorldTests {
     var fusionBase = new MobileBase(fusionRobot,
       new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
     var wheelSource = new WheelOdometryLocalization(fusionBase);
-    var fusion = new PoseFusionLocalization(wheelSource, frames, "map", "base");
+    var fusion = new PoseFusionLocalization(wheelSource, frames, "map", "base",
+      new PoseFusionOptions(0.00000002, 0.00000005, 2.0, 0.5,
+        0.25, 0.1, 0.05));
     var fusedInput = new RobotSnapshot("fused-base", Int64.ofInt(1), Int64.ofInt(100),
       [0.0, 0.0], [], [], 1, 0, Int64.ofInt(110), [], "fused-clock", "host-clock");
     var unanchored = fusion.update(fusedInput);
@@ -766,6 +769,40 @@ class RobotWorldTests {
       "fused-clock", "host-clock"));
     check(Math.abs(fusedMoved.pose.x - 5.3) < 1e-9,
       "Fused map pose continues to follow wheel odometry between absolute updates");
+    check(switch fusedMoved.quality { case Degraded: true; case _: false; } &&
+      fusedMoved.covariance.xx > smoothed.covariance.xx,
+      "absolute pose timeout degrades quality and grows uncertainty");
+
+    var outOfOrder = fusion.fuse(new LocalizationState(Int64.ofInt(1),
+      new Pose2(50.0, 0.0, 0.0), "map", "base",
+      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01), Good,
+      Int64.ofInt(110), Int64.ofInt(210), "gps-clock", "host-clock"));
+    check(Math.abs(outOfOrder.pose.x - fusedMoved.pose.x) < 1e-9,
+      "pose fusion rejects duplicate or out-of-order absolute measurements");
+
+    var impossibleJump = fusion.fuse(new LocalizationState(Int64.ofInt(3),
+      new Pose2(25.0, 0.0, 0.0), "map", "base",
+      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01), Good,
+      Int64.ofInt(220), Int64.ofInt(210), "gps-clock", "host-clock"));
+    check(Math.abs(impossibleJump.pose.x - fusedMoved.pose.x) < 1e-9 &&
+      switch impossibleJump.quality { case Degraded: true; case _: false; },
+      "innovation gating rejects a large localization jump and degrades quality");
+
+    var recovered = fusion.fuse(new LocalizationState(Int64.ofInt(4),
+      new Pose2(5.9, 0.0, 0.0), "map", "base",
+      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01), Good,
+      Int64.ofInt(230), Int64.ofInt(210), "gps-clock", "host-clock"));
+    check(Math.abs(recovered.pose.x - impossibleJump.pose.x) <= 0.25 &&
+      switch recovered.quality { case Good: true; case _: false; },
+      "valid absolute localization recovers through bounded pose corrections");
+
+    var stale = fusion.fuse(new LocalizationState(Int64.ofInt(5),
+      new Pose2(6.0, 0.0, 0.0), "map", "base",
+      new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01), Good,
+      Int64.ofInt(240), Int64.ofInt(0), "gps-clock", "host-clock"));
+    check(Math.abs(stale.pose.x - recovered.pose.x) < 1e-9 &&
+      switch stale.quality { case Good: true; case _: false; },
+      "stale external localization is ignored without disturbing a fresh estimate");
 
     var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
     var simulation = new Simulation();

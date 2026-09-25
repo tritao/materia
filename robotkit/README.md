@@ -175,7 +175,11 @@ simulation-owned robot pose into `map` to `base` for deterministic scenarios.
 `target_T_source` lookup direction. `PoseFusionLocalization` combines wheel
 odometry with transformed external pose observations using separate covariance
 weights for planar position and heading. It reports an invalid estimate until
-the odometry frame can be anchored to the requested reference frame.
+the odometry frame can be anchored to the requested reference frame. Its
+`PoseFusionOptions` bounds observation age, absolute-pose timeout, innovation,
+and per-update correction; stale absolute localization degrades quality and
+grows covariance, while accepted measurements must advance per-source sequence
+and timestamp. Receive-time checks require a shared local clock ID.
 `FrameTree2.fromRobotModel(model, bodyLinkId)` builds planar transforms for
 authored frames attached to that body link. It ignores mount height and rejects
 roll or pitch. `RobotFrameTree2.fromSnapshot(model, blueprint, snapshot,

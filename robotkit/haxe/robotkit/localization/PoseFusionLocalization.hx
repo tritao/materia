@@ -10,6 +10,7 @@ class PoseFusionLocalization implements Localization {
   public final frames:FrameTree2;
   public final referenceFrame:String;
   public final bodyFrame:String;
+  public final options:PoseFusionOptions;
 
   var latestOdometry:Null<LocalizationState> = null;
   var currentState:Null<LocalizationState> = null;
@@ -18,9 +19,14 @@ class PoseFusionLocalization implements Localization {
     1.0e6, 0.0, 1.0e6);
   var hasAbsoluteObservation = false;
   var absoluteQuality:LocalizationQuality = Degraded;
+  var lastAbsoluteReceivedTimestampNs:Null<Int64> = null;
+  var lastAbsoluteReceivedClockId:String = "";
+  var appliedStaleSeconds:Float = 0.0;
+  final sourceOrders:Map<String, AbsoluteObservationOrder> = new Map();
 
   public function new(odometry:Localization, frames:FrameTree2,
-      ?referenceFrame:String = "map", ?bodyFrame:String = "base") {
+      ?referenceFrame:String = "map", ?bodyFrame:String = "base",
+      ?options:PoseFusionOptions) {
     if (odometry == null || frames == null || referenceFrame == null ||
         referenceFrame.length == 0 || bodyFrame == null || bodyFrame.length == 0 ||
         referenceFrame == bodyFrame)
@@ -29,12 +35,14 @@ class PoseFusionLocalization implements Localization {
     this.frames = frames;
     this.referenceFrame = referenceFrame;
     this.bodyFrame = bodyFrame;
+    this.options = options == null ? new PoseFusionOptions() : options;
   }
 
   public function update(snapshot:RobotSnapshot):LocalizationState {
     latestOdometry = odometry.update(snapshot);
     var odom:LocalizationState = cast latestOdometry;
     ensureReferenceFromOdometry(odom.referenceFrame);
+    ageCorrectionCovariance(odom);
     return publish(odom);
   }
 
@@ -48,6 +56,21 @@ class PoseFusionLocalization implements Localization {
     if (odom.bodyFrame != bodyFrame)
       throw 'Odometry body frame "${odom.bodyFrame}" does not match fusion body frame "$bodyFrame"';
 
+    ageCorrectionCovariance(odom);
+    // Receive timestamps are comparable only when they share a local clock.
+    if (observation.receivedClockId != odom.receivedClockId)
+      return publish(odom);
+    var observationAge = elapsedSeconds(odom.receivedTimestampNs,
+      observation.receivedTimestampNs);
+    if (observationAge > options.maxObservationAgeSeconds)
+      return publish(odom);
+
+    var previousOrder = sourceOrders.get(observation.sourceClockId);
+    if (previousOrder != null &&
+        (Int64.compare(observation.sequence, previousOrder.sequence) <= 0 ||
+          Int64.compare(observation.sourceTimestampNs, previousOrder.timestampNs) < 0))
+      return publish(odom);
+
     var referenceFromObservation = observation.referenceFrame == referenceFrame
       ? new Pose2()
       : frames.lookup(referenceFrame, observation.referenceFrame);
@@ -56,8 +79,33 @@ class PoseFusionLocalization implements Localization {
       : frames.lookup(observation.bodyFrame, bodyFrame);
     var absoluteBodyPose = referenceFromObservation.compose(observation.pose)
       .compose(observationBodyInTarget);
+
+    var poseForCorrection = absoluteBodyPose;
+    if (hasAbsoluteObservation && referenceFromOdometry != null) {
+      var predictedPose = cast(referenceFromOdometry, Pose2).compose(odom.pose);
+      var innovation = absoluteBodyPose.relativeTo(predictedPose);
+      var positionInnovation = Math.sqrt(innovation.x * innovation.x +
+        innovation.y * innovation.y);
+      if (positionInnovation > options.maxPositionInnovationMeters ||
+          Math.abs(innovation.yaw) > options.maxYawInnovationRadians) {
+        absoluteQuality = Degraded;
+        return publish(odom);
+      }
+
+      // Bound each accepted correction so a returning absolute source cannot
+      // snap the fused pose in one update.
+      var correctionScale = positionInnovation > options.maxCorrectionStepMeters
+        ? options.maxCorrectionStepMeters / positionInnovation
+        : 1.0;
+      var correctionYaw = clamp(innovation.yaw,
+        -options.maxCorrectionStepRadians, options.maxCorrectionStepRadians);
+      poseForCorrection = predictedPose.compose(new Pose2(
+        innovation.x * correctionScale, innovation.y * correctionScale,
+        correctionYaw));
+    }
+
     var odometryInverse = new Pose2().relativeTo(odom.pose);
-    var measuredCorrection = absoluteBodyPose.compose(odometryInverse);
+    var measuredCorrection = poseForCorrection.compose(odometryInverse);
     var summedCovariance = addCovariance(observation.covariance, odom.covariance);
     // This first planar fusion pass weights x, y, and yaw independently.
     var measurementCovariance = new PoseCovariance2(summedCovariance.xx, 0.0, 0.0,
@@ -81,6 +129,11 @@ class PoseFusionLocalization implements Localization {
     }
     hasAbsoluteObservation = true;
     absoluteQuality = observation.quality;
+    sourceOrders.set(observation.sourceClockId,
+      new AbsoluteObservationOrder(observation.sequence, observation.sourceTimestampNs));
+    lastAbsoluteReceivedTimestampNs = observation.receivedTimestampNs;
+    lastAbsoluteReceivedClockId = observation.receivedClockId;
+    appliedStaleSeconds = 0.0;
     return publish(odom);
   }
 
@@ -95,6 +148,10 @@ class PoseFusionLocalization implements Localization {
       1.0e6, 0.0, 1.0e6);
     hasAbsoluteObservation = false;
     absoluteQuality = Degraded;
+    lastAbsoluteReceivedTimestampNs = null;
+    lastAbsoluteReceivedClockId = "";
+    appliedStaleSeconds = 0.0;
+    for (sourceClock in sourceOrders.keys()) sourceOrders.remove(sourceClock);
   }
 
   function ensureReferenceFromOdometry(odometryReference:String):Void {
@@ -111,12 +168,14 @@ class PoseFusionLocalization implements Localization {
   }
 
   function publish(odom:LocalizationState):LocalizationState {
+    ageCorrectionCovariance(odom);
     var correction:Null<Pose2> = referenceFromOdometry;
     var pose = correction == null ? new Pose2() : cast(correction, Pose2).compose(odom.pose);
     var quality = switch odom.quality {
       case Invalid: Invalid;
       case _:
-        hasAbsoluteObservation && absoluteQuality == LocalizationQuality.Good
+        hasAbsoluteObservation && absoluteQuality == LocalizationQuality.Good &&
+          isAbsoluteFresh(odom)
           ? Good
           : (correction == null ? Invalid : Degraded);
     };
@@ -133,6 +192,38 @@ class PoseFusionLocalization implements Localization {
     return currentState;
   }
 
+  function ageCorrectionCovariance(odom:LocalizationState):Void {
+    if (!hasAbsoluteObservation || lastAbsoluteReceivedTimestampNs == null ||
+        odom.receivedClockId != lastAbsoluteReceivedClockId) return;
+    var age = elapsedSeconds(odom.receivedTimestampNs,
+      cast lastAbsoluteReceivedTimestampNs);
+    var staleSeconds = Math.max(0.0, age - options.absoluteTimeoutSeconds);
+    var newlyStaleSeconds = Math.max(0.0, staleSeconds - appliedStaleSeconds);
+    if (newlyStaleSeconds > 0.0) {
+      var growth = options.staleCovarianceGrowthPerSecond * newlyStaleSeconds;
+      correctionCovariance = new PoseCovariance2(
+        correctionCovariance.xx + growth, correctionCovariance.xy,
+        correctionCovariance.xYaw, correctionCovariance.yy + growth,
+        correctionCovariance.yYaw, correctionCovariance.yawYaw + growth);
+    }
+    appliedStaleSeconds = Math.max(appliedStaleSeconds, staleSeconds);
+  }
+
+  function isAbsoluteFresh(odom:LocalizationState):Bool {
+    if (!hasAbsoluteObservation || lastAbsoluteReceivedTimestampNs == null ||
+        odom.receivedClockId != lastAbsoluteReceivedClockId) return false;
+    return elapsedSeconds(odom.receivedTimestampNs,
+      cast lastAbsoluteReceivedTimestampNs) <= options.absoluteTimeoutSeconds;
+  }
+
+  static function elapsedSeconds(later:Int64, earlier:Int64):Float {
+    if (Int64.compare(later, earlier) <= 0) return 0.0;
+    return Std.parseFloat(Int64.toStr(Int64.sub(later, earlier))) / 1000000000.0;
+  }
+
+  static function clamp(value:Float, minimum:Float, maximum:Float):Float
+    return Math.max(minimum, Math.min(maximum, value));
+
   static function fuseAxis(prior:Float, priorVariance:Float,
       measurement:Float, measurementVariance:Float):FusedAxis {
     var sum = priorVariance + measurementVariance;
@@ -147,6 +238,16 @@ class PoseFusionLocalization implements Localization {
     return new PoseCovariance2(left.xx + right.xx, left.xy + right.xy,
       left.xYaw + right.xYaw, left.yy + right.yy, left.yYaw + right.yYaw,
       left.yawYaw + right.yawYaw);
+}
+
+private class AbsoluteObservationOrder {
+  public final sequence:Int64;
+  public final timestampNs:Int64;
+
+  public function new(sequence:Int64, timestampNs:Int64) {
+    this.sequence = sequence;
+    this.timestampNs = timestampNs;
+  }
 }
 
 private class FusedAxis {
