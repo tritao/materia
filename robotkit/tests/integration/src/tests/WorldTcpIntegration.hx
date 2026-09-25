@@ -32,7 +32,14 @@ import robotkit.localization.WheelOdometryLocalization;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Path;
+import robotkit.navigation.OccupancyCell;
+import robotkit.navigation.OccupancyGrid2;
+import robotkit.navigation.Costmap2;
+import robotkit.navigation.AStarPlanner;
+import robotkit.navigation.Navigator;
+import robotkit.perception.PerceptionSnapshot;
 import robotkit.skill.FollowPath;
+import robotkit.skill.GoTo;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
 
@@ -255,24 +262,31 @@ class WorldTcpIntegration {
       var current = remote.snapshot();
       var estimate = localization.update(current);
       var goalPose = new Pose2(estimate.pose.x + 0.1, estimate.pose.y, estimate.pose.yaw);
-      var path = new Path([estimate.pose, goalPose], "odom");
-      var followPath = new FollowPath(new Navigation(mobileBase, localization, 0.2, 0.2, 0.8), path,
-        new NavigationGoal(goalPose, "odom", 0.01, 0.05));
+      var grid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0),
+        100, 100, "odom", OccupancyCell.Free);
+      var costmap = new Costmap2(grid, 0.25);
+      var navigation = new Navigation(mobileBase, localization, 0.2, 0.2, 0.8);
+      var navigator = new Navigator(navigation, new AStarPlanner(costmap), costmap);
+      var goTo = new GoTo(navigator, new NavigationGoal(goalPose, "odom", 0.01, 0.05),
+        function(snapshot) {
+          localization.update(snapshot);
+          return new PerceptionSnapshot();
+        });
       var skillRunner = new SkillRunner();
-      if (skillRunner.start(followPath) != SkillStatus.Running ||
-          skillRunner.activeSkill() != followPath)
-        throw "SkillRunner did not start FollowPath for RemoteRobot";
+      if (skillRunner.start(goTo) != SkillStatus.Running ||
+          skillRunner.activeSkill() != goTo)
+        throw "SkillRunner did not start goal-level GoTo for RemoteRobot";
       if (skillRunner.update(current, 0.02) != SkillStatus.Running)
-        throw "RemoteRobot FollowPath did not remain active after its first update";
+        throw "RemoteRobot GoTo did not remain active after its first update";
       waitUntil(runtime, function() {
         var state = remote.snapshot();
         return state.velocities.length == 3 && state.velocities.get(0) > 0.0
           && state.velocities.get(1) > 0.0;
-      }, "FollowPath did not send an atomic two-wheel velocity target through robotd");
+      }, "GoTo did not send an atomic two-wheel velocity target through robotd");
       skillRunner.cancel();
       if (skillRunner.status() != SkillStatus.Cancelled || skillRunner.activeSkill() != null ||
           skillRunner.result() == null)
-        throw "SkillRunner did not cancel RemoteRobot FollowPath cleanly";
+        throw "SkillRunner did not cancel RemoteRobot GoTo cleanly";
 
       var facility = new Facility("serial-facility", "Serial integration facility");
       facility.addZone(new Zone("floor", "Floor", "map",
@@ -311,7 +325,7 @@ class WorldTcpIntegration {
       if (mission.status != materia.automation.mission.MissionStatus.Succeeded ||
           fleet.availableRobotIds().indexOf(LOGICAL_ID) < 0)
         throw "serial mission did not complete and release its fleet assignment";
-      Sys.println("SkillRunner FollowPath, shared behavior, and MissionExecutor passed: local simulation and robotd serial");
+      Sys.println("SkillRunner GoTo, shared behavior, and MissionExecutor passed: local simulation and robotd serial");
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();

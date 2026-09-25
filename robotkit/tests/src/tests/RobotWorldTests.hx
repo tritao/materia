@@ -2037,6 +2037,32 @@ class RobotWorldTests {
     var replayDescription = new RobotDescription("forklift", "recorded forklift",
       linkNames, jointNames);
     var replayCapabilities = new RobotCapabilities("forklift", 5, true, true, true, false);
+
+    var goalReplay = new ReplayRobot("forklift", recording,
+      replayDescription, replayCapabilities);
+    var goalReplayBase = MobileBase.fromBlueprint(goalReplay, blueprint);
+    var goalReplayLocalization = new WheelOdometryLocalization(goalReplayBase);
+    var goalReplayNavigation = new Navigation(goalReplayBase,
+      goalReplayLocalization, 0.2, 0.2, 0.8);
+    var goalReplayGrid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0),
+      100, 100, "odom", OccupancyCell.Free);
+    var goalReplayCostmap = new Costmap2(goalReplayGrid, 0.25);
+    var goalReplayNavigator = new Navigator(goalReplayNavigation,
+      new AStarPlanner(goalReplayCostmap), goalReplayCostmap);
+    goalReplayLocalization.update(goalReplay.snapshot());
+    var goalReplaySkill = new GoTo(goalReplayNavigator,
+      new NavigationGoal(path.goal(), "odom", 0.02, 0.1), function(snapshot) {
+        goalReplayLocalization.update(snapshot);
+        return new PerceptionSnapshot();
+      });
+    var goalReplayRunner = new SkillRunner();
+    var goalReplayStatus = goalReplayRunner.start(goalReplaySkill);
+    while (goalReplayStatus == SkillStatus.Running && goalReplay.advance())
+      goalReplayStatus = goalReplayRunner.update(goalReplay.snapshot(), 0.01);
+    check(goalReplayStatus == SkillStatus.Succeeded && goalReplayRunner.result() != null,
+      "goal-level GoTo completes against recorded ReplayRobot observations");
+    goalReplay.close();
+
     var replay = new ReplayRobot("forklift", recording, replayDescription, replayCapabilities);
     var replayBase = MobileBase.fromBlueprint(replay, blueprint);
     var replayLocalization = new WheelOdometryLocalization(replayBase);
