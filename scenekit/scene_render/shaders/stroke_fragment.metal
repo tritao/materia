@@ -17,12 +17,8 @@ fragment float4 main0(Input input [[stage_in]],
         if (dot(clip.planes[index].xyz, input.world_position) + clip.planes[index].w < 0.0)
             discard_fragment();
     }
-    float outside_x = max(max(-input.line_coordinate.x,
-                              input.line_coordinate.x - input.line_length), 0.0);
-    float outside_y = max(abs(input.line_coordinate.y) - input.line_half_width, 0.0);
-    float signed_distance = length(float2(outside_x, outside_y)) +
-        min(max(outside_x, abs(input.line_coordinate.y) - input.line_half_width), 0.0) -
-        input.line_half_width;
+    float2 nearest = float2(clamp(input.line_coordinate.x, 0.0, input.line_length), 0.0);
+    float signed_distance = length(input.line_coordinate - nearest) - input.line_half_width;
     float coverage = clamp(0.5 - signed_distance / max(fwidth(signed_distance), 1e-4), 0.0, 1.0);
     return float4(params.stroke_color.rgb * coverage, params.stroke_color.a * coverage);
 }

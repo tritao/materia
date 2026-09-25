@@ -15,12 +15,8 @@ float4 main(Input input) : SV_Target0 {
         if (index >= int(clip_plane_count.x)) break;
         if (dot(clip_planes[index].xyz, input.world_position) + clip_planes[index].w < 0.0f) discard;
     }
-    float outside_x = max(max(-input.line_coordinate.x,
-                              input.line_coordinate.x - input.line_length), 0.0f);
-    float outside_y = max(abs(input.line_coordinate.y) - input.line_half_width, 0.0f);
-    float signed_distance = length(float2(outside_x, outside_y)) +
-        min(max(outside_x, abs(input.line_coordinate.y) - input.line_half_width), 0.0f) -
-        input.line_half_width;
+    float2 nearest = float2(clamp(input.line_coordinate.x, 0.0f, input.line_length), 0.0f);
+    float signed_distance = length(input.line_coordinate - nearest) - input.line_half_width;
     float coverage = saturate(0.5f - signed_distance / max(fwidth(signed_distance), 1e-4f));
     return float4(stroke_color.rgb * coverage, stroke_color.a * coverage);
 }

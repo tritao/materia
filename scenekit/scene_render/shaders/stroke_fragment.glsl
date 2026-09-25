@@ -15,10 +15,8 @@ void main() {
         if (index >= int(clip_plane_count.x)) break;
         if (dot(clip_planes[index].xyz, world_position) + clip_planes[index].w < 0.0) discard;
     }
-    float outside_x = max(max(-line_coordinate.x, line_coordinate.x - line_length), 0.0);
-    float outside_y = max(abs(line_coordinate.y) - line_half_width, 0.0);
-    float signed_distance = length(vec2(outside_x, outside_y)) +
-        min(max(outside_x, abs(line_coordinate.y) - line_half_width), 0.0) - line_half_width;
+    vec2 nearest = vec2(clamp(line_coordinate.x, 0.0, line_length), 0.0);
+    float signed_distance = length(line_coordinate - nearest) - line_half_width;
     float coverage = clamp(0.5 - signed_distance / max(fwidth(signed_distance), 1e-4), 0.0, 1.0);
     fragment_color = vec4(stroke_color.rgb * coverage, stroke_color.a * coverage);
 }

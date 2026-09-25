@@ -51,13 +51,14 @@ vertex Output main0(Input input [[stage_in]], constant ViewParams &view [[buffer
     float2 normal = float2(-tangent.y, tangent.x);
     float along = input.stroke_coordinate.x;
     float half_width = params.stroke_view.z;
-    float cap_extension = along < 0.5 ? -half_width : half_width;
+    float extent = half_width + 1.0;
+    float cap_extension = along < 0.5 ? -extent : extent;
     float4 clip = mix(a, b, along);
-    clip.xy += (normal * (input.stroke_coordinate.y * half_width) + tangent * cap_extension) *
+    clip.xy += (normal * (input.stroke_coordinate.y * extent) + tangent * cap_extension) *
                (2.0 / params.stroke_view.xy) * clip.w;
     output.position = clip;
     output.line_coordinate = float2(along * length_px + cap_extension,
-                                    input.stroke_coordinate.y * half_width);
+                                    input.stroke_coordinate.y * extent);
     output.line_length = length_px;
     output.line_half_width = half_width;
     return output;

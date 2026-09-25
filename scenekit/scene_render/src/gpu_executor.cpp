@@ -766,7 +766,8 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats) {
     depth.enabled = 1;
     depth.compare = NKGPU_COMPAREFUNC_LESS_EQUAL;
     depth.write_enabled = 0;
-    depth.bias = -0.00002f;
+    depth.bias = -1.0f;
+    depth.bias_slope_scale = -2.0f;
     nkgpu_blend_state blend{};
     blend.enabled = 1;
     blend.src_rgb = NKGPU_BLENDFACTOR_ONE;

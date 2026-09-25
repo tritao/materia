@@ -45,12 +45,13 @@ void main() {
     vec2 normal = vec2(-tangent.y, tangent.x);
     float along = stroke_coordinate.x;
     float half_width = stroke_view.z;
-    float cap_extension = along < 0.5 ? -half_width : half_width;
+    float extent = half_width + 1.0;
+    float cap_extension = along < 0.5 ? -extent : extent;
     vec4 clip = mix(a, b, along);
-    vec2 pixel_offset = normal * (stroke_coordinate.y * half_width) + tangent * cap_extension;
+    vec2 pixel_offset = normal * (stroke_coordinate.y * extent) + tangent * cap_extension;
     clip.xy += pixel_offset * (2.0 / stroke_view.xy) * clip.w;
     gl_Position = clip;
-    line_coordinate = vec2(along * length_px + cap_extension, stroke_coordinate.y * half_width);
+    line_coordinate = vec2(along * length_px + cap_extension, stroke_coordinate.y * extent);
     line_length = length_px;
     line_half_width = half_width;
 }
