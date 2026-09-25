@@ -3,6 +3,7 @@ cbuffer material_params : register(b0)
     float4 base_color : packoffset(c0);
     float4 surface_params : packoffset(c1);
     float4 emissive : packoffset(c2);
+    float4 texture_flags : packoffset(c3);
 };
 
 cbuffer lighting_params : register(b3)
@@ -18,6 +19,10 @@ cbuffer lighting_params : register(b3)
 };
 
 Texture2D base_color_texture : register(t0);
+Texture2D metallic_roughness_texture : register(t1);
+Texture2D normal_texture : register(t2);
+Texture2D occlusion_texture : register(t3);
+Texture2D emissive_texture : register(t4);
 SamplerState base_color_sampler : register(s0);
 
 cbuffer clip_params : register(b2)
@@ -44,17 +49,28 @@ float4 main(SceneFragmentInput input) : SV_Target0
     }
     float4 texture_color = base_color_texture.Sample(base_color_sampler, input.texcoord0);
     float3 N = normalize(input.normal);
+    if (texture_flags.x > 0.5f) {
+        float3 mapped = normal_texture.Sample(base_color_sampler, input.texcoord0).xyz * 2.0f - 1.0f;
+        float3 dp1 = ddx(input.world_position), dp2 = ddy(input.world_position);
+        float2 duv1 = ddx(input.texcoord0), duv2 = ddy(input.texcoord0);
+        float3 T = cross(dp2, N) * duv1.x + cross(N, dp1) * duv2.x;
+        float3 B = cross(dp2, N) * duv1.y + cross(N, dp1) * duv2.y;
+        float scale = rsqrt(max(max(dot(T, T), dot(B, B)), 1.0e-8f));
+        N = normalize(T * (mapped.x * scale) + B * (mapped.y * scale) + N * mapped.z);
+    }
+    float4 metal_rough = metallic_roughness_texture.Sample(base_color_sampler, input.texcoord0);
     float hemisphere = 0.5f + 0.5f * dot(N, float3(0.0f, 0.0f, 1.0f));
     float3 albedo = base_color.rgb * texture_color.rgb * input.color0.rgb;
-    float metallic = saturate(surface_params.x);
-    float roughness = clamp(surface_params.y, 0.045f, 1.0f);
+    float metallic = saturate(surface_params.x * metal_rough.b);
+    float roughness = clamp(surface_params.y * metal_rough.g, 0.045f, 1.0f);
     float alpha_ggx = roughness * roughness;
     float alpha2 = alpha_ggx * alpha_ggx;
     float3 V = normalize(camera_position.xyz - input.world_position);
     float NdotV = max(dot(N, V), 0.0001f);
     float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
     float3 ambient = lerp(ambient_ground.rgb, ambient_sky.rgb, hemisphere) *
-                     albedo * (1.0f - metallic);
+                     albedo * (1.0f - metallic) *
+                     occlusion_texture.Sample(base_color_sampler, input.texcoord0).r;
     float3 direct = float3(0.0f, 0.0f, 0.0f);
     for (int index = 0; index < 32; ++index) {
         if (index >= (int)lighting_mode.y) break;
@@ -96,7 +112,8 @@ float4 main(SceneFragmentInput input) : SV_Target0
                   (intensity * attenuation * NdotL * 3.14159265f) *
                   (diffuse + specular);
     }
-    float3 color = ambient + direct + emissive.rgb;
+    float3 color = ambient + direct + emissive.rgb *
+                   emissive_texture.Sample(base_color_sampler, input.texcoord0).rgb;
     float alpha = base_color.a * texture_color.a * input.color0.a;
     if (surface_params.w > 1.5f && alpha < surface_params.z)
         discard;

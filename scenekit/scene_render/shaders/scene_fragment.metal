@@ -7,6 +7,7 @@ struct SceneMaterialParams
     float4 base_color;
     float4 surface_params;
     float4 emissive;
+    float4 texture_flags;
 };
 
 struct SceneLightingParams
@@ -40,6 +41,10 @@ fragment float4 main0(SceneFragmentInput input [[stage_in]],
                       constant SceneClipParams &clip [[buffer(2)]],
                       constant SceneLightingParams &lights [[buffer(3)]],
                       texture2d<float> base_color_texture [[texture(0)]],
+                      texture2d<float> metallic_roughness_texture [[texture(1)]],
+                      texture2d<float> normal_texture [[texture(2)]],
+                      texture2d<float> occlusion_texture [[texture(3)]],
+                      texture2d<float> emissive_texture [[texture(4)]],
                       sampler base_color_sampler [[sampler(0)]])
 {
     for (int index = 0; index < 32; ++index) {
@@ -50,17 +55,28 @@ fragment float4 main0(SceneFragmentInput input [[stage_in]],
     }
     float4 texture_color = base_color_texture.sample(base_color_sampler, input.texcoord0);
     float3 N = normalize(input.normal);
+    if (params.texture_flags.x > 0.5) {
+        float3 mapped = normal_texture.sample(base_color_sampler, input.texcoord0).xyz * 2.0 - 1.0;
+        float3 dp1 = dfdx(input.world_position), dp2 = dfdy(input.world_position);
+        float2 duv1 = dfdx(input.texcoord0), duv2 = dfdy(input.texcoord0);
+        float3 T = cross(dp2, N) * duv1.x + cross(N, dp1) * duv2.x;
+        float3 B = cross(dp2, N) * duv1.y + cross(N, dp1) * duv2.y;
+        float scale = rsqrt(max(max(dot(T, T), dot(B, B)), 1.0e-8));
+        N = normalize(T * (mapped.x * scale) + B * (mapped.y * scale) + N * mapped.z);
+    }
+    float4 metal_rough = metallic_roughness_texture.sample(base_color_sampler, input.texcoord0);
     float hemisphere = 0.5 + 0.5 * dot(N, float3(0.0, 0.0, 1.0));
     float3 albedo = params.base_color.rgb * texture_color.rgb * input.color0.rgb;
-    float metallic = clamp(params.surface_params.x, 0.0, 1.0);
-    float roughness = clamp(params.surface_params.y, 0.045, 1.0);
+    float metallic = clamp(params.surface_params.x * metal_rough.b, 0.0, 1.0);
+    float roughness = clamp(params.surface_params.y * metal_rough.g, 0.045, 1.0);
     float alpha_ggx = roughness * roughness;
     float alpha2 = alpha_ggx * alpha_ggx;
     float3 V = normalize(lights.camera_position.xyz - input.world_position);
     float NdotV = max(dot(N, V), 0.0001);
     float3 F0 = mix(float3(0.04), albedo, metallic);
     float3 ambient = mix(lights.ambient_ground.rgb, lights.ambient_sky.rgb, hemisphere) *
-                     albedo * (1.0 - metallic);
+                     albedo * (1.0 - metallic) *
+                     occlusion_texture.sample(base_color_sampler, input.texcoord0).r;
     float3 direct = float3(0.0);
     for (int index = 0; index < 32; ++index) {
         if (index >= int(lights.lighting_mode.y)) break;
@@ -102,7 +118,8 @@ fragment float4 main0(SceneFragmentInput input [[stage_in]],
                   (intensity * attenuation * NdotL * 3.14159265) *
                   (diffuse + specular);
     }
-    float3 color = ambient + direct + params.emissive.rgb;
+    float3 color = ambient + direct + params.emissive.rgb *
+                   emissive_texture.sample(base_color_sampler, input.texcoord0).rgb;
     float alpha = params.base_color.a * texture_color.a * input.color0.a;
     if (params.surface_params.w > 1.5 && alpha < params.surface_params.z)
         discard_fragment();

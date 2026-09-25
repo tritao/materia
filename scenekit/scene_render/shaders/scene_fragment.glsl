@@ -4,6 +4,7 @@
 uniform vec4 base_color;
 uniform vec4 material_params;
 uniform vec4 emissive;
+uniform vec4 texture_flags;
 uniform vec4 light_position_type[32];
 uniform vec4 light_direction_range[32];
 uniform vec4 light_color_intensity[32];
@@ -13,6 +14,10 @@ uniform vec4 ambient_ground;
 uniform vec4 lighting_mode;
 uniform vec4 camera_position;
 uniform sampler2D base_color_texture;
+uniform sampler2D metallic_roughness_texture;
+uniform sampler2D normal_texture;
+uniform sampler2D occlusion_texture;
+uniform sampler2D emissive_texture;
 in vec3 world_position;
 in vec3 vertex_normal;
 in vec2 vertex_texcoord;
@@ -30,17 +35,28 @@ void main() {
     }
     vec4 texture_color = texture(base_color_texture, vertex_texcoord);
     vec3 N = normalize(vertex_normal);
+    if (texture_flags.x > 0.5) {
+        vec3 mapped = texture(normal_texture, vertex_texcoord).xyz * 2.0 - 1.0;
+        vec3 dp1 = dFdx(world_position), dp2 = dFdy(world_position);
+        vec2 duv1 = dFdx(vertex_texcoord), duv2 = dFdy(vertex_texcoord);
+        vec3 T = cross(dp2, N) * duv1.x + cross(N, dp1) * duv2.x;
+        vec3 B = cross(dp2, N) * duv1.y + cross(N, dp1) * duv2.y;
+        float scale = inversesqrt(max(max(dot(T, T), dot(B, B)), 1.0e-8));
+        N = normalize(T * (mapped.x * scale) + B * (mapped.y * scale) + N * mapped.z);
+    }
+    vec4 metal_rough = texture(metallic_roughness_texture, vertex_texcoord);
     float hemisphere = 0.5 + 0.5 * dot(N, vec3(0.0, 0.0, 1.0));
     vec3 albedo = base_color.rgb * texture_color.rgb * vertex_color.rgb;
-    float metallic = clamp(material_params.x, 0.0, 1.0);
-    float roughness = clamp(material_params.y, 0.045, 1.0);
+    float metallic = clamp(material_params.x * metal_rough.b, 0.0, 1.0);
+    float roughness = clamp(material_params.y * metal_rough.g, 0.045, 1.0);
     float alpha_ggx = roughness * roughness;
     float alpha2 = alpha_ggx * alpha_ggx;
     vec3 V = normalize(camera_position.xyz - world_position);
     float NdotV = max(dot(N, V), 0.0001);
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
     vec3 ambient = mix(ambient_ground.rgb, ambient_sky.rgb, hemisphere) *
-                   albedo * (1.0 - metallic);
+                   albedo * (1.0 - metallic) *
+                   texture(occlusion_texture, vertex_texcoord).r;
     vec3 direct = vec3(0.0);
     for (int index = 0; index < 32; ++index) {
         if (index >= int(lighting_mode.y)) break;
@@ -82,7 +98,8 @@ void main() {
                   (intensity * attenuation * NdotL * 3.14159265) *
                   (diffuse + specular);
     }
-    vec3 color = ambient + direct + emissive.rgb;
+    vec3 color = ambient + direct + emissive.rgb *
+                 texture(emissive_texture, vertex_texcoord).rgb;
     float alpha = base_color.a * texture_color.a * vertex_color.a;
     if (material_params.w > 1.5 && alpha < material_params.z)
         discard;

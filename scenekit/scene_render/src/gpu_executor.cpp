@@ -60,9 +60,10 @@ struct MaterialUniformData {
     std::array<float, 4> base_color{};
     std::array<float, 4> surface_params{};
     std::array<float, 4> emissive{};
+    std::array<float, 4> texture_flags{}; // x = normal map present
 };
 
-static_assert(sizeof(MaterialUniformData) == sizeof(float) * 12);
+static_assert(sizeof(MaterialUniformData) == sizeof(float) * 16);
 
 struct LightingUniformData {
     // Fits the minimum GLES3 fragment uniform budget alongside materials and clip planes.
@@ -321,13 +322,14 @@ struct NativeKitGpuExecutor::State {
     };
 
     struct MaterialGpu {
-        nkgpu_image image{};
+        std::array<nkgpu_image, 5> images{};
         nkgpu_sampler sampler{};
         std::uint64_t material_revision = 0;
-        std::uint64_t image_revision = 0;
+        std::array<std::uint64_t, 5> image_revisions{};
         std::uint64_t sampler_revision = 0;
-        bool owns_image = false;
+        std::array<bool, 5> owns_images{};
         bool owns_sampler = false;
+        bool has_normal_map = false;
     };
 
     struct BatchGpu {
@@ -401,8 +403,9 @@ struct NativeKitGpuExecutor::State {
         }
         for (auto &[id, resource] : material_resources) {
             (void)id;
-            if (resource.owns_image && resource.image.id)
-                (void)nkgpu_image_destroy(renderer, resource.image);
+            for (std::size_t slot = 0; slot < resource.images.size(); ++slot)
+                if (resource.owns_images[slot] && resource.images[slot].id)
+                    (void)nkgpu_image_destroy(renderer, resource.images[slot]);
             if (resource.owns_sampler && resource.sampler.id)
                 (void)nkgpu_sampler_destroy(renderer, resource.sampler);
         }
@@ -604,6 +607,8 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 0, 2, "emissive",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 0, 3, "texture_flags",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(LightingUniformData))) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 3, 0, "light_position_type",
@@ -624,6 +629,14 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                            "base_color_texture")) != NKGPU_OK ||
+            (result = nkgpu_shader_texture(shader_builder, 1, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                           "metallic_roughness_texture")) != NKGPU_OK ||
+            (result = nkgpu_shader_texture(shader_builder, 2, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                           "normal_texture")) != NKGPU_OK ||
+            (result = nkgpu_shader_texture(shader_builder, 3, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                           "occlusion_texture")) != NKGPU_OK ||
+            (result = nkgpu_shader_texture(shader_builder, 4, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                           "emissive_texture")) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 2, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(ClipUniformData))) != NKGPU_OK ||
             (result =
@@ -1351,32 +1364,48 @@ bool ensure_material(StateT &state, const SceneSnapshot &snapshot, const Materia
     if (!ensure_default_material_resources(state, stats))
         return false;
 
-    const auto *image = static_cast<const ImageResource *>(nullptr);
-    const auto *sampler = static_cast<const SamplerResource *>(nullptr);
-    if (resource.state->base_color_texture.valid()) {
-        if (const auto *texture = snapshot.find_texture(resource.state->base_color_texture))
-            image = snapshot.find_image(texture->image);
+    const std::array<TextureId, 5> texture_ids = {
+        resource.state->base_color_texture, resource.state->metallic_roughness_texture,
+        resource.state->normal_texture, resource.state->occlusion_texture,
+        resource.state->emissive_texture};
+    std::array<const ImageResource *, 5> images{};
+    std::array<std::uint64_t, 5> image_revisions{};
+    for (std::size_t slot = 0; slot < texture_ids.size(); ++slot) {
+        if (const auto *texture = snapshot.find_texture(texture_ids[slot])) {
+            const auto *image = snapshot.find_image(texture->image);
+            if (image && gpu_image_format(image->format) != 0) {
+                images[slot] = image;
+                image_revisions[slot] = image->revision ^ (texture->revision << 1);
+            }
+        }
     }
-    if (resource.state->sampler.valid())
-        sampler = snapshot.find_sampler(resource.state->sampler);
-    const auto image_revision = image ? image->revision : 0;
+    const auto *sampler = resource.state->sampler.valid()
+                              ? snapshot.find_sampler(resource.state->sampler)
+                              : nullptr;
     const auto sampler_revision = sampler ? sampler->revision : 0;
     auto [found, inserted] = state.material_resources.try_emplace(resource.id);
     auto &cached = found->second;
     if (!inserted && cached.material_revision == resource.revision &&
-        cached.image_revision == image_revision && cached.sampler_revision == sampler_revision)
+        cached.image_revisions == image_revisions && cached.sampler_revision == sampler_revision)
         return true;
 
-    if (cached.owns_image && cached.image.id)
-        (void)nkgpu_image_destroy(state.renderer, cached.image);
+    for (std::size_t slot = 0; slot < cached.images.size(); ++slot)
+        if (cached.owns_images[slot] && cached.images[slot].id)
+            (void)nkgpu_image_destroy(state.renderer, cached.images[slot]);
     if (cached.owns_sampler && cached.sampler.id)
         (void)nkgpu_sampler_destroy(state.renderer, cached.sampler);
     cached = {};
     cached.material_revision = resource.revision;
-    cached.image_revision = image_revision;
+    cached.image_revisions = image_revisions;
     cached.sampler_revision = sampler_revision;
+    cached.has_normal_map = images[2] != nullptr;
 
-    if (image && gpu_image_format(image->format) != 0) {
+    for (std::size_t slot = 0; slot < images.size(); ++slot) {
+        const auto *image = images[slot];
+        if (!image) {
+            cached.images[slot] = state.default_image;
+            continue;
+        }
         nkgpu_image_desc descriptor{};
         descriptor.struct_size = sizeof(descriptor);
         descriptor.width = image->width;
@@ -1389,12 +1418,11 @@ bool ensure_material(StateT &state, const SceneSnapshot &snapshot, const Materia
         descriptor.data = reinterpret_cast<const std::uint8_t *>(image->data.data());
         descriptor.data_size = static_cast<std::uint32_t>(image->data.size());
         descriptor.type = NKGPU_IMAGETYPE_2D;
-        const auto result = nkgpu_image_create_desc(state.renderer, &descriptor, &cached.image);
+        const auto result = nkgpu_image_create_desc(state.renderer, &descriptor,
+                                                     &cached.images[slot]);
         if (result != NKGPU_OK)
             return set_failure(state, stats, result);
-        cached.owns_image = true;
-    } else {
-        cached.image = state.default_image;
+        cached.owns_images[slot] = true;
     }
 
     if (sampler) {
@@ -1790,8 +1818,10 @@ bool prepare_resources(StateT &state, const RenderPlan &plan, const SceneSnapsho
             ++found;
             continue;
         }
-        if (state.renderer.id && found->second.owns_image && found->second.image.id)
-            (void)nkgpu_image_destroy(state.renderer, found->second.image);
+        if (state.renderer.id)
+            for (std::size_t slot = 0; slot < found->second.images.size(); ++slot)
+                if (found->second.owns_images[slot] && found->second.images[slot].id)
+                    (void)nkgpu_image_destroy(state.renderer, found->second.images[slot]);
         if (state.renderer.id && found->second.owns_sampler && found->second.sampler.id)
             (void)nkgpu_sampler_destroy(state.renderer, found->second.sampler);
         found = state.material_resources.erase(found);
@@ -2109,6 +2139,7 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
             (void)nkgpu_end_frame(state_->renderer);
             return stats;
         }
+        material_data.texture_flags[0] = material_gpu->second.has_normal_map ? 1.0f : 0.0f;
         if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(
                  state_->renderer, 1,
@@ -2121,7 +2152,15 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
                                                 0)) != NKGPU_OK) ||
             (result = nkgpu_apply_vertex_buffer(state_->renderer, 1, batch.buffer, 0)) !=
                 NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 0, material_gpu->second.image)) !=
+            (result = nkgpu_apply_image(state_->renderer, 0, material_gpu->second.images[0])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state_->renderer, 1, material_gpu->second.images[1])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state_->renderer, 2, material_gpu->second.images[2])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state_->renderer, 3, material_gpu->second.images[3])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state_->renderer, 4, material_gpu->second.images[4])) !=
                 NKGPU_OK ||
             (result = nkgpu_apply_sampler(state_->renderer, 0, material_gpu->second.sampler)) !=
                 NKGPU_OK ||
@@ -2267,6 +2306,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         const auto material_gpu = state_->material_resources.find(batch.key.material);
         if (material_gpu == state_->material_resources.end())
             return fail_frame(NKGPU_ERROR_INVALID_HANDLE);
+        material_data.texture_flags[0] = material_gpu->second.has_normal_map ? 1.0f : 0.0f;
         if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(
                  state_->renderer, 1,
@@ -2279,7 +2319,15 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
                                                 0)) != NKGPU_OK) ||
             (result = nkgpu_apply_vertex_buffer(state_->renderer, 1, batch.buffer, 0)) !=
                 NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 0, material_gpu->second.image)) !=
+            (result = nkgpu_apply_image(state_->renderer, 0, material_gpu->second.images[0])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state_->renderer, 1, material_gpu->second.images[1])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state_->renderer, 2, material_gpu->second.images[2])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state_->renderer, 3, material_gpu->second.images[3])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state_->renderer, 4, material_gpu->second.images[4])) !=
                 NKGPU_OK ||
             (result = nkgpu_apply_sampler(state_->renderer, 0, material_gpu->second.sampler)) !=
                 NKGPU_OK ||

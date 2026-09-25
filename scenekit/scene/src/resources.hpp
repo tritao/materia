@@ -132,10 +132,16 @@ public:
         auto [found, inserted] = resources.emplace(id, Resource{id});
         if (!inserted)
             ++found->second.revision;
+        ++store_revision;
         return found->second;
     }
 
-    bool destroy(Id id) noexcept { return resources.erase(id) != 0; }
+    bool destroy(Id id) noexcept {
+        if (resources.erase(id) == 0)
+            return false;
+        ++store_revision;
+        return true;
+    }
 
     const Resource *find(Id id) const noexcept {
         const auto found = resources.find(id);
@@ -148,6 +154,7 @@ public:
     }
 
     std::size_t size() const noexcept { return resources.size(); }
+    std::uint64_t revision() const noexcept { return store_revision; }
 
     template<class Fn>
     void for_each(Fn &&fn) const {
@@ -157,6 +164,7 @@ public:
 
 private:
     std::unordered_map<Id, Resource> resources;
+    std::uint64_t store_revision = 0;
 };
 
 using ImageStore = ResourceStore<ImageResource, ImageId>;

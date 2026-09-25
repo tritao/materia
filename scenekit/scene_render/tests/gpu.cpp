@@ -228,6 +228,60 @@ int main() {
         material_resource.edit_state().roughness = 0.0f;
         scene->publish();
 
+        const auto make_map = [&](std::array<std::byte, 4> rgba) {
+            const auto map_image = scene->reserve_image_id();
+            auto &map_resource = scene->image_store().create(map_image);
+            map_resource.width = map_resource.height = 1;
+            map_resource.format = nkscene::ImageFormat::RGBA8;
+            map_resource.data.assign(rgba.begin(), rgba.end());
+            const auto map_texture = scene->reserve_texture_id();
+            scene->texture_store().create(map_texture).image = map_image;
+            return map_texture;
+        };
+        const auto metal_rough_map = make_map({std::byte{255}, std::byte{48},
+                                                std::byte{255}, std::byte{255}});
+        const auto normal_map = make_map({std::byte{255}, std::byte{128},
+                                          std::byte{128}, std::byte{255}});
+        const auto occlusion_map = make_map({std::byte{24}, std::byte{24},
+                                             std::byte{24}, std::byte{255}});
+        const auto emissive_map = make_map({std::byte{0}, std::byte{255},
+                                            std::byte{0}, std::byte{255}});
+        material_resource.edit_state().roughness = 0.7f;
+        material_resource.edit_state().metallic = 0.3f;
+        material_resource.edit_state().emissive = {0.25f, 0.25f, 0.25f};
+        scene->publish();
+        const auto capture_maps = [&] {
+            std::vector<std::uint8_t> pixels;
+            assert(executor.capture_rgba8(studio_plan, scene->snapshot(), options.width,
+                       options.height, {0.0f, 0.0f, 0.0f, 1.0f}, pixels) == NKGPU_OK);
+            return pixels;
+        };
+        auto previous_map_pixels = capture_maps();
+        const auto check_map = [&](nkscene::TextureId map, nkscene::TextureId nkscene::MaterialState::*slot) {
+            material_resource.edit_state().*slot = map;
+            scene->publish();
+            const auto pixels = capture_maps();
+            assert(pixels != previous_map_pixels);
+            previous_map_pixels = pixels;
+        };
+        check_map(metal_rough_map, &nkscene::MaterialState::metallic_roughness_texture);
+        check_map(normal_map, &nkscene::MaterialState::normal_texture);
+        check_map(occlusion_map, &nkscene::MaterialState::occlusion_texture);
+        check_map(emissive_map, &nkscene::MaterialState::emissive_texture);
+        const auto occlusion_image = scene->texture_store().find(occlusion_map)->image;
+        scene->image_store().create(occlusion_image).data = {
+            std::byte{255}, std::byte{255}, std::byte{255}, std::byte{255}};
+        scene->publish();
+        assert(capture_maps() != previous_map_pixels);
+        material_resource.edit_state().metallic_roughness_texture = {};
+        material_resource.edit_state().normal_texture = {};
+        material_resource.edit_state().occlusion_texture = {};
+        material_resource.edit_state().emissive_texture = {};
+        material_resource.edit_state().metallic = 0.0f;
+        material_resource.edit_state().roughness = 0.0f;
+        material_resource.edit_state().emissive = {};
+        scene->publish();
+
         nkscene::PickResult picked;
         assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
                                   16, options.height / 2, &picked) == NKGPU_OK);

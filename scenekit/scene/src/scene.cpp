@@ -863,12 +863,23 @@ void Scene::publish_state(const ChangeSet *changes,
     state->entity_names = entity_names;
     state->geometry_store_revision = geometries.revision();
     state->material_store_revision = materials.revision();
+    state->image_store_revision = images.revision();
+    state->texture_store_revision = textures.revision();
+    state->sampler_store_revision = samplers.revision();
     const bool geometry_resources_changed =
         !previous || previous->geometry_store_revision != geometries.revision();
-    const bool material_resources_changed =
+    const bool material_store_changed =
         !previous || previous->material_store_revision != materials.revision();
+    const bool texture_resources_changed =
+        !previous || previous->image_store_revision != images.revision() ||
+        previous->texture_store_revision != textures.revision() ||
+        previous->sampler_store_revision != samplers.revision();
+    const bool material_resources_changed = material_store_changed || texture_resources_changed;
     state->geometry_resources_revision = state->geometry_store_revision;
-    state->material_resources_revision = state->material_store_revision;
+    state->material_resources_revision = state->material_store_revision +
+                                         state->image_store_revision +
+                                         state->texture_store_revision +
+                                         state->sampler_store_revision;
     if (!previous || geometry_resources_changed || material_resources_changed) {
         auto resource_delta = std::make_shared<PublishedResourceDelta>();
         resource_delta->geometry_revision = state->geometry_resources_revision;
@@ -882,6 +893,10 @@ void Scene::publish_state(const ChangeSet *changes,
                                  resource_delta->geometries);
         materials.changes_since(previous ? previous->material_store_revision : 0,
                                 resource_delta->materials);
+        if (texture_resources_changed)
+            materials.for_each([&](MaterialId id, const MaterialResource &) {
+                resource_delta->materials.push_back(id);
+            });
         const auto compact_ids = []<class Id>(std::vector<Id> &ids) {
             std::sort(ids.begin(), ids.end(),
                       [](Id lhs, Id rhs) { return lhs.value < rhs.value; });
@@ -934,11 +949,11 @@ void Scene::publish_state(const ChangeSet *changes,
     } else
         state->geometries =
             collect.template operator()<GeometryStore, GeometryResource>(geometries);
-    if (previous && !material_resources_changed)
+    if (previous && !material_store_changed)
         state->materials = previous->materials;
     else
         state->materials = collect.template operator()<MaterialStore, MaterialResource>(materials);
-    if (previous && !geometry_resources_changed && !material_resources_changed) {
+    if (previous && !texture_resources_changed) {
         state->images = previous->images;
         state->textures = previous->textures;
         state->samplers = previous->samplers;

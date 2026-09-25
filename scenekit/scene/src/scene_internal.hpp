@@ -69,6 +69,9 @@ struct PublishedSceneState {
     std::unordered_map<EntityId, std::string> entity_names;
     std::uint64_t geometry_store_revision = 0;
     std::uint64_t material_store_revision = 0;
+    std::uint64_t image_store_revision = 0;
+    std::uint64_t texture_store_revision = 0;
+    std::uint64_t sampler_store_revision = 0;
     std::uint64_t geometry_resources_revision = 0;
     std::uint64_t material_resources_revision = 0;
     std::shared_ptr<const PublishedResourceDelta> resource_delta;
