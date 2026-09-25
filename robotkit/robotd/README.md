@@ -49,14 +49,17 @@ does not authenticate clients; use an isolated robot network or SSH tunnel.
 
 Serial hosting requires a deployment JSON file. It names the robot and ordered
 joints, gives the UART path, baud, `f32` target error budget, and fingerprint,
-and points to a device layout JSON file. The layout lists channels in the same
-order as the model joints. `robotd` checks that order before opening the UART.
+and points to a device layout JSON file and the matching schema lock. The layout
+lists channels in the same order as the model joints. `robotd` recomputes the
+fingerprint from the exact layout bytes and schema lock and checks the channel
+order before opening the UART.
 See [`../tests/fixtures/device-deployment/robot.json`](../tests/fixtures/device-deployment/robot.json)
 for the PTY fixture. Its calibration and fingerprint are test values; a physical
 deployment needs measured values. Generate the deployed fingerprint from the
 exact layout bytes with `python3 ../tools/device_fingerprint.py layout.json
---rust firmware_fingerprint.rs`, then put the printed hex value in `robot.json`
-and compile the Rust constant into the MCU firmware.
+--schema-lock device_wire.lock.json --rust firmware_fingerprint.rs`, then put
+the printed hex value in `robot.json` and compile the Rust constant into the
+MCU firmware. Include that exact schema lock file in the deployment directory.
 
 The protocol and world TCP clients are integration tests rather than robotd
 runtime modes. Run them through `../tests/world-tcp.sh`.

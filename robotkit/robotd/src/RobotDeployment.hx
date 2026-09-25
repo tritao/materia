@@ -40,7 +40,13 @@ class RobotDeployment {
       throw "robotd: deployment target_error must be finite and nonnegative";
 
     var layoutPath = Path.join([directory, requiredString(config, "layout")]);
-    var layout:Dynamic = Json.parse(sys.io.File.getContent(layoutPath));
+    var layoutBytes = sys.io.File.getBytes(layoutPath);
+    var lockPath = Path.join([directory, requiredString(config, "schema_lock")]);
+    var actualFingerprint = DeviceFingerprint.compute(layoutBytes,
+      sys.io.File.getBytes(lockPath));
+    if (actualFingerprint != fingerprint.toLowerCase())
+      throw 'robotd: deployment fingerprint does not match layout and schema lock (expected $actualFingerprint)';
+    var layout:Dynamic = Json.parse(layoutBytes.toString());
     var channels:Array<Dynamic> = Reflect.field(layout, "channels");
     var joints:Array<Dynamic> = Reflect.field(config, "joints");
     if (joints == null || channels == null || joints.length == 0 ||

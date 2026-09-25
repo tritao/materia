@@ -63,17 +63,30 @@ def main():
         deployment_dir = Path(temp)
         fixture_dir = ROOT / "robotkit/tests/fixtures/device-deployment"
         (deployment_dir / "layout.json").write_bytes((fixture_dir / "layout.json").read_bytes())
+        (deployment_dir / "device_wire.lock.json").write_bytes(
+            (fixture_dir / "device_wire.lock.json").read_bytes())
         deployment = json.loads((fixture_dir / "robot.json").read_text())
         deployment["device"]["path"] = slave_path
         deployment_path = deployment_dir / "robot.json"
         deployment_path.write_text(json.dumps(deployment))
+        wrong = json.loads(json.dumps(deployment))
+        wrong["device"]["fingerprint"] = "000102030405060708090a0b0c0d0e0f"
+        wrong_path = deployment_dir / "wrong-fingerprint.json"
+        wrong_path.write_text(json.dumps(wrong))
+        rejected = subprocess.run(
+            [str(HAXEON), "run", "--project", str(ROBOTD), "--", "--server",
+             f"--deployment={wrong_path}"], cwd=ROOT, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+        if rejected.returncode == 0 or "fingerprint does not match" not in rejected.stdout:
+            raise RuntimeError(f"robotd accepted a stale deployment fingerprint:\n{rejected.stdout}")
         device_log_path = Path(temp) / "device.log"
         server_log_path = Path(temp) / "robotd.log"
         client_log_path = Path(temp) / "client.log"
         with device_log_path.open("w+") as device_log, server_log_path.open("w+") as server_log, \
                 client_log_path.open("w+") as client_log:
             device = subprocess.Popen(
-                [str(TARGET / "debug/robotd_pty_device"), str(master), str(control_read)],
+                [str(TARGET / "debug/robotd_pty_device"), str(master), str(control_read),
+                 deployment["device"]["fingerprint"]],
                 cwd=ROOT, pass_fds=(master, control_read), stdout=device_log,
                 stderr=subprocess.STDOUT)
             os.close(control_read)

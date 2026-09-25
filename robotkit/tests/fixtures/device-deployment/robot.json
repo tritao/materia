@@ -1,10 +1,11 @@
 {
   "name": "pty-forklift",
   "layout": "layout.json",
+  "schema_lock": "device_wire.lock.json",
   "device": {
     "path": "/dev/replace-with-pty",
     "baud": 115200,
-    "fingerprint": "000102030405060708090a0b0c0d0e0f",
+    "fingerprint": "e9757b4c951367c3a9953110f1f2d34c",
     "target_error": 0.000001
   },
   "joints": [

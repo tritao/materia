@@ -68,9 +68,15 @@ fn main() {
     let mut args = std::env::args().skip(1);
     let port_fd: i32 = args.next().expect("PTY descriptor").parse().unwrap();
     let control_fd: i32 = args.next().expect("completion descriptor").parse().unwrap();
+    let fingerprint_hex = args.next().expect("deployment fingerprint");
+    assert_eq!(fingerprint_hex.len(), 32);
+    let mut fingerprint = [0u8; 16];
+    for (index, byte) in fingerprint.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&fingerprint_hex[index * 2..index * 2 + 2], 16)
+            .expect("hex deployment fingerprint");
+    }
     let mut port = unsafe { File::from_raw_fd(port_fd) };
     let mut control = unsafe { File::from_raw_fd(control_fd) };
-    let fingerprint = std::array::from_fn(|index| index as u8);
     let mut protocol = DeviceProtocol::new(JOINTS as u8, fingerprint).unwrap();
     let zero = JointState { position: 0.0, velocity: 0.0, effort: 0.0 };
     let mut device = FakeDevice { state: [zero; JOINTS], stops: 0, resets: 0, targets: 0, timestamp: 0 };
