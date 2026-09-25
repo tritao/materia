@@ -293,6 +293,10 @@ without adding a robot subclass or capability registry. A skill is advanced by
 the application loop through `start()`, `update(snapshot, dt)`, and
 `cancel()`; it exposes terminal `status()` and `result()` values. The first
 compositions are `GoTo`, `Dock`, `PickPallet`, `PlacePallet`, and `Charge`.
+`SkillRunner` provides a one-skill-at-a-time robot-local update loop. It forwards
+observations and elapsed time, rejects overlapping starts, handles cancellation,
+and retains the terminal status and result; mission sequencing remains above
+RobotKit.
 Pick and place skills issue atomic fork batches, then wait for observed load
 state changes. Charging waits for the configured battery fraction after the
 docking approach succeeds. These lifecycle operations coordinate application

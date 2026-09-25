@@ -301,6 +301,10 @@ follows a path, `Dock` approaches a detected target, `PickPallet` and
 `Charge` docks before waiting for a battery threshold. Skills run at the
 application's update frequency and use the same `Robot` boundary, so the same
 scenario can run with `SimulatedRobot`, `RemoteRobot`, or `ReplayRobot`.
+`SkillRunner` owns one active skill at a time, forwards snapshots and elapsed
+time, cancels the active skill, and retains its terminal status and result.
+Starting another skill while one is running is rejected; mission sequencing
+and retry policy stay with the application.
 
 ```haxe
 var base = new MobileBase(robot,
@@ -311,8 +315,9 @@ var navigation = new Navigation(base, localization);
 var forks = new Forks(robot, forkConfig);
 
 var pick = new PickPallet(navigation, forks, pallet, payload, approachPose, 0.5);
-pick.start();
-// Call update(robot.snapshot(), dt) until the load sensor confirms pickup.
+var runner = new SkillRunner();
+runner.start(pick);
+// Call runner.update(robot.snapshot(), dt) until runner.status() is terminal.
 ```
 
 ### Persistent recordings

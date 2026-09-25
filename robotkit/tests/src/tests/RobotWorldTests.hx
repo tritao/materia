@@ -120,6 +120,7 @@ import robotkit.skill.GoTo;
 import robotkit.skill.PickPallet;
 import robotkit.skill.PlacePallet;
 import robotkit.skill.SkillStatus;
+import robotkit.skill.SkillRunner;
 
 class RobotWorldTests {
   static var assertions = 0;
@@ -1883,31 +1884,48 @@ class RobotWorldTests {
       "authored sensor frame and mount reach the simulated forklift observation");
     var path = new Path([new Pose2(0.0, 0.0, 0.0), new Pose2(0.18, 0.0, 0.0)], "odom");
     var goTo = new GoTo(navigation, path, new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
-    goTo.start();
-    var liveStatus = goTo.status();
+    var skillRunner = new SkillRunner();
+    var liveStatus = skillRunner.start(goTo);
+    check(liveStatus == SkillStatus.Running && skillRunner.activeSkill() == goTo,
+      "SkillRunner starts one robot-local skill and exposes it as active");
+    var conflictingSkill = new GoTo(navigation, path);
+    throws(function() skillRunner.start(conflictingSkill),
+      "SkillRunner rejects a second skill while one is running");
     var ticks = 0;
     while (switch liveStatus { case Running: true; case _: false; } && ticks < 300) {
       var observation = simulatedRobot.snapshot();
-      liveStatus = goTo.update(observation, 0.01);
+      liveStatus = skillRunner.update(observation, 0.01);
       if (switch liveStatus { case Running: true; case _: false; })
         simulation.step(Int64.ofInt((ticks + 1) * 10000000));
       ticks++;
     }
-    check(switch liveStatus { case Succeeded: true; case _: false; } && ticks < 300,
-      "GoTo drives a simulated forklift along its path");
+    check(switch liveStatus { case Succeeded: true; case _: false; } && ticks < 300 &&
+      skillRunner.activeSkill() == null && skillRunner.result() != null,
+      "SkillRunner completes GoTo and retains its terminal result");
     var liveSnapshot = simulatedRobot.snapshot();
     var liveEstimate = localization.state();
     var liveEstimateValue:robotkit.localization.LocalizationState = cast liveEstimate;
+    var cancelPose = new Pose2(liveEstimateValue.pose.x + 1.0,
+      liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
+    var cancelPath = new Path([liveEstimateValue.pose, cancelPose], "odom");
+    var cancelledSkill = new GoTo(navigation, cancelPath);
+    skillRunner.start(cancelledSkill);
+    skillRunner.cancel();
+    check(skillRunner.status() == SkillStatus.Cancelled &&
+      skillRunner.activeSkill() == null && skillRunner.result() != null,
+      "SkillRunner cancels its active skill and records a terminal result");
+
     var dockPose = new Pose2(liveEstimateValue.pose.x + 0.02,
       liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
     var dockDetection = new Detection("charger-dock", "dock", 0.95, dockPose,
       "odom", liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
       liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
     var dock = new Dock(navigation, new DockingTarget(dockDetection, dockPose));
-    dock.start();
-    var dockStatus = dock.update(liveSnapshot, 0.01);
-    check(switch dockStatus { case Succeeded: true; case _: false; },
-      "Dock aligns the simulated base with a detected approach pose");
+    skillRunner.start(dock);
+    var dockStatus = skillRunner.update(liveSnapshot, 0.01);
+    check(switch dockStatus { case Succeeded: true; case _: false; } &&
+      skillRunner.activeSkill() == null,
+      "SkillRunner runs Dock through the same robot-local lifecycle");
     var pickPose = new Pose2(liveEstimateValue.pose.x + 0.02,
       liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
     var palletDetection = new Detection("pallet-17", "pallet", 0.98,
