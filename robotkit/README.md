@@ -299,11 +299,13 @@ charge, voltage, current, temperature, energy, and clock provenance.
 plans and replans to a framed goal through `Navigator`; provide a snapshot
 processor that updates localization and returns obstacles in the costmap frame.
 `FollowPath` tracks a supplied path and its speed limits without planning.
-`Dock` approaches a detected target, `PickPallet` and `PlacePallet` combine
-navigation with fork commands and load confirmation, and `Charge` docks before
-waiting for a battery threshold. Skills run at the application's update
-frequency and use the same `Robot` boundary, so the same scenario can run with
-`SimulatedRobot`, `RemoteRobot`, or `ReplayRobot`.
+`Dock`, `PickPallet`, and `PlacePallet` also plan their approach goals through
+`Navigator` and update perception on each robot snapshot. `PickPallet` and
+`PlacePallet` combine that navigation with fork commands and load confirmation;
+`Charge` uses the same planned docking path before waiting for a battery
+threshold. Skills run at the application's update frequency and use the same
+`Robot` boundary, so the same scenario can run with `SimulatedRobot`,
+`RemoteRobot`, or `ReplayRobot`.
 `SkillRunner` owns one active skill at a time, forwards snapshots and elapsed
 time, cancels the active skill, and retains its terminal status and result.
 Starting another skill while one is running is rejected; mission sequencing
@@ -323,9 +325,14 @@ var base = new MobileBase(robot,
   motionLimits);
 var localization = new WheelOdometryLocalization(base);
 var navigation = new Navigation(base, localization);
+var navigator = new Navigator(navigation, planner, costmap);
 var forks = new Forks(robot, forkConfig);
+var observePerception = function(snapshot) {
+  return framedPerception.observeRobotSnapshot(snapshot, model, blueprint, bodyLinkId);
+};
 
-var pick = new PickPallet(navigation, forks, pallet, payload, approachPose, 0.5);
+var pick = new PickPallet(navigator, observePerception, forks, pallet, payload,
+  approachPose, 0.5);
 var runner = new SkillRunner();
 runner.start(pick);
 // Call runner.update(robot.snapshot(), dt) until runner.status() is terminal.

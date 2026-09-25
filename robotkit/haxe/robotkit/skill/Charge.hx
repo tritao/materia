@@ -1,7 +1,8 @@
 package robotkit.skill;
 
-import robotkit.navigation.Navigation;
+import robotkit.navigation.Navigator;
 import robotkit.perception.DockingTarget;
+import robotkit.perception.PerceptionSnapshot;
 import robotkit.power.Power;
 import robotkit.world.RobotSnapshot;
 
@@ -18,13 +19,16 @@ class Charge implements Skill {
   final lifecycle:SkillLifecycle = new SkillLifecycle();
   var stage:ChargeStage = Docking;
 
-  public function new(navigation:Navigation, target:DockingTarget, power:Power,
-      targetChargeFraction:Float, ?minimumConfidence:Float = 0.5) {
-    if (navigation == null || target == null || power == null ||
+  public function new(navigator:Navigator, target:DockingTarget, power:Power,
+      targetChargeFraction:Float,
+      observePerception:RobotSnapshot -> PerceptionSnapshot,
+      ?minimumConfidence:Float = 0.5) {
+    if (navigator == null || target == null || power == null ||
+        observePerception == null ||
         !Math.isFinite(targetChargeFraction) || targetChargeFraction <= 0.0 ||
         targetChargeFraction > 1.0)
       throw "Charge requires navigation, docking target, power, and a valid charge fraction";
-    dock = new Dock(navigation, target, minimumConfidence);
+    dock = new Dock(navigator, target, observePerception, minimumConfidence);
     this.power = power;
     this.targetChargeFraction = targetChargeFraction;
   }

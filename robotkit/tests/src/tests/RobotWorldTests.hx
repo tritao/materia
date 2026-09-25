@@ -1890,6 +1890,14 @@ class RobotWorldTests {
     localization.update(latestSnapshot);
     loadSafety.refresh();
     var unloadedLimits = base.motionLimits;
+    var grid = new OccupancyGrid2(0.2, new Pose2(-1.0, -2.0), 40, 20,
+      "map", OccupancyCell.Free);
+    var baseFootprint = base.footprint;
+    if (baseFootprint == null)
+      throw "Forklift model did not provide a base footprint";
+    var unloadedCostmap = new Costmap2(grid, baseFootprint.radius, true, 0.3, 1.5);
+    var unloadedNavigator = new Navigator(navigation,
+      new AStarPlanner(unloadedCostmap), unloadedCostmap);
 
     var dockApproach = new Pose2(0.4, 0.0, 0.0);
     var palletPose = new Pose2(1.4, 0.0, 0.0);
@@ -1917,6 +1925,11 @@ class RobotWorldTests {
     var scene = groundTruth.observe(latestSnapshot.sensors.toArray());
     check(scene.dockingTargets().length == 2 && scene.pallets().length == 1,
       "simulated scene supplies pallet and charger detections");
+    var observeNavigation:RobotSnapshot -> PerceptionSnapshot = function(snapshot) {
+      latestSnapshot = snapshot;
+      localization.update(snapshot);
+      return groundTruth.observe(snapshot.sensors.toArray());
+    };
 
     var observationHook:RobotSnapshot -> Void = function(_) {};
     var controlHook:Void -> Void = function() {};
@@ -1935,7 +1948,8 @@ class RobotWorldTests {
       return status;
     }
 
-    var dock = new Dock(navigation, scene.dockingTargets()[0]);
+    var dock = new Dock(unloadedNavigator, scene.dockingTargets()[0],
+      observeNavigation);
     check(runSkill(dock) == SkillStatus.Succeeded &&
       runner.result() != null,
       "SkillRunner docks at the pallet staging pose in simulation");
@@ -1943,8 +1957,8 @@ class RobotWorldTests {
     var payload = new Payload(500.0, 1.2, 0.8, 0.15, 0.6, 0.0, 0.35);
     var pickScene = groundTruth.observe(latestSnapshot.sensors.toArray());
     var pallet = pickScene.pallets()[0];
-    var pick = new PickPallet(navigation, forks, pallet, payload, pickApproach,
-      0.5, 0.1, 0.45, 0.06, 0.1);
+    var pick = new PickPallet(unloadedNavigator, observeNavigation, forks, pallet,
+      payload, pickApproach, 0.5, 0.1, 0.45, 0.06, 0.1);
     observationHook = function(_) {
       if (runner.activeSkill() == pick && forks.loadState.payload == payload &&
           !forks.loadState.secured && forks.state().lift.position >= 0.49)
@@ -1959,9 +1973,8 @@ class RobotWorldTests {
 
     var loadedState = loadSafety.refresh();
     var loadedLimits = base.motionLimits;
-    var baseFootprint = base.footprint;
     var loadedFootprint = loadedState.footprint;
-    if (baseFootprint == null || loadedFootprint == null)
+    if (loadedFootprint == null)
       throw "Forklift load policy did not provide both robot footprints";
     check(loadedState.phase == SafetyPhase.Restricted &&
       loadedLimits.maxLinearSpeed < unloadedLimits.maxLinearSpeed &&
@@ -1969,18 +1982,12 @@ class RobotWorldTests {
       loadedFootprint.radius > baseFootprint.radius,
       "confirmed pallet load lowers driving limits and expands the planning footprint");
 
-    var grid = new OccupancyGrid2(0.2, new Pose2(-1.0, -2.0), 40, 20,
-      "map", OccupancyCell.Free);
     var costmap = new Costmap2(grid, loadedFootprint.radius, true, 0.3, 1.5);
     var planner = new AStarPlanner(costmap);
-    var navigator = new Navigator(navigation, planner, costmap);
+    var loadedNavigator = new Navigator(navigation, planner, costmap);
     var loadedGoalPose = new Pose2(2.4, 0.0, 0.0);
-    var loadedGoal = new GoTo(navigator,
-      new NavigationGoal(loadedGoalPose, "map", 0.12, 0.12), function(snapshot) {
-        latestSnapshot = snapshot;
-        localization.update(snapshot);
-        return groundTruth.observe(snapshot.sensors.toArray());
-      });
+    var loadedGoal = new GoTo(loadedNavigator,
+      new NavigationGoal(loadedGoalPose, "map", 0.12, 0.12), observeNavigation);
     var maxLoadedCommand = 0.0;
     controlHook = function() {
       maxLoadedCommand = Math.max(maxLoadedCommand,
@@ -1995,8 +2002,8 @@ class RobotWorldTests {
       loadedEstimate != null && Math.abs(loadedEstimate.pose.x - loadedGoalPose.x) <= 0.14,
       "goal-level GoTo reaches the delivery area within load-reduced speed limits");
 
-    var place = new PlacePallet(navigation, forks, payload, placeApproach,
-      0.0, 0.0, 0.45, 0.06, 0.1);
+    var place = new PlacePallet(loadedNavigator, observeNavigation, forks,
+      payload, placeApproach, 0.0, 0.0, 0.45, 0.06, 0.1);
     observationHook = function(_) {
       if (runner.activeSkill() == place && forks.loadState.secured &&
           forks.state().lift.position <= 0.01)
@@ -2018,7 +2025,8 @@ class RobotWorldTests {
     power.battery = new BatteryState("traction-pack", 0.3, 48.0, 10.0, 25.0,
       latestSnapshot.sourceTimestampNs, latestSnapshot.receivedTimestampNs,
       latestSnapshot.sourceClockId, latestSnapshot.receivedClockId);
-    var charge = new Charge(navigation, chargerTarget, power, 0.8);
+    var charge = new Charge(loadedNavigator, chargerTarget, power, 0.8,
+      observeNavigation);
     var chargeStatus = runner.start(charge);
     var chargeTicks = 0;
     while (chargeStatus == SkillStatus.Running &&
@@ -2057,6 +2065,17 @@ class RobotWorldTests {
     var base = MobileBase.fromRobot(simulatedRobot, model);
     var localization = new WheelOdometryLocalization(base);
     var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
+    var liveFootprint = base.footprint;
+    if (liveFootprint == null) throw "Forklift model did not provide a footprint";
+    var liveGrid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0),
+      100, 100, "odom", OccupancyCell.Free);
+    var liveCostmap = new Costmap2(liveGrid, liveFootprint.radius);
+    var liveNavigator = new Navigator(navigation,
+      new AStarPlanner(liveCostmap), liveCostmap);
+    var observeLive:RobotSnapshot -> PerceptionSnapshot = function(snapshot) {
+      localization.update(snapshot);
+      return new PerceptionSnapshot();
+    };
     var forks = Forks.fromRobot(simulatedRobot, model);
     simulation.step(Int64.ofInt(1));
     var configuredScan = sourceRobot.snapshot().sensors;
@@ -2105,7 +2124,8 @@ class RobotWorldTests {
     var dockDetection = new Detection("charger-dock", "dock", 0.95, dockPose,
       "odom", liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
       liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
-    var dock = new Dock(navigation, new DockingTarget(dockDetection, dockPose));
+    var dock = new Dock(liveNavigator, new DockingTarget(dockDetection, dockPose),
+      observeLive);
     skillRunner.start(dock);
     var dockStatus = skillRunner.update(liveSnapshot, 0.01);
     check(switch dockStatus { case Succeeded: true; case _: false; } &&
@@ -2119,8 +2139,8 @@ class RobotWorldTests {
       liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
     var pallet = new Pallet(palletDetection, 1.2, 0.8, 0.15);
     var payload = new Payload(500.0, 1.2, 0.8, 0.15, 0.6, 0.0, 0.35);
-    var pick = new PickPallet(navigation, forks, pallet, payload, pickPose,
-      0.5, 0.1, 0.45, 0.05, 0.1);
+    var pick = new PickPallet(liveNavigator, observeLive, forks, pallet, payload,
+      pickPose, 0.5, 0.1, 0.45, 0.05, 0.1);
     pick.start();
     var pickStatus = pick.update(liveSnapshot, 0.01);
     check(switch pickStatus { case Running: true; case _: false; } &&
@@ -2159,7 +2179,8 @@ class RobotWorldTests {
     liveSnapshot = simulatedRobot.snapshot();
 
     var placePose = new Pose2(travelPose.x + 0.02, travelPose.y, travelPose.yaw);
-    var place = new PlacePallet(navigation, forks, payload, placePose, 0.0, 0.0, 0.35);
+    var place = new PlacePallet(liveNavigator, observeLive, forks, payload,
+      placePose, 0.0, 0.0, 0.35);
     place.start();
     var placeStatus = place.update(liveSnapshot, 0.01);
     check(switch placeStatus { case Running: true; case _: false; } &&
@@ -2183,8 +2204,8 @@ class RobotWorldTests {
     livePower.battery = new BatteryState("traction-pack", 0.6, 48.0, -4.0, 25.0,
       liveSnapshot.sourceTimestampNs, liveSnapshot.receivedTimestampNs,
       liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
-    var charge = new Charge(navigation, new DockingTarget(chargeDetection, chargePose),
-      livePower, 0.8);
+    var charge = new Charge(liveNavigator,
+      new DockingTarget(chargeDetection, chargePose), livePower, 0.8, observeLive);
     charge.start();
     var chargeStatus = charge.update(liveSnapshot, 0.01);
     check(switch chargeStatus { case Running: true; case _: false; },
@@ -2237,6 +2258,17 @@ class RobotWorldTests {
     var replayBase = MobileBase.fromBlueprint(replay, blueprint);
     var replayLocalization = new WheelOdometryLocalization(replayBase);
     var replayNavigation = new Navigation(replayBase, replayLocalization, 0.2, 0.2, 0.8);
+    var replayFootprint = replayBase.footprint;
+    if (replayFootprint == null) throw "Recorded forklift model did not provide a footprint";
+    var replayGrid = new OccupancyGrid2(0.1, new Pose2(-5.0, -5.0),
+      100, 100, "odom", OccupancyCell.Free);
+    var replayCostmap = new Costmap2(replayGrid, replayFootprint.radius);
+    var replayNavigator = new Navigator(replayNavigation,
+      new AStarPlanner(replayCostmap), replayCostmap);
+    var observeReplay:RobotSnapshot -> PerceptionSnapshot = function(snapshot) {
+      replayLocalization.update(snapshot);
+      return new PerceptionSnapshot();
+    };
     var replayFollowPath = new FollowPath(replayNavigation, path,
       new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
     var replaySkillRunner = new SkillRunner();
@@ -2255,8 +2287,8 @@ class RobotWorldTests {
     var replayDockDetection = new Detection("charger-dock", "dock", 0.95, replayDockPose,
       "odom", replaySnapshot.sourceSequence, replaySnapshot.sourceTimestampNs,
       replaySnapshot.receivedTimestampNs, replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
-    var replayDock = new Dock(replayNavigation,
-      new DockingTarget(replayDockDetection, replayDockPose));
+    var replayDock = new Dock(replayNavigator,
+      new DockingTarget(replayDockDetection, replayDockPose), observeReplay);
     replaySkillRunner.start(replayDock);
     check(switch replaySkillRunner.update(replaySnapshot, 0.01) {
       case Succeeded: true;
@@ -2271,8 +2303,8 @@ class RobotWorldTests {
       replaySnapshot.sourceSequence, replaySnapshot.sourceTimestampNs,
       replaySnapshot.receivedTimestampNs, replaySnapshot.sourceClockId,
       replaySnapshot.receivedClockId), 1.2, 0.8, 0.15);
-    var replayPick = new PickPallet(replayNavigation, replayForks, replayPallet,
-      payload, replayPickPose, 0.5, 0.1, 0.45, 0.05, 0.1);
+    var replayPick = new PickPallet(replayNavigator, observeReplay, replayForks,
+      replayPallet, payload, replayPickPose, 0.5, 0.1, 0.45, 0.05, 0.1);
     replayPick.start();
     replayPick.update(replaySnapshot, 0.01);
     replayForks.setLoadState(LoadState.carried(payload));
@@ -2305,8 +2337,8 @@ class RobotWorldTests {
       "FollowPath reaches the second recorded location through ReplayRobot");
     replaySnapshot = replay.snapshot();
     var replayPlacePose = new Pose2(placePose.x, placePose.y, placePose.yaw);
-    var replayPlace = new PlacePallet(replayNavigation, replayForks, payload,
-      replayPlacePose, 0.0, 0.0, 0.35);
+    var replayPlace = new PlacePallet(replayNavigator, observeReplay, replayForks,
+      payload, replayPlacePose, 0.0, 0.0, 0.35);
     replayPlace.start();
     var replayPlaceStatus = replayPlace.update(replaySnapshot, 0.01);
     check(switch replayPlaceStatus { case Running: true; case _: false; } &&
@@ -2330,8 +2362,9 @@ class RobotWorldTests {
     replayPower.battery = new BatteryState("traction-pack", 0.6, 48.0, -4.0, 25.0,
       replaySnapshot.sourceTimestampNs, replaySnapshot.receivedTimestampNs,
       replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
-    var replayCharge = new Charge(replayNavigation,
-      new DockingTarget(replayChargeDetection, replayChargePose), replayPower, 0.8);
+    var replayCharge = new Charge(replayNavigator,
+      new DockingTarget(replayChargeDetection, replayChargePose), replayPower, 0.8,
+      observeReplay);
     replayCharge.start();
     check(switch replayCharge.update(replaySnapshot, 0.01) {
       case Running: true;
