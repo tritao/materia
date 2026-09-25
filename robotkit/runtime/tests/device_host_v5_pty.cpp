@@ -60,11 +60,16 @@ int main(int argc, char **argv) {
         CHECK(link->send_targets(lossy, 1e-6));
         CHECK(link->read_state(state));
         CHECK(state.header.accepted_sequence == 2 && state.joints[0].velocity == -2.0f);
+        const std::array<v5::HostTarget, 1> rejected_target{{{0, 2, 2.0}}};
+        CHECK(link->send_targets(rejected_target, 0.0));
+        CHECK(::write(control[1], "F", 1) == 1);
+        CHECK(link->read_state(state));
+        CHECK(state.header.fault == 1 && state.header.accepted_sequence == 2);
         CHECK(::write(control[1], "W", 1) == 1);
         CHECK(link->read_state(state)); // Device-local watchdog expires without more commands.
         CHECK(state.header.safety == 2 && state.header.accepted_sequence == 2);
         const auto previous_session = link->session_id();
-        CHECK(previous_session != 0 && link->last_sent_sequence() == 2);
+        CHECK(previous_session != 0 && link->last_sent_sequence() == 3);
         CHECK(link->begin_session());
         CHECK(link->session_id() != previous_session && link->last_sent_sequence() == 0);
         auto endpoint = robotkit::DeviceSerialEndpointV5::attach(std::move(link), 1, 1e-6);

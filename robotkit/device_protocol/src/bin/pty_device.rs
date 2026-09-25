@@ -12,12 +12,14 @@ struct FakeDevice {
     resets: usize,
     targets: usize,
     timestamp: u64,
+    fault_once: bool,
 }
 
 impl Device for FakeDevice {
     fn stop_all(&mut self) { self.stops += 1; }
     fn apply_targets(&mut self, targets: &[JointTarget]) -> bool {
         assert_eq!(targets.len(), 1);
+        if targets[0].value == 2.0 { return false; }
         assert_eq!(targets[0].value, 1.1f32);
         self.targets += 1;
         true
@@ -27,7 +29,9 @@ impl Device for FakeDevice {
         let timestamp_ns = self.timestamp;
         self.timestamp += 1;
         joints[0] = JointState { position: 1.0, velocity: -2.0, effort: 0.5 };
-        StateMeta { timestamp_ns, safety: 0, fault: 0, joint_count: 1 }
+        let fault = u8::from(self.fault_once);
+        self.fault_once = false;
+        StateMeta { timestamp_ns, safety: 0, fault, joint_count: 1 }
     }
 }
 
@@ -55,7 +59,7 @@ fn main() {
     let mut completion = unsafe { File::from_raw_fd(completion_fd) };
     let fingerprint = std::array::from_fn(|index| index as u8);
     let mut protocol = DeviceProtocol::new(1, fingerprint).unwrap();
-    let mut device = FakeDevice { stops: 0, resets: 0, targets: 0, timestamp: 0 };
+    let mut device = FakeDevice { stops: 0, resets: 0, targets: 0, timestamp: 0, fault_once: false };
     let start = Instant::now();
     let mut read_buffer = [0u8; 17];
     let mut frame = [0u8; MAX_FRAME_SIZE];
@@ -68,6 +72,11 @@ fn main() {
             Ok(1) if control[0] == b'W' => {
                 let simulated_now = start.elapsed().as_nanos() as u64 + WATCHDOG_NS;
                 assert!(protocol.poll_watchdog(simulated_now, WATCHDOG_NS, &mut device));
+                let size = protocol.encode_state(&mut device, &mut frame).unwrap();
+                write_chunks(&mut port, &frame[..size]);
+            }
+            Ok(1) if control[0] == b'F' => {
+                device.fault_once = true;
                 let size = protocol.encode_state(&mut device, &mut frame).unwrap();
                 write_chunks(&mut port, &frame[..size]);
             }
@@ -103,6 +112,7 @@ fn main() {
     assert_eq!(device.stops, 5); // Three sessions, watchdog expiry, and one normal stop.
     assert_eq!(device.resets, 2);
     assert_eq!(device.targets, 2);
+    assert!(protocol.statistics().rejected >= 1);
     assert_eq!(protocol.last_sequence(), 0); // Mismatched final session is safe.
     assert!(!protocol.model_matches());
 }

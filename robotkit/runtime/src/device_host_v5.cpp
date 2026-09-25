@@ -247,7 +247,7 @@ bool HostLink::read_state(HostState &state) {
             head.joint_count * device_wire::JointState::SIZE ||
             (has_timestamp_ && head.timestamp_ns <= last_timestamp_ns_) ||
             head.accepted_sequence > last_sent_sequence_ ||
-            (head.accepted_sequence < last_sent_sequence_ && head.safety < 2)) continue;
+            (head.accepted_sequence < last_sent_sequence_ && head.safety < 2 && head.fault == 0)) continue;
         bool valid = true;
         for (std::size_t index = 0; index < head.joint_count; ++index) {
             const auto offset = device_wire::StateHeader::SIZE + index * device_wire::JointState::SIZE;
