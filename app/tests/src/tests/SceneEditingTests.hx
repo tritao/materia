@@ -197,8 +197,8 @@ class SceneEditingTests {
       "save and reopen preserve the design pose instead of the simulation pose");
     reopened.dispose();
 
-    var perspectiveView=scene.configureRenderView(new SceneView(),Transform.identity(),[pose]);
     var perspective=new PerspectiveCamera();perspective.frame(3.0,2.0,1.5,1.8,1.8,0.2,4.0/3.0);
+    var perspectiveView=scene.configureRenderView(new SceneView(),perspective.viewProjection(4.0/3.0),[pose]);
     var ray=perspective.screenRay(400,300,800,600);
     check(scene.pickRayWithView(perspectiveView,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ)=="tower",
@@ -564,7 +564,8 @@ class SceneEditingTests {
       "creating a robot configuration creates one shared history entry");
     sensors.selectRobot("materia/robot");
     var properties=sensors.properties();
-    var rays=new PropertyBinding(properties[3],sensors.context());
+    var raysProperty=[for(property in properties) if(StringTools.endsWith(property.id,":rays")) property][0];
+    var rays=new PropertyBinding(raysProperty,sensors.context());
     check(switch rays.apply(PropertyValue.Int(65)){case PropertyEditResult.Rejected(_):true;default:false;},
       "sensor UI rejects ray counts above runtime capacity");
     check(rays.apply(PropertyValue.Int(32))==PropertyEditResult.Applied,
@@ -629,7 +630,9 @@ class SceneEditingTests {
     var recordingPath = directory + "/robot.mcap";
     var session = new SceneDocumentSession();
     var rate = new PropertyBinding(session.sensors.properties()[2], session.sensors.context());
-    var mountX = new PropertyBinding(session.sensors.properties()[9], session.sensors.context());
+    var mountXProperty = [for (property in session.sensors.properties())
+      if (StringTools.endsWith(property.id, ":position-0")) property][0];
+    var mountX = new PropertyBinding(mountXProperty, session.sensors.context());
     check(rate.apply(PropertyValue.Float(20.0)) == PropertyEditResult.Applied,
       "sensor workflow edits acquisition rate");
     check(mountX.apply(PropertyValue.Float(0.25)) == PropertyEditResult.Applied,
