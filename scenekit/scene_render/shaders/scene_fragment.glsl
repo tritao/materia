@@ -26,6 +26,18 @@ uniform vec4 clip_planes[32];
 uniform vec4 clip_plane_count;
 out vec4 fragment_color;
 
+vec3 srgb_to_linear(vec3 value) {
+    value = max(value, vec3(0.0));
+    return mix(value / 12.92, pow((value + 0.055) / 1.055, vec3(2.4)),
+               step(vec3(0.04045), value));
+}
+
+vec3 linear_to_srgb(vec3 value) {
+    value = max(value, vec3(0.0));
+    return mix(value * 12.92, 1.055 * pow(value, vec3(1.0 / 2.4)) - 0.055,
+               step(vec3(0.0031308), value));
+}
+
 void main() {
     for (int index = 0; index < 32; ++index) {
         if (index >= int(clip_plane_count.x))
@@ -46,7 +58,10 @@ void main() {
     }
     vec4 metal_rough = texture(metallic_roughness_texture, vertex_texcoord);
     float hemisphere = 0.5 + 0.5 * dot(N, vec3(0.0, 0.0, 1.0));
-    vec3 albedo = base_color.rgb * texture_color.rgb * vertex_color.rgb;
+    vec3 base_texel = texture_flags.y > 0.5
+                          ? srgb_to_linear(texture_color.rgb) : texture_color.rgb;
+    vec3 albedo = srgb_to_linear(base_color.rgb) * base_texel *
+                  srgb_to_linear(vertex_color.rgb);
     float metallic = clamp(material_params.x * metal_rough.b, 0.0, 1.0);
     float roughness = clamp(material_params.y * metal_rough.g, 0.045, 1.0);
     float alpha_ggx = roughness * roughness;
@@ -58,6 +73,17 @@ void main() {
                    albedo * (1.0 - metallic) *
                    texture(occlusion_texture, vertex_texcoord).r;
     vec3 direct = vec3(0.0);
+    if (lighting_mode.z > 0.0) {
+        vec3 R = reflect(-V, N);
+        float reflection_height = clamp(0.5 + 0.5 * R.z, 0.0, 1.0);
+        vec3 reflected = mix(ambient_ground.rgb, ambient_sky.rgb, reflection_height);
+        vec3 average_env = 0.5 * (ambient_ground.rgb + ambient_sky.rgb);
+        reflected = mix(average_env, reflected, 1.0 - roughness * roughness);
+        vec3 grazing = max(F0, vec3(1.0 - roughness));
+        vec3 env_fresnel = F0 + (grazing - F0) * pow(1.0 - NdotV, 5.0);
+        ambient += reflected * env_fresnel * lighting_mode.z *
+                   texture(occlusion_texture, vertex_texcoord).r;
+    }
     for (int index = 0; index < 32; ++index) {
         if (index >= int(lighting_mode.y)) break;
         float intensity = max(light_color_intensity[index].w, 0.0);
@@ -98,10 +124,12 @@ void main() {
                   (intensity * attenuation * NdotL * 3.14159265) *
                   (diffuse + specular);
     }
-    vec3 color = ambient + direct + emissive.rgb *
-                 texture(emissive_texture, vertex_texcoord).rgb;
+    vec3 emissive_texel = texture(emissive_texture, vertex_texcoord).rgb;
+    if (texture_flags.z > 0.5)
+        emissive_texel = srgb_to_linear(emissive_texel);
+    vec3 color = ambient + direct + srgb_to_linear(emissive.rgb) * emissive_texel;
     float alpha = base_color.a * texture_color.a * vertex_color.a;
     if (material_params.w > 1.5 && alpha < material_params.z)
         discard;
-    fragment_color = vec4(color, alpha);
+    fragment_color = vec4(linear_to_srgb(color), alpha);
 }

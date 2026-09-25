@@ -36,6 +36,20 @@ struct SceneFragmentInput
     float4 color0 [[user(locn3)]];
 };
 
+float3 srgb_to_linear(float3 value)
+{
+    value = max(value, float3(0.0));
+    return mix(value / 12.92, pow((value + 0.055) / 1.055, float3(2.4)),
+               step(float3(0.04045), value));
+}
+
+float3 linear_to_srgb(float3 value)
+{
+    value = max(value, float3(0.0));
+    return mix(value * 12.92, 1.055 * pow(value, float3(1.0 / 2.4)) - 0.055,
+               step(float3(0.0031308), value));
+}
+
 fragment float4 main0(SceneFragmentInput input [[stage_in]],
                       constant SceneMaterialParams &params [[buffer(0)]],
                       constant SceneClipParams &clip [[buffer(2)]],
@@ -66,7 +80,10 @@ fragment float4 main0(SceneFragmentInput input [[stage_in]],
     }
     float4 metal_rough = metallic_roughness_texture.sample(base_color_sampler, input.texcoord0);
     float hemisphere = 0.5 + 0.5 * dot(N, float3(0.0, 0.0, 1.0));
-    float3 albedo = params.base_color.rgb * texture_color.rgb * input.color0.rgb;
+    float3 base_texel = params.texture_flags.y > 0.5
+                            ? srgb_to_linear(texture_color.rgb) : texture_color.rgb;
+    float3 albedo = srgb_to_linear(params.base_color.rgb) * base_texel *
+                    srgb_to_linear(input.color0.rgb);
     float metallic = clamp(params.surface_params.x * metal_rough.b, 0.0, 1.0);
     float roughness = clamp(params.surface_params.y * metal_rough.g, 0.045, 1.0);
     float alpha_ggx = roughness * roughness;
@@ -78,6 +95,17 @@ fragment float4 main0(SceneFragmentInput input [[stage_in]],
                      albedo * (1.0 - metallic) *
                      occlusion_texture.sample(base_color_sampler, input.texcoord0).r;
     float3 direct = float3(0.0);
+    if (lights.lighting_mode.z > 0.0) {
+        float3 R = reflect(-V, N);
+        float reflection_height = clamp(0.5 + 0.5 * R.z, 0.0, 1.0);
+        float3 reflected = mix(lights.ambient_ground.rgb, lights.ambient_sky.rgb, reflection_height);
+        float3 average_env = 0.5 * (lights.ambient_ground.rgb + lights.ambient_sky.rgb);
+        reflected = mix(average_env, reflected, 1.0 - roughness * roughness);
+        float3 grazing = max(F0, float3(1.0 - roughness));
+        float3 env_fresnel = F0 + (grazing - F0) * pow(1.0 - NdotV, 5.0);
+        ambient += reflected * env_fresnel * lights.lighting_mode.z *
+                   occlusion_texture.sample(base_color_sampler, input.texcoord0).r;
+    }
     for (int index = 0; index < 32; ++index) {
         if (index >= int(lights.lighting_mode.y)) break;
         float intensity = max(lights.light_color_intensity[index].w, 0.0);
@@ -118,10 +146,12 @@ fragment float4 main0(SceneFragmentInput input [[stage_in]],
                   (intensity * attenuation * NdotL * 3.14159265) *
                   (diffuse + specular);
     }
-    float3 color = ambient + direct + params.emissive.rgb *
-                   emissive_texture.sample(base_color_sampler, input.texcoord0).rgb;
+    float3 emissive_texel = emissive_texture.sample(base_color_sampler, input.texcoord0).rgb;
+    if (params.texture_flags.z > 0.5)
+        emissive_texel = srgb_to_linear(emissive_texel);
+    float3 color = ambient + direct + srgb_to_linear(params.emissive.rgb) * emissive_texel;
     float alpha = params.base_color.a * texture_color.a * input.color0.a;
     if (params.surface_params.w > 1.5 && alpha < params.surface_params.z)
         discard_fragment();
-    return float4(color, alpha);
+    return float4(linear_to_srgb(color), alpha);
 }

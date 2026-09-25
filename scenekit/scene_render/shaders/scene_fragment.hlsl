@@ -39,6 +39,20 @@ struct SceneFragmentInput
     float4 color0 : TEXCOORD3;
 };
 
+float3 srgb_to_linear(float3 value)
+{
+    value = max(value, 0.0f);
+    return lerp(value / 12.92f, pow((value + 0.055f) / 1.055f, 2.4f),
+                step(0.04045f, value));
+}
+
+float3 linear_to_srgb(float3 value)
+{
+    value = max(value, 0.0f);
+    return lerp(value * 12.92f, 1.055f * pow(value, 1.0f / 2.4f) - 0.055f,
+                step(0.0031308f, value));
+}
+
 float4 main(SceneFragmentInput input) : SV_Target0
 {
     for (int index = 0; index < 32; ++index) {
@@ -60,7 +74,10 @@ float4 main(SceneFragmentInput input) : SV_Target0
     }
     float4 metal_rough = metallic_roughness_texture.Sample(base_color_sampler, input.texcoord0);
     float hemisphere = 0.5f + 0.5f * dot(N, float3(0.0f, 0.0f, 1.0f));
-    float3 albedo = base_color.rgb * texture_color.rgb * input.color0.rgb;
+    float3 base_texel = texture_flags.y > 0.5f
+                            ? srgb_to_linear(texture_color.rgb) : texture_color.rgb;
+    float3 albedo = srgb_to_linear(base_color.rgb) * base_texel *
+                    srgb_to_linear(input.color0.rgb);
     float metallic = saturate(surface_params.x * metal_rough.b);
     float roughness = clamp(surface_params.y * metal_rough.g, 0.045f, 1.0f);
     float alpha_ggx = roughness * roughness;
@@ -72,6 +89,17 @@ float4 main(SceneFragmentInput input) : SV_Target0
                      albedo * (1.0f - metallic) *
                      occlusion_texture.Sample(base_color_sampler, input.texcoord0).r;
     float3 direct = float3(0.0f, 0.0f, 0.0f);
+    if (lighting_mode.z > 0.0f) {
+        float3 R = reflect(-V, N);
+        float reflection_height = saturate(0.5f + 0.5f * R.z);
+        float3 reflected = lerp(ambient_ground.rgb, ambient_sky.rgb, reflection_height);
+        float3 average_env = 0.5f * (ambient_ground.rgb + ambient_sky.rgb);
+        reflected = lerp(average_env, reflected, 1.0f - roughness * roughness);
+        float3 grazing = max(F0, 1.0f - roughness);
+        float3 env_fresnel = F0 + (grazing - F0) * pow(1.0f - NdotV, 5.0f);
+        ambient += reflected * env_fresnel * lighting_mode.z *
+                   occlusion_texture.Sample(base_color_sampler, input.texcoord0).r;
+    }
     for (int index = 0; index < 32; ++index) {
         if (index >= (int)lighting_mode.y) break;
         float intensity = max(light_color_intensity[index].w, 0.0f);
@@ -112,10 +140,12 @@ float4 main(SceneFragmentInput input) : SV_Target0
                   (intensity * attenuation * NdotL * 3.14159265f) *
                   (diffuse + specular);
     }
-    float3 color = ambient + direct + emissive.rgb *
-                   emissive_texture.Sample(base_color_sampler, input.texcoord0).rgb;
+    float3 emissive_texel = emissive_texture.Sample(base_color_sampler, input.texcoord0).rgb;
+    if (texture_flags.z > 0.5f)
+        emissive_texel = srgb_to_linear(emissive_texel);
+    float3 color = ambient + direct + srgb_to_linear(emissive.rgb) * emissive_texel;
     float alpha = base_color.a * texture_color.a * input.color0.a;
     if (surface_params.w > 1.5f && alpha < surface_params.z)
         discard;
-    return float4(color, alpha);
+    return float4(linear_to_srgb(color), alpha);
 }

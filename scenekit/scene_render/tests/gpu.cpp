@@ -228,6 +228,32 @@ int main() {
         material_resource.edit_state().roughness = 0.0f;
         scene->publish();
 
+        nkscene::SceneView reflection_view = pbr_view;
+        reflection_view.studio_lighting.directions[2][3] = 0.0f;
+        reflection_view.studio_lighting.ambient_sky = {0.4f, 0.4f, 0.4f, 0.0f};
+        reflection_view.studio_lighting.ambient_ground = {0.05f, 0.05f, 0.05f, 0.0f};
+        const auto reflection_plan = nkscene::compile(scene->snapshot(), reflection_view);
+        material_resource.edit_state().metallic = 1.0f;
+        material_resource.edit_state().roughness = 0.2f;
+        scene->publish();
+        std::vector<std::uint8_t> reflected_pixels;
+        assert(executor.capture_rgba8(reflection_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, reflected_pixels) == NKGPU_OK);
+        bool has_reflection = false;
+        for (std::size_t index = 0; index < reflected_pixels.size(); index += 4)
+            has_reflection = has_reflection || reflected_pixels[index] != 0 ||
+                             reflected_pixels[index + 1] != 0 || reflected_pixels[index + 2] != 0;
+        assert(has_reflection);
+        material_resource.edit_state().roughness = 0.9f;
+        scene->publish();
+        std::vector<std::uint8_t> rough_reflected_pixels;
+        assert(executor.capture_rgba8(reflection_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, rough_reflected_pixels) == NKGPU_OK);
+        assert(rough_reflected_pixels != reflected_pixels);
+        material_resource.edit_state().metallic = 0.0f;
+        material_resource.edit_state().roughness = 0.0f;
+        scene->publish();
+
         const auto make_map = [&](std::array<std::byte, 4> rgba) {
             const auto map_image = scene->reserve_image_id();
             auto &map_resource = scene->image_store().create(map_image);
@@ -273,6 +299,33 @@ int main() {
             std::byte{255}, std::byte{255}, std::byte{255}, std::byte{255}};
         scene->publish();
         assert(capture_maps() != previous_map_pixels);
+
+        // Emissive color and RGBA8 texels are decoded before multiplication.
+        const auto half_red_map = make_map({std::byte{128}, std::byte{0},
+                                             std::byte{0}, std::byte{255}});
+        auto dark_view = reflection_view;
+        dark_view.studio_lighting.ambient_sky = {0.0f, 0.0f, 0.0f, 0.0f};
+        dark_view.studio_lighting.ambient_ground = {0.0f, 0.0f, 0.0f, 0.0f};
+        const auto dark_plan = nkscene::compile(scene->snapshot(), dark_view);
+        material_resource.edit_state().base_color = {0.0f, 0.0f, 0.0f, 1.0f};
+        material_resource.edit_state().emissive = {0.5f, 0.0f, 0.0f};
+        material_resource.edit_state().emissive_texture = half_red_map;
+        scene->publish();
+        std::vector<std::uint8_t> linear_pixels;
+        assert(executor.capture_rgba8(dark_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, linear_pixels) == NKGPU_OK);
+        const auto srgb_decode = [](float value) {
+            return value <= 0.04045f ? value / 12.92f
+                                     : std::pow((value + 0.055f) / 1.055f, 2.4f);
+        };
+        const auto srgb_encode = [](float value) {
+            return value <= 0.0031308f ? value * 12.92f
+                                       : 1.055f * std::pow(value, 1.0f / 2.4f) - 0.055f;
+        };
+        const auto expected_red = static_cast<int>(std::round(
+            srgb_encode(srgb_decode(0.5f) * srgb_decode(128.0f / 255.0f)) * 255.0f));
+        const auto red_pixel = linear_pixels[(48 * options.width + 24) * 4];
+        assert(std::abs(static_cast<int>(red_pixel) - expected_red) <= 2);
         material_resource.edit_state().metallic_roughness_texture = {};
         material_resource.edit_state().normal_texture = {};
         material_resource.edit_state().occlusion_texture = {};
@@ -280,6 +333,7 @@ int main() {
         material_resource.edit_state().metallic = 0.0f;
         material_resource.edit_state().roughness = 0.0f;
         material_resource.edit_state().emissive = {};
+        material_resource.edit_state().base_color = {0.2f, 0.7f, 1.0f, 1.0f};
         scene->publish();
 
         nkscene::PickResult picked;

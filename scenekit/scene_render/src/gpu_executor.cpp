@@ -60,7 +60,7 @@ struct MaterialUniformData {
     std::array<float, 4> base_color{};
     std::array<float, 4> surface_params{};
     std::array<float, 4> emissive{};
-    std::array<float, 4> texture_flags{}; // x = normal map present
+    std::array<float, 4> texture_flags{}; // x = normal map, y/z = sRGB base/emissive maps
 };
 
 static_assert(sizeof(MaterialUniformData) == sizeof(float) * 16);
@@ -74,7 +74,7 @@ struct LightingUniformData {
     std::array<std::array<float, 4>, max_lights> light_cones{};
     std::array<float, 4> ambient_sky{0.35f, 0.35f, 0.35f, 0.0f};
     std::array<float, 4> ambient_ground{0.35f, 0.35f, 0.35f, 0.0f};
-    std::array<float, 4> lighting_mode{}; // x = studio shading, y = light count
+    std::array<float, 4> lighting_mode{}; // x = studio shading, y = light count, z = environment reflection
     std::array<float, 4> camera_position{}; // world-space near-plane center
 };
 
@@ -217,7 +217,7 @@ LightingUniformData lighting_uniform_data(const RenderPlan &plan,
                                           const SceneSnapshot &snapshot) noexcept {
     LightingUniformData result;
     if (plan.studio_lighting().enabled) {
-        result.lighting_mode = {1.0f, 3.0f, 0.0f, 0.0f};
+        result.lighting_mode = {1.0f, 3.0f, 0.6f, 0.0f};
         for (std::size_t index = 0; index < 3; ++index) {
             const auto &direction = plan.studio_lighting().directions[index];
             const auto &color = plan.studio_lighting().colors[index];
@@ -330,6 +330,8 @@ struct NativeKitGpuExecutor::State {
         std::array<bool, 5> owns_images{};
         bool owns_sampler = false;
         bool has_normal_map = false;
+        bool base_color_srgb = false;
+        bool emissive_srgb = false;
     };
 
     struct BatchGpu {
@@ -1399,6 +1401,8 @@ bool ensure_material(StateT &state, const SceneSnapshot &snapshot, const Materia
     cached.image_revisions = image_revisions;
     cached.sampler_revision = sampler_revision;
     cached.has_normal_map = images[2] != nullptr;
+    cached.base_color_srgb = images[0] && images[0]->format == ImageFormat::RGBA8;
+    cached.emissive_srgb = images[4] && images[4]->format == ImageFormat::RGBA8;
 
     for (std::size_t slot = 0; slot < images.size(); ++slot) {
         const auto *image = images[slot];
@@ -2140,6 +2144,8 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
             return stats;
         }
         material_data.texture_flags[0] = material_gpu->second.has_normal_map ? 1.0f : 0.0f;
+        material_data.texture_flags[1] = material_gpu->second.base_color_srgb ? 1.0f : 0.0f;
+        material_data.texture_flags[2] = material_gpu->second.emissive_srgb ? 1.0f : 0.0f;
         if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(
                  state_->renderer, 1,
@@ -2307,6 +2313,8 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         if (material_gpu == state_->material_resources.end())
             return fail_frame(NKGPU_ERROR_INVALID_HANDLE);
         material_data.texture_flags[0] = material_gpu->second.has_normal_map ? 1.0f : 0.0f;
+        material_data.texture_flags[1] = material_gpu->second.base_color_srgb ? 1.0f : 0.0f;
+        material_data.texture_flags[2] = material_gpu->second.emissive_srgb ? 1.0f : 0.0f;
         if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(
                  state_->renderer, 1,
