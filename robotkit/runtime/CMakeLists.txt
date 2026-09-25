@@ -3,6 +3,7 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/runtime.cpp
     src/runtime_c_api.cpp
     src/recording.cpp
+    src/serial_protocol.cpp
     src/serial_endpoint.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
@@ -50,6 +51,13 @@ if(RK_BUILD_TESTS)
     set_tests_properties(robotkit_recording PROPERTIES LABELS "robot;recording;mcap" TIMEOUT 30)
 
     if(NOT WIN32)
+        add_executable(robotkit_serial_protocol_tests tests/serial_protocol.cpp)
+        target_compile_features(robotkit_serial_protocol_tests PRIVATE cxx_std_20)
+        target_link_libraries(robotkit_serial_protocol_tests PRIVATE RobotKit::runtime)
+        add_test(NAME robotkit_serial_protocol COMMAND robotkit_serial_protocol_tests)
+        set_tests_properties(robotkit_serial_protocol PROPERTIES LABELS "robot;runtime;hardware"
+            TIMEOUT 30)
+
         add_executable(robotkit_serial_endpoint_tests tests/serial_endpoint.cpp)
         target_compile_features(robotkit_serial_endpoint_tests PRIVATE cxx_std_20)
         target_link_libraries(robotkit_serial_endpoint_tests PRIVATE RobotKit::runtime)

@@ -43,10 +43,13 @@ without motor hardware:
 python3 ../tests/serial-tcp.py
 ```
 
-Before connecting actual hardware, implement the device side of
-[`../runtime/SERIAL_PROTOCOL.md`](../runtime/SERIAL_PROTOCOL.md). The device
-must enforce a local actuator watchdog; a disconnected cable cannot receive a
-host emergency-stop frame.
+[`../runtime/SERIAL_PROTOCOL.md`](../runtime/SERIAL_PROTOCOL.md) describes the
+device contract, and `robotkit_serial_protocol.hpp` provides a tested RKC3
+command decoder. A platform still needs firmware that connects decoded
+commands to its motor and sensor drivers and enforces the local actuator
+watchdog; a disconnected cable cannot receive a host emergency-stop frame.
+Protocol v3 also requires a device sequence reset when the host process
+restarts, unless the device itself restarts while safely stopped.
 
 The same runtime command/controller boundary is used by simulation and by the
 first native physical endpoint (`SerialRobotEndpoint`). Sensor state is carried

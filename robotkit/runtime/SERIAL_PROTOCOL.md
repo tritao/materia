@@ -52,6 +52,24 @@ the host process cannot provide a watchdog after a cable or process failure.
 
 The exact payload length is 20 + 16 * target_count.
 
+`robotkit_serial_protocol.hpp` provides a fixed-capacity `SerialCommandDecoder`
+for the RKC3 command stream. It delivers a complete `SerialCommandFrame` to a
+synchronous handler only after validating the payload size, CRC, command kind,
+target modes, finite values, duplicate joints, configured joint range, and
+strictly increasing sequence. Only delivered commands refresh its watchdog
+timestamp. A device loop should call `watchdog_expired()` on its local clock
+and put actuators into its safe state when it returns true. The decoder does
+not implement motor drivers, safety circuits, or the device's application of
+stop, emergency-stop, and reset commands.
+
+Protocol v3 has no host session handshake. The command sequence starts from one
+for each new `RobotRuntime`, while a device that remains powered retains its
+sequence watermark. If the host process restarts without restarting or
+explicitly reinitializing the device decoder while actuators are safe, the new
+host's commands will be rejected as stale. A deployed system must account for
+that limitation; a negotiated session identifier is needed to support host
+restarts without resetting the device.
+
 ## Device state payload
 
 The payload begins with a 16-byte header:
