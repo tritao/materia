@@ -14,9 +14,13 @@ import haxe.Int64;
 class Simulation {
   final owner:Ownedrk_simulation;
   final robots:Array<RobotRuntime> = [];
+  public final fixedTimestepSeconds:Float;
   var disposed:Bool = false;
 
   public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1, ?backend:Int = 0) {
+    if (!Math.isFinite(fixedTimestep) || fixedTimestep <= 0.0 || physicsSubsteps <= 0)
+      throw "Simulation requires a positive finite timestep and positive substep count";
+    fixedTimestepSeconds = fixedTimestep;
     var desc = new rk_simulation_desc();
     desc.set_struct_size(rk_simulation_desc.size());
     desc.set_fixed_timestep(fixedTimestep);

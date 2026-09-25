@@ -6,6 +6,7 @@ import sys.thread.Mutex;
 import sys.thread.Thread;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.runtime.DifferentialDrivePlant;
 import robotkit.runtime.RobotRuntimeJointBlueprint;
 import robotkit.runtime.RobotCompileException;
 import robotkit.runtime.RobotRuntimeConfiguration;
@@ -1385,19 +1386,12 @@ class RobotWorldTests {
     var guard = new MotionGuard(navigation, footprint, 0.2, 1.5, 0.1, 0.4);
     var navigator = new Navigator(navigation, planner, costmap, 0.2, guard);
 
-    // The current articulated simulator does not couple wheel joints to planar
-    // base translation, so this scenario supplies that kinematic plant while
-    // retaining SimKit sensors, runtime snapshots, localization, and perception.
-    var simulatedPose = new Pose2();
+    // The articulated physics backend does not model wheel traction, so an ideal
+    // differential-drive plant couples commanded wheel rates to the chassis.
+    var plant = new DifferentialDrivePlant(simulation, 0, base);
     var lastPerception = new PerceptionSnapshot();
-    function robotObservation(tick:Int):RobotSnapshot {
-      simulatedPose = simulatedPose.integrate(base.currentCommand(), 0.02);
-      var halfYaw = simulatedPose.yaw * 0.5;
-      simulation.teleportRobot(0, [simulatedPose.x, simulatedPose.y, 0.0],
-        [0.0, 0.0, Math.sin(halfYaw), Math.cos(halfYaw)]);
-      simulation.step(Int64.ofInt(tick));
-      return robot.snapshot();
-    }
+    function robotObservation(tick:Int):RobotSnapshot
+      return plant.step(Int64.ofInt(tick));
     function perceive(snapshot:RobotSnapshot):PerceptionSnapshot {
       lastPerception = framedPerception.observeRobotSnapshot(snapshot, model,
         blueprint, baseLink.id);
@@ -1417,8 +1411,7 @@ class RobotWorldTests {
       navigator.status == NavigatorStatus.Navigating,
       "GoTo plans and starts a goal through SkillRunner");
 
-    simulatedPose = new Pose2(simulatedPose.x, simulatedPose.y + 0.6,
-      simulatedPose.yaw);
+    plant.teleport(new Pose2(plant.pose.x, plant.pose.y + 0.6, plant.pose.yaw));
     var tick = 2;
     var goalStatus = goalRunner.update(robotObservation(tick++), 0.02);
     var status = navigator.status;
