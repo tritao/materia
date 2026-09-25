@@ -1,16 +1,249 @@
 {
+  "schemaVersion": 3,
   "name": "pty-forklift",
-  "layout": "layout.json",
-  "schema_lock": "device_wire.lock.json",
-  "device": {
-    "path": "/dev/replace-with-pty",
-    "baud": 115200,
-    "fingerprint": "e9757b4c951367c3a9953110f1f2d34c",
-    "target_error": 0.000001
-  },
+  "collisionApproximation": "bounds-box",
+  "links": [
+    {
+      "id": "link/base",
+      "name": "base",
+      "mass": 1,
+      "centerOfMass": [
+        0,
+        0,
+        0
+      ],
+      "inertiaTensor": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "visualGeometry": null,
+      "collisionGeometry": null
+    },
+    {
+      "id": "link/left-wheel",
+      "name": "left wheel",
+      "mass": 1,
+      "centerOfMass": [
+        0,
+        0,
+        0
+      ],
+      "inertiaTensor": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "visualGeometry": null,
+      "collisionGeometry": null
+    },
+    {
+      "id": "link/right-wheel",
+      "name": "right wheel",
+      "mass": 1,
+      "centerOfMass": [
+        0,
+        0,
+        0
+      ],
+      "inertiaTensor": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "visualGeometry": null,
+      "collisionGeometry": null
+    },
+    {
+      "id": "link/lift",
+      "name": "mast lift",
+      "mass": 1,
+      "centerOfMass": [
+        0,
+        0,
+        0
+      ],
+      "inertiaTensor": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "visualGeometry": null,
+      "collisionGeometry": null
+    }
+  ],
   "joints": [
-    {"id": "joint/left-wheel", "name": "left wheel joint", "type": "continuous", "limits": {"lower": -100, "upper": 100, "effort": 100}},
-    {"id": "joint/right-wheel", "name": "right wheel joint", "type": "continuous", "limits": {"lower": -100, "upper": 100, "effort": 100}},
-    {"id": "joint/lift", "name": "mast lift", "type": "prismatic", "limits": {"lower": 0, "upper": 1, "velocity": 2, "effort": 100}}
-  ]
+    {
+      "id": "joint/left-wheel",
+      "name": "left wheel joint",
+      "type": "continuous",
+      "parentLink": "link/base",
+      "childLink": "link/left-wheel",
+      "limits": {
+        "lower": -100,
+        "upper": 100,
+        "velocity": 0,
+        "effort": 100
+      },
+      "drive": null,
+      "parentFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "parentFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "childFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "childFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "id": "joint/right-wheel",
+      "name": "right wheel joint",
+      "type": "continuous",
+      "parentLink": "link/base",
+      "childLink": "link/right-wheel",
+      "limits": {
+        "lower": -100,
+        "upper": 100,
+        "velocity": 0,
+        "effort": 100
+      },
+      "drive": null,
+      "parentFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "parentFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "childFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "childFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "id": "joint/lift",
+      "name": "mast lift",
+      "type": "prismatic",
+      "parentLink": "link/base",
+      "childLink": "link/lift",
+      "limits": {
+        "lower": 0,
+        "upper": 1,
+        "velocity": 2,
+        "effort": 100
+      },
+      "drive": null,
+      "parentFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "parentFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "childFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "childFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "frames": [],
+  "sensors": [],
+  "mobileBase": {
+    "drive": {
+      "kind": "differential",
+      "leftWheelJoint": "joint/left-wheel",
+      "rightWheelJoint": "joint/right-wheel",
+      "wheelRadius": 0.1,
+      "trackWidth": 0.5
+    },
+    "maxLinearSpeed": 0.5,
+    "maxAngularSpeed": 1,
+    "maxLinearAcceleration": 1,
+    "maxAngularAcceleration": 1,
+    "footprintLength": null,
+    "footprintWidth": null
+  },
+  "forkMechanism": {
+    "liftJoint": "joint/lift",
+    "tiltJoint": null,
+    "spreadJoint": null,
+    "maxMassKg": 1000,
+    "maxLoadMomentKgMeters": 600,
+    "maxLiftHeightMeters": 1
+  }
 }

@@ -26,16 +26,17 @@ probe-rs download --chip STM32G474RETx \
 The fingerprint constant in `src/fingerprint.rs` comes from
 `../../../deployment/bench-nucleo-g474re/layout.json` and its adjacent
 `device_wire.lock.json`. If either changes, regenerate it with
-`tools/device_fingerprint.py` and update `robot.json` with the printed hex.
-`robotd` verifies those same bytes at startup. The bench `target_error` and
-virtual layout are test settings, not drivetrain calibration.
+`tools/device_fingerprint.py` and update `deployment.json` with the printed hex.
+`robotd` verifies those same bytes at startup. The semantic model is in the
+adjacent `robot.json`; the bench `target_error` and virtual layout are test
+settings, not drivetrain calibration.
 
 Copy the bench deployment directory to the Linux board, edit only the `device.path`
 for its actual UART node, then start from the `robotkit` directory:
 
 ```sh
 ../haxeon/scripts/haxeon run --project robotd/haxeon.json -- \
-  --server --deployment=/path/to/bench-nucleo-g474re/robot.json \
+  --server --deployment=/path/to/bench-nucleo-g474re/deployment.json \
   --listen=192.168.10.20
 ```
 

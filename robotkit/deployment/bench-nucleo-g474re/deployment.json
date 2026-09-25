@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "model": "robot.json",
+  "device": {
+    "path": "/dev/robotkit-mcu",
+    "baud": 460800,
+    "layout": "layout.json",
+    "schema_lock": "device_wire.lock.json",
+    "fingerprint": "dd4fff8c84fba2fabc96085ee0587059",
+    "target_error": 1e-06
+  }
+}

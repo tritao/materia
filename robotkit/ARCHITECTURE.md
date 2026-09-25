@@ -147,6 +147,12 @@ robot. `RobotRuntimeCompiler` turns the editable `RobotModel` directly into a
 creation, and `RobotRuntime.snapshot()` returns the runtime snapshot value
 directly.
 
+`RobotModelCodec` stores the complete semantic robot definition as a versioned
+JSON artifact shared by editor, simulation, and `robotd`. Deployment files refer
+to that artifact and keep `DeviceLayout` as the separate ordered mapping from
+model joint IDs to RKD5 channels. The RKD5 fingerprint covers the exact device
+layout and wire schema lock, not mutable semantic model fields.
+
 Compilation has two deliberate entry points. `RobotRuntimeCompiler.validate()`
 returns every `RobotCompileDiagnostic` with a stable code, field path, and
 human-readable message. `compile()` uses that same validation pass and throws a

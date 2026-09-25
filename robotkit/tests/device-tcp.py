@@ -62,12 +62,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix="robotkit-device-tcp-") as temp:
         deployment_dir = Path(temp)
         fixture_dir = ROOT / "robotkit/tests/fixtures/device-deployment"
+        (deployment_dir / "robot.json").write_bytes((fixture_dir / "robot.json").read_bytes())
         (deployment_dir / "layout.json").write_bytes((fixture_dir / "layout.json").read_bytes())
         (deployment_dir / "device_wire.lock.json").write_bytes(
             (fixture_dir / "device_wire.lock.json").read_bytes())
-        deployment = json.loads((fixture_dir / "robot.json").read_text())
+        deployment = json.loads((fixture_dir / "deployment.json").read_text())
         deployment["device"]["path"] = slave_path
-        deployment_path = deployment_dir / "robot.json"
+        deployment_path = deployment_dir / "deployment.json"
         deployment_path.write_text(json.dumps(deployment))
         wrong = json.loads(json.dumps(deployment))
         wrong["device"]["fingerprint"] = "000102030405060708090a0b0c0d0e0f"

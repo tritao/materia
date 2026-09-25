@@ -33,7 +33,7 @@ Run the current skeleton with:
 
 # Host a deployed robot through a serial device
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
-  --server --deployment=/etc/robotkit/robot.json --listen=192.168.10.20
+  --server --deployment=/etc/robotkit/deployment.json --listen=192.168.10.20
 
 # Optionally host a Haxeon behavior inside robotd
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
@@ -47,19 +47,23 @@ The TCP listener defaults to `127.0.0.1`. `--listen` accepts an explicit IPv4
 address, including `0.0.0.0` to bind all interfaces. The RobotKit TCP protocol
 does not authenticate clients; use an isolated robot network or SSH tunnel.
 
-Serial hosting requires a deployment JSON file. It names the robot and ordered
-joints, gives the UART path, baud, `f32` target error budget, and fingerprint,
-and points to a device layout JSON file and the matching schema lock. The layout
-lists channels in the same order as the model joints. `robotd` recomputes the
-fingerprint from the exact layout bytes and schema lock and checks the channel
-order before opening the UART.
-See [`../tests/fixtures/device-deployment/robot.json`](../tests/fixtures/device-deployment/robot.json)
+Serial hosting requires a deployment JSON file. It refers to the canonical
+semantic robot model and gives the UART path, baud, `f32` target error budget,
+and layout fingerprint. Its device section points to a device layout and the
+matching schema lock. The layout maps ordered RKD5 channels to joint IDs in the
+model. `robotd` loads the complete `RobotModel`, recomputes the fingerprint from
+the exact layout bytes and schema lock, and checks the channel order before
+opening the UART. `RobotModelCodec` reads and migrates versioned model artifacts;
+the device fingerprint still covers only the physical layout and wire schema.
+
+See [`../tests/fixtures/device-deployment/deployment.json`](../tests/fixtures/device-deployment/deployment.json)
+and its referenced [`robot.json`](../tests/fixtures/device-deployment/robot.json)
 for the PTY fixture. Its calibration and fingerprint are test values; a physical
 deployment needs measured values. Generate the deployed fingerprint from the
 exact layout bytes with `python3 ../tools/device_fingerprint.py layout.json
 --schema-lock device_wire.lock.json --rust firmware_fingerprint.rs`, then put
-the printed hex value in `robot.json` and compile the Rust constant into the
-MCU firmware. Include that exact schema lock file in the deployment directory.
+the printed hex value in `deployment.json` and compile the Rust constant into
+the MCU firmware. Include that exact schema lock file in the deployment directory.
 
 The protocol and world TCP clients are integration tests rather than robotd
 runtime modes. Run them through `../tests/world-tcp.sh`.

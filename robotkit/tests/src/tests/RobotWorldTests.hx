@@ -24,6 +24,9 @@ import robotkit.model.Sensor;
 import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotMobileConfiguration;
 import robotkit.model.RobotForkConfiguration;
+import robotkit.model.RobotModelCodec;
+import robotkit.device.DeviceChannel;
+import robotkit.device.DeviceLayout;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotDescription;
@@ -120,6 +123,7 @@ class RobotWorldTests {
     testJointTargetBatches();
     testMobileLayer();
     testModelDrivenConfiguration();
+    testRobotModelCodec();
     testLocalization();
     testNavigation();
     testForkMechanisms();
@@ -573,6 +577,102 @@ class RobotWorldTests {
     for (value in duplicateDiagnostics) if (value.code == "RK_ROLE_DUPLICATE") hasDuplicateRole = true;
     check(hasDuplicateRole,
       "robot model validation rejects assigning one joint to multiple mechanism roles");
+  }
+
+  static function testRobotModelCodec():Void {
+    var source = configuredForkliftModel();
+    source.collisionApproximation = robotkit.model.CollisionApproximation.None;
+    source.links[0].mass = 42.5;
+    source.links[0].centerOfMass = [0.1, -0.2, 0.3];
+    source.links[0].inertiaTensor = [2.0, 0.1, 0.0, 0.1, 3.0, 0.2, 0.0, 0.2, 4.0];
+    source.links[0].visualGeometry = "meshes/base.glb";
+    source.links[0].collisionGeometry = "colliders/base.obj";
+    source.joints[0].drive = new Actuator("left-wheel-drive", 90.0, 12.0);
+    source.joints[0].parentFramePosition = [0.0, 0.25, 0.1];
+    source.joints[0].parentFrameRotation = [0.0, 0.0, 0.1, 0.99498743710662];
+    source.joints[0].axis = [0.0, 1.0, 0.0];
+    source.frames[0].rotation = [0.0, 0.0, 0.38268343236509, 0.923879532511287];
+    source.sensors[0].startAngleRadians = -0.4;
+    source.sensors[0].fieldOfViewRadians = 2.4;
+
+    var encoded = RobotModelCodec.encode(source);
+    var restored = RobotModelCodec.decode(encoded);
+    equal(restored.schemaVersion, RobotModel.CURRENT_VERSION,
+      "decoded RobotModel uses the current semantic schema");
+    equal(RobotModelCodec.encode(restored).toString(), encoded.toString(),
+      "canonical RobotModel artifact round-trips byte for byte");
+    equal(restored.links[0].mass, 42.5, "RobotModel codec preserves link mass");
+    equal(restored.links[0].inertiaTensor[7], 0.2, "RobotModel codec preserves inertia tensor");
+    equal(restored.links[0].visualGeometry, "meshes/base.glb",
+      "RobotModel codec preserves geometry references");
+    equal(restored.joints[0].parentFramePosition[1], 0.25,
+      "RobotModel codec preserves joint frame transforms");
+    var restoredDrive:Actuator = cast restored.joints[0].drive;
+    equal(restoredDrive.maxRate, 12.0, "RobotModel codec preserves actuator settings");
+    equal(restored.frames[0].link.id, "link/base", "RobotModel codec resolves frame link references");
+    check(restored.sensors[0].frame == restored.frames[0],
+      "RobotModel codec resolves sensor frame references to shared frame objects");
+    equal(restored.sensors[0].startAngleRadians, -0.4,
+      "RobotModel codec preserves LiDAR angular origin");
+    check(restored.mobileBase != null && restored.forkMechanism != null,
+      "RobotModel codec preserves mobile and fork configurations");
+    equal(RobotRuntimeCompiler.compile(restored).jointCount, source.joints.length,
+      "decoded canonical model compiles through the normal runtime path");
+    var ackermannSource = configuredForkliftModel();
+    ackermannSource.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left-wheel", 1.2, 0.1, 0.5),
+      1.2, 1.5);
+    var ackermannRestored = RobotModelCodec.decode(RobotModelCodec.encode(ackermannSource));
+    var ackermannMobile:RobotMobileConfiguration = cast ackermannRestored.mobileBase;
+    check(switch ackermannMobile.drive {
+      case Ackermann(steering, drive, wheelBase, radius, maxAngle):
+        steering == "joint/tilt" && drive == "joint/left-wheel" &&
+          wheelBase == 1.2 && radius == 0.1 && maxAngle == 0.5;
+      case _: false;
+    }, "RobotModel codec round-trips Ackermann drive configuration");
+
+    var channelRecords = [for (index in 0...source.joints.length)
+      {index: index, joint: source.joints[index].id}];
+    var deviceLayout = DeviceLayout.decode(haxe.io.Bytes.ofString(
+      haxe.Json.stringify({channels: channelRecords})));
+    deviceLayout.validateAgainst(source);
+    var wrongLayout = new DeviceLayout([for (index in 0...source.joints.length)
+      new DeviceChannel(index, source.joints[source.joints.length - index - 1].id)]);
+    throws(function() wrongLayout.validateAgainst(source),
+      "device channel mapping rejects order that differs from semantic model joints");
+
+    var legacyV1 = haxe.io.Bytes.ofString('{"schemaVersion":1,"name":"legacy-arm",'
+      + '"links":[{"id":"base","name":"base"}],"joints":[],"frames":[],"sensors":[]}');
+    var migratedV1 = RobotModelCodec.decode(legacyV1);
+    equal(migratedV1.schemaVersion, RobotModel.CURRENT_VERSION,
+      "v1 RobotModel artifact migrates to the current schema");
+    equal(migratedV1.links[0].mass, 1.0, "v1 migration supplies default link mass");
+    equal(migratedV1.links[0].inertiaTensor[8], 1.0,
+      "v1 migration supplies default link inertia");
+    equal(RobotModelCodec.decode(RobotModelCodec.encode(migratedV1)).name, "legacy-arm",
+      "migrated RobotModel can be saved in the current canonical format");
+
+    var legacyV2:Dynamic = haxe.Json.parse(encoded.toString());
+    Reflect.setField(legacyV2, "schemaVersion", 2);
+    Reflect.setField(legacyV2, "mobileBase", null);
+    Reflect.setField(legacyV2, "forkMechanism", null);
+    var legacySensors:Array<Dynamic> = cast Reflect.field(legacyV2, "sensors");
+    Reflect.setField(legacySensors[0], "startAngleRadians", null);
+    Reflect.setField(legacySensors[0], "fieldOfViewRadians", null);
+    var migratedV2 = RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(legacyV2)));
+    equal(migratedV2.sensors[0].startAngleRadians, 0.0,
+      "v2 migration supplies default sensor angle");
+    equal(migratedV2.sensors[0].fieldOfViewRadians, Math.PI * 2.0,
+      "v2 migration supplies full-circle sensor coverage");
+    equal(migratedV2.mobileBase, null, "v2 migration defaults newer semantic roles");
+
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString('{"schemaVersion":99}')),
+      "future RobotModel schema versions are rejected");
+    var brokenReference:Dynamic = haxe.Json.parse(encoded.toString());
+    var brokenJoints:Array<Dynamic> = cast Reflect.field(brokenReference, "joints");
+    Reflect.setField(brokenJoints[0], "parentLink", "link/missing");
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(brokenReference))),
+      "RobotModel codec rejects unresolved link references");
   }
 
   static function testLocalization():Void {

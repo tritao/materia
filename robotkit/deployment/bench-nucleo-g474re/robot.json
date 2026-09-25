@@ -1,33 +1,178 @@
 {
+  "schemaVersion": 3,
   "name": "bench-nucleo-g474re",
-  "layout": "layout.json",
-  "schema_lock": "device_wire.lock.json",
-  "device": {
-    "path": "/dev/robotkit-mcu",
-    "baud": 460800,
-    "fingerprint": "dd4fff8c84fba2fabc96085ee0587059",
-    "target_error": 1e-06
-  },
+  "collisionApproximation": "bounds-box",
+  "links": [
+    {
+      "id": "link/base",
+      "name": "base",
+      "mass": 1,
+      "centerOfMass": [
+        0,
+        0,
+        0
+      ],
+      "inertiaTensor": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "visualGeometry": null,
+      "collisionGeometry": null
+    },
+    {
+      "id": "link/left-wheel",
+      "name": "left wheel",
+      "mass": 1,
+      "centerOfMass": [
+        0,
+        0,
+        0
+      ],
+      "inertiaTensor": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "visualGeometry": null,
+      "collisionGeometry": null
+    },
+    {
+      "id": "link/right-wheel",
+      "name": "right wheel",
+      "mass": 1,
+      "centerOfMass": [
+        0,
+        0,
+        0
+      ],
+      "inertiaTensor": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "visualGeometry": null,
+      "collisionGeometry": null
+    }
+  ],
   "joints": [
     {
       "id": "joint/left-wheel",
       "name": "left wheel",
       "type": "continuous",
+      "parentLink": "link/base",
+      "childLink": "link/left-wheel",
       "limits": {
         "lower": -100,
         "upper": 100,
+        "velocity": 0,
         "effort": 100
-      }
+      },
+      "drive": null,
+      "parentFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "parentFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "childFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "childFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ]
     },
     {
       "id": "joint/right-wheel",
       "name": "right wheel",
       "type": "continuous",
+      "parentLink": "link/base",
+      "childLink": "link/right-wheel",
       "limits": {
         "lower": -100,
         "upper": 100,
+        "velocity": 0,
         "effort": 100
-      }
+      },
+      "drive": null,
+      "parentFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "parentFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "childFramePosition": [
+        0,
+        0,
+        0
+      ],
+      "childFrameRotation": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "axis": [
+        0,
+        0,
+        1
+      ]
     }
-  ]
+  ],
+  "frames": [],
+  "sensors": [],
+  "mobileBase": {
+    "drive": {
+      "kind": "differential",
+      "leftWheelJoint": "joint/left-wheel",
+      "rightWheelJoint": "joint/right-wheel",
+      "wheelRadius": 0.1,
+      "trackWidth": 0.5
+    },
+    "maxLinearSpeed": 0.5,
+    "maxAngularSpeed": 1,
+    "maxLinearAcceleration": 1,
+    "maxAngularAcceleration": 1,
+    "footprintLength": null,
+    "footprintWidth": null
+  },
+  "forkMechanism": null
 }

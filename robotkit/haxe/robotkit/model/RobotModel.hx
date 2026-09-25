@@ -2,7 +2,7 @@ package robotkit.model;
 
 /** Editable static definition of a robot's links, joints, and sensors. */
 class RobotModel {
-  public static inline var CURRENT_VERSION:Int = 2;
+  public static inline var CURRENT_VERSION:Int = 3;
   public final schemaVersion:Int = CURRENT_VERSION;
   public final name:String;
   public final links:Array<Link> = [];
