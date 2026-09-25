@@ -86,12 +86,29 @@ if(RK_BUILD_TESTS)
     set_tests_properties(robotkit_recording PROPERTIES LABELS "robot;recording;mcap" TIMEOUT 30)
 
     if(NOT WIN32)
-        find_package(Threads REQUIRED)
-        add_executable(robotkit_device_host_v5_pty_tests tests/device_host_v5_pty.cpp)
-        target_compile_features(robotkit_device_host_v5_pty_tests PRIVATE cxx_std_20)
-        target_link_libraries(robotkit_device_host_v5_pty_tests PRIVATE RobotKit::runtime Threads::Threads)
-        add_test(NAME robotkit_device_host_v5_pty COMMAND robotkit_device_host_v5_pty_tests)
-        set_tests_properties(robotkit_device_host_v5_pty PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
+        if(RK_CARGO_EXECUTABLE)
+            add_custom_command(
+                OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device
+                COMMAND ${RK_CARGO_EXECUTABLE} build
+                    --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/Cargo.toml
+                    --target-dir ${CMAKE_CURRENT_BINARY_DIR}/cargo-target
+                    --bin pty_device
+                DEPENDS
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/Cargo.toml
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/bin/pty_device.rs
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/lib.rs
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/runtime.rs
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/device_wire.rs
+                VERBATIM)
+            add_custom_target(robotkit_pty_device DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device)
+            add_executable(robotkit_device_host_v5_pty_tests tests/device_host_v5_pty.cpp)
+            target_compile_features(robotkit_device_host_v5_pty_tests PRIVATE cxx_std_20)
+            target_link_libraries(robotkit_device_host_v5_pty_tests PRIVATE RobotKit::runtime)
+            add_dependencies(robotkit_device_host_v5_pty_tests robotkit_pty_device)
+            add_test(NAME robotkit_device_host_v5_pty COMMAND robotkit_device_host_v5_pty_tests
+                ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device)
+            set_tests_properties(robotkit_device_host_v5_pty PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
+        endif()
 
         add_executable(robotkit_serial_protocol_tests tests/serial_protocol.cpp)
         target_compile_features(robotkit_serial_protocol_tests PRIVATE cxx_std_20)

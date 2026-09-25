@@ -6,7 +6,10 @@ The fixed payload records come from `robotkit/schema/device_wire.wire.idl`.
 The hardware-independent Rust `robotkit-device-protocol` crate implements the
 device parser, session and watchdog state, and outgoing ACK/STATE encoding.
 The POSIX `HostLink` implements v5 negotiation, commands, and state sampling
-beside the v4 endpoint; its PTY test exercises a complete exchange.
+beside the v4 endpoint. Its PTY test runs the Rust device core in a separate
+process against the C++ host, covering session negotiation, commands, a
+simulated watchdog expiry, restart, and model rejection. It uses a virtual
+serial port; physical UART timing and MCU integration remain untested.
 
 ## Frame
 
