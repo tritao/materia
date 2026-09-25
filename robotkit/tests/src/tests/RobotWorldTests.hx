@@ -806,6 +806,41 @@ class RobotWorldTests {
     check(forwardProjection.distanceAlongPath >= 1.2 &&
       Math.abs(forwardProjection.crossTrackError - 0.8) < 1e-9,
       "Path projection stays monotonic and signs cross-track relative to the active segment");
+    var loopPath = new Path([
+      new Pose2(0.0, 0.0), new Pose2(1.0, 0.0), new Pose2(1.0, 1.0),
+      new Pose2(0.0, 1.0), new Pose2(0.0, 0.05)
+    ], "map");
+    var nearLoopStart = new Pose2(0.0, 0.04, 0.0);
+    var globalLoopProjection = loopPath.project(nearLoopStart, 0.0);
+    check(globalLoopProjection.distanceAlongPath > 3.9,
+      "unbounded path projection exposes a close future branch at a loop");
+    var boundedLoopProjection = loopPath.project(nearLoopStart, 0.0, 0.2);
+    check(boundedLoopProjection.distanceAlongPath <= 0.2 &&
+      boundedLoopProjection.segmentIndex == 0,
+      "bounded path projection stays on the nearby current branch");
+    throws(function() loopPath.project(nearLoopStart, 0.5, 0.4),
+      "bounded path projection rejects an upper bound before its minimum");
+
+    var loopRobot = new FakeRobot("nav-loop");
+    loopRobot.positions = [0.0, 0.0];
+    var loopBase = new MobileBase(loopRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var loopLocalization = new WheelOdometryLocalization(loopBase);
+    loopLocalization.reset(nearLoopStart);
+    var loopNavigation = new Navigation(loopBase, loopLocalization);
+    var loopGoal = new NavigationGoal(loopPath.goal(), "map", 0.001, 0.1);
+    loopNavigation.follow(loopPath, loopGoal);
+    loopNavigation.updateObservation(new RobotSnapshot("nav-loop", Int64.ofInt(1),
+      Int64.ofInt(1), [0.0, 0.0], [], [], 1, 0, Int64.ofInt(2), [],
+      "loop-clock", "host"), 0.1);
+    check(loopNavigation.progressDistance <= 0.05,
+      "Navigation does not jump to a later loop branch from a small localization offset");
+    var resumedNavigation = new Navigation(loopBase, loopLocalization);
+    resumedNavigation.follow(loopPath, loopGoal, null, 2.0);
+    equal(resumedNavigation.progressDistance, 2.0,
+      "Navigation accepts an explicit path distance when resuming mid-route");
+    throws(function() resumedNavigation.follow(loopPath, loopGoal, null,
+      loopPath.length + 0.1), "Navigation rejects a resume distance outside its path");
 
     var robot = new FakeRobot("nav-base");
     robot.positions = [0.0, 0.0];
@@ -872,9 +907,12 @@ class RobotWorldTests {
       0.2, 0.5, 1.0);
     var straightGoal = new NavigationGoal(new Pose2(1.0, 0.0, 0.0), "odom", 0.01, 0.1);
     overshootNavigation.follow(new Path([new Pose2(), straightGoal.pose], "odom"), straightGoal);
+    overshootNavigation.updateObservation(new RobotSnapshot("nav-overshoot",
+      Int64.ofInt(2), Int64.ofInt(20), [0.0, 0.0], [], [], 1, 0,
+      Int64.ofInt(21), [], "overshoot-clock", "host"), 0.1);
     var overshootStatus = overshootNavigation.updateObservation(new RobotSnapshot(
-      "nav-overshoot", Int64.ofInt(2), Int64.ofInt(20), [12.0, 12.0], [], [],
-      1, 0, Int64.ofInt(21), [], "overshoot-clock", "host"), 0.1);
+      "nav-overshoot", Int64.ofInt(3), Int64.ofInt(30), [12.0, 12.0], [], [],
+      1, 0, Int64.ofInt(31), [], "overshoot-clock", "host"), 0.1);
     check(switch overshootStatus { case Following: true; case _: false; } &&
       switch overshootRobot.lastCommand {
         case JointTargets(targets, _): targets.length == 2 &&

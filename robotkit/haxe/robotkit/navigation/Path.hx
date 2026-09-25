@@ -78,12 +78,23 @@ class Path {
     return goal();
   }
 
-  /** Projects a pose onto the not-yet-traversed path. Progress never moves backwards. */
-  public function project(pose:Pose2, minimumDistance:Float):PathProjection {
-    if (pose == null || !Math.isFinite(minimumDistance))
+  /**
+   * Projects onto a bounded, not-yet-traversed portion of the path. Progress
+   * never moves backwards; callers can also cap forward progress to avoid
+   * jumping onto a later branch at a crossing or loop.
+   */
+  public function project(pose:Pose2, minimumDistance:Float,
+      ?maximumDistance:Float):PathProjection {
+    if (pose == null || !Math.isFinite(minimumDistance) ||
+        (maximumDistance != null && !Math.isFinite(maximumDistance)))
       throw "Path projection requires a pose and finite progress";
     var minimum = minimumDistance < 0.0 ? 0.0 : minimumDistance;
     if (minimum > length) minimum = length;
+    var maximum = maximumDistance == null ? length : cast maximumDistance;
+    if (maximum < 0.0) maximum = 0.0;
+    if (maximum > length) maximum = length;
+    if (maximum < minimum)
+      throw "Path projection maximum progress must not precede its minimum";
     var bestDistance = 1.0e300;
     var bestProgress = minimum;
     var bestSegment = -1;
@@ -94,7 +105,8 @@ class Path {
       var startDistance = distances[index];
       var endDistance = distances[index + 1];
       var segmentLength = endDistance - startDistance;
-      if (segmentLength <= 1e-9 || endDistance < minimum) continue;
+      if (segmentLength <= 1e-9 || endDistance < minimum || startDistance > maximum)
+        continue;
       var from = waypoints[index];
       var to = waypoints[index + 1];
       var dx = to.x - from.x;
@@ -102,8 +114,9 @@ class Path {
       var alpha = ((pose.x - from.x) * dx + (pose.y - from.y) * dy) /
         (segmentLength * segmentLength);
       var minimumAlpha = Math.max(0.0, (minimum - startDistance) / segmentLength);
+      var maximumAlpha = Math.min(1.0, (maximum - startDistance) / segmentLength);
       if (alpha < minimumAlpha) alpha = minimumAlpha;
-      if (alpha > 1.0) alpha = 1.0;
+      if (alpha > maximumAlpha) alpha = maximumAlpha;
       var candidate = startDistance + alpha * segmentLength;
       var px = from.x + alpha * dx;
       var py = from.y + alpha * dy;

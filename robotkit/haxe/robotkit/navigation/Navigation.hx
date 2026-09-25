@@ -28,6 +28,7 @@ class Navigation {
   var currentPath:Null<Path> = null;
   var currentSpeedLimits:Array<PathSpeedLimit> = [];
   var currentTrajectory:Null<Trajectory> = null;
+  var lastProjectionPose:Null<Pose2> = null;
   var currentGoal:Null<NavigationGoal> = null;
   var commandedLinearSpeed:Float = 0.0;
   var trajectoryElapsedSeconds:Float = 0.0;
@@ -53,10 +54,16 @@ class Navigation {
     this.allowReverse = allowReverse;
   }
 
-  /** Starts following a framed polyline; the final waypoint supplies the default goal. */
+  /**
+   * Starts following a framed polyline; the final waypoint supplies the
+   * default goal. Use startDistance to resume on a path after its first pose.
+   */
   public function follow(path:Path, ?goal:NavigationGoal,
-      ?speedLimits:Array<PathSpeedLimit>):Void {
+      ?speedLimits:Array<PathSpeedLimit>, ?startDistance:Float):Void {
     if (path == null) throw "Navigation.follow requires a path";
+    if (startDistance != null && (!Math.isFinite(startDistance) ||
+        startDistance < 0.0 || startDistance > path.length))
+      throw "Navigation start distance must be finite and lie on the path";
     var target = goal == null
       ? new NavigationGoal(path.goal(), path.frameId)
       : goal;
@@ -71,11 +78,27 @@ class Navigation {
         throw "Navigation path speed limits must be ordered and fit within the path";
       previousEnd = limit.endDistanceMeters;
     }
+    var initialProgress = startDistance == null ? 0.0 : cast startDistance;
+    var initialEstimate:Null<LocalizationState> = localization.state();
+    if (startDistance == null && initialEstimate != null &&
+        initialEstimate.referenceFrame == path.frameId) {
+      var start = path.start();
+      var offsetX = initialEstimate.pose.x - start.x;
+      var offsetY = initialEstimate.pose.y - start.y;
+      var distanceFromStart = Math.pow(offsetX * offsetX + offsetY * offsetY, 0.5);
+      if (distanceFromStart > lookaheadDistance)
+        initialProgress = path.project(initialEstimate.pose, 0.0).distanceAlongPath;
+    }
     currentPath = path;
     currentSpeedLimits = configuredSpeedLimits;
     currentTrajectory = null;
     currentGoal = target;
-    progressDistance = 0.0;
+    progressDistance = initialProgress;
+    lastProjectionPose = initialEstimate == null ||
+      initialEstimate.referenceFrame != path.frameId
+      ? null
+      : new Pose2(initialEstimate.pose.x, initialEstimate.pose.y,
+        initialEstimate.pose.yaw);
     crossTrackError = 0.0;
     commandedLinearSpeed = 0.0;
     status = Following;
@@ -94,6 +117,7 @@ class Navigation {
     currentSpeedLimits = [];
     currentTrajectory = trajectory;
     currentGoal = target;
+    lastProjectionPose = null;
     trajectoryElapsedSeconds = 0.0;
     progressDistance = 0.0;
     crossTrackError = 0.0;
@@ -166,7 +190,24 @@ class Navigation {
     }
 
     var path:Path = cast currentPath;
-    var projection = path.project(state.pose, progressDistance);
+    if (lastProjectionPose == null && progressDistance == 0.0) {
+      var start = path.start();
+      var startX = state.pose.x - start.x;
+      var startY = state.pose.y - start.y;
+      if (Math.pow(startX * startX + startY * startY, 0.5) > lookaheadDistance)
+        progressDistance = path.project(state.pose, 0.0).distanceAlongPath;
+    }
+    var maxProgressAdvance = 0.05;
+    if (lastProjectionPose != null) {
+      var previousPose:Pose2 = cast lastProjectionPose;
+      var movedX = state.pose.x - previousPose.x;
+      var movedY = state.pose.y - previousPose.y;
+      var observedTravel = Math.pow(movedX * movedX + movedY * movedY, 0.5);
+      maxProgressAdvance = Math.max(maxProgressAdvance, observedTravel * 1.5 + 0.02);
+    }
+    var maximumProgress = Math.min(path.length, progressDistance + maxProgressAdvance);
+    var projection = path.project(state.pose, progressDistance, maximumProgress);
+    lastProjectionPose = new Pose2(state.pose.x, state.pose.y, state.pose.yaw);
     progressDistance = projection.distanceAlongPath;
     crossTrackError = projection.crossTrackError;
     var lookahead = Math.max(lookaheadDistance,
@@ -230,6 +271,7 @@ class Navigation {
     currentSpeedLimits = [];
     currentTrajectory = null;
     currentGoal = null;
+    lastProjectionPose = null;
     progressDistance = 0.0;
     crossTrackError = 0.0;
     commandedLinearSpeed = 0.0;
