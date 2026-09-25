@@ -372,8 +372,13 @@ class AutomationTests {
       var mission = new Mission("sim-mission", "Simulated station transfer", [task]);
       var assignment:FleetAssignment = cast dispatcher.dispatch(mission);
       var liveFactory = new MobileTransportSkillFactory(model);
+      var trafficRobot = new AutomationFakeRobot("traffic-owner", model);
+      world.attach(trafficRobot);
+      fleet.addRobot(trafficRobot.id());
       var traffic = new TrafficManager(facility, fleet);
-      traffic.blockLane("main-lane", "temporary test closure");
+      var route = new FacilityRouter(facility).route(origin.id, destination.id);
+      check(traffic.reserveRoute(route, trafficRobot.id()),
+        "another fleet robot can hold a transport route before mission execution");
       var executor = new MissionExecutor(fleet, assignment, facility, liveFactory, traffic);
       executor.start();
       var waitingNavigation:Navigation = cast liveFactory.lastNavigation;
@@ -383,9 +388,10 @@ class AutomationTests {
       } && switch waitingNavigation.status {
         case robotkit.navigation.NavigationStatus.Idle: true;
         case _: false;
-      } && traffic.owner("main-lane") == null,
-        "mission waits for a blocked lane before starting its transport skill");
-      traffic.unblockLane("main-lane");
+      } && traffic.owner("main-lane") == trafficRobot.id() &&
+        traffic.waitingForLane("main-lane").indexOf(liveRobot.id()) >= 0,
+        "mission waits for an occupied route before starting its transport skill");
+      traffic.releaseRoute(route, trafficRobot.id());
       var acquiredStatus = executor.update(0.01);
       check(switch acquiredStatus {
         case MissionExecutionStatus.Running: true;
@@ -411,6 +417,24 @@ class AutomationTests {
         "simulated skill completion closes the assigned mission");
       equal(traffic.owner("main-lane"), null,
         "mission completion releases its route reservation");
+
+      check(traffic.reserveRoute(route, trafficRobot.id()),
+        "another robot can reserve the route for a pending-mission cancellation check");
+      var cancelledMission = new Mission("cancelled-transport",
+        "Cancel a queued transport", [task]);
+      var cancelledAssignment:FleetAssignment = cast dispatcher.dispatch(cancelledMission);
+      var cancelledFactory = new MobileTransportSkillFactory(model);
+      var cancelledExecutor = new MissionExecutor(fleet, cancelledAssignment,
+        facility, cancelledFactory, traffic);
+      cancelledExecutor.start();
+      check(traffic.waitingForLane("main-lane").indexOf(liveRobot.id()) >= 0,
+        "queued transport records its robot in the route waiter list");
+      cancelledExecutor.cancel();
+      check(traffic.waitingForLane("main-lane").length == 0 &&
+        traffic.owner("main-lane") == trafficRobot.id() &&
+        switch cancelledMission.status { case MissionStatus.Cancelled: true; case _: false; },
+        "cancelling a queued mission removes its waiter and preserves the route owner");
+      traffic.releaseRoute(route, trafficRobot.id());
       var liveNavigation:Navigation = cast liveFactory.lastNavigation;
       var liveEstimateValue:LocalizationState = cast liveNavigation.localization.state();
       check(Math.abs(liveEstimateValue.pose.x - destination.pose.x) <= 0.02,
