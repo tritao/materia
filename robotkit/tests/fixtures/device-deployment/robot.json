@@ -1,0 +1,15 @@
+{
+  "name": "pty-forklift",
+  "layout": "layout.json",
+  "device": {
+    "path": "/dev/replace-with-pty",
+    "baud": 115200,
+    "fingerprint": "000102030405060708090a0b0c0d0e0f",
+    "target_error": 0.000001
+  },
+  "joints": [
+    {"id": "joint/left-wheel", "name": "left wheel joint", "type": "continuous", "limits": {"lower": -100, "upper": 100, "effort": 100}},
+    {"id": "joint/right-wheel", "name": "right wheel joint", "type": "continuous", "limits": {"lower": -100, "upper": 100, "effort": 100}},
+    {"id": "joint/lift", "name": "mast lift", "type": "prismatic", "limits": {"lower": 0, "upper": 1, "velocity": 2, "effort": 100}}
+  ]
+}

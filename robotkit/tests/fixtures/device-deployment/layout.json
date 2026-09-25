@@ -1,0 +1,7 @@
+{
+  "channels": [
+    {"index": 0, "joint": "joint/left-wheel", "direction": 1, "encoder_counts_per_rev": 4096},
+    {"index": 1, "joint": "joint/right-wheel", "direction": 1, "encoder_counts_per_rev": 4096},
+    {"index": 2, "joint": "joint/lift", "direction": 1, "encoder_counts_per_rev": 4096}
+  ]
+}

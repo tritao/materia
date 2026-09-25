@@ -2,6 +2,7 @@
 """Exercise RobotClient -> robotd -> RKD5 against the real Rust device core."""
 
 import fcntl
+import json
 import os
 from pathlib import Path
 import pty
@@ -18,9 +19,6 @@ ROBOTD = ROOT / "robotkit/robotd/haxeon.json"
 CLIENT = ROOT / "robotkit/tests/integration/haxeon.json"
 MANIFEST = ROOT / "robotkit/device_protocol/Cargo.toml"
 TARGET = ROOT / "robotkit/tests/build/device-pty-cargo"
-FINGERPRINT = "000102030405060708090a0b0c0d0e0f"
-
-
 def run(*args):
     result = subprocess.run(args, cwd=ROOT, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
@@ -62,6 +60,13 @@ def main():
     nonblocking(control_read)
     port = unused_port()
     with tempfile.TemporaryDirectory(prefix="robotkit-device-tcp-") as temp:
+        deployment_dir = Path(temp)
+        fixture_dir = ROOT / "robotkit/tests/fixtures/device-deployment"
+        (deployment_dir / "layout.json").write_bytes((fixture_dir / "layout.json").read_bytes())
+        deployment = json.loads((fixture_dir / "robot.json").read_text())
+        deployment["device"]["path"] = slave_path
+        deployment_path = deployment_dir / "robot.json"
+        deployment_path.write_text(json.dumps(deployment))
         device_log_path = Path(temp) / "device.log"
         server_log_path = Path(temp) / "robotd.log"
         client_log_path = Path(temp) / "client.log"
@@ -78,8 +83,8 @@ def main():
             try:
                 server = subprocess.Popen(
                     [str(HAXEON), "run", "--project", str(ROBOTD), "--", "--server",
-                     "--multi-joint", f"--serial={slave_path}", f"--port={port}",
-                     f"--fingerprint={FINGERPRINT}", "--target-error=0.000001"],
+                     f"--deployment={deployment_path}", f"--port={port}",
+                     "--listen=0.0.0.0"],
                     cwd=ROOT, stdout=server_log, stderr=subprocess.STDOUT,
                     start_new_session=True)
                 os.close(slave)

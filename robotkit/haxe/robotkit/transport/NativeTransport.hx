@@ -10,14 +10,16 @@ class NativeTransport {
   /** nk_transport_receive uses this transport-specific status when drained. */
   static inline final RECEIVE_WOULD_BLOCK:Int = -205;
 
-  public static function options(port:Int):TransportOptions {
+  public static function options(port:Int, ?host:String = "127.0.0.1"):TransportOptions {
     if (port <= 0 || port > 65535)
       throw "RobotKit TCP port is outside the valid range";
+    if (host == null || host.length == 0)
+      throw "RobotKit TCP host must not be empty";
     var value = new TransportOptions();
     value.set_struct_size(TransportOptions.size());
     value.set_kind(TransportKind.Tcp);
     value.set_flags(TransportFlags.NoDelay);
-    value.set_host("127.0.0.1");
+    value.set_host(host);
     value.set_port(port);
     value.set_timeout_ms(5000);
     value.set_backlog(8);
@@ -26,8 +28,8 @@ class NativeTransport {
     return value;
   }
 
-  public static function listen(port:Int):OwnedListenerHandle {
-    var result = NativeKit.nk_transport_listen(options(port));
+  public static function listen(port:Int, ?host:String = "127.0.0.1"):OwnedListenerHandle {
+    var result = NativeKit.nk_transport_listen(options(port, host));
     if (result.status != Result.Ok)
       throw 'RobotKit TCP listen failed: ${NativeKit.nk_last_error()}';
     return result.out_listener;

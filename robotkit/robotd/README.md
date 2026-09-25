@@ -6,7 +6,7 @@ runtime/control and endpoint adapters behind the versioned protocol exposed to
 editor clients.
 
 The executable builds a small Haxeon robot document into a bulk RobotKit
-runtime blueprint. By default it uses the SimKit-backed endpoint; `--serial`
+runtime blueprint. By default it uses the SimKit-backed endpoint; `--deployment`
 selects the POSIX serial endpoint while preserving the same runtime and
 NativeKit TCP process boundary. The server owns one deployed runtime, a unique
 session for each connection, one controller lease, and any number of read-only
@@ -27,11 +27,13 @@ Run the current skeleton with:
 # Start the authoritative robot process
 ../../haxeon/scripts/haxeon run --project haxeon.json -- --server
 
-# Host the compiled robot model through a serial device
+# Bind to a robot LAN interface when the network is isolated
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
-  --server --serial=/dev/serial/by-id/robot-controller \
-  --fingerprint=000102030405060708090a0b0c0d0e0f --target-error=0.000001 \
-  --baud=115200
+  --server --listen=192.168.10.20
+
+# Host a deployed robot through a serial device
+../../haxeon/scripts/haxeon run --project haxeon.json -- \
+  --server --deployment=/etc/robotkit/robot.json --listen=192.168.10.20
 
 # Optionally host a Haxeon behavior inside robotd
 ../../haxeon/scripts/haxeon run --project haxeon.json -- \
@@ -40,6 +42,21 @@ Run the current skeleton with:
 # Native-only runtime smoke test
 ../../haxeon/scripts/haxeon run --project haxeon.json -- --in-memory
 ```
+
+The TCP listener defaults to `127.0.0.1`. `--listen` accepts an explicit IPv4
+address, including `0.0.0.0` to bind all interfaces. The RobotKit TCP protocol
+does not authenticate clients; use an isolated robot network or SSH tunnel.
+
+Serial hosting requires a deployment JSON file. It names the robot and ordered
+joints, gives the UART path, baud, `f32` target error budget, and fingerprint,
+and points to a device layout JSON file. The layout lists channels in the same
+order as the model joints. `robotd` checks that order before opening the UART.
+See [`../tests/fixtures/device-deployment/robot.json`](../tests/fixtures/device-deployment/robot.json)
+for the PTY fixture. Its calibration and fingerprint are test values; a physical
+deployment needs measured values. Generate the deployed fingerprint from the
+exact layout bytes with `python3 ../tools/device_fingerprint.py layout.json
+--rust firmware_fingerprint.rs`, then put the printed hex value in `robot.json`
+and compile the Rust constant into the MCU firmware.
 
 The protocol and world TCP clients are integration tests rather than robotd
 runtime modes. Run them through `../tests/world-tcp.sh`.

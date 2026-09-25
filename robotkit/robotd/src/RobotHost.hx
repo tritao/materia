@@ -22,39 +22,33 @@ class RobotHost {
 
   public function run():Void {
     if (args.indexOf("--help") >= 0) {
-      Sys.println("Usage: robotd [--server [--once]] [--port=N] "
+      Sys.println("Usage: robotd [--server [--once]] [--port=N] [--listen=IPv4] "
         + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] "
-        + "[--serial=DEVICE --fingerprint=32_HEX --target-error=SI_VALUE "
-        + "[--baud=BAUD]] [--help]");
+        + "[--deployment=FILE] [--help]");
       return;
     }
     var port = parsePort();
+    var listenAddress = parseListenAddress();
     var robotId = parseRobotId();
-    var serialPath = parseSerialPath();
-    var baud = parseBaud();
-    var fingerprint = optionValue("--fingerprint=");
-    var targetErrorText = optionValue("--target-error=");
-    if (serialPath != null) {
-      if (fingerprint == null || !~/^[0-9a-fA-F]{32}$/.match(fingerprint) ||
-          fingerprint.toLowerCase() == "00000000000000000000000000000000")
-        throw "robotd: --serial requires a nonzero 32-digit --fingerprint";
-      if (targetErrorText == null)
-        throw "robotd: --serial requires --target-error in SI units";
-    } else if (fingerprint != null || targetErrorText != null) {
-      throw "robotd: --fingerprint and --target-error require --serial";
-    }
-    var targetError = targetErrorText == null ? 0.0 : Std.parseFloat(targetErrorText);
-    if (!Math.isFinite(targetError) || targetError < 0.0)
-      throw "robotd: --target-error must be finite and nonnegative";
-    var hasBaud = false;
-    for (arg in args) if (arg.indexOf("--baud=") == 0) hasBaud = true;
-    if (serialPath == null && hasBaud)
-      throw "robotd: --baud requires --serial";
-    if (serialPath != null && args.indexOf("--in-memory") >= 0)
-      throw "robotd: --serial cannot be combined with --in-memory";
+    var deploymentPath = optionValue("--deployment=");
+    var deployment = deploymentPath == null ? null : new RobotDeployment(deploymentPath);
+    var serialPath = deployment == null ? null : deployment.serialPath;
+    var baud = deployment == null ? 115200 : deployment.baud;
+    var fingerprint = deployment == null ? null : deployment.fingerprint;
+    var targetError = deployment == null ? 0.0 : deployment.targetError;
+    if (optionValue("--serial=") != null || optionValue("--fingerprint=") != null ||
+        optionValue("--target-error=") != null || optionValue("--baud=") != null)
+      throw "robotd: serial settings belong in --deployment";
+    if (deployment != null && args.indexOf("--multi-joint") >= 0)
+      throw "robotd: --deployment cannot be combined with --multi-joint";
+    if (deployment != null && args.indexOf("--server") < 0)
+      throw "robotd: --deployment requires --server";
+    if (deployment != null && args.indexOf("--in-memory") >= 0)
+      throw "robotd: --deployment cannot be combined with --in-memory";
     var behavior = parseBehavior();
     var multiJoint = args.indexOf("--multi-joint") >= 0;
-    var robot = new RobotModel(multiJoint ? "demo-forklift" : "demo-arm");
+    var robot = deployment == null ? new RobotModel(multiJoint ? "demo-forklift" : "demo-arm") : deployment.robot;
+    if (deployment == null) {
     var base = robot.addLink(new Link("base"));
     if (multiJoint) {
       var leftWheel = robot.addLink(new Link("left wheel", "link/left-wheel"));
@@ -94,6 +88,7 @@ class RobotHost {
       var sensor = robot.addSensor(new robotkit.model.Sensor(kind, kind, 0, 'demo/$kind'));
       sensor.frame = mount;
     }
+    }
     var blueprint = RobotRuntimeCompiler.compile(robot);
     if (args.indexOf("--server") >= 0) {
       var serverSimulation:Null<Simulation> = null;
@@ -109,7 +104,7 @@ class RobotHost {
         if (serverRuntime == null) throw "robotd: failed to create runtime";
         var hostedRuntime:RobotRuntime = serverRuntime;
         var server = new RobotServer(robot, blueprint, hostedRuntime, serverSimulation,
-          port, robotId, behavior);
+          port, robotId, behavior, listenAddress);
         server.run(args.indexOf("--once") >= 0);
       } catch (error:Dynamic) {
         if (serverSimulation != null) serverSimulation.dispose();
@@ -156,6 +151,21 @@ class RobotHost {
     return 17890;
   }
 
+  function parseListenAddress():String {
+    var value = optionValue("--listen=");
+    if (value == null) return "127.0.0.1";
+    var parts = value.split(".");
+    if (parts.length != 4) throw "robotd: --listen requires an IPv4 address";
+    for (part in parts) {
+      if (part.length == 0 || part.length > 3 || !~/^[0-9]+$/.match(part))
+        throw "robotd: --listen requires an IPv4 address";
+      var octet = Std.parseInt(part);
+      if (octet == null || octet > 255)
+        throw "robotd: --listen requires an IPv4 address";
+    }
+    return value;
+  }
+
   function parseRobotId():Int {
     for (arg in args) {
       if (arg.indexOf("--robot-id=") == 0) {
@@ -167,30 +177,9 @@ class RobotHost {
     return 1;
   }
 
-  function parseSerialPath():Null<String> {
-    for (arg in args) {
-      if (arg.indexOf("--serial=") != 0) continue;
-      var value = StringTools.trim(arg.substr(9));
-      if (value.length == 0) throw "robotd: --serial requires a device path";
-      return value;
-    }
-    return null;
-  }
-
   function optionValue(prefix:String):Null<String> {
     for (arg in args) if (arg.indexOf(prefix) == 0) return StringTools.trim(arg.substr(prefix.length));
     return null;
-  }
-
-  function parseBaud():Int {
-    for (arg in args) {
-      if (arg.indexOf("--baud=") != 0) continue;
-      var value = Std.parseInt(arg.substr(7));
-      if (value == null || [115200, 230400, 460800, 921600].indexOf(value) < 0)
-        throw "robotd: --baud supports 115200, 230400, 460800, or 921600";
-      return value;
-    }
-    return 115200;
   }
 
   function parseBehavior():Null < RobotBehavior > {

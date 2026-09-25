@@ -50,6 +50,7 @@ class RobotServer {
   final nativeRuntime:NativeKitRuntime;
   final listener:OwnedListenerHandle;
   final port:Int;
+  final listenAddress:String;
   final robotId:Int;
   final subscription:NativeKitEventSubscription;
   final behaviorRunner:Null<RobotBehaviorRunner>;
@@ -76,12 +77,14 @@ class RobotServer {
   var disposed:Bool = false;
 
   public function new(robot:RobotModel, blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
-      simulation:Null<Simulation>, port:Int, robotId:Int, ?behavior:RobotBehavior) {
+      simulation:Null<Simulation>, port:Int, robotId:Int, ?behavior:RobotBehavior,
+      ?listenAddress:String = "127.0.0.1") {
     this.robot = robot;
     this.blueprint = blueprint;
     this.runtime = runtime;
     this.simulation = simulation;
     this.port = port;
+    this.listenAddress = listenAddress;
     this.robotId = robotId;
     behaviorRunner = behavior == null ? null : new RobotBehaviorRunner(behavior);
     if (behaviorRunner != null) controlOwner = LocalBehavior;
@@ -89,7 +92,7 @@ class RobotServer {
     try {
       if (simulation != null) simulation.start();
       else runtime.start();
-      listener = NativeTransport.listen(port);
+      listener = NativeTransport.listen(port, listenAddress);
       stream = new RobotFrameStream();
       subscription = nativeRuntime.events.listen(onEvent);
     } catch (error:Dynamic) {
@@ -104,7 +107,7 @@ class RobotServer {
 
   public function run(?once:Bool = false):Void {
     onceMode = once;
-    Sys.println('robotd: listening on 127.0.0.1:$port');
+    Sys.println('robotd: listening on $listenAddress:$port');
     try {
       var stopped = false;
       while (!stopped) {
