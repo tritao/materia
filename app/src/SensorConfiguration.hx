@@ -429,9 +429,9 @@ class SensorConfiguration {
     var field = Reflect.field(value, name); if (!Std.isOfType(field, String) || StringTools.trim(field).length == 0) throw 'Invalid sensor document field $name'; return cast field;
   }
   static function optionalString(value:Dynamic, name:String):Null<String> {
-    var field:Dynamic = Reflect.field(value, name);
+    var field = Reflect.field(value, name);
     if (field == null) return null;
-    if (!Std.isOfType(field, String) || SceneCodec.containsNul(cast field))
+    if (!Std.isOfType(field, String) || StringTools.trim(field).length == 0 || SceneCodec.containsNul(cast field))
       throw 'Invalid sensor document field $name';
     return cast field;
   }
@@ -450,13 +450,6 @@ class SensorConfiguration {
     var result:Float = cast field;
     if (!Math.isFinite(result)) throw 'Non-finite sensor document field $name';
     return result;
-  }
-  static function optionalString(value:Dynamic, name:String):Null<String> {
-    var field = Reflect.field(value, name);
-    if (field == null) return null;
-    if (!Std.isOfType(field, String) || StringTools.trim(field).length == 0)
-      throw 'Invalid sensor document field $name';
-    return cast field;
   }
   static function vector(value:Dynamic, name:String, count:Int):Array<Float> {
     var items = requiredArray(value, name); if (items.length != count) throw 'Invalid sensor document vector $name';
