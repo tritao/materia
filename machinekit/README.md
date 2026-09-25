@@ -22,10 +22,19 @@ Each component also produces the machining it needs:
 | `DeepGrooveBearing` | 625–6205, ISO 15 boundary dimensions | `housingSeat()`, `journalDiameter()` |
 | `SocketHeadCapScrew` | M3–M12, ISO 4762 heads | `clearanceHole()` (ISO 273), `tapHole()`, `counterboreHole()` (DIN 974-1) |
 | `NemaStepper` | NEMA 17, 23, 34 | `mountingCutout()`, `mountScrew()`, `boltPattern()` |
+| `ParallelKey` | DIN 6885-1 form A, by shaft diameter | — |
+| `SteppedShaft` | — (built from arbitrary sections) | keyway and retaining-ring groove cuts, `diameterAt()` |
+
+`SteppedShaft` stacks coaxial cylindrical sections along +Z, producing square
+shoulders at each diameter change. Keyways are cut on the shaft's local +Y
+side, so a `ParallelKey` mated through the keyway's connector with a fixed
+joint sits flush in the slot; retaining-ring grooves are plain cutting tools
+with no connector of their own.
 
 `examples/MotorShaftBearings.hx` mounts a NEMA 17 motor on a plate with four
 M3 screws and carries an output shaft on two 608 bearings through a continuous
-coupling joint. It also produces the aggregated BOM.
+coupling joint. The shaft steps down past the outboard bearing to carry a
+retaining-ring groove and an output key. It also produces the aggregated BOM.
 
 Run the smoke tests after building CadKit's native library:
 

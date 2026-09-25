@@ -5,7 +5,9 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.SteppedShaft;
 import machinekit.standard.DeepGrooveBearing;
+import machinekit.standard.ParallelKey;
 import machinekit.standard.SocketHeadCapScrew;
 
 /** Plate with a NEMA pilot and bolt cutout. Its back face (z=0) mates to the motor face. */
@@ -30,37 +32,21 @@ class MotorPlate extends MachineComponent {
 	}
 }
 
-/** Plain round shaft along +Z with named bearing seats; a stepped shaft generator comes later. */
-class PlainShaft extends MachineComponent {
-	public final diameter:Float;
-	public final length:Float;
-
-	public function new(diameter:Float, length:Float, seats:Array<{name:String, z:Float}>) {
-		super('SHAFT-D${diameter}-L${length}', 'Shaft ${diameter} x ${length}', "steel C45");
-		this.diameter = diameter;
-		this.length = length;
-		addConnector("input", Axis, Solids.axial(0, 0, 0));
-		addConnector("output", Shaft, Solids.axial(0, 0, length));
-		for (seat in seats) {
-			if (seat.z < 0 || seat.z > length) throw 'Seat "${seat.name}" lies outside the shaft';
-			addConnector(seat.name, Face, Solids.axial(0, 0, seat.z));
-		}
-	}
-
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.cylinder(diameter / 2, 0, length);
-}
-
-/** NEMA 17 motor on a plate, four M3 screws, and an output shaft carried by two 608 bearings. */
+/** NEMA 17 motor on a plate, four M3 screws, and an output shaft carried by two 608 bearings.
+ * The shaft steps down past the outboard bearing to carry a retaining-ring groove and an
+ * output key, exercising `SteppedShaft`'s keyway and groove machining.
+ */
 class MotorShaftBearings {
 	public static inline var PLATE_THICKNESS:Float = 6;
 	public static inline var SHAFT_LENGTH:Float = 60;
+	public static inline var COLLAR_LENGTH:Float = 51.5;
 
 	public final motor = NemaStepper.frame(17);
 	public final plate:MotorPlate;
 	public final screw:SocketHeadCapScrew;
 	public final bearing = DeepGrooveBearing.metric("608");
-	public final shaft:PlainShaft;
+	public final key = ParallelKey.forShaft(6, 6);
+	public final shaft:SteppedShaft;
 
 	public function new() {
 		plate = new MotorPlate(motor, PLATE_THICKNESS);
@@ -68,10 +54,12 @@ class MotorShaftBearings {
 		var engagement = motor.spec.mountHoleDepth - 0.5;
 		screw = motor.mountScrew(Math.ffloor(PLATE_THICKNESS + engagement));
 		if (screw.length - PLATE_THICKNESS < 1.3 * screw.diameter) throw "Mount screw engagement is too short";
-		shaft = new PlainShaft(bearing.bore, SHAFT_LENGTH, [
-			{name: "bearingA", z: 10},
-			{name: "bearingB", z: SHAFT_LENGTH - 10 - bearing.width},
-		]);
+		shaft = new SteppedShaft(
+			[{diameter: bearing.bore, length: COLLAR_LENGTH}, {diameter: 6, length: SHAFT_LENGTH - COLLAR_LENGTH}],
+			[{name: "bearingA", z: 10}, {name: "bearingB", z: SHAFT_LENGTH - 10 - bearing.width}],
+			[{name: "outputKey", z0: 52, key: key}],
+			[{z0: 50, width: 1.2, diameter: 7.4}]
+		);
 	}
 
 	public function assembly():AssemblyModel {
@@ -90,6 +78,8 @@ class MotorShaftBearings {
 			bearing.addTo(model, seat);
 			model.mate('$seat-seat', "fixed", "shaft", seat, seat, "front");
 		}
+		key.addTo(model, "key");
+		model.mate("key-seat", "fixed", "shaft", "outputKey", "key", "seat");
 		return model;
 	}
 
@@ -100,6 +90,7 @@ class MotorShaftBearings {
 		result.addComponent(screw, 4);
 		result.addComponent(shaft);
 		result.addComponent(bearing, 2);
+		result.addComponent(key);
 		return result;
 	}
 
@@ -107,7 +98,7 @@ class MotorShaftBearings {
 	public function components():Array<{id:String, component:MachineComponent}> {
 		var result:Array<{id:String, component:MachineComponent}> = [
 			{id: "motor", component: motor}, {id: "plate", component: plate}, {id: "shaft", component: shaft},
-			{id: "bearingA", component: bearing}, {id: "bearingB", component: bearing}];
+			{id: "bearingA", component: bearing}, {id: "bearingB", component: bearing}, {id: "key", component: key}];
 		for (i in 1...5) result.push({id: 'screw$i', component: screw});
 		return result;
 	}

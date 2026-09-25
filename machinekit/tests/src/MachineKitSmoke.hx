@@ -2,8 +2,10 @@ import cadkit.modeling.Part;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.SteppedShaft;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.DeepGrooveBearing;
+import machinekit.standard.ParallelKey;
 import machinekit.standard.SocketHeadCapScrew;
 import materia.project.AssemblyFrames;
 
@@ -139,6 +141,65 @@ class MachineKitSmoke {
 		cutout.close();
 	}
 
+	static function shafts():Void {
+		var key = ParallelKey.forShaft(6, 6);
+		check(key.designation == "DIN6885-2x2x6", "key designation");
+		check(key.spec.width == 2 && key.spec.height == 2, "key cross-section");
+		var keyPreview = key.geometry();
+		solid(keyPreview, "key preview");
+		near(keyPreview.volume(), 2 * 2 * 6, "key volume");
+		keyPreview.close();
+		throws(() -> ParallelKey.metric("9x9", 10), 'Unknown parallel key "9x9"');
+		throws(() -> ParallelKey.forShaft(100, 10), "No DIN 6885-1 key fits shaft diameter 100");
+
+		var shaft = new SteppedShaft(
+			[{diameter: 8, length: 51.5}, {diameter: 6, length: 8.5}],
+			[{name: "bearingA", z: 10}, {name: "bearingB", z: 43}],
+			[{name: "outputKey", z0: 52, key: key}],
+			[{z0: 50, width: 1.2, diameter: 7.4}]
+		);
+		near(shaft.totalLength, 60, "shaft total length");
+		near(shaft.diameterAt(0), 8, "shaft start diameter");
+		near(shaft.diameterAt(51.5), 6, "shaft boundary belongs to the next section");
+		near(shaft.diameterAt(60), 6, "shaft end diameter");
+		throws(() -> shaft.diameterAt(-1), "outside 0..60");
+		throws(() -> shaft.diameterAt(61), "outside 0..60");
+
+		var envelope = shaft.geometry(Envelope);
+		solid(envelope, "shaft envelope");
+		near(envelope.volume(), Math.PI * 16 * 51.5 + Math.PI * 9 * 8.5, "shaft envelope volume");
+		envelope.close();
+		var preview = shaft.geometry();
+		solid(preview, "shaft preview");
+		check(preview.volume() < Math.PI * 16 * 51.5 + Math.PI * 9 * 8.5, "preview removes keyway and groove material");
+		preview.close();
+
+		near(shaft.connector("input").frame.z, 0, "shaft input connector");
+		near(shaft.connector("output").frame.z, 60, "shaft output connector");
+		near(shaft.connector("bearingA").frame.z, 10, "shaft bearingA connector");
+		var seat = shaft.connector("outputKey").frame;
+		near(seat.z, 55, "keyway connector z");
+		near(seat.y, 3 - 1.2, "keyway connector floor");
+
+		throws(() -> new SteppedShaft([{diameter: -1, length: 10}]), "positive diameter and length");
+		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], [{name: "x", z: 20}]),
+			'Face "x" lies outside the shaft');
+		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], null,
+			[{name: "k", z0: 5, key: ParallelKey.forShaft(6, 8)}]), 'Keyway "k" lies outside the shaft');
+		throws(() -> new SteppedShaft(
+			[{diameter: 8, length: 10}, {diameter: 6, length: 10}], null,
+			[{name: "k", z0: 8, key: ParallelKey.forShaft(6, 4)}]), 'Keyway "k" must lie within one shaft section');
+		throws(() -> new SteppedShaft([{diameter: 2, length: 10}], null,
+			[{name: "k", z0: 0, key: ParallelKey.forShaft(6, 4)}]), 'Keyway "k" is deeper than the shaft radius');
+		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], null, null,
+			[{z0: 0, width: 20, diameter: 6}]), "Retaining ring groove lies outside the shaft");
+		throws(() -> new SteppedShaft(
+			[{diameter: 8, length: 10}, {diameter: 6, length: 10}], null, null,
+			[{z0: 8, width: 4, diameter: 5}]), "Retaining ring groove must lie within one shaft section");
+		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], null, null,
+			[{z0: 0, width: 2, diameter: 9}]), "Retaining ring groove diameter must be smaller than the shaft");
+	}
+
 	static function assembly():Void {
 		var example = new MotorShaftBearings();
 		check(example.screw.designation == "ISO4762-M3x10", "selected mount screw");
@@ -154,7 +215,7 @@ class MachineKitSmoke {
 
 		var model = example.assembly();
 		var definition = model.definition("motor-shaft-bearings");
-		check(definition.joints.length == 8, "assembly joint count");
+		check(definition.joints.length == 9, "assembly joint count");
 		var state = model.initialState("motor-shaft-bearings");
 		near(state.worldConnector("plate", "bolt2").z, 6, "plate top");
 		var head = state.worldConnector("screw2", "head");
@@ -177,11 +238,12 @@ class MachineKitSmoke {
 		near(state.worldConnector("screw2", "head").x, -15.5, "screws do not rotate");
 
 		var lines = example.bom().lines();
-		check(lines.length == 5, "BOM line count");
+		check(lines.length == 6, "BOM line count");
 		var bom = example.bom();
 		check(bom.quantity("ISO4762-M3x10") == 4, "screw quantity");
 		check(bom.quantity("608-2Z") == 2, "bearing quantity");
 		check(bom.quantity("NEMA17-48") == 1, "motor quantity");
+		check(bom.quantity("DIN6885-2x2x6") == 1, "key quantity");
 		var duplicate = new Bom();
 		duplicate.add({partNumber: "X", description: "a", quantity: 1, material: null});
 		throws(() -> duplicate.add({partNumber: "X", description: "b", quantity: 1, material: null}), "conflicting");
@@ -191,6 +253,7 @@ class MachineKitSmoke {
 		bearings();
 		screws();
 		motors();
+		shafts();
 		assembly();
 		trace("MachineKit smoke passed");
 	}
