@@ -17,6 +17,13 @@ struct HostState {
     std::array<device_wire::JointState, device_wire::MAX_JOINTS> joints{};
 };
 
+/** SI-unit target before conversion to the f32 device wire representation. */
+struct HostTarget {
+    std::uint16_t joint;
+    std::uint8_t mode;
+    double value;
+};
+
 /** POSIX v5 link used beside the active v4 SerialRobotEndpoint. */
 class RK_API HostLink final {
 public:
@@ -31,6 +38,8 @@ public:
 
     bool begin_session();
     bool send_command(std::uint8_t kind, std::span<const device_wire::JointTarget> targets = {});
+    /** Sends targets only if each f32 conversion fits the caller's SI-unit error budget. */
+    bool send_targets(std::span<const HostTarget> targets, double max_absolute_error);
     bool read_state(HostState &state);
     std::uint64_t session_id() const noexcept { return session_id_; }
     std::uint64_t last_sent_sequence() const noexcept { return last_sent_sequence_; }

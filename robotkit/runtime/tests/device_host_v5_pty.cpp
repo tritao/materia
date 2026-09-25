@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fcntl.h>
+#include <limits>
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -11,7 +12,6 @@
 #define CHECK(condition) do { if (!(condition)) { std::fprintf(stderr, "check failed at line %d: %s\n", __LINE__, #condition); std::abort(); } } while (false)
 
 namespace v5 = robotkit::v5;
-namespace wire = robotkit::device_wire;
 
 int main(int argc, char **argv) {
     CHECK(argc == 2);
@@ -44,8 +44,17 @@ int main(int argc, char **argv) {
         v5::HostState state{};
         CHECK(link->read_state(state));
         CHECK(state.header.safety == 0 && state.header.accepted_sequence == 1);
-        const std::array<wire::JointTarget, 1> targets{{{0, 2, 0, 1.5f}}};
-        CHECK(link->send_command(1, targets));
+        const std::array<v5::HostTarget, 1> lossy{{{0, 2, 1.1}}};
+        CHECK(!link->send_targets(lossy, 1e-9));
+        CHECK(!link->send_targets(lossy, -1.0));
+        const std::array<v5::HostTarget, 1> too_large{{{0, 2, std::numeric_limits<double>::max()}}};
+        CHECK(!link->send_targets(too_large, 1.0));
+        const std::array<v5::HostTarget, 1> not_finite{{{0, 2, std::numeric_limits<double>::quiet_NaN()}}};
+        CHECK(!link->send_targets(not_finite, 1.0));
+        const std::array<v5::HostTarget, 1> too_small{{{0, 2, std::numeric_limits<double>::denorm_min()}}};
+        CHECK(!link->send_targets(too_small, 1.0));
+        CHECK(link->last_sent_sequence() == 1);
+        CHECK(link->send_targets(lossy, 1e-6));
         CHECK(link->read_state(state));
         CHECK(state.header.accepted_sequence == 2 && state.joints[0].velocity == -2.0f);
         CHECK(::write(control[1], "W", 1) == 1);

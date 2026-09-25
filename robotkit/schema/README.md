@@ -18,7 +18,8 @@ followed by exactly `joint_count * JointState::SIZE` bytes. Counts are capped by
 `MAX_JOINTS`. Reserved bytes must be zero when transmitted and checked by the
 protocol decoder. The outer frame supplies the message type and payload size.
 
-The `f32` joint values are a proposed wire precision. Validate physical
-resolution and range before freezing the v5 protocol and schema lock. The
+The `f32` joint values are a proposed wire precision. The host's double-to-f32
+target path now requires an explicit absolute error budget; physical resolution
+and state range still need validation before freezing the v5 schema. The
 current v4 serial endpoint remains active until v5 conformance and safety
 tests pass.

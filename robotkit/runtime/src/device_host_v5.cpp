@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <random>
 
 #if defined(_WIN32)
@@ -211,6 +212,22 @@ bool HostLink::send_command(std::uint8_t kind, std::span<const device_wire::Join
     }
     last_sent_sequence_ = sequence;
     return true;
+}
+
+bool HostLink::send_targets(std::span<const HostTarget> targets, double max_absolute_error) {
+    if (targets.empty() || targets.size() > joint_count_ ||
+        !std::isfinite(max_absolute_error) || max_absolute_error < 0.0) return false;
+    std::array<device_wire::JointTarget, device_wire::MAX_JOINTS> wire_targets{};
+    for (std::size_t index = 0; index < targets.size(); ++index) {
+        const auto &target = targets[index];
+        if (!std::isfinite(target.value) ||
+            std::abs(target.value) > std::numeric_limits<float>::max()) return false;
+        const auto value = static_cast<float>(target.value);
+        if (!std::isfinite(value) || (target.value != 0.0 && value == 0.0f) ||
+            std::abs(static_cast<double>(value) - target.value) > max_absolute_error) return false;
+        wire_targets[index] = {target.joint, target.mode, 0, value};
+    }
+    return send_command(1, std::span(wire_targets).first(targets.size()));
 }
 
 bool HostLink::read_state(HostState &state) {

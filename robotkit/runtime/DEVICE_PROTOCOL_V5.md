@@ -92,5 +92,16 @@ command transmission and processing time, with explicit margin. Do not inherit
 v4's 9,600 baud support or its fixed 250 ms response constant by accident.
 
 The `f32` target/state values and 16-byte model fingerprint are draft choices.
-Validate physical resolution and define how the fingerprint is derived before
-freezing v5 for hardware use.
+At magnitudes of 1, 100, and 1,000 SI units, adjacent `f32` values are about
+1.19e-7, 7.63e-6, and 6.10e-5 units apart respectively. A rounded target can
+therefore differ by up to half that spacing. `HostLink::send_targets` accepts
+`double` values only when their actual conversion error stays within a caller
+supplied absolute SI-unit budget; nonfinite, overflowing, and nonzero values
+that round to zero are rejected. A deployed robot must set that budget from
+its encoder resolution, gearing, travel range, and control accuracy. Validate
+state precision over the same physical range before freezing the schema.
+
+The fingerprint must be derived from a deployed model/device layout artifact,
+including the ordered joint-to-channel map and safety-relevant calibration.
+RobotKit does not yet have that artifact, so tests use explicit fingerprints.
+Do not derive it from a mutable model name or process-local hash.

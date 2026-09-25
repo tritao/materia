@@ -18,7 +18,7 @@ impl Device for FakeDevice {
     fn stop_all(&mut self) { self.stops += 1; }
     fn apply_targets(&mut self, targets: &[JointTarget]) -> bool {
         assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0].value, 1.5);
+        assert_eq!(targets[0].value, 1.1f32);
         self.targets += 1;
         true
     }
