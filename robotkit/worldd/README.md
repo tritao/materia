@@ -2,9 +2,9 @@
 
 `WorldHost` is the headless composition point for RobotKit. It creates one
 `RobotWorld`, one shared `Simulation`, attaches remote and simulated robots,
-and exposes the resulting immutable snapshots. It deliberately adds no second
-world model or fleet abstraction; a future protocol server should wrap this
-composition rather than duplicate its ownership rules.
+and exposes the resulting immutable snapshots. It is a local simulation host,
+not a multi-robot protocol service, and adds no second world model or fleet
+abstraction.
 
 The package also has a small executable smoke host. It creates the same
 composition without introducing another runtime model:
@@ -15,6 +15,6 @@ composition without introducing another runtime model:
 
 Use `Simulation` for reset, robot teleport, and environment-object operations;
 use `RobotWorld` for adapter ownership, discovery, health, observation events,
-and transport-neutral commands/snapshots. A future Facility/Fleet/Mission
-layer may compose `RobotWorld`, but must not move those concepts into
-RobotKit.
+and transport-neutral commands/snapshots. The separate `materia.automation`
+package composes facility, fleet, task, and mission behavior over RobotKit;
+those operational concepts remain outside RobotKit.
