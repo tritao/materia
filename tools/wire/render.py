@@ -9,6 +9,8 @@ from typing import Any
 from .backends.cpp import cpp_header, codec_cpp, codec_header
 from .backends.haxe import haxe_files
 from .backends.markdown import docs
+from .backends.packed_cpp import render as packed_cpp
+from .backends.rust import render as packed_rust
 from .model import Schema
 from .validate import ValidationError, dump_normalized
 
@@ -42,6 +44,10 @@ def plan(schema: Schema, norm: dict[str, Any], config: dict[str, Any], root: Pat
         add(paths["cpp_types"], cpp_header(schema, norm, namespace=options["namespace"], aliases=options.get("aliases", {})))
         add(paths["cpp_codec_header"], codec_header(schema, namespace=options["namespace"], reader_namespace=options["reader_namespace"], generated_header=options["generated_header"]))
         add(paths["cpp_codec_source"], codec_cpp(schema, norm, namespace=options["namespace"], reader_namespace=options["reader_namespace"], codec_header_name=options["codec_header"], msgpack_header=options["msgpack_header"]))
+    if "packed_cpp" in config:
+        add(paths["packed_cpp"], packed_cpp(schema, norm, config["packed_cpp"]["namespace"]))
+    if "rust" in config:
+        add(paths["rust"], packed_rust(schema, norm))
     if "markdown" in config:
         options = config["markdown"]
         add(paths["markdown"], docs(schema, norm, title=options["title"], intro=options["intro"], codec_name=config.get("haxe", {}).get("codec_name", "wire codec")))
