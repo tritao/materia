@@ -872,7 +872,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if(ownership!=null){
         var sensorTarget=sensors.robotId+"/"+selected.id;
         var sensorProperties=["updateRate","noiseStddev","noiseSeed","mount.frameId","mount.position","mount.rotation"];
-        if(selected.kind=="lidar"){sensorProperties.push("rayCount");sensorProperties.push("maxRange");}
+        if(selected.kind=="lidar"){sensorProperties.push("rayCount");sensorProperties.push("maxRange");
+          sensorProperties.push("startAngleRadians");sensorProperties.push("fieldOfViewRadians");}
         content.push(new KeyedView("sensor-origin",textLines("script-sensor-origins",
           ["Value origins"].concat(ownership.propertyOrigins(sensorTarget,sensorProperties)))));
         var decreaseRate=new Button("Rate -1 Hz",null,function(){

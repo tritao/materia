@@ -1,6 +1,7 @@
 package robotkit.perception;
 
 import robotkit.mobile.Pose2;
+import robotkit.runtime.RobotRuntimeSensorBlueprint;
 import robotkit.world.SensorFrame;
 
 /** Groups adjacent planar LiDAR returns into circular obstacle observations. */
@@ -12,6 +13,17 @@ class LidarObstaclePerception implements Perception {
   public final maxClusterGapMeters:Float;
   public final startAngleRadians:Float;
   public final fieldOfViewRadians:Float;
+
+  /** Builds a scan processor from the LiDAR settings compiled from a robot model. */
+  public static function fromSensor(sensor:RobotRuntimeSensorBlueprint,
+      obstacleRadiusMeters:Float, ?minRangeMeters:Float = 0.05,
+      ?minConfidence:Float = 0.5, ?maxClusterGapMeters:Float = 0.1):LidarObstaclePerception {
+    if (sensor == null || sensor.kind != "lidar")
+      throw "LiDAR perception requires a compiled LiDAR sensor";
+    return new LidarObstaclePerception(sensor.maxRange, obstacleRadiusMeters,
+      minRangeMeters, minConfidence, maxClusterGapMeters,
+      sensor.startAngleRadians, sensor.fieldOfViewRadians);
+  }
 
   public function new(maxRangeMeters:Float, obstacleRadiusMeters:Float,
       ?minRangeMeters:Float = 0.05, ?minConfidence:Float = 0.5,

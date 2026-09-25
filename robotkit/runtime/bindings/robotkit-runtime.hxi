@@ -381,7 +381,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * realtime code is running and lets Simulation build several runtimes before
 	 * its first shared tick.
 	 */
-	struct rk_robot_runtime_blueprint @layout(197432, 8) {
+	struct rk_robot_runtime_blueprint @layout(197560, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -586,7 +586,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Compiled sensor slot. Semantic IDs live in the immutable host mapping.
 	 */
-	struct rk_sensor_config @layout(96, 8) {
+	struct rk_sensor_config @layout(112, 8) {
 		kind: u32 @offset(0);
 		link: rk_link_id @offset(4);
 		/**
@@ -617,6 +617,14 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * < Independent Gaussian noise, SI units. Zero disables it.
 		 */
 		noise_stddev: f64 @offset(88);
+		/**
+		 * < Bearing of the first LiDAR ray in the sensor frame.
+		 */
+		start_angle: f64 @offset(96);
+		/**
+		 * < LiDAR angular coverage in radians, (0, 2*pi].
+		 */
+		field_of_view: f64 @offset(104);
 	}
 	/**
 	 * Latest acquisition for one compiled sensor slot; zero sequence means absent.

@@ -9,6 +9,10 @@ class Sensor {
   public var frame:Null<Frame>;
   public var rayCount:Int = 8;
   public var maxRange:Float = 10.0;
+  /** Bearing of the first LiDAR ray in the sensor frame. */
+  public var startAngleRadians:Float = 0.0;
+  /** Angular coverage. The default is one full revolution. */
+  public var fieldOfViewRadians:Float = Math.PI * 2.0;
   public var noiseStddev:Float = 0.0;
   public var noiseSeed:Int = 1;
 

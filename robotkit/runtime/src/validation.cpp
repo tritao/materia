@@ -64,7 +64,10 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         for (double v : sensor.rotation) { if (!is_finite(v)) return RK_ERROR_INVALID_ARGUMENT; norm += v*v; }
         if (std::abs(norm - 1.0) > 1e-6) return RK_ERROR_INVALID_ARGUMENT;
         if (sensor.kind == RK_SENSOR_LIDAR && (!sensor.ray_count || sensor.ray_count > RK_MAX_SENSOR_VALUES ||
-            !is_finite(sensor.max_range) || sensor.max_range <= 0.0)) return RK_ERROR_INVALID_ARGUMENT;
+            !is_finite(sensor.max_range) || sensor.max_range <= 0.0 ||
+            !is_finite(sensor.start_angle) || !is_finite(sensor.field_of_view) ||
+            sensor.field_of_view < 0.0 || sensor.field_of_view > 6.283185307179586))
+            return RK_ERROR_INVALID_ARGUMENT;
     }
     for (uint32_t index = 0; index < blueprint->joint_count; ++index) {
         const auto &joint = blueprint->joints[index];

@@ -217,7 +217,8 @@ class SensorConfiguration {
     sensors: [for (sensor in value.sensors) {id:sensor.id, name:sensor.name, kind:sensor.kind,
       updateRate:sensor.updateRate, frameId:sensor.frame == null ? null : sensor.frame.id,
       rayCount:sensor.rayCount, maxRange:sensor.maxRange, noiseStddev:sensor.noiseStddev,
-      noiseSeed:sensor.noiseSeed}]
+      noiseSeed:sensor.noiseSeed, startAngleRadians:sensor.startAngleRadians,
+      fieldOfViewRadians:sensor.fieldOfViewRadians}]
   };
 
   static function mobileRecord(value:Null<RobotMobileConfiguration>):Dynamic {
@@ -402,6 +403,10 @@ class SensorConfiguration {
       }
       sensor.rayCount = requiredInteger(value, "rayCount"); sensor.maxRange = finite(value, "maxRange");
       sensor.noiseStddev = finite(value, "noiseStddev"); sensor.noiseSeed = requiredInteger(value, "noiseSeed");
+      var startAngle = optionalFinite(value, "startAngleRadians");
+      var fieldOfView = optionalFinite(value, "fieldOfViewRadians");
+      if (startAngle != null) sensor.startAngleRadians = startAngle;
+      if (fieldOfView != null) sensor.fieldOfViewRadians = fieldOfView;
       model.addSensor(sensor);
       var slash = id.lastIndexOf("/");
       var suffix = Std.parseInt(slash < 0 ? id : id.substr(slash + 1));
@@ -497,6 +502,10 @@ class SensorConfiguration {
         function(value)sensor.rayCount=value,1,64));
       result.push(number(sensor,"range","Maximum range",function()return sensor.maxRange,
         function(value)sensor.maxRange=value,0.000001,1000000.0,"m",0.1));
+      result.push(number(sensor,"start-angle","Start angle",function()return sensor.startAngleRadians,
+        function(value)sensor.startAngleRadians=value,-Math.PI * 2.0,Math.PI * 2.0,"rad",0.01));
+      result.push(number(sensor,"field-of-view","Field of view",function()return sensor.fieldOfViewRadians,
+        function(value)sensor.fieldOfViewRadians=value,0.000001,Math.PI * 2.0,"rad",0.01));
     }
     result.push(number(sensor,"noise","Noise σ",function()return sensor.noiseStddev,
       function(value)sensor.noiseStddev=value,0.0,1000000.0,null,0.001));

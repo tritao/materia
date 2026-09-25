@@ -388,6 +388,12 @@ class ScriptOwnership {
       case "maxRange":
         if (item.kind != "number") return false;
         if (overridesEnabled) sensor.maxRange = cast overrideValue(item);
+      case "startAngleRadians":
+        if (item.kind != "number") return false;
+        if (overridesEnabled) sensor.startAngleRadians = cast overrideValue(item);
+      case "fieldOfViewRadians":
+        if (item.kind != "number") return false;
+        if (overridesEnabled) sensor.fieldOfViewRadians = cast overrideValue(item);
       case "noiseStddev":
         if (item.kind != "number") return false;
         if (overridesEnabled) sensor.noiseStddev = cast overrideValue(item);
@@ -493,6 +499,11 @@ class ScriptOwnership {
         if (item.kind != "integer" || numeric < 1 || numeric > 64) throw "Invalid LiDAR ray count";
       case "maxRange" | "mass":
         if (numeric <= 0) throw "Override value must be positive";
+      case "fieldOfViewRadians":
+        if (numeric <= 0 || numeric > Math.PI * 2.0) throw "Invalid LiDAR field of view";
+      case "startAngleRadians":
+        // Any finite bearing is valid; it is interpreted in the sensor frame.
+        if (item.kind != "number") throw "LiDAR start angle must be numeric";
       case "noiseStddev" | "noiseSeed":
         if (numeric < 0) throw "Override value cannot be negative";
       case "position":

@@ -82,6 +82,12 @@ int main() {
     sensor.rotation[3] = 0.0;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
     sensor.rotation[3] = 1.0;
+    sensor.field_of_view = 6.283185307179586 + 0.01;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    sensor.field_of_view = 6.283185307179586;
+    sensor.start_angle = NAN;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    sensor.start_angle = 0.0;
     sensor.noise_stddev = -1.0;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
     sensor.noise_stddev = 0.0;

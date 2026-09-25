@@ -64,8 +64,9 @@ into the Perspective tab's GPU surface.
 
 The Sensors workspace tab edits RobotKit sensor definitions without exposing
 runtime or hardware handles. It supports adding/removing LiDAR and IMU sensors,
-selection, identity, update rate, LiDAR ray/range settings, deterministic noise,
-link selection, and explicit shared or independent frame mounts. Sensor changes
+selection, identity, update rate, LiDAR ray/range and angular coverage settings,
+deterministic noise, link selection, and explicit shared or independent frame
+mounts. Sensor changes
 participate in document undo/redo and are saved atomically with the scene.
 Apply/Rebuild validates and constructs a replacement RobotKit/SimKit runtime
 before retiring the current one; a failed rebuild leaves the running

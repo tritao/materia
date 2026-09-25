@@ -476,6 +476,9 @@ class SceneEditingTests {
     var mast = authored.model.addLink(new Link("Mast", "link/mast"));
     var carriage = authored.model.addLink(new Link("Carriage", "link/carriage"));
     var forksLink = authored.model.addLink(new Link("Forks", "link/forks"));
+    var configuredLidar:robotkit.model.Sensor = authored.selected();
+    configuredLidar.startAngleRadians = -Math.PI * 0.5;
+    configuredLidar.fieldOfViewRadians = Math.PI;
     function addJoint(id:String, name:String, type:JointType, child:Link,
         lower:Float, upper:Float):Void {
       var joint = new Joint(name, type, base, child, id);
@@ -499,6 +502,10 @@ class SceneEditingTests {
     check(reopenedMobile != null && reopenedForks != null &&
       reopenedAuthored.diagnostics().length == 0,
       "Materia robot records preserve and validate authored mechanism roles");
+    var reopenedLidar:robotkit.model.Sensor = reopenedAuthored.selected();
+    check(reopenedLidar.startAngleRadians == -Math.PI * 0.5 &&
+      reopenedLidar.fieldOfViewRadians == Math.PI,
+      "sensor records preserve LiDAR angular coverage");
     var mobileConfig:RobotMobileConfiguration = cast reopenedMobile;
     var forkConfig:RobotForkConfiguration = cast reopenedForks;
     check(switch mobileConfig.drive {

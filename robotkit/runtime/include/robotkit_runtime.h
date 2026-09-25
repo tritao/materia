@@ -78,7 +78,7 @@ enum {
     RK_MAX_SERIAL_JOINTS = 64, /**< Capacity of the current serial wire protocol. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 4 /**< Version of the RobotKit C data contract (physical model v2). */
+    RK_API_VERSION = 4 /**< Version of the RobotKit C data contract (physical model v2 and configured LiDAR coverage). */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -266,6 +266,8 @@ typedef struct rk_sensor_config {
     uint32_t noise_seed; /**< Deterministic per-sensor PRNG seed. */
     double max_range; /**< LiDAR maximum range in meters. */
     double noise_stddev; /**< Independent Gaussian noise, SI units. Zero disables it. */
+    double start_angle; /**< Bearing of the first LiDAR ray in the sensor frame. */
+    double field_of_view; /**< LiDAR angular coverage in radians; zero selects 2*pi. */
 } rk_sensor_config;
 
 /** Latest acquisition for one compiled sensor slot; zero sequence means absent. */

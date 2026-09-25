@@ -124,8 +124,13 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                 sensors::imu(rotation, base->angular_velocity, acceleration, simulation_.gravity_, sample.values);
             } else {
                 sample.value_count = config.ray_count;
+                const double field_of_view = config.field_of_view > 0.0
+                    ? config.field_of_view : 6.283185307179586;
+                const double angular_step = config.ray_count <= 1 ? 0.0
+                    : field_of_view / (field_of_view >= 6.283185307179586 - 1e-9
+                        ? config.ray_count : config.ray_count - 1);
                 for (uint32_t ray = 0; ray < config.ray_count; ++ray) {
-                    const double angle = ray * 6.283185307179586 / config.ray_count;
+                    const double angle = config.start_angle + ray * angular_step;
                     const double local[3] = {std::cos(angle), std::sin(angle), 0.0};
                     double direction[3];
                     sensors::rotate(rotation, local, direction);

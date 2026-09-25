@@ -81,7 +81,8 @@ class RobotRuntimeCompiler {
         frame == null ? link.id : frame.id, link.id, robot.links.indexOf(link),
         frame == null ? [0.0, 0.0, 0.0] : frame.position,
         frame == null ? [0.0, 0.0, 0.0, 1.0] : frame.rotation,
-        sensor.updateRate, sensor.rayCount, sensor.maxRange, sensor.noiseStddev, sensor.noiseSeed));
+        sensor.updateRate, sensor.rayCount, sensor.maxRange, sensor.noiseStddev, sensor.noiseSeed,
+        sensor.startAngleRadians, sensor.fieldOfViewRadians));
     }
     return result;
   }
@@ -301,8 +302,11 @@ class RobotRuntimeCompiler {
       if (!Math.isFinite(sensor.noiseStddev) || sensor.noiseStddev < 0.0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_NOISE", path, "invalid noise standard deviation"));
       if (sensor.kind == "lidar" && (sensor.rayCount < 1 || sensor.rayCount > RobotKitRuntimeConstants.RK_MAX_SENSOR_VALUES
-          || !Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0))
-        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_SCAN", path, "invalid LiDAR resolution or range"));
+          || !Math.isFinite(sensor.maxRange) || sensor.maxRange <= 0.0
+          || !Math.isFinite(sensor.startAngleRadians) || !Math.isFinite(sensor.fieldOfViewRadians)
+          || sensor.fieldOfViewRadians <= 0.0 || sensor.fieldOfViewRadians > Math.PI * 2.0 + 1e-6))
+        diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_SCAN", path,
+          "invalid LiDAR resolution, range, or angular coverage"));
       if (!Math.isFinite(sensor.updateRate) || sensor.updateRate < 0.0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_RATE", '$path.updateRate',
           "sensor update rate must be non-negative"));

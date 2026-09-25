@@ -306,17 +306,20 @@ The mount-point velocity includes `omega × offset`, so an offset rotating IMU
 measures tangential and centripetal acceleration rather than only link-origin
 acceleration. Mount orientation rotates both IMU vectors and LiDAR rays.
 The first sample after creation, reset, or teleport primes the derivative and
-does not publish IMU. LiDAR casts 1–64 planar rays counterclockwise from +X,
-with a configurable positive maximum range, against oriented boxes at their
+does not publish IMU. LiDAR casts 1–64 planar rays from the configured first
+bearing across its angular coverage in the sensor frame. A full revolution does
+not duplicate its endpoint; partial scans include both coverage boundaries. It
+uses a configurable positive maximum range against oriented boxes at their
 physics poses. It excludes all own links and includes other robots and
 environment objects. Mesh queries are not implemented. Defaults are 8 rays,
-10 m, every shared tick, and no noise. `updateRate` is Hz (zero = every tick),
+10 m, a full revolution starting at +X, every shared tick, and no noise.
+`updateRate` is Hz (zero = every tick),
 quantized to available physics ticks without interpolating invented samples.
 Each sensor has its own sequence and source/receive timestamps, held unchanged
 between acquisitions. Seeded Gaussian noise is optional per sensor; LiDAR
 clips noisy distances to `[0, maxRange]`. Reset restarts the schedule and PRNG.
 
-Native ABI version 3 carries up to 8 sensor configurations and bounded sample
+Native ABI version 4 carries up to 8 sensor configurations and bounded sample
 payloads of up to 64 values each; a zero sample sequence means no acquisition.
 Both `SimulatedRobot` and robotd project only valid measurements through the
 same immutable sensor frames; endpoints without those measurements do not

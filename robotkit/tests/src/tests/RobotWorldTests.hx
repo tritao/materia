@@ -1461,6 +1461,12 @@ class RobotWorldTests {
     noisy.noiseStddev = 0.01; noisy.noiseSeed = 42;
     var imu = model.addSensor(new robotkit.model.Sensor("imu", "imu", 0, "sensor/imu"));
     imu.frame = mount;
+    var partial = model.addSensor(new robotkit.model.Sensor("partial", "lidar", 0, "sensor/partial"));
+    partial.frame = mount;
+    partial.rayCount = 3;
+    partial.maxRange = 3.0;
+    partial.startAngleRadians = -Math.PI * 0.5;
+    partial.fieldOfViewRadians = Math.PI;
     var blueprint = RobotRuntimeCompiler.compile(model);
     mount.position[0] = 100.0;
     mount.name = "renamed";
@@ -1480,6 +1486,19 @@ class RobotWorldTests {
     equal(firstScan.values.length, 16, "configured resolution reaches native scanner");
     check(Math.abs(firstScan.values.get(0) - 1.75) < 0.000001, "mounted scanner rotates and translates rays");
     equal(firstScan.values.get(8), 3.0, "configured maximum range reaches native scanner");
+    // The IMU has no sample on the first tick because it needs a velocity
+    // derivative, so the partial scan is the third published frame here.
+    var partialScan = first.sensors.get(2);
+    equal(partialScan.values.length, 3, "partial field of view keeps configured ray count");
+    equal(partialScan.values.get(0), 3.0, "partial scan starts at configured bearing");
+    check(Math.abs(partialScan.values.get(1) - 1.75) < 0.000001,
+      "partial scan distributes rays across configured angular coverage");
+    equal(partialScan.values.get(2), 3.0, "partial scan includes its final bearing");
+    var perception = LidarObstaclePerception.fromSensor(blueprint.sensors[3], 0.1);
+    var observations = perception.observe([partialScan]);
+    equal(observations.obstacles().length, 1, "compiled LiDAR settings construct matching perception");
+    check(Math.abs(observations.obstacles()[0].detection.pose.x - 1.75) < 0.000001,
+      "perception ray angles match simulated scan angles");
     var noisyValue = first.sensors.get(1).values.get(0);
     check(noisyValue != firstScan.values.get(0), "configured noise changes measurement");
     simulation.step(Int64.ofInt(2));
@@ -1504,6 +1523,11 @@ class RobotWorldTests {
     noisy.updateRate = -1.0;
     var diagnostics = RobotRuntimeCompiler.validate(model);
     check(hasDiagnostic(diagnostics, "RK_SENSOR_SCAN"), "oversized scans rejected before native lowering");
+    scan.rayCount = 16;
+    partial.fieldOfViewRadians = Math.PI * 2.1;
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(model), "RK_SENSOR_SCAN"),
+      "LiDAR angular coverage beyond one revolution is rejected");
+    partial.fieldOfViewRadians = Math.PI;
     check(hasDiagnostic(diagnostics, "RK_FRAME_POSE"), "non-unit mount rotations rejected");
     check(hasDiagnostic(diagnostics, "RK_SENSOR_RATE"), "negative sample rates rejected");
   }

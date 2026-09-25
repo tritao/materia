@@ -62,8 +62,8 @@ IMU measures mounted sensor-frame angular velocity and specific force from
 physics body state; its first sample after reset/teleport primes the derivative.
 Frames define mount translation/orientation; IDs and mounts survive compilation,
 wire transport, and recording. Sensors configure Hz, LiDAR ray count (1–64),
-range, and deterministic seeded Gaussian noise. LiDAR queries box geometry and
-excludes own links. Runtime receipt
+range, first-ray bearing, angular coverage, and deterministic seeded Gaussian
+noise. LiDAR queries box geometry and excludes own links. Runtime receipt
 timestamps use the actual local monotonic clock, not the simulation tick hint.
 Absolute world-command deadlines are rejected until clock negotiation and
 runtime enforcement are available.
@@ -208,8 +208,9 @@ var forks = Forks.fromBlueprint(robot, blueprint);
 ```
 
 `robotkit.perception` provides timestamped `Detection`, `Obstacle`, `Pallet`,
-and `DockingTarget` values. `LidarObstaclePerception` turns finite in-range
-LiDAR returns into planar obstacle observations in the sensor frame.
+and `DockingTarget` values. `LidarObstaclePerception.fromSensor()` uses the
+compiled sensor's range and angular coverage to turn finite LiDAR returns into
+planar obstacle observations in the sensor frame.
 `robotkit.safety` exposes operator-facing phase, active restrictions, speed
 limit, and stopping envelope values; the native runtime continues to enforce
 hard safety. `LoadSafetyPolicy.refresh()` reduces `MobileBase` speed and

@@ -83,6 +83,8 @@ class ScriptedSetupTests {
     ownership.setOverride(sensorTarget, "noiseStddev", "number", 0.125);
     ownership.setOverride(sensorTarget, "rayCount", "integer", 17);
     ownership.setOverride(sensorTarget, "maxRange", "number", 8.5);
+    ownership.setOverride(sensorTarget, "startAngleRadians", "number", -1.2);
+    ownership.setOverride(sensorTarget, "fieldOfViewRadians", "number", 2.4);
     ownership.setOverride(sensorTarget, "mount.position", "vector", [0.6, 0.1, 0.2]);
     ownership.setOverride(sensorTarget, "mount.rotation", "vector", [0.0, 0.0, 0.0, 1.0]);
     ownership.setOverride("materia/robot", "position", "vector", [-2.0, 0.5, 0.0]);
@@ -98,7 +100,9 @@ class ScriptedSetupTests {
     var overriddenFrame:robotkit.model.Frame = cast overriddenLidar.frame;
     check(
       overriddenLidar.noiseStddev == 0.125 && overriddenLidar.rayCount == 17
-      && overriddenLidar.maxRange == 8.5 && overriddenFrame != null && overriddenFrame.position[0] == 0.6,
+      && overriddenLidar.maxRange == 8.5 && overriddenLidar.startAngleRadians == -1.2
+      && overriddenLidar.fieldOfViewRadians == 2.4
+      && overriddenFrame != null && overriddenFrame.position[0] == 0.6,
       "typed sensor and mount overrides materialize"
     );
     check(overridden.sensors.robotPosition("materia/robot")[0] == -2.0, "stable robot pose override materializes");
