@@ -100,6 +100,9 @@ std::vector<std::uint8_t> state_frame(std::uint64_t timestamp_ns, std::uint32_t 
 } // namespace
 
 int main() {
+    constexpr std::uint8_t crc_test_vector[] = "123456789";
+    assert(crc32(crc_test_vector, sizeof(crc_test_vector) - 1) == 0xcbf43926u);
+
     int sockets[2]{};
     assert(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
     auto endpoint = std::make_shared<robotkit::SerialRobotEndpoint>(sockets[0]);
@@ -232,5 +235,11 @@ int main() {
     assert(state.sensor_count == 2 && state.sensors[0].sequence == 3);
     assert(state.sensors[1].sequence == 4 && state.sensors[1].values[2] == 1.6);
     serial.reset();
+
+    rk_robot_runtime serial_handle = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_robot_runtime_create_serial(&blueprint, serial_path, 115200,
+        &serial_handle) == RK_OK);
+    assert(serial_handle != RK_INVALID_ROBOT_RUNTIME);
+    rk_robot_runtime_destroy(serial_handle);
     ::close(serial_master);
 }
