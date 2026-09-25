@@ -43,6 +43,7 @@ class RecordingRobot implements Robot {
   }
 
   public function stop(mode:StopMode):Void source.stop(mode);
+  public function resetSafety():Void source.resetSafety();
 
   public function setChangeListener(listener:Null<RobotId->Void>):Void
     source.setChangeListener(listener);

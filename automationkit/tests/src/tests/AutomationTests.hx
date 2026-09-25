@@ -567,6 +567,7 @@ private class AutomationFakeRobot implements Robot {
   public function fault():Null<RobotFault> return null;
   public function submit(command:RobotCommand):Void {}
   public function stop(mode:StopMode):Void {}
+  public function resetSafety():Void {}
   public function setChangeListener(listener:Null<RobotId->Void>):Void changeListener = listener;
   public function close():Void changeListener = null;
 }

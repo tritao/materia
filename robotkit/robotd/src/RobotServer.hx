@@ -29,6 +29,7 @@ import robotkit.protocol.RobotFrame.RobotFrameStream;
 import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.RobotProtocol;
 import robotkit.protocol.RobotStateMsg;
+import robotkit.protocol.SafetyReset;
 import robotkit.protocol.Stop;
 import robotkit.protocol.SensorFrameMsg;
 import robotkit.transport.NativeTransport;
@@ -250,6 +251,20 @@ class RobotServer {
           sendFault(422, 'stop rejected: $error', false);
         }
       }
+    case RobotMessageType.SafetyReset:
+      var value:SafetyReset = RobotProtocol.decodeSafetyReset(frame);
+      if (!controllerGranted || !sameRobot(value.robotId) || !validSession(frame)
+          || !validCommandSequence(frame.sequence)) {
+        sendFault(400, "invalid safety reset session", false);
+      } else {
+        try {
+          runtime.resetSafety(Int64.toInt(frame.sequence));
+          lastRequestSequence = frame.sequence;
+          servedState = true;
+        } catch (error:Dynamic) {
+          sendFault(422, 'safety reset rejected: $error', false);
+        }
+      }
     case _:
       sendFault(404, "unsupported RobotKit message", false);
   }
@@ -458,7 +473,7 @@ class RobotServer {
     if (target == null) return;
     var message = new RobotStateMsg(snapshot.robotId, snapshot.sequence,
       snapshot.sourceTimestampNs, snapshot.q.toArray(), snapshot.dq.toArray(), snapshot.effort.toArray(),
-      snapshot.mode, snapshot.faultCode, snapshot.receivedTimestampNs);
+      snapshot.mode, snapshot.faultCode, snapshot.receivedTimestampNs, snapshot.safety);
     sendTo(target, targetSession, RobotProtocol.state(message, targetSession, snapshot.sequence,
       snapshot.sourceTimestampNs));
     for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot))

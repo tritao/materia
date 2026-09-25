@@ -16,6 +16,8 @@ class RobotSnapshot {
   public final sensors:ImmutableSensorArray;
   public final mode:Int;
   public final faultCode:Int;
+  /** Current runtime safety state: ready, stopping, emergency-stop, or fault. */
+  public final safety:Int;
 
   /** Compatibility alias; new code should name the clock explicitly. */
   public var timestampNs(get, never):Int64;
@@ -32,7 +34,8 @@ class RobotSnapshot {
     ?receivedTimestampNs:Int64,
     ?sensors:Array<SensorFrame>,
     ?sourceClockId:String = "unspecified",
-    ?receivedClockId:String = "robotkit.monotonic"
+    ?receivedClockId:String = "robotkit.monotonic",
+    ?safety:Int = 0
   ) {
     this.id = id;
     this.sourceSequence = sourceSequence;
@@ -48,6 +51,7 @@ class RobotSnapshot {
     this.sensors = new ImmutableSensorArray(sensors);
     this.mode = mode;
     this.faultCode = faultCode;
+    this.safety = safety;
   }
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;

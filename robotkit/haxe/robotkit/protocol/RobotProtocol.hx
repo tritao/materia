@@ -40,6 +40,12 @@ class RobotProtocol {
     return message(RobotMessageType.Stop, MessagePack.encode(value), sessionId,
       sequence, timestampNs);
 
+  public static function safetyReset(value:SafetyReset,
+      ?sessionId:haxe.Int64 = null, ?sequence:haxe.Int64 = null,
+      ?timestampNs:haxe.Int64 = null):RobotFrame
+    return message(RobotMessageType.SafetyReset, MessagePack.encode(value),
+      sessionId, sequence, timestampNs);
+
   public static function sensorFrame(value:SensorFrameMsg,
       ?sessionId:haxe.Int64 = null, ?sequence:haxe.Int64 = null,
       ?timestampNs:haxe.Int64 = null):RobotFrame
@@ -60,6 +66,9 @@ class RobotProtocol {
 
   public static function decodeStop(frame:RobotFrame):Stop
     return decodeStopPayload(frame);
+
+  public static function decodeSafetyReset(frame:RobotFrame):SafetyReset
+    return decodeSafetyResetPayload(frame);
 
   public static function decodeSensorFrame(frame:RobotFrame):SensorFrameMsg
     return decodeSensorFramePayload(frame);
@@ -98,6 +107,11 @@ class RobotProtocol {
 
   static function decodeStopPayload(frame:RobotFrame):Stop {
     expect(frame, RobotMessageType.Stop);
+    return MessagePack.decode(frame.payload);
+  }
+
+  static function decodeSafetyResetPayload(frame:RobotFrame):SafetyReset {
+    expect(frame, RobotMessageType.SafetyReset);
     return MessagePack.decode(frame.payload);
   }
 

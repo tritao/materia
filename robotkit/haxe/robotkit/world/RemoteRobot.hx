@@ -1,5 +1,6 @@
 package robotkit.world;
 
+import RobotKitRuntime;
 import nativekit.ffi.NativeKit;
 import NativeKitEvents;
 import haxe.Int64;
@@ -83,7 +84,10 @@ class RemoteRobot implements Robot {
     currentSnapshot.mode,
     currentSnapshot.faultCode,
     currentSnapshot.receivedTimestampNs,
-    currentSensors
+    currentSensors,
+    currentSnapshot.sourceClockId,
+    currentSnapshot.receivedClockId,
+    currentSnapshot.safety
   );
 
   public function sensors():Array<SensorFrame> {
@@ -104,6 +108,8 @@ class RemoteRobot implements Robot {
     client.stop("world stop", mode == StopMode.Emergency);
   }
 
+  public function resetSafety():Void client.resetSafety();
+
   public function setChangeListener(listener:Null < RobotId -> Void >):Void {
     changeListener = listener;
   }
@@ -120,7 +126,11 @@ class RemoteRobot implements Robot {
       value.effort,
       value.mode,
       value.fault,
-      NativeKit.nk_time_now_ns()
+      NativeKit.nk_time_now_ns(),
+      currentSensors,
+      "unspecified",
+      "robotkit.monotonic",
+      value.safety
     );
     notifyChanged();
   }

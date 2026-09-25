@@ -11,11 +11,12 @@ class RobotStateMsg {
   @:id(7) public var mode:Int;
   @:id(8) public var fault:Int;
   @:id(9) public var receivedTimestampNs:haxe.Int64;
+  @:id(10) public var safety:Int;
 
   public function new(?robotId:haxe.Int64 = null, ?sequence:haxe.Int64 = null,
       ?sourceTimestampNs:haxe.Int64 = null, ?q:Array<Float> = null,
       ?dq:Array<Float> = null, ?effort:Array<Float> = null, ?mode:Int = 0,
-      ?fault:Int = 0, ?receivedTimestampNs:haxe.Int64 = null) {
+      ?fault:Int = 0, ?receivedTimestampNs:haxe.Int64 = null, ?safety:Int = 0) {
     this.robotId = robotId == null ? haxe.Int64.ofInt(0) : robotId;
     this.sequence = sequence == null ? haxe.Int64.ofInt(0) : sequence;
     this.sourceTimestampNs = sourceTimestampNs == null
@@ -29,6 +30,7 @@ class RobotStateMsg {
     this.receivedTimestampNs = receivedTimestampNs == null
       ? this.sourceTimestampNs
       : receivedTimestampNs;
+    this.safety = safety;
   }
 
 }

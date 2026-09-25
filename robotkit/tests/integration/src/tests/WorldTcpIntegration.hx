@@ -1,5 +1,6 @@
 package tests;
 
+import RobotKitRuntime;
 import NativeKitRuntime;
 import haxe.Int64;
 import materia.automation.facility.Facility;
@@ -99,6 +100,12 @@ class WorldTcpIntegration {
         var state = world.snapshot().robot(LOGICAL_ID);
         return state != null && state.positions.length > 0;
       }, "remote robot did not publish its initial state");
+      if (remote.snapshot().safety != RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP)
+        throw "new serial session did not publish its latched safety stop";
+      world.resetSafety(LOGICAL_ID);
+      waitUntil(runtime, function() return remote.snapshot().safety ==
+          RobotKitRuntimeConstants.RK_SAFETY_READY,
+        "explicit safety reset did not release the new serial session");
       var deadlineRejected = false;
       try remote.submit(robotkit.world.RobotCommand.JointTargets([
         robotkit.world.JointTarget.position(0, 0.9)

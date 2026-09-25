@@ -30,6 +30,7 @@ class SerialRobot implements Robot {
   public function fault():Null<RobotFault> return adapter.fault();
   public function submit(command:RobotCommand):Void adapter.submit(command);
   public function stop(mode:StopMode):Void adapter.stop(mode);
+  public function resetSafety():Void adapter.resetSafety();
   public function setChangeListener(listener:Null < RobotId -> Void >):Void
     adapter.setChangeListener(listener);
   public function close():Void adapter.close();

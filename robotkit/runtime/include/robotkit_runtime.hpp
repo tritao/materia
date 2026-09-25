@@ -55,11 +55,17 @@ public:
      *
      * @param timestamp_ns Owner-clock sampling hint; not Runtime acceptance time.
      * @param state Destination state, including arrays sized by the runtime
-     * layout. The runtime preserves its own mode and safety fields around this
-     * call; endpoints should populate source time and observed physical state.
+     * layout. The runtime preserves its mode. Safety is preserved by default;
+     * an endpoint that reports safety state may provide its observed value.
      * @return RK_OK when a complete state was copied, or a backend error.
      */
     virtual rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) = 0;
+
+    /** Returns true when sample() supplies the endpoint's observed safety state. */
+    virtual bool reports_safety_state() const noexcept { return false; }
+
+    /** Initial endpoint safety state, used before the first state sample. */
+    virtual rk_safety_state initial_safety_state() const noexcept { return RK_SAFETY_READY; }
 
     /**
      * Rolls back command effects staged during a failed simulation tick.

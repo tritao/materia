@@ -1595,7 +1595,8 @@ class RobotWorldTests {
       [0.1, 0.2, 0.3], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2", "host.monotonic");
     var first = new RobotSnapshot("robot-a", Int64.parseString("9007199254740995"),
       Int64.parseString("9223372036854775000"), [0.5], [0.25], [0.125], 1, 0,
-      Int64.parseString("9223372036854775002"), [sensor], "robot-a.reset-2", "host.monotonic");
+      Int64.parseString("9223372036854775002"), [sensor], "robot-a.reset-2", "host.monotonic",
+      RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP);
     var second = new RobotSnapshot("robot-b", Int64.ofInt(3), Int64.ofInt(10),
       [0.75], [], [], 1, 0, Int64.ofInt(20), [], "robot-b.boot-1", "host.monotonic");
     writer.recordCommand(RobotCommand.JointTargets([
@@ -1627,6 +1628,7 @@ class RobotWorldTests {
     equal(loaded.snapshots[0].sourceTimestampNs, first.sourceTimestampNs, "MCAP preserves exact 64-bit timestamps");
     equal(loaded.snapshots[0].sourceSequence, first.sourceSequence, "MCAP preserves exact 64-bit sequences");
     equal(loaded.snapshots[0].sourceClockId, "robot-a.reset-2", "MCAP preserves reset clock identity");
+    equal(loaded.snapshots[0].safety, first.safety, "MCAP preserves robot safety state");
     equal(loaded.snapshots[0].sensors.get(0).frameId, "frame/front", "MCAP preserves sensor frame identity");
     equal(loaded.snapshots[0].sensors.get(0).mountPosition.get(2), 0.3, "MCAP preserves sensor mount");
     equal(loaded.worlds[0].robotIds().length, 2, "MCAP preserves multiple robots");
@@ -2050,6 +2052,8 @@ class RobotWorldTests {
     equal(Std.string(robot.lastCommand), Std.string(command), "command forwarded to selected robot");
     world.stop("arm", StopMode.Emergency);
     equal(Std.string(robot.lastStop), Std.string(StopMode.Emergency), "stop forwarded to selected robot");
+    world.resetSafety("arm");
+    equal(robot.resetCount, 1, "safety reset acknowledgement forwarded to selected robot");
     throws(function() world.attach(new FakeRobot("arm")), "duplicate logical ID rejected");
     world.close();
     check(robot.closed, "world closes attached robot it owns");
@@ -2286,6 +2290,7 @@ private class FakeRobot implements Robot {
   public var listener:Null < RobotId -> Void > = null;
   public var lastCommand:Null<RobotCommand> = null;
   public var lastStop:Null<StopMode> = null;
+  public var resetCount = 0;
   public var closed = false;
   public var closeCount = 0;
 
@@ -2316,6 +2321,7 @@ private class FakeRobot implements Robot {
   public function fault():Null < RobotFault > return null;
   public function submit(command:RobotCommand):Void lastCommand = command;
   public function stop(mode:StopMode):Void lastStop = mode;
+  public function resetSafety():Void resetCount++;
   public function setChangeListener(value:Null < RobotId -> Void >):Void listener = value;
   public function emitChange():Void if (listener != null) listener(logicalId);
   public function close():Void {

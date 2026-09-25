@@ -196,6 +196,13 @@ class RobotWorld {
     requireRobot(id).stop(mode);
   }
 
+  /** Explicitly acknowledges and clears the selected robot's latched safety stop. */
+  public function resetSafety(id:RobotId):Void {
+    ensureOpen();
+    ensureOwner();
+    requireRobot(id).resetSafety();
+  }
+
   public function status():RobotStatus {
     ensureOwner();
     if (robotMap.keys().hasNext() == false) return Disconnected;

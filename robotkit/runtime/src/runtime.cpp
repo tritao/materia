@@ -124,8 +124,9 @@ RobotRuntime::RobotRuntime(const rk_robot_runtime_blueprint &blueprint,
     : blueprint_(blueprint), endpoint_(std::move(endpoint)), period_(period) {
     state_.struct_size = sizeof(state_);
     state_.joint_count = blueprint_.joint_count;
-    state_.mode = RK_ROBOT_MODE_IDLE;
-    state_.safety = RK_SAFETY_READY;
+    state_.safety = endpoint_ ? endpoint_->initial_safety_state() : RK_SAFETY_READY;
+    state_.mode = state_.safety == RK_SAFETY_EMERGENCY_STOP ||
+        state_.safety == RK_SAFETY_FAULT ? RK_ROBOT_MODE_FAULT : RK_ROBOT_MODE_IDLE;
 }
 
 RobotRuntime::~RobotRuntime() {
@@ -403,7 +404,10 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     next.sensor_count = 0;
     const auto result = endpoint_->sample(timestamp_ns, next);
     next.mode = runtime_mode;
-    next.safety = runtime_safety;
+    if (!endpoint_->reports_safety_state())
+        next.safety = runtime_safety;
+    else if (next.safety == RK_SAFETY_EMERGENCY_STOP || next.safety == RK_SAFETY_FAULT)
+        next.mode = RK_ROBOT_MODE_FAULT;
     const auto sample_validation = result == RK_OK
         ? rk_robot_state_validate(&next) : RK_OK;
     const auto configured_sensor_count = blueprint_.sensor_count == 0 ? 3 : blueprint_.sensor_count;
@@ -468,8 +472,9 @@ void RobotRuntime::reset_state() noexcept {
     state_ = {};
     state_.struct_size = sizeof(state_);
     state_.joint_count = blueprint_.joint_count;
-    state_.mode = RK_ROBOT_MODE_IDLE;
-    state_.safety = RK_SAFETY_READY;
+    state_.safety = endpoint_ ? endpoint_->initial_safety_state() : RK_SAFETY_READY;
+    state_.mode = state_.safety == RK_SAFETY_EMERGENCY_STOP ||
+        state_.safety == RK_SAFETY_FAULT ? RK_ROBOT_MODE_FAULT : RK_ROBOT_MODE_IDLE;
     control_ = {};
     control_backup_ = {};
     state_backup_valid_ = false;

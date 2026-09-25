@@ -9,10 +9,12 @@
 namespace robotkit {
 namespace {
 
-constexpr std::array<uint8_t, 4> command_magic{'R', 'K', 'C', '3'};
+constexpr std::array<uint8_t, 4> session_magic{'R', 'K', 'H', '4'};
+constexpr std::array<uint8_t, 4> command_magic{'R', 'K', 'C', '4'};
 constexpr size_t envelope_header_bytes = 8;
 constexpr size_t checksum_bytes = 4;
-constexpr size_t command_header_bytes = 20;
+constexpr size_t session_payload_bytes = 8;
+constexpr size_t command_header_bytes = 28;
 constexpr size_t target_bytes = 16;
 static_assert(sizeof(double) == 8 && std::numeric_limits<double>::is_iec559);
 
@@ -48,21 +50,25 @@ uint32_t crc32(const uint8_t *bytes, size_t size) noexcept {
     return ~value;
 }
 
-enum class DecodeResult { valid, invalid, stale };
+enum class DecodeResult { valid, invalid, stale, wrong_session };
 
 DecodeResult decode_command(const uint8_t *payload, size_t payload_size,
-                            uint32_t joint_count, uint64_t last_sequence,
+                            uint32_t joint_count, uint64_t session_id,
+                            uint64_t last_sequence,
                             SerialCommandFrame &out) noexcept {
     if (payload_size < command_header_bytes)
         return DecodeResult::invalid;
 
     const uint32_t kind = read_u32(payload);
-    const uint64_t sequence = read_u64(payload + 4);
-    const uint32_t target_count = read_u32(payload + 12);
-    if (read_u32(payload + 16) != 0 || kind > RK_COMMAND_RESET_SAFETY ||
+    const uint64_t command_session_id = read_u64(payload + 4);
+    const uint64_t sequence = read_u64(payload + 12);
+    const uint32_t target_count = read_u32(payload + 20);
+    if (read_u32(payload + 24) != 0 || kind > RK_COMMAND_RESET_SAFETY ||
         target_count > RK_MAX_SERIAL_JOINTS ||
         payload_size != command_header_bytes + static_cast<size_t>(target_count) * target_bytes)
         return DecodeResult::invalid;
+    if (!session_id || command_session_id != session_id)
+        return DecodeResult::wrong_session;
     if (!sequence || sequence <= last_sequence)
         return DecodeResult::stale;
     if (target_count > joint_count ||
@@ -71,6 +77,7 @@ DecodeResult decode_command(const uint8_t *payload, size_t payload_size,
 
     SerialCommandFrame decoded{};
     decoded.kind = kind;
+    decoded.session_id = command_session_id;
     decoded.sequence = sequence;
     decoded.target_count = target_count;
     bool targeted[RK_MAX_SERIAL_JOINTS]{};
@@ -98,9 +105,10 @@ SerialCommandDecoder::SerialCommandDecoder(uint32_t joint_count) noexcept
     : joint_count_(joint_count) {}
 
 size_t SerialCommandDecoder::feed(const uint8_t *bytes, size_t size,
-                                  uint64_t received_at_ns, CommandHandler handler,
-                                  void *context) noexcept {
-    if ((!bytes && size) || !valid_configuration() || !handler)
+                                  uint64_t received_at_ns,
+                                  SessionHandler session_handler,
+                                  CommandHandler handler, void *context) noexcept {
+    if ((!bytes && size) || !valid_configuration() || !session_handler || !handler)
         return 0;
 
     size_t accepted = 0;
@@ -110,7 +118,7 @@ size_t SerialCommandDecoder::feed(const uint8_t *bytes, size_t size,
             ++statistics_.bad_length;
         }
         buffer_[buffer_size_++] = bytes[index];
-        process_buffer(received_at_ns, handler, context, accepted);
+        process_buffer(received_at_ns, session_handler, handler, context, accepted);
     }
     return accepted;
 }
@@ -123,19 +131,24 @@ bool SerialCommandDecoder::watchdog_expired(uint64_t now_ns,
 }
 
 void SerialCommandDecoder::process_buffer(uint64_t received_at_ns,
-                                         CommandHandler handler, void *context,
-                                         size_t &accepted) noexcept {
+                                          SessionHandler session_handler,
+                                          CommandHandler handler, void *context,
+                                          size_t &accepted) noexcept {
     while (buffer_size_) {
         const auto begin = buffer_.begin();
         const auto end = begin + static_cast<ptrdiff_t>(buffer_size_);
-        const auto magic = std::search(begin, end, command_magic.begin(), command_magic.end());
+        const auto session = std::search(begin, end, session_magic.begin(), session_magic.end());
+        const auto command = std::search(begin, end, command_magic.begin(), command_magic.end());
+        const auto magic = session == end ? command :
+            (command == end || session < command ? session : command);
         if (magic == end) {
             size_t keep = 0;
-            const size_t maximum_prefix = std::min(buffer_size_, command_magic.size() - 1);
+            const size_t maximum_prefix = std::min(buffer_size_, session_magic.size() - 1);
             for (size_t count = maximum_prefix; count > 0; --count) {
-                if (std::equal(buffer_.begin() + static_cast<ptrdiff_t>(buffer_size_ - count),
-                               buffer_.begin() + static_cast<ptrdiff_t>(buffer_size_),
-                               command_magic.begin())) {
+                const auto suffix = buffer_.begin() + static_cast<ptrdiff_t>(buffer_size_ - count);
+                const auto suffix_end = buffer_.begin() + static_cast<ptrdiff_t>(buffer_size_);
+                if (std::equal(suffix, suffix_end, session_magic.begin()) ||
+                    std::equal(suffix, suffix_end, command_magic.begin())) {
                     keep = count;
                     break;
                 }
@@ -169,19 +182,38 @@ void SerialCommandDecoder::process_buffer(uint64_t received_at_ns,
             continue;
         }
 
-        SerialCommandFrame command{};
-        const auto result = decode_command(buffer_.data() + envelope_header_bytes, payload_size,
-                                           joint_count_, last_sequence_, command);
-        if (result == DecodeResult::stale) {
-            ++statistics_.stale_sequence;
-        } else if (result == DecodeResult::invalid) {
-            ++statistics_.invalid_command;
+        const bool is_session = std::equal(session_magic.begin(), session_magic.end(), buffer_.begin());
+        if (is_session) {
+            if (payload_size != session_payload_bytes) {
+                ++statistics_.invalid_command;
+            } else {
+                const uint64_t requested_session = read_u64(buffer_.data() + envelope_header_bytes);
+                if (!requested_session || !session_handler(context, requested_session)) {
+                    ++statistics_.rejected_session;
+                } else {
+                    session_id_ = requested_session;
+                    last_sequence_ = 0;
+                    last_received_at_ns_ = 0;
+                    has_received_command_ = false;
+                }
+            }
         } else {
-            last_sequence_ = command.sequence;
-            last_received_at_ns_ = received_at_ns;
-            has_received_command_ = true;
-            handler(context, command);
-            ++accepted;
+            SerialCommandFrame decoded{};
+            const auto result = decode_command(buffer_.data() + envelope_header_bytes,
+                payload_size, joint_count_, session_id_, last_sequence_, decoded);
+            if (result == DecodeResult::stale) {
+                ++statistics_.stale_sequence;
+            } else if (result == DecodeResult::wrong_session) {
+                ++statistics_.rejected_session;
+            } else if (result == DecodeResult::invalid) {
+                ++statistics_.invalid_command;
+            } else {
+                last_sequence_ = decoded.sequence;
+                last_received_at_ns_ = received_at_ns;
+                has_received_command_ = true;
+                handler(context, decoded);
+                ++accepted;
+            }
         }
         discard_prefix(frame_size);
     }

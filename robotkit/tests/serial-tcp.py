@@ -2,6 +2,7 @@
 """Exercise RemoteRobot's TCP path through robotd and a serial PTY emulator."""
 
 import os
+import math
 import pty
 import select
 import socket
@@ -33,13 +34,15 @@ def write_all(descriptor, data):
         offset += os.write(descriptor, data[offset:])
 
 
-def read_commands(pending, position, velocity, effort, target_seen):
+def read_commands(pending, position, velocity, effort, target_seen, device, master):
     while True:
-        start = pending.find(b"RKC3")
-        if start < 0:
+        candidates = [(pending.find(magic), magic) for magic in (b"RKH4", b"RKC4")]
+        candidates = [(start, magic) for start, magic in candidates if start >= 0]
+        if not candidates:
             if len(pending) > 3:
                 del pending[:-3]
             return
+        start, magic = min(candidates, key=lambda candidate: candidate[0])
         if start:
             del pending[:start]
         if len(pending) < 8:
@@ -54,20 +57,60 @@ def read_commands(pending, position, velocity, effort, target_seen):
             continue
 
         payload = packet[8:-4]
-        if len(payload) < 20:
+        if magic == b"RKH4":
+            if len(payload) != 8:
+                continue
+            session_id = struct.unpack_from("<Q", payload)[0]
+            if not session_id:
+                continue
+            device["session_id"] = session_id
+            device["last_command_sequence"] = 0
+            device["safety"] = 2
+            velocity[:] = [0.0] * len(velocity)
+            effort[:] = [0.0] * len(effort)
+            state_payload = struct.pack("<IQIQQI", len(position), time.monotonic_ns(), 3,
+                session_id, 0, device["safety"])
+            for joint in range(len(position)):
+                state_payload += struct.pack("<ddd", position[joint], 0.0, 0.0)
+            sensors = [position.copy(), [0.0, 0.0, 0.0, 0.0, 0.0, 9.81], [10.0] * 8]
+            for values in sensors:
+                state_payload += struct.pack("<QQI", 1, time.monotonic_ns(), len(values))
+                state_payload += struct.pack("<" + "d" * len(values), *values)
+            write_all(master, frame(b"RKS4", state_payload))
             continue
-        kind, _, target_count, _ = struct.unpack_from("<IQII", payload)
+
+        if len(payload) < 28:
+            continue
+        kind, session_id, command_sequence, target_count, reserved = struct.unpack_from(
+            "<IQQII", payload)
+        if (session_id != device["session_id"] or not command_sequence
+                or command_sequence <= device["last_command_sequence"] or reserved != 0
+                or len(payload) != 28 + target_count * 16):
+            continue
         if kind in (2, 3, 4):
             for joint in range(len(velocity)):
                 velocity[joint] = 0.0
                 effort[joint] = 0.0
+            device["safety"] = 2 if kind == 3 else 0
+            device["last_command_sequence"] = command_sequence
             continue
-        if kind != 1 or len(payload) != 20 + target_count * 16:
+        if kind == 0:
+            device["last_command_sequence"] = command_sequence
             continue
+        if kind != 1 or device["safety"] != 0:
+            continue
+        decoded = []
+        seen = set()
         for index in range(target_count):
-            joint, mode, value = struct.unpack_from("<IId", payload, 20 + index * 16)
-            if joint >= len(position):
-                continue
+            joint, mode, value = struct.unpack_from("<IId", payload, 28 + index * 16)
+            if joint >= len(position) or joint in seen or mode not in (1, 2, 3) or not math.isfinite(value):
+                decoded = []
+                break
+            seen.add(joint)
+            decoded.append((joint, mode, value))
+        if target_count and not decoded:
+            continue
+        for joint, mode, value in decoded:
             if mode == 1:
                 position[joint] = value
                 velocity[joint] = 0.0
@@ -79,11 +122,13 @@ def read_commands(pending, position, velocity, effort, target_seen):
                 effort[joint] = 0.0
             elif mode == 3:
                 effort[joint] = value
+        device["last_command_sequence"] = command_sequence
 
 
 def run_device(master, stopping, position, velocity, effort, target_seen):
     pending = bytearray()
     sequence = 0
+    device = {"session_id": 0, "last_command_sequence": 0, "safety": 2}
     next_state = time.monotonic()
     last_update = next_state
     while not stopping.is_set():
@@ -94,18 +139,19 @@ def run_device(master, stopping, position, velocity, effort, target_seen):
             except OSError:
                 return
             pending.extend(data)
-            read_commands(pending, position, velocity, effort, target_seen)
+            read_commands(pending, position, velocity, effort, target_seen, device, master)
 
         now = time.monotonic()
         elapsed = now - last_update
         for joint in range(len(position)):
             position[joint] += velocity[joint] * elapsed
         last_update = now
-        if now < next_state:
+        if now < next_state or not device["session_id"]:
             continue
         sequence += 1
         timestamp = time.monotonic_ns()
-        payload = struct.pack("<IQI", len(position), timestamp, 3)
+        payload = struct.pack("<IQIQQI", len(position), timestamp, 3,
+            device["session_id"], device["last_command_sequence"], device["safety"])
         for joint in range(len(position)):
             payload += struct.pack("<ddd", position[joint], velocity[joint], effort[joint])
         sensors = [
@@ -117,7 +163,7 @@ def run_device(master, stopping, position, velocity, effort, target_seen):
             payload += struct.pack("<QQI", sequence, timestamp, len(values))
             payload += struct.pack("<" + "d" * len(values), *values)
         try:
-            write_all(master, frame(b"RKS3", payload))
+            write_all(master, frame(b"RKS4", payload))
         except OSError:
             return
         next_state = now + 0.02

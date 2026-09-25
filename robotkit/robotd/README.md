@@ -44,12 +44,12 @@ python3 ../tests/serial-tcp.py
 ```
 
 [`../runtime/SERIAL_PROTOCOL.md`](../runtime/SERIAL_PROTOCOL.md) describes the
-device contract, and `robotkit_serial_protocol.hpp` provides a tested RKC3
-command decoder. A platform still needs firmware that connects decoded
-commands to its motor and sensor drivers and enforces the local actuator
-watchdog; a disconnected cable cannot receive a host emergency-stop frame.
-Protocol v3 also requires a device sequence reset when the host process
-restarts, unless the device itself restarts while safely stopped.
+device contract, and `robotkit_serial_protocol.hpp` provides a tested RKH4/RKC4
+session and command decoder. A platform still needs firmware that connects
+decoded commands to its motor and sensor drivers and enforces the local
+actuator watchdog; a disconnected cable cannot receive a host emergency-stop
+frame. Each new host session begins with the device latched in emergency-stop,
+and the application must explicitly reset safety before moving.
 
 The same runtime command/controller boundary is used by simulation and by the
 first native physical endpoint (`SerialRobotEndpoint`). Sensor state is carried

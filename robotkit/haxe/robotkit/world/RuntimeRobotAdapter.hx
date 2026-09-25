@@ -60,7 +60,8 @@ class RuntimeRobotAdapter implements Robot {
     observe(value);
     return new RobotSnapshot(logicalId, value.sequence, value.sourceTimestampNs,
       value.q.toArray(), value.dq.toArray(), value.effort.toArray(), value.mode,
-      value.faultCode, value.receivedTimestampNs, currentSensors);
+      value.faultCode, value.receivedTimestampNs, currentSensors,
+      "unspecified", "robotkit.monotonic", value.safety);
   }
 
   public function fault():Null<RobotFault> {
@@ -86,6 +87,12 @@ class RuntimeRobotAdapter implements Robot {
     ensureOpen();
     commandSequence++;
     runtime.submitStop(commandSequence, mode == StopMode.Emergency);
+  }
+
+  public function resetSafety():Void {
+    ensureOpen();
+    commandSequence++;
+    runtime.resetSafety(commandSequence);
   }
 
   public function sensors():Array<SensorFrame> {

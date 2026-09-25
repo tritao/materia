@@ -81,9 +81,9 @@ class RobotRecordingCodec {
       wide(root, "recordingTimestampNs"), version);
   }
 
-  static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,sensors:[for(s in v.sensors.toArray()) sensor(s)]};
+  static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,safety:v.safety,sensors:[for(s in v.sensors.toArray()) sensor(s)]};
   static function sensor(v:SensorFrame):Dynamic return {sensorId:v.sensorId,kind:v.kind,frameId:v.frameId,sequence:Int64.toStr(v.sequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,values:v.values.toArray(),linkId:v.linkId,mountPosition:v.mountPosition.toArray(),mountRotation:v.mountRotation.toArray()};
-  static function readSnapshot(v:Dynamic):RobotSnapshot return new RobotSnapshot(string(v,"id"),wide(v,"sourceSequence"),wide(v,"sourceTimestampNs"),floats(v,"positions"),floats(v,"velocities"),floats(v,"efforts"),fieldInt(v,"mode"),fieldInt(v,"faultCode"),wide(v,"receivedTimestampNs"),[for(s in array(v,"sensors")) readSensor(s)],string(v,"sourceClockId"),string(v,"receivedClockId"));
+  static function readSnapshot(v:Dynamic):RobotSnapshot return new RobotSnapshot(string(v,"id"),wide(v,"sourceSequence"),wide(v,"sourceTimestampNs"),floats(v,"positions"),floats(v,"velocities"),floats(v,"efforts"),fieldInt(v,"mode"),fieldInt(v,"faultCode"),wide(v,"receivedTimestampNs"),[for(s in array(v,"sensors")) readSensor(s)],string(v,"sourceClockId"),string(v,"receivedClockId"),optionalFieldInt(v,"safety",0));
   static function readSensor(v:Dynamic):SensorFrame {
     var position = floats(v, "mountPosition");
     var rotation = floats(v, "mountRotation");
@@ -119,6 +119,7 @@ class RobotRecordingCodec {
   }
   static function nullableWide(v:Dynamic,n:String):Null<Int64> {var x=Reflect.field(v,n);return x==null?null:wide(v,n);}
   static function fieldInt(v:Dynamic,n:String):Int {var x=Reflect.field(v,n);if(!Std.isOfType(x,Int))throw 'Invalid recording field $n';return x;}
+  static function optionalFieldInt(v:Dynamic,n:String,defaultValue:Int):Int {var x=Reflect.field(v,n);if(x==null)return defaultValue;if(!Std.isOfType(x,Int))throw 'Invalid recording field $n';return x;}
   static function fieldIntString(v:Dynamic,n:String):Int {var x=Std.parseInt(string(v,n));if(x==null)throw 'Invalid recording field $n';return x;}
   static function fieldFloat(v:Dynamic,n:String):Float {var x=Reflect.field(v,n);if(!Std.isOfType(x,Float)&&!Std.isOfType(x,Int))throw 'Invalid recording field $n';var result:Float=x;if(!Math.isFinite(result))throw 'Non-finite recording field $n';return result;}
   static function fieldBool(v:Dynamic,n:String):Bool {var x=Reflect.field(v,n);if(!Std.isOfType(x,Bool))throw 'Invalid recording field $n';return x;}

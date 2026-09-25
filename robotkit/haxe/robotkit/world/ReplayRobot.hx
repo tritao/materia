@@ -51,6 +51,7 @@ class ReplayRobot implements Robot {
   }
 
   public function stop(mode:StopMode):Void ensureLive();
+  public function resetSafety():Void ensureLive();
 
   /** Advances one selected robot observation in recording ordinal order. */
   public function advance():Bool {
@@ -103,7 +104,7 @@ class ReplayRobot implements Robot {
     return new RobotSnapshot(value.id, value.sourceSequence, value.sourceTimestampNs,
       value.positions.toArray(), value.velocities.toArray(), value.efforts.toArray(),
       value.mode, faultCode, value.receivedTimestampNs, sensors,
-      value.sourceClockId, value.receivedClockId);
+      value.sourceClockId, value.receivedClockId, value.safety);
 
   function ensureLive():Void if (closed) throw "ReplayRobot has been closed";
 }

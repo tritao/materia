@@ -17,6 +17,8 @@ interface Robot {
   function fault():Null<RobotFault>;
   function submit(command:RobotCommand):Void;
   function stop(mode:StopMode):Void;
+  /** Explicit application acknowledgement that permits clearing a safety latch. */
+  function resetSafety():Void;
   function setChangeListener(listener:Null < RobotId -> Void >):Void;
   function close():Void;
 }

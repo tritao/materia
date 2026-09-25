@@ -19,6 +19,7 @@ import robotkit.protocol.RobotFrame.RobotFrameStream;
 import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.RobotProtocol;
 import robotkit.protocol.RobotStateMsg;
+import robotkit.protocol.SafetyReset;
 import robotkit.protocol.SensorFrameMsg;
 import robotkit.protocol.Stop;
 import robotkit.transport.NativeTransport;
@@ -213,6 +214,15 @@ class RobotClient {
     var value = new Stop(robotId(), reason, emergency);
     send(RobotProtocol.stop(value, sessionId, sequence,
       NativeKit.nk_time_now_ns()));
+    return sequence;
+  }
+
+  /** Acknowledges the current safety stop and asks robotd to reset it. */
+  public function resetSafety(?reason:String = "application acknowledged safety stop"):Int64 {
+    ensureReady();
+    var sequence = nextCommandSequence();
+    send(RobotProtocol.safetyReset(new SafetyReset(robotId(), reason), sessionId,
+      sequence, NativeKit.nk_time_now_ns()));
     return sequence;
   }
 

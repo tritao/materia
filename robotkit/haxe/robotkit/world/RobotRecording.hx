@@ -76,7 +76,8 @@ class RobotRecording implements RobotRecordingSink {
     return new RobotSnapshot(value.id, value.sourceSequence, value.sourceTimestampNs,
       value.positions.toArray(), value.velocities.toArray(), value.efforts.toArray(),
       value.mode, value.faultCode, value.receivedTimestampNs,
-      value.sensors.toArray(), value.sourceClockId, value.receivedClockId);
+      value.sensors.toArray(), value.sourceClockId, value.receivedClockId,
+      value.safety);
 
   function pushWorldEvent(event:RobotWorldEvent, robotId:RobotId):Void {
     events.push(RobotRecordingEvent.WorldEvent(event));

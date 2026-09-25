@@ -39,7 +39,8 @@ class WorldSnapshot {
           value.receivedTimestampNs,
           value.sensors.toArray(),
           value.sourceClockId,
-          value.receivedClockId
+          value.receivedClockId,
+          value.safety
         )
       );
     }
