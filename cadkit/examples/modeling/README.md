@@ -35,7 +35,9 @@ polygonal CAD profiles with bored pivots; the bucket includes a cutting lip and
 teeth; cylinder bodies are hollow and their pin eyes are bored. No source
 geometry is imported. `ProceduralExcavatorAssembly.hx` places the parts using
 named pin frames, revolute mates, prismatic cylinder slides, and checked
-linkage closures.
+linkage closures. `buildState()` offsets the dependent link and cylinder
+coordinates slightly, then uses `AssemblyState.solveClosures()` to restore the
+pin and slider closures before writing the generated configuration.
 
 Running the example prints JSON with solid, face, edge, volume, surface-area,
 and bounding-box metrics for every component. It also writes each generated

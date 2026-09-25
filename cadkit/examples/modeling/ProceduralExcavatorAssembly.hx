@@ -12,8 +12,21 @@ class ProceduralExcavatorAssembly {
 
 	public static function buildDefinition():AssemblyDefinition return buildModel().definition("excavator");
 
-	public static function buildState():AssemblyStateRecord
-		return buildModel().initialState("excavator").record();
+	public static function buildState():AssemblyStateRecord {
+		var state = buildModel().initialState("excavator");
+		var dependent = ["link-one-hinge", "link-two-hinge",
+			"boom-cylinder-hinge", "boom-cylinder-slide",
+			"stick-cylinder-hinge", "stick-cylinder-slide",
+			"bucket-cylinder-hinge", "bucket-cylinder-slide"];
+		// Start near the authored pose to choose the same linkage branch, then
+		// let the closure solver restore pin coincidence and cylinder lengths.
+		for (joint in dependent)
+			state.setJoint(joint, state.joint(joint) + (StringTools.endsWith(joint, "-slide") ? 0.1 : 0.002));
+		var result = state.solveClosures(dependent);
+		if (!result.converged)
+			throw 'Excavator closure solve failed: ${result.message} (${result.closureIds.join(", ")})';
+		return state.record();
+	}
 
 	static function buildModel():AssemblyModel {
 		var model = new AssemblyModel();
