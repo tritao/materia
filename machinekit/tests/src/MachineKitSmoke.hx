@@ -9,6 +9,8 @@ import machinekit.standard.FlatWasher;
 import machinekit.standard.HexBolt;
 import machinekit.standard.HexNut;
 import machinekit.standard.ParallelKey;
+import machinekit.standard.RetainingRing;
+import machinekit.standard.ShaftCollar;
 import machinekit.standard.SocketHeadCapScrew;
 import materia.project.AssemblyFrames;
 
@@ -226,7 +228,7 @@ class MachineKitSmoke {
 			[{diameter: 8, length: 51.5}, {diameter: 6, length: 8.5}],
 			[{name: "bearingA", z: 10}, {name: "bearingB", z: 43}],
 			[{name: "outputKey", z0: 52, key: key}],
-			[{z0: 50, width: 1.2, diameter: 7.4}]
+			[{name: "ring", z0: 50, width: 1.2, diameter: 7.4}]
 		);
 		near(shaft.totalLength, 60, "shaft total length");
 		near(shaft.diameterAt(0), 8, "shaft start diameter");
@@ -250,6 +252,7 @@ class MachineKitSmoke {
 		var seat = shaft.connector("outputKey").frame;
 		near(seat.z, 55, "keyway connector z");
 		near(seat.y, 3 - 1.2, "keyway connector floor");
+		near(shaft.connector("ring").frame.z, 50.6, "groove connector z");
 
 		throws(() -> new SteppedShaft([{diameter: -1, length: 10}]), "positive diameter and length");
 		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], [{name: "x", z: 20}]),
@@ -270,6 +273,33 @@ class MachineKitSmoke {
 			[{z0: 0, width: 2, diameter: 9}]), "Retaining ring groove diameter must be smaller than the shaft");
 	}
 
+	static function shaftHardware():Void {
+		var ring = RetainingRing.forShaft(8);
+		check(ring.designation == "DIN471-8", "ring designation");
+		check(ring.spec.grooveDiameter == 7.4 && ring.spec.outerDiameter == 12.2, "ring dimensions");
+		throws(() -> RetainingRing.forShaft(9), 'Unknown retaining ring shaft diameter "9"');
+
+		var envelope = ring.geometry(Envelope);
+		solid(envelope, "ring envelope");
+		near(envelope.volume(), annulus(12.2, 7.4, 0.8), "ring envelope volume");
+		envelope.close();
+		var preview = ring.geometry();
+		solid(preview, "ring preview");
+		near(preview.volume(), annulus(12.2, 7.4, 0.8) * 8 / 9, "ring preview volume (gapped)");
+		preview.close();
+		near(ring.connector("seat").frame.z, 0.4, "ring seat connector");
+
+		var collar = ShaftCollar.forShaft(8);
+		check(collar.designation == "COLLAR-8", "collar designation");
+		check(collar.spec.setScrew == "M4", "collar set screw size");
+		throws(() -> ShaftCollar.forShaft(9), 'Unknown shaft collar bore diameter "9"');
+		var collarPart = collar.geometry();
+		solid(collarPart, "collar");
+		near(collarPart.volume(), Math.PI * (8 * 8 - 4 * 4) * 11, "collar volume");
+		collarPart.close();
+		near(collar.connector("axis").frame.z, 5.5, "collar axis connector");
+	}
+
 	static function assembly():Void {
 		var example = new MotorShaftBearings();
 		check(example.screw.designation == "ISO4762-M3x10", "selected mount screw");
@@ -285,7 +315,7 @@ class MachineKitSmoke {
 
 		var model = example.assembly();
 		var definition = model.definition("motor-shaft-bearings");
-		check(definition.joints.length == 9, "assembly joint count");
+		check(definition.joints.length == 10, "assembly joint count");
 		var state = model.initialState("motor-shaft-bearings");
 		near(state.worldConnector("plate", "bolt2").z, 6, "plate top");
 		var head = state.worldConnector("screw2", "head");
@@ -308,12 +338,13 @@ class MachineKitSmoke {
 		near(state.worldConnector("screw2", "head").x, -15.5, "screws do not rotate");
 
 		var lines = example.bom().lines();
-		check(lines.length == 6, "BOM line count");
+		check(lines.length == 7, "BOM line count");
 		var bom = example.bom();
 		check(bom.quantity("ISO4762-M3x10") == 4, "screw quantity");
 		check(bom.quantity("608-2Z") == 2, "bearing quantity");
 		check(bom.quantity("NEMA17-48") == 1, "motor quantity");
 		check(bom.quantity("DIN6885-2x2x6") == 1, "key quantity");
+		check(bom.quantity("DIN471-8") == 1, "ring quantity");
 		var duplicate = new Bom();
 		duplicate.add({partNumber: "X", description: "a", quantity: 1, material: null});
 		throws(() -> duplicate.add({partNumber: "X", description: "b", quantity: 1, material: null}), "conflicting");
@@ -325,6 +356,7 @@ class MachineKitSmoke {
 		motors();
 		fasteners();
 		shafts();
+		shaftHardware();
 		assembly();
 		trace("MachineKit smoke passed");
 	}

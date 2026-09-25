@@ -10,11 +10,13 @@ import materia.project.AssemblyRecord.AssemblyFrame;
 
 /** Small construction helpers shared by generators. Inputs passed as `parts` are consumed. */
 class Solids {
-	/** Revolves a closed (radius, z) half-section about +Z. */
-	public static function revolve(section:Array<{r:Float, z:Float}>):Part {
+	/** Revolves a closed (radius, z) half-section about +Z, through `angle` radians (full circle
+	 * by default) starting from +X toward +Y.
+	 */
+	public static function revolve(section:Array<{r:Float, z:Float}>, angle:Float = Math.PI * 2):Part {
 		var sketch = Sketch.polygon([for (point in section) new Vector(point.r, point.z)], Plane.XZ());
 		try {
-			var result = sketch.revolve(Axis.Z());
+			var result = sketch.revolve(Axis.Z(), angle);
 			sketch.close();
 			return result;
 		} catch (error:Dynamic) {

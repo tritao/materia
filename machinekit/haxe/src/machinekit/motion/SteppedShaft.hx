@@ -23,8 +23,11 @@ typedef ShaftKeyway = {
 	var key:ParallelKey;
 }
 
-/** A full-depth retaining-ring groove from `z0` to `z0 + width`, cut to `diameter`. */
+/** A full-depth retaining-ring groove from `z0` to `z0 + width`, cut to `diameter`.
+ * A `name` connector (axis, groove mid-width) is added when given, for mating a `RetainingRing`.
+ */
 typedef ShaftGroove = {
+	var ?name:String;
 	var z0:Float;
 	var width:Float;
 	var diameter:Float;
@@ -33,8 +36,9 @@ typedef ShaftGroove = {
 /** Coaxial cylindrical sections stacked along +Z, producing square shoulders at each diameter
  * change. CAD frame: input end at z=0, output end at z=totalLength.
  * Connectors: `input` (axis, z=0), `output` (shaft, z=totalLength), plus any `namedFaces` (axis,
- * for bearing or collar seats) and one connector per keyway. Keyways are cut on the shaft's local
- * +Y side, so a `ParallelKey` mated through the keyway's connector sits flush in the slot.
+ * for bearing or collar seats), one connector per named keyway, and one per named groove. Keyways
+ * are cut on the shaft's local +Y side, so a `ParallelKey` mated through the keyway's connector
+ * sits flush in the slot; groove connectors are axial, for a `RetainingRing`.
  */
 class SteppedShaft extends MachineComponent {
 	public final sections:Array<ShaftSection>;
@@ -82,6 +86,7 @@ class SteppedShaft extends MachineComponent {
 				throw "Retaining ring groove must lie within one shaft section";
 			if (!(groove.diameter > 0) || !(groove.diameter < diameterAt(groove.z0)))
 				throw "Retaining ring groove diameter must be smaller than the shaft";
+			if (groove.name != null) addConnector(groove.name, Axis, Solids.axial(0, 0, groove.z0 + groove.width / 2));
 		}
 	}
 

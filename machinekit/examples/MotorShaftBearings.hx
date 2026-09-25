@@ -8,6 +8,7 @@ import machinekit.motion.NemaStepper;
 import machinekit.motion.SteppedShaft;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.ParallelKey;
+import machinekit.standard.RetainingRing;
 import machinekit.standard.SocketHeadCapScrew;
 
 /** Plate with a NEMA pilot and bolt cutout. Its back face (z=0) mates to the motor face. */
@@ -33,8 +34,8 @@ class MotorPlate extends MachineComponent {
 }
 
 /** NEMA 17 motor on a plate, four M3 screws, and an output shaft carried by two 608 bearings.
- * The shaft steps down past the outboard bearing to carry a retaining-ring groove and an
- * output key, exercising `SteppedShaft`'s keyway and groove machining.
+ * The shaft steps down past the outboard bearing to carry a retaining ring and an output key,
+ * exercising `SteppedShaft`'s keyway and groove machining.
  */
 class MotorShaftBearings {
 	public static inline var PLATE_THICKNESS:Float = 6;
@@ -46,6 +47,7 @@ class MotorShaftBearings {
 	public final screw:SocketHeadCapScrew;
 	public final bearing = DeepGrooveBearing.metric("608");
 	public final key = ParallelKey.forShaft(6, 6);
+	public final ring = RetainingRing.forShaft(8);
 	public final shaft:SteppedShaft;
 
 	public function new() {
@@ -58,7 +60,7 @@ class MotorShaftBearings {
 			[{diameter: bearing.bore, length: COLLAR_LENGTH}, {diameter: 6, length: SHAFT_LENGTH - COLLAR_LENGTH}],
 			[{name: "bearingA", z: 10}, {name: "bearingB", z: SHAFT_LENGTH - 10 - bearing.width}],
 			[{name: "outputKey", z0: 52, key: key}],
-			[{z0: 50, width: 1.2, diameter: 7.4}]
+			[{name: "bearingBRing", z0: 50, width: ring.thickness, diameter: ring.spec.grooveDiameter}]
 		);
 	}
 
@@ -80,6 +82,8 @@ class MotorShaftBearings {
 		}
 		key.addTo(model, "key");
 		model.mate("key-seat", "fixed", "shaft", "outputKey", "key", "seat");
+		ring.addTo(model, "ring");
+		model.mate("ring-seat", "fixed", "shaft", "bearingBRing", "ring", "seat");
 		return model;
 	}
 
@@ -91,6 +95,7 @@ class MotorShaftBearings {
 		result.addComponent(shaft);
 		result.addComponent(bearing, 2);
 		result.addComponent(key);
+		result.addComponent(ring);
 		return result;
 	}
 
@@ -98,7 +103,8 @@ class MotorShaftBearings {
 	public function components():Array<{id:String, component:MachineComponent}> {
 		var result:Array<{id:String, component:MachineComponent}> = [
 			{id: "motor", component: motor}, {id: "plate", component: plate}, {id: "shaft", component: shaft},
-			{id: "bearingA", component: bearing}, {id: "bearingB", component: bearing}, {id: "key", component: key}];
+			{id: "bearingA", component: bearing}, {id: "bearingB", component: bearing}, {id: "key", component: key},
+			{id: "ring", component: ring}];
 		for (i in 1...5) result.push({id: 'screw$i', component: screw});
 		return result;
 	}
