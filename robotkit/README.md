@@ -160,6 +160,11 @@ covariance, quality, and both source and receive clock identities.
 `WheelOdometryLocalization` derives an `odom` to `base` estimate from a
 differential `MobileBase`; `SimulationTruthLocalization` projects a
 simulation-owned robot pose into `map` to `base` for deterministic scenarios.
+`FrameTree2` stores static parent-child transforms and exposes explicit
+`target_T_source` lookup direction. `PoseFusionLocalization` combines wheel
+odometry with transformed external pose observations using separate covariance
+weights for planar position and heading. It reports an invalid estimate until
+the odometry frame can be anchored to the requested reference frame.
 
 `robotkit.navigation.Navigation` follows a framed `Path` using the latest
 localization state and an application-supplied update duration. `Trajectory`

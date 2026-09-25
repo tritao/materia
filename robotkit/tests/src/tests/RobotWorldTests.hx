@@ -60,7 +60,11 @@ import robotkit.mobile.DifferentialOdometry;
 import robotkit.localization.WheelOdometryLocalization;
 import robotkit.localization.SimulationTruthLocalization;
 import robotkit.localization.LocalizationQuality;
+import robotkit.localization.LocalizationState;
 import robotkit.localization.PoseCovariance2;
+import robotkit.localization.FrameTransform2;
+import robotkit.localization.FrameTree2;
+import robotkit.localization.PoseFusionLocalization;
 import robotkit.navigation.Path;
 import robotkit.navigation.Trajectory;
 import robotkit.navigation.TrajectorySample;
@@ -595,6 +599,51 @@ class RobotWorldTests {
     equal(localization.state(), null, "localization reset clears its published state");
     throws(function() new PoseCovariance2(-1.0),
       "pose covariance rejects negative variances");
+
+    var frames = new FrameTree2();
+    frames.add(new FrameTransform2("map", "facility", new Pose2(5.0, 0.0, 0.0)));
+    frames.add(new FrameTransform2("base", "imu", new Pose2(0.2, 0.0, 0.0)));
+    check(Math.abs(frames.lookup("map", "facility").x - 5.0) < 1e-9 &&
+      Math.abs(frames.lookup("imu", "base").x + 0.2) < 1e-9,
+      "Frame tree lookups preserve target/source transform direction");
+    var cyclicFrames = new FrameTree2();
+    cyclicFrames.add(new FrameTransform2("map", "odom", new Pose2()));
+    cyclicFrames.add(new FrameTransform2("odom", "base", new Pose2()));
+    throws(function() cyclicFrames.add(new FrameTransform2("base", "map", new Pose2())),
+      "Frame tree rejects cyclic parent relationships");
+
+    var fusionRobot = new FakeRobot("fused-base");
+    fusionRobot.positions = [0.0, 0.0];
+    var fusionBase = new MobileBase(fusionRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var wheelSource = new WheelOdometryLocalization(fusionBase);
+    var fusion = new PoseFusionLocalization(wheelSource, frames, "map", "base");
+    var fusedInput = new RobotSnapshot("fused-base", Int64.ofInt(1), Int64.ofInt(100),
+      [0.0, 0.0], [], [], 1, 0, Int64.ofInt(110), [], "fused-clock", "host-clock");
+    var unanchored = fusion.update(fusedInput);
+    check(switch unanchored.quality { case Invalid: true; case _: false; },
+      "Pose fusion marks output invalid until frames are connected by an absolute pose");
+    var externalPose = new LocalizationState(Int64.ofInt(1),
+      new Pose2(0.3, 0.0, 0.0), "facility", "imu",
+      new PoseCovariance2(0.04, 0.0, 0.0, 0.04, 0.0, 0.01), Good,
+      Int64.ofInt(100), Int64.ofInt(110), "gps-clock", "host-clock");
+    var fused = fusion.fuse(externalPose);
+    check(fused.referenceFrame == "map" && fused.bodyFrame == "base" &&
+      Math.abs(fused.pose.x - 5.1) < 1e-9 &&
+      switch fused.quality { case Good: true; case _: false; },
+      "Pose fusion transforms external sensor poses into the requested robot frame");
+    var secondExternalPose = new LocalizationState(Int64.ofInt(2),
+      new Pose2(0.5, 0.0, 0.0), "facility", "imu",
+      new PoseCovariance2(0.04, 0.0, 0.0, 0.04, 0.0, 0.01), Good,
+      Int64.ofInt(120), Int64.ofInt(130), "gps-clock", "host-clock");
+    var smoothed = fusion.fuse(secondExternalPose);
+    check(Math.abs(smoothed.pose.x - 5.2) < 1e-9 && smoothed.covariance.xx < 0.04,
+      "Pose fusion weights repeated absolute observations by covariance");
+    var fusedMoved = fusion.update(new RobotSnapshot("fused-base", Int64.ofInt(2),
+      Int64.ofInt(200), [1.0, 1.0], [], [], 1, 0, Int64.ofInt(210), [],
+      "fused-clock", "host-clock"));
+    check(Math.abs(fusedMoved.pose.x - 5.3) < 1e-9,
+      "Fused map pose continues to follow wheel odometry between absolute updates");
 
     var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
     var simulation = new Simulation();
