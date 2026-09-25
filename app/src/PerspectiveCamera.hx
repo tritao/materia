@@ -11,6 +11,8 @@ class PerspectiveCamera {
   public var yaw(default, null):Float;
   public var pitch(default, null):Float;
   public var distance(default, null):Float;
+  public var clipNear(default, null):Float = 0.001;
+  public var clipFar(default, null):Float = 100.0;
   public var revision(default, null):Int = 0;
 
   public function new() reset();
@@ -20,7 +22,39 @@ class PerspectiveCamera {
     distance = 9.354143466934854;
     yaw = -0.9652516631899266;
     pitch = 0.5639426413606289;
+    resetClipRange();
     revision++;
+  }
+
+  function resetClipRange():Void {
+    clipNear = Math.max(0.001, distance / 100.0);
+    clipFar = Math.max(100.0, distance * 100.0);
+  }
+
+  /** Fits the depth range to visible world-space axis-aligned bounds. */
+  public function fitClipRange(bounds:Array<Array<Float>>):Void {
+    var eye = eyePosition(), backward = viewDirection();
+    var forward = [-backward[0], -backward[1], -backward[2]];
+    var nearest = 1e300, farthest = 0.0, crossesEye = false;
+    for (box in bounds) {
+      if (box == null || box.length != 6) continue;
+      var cx = (box[0] + box[3]) * 0.5 - eye[0];
+      var cy = (box[1] + box[4]) * 0.5 - eye[1];
+      var cz = (box[2] + box[5]) * 0.5 - eye[2];
+      var radius = Math.abs(forward[0]) * (box[3] - box[0]) * 0.5 +
+        Math.abs(forward[1]) * (box[4] - box[1]) * 0.5 +
+        Math.abs(forward[2]) * (box[5] - box[2]) * 0.5;
+      var depth = cx * forward[0] + cy * forward[1] + cz * forward[2];
+      if (depth + radius <= 0.0) continue;
+      farthest = Math.max(farthest, depth + radius);
+      if (depth - radius <= 0.0) crossesEye = true;
+      else nearest = Math.min(nearest, depth - radius);
+    }
+    if (farthest <= 0.0) { resetClipRange(); return; }
+    // A bounding box is conservative; the margin also prevents clipping while orbiting.
+    clipNear = crossesEye ? Math.max(0.000001, distance / 10000.0)
+      : Math.max(0.000001, nearest * 0.8);
+    clipFar = Math.max(clipNear * 2.0, farthest * 1.2);
   }
 
   public function orbit(deltaX:Float, deltaY:Float):Void {
@@ -47,6 +81,7 @@ class PerspectiveCamera {
 
   public function zoom(deltaY:Float):Void {
     distance = clamp(distance * Math.pow(2.0, deltaY * 0.002), 0.05, 1000000.0);
+    resetClipRange();
     revision++;
   }
 
@@ -57,6 +92,7 @@ class PerspectiveCamera {
     var horizontal = Math.max(width, depth) / Math.max(0.01, aspect);
     var diameter = Math.max(0.1, Math.max(vertical, horizontal));
     distance = clamp((diameter * 0.65) / Math.tan(FOV_Y * Math.PI / 360.0), 0.05, 1000000.0);
+    resetClipRange();
     revision++;
   }
 
@@ -69,7 +105,7 @@ class PerspectiveCamera {
       side[1], up[1], -forward[1], 0.0,
       side[2], up[2], -forward[2], 0.0,
       -dot(side, eye), -dot(up, eye), dot(forward, eye), 1.0];
-    var near = Math.max(0.001, distance / 10000.0), far = Math.max(100.0, distance * 100.0);
+    var near = clipNear, far = clipFar;
     var scale = 1.0 / Math.tan(FOV_Y * Math.PI / 360.0);
     var projection = [scale / Math.max(0.01, aspect), 0.0, 0.0, 0.0,
       0.0, scale, 0.0, 0.0,

@@ -73,6 +73,18 @@ class SceneEditingTests {
       var value = matrix.element(index);
       check(value == value && value - value == 0.0, "perspective matrix remains finite");
     }
+    camera.reset();
+    camera.fitClipRange([[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]]);
+    check(camera.clipNear > camera.distance * 0.5 && camera.clipFar < camera.distance * 2.0,
+      "viewport depth range follows nearby scene bounds");
+    var eye = camera.eyePosition();
+    camera.fitClipRange([[eye[0]-0.5, eye[1]-0.5, eye[2]-0.5,
+      eye[0]+0.5, eye[1]+0.5, eye[2]+0.5]]);
+    check(camera.clipNear < 0.01 && camera.clipFar > camera.clipNear,
+      "camera inside visible bounds retains nearby geometry");
+    camera.fitClipRange([]);
+    check(camera.clipNear > 0.0 && camera.clipFar > camera.clipNear,
+      "empty scene retains a valid depth range");
     var ray = camera.screenRay(800, 450, 1600, 900);
     var planeDistance = (camera.targetZ - ray.originZ) / ray.directionZ;
     near(ray.originX + ray.directionX * planeDistance, camera.targetX,

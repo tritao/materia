@@ -103,6 +103,7 @@ class EditorPerspectiveViewport implements View {
         renderedLightingRevision != lightingRevision ||
         width != renderedWidth || height != renderedHeight)) {
       var started = Sys.time();
+      fitCameraClipRange();
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
         simulationActive ? simulationPoses : null);
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
@@ -242,6 +243,7 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function pick(localX:Float, localY:Float):String {
+    fitCameraClipRange();
     var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
     var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),
       simulationActive?simulationPoses:null);
@@ -260,6 +262,7 @@ class EditorPerspectiveViewport implements View {
 
   function selectAt(localX:Float,localY:Float):String {
     if(!editingEnabled()){var id=pick(localX,localY);scene.select(id);return id;}
+    fitCameraClipRange();
     var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
     var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null);
     return scene.selectRayWithView(view,ray.originX,ray.originY,ray.originZ,
@@ -280,6 +283,22 @@ class EditorPerspectiveViewport implements View {
         for(column in 0...3)value+=transform.element(column*4+row)*local[column];
         result[row]=Math.min(result[row],value);result[row+3]=Math.max(result[row+3],value);}}
     return result;
+  }
+
+  function fitCameraClipRange():Void {
+    var bounds:Array<Array<Float>> = [];
+    for (item in scene.items()) {
+      if (!item.visible) continue;
+      if (simulationActive) {
+        bounds.push(transformedBounds(displayTransform(item), item.width, item.height, item.depth));
+      } else {
+        var world = scene.info(item.id).bounds();
+        if (world.valid)
+          bounds.push([world.minX, world.minY, world.minZ,
+            world.maxX, world.maxY, world.maxZ]);
+      }
+    }
+    camera.fitClipRange(bounds);
   }
 
   function displayTransform(item:EditorSceneObject):Transform {
