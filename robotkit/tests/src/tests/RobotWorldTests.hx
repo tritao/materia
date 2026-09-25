@@ -121,6 +121,7 @@ import robotkit.skill.FollowPath;
 import robotkit.skill.GoTo;
 import robotkit.skill.PickPallet;
 import robotkit.skill.PlacePallet;
+import robotkit.skill.Skill;
 import robotkit.skill.SkillStatus;
 import robotkit.skill.SkillRunner;
 
@@ -146,6 +147,7 @@ class RobotWorldTests {
     testForkMechanisms();
     testPerceptionSafetyPower();
     testLoadSafetyPolicy();
+    testSimulatedMaterialHandlingScenario();
     testForkliftSkillsOnSimulationAndReplay();
     testMcapRoundTrip();
     testMcapRobustness();
@@ -1864,6 +1866,150 @@ class RobotWorldTests {
     check(recovered.phase == SafetyPhase.Normal && !base.safetyStopRequired,
       "A valid refreshed load state clears the policy stop and restores nominal limits");
     base.command(new Twist2(0.1, 0.0), 0.1);
+  }
+
+  static function testSimulatedMaterialHandlingScenario():Void {
+    var model = configuredForkliftModel();
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var simulation = new Simulation(0.02);
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("material-handling", runtime, model.name,
+      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var base = MobileBase.fromBlueprint(robot, blueprint);
+    var forks = Forks.fromBlueprint(robot, blueprint);
+    forks.setLoadState(LoadState.empty());
+    var loadSafety = new LoadSafetyPolicy(base, forks);
+    var localization = new SimulationTruthLocalization(simulation, 0,
+      "map", "link/base");
+    var navigation = new Navigation(base, localization, 0.3, 0.45, 1.0);
+    var plant = new DifferentialDrivePlant(simulation, 0, base);
+    var runner = new SkillRunner();
+    var tick = 0;
+    var timestep = 0.02;
+    var latestSnapshot:RobotSnapshot = plant.step(Int64.ofInt(tick++));
+    localization.update(latestSnapshot);
+    loadSafety.refresh();
+    var unloadedLimits = base.motionLimits;
+
+    var dockApproach = new Pose2(0.4, 0.0, 0.0);
+    var palletPose = new Pose2(1.4, 0.0, 0.0);
+    var pickApproach = new Pose2(0.9, 0.0, 0.0);
+    var placeApproach = new Pose2(2.7, 0.0, 0.0);
+    function detection(id:String, kind:String, pose:Pose2):Detection {
+      return new Detection(id, kind, 0.98, pose, "map",
+        latestSnapshot.sourceSequence, latestSnapshot.sourceTimestampNs,
+        latestSnapshot.receivedTimestampNs, latestSnapshot.sourceClockId,
+        latestSnapshot.receivedClockId);
+    }
+    // Scene truth and a deterministic load sensor make pallet interaction
+    // repeatable; chassis and fork actuation still advance through SimKit.
+    var groundTruth = new GroundTruthPerception(function() {
+      var palletDetection = detection("pallet-17", "pallet", palletPose);
+      var dockDetection = detection("pallet-staging", "dock", palletPose);
+      return new PerceptionSnapshot([], [],
+        [new Pallet(palletDetection, 1.2, 0.8, 0.15)],
+        [new DockingTarget(dockDetection, dockApproach)]);
+    });
+    var scene = groundTruth.observe(latestSnapshot.sensors.toArray());
+    check(scene.dockingTargets().length == 1 && scene.pallets().length == 1,
+      "simulated scene supplies a docking target and pallet detection");
+
+    var observationHook:RobotSnapshot -> Void = function(_) {};
+    var controlHook:Void -> Void = function() {};
+    function runSkill(skill:Skill):SkillStatus {
+      var status = runner.start(skill);
+      var steps = 0;
+      while (status == SkillStatus.Running && steps < 1500) {
+        var snapshot = plant.step(Int64.ofInt(tick++));
+        latestSnapshot = snapshot;
+        observationHook(snapshot);
+        loadSafety.refresh();
+        status = runner.update(snapshot, timestep);
+        controlHook();
+        steps++;
+      }
+      return status;
+    }
+
+    var dock = new Dock(navigation, scene.dockingTargets()[0]);
+    check(runSkill(dock) == SkillStatus.Succeeded &&
+      runner.result() != null,
+      "SkillRunner docks at the pallet staging pose in simulation");
+
+    var payload = new Payload(500.0, 1.2, 0.8, 0.15, 0.6, 0.0, 0.35);
+    var pickScene = groundTruth.observe(latestSnapshot.sensors.toArray());
+    var pallet = pickScene.pallets()[0];
+    var pick = new PickPallet(navigation, forks, pallet, payload, pickApproach,
+      0.5, 0.1, 0.45, 0.06, 0.1);
+    observationHook = function(_) {
+      if (runner.activeSkill() == pick && forks.loadState.payload == payload &&
+          !forks.loadState.secured && forks.state().lift.position >= 0.49)
+        forks.setLoadState(LoadState.carried(payload));
+    };
+    var pickStatus = runSkill(pick);
+    observationHook = function(_) {};
+    check(pickStatus == SkillStatus.Succeeded && runner.result() != null &&
+      forks.loadState.secured && forks.loadState.payload == payload &&
+      Math.abs(forks.state().lift.position - 0.5) < 1e-6,
+      "SkillRunner picks and secures the pallet after simulated fork actuation");
+
+    var loadedState = loadSafety.refresh();
+    var loadedLimits = base.motionLimits;
+    var baseFootprint = base.footprint;
+    var loadedFootprint = loadedState.footprint;
+    if (baseFootprint == null || loadedFootprint == null)
+      throw "Forklift load policy did not provide both robot footprints";
+    check(loadedState.phase == SafetyPhase.Restricted &&
+      loadedLimits.maxLinearSpeed < unloadedLimits.maxLinearSpeed &&
+      loadedLimits.maxLinearAcceleration < unloadedLimits.maxLinearAcceleration &&
+      loadedFootprint.radius > baseFootprint.radius,
+      "confirmed pallet load lowers driving limits and expands the planning footprint");
+
+    var grid = new OccupancyGrid2(0.2, new Pose2(-1.0, -2.0), 40, 20,
+      "map", OccupancyCell.Free);
+    var costmap = new Costmap2(grid, loadedFootprint.radius, true, 0.3, 1.5);
+    var planner = new AStarPlanner(costmap);
+    var navigator = new Navigator(navigation, planner, costmap);
+    var loadedGoalPose = new Pose2(2.4, 0.0, 0.0);
+    var loadedGoal = new GoTo(navigator,
+      new NavigationGoal(loadedGoalPose, "map", 0.12, 0.12), function(snapshot) {
+        latestSnapshot = snapshot;
+        localization.update(snapshot);
+        return groundTruth.observe(snapshot.sensors.toArray());
+      });
+    var maxLoadedCommand = 0.0;
+    controlHook = function() {
+      maxLoadedCommand = Math.max(maxLoadedCommand,
+        Math.abs(base.currentCommand().linear));
+    };
+    var loadedStatus = runSkill(loadedGoal);
+    controlHook = function() {};
+    var loadedEstimate = localization.state();
+    check(loadedStatus == SkillStatus.Succeeded && runner.result() != null &&
+      maxLoadedCommand > 0.05 &&
+      maxLoadedCommand <= loadedLimits.maxLinearSpeed + 1e-9 &&
+      loadedEstimate != null && Math.abs(loadedEstimate.pose.x - loadedGoalPose.x) <= 0.14,
+      "goal-level GoTo reaches the delivery area within load-reduced speed limits");
+
+    var place = new PlacePallet(navigation, forks, payload, placeApproach,
+      0.0, 0.0, 0.45, 0.06, 0.1);
+    observationHook = function(_) {
+      if (runner.activeSkill() == place && forks.loadState.secured &&
+          forks.state().lift.position <= 0.01)
+        forks.setLoadState(LoadState.empty());
+    };
+    var placeStatus = runSkill(place);
+    check(placeStatus == SkillStatus.Succeeded && runner.result() != null &&
+      forks.loadState.observed && !forks.loadState.secured &&
+      forks.loadState.payload == null,
+      "SkillRunner places the pallet after simulated release confirmation");
+    loadSafety.refresh();
+    check(base.motionLimits.maxLinearSpeed == unloadedLimits.maxLinearSpeed &&
+      !base.safetyStopRequired,
+      "confirmed pallet release restores the unloaded motion limits");
+
+    robot.close();
+    simulation.dispose();
   }
 
   static function testForkliftSkillsOnSimulationAndReplay():Void {
