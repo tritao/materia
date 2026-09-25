@@ -207,6 +207,20 @@ navigation.follow(new Path([startPose, stagingPose, goalPose], "odom"));
 navigation.updateObservation(robot.snapshot(), 0.02);
 ```
 
+`robotkit.navigation.MotionGuard` filters those commands using a
+`PerceptionSnapshot`, localization frames, and the mobile base footprint. It
+passes clear-path commands, scales linear and angular speed as an obstacle
+enters the stopping envelope, and requests a zero twist inside the configured
+margin. Feed it body-frame obstacles or use `FrameAwarePerception` to project
+sensor observations into the localization frame. This is software collision
+avoidance; the native runtime and hardware safety functions remain responsible
+for hard stops.
+
+```haxe
+var guard = new MotionGuard(navigation, base.footprint);
+guard.update(perception.observe(robot.snapshot().sensors.toArray()), 0.02);
+```
+
 `robotkit.material.Forks` maps configured lift, tilt, and spread joint names to
 atomic position batches. `ForkState` reads their positions, velocities, efforts,
 and source/receive clocks. `Payload`, `LoadState`, and `LoadLimits` represent
@@ -239,6 +253,11 @@ bodyLinkId)` to update localization and model kinematics together before
 transforming the sensor observations. With `observe(sensorFrames)`, update
 localization from the matching robot observation first. Disconnected frames and
 invalid localization are rejected.
+`MotionGuard` accepts obstacles in either the localization body frame or
+reference frame. It projects reference-frame detections into the current body
+pose, checks their circles against the footprint corridor, and uses
+`StoppingEnvelope` plus configured margin to choose clear, approaching, or
+blocked command behavior.
 `robotkit.safety` exposes operator-facing phase, active restrictions, speed
 limit, and stopping envelope values; the native runtime continues to enforce
 hard safety. `LoadSafetyPolicy.refresh()` reduces `MobileBase` speed and

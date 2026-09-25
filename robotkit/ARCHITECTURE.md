@@ -257,6 +257,13 @@ pure-pursuit controller at application update frequency. It obtains a fresh
 first controller does not require a trajectory planner. Native `RobotRuntime`
 continues to own joint limits and hard safety enforcement.
 
+`robotkit.navigation.MotionGuard` is an application-level command filter between
+navigation and `MobileBase`. It transforms reference-frame obstacles into the
+localized body frame, checks a forward footprint corridor, and uses a stopping
+envelope to pass, scale, or zero the requested twist. Obstacles in unresolved
+frames block motion until perception transforms them. The guard is software
+collision avoidance and does not replace native or hardware safety.
+
 `robotkit.material.Forks` is another explicit view over `Robot`. Its named axis
 configuration is resolved against `RobotDescription` once, then each lift,
 tilt, or spread request is validated and submitted as one `JointTargets` batch.

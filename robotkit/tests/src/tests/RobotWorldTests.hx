@@ -80,6 +80,8 @@ import robotkit.navigation.PathSpeedLimit;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationStatus;
+import robotkit.navigation.MotionGuard;
+import robotkit.navigation.MotionGuardState;
 import robotkit.material.ForkAxisConfig;
 import robotkit.material.ForkAxisState;
 import robotkit.material.ForkConfig;
@@ -89,6 +91,7 @@ import robotkit.material.LoadLimits;
 import robotkit.material.LoadState;
 import robotkit.material.Payload;
 import robotkit.perception.Detection;
+import robotkit.perception.Obstacle;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.LidarObstaclePerception;
 import robotkit.perception.GroundTruthPerception;
@@ -126,6 +129,7 @@ class RobotWorldTests {
     testRobotModelCodec();
     testLocalization();
     testNavigation();
+    testMotionGuard();
     testForkMechanisms();
     testPerceptionSafetyPower();
     testLoadSafetyPolicy();
@@ -1086,6 +1090,94 @@ class RobotWorldTests {
       case Failed(_): true;
       case _: false;
     }, "Navigation fails explicitly when path and localization frames differ");
+  }
+
+  static function testMotionGuard():Void {
+    var model = new RobotModel("motion-guard-sim");
+    var baseLink = model.addLink(new Link("base", "base"));
+    var leftLink = model.addLink(new Link("left wheel", "left-wheel"));
+    var rightLink = model.addLink(new Link("right wheel", "right-wheel"));
+    var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink,
+      "joint/left-wheel");
+    left.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
+    model.addJoint(left);
+    var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink,
+      "joint/right-wheel");
+    right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
+    model.addJoint(right);
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
+        0.1, 0.5), 0.6, 1.0, 2.0, 4.0, 0.6, 0.4);
+    var lidar = model.addSensor(new Sensor("front lidar", "lidar", 0.0,
+      "sensor/front-lidar"));
+    lidar.rayCount = 64;
+    lidar.maxRange = 5.0;
+
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("motion-guard-sim", runtime, model.name,
+      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var base = MobileBase.fromBlueprint(robot, blueprint);
+    var localization = new FixedLocalization(new LocalizationState(Int64.ofInt(0),
+      new Pose2(), "map", "base", PoseCovariance2.zero(), Good,
+      Int64.ofInt(0), Int64.ofInt(0), "sim-clock", "host-clock"));
+    var lidarPerception = LidarObstaclePerception.fromBlueprint(blueprint,
+      "sensor/front-lidar", 0.08, 0.05, 0.4);
+    var framedPerception = new FrameAwarePerception(lidarPerception, localization);
+    var navigation = new Navigation(base, localization, 0.2, 0.6, 1.0);
+    var guard = new MotionGuard(navigation, null, 0.2, 2.0, 0.15, 0.5);
+    var path = new Path([new Pose2(), new Pose2(5.0, 0.0, 0.0)], "map");
+    navigation.follow(path);
+
+    function observe(tick:Int):PerceptionSnapshot {
+      simulation.step(Int64.ofInt(tick));
+      var snapshot = robot.snapshot();
+      return framedPerception.observe(snapshot.sensors.toArray());
+    }
+    var clear = observe(1);
+    equal(clear.obstacles().length, 0, "simulated LiDAR reports a clear path initially");
+    guard.update(clear, 1.0);
+    check(switch guard.state { case Clear: true; case _: false; } &&
+      base.currentCommand().linear > 0.5,
+      "MotionGuard leaves navigation speed unchanged when the path is clear");
+
+    var objectId = simulation.spawnBox([1.0, 0.0, 0.0], [0.1, 0.1, 0.1]);
+    var detected = observe(2);
+    check(detected.obstacles().length > 0,
+      "simulated LiDAR perception detects an obstacle in the navigation corridor");
+    guard.update(detected, 0.1);
+    var approachSpeed = base.currentCommand().linear;
+    check(switch guard.state { case Approaching(_, _, _): true; case _: false; } &&
+      approachSpeed > 0.0 && approachSpeed < 0.6,
+      "MotionGuard reduces navigation speed inside the stopping envelope");
+
+    simulation.teleportObject(objectId, [0.65, 0.0, 0.0]);
+    var blocked = observe(3);
+    check(blocked.obstacles().length > 0,
+      "simulated perception continues observing an obstacle near the footprint");
+    guard.update(blocked, 0.1);
+    guard.update(blocked, 0.1);
+    check(switch guard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9,
+      "MotionGuard commands a stop when obstacle clearance reaches its margin");
+
+    simulation.removeObject(objectId);
+    var resumed = observe(4);
+    equal(resumed.obstacles().length, 0, "simulated LiDAR clears the removed obstacle");
+    guard.update(resumed, 0.1);
+    check(switch guard.state { case Clear: true; case _: false; } &&
+      base.currentCommand().linear > 0.0,
+      "MotionGuard lets navigation resume after the obstacle is removed");
+    var unframedObstacle = new Obstacle(new Detection("unframed-obstacle", "obstacle",
+      1.0, new Pose2(1.0, 0.0), "camera-frame", Int64.ofInt(1), Int64.ofInt(10),
+      Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    guard.update(new PerceptionSnapshot([], [unframedObstacle]), 0.1);
+    check(switch guard.state { case Blocked(_): true; case _: false; },
+      "MotionGuard blocks when obstacle frame transforms are unavailable");
+    guard.detach();
+    robot.close();
+    simulation.dispose();
   }
 
   static function testForkMechanisms():Void {

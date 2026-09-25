@@ -32,6 +32,7 @@ class Navigation {
   var currentGoal:Null<NavigationGoal> = null;
   var commandedLinearSpeed:Float = 0.0;
   var trajectoryElapsedSeconds:Float = 0.0;
+  var commandFilter:Null<Twist2 -> Twist2> = null;
 
   public function new(base:MobileBase, localization:Localization,
       ?lookaheadDistance:Float = 0.5, ?cruiseSpeed:Float = 0.5,
@@ -265,6 +266,14 @@ class Navigation {
     }
   }
 
+  /** Installs a final command filter used by operational motion guards. */
+  public function setCommandFilter(filter:Null<Twist2 -> Twist2>):Void {
+    commandFilter = filter;
+  }
+
+  /** Whether a command filter is currently owned by an operational layer. */
+  public function hasCommandFilter():Bool return commandFilter != null;
+
   public function reset():Void {
     if (isFollowing()) base.stop(StopMode.Normal);
     currentPath = null;
@@ -301,7 +310,9 @@ class Navigation {
 
   function command(twist:Twist2, durationSeconds:Float):NavigationStatus {
     try {
-      var accepted = base.command(twist, durationSeconds);
+      var filtered = commandFilter == null ? twist : commandFilter(twist);
+      if (filtered == null) throw "Navigation command filter returned no command";
+      var accepted = base.command(filtered, durationSeconds);
       commandedLinearSpeed = accepted.linear;
       return status;
     } catch (error:Dynamic) {
