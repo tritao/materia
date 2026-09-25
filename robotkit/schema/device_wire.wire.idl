@@ -1,0 +1,72 @@
+# RobotKit v5 device payload records. Outer frame and safety rules are separate.
+
+const PROTOCOL_VERSION : u8 = 5;
+const MAX_JOINTS : u8 = 64;
+
+enum MessageType : u8 {
+    session_begin = 1
+    session_ack = 2
+    command = 3
+    state = 4
+}
+
+enum SessionStatus : u8 {
+    latched_safe = 1
+    model_mismatch = 2
+}
+
+enum CommandKind : u8 {
+    targets = 1
+    stop = 2
+    emergency_stop = 3
+    reset_safety = 4
+}
+
+enum TargetMode : u8 {
+    position = 1
+    velocity = 2
+    effort = 3
+}
+
+packed SessionBegin endian little {
+    session : u64
+    model_fingerprint : u8[16]
+}
+
+packed SessionAck endian little {
+    session : u64
+    device_fingerprint : u8[16]
+    status : u8
+    reserved : u8[3]
+}
+
+packed CommandHeader endian little {
+    session : u64
+    sequence : u64
+    kind : u8
+    target_count : u8
+    reserved : u16
+}
+
+packed JointTarget endian little {
+    joint : u16
+    mode : u8
+    flags : u8
+    value : f32
+}
+
+packed StateHeader endian little {
+    session : u64
+    timestamp_ns : u64
+    accepted_sequence : u64
+    safety : u8
+    fault : u8
+    joint_count : u8
+    reserved : u8
+}
+
+packed JointState endian little {
+    position : f32
+    velocity : f32
+    effort : f32
+}

@@ -25,6 +25,22 @@ set_target_properties(robotkit_runtime PROPERTIES
     SOVERSION 0)
 
 if(RK_BUILD_TESTS)
+    find_package(Python3 3.10 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME robotkit_device_wire_codegen
+            COMMAND ${Python3_EXECUTABLE} -B -m tools.wire check --config robotkit/wire.json)
+        set_tests_properties(robotkit_device_wire_codegen PROPERTIES
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
+            LABELS "robot;wire;codegen" TIMEOUT 30)
+    endif()
+
+    add_executable(robotkit_device_wire_tests tests/device_wire.cpp)
+    target_compile_features(robotkit_device_wire_tests PRIVATE cxx_std_20)
+    target_include_directories(robotkit_device_wire_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/generated)
+    add_test(NAME robotkit_device_wire COMMAND robotkit_device_wire_tests
+        ${CMAKE_CURRENT_SOURCE_DIR}/../schema/device_wire_vectors.tsv)
+    set_tests_properties(robotkit_device_wire PROPERTIES LABELS "robot;wire;codegen" TIMEOUT 30)
+
     add_executable(robotkit_validation_tests tests/validation.cpp)
     target_compile_features(robotkit_validation_tests PRIVATE cxx_std_20)
     target_link_libraries(robotkit_validation_tests PRIVATE RobotKit::runtime)

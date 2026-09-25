@@ -1,0 +1,10 @@
+{
+  "schema": "schema/device_wire.wire.idl",
+  "lock": "schema/device_wire.lock.json",
+  "packed_cpp": { "namespace": "robotkit::device_wire" },
+  "rust": {},
+  "outputs": {
+    "packed_cpp": "runtime/generated/device_wire.hpp",
+    "rust": "device_protocol/src/device_wire.rs"
+  }
+}
