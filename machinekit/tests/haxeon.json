@@ -1,0 +1,13 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-tests" },
+	"entry": "MachineKitSmoke",
+	"sourceRoots": ["src", "../examples"],
+	"dependencies": {
+		"projectkit": { "path": "../../projectkit" },
+		"cadkit": { "path": "../../cadkit" },
+		"machinekit": { "path": ".." }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

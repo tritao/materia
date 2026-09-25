@@ -1,0 +1,11 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit" },
+	"sourceRoots": ["haxe/src"],
+	"scopeSourceRoots": false,
+	"dependencies": {
+		"projectkit": { "path": "../projectkit" },
+		"cadkit": { "path": "../cadkit" }
+	},
+	"target": "host"
+}
