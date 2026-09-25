@@ -155,6 +155,12 @@ class AutomationTests {
       check(traffic.release("inbound-outbound", robot.id()), "owner releases its lane");
       check(traffic.reserve("inbound-outbound", secondRobot.id()), "waiting robot can reserve the released lane");
       check(traffic.release("inbound-outbound", secondRobot.id()), "second lane owner releases its reservation");
+      check(traffic.reserve("inbound-outbound", robot.id()) &&
+        !traffic.reserveIntersection(rack.id, robot.id()) &&
+        traffic.release("inbound-outbound", robot.id()) &&
+        traffic.reserveIntersection(rack.id, robot.id()) &&
+        traffic.releaseIntersection(rack.id, robot.id()),
+        "individual resource locks reject acquisition that violates global deadlock order");
 
       for (index in 0...4) mission.completeCurrentTask();
       check(switch mission.status { case Succeeded: true; case _: false; },
@@ -166,6 +172,39 @@ class AutomationTests {
       dispatcher.releaseCompleted(secondMission);
       equal(fleet.availableRobotIds().length, 2, "terminal releases return robots to the fleet");
       equal(fleet.assignmentForMission(mission.id), null, "terminal release removes the assignment");
+
+      var thirdRobot = new AutomationFakeRobot("forklift-3");
+      world.attach(thirdRobot);
+      fleet.addRobot(thirdRobot.id());
+      check(traffic.reserveRoute(route, robot.id(), 1),
+        "traffic manager atomically reserves every lane and intermediate junction for a route");
+      equal(traffic.owner("inbound-rack"), robot.id(), "route reservation owns its first lane");
+      equal(traffic.intersectionOwner(rack.id), robot.id(),
+        "route reservation owns the shared rack junction");
+      check(!traffic.reserveRoute(reverseRoute, secondRobot.id(), 5) &&
+        !traffic.reserveRoute(reverseRoute, thirdRobot.id(), 10),
+        "conflicting route reservations wait without holding partial resources");
+      var routeQueue = traffic.waitingForLane("inbound-rack");
+      check(routeQueue.length == 2 && routeQueue[0] == thirdRobot.id() &&
+        routeQueue[1] == secondRobot.id(),
+        "traffic route waiters are ordered by priority and then arrival");
+      check(traffic.releaseRoute(route, robot.id()) &&
+        traffic.reserveRoute(reverseRoute, thirdRobot.id(), 10),
+        "highest-priority route acquires the complete resource bundle when released");
+      check(!traffic.reserveRoute(reverseRoute, secondRobot.id(), 5),
+        "lower-priority route remains queued behind an active reservation");
+      check(traffic.releaseRoute(reverseRoute, thirdRobot.id()) &&
+        traffic.reserveRoute(reverseRoute, secondRobot.id(), 5) &&
+        traffic.releaseRoute(reverseRoute, secondRobot.id()),
+        "queued route proceeds after the higher-priority robot releases its bundle");
+      traffic.blockLane("inbound-rack", "pallet spill");
+      check(!traffic.reserveRoute(route, robot.id(), 10) &&
+        traffic.laneBlockReason("inbound-rack") == "pallet spill" &&
+        traffic.reservedLanes(robot.id()).length == 0,
+        "blocked lanes reject route acquisition without partial reservations");
+      check(traffic.unblockLane("inbound-rack") && traffic.reserveRoute(route, robot.id()) &&
+        traffic.releaseRoute(route, robot.id()),
+        "clearing a lane block allows a complete route reservation");
 
       var executableMission = new Mission("mission-19", "Execute work order", [
         new Transport("move-2", inbound.id, outbound.id, payload),

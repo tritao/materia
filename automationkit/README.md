@@ -21,8 +21,10 @@ sequence using lane speed and direction, then composes its centerlines into one
 framed path suitable for `Navigation` or a `GoTo` skill. Rack slot IDs and
 facility entity IDs are validated at insertion. Fleet assignments require an attached, ready robot;
 mission completion releases that robot for the next assignment. `TrafficManager`
-allows one fleet member to own a lane at a time and makes reservations
-idempotent for the current owner.
+allows one fleet member to own a lane or intersection at a time, supports
+priority-ordered waits and blocked lanes, and can reserve a complete route's
+lanes and junctions atomically. Route bundles hold all required resources until
+`releaseRoute`, so a waiting route never holds a partial set of locks.
 
 Task execution is an explicit composition point. `TaskSkillFactory` receives
 the current task, assigned `Robot`, and `Facility`, then returns a configured
