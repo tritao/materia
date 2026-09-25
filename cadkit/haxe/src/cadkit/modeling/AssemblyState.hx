@@ -71,7 +71,9 @@ class AssemblyState {
 		if (joint == null || joint.role != AssemblyJointRole.Tree ||
 			!AssemblyDefinitionCodec.hasCoordinate(joint.type))
 			throw 'Joint "$id" is not a driving tree joint';
-		return coordinates.get(id);
+		var value = coordinates.get(id);
+		if (value == null) throw 'Missing coordinate for joint "$id"';
+		return value;
 	}
 
 	public function setRootPose(id:String, pose:AssemblyFrame):Void {
@@ -100,6 +102,7 @@ class AssemblyState {
 		var occurrence = occurrences.get(id);
 		if (occurrence == null) throw 'Missing assembly occurrence "$id"';
 		var component = components.get(occurrence.definition);
+		if (component == null) throw 'Missing assembly component "${occurrence.definition}"';
 		for (connector in component.connectors) if (connector.name == name)
 			return AssemblyFrames.compose(worldPose(id), connector.frame);
 		throw 'Missing assembly connector "$id/$name"';
@@ -135,8 +138,11 @@ class AssemblyState {
 	public function record():AssemblyStateRecord {
 		var values:Array<AssemblyJointCoordinate> = [];
 		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree &&
-			AssemblyDefinitionCodec.hasCoordinate(joint.type))
-			values.push({joint: joint.id, value: coordinates.get(joint.id)});
+			AssemblyDefinitionCodec.hasCoordinate(joint.type)) {
+			var value = coordinates.get(joint.id);
+			if (value == null) throw 'Missing coordinate for joint "${joint.id}"';
+			values.push({joint: joint.id, value: value});
+		}
 		var roots:Array<AssemblyRootPose> = [];
 		for (occurrence in definition.occurrences) if (rootPoses.exists(occurrence.id))
 			roots.push({occurrence: occurrence.id, pose: rootPoses.get(occurrence.id)});
@@ -155,6 +161,7 @@ class AssemblyState {
 		var pose:AssemblyFrame;
 		if (joint == null) {
 			var occurrence = occurrences.get(id);
+			if (occurrence == null) throw 'Missing assembly occurrence "$id"';
 			pose = rootPoses.exists(id) ? rootPoses.get(id) : occurrence.initialPose;
 		} else {
 			var parentPose = solveOccurrence(joint.parent, visiting);
@@ -173,7 +180,9 @@ class AssemblyState {
 
 	function connector(occurrenceId:String, name:String):AssemblyConnector {
 		var occurrence = occurrences.get(occurrenceId);
+		if (occurrence == null) throw 'Missing assembly occurrence "$occurrenceId"';
 		var component = components.get(occurrence.definition);
+		if (component == null) throw 'Missing assembly component "${occurrence.definition}"';
 		for (connector in component.connectors) if (connector.name == name) return connector;
 		throw 'Missing assembly connector "$occurrenceId/$name"';
 	}

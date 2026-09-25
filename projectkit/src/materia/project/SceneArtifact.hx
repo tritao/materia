@@ -140,12 +140,13 @@ class SceneArtifact {
 		}
 		if (data.assemblyState != null && data.assemblyDefinition == null)
 			throw "Scene artifact assembly state has no definition";
-		if (data.assemblyDefinition != null) {
-			AssemblyDefinitionCodec.validate(data.assemblyDefinition);
-			for (definition in data.assemblyDefinition.definitions) if (!ids.exists(definition.id))
+		var assemblyDefinition = data.assemblyDefinition;
+		if (assemblyDefinition != null) {
+			AssemblyDefinitionCodec.validate(assemblyDefinition);
+			for (definition in assemblyDefinition.definitions) if (!ids.exists(definition.id))
 				throw 'Assembly component definition "${definition.id}" has no geometry part';
 			if (data.assemblyState != null)
-				AssemblyDefinitionCodec.validateState(data.assemblyDefinition, data.assemblyState);
+				AssemblyDefinitionCodec.validateState(assemblyDefinition, data.assemblyState);
 		}
 	}
 
