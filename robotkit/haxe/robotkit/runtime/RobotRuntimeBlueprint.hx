@@ -53,6 +53,19 @@ class RobotRuntimeBlueprint {
     joints.push(value);
   }
 
+  /** Finds a compiled sensor by its stable model ID, independent of array order. */
+  public function sensorById(id:String):Null<RobotRuntimeSensorBlueprint> {
+    if (id == null || id.length == 0) return null;
+    if (identity != null) {
+      var index = identity.sensorIndex(id);
+      if (index >= 0 && index < sensors.length && sensors[index].id == id)
+        return sensors[index];
+    }
+    for (sensor in sensors) if (sensor.id == id) return sensor;
+    for (sensor in sensorLayout()) if (sensor.id == id) return sensor;
+    return null;
+  }
+
   @:allow(RobotRuntime, Simulation)
   function nativeValue():rk_robot_runtime_blueprint {
     if (joints.length != jointCount)

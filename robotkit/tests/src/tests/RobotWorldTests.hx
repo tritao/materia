@@ -1700,7 +1700,11 @@ class RobotWorldTests {
     check(Math.abs(partialScan.values.get(1) - 1.75) < 0.000001,
       "partial scan distributes rays across configured angular coverage");
     equal(partialScan.values.get(2), 3.0, "partial scan includes its final bearing");
-    var perception = LidarObstaclePerception.fromSensor(blueprint.sensors[3], 0.1);
+    var perception = LidarObstaclePerception.fromBlueprint(blueprint,
+      "sensor/partial", 0.1);
+    throws(function() LidarObstaclePerception.fromBlueprint(blueprint,
+      "sensor/missing", 0.1),
+      "LiDAR perception rejects unknown authored sensor IDs");
     var observations = perception.observe([partialScan]);
     equal(observations.obstacles().length, 1, "compiled LiDAR settings construct matching perception");
     check(Math.abs(observations.obstacles()[0].detection.pose.x - 1.75) < 0.000001,

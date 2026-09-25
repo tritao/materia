@@ -1,6 +1,7 @@
 package robotkit.perception;
 
 import robotkit.mobile.Pose2;
+import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeSensorBlueprint;
 import robotkit.world.SensorFrame;
 
@@ -23,6 +24,19 @@ class LidarObstaclePerception implements Perception {
     return new LidarObstaclePerception(sensor.maxRange, obstacleRadiusMeters,
       minRangeMeters, minConfidence, maxClusterGapMeters,
       sensor.startAngleRadians, sensor.fieldOfViewRadians);
+  }
+
+  /** Builds perception from a sensor selected by its stable authored ID. */
+  public static function fromBlueprint(blueprint:RobotRuntimeBlueprint,
+      sensorId:String, obstacleRadiusMeters:Float,
+      ?minRangeMeters:Float = 0.05, ?minConfidence:Float = 0.5,
+      ?maxClusterGapMeters:Float = 0.1):LidarObstaclePerception {
+    if (blueprint == null) throw "LiDAR perception requires a compiled robot blueprint";
+    var sensor = blueprint.sensorById(sensorId);
+    if (sensor == null)
+      throw 'Compiled robot has no sensor with ID "$sensorId"';
+    return fromSensor(sensor, obstacleRadiusMeters, minRangeMeters,
+      minConfidence, maxClusterGapMeters);
   }
 
   public function new(maxRangeMeters:Float, obstacleRadiusMeters:Float,

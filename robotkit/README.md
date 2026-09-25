@@ -221,7 +221,9 @@ var forks = Forks.fromBlueprint(robot, blueprint);
 `robotkit.perception` provides timestamped `Detection`, `Obstacle`, `Pallet`,
 and `DockingTarget` values. `LidarObstaclePerception.fromSensor()` uses the
 compiled sensor's range and angular coverage to turn finite LiDAR returns into
-planar obstacle observations in the sensor frame. `FrameAwarePerception` wraps
+planar obstacle observations in the sensor frame. `fromBlueprint()` selects the
+compiled sensor by its stable authored ID, independent of sensor array order.
+`FrameAwarePerception` wraps
 a perception source and transforms detections, pallets, obstacles, and docking
 approach poses through `FrameTree2` and the latest valid localization estimate
 into one reference frame. Sensor-to-body transforms must be present in that
