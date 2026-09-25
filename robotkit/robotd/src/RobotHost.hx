@@ -4,6 +4,9 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
+import robotkit.model.RobotDriveConfiguration;
+import robotkit.model.RobotForkConfiguration;
+import robotkit.model.RobotMobileConfiguration;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
@@ -35,28 +38,40 @@ class RobotHost {
     if (serialPath != null && args.indexOf("--in-memory") >= 0)
       throw "robotd: --serial cannot be combined with --in-memory";
     var behavior = parseBehavior();
-    var robot = new RobotModel("demo-arm");
+    var multiJoint = args.indexOf("--multi-joint") >= 0;
+    var robot = new RobotModel(multiJoint ? "demo-forklift" : "demo-arm");
     var base = robot.addLink(new Link("base"));
-    var tool = robot.addLink(new Link("tool"));
-    var shoulder = robot.addJoint(new Joint("shoulder", JointType.Revolute, base, tool));
-    shoulder.limits.lower = -3.14;
-    shoulder.limits.upper = 3.14;
-    shoulder.limits.effort = 100.0;
-    if (args.indexOf("--multi-joint") >= 0) {
-      var wheel = robot.addLink(new Link("wheel"));
-      var carriage = robot.addLink(new Link("carriage"));
-      var wheelJoint = robot.addJoint(new Joint("wheel-joint", JointType.Revolute,
-        tool, wheel));
-      wheelJoint.limits.lower = -100.0;
-      wheelJoint.limits.upper = 100.0;
-      wheelJoint.limits.velocity = 10.0;
-      wheelJoint.limits.effort = 100.0;
-      var liftJoint = robot.addJoint(new Joint("lift", JointType.Prismatic,
-        tool, carriage));
-      liftJoint.limits.lower = -1.0;
+    if (multiJoint) {
+      var leftWheel = robot.addLink(new Link("left wheel", "link/left-wheel"));
+      var rightWheel = robot.addLink(new Link("right wheel", "link/right-wheel"));
+      var carriage = robot.addLink(new Link("fork carriage", "link/carriage"));
+      var leftWheelJoint = robot.addJoint(new Joint("left wheel joint", JointType.Continuous,
+        base, leftWheel, "joint/left-wheel"));
+      leftWheelJoint.limits.lower = -100.0;
+      leftWheelJoint.limits.upper = 100.0;
+      leftWheelJoint.limits.effort = 100.0;
+      var rightWheelJoint = robot.addJoint(new Joint("right wheel joint", JointType.Continuous,
+        base, rightWheel, "joint/right-wheel"));
+      rightWheelJoint.limits.lower = -100.0;
+      rightWheelJoint.limits.upper = 100.0;
+      rightWheelJoint.limits.effort = 100.0;
+      var liftJoint = robot.addJoint(new Joint("mast lift", JointType.Prismatic,
+        base, carriage, "joint/lift"));
+      liftJoint.limits.lower = 0.0;
       liftJoint.limits.upper = 1.0;
       liftJoint.limits.velocity = 2.0;
       liftJoint.limits.effort = 100.0;
+      robot.mobileBase = new RobotMobileConfiguration(
+        RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
+          0.1, 0.5), 0.5, 1.0, 1.0, 1.0);
+      robot.forkMechanism = new RobotForkConfiguration("joint/lift", 1000.0,
+        600.0, 1.0);
+    } else {
+      var tool = robot.addLink(new Link("tool"));
+      var shoulder = robot.addJoint(new Joint("shoulder", JointType.Revolute, base, tool));
+      shoulder.limits.lower = -3.14;
+      shoulder.limits.upper = 3.14;
+      shoulder.limits.effort = 100.0;
     }
     var mount = robot.addFrame(new robotkit.model.Frame("sensor mount", base, "demo/sensor-mount"));
     mount.position = [0.2, 0.0, 0.0];

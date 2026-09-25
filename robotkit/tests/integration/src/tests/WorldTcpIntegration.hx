@@ -10,9 +10,7 @@ import robotkit.behavior.WorldBehaviorRunner;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
 import robotkit.world.ReplayRobot;
-import robotkit.mobile.DifferentialDrive;
 import robotkit.mobile.MobileBase;
-import robotkit.mobile.MotionLimits;
 import robotkit.mobile.Pose2;
 import robotkit.localization.WheelOdometryLocalization;
 import robotkit.navigation.Navigation;
@@ -32,28 +30,32 @@ class WorldTcpIntegration {
     var simulation = new robotkit.runtime.Simulation();
     var failure:Dynamic = null;
     try {
-      var model = new robotkit.model.RobotModel("demo-arm");
+      var model = new robotkit.model.RobotModel("demo-forklift");
       var base = model.addLink(new robotkit.model.Link("base"));
-      var tool = model.addLink(new robotkit.model.Link("tool"));
-      var joint = model.addJoint(new robotkit.model.Joint("shoulder",
-        robotkit.model.JointType.Revolute, base, tool));
-      joint.limits.lower = -3.14;
-      joint.limits.upper = 3.14;
-      joint.limits.effort = 100;
-      var wheel = model.addLink(new robotkit.model.Link("wheel"));
-      var wheelJoint = model.addJoint(new robotkit.model.Joint("wheel-joint",
-        robotkit.model.JointType.Revolute, tool, wheel));
-      wheelJoint.limits.lower = -100.0;
-      wheelJoint.limits.upper = 100.0;
-      wheelJoint.limits.velocity = 10.0;
-      wheelJoint.limits.effort = 100.0;
-      var carriage = model.addLink(new robotkit.model.Link("carriage"));
-      var liftJoint = model.addJoint(new robotkit.model.Joint("lift",
-        robotkit.model.JointType.Prismatic, tool, carriage));
-      liftJoint.limits.lower = -1.0;
+      var leftWheel = model.addLink(new robotkit.model.Link("left wheel", "link/left-wheel"));
+      var rightWheel = model.addLink(new robotkit.model.Link("right wheel", "link/right-wheel"));
+      var carriage = model.addLink(new robotkit.model.Link("fork carriage", "link/carriage"));
+      var leftWheelJoint = model.addJoint(new robotkit.model.Joint("left wheel joint",
+        robotkit.model.JointType.Continuous, base, leftWheel, "joint/left-wheel"));
+      leftWheelJoint.limits.lower = -100.0;
+      leftWheelJoint.limits.upper = 100.0;
+      leftWheelJoint.limits.effort = 100.0;
+      var rightWheelJoint = model.addJoint(new robotkit.model.Joint("right wheel joint",
+        robotkit.model.JointType.Continuous, base, rightWheel, "joint/right-wheel"));
+      rightWheelJoint.limits.lower = -100.0;
+      rightWheelJoint.limits.upper = 100.0;
+      rightWheelJoint.limits.effort = 100.0;
+      var liftJoint = model.addJoint(new robotkit.model.Joint("mast lift",
+        robotkit.model.JointType.Prismatic, base, carriage, "joint/lift"));
+      liftJoint.limits.lower = 0.0;
       liftJoint.limits.upper = 1.0;
       liftJoint.limits.velocity = 2.0;
       liftJoint.limits.effort = 100.0;
+      model.mobileBase = new robotkit.model.RobotMobileConfiguration(
+        robotkit.model.RobotDriveConfiguration.Differential("joint/left-wheel",
+          "joint/right-wheel", 0.1, 0.5), 0.5, 1.0, 1.0, 1.0);
+      model.forkMechanism = new robotkit.model.RobotForkConfiguration("joint/lift",
+        1000.0, 600.0, 1.0);
       var mount = model.addFrame(new robotkit.model.Frame("sensor mount", base, "demo/sensor-mount"));
       mount.position = [0.2, 0.0, 0.0];
       for (kind in ["joint_encoder", "imu", "lidar"]) {
@@ -62,7 +64,7 @@ class WorldTcpIntegration {
       }
       var local = new robotkit.world.SimulatedRobot("local", simulation.addRobot(
         robotkit.runtime.RobotRuntimeCompiler.compile(model)), model.name,
-        ["base", "tool", "wheel", "carriage"], ["shoulder", "wheel-joint", "lift"]);
+        [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
       world.attach(local);
       simulation.step(Int64.ofInt(1));
       simulation.step(Int64.ofInt(2));
@@ -183,8 +185,7 @@ class WorldTcpIntegration {
         return state.positions.length == 3 && state.positions.get(0) == 0.25
           && state.velocities.get(1) > 0.0 && state.efforts.get(2) != 0.0;
       }, "atomic mixed-mode target batch did not reach robotd runtime");
-      var mobileBase = new MobileBase(remote,
-        new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(0.5, 1.0));
+      var mobileBase = MobileBase.fromRobot(remote, model);
       var localization = new WheelOdometryLocalization(mobileBase);
       var current = remote.snapshot();
       var estimate = localization.update(current);

@@ -33,7 +33,7 @@ def write_all(descriptor, data):
         offset += os.write(descriptor, data[offset:])
 
 
-def read_commands(pending, position, target_seen):
+def read_commands(pending, position, velocity, effort, target_seen):
     while True:
         start = pending.find(b"RKC3")
         if start < 0:
@@ -61,15 +61,26 @@ def read_commands(pending, position, target_seen):
             continue
         for index in range(target_count):
             joint, mode, value = struct.unpack_from("<IId", payload, 20 + index * 16)
-            if joint == 0 and mode == 1:
-                position[0] = value
-                target_seen.set()
+            if joint >= len(position):
+                continue
+            if mode == 1:
+                position[joint] = value
+                velocity[joint] = 0.0
+                effort[joint] = 0.0
+                if joint == 0 and abs(value - 0.5) < 1e-9:
+                    target_seen.set()
+            elif mode == 2:
+                velocity[joint] = value
+                effort[joint] = 0.0
+            elif mode == 3:
+                effort[joint] = value
 
 
-def run_device(master, stopping, position, target_seen):
+def run_device(master, stopping, position, velocity, effort, target_seen):
     pending = bytearray()
     sequence = 0
     next_state = time.monotonic()
+    last_update = next_state
     while not stopping.is_set():
         readable, _, _ = select.select([master], [], [], 0.002)
         if readable:
@@ -78,19 +89,24 @@ def run_device(master, stopping, position, target_seen):
             except OSError:
                 return
             pending.extend(data)
-            read_commands(pending, position, target_seen)
+            read_commands(pending, position, velocity, effort, target_seen)
 
         now = time.monotonic()
+        elapsed = now - last_update
+        for joint in range(len(position)):
+            position[joint] += velocity[joint] * elapsed
+        last_update = now
         if now < next_state:
             continue
         sequence += 1
         timestamp = time.monotonic_ns()
-        payload = struct.pack("<IQI", 1, timestamp, 3)
-        payload += struct.pack("<ddd", position[0], 0.0, 0.0)
+        payload = struct.pack("<IQI", len(position), timestamp, 3)
+        for joint in range(len(position)):
+            payload += struct.pack("<ddd", position[joint], velocity[joint], effort[joint])
         sensors = [
-            [position[0]],
+            position.copy(),
             [0.0, 0.0, 0.0, 0.0, 0.0, 9.81],
-            [5.0] * 8,
+            [10.0] * 8,
         ]
         for values in sensors:
             payload += struct.pack("<QQI", sequence, timestamp, len(values))
@@ -120,20 +136,24 @@ def run():
 
     stopping = threading.Event()
     target_seen = threading.Event()
-    position = [0.0]
+    position = [0.0, 0.0, 0.0]
+    velocity = [0.0, 0.0, 0.0]
+    effort = [0.0, 0.0, 0.0]
     device_thread = threading.Thread(
-        target=run_device, args=(master, stopping, position, target_seen), daemon=True
+        target=run_device,
+        args=(master, stopping, position, velocity, effort, target_seen),
+        daemon=True,
     )
     device_thread.start()
 
     server_args = [
         HAXEON, "run", "--project", "robotkit/robotd/haxeon.json", "--",
         "--server", "--once", "--serial=" + device_path, "--baud=115200",
-        "--port=" + str(port),
+        "--multi-joint", "--robot-id=42", "--port=" + str(port),
     ]
     client_args = [
         HAXEON, "run", "--project", "robotkit/tests/integration/haxeon.json", "--",
-        "--smoke", "--port=" + str(port),
+        "--port=" + str(port),
     ]
 
     try:
@@ -157,8 +177,8 @@ def run():
                     client_args, cwd=ROOT, capture_output=True, text=True, timeout=60
                 )
                 if client.returncode != 0:
-                    raise RuntimeError("RobotClient smoke failed:\n" + client.stdout + client.stderr)
-                if not target_seen.wait(1.0) or abs(position[0] - 0.5) > 1e-9:
+                    raise RuntimeError("TCP client integration failed:\n" + client.stdout + client.stderr)
+                if not target_seen.wait(1.0):
                     raise RuntimeError("robotd did not send the expected serial joint target")
                 try:
                     server.wait(timeout=5)
@@ -166,7 +186,7 @@ def run():
                     raise RuntimeError("robotd did not stop after the one-shot client") from error
                 if server.returncode != 0:
                     raise RuntimeError("robotd failed:\n" + read_server_log(server_output))
-                print("RemoteRobot TCP smoke passed through robotd and a serial PTY emulator")
+                print("RemoteRobot behavior and GoTo parity passed through robotd and a serial PTY emulator")
                 print(client.stdout.strip())
             finally:
                 if server.poll() is None:

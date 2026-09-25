@@ -35,8 +35,9 @@ Run the current skeleton with:
 The protocol and world TCP clients are integration tests rather than robotd
 runtime modes. Run them through `../tests/world-tcp.sh`.
 
-Run the TCP client against a pseudo-terminal device emulator to exercise the
-serial server path without motor hardware:
+Run the model-driven `MobileBase`, `GoTo`, sensor, and recording parity checks
+against a pseudo-terminal device emulator to exercise the serial server path
+without motor hardware:
 
 ```sh
 python3 ../tests/serial-tcp.py
