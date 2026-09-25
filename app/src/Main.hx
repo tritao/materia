@@ -162,6 +162,7 @@ class Main {
     if (diagnostics == null) throw "Invalid editor launch options";
     var host = new DesktopUiHostOptions();
     host.title = "Materia";
+    host.icons = MateriaIcon.create();
     host.width = diagnostics.windowWidth;
     host.height = diagnostics.windowHeight;
     host.captureDirectory = diagnostics.captureDirectory;

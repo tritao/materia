@@ -11,6 +11,7 @@ import NativeKitSurface;
 import NativeKitSurface.NativeKitSurfaceFrameSubscription;
 import Renderer;
 import haxe.Json;
+import haxe.io.Bytes;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -63,6 +64,24 @@ class DesktopUiHost {
 			if (createdWindow.status != Result.Ok)
 				throw "Window creation failed: " + NativeKit.nk_last_error();
 			window = createdWindow.out_window.borrow();
+			if (options.icons != null) {
+				var icons = options.icons;
+				var pixels = Bytes.alloc(icons.byteCount);
+				var images:Array<IconImage> = [];
+				var offset = 0;
+				for (icon in icons.imageList()) {
+					pixels.blit(offset, icon.pixels, 0, icon.pixels.length);
+					var image = new IconImage();
+					image.set_offset(offset);
+					image.set_width(icon.width);
+					image.set_height(icon.height);
+					image.set_stride(icon.stride);
+					images.push(image);
+					offset += icon.pixels.length;
+				}
+				if (NativeKit.nk_window_set_icons(window, pixels, images) != Result.Ok)
+					throw "Window icons failed: " + NativeKit.nk_last_error();
+			}
 
 			var graphicsApi:GraphicsApi = NativeKitGpu.nkgpu_default_graphics_api();
 			var surfaceOptions = new SurfaceOptions();

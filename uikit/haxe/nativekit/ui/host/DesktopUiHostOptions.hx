@@ -10,6 +10,7 @@ class DesktopUiHostOptions extends UiHostOptions {
 	/** True while application state changes without input events, such as live simulation. */
 	public var continuousFrames:Null<Void->Bool> = null;
 	public var eventHistoryLimit:Int = 100;
+	public var icons:Null<ApplicationIconSet> = null;
 
 	public function new() super();
 
