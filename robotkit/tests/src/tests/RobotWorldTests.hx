@@ -116,6 +116,7 @@ import robotkit.power.BatteryState;
 import robotkit.power.Power;
 import robotkit.skill.Charge;
 import robotkit.skill.Dock;
+import robotkit.skill.FollowPath;
 import robotkit.skill.GoTo;
 import robotkit.skill.PickPallet;
 import robotkit.skill.PlacePallet;
@@ -1388,15 +1389,21 @@ class RobotWorldTests {
     // base translation, so this scenario supplies that kinematic plant while
     // retaining SimKit sensors, runtime snapshots, localization, and perception.
     var simulatedPose = new Pose2();
-    function observe(tick:Int):PerceptionSnapshot {
+    var lastPerception = new PerceptionSnapshot();
+    function robotObservation(tick:Int):RobotSnapshot {
       simulatedPose = simulatedPose.integrate(base.currentCommand(), 0.02);
       var halfYaw = simulatedPose.yaw * 0.5;
       simulation.teleportRobot(0, [simulatedPose.x, simulatedPose.y, 0.0],
         [0.0, 0.0, Math.sin(halfYaw), Math.cos(halfYaw)]);
       simulation.step(Int64.ofInt(tick));
-      return framedPerception.observeRobotSnapshot(robot.snapshot(), model,
-        blueprint, baseLink.id);
+      return robot.snapshot();
     }
+    function perceive(snapshot:RobotSnapshot):PerceptionSnapshot {
+      lastPerception = framedPerception.observeRobotSnapshot(snapshot, model,
+        blueprint, baseLink.id);
+      return lastPerception;
+    }
+    function observe(tick:Int):PerceptionSnapshot return perceive(robotObservation(tick));
     var initialPerception = observe(1);
     equal(initialPerception.obstacles().length, 0,
       "simulated navigation starts with a clear LiDAR observation");
@@ -1404,34 +1411,40 @@ class RobotWorldTests {
     var offPathGoalPose = new Pose2(initialState.pose.x + 1.0,
       initialState.pose.y, initialState.pose.yaw);
     var offPathGoal = new NavigationGoal(offPathGoalPose, "map", 0.12, 0.15);
-    check(switch navigator.navigateTo(offPathGoal) {
-      case NavigatorStatus.Navigating: true;
-      case _: false;
-    }, "Navigator plans and starts a goal from current localization");
+    var goalRunner = new SkillRunner();
+    var goalSkill = new GoTo(navigator, offPathGoal, perceive);
+    check(goalRunner.start(goalSkill) == SkillStatus.Running &&
+      navigator.status == NavigatorStatus.Navigating,
+      "GoTo plans and starts a goal through SkillRunner");
 
     simulatedPose = new Pose2(simulatedPose.x, simulatedPose.y + 0.6,
       simulatedPose.yaw);
     var tick = 2;
-    var status = navigator.update(observe(tick++), 0.02);
+    var goalStatus = goalRunner.update(robotObservation(tick++), 0.02);
+    var status = navigator.status;
     var initialOffPathError = Math.abs(navigation.crossTrackError);
-    while (tick < 1000 && status != NavigatorStatus.Succeeded) {
-      status = navigator.update(observe(tick++), 0.02);
+    while (tick < 1000 && goalStatus == SkillStatus.Running) {
+      goalStatus = goalRunner.update(robotObservation(tick++), 0.02);
+      status = navigator.status;
     }
     var offPathFinal = requireLocalizationState(localization);
-    check(initialOffPathError >= 0.45 && status == NavigatorStatus.Succeeded &&
+    check(initialOffPathError >= 0.45 && goalStatus == SkillStatus.Succeeded &&
+      status == NavigatorStatus.Succeeded && goalRunner.result() != null &&
       Math.abs(offPathFinal.pose.x - offPathGoalPose.x) <= 0.16 &&
       Math.abs(offPathFinal.pose.y - offPathGoalPose.y) <= 0.16,
-      "simulated Navigator rejoins and completes a goal after an off-path start");
+      "SkillRunner GoTo reaches its goal after starting off the planned path");
 
     var goalPose = new Pose2(initialState.pose.x + 4.0,
       initialState.pose.y, initialState.pose.yaw);
     var goal = new NavigationGoal(goalPose, "map", 0.12, 0.15);
-    check(switch navigator.navigateTo(goal) {
-      case NavigatorStatus.Navigating: true;
-      case _: false;
-    }, "Navigator starts a second simulated goal before an obstacle appears");
+    var obstacleGoalSkill = new GoTo(navigator, goal, perceive);
+    var obstacleGoalStatus = goalRunner.start(obstacleGoalSkill);
+    check(obstacleGoalStatus == SkillStatus.Running &&
+      navigator.status == NavigatorStatus.Navigating,
+      "GoTo starts another simulated goal before an obstacle appears");
     for (_ in 0...40) {
-      status = navigator.update(observe(tick++), 0.02);
+      obstacleGoalStatus = goalRunner.update(robotObservation(tick++), 0.02);
+      status = navigator.status;
     }
     var movingState = requireLocalizationState(localization);
     check(movingState.pose.x > offPathFinal.pose.x + 0.05,
@@ -1442,15 +1455,15 @@ class RobotWorldTests {
     var detectedObstacle = false;
     var pathDetoured = false;
     for (_ in 0...1200) {
-      var perception = observe(tick++);
-      if (perception.obstacles().length > 0) detectedObstacle = true;
-      status = navigator.update(perception, 0.02);
+      obstacleGoalStatus = goalRunner.update(robotObservation(tick++), 0.02);
+      if (lastPerception.obstacles().length > 0) detectedObstacle = true;
+      status = navigator.status;
       var currentPath:Null<Path> = navigator.activePath;
       if (navigator.replanCount > 0 && currentPath != null) {
         for (point in currentPath.poses())
           if (Math.abs(point.y - goalPose.y) > 0.45) pathDetoured = true;
       }
-      if (status == NavigatorStatus.Succeeded) break;
+      if (obstacleGoalStatus == SkillStatus.Succeeded) break;
     }
     check(detectedObstacle,
       "simulated LiDAR perception detects an obstacle during navigation");
@@ -1466,8 +1479,9 @@ class RobotWorldTests {
         routeSummary.push('${point.x},${point.y},${point.yaw}');
       }
     }
-    check(status == NavigatorStatus.Succeeded,
-      'Navigator reaches its goal after replanning (state: ${Std.string(status)}, pose: ${finalState.pose.x},${finalState.pose.y},${finalState.pose.yaw}, goal: ${goalPose.x},${goalPose.y}, replans: ${navigator.replanCount}, guard: ${Std.string(guard.state)}, command: ${Std.string(base.currentCommand().linear)},${Std.string(base.currentCommand().angular)}, path: ${routeSummary.join(";")})');
+    check(obstacleGoalStatus == SkillStatus.Succeeded &&
+      status == NavigatorStatus.Succeeded,
+      'GoTo reaches its goal through SkillRunner after replanning (state: ${Std.string(status)}, pose: ${finalState.pose.x},${finalState.pose.y},${finalState.pose.yaw}, goal: ${goalPose.x},${goalPose.y}, replans: ${navigator.replanCount}, guard: ${Std.string(guard.state)}, command: ${Std.string(base.currentCommand().linear)},${Std.string(base.currentCommand().angular)}, path: ${routeSummary.join(";")})');
     var finalDx = finalState.pose.x - goalPose.x;
     var finalDy = finalState.pose.y - goalPose.y;
     check(Math.sqrt(finalDx * finalDx + finalDy * finalDy) <= 0.16,
@@ -1883,12 +1897,13 @@ class RobotWorldTests {
       configuredScan.get(0).mountPosition.get(0) == 0.35,
       "authored sensor frame and mount reach the simulated forklift observation");
     var path = new Path([new Pose2(0.0, 0.0, 0.0), new Pose2(0.18, 0.0, 0.0)], "odom");
-    var goTo = new GoTo(navigation, path, new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
+    var pathSkill = new FollowPath(navigation, path,
+      new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
     var skillRunner = new SkillRunner();
-    var liveStatus = skillRunner.start(goTo);
-    check(liveStatus == SkillStatus.Running && skillRunner.activeSkill() == goTo,
+    var liveStatus = skillRunner.start(pathSkill);
+    check(liveStatus == SkillStatus.Running && skillRunner.activeSkill() == pathSkill,
       "SkillRunner starts one robot-local skill and exposes it as active");
-    var conflictingSkill = new GoTo(navigation, path);
+    var conflictingSkill = new FollowPath(navigation, path);
     throws(function() skillRunner.start(conflictingSkill),
       "SkillRunner rejects a second skill while one is running");
     var ticks = 0;
@@ -1901,14 +1916,14 @@ class RobotWorldTests {
     }
     check(switch liveStatus { case Succeeded: true; case _: false; } && ticks < 300 &&
       skillRunner.activeSkill() == null && skillRunner.result() != null,
-      "SkillRunner completes GoTo and retains its terminal result");
+      "SkillRunner completes FollowPath and retains its terminal result");
     var liveSnapshot = simulatedRobot.snapshot();
     var liveEstimate = localization.state();
     var liveEstimateValue:robotkit.localization.LocalizationState = cast liveEstimate;
     var cancelPose = new Pose2(liveEstimateValue.pose.x + 1.0,
       liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
     var cancelPath = new Path([liveEstimateValue.pose, cancelPose], "odom");
-    var cancelledSkill = new GoTo(navigation, cancelPath);
+    var cancelledSkill = new FollowPath(navigation, cancelPath);
     skillRunner.start(cancelledSkill);
     skillRunner.cancel();
     check(skillRunner.status() == SkillStatus.Cancelled &&
@@ -1957,7 +1972,7 @@ class RobotWorldTests {
     var travelPose = new Pose2(travelStartValue.pose.x + 0.12,
       travelStartValue.pose.y, travelStartValue.pose.yaw);
     var travelPath = new Path([travelStartValue.pose, travelPose], "odom");
-    var travel = new GoTo(navigation, travelPath,
+    var travel = new FollowPath(navigation, travelPath,
       new NavigationGoal(travelPose, "odom", 0.02, 0.1));
     travel.start();
     var travelStatus = travel.status();
@@ -1970,7 +1985,7 @@ class RobotWorldTests {
       travelTicks++;
     }
     check(switch travelStatus { case Succeeded: true; case _: false; } && travelTicks < 300,
-      "GoTo drives the loaded forklift to a second location");
+      "FollowPath drives the loaded forklift to a second location");
     liveSnapshot = simulatedRobot.snapshot();
 
     var placePose = new Pose2(travelPose.x + 0.02, travelPose.y, travelPose.yaw);
@@ -2026,16 +2041,16 @@ class RobotWorldTests {
     var replayBase = MobileBase.fromBlueprint(replay, blueprint);
     var replayLocalization = new WheelOdometryLocalization(replayBase);
     var replayNavigation = new Navigation(replayBase, replayLocalization, 0.2, 0.2, 0.8);
-    var replayGoTo = new GoTo(replayNavigation, path,
+    var replayFollowPath = new FollowPath(replayNavigation, path,
       new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
     var replaySkillRunner = new SkillRunner();
-    var replayStatus = replaySkillRunner.start(replayGoTo);
+    var replayStatus = replaySkillRunner.start(replayFollowPath);
     replayStatus = replaySkillRunner.update(replay.snapshot(), 0.01);
     while (switch replayStatus { case Running: true; case _: false; } && replay.advance())
       replayStatus = replaySkillRunner.update(replay.snapshot(), 0.01);
     check(switch replayStatus { case Succeeded: true; case _: false; } &&
       replaySkillRunner.activeSkill() == null && replaySkillRunner.result() != null,
-      "SkillRunner completes GoTo against the recorded ReplayRobot observations");
+      "SkillRunner completes FollowPath against the recorded ReplayRobot observations");
     var replaySnapshot = replay.snapshot();
     var replayEstimate = replayLocalization.state();
     var replayEstimateValue:robotkit.localization.LocalizationState = cast replayEstimate;
@@ -2051,7 +2066,7 @@ class RobotWorldTests {
       case Succeeded: true;
       case _: false;
     } && replaySkillRunner.activeSkill() == null,
-      "SkillRunner starts another skill after replayed GoTo completes");
+      "SkillRunner starts another skill after replayed FollowPath completes");
     var replayForks = Forks.fromBlueprint(replay, blueprint);
     var replayPickPose = new Pose2(replayEstimateValue.pose.x + 0.02,
       replayEstimateValue.pose.y, replayEstimateValue.pose.yaw);
@@ -2079,7 +2094,7 @@ class RobotWorldTests {
     var replayTravelStartValue:robotkit.localization.LocalizationState = cast replayTravelStart;
     var replayTravelPose = new Pose2(travelPose.x, travelPose.y, travelPose.yaw);
     var replayTravelPath = new Path([replayTravelStartValue.pose, replayTravelPose], "odom");
-    var replayTravel = new GoTo(replayNavigation, replayTravelPath,
+    var replayTravel = new FollowPath(replayNavigation, replayTravelPath,
       new NavigationGoal(replayTravelPose, "odom", 0.02, 0.1));
     replayTravel.start();
     var replayTravelStatus = replayTravel.update(replay.snapshot(), 0.01);
@@ -2091,7 +2106,7 @@ class RobotWorldTests {
       replayTravelTicks++;
     }
     check(switch replayTravelStatus { case Succeeded: true; case _: false; },
-      "GoTo reaches the second recorded location through ReplayRobot");
+      "FollowPath reaches the second recorded location through ReplayRobot");
     replaySnapshot = replay.snapshot();
     var replayPlacePose = new Pose2(placePose.x, placePose.y, placePose.yaw);
     var replayPlace = new PlacePallet(replayNavigation, replayForks, payload,

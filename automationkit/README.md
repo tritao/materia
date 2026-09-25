@@ -19,7 +19,7 @@ Facility lanes retain a `robotkit.navigation.Path` and enforce frame agreement
 with their endpoint stations. `FacilityRouter` plans the least-travel-time lane
 sequence using lane speed and direction, then composes its centerlines into one
 framed path with per-lane speed intervals. Pass `route.speedLimits()` to
-`GoTo` so `Navigation` brakes before entering a slower lane. Rack slot IDs and
+`FollowPath` so `Navigation` brakes before entering a slower lane. Rack slot IDs and
 facility entity IDs are validated at insertion. Fleet assignments require an attached, ready robot;
 mission completion releases that robot for the next assignment. `TrafficManager`
 allows one fleet member to own a lane or intersection at a time, supports
@@ -30,7 +30,7 @@ lanes and junctions atomically. Route bundles hold all required resources until
 Task execution is an explicit composition point. `TaskSkillFactory` receives
 the current task, assigned `Robot`, and `Facility`, then returns a configured
 `robotkit.skill.Skill`. For example, an application can resolve a
-`Transport`'s station IDs through `FacilityRouter` and return `GoTo`; a perception
+`Transport`'s station IDs through `FacilityRouter` and return `FollowPath`; a perception
 adapter can resolve a rack task into `PickPallet` or `PlacePallet`. The
 executor owns sequencing and lifecycle propagation, while route planning,
 perception, and robot-specific mechanism configuration remain explicit

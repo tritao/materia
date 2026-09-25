@@ -296,15 +296,26 @@ charge, voltage, current, temperature, energy, and clock provenance.
 
 `robotkit.skill` composes these explicit views into task-sized operations. Each
 `Skill` has `start`, `update`, `cancel`, `status`, and `result` methods. `GoTo`
-follows a path, `Dock` approaches a detected target, `PickPallet` and
-`PlacePallet` combine navigation with fork commands and load confirmation, and
-`Charge` docks before waiting for a battery threshold. Skills run at the
-application's update frequency and use the same `Robot` boundary, so the same
-scenario can run with `SimulatedRobot`, `RemoteRobot`, or `ReplayRobot`.
+plans and replans to a framed goal through `Navigator`; provide a snapshot
+processor that updates localization and returns obstacles in the costmap frame.
+`FollowPath` tracks a supplied path and its speed limits without planning.
+`Dock` approaches a detected target, `PickPallet` and `PlacePallet` combine
+navigation with fork commands and load confirmation, and `Charge` docks before
+waiting for a battery threshold. Skills run at the application's update
+frequency and use the same `Robot` boundary, so the same scenario can run with
+`SimulatedRobot`, `RemoteRobot`, or `ReplayRobot`.
 `SkillRunner` owns one active skill at a time, forwards snapshots and elapsed
 time, cancels the active skill, and retains its terminal status and result.
 Starting another skill while one is running is rejected; mission sequencing
 and retry policy stay with the application.
+
+```haxe
+var goTo = new GoTo(navigator, goal, function(snapshot) {
+  return framedPerception.observeRobotSnapshot(snapshot, model, blueprint, bodyLinkId);
+});
+runner.start(goTo);
+// Call runner.update(robot.snapshot(), dt) until runner.status() is terminal.
+```
 
 ```haxe
 var base = new MobileBase(robot,

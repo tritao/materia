@@ -44,7 +44,7 @@ import robotkit.mobile.Pose2;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Path;
-import robotkit.skill.GoTo;
+import robotkit.skill.FollowPath;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.world.Robot;
@@ -292,7 +292,7 @@ class AutomationTests {
       check(switch transportExecutor.update(0.02) {
         case MissionExecutionStatus.Succeeded: true;
         case _: false;
-      }, "facility transport task executes through a RobotKit GoTo skill");
+      }, "facility transport task executes through a RobotKit FollowPath skill");
       check(switch transportMission.status { case MissionStatus.Succeeded: true; case _: false; },
         "RobotKit skill completion finishes the facility transport mission");
 
@@ -626,7 +626,7 @@ private class FacilityTransportSkillFactory implements TaskSkillFactory {
         var localization = new FixedPoseLocalization(destination.pose);
         var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
         var route = new FacilityRouter(facility).route(pickup.id, destination.id);
-        new GoTo(navigation, route.path,
+        new FollowPath(navigation, route.path,
           new NavigationGoal(destination.pose, destination.frameId), route.speedLimits());
       case _: throw 'unsupported task kind ${Std.string(task.kind)}';
     }
@@ -669,7 +669,7 @@ private class MobileTransportSkillFactory implements TaskSkillFactory {
         var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
         lastNavigation = navigation;
         var route = new FacilityRouter(facility).route(pickup.id, destination.id);
-        new GoTo(navigation, route.path,
+        new FollowPath(navigation, route.path,
           new NavigationGoal(destination.pose, destination.frameId, 0.02, 0.1),
           route.speedLimits());
       case _: throw 'unsupported task kind ${Std.string(task.kind)}';

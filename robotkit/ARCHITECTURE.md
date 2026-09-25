@@ -292,7 +292,9 @@ hard stops and joint limits remain enforced in `RobotRuntime`.
 without adding a robot subclass or capability registry. A skill is advanced by
 the application loop through `start()`, `update(snapshot, dt)`, and
 `cancel()`; it exposes terminal `status()` and `result()` values. The first
-compositions are `GoTo`, `Dock`, `PickPallet`, `PlacePallet`, and `Charge`.
+compositions are `GoTo`, `FollowPath`, `Dock`, `PickPallet`, `PlacePallet`, and
+`Charge`. `GoTo` owns goal-level planning and replanning through `Navigator`;
+`FollowPath` tracks an explicitly supplied path and speed limits.
 `SkillRunner` provides a one-skill-at-a-time robot-local update loop. It forwards
 observations and elapsed time, rejects overlapping starts, handles cancellation,
 and retains the terminal status and result; mission sequencing remains above

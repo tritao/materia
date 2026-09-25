@@ -32,7 +32,7 @@ import robotkit.localization.WheelOdometryLocalization;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Path;
-import robotkit.skill.GoTo;
+import robotkit.skill.FollowPath;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
 
@@ -256,23 +256,23 @@ class WorldTcpIntegration {
       var estimate = localization.update(current);
       var goalPose = new Pose2(estimate.pose.x + 0.1, estimate.pose.y, estimate.pose.yaw);
       var path = new Path([estimate.pose, goalPose], "odom");
-      var goTo = new GoTo(new Navigation(mobileBase, localization, 0.2, 0.2, 0.8), path,
+      var followPath = new FollowPath(new Navigation(mobileBase, localization, 0.2, 0.2, 0.8), path,
         new NavigationGoal(goalPose, "odom", 0.01, 0.05));
       var skillRunner = new SkillRunner();
-      if (skillRunner.start(goTo) != SkillStatus.Running ||
-          skillRunner.activeSkill() != goTo)
-        throw "SkillRunner did not start GoTo for RemoteRobot";
+      if (skillRunner.start(followPath) != SkillStatus.Running ||
+          skillRunner.activeSkill() != followPath)
+        throw "SkillRunner did not start FollowPath for RemoteRobot";
       if (skillRunner.update(current, 0.02) != SkillStatus.Running)
-        throw "RemoteRobot GoTo did not remain active after its first update";
+        throw "RemoteRobot FollowPath did not remain active after its first update";
       waitUntil(runtime, function() {
         var state = remote.snapshot();
         return state.velocities.length == 3 && state.velocities.get(0) > 0.0
           && state.velocities.get(1) > 0.0;
-      }, "GoTo did not send an atomic two-wheel velocity target through robotd");
+      }, "FollowPath did not send an atomic two-wheel velocity target through robotd");
       skillRunner.cancel();
       if (skillRunner.status() != SkillStatus.Cancelled || skillRunner.activeSkill() != null ||
           skillRunner.result() == null)
-        throw "SkillRunner did not cancel RemoteRobot GoTo cleanly";
+        throw "SkillRunner did not cancel RemoteRobot FollowPath cleanly";
 
       var facility = new Facility("serial-facility", "Serial integration facility");
       facility.addZone(new Zone("floor", "Floor", "map",
@@ -311,7 +311,7 @@ class WorldTcpIntegration {
       if (mission.status != materia.automation.mission.MissionStatus.Succeeded ||
           fleet.availableRobotIds().indexOf(LOGICAL_ID) < 0)
         throw "serial mission did not complete and release its fleet assignment";
-      Sys.println("SkillRunner GoTo, shared behavior, and MissionExecutor passed: local simulation and robotd serial");
+      Sys.println("SkillRunner FollowPath, shared behavior, and MissionExecutor passed: local simulation and robotd serial");
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();
@@ -349,7 +349,7 @@ private class SerialTransportSkillFactory implements materia.automation.mission.
           route.maximumSpeedMetersPerSecond, 1.0);
         var goalStation = facility.station(transport.destinationStationId);
         if (goalStation == null) throw "transport mission destination is missing";
-        new GoTo(navigation, route.path,
+        new FollowPath(navigation, route.path,
           new NavigationGoal(goalStation.pose, goalStation.frameId, 0.02, 0.1));
       case _: throw 'serial integration does not support task kind ${Std.string(task.kind)}';
     }
