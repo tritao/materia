@@ -8,12 +8,20 @@ import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.RobotRuntimeJointBlueprint;
 import robotkit.runtime.RobotCompileException;
+import robotkit.runtime.RobotRuntimeConfiguration;
+import robotkit.runtime.RobotRuntimeMobileConfiguration;
+import robotkit.runtime.RobotRuntimeForkConfiguration;
+import robotkit.runtime.RobotRuntimeForkAxisConfiguration;
 import robotkit.runtime.Simulation;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
+import robotkit.model.JointLimits;
 import robotkit.model.Actuator;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
+import robotkit.model.RobotDriveConfiguration;
+import robotkit.model.RobotMobileConfiguration;
+import robotkit.model.RobotForkConfiguration;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotDescription;
@@ -60,6 +68,7 @@ import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationStatus;
 import robotkit.material.ForkAxisConfig;
+import robotkit.material.ForkAxisState;
 import robotkit.material.ForkConfig;
 import robotkit.material.ForkState;
 import robotkit.material.Forks;
@@ -96,6 +105,7 @@ class RobotWorldTests {
     testReplayCorrectness();
     testJointTargetBatches();
     testMobileLayer();
+    testModelDrivenConfiguration();
     testLocalization();
     testNavigation();
     testForkMechanisms();
@@ -408,6 +418,145 @@ class RobotWorldTests {
     var afterStale = odometry.update(sample(3, 4.3, 4.3, "source-B"));
     check(Math.abs(afterStale.x - afterClockReset.x) < 0.03,
       "wheel odometry ignores stale timestamps without moving its baseline");
+  }
+
+  static function testModelDrivenConfiguration():Void {
+    var model = new RobotModel("authored-forklift");
+    var base = model.addLink(new Link("base", "link/base"));
+    var left = model.addLink(new Link("left wheel", "link/left-wheel"));
+    var right = model.addLink(new Link("right wheel", "link/right-wheel"));
+    var mast = model.addLink(new Link("mast", "link/mast"));
+    var tilt = model.addLink(new Link("fork carriage", "link/carriage"));
+    var spread = model.addLink(new Link("forks", "link/forks"));
+    function addJoint(id:String, name:String, type:JointType, child:Link,
+        lower:Float, upper:Float):Joint {
+      var joint = new Joint(name, type, base, child, id);
+      joint.limits = new JointLimits(lower, upper, 20.0, 100.0);
+      return model.addJoint(joint);
+    }
+    addJoint("joint/left-wheel", "left wheel joint", JointType.Continuous, left, -100.0, 100.0);
+    addJoint("joint/right-wheel", "right wheel joint", JointType.Continuous, right, -100.0, 100.0);
+    addJoint("joint/lift", "mast lift", JointType.Prismatic, mast, 0.0, 2.0);
+    addJoint("joint/tilt", "fork tilt", JointType.Revolute, tilt, -0.5, 0.7);
+    addJoint("joint/spread", "fork spread", JointType.Prismatic, spread, 0.0, 0.8);
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
+      1.2, 1.5, 0.8, 1.0, 2.2, 1.1);
+    model.forkMechanism = new RobotForkConfiguration("joint/lift",
+      1000.0, 600.0, 1.8, "joint/tilt", "joint/spread");
+
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var runtimeConfiguration:Null<RobotRuntimeConfiguration> = blueprint.configuration;
+    check(runtimeConfiguration != null,
+      "runtime compilation preserves authored mobile and fork roles");
+    var resolvedConfiguration:RobotRuntimeConfiguration = cast runtimeConfiguration;
+    var mobileRuntime:Null<RobotRuntimeMobileConfiguration> = resolvedConfiguration.mobileBase;
+    var forkRuntime:Null<RobotRuntimeForkConfiguration> = resolvedConfiguration.forks;
+    check(mobileRuntime != null && forkRuntime != null,
+      "runtime compilation includes both mobile and fork views");
+    var mobileConfig:RobotRuntimeMobileConfiguration = cast mobileRuntime;
+    var forkConfig:RobotRuntimeForkConfiguration = cast forkRuntime;
+    check(switch mobileConfig.drive {
+      case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(leftIndex, leftName,
+          rightIndex, rightName, radius, track):
+        leftIndex == 0 && leftName == "left wheel joint" && rightIndex == 1 &&
+          rightName == "right wheel joint" && radius == 0.1 && track == 0.5;
+      case _: false;
+    }, "runtime compilation resolves stable drive joint IDs to command indices");
+    equal(forkConfig.lift.jointIndex, 2,
+      "runtime compilation resolves the authored fork lift role");
+    var tiltRuntime:RobotRuntimeForkAxisConfiguration = cast forkConfig.tilt;
+    var spreadRuntime:RobotRuntimeForkAxisConfiguration = cast forkConfig.spread;
+    check(tiltRuntime.jointIndex == 3 && spreadRuntime.jointIndex == 4,
+      "runtime compilation resolves optional fork axes");
+
+    var robot = new FakeRobot("authored-forklift");
+    robot.jointNames = [for (joint in model.joints) joint.name];
+    robot.positions = [0.0, 0.0, 0.25, 0.1, 0.3];
+    robot.velocities = [0.0, 0.0, 0.0, -0.02, 0.0];
+    robot.efforts = [0.0, 0.0, 2.0, 0.5, 0.25];
+    var mobile = MobileBase.fromRobot(robot, model);
+    var footprint:Footprint = cast mobile.footprint;
+    check(mobile.footprint != null && Math.abs(footprint.radius - 1.23) < 0.01,
+      "MobileBase factory applies the model-authored footprint");
+    mobile.command(new Twist2(0.4, 0.0));
+    check(switch robot.lastCommand {
+      case JointTargets(targets, _): targets.length == 2 &&
+        targets[0].joint == 0 && targets[1].joint == 1 &&
+        Math.abs(targets[0].target - 4.0) < 1e-9 &&
+        Math.abs(targets[1].target - 4.0) < 1e-9;
+      case _: false;
+    }, "MobileBase factory commands the joints selected by authored roles");
+
+    var forks = Forks.fromRobot(robot, model);
+    var blueprintForks = Forks.fromBlueprint(robot, blueprint);
+    check(forks.config.lift.jointName == blueprintForks.config.lift.jointName,
+      "Forks can be constructed from either the model or its compiled blueprint");
+    var forkState = forks.state();
+    var tiltState:ForkAxisState = cast forkState.tilt;
+    var spreadState:ForkAxisState = cast forkState.spread;
+    check(forkState.lift.position == 0.25 &&
+      tiltState.position == 0.1 && spreadState.position == 0.3,
+      "Forks factory maps model roles and limits into live fork state");
+    forks.raise(1.0);
+    check(switch robot.lastCommand {
+      case JointTargets(targets, _): targets.length == 1 &&
+        targets[0].joint == 2 && targets[0].target == 1.0;
+      case _: false;
+    }, "Forks factory commands the authored lift joint without manual names or indices");
+
+    var savedForkConfig = model.forkMechanism;
+    model.forkMechanism = null;
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left-wheel",
+        1.2, 0.1, 0.5), 1.2, 1.5);
+    var ackermannBlueprint = RobotRuntimeCompiler.compile(model);
+    var ackermann = MobileBase.fromBlueprint(robot, ackermannBlueprint);
+    ackermann.command(new Twist2(0.5, 0.2));
+    check(switch robot.lastCommand {
+      case JointTargets(targets, _): targets.length == 2 &&
+        targets[0].joint == 3 && targets[0].mode == robotkit.world.JointTargetMode.Position &&
+        targets[1].joint == 0 && targets[1].mode == robotkit.world.JointTargetMode.Velocity;
+      case _: false;
+    }, "model-driven Ackermann roles preserve the steering and wheel target modes");
+    model.forkMechanism = savedForkConfig;
+
+    var mismatched = new FakeRobot("wrong-joint-order");
+    mismatched.jointNames = ["right wheel joint", "left wheel joint", "mast lift",
+      "fork tilt", "fork spread"];
+    throws(function() MobileBase.fromBlueprint(mismatched, blueprint),
+      "model-driven factory detects a runtime robot with a different joint order");
+    var ambiguous = new FakeRobot("ambiguous-joint-description");
+    ambiguous.jointNames = ["mast lift", "right wheel joint", "mast lift",
+      "fork tilt", "fork spread"];
+    throws(function() Forks.fromBlueprint(ambiguous, blueprint),
+      "model-driven fork factory rejects ambiguous duplicate joint names");
+
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("missing-left", "joint/right-wheel", 0.1, 0.5),
+      1.2, 1.5);
+    var missingDiagnostics = RobotRuntimeCompiler.validate(model);
+    var hasMissingRole = false;
+    for (value in missingDiagnostics) if (value.code == "RK_ROLE_JOINT") hasMissingRole = true;
+    check(missingDiagnostics.length > 0 &&
+      hasMissingRole,
+      "robot model validation rejects mechanism roles that reference missing joints");
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/lift", "joint/right-wheel", 0.1, 0.5),
+      1.2, 1.5);
+    var typeDiagnostics = RobotRuntimeCompiler.validate(model);
+    var hasTypeError = false;
+    for (value in typeDiagnostics) if (value.code == "RK_ROLE_TYPE") hasTypeError = true;
+    check(hasTypeError,
+      "robot model validation rejects joint types that cannot fill a mechanism role");
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/left-wheel", 0.1, 0.5),
+      1.2, 1.5);
+    var duplicateDiagnostics = RobotRuntimeCompiler.validate(model);
+    var hasDuplicateRole = false;
+    for (value in duplicateDiagnostics) if (value.code == "RK_ROLE_DUPLICATE") hasDuplicateRole = true;
+    check(hasDuplicateRole,
+      "robot model validation rejects assigning one joint to multiple mechanism roles");
   }
 
   static function testLocalization():Void {

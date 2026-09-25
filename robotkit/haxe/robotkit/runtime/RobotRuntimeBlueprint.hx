@@ -19,6 +19,8 @@ class RobotRuntimeBlueprint {
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+  /** Compiled user-layer roles; null for manually assembled native blueprints. */
+  public final configuration:Null<RobotRuntimeConfiguration>;
 
   public function sensorLayout():Array<RobotRuntimeSensorBlueprint> {
     if (sensors.length > 0) return sensors.copy();
@@ -29,7 +31,8 @@ class RobotRuntimeBlueprint {
   }
 
   public function new(revision:Int, jointCount:Int, linkCount:Int,
-      ?frameCount:Int = 0, ?identity:RobotRuntimeIdentity) {
+      ?frameCount:Int = 0, ?identity:RobotRuntimeIdentity,
+      ?configuration:RobotRuntimeConfiguration) {
     if (revision < 0 || jointCount < 0 || jointCount > RobotKitRuntimeConstants.RK_MAX_JOINTS ||
         linkCount < 1 || linkCount > RobotKitRuntimeConstants.RK_MAX_LINKS || frameCount < 0)
       throw "Invalid RobotKit runtime blueprint";
@@ -41,6 +44,7 @@ class RobotRuntimeBlueprint {
     for (_ in 0...linkCount)
       links.push(new RobotRuntimeLinkBlueprint(1.0, [0.0, 0.0, 0.0],
         [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]));
+    this.configuration = configuration;
   }
 
   public function addJoint(value:RobotRuntimeJointBlueprint):Void {

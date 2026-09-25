@@ -3,6 +3,9 @@ package robotkit.runtime;
 import robotkit.model.RobotModel;
 import robotkit.model.JointType;
 import robotkit.model.CollisionApproximation;
+import robotkit.model.RobotDriveConfiguration;
+import robotkit.model.RobotForkConfiguration;
+import robotkit.model.RobotMobileConfiguration;
 import RobotKitRuntime;
 
 /** Compiles the editable semantic robot model into an execution blueprint. */
@@ -25,7 +28,8 @@ class RobotRuntimeCompiler {
         [for (frame in robot.frames) frame.id],
         [for (frame in robot.frames) frame.link.id],
         [for (link in robot.links) link.visualGeometry],
-        [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation));
+        [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation),
+      compileConfiguration(robot));
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
       case CollisionApproximation.BoundsBox: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
@@ -304,6 +308,8 @@ class RobotRuntimeCompiler {
           "sensor update rate must be non-negative"));
     }
 
+    validateUserConfiguration(robot, diagnostics);
+
     var roots:Array<Int> = [];
     for (index in 0...indegree.length)
       if (indegree[index] == 0) roots.push(index);
@@ -349,6 +355,130 @@ class RobotRuntimeCompiler {
             "link is not reachable from the robot root"));
     }
     return diagnostics;
+  }
+
+  static function validateUserConfiguration(robot:RobotModel,
+      diagnostics:Array<RobotCompileDiagnostic>):Void {
+    var roleOwners = new Map<String, String>();
+    function resolveRole(id:Null<String>, path:String,
+        allowed:Array<JointType>):Null<Int> {
+      if (id == null || id.length == 0) {
+        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_JOINT", path,
+          "mechanism role requires a joint ID"));
+        return null;
+      }
+      var index = -1;
+      for (i in 0...robot.joints.length) {
+        var candidate = robot.joints[i];
+        if (candidate != null && candidate.id == id) { index = i; break; }
+      }
+      if (index < 0) {
+        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_JOINT", path,
+          'joint ID "$id" is not part of this robot'));
+        return null;
+      }
+      var joint = robot.joints[index];
+      if (allowed.indexOf(joint.type) < 0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_TYPE", path,
+          'joint "${joint.name}" has type ${joint.type}, which cannot fill this role'));
+      var previous = roleOwners.get(id);
+      if (previous != null)
+        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_DUPLICATE", path,
+          'joint "$id" is already assigned to $previous'));
+      else
+        roleOwners.set(id, path);
+      return index;
+    }
+    function positive(value:Float, path:String):Void {
+      if (!Math.isFinite(value) || value <= 0.0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_VALUE", path,
+          "value must be finite and positive"));
+    }
+
+    var mobile = robot.mobileBase;
+    if (mobile != null) {
+      positive(mobile.maxLinearSpeed, "mobileBase.maxLinearSpeed");
+      positive(mobile.maxAngularSpeed, "mobileBase.maxAngularSpeed");
+      positive(mobile.maxLinearAcceleration, "mobileBase.maxLinearAcceleration");
+      positive(mobile.maxAngularAcceleration, "mobileBase.maxAngularAcceleration");
+      if ((mobile.footprintLength == null) != (mobile.footprintWidth == null))
+        diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_FOOTPRINT", "mobileBase.footprint",
+          "footprint length and width must both be set or both be omitted"));
+      if (mobile.footprintLength != null) positive(mobile.footprintLength, "mobileBase.footprint.length");
+      if (mobile.footprintWidth != null) positive(mobile.footprintWidth, "mobileBase.footprint.width");
+      switch mobile.drive {
+        case Differential(leftId, rightId, radius, trackWidth):
+          resolveRole(leftId, "mobileBase.drive.leftWheelJointId", [JointType.Revolute, JointType.Continuous]);
+          resolveRole(rightId, "mobileBase.drive.rightWheelJointId", [JointType.Revolute, JointType.Continuous]);
+          positive(radius, "mobileBase.drive.wheelRadius");
+          positive(trackWidth, "mobileBase.drive.trackWidth");
+        case Ackermann(steeringId, driveId, wheelBase, radius, maxSteeringAngle):
+          resolveRole(steeringId, "mobileBase.drive.steeringJointId", [JointType.Revolute]);
+          resolveRole(driveId, "mobileBase.drive.driveWheelJointId", [JointType.Revolute, JointType.Continuous]);
+          positive(wheelBase, "mobileBase.drive.wheelBase");
+          positive(radius, "mobileBase.drive.wheelRadius");
+          if (!Math.isFinite(maxSteeringAngle) || maxSteeringAngle <= 0.0 || maxSteeringAngle >= Math.PI * 0.5)
+            diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_VALUE", "mobileBase.drive.maxSteeringAngle",
+              "steering angle must be finite and between zero and pi/2"));
+        case null:
+          diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_DRIVE", "mobileBase.drive",
+            "mobile base drive configuration is missing"));
+      }
+    }
+
+    var forks:Null<RobotForkConfiguration> = robot.forkMechanism;
+    if (forks != null) {
+      var linear = [JointType.Prismatic];
+      resolveRole(forks.liftJointId, "forkMechanism.liftJointId", linear);
+      if (forks.tiltJointId != null)
+        resolveRole(forks.tiltJointId, "forkMechanism.tiltJointId", [JointType.Revolute]);
+      if (forks.spreadJointId != null)
+        resolveRole(forks.spreadJointId, "forkMechanism.spreadJointId", linear);
+      positive(forks.maxMassKg, "forkMechanism.maxMassKg");
+      positive(forks.maxLoadMomentKgMeters, "forkMechanism.maxLoadMomentKgMeters");
+      positive(forks.maxLiftHeightMeters, "forkMechanism.maxLiftHeightMeters");
+    }
+  }
+
+  static function compileConfiguration(robot:RobotModel):RobotRuntimeConfiguration {
+    function jointIndex(id:String):Int {
+      for (index in 0...robot.joints.length)
+        if (robot.joints[index].id == id) return index;
+      throw 'Validated robot configuration references missing joint "$id"';
+    }
+    var mobileConfig:Null<RobotRuntimeMobileConfiguration> = null;
+    var mobile = robot.mobileBase;
+    if (mobile != null) {
+      var drive:RobotRuntimeDriveConfiguration = switch mobile.drive {
+        case Differential(leftId, rightId, radius, trackWidth):
+          var leftIndex = jointIndex(leftId), rightIndex = jointIndex(rightId);
+          RobotRuntimeDriveConfiguration.Differential(leftIndex, robot.joints[leftIndex].name,
+            rightIndex, robot.joints[rightIndex].name, radius, trackWidth);
+        case Ackermann(steeringId, driveId, wheelBase, radius, maxAngle):
+          var steeringIndex = jointIndex(steeringId), driveIndex = jointIndex(driveId);
+          RobotRuntimeDriveConfiguration.Ackermann(steeringIndex, robot.joints[steeringIndex].name,
+            driveIndex, robot.joints[driveIndex].name, wheelBase, radius, maxAngle);
+        case null: throw "Validated robot configuration has no drive";
+      };
+      mobileConfig = new RobotRuntimeMobileConfiguration(drive,
+        mobile.maxLinearSpeed, mobile.maxAngularSpeed,
+        mobile.maxLinearAcceleration, mobile.maxAngularAcceleration,
+        mobile.footprintLength, mobile.footprintWidth);
+    }
+    var forkConfig:Null<RobotRuntimeForkConfiguration> = null;
+    var forks = robot.forkMechanism;
+    if (forks != null) {
+      function axis(id:String):RobotRuntimeForkAxisConfiguration {
+        var index = jointIndex(id), joint = robot.joints[index];
+        return new RobotRuntimeForkAxisConfiguration(index, joint.name,
+          joint.limits.lower, joint.limits.upper);
+      }
+      forkConfig = new RobotRuntimeForkConfiguration(axis(forks.liftJointId),
+        forks.tiltJointId == null ? null : axis(forks.tiltJointId),
+        forks.spreadJointId == null ? null : axis(forks.spreadJointId),
+        forks.maxMassKg, forks.maxLoadMomentKgMeters, forks.maxLiftHeightMeters);
+    }
+    return new RobotRuntimeConfiguration(mobileConfig, forkConfig);
   }
 
   static function validVector(value:Array<Float>, count:Int):Bool {

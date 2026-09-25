@@ -4,6 +4,12 @@ import robotkit.world.JointTarget;
 import robotkit.world.JointTargetMode;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
+import robotkit.model.RobotModel;
+import robotkit.runtime.RobotRuntimeBlueprint;
+import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.runtime.RobotRuntimeConfiguration;
+import robotkit.runtime.RobotRuntimeForkAxisConfiguration;
+import robotkit.runtime.RobotRuntimeForkConfiguration;
 
 /** Named fork mechanism view over a normal Robot instance. */
 class Forks {
@@ -14,6 +20,43 @@ class Forks {
   final liftIndex:Int;
   final tiltIndex:Null<Int>;
   final spreadIndex:Null<Int>;
+
+  /** Builds the fork view from roles and limits authored on a RobotModel. */
+  public static function fromRobot(robot:Robot, model:RobotModel):Forks
+    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model));
+
+  /** Builds the fork view from a previously compiled robot blueprint. */
+  public static function fromBlueprint(robot:Robot,
+      blueprint:RobotRuntimeBlueprint):Forks {
+    if (robot == null || blueprint == null)
+      throw "Robot blueprint has no fork-mechanism configuration";
+    var configuration:Null<RobotRuntimeConfiguration> = blueprint.configuration;
+    if (configuration == null)
+      throw "Robot blueprint has no fork-mechanism configuration";
+    var maybeConfig:Null<RobotRuntimeForkConfiguration> = configuration.forks;
+    if (maybeConfig == null) throw "Robot blueprint has no fork-mechanism configuration";
+    var config:RobotRuntimeForkConfiguration = cast maybeConfig;
+    requireJoint(robot, config.lift);
+    if (config.tilt != null) requireJoint(robot, cast config.tilt);
+    if (config.spread != null) requireJoint(robot, cast config.spread);
+    return new Forks(robot, new ForkConfig(axisConfig(config.lift),
+      new LoadLimits(config.maxMassKg, config.maxLoadMomentKgMeters,
+        config.maxLiftHeightMeters),
+      config.tilt == null ? null : axisConfig(cast config.tilt),
+      config.spread == null ? null : axisConfig(cast config.spread)));
+  }
+
+  static function axisConfig(value:RobotRuntimeForkAxisConfiguration):ForkAxisConfig
+    return new ForkAxisConfig(value.jointName, value.minimum, value.maximum);
+
+  static function requireJoint(robot:Robot,
+      expected:RobotRuntimeForkAxisConfiguration):Void {
+    var joints = robot.description().joints;
+    if (expected.jointIndex < 0 || expected.jointIndex >= joints.length ||
+        joints[expected.jointIndex] != expected.jointName ||
+        joints.indexOf(expected.jointName) != expected.jointIndex)
+      throw 'Robot description does not match authored joint "${expected.jointName}" at index ${expected.jointIndex}';
+  }
 
   public function new(robot:Robot, config:ForkConfig) {
     if (robot == null || config == null)

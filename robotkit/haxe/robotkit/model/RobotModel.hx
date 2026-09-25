@@ -10,6 +10,10 @@ class RobotModel {
   public final sensors:Array<Sensor> = [];
   public final frames:Array<Frame> = [];
   public var collisionApproximation:CollisionApproximation = CollisionApproximation.BoundsBox;
+  /** Semantic mobile roles authored against stable joint IDs. */
+  public var mobileBase:Null<RobotMobileConfiguration> = null;
+  /** Semantic fork roles authored against stable joint IDs. */
+  public var forkMechanism:Null<RobotForkConfiguration> = null;
 
   public function addFrame(frame:Frame):Frame {
     frames.push(frame);

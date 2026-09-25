@@ -4,6 +4,12 @@ import robotkit.world.JointTarget;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.StopMode;
+import robotkit.model.RobotModel;
+import robotkit.runtime.RobotRuntimeBlueprint;
+import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.runtime.RobotRuntimeConfiguration;
+import robotkit.runtime.RobotRuntimeDriveConfiguration;
+import robotkit.runtime.RobotRuntimeMobileConfiguration;
 
 /** Configured mobile-drive view over an ordinary Robot instance. */
 class MobileBase {
@@ -12,6 +18,48 @@ class MobileBase {
   public final motionLimits:MotionLimits;
   public final footprint:Null<Footprint>;
   var previousCommand:Twist2 = new Twist2();
+
+  /** Builds the mobile view from roles and dimensions authored on a RobotModel. */
+  public static function fromRobot(robot:Robot, model:RobotModel):MobileBase
+    return fromBlueprint(robot, RobotRuntimeCompiler.compile(model));
+
+  /** Builds the mobile view from a previously compiled robot blueprint. */
+  public static function fromBlueprint(robot:Robot,
+      blueprint:RobotRuntimeBlueprint):MobileBase {
+    if (robot == null || blueprint == null)
+      throw "Robot blueprint has no mobile-base configuration";
+    var configuration:Null<RobotRuntimeConfiguration> = blueprint.configuration;
+    if (configuration == null)
+      throw "Robot blueprint has no mobile-base configuration";
+    var maybeConfig:Null<RobotRuntimeMobileConfiguration> = configuration.mobileBase;
+    if (maybeConfig == null) throw "Robot blueprint has no mobile-base configuration";
+    var config:RobotRuntimeMobileConfiguration = cast maybeConfig;
+    var drive:DriveModel = switch config.drive {
+      case RobotRuntimeDriveConfiguration.Differential(leftIndex, leftName,
+          rightIndex, rightName, wheelRadius, trackWidth):
+        requireJoint(robot, leftIndex, leftName);
+        requireJoint(robot, rightIndex, rightName);
+        new DifferentialDrive(leftIndex, rightIndex, wheelRadius, trackWidth);
+      case RobotRuntimeDriveConfiguration.Ackermann(steeringIndex, steeringName,
+          driveIndex, driveName, wheelBase, wheelRadius, maxSteeringAngle):
+        requireJoint(robot, steeringIndex, steeringName);
+        requireJoint(robot, driveIndex, driveName);
+        new AckermannDrive(steeringIndex, driveIndex, wheelBase,
+          wheelRadius, maxSteeringAngle);
+    };
+    var footprint = config.footprintLength == null ? null : Footprint.rectangle(
+      config.footprintLength, cast config.footprintWidth);
+    return new MobileBase(robot, drive, new MotionLimits(config.maxLinearSpeed,
+      config.maxAngularSpeed, config.maxLinearAcceleration,
+      config.maxAngularAcceleration), footprint);
+  }
+
+  static function requireJoint(robot:Robot, index:Int, expectedName:String):Void {
+    var joints = robot.description().joints;
+    if (index < 0 || index >= joints.length || joints[index] != expectedName ||
+        joints.indexOf(expectedName) != index)
+      throw 'Robot description does not match authored joint "$expectedName" at index $index';
+  }
 
   public function new(robot:Robot, driveModel:DriveModel, motionLimits:MotionLimits,
       ?footprint:Footprint) {

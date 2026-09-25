@@ -29,11 +29,15 @@ import robotkit.world.JointTarget;
 import robotkit.model.Actuator;
 import robotkit.model.Frame;
 import robotkit.model.Joint;
+import robotkit.model.JointLimits;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.CollisionApproximation;
 import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.model.RobotDriveConfiguration;
+import robotkit.model.RobotMobileConfiguration;
+import robotkit.model.RobotForkConfiguration;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -465,6 +469,61 @@ class SceneEditingTests {
   }
 
   static function sensorConfiguration():Void {
+    var authored = new SensorConfiguration();
+    var base = authored.model.links[0];
+    var left = authored.model.addLink(new Link("Left wheel", "link/left"));
+    var right = authored.model.addLink(new Link("Right wheel", "link/right"));
+    var mast = authored.model.addLink(new Link("Mast", "link/mast"));
+    var carriage = authored.model.addLink(new Link("Carriage", "link/carriage"));
+    var forksLink = authored.model.addLink(new Link("Forks", "link/forks"));
+    function addJoint(id:String, name:String, type:JointType, child:Link,
+        lower:Float, upper:Float):Void {
+      var joint = new Joint(name, type, base, child, id);
+      joint.limits = new JointLimits(lower, upper, 20.0, 100.0);
+      authored.model.addJoint(joint);
+    }
+    addJoint("joint/left", "left wheel joint", JointType.Continuous, left, -100.0, 100.0);
+    addJoint("joint/right", "right wheel joint", JointType.Continuous, right, -100.0, 100.0);
+    addJoint("joint/lift", "mast lift", JointType.Prismatic, mast, 0.0, 2.0);
+    addJoint("joint/tilt", "fork tilt", JointType.Revolute, carriage, -0.5, 0.5);
+    addJoint("joint/spread", "fork spread", JointType.Prismatic, forksLink, 0.0, 0.8);
+    authored.model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/left", "joint/right", 0.1, 0.5),
+      1.0, 1.5, 0.8, 1.0, 2.0, 1.0);
+    authored.model.forkMechanism = new RobotForkConfiguration("joint/lift",
+      1000.0, 600.0, 1.8, "joint/tilt", "joint/spread");
+    var reopenedAuthored = new SensorConfiguration(
+      haxe.Json.parse(haxe.Json.stringify(authored.records())));
+    var reopenedMobile:Null<RobotMobileConfiguration> = reopenedAuthored.model.mobileBase;
+    var reopenedForks:Null<RobotForkConfiguration> = reopenedAuthored.model.forkMechanism;
+    check(reopenedMobile != null && reopenedForks != null &&
+      reopenedAuthored.diagnostics().length == 0,
+      "Materia robot records preserve and validate authored mechanism roles");
+    var mobileConfig:RobotMobileConfiguration = cast reopenedMobile;
+    var forkConfig:RobotForkConfiguration = cast reopenedForks;
+    check(switch mobileConfig.drive {
+      case Differential(leftId, rightId, radius, track):
+        leftId == "joint/left" && rightId == "joint/right" && radius == 0.1 && track == 0.5;
+      case _: false;
+    } && forkConfig.liftJointId == "joint/lift" &&
+      forkConfig.tiltJointId == "joint/tilt" && forkConfig.spreadJointId == "joint/spread",
+      "save and reopen retain drive geometry and named fork axes");
+    authored.model.forkMechanism = null;
+    authored.model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Ackermann("joint/tilt", "joint/left", 1.2, 0.1, 0.5),
+      1.0, 1.5);
+    var reopenedAckermann = new SensorConfiguration(
+      haxe.Json.parse(haxe.Json.stringify(authored.records())));
+    var ackermannConfig:RobotMobileConfiguration = cast reopenedAckermann.model.mobileBase;
+    check(switch ackermannConfig.drive {
+      case Ackermann(steeringId, wheelId, wheelBase, radius, angle):
+        steeringId == "joint/tilt" && wheelId == "joint/left" &&
+          wheelBase == 1.2 && radius == 0.1 && angle == 0.5;
+      case _: false;
+    }, "save and reopen retain Ackermann steering roles and dimensions");
+    reopenedAckermann.dispose();
+    reopenedAuthored.dispose(); authored.dispose();
+
     var historySensors=new SensorConfiguration();
     historySensors.add("imu");
     historySensors.selectRobot("robot/history-b");

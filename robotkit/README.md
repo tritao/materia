@@ -133,11 +133,20 @@ wheel rate. `Pose2`, `Twist2`, and `Footprint` are transport-neutral values.
 `DifferentialOdometry` integrates wheel-position changes from `RobotSnapshot`
 and resets its encoder baseline when the source clock identity changes.
 
+Drive roles can be authored on `RobotModel` with stable joint IDs instead of
+repeating runtime array positions and wheel geometry in application factories.
+The compiler resolves those roles against the model's joint ordering and stores
+the resolved configuration on `RobotRuntimeBlueprint`. It rejects missing or
+reused roles, incompatible joint types, and invalid dimensions before runtime
+creation. Factories also check the live robot description against the compiled
+joint ordering before exposing a control view.
+
 ```haxe
-var base = new MobileBase(robot,
-  new DifferentialDrive(leftWheelJoint, rightWheelJoint, wheelRadius, trackWidth),
-  new MotionLimits(1.5, 1.2, 0.8, 1.5),
-  Footprint.rectangle(0.8, 0.55));
+model.mobileBase = new RobotMobileConfiguration(
+  RobotDriveConfiguration.Differential(leftWheelId, rightWheelId, 0.1, 0.5),
+  1.5, 1.2, 0.8, 1.5, 0.8, 0.55);
+var blueprint = RobotRuntimeCompiler.compile(model);
+var base = MobileBase.fromBlueprint(robot, blueprint);
 base.command(new Twist2(0.6, 0.2), 0.02);
 ```
 
@@ -168,6 +177,17 @@ atomic position batches. `ForkState` reads their positions, velocities, efforts,
 and source/receive clocks. `Payload`, `LoadState`, and `LoadLimits` represent
 load knowledge and a configured mass, load-moment, and lift-height envelope;
 runtime joint limits remain authoritative.
+
+Fork axes can use model-owned joint limits and IDs. Compile the model once and
+construct both views from its blueprint:
+
+```haxe
+model.forkMechanism = new RobotForkConfiguration(liftJointId,
+  1000.0, 600.0, 1.8, tiltJointId, spreadJointId);
+var blueprint = RobotRuntimeCompiler.compile(model);
+var base = MobileBase.fromBlueprint(robot, blueprint);
+var forks = Forks.fromBlueprint(robot, blueprint);
+```
 
 `robotkit.perception` provides timestamped `Detection`, `Obstacle`, `Pallet`,
 and `DockingTarget` values. `LidarObstaclePerception` turns finite in-range

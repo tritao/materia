@@ -19,6 +19,9 @@ import robotkit.model.JointLimits;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Sensor;
+import robotkit.model.RobotDriveConfiguration;
+import robotkit.model.RobotMobileConfiguration;
+import robotkit.model.RobotForkConfiguration;
 import robotkit.runtime.RobotRuntimeCompiler;
 
 /** Editable RobotKit sensor model used by Materia's sensor panel. */
@@ -209,10 +212,48 @@ class SensorConfiguration {
         maxRate:joint.drive.maxRate}}],
     frames: [for (frame in value.frames) {id:frame.id, name:frame.name, linkId:frame.link.id,
       position:frame.position.copy(), rotation:frame.rotation.copy()}],
+    mobileBase: mobileRecord(value.mobileBase),
+    forkMechanism: forkRecord(value.forkMechanism),
     sensors: [for (sensor in value.sensors) {id:sensor.id, name:sensor.name, kind:sensor.kind,
       updateRate:sensor.updateRate, frameId:sensor.frame == null ? null : sensor.frame.id,
       rayCount:sensor.rayCount, maxRange:sensor.maxRange, noiseStddev:sensor.noiseStddev,
       noiseSeed:sensor.noiseSeed}]
+  };
+
+  static function mobileRecord(value:Null<RobotMobileConfiguration>):Dynamic {
+    if (value == null) return null;
+    return {
+      drive: driveRecord(value.drive),
+      maxLinearSpeed: value.maxLinearSpeed,
+      maxAngularSpeed: value.maxAngularSpeed,
+      maxLinearAcceleration: value.maxLinearAcceleration,
+      maxAngularAcceleration: value.maxAngularAcceleration,
+      footprintLength: value.footprintLength,
+      footprintWidth: value.footprintWidth
+    };
+  }
+
+  static function forkRecord(value:Null<RobotForkConfiguration>):Dynamic {
+    if (value == null) return null;
+    return {
+      liftJointId: value.liftJointId,
+      tiltJointId: value.tiltJointId,
+      spreadJointId: value.spreadJointId,
+      maxMassKg: value.maxMassKg,
+      maxLoadMomentKgMeters: value.maxLoadMomentKgMeters,
+      maxLiftHeightMeters: value.maxLiftHeightMeters
+    };
+  }
+
+  static function driveRecord(value:RobotDriveConfiguration):Dynamic return switch value {
+    case Differential(leftId, rightId, wheelRadius, trackWidth): {
+      kind:"differential", leftWheelJointId:leftId, rightWheelJointId:rightId,
+      wheelRadius:wheelRadius, trackWidth:trackWidth
+    };
+    case Ackermann(steeringId, driveId, wheelBase, wheelRadius, maxSteeringAngle): {
+      kind:"ackermann", steeringJointId:steeringId, driveWheelJointId:driveId,
+      wheelBase:wheelBase, wheelRadius:wheelRadius, maxSteeringAngle:maxSteeringAngle
+    };
   };
 
   function captureCurrent():Void {
@@ -310,6 +351,34 @@ class SensorConfiguration {
         finite(drive,"maxEffort"),finite(drive,"maxRate"));
       model.addJoint(joint);
     }
+    var mobileData:Dynamic = Reflect.field(data, "mobileBase");
+    if (mobileData != null) {
+      var driveData:Dynamic = Reflect.field(mobileData, "drive");
+      if (driveData == null) throw "Mobile-base configuration requires a drive";
+      var drive:RobotDriveConfiguration = switch requiredString(driveData, "kind") {
+        case "differential": RobotDriveConfiguration.Differential(
+          requiredString(driveData, "leftWheelJointId"),
+          requiredString(driveData, "rightWheelJointId"),
+          finite(driveData, "wheelRadius"), finite(driveData, "trackWidth"));
+        case "ackermann": RobotDriveConfiguration.Ackermann(
+          requiredString(driveData, "steeringJointId"),
+          requiredString(driveData, "driveWheelJointId"),
+          finite(driveData, "wheelBase"), finite(driveData, "wheelRadius"),
+          finite(driveData, "maxSteeringAngle"));
+        default: throw "Unsupported mobile-base drive configuration";
+      };
+      model.mobileBase = new RobotMobileConfiguration(drive,
+        finite(mobileData, "maxLinearSpeed"), finite(mobileData, "maxAngularSpeed"),
+        finite(mobileData, "maxLinearAcceleration"), finite(mobileData, "maxAngularAcceleration"),
+        optionalFinite(mobileData, "footprintLength"), optionalFinite(mobileData, "footprintWidth"));
+    }
+    var forkData:Dynamic = Reflect.field(data, "forkMechanism");
+    if (forkData != null) {
+      model.forkMechanism = new RobotForkConfiguration(requiredString(forkData, "liftJointId"),
+        finite(forkData, "maxMassKg"), finite(forkData, "maxLoadMomentKgMeters"),
+        finite(forkData, "maxLiftHeightMeters"), optionalString(forkData, "tiltJointId"),
+        optionalString(forkData, "spreadJointId"));
+    }
     var frames = new Map<String, Frame>();
     for (value in requiredArray(data, "frames")) {
       var link = links.get(requiredString(value, "linkId"));
@@ -367,6 +436,22 @@ class SensorConfiguration {
   }
   static function requiredInteger(value:Dynamic, name:String):Int {
     var field = Reflect.field(value, name); if (!Std.isOfType(field, Int)) throw 'Invalid sensor document field $name'; return cast field;
+  }
+  static function optionalFinite(value:Dynamic, name:String):Null<Float> {
+    var field = Reflect.field(value, name);
+    if (field == null) return null;
+    if (!Std.isOfType(field, Float) && !Std.isOfType(field, Int))
+      throw 'Invalid sensor document field $name';
+    var result:Float = cast field;
+    if (!Math.isFinite(result)) throw 'Non-finite sensor document field $name';
+    return result;
+  }
+  static function optionalString(value:Dynamic, name:String):Null<String> {
+    var field = Reflect.field(value, name);
+    if (field == null) return null;
+    if (!Std.isOfType(field, String) || StringTools.trim(field).length == 0)
+      throw 'Invalid sensor document field $name';
+    return cast field;
   }
   static function vector(value:Dynamic, name:String, count:Int):Array<Float> {
     var items = requiredArray(value, name); if (items.length != count) throw 'Invalid sensor document vector $name';
