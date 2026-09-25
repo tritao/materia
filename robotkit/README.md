@@ -82,9 +82,9 @@ Select it with `new Simulation(0.01, 2, 1)`; backend `0` remains the test backen
 `Robot` interface used by `RemoteRobot`. `robotkit.world.SerialRobot` compiles
 an authored `RobotModel`, opens a POSIX serial device, and owns its standalone
 runtime. Both can be attached to `RobotWorld` and used through the same command
-and snapshot interfaces. The first serial protocol version carries joint
-positions, velocities, efforts, and indexed target batches; it does not yet
-carry physical IMU or LiDAR samples.
+and snapshot interfaces. The serial protocol carries indexed target batches,
+joint positions/velocities/efforts, and sensor samples in compiled model slot
+order; see the serial protocol document before implementing device firmware.
 
 The complete ownership and tick model is documented in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).

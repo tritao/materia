@@ -180,11 +180,12 @@ positions are checked against the compiled envelope. Stale/malformed samples,
 limit violations, and endpoint failures latch a runtime fault and trigger a
 best-effort emergency-stop command through the same endpoint boundary.
 
-The first concrete physical backend is `SerialRobotEndpoint`: a fixed framed
-POSIX command/state stream with non-blocking reads. It is intentionally a
-specific endpoint, not a universal driver hierarchy. Disconnects and incomplete
-state frames become runtime faults, which keeps stale sensor data visible to
-the same safety boundary used by simulation.
+The first concrete physical backend is `SerialRobotEndpoint`: a framed POSIX
+command/state stream with bounded variable payloads, CRC-32, and sensor slot
+transport. It is intentionally a specific endpoint, not a universal driver
+hierarchy. It waits for a fresh state frame and faults on a disconnected or
+silent device, keeping stale sensor data visible to the same safety boundary
+used by simulation. The serial protocol document defines the firmware contract.
 
 `Simulation` is the shared ownership boundary for local physics. It owns the
 SceneKit scene, SimKit world and host, physics resources, simulation clock,

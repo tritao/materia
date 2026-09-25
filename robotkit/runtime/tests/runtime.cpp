@@ -120,6 +120,28 @@ public:
     bool emergency_stop_received = false;
 };
 
+class WrongSensorLayoutEndpoint final : public robotkit::RobotEndpoint {
+public:
+    rk_result apply(const rk_robot_command &command) override {
+        if (command.kind == RK_COMMAND_EMERGENCY_STOP)
+            emergency_stop_received = true;
+        return RK_OK;
+    }
+
+    rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override {
+        state.struct_size = sizeof(state);
+        state.source_timestamp_ns = timestamp_ns;
+        state.joint_count = 2;
+        state.sensor_count = 1;
+        state.sensors[0].sequence = 1;
+        state.sensors[0].value_count = 1;
+        state.sensors[0].values[0] = 1.0;
+        return RK_OK;
+    }
+
+    bool emergency_stop_received = false;
+};
+
 void wait_for_sequence(robotkit::RobotRuntime &runtime, uint64_t sequence) {
     for (int attempt = 0; attempt != 100; ++attempt) {
         rk_robot_state state{};
@@ -280,6 +302,13 @@ int main() {
     assert(out_of_limit.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
     assert(out_of_limit_endpoint->emergency_stop_received);
+
+    auto wrong_sensor_endpoint = std::make_shared<WrongSensorLayoutEndpoint>();
+    robotkit::RobotRuntime wrong_sensor_layout(blueprint, wrong_sensor_endpoint);
+    assert(wrong_sensor_layout.publish_sample(100) == RK_ERROR_BACKEND);
+    assert(wrong_sensor_layout.snapshot(state) == RK_OK);
+    assert(state.safety == RK_SAFETY_FAULT);
+    assert(wrong_sensor_endpoint->emergency_stop_received);
 
     command.sequence = 2;
     command.kind = RK_COMMAND_EMERGENCY_STOP;

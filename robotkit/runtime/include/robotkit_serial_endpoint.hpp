@@ -12,13 +12,10 @@ namespace robotkit {
 /**
  * Small framed serial endpoint for the first physical RobotKit backend.
  *
- * The wire format is deliberately fixed-width and documented by the packet
- * values below: version 2 command packets travel host-to-device and state
- * packets travel device-to-host. Each target includes its compiled joint
- * index, so sparse and mixed-mode batches retain their meaning. A device
- * implementation can therefore be tested with a
- * serial loopback before it is attached to a particular motor controller.
- * RobotRuntime still owns validation, sequencing, limits, and safety state.
+ * Version 3 command and state frames use bounded variable-length payloads,
+ * CRC-32, and compiled joint/sensor slot indices. A device implementation can
+ * be tested with a serial loopback before it is attached to a motor controller.
+ * RobotRuntime still owns command sequencing, limits, and host safety state.
  */
 class RK_API SerialRobotEndpoint final : public RobotEndpoint {
 public:
@@ -33,6 +30,7 @@ public:
     SerialRobotEndpoint &operator=(const SerialRobotEndpoint &) = delete;
 
     rk_result apply(const rk_robot_command &command) override;
+    /** Samples the next fresh state frame, waiting up to the link timeout. */
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
 
     /**

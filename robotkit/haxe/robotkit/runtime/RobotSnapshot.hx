@@ -63,6 +63,8 @@ class RobotSnapshot {
       efforts.push(value.get_effort(index));
     }
     var frames:Array<SensorFrame> = [];
+    if (value.get_sensor_count() > layout.length)
+      throw "Runtime published more sensor slots than its compiled blueprint";
     for (i in 0...value.get_sensor_count()) {
       var sample = value.get_sensors(i);
       if (sample.get_sequence() == Int64.ofInt(0)) continue;

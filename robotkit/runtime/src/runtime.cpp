@@ -406,8 +406,11 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     next.safety = runtime_safety;
     const auto sample_validation = result == RK_OK
         ? rk_robot_state_validate(&next) : RK_OK;
+    const auto configured_sensor_count = blueprint_.sensor_count == 0 ? 3 : blueprint_.sensor_count;
     if (result != RK_OK || sample_validation != RK_OK ||
-        next.joint_count != blueprint_.joint_count) {
+        next.joint_count != blueprint_.joint_count ||
+        next.sensor_count > configured_sensor_count ||
+        (next.sensor_count != 0 && next.sensor_count != configured_sensor_count)) {
         latch_fault();
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }
