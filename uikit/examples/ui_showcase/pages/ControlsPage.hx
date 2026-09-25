@@ -24,12 +24,23 @@ import nativekit.ui.widgets.controls.SpinnerKind;
 import nativekit.ui.widgets.controls.Select;
 import nativekit.ui.widgets.controls.SelectOption;
 import nativekit.ui.widgets.controls.Toggle;
+import nativekit.ui.widgets.text.TextField;
 
 /** Interactive primitive controls and their common input states. */
 class ControlsPage {
 	public static function build(explorer:UiExplorer, items:Array<KeyedView>):Void {
 		explorer.pageHeading(items, "Controls",
 			"Focus, hover, pressed, selected and disabled states are part of each widget.");
+		if (explorer.state.visualPropertyInputs)
+			items.push(explorer.keyed("inspector-fields", explorer.panel("inspector-fields-card", [
+				explorer.keyed("heading", explorer.heading("Inspector input contrast")),
+				explorer.keyed("enabled-label", explorer.label("Enabled values")),
+				explorer.keyed("position", propertyInput("position-value", "1.5")),
+				explorer.keyed("name", propertyInput("name-value", "Blue box")),
+				explorer.keyed("colour", propertyInput("colour-value", "#458AFF")),
+				explorer.keyed("disabled-label", explorer.label("Disabled value")),
+				explorer.keyed("disabled", propertyInput("disabled-value", "0.1", false))
+			])));
 		items.push(explorer.keyed("controls-row", new Row("controls-row", [
 			explorer.keyed("buttons", explorer.panel("buttons-card", [
 				explorer.keyed("heading", explorer.heading("Buttons")),
@@ -112,6 +123,15 @@ class ControlsPage {
 			"Waiting for a measurable result");
 		progress.mode = ProgressMode.Indeterminate;
 		return progress;
+	}
+
+	static function propertyInput(key:String, value:String, enabled:Bool = true):TextField {
+		var style = new LayoutStyle();
+		style.width = LayoutAxis.fixed(220.0);
+		var field = new TextField(key, value, null, style, key);
+		field.classes = ["property-input"];
+		field.enabled = enabled;
+		return field;
 	}
 
 	static function iconButtonSample():IconButton {

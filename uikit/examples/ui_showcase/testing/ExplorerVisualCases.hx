@@ -44,6 +44,7 @@ class ExplorerVisualCases {
 		state.visualFocusLabel = null;
 		state.visualTextAreaSelection = false;
 		state.visualTextComposition = false;
+		state.visualPropertyInputs = false;
 		state.selectedPage = "overview";
 		switch caseId {
 			case ExplorerVisualCase.Overview, ExplorerVisualCase.OverviewCompact:
@@ -53,6 +54,11 @@ class ExplorerVisualCases {
 				state.selectedPage = "controls";
 				state.lightTheme = true;
 				explorer.context.setTheme(UiExplorer.makeTheme(true));
+			case ExplorerVisualCase.InspectorFieldsLight:
+				state.selectedPage = "controls";
+				state.lightTheme = true;
+				state.visualPropertyInputs = true;
+				explorer.context.setTheme(nativekit.ui.theme.Theme.light());
 			case ExplorerVisualCase.ControlsFocused:
 				state.selectedPage = "controls";
 				state.visualFocusLabel = "Primary action";

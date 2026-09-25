@@ -179,10 +179,15 @@ class TextField implements View {
 			}
 			var showsPlaceholder = editor.documentLength() == 0 && placeholder != null &&
 				placeholder.length > 0;
+			// Compact property values use the standard text renderer so their theme
+			// foreground reaches the pixels, including while the editor has focus.
+			var useTextNode = showsPlaceholder || (!multiline && classes.indexOf("property-input") >= 0);
 			var textNode = new RenderNode(context.id("text"),
-				showsPlaceholder ? LayoutVisualKind.Text : LayoutVisualKind.Custom, textNodeStyle);
+				useTextNode ? LayoutVisualKind.Text : LayoutVisualKind.Custom, textNodeStyle);
 			if (showsPlaceholder)
 				textNode.layout.text = placeholder;
+			else if (useTextNode)
+				textNode.layout.text = editor.layoutText();
 			else
 				textNode.layout.intrinsicContent = editor.renderContent;
 			var textNodeTextStyle = new TextStyle(editor.textStyle.fontSize,

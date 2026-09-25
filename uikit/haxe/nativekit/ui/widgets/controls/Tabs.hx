@@ -4,6 +4,7 @@ import LayoutAxis;
 import LayoutDirection;
 import LayoutStyle;
 import LayoutVisualKind;
+import Color;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
@@ -118,6 +119,8 @@ class Tabs implements View {
 				tabDragState = context.state(context.id("tab-drag"), new TabDragState());
 			for (item in items) {
 				var button = new Button(item.label, null, function() { select(item.key); }, item.key);
+				button.variant = ButtonVariant.Navigation;
+				button.classes = ["tab-header"];
 				button.leadingIcon = item.icon;
 				button.iconSize = 14.0;
 				button.enabled = item.enabled;
@@ -128,7 +131,22 @@ class Tabs implements View {
 					return context.withScope(new Key(item.key),
 						function() return button.build(context));
 				});
-				strip.add(buttonNode);
+				var headerStyle = new LayoutStyle();
+				headerStyle.direction = LayoutDirection.TopToBottom;
+				var header = new RenderNode(context.id("tab-header:" + item.key),
+					LayoutVisualKind.Box, headerStyle);
+				header.hitTestSelf = false;
+				header.add(buttonNode);
+				var indicatorStyle = new LayoutStyle();
+				indicatorStyle.width = LayoutAxis.grow();
+				indicatorStyle.height = LayoutAxis.fixed(2.0);
+				indicatorStyle.background = item.key == active ? context.theme.tokens.accent :
+					Color.rgba(0.0, 0.0, 0.0, 0.0);
+				var indicator = new RenderNode(context.id("tab-indicator:" + item.key),
+					LayoutVisualKind.Box, indicatorStyle);
+				indicator.hitTestSelf = false;
+				header.add(indicator);
+				strip.add(header);
 				buttonNodes.push(buttonNode);
 				if (onTabHeaderBuilt != null)
 					onTabHeaderBuilt(item.key, buttonNode);

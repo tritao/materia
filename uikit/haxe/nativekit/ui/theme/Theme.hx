@@ -77,7 +77,7 @@ class Theme {
 		tokens.accent = light ? rgba(0.12, 0.37, 0.72) : rgba(0.25, 0.61, 0.89);
 		tokens.text = light ? rgba(0.10, 0.14, 0.21) : rgba(0.91, 0.94, 0.98);
 		tokens.mutedText = light ? rgba(0.32, 0.38, 0.47) : rgba(0.62, 0.68, 0.77);
-		tokens.disabledText = light ? rgba(0.48, 0.51, 0.57) : rgba(0.53, 0.55, 0.59);
+		tokens.disabledText = light ? rgba(0.38, 0.42, 0.49) : rgba(0.53, 0.55, 0.59);
 		tokens.buttonText = rgba(1.0, 1.0, 1.0);
 		tokens.disabledButtonText = light ? rgba(0.28, 0.31, 0.36) : rgba(0.62, 0.65, 0.70);
 		tokens.buttonBackground = light ? rgba(0.18, 0.39, 0.70) : rgba(0.16, 0.38, 0.70);
@@ -163,6 +163,39 @@ class Theme {
 			[StyleValue.background(tokens.navigationSelected)]);
 		styles.rule(StyleSelector.widget("button").className("navigation").state(StyleState.Disabled),
 			[StyleValue.background(tokens.navigationDisabled)]);
+		styles.rule(StyleSelector.widget("button").className("secondary"), [
+			StyleValue.background(tokens.surfaceRaised),
+			StyleValue.borderColor(tokens.border), StyleValue.borderWidth(1.0)
+		]);
+		styles.rule(StyleSelector.widget("button").className("secondary").state(StyleState.Hovered), [
+			StyleValue.background(tokens.surfaceHover), StyleValue.borderColor(tokens.borderStrong)
+		]);
+		styles.rule(StyleSelector.widget("button").className("secondary").state(StyleState.Pressed),
+			[StyleValue.background(tokens.surfaceSunken)]);
+		styles.rule(StyleSelector.widget("button").className("secondary").state(StyleState.Focused),
+			[StyleValue.borderColor(tokens.focusRing)]);
+		styles.rule(StyleSelector.widget("button").className("secondary").state(StyleState.Selected),
+			[StyleValue.background(tokens.selection)]);
+		styles.rule(StyleSelector.widget("button").className("secondary").state(StyleState.Disabled),
+			[StyleValue.background(tokens.surfaceSunken)]);
+		styles.rule(StyleSelector.widget("button").className("tab-header"), [
+			StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 0.0)),
+			StyleValue.padding(new Insets(10.0, 6.0, 10.0, 6.0))
+		]);
+		styles.rule(StyleSelector.widget("button").className("tab-header").state(StyleState.Hovered),
+			[StyleValue.background(tokens.surfaceHover)]);
+		styles.rule(StyleSelector.widget("button").className("tab-header").state(StyleState.Selected),
+			[StyleValue.background(tokens.surfaceRaised)]);
+		styles.rule(StyleSelector.widget("button").className("tab-header").state(StyleState.Focused),
+			[StyleValue.borderColor(tokens.focusRing), StyleValue.borderWidth(1.0)]);
+		styles.rule(StyleSelector.widget("button").className("inspector-section-header"), [
+			StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 0.0)),
+			StyleValue.borderWidth(0.0)
+		]);
+		styles.rule(StyleSelector.widget("button").className("inspector-section-header").state(StyleState.Hovered),
+			[StyleValue.background(tokens.surfaceHover)]);
+		styles.rule(StyleSelector.widget("button").className("inspector-section-header").state(StyleState.Focused),
+			[StyleValue.borderColor(tokens.focusRing), StyleValue.borderWidth(1.0)]);
 		styles.rule(StyleSelector.widget("button").className("menu-item"), [
 			StyleValue.width(LayoutAxis.grow()),
 			StyleValue.padding(new Insets(10.0, 10.0, 6.0, 6.0)),
@@ -205,10 +238,17 @@ class Theme {
 		styles.rule(StyleSelector.widget("text-field").className("property-input"), [
 			StyleValue.height(LayoutAxis.fixed(32.0)),
 			StyleValue.padding(new Insets(8.0, 5.0, 8.0, 5.0)),
-			StyleValue.background(tokens.selectionField),
-			StyleValue.borderColor(tokens.selectionBorder),
+			StyleValue.textColor(tokens.textPrimary),
+			StyleValue.background(tokens.surfaceSunken),
+			StyleValue.borderColor(tokens.border),
 			StyleValue.borderWidth(1.0)
 		]);
+		styles.rule(StyleSelector.widget("text-field").className("property-input").state(StyleState.Disabled),
+			[StyleValue.textColor(tokens.textDisabled)]);
+		styles.rule(StyleSelector.widget("text-field").className("property-input").state(StyleState.Hovered),
+			[StyleValue.borderColor(tokens.borderStrong)]);
+		styles.rule(StyleSelector.widget("text-field").className("property-input").state(StyleState.Focused),
+			[StyleValue.borderColor(tokens.focusRing)]);
 		styles.rule(StyleSelector.widget("text-field").className("combo-trigger"), [
 			StyleValue.background(tokens.selectionField),
 			StyleValue.padding(new Insets(34.0, 8.0, 34.0, 8.0)),

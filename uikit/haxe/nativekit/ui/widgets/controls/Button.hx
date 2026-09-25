@@ -84,6 +84,8 @@ class Button implements View {
 		var resolvedClasses = classes.copy();
 		if (variant == ButtonVariant.Navigation)
 			resolvedClasses.push("navigation");
+		else if (variant == ButtonVariant.Secondary)
+			resolvedClasses.push("secondary");
 		var target = new StyleTarget("button", key, key, resolvedClasses, ["button"], flags);
 		var computed = context.styleResolver.resolve(target, context.inheritedStyle, context.theme.styles,
 			context.styleSheet, style, context.environment);
@@ -107,7 +109,9 @@ class Button implements View {
 			node.on(UiEventKind.Click, activate);
 			node.on(UiEventKind.Activate, activate);
 		}
-		var foreground = context.theme.buttonLabelColor(enabled, resolvedStyle.background);
+		var foreground = variant == ButtonVariant.Secondary || variant == ButtonVariant.Navigation
+			? (enabled ? context.theme.tokens.textPrimary : context.theme.tokens.textDisabled)
+			: context.theme.buttonLabelColor(enabled, resolvedStyle.background);
 		if (leadingIcon != null)
 			node.add(new Icon("leading-icon", leadingIcon, iconSize, foreground).build(context));
 		var labelNode = context.withScope(new Key("label"), function() {

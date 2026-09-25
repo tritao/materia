@@ -23,6 +23,7 @@ class ExplorerState {
 	public var visualFocusLabel:Null<String> = null;
 	public var visualTextAreaSelection:Bool = false;
 	public var visualTextComposition:Bool = false;
+	public var visualPropertyInputs:Bool = false;
 	public var textDiagnostics:Null<TextEditorDiagnostics> = null;
 	public var textLastClipboardAction:String = "No clipboard command requested";
 	public var textLastSubmit:String = "No editor submitted yet";

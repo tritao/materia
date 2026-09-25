@@ -286,6 +286,10 @@ class FrameworkSmoke {
 		clippingEditor.dispose();
 		var session = LayoutSession.create();
 		var context = new UiContext(session, fonts);
+		if (!propertyInputContrastValid(fonts))
+			return 301;
+		if (!tabHierarchyValid(fonts))
+			return 302;
 		if (context.buildContext.fonts != fonts)
 			return 30;
 		if (!commandHistoryValid(context))
@@ -1915,7 +1919,7 @@ class FrameworkSmoke {
 		], "first", function(_) { tabChanges++; });
 		var tabsFrame = new LayoutFrame(256.0, 192.0);
 		var tabsRoot = context.submit(tabs, tabsFrame);
-		var secondTab = tabsRoot.children[0].children[1];
+		var secondTab = tabsRoot.children[0].children[1].children[0];
 		var secondTabGeometry:ResolvedLayoutItem = cast secondTab.resolved;
 		context.pointerDown(secondTabGeometry.x + 2.0, secondTabGeometry.y + 2.0, 0);
 		context.pointerUp(secondTabGeometry.x + 2.0, secondTabGeometry.y + 2.0, 0);
@@ -1924,14 +1928,14 @@ class FrameworkSmoke {
 		tabsRoot = context.submit(tabs, tabsFrame);
 		var secondPage:Semantics = cast tabsRoot.children[1].semantics;
 		if (secondPage.role != AccessibilityRole.TabPanel || secondPage.label != "Second" ||
-			(cast(tabsRoot.children[0].children[1].semantics, Semantics).states &
+			(cast(tabsRoot.children[0].children[1].children[0].semantics, Semantics).states &
 			AccessibilityState.Selected) == 0)
 			return 96;
-		if (!context.focusWidget(tabsRoot.children[0].children[1].id))
+		if (!context.focusWidget(tabsRoot.children[0].children[1].children[0].id))
 			return 97;
 		context.key(UiEventKind.KeyDown, UiKey.Left);
 		if (tabs.selectedKey != "first" || context.focus.focusedId == null ||
-			!context.focus.focusedId.equals(tabsRoot.children[0].children[0].id))
+			!context.focus.focusedId.equals(tabsRoot.children[0].children[0].children[0].id))
 			return 98;
 
 		var theme = new Theme();
@@ -3166,6 +3170,77 @@ class FrameworkSmoke {
 		Sys.println("PASS: Haxe framework, 4,000-node layout pressure, and NativeKit input routing");
 		return 0;
 	}
+
+	static function propertyInputContrastValid(fonts:FontCollection):Bool {
+		var theme = nativekit.ui.theme.Theme.light();
+		var context = new UiContext(null, fonts, theme);
+		var values = ["1.5", "0.1", "Blue box", "#458AFF"];
+		for (index in 0...values.length) {
+			var fieldStyle = new LayoutStyle();
+			fieldStyle.width = LayoutAxis.fixed(220.0);
+			var field = new TextField("contrast-" + index, values[index], null, fieldStyle);
+			field.classes = ["property-input"];
+			field.enabled = index != 1;
+			var root = context.submit(field, new LayoutFrame(240.0, 40.0));
+			var expected = field.enabled ? theme.tokens.textPrimary : theme.tokens.textDisabled;
+			var foreground:Color = root.computedStyle.get(nativekit.ui.style.StyleProperty.TextColor);
+			var background:Color = root.computedStyle.get(nativekit.ui.style.StyleProperty.Background);
+			var rendered:Color = root.children[0].children[0].layout.textColor;
+			if (foreground == null || background == null || rendered == null ||
+				root.children[0].children[0].layout.visualKind != LayoutVisualKind.Text ||
+				foreground.red != expected.red || foreground.green != expected.green ||
+				foreground.blue != expected.blue || rendered.red != expected.red ||
+				rendered.green != expected.green || rendered.blue != expected.blue ||
+				background.red != theme.tokens.surfaceSunken.red ||
+				background.green != theme.tokens.surfaceSunken.green ||
+				background.blue != theme.tokens.surfaceSunken.blue ||
+				contrastRatio(foreground, background) < 4.5) {
+				context.dispose();
+				return false;
+			}
+		}
+		context.dispose();
+		return true;
+	}
+
+	static function tabHierarchyValid(fonts:FontCollection):Bool {
+		var theme = nativekit.ui.theme.Theme.light();
+		var context = new UiContext(null, fonts, theme);
+		var tabs = new Tabs("hierarchy-test", [
+			new TabItem("one", "One", new Text("First")),
+			new TabItem("two", "Two", new Text("Second"))
+		], "one");
+		var root = context.submit(tabs, new LayoutFrame(300.0, 120.0));
+		var first = root.children[0].children[0];
+		var second = root.children[0].children[1];
+		var active = first.children[0].layout.style.background;
+		var inactive = second.children[0].layout.style.background;
+		var indicator = first.children[1].layout.style.background;
+		var result = active.red == theme.tokens.surfaceRaised.red &&
+			active.green == theme.tokens.surfaceRaised.green &&
+			inactive.alpha == 0.0 &&
+			indicator.red == theme.tokens.accent.red &&
+			indicator.green == theme.tokens.accent.green &&
+			second.children[1].layout.style.background.alpha == 0.0;
+		context.dispose();
+		return result;
+	}
+
+	static function contrastRatio(a:Color, b:Color):Float {
+		var aLuminance = colorLuminance(a);
+		var bLuminance = colorLuminance(b);
+		return (Math.max(aLuminance, bLuminance) + 0.05) /
+			(Math.min(aLuminance, bLuminance) + 0.05);
+	}
+
+	static function colorLuminance(color:Color):Float {
+		return 0.2126 * linearChannel(color.red) +
+			0.7152 * linearChannel(color.green) +
+			0.0722 * linearChannel(color.blue);
+	}
+
+	static function linearChannel(channel:Float):Float
+		return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
 
 	static function hostFrameLifecycleValid():Bool {
 		var state = new UiHostFrameState(800, 600);

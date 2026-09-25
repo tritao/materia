@@ -231,8 +231,7 @@ private class PropertyInspectorSectionHeader implements View {
 			style, onToggle, key);
 		button.leadingIcon = section.expanded ? IconName.ChevronDown : IconName.ChevronRight;
 		button.iconSize = 14.0;
-		button.variant = ButtonVariant.Navigation;
-		button.selected = section.expanded;
+		button.variant = ButtonVariant.Secondary;
 		button.classes = ["inspector-section-header"];
 		return button.build(context);
 	}

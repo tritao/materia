@@ -4,4 +4,5 @@ package nativekit.ui.widgets.controls;
 enum abstract ButtonVariant(Int) from Int to Int {
 	var Primary = 0;
 	var Navigation = 1;
+	var Secondary = 2;
 }

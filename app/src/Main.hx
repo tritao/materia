@@ -677,7 +677,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       toolbarMenuVisible = !toolbarMenuVisible;
       commands.refresh();
     }, "toolbar-more");
-    more.variant = ButtonVariant.Navigation;
+    more.variant = ButtonVariant.Secondary;
     more.leadingIcon = IconName.ChevronDown;
     more.accessibilityLabel = "More editor actions";
     more.selected = toolbarMenuVisible;
@@ -690,7 +690,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var action = new CommandButton(key, commandId, commands);
     action.displayLabel = compact ? "" : label;
     action.leadingIcon = icon;
-    action.variant = primary ? ButtonVariant.Primary : ButtonVariant.Navigation;
+    action.variant = primary ? ButtonVariant.Primary : ButtonVariant.Secondary;
     return action;
   }
 
@@ -971,6 +971,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var action = new CommandButton(key, commandId, commands);
     action.displayLabel = label;
     action.leadingIcon = icon;
+    action.variant = commandId == "scene.apply-sketch" ? ButtonVariant.Primary : ButtonVariant.Secondary;
     return action;
   }
 
