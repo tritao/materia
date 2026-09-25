@@ -61,6 +61,7 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	 * Picks against one view using the index's retained scene bounds and its pose overrides.
 	 */
 	extern fn nkscene_render_spatial_index_pick_ray_with_view(index: nkscene_render_spatial_index, view: ptr<const<nkscene_render_view>>, ray: ptr<const<nkscene_render_ray>>, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
+	extern fn nkscene_render_spatial_index_pick_ray_with_view_edges(index: nkscene_render_spatial_index, view: ptr<const<nkscene_render_view>>, ray: ptr<const<nkscene_render_ray>>, angular_tolerance: f32, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
 	/**
 	 * Performs nearest-hit picking for a batch of rays against one immutable snapshot.
 	 * `rays` and `out_results` must each reference `ray_count` elements.

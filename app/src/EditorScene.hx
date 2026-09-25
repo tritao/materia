@@ -83,6 +83,7 @@ class EditorScene {
   var selectionMaterial:Material;
   public var selectedId(default, null):String = "box";
   public var selectedCadFaceIndex(default, null):Int = -1;
+  public var selectedCadEdgeIndex(default, null):Int = -1;
   public var selectedCadFaceX(default, null):Float = 0.0;
   public var selectedCadFaceY(default, null):Float = 0.0;
   var selectedCadFaceFingerprint:Null<TopologyFingerprint> = null;
@@ -1228,6 +1229,7 @@ class EditorScene {
   }
 
   function clearSelectedCadFace():Void {
+    selectedCadEdgeIndex = -1;
     var session = cadSessions.get(selectedId);
     if (session != null)
       session.selectedTopology = null;
@@ -1488,17 +1490,25 @@ class EditorScene {
   }
 
   public function selectRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
-      directionX:Float, directionY:Float, directionZ:Float):String {
+      directionX:Float, directionY:Float, directionZ:Float,
+      edgeAngularTolerance:Float = 0.0):String {
     refreshPresentationIfStale();
-    return selectHit(spatial.pickRayWithView(view, originX, originY, originZ,
-      directionX, directionY, directionZ));
+    return selectHit(edgeAngularTolerance > 0.0
+      ? spatial.pickRayWithViewEdges(view, originX, originY, originZ,
+          directionX, directionY, directionZ, edgeAngularTolerance)
+      : spatial.pickRayWithView(view, originX, originY, originZ,
+          directionX, directionY, directionZ));
   }
 
   public function pickRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
-      directionX:Float, directionY:Float, directionZ:Float):String {
+      directionX:Float, directionY:Float, directionZ:Float,
+      edgeAngularTolerance:Float = 0.0):String {
     refreshPresentationIfStale();
-    return idForHit(spatial.pickRayWithView(view, originX, originY, originZ,
-      directionX, directionY, directionZ));
+    return idForHit(edgeAngularTolerance > 0.0
+      ? spatial.pickRayWithViewEdges(view, originX, originY, originZ,
+          directionX, directionY, directionZ, edgeAngularTolerance)
+      : spatial.pickRayWithView(view, originX, originY, originZ,
+          directionX, directionY, directionZ));
   }
 
   static function poseTransform(position:Array<Float>, rotation:Array<Float>):Transform {
@@ -1762,13 +1772,18 @@ class EditorScene {
 
   function selectHit(hit:PickResult):String {
     var previousFace=selectedCadFaceIndex;
+    var previousEdge=selectedCadEdgeIndex;
     var id=idForHit(hit);
     // Keep a selected feature-tree row while picking a replacement face on the same part.
     if (id != selectedId || (activeSketchEdit != null && selectedFeatureKey != null))
       select(id);
     clearSelectedCadFace();
     var item=object(id);
-    if(item!=null&&isCadKind(item.kind)&&hit.subelement()>=0){
+    var subelement=hit.subelement();
+    if(item!=null&&(isCadKind(item.kind)||item.kind=="cad-preview")&&
+        (subelement & 0x40000000)!=0) {
+      selectedCadEdgeIndex = (subelement & 0x3fffffff)-1;
+    } else if(item!=null&&isCadKind(item.kind)&&subelement>=0){
       var session=requireCadSession(id);
       try {
         var index=hit.subelement();
@@ -1778,7 +1793,8 @@ class EditorScene {
         installSelectedCadFace(session,face,index,hit.worldX()-item.x,hit.worldY()-item.y);
       } catch(error:Dynamic){clearSelectedCadFace();}
     }
-    if(previousFace!=selectedCadFaceIndex){selectionRevision++;nextRevision++;revision=nextRevision;}
+    if(previousFace!=selectedCadFaceIndex||previousEdge!=selectedCadEdgeIndex)
+      {selectionRevision++;nextRevision++;revision=nextRevision;}
     return id;
   }
 

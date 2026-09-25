@@ -103,6 +103,16 @@ class SpatialIndex {
 		return new PickResult(result.out_result);
 	}
 
+	public function pickRayWithViewEdges(view:SceneView, originX:Float, originY:Float, originZ:Float,
+			directionX:Float, directionY:Float, directionZ:Float, angularTolerance:Float):PickResult {
+		ensureLive();
+		var ray = makeRay(originX, originY, originZ, directionX, directionY, directionZ),
+			result = NativeKitSceneRender.nkscene_render_spatial_index_pick_ray_with_view_edges(
+				owner.borrow(), view.nativeValue(), ray, angularTolerance);
+		check(result.status, "spatialIndex.pickRayWithViewEdges");
+		return new PickResult(result.out_result);
+	}
+
 	public function dispose():Void {
 		if (disposed)
 			return;

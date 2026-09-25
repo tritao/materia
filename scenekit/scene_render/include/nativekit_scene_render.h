@@ -258,6 +258,11 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray(
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray_with_view(
     nkscene_render_spatial_index index, const nkscene_render_view *view,
     const nkscene_render_ray *ray, nkscene_render_pick_result *out_result NK_OUT);
+/** Picks tagged CAD strokes within an angular radius, respecting the presented view. */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray_with_view_edges(
+    nkscene_render_spatial_index index, const nkscene_render_view *view,
+    const nkscene_render_ray *ray, float angular_tolerance,
+    nkscene_render_pick_result *out_result NK_OUT);
 /** Performs nearest-hit picking for a batch of rays against one immutable snapshot.
  * `rays` and `out_results` must each reference `ray_count` elements.
  */

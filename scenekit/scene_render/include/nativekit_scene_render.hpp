@@ -359,6 +359,7 @@ class NKSRENDER_API SceneSpatialIndex {
     PickResult pick_ray(const Ray &) const;
     /** Pick the effective presentation without constructing a second spatial index. */
     PickResult pick_ray(const Ray &, const SceneView &) const;
+    PickResult pick_ray_with_edges(const Ray &, const SceneView &, float angular_tolerance) const;
     std::vector<PickResult> pick_rays(std::span<const Ray>) const;
 
   private:

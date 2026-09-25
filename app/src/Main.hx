@@ -1190,10 +1190,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
             "Repair support face", IconName.Inspect)));
     }
     if(scene.isCadPart(selected.id) && scene.hasCadOutput(selected.id))rows.push(new KeyedView("face-selection",
-      new Text(scene.selectedCadFaceIndex<0?"Click a CAD face to select it":
+      new Text(scene.selectedCadEdgeIndex>=0?"Selected edge "+(scene.selectedCadEdgeIndex+1):
+        scene.selectedCadFaceIndex<0?"Click a CAD face or edge to select it":
         selected.kind=="cad-plate"
           ?"Selected face "+(scene.selectedCadFaceIndex+1)+" · Add hole uses the picked location"
           :"Selected face "+(scene.selectedCadFaceIndex+1))));
+    if(selected.kind=="cad-preview"&&scene.selectedCadEdgeIndex>=0)
+      rows.push(new KeyedView("edge-selection",
+        new Text("Selected edge "+(scene.selectedCadEdgeIndex+1))));
     if (scene.canCreateSketch())
       rows.push(new KeyedView("create-sketch",
         sceneAction("create-constrained-sketch", "scene.create-sketch", "Create sketch", IconName.Plus)));

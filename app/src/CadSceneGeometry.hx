@@ -78,7 +78,8 @@ class CadSceneGeometry {
 
   static function appendMeshEdges(geometry:GeometryData, mesh:Mesh):Void {
     var segments = mesh.edgeSegments;
-    if (segments.length % 48 != 0)
+    var edgeIds = mesh.edgeIds;
+    if (segments.length % 48 != 0 || edgeIds.length != Std.int(segments.length / 48) * 4)
       throw "CadKit returned an inconsistent edge segment stream";
     for (index in 0...Std.int(segments.length / 48)) {
       var offset = index * 48;
@@ -88,7 +89,8 @@ class CadSceneGeometry {
         segments.getDouble(offset + 16) * METRES_PER_MILLIMETRE,
         segments.getDouble(offset + 24) * METRES_PER_MILLIMETRE,
         segments.getDouble(offset + 32) * METRES_PER_MILLIMETRE,
-        segments.getDouble(offset + 40) * METRES_PER_MILLIMETRE);
+        segments.getDouble(offset + 40) * METRES_PER_MILLIMETRE,
+        edgeIds.getInt32(index * 4));
     }
   }
 }

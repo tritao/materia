@@ -22,6 +22,7 @@ typedef SceneArtifactPart = {
 	var normals:Bytes;
 	var indices:Bytes;
 	@:optional var edgeSegments:Bytes;
+	@:optional var edgeIds:Bytes;
 	var faceRanges:Array<SceneArtifactFaceRange>;
 }
 
@@ -34,7 +35,7 @@ typedef SceneArtifactData = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 4;
+	public static inline var VERSION:Int = 5;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -47,13 +48,14 @@ class SceneArtifact {
 		if (assembly.length > 2000000) throw "Scene artifact assembly metadata is too large";
 		var length = 24 + assembly.length; // Signature, version, scale, part count, assembly length.
 		for (part in data.parts) {
-			validatePart(part);
+			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
 			if (id.length == 0 || id.length > 4096 || name.length == 0 || name.length > 4096)
 				throw "Scene artifact has an invalid part ID or name";
 			names.push({id: id, name: name});
 			length += 36 + id.length + name.length + part.vertices.length + part.normals.length
 				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
+				+ (part.edgeIds == null ? 0 : part.edgeIds.length)
 				+ part.faceRanges.length * 12;
 			if (length > MAX_BYTES) throw "Scene artifact exceeds the 150 MB limit";
 		}
@@ -81,6 +83,10 @@ class SceneArtifact {
 			if (part.edgeSegments != null) {
 				result.blit(offset, part.edgeSegments, 0, part.edgeSegments.length);
 				offset += part.edgeSegments.length;
+			}
+			if (part.edgeIds != null) {
+				result.blit(offset, part.edgeIds, 0, part.edgeIds.length);
+				offset += part.edgeIds.length;
 			}
 			for (range in part.faceRanges) {
 				offset = putInt(result, offset, range.faceIndex);
@@ -119,7 +125,7 @@ class SceneArtifact {
 		}
 	}
 
-	static function validatePart(part:SceneArtifactPart):Void {
+	static function validatePart(part:SceneArtifactPart, requireEdgeIds:Bool = false):Void {
 		if (part.name == null || StringTools.trim(part.name).length == 0 ||
 			part.vertexCount <= 0 || part.vertexCount > MAX_VERTICES || part.indexCount <= 0 ||
 			part.indexCount % 3 != 0 || part.indexCount / 3 > MAX_TRIANGLES ||
@@ -135,6 +141,10 @@ class SceneArtifact {
 				if (!finite(part.edgeSegments.getDouble(offset * 8)))
 					throw 'Scene artifact part "${part.id}" has a non-finite edge endpoint';
 		}
+		if ((requireEdgeIds && part.edgeSegments != null && part.edgeSegments.length > 0 && part.edgeIds == null) ||
+			(part.edgeIds != null &&
+				(part.edgeSegments == null || part.edgeIds.length != Std.int(part.edgeSegments.length / 48) * 4)))
+			throw 'Scene artifact part "${part.id}" has inconsistent edge identities';
 		for (color in [part.red, part.green, part.blue])
 			if (!finite(color) || color < 0.0 || color > 1.0)
 				throw 'Scene artifact part "${part.id}" has an invalid color';
@@ -173,7 +183,7 @@ private class SceneArtifactReader {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != 2 && version != 3 && version != SceneArtifact.VERSION)
+		if (version != 2 && version != 3 && version != 4 && version != SceneArtifact.VERSION)
 			throw "Unsupported scene artifact version";
 		var metresPerUnit = readDouble();
 		var count = readInt();
@@ -191,15 +201,17 @@ private class SceneArtifactReader {
 				indexCount % 3 != 0 || indexCount / 3 > 4000000 || rangeCount < 0 || rangeCount > 100000 ||
 				edgeByteCount < 0 || edgeByteCount % 48 != 0 || edgeByteCount > SceneArtifact.MAX_BYTES)
 				throw 'Scene artifact part "$id" has invalid mesh counts';
-			var vertices = readBytes(vertexCount * 24), normals = readBytes(vertexCount * 24),
+		var vertices = readBytes(vertexCount * 24), normals = readBytes(vertexCount * 24),
 				indices = readBytes(indexCount * 4), edgeSegments = readBytes(edgeByteCount);
+			var edgeIds = version >= 5 ? readBytes(Std.int(edgeByteCount / 48) * 4) : null;
 			var faceRanges:Array<SceneArtifactFaceRange> = [];
 			for (_ in 0...rangeCount)
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
 			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
 				vertexCount: vertexCount, indexCount: indexCount, vertices: vertices, normals: normals,
-				indices: indices, edgeSegments: edgeSegments, faceRanges: faceRanges};
-			@:privateAccess SceneArtifact.validatePart(part);
+				indices: indices, edgeSegments: edgeSegments, edgeIds: edgeIds,
+				faceRanges: faceRanges};
+			@:privateAccess SceneArtifact.validatePart(part, version >= 5);
 			parts.push(part);
 		}
 		var assembly:Null<AssemblyRecord> = null;

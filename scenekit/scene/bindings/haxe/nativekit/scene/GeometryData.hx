@@ -5,6 +5,7 @@ import haxe.io.Bytes;
 
 /** Owns the backing arrays used to describe one geometry resource. */
 class GeometryData {
+	public static inline var EDGE_SUBELEMENT_TAG:Int = 0x40000000;
 	final value:nkscene_geometry_data;
 	final vertices:Array<nkscene_geometry_vertex> = [];
 	final subelements:Array<nkscene_subelement_range> = [];
@@ -104,7 +105,8 @@ class GeometryData {
 
 	/** Adds one object-space centerline segment for the analytic GPU stroke pass. */
 	public function addStrokeSegment(startX:Float, startY:Float, startZ:Float,
-			endX:Float, endY:Float, endZ:Float):GeometryData {
+			endX:Float, endY:Float, endZ:Float, edgeIndex:Int = -1):GeometryData {
+		if (edgeIndex >= 0x3fffffff) throw "CAD edge index exceeds stroke identity range";
 		var segment = new nkscene_stroke_segment();
 		segment.set_start(0, startX);
 		segment.set_start(1, startY);
@@ -112,6 +114,7 @@ class GeometryData {
 		segment.set_end(0, endX);
 		segment.set_end(1, endY);
 		segment.set_end(2, endZ);
+		segment.set_subelement(edgeIndex < 0 ? 0 : EDGE_SUBELEMENT_TAG | (edgeIndex + 1));
 		strokeSegments.push(segment);
 		return this;
 	}

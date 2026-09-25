@@ -874,6 +874,44 @@ void spatial_queries_and_cpu_picking_are_snapshot_bound() {
     assert(!index.pick_ray(hidden_ray).node.valid());
 }
 
+void tagged_strokes_pick_only_when_visible() {
+    auto scene = std::make_shared<Scene>();
+    const auto geometry = scene->reserve_geometry_id();
+    auto &resource = scene->geometry_store().create(geometry);
+    resource.bounds.valid = true;
+    resource.bounds.minimum = {-1.0f, -1.0f, -1.0f};
+    resource.bounds.maximum = {1.0f, 1.0f, 0.0f};
+    auto &payload = resource.edit_payload();
+    payload.vertices = {{{-1.0f, -1.0f, 0.0f}}, {{1.0f, -1.0f, 0.0f}},
+                        {{1.0f, 1.0f, 0.0f}}, {{-1.0f, -1.0f, 0.0f}},
+                        {{1.0f, 1.0f, 0.0f}}, {{-1.0f, 1.0f, 0.0f}}};
+    payload.stroke_segments.push_back({{-0.8f, -0.8f, 0.0f}, {0.8f, -0.8f, 0.0f},
+                                       0x40000001u});
+    payload.stroke_segments.push_back({{-0.8f, 0.0f, -1.0f}, {0.8f, 0.0f, -1.0f},
+                                       0x40000002u});
+    const auto material = scene->reserve_material_id();
+    scene->material_store().create(material);
+    const auto node = scene->reserve_node_id();
+    Transaction transaction(scene);
+    transaction.add_create(node);
+    ChangeSet changes;
+    assert(scene->commit(transaction, changes) == NKS_OK);
+    transaction.close();
+    Transaction configure(scene);
+    configure.add_geometry(node, geometry);
+    configure.add_material(node, material);
+    assert(scene->commit(configure, changes) == NKS_OK);
+    configure.close();
+    nkscene::SceneSpatialIndex index(scene->snapshot());
+    nkscene::SceneView view;
+    const auto edge = index.pick_ray_with_edges({{0.0f, -0.8f, 5.0f}, {0.0f, 0.0f, -1.0f}},
+                                                view, 0.01f);
+    assert(edge.node == node && edge.subelement.value == 0x40000001u);
+    const auto face = index.pick_ray_with_edges({{0.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}},
+                                                view, 0.01f);
+    assert(face.node == node && face.subelement.value != 0x40000002u);
+}
+
 void runtime_pose_overrides_render_and_pick_without_mutating_snapshot() {
     auto scene = std::make_shared<Scene>();
     const auto geometry = scene->reserve_geometry_id();
@@ -1129,6 +1167,7 @@ int main() {
     scene_view_culling_uses_spatial_candidates();
     mixed_hierarchy_and_empty_batches_remain_incremental();
     spatial_queries_and_cpu_picking_are_snapshot_bound();
+    tagged_strokes_pick_only_when_visible();
     runtime_pose_overrides_render_and_pick_without_mutating_snapshot();
     geometry_edits_refresh_bounds_and_picking_for_new_snapshots();
     spatial_index_refits_transform_changes_and_requests_rebuilds();

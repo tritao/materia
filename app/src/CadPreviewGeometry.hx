@@ -34,6 +34,7 @@ class CadPreviewGeometry {
     for (range in part.faceRanges)
       geometry.addSubelement(Std.int(range.firstIndex / 3), Std.int(range.indexCount / 3), range.faceIndex);
     var edges = part.edgeSegments;
+    var edgeIds = part.edgeIds;
     if (edges != null) for (index in 0...Std.int(edges.length / 48)) {
       var offset = index * 48;
       geometry.addStrokeSegment(
@@ -42,7 +43,8 @@ class CadPreviewGeometry {
         (edges.getDouble(offset + 16) - centerZ) * scale,
         (edges.getDouble(offset + 24) - centerX) * scale,
         (edges.getDouble(offset + 32) - centerY) * scale,
-        (edges.getDouble(offset + 40) - centerZ) * scale);
+        (edges.getDouble(offset + 40) - centerZ) * scale,
+        edgeIds == null || edgeIds.length == 0 ? -1 : edgeIds.getInt32(index * 4));
     }
     geometry.setBounds((minimum[0] - centerX) * scale,
       (minimum[1] - centerY) * scale, (minimum[2] - centerZ) * scale,

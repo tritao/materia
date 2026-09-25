@@ -246,7 +246,16 @@ class EditorPerspectiveViewport implements View {
     var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),
       simulationActive?simulationPoses:null);
     return scene.pickRayWithView(view,ray.originX,ray.originY,ray.originZ,
-      ray.directionX,ray.directionY,ray.directionZ);
+      ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
+  }
+
+  function edgeAngularTolerance(localX:Float,localY:Float):Float {
+    var width=Math.max(1,renderedWidth),height=Math.max(1,renderedHeight);
+    var center=camera.screenRay(localX,localY,width,height);
+    var offset=camera.screenRay(localX+3.0,localY,width,height);
+    var dot=center.directionX*offset.directionX+center.directionY*offset.directionY+
+      center.directionZ*offset.directionZ;
+    return Math.acos(Math.max(-1.0,Math.min(1.0,dot)));
   }
 
   function selectAt(localX:Float,localY:Float):String {
@@ -254,7 +263,7 @@ class EditorPerspectiveViewport implements View {
     var ray=camera.screenRay(localX,localY,Math.max(1,renderedWidth),Math.max(1,renderedHeight));
     var view=scene.configureRenderView(new SceneView(),camera.viewProjection(aspect()),null);
     return scene.selectRayWithView(view,ray.originX,ray.originY,ray.originZ,
-      ray.directionX,ray.directionY,ray.directionZ);
+      ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
   }
 
   public static function pickScene(scene:EditorScene, camera:PerspectiveCamera,

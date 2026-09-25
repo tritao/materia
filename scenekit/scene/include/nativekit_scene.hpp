@@ -188,6 +188,7 @@ struct GeometryPayload {
     struct StrokeSegment {
         std::array<float, 3> start{};
         std::array<float, 3> end{};
+        std::uint32_t subelement = 0;
     };
     std::vector<StrokeSegment> stroke_segments;
     /** Optional uint32 triangle indices. Empty means sequential triangles. */

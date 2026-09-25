@@ -570,6 +570,11 @@ PickResult SceneSpatialIndex::pick_ray(const Ray &ray) const {
 }
 
 PickResult SceneSpatialIndex::pick_ray(const Ray &ray, const SceneView &view) const {
+    return pick_ray_with_edges(ray, view, 0.0f);
+}
+
+PickResult SceneSpatialIndex::pick_ray_with_edges(const Ray &ray, const SceneView &view,
+                                                  float angular_tolerance) const {
     PickResult result;
     Ray normalized;
     if (!state_ || !normalize_ray(ray, normalized))
@@ -646,6 +651,85 @@ PickResult SceneSpatialIndex::pick_ray(const Ray &ray, const SceneView &view) co
         const auto pose = poses.find(entry.node);
         if (pose != poses.end())
             visit(entry.node, &pose->second, entry.bounds);
+    }
+    if (angular_tolerance > 0.0f && std::isfinite(angular_tolerance)) {
+        auto best_angular_distance = angular_tolerance;
+        for (const auto &node : state_->snapshot.nodes()) {
+            const auto visible = visibility.visible.find(node.node);
+            const auto in_view = visibility.in_view.find(node.node);
+            if (visible == visibility.visible.end() || !visible->second ||
+                in_view == visibility.in_view.end() || !in_view->second ||
+                !node.geometry.valid() || !node.material.valid())
+                continue;
+            const auto *geometry = state_->snapshot.find_geometry(node.geometry);
+            if (!geometry || !geometry->payload ||
+                !state_->snapshot.find_material(node.material))
+                continue;
+            const auto pose = poses.find(node.node);
+            const auto &transform = pose == poses.end() ? node.world_transform.transform : pose->second;
+            const auto bounds = transformed_bounds(geometry->bounds, transform);
+            if (render_internal::culled_by_camera(bounds, camera) ||
+                render_internal::culled_by_clip_planes(bounds, view.clip_planes))
+                continue;
+            for (const auto &segment : geometry->payload->stroke_segments) {
+                if (!segment.subelement)
+                    continue;
+                GeometryVertex first{}, second{};
+                first.position = segment.start;
+                second.position = segment.end;
+                const auto a = transform_point(transform, first);
+                const auto b = transform_point(transform, second);
+                const Vec3 edge{b.x - a.x, b.y - a.y, b.z - a.z};
+                const Vec3 offset{a.x - normalized.origin.x, a.y - normalized.origin.y,
+                                  a.z - normalized.origin.z};
+                const auto edge_sq = edge.x * edge.x + edge.y * edge.y + edge.z * edge.z;
+                const auto projection = edge.x * normalized.direction.x +
+                                        edge.y * normalized.direction.y +
+                                        edge.z * normalized.direction.z;
+                const auto ray_projection = offset.x * normalized.direction.x +
+                                            offset.y * normalized.direction.y +
+                                            offset.z * normalized.direction.z;
+                const auto denominator = edge_sq - projection * projection;
+                auto along = denominator > 1.0e-12f
+                                 ? (projection * ray_projection -
+                                    edge.x * offset.x - edge.y * offset.y - edge.z * offset.z) /
+                                       denominator
+                                 : 0.0f;
+                along = std::clamp(along, 0.0f, 1.0f);
+                const auto point = scale_add(a, edge, along);
+                const Vec3 to_point{point.x - normalized.origin.x,
+                                    point.y - normalized.origin.y,
+                                    point.z - normalized.origin.z};
+                const auto depth = to_point.x * normalized.direction.x +
+                                   to_point.y * normalized.direction.y +
+                                   to_point.z * normalized.direction.z;
+                if (depth <= 0.0f || depth > best_distance + std::max(1.0e-4f, depth * 1.0e-4f))
+                    continue;
+                const auto dx = to_point.x - depth * normalized.direction.x;
+                const auto dy = to_point.y - depth * normalized.direction.y;
+                const auto dz = to_point.z - depth * normalized.direction.z;
+                const auto angle = std::sqrt(dx * dx + dy * dy + dz * dz) / depth;
+                if (angle >= best_angular_distance)
+                    continue;
+                bool clipped = false;
+                for (const auto &plane : view.clip_planes) {
+                    if (plane.enabled && plane.normal[0] * point.x +
+                                             plane.normal[1] * point.y +
+                                             plane.normal[2] * point.z + plane.distance < 0.0f) {
+                        clipped = true;
+                        break;
+                    }
+                }
+                if (clipped)
+                    continue;
+                best_angular_distance = angle;
+                result.node = node.node;
+                result.source = node.source;
+                result.subelement = {segment.subelement};
+                result.worldPosition = point;
+                result.depth = depth;
+            }
+        }
     }
     return result;
 }

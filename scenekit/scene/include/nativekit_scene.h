@@ -152,6 +152,8 @@ typedef struct nkscene_vertex_stream {
 typedef struct nkscene_stroke_segment {
     float start[3];
     float end[3];
+    /** Zero for an anonymous stroke; tagged BRep edge ID for CAD strokes. */
+    uint32_t subelement;
 } nkscene_stroke_segment;
 
 typedef struct nkscene_subelement_range {

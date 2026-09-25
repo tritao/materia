@@ -620,6 +620,7 @@ nkscene_result prepare_geometry_data(const nkscene_geometry_data *data,
         GeometryPayload::StrokeSegment copied;
         std::copy(std::begin(segment.start), std::end(segment.start), copied.start.begin());
         std::copy(std::begin(segment.end), std::end(segment.end), copied.end.begin());
+        copied.subelement = segment.subelement;
         for (const auto coordinate : copied.start)
             if (!std::isfinite(coordinate))
                 return NKS_ERROR_INVALID_ARGUMENT;
@@ -2422,6 +2423,7 @@ nkscene_result NKS_CALL nkscene_geometry_set_data(nkscene_scene scene, nkscene_g
         nkscene::GeometryPayload::StrokeSegment copied;
         std::copy(std::begin(segment.start), std::end(segment.start), copied.start.begin());
         std::copy(std::begin(segment.end), std::end(segment.end), copied.end.begin());
+        copied.subelement = segment.subelement;
         for (const auto coordinate : copied.start)
             if (!std::isfinite(coordinate))
                 return NKS_ERROR_INVALID_ARGUMENT;

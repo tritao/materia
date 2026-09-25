@@ -374,6 +374,10 @@ int main() {
     assert(cad_mesh_copy_edge_segments_bytes(mesh, nullptr, &edge_bytes_size) ==
            CAD_ERROR_BUFFER_TOO_SMALL);
     assert(edge_bytes_size > 0 && edge_bytes_size % (2 * sizeof(cad_vec3)) == 0);
+    std::uint32_t edge_ids_size = 0;
+    assert(cad_mesh_copy_edge_ids_bytes(mesh, nullptr, &edge_ids_size) ==
+           CAD_ERROR_BUFFER_TOO_SMALL);
+    assert(edge_ids_size == edge_bytes_size / (2 * sizeof(cad_vec3)) * sizeof(std::uint32_t));
     assert(vertex_bytes_size == vertex_count * sizeof(cad_vec3));
     assert(normal_bytes_size == vertex_count * sizeof(cad_vec3));
     assert(index_bytes_size == index_count * sizeof(std::uint32_t));
@@ -381,10 +385,19 @@ int main() {
     std::vector<std::uint8_t> normal_bytes(normal_bytes_size);
     std::vector<std::uint8_t> index_bytes(index_bytes_size);
     std::vector<std::uint8_t> edge_bytes(edge_bytes_size);
+    std::vector<std::uint8_t> edge_ids(edge_ids_size);
     assert(cad_mesh_copy_vertices_bytes(mesh, vertex_bytes.data(), &vertex_bytes_size) == CAD_OK);
     assert(cad_mesh_copy_normals_bytes(mesh, normal_bytes.data(), &normal_bytes_size) == CAD_OK);
     assert(cad_mesh_copy_indices_bytes(mesh, index_bytes.data(), &index_bytes_size) == CAD_OK);
     assert(cad_mesh_copy_edge_segments_bytes(mesh, edge_bytes.data(), &edge_bytes_size) == CAD_OK);
+    assert(cad_mesh_copy_edge_ids_bytes(mesh, edge_ids.data(), &edge_ids_size) == CAD_OK);
+    std::uint32_t mesh_edge_count = 0;
+    assert(cad_shape_subshape_count(shape, CAD_SHAPE_EDGE, &mesh_edge_count) == CAD_OK);
+    for (std::size_t offset = 0; offset < edge_ids.size(); offset += sizeof(std::uint32_t)) {
+        std::uint32_t edge_id = mesh_edge_count;
+        std::memcpy(&edge_id, edge_ids.data() + offset, sizeof(edge_id));
+        assert(edge_id < mesh_edge_count);
+    }
     for (std::size_t offset = 0; offset < edge_bytes.size(); offset += sizeof(cad_vec3)) {
         cad_vec3 endpoint{};
         std::memcpy(&endpoint, edge_bytes.data() + offset, sizeof(endpoint));

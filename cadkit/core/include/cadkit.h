@@ -566,6 +566,12 @@ CADKIT_API cad_result cad_mesh_copy_edge_segments_bytes(
     uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
     uint32_t* byte_capacity CADKIT_HXI_INOUT);
 
+/* One zero-based BRep edge index per edge segment. */
+CADKIT_API cad_result cad_mesh_copy_edge_ids_bytes(
+    cad_mesh mesh,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
 CADKIT_API void cad_shape_destroy(cad_shape shape);
 
 CADKIT_API void cad_mesh_destroy(cad_mesh mesh);

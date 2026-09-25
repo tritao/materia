@@ -563,6 +563,36 @@ nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray_with_view(
     return NKS_OK;
 }
 
+nkscene_result NKS_CALL nkscene_render_spatial_index_pick_ray_with_view_edges(
+    nkscene_render_spatial_index index_handle, const nkscene_render_view *view_input,
+    const nkscene_render_ray *ray, float angular_tolerance,
+    nkscene_render_pick_result *out_result) {
+    if (!view_input || !ray || !out_result || !std::isfinite(angular_tolerance) ||
+        angular_tolerance < 0.0f)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    nkscene::SceneView view;
+    const auto view_result = copy_view(view_input, view);
+    if (view_result != NKS_OK)
+        return view_result;
+    auto &state = registry();
+    std::lock_guard lock(state.mutex);
+    const auto index = state.spatial_indices.get(nkscene::unpack_handle(index_handle));
+    if (!index)
+        return NKS_ERROR_INVALID_HANDLE;
+    const nkscene::Ray query{{ray->origin[0], ray->origin[1], ray->origin[2]},
+                             {ray->direction[0], ray->direction[1], ray->direction[2]}};
+    const auto result = index->pick_ray_with_edges(query, view, angular_tolerance);
+    *out_result = {};
+    out_result->node.value = result.node.value;
+    out_result->source.value = result.source.value;
+    out_result->subelement = result.subelement.value;
+    out_result->world_position[0] = result.worldPosition.x;
+    out_result->world_position[1] = result.worldPosition.y;
+    out_result->world_position[2] = result.worldPosition.z;
+    out_result->depth = result.depth;
+    return NKS_OK;
+}
+
 nkscene_result NKS_CALL nkscene_render_spatial_index_pick_rays(
     nkscene_render_spatial_index index_handle, const nkscene_render_ray *rays,
     uint64_t ray_count, nkscene_render_pick_result *out_results) {

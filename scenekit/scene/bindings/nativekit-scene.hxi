@@ -267,9 +267,10 @@ interface NativeKitScene @target("portable-abi64") @library("nativekit_scene") {
 	/**
 	 * One object-space CAD edge segment attached to its face geometry.
 	 */
-	struct nkscene_stroke_segment @layout(24, 4) {
+	struct nkscene_stroke_segment @layout(28, 4) {
 		start: array<f32, 3> @offset(0);
 		end: array<f32, 3> @offset(12);
+		subelement: u32 @offset(24);
 	}
 	struct nkscene_subelement_range @layout(12, 4) {
 		first_primitive: u32 @offset(0);

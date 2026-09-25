@@ -98,6 +98,7 @@ struct MeshData {
     std::vector<std::uint32_t> indices;
     std::vector<cad_mesh_face_range> face_ranges;
     std::vector<cad_vec3> edge_segment_endpoints;
+    std::vector<std::uint32_t> edge_segment_ids;
 };
 
 struct MeshEntry {
@@ -1402,6 +1403,7 @@ cad_result build_mesh(
                         continue;
                     out_mesh.edge_segment_endpoints.push_back({first.X(), first.Y(), first.Z()});
                     out_mesh.edge_segment_endpoints.push_back({second.X(), second.Y(), second.Z()});
+                    out_mesh.edge_segment_ids.push_back(static_cast<std::uint32_t>(edge_index - 1));
                 }
             }
             continue;
@@ -1416,6 +1418,7 @@ cad_result build_mesh(
                 continue;
             out_mesh.edge_segment_endpoints.push_back({first.X(), first.Y(), first.Z()});
             out_mesh.edge_segment_endpoints.push_back({second.X(), second.Y(), second.Z()});
+            out_mesh.edge_segment_ids.push_back(static_cast<std::uint32_t>(edge_index - 1));
         }
     }
 
@@ -3055,6 +3058,16 @@ extern "C" CADKIT_API cad_result cad_mesh_copy_edge_segments_bytes(
     clear_error();
     return copy_mesh_bytes<cad_vec3>(mesh, output, byte_capacity, [](const MeshData& value) -> const auto& {
         return value.edge_segment_endpoints;
+    });
+}
+
+extern "C" CADKIT_API cad_result cad_mesh_copy_edge_ids_bytes(
+    cad_mesh mesh,
+    std::uint8_t* output,
+    std::uint32_t* byte_capacity) {
+    clear_error();
+    return copy_mesh_bytes<std::uint32_t>(mesh, output, byte_capacity, [](const MeshData& value) -> const auto& {
+        return value.edge_segment_ids;
     });
 }
 
