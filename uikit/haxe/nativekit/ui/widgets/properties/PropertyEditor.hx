@@ -236,6 +236,7 @@ class PropertyEditor implements View {
 		var field = new TextField(editorKey, draftOrValue(descriptor, value), function(next) {
 			setDraft(descriptor, next);
 		}, fieldStyle);
+		field.classes = ["property-input"];
 		field.enabled = writable;
 		field.placeholder = isMixed(value) ? "Mixed" : null;
 		field.onSubmit = function(next) {

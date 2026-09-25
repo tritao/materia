@@ -19,6 +19,10 @@ class Tooltip implements View {
 	final content:View;
 	public final x:Float;
 	public final y:Float;
+	/** Fill the available row width when the anchor needs to clip long text. */
+	public var fillAnchor:Bool = false;
+	/** Optional condition checked when the pointer enters the anchor. */
+	public var showWhen:Null<Void->Bool> = null;
 
 	public function new(key:String, anchor:View, content:View, x:Float = 0.0, y:Float = -28.0) {
 		if (anchor == null || content == null)
@@ -42,7 +46,7 @@ class Tooltip implements View {
 			tooltipStyle.visible = cast state.value;
 			var tooltip = new AnonymousTooltipContent(content, tooltipStyle);
 			var rootStyle = new LayoutStyle();
-			rootStyle.width = LayoutAxis.fit();
+			rootStyle.width = fillAnchor ? LayoutAxis.grow() : LayoutAxis.fit();
 			rootStyle.height = LayoutAxis.fit();
 			rootStyle.clipToParent = false;
 			var root = context.withScope(new Key("layers"), function() {
@@ -65,7 +69,9 @@ class Tooltip implements View {
 			var anchorNode = root.children[0];
 			var tooltipNode = root.children[1];
 			tooltipNode.layout.style.visible = state.value;
-			anchorNode.on(UiEventKind.HoverEnter, function(_) { state.update(true); });
+			anchorNode.on(UiEventKind.HoverEnter, function(_) {
+				state.update(showWhen == null || showWhen());
+			});
 			anchorNode.on(UiEventKind.HoverLeave, function(_) { state.update(false); });
 			tooltipNode.on(UiEventKind.HoverEnter, function(_) { state.update(true); });
 			tooltipNode.on(UiEventKind.HoverLeave, function(_) { state.update(false); });

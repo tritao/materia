@@ -184,6 +184,13 @@ class Theme {
 		styles.rule(StyleSelector.widget("text-field"), [StyleValue.textColor(text)]);
 		styles.rule(StyleSelector.widget("text-field").state(StyleState.Disabled),
 			[StyleValue.textColor(disabledText)]);
+		styles.rule(StyleSelector.widget("text-field").className("property-input"), [
+			StyleValue.height(LayoutAxis.fixed(32.0)),
+			StyleValue.padding(new Insets(8.0, 5.0, 8.0, 5.0)),
+			StyleValue.background(tokens.selectionField),
+			StyleValue.borderColor(tokens.selectionBorder),
+			StyleValue.borderWidth(1.0)
+		]);
 		styles.rule(StyleSelector.widget("text-field").className("combo-trigger"), [
 			StyleValue.background(tokens.selectionField),
 			StyleValue.padding(new Insets(34.0, 8.0, 34.0, 8.0)),
@@ -292,6 +299,7 @@ class Theme {
 		styles.rule(StyleSelector.widget("tooltip"), [
 			StyleValue.padding(new Insets(6.0, 6.0, 4.0, 4.0)),
 			StyleValue.background(tooltipBackground),
+			StyleValue.textColor(Color.rgba(0.96, 0.97, 0.99, 1.0)),
 			StyleValue.radius(StyleProperty.RadiusTopLeft, tokens.radiusSmall),
 			StyleValue.radius(StyleProperty.RadiusTopRight, tokens.radiusSmall),
 			StyleValue.radius(StyleProperty.RadiusBottomRight, tokens.radiusSmall),

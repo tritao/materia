@@ -2,6 +2,8 @@ package app;
 
 import nativekit.ui.core.View;
 import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.text.MiddleEllipsisText;
+import nativekit.ui.widgets.overlays.Tooltip;
 import nativekit.ui.widgets.collections.TreeRootMetadata;
 import nativekit.ui.widgets.collections.TreeViewModel;
 import materia.project.AssemblyRecord;
@@ -59,20 +61,27 @@ class EditorSceneTree implements TreeViewModel {
   public function estimatedExtent():Float return 28.0;
   public function extentIsUniform():Bool return true;
   public function extentAt(key:String):Float return 28.0;
+  function labeledItem(key:String, label:String):View {
+    var text = new MiddleEllipsisText("short-label:" + key, label);
+    var tooltip = new Tooltip("label-tooltip:" + key, text, new Text(label));
+    tooltip.fillAnchor = true;
+    tooltip.showWhen = function() return text.truncated;
+    return tooltip;
+  }
   public function buildItem(key:String):View {
     var item=scene.object(key);
     if(item!=null) {
       var joint = incoming.get(item.id);
-      return new Text(item.label + (joint == null ? "" : " · " + joint.kind) +
+      return labeledItem(key, item.label + (joint == null ? "" : " · " + joint.kind) +
         (item.visible ? "" : " (hidden)"));
     }
     var marker=key.indexOf(":feature:");
     if(marker>=0){
       var id=key.substr(0,marker),index=Std.parseInt(key.substr(marker+9));
-      return new Text(index==null||index<0||index>=scene.cadFeatureCount(id)?"Feature":
+      return labeledItem(key, index==null||index<0||index>=scene.cadFeatureCount(id)?"Feature":
         "Feature "+(index+1)+" · "+scene.cadFeatureNameAt(id,index));
     }
-    return new Text("Scene");
+    return labeledItem(key, "Scene");
   }
   public function revision():Int return scene.revision;
 }

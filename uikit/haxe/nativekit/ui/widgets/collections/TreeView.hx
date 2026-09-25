@@ -3,6 +3,8 @@ import nativekit.ui.widgets.controls.IconButton;
 
 import Color;
 import LayoutAxis;
+import LayoutAlignmentX;
+import LayoutAlignmentY;
 import LayoutDirection;
 import LayoutStyle;
 import LayoutVisualKind;
@@ -21,6 +23,8 @@ import nativekit.ui.semantics.AccessibilityOrientation;
 import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.AccessibilityState;
 import nativekit.ui.semantics.Semantics;
+import nativekit.ui.style.StyleState;
+import nativekit.ui.style.StyleStateUtil;
 import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.KeyedView;
 import nativekit.ui.widgets.layout.Spacer;
@@ -640,14 +644,19 @@ private class TreeViewRow implements View {
 
 	public function build(context:BuildContext):RenderNode {
 		return context.withScope(new Key(key), function() {
+			var id = context.id("tree-item");
+			var flags = context.interactionStates.get(id);
 			var style = new LayoutStyle();
 			style.width = LayoutAxis.grow();
 			style.height = LayoutAxis.fixed(entry.extent);
 			style.direction = LayoutDirection.LeftToRight;
+			style.childAlignY = LayoutAlignmentY.Center;
 			style.padding = new Insets(entry.depth * 16.0, 0.0, 0.0, 0.0);
 			style.background = selected ? context.theme.tokens.selectionHighlight :
-				Color.rgba(0.0, 0.0, 0.0, 0.0);
-			var node = new RenderNode(context.id("tree-item"), LayoutVisualKind.Box, style);
+				StyleStateUtil.contains(flags, StyleState.Hovered)
+					? context.theme.tokens.selectionHover : Color.rgba(0.0, 0.0, 0.0, 0.0);
+			var node = new RenderNode(id, LayoutVisualKind.Box, style);
+			node.states = flags;
 			node.focusable = true;
 			var semantics = new Semantics(AccessibilityRole.TreeItem);
 			semantics.actions = AccessibilityAction.Activate | AccessibilityAction.Select;
@@ -694,6 +703,8 @@ private class TreeDisclosure implements View {
 			var style = new LayoutStyle();
 			style.width = LayoutAxis.fixed(16.0);
 			style.height = LayoutAxis.grow();
+			style.childAlignX = LayoutAlignmentX.Center;
+			style.childAlignY = LayoutAlignmentY.Center;
 			style.padding = new Insets(0.0, 0.0, 0.0, 0.0);
 			style.background = Color.rgba(0.0, 0.0, 0.0, 0.0);
 			return new IconButton("disclosure", expanded ? IconName.ChevronDown : IconName.ChevronRight,
