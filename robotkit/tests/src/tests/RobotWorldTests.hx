@@ -85,6 +85,7 @@ import robotkit.material.Payload;
 import robotkit.perception.Detection;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.LidarObstaclePerception;
+import robotkit.perception.GroundTruthPerception;
 import robotkit.perception.Pallet;
 import robotkit.perception.PerceptionSnapshot;
 import robotkit.safety.SafetyPhase;
@@ -968,6 +969,16 @@ class RobotWorldTests {
     check(semantic.pallets()[0].lengthMeters == 1.2 &&
       semantic.dockingTargets()[0].approachPose.x == 3.0,
       "perception values represent pallet and docking targets");
+    var sceneTruth:PerceptionSnapshot = semantic;
+    var truthPerception = new GroundTruthPerception(function() return sceneTruth);
+    var truthObservation = truthPerception.observe([]);
+    check(truthObservation.pallets()[0].detection.id == "pallet-1" &&
+      truthObservation.dockingTargets()[0].detection.id == "dock-1",
+      "ground-truth perception supplies semantic scene values through the perception API");
+    sceneTruth = new PerceptionSnapshot([], [obstacles[0]], [], []);
+    check(truthPerception.observe([lidar]).obstacles()[0].detection.id ==
+      obstacles[0].detection.id && truthPerception.observe([]).pallets().length == 0,
+      "ground-truth perception reads current scene truth independently of sensor frames");
 
     var envelope = new StoppingEnvelope(2.0, 0.5, 2.0);
     check(Math.abs(envelope.distanceMeters - 2.0) < 1e-9,
