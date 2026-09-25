@@ -880,6 +880,28 @@ class RobotWorldTests {
       "semantic obstacle preserves source clock identity");
     var detections = observed.detections();
     detections.pop();
+    var scanRanges = [for (_ in 0...64) 10.0];
+    scanRanges[0] = 2.0;
+    scanRanges[63] = 2.0;
+    scanRanges[10] = 1.0;
+    scanRanges[11] = 1.0;
+    var clustered = perception.observe([new SensorFrame("dense-lidar", "lidar", "laser",
+      Int64.ofInt(9), Int64.ofInt(130), scanRanges, Int64.ofInt(135), "base-link",
+      null, null, "robot-boot", "host-clock")]);
+    var clusteredObstacles = clustered.obstacles();
+    check(clusteredObstacles.length == 2 &&
+      clusteredObstacles[0].detection.confidence > perception.minConfidence &&
+      clusteredObstacles[0].detection.pose.x > 1.9 &&
+      Math.abs(clusteredObstacles[0].detection.pose.y) < 0.11 &&
+      clusteredObstacles[0].radiusMeters > perception.obstacleRadiusMeters,
+      "LiDAR clustering merges nearby returns across the circular scan seam");
+    var partialScan = new LidarObstaclePerception(10.0, 0.1, 0.05, 0.5,
+      0.1, -Math.PI * 0.5, Math.PI).observe([new SensorFrame("front-scan", "lidar",
+      "laser", Int64.ofInt(10), Int64.ofInt(140), [1.0, 10.0, 10.0],
+      Int64.ofInt(145), "base-link", null, null, "robot-boot", "host-clock")]);
+    check(Math.abs(partialScan.obstacles()[0].detection.pose.x) < 1e-9 &&
+      Math.abs(partialScan.obstacles()[0].detection.pose.y + 1.0) < 1e-9,
+      "LiDAR perception respects configured start angle and partial field of view");
     equal(observed.detections().length, 2, "perception snapshot returns owned collections");
 
     var palletDetection = new Detection("pallet-1", "pallet", 0.95,
