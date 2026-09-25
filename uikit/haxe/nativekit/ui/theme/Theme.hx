@@ -172,6 +172,8 @@ class Theme {
 			[StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 0.0))]);
 		styles.rule(StyleSelector.widget("button").className("menu-item").state(StyleState.Hovered),
 			[StyleValue.background(tokens.selectionHover)]);
+		styles.rule(StyleSelector.widget("button").className("menu-item").state(StyleState.Focused),
+			[StyleValue.background(buttonFocused)]);
 		styles.rule(StyleSelector.widget("button").className("menu-item").state(StyleState.Pressed),
 			[StyleValue.background(tokens.selectionPressed)]);
 		styles.rule(StyleSelector.widget("button").className("select-trigger"), [

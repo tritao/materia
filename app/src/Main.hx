@@ -482,7 +482,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
       );
       layers.push(new StackChild("command-palette", palette, 0.0, 0.0, 30));
     }
-    if (toolbarMenuVisible) {
+    var documentDialog = makeDocumentDialog();
+    if (documentDialog != null) layers.push(new StackChild("document-dialog", documentDialog,
+      0.0, 0.0, 100, LayoutAxis.grow(), LayoutAxis.grow()));
+    var shellStyle = fillStyle();
+    shellStyle.background = appearance.canvas;
+    var shell = new AppShell("reference-editor-shell", new Stack("overlay-host", layers),
+      topBar(), null, null, shellStyle);
+    var windowLayers:Array<StackChild> = [new StackChild("shell", shell, 0.0, 0.0, 0,
+      LayoutAxis.grow(), LayoutAxis.grow())];
+    if (toolbarMenuVisible && documentDialog == null) {
       var toolbarMenu = new CommandMenu("editor-more-menu", [
         "editor.save-as", "scene.export-step", "editor.undo", "editor.redo",
         "scene.frame-selected", "scene.reset-perspective", "scene.show-perspective",
@@ -491,15 +500,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ], Math.max(8.0, viewportWidth - 228.0), 44.0, commands, ui.commandContext,
         function() { toolbarMenuVisible = false; commands.refresh(); },
         function(_) { toolbarMenuVisible = false; commands.refresh(); });
-      layers.push(new StackChild("editor-more-menu", toolbarMenu, 0.0, 0.0, 25));
+      windowLayers.push(new StackChild("editor-more-menu", toolbarMenu, 0.0, 0.0, 25));
     }
-
-    var documentDialog = makeDocumentDialog();
-    if (documentDialog != null) layers.push(new StackChild("document-dialog", documentDialog,
-      0.0, 0.0, 100, LayoutAxis.grow(), LayoutAxis.grow()));
-    var shellStyle = fillStyle();
-    shellStyle.background = appearance.canvas;
-    return new AppShell("reference-editor-shell", new Stack("overlay-host", layers), topBar(), null, null, shellStyle);
+    return new Stack("window-overlay-host", windowLayers);
   }
 
   /** Convenience entry point for a NativeKit host's layout phase. */

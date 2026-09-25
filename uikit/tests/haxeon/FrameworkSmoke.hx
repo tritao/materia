@@ -3873,6 +3873,7 @@ class FrameworkSmoke {
 		surfaceRegistry.register(new Command("surface.run", "Run simulation", function() {
 			surfaceRuns++;
 		}, new Shortcut(UiKey.R, UiModifier.Control)));
+		surfaceRegistry.register(new Command("surface.stop", "Stop simulation", function() {}));
 		var toolbar = new Toolbar("command-toolbar", ["surface.run"], surfaceRegistry);
 		var toolbarRoot = uiContext.submit(toolbar, new LayoutFrame(480.0, 48.0));
 		var commandButton:Null<RenderNode> = null;
@@ -3886,10 +3887,35 @@ class FrameworkSmoke {
 		if (!uiContext.accessibilityAction(commandButton.id.value, AccessibilityAction.Activate,
 			null, -1, -1, 1) || surfaceRuns != 1)
 			return false;
-		var menuRoot = uiContext.submit(new CommandMenu("surface-menu", ["surface.run"],
+		var menuRoot = uiContext.submit(new CommandMenu("surface-menu", ["surface.run", "surface.stop"],
 			24.0, 24.0, surfaceRegistry), new LayoutFrame(480.0, 320.0));
 		if (menuRoot == null || menuRoot.semantics == null ||
 			menuRoot.semantics.role != AccessibilityRole.Menu)
+			return false;
+		var firstItem:Null<RenderNode> = null;
+		menuRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.label == "Run simulation" &&
+				node.semantics.role == AccessibilityRole.MenuItem)
+				firstItem = node;
+		});
+		if (firstItem == null ||
+			firstItem.computedStyle.get(StyleProperty.Background).red != uiContext.buildContext.theme.buttonFocused.red)
+			return false;
+		var settledMenu = uiContext.submit(new CommandMenu("surface-menu", ["surface.run", "surface.stop"],
+			24.0, 24.0, surfaceRegistry), new LayoutFrame(480.0, 320.0));
+		var settledFirst:Null<RenderNode> = settledMenu.find(firstItem.id);
+		if (settledFirst == null ||
+			settledFirst.computedStyle.get(StyleProperty.Background).red !=
+			firstItem.computedStyle.get(StyleProperty.Background).red)
+			return false;
+		var sceneNudges = 0;
+		uiContext.commands.register(new Command("scene.nudge", "Nudge scene", function() {
+			sceneNudges++;
+		}, new Shortcut(UiKey.Down)));
+		uiContext.key(UiEventKind.KeyDown, UiKey.Down);
+		var focused = uiContext.focus.focusedNode();
+		if (sceneNudges != 0 || focused == null || focused.semantics == null ||
+			focused.semantics.label != "Stop simulation")
 			return false;
 		var palette = new CommandPalette("surface-palette", surfaceRegistry, null,
 			40.0, 40.0);

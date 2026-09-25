@@ -9,6 +9,7 @@ import Insets;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.View;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiEventKind;
 import nativekit.ui.semantics.AccessibilityAction;
 import nativekit.ui.semantics.AccessibilityRole;
@@ -66,6 +67,28 @@ class Menu implements View {
 		popup.modal = true;
 		popup.dimBackdrop = false;
 		var root:RenderNode = popup.build(context);
+		var focusableItems:Array<RenderNode> = [];
+		root.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.MenuItem && node.enabled)
+				focusableItems.push(node);
+		});
+		root.on(UiEventKind.KeyDown, function(event) {
+			if (event.defaultPrevented || (event.key != UiKey.Down && event.key != UiKey.Up))
+				return;
+			if (focusableItems.length > 0) {
+				var current = -1;
+				for (index in 0...focusableItems.length)
+					if (focusableItems[index].id.equals(event.target)) {
+						current = index;
+						break;
+					}
+				var next = event.key == UiKey.Down ? current + 1 : current - 1;
+				if (next < 0) next = focusableItems.length - 1;
+				if (next >= focusableItems.length) next = 0;
+				context.requestFocus(focusableItems[next].id);
+			}
+			event.preventDefault();
+		});
 		var semantics = new Semantics(AccessibilityRole.Menu, "Menu");
 		semantics.states |= AccessibilityState.Modal;
 		if (hasDismissHandler)

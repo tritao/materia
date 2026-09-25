@@ -227,7 +227,8 @@ class UiContext {
 		return submitInternal(frame, cacheKey, build);
 	}
 
-	function submitInternal(frame:LayoutFrame, cacheKey:Null<String>, build:Void->View):RenderNode {
+	function submitInternal(frame:LayoutFrame, cacheKey:Null<String>, build:Void->View,
+			reconcileNewFocus:Bool = true):RenderNode {
 		var submitStartedAt = Sys.time();
 		diagnosticStage = 1;
 		ensureLive();
@@ -237,12 +238,14 @@ class UiContext {
 		var styleCacheHitsBefore = buildContext.styleResolver.cacheHits;
 		var styleCacheMissesBefore = buildContext.styleResolver.cacheMisses;
 		diagnosticStage = 2;
-		gestures.advance(frame.deltaSeconds);
+		if (reconcileNewFocus)
+			gestures.advance(frame.deltaSeconds);
 		diagnosticStage = 3;
-		animations.advance(frame.deltaSeconds);
+		if (reconcileNewFocus)
+			animations.advance(frame.deltaSeconds);
 		buildContext.setViewport(frame.width, frame.height);
 		buildContext.setEnvironmentViewport(frame.width, frame.height);
-		if (cacheKey != null && canReuseSubmittedFrame(cacheKey, frame)) {
+		if (reconcileNewFocus && cacheKey != null && canReuseSubmittedFrame(cacheKey, frame)) {
 			frameNumber++;
 			lastFrameMetrics = new UiFrameMetrics(frameNumber, submittedNodeCount, 0, 0, 0,
 				buildContext.styleResolver.cachedStyleCount, 0, submittedNodeCount, UiDirtyFlag.None,
@@ -394,6 +397,10 @@ class UiContext {
 			styleInvalidation.semanticsInvalidatedNodes > 0 ||
 			resolvedGeometryChangedNodes > 0 || focusChanged))
 			accessibilityBridge.update(next, focus.focusedId);
+		// A newly mounted focus trap chooses its first target after layout. Rebuild
+		// once with that focus state before returning the frame for painting.
+		if (reconcileNewFocus && focusChanged && nextFocus != null)
+			return submitInternal(frame, cacheKey, function() return view, false);
 		frameNumber++;
 		var submitEndedAt = Sys.time();
 		lastFrameMetrics = new UiFrameMetrics(frameNumber, nodeCount,
