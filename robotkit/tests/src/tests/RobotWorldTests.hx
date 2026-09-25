@@ -2028,12 +2028,14 @@ class RobotWorldTests {
     var replayNavigation = new Navigation(replayBase, replayLocalization, 0.2, 0.2, 0.8);
     var replayGoTo = new GoTo(replayNavigation, path,
       new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
-    replayGoTo.start();
-    var replayStatus = replayGoTo.update(replay.snapshot(), 0.01);
+    var replaySkillRunner = new SkillRunner();
+    var replayStatus = replaySkillRunner.start(replayGoTo);
+    replayStatus = replaySkillRunner.update(replay.snapshot(), 0.01);
     while (switch replayStatus { case Running: true; case _: false; } && replay.advance())
-      replayStatus = replayGoTo.update(replay.snapshot(), 0.01);
-    check(switch replayStatus { case Succeeded: true; case _: false; },
-      "GoTo reaches the same recorded path through ReplayRobot");
+      replayStatus = replaySkillRunner.update(replay.snapshot(), 0.01);
+    check(switch replayStatus { case Succeeded: true; case _: false; } &&
+      replaySkillRunner.activeSkill() == null && replaySkillRunner.result() != null,
+      "SkillRunner completes GoTo against the recorded ReplayRobot observations");
     var replaySnapshot = replay.snapshot();
     var replayEstimate = replayLocalization.state();
     var replayEstimateValue:robotkit.localization.LocalizationState = cast replayEstimate;
@@ -2044,11 +2046,12 @@ class RobotWorldTests {
       replaySnapshot.receivedTimestampNs, replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
     var replayDock = new Dock(replayNavigation,
       new DockingTarget(replayDockDetection, replayDockPose));
-    replayDock.start();
-    check(switch replayDock.update(replaySnapshot, 0.01) {
+    replaySkillRunner.start(replayDock);
+    check(switch replaySkillRunner.update(replaySnapshot, 0.01) {
       case Succeeded: true;
       case _: false;
-    }, "Dock replays the same recorded approach");
+    } && replaySkillRunner.activeSkill() == null,
+      "SkillRunner starts another skill after replayed GoTo completes");
     var replayForks = Forks.fromBlueprint(replay, blueprint);
     var replayPickPose = new Pose2(replayEstimateValue.pose.x + 0.02,
       replayEstimateValue.pose.y, replayEstimateValue.pose.yaw);

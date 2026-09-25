@@ -33,6 +33,8 @@ import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Path;
 import robotkit.skill.GoTo;
+import robotkit.skill.SkillRunner;
+import robotkit.skill.SkillStatus;
 
 /** End-to-end assertion of the world adapter against a real robotd TCP peer. */
 class WorldTcpIntegration {
@@ -134,8 +136,10 @@ class WorldTcpIntegration {
         var state = world.snapshot().robot(LOGICAL_ID);
         return state != null && state.positions.length > 0;
       }, "remote robot did not publish its initial state");
-      if (remote.snapshot().safety != RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP)
-        throw "new serial session did not publish its latched safety stop";
+      remote.stop(robotkit.world.StopMode.Emergency);
+      waitUntil(runtime, function() return remote.snapshot().safety ==
+          RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP,
+        "simulated robot did not latch an explicit remote emergency stop");
       world.resetSafety(LOGICAL_ID);
       waitUntil(runtime, function() return remote.snapshot().safety ==
           RobotKitRuntimeConstants.RK_SAFETY_READY,
@@ -254,14 +258,21 @@ class WorldTcpIntegration {
       var path = new Path([estimate.pose, goalPose], "odom");
       var goTo = new GoTo(new Navigation(mobileBase, localization, 0.2, 0.2, 0.8), path,
         new NavigationGoal(goalPose, "odom", 0.01, 0.05));
-      goTo.start();
-      goTo.update(current, 0.02);
+      var skillRunner = new SkillRunner();
+      if (skillRunner.start(goTo) != SkillStatus.Running ||
+          skillRunner.activeSkill() != goTo)
+        throw "SkillRunner did not start GoTo for RemoteRobot";
+      if (skillRunner.update(current, 0.02) != SkillStatus.Running)
+        throw "RemoteRobot GoTo did not remain active after its first update";
       waitUntil(runtime, function() {
         var state = remote.snapshot();
         return state.velocities.length == 3 && state.velocities.get(0) > 0.0
           && state.velocities.get(1) > 0.0;
       }, "GoTo did not send an atomic two-wheel velocity target through robotd");
-      goTo.cancel();
+      skillRunner.cancel();
+      if (skillRunner.status() != SkillStatus.Cancelled || skillRunner.activeSkill() != null ||
+          skillRunner.result() == null)
+        throw "SkillRunner did not cancel RemoteRobot GoTo cleanly";
 
       var facility = new Facility("serial-facility", "Serial integration facility");
       facility.addZone(new Zone("floor", "Floor", "map",
@@ -300,7 +311,7 @@ class WorldTcpIntegration {
       if (mission.status != materia.automation.mission.MissionStatus.Succeeded ||
           fleet.availableRobotIds().indexOf(LOGICAL_ID) < 0)
         throw "serial mission did not complete and release its fleet assignment";
-      Sys.println("Shared behavior, GoTo, and MissionExecutor passed: local simulation and robotd serial");
+      Sys.println("SkillRunner GoTo, shared behavior, and MissionExecutor passed: local simulation and robotd serial");
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();
