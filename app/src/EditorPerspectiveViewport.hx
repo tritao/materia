@@ -38,6 +38,9 @@ class EditorPerspectiveViewport implements View {
   var renderedWidth:Int = 0;
   var renderedHeight:Int = 0;
   var renderedCameraRevision:Int = -1;
+  var renderedLightingRevision:Int = -1;
+  var lightingRevision:Int = 0;
+  var lightingPreset:Int = 0;
   var renderCount:Int = 0;
   var lastRenderSeconds:Float = 0.0;
   var totalRenderSeconds:Float = 0.0;
@@ -67,6 +70,14 @@ class EditorPerspectiveViewport implements View {
     this.style = style == null ? defaultStyle() : style.copy();
   }
 
+  public function lightingPresetId():Int return lightingPreset;
+
+  public function setLightingPreset(preset:Int):Void {
+    if (preset < 0 || preset > 2 || preset == lightingPreset) return;
+    lightingPreset = preset;
+    lightingRevision++;
+  }
+
   public function build(context:BuildContext):RenderNode {
     return context.withScope(new Key(key), function() {
       var node = new RenderNode(context.id("perspective"), LayoutVisualKind.Custom, style);
@@ -75,7 +86,7 @@ class EditorPerspectiveViewport implements View {
       node.semantics = new Semantics(AccessibilityRole.Image,
         "Scene perspective GPU view");
       node.onPaint(paint, "perspective:" + scene.revision + ":" + runtimeRevision + ":" +
-        sketchDragRevision + ":" + camera.revision + ":" +
+        sketchDragRevision + ":" + camera.revision + ":light:" + lightingRevision + ":" +
         renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep);
       installNavigation(node);
       return node;
@@ -89,6 +100,7 @@ class EditorPerspectiveViewport implements View {
     var displayRevision=scene.revision+runtimeRevision*1000003;
     if (renderer != null && (surface == null || renderedRevision != displayRevision ||
         renderedCameraRevision != camera.revision ||
+        renderedLightingRevision != lightingRevision ||
         width != renderedWidth || height != renderedHeight)) {
       var started = Sys.time();
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
@@ -96,14 +108,31 @@ class EditorPerspectiveViewport implements View {
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       var directions:Array<Float> = [];
       // Coin directions point from each light into the scene; the shader needs the reverse.
-      for (light in [[0.6841049, -0.12062616, -0.7193398, 0.76],
-          [-0.6403416, 0.7631294, 0.087155744, 0.34],
-          [-0.7544065, -0.63302225, -0.17364818, 0.50]]) {
+      var intensities = switch (lightingPreset) {
+        case 1: [0.65, 0.45, 0.25];
+        case 2: [0.95, 0.20, 0.65];
+        default: [0.76, 0.34, 0.50];
+      };
+      var coinDirections = [[0.6841049, -0.12062616, -0.7193398],
+        [-0.6403416, 0.7631294, 0.087155744],
+        [-0.7544065, -0.63302225, -0.17364818]];
+      for (index in 0...3) {
+        var light = coinDirections[index];
         var direction = camera.studioDirection(-light[0], -light[1], -light[2]);
         directions.push(direction[0]); directions.push(direction[1]);
-        directions.push(direction[2]); directions.push(light[3]);
+        directions.push(direction[2]); directions.push(intensities[index]);
       }
-      view.setStudioLighting(directions, [0.22, 0.23, 0.24], [0.16, 0.16, 0.17]);
+      var sky = switch (lightingPreset) {
+        case 1: [0.25, 0.26, 0.27];
+        case 2: [0.18, 0.19, 0.20];
+        default: [0.22, 0.23, 0.24];
+      };
+      var ground = switch (lightingPreset) {
+        case 1: [0.22, 0.22, 0.23];
+        case 2: [0.08, 0.08, 0.09];
+        default: [0.16, 0.16, 0.17];
+      };
+      view.setStudioLighting(directions, sky, ground);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
       var rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height,
@@ -114,6 +143,7 @@ class EditorPerspectiveViewport implements View {
       surface = next;
       renderedRevision = displayRevision;
       renderedCameraRevision = camera.revision;
+      renderedLightingRevision = lightingRevision;
       renderedWidth = width;
       renderedHeight = height;
       lastRenderSeconds = Sys.time() - started;

@@ -485,6 +485,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var toolbarMenu = new CommandMenu("editor-more-menu", [
         "editor.save-as", "scene.export-step", "editor.undo", "editor.redo",
         "scene.frame-selected", "scene.reset-perspective", "scene.show-perspective",
+        "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
         "scene.toggle-grid", "editor.command-palette", "workspace.reset"
       ], Math.max(8.0, viewportWidth - 228.0), 44.0, commands, ui.commandContext,
         function() { toolbarMenuVisible = false; commands.refresh(); },
@@ -1449,6 +1450,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       workspace.open("perspective", "viewport");
       commands.refresh();
     }, null, function() return perspectiveViewport != null));
+    registerLightingPreset("scene.lighting-studio", "Lighting: Studio", 0);
+    registerLightingPreset("scene.lighting-soft", "Lighting: Soft", 1);
+    registerLightingPreset("scene.lighting-contrast", "Lighting: Contrast", 2);
     commands.register(new Command("scene.toggle-grid", "Toggle grid", function() {
       gridVisible = !gridVisible;
       log(gridVisible ? "Grid enabled" : "Grid disabled");
@@ -1487,6 +1491,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
       log("Grid spacing set to " + spacing + " m");
       commands.refresh();
     }, null, null, function() return gridSpacing == spacing));
+  }
+
+  function registerLightingPreset(id:String, label:String, preset:Int):Void {
+    commands.register(new Command(id, label, function() {
+      if (perspectiveViewport != null) perspectiveViewport.setLightingPreset(preset);
+      log(label);
+      commands.refresh();
+    }, null, function() return !documents.blocked() && perspectiveViewport != null,
+      function() return perspectiveViewport != null &&
+        perspectiveViewport.lightingPresetId() == preset));
   }
 
   function registerNudgeCommand(id:String, label:String, key:Int, modifiers:Int,

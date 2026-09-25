@@ -200,6 +200,10 @@ int main(int argc, char **argv) {
             nkscene::SceneView view; view.camera.enabled=true;
             view.camera.view_projection=view_projection(yaw,pitch,
                 float(options.width)/options.height);
+            view.camera.has_view_pose=true;
+            view.camera.position={10*std::cos(pitch)*std::cos(yaw),
+                                  10*std::cos(pitch)*std::sin(yaw),10*std::sin(pitch)};
+            view.camera.view_direction=unit(view.camera.position);
             configure_studio(view,yaw,pitch);
             auto plan=nkscene::compile(scene->snapshot(),view);
             std::vector<std::uint8_t> pixels;

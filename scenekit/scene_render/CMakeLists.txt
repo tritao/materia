@@ -143,6 +143,14 @@ if(NK_BUILD_TESTS)
                 src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")
             target_link_libraries(nativekit_scene_render_lighting_gallery PRIVATE
                 NativeKit::scene_render NativeKit::scene NativeKit::gpu NativeKit::nativekit)
+            add_test(NAME scene_render_lighting_regression
+                COMMAND ${Python3_EXECUTABLE}
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tests/lighting_regression.py"
+                    --gallery $<TARGET_FILE:nativekit_scene_render_lighting_gallery>
+                    --xvfb ${NKSRENDER_XVFB_RUN}
+                    --reference "${CMAKE_CURRENT_SOURCE_DIR}/tests/lighting_reference.json")
+            set_tests_properties(scene_render_lighting_regression PROPERTIES
+                LABELS "scene;render;graphics;lighting" TIMEOUT 120)
         endif()
     endif()
 endif()
