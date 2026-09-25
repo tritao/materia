@@ -18,6 +18,7 @@ struct SceneLightingParams
     float4 ambient_sky;
     float4 ambient_ground;
     float4 lighting_mode;
+    float4 camera_position;
 };
 
 struct SceneClipParams
@@ -50,7 +51,17 @@ fragment float4 main0(SceneFragmentInput input [[stage_in]],
     float4 texture_color = base_color_texture.sample(base_color_sampler, input.texcoord0);
     float3 N = normalize(input.normal);
     float hemisphere = 0.5 + 0.5 * dot(N, float3(0.0, 0.0, 1.0));
-    float3 diffuse = mix(lights.ambient_ground.rgb, lights.ambient_sky.rgb, hemisphere);
+    float3 albedo = params.base_color.rgb * texture_color.rgb * input.color0.rgb;
+    float metallic = clamp(params.surface_params.x, 0.0, 1.0);
+    float roughness = clamp(params.surface_params.y, 0.045, 1.0);
+    float alpha_ggx = roughness * roughness;
+    float alpha2 = alpha_ggx * alpha_ggx;
+    float3 V = normalize(lights.camera_position.xyz - input.world_position);
+    float NdotV = max(dot(N, V), 0.0001);
+    float3 F0 = mix(float3(0.04), albedo, metallic);
+    float3 ambient = mix(lights.ambient_ground.rgb, lights.ambient_sky.rgb, hemisphere) *
+                     albedo * (1.0 - metallic);
+    float3 direct = float3(0.0);
     for (int index = 0; index < 32; ++index) {
         if (index >= int(lights.lighting_mode.y)) break;
         float intensity = max(lights.light_color_intensity[index].w, 0.0);
@@ -74,14 +85,24 @@ fragment float4 main0(SceneFragmentInput input [[stage_in]],
                 attenuation *= clamp((cone - lights.light_cones[index].y) / width, 0.0, 1.0);
             }
         }
-        diffuse += lights.light_color_intensity[index].rgb *
-                   (intensity * attenuation * max(dot(N, L), 0.0));
+        float NdotL = max(dot(N, L), 0.0);
+        if (NdotL <= 0.0) continue;
+        float3 H = normalize(V + L);
+        float NdotH = max(dot(N, H), 0.0);
+        float VdotH = max(dot(V, H), 0.0);
+        float d = NdotH * NdotH * (alpha2 - 1.0) + 1.0;
+        float D = alpha2 / max(3.14159265 * d * d, 0.0001);
+        float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
+        float Gv = NdotV / (NdotV * (1.0 - k) + k);
+        float Gl = NdotL / (NdotL * (1.0 - k) + k);
+        float3 F = F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
+        float3 specular = D * Gv * Gl * F / max(4.0 * NdotV * NdotL, 0.0001);
+        float3 diffuse = (1.0 - F) * (1.0 - metallic) * albedo / 3.14159265;
+        direct += lights.light_color_intensity[index].rgb *
+                  (intensity * attenuation * NdotL * 3.14159265) *
+                  (diffuse + specular);
     }
-    float surface_response = mix(1.0, 0.65, clamp(params.surface_params.x, 0.0, 1.0)) *
-                             mix(0.5, 1.0, clamp(params.surface_params.y, 0.0, 1.0));
-    surface_response = mix(surface_response, 1.0, lights.lighting_mode.x);
-    float3 color = params.base_color.rgb * texture_color.rgb * input.color0.rgb * diffuse *
-                   surface_response + params.emissive.rgb;
+    float3 color = ambient + direct + params.emissive.rgb;
     float alpha = params.base_color.a * texture_color.a * input.color0.a;
     if (params.surface_params.w > 1.5 && alpha < params.surface_params.z)
         discard_fragment();

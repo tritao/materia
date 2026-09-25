@@ -74,9 +74,10 @@ struct LightingUniformData {
     std::array<float, 4> ambient_sky{0.35f, 0.35f, 0.35f, 0.0f};
     std::array<float, 4> ambient_ground{0.35f, 0.35f, 0.35f, 0.0f};
     std::array<float, 4> lighting_mode{}; // x = studio shading, y = light count
+    std::array<float, 4> camera_position{}; // world-space near-plane center
 };
 
-static_assert(sizeof(LightingUniformData) == sizeof(float) * (32 * 4 * 4 + 12));
+static_assert(sizeof(LightingUniformData) == sizeof(float) * (32 * 4 * 4 + 16));
 
 struct PostProcessUniformData {
     std::array<float, 4> color_params{};
@@ -618,6 +619,8 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
             (result = nkgpu_shader_uniform(shader_builder, 3, 5, "ambient_ground",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 3, 6, "lighting_mode",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 7, "camera_position",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                            "base_color_texture")) != NKGPU_OK ||
@@ -1846,6 +1849,22 @@ bool invert_matrix(const std::array<float, 16> &matrix, std::array<float, 16> &i
     return true;
 }
 
+std::array<float, 4> camera_position_from_view_projection(const RenderPlan &plan) noexcept {
+    std::array<float, 16> inverse{};
+    if (!invert_matrix(plan.view_projection(), inverse))
+        return {0.0f, 0.0f, 1.0f, 0.0f};
+    // The near-plane center approximates the eye for perspective cameras. Its
+    // offset is only one near-plane distance and keeps SceneCamera ABI stable.
+    const float homogeneous[4] = {-inverse[8] + inverse[12],
+                                  -inverse[9] + inverse[13],
+                                  -inverse[10] + inverse[14],
+                                  -inverse[11] + inverse[15]};
+    if (std::abs(homogeneous[3]) < 1.0e-8f)
+        return {0.0f, 0.0f, 1.0f, 0.0f};
+    return {homogeneous[0] / homogeneous[3], homogeneous[1] / homogeneous[3],
+            homogeneous[2] / homogeneous[3], 1.0f};
+}
+
 bool unproject_pick_pixel(const RenderPlan &plan, std::uint32_t x, std::uint32_t y,
                           std::uint32_t width, std::uint32_t height, float depth,
                           Vec3 &world_position) noexcept {
@@ -2060,7 +2079,8 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
         return stats;
     }
     const auto clip_data = clip_uniform_data(plan);
-    const auto lighting_data = lighting_uniform_data(plan, snapshot);
+    auto lighting_data = lighting_uniform_data(plan, snapshot);
+    lighting_data.camera_position = camera_position_from_view_projection(plan);
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
         if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
@@ -2220,7 +2240,8 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         return fail_frame(result);
 
     const auto clip_data = clip_uniform_data(plan);
-    const auto lighting_data = lighting_uniform_data(plan, snapshot);
+    auto lighting_data = lighting_uniform_data(plan, snapshot);
+    lighting_data.camera_position = camera_position_from_view_projection(plan);
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
         if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)

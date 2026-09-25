@@ -154,7 +154,7 @@ class EditorScene {
       }
       var phaseStarted = profileLoadStart();
       selectionMaterial = scene.createMaterial();
-      scene.setMaterialData(selectionMaterial, MaterialData.opaque(1.0, 0.88, 0.35));
+      scene.setMaterialData(selectionMaterial, MaterialData.opaque(1.0, 0.88, 0.35).setRoughness(0.7));
       profileLoadEnd("finalMaterial", phaseStarted);
       phaseStarted = profileLoadStart();
       snapshot = scene.snapshot();
@@ -200,7 +200,7 @@ class EditorScene {
       profileLoadEnd("geometryPublication", phaseStarted);
       phaseStarted = profileLoadStart();
       var material = scene.createMaterial();
-      scene.setMaterialData(material, MaterialData.opaque(red, green, blue));
+      scene.setMaterialData(material, MaterialData.opaque(red, green, blue).setRoughness(0.65));
       profileLoadEnd("materialSetup", phaseStarted);
       phaseStarted = profileLoadStart();
       var transaction = scene.beginTransaction();
@@ -259,7 +259,7 @@ class EditorScene {
         geometry = boxGeometry(item.width, item.height, item.depth);
       }
       geometryData.push(geometry);
-      materialData.push(MaterialData.opaque(item.red, item.green, item.blue));
+      materialData.push(MaterialData.opaque(item.red, item.green, item.blue).setRoughness(0.65));
       candidates.push(new EditorSceneObject(item.id, item.label, item.type,
         item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
         item.mass, item.red, item.green, item.blue, storedCadGraph,
@@ -1273,7 +1273,7 @@ class EditorScene {
           failIfInjected("prepare.new-geometry");
           var material = scene.createMaterial();
           prepared.createdMaterials.push(material);
-          scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue));
+          scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue).setRoughness(0.65));
           failIfInjected("prepare.new-material");
           var node = prepared.transaction.createNode();
           prepared.transaction.setName(node, record.label);
@@ -1335,7 +1335,7 @@ class EditorScene {
           if (item.red != record.red || item.green != record.green || item.blue != record.blue) {
             var material = scene.createMaterial();
             prepared.createdMaterials.push(material);
-            scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue));
+            scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue).setRoughness(0.65));
             prepared.transaction.setMaterial(runtime.node, material);
             prepared.retiredMaterials.push(runtime.material);
             runtime = new EditorSceneRuntimeObject(runtime.node, runtime.geometry, material);

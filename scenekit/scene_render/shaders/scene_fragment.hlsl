@@ -14,6 +14,7 @@ cbuffer lighting_params : register(b3)
     float4 ambient_sky : packoffset(c128);
     float4 ambient_ground : packoffset(c129);
     float4 lighting_mode : packoffset(c130);
+    float4 camera_position : packoffset(c131);
 };
 
 Texture2D base_color_texture : register(t0);
@@ -44,7 +45,17 @@ float4 main(SceneFragmentInput input) : SV_Target0
     float4 texture_color = base_color_texture.Sample(base_color_sampler, input.texcoord0);
     float3 N = normalize(input.normal);
     float hemisphere = 0.5f + 0.5f * dot(N, float3(0.0f, 0.0f, 1.0f));
-    float3 diffuse = lerp(ambient_ground.rgb, ambient_sky.rgb, hemisphere);
+    float3 albedo = base_color.rgb * texture_color.rgb * input.color0.rgb;
+    float metallic = saturate(surface_params.x);
+    float roughness = clamp(surface_params.y, 0.045f, 1.0f);
+    float alpha_ggx = roughness * roughness;
+    float alpha2 = alpha_ggx * alpha_ggx;
+    float3 V = normalize(camera_position.xyz - input.world_position);
+    float NdotV = max(dot(N, V), 0.0001f);
+    float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
+    float3 ambient = lerp(ambient_ground.rgb, ambient_sky.rgb, hemisphere) *
+                     albedo * (1.0f - metallic);
+    float3 direct = float3(0.0f, 0.0f, 0.0f);
     for (int index = 0; index < 32; ++index) {
         if (index >= (int)lighting_mode.y) break;
         float intensity = max(light_color_intensity[index].w, 0.0f);
@@ -68,14 +79,24 @@ float4 main(SceneFragmentInput input) : SV_Target0
                 attenuation *= saturate((cone - light_cones[index].y) / width);
             }
         }
-        diffuse += light_color_intensity[index].rgb *
-                   (intensity * attenuation * max(dot(N, L), 0.0f));
+        float NdotL = max(dot(N, L), 0.0f);
+        if (NdotL <= 0.0f) continue;
+        float3 H = normalize(V + L);
+        float NdotH = max(dot(N, H), 0.0f);
+        float VdotH = max(dot(V, H), 0.0f);
+        float d = NdotH * NdotH * (alpha2 - 1.0f) + 1.0f;
+        float D = alpha2 / max(3.14159265f * d * d, 0.0001f);
+        float k = (roughness + 1.0f) * (roughness + 1.0f) / 8.0f;
+        float Gv = NdotV / (NdotV * (1.0f - k) + k);
+        float Gl = NdotL / (NdotL * (1.0f - k) + k);
+        float3 F = F0 + (1.0f - F0) * pow(1.0f - VdotH, 5.0f);
+        float3 specular = D * Gv * Gl * F / max(4.0f * NdotV * NdotL, 0.0001f);
+        float3 diffuse = (1.0f - F) * (1.0f - metallic) * albedo / 3.14159265f;
+        direct += light_color_intensity[index].rgb *
+                  (intensity * attenuation * NdotL * 3.14159265f) *
+                  (diffuse + specular);
     }
-    float surface_response = lerp(1.0f, 0.65f, saturate(surface_params.x)) *
-                             lerp(0.5f, 1.0f, saturate(surface_params.y));
-    surface_response = lerp(surface_response, 1.0f, lighting_mode.x);
-    float3 color = base_color.rgb * texture_color.rgb * input.color0.rgb * diffuse *
-                   surface_response + emissive.rgb;
+    float3 color = ambient + direct + emissive.rgb;
     float alpha = base_color.a * texture_color.a * input.color0.a;
     if (surface_params.w > 1.5f && alpha < surface_params.z)
         discard;

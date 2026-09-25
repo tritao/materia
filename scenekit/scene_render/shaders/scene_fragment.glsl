@@ -11,6 +11,7 @@ uniform vec4 light_cones[32];
 uniform vec4 ambient_sky;
 uniform vec4 ambient_ground;
 uniform vec4 lighting_mode;
+uniform vec4 camera_position;
 uniform sampler2D base_color_texture;
 in vec3 world_position;
 in vec3 vertex_normal;
@@ -30,7 +31,17 @@ void main() {
     vec4 texture_color = texture(base_color_texture, vertex_texcoord);
     vec3 N = normalize(vertex_normal);
     float hemisphere = 0.5 + 0.5 * dot(N, vec3(0.0, 0.0, 1.0));
-    vec3 diffuse = mix(ambient_ground.rgb, ambient_sky.rgb, hemisphere);
+    vec3 albedo = base_color.rgb * texture_color.rgb * vertex_color.rgb;
+    float metallic = clamp(material_params.x, 0.0, 1.0);
+    float roughness = clamp(material_params.y, 0.045, 1.0);
+    float alpha_ggx = roughness * roughness;
+    float alpha2 = alpha_ggx * alpha_ggx;
+    vec3 V = normalize(camera_position.xyz - world_position);
+    float NdotV = max(dot(N, V), 0.0001);
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    vec3 ambient = mix(ambient_ground.rgb, ambient_sky.rgb, hemisphere) *
+                   albedo * (1.0 - metallic);
+    vec3 direct = vec3(0.0);
     for (int index = 0; index < 32; ++index) {
         if (index >= int(lighting_mode.y)) break;
         float intensity = max(light_color_intensity[index].w, 0.0);
@@ -54,14 +65,24 @@ void main() {
                 attenuation *= clamp((cone - light_cones[index].y) / width, 0.0, 1.0);
             }
         }
-        diffuse += light_color_intensity[index].rgb *
-                   (intensity * attenuation * max(dot(N, L), 0.0));
+        float NdotL = max(dot(N, L), 0.0);
+        if (NdotL <= 0.0) continue;
+        vec3 H = normalize(V + L);
+        float NdotH = max(dot(N, H), 0.0);
+        float VdotH = max(dot(V, H), 0.0);
+        float d = NdotH * NdotH * (alpha2 - 1.0) + 1.0;
+        float D = alpha2 / max(3.14159265 * d * d, 0.0001);
+        float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
+        float Gv = NdotV / (NdotV * (1.0 - k) + k);
+        float Gl = NdotL / (NdotL * (1.0 - k) + k);
+        vec3 F = F0 + (1.0 - F0) * pow(1.0 - VdotH, 5.0);
+        vec3 specular = D * Gv * Gl * F / max(4.0 * NdotV * NdotL, 0.0001);
+        vec3 diffuse = (1.0 - F) * (1.0 - metallic) * albedo / 3.14159265;
+        direct += light_color_intensity[index].rgb *
+                  (intensity * attenuation * NdotL * 3.14159265) *
+                  (diffuse + specular);
     }
-    float surface_response = mix(1.0, 0.65, clamp(material_params.x, 0.0, 1.0)) *
-                             mix(0.5, 1.0, clamp(material_params.y, 0.0, 1.0));
-    surface_response = mix(surface_response, 1.0, lighting_mode.x);
-    vec3 color = base_color.rgb * texture_color.rgb * vertex_color.rgb * diffuse *
-                 surface_response + emissive.rgb;
+    vec3 color = ambient + direct + emissive.rgb;
     float alpha = base_color.a * texture_color.a * vertex_color.a;
     if (material_params.w > 1.5 && alpha < material_params.z)
         discard;

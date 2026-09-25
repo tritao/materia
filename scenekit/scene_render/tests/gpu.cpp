@@ -201,6 +201,33 @@ int main() {
                    options.height, {0.0f, 0.0f, 0.0f, 1.0f}, rim_pixels) == NKGPU_OK);
         assert(rim_pixels != studio_pixels);
 
+        // Roughness changes highlight width, and metallic changes the energy split.
+        nkscene::SceneView pbr_view = studio_view;
+        pbr_view.camera.enabled = true;
+        pbr_view.camera.view_projection[10] = -1.0f;
+        pbr_view.studio_lighting.ambient_sky = {0.0f, 0.0f, 0.0f, 0.0f};
+        pbr_view.studio_lighting.ambient_ground = {0.0f, 0.0f, 0.0f, 0.0f};
+        const auto pbr_plan = nkscene::compile(scene->snapshot(), pbr_view);
+        const auto capture_pbr = [&] {
+            std::vector<std::uint8_t> pixels;
+            assert(executor.capture_rgba8(pbr_plan, scene->snapshot(), options.width,
+                       options.height, {0.0f, 0.0f, 0.0f, 1.0f}, pixels) == NKGPU_OK);
+            return pixels;
+        };
+        material_resource.edit_state().roughness = 0.25f;
+        scene->publish();
+        const auto smooth_pixels = capture_pbr();
+        material_resource.edit_state().roughness = 0.9f;
+        scene->publish();
+        const auto rough_pixels = capture_pbr();
+        assert(smooth_pixels != rough_pixels);
+        material_resource.edit_state().metallic = 1.0f;
+        scene->publish();
+        assert(capture_pbr() != rough_pixels);
+        material_resource.edit_state().metallic = 0.0f;
+        material_resource.edit_state().roughness = 0.0f;
+        scene->publish();
+
         nkscene::PickResult picked;
         assert(executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
                                   16, options.height / 2, &picked) == NKGPU_OK);

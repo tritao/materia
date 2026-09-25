@@ -34,7 +34,7 @@ def generate() -> bytes:
             source = template.replace("{{VERSION}}", version)
             vertex_precision = precision if precision_placeholder == "VERTEX_PRECISION" else ""
             fragment_precision = (
-                "precision mediump float;"
+                "precision highp float;"
                 if precision_placeholder == "FRAGMENT_PRECISION" and variant == "gles"
                 else ""
             )

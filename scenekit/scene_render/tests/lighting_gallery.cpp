@@ -181,8 +181,8 @@ int main(int argc, char **argv) {
         auto &material_state = mat.edit_state();
         material_state.base_color = argc == 3 ? std::array<float,4>{0.24f,0.29f,0.35f,1.0f}
                                                : std::array<float,4>{0.74f,0.77f,0.81f,1.0f};
-        // Match the editor's currently implicit material fields.
-        material_state.roughness = 0.0f;
+        // Match the editor's default broad plastic highlight.
+        material_state.roughness = 0.65f;
         const auto node=scene->reserve_node_id();
         nkscene::Transaction create(scene); create.add_create(node);
         nkscene::ChangeSet changes;
