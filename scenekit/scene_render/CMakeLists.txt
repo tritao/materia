@@ -21,6 +21,12 @@ set(NKSCENE_RENDER_SHADER_INPUTS
     shaders/stroke_fragment.hlsl
     shaders/stroke_vertex.metal
     shaders/stroke_fragment.metal
+    shaders/workplane_vertex.glsl
+    shaders/workplane_fragment.glsl
+    shaders/workplane_vertex.hlsl
+    shaders/workplane_fragment.hlsl
+    shaders/workplane_vertex.metal
+    shaders/workplane_fragment.metal
     tools/generate-shaders.py)
 set(NKSCENE_RENDER_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(NKSCENE_RENDER_SHADER_HEADER

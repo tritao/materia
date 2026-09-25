@@ -61,6 +61,9 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	 * Picks against one view using the index's retained scene bounds and its pose overrides.
 	 */
 	extern fn nkscene_render_spatial_index_pick_ray_with_view(index: nkscene_render_spatial_index, view: ptr<const<nkscene_render_view>>, ray: ptr<const<nkscene_render_ray>>, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
+	/**
+	 * Picks tagged CAD strokes within an angular radius, respecting the presented view.
+	 */
 	extern fn nkscene_render_spatial_index_pick_ray_with_view_edges(index: nkscene_render_spatial_index, view: ptr<const<nkscene_render_view>>, ray: ptr<const<nkscene_render_ray>>, angular_tolerance: f32, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
 	/**
 	 * Performs nearest-hit picking for a batch of rays against one immutable snapshot.
@@ -149,7 +152,7 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		visible_items: u64 @offset(80);
 		culled_items: u64 @offset(88);
 	}
-	struct nkscene_render_view @layout(416, 8) {
+	struct nkscene_render_view @layout(488, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		root: nkscene_node_id @offset(8);
 		include_invisible: u32 @offset(16);
@@ -178,15 +181,29 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		camera_node: nkscene_node_id @offset(232);
 		pose_overrides: ptr<const<nkscene_render_pose_override>> @offset(240) @borrowed @length_field("pose_override_count");
 		pose_override_count: u32 @offset(248);
+		/**
+		 * Optional world-space CAD viewport lighting; zero keeps authored scene lighting.
+		 */
 		studio_lighting_enabled: u32 @offset(252);
 		studio_light_directions: array<f32, 12> @offset(256);
 		studio_ambient_sky: array<f32, 4> @offset(304);
 		studio_ambient_ground: array<f32, 4> @offset(320);
 		studio_light_colors: array<f32, 12> @offset(336);
+		/**
+		 * Optional exact view pose for specular lighting with an explicit camera matrix.
+		 */
 		camera_view_pose_enabled: u32 @offset(384);
 		camera_world_position: array<f32, 3> @offset(388);
 		camera_view_direction: array<f32, 3> @offset(400);
 		camera_orthographic: u32 @offset(412);
+		/**
+		 * Optional infinite z=0 presentation grid. Ray vectors address clip-space x/y.
+		 */
+		workplane_grid_enabled: u32 @offset(416);
+		workplane_grid_eye_spacing: array<f32, 4> @offset(420);
+		workplane_grid_forward: array<f32, 4> @offset(436);
+		workplane_grid_right: array<f32, 4> @offset(452);
+		workplane_grid_up: array<f32, 4> @offset(468);
 	}
 	struct nkscene_render_visibility_override @layout(16, 8) {
 		node: nkscene_node_id @offset(0);

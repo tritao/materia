@@ -87,6 +87,13 @@ struct PostProcessUniformData {
     std::array<std::int32_t, 4> random_params{};
 };
 
+struct WorkplaneUniformData {
+    std::array<float, 4> eye_spacing{};
+    std::array<float, 4> forward{};
+    std::array<float, 4> right{};
+    std::array<float, 4> up{};
+};
+
 static_assert(sizeof(PostProcessUniformData) == sizeof(float) * 8 + sizeof(std::int32_t) * 4);
 
 static_assert(sizeof(ClipUniformData) ==
@@ -360,6 +367,9 @@ struct NativeKitGpuExecutor::State {
     nkgpu_shader postprocess_shader{};
     nkgpu_pipeline postprocess_pipeline{};
     nkgpu_buffer postprocess_vertex_buffer{};
+    nkgpu_shader workplane_shader{};
+    nkgpu_pipeline workplane_pipeline{};
+    nkgpu_buffer workplane_vertex_buffer{};
     nkgpu_image capture_color{};
     nkgpu_image capture_depth{};
     nkgpu_image postprocess_color{};
@@ -424,6 +434,8 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_image_destroy(renderer, postprocess_color);
         if (renderer.id && postprocess_vertex_buffer.id)
             (void)nkgpu_buffer_destroy(renderer, postprocess_vertex_buffer);
+        if (renderer.id && workplane_vertex_buffer.id)
+            (void)nkgpu_buffer_destroy(renderer, workplane_vertex_buffer);
         if (renderer.id && pick_color.id)
             (void)nkgpu_image_destroy(renderer, pick_color);
         if (renderer.id && pick_subelement.id)
@@ -458,6 +470,10 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_pipeline_destroy(renderer, postprocess_pipeline);
         if (renderer.id && postprocess_shader.id)
             (void)nkgpu_shader_destroy(renderer, postprocess_shader);
+        if (renderer.id && workplane_pipeline.id)
+            (void)nkgpu_pipeline_destroy(renderer, workplane_pipeline);
+        if (renderer.id && workplane_shader.id)
+            (void)nkgpu_shader_destroy(renderer, workplane_shader);
         geometry_resources.clear();
         material_revisions.clear();
         material_resources.clear();
@@ -481,6 +497,9 @@ struct NativeKitGpuExecutor::State {
         postprocess_pipeline = {};
         postprocess_shader = {};
         postprocess_vertex_buffer = {};
+        workplane_vertex_buffer = {};
+        workplane_pipeline = {};
+        workplane_shader = {};
         capture_color = {};
         capture_depth = {};
         postprocess_color = {};
@@ -1152,6 +1171,68 @@ bool ensure_postprocess_pipeline(StateT &state, GpuExecutionStats &stats) {
                                   &state.postprocess_sampler);
     if (result != NKGPU_OK)
         return fail_setup(result);
+    return true;
+}
+
+template <class StateT>
+bool ensure_workplane_pipeline(StateT &state, GpuExecutionStats &stats) {
+    if (state.workplane_pipeline.id)
+        return true;
+    const auto sources = render_internal::workplane_shader_sources(
+        nkgpu_query_backend(state.renderer));
+    if (!sources.vertex || !sources.fragment)
+        return set_failure(state, stats, NKGPU_ERROR_UNSUPPORTED);
+    constexpr float triangle[] = {-1.0f, -1.0f, 3.0f, -1.0f, -1.0f, 3.0f};
+    auto result = nkgpu_buffer_create(state.renderer,
+        reinterpret_cast<const std::uint8_t *>(triangle), sizeof(triangle),
+        &state.workplane_vertex_buffer);
+    if (result != NKGPU_OK)
+        return set_failure(state, stats, result);
+    nkgpu_shader_builder shader_builder{};
+    if ((result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex,
+                                    sources.fragment, &shader_builder)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    if ((result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                            sizeof(WorkplaneUniformData))) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    for (std::uint32_t index = 0; index < 4; ++index) {
+        constexpr const char *names[] = {"grid_eye_spacing", "grid_forward",
+                                         "grid_right", "grid_up"};
+        if ((result = nkgpu_shader_uniform(shader_builder, 0, index, names[index],
+                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK)
+            return set_failure(state, stats, result);
+    }
+    if ((result = nkgpu_shader_end(shader_builder, &state.workplane_shader)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    nkgpu_pipeline_builder pipeline_builder{};
+    if ((result = nkgpu_pipeline_begin(state.renderer, state.workplane_shader,
+                                       sizeof(float) * 2, &pipeline_builder)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    nkgpu_blend_state blend{};
+    blend.enabled = 1;
+    blend.src_rgb = NKGPU_BLENDFACTOR_ONE;
+    blend.dst_rgb = NKGPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    blend.op_rgb = NKGPU_BLENDOP_ADD;
+    blend.src_alpha = NKGPU_BLENDFACTOR_ONE;
+    blend.dst_alpha = NKGPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    blend.op_alpha = NKGPU_BLENDOP_ADD;
+    nkgpu_depth_state grid_depth{};
+    grid_depth.enabled = 1;
+    grid_depth.compare = NKGPU_COMPAREFUNC_ALWAYS;
+    grid_depth.write_enabled = 0;
+    if ((result = nkgpu_pipeline_attribute(pipeline_builder, 0, 0, 0,
+                                           NKGPU_VERTEXFORMAT_FLOAT2)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 0, sizeof(float) * 2,
+                                               NKGPU_VERTEXSTEP_PER_VERTEX, 1)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_primitive_type(pipeline_builder,
+                                                NKGPU_PRIMITIVETYPE_TRIANGLES)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_depth(pipeline_builder, &grid_depth)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_color_target(pipeline_builder, 0, NKGPU_IMAGEFORMAT_RGBA8,
+                                              NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK ||
+        (result = nkgpu_pipeline_end(pipeline_builder, &state.workplane_pipeline)) != NKGPU_OK)
+        return set_failure(state, stats, result);
     return true;
 }
 
@@ -2246,6 +2327,8 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         return state_->last_result;
     if (!ensure_capture_targets(*state_, width, height, stats))
         return state_->last_result;
+    if (plan.workplane_grid().enabled && !ensure_workplane_pipeline(*state_, stats))
+        return state_->last_result;
     const auto apply_post_process = post_process.enabled();
     if (apply_post_process &&
         (!ensure_postprocess_target(*state_, width, height, stats) ||
@@ -2299,6 +2382,19 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     if ((result = nkgpu_apply_viewport(state_->renderer, 0, 0, static_cast<std::int32_t>(width),
                                        static_cast<std::int32_t>(height))) != NKGPU_OK)
         return fail_frame(result);
+
+    if (plan.workplane_grid().enabled) {
+        const auto &grid = plan.workplane_grid();
+        WorkplaneUniformData data{grid.eye_spacing, grid.forward, grid.right, grid.up};
+        if ((result = nkgpu_apply_pipeline(state_->renderer,
+                                            state_->workplane_pipeline)) != NKGPU_OK ||
+            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0,
+                                                 state_->workplane_vertex_buffer, 0)) != NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(state_->renderer, 0,
+                 reinterpret_cast<const std::uint8_t *>(&data), sizeof(data))) != NKGPU_OK ||
+            (result = nkgpu_draw(state_->renderer, 0, 3, 1)) != NKGPU_OK)
+            return fail_frame(result);
+    }
 
     const auto clip_data = clip_uniform_data(plan);
     auto lighting_data = lighting_uniform_data(plan, snapshot);

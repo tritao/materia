@@ -107,6 +107,12 @@ class EditorPerspectiveViewport implements View {
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
         simulationActive ? simulationPoses : null);
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
+      if (gridVisible && gridStep > 0.0) {
+        var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
+        view.setWorkplaneGrid(camera.eyePosition(), camera.studioDirection(0.0, 0.0, -1.0),
+          camera.studioDirection(scale * width / height, 0.0, 0.0),
+          camera.studioDirection(0.0, scale, 0.0), gridStep, camera.distance);
+      }
       var directions:Array<Float> = [];
       // Coin directions point from each light into the scene; the shader needs the reverse.
       var intensities = switch (lightingPreset) {
@@ -201,6 +207,7 @@ class EditorPerspectiveViewport implements View {
   public function resetView():Void camera.reset();
 
   public function setPlacementOptions(snap:Bool, step:Float, ?visible:Bool = true):Void {
+    if (gridStep != step || gridVisible != visible) renderedRevision = -1;
     gridSnapEnabled = snap;
     gridStep = step;
     gridVisible = visible;
@@ -330,26 +337,7 @@ class EditorPerspectiveViewport implements View {
     var projection = camera.viewProjection(width / Math.max(1.0, height),
       Math.max(0.001, camera.distance / 10000.0),
       Math.max(100.0, camera.distance * 100.0));
-    var extent = visibleGridExtent(width, height);
-    var spacing = gridStep;
-    while (extent / spacing > 96.0) spacing *= 2.0;
-    var minX = Math.floor((camera.targetX - extent) / spacing) * spacing;
-    var maxX = Math.ceil((camera.targetX + extent) / spacing) * spacing;
-    var minY = Math.floor((camera.targetY - extent) / spacing) * spacing;
-    var maxY = Math.ceil((camera.targetY + extent) / spacing) * spacing;
-    var grid = new PathBuilder();
-    var x = minX;
-    while (x <= maxX) {
-      appendWorldSegment(grid, projection, x, minY, 0.0, x, maxY, 0.0, width, height);
-      x += spacing;
-    }
-    var y = minY;
-    while (y <= maxY) {
-      appendWorldSegment(grid, projection, minX, y, 0.0, maxX, y, 0.0, width, height);
-      y += spacing;
-    }
-    canvas.strokeTransient(grid.build(), Color.rgba(0.15, 0.22, 0.28, 0.14), 1.0);
-
+    var extent = visibleAxisExtent(width, height);
     var xAxis = new PathBuilder();
     if (appendWorldSegment(xAxis, projection, -extent, 0.0, 0.0, extent, 0.0, 0.0, width, height)) {
       canvas.strokeTransient(xAxis.build(), Color.rgba(0.72, 0.25, 0.22, 0.72), 1.5);
@@ -365,7 +353,7 @@ class EditorPerspectiveViewport implements View {
     }
   }
 
-  function visibleGridExtent(width:Float, height:Float):Float {
+  function visibleAxisExtent(width:Float, height:Float):Float {
     var eye = camera.eyePosition();
     var extent = Math.max(gridStep * 8.0, camera.distance * 1.5);
     var hasIntersection = false, hasHorizon = false;

@@ -401,6 +401,13 @@ std::uint64_t view_signature(const SceneView &view) noexcept {
             add(std::hash<float>{}(value));
     }
     add(view.studio_lighting.enabled ? 1 : 0);
+    add(view.workplane_grid.enabled ? 1 : 0);
+    if (view.workplane_grid.enabled) {
+        for (const auto value : view.workplane_grid.eye_spacing) add(std::hash<float>{}(value));
+        for (const auto value : view.workplane_grid.forward) add(std::hash<float>{}(value));
+        for (const auto value : view.workplane_grid.right) add(std::hash<float>{}(value));
+        for (const auto value : view.workplane_grid.up) add(std::hash<float>{}(value));
+    }
     if (view.studio_lighting.enabled) {
         for (const auto &light : view.studio_lighting.directions)
             for (const auto value : light)

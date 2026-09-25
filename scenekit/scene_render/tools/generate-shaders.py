@@ -23,6 +23,8 @@ SHADERS = {
     "postprocess_fragment": ("postprocess_fragment.glsl", "FRAGMENT_PRECISION"),
     "stroke_vertex": ("stroke_vertex.glsl", "VERTEX_PRECISION"),
     "stroke_fragment": ("stroke_fragment.glsl", "FRAGMENT_PRECISION"),
+    "workplane_vertex": ("workplane_vertex.glsl", "VERTEX_PRECISION"),
+    "workplane_fragment": ("workplane_fragment.glsl", "FRAGMENT_PRECISION"),
 }
 
 
@@ -43,7 +45,7 @@ def generate() -> bytes:
             symbols.append((f"{name}_{variant}", source))
 
     for name in ("scene_vertex", "scene_fragment", "scene_pick_vertex", "scene_pick_fragment",
-                 "stroke_vertex", "stroke_fragment"):
+                 "stroke_vertex", "stroke_fragment", "workplane_vertex", "workplane_fragment"):
         for language, extension in (("hlsl", "hlsl"), ("metal", "metal")):
             filename = name.replace("scene_pick", "pick")
             source = (SHADER_DIR / f"{filename}.{extension}").read_text(encoding="utf-8")

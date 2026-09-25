@@ -68,6 +68,23 @@ class SceneView {
 		return this;
 	}
 
+	/** Renders an infinite z=0 grid behind scene geometry for editor views. */
+	public function setWorkplaneGrid(eye:Array<Float>, forward:Array<Float>,
+			right:Array<Float>, up:Array<Float>, spacing:Float, cameraDistance:Float):SceneView {
+		if (eye.length != 3 || forward.length != 3 || right.length != 3 || up.length != 3 ||
+			spacing <= 0.0) throw "invalid workplane grid data";
+		value.set_workplane_grid_enabled(1);
+		for (axis in 0...3) {
+			value.set_workplane_grid_eye_spacing(axis, eye[axis]);
+			value.set_workplane_grid_forward(axis, forward[axis]);
+			value.set_workplane_grid_right(axis, right[axis]);
+			value.set_workplane_grid_up(axis, up[axis]);
+		}
+		value.set_workplane_grid_eye_spacing(3, spacing);
+		value.set_workplane_grid_forward(3, cameraDistance);
+		return this;
+	}
+
 	/** Sets three world-space directions, intensities, and optional RGB light colors. */
 	public function setStudioLighting(directions:Array<Float>, sky:Array<Float>, ground:Array<Float>,
 			?colors:Array<Float>):SceneView {

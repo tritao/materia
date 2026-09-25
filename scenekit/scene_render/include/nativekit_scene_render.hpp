@@ -156,6 +156,14 @@ struct StudioLighting {
     std::array<float, 4> ambient_ground{0.16f, 0.16f, 0.17f, 0.0f};
 };
 
+struct WorkplaneGrid {
+    bool enabled = false;
+    std::array<float, 4> eye_spacing{};
+    std::array<float, 4> forward{};
+    std::array<float, 4> right{};
+    std::array<float, 4> up{};
+};
+
 struct SceneView {
     /** Invalid means that the view contains every node. */
     NodeId root;
@@ -180,6 +188,7 @@ struct SceneView {
     /** Conservative node-level sectioning planes. */
     std::vector<ClipPlane> clip_planes;
     StudioLighting studio_lighting;
+    WorkplaneGrid workplane_grid;
 
     void set_visibility_override(NodeId node, bool visible) {
         const auto found = std::find_if(
@@ -435,6 +444,7 @@ class RenderPlan {
     const std::array<float, 16> &view_projection() const noexcept { return view_projection_; }
     const SceneCamera &camera() const noexcept { return camera_; }
     const StudioLighting &studio_lighting() const noexcept { return studio_lighting_; }
+    const WorkplaneGrid &workplane_grid() const noexcept { return workplane_grid_; }
     std::span<const std::array<float, 4>> clip_planes() const noexcept {
         return {clip_planes_.data(), clip_plane_count_};
     }
@@ -503,6 +513,7 @@ class RenderPlan {
                                               0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
     SceneCamera camera_;
     StudioLighting studio_lighting_;
+    WorkplaneGrid workplane_grid_;
     bool camera_enabled_ = false;
     std::array<std::array<float, 4>, max_clip_planes> clip_planes_{};
     std::uint32_t clip_plane_count_ = 0;

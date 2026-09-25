@@ -67,6 +67,9 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
     const bool has_camera_view_pose =
         input->struct_size >= offsetof(nkscene_render_view, camera_orthographic) +
                                   sizeof(input->camera_orthographic);
+    const bool has_workplane_grid =
+        input->struct_size >= offsetof(nkscene_render_view, workplane_grid_up) +
+                                  sizeof(input->workplane_grid_up);
     if ((input->visibility_override_count != 0 && !input->visibility_overrides) ||
         (input->material_override_count != 0 && !input->material_overrides) ||
         (input->clip_plane_count != 0 && !input->clip_planes) ||
@@ -197,6 +200,24 @@ nkscene_result copy_view(const nkscene_render_view *input, nkscene::SceneView &o
                 for (uint32_t axis = 0; axis < 4; ++axis)
                     output.studio_lighting.colors[light][axis] =
                         input->studio_light_colors[light * 4 + axis];
+    }
+    if (has_workplane_grid && input->workplane_grid_enabled) {
+        output.workplane_grid.enabled = true;
+        for (uint32_t axis = 0; axis < 4; ++axis) {
+            const auto eye = input->workplane_grid_eye_spacing[axis];
+            const auto forward = input->workplane_grid_forward[axis];
+            const auto right = input->workplane_grid_right[axis];
+            const auto up = input->workplane_grid_up[axis];
+            if (!std::isfinite(eye) || !std::isfinite(forward) ||
+                !std::isfinite(right) || !std::isfinite(up))
+                return NKS_ERROR_INVALID_ARGUMENT;
+            output.workplane_grid.eye_spacing[axis] = eye;
+            output.workplane_grid.forward[axis] = forward;
+            output.workplane_grid.right[axis] = right;
+            output.workplane_grid.up[axis] = up;
+        }
+        if (output.workplane_grid.eye_spacing[3] <= 0.0f)
+            return NKS_ERROR_INVALID_ARGUMENT;
     }
     return NKS_OK;
 }
