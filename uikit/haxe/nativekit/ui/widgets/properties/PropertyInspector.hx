@@ -225,6 +225,8 @@ private class PropertyInspectorSectionHeader implements View {
 	public function build(context:BuildContext):RenderNode {
 		var style = new LayoutStyle();
 		style.width = LayoutAxis.grow();
+		// Keep the header's text inside its available width when the dock narrows.
+		style.clipHorizontal = true;
 		var button = new Button(section.label,
 			style, onToggle, key);
 		button.leadingIcon = section.expanded ? IconName.ChevronDown : IconName.ChevronRight;
