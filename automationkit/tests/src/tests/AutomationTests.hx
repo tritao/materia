@@ -4,6 +4,7 @@ import NativeKitRuntime;
 import haxe.Int64;
 import materia.automation.facility.Charger;
 import materia.automation.facility.Facility;
+import materia.automation.facility.FacilityRouter;
 import materia.automation.facility.Lane;
 import materia.automation.facility.Rack;
 import materia.automation.facility.Station;
@@ -85,7 +86,11 @@ class AutomationTests {
       facility.addRack(rack);
       facility.addCharger(charger);
       facility.addLane(new Lane("inbound-outbound", inbound.id, outbound.id,
-        new Path([inbound.pose, outbound.pose], "map"), 2.0, 1.0, false));
+        new Path([inbound.pose, outbound.pose], "map"), 2.0, 0.2, false));
+      facility.addLane(new Lane("inbound-rack", inbound.id, rack.id,
+        new Path([inbound.pose, new Pose2(2.0, 0.0), rack.pose], "map"), 1.5, 1.5));
+      facility.addLane(new Lane("rack-outbound", rack.id, outbound.id,
+        new Path([rack.pose, new Pose2(3.0, 1.0), outbound.pose], "map"), 1.5, 1.5));
       var lane:Lane = cast facility.lane("inbound-outbound");
       var storedRack:Rack = cast facility.rack("rack-4");
       equal(facility.stations().length, 4, "facility indexes stations and specialized locations");
@@ -97,6 +102,17 @@ class AutomationTests {
         "facility rejects a lane whose frame differs from its stations");
       throws(function() new Rack("bad-rack", "Bad", "main", "map", new Pose2(), ["A", "A"]),
         "rack rejects duplicate slot IDs");
+      var router = new FacilityRouter(facility);
+      var route = router.route(inbound.id, outbound.id);
+      var routeLegs = route.legs();
+      check(routeLegs.length == 2 && routeLegs[0].lane.id == "inbound-rack" &&
+        route.maximumSpeedMetersPerSecond == 1.5 && route.path.frameId == "map" &&
+        route.path.start().x == inbound.pose.x && route.path.goal().x == outbound.pose.x,
+        "facility router chooses the fastest lane sequence and composes its framed path");
+      var reverseRoute = router.route(outbound.id, inbound.id);
+      var reverseLegs = reverseRoute.legs();
+      check(reverseLegs.length == 2 && reverseLegs[0].reversed && reverseLegs[1].reversed,
+        "facility router traverses bidirectional lanes while excluding one-way lanes");
 
       var tasks:Array<Task> = [
         new Pick("pick-1", rack.id, "A1", payload),
@@ -471,8 +487,9 @@ private class FacilityTransportSkillFactory implements TaskSkillFactory {
           new MotionLimits(1.0, 1.0));
         var localization = new FixedPoseLocalization(destination.pose);
         var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
-        var path = new Path([pickup.pose, destination.pose], destination.frameId);
-        new GoTo(navigation, path, new NavigationGoal(destination.pose, destination.frameId));
+        var route = new FacilityRouter(facility).route(pickup.id, destination.id);
+        new GoTo(navigation, route.path,
+          new NavigationGoal(destination.pose, destination.frameId));
       case _: throw 'unsupported task kind ${Std.string(task.kind)}';
     }
   }
@@ -513,9 +530,9 @@ private class MobileTransportSkillFactory implements TaskSkillFactory {
         var localization = new WheelOdometryLocalization(base, destination.frameId);
         var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
         lastNavigation = navigation;
-        var path = new Path([pickup.pose, destination.pose], destination.frameId);
-        new GoTo(navigation, path, new NavigationGoal(destination.pose, destination.frameId,
-          0.02, 0.1));
+        var route = new FacilityRouter(facility).route(pickup.id, destination.id);
+        new GoTo(navigation, route.path,
+          new NavigationGoal(destination.pose, destination.frameId, 0.02, 0.1));
       case _: throw 'unsupported task kind ${Std.string(task.kind)}';
     }
   }

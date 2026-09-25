@@ -16,8 +16,10 @@ The first domain model includes:
   RobotKit skill and releases the assignment on success, failure, or cancel.
 
 Facility lanes retain a `robotkit.navigation.Path` and enforce frame agreement
-with their endpoint stations. Rack slot IDs and facility entity IDs are
-validated at insertion. Fleet assignments require an attached, ready robot;
+with their endpoint stations. `FacilityRouter` plans the least-travel-time lane
+sequence using lane speed and direction, then composes its centerlines into one
+framed path suitable for `Navigation` or a `GoTo` skill. Rack slot IDs and
+facility entity IDs are validated at insertion. Fleet assignments require an attached, ready robot;
 mission completion releases that robot for the next assignment. `TrafficManager`
 allows one fleet member to own a lane at a time and makes reservations
 idempotent for the current owner.
@@ -25,7 +27,7 @@ idempotent for the current owner.
 Task execution is an explicit composition point. `TaskSkillFactory` receives
 the current task, assigned `Robot`, and `Facility`, then returns a configured
 `robotkit.skill.Skill`. For example, an application can resolve a
-`Transport`'s station IDs into a framed path and return `GoTo`; a perception
+`Transport`'s station IDs through `FacilityRouter` and return `GoTo`; a perception
 adapter can resolve a rack task into `PickPallet` or `PlacePallet`. The
 executor owns sequencing and lifecycle propagation, while route planning,
 perception, and robot-specific mechanism configuration remain explicit
