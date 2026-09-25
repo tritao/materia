@@ -29,6 +29,7 @@ Each component also produces the machining it needs:
 | `RetainingRing` | DIN 471 external, by shaft diameter | — |
 | `ShaftCollar` | set-screw type, by bore diameter | — |
 | `SteppedShaft` | — (built from arbitrary sections) | keyway and retaining-ring groove cuts, `diameterAt()` |
+| `PillowBlockHousing` | — (sized from a `DeepGrooveBearing`) | `mountScrewPart()` |
 
 `SteppedShaft` stacks coaxial cylindrical sections along +Z, producing square
 shoulders at each diameter change. Keyways are cut on the shaft's local +Y
@@ -57,6 +58,35 @@ and places a member in world space between its two points; a member's local
 `reference` vector projected perpendicular to the member's axis, defaulting to
 +Z (or +Y for a nearly vertical member). `cutList()` aggregates member lengths
 by profile designation.
+
+## Transmission
+
+`machinekit.transmission` has `SpurGear` (standard full-depth involute teeth,
+sampled as a polyline profile, extruded along +Z) and `Rack` (its straight-flank,
+infinite-radius limit, extruded along +X with teeth along +Z). `GearPair.mesh(a, b)`
+computes the standard centre distance and ratio for two same-module gears and a
+placement pose for `b` relative to `a`.
+
+## Assembly
+
+`machinekit.assembly` composes standalone `MachineComponent`s into small
+machines, the same way `examples/MotorShaftBearings.hx` does, but as reusable
+library classes rather than one-off scripts:
+
+- `PillowBlock` mounts a `DeepGrooveBearing` in a flange-style
+  `PillowBlockHousing` (bore and four screws along the same axis, like
+  `NemaStepper`'s mounting face — not a classic two-bolt base-mount housing)
+  with four `SocketHeadCapScrew`s. `addTo(model, id, ?pose)` places the whole
+  block and mates the bearing and screws onto it; the bearing's own
+  `front`/`axis`/`back` connectors stay reachable as `'<id>-bearing'` for
+  mating a shaft through it.
+- `LinearAxis` drives a `SteppedShaft` lead screw from a `NemaStepper` through
+  a continuous coupling, with a `Carriage` riding it on a prismatic joint.
+  Two `PillowBlock`s and a `RectTube` rail (via `FrameAssembly`) represent the
+  fixed frame; they are independently placed in the same `AssemblyModel`
+  rather than mated to the screw, since a real frame constrains the screw at
+  both ends (a statically indeterminate assembly), which this simplified
+  kinematic model does not attempt to capture.
 
 Run the smoke tests after building CadKit's native library:
 

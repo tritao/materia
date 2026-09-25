@@ -1,4 +1,7 @@
+import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
+import machinekit.assembly.LinearAxis;
+import machinekit.assembly.PillowBlock;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.motion.NemaStepper;
@@ -18,6 +21,9 @@ import machinekit.structural.FlatBar;
 import machinekit.structural.FrameAssembly;
 import machinekit.structural.RectTube;
 import machinekit.structural.RoundTube;
+import machinekit.transmission.GearPair;
+import machinekit.transmission.Rack;
+import machinekit.transmission.SpurGear;
 import materia.project.AssemblyFrames;
 
 class MachineKitSmoke {
@@ -391,6 +397,123 @@ class MachineKitSmoke {
 		near(cutList[0].totalLength, 800, "cut list total length");
 	}
 
+	static function gears():Void {
+		var gear = new SpurGear(2, 20, 12);
+		check(gear.designation == "SPUR-M2-20T", "spur gear designation");
+		near(gear.pitchDiameter, 40, "spur gear pitch diameter");
+		near(gear.baseDiameter, 40 * Math.cos(SpurGear.STANDARD_PRESSURE_ANGLE), "spur gear base diameter");
+		near(gear.outsideDiameter, 44, "spur gear outside diameter");
+		near(gear.rootDiameter, 35, "spur gear root diameter");
+		throws(() -> new SpurGear(-1, 20, 12), "positive module");
+		throws(() -> new SpurGear(2, 5, 12), "at least 6 teeth");
+		throws(() -> new SpurGear(2, 20, -1), "positive face width");
+
+		var part = gear.geometry();
+		solid(part, "spur gear");
+		var box = bounds(part);
+		near(box.maxX, gear.outsideDiameter / 2, "spur gear outside radius");
+		check(box.maxX > gear.pitchDiameter / 2, "spur gear teeth extend past the pitch circle");
+		part.close();
+
+		var pinion = new SpurGear(2, 12, 12);
+		throws(() -> pinion.centerDistance(new SpurGear(2.5, 20, 12)), "share a module");
+		var pair = GearPair.mesh(pinion, gear);
+		near(pair.centerDistance, (pinion.pitchDiameter + gear.pitchDiameter) / 2, "gear pair centre distance");
+		near(pair.ratio(), gear.teeth / pinion.teeth, "gear pair ratio");
+		near(pair.pose().x, pair.centerDistance, "gear pair pose offset");
+
+		var rack = new Rack(2, 10, 12);
+		check(rack.designation == "RACK-M2-10T", "rack designation");
+		near(rack.length, 10 * Math.PI * 2, "rack length");
+		throws(() -> new Rack(2, 0, 12), "at least one tooth");
+
+		var rackPart = rack.geometry();
+		solid(rackPart, "rack");
+		var rackBox = bounds(rackPart);
+		near(rackBox.minX, 0, "rack face start");
+		near(rackBox.maxX, 12, "rack face width");
+		near(rackBox.minZ, 0, "rack length start");
+		near(rackBox.maxZ, rack.length, "rack length end");
+		rackPart.close();
+	}
+
+	static function pillowBlock():Void {
+		var bearing = DeepGrooveBearing.metric("6204");
+		var block = new PillowBlock(bearing);
+		check(block.housing.mountScrew == "M6", "pillow block mount screw size");
+		near(block.housing.face, 65.8, "pillow block face");
+		near(block.housing.depth, 23.4, "pillow block depth");
+		near(block.housing.boltSpacing, 56.4, "pillow block bolt spacing");
+
+		var envelope = block.housing.geometry(Envelope);
+		solid(envelope, "pillow block envelope");
+		var envelopeVolume = envelope.volume();
+		near(envelopeVolume, 65.8 * 65.8 * 23.4 - Math.PI * 23.525 * 23.525 * 23.4, "pillow block envelope volume");
+		envelope.close();
+		var preview = block.housing.geometry();
+		solid(preview, "pillow block preview");
+		check(preview.volume() < envelopeVolume, "preview also removes bolt holes");
+		preview.close();
+
+		near(block.housing.connector("bore").frame.z, 11.7, "pillow block bore connector");
+		near(block.housing.connector("bolt1").frame.x, 28.2, "pillow block bolt connector x");
+
+		var model = new AssemblyModel();
+		block.addTo(model, "pb");
+		var definition = model.definition("pillow-block");
+		check(definition.joints.length == 5, "pillow block joint count");
+		var state = model.initialState("pillow-block");
+		near(state.worldConnector("pb-bearing", "axis").z, 18.7, "bearing centred in housing, offset by half its width");
+
+		var lines = block.bom().lines();
+		check(lines.length == 3, "pillow block BOM line count");
+		check(block.bom().quantity(block.screw.designation) == 4, "pillow block screw quantity");
+		for (entry in block.components()) {
+			var part = entry.component.geometry(Envelope);
+			check(part.valid(), '${entry.id} envelope is invalid');
+			part.close();
+		}
+	}
+
+	static function linearAxis():Void {
+		var axis = new LinearAxis();
+		check(axis.motor.designation == "NEMA23-56", "linear axis motor designation");
+		near(axis.length, 240, "linear axis screw length");
+		near(axis.screw.totalLength, 240, "linear axis screw total length");
+		near(axis.carriage.boreDiameter, 10, "linear axis carriage bore");
+		throws(() -> new LinearAxis(23, 10, -1), "positive stroke");
+		throws(() -> new LinearAxis(23, 50, 200, "6001"), "bore is smaller than the screw diameter");
+
+		for (entry in axis.components()) {
+			var part = entry.component.geometry(Envelope);
+			check(part.valid(), '${entry.id} envelope is invalid');
+			part.close();
+		}
+		var rail = axis.frame.geometry("rail");
+		solid(rail, "linear axis rail");
+		rail.close();
+		var cutList = axis.frame.cutList();
+		check(cutList.length == 1, "linear axis frame cut list");
+		near(cutList[0].totalLength, 240, "linear axis rail length");
+
+		var model = axis.assembly();
+		var definition = model.definition("linear-axis");
+		check(definition.joints.length == 12, "linear axis joint count");
+		var state = model.initialState("linear-axis");
+		near(state.worldConnector("screw", "input").z, 21, "screw seats on the motor shaft");
+		near(state.worldConnector("carriage", "bore").z, 71, "carriage starts clear of the screw ends");
+		near(state.worldConnector("pillowA-bearing", "axis").z, 14, "pillow block A bearing centred");
+		near(state.worldConnector("pillowB-bearing", "axis").z, 234, "pillow block B bearing centred");
+
+		state.setJoint("carriage-slide", 100);
+		state.forwardKinematics();
+		near(state.worldConnector("carriage", "bore").z, 121, "carriage travels along the screw");
+
+		var lines = axis.bom().lines();
+		check(lines.length == 6, "linear axis BOM line count");
+		check(axis.bom().quantity(axis.bearing.designation) == 2, "linear axis bearing quantity");
+	}
+
 	static function assembly():Void {
 		var example = new MotorShaftBearings();
 		check(example.screw.designation == "ISO4762-M3x10", "selected mount screw");
@@ -449,6 +572,9 @@ class MachineKitSmoke {
 		shafts();
 		shaftHardware();
 		structural();
+		gears();
+		pillowBlock();
+		linearAxis();
 		assembly();
 		trace("MachineKit smoke passed");
 	}
