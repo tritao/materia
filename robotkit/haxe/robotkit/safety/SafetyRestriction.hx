@@ -6,4 +6,5 @@ enum SafetyRestriction {
   StopRequired(reason:String);
   ForkHeightLimited(maxHeightMeters:Float);
   PayloadLimited(maxMassKg:Float);
+  LoadStateUnknown;
 }

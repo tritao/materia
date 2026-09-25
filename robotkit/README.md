@@ -207,7 +207,12 @@ and `DockingTarget` values. `LidarObstaclePerception` turns finite in-range
 LiDAR returns into planar obstacle observations in the sensor frame.
 `robotkit.safety` exposes operator-facing phase, active restrictions, speed
 limit, and stopping envelope values; the native runtime continues to enforce
-hard safety. `robotkit.power` defines `BatteryState` and a `Power` view for
+hard safety. `LoadSafetyPolicy.refresh()` reduces `MobileBase` speed and
+acceleration limits from observed payload mass and fork height, reports an
+expanded robot-and-load footprint, and blocks new base commands when fork or
+payload state exceeds its configured envelope. Unknown load state applies
+conservative limits until the application confirms the forks are empty or
+carrying a load. `robotkit.power` defines `BatteryState` and a `Power` view for
 charge, voltage, current, temperature, energy, and clock provenance.
 
 `robotkit.skill` composes these explicit views into task-sized operations. Each

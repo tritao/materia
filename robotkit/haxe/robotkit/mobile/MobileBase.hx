@@ -15,8 +15,10 @@ import robotkit.runtime.RobotRuntimeMobileConfiguration;
 class MobileBase {
   public final robot:Robot;
   public final driveModel:DriveModel;
-  public final motionLimits:MotionLimits;
+  public final nominalMotionLimits:MotionLimits;
+  public var motionLimits(default, null):MotionLimits;
   public final footprint:Null<Footprint>;
+  public var safetyStopRequired(default, null):Bool = false;
   var previousCommand:Twist2 = new Twist2();
 
   /** Builds the mobile view from roles and dimensions authored on a RobotModel. */
@@ -67,12 +69,33 @@ class MobileBase {
       throw "MobileBase requires a robot, drive model, and motion limits";
     this.robot = robot;
     this.driveModel = driveModel;
+    this.nominalMotionLimits = motionLimits;
     this.motionLimits = motionLimits;
     this.footprint = footprint;
   }
 
+  /** Applies user-level safety setpoints that can only lower authored limits. */
+  public function applySafetyLimits(limits:MotionLimits):Void {
+    if (limits == null) throw "Safety motion limits cannot be null";
+    if (limits.maxLinearSpeed > nominalMotionLimits.maxLinearSpeed ||
+        limits.maxAngularSpeed > nominalMotionLimits.maxAngularSpeed ||
+        limits.maxLinearAcceleration > nominalMotionLimits.maxLinearAcceleration ||
+        limits.maxAngularAcceleration > nominalMotionLimits.maxAngularAcceleration)
+      throw "Safety motion limits cannot exceed the authored mobile-base limits";
+    motionLimits = limits;
+  }
+
+  public function clearSafetyLimits():Void motionLimits = nominalMotionLimits;
+
+  /** Blocks MobileBase commands while a user-level policy requires a stop. */
+  public function applySafetyStop(required:Bool):Void safetyStopRequired = required;
+
+  public function currentCommand():Twist2
+    return new Twist2(previousCommand.linear, previousCommand.angular);
+
   /** Limits a body command and submits all drive joints as one RobotCommand. */
   public function command(twist:Twist2, ?durationSeconds:Float):Twist2 {
+    if (safetyStopRequired) throw "MobileBase command rejected by an active safety stop";
     var bounded = motionLimits.constrain(twist, previousCommand, durationSeconds);
     bounded = driveModel.constrain(bounded);
     var targets = driveModel.targets(bounded);

@@ -84,6 +84,8 @@ import robotkit.safety.SafetyPhase;
 import robotkit.safety.SafetyRestriction;
 import robotkit.safety.SafetyState;
 import robotkit.safety.StoppingEnvelope;
+import robotkit.safety.LoadSafetyConfiguration;
+import robotkit.safety.LoadSafetyPolicy;
 import robotkit.power.BatteryState;
 import robotkit.power.Power;
 import robotkit.skill.Charge;
@@ -110,6 +112,7 @@ class RobotWorldTests {
     testNavigation();
     testForkMechanisms();
     testPerceptionSafetyPower();
+    testLoadSafetyPolicy();
     testForkliftSkillsOnSimulationAndReplay();
     testMcapRoundTrip();
     testMcapRobustness();
@@ -913,6 +916,81 @@ class RobotWorldTests {
     throws(function() new BatteryState("bad-pack", 1.1, 48.0, 0.0, 20.0,
       Int64.ofInt(0), Int64.ofInt(0), "battery", "host"),
       "battery state rejects invalid charge fractions");
+  }
+
+  static function testLoadSafetyPolicy():Void {
+    var robot = new FakeRobot("load-safety");
+    robot.jointNames = ["left-wheel", "right-wheel", "lift"];
+    robot.positions = [0.0, 0.0, 0.0];
+    robot.velocities = [0.0, 0.0, 0.0];
+    robot.efforts = [0.0, 0.0, 0.0];
+    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(1.0, 2.0, 2.0, 3.0), Footprint.rectangle(0.8, 0.6));
+    var forks = new Forks(robot, new ForkConfig(new ForkAxisConfig("lift", 0.0, 2.0),
+      new LoadLimits(1000.0, 600.0, 2.0)));
+    var policy = new LoadSafetyPolicy(base, forks, new LoadSafetyConfiguration());
+    var unknown = policy.state();
+    check(unknown.phase == SafetyPhase.Restricted &&
+      base.motionLimits.maxLinearSpeed < base.nominalMotionLimits.maxLinearSpeed &&
+      switch unknown.restrictions()[0] { case LoadStateUnknown: true; case _: false; },
+      "Load safety applies conservative motion limits when load state is unknown");
+    var unknownFootprint:Footprint = cast unknown.footprint;
+    var baseFootprint:Footprint = cast base.footprint;
+    check(unknownFootprint.radius > baseFootprint.radius,
+      "Unknown load state expands the reported footprint by its configured margin");
+
+    forks.setLoadState(LoadState.empty());
+    var empty = policy.refresh();
+    var emptyLimits:MotionLimits = cast empty.effectiveMotionLimits;
+    check(empty.phase == SafetyPhase.Normal &&
+      base.motionLimits.maxLinearSpeed == base.nominalMotionLimits.maxLinearSpeed,
+      "Confirmed empty forks restore nominal mobile limits");
+    base.command(new Twist2(0.8, 0.0), 1.0);
+    empty = policy.refresh();
+
+    var payload = new Payload(500.0, 1.2, 0.8, 0.8, 0.6, 0.0, 0.4);
+    forks.setLoadState(LoadState.carried(payload));
+    var loaded = policy.refresh();
+    var loadedLimits:MotionLimits = cast loaded.effectiveMotionLimits;
+    var loadedFootprint:Footprint = cast loaded.footprint;
+    var vertices = loadedFootprint.vertices();
+    var maxX = vertices[0].x;
+    for (point in vertices) maxX = Math.max(maxX, point.x);
+    check(loaded.phase == SafetyPhase.Restricted &&
+      loadedLimits.maxLinearSpeed < emptyLimits.maxLinearSpeed &&
+      loadedLimits.maxLinearAcceleration < emptyLimits.maxLinearAcceleration &&
+      loaded.stoppingEnvelope.distanceMeters > empty.stoppingEnvelope.distanceMeters &&
+      maxX >= 1.19,
+      "Payload mass reduces driving limits and stopping margin while expanding the footprint");
+
+    robot.positions[2] = 1.5;
+    var raised = policy.refresh();
+    var raisedLimits:MotionLimits = cast raised.effectiveMotionLimits;
+    var hasHeightRestriction = false;
+    for (restriction in raised.restrictions()) {
+      if (switch restriction {
+        case ForkHeightLimited(_): true;
+        case _: false;
+      }) hasHeightRestriction = true;
+    }
+    check(raisedLimits.maxAngularSpeed < loadedLimits.maxAngularSpeed &&
+      hasHeightRestriction,
+      "Raised forks further reduce turning speed and report the height restriction");
+
+    robot.positions[2] = 0.0;
+    forks.setLoadState(LoadState.carried(new Payload(1200.0,
+      1.0, 0.8, 0.8, 0.4)));
+    var invalid = policy.refresh();
+    check(invalid.phase == SafetyPhase.ProtectiveStop && base.safetyStopRequired &&
+      invalid.speedLimitMetersPerSecond == 0.0,
+      "Load envelope violations latch a protective stop in the mobile view");
+    throws(function() base.command(new Twist2(0.1, 0.0), 0.1),
+      "MobileBase blocks new motion commands while its load policy requires a stop");
+    forks.setLoadState(LoadState.empty());
+    var recovered = policy.refresh();
+    check(recovered.phase == SafetyPhase.Normal && !base.safetyStopRequired,
+      "A valid refreshed load state clears the policy stop and restores nominal limits");
+    base.command(new Twist2(0.1, 0.0), 0.1);
   }
 
   static function testForkliftSkillsOnSimulationAndReplay():Void {
