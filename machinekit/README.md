@@ -41,6 +41,23 @@ M3 screws and carries an output shaft on two 608 bearings through a continuous
 coupling joint. The shaft steps down past the outboard bearing to carry a
 retaining ring and an output key. It also produces the aggregated BOM.
 
+## Structural
+
+`machinekit.structural` builds machine bases and frames from named 3D points
+and straight members, rather than the connector-mating model above: a frame is
+one rigid weldment, not a kinematic mechanism, so members carry no assembly
+joints. Each cross-section (`RectTube`, `RoundTube`, `Angle`, `Channel`,
+`FlatBar`) implements `StructuralProfile` and extrudes itself along local +Z
+to a caller-chosen length, the same axis convention as every other generator.
+
+`FrameAssembly` registers named points with `point(name, x, y, z)`, then
+members with `member(name, start, end, profile)`. `geometry(name)` extrudes
+and places a member in world space between its two points; a member's local
++X (a channel's open side, an angle's leg corner, ...) follows an optional
+`reference` vector projected perpendicular to the member's axis, defaulting to
++Z (or +Y for a nearly vertical member). `cutList()` aggregates member lengths
+by profile designation.
+
 Run the smoke tests after building CadKit's native library:
 
 ```sh

@@ -1,0 +1,116 @@
+package machinekit.structural;
+
+import cadkit.modeling.Location;
+import cadkit.modeling.Part;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
+
+/** A cross-section factory for `FrameAssembly` members: `geometry(length)` extrudes the section
+ * along local +Z from z=0 to z=length, matching every other machinekit generator's axis
+ * convention. `RectTube`, `RoundTube`, `Angle`, `Channel`, and `FlatBar` implement this.
+ */
+interface StructuralProfile {
+	function profileDesignation():String;
+	function profileDescription():String;
+	function geometry(length:Float):Part;
+}
+
+/** Lengths of one profile aggregated across every member that uses it. */
+typedef CutListLine = {
+	var designation:String;
+	var description:String;
+	var quantity:Int;
+	var totalLength:Float;
+}
+
+/** Builds a structural frame from named 3D points and members that extrude a `StructuralProfile`
+ * between two points. A frame is one rigid weldment, not a kinematic mechanism, so members carry
+ * no assembly joints: `geometry(name)` returns the member's `Part` already placed in world space.
+ *
+ * A member's local +X (a channel's open side, an angle's leg corner, ...) follows `reference`
+ * projected perpendicular to the member's axis; `reference` defaults to +Z, or +Y when the member
+ * is nearly vertical, matching the axis-picking convention CadKit's own examples use for
+ * arbitrary-direction placement.
+ */
+typedef FrameMember = {
+	var name:String;
+	var start:String;
+	var end:String;
+	var profile:StructuralProfile;
+	var reference:Null<Vector>;
+}
+
+class FrameAssembly {
+	final points:Map<String, Vector> = new Map();
+	final members:Array<FrameMember> = [];
+
+	public function new() {}
+
+	public function point(name:String, x:Float, y:Float, z:Float):Void {
+		if (name == null || name.length == 0 || points.exists(name)) throw 'Duplicate frame point "$name"';
+		points.set(name, new Vector(x, y, z));
+	}
+
+	public function member(name:String, start:String, end:String, profile:StructuralProfile, ?reference:Vector):Void {
+		if (name == null || name.length == 0) throw "Frame member needs a name";
+		for (existing in members) if (existing.name == name) throw 'Duplicate frame member "$name"';
+		if (!points.exists(start)) throw 'Unknown frame point "$start"';
+		if (!points.exists(end)) throw 'Unknown frame point "$end"';
+		if (start == end) throw 'Member "$name" needs distinct endpoints';
+		members.push({name: name, start: start, end: end, profile: profile, reference: reference});
+	}
+
+	/** Straight-line distance between a member's endpoints. */
+	public function length(name:String):Float {
+		var m = find(name);
+		return points.get(m.end).subtract(points.get(m.start)).length();
+	}
+
+	/** The member's `Part`, extruded to its length and placed in world space along its endpoints. */
+	public function geometry(name:String):Part {
+		var m = find(name);
+		var start = points.get(m.start), end = points.get(m.end);
+		var axis = end.subtract(start);
+		var len = axis.length();
+		if (!(len > 1e-9)) throw 'Member "$name" has coincident endpoints';
+		var direction = axis.scale(1 / len);
+		var reference = m.reference != null ? m.reference
+			: (Math.abs(direction.dot(Vector.Z())) < 0.9 ? Vector.Z() : Vector.Y());
+		var sideways = direction.cross(reference).normalized();
+		var body = m.profile.geometry(len);
+		try {
+			var placed = body.placed(new Location(new Plane(start, sideways, direction)));
+			body.close();
+			return placed;
+		} catch (error:Dynamic) {
+			body.close();
+			throw error;
+		}
+	}
+
+	/** Lengths aggregated by profile designation, in first-used order. */
+	public function cutList():Array<CutListLine> {
+		var byDesignation:Map<String, CutListLine> = new Map();
+		var order:Array<String> = [];
+		for (m in members) {
+			var designation = m.profile.profileDesignation();
+			var len = length(m.name);
+			var line = byDesignation.get(designation);
+			if (line == null) {
+				byDesignation.set(designation, {designation: designation, description: m.profile.profileDescription(),
+					quantity: 1, totalLength: len});
+				order.push(designation);
+			} else {
+				line.quantity++;
+				line.totalLength += len;
+				byDesignation.set(designation, line);
+			}
+		}
+		return [for (designation in order) byDesignation.get(designation)];
+	}
+
+	function find(name:String):FrameMember {
+		for (m in members) if (m.name == name) return m;
+		throw 'Unknown frame member "$name"';
+	}
+}

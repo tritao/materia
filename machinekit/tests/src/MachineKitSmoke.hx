@@ -12,6 +12,12 @@ import machinekit.standard.ParallelKey;
 import machinekit.standard.RetainingRing;
 import machinekit.standard.ShaftCollar;
 import machinekit.standard.SocketHeadCapScrew;
+import machinekit.structural.Angle;
+import machinekit.structural.Channel;
+import machinekit.structural.FlatBar;
+import machinekit.structural.FrameAssembly;
+import machinekit.structural.RectTube;
+import machinekit.structural.RoundTube;
 import materia.project.AssemblyFrames;
 
 class MachineKitSmoke {
@@ -300,6 +306,91 @@ class MachineKitSmoke {
 		near(collar.connector("axis").frame.z, 5.5, "collar axis connector");
 	}
 
+	static function structural():Void {
+		var tube = new RectTube(40, 40, 3);
+		check(tube.designation == "RECT-40x40x3", "rect tube designation");
+		throws(() -> new RectTube(10, 10, 6), "wall is too thick");
+		var tubePart = tube.geometry(100);
+		solid(tubePart, "rect tube");
+		near(tubePart.volume(), (40 * 40 - 34 * 34) * 100, "rect tube volume");
+		tubePart.close();
+
+		var round = new RoundTube(20, 2);
+		check(round.designation == "ROUND-20x2", "round tube designation");
+		throws(() -> new RoundTube(10, 6), "wall is too thick");
+		var roundPart = round.geometry(50);
+		solid(roundPart, "round tube");
+		near(roundPart.volume(), Math.PI * (10 * 10 - 8 * 8) * 50, "round tube volume");
+		roundPart.close();
+
+		var angle = new Angle(30, 30, 3);
+		check(angle.designation == "ANGLE-30x30x3", "angle designation");
+		throws(() -> new Angle(10, 10, 10), "thickness must be less than either leg");
+		var anglePart = angle.geometry(40);
+		solid(anglePart, "angle");
+		near(anglePart.volume(), 171 * 40, "angle volume");
+		anglePart.close();
+
+		var channel = new Channel(40, 20, 3);
+		check(channel.designation == "CHANNEL-40x20x3", "channel designation");
+		throws(() -> new Channel(10, 10, 6), "thickness is too thick for its height");
+		throws(() -> new Channel(40, 3, 3), "must be less than the flange width");
+		var channelPart = channel.geometry(60);
+		solid(channelPart, "channel");
+		near(channelPart.volume(), 222 * 60, "channel volume");
+		channelPart.close();
+
+		var bar = new FlatBar(50, 5);
+		check(bar.designation == "FLAT-50x5", "flat bar designation");
+		throws(() -> new FlatBar(-1, 5), "positive width and thickness");
+		var barPart = bar.geometry(200);
+		solid(barPart, "flat bar");
+		near(barPart.volume(), 50 * 5 * 200, "flat bar volume");
+		barPart.close();
+
+		var frame = new FrameAssembly();
+		frame.point("A", 0, 0, 0);
+		frame.point("B", 0, 0, 500);
+		frame.point("C", 300, 0, 500);
+		throws(() -> frame.point("A", 1, 1, 1), 'Duplicate frame point "A"');
+		frame.member("upright", "A", "B", tube);
+		frame.member("beam", "B", "C", tube);
+		throws(() -> frame.member("upright", "A", "C", tube), 'Duplicate frame member "upright"');
+		throws(() -> frame.member("bad", "A", "Z", tube), 'Unknown frame point "Z"');
+		throws(() -> frame.member("bad", "A", "A", tube), 'needs distinct endpoints');
+		throws(() -> frame.length("missing"), 'Unknown frame member "missing"');
+
+		var zeroFrame = new FrameAssembly();
+		zeroFrame.point("A", 0, 0, 0);
+		zeroFrame.point("D", 0, 0, 0);
+		zeroFrame.member("zero", "A", "D", tube);
+		throws(() -> zeroFrame.geometry("zero"), 'has coincident endpoints');
+
+		near(frame.length("upright"), 500, "upright length");
+		near(frame.length("beam"), 300, "beam length");
+		var upright = frame.geometry("upright");
+		solid(upright, "upright member");
+		near(upright.volume(), (40 * 40 - 34 * 34) * 500, "upright member volume");
+		var uprightBox = bounds(upright);
+		near(uprightBox.maxX, 20, "upright cross-section extent");
+		near(uprightBox.minZ, 0, "upright start");
+		near(uprightBox.maxZ, 500, "upright end");
+		upright.close();
+		var beam = frame.geometry("beam");
+		solid(beam, "beam member");
+		var beamBox = bounds(beam);
+		near(beamBox.minX, 0, "beam start");
+		near(beamBox.maxX, 300, "beam end");
+		near(beamBox.minZ, 480, "beam cross-section low");
+		near(beamBox.maxZ, 520, "beam cross-section high");
+		beam.close();
+
+		var cutList = frame.cutList();
+		check(cutList.length == 1, "cut list groups by profile");
+		check(cutList[0].quantity == 2, "cut list quantity");
+		near(cutList[0].totalLength, 800, "cut list total length");
+	}
+
 	static function assembly():Void {
 		var example = new MotorShaftBearings();
 		check(example.screw.designation == "ISO4762-M3x10", "selected mount screw");
@@ -357,6 +448,7 @@ class MachineKitSmoke {
 		fasteners();
 		shafts();
 		shaftHardware();
+		structural();
 		assembly();
 		trace("MachineKit smoke passed");
 	}
