@@ -18,14 +18,15 @@ class ProjectSourceTests {
       ? FileSystem.fullPath("..") : FileSystem.fullPath("../../..");
     Sys.setCwd(root);
     var manifest = root + "/cadkit/examples/modeling/materia.project.json";
-    var generated = MateriaProjectRunner.load(manifest);
+    var generatedScene = MateriaProjectRunner.loadProject(manifest);
+    var generated = generatedScene.objects;
     check(generated.length == 13, "project generates all excavator parts");
     var base = generated[0], removed = generated[1];
     var session = new ProjectDocumentSession();
     var output = "/tmp/materia-project-source-" + Sys.getPid() + ".materia.json";
     var stage = "open generated scene";
     try {
-      session.openGeneratedScene(generated, manifest);
+      session.openGeneratedScene(generated, manifest, generatedScene.assembly);
       session.scene.select(base.id);
       check(session.scene.nudgeSelected(0.1, 0.0), "generated part can be moved");
       check(session.scene.duplicateSelected(), "generated part can be instanced");
@@ -33,6 +34,34 @@ class ProjectSourceTests {
       session.scene.select(removed.id);
       check(session.scene.deleteSelected(), "generated part can be removed");
       check(session.scene.createRectangle(), "authored object can join project");
+      stage = "transfer unsaved scene";
+      var live = session.liveState();
+      check(live.indexOf(base.meshSnapshot) < 0,
+        "live state retains the project reference instead of embedding generated geometry");
+      var restored = new ProjectDocumentSession();
+      try {
+        restored.restoreLiveState(live);
+        check(restored.isDirty() && restored.path == null,
+          "unsaved project stays untitled and dirty after reload");
+        check(restored.projectReference == manifest && restored.projectAssembly != null,
+          "reload keeps the generated project and assembly");
+        check(restored.scene.object(removed.id) == null && restored.scene.object(copyId) != null &&
+          restored.scene.items().length == 14,
+          "reload keeps generated removals, instances, and authored objects");
+        check(Math.abs(restored.scene.info(base.id).localTransform().element(12) - (base.x + 0.1)) < 0.000001,
+          "reload keeps an unsaved part transform");
+        var previousScene = restored.scene;
+        var invalid:Dynamic = Json.parse(live);
+        Reflect.setField(invalid, "content", "invalid scene document");
+        var failed = false;
+        try restored.restoreLiveState(Json.stringify(invalid)) catch (_:Dynamic) failed = true;
+        check(failed && restored.scene == previousScene && restored.isDirty(),
+          "failed restore leaves the current document intact");
+      } catch (error:Dynamic) {
+        restored.dispose();
+        throw error;
+      }
+      restored.dispose();
       stage = "save scene";
       session.save(output);
       var saved = File.getContent(output);
