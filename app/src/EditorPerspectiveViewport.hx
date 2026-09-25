@@ -330,9 +330,9 @@ class EditorPerspectiveViewport implements View {
     var projection = camera.viewProjection(width / Math.max(1.0, height),
       Math.max(0.001, camera.distance / 10000.0),
       Math.max(100.0, camera.distance * 100.0));
-    var extent = Math.max(gridStep * 8.0, Math.min(500.0, camera.distance * 1.5));
+    var extent = visibleGridExtent(width, height);
     var spacing = gridStep;
-    while (extent / spacing > 48.0) spacing *= 2.0;
+    while (extent / spacing > 96.0) spacing *= 2.0;
     var minX = Math.floor((camera.targetX - extent) / spacing) * spacing;
     var maxX = Math.ceil((camera.targetX + extent) / spacing) * spacing;
     var minY = Math.floor((camera.targetY - extent) / spacing) * spacing;
@@ -348,7 +348,7 @@ class EditorPerspectiveViewport implements View {
       appendWorldSegment(grid, projection, minX, y, 0.0, maxX, y, 0.0, width, height);
       y += spacing;
     }
-    canvas.strokeTransient(grid.build(), Color.rgba(0.15, 0.22, 0.28, 0.22), 1.0);
+    canvas.strokeTransient(grid.build(), Color.rgba(0.15, 0.22, 0.28, 0.14), 1.0);
 
     var xAxis = new PathBuilder();
     if (appendWorldSegment(xAxis, projection, -extent, 0.0, 0.0, extent, 0.0, 0.0, width, height)) {
@@ -363,6 +363,26 @@ class EditorPerspectiveViewport implements View {
         Math.min(extent, Math.max(1.0, camera.distance)), width, height)) {
       canvas.strokeTransient(zAxis.build(), Color.rgba(0.22, 0.39, 0.78, 0.82), 1.5);
     }
+  }
+
+  function visibleGridExtent(width:Float, height:Float):Float {
+    var eye = camera.eyePosition();
+    var extent = Math.max(gridStep * 8.0, camera.distance * 1.5);
+    var hasIntersection = false, hasHorizon = false;
+    for (screenX in [0.0, width]) for (screenY in [0.0, height]) {
+      var ray = camera.screenRay(screenX, screenY, width, height);
+      if (Math.abs(ray.directionZ) < 0.000001) { hasHorizon = true; continue; }
+      var distance = -eye[2] / ray.directionZ;
+      if (distance <= 0.0) { hasHorizon = true; continue; }
+      hasIntersection = true;
+      var x = eye[0] + ray.directionX * distance;
+      var y = eye[1] + ray.directionY * distance;
+      extent = Math.max(extent, Math.max(Math.abs(x - camera.targetX),
+        Math.abs(y - camera.targetY)) * 1.2);
+    }
+    if (hasIntersection && hasHorizon)
+      extent = Math.max(extent, camera.distance * 80.0);
+    return Math.min(5000.0, extent);
   }
 
   function appendWorldSegment(path:PathBuilder, projection:Transform, x0:Float, y0:Float, z0:Float,
