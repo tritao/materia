@@ -9,7 +9,15 @@ import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactPart;
 import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.project.AssemblyRecord.AssemblyConnector;
+import materia.project.AssemblyRecord.AssemblyInstance;
+import materia.project.AssemblyRecord.AssemblyJoint;
 import materia.project.AssemblyRecord;
+import materia.project.AssemblyDefinition;
+import materia.project.AssemblyDefinition.AssemblyComponentDefinition;
+import materia.project.AssemblyDefinition.AssemblyJointRole;
+import cadkit.modeling.AssemblyState;
+import materia.project.AssemblyDefinitionCodec;
 import nativekit.scene.GeometryData;
 import sys.FileSystem;
 import sys.io.File;
@@ -202,9 +210,23 @@ class MateriaProjectRunner {
     var records:Array<SceneObjectData> = [];
     var geometryBySnapshot:Map<String, GeometryData> = new Map();
     var scale = artifact.metresPerUnit;
-    var poses = new Map<String, AssemblyFrame>();
-    if (artifact.assembly != null)
+    var poses:Map<String, AssemblyFrame> = new Map();
+    var componentUseCount = new Map<String, Int>();
+    var resolvedAssembly = artifact.assembly;
+    if (artifact.assemblyDefinition != null) {
+      var state = new AssemblyState(artifact.assemblyDefinition, artifact.assemblyState);
+      for (occurrence in artifact.assemblyDefinition.occurrences) {
+        poses.set(occurrence.id, state.worldPose(occurrence.id));
+        var count = componentUseCount.get(occurrence.definition);
+        componentUseCount.set(occurrence.definition, count == null ? 1 : count + 1);
+      }
+      resolvedAssembly = legacySnapshot(artifact.assemblyDefinition, state);
+    } else if (artifact.assembly != null) {
       for (instance in artifact.assembly.instances) poses.set(instance.id, instance.pose);
+    }
+
+    var boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}> = new Map();
+    var geometryKeyByDefinition:Map<String, String> = new Map();
     for (component in artifact.parts) {
       var label = component.name;
       var minimum = [1e300, 1e300, 1e300], maximum = [-1e300, -1e300, -1e300];
@@ -215,29 +237,87 @@ class MateriaProjectRunner {
         maximum[axis] = Math.max(maximum[axis], coordinate);
       }
       var geometry = CadPreviewGeometry.fromArtifact(component, minimum, maximum, scale);
-      var centerX = (minimum[0] + maximum[0]) * 0.5;
-      var centerY = (minimum[1] + maximum[1]) * 0.5;
-      var centerZ = (minimum[2] + maximum[2]) * 0.5;
-      var pose = poses.get(component.id);
-      var center = pose == null ? {x: centerX, y: centerY, z: centerZ}
-        : AssemblyFrames.transformPoint(pose, centerX, centerY, centerZ);
       var geometryKey = "materia.artifact-part/1:" + artifactHash + ":" + component.id;
       geometryBySnapshot.set(geometryKey, geometry);
-      records.push({id: "project:" + component.id, label: label, type: "cad-preview",
-        x: center.x * scale,
-        y: center.y * scale,
-        z: center.z * scale,
-        width: Math.max(0.000001, (maximum[0] - minimum[0]) * scale),
-        height: Math.max(0.000001, (maximum[1] - minimum[1]) * scale),
-        depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
-        collisionEnabled: false, dynamicBody: false, mass: 1.0,
-        red: component.red, green: component.green, blue: component.blue,
-        visible: true,
-        meshSnapshot: geometryKey,
-        rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]});
+      boundsByDefinition.set(component.id, {minimum: minimum, maximum: maximum});
+      geometryKeyByDefinition.set(component.id, geometryKey);
     }
-    return {objects: records, assembly: artifact.assembly,
+
+    if (artifact.assemblyDefinition != null) {
+      var parts = new Map<String, SceneArtifactPart>();
+      for (part in artifact.parts) parts.set(part.id, part);
+      for (occurrence in artifact.assemblyDefinition.occurrences) {
+        var component = parts.get(occurrence.definition);
+        if (component == null) throw 'Missing geometry definition "${occurrence.definition}"';
+        addOccurrenceRecord(records, component, occurrence.id, occurrence.definition,
+          poses.get(occurrence.id), componentUseCount.get(occurrence.definition),
+          boundsByDefinition, geometryKeyByDefinition, scale);
+      }
+    } else if (artifact.assembly != null) {
+      var parts = new Map<String, SceneArtifactPart>();
+      for (part in artifact.parts) parts.set(part.id, part);
+      for (instance in artifact.assembly.instances) {
+        var component = parts.get(instance.id);
+        if (component == null) continue;
+        addOccurrenceRecord(records, component, instance.id, instance.id, poses.get(instance.id), 1,
+          boundsByDefinition, geometryKeyByDefinition, scale);
+      }
+    } else {
+      for (component in artifact.parts)
+        addOccurrenceRecord(records, component, component.id, component.id, null, 1,
+          boundsByDefinition, geometryKeyByDefinition, scale);
+    }
+
+    return {objects: records, assembly: resolvedAssembly,
       geometryBySnapshot: geometryBySnapshot};
+  }
+
+  static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
+      occurrenceId:String, definitionId:String, pose:Null<AssemblyFrame>, useCount:Null<Int>,
+      boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}>,
+      geometryKeyByDefinition:Map<String, String>, scale:Float):Void {
+    var bounds = boundsByDefinition.get(definitionId);
+    if (bounds == null) throw 'Missing bounds for geometry definition "$definitionId"';
+    var minimum = bounds.minimum, maximum = bounds.maximum;
+    var centerX = (minimum[0] + maximum[0]) * 0.5;
+    var centerY = (minimum[1] + maximum[1]) * 0.5;
+    var centerZ = (minimum[2] + maximum[2]) * 0.5;
+    var center = pose == null ? {x: centerX, y: centerY, z: centerZ}
+      : AssemblyFrames.transformPoint(pose, centerX, centerY, centerZ);
+    var label = useCount != null && useCount > 1 ? component.name + " · " + occurrenceId : component.name;
+    records.push({id: "project:" + occurrenceId, label: label, type: "cad-preview",
+      x: center.x * scale, y: center.y * scale, z: center.z * scale,
+      width: Math.max(0.000001, (maximum[0] - minimum[0]) * scale),
+      height: Math.max(0.000001, (maximum[1] - minimum[1]) * scale),
+      depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
+      collisionEnabled: false, dynamicBody: false, mass: 1.0,
+      red: component.red, green: component.green, blue: component.blue, visible: true,
+      meshSnapshot: geometryKeyByDefinition.get(definitionId),
+      rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]});
+  }
+
+  static function legacySnapshot(definition:AssemblyDefinition, state:AssemblyState):AssemblyRecord {
+    var definitions = new Map<String, AssemblyComponentDefinition>();
+    var instances:Array<AssemblyInstance> = [];
+    for (component in definition.definitions) definitions.set(component.id, component);
+    for (occurrence in definition.occurrences) {
+      var component = definitions.get(occurrence.definition);
+      if (component == null) throw 'Assembly occurrence "${occurrence.id}" has no component definition';
+      var connectors:Array<AssemblyConnector> = [];
+      for (connector in component.connectors) connectors.push({name: connector.name, frame: connector.frame});
+      instances.push({id: occurrence.id, pose: state.worldPose(occurrence.id), connectors: connectors});
+    }
+    var joints:Array<AssemblyJoint> = [];
+    // Put tree edges first so the legacy tree view cannot mistake a closure for a parent edge.
+    for (role in [AssemblyJointRole.Tree, AssemblyJointRole.Closure])
+      for (joint in definition.joints) if (joint.role == role) {
+        var value = AssemblyDefinitionCodec.hasCoordinate(joint.type) && role == AssemblyJointRole.Tree
+          ? state.joint(joint.id) : 0.0;
+        joints.push({id: joint.id, kind: joint.type, parent: joint.parent,
+          parentConnector: joint.parentConnector, child: joint.child,
+          childConnector: joint.childConnector, value: value});
+      }
+    return {instances: instances, joints: joints};
   }
 
   static function projectToolsDirectory():String {

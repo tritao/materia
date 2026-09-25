@@ -132,9 +132,11 @@ until the joint-coordinate loop solver is added. `AssemblyBuilder` can author
 repeated occurrences that reference the same component definition directly.
 
 The generated artifact writes both the new definition/state payload and the
-compatibility record. Existing scene artifact readers remain supported, and the
-current editor continues to use the compatibility record until its hierarchy
-and preview path switches to occurrence instancing.
+compatibility record. The project loader now evaluates the new state, creates a
+scene object for each occurrence, and shares one SceneKit geometry resource for
+all occurrences of the same component definition. The compatibility record
+continues to supply the editor hierarchy and labels while older artifacts stay
+readable.
 
 The viewport entrypoint opts into a generated artifact cache. Materia reuses the
 artifact when its Haxeon source graph, compiler sources, and native runtime build

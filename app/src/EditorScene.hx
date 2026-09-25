@@ -182,6 +182,18 @@ class EditorScene {
     return CadPreviewGeometry.geometry(snapshot);
   }
 
+  function sharedPreviewGeometry(snapshot:Null<String>, entries:Map<String, EditorSceneRuntimeObject>,
+      first:Array<EditorSceneObject>, second:Array<EditorSceneObject>, ?excludeId:String):Null<Geometry> {
+    if (snapshot == null) return null;
+    for (candidate in first.concat(second)) {
+      if (candidate.id == excludeId || candidate.kind != "cad-preview" || candidate.meshSnapshot != snapshot)
+        continue;
+      var runtime = entries.get(candidate.id);
+      if (runtime != null && !runtime.geometry.isDisposed()) return runtime.geometry;
+    }
+    return null;
+  }
+
   function addObject(id:String, label:String, x:Float, y:Float, z:Float,
       width:Float, height:Float, depth:Float, red:Float, green:Float, blue:Float,
       visible:Bool = true,collisionEnabled:Bool=true,dynamicBody:Bool=false,mass:Float=1.0,
@@ -250,26 +262,35 @@ class EditorScene {
   function addObjects(data:Array<SceneObjectData>):Void {
     if (data.length == 0) return;
     var geometryData:Array<GeometryData> = [];
+    var geometryIndexes:Array<Int> = [];
+    var previewGeometryIndexes:Map<String, Int> = new Map();
     var materialData:Array<MaterialData> = [];
     var candidates:Array<EditorSceneObject> = [];
     var preparationStarted = profileLoadStart();
     for (item in data) {
       var session:Null<CadDocumentSession> = null;
       var storedCadGraph = item.cadGraph;
-      var geometry:GeometryData;
-      if (isCadKind(item.type)) {
+      var geometryIndex:Null<Int> = null;
+      if (item.type == "cad-preview" && item.meshSnapshot != null)
+        geometryIndex = previewGeometryIndexes.get(item.meshSnapshot);
+      if (geometryIndex == null && isCadKind(item.type)) {
         session = createCadSession(storedCadGraph, item.width, item.height, item.depth, item.type);
         if (storedCadGraph == null)
           storedCadGraph = session.encode();
-        geometry = session.geometry();
+        geometryIndex = geometryData.length;
+        geometryData.push(session.geometry());
         cadSessions.set(item.id, session);
-      } else if (item.type == "cad-preview") {
+      } else if (geometryIndex == null && item.type == "cad-preview") {
         if (item.meshSnapshot == null) throw "CAD preview object has no mesh snapshot";
-        geometry = previewGeometry(item.meshSnapshot);
-      } else {
-        geometry = boxGeometry(item.width, item.height, item.depth);
+        geometryIndex = geometryData.length;
+        geometryData.push(previewGeometry(item.meshSnapshot));
+        previewGeometryIndexes.set(item.meshSnapshot, geometryIndex);
+      } else if (geometryIndex == null) {
+        geometryIndex = geometryData.length;
+        geometryData.push(boxGeometry(item.width, item.height, item.depth));
       }
-      geometryData.push(geometry);
+      if (geometryIndex == null) throw 'No geometry resource was prepared for "${item.id}"';
+      geometryIndexes.push(geometryIndex);
       materialData.push(MaterialData.opaque(item.red, item.green, item.blue).setRoughness(0.65));
       candidates.push(new EditorSceneObject(item.id, item.label, item.type,
         item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
@@ -294,7 +315,7 @@ class EditorScene {
         var node = transaction.createNode();
         transaction.setName(node, item.label);
         transaction.setVisibility(node, item.visible);
-        transaction.setGeometry(node, geometries[index]);
+        transaction.setGeometry(node, geometries[geometryIndexes[index]]);
         transaction.setMaterial(node, materials[index]);
         transaction.setTransform(node, objectTransform(item.x, item.y, item.z, item.rotation));
         nodes.push(node);
@@ -311,7 +332,7 @@ class EditorScene {
     var bookkeepingStarted = profileLoadStart();
     for (index in 0...data.length) {
       var item = data[index];
-      bridge.attach(item.id, nodes[index], geometries[index], materials[index]);
+      bridge.attach(item.id, nodes[index], geometries[geometryIndexes[index]], materials[index]);
       objects.push(candidates[index]);
     }
     profileLoadEnd("applicationBookkeeping", bookkeepingStarted);
@@ -1275,15 +1296,21 @@ class EditorScene {
         else
           prepared.cadSessions.remove(record.id);
         if (item == null) {
-          var geometry = scene.createGeometry();
-          prepared.createdGeometry.push(geometry);
-          var geometryData = session != null
-            ? session.geometry()
-            : (record.type == "cad-preview"
-              ? previewGeometry(record.meshSnapshot)
-              : boxGeometry(record.width, record.height, record.depth));
-          scene.setGeometryData(geometry, geometryData);
-          failIfInjected("prepare.new-geometry");
+          var geometry = record.type == "cad-preview"
+            ? sharedPreviewGeometry(record.meshSnapshot, prepared.bridgeEntries, objects, prepared.objects)
+            : null;
+          if (geometry == null) {
+            geometry = scene.createGeometry();
+            prepared.createdGeometry.push(geometry);
+            var geometryData = session != null
+              ? session.geometry()
+              : (record.type == "cad-preview"
+                ? previewGeometry(record.meshSnapshot)
+                : boxGeometry(record.width, record.height, record.depth));
+            scene.setGeometryData(geometry, geometryData);
+            failIfInjected("prepare.new-geometry");
+          }
+          if (geometry == null) throw 'No geometry resource was prepared for "${record.id}"';
           var material = scene.createMaterial();
           prepared.createdMaterials.push(material);
           scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue).setRoughness(0.65));
@@ -1330,14 +1357,21 @@ class EditorScene {
               item.y != record.y || item.z != record.z || !sameRotation(item.rotation, record.rotation)) prepared.changed = true;
           if (item.width != record.width || item.height != record.height || item.depth != record.depth ||
               item.kind != record.type || item.cadGraph != storedGraph || item.meshSnapshot != record.meshSnapshot) {
-            var geometryData = session != null
-              ? session.geometry()
-              : (record.type == "cad-preview"
-                ? previewGeometry(record.meshSnapshot)
-                : boxGeometry(record.width, record.height, record.depth));
-            var geometry = scene.createGeometry();
-            prepared.createdGeometry.push(geometry);
-            scene.setGeometryData(geometry, geometryData);
+            var geometry = record.type == "cad-preview"
+              ? sharedPreviewGeometry(record.meshSnapshot, prepared.bridgeEntries, objects,
+                prepared.objects, record.id)
+              : null;
+            if (geometry == null) {
+              geometry = scene.createGeometry();
+              prepared.createdGeometry.push(geometry);
+              var geometryData = session != null
+                ? session.geometry()
+                : (record.type == "cad-preview"
+                  ? previewGeometry(record.meshSnapshot)
+                  : boxGeometry(record.width, record.height, record.depth));
+              scene.setGeometryData(geometry, geometryData);
+            }
+            if (geometry == null) throw 'No geometry resource was prepared for "${record.id}"';
             prepared.transaction.setGeometry(runtime.node, geometry);
             prepared.retiredGeometry.push(runtime.geometry);
             runtime = new EditorSceneRuntimeObject(runtime.node, geometry, runtime.material);
@@ -2651,7 +2685,15 @@ private class PreparedSceneEdit {
 
   /** Retirement happens only after the native scene no longer references these handles. */
   public function retire():Void {
-    for (geometry in retiredGeometry) try geometry.dispose() catch (_:Dynamic) {}
+    var activeGeometry:Array<Geometry> = [];
+    for (runtime in bridgeEntries) if (activeGeometry.indexOf(runtime.geometry) < 0)
+      activeGeometry.push(runtime.geometry);
+    var disposedGeometry:Array<Geometry> = [];
+    for (geometry in retiredGeometry) if (activeGeometry.indexOf(geometry) < 0 &&
+        disposedGeometry.indexOf(geometry) < 0) {
+      try geometry.dispose() catch (_:Dynamic) {}
+      disposedGeometry.push(geometry);
+    }
     for (material in retiredMaterials) try material.dispose() catch (_:Dynamic) {}
     for (session in retiredCadSessions) try session.close() catch (_:Dynamic) {}
   }
