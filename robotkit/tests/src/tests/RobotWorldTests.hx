@@ -1895,6 +1895,8 @@ class RobotWorldTests {
     var palletPose = new Pose2(1.4, 0.0, 0.0);
     var pickApproach = new Pose2(0.9, 0.0, 0.0);
     var placeApproach = new Pose2(2.7, 0.0, 0.0);
+    var chargerPose = new Pose2(3.4, 0.0, 0.0);
+    var chargerApproach = new Pose2(3.0, 0.0, 0.0);
     function detection(id:String, kind:String, pose:Pose2):Detection {
       return new Detection(id, kind, 0.98, pose, "map",
         latestSnapshot.sourceSequence, latestSnapshot.sourceTimestampNs,
@@ -1906,13 +1908,15 @@ class RobotWorldTests {
     var groundTruth = new GroundTruthPerception(function() {
       var palletDetection = detection("pallet-17", "pallet", palletPose);
       var dockDetection = detection("pallet-staging", "dock", palletPose);
+      var chargerDetection = detection("charger-1", "charger", chargerPose);
       return new PerceptionSnapshot([], [],
         [new Pallet(palletDetection, 1.2, 0.8, 0.15)],
-        [new DockingTarget(dockDetection, dockApproach)]);
+        [new DockingTarget(dockDetection, dockApproach),
+          new DockingTarget(chargerDetection, chargerApproach)]);
     });
     var scene = groundTruth.observe(latestSnapshot.sensors.toArray());
-    check(scene.dockingTargets().length == 1 && scene.pallets().length == 1,
-      "simulated scene supplies a docking target and pallet detection");
+    check(scene.dockingTargets().length == 2 && scene.pallets().length == 1,
+      "simulated scene supplies pallet and charger detections");
 
     var observationHook:RobotSnapshot -> Void = function(_) {};
     var controlHook:Void -> Void = function() {};
@@ -2007,6 +2011,33 @@ class RobotWorldTests {
     check(base.motionLimits.maxLinearSpeed == unloadedLimits.maxLinearSpeed &&
       !base.safetyStopRequired,
       "confirmed pallet release restores the unloaded motion limits");
+
+    var chargingScene = groundTruth.observe(latestSnapshot.sensors.toArray());
+    var chargerTarget = chargingScene.dockingTargets()[1];
+    var power = new FakePower();
+    power.battery = new BatteryState("traction-pack", 0.3, 48.0, 10.0, 25.0,
+      latestSnapshot.sourceTimestampNs, latestSnapshot.receivedTimestampNs,
+      latestSnapshot.sourceClockId, latestSnapshot.receivedClockId);
+    var charge = new Charge(navigation, chargerTarget, power, 0.8);
+    var chargeStatus = runner.start(charge);
+    var chargeTicks = 0;
+    while (chargeStatus == SkillStatus.Running &&
+        charge.dock.status() == SkillStatus.Running && chargeTicks < 1500) {
+      latestSnapshot = plant.step(Int64.ofInt(tick++));
+      loadSafety.refresh();
+      chargeStatus = runner.update(latestSnapshot, timestep);
+      chargeTicks++;
+    }
+    check(chargeStatus == SkillStatus.Running &&
+      charge.dock.status() == SkillStatus.Succeeded && runner.activeSkill() == charge,
+      "Charge docks at the detected charger and waits while the battery is low");
+    power.battery = new BatteryState("traction-pack", 0.85, 48.0, -4.0, 25.0,
+      latestSnapshot.sourceTimestampNs, latestSnapshot.receivedTimestampNs,
+      latestSnapshot.sourceClockId, latestSnapshot.receivedClockId);
+    chargeStatus = runner.update(latestSnapshot, timestep);
+    check(chargeStatus == SkillStatus.Succeeded && runner.result() != null &&
+      runner.activeSkill() == null,
+      "Charge completes through SkillRunner when the battery reaches its target");
 
     robot.close();
     simulation.dispose();
