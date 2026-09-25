@@ -64,7 +64,8 @@ HostLink::~HostLink() {
 
 std::unique_ptr<HostLink> HostLink::open(const char *path, unsigned baud,
     std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count) {
-    if (!path || !baud_value(baud) || joint_count > device_wire::MAX_JOINTS) return {};
+    if (!path || !baud_value(baud) || joint_count > device_wire::MAX_JOINTS ||
+        std::all_of(fingerprint.begin(), fingerprint.end(), [](auto byte) { return byte == 0; })) return {};
     const int fd = ::open(path, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd < 0) return {};
     termios settings{};
@@ -163,7 +164,8 @@ bool HostLink::begin_session() {
     has_timestamp_ = false;
     last_session_status_ = 0;
     input_.clear();
-    if (joint_count_ > device_wire::MAX_JOINTS || !response_deadline_us(baud_)) return false;
+    if (joint_count_ > device_wire::MAX_JOINTS || !response_deadline_us(baud_) ||
+        std::all_of(fingerprint_.begin(), fingerprint_.end(), [](auto byte) { return byte == 0; })) return false;
     const auto requested = random_session();
     const device_wire::SessionBegin begin{requested, fingerprint_};
     std::array<std::uint8_t, device_wire::SessionBegin::SIZE> body{};

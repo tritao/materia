@@ -58,7 +58,8 @@ reset the accepted sequence, and clear watchdog credit *before* it acknowledges
 the session. The device compares the host's 16-byte model fingerprint with its
 compiled fingerprint. Mismatch is acknowledged with `model_mismatch`; no
 commands may be accepted in that session. The fingerprint catches accidental
-model/layout mismatch; it is not an authentication mechanism.
+model/layout mismatch; it is not an authentication mechanism. An all-zero
+fingerprint is an invalid unconfigured placeholder on both host and device.
 
 A matching session is acknowledged `latched_safe`. Motion remains forbidden
 until an explicit accepted `reset_safety` command, subject to device safety

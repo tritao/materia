@@ -80,7 +80,7 @@ pub struct DeviceProtocol {
 
 impl DeviceProtocol {
     pub fn new(joint_count: u8, fingerprint: [u8; 16]) -> Option<Self> {
-        if joint_count > MAX_JOINTS { return None; }
+        if joint_count > MAX_JOINTS || fingerprint == [0; 16] { return None; }
         Some(Self {
             fingerprint, joint_count, buffer: [0; MAX_FRAME_SIZE], buffered: 0,
             session: 0, last_sequence: 0, last_command_ns: 0, has_command: false,

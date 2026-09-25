@@ -59,6 +59,7 @@ fn every_fragment_boundary_and_canonical_outputs() {
     stream.extend_from_slice(&reset);
     stream.extend_from_slice(&target);
     let fingerprint = core::array::from_fn(|index| index as u8);
+    assert!(DeviceProtocol::new(1, [0; 16]).is_none());
     for split in 0..=stream.len() {
         let mut core = DeviceProtocol::new(2, fingerprint).unwrap();
         let mut device = FakeDevice { accept_reset: true, accept_targets: true, joint_count: 2, ..Default::default() };

@@ -57,6 +57,7 @@ int main(int argc, char **argv) {
     }
     ::close(control[0]);
     std::array<std::uint8_t, 16> fingerprint{};
+    CHECK(!v5::HostLink::open(slave, 115200, fingerprint, 1));
     for (std::size_t i = 0; i < fingerprint.size(); ++i)
         fingerprint[i] = static_cast<std::uint8_t>(i);
     {
