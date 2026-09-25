@@ -24,6 +24,7 @@ import machinekit.structural.FlatBar;
 import machinekit.structural.FrameAssembly;
 import machinekit.structural.RectTube;
 import machinekit.structural.RoundTube;
+import machinekit.structural.TSlotExtrusion;
 import machinekit.transmission.GearPair;
 import machinekit.transmission.Rack;
 import machinekit.transmission.SpurGear;
@@ -357,13 +358,29 @@ class MachineKitSmoke {
 		near(barPart.volume(), 50 * 5 * 200, "flat bar volume");
 		barPart.close();
 
+		var tslot = new TSlotExtrusion(20);
+		check(tslot.designation == "TSLOT-20x20", "t-slot designation");
+		throws(() -> new TSlotExtrusion(-1), "positive size");
+		var tslotPart = tslot.geometry(100);
+		solid(tslotPart, "t-slot extrusion");
+		var tslotBox = bounds(tslotPart);
+		near(tslotBox.maxX, 10, "t-slot outer boundary");
+		near(tslotBox.minZ, 0, "t-slot start");
+		near(tslotBox.maxZ, 100, "t-slot end");
+		var tslotVolume = tslotPart.volume();
+		check(tslotVolume < 20 * 20 * 100, "t-slot removes material for slots and bore");
+		check(tslotVolume > 10 * 20 * 100, "t-slot keeps most of its cross-section");
+		tslotPart.close();
+
 		var frame = new FrameAssembly();
 		frame.point("A", 0, 0, 0);
 		frame.point("B", 0, 0, 500);
 		frame.point("C", 300, 0, 500);
 		throws(() -> frame.point("A", 1, 1, 1), 'Duplicate frame point "A"');
+		frame.point("D", 300, 0, 0);
 		frame.member("upright", "A", "B", tube);
 		frame.member("beam", "B", "C", tube);
+		frame.member("brace", "C", "D", tslot);
 		throws(() -> frame.member("upright", "A", "C", tube), 'Duplicate frame member "upright"');
 		throws(() -> frame.member("bad", "A", "Z", tube), 'Unknown frame point "Z"');
 		throws(() -> frame.member("bad", "A", "A", tube), 'needs distinct endpoints');
@@ -395,9 +412,18 @@ class MachineKitSmoke {
 		beam.close();
 
 		var cutList = frame.cutList();
-		check(cutList.length == 1, "cut list groups by profile");
-		check(cutList[0].quantity == 2, "cut list quantity");
-		near(cutList[0].totalLength, 800, "cut list total length");
+		check(cutList.length == 2, "cut list groups by profile");
+		for (line in cutList) {
+			if (line.designation == tube.designation) {
+				check(line.quantity == 2, "rect tube cut list quantity");
+				near(line.totalLength, 800, "rect tube cut list total length");
+			} else if (line.designation == tslot.designation) {
+				check(line.quantity == 1, "t-slot cut list quantity");
+				near(line.totalLength, 500, "t-slot cut list total length");
+			} else {
+				throw 'unexpected cut list designation "${line.designation}"';
+			}
+		}
 	}
 
 	static function gears():Void {

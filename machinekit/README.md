@@ -48,8 +48,12 @@ retaining ring and an output key. It also produces the aggregated BOM.
 and straight members, rather than the connector-mating model above: a frame is
 one rigid weldment, not a kinematic mechanism, so members carry no assembly
 joints. Each cross-section (`RectTube`, `RoundTube`, `Angle`, `Channel`,
-`FlatBar`) implements `StructuralProfile` and extrudes itself along local +Z
-to a caller-chosen length, the same axis convention as every other generator.
+`FlatBar`, `TSlotExtrusion`) implements `StructuralProfile` and extrudes
+itself along local +Z to a caller-chosen length, the same axis convention as
+every other generator. `TSlotExtrusion` is a square 2020/4040-style profile
+with a T-slot channel on each face and a centre bore, all proportional to its
+`size` rather than a vendor's literal table, sized with margin so adjacent
+faces' slot heads and the bore never intersect and sever the corner posts.
 
 `FrameAssembly` registers named points with `point(name, x, y, z)`, then
 members with `member(name, start, end, profile)`. `geometry(name)` extrudes
