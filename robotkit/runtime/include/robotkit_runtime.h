@@ -95,7 +95,8 @@ enum {
     RK_ERROR_BACKEND = -8, /**< The underlying endpoint or physics backend failed. */
     RK_ERROR_STALE_COMMAND = -9, /**< Command sequence is not newer than the last accepted command. */
     RK_ERROR_LIMIT = -10, /**< Command violates a compiled joint or actuator limit. */
-    RK_ERROR_STALE_STATE = -11 /**< The endpoint only supplied an old observation. */
+    RK_ERROR_STALE_STATE = -11, /**< The endpoint only supplied an old observation. */
+    RK_ERROR_MODEL_MISMATCH = -12 /**< Device layout fingerprint differs from the host deployment. */
 };
 
 /* ------------------------------------------------------------------------- */
@@ -427,6 +428,11 @@ RK_API rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprin
 RK_API rk_result RK_CALL rk_robot_runtime_create_serial(
     const rk_robot_runtime_blueprint *blueprint, const char *device_path RK_UTF8,
     uint32_t baud, rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
+/** Explicit v5 runtime; fingerprint is 32 hex digits and error is in target SI units. */
+RK_API rk_result RK_CALL rk_robot_runtime_create_serial_v5(
+    const rk_robot_runtime_blueprint *blueprint, const char *device_path RK_UTF8,
+    uint32_t baud, const char *fingerprint_hex RK_UTF8,
+    double max_target_error, rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
 /**
  * Stops and releases a standalone runtime handle.
  *

@@ -14,7 +14,7 @@ class RK_API DeviceSerialEndpointV5 final : public RobotEndpoint {
 public:
     static std::shared_ptr<DeviceSerialEndpointV5> open(const char *path, unsigned baud,
         std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count,
-        double max_target_error);
+        double max_target_error, std::uint8_t *session_status = nullptr);
     /** Takes an already negotiated link after verifying its initial safe STATE. */
     static std::shared_ptr<DeviceSerialEndpointV5> attach(std::unique_ptr<v5::HostLink> link,
         std::uint8_t joint_count, double max_target_error);

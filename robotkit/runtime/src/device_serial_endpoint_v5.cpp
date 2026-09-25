@@ -7,10 +7,11 @@ namespace robotkit {
 
 std::shared_ptr<DeviceSerialEndpointV5> DeviceSerialEndpointV5::open(const char *path, unsigned baud,
     std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count,
-    double max_target_error) {
+    double max_target_error, std::uint8_t *session_status) {
+    if (session_status) *session_status = 0;
     if (!std::isfinite(max_target_error) || max_target_error < 0.0 ||
         joint_count > device_wire::MAX_JOINTS) return {};
-    return attach(v5::HostLink::open(path, baud, fingerprint, joint_count),
+    return attach(v5::HostLink::open(path, baud, fingerprint, joint_count, session_status),
         joint_count, max_target_error);
 }
 

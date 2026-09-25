@@ -63,7 +63,9 @@ HostLink::~HostLink() {
 }
 
 std::unique_ptr<HostLink> HostLink::open(const char *path, unsigned baud,
-    std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count) {
+    std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count,
+    std::uint8_t *session_status) {
+    if (session_status) *session_status = 0;
     if (!path || !baud_value(baud) || joint_count > device_wire::MAX_JOINTS ||
         std::all_of(fingerprint.begin(), fingerprint.end(), [](auto byte) { return byte == 0; })) return {};
     const int fd = ::open(path, O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -80,7 +82,9 @@ std::unique_ptr<HostLink> HostLink::open(const char *path, unsigned baud,
     cfsetospeed(&settings, baud_value(baud));
     if (tcsetattr(fd, TCSANOW, &settings) != 0) { ::close(fd); return {}; }
     auto link = std::unique_ptr<HostLink>(new HostLink(fd, true, baud, fingerprint, joint_count));
-    if (!link->begin_session()) return {};
+    const bool accepted = link->begin_session();
+    if (session_status) *session_status = link->last_session_status();
+    if (!accepted) return {};
     return link;
 }
 

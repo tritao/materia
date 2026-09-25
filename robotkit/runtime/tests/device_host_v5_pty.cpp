@@ -126,12 +126,23 @@ int main(int argc, char **argv) {
         CHECK(endpoint->sample(0, runtime_state) == RK_OK);
         CHECK(runtime_state.safety == RK_SAFETY_READY);
     }
-    auto wrong = fingerprint;
-    wrong[0] ^= 1;
-    const int rejected_fd = ::open(slave, O_RDWR | O_NOCTTY | O_NONBLOCK);
-    CHECK(rejected_fd >= 0);
-    v5::HostLink rejected(rejected_fd, true, 115200, wrong, 1);
-    CHECK(!rejected.begin_session() && rejected.last_session_status() == 2);
+    constexpr char fingerprint_hex[] = "000102030405060708090a0b0c0d0e0f";
+    auto layout = blueprint();
+    rk_robot_runtime handle = RK_INVALID_ROBOT_RUNTIME;
+    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+        "00000000000000000000000000000000", 1e-6, &handle) == RK_ERROR_INVALID_ARGUMENT);
+    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+        "not-a-fingerprint", 1e-6, &handle) == RK_ERROR_INVALID_ARGUMENT);
+    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+        fingerprint_hex, -1.0, &handle) == RK_ERROR_INVALID_ARGUMENT);
+    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+        fingerprint_hex, 1e-6, &handle) == RK_OK);
+    CHECK(handle != RK_INVALID_ROBOT_RUNTIME);
+    rk_robot_runtime_destroy(handle);
+    handle = RK_INVALID_ROBOT_RUNTIME;
+    CHECK(rk_robot_runtime_create_serial_v5(&layout, slave, 115200,
+        "010102030405060708090a0b0c0d0e0f", 1e-6, &handle) == RK_ERROR_MODEL_MISMATCH);
+    CHECK(handle == RK_INVALID_ROBOT_RUNTIME);
     ::close(control[1]);
     int status = 0;
     CHECK(::waitpid(child, &status, 0) == child);

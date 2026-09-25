@@ -44,6 +44,24 @@ class RobotRuntime {
     return new RobotRuntime(result.out_runtime, blueprint);
   }
 
+  /** Creates a v5 serial runtime using a deployed layout fingerprint and SI-unit error budget. */
+  public static function createSerialV5(blueprint:RobotRuntimeBlueprint,
+      devicePath:String, fingerprintHex:String, maxTargetError:Float,
+      ?baud:Int = 115200):RobotRuntime {
+    if (blueprint == null) throw "Serial v5 runtime requires a compiled blueprint";
+    if (devicePath == null || StringTools.trim(devicePath).length == 0)
+      throw "Serial v5 runtime requires a device path";
+    if (fingerprintHex == null || !~/^[0-9a-fA-F]{32}$/.match(fingerprintHex) ||
+        fingerprintHex.toLowerCase() == "00000000000000000000000000000000")
+      throw "Serial v5 runtime requires a nonzero 32-digit fingerprint";
+    if (!Math.isFinite(maxTargetError) || maxTargetError < 0.0)
+      throw "Serial v5 runtime requires a finite nonnegative target error budget";
+    var result = RobotKitRuntime.rk_robot_runtime_create_serial_v5(
+      blueprint.nativeValue(), devicePath, baud, fingerprintHex, maxTargetError);
+    check(result.status, "runtime.createSerialV5");
+    return new RobotRuntime(result.out_runtime, blueprint);
+  }
+
   /** Starts a standalone runtime worker; Simulation-owned runtimes reject this. */
   public function start():Void {
     ensureLive();

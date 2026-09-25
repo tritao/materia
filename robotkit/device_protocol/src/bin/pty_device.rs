@@ -109,7 +109,7 @@ fn main() {
         }
         std::thread::sleep(Duration::from_millis(1));
     }
-    assert_eq!(device.stops, 5); // Three sessions, watchdog expiry, and one normal stop.
+    assert_eq!(device.stops, 6); // Four sessions, watchdog expiry, and one normal stop.
     assert_eq!(device.resets, 2);
     assert_eq!(device.targets, 2);
     assert!(protocol.statistics().rejected >= 1);

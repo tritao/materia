@@ -34,7 +34,8 @@ public:
     HostLink &operator=(const HostLink &) = delete;
 
     static std::unique_ptr<HostLink> open(const char *path, unsigned baud,
-        std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count);
+        std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count,
+        std::uint8_t *session_status = nullptr);
 
     bool begin_session();
     bool send_command(std::uint8_t kind, std::span<const device_wire::JointTarget> targets = {});

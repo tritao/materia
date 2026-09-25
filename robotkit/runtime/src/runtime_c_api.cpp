@@ -1,8 +1,12 @@
 #include "robotkit_runtime.h"
 #include "robotkit_runtime.hpp"
 #include "robotkit_serial_endpoint.hpp"
+#include "robotkit_device_serial_endpoint_v5.hpp"
 #include "runtime_registry.hpp"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -12,6 +16,26 @@ namespace {
 std::mutex registry_mutex;
 std::unordered_map<rk_robot_runtime, std::shared_ptr<robotkit::RobotRuntime>> runtimes;
 rk_robot_runtime next_runtime = 1;
+
+int hex_nibble(char value) {
+    if (value >= '0' && value <= '9') return value - '0';
+    if (value >= 'a' && value <= 'f') return value - 'a' + 10;
+    if (value >= 'A' && value <= 'F') return value - 'A' + 10;
+    return -1;
+}
+
+bool parse_fingerprint(const char *hex, std::array<std::uint8_t, 16> &result) {
+    if (!hex) return false;
+    for (std::size_t index = 0; index < result.size(); ++index) {
+        if (!hex[2 * index] || !hex[2 * index + 1]) return false;
+        const int high = hex_nibble(hex[2 * index]);
+        const int low = hex_nibble(hex[2 * index + 1]);
+        if (high < 0 || low < 0) return false;
+        result[index] = static_cast<std::uint8_t>((high << 4) | low);
+    }
+    return hex[32] == '\0' &&
+        !std::all_of(result.begin(), result.end(), [](auto byte) { return byte == 0; });
+}
 
 } // namespace
 
@@ -76,6 +100,35 @@ rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprin
         auto endpoint = robotkit::SerialRobotEndpoint::open(device_path, baud);
         if (!endpoint)
             return RK_ERROR_BACKEND;
+        auto runtime = std::make_shared<robotkit::RobotRuntime>(*blueprint,
+            std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint));
+        *out_runtime = robotkit::internal::register_runtime(std::move(runtime));
+        return RK_OK;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
+rk_result RK_CALL rk_robot_runtime_create_serial_v5(const rk_robot_runtime_blueprint *blueprint,
+                                                    const char *device_path, uint32_t baud,
+                                                    const char *fingerprint_hex,
+                                                    double max_target_error,
+                                                    rk_robot_runtime *out_runtime) {
+    std::array<std::uint8_t, 16> fingerprint{};
+    if (!out_runtime || !blueprint || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
+        !device_path || !*device_path || blueprint->joint_count > RK_MAX_SERIAL_JOINTS ||
+        !std::isfinite(max_target_error) || max_target_error < 0.0 ||
+        !parse_fingerprint(fingerprint_hex, fingerprint))
+        return RK_ERROR_INVALID_ARGUMENT;
+    *out_runtime = RK_INVALID_ROBOT_RUNTIME;
+    try {
+        std::uint8_t session_status = 0;
+        auto endpoint = robotkit::DeviceSerialEndpointV5::open(device_path, baud, fingerprint,
+            static_cast<std::uint8_t>(blueprint->joint_count), max_target_error, &session_status);
+        if (!endpoint)
+            return session_status == 2 ? RK_ERROR_MODEL_MISMATCH : RK_ERROR_BACKEND;
         auto runtime = std::make_shared<robotkit::RobotRuntime>(*blueprint,
             std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint));
         *out_runtime = robotkit::internal::register_runtime(std::move(runtime));

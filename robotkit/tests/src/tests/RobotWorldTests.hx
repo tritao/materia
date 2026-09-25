@@ -1821,6 +1821,13 @@ class RobotWorldTests {
       '/dev/robotkit-missing-${Sys.getPid()}') catch (_:Dynamic) failed = true;
     if (robot != null) robot.close();
     check(failed, "serial Robot adapter reports an unavailable device path");
+    failed = false;
+    robot = null;
+    try robot = SerialRobot.createV5("serial-probe-v5", model,
+      '/dev/robotkit-missing-${Sys.getPid()}',
+      "000102030405060708090a0b0c0d0e0f", 1e-6) catch (_:Dynamic) failed = true;
+    if (robot != null) robot.close();
+    check(failed, "v5 serial adapter reports an unavailable device path through Haxe FFI");
   }
 
   static function testSensorResetPublication():Void {
