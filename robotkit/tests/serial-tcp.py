@@ -64,6 +64,7 @@ def read_commands(pending, position, velocity, effort, target_seen, device, mast
             if not session_id:
                 continue
             device["session_id"] = session_id
+            device["session_ids"].append(session_id)
             device["last_command_sequence"] = 0
             device["safety"] = 2
             velocity[:] = [0.0] * len(velocity)
@@ -125,10 +126,9 @@ def read_commands(pending, position, velocity, effort, target_seen, device, mast
         device["last_command_sequence"] = command_sequence
 
 
-def run_device(master, stopping, position, velocity, effort, target_seen):
+def run_device(master, stopping, position, velocity, effort, target_seen, device):
     pending = bytearray()
     sequence = 0
-    device = {"session_id": 0, "last_command_sequence": 0, "safety": 2}
     next_state = time.monotonic()
     last_update = next_state
     while not stopping.is_set():
@@ -187,6 +187,43 @@ def tcp_ready(port):
         connection.close()
 
 
+def run_robotd_session(server_args, client_args, port):
+    with tempfile.TemporaryFile(mode="w+t") as server_output:
+        server = subprocess.Popen(
+            server_args, cwd=ROOT, stdout=server_output, stderr=subprocess.STDOUT
+        )
+        try:
+            deadline = time.monotonic() + 60
+            while time.monotonic() < deadline:
+                log = read_server_log(server_output)
+                if tcp_ready(port):
+                    break
+                if server.poll() is not None:
+                    raise RuntimeError("robotd exited before listening:\n" + log)
+                time.sleep(0.05)
+            else:
+                raise RuntimeError("robotd did not start:\n" + read_server_log(server_output))
+            # Let robotd clear the probe connection before the real client arrives.
+            time.sleep(0.1)
+
+            client = subprocess.run(
+                client_args, cwd=ROOT, capture_output=True, text=True, timeout=60
+            )
+            if client.returncode != 0:
+                raise RuntimeError("TCP client integration failed:\n" + client.stdout + client.stderr)
+            try:
+                server.wait(timeout=5)
+            except subprocess.TimeoutExpired as error:
+                raise RuntimeError("robotd did not stop after the one-shot client") from error
+            if server.returncode != 0:
+                raise RuntimeError("robotd failed:\n" + read_server_log(server_output))
+            return client.stdout.strip()
+        finally:
+            if server.poll() is None:
+                server.terminate()
+                server.wait(timeout=5)
+
+
 def run():
     master, slave = pty.openpty()
     tty.setraw(slave)
@@ -202,9 +239,11 @@ def run():
     position = [0.0, 0.0, 0.0]
     velocity = [0.0, 0.0, 0.0]
     effort = [0.0, 0.0, 0.0]
+    device = {"session_id": 0, "last_command_sequence": 0, "safety": 2,
+        "session_ids": []}
     device_thread = threading.Thread(
         target=run_device,
-        args=(master, stopping, position, velocity, effort, target_seen),
+        args=(master, stopping, position, velocity, effort, target_seen, device),
         daemon=True,
     )
     device_thread.start()
@@ -220,43 +259,27 @@ def run():
     ]
 
     try:
-        with tempfile.TemporaryFile(mode="w+t") as server_output:
-            server = subprocess.Popen(
-                server_args, cwd=ROOT, stdout=server_output, stderr=subprocess.STDOUT
-            )
+        outputs = []
+        for session_index in range(2):
+            if session_index > 0:
+                target_seen.clear()
+            session_client_args = client_args if session_index == 0 else client_args + [
+                "--restart-check"
+            ]
             try:
-                deadline = time.monotonic() + 60
-                while time.monotonic() < deadline:
-                    log = read_server_log(server_output)
-                    if tcp_ready(port):
-                        break
-                    if server.poll() is not None:
-                        raise RuntimeError("robotd exited before listening:\n" + log)
-                    time.sleep(0.05)
-                else:
-                    raise RuntimeError("robotd did not start:\n" + read_server_log(server_output))
-                # Let robotd clear the probe connection before the real client arrives.
-                time.sleep(0.1)
-
-                client = subprocess.run(
-                    client_args, cwd=ROOT, capture_output=True, text=True, timeout=60
-                )
-                if client.returncode != 0:
-                    raise RuntimeError("TCP client integration failed:\n" + client.stdout + client.stderr)
-                if not target_seen.wait(1.0):
-                    raise RuntimeError("robotd did not send the expected serial joint target")
-                try:
-                    server.wait(timeout=5)
-                except subprocess.TimeoutExpired as error:
-                    raise RuntimeError("robotd did not stop after the one-shot client") from error
-                if server.returncode != 0:
-                    raise RuntimeError("robotd failed:\n" + read_server_log(server_output))
-                print("RemoteRobot behavior and GoTo parity passed through robotd and a serial PTY emulator")
-                print(client.stdout.strip())
-            finally:
-                if server.poll() is None:
-                    server.terminate()
-                    server.wait(timeout=5)
+                outputs.append(run_robotd_session(server_args, session_client_args, port))
+            except RuntimeError as error:
+                raise RuntimeError(
+                    f"robotd host session {session_index + 1} failed:\n{error}"
+                ) from error
+            if not target_seen.wait(1.0):
+                raise RuntimeError("robotd did not send the expected serial joint target")
+        if (len(device["session_ids"]) != 2 or
+                device["session_ids"][0] == device["session_ids"][1]):
+            raise RuntimeError("robotd restart did not negotiate a distinct serial host session")
+        print("RemoteRobot behavior and GoTo parity passed across two robotd sessions on one serial PTY device")
+        for output in outputs:
+            print(output)
     finally:
         stopping.set()
         device_thread.join(timeout=1)

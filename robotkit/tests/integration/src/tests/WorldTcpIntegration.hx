@@ -38,6 +38,40 @@ import robotkit.skill.GoTo;
 class WorldTcpIntegration {
   static inline final LOGICAL_ID = "warehouse/forklift-17";
 
+  /** Checks a fresh robotd process against a serial device that stayed powered. */
+  public static function runRestartCheck(host:String, port:Int):Void {
+    var runtime = NativeKitRuntime.start();
+    var world = new RobotWorld();
+    var remote = new RemoteRobot(LOGICAL_ID);
+    world.attach(remote);
+    var failure:Dynamic = null;
+    try {
+      remote.connect(host, port, runtime.events);
+      waitUntil(runtime, function() return remote.status() == RobotStatus.Ready,
+        "restarted robotd did not become ready");
+      waitUntil(runtime, function() {
+        var state = remote.snapshot();
+        return state.positions.length == 3 && state.safety ==
+          RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP;
+      }, "new host process did not latch the persistent device in emergency-stop");
+      world.resetSafety(LOGICAL_ID);
+      waitUntil(runtime, function() return remote.snapshot().safety ==
+          RobotKitRuntimeConstants.RK_SAFETY_READY,
+        "restarted serial session did not accept an explicit safety reset");
+      remote.submit(robotkit.world.RobotCommand.JointTargets([
+        robotkit.world.JointTarget.position(0, 0.5)
+      ], null));
+      waitUntil(runtime, function() {
+        var state = remote.snapshot();
+        return state.positions.length == 3 && state.positions.get(0) == 0.5;
+      }, "restarted host sequence did not reach the still-powered device");
+      Sys.println("robotd restart negotiated a new safe serial session and reset command sequence");
+    } catch (error:Dynamic) failure = error;
+    world.close();
+    runtime.dispose();
+    if (failure != null) throw failure;
+  }
+
   public static function run(host:String, port:Int):Void {
     var runtime = NativeKitRuntime.start();
     var world = new RobotWorld();
@@ -181,8 +215,12 @@ class WorldTcpIntegration {
               if (other.mountPosition.get(i) != sensor.mountPosition.get(i)) throw "sensor mounts differ";
             for (i in 0...4)
               if (other.mountRotation.get(i) != sensor.mountRotation.get(i)) throw "sensor rotations differ";
-            for (i in 0...sensor.values.length)
-              if (Math.abs(other.values.get(i) - sensor.values.get(i)) > 1e-9) throw "sensor measurements differ";
+            for (i in 0...sensor.values.length) {
+              var expectedValue = sensor.values.get(i);
+              var actualValue = other.values.get(i);
+              if (Math.abs(actualValue - expectedValue) > 1e-9)
+                throw 'sensor measurements differ for ${sensor.sensorId}[$i]: expected=$expectedValue actual=$actualValue';
+            }
           }
           if (!found) throw "remote sensor identity missing";
         }
