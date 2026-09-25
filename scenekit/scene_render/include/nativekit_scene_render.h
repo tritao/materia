@@ -128,7 +128,8 @@ typedef struct nkscene_render_view {
     float camera_world_position[3];
     float camera_view_direction[3]; /* unit vector from the scene toward the camera */
     uint32_t camera_orthographic NK_BOOL32;
-    /** Optional infinite z=0 presentation grid. Ray vectors address clip-space x/y. */
+    /** Optional infinite z=0 presentation grid. Ray vectors address clip-space x/y.
+        eye_spacing.w is cell size; forward.w is camera distance for fading. */
     uint32_t workplane_grid_enabled NK_BOOL32;
     float workplane_grid_eye_spacing[4];
     float workplane_grid_forward[4];

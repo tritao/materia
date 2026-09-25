@@ -158,8 +158,11 @@ struct StudioLighting {
 
 struct WorkplaneGrid {
     bool enabled = false;
+    // xyz = eye position, w = cell size.
     std::array<float, 4> eye_spacing{};
+    // xyz = center camera ray, w = camera distance for fading.
     std::array<float, 4> forward{};
+    // Ray offsets for clip-space x/y in [-1, 1].
     std::array<float, 4> right{};
     std::array<float, 4> up{};
 };

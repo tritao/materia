@@ -68,7 +68,9 @@ class SceneView {
 		return this;
 	}
 
-	/** Renders an infinite z=0 grid behind scene geometry for editor views. */
+	/** Renders an infinite z=0 grid behind scene geometry for editor views.
+	 *  Forward, right, and up are world-space ray basis vectors; right/up include
+	 *  the camera's field-of-view scale for clip-space coordinates in [-1, 1]. */
 	public function setWorkplaneGrid(eye:Array<Float>, forward:Array<Float>,
 			right:Array<Float>, up:Array<Float>, spacing:Float, cameraDistance:Float):SceneView {
 		if (eye.length != 3 || forward.length != 3 || right.length != 3 || up.length != 3 ||
