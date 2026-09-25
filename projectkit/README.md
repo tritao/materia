@@ -15,8 +15,9 @@ scene consumers.
 
 The artifact is derived output. The project's source code and manifest remain
 authoritative. CadKit authors CAD occurrences and mates; ProjectKit stores their
-portable assembly record; Materia applies the poses to preview geometry.
-Joint motion and simulation state are separate from this initial pose record.
+portable assembly record; Materia evaluates tree-joint coordinates into preview
+poses. Generated project documents can persist an `AssemblyStateRecord` override
+separately from the source assembly definition.
 
 ## Kinematic definitions
 

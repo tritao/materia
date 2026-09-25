@@ -33,6 +33,9 @@ class SceneCodec {
     if (Reflect.field(root, "script") != null) throw "A scene cannot have both script and project owners";
     if (numberField(value, "version") != 1) throw "Unsupported generated project record version";
     var reference = stringField(value, "reference");
+    var assemblyState = optionalText(value, "assemblyState");
+    if (assemblyState != null && assemblyState.length > 2000000)
+      throw "Generated project assembly state is too large";
     var overrides:Dynamic = field(value, "overrides");
     var removed:Dynamic = field(value, "removed");
     var instances:Dynamic = field(value, "instances");
@@ -70,7 +73,7 @@ class SceneCodec {
       instanceRecords.push({sourceId: sourceId, object: object});
     }
     return {version: 1, reference: reference, overrides: cast overrides,
-      removed: removedIds, instances: instanceRecords};
+      removed: removedIds, instances: instanceRecords, assemblyState: assemblyState};
   }
 
   public static function decodeScript(text:String):Null < ScriptOwnershipRecord > {

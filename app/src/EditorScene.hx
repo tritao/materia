@@ -76,6 +76,8 @@ class EditorScene {
   var objects:Array<EditorSceneObject>;
   var cadSessions:Map<String, CadDocumentSession>;
   final generatedGeometry:Map<String, GeometryData>;
+  final kinematicOccurrences:Map<String, Bool> = new Map();
+  var assemblyPropertyProvider:Null<String->Array<PropertyDescriptor>> = null;
   var nextObjectId:Int = 1;
   var snapshot:SceneSnapshot;
   var spatial:SpatialIndex;
@@ -1476,6 +1478,73 @@ class EditorScene {
 
   public function items():Array<EditorSceneObject> return objects.copy();
 
+  /** Marks generated occurrences as pose-driven and supplies their joint properties. */
+  public function configureAssemblyOccurrences(occurrenceIds:Array<String>,
+      propertyProvider:Null<String->Array<PropertyDescriptor>>):Void {
+    kinematicOccurrences.clear();
+    if (occurrenceIds != null) for (id in occurrenceIds) {
+      if (id == null || id.length == 0) throw "Assembly occurrence IDs must be non-empty";
+      var sceneId = StringTools.startsWith(id, "project:") ? id : "project:" + id;
+      kinematicOccurrences.set(sceneId, true);
+    }
+    assemblyPropertyProvider = propertyProvider;
+    selectionRevision++;
+    nextRevision++;
+    revision = nextRevision;
+  }
+
+  public function canMoveInViewport(id:String):Bool
+    return object(id) != null && !kinematicOccurrences.exists(id);
+
+  /** Apply a full FK result as one native scene transaction. Positions are geometry-centre poses. */
+  public function setAssemblyOccurrenceTransforms(
+      transforms:Array<{id:String, x:Float, y:Float, z:Float, rotation:Array<Float>}>):Void {
+    if (transforms == null) throw "Assembly transforms are required";
+    var updates:Array<{item:EditorSceneObject, runtime:EditorSceneRuntimeObject,
+      x:Float, y:Float, z:Float, rotation:Array<Float>}> = [];
+    var seen = new Map<String, Bool>();
+    for (value in transforms) {
+      if (value == null || !kinematicOccurrences.exists(value.id) || seen.exists(value.id) ||
+          !finiteCoordinate(value.x) || !finiteCoordinate(value.y) || !finiteCoordinate(value.z) ||
+          value.rotation == null || value.rotation.length != 4)
+        throw "Assembly occurrence transform is invalid";
+      var norm = 0.0;
+      for (component in value.rotation) {
+        if (!Math.isFinite(component)) throw "Assembly occurrence rotation must be finite";
+        norm += component * component;
+      }
+      if (Math.abs(norm - 1.0) > 1e-4) throw "Assembly occurrence rotation must be normalized";
+      var item = object(value.id);
+      var runtime = bridge.runtime(value.id);
+      seen.set(value.id, true);
+      if (item == null) continue;
+      if (runtime == null) throw 'Assembly occurrence has no runtime node "${value.id}"';
+      updates.push({item: item, runtime: runtime, x: value.x, y: value.y, z: value.z,
+        rotation: value.rotation.copy()});
+    }
+    if (updates.length == 0) return;
+    var changed:Array<{item:EditorSceneObject, runtime:EditorSceneRuntimeObject,
+      x:Float, y:Float, z:Float, rotation:Array<Float>}> = [];
+    for (update in updates) if (update.item.x != update.x || update.item.y != update.y ||
+        update.item.z != update.z || !sameRotation(update.item.rotation, update.rotation))
+      changed.push(update);
+    if (changed.length == 0) return;
+    var transaction = scene.beginTransaction();
+    try {
+      for (update in changed)
+        transaction.setTransform(update.runtime.node,
+          objectTransform(update.x, update.y, update.z, update.rotation));
+      transaction.commit();
+    } catch (error:Dynamic) { transaction.dispose(); throw error; }
+    var updatedNodes:Array<NodeId> = [];
+    for (update in changed) {
+      update.item.x = update.x; update.item.y = update.y; update.item.z = update.z;
+      update.item.rotation = update.rotation;
+      updatedNodes.push(update.runtime.node);
+    }
+    publish(updatedNodes);
+  }
+
   public function object(id:String):Null<EditorSceneObject> {
     for (item in objects) if (item.id == id) return item;
     return null;
@@ -1867,6 +1936,8 @@ class EditorScene {
   public function setPositionXY(id:String, x:Float, y:Float):Void {
     if (!finiteCoordinate(x) || !finiteCoordinate(y))
       throw "Position requires finite X and Y coordinates";
+    if (kinematicOccurrences.exists(id))
+      throw "Assembly occurrence positions are driven by their joints";
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
     var runtime = runtimeFor(id);
@@ -1886,6 +1957,7 @@ class EditorScene {
         !finiteCoordinate(toX) || !finiteCoordinate(toY))
       throw "Move requires finite planar coordinates";
     if (object(id) == null) throw "Unknown scene object: " + id;
+    if (kinematicOccurrences.exists(id)) return false;
     if (fromX == toX && fromY == toY) return false;
     return document.record(new EditOperation("Move object",
       function() setPositionXY(id, toX, toY),
@@ -1895,7 +1967,7 @@ class EditorScene {
   public function nudgeSelected(deltaX:Float, deltaY:Float):Bool {
     var item = object(selectedId);
     if (item == null || !finiteCoordinate(deltaX) || !finiteCoordinate(deltaY) ||
-        (deltaX == 0.0 && deltaY == 0.0)) return false;
+        (deltaX == 0.0 && deltaY == 0.0) || kinematicOccurrences.exists(selectedId)) return false;
     var fromX = item.x;
     var fromY = item.y;
     var toX = Math.max(-1000000.0, Math.min(1000000.0, fromX + deltaX));
@@ -2028,7 +2100,8 @@ class EditorScene {
     // Capture identity in each binding: undo must still target this object after selection changes.
     var prefix = id + ":" + selectionRevision + ":";
     var result:Array<PropertyDescriptor> = [];
-    for (axis in 0...2) result.push(positionProperty(id, axis, prefix));
+    if (!kinematicOccurrences.exists(id))
+      for (axis in 0...2) result.push(positionProperty(id, axis, prefix));
     var visibility = new PropertyDescriptorOptions();
     visibility.category = "Rendering";
     result.push(new PropertyDescriptor(prefix + "visible", "Visible", PropertyType.Bool,
@@ -2115,6 +2188,8 @@ class EditorScene {
       result.push(filletRadiusProperty(id, selectedFeature.id.toInt(), prefix));
     if (activeSketchEdit != null && activeSketchObjectId == id)
       appendSketchDraftProperties(result, activeSketchEdit, prefix);
+    if (assemblyPropertyProvider != null)
+      for (property in assemblyPropertyProvider(id)) result.push(property);
     result.push(boolProperty(id,"collision","Collision",function(item)return item.collisionEnabled,
       "Physics",prefix));
     result.push(boolProperty(id,"dynamic","Dynamic body",function(item)return item.dynamicBody,

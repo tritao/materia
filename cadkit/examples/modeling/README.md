@@ -127,16 +127,31 @@ tree/closure roles, axes, limits, and default joint coordinates;
 `AssemblyModel.initialState()` creates a separate runtime state. A state can
 change a tree coordinate with `setJoint()`, recompute placements with
 `forwardKinematics()`, and read a derived pose with `worldPose()`. Closure edges
-are not used for FK; `closureResiduals()` reports their current geometric error
-until the joint-coordinate loop solver is added. `AssemblyBuilder` can author
-repeated occurrences that reference the same component definition directly.
+are not used for FK; `closureResiduals()` reports their current geometric error.
+`solveClosures()` adjusts only caller-selected movable tree-joint coordinates,
+keeps all other coordinates fixed, respects joint limits, and reports residuals,
+local degrees of freedom, and failed closure IDs. It updates the state only when
+all closures meet the requested position and angular tolerances. For example:
+
+```haxe
+var result = state.solveClosures(["link-one-hinge", "link-two-hinge"], {
+	positionTolerance: 0.001,
+	angularTolerance: 0.00001
+});
+if (!result.converged) throw result.message;
+```
+
+`AssemblyBuilder` can author repeated occurrences that reference the same
+component definition directly.
 
 The generated artifact writes both the new definition/state payload and the
 compatibility record. The project loader now evaluates the new state, creates a
 scene object for each occurrence, and shares one SceneKit geometry resource for
 all occurrences of the same component definition. The compatibility record
 continues to supply the editor hierarchy and labels while older artifacts stay
-readable.
+readable. The project inspector exposes each movable tree-joint coordinate;
+edits recompute FK poses as one undoable scene change and save the separate
+assembly state in the project document.
 
 The viewport entrypoint opts into a generated artifact cache. Materia reuses the
 artifact when its Haxeon source graph, compiler sources, and native runtime build

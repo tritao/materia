@@ -16,6 +16,7 @@ import materia.project.AssemblyRecord;
 import materia.project.AssemblyDefinition;
 import materia.project.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.project.AssemblyDefinition.AssemblyJointRole;
+import materia.project.AssemblyDefinition.AssemblyStateRecord;
 import cadkit.modeling.AssemblyState;
 import materia.project.AssemblyDefinitionCodec;
 import nativekit.scene.GeometryData;
@@ -213,20 +214,22 @@ class MateriaProjectRunner {
     var poses:Map<String, AssemblyFrame> = new Map();
     var componentUseCount = new Map<String, Int>();
     var resolvedAssembly = artifact.assembly;
+    var runtimeState:Null<AssemblyState> = null;
     if (artifact.assemblyDefinition != null) {
-      var state = new AssemblyState(artifact.assemblyDefinition, artifact.assemblyState);
+      runtimeState = new AssemblyState(artifact.assemblyDefinition, artifact.assemblyState);
       for (occurrence in artifact.assemblyDefinition.occurrences) {
-        poses.set(occurrence.id, state.worldPose(occurrence.id));
+        poses.set(occurrence.id, runtimeState.worldPose(occurrence.id));
         var count = componentUseCount.get(occurrence.definition);
         componentUseCount.set(occurrence.definition, count == null ? 1 : count + 1);
       }
-      resolvedAssembly = legacySnapshot(artifact.assemblyDefinition, state);
+      resolvedAssembly = legacySnapshot(artifact.assemblyDefinition, runtimeState);
     } else if (artifact.assembly != null) {
       for (instance in artifact.assembly.instances) poses.set(instance.id, instance.pose);
     }
 
     var boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}> = new Map();
     var geometryKeyByDefinition:Map<String, String> = new Map();
+    var localCentersByDefinition:Map<String, Array<Float>> = new Map();
     for (component in artifact.parts) {
       var label = component.name;
       var minimum = [1e300, 1e300, 1e300], maximum = [-1e300, -1e300, -1e300];
@@ -241,6 +244,10 @@ class MateriaProjectRunner {
       geometryBySnapshot.set(geometryKey, geometry);
       boundsByDefinition.set(component.id, {minimum: minimum, maximum: maximum});
       geometryKeyByDefinition.set(component.id, geometryKey);
+      localCentersByDefinition.set(component.id, [
+        (minimum[0] + maximum[0]) * 0.5,
+        (minimum[1] + maximum[1]) * 0.5,
+        (minimum[2] + maximum[2]) * 0.5]);
     }
 
     if (artifact.assemblyDefinition != null) {
@@ -269,7 +276,47 @@ class MateriaProjectRunner {
     }
 
     return {objects: records, assembly: resolvedAssembly,
-      geometryBySnapshot: geometryBySnapshot};
+      geometryBySnapshot: geometryBySnapshot,
+      assemblyDefinition: artifact.assemblyDefinition,
+      assemblyState: runtimeState == null ? null : runtimeState.record(),
+      localCentersByDefinition: localCentersByDefinition,
+      metresPerUnit: scale};
+  }
+
+  /** Re-evaluate generated occurrence placements for a project-owned configuration. */
+  public static function evaluateAssemblyState(generated:GeneratedAssemblyScene,
+      stateRecord:AssemblyStateRecord):GeneratedAssemblyScene {
+    var definition = generated.assemblyDefinition;
+    if (definition == null) throw "Generated project has no kinematic assembly definition";
+    var state = new AssemblyState(definition, stateRecord);
+    var objects:Array<SceneObjectData> = [];
+    var byId:Map<String, SceneObjectData> = new Map();
+    for (source in generated.objects) {
+      var copy:SceneObjectData = {id: source.id, label: source.label, type: source.type,
+        x: source.x, y: source.y, z: source.z, width: source.width, height: source.height,
+        depth: source.depth, collisionEnabled: source.collisionEnabled, dynamicBody: source.dynamicBody,
+        mass: source.mass, red: source.red, green: source.green, blue: source.blue,
+        visible: source.visible, rotation: source.rotation == null ? null : source.rotation.copy(),
+        cadGraph: source.cadGraph, meshSnapshot: source.meshSnapshot, sketchDraft: source.sketchDraft};
+      objects.push(copy);
+      byId.set(copy.id, copy);
+    }
+    for (occurrence in definition.occurrences) {
+      var item = byId.get("project:" + occurrence.id);
+      var center = generated.localCentersByDefinition.get(occurrence.definition);
+      if (item == null || center == null || center.length != 3)
+        throw 'Generated project is missing preview placement data for "${occurrence.id}"';
+      var pose = state.worldPose(occurrence.id);
+      var worldCenter = AssemblyFrames.transformPoint(pose, center[0], center[1], center[2]);
+      item.x = worldCenter.x * generated.metresPerUnit;
+      item.y = worldCenter.y * generated.metresPerUnit;
+      item.z = worldCenter.z * generated.metresPerUnit;
+      item.rotation = [pose.qx, pose.qy, pose.qz, pose.qw];
+    }
+    return {objects: objects, assembly: legacySnapshot(definition, state),
+      geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: definition,
+      assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
+      metresPerUnit: generated.metresPerUnit};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -296,7 +343,7 @@ class MateriaProjectRunner {
       rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]});
   }
 
-  static function legacySnapshot(definition:AssemblyDefinition, state:AssemblyState):AssemblyRecord {
+  public static function legacySnapshot(definition:AssemblyDefinition, state:AssemblyState):AssemblyRecord {
     var definitions = new Map<String, AssemblyComponentDefinition>();
     var instances:Array<AssemblyInstance> = [];
     for (component in definition.definitions) definitions.set(component.id, component);
@@ -376,4 +423,8 @@ typedef GeneratedAssemblyScene = {
   var objects:Array<SceneObjectData>;
   var assembly:Null<AssemblyRecord>;
   var geometryBySnapshot:Map<String, GeometryData>;
+  var assemblyDefinition:Null<AssemblyDefinition>;
+  var assemblyState:Null<AssemblyStateRecord>;
+  var localCentersByDefinition:Map<String, Array<Float>>;
+  var metresPerUnit:Float;
 }

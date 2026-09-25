@@ -7,6 +7,8 @@ typedef ProjectSceneRecord = {
   var overrides:Array<Dynamic>;
   var removed:Array<String>;
   var instances:Array<ProjectSceneInstance>;
+  /** Encoded AssemblyStateRecord for the generated assembly configuration. */
+  @:optional var assemblyState:String;
 }
 
 typedef ProjectSceneInstance = {

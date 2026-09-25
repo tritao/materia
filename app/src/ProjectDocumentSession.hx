@@ -8,9 +8,23 @@ import haxe.Json;
 import app.ScriptOwnership.ScriptMaterialization;
 import nativekit.ui.editing.EditorDocument;
 import nativekit.ui.editing.EditHistory;
+import nativekit.ui.editing.EditOperation;
+import nativekit.ui.properties.PropertyDescriptor;
+import nativekit.ui.properties.PropertyDescriptorOptions;
+import nativekit.ui.properties.PropertyType;
+import nativekit.ui.properties.PropertyValue;
 import bimkit.BimDocument;
 import app.ProjectSceneRecord.ProjectSceneInstance;
 import materia.project.AssemblyRecord;
+import materia.project.AssemblyDefinition;
+import materia.project.AssemblyDefinition.AssemblyComponentOccurrence;
+import materia.project.AssemblyDefinition.AssemblyJointRole;
+import materia.project.AssemblyDefinition.AssemblyJointLimits;
+import materia.project.AssemblyDefinition.AssemblyJointType;
+import materia.project.AssemblyDefinition.AssemblyStateRecord;
+import materia.project.AssemblyDefinitionCodec;
+import materia.project.AssemblyFrames;
+import cadkit.modeling.AssemblyState;
 import nativekit.scene.GeometryData;
 
 /** Owns the current document; unsuccessful I/O leaves it and its history intact. */
@@ -28,6 +42,12 @@ class ProjectDocumentSession {
   public var scriptOwnership(default,null):Null<ScriptOwnership> = null;
   public var projectReference(default,null):Null<String> = null;
   public var projectAssembly(default,null):Null<AssemblyRecord> = null;
+  public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
+  public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
+  var assemblyRuntime:Null<AssemblyState> = null;
+  var assemblyLocalCentersByDefinition:Null<Map<String, Array<Float>>> = null;
+  var assemblyMetresPerUnit:Float = 1.0;
+  final assemblyOccurrenceIds:Map<String, Bool> = new Map();
   var projectBaseline:Null<Array<SceneObjectData>> = null;
   /** Application-owned runtime cleanup invoked only after replacement data validates. */
   public var beforeReplace:Null<Void->Void> = null;
@@ -121,7 +141,9 @@ class ProjectDocumentSession {
 
   /** Open generated geometry while retaining its source manifest. */
   public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
-      ?assembly:AssemblyRecord, ?geometryBySnapshot:Map<String, GeometryData>):Void {
+      ?assembly:AssemblyRecord, ?geometryBySnapshot:Map<String, GeometryData>,
+      ?assemblyDefinition:AssemblyDefinition, ?assemblyState:AssemblyStateRecord,
+      ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -138,8 +160,19 @@ class ProjectDocumentSession {
       if (nextBim != null) nextBim.close();
       throw error;
     }
+    var runtime:Null<AssemblyState> = null;
+    try {
+      runtime = assemblyDefinition == null ? null : new AssemblyState(assemblyDefinition, assemblyState);
+      configureAssembly(next, assemblyDefinition);
+    } catch (error:Dynamic) {
+      next.dispose();
+      if (nextSensors != null) nextSensors.dispose();
+      if (nextBim != null) nextBim.close();
+      throw error;
+    }
     replace(next, nextSensors, null, null, nextBim, nextDocument);
     projectAssembly = assembly;
+    installAssemblyRuntime(assemblyDefinition, runtime, localCentersByDefinition, metresPerUnit);
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -151,6 +184,14 @@ class ProjectDocumentSession {
       : FilePath.join([FilePath.directory(absolute), project.reference]);
     reference = FileSystem.fullPath(reference);
     var generated = MateriaProjectRunner.loadProject(reference);
+    var stateRecord = generated.assemblyState;
+    if (project.assemblyState != null) {
+      if (generated.assemblyDefinition == null)
+        throw "Generated project state has no kinematic assembly definition";
+      stateRecord = AssemblyDefinitionCodec.decodeState(generated.assemblyDefinition, project.assemblyState);
+    }
+    if (stateRecord != null && generated.assemblyDefinition != null)
+      generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
     var baseline = generated.objects;
     var data = materializeProject(baseline, project, SceneCodec.decode(text));
     var nextDocument = createDocument();
@@ -165,10 +206,130 @@ class ProjectDocumentSession {
       if (nextBim != null) nextBim.close();
       throw error;
     }
+    var runtime:Null<AssemblyState> = null;
+    try {
+      runtime = generated.assemblyDefinition == null ? null :
+        new AssemblyState(generated.assemblyDefinition, stateRecord);
+      configureAssembly(next, generated.assemblyDefinition);
+    } catch (error:Dynamic) {
+      if (next != null) next.dispose();
+      if (nextSensors != null) nextSensors.dispose();
+      if (nextBim != null) nextBim.close();
+      throw error;
+    }
     replace(next, nextSensors, absolute, null, nextBim, nextDocument);
     projectReference = reference;
     projectBaseline = baseline;
     projectAssembly = generated.assembly;
+    installAssemblyRuntime(generated.assemblyDefinition, runtime,
+      generated.localCentersByDefinition, generated.metresPerUnit);
+  }
+
+  function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
+    if (definition == null) return;
+    var ids:Array<String> = [];
+    for (occurrence in definition.occurrences) ids.push(occurrence.id);
+    target.configureAssemblyOccurrences(ids, function(id) return assemblyPropertiesForOccurrence(id));
+  }
+
+  function installAssemblyRuntime(definition:Null<AssemblyDefinition>, state:Null<AssemblyState>,
+      centers:Null<Map<String, Array<Float>>>, metresPerUnit:Float):Void {
+    assemblyOccurrenceIds.clear();
+    projectAssemblyDefinition = definition;
+    assemblyRuntime = state;
+    assemblyLocalCentersByDefinition = centers;
+    assemblyMetresPerUnit = metresPerUnit;
+    if (definition == null || state == null) {
+      projectAssemblyState = null;
+      return;
+    }
+    for (occurrence in definition.occurrences) assemblyOccurrenceIds.set("project:" + occurrence.id, true);
+    projectAssemblyState = state.record();
+    projectAssembly = MateriaProjectRunner.legacySnapshot(definition, state);
+  }
+
+  function assemblyPropertiesForOccurrence(sceneId:String):Array<PropertyDescriptor> {
+    var result:Array<PropertyDescriptor> = [];
+    var definition = projectAssemblyDefinition, centers = assemblyLocalCentersByDefinition;
+    if (definition == null || assemblyRuntime == null || centers == null ||
+        !StringTools.startsWith(sceneId, "project:")) return result;
+    var occurrenceId = sceneId.substr(8);
+    var occurrence:Null<AssemblyComponentOccurrence> = null;
+    for (item in definition.occurrences) if (item.id == occurrenceId) { occurrence = item; break; }
+    if (occurrence == null) return result;
+    for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree &&
+        (joint.parent == occurrenceId || joint.child == occurrenceId) &&
+        AssemblyDefinitionCodec.hasCoordinate(joint.type))
+      result.push(assemblyJointProperty(joint.id, joint.type, joint.limits,
+        joint.type == AssemblyJointType.Prismatic ? assemblyMetresPerUnit : 1.0));
+    return result;
+  }
+
+  function assemblyJointProperty(jointId:String, type:AssemblyJointType,
+      limits:AssemblyJointLimits, factor:Float):PropertyDescriptor {
+    var options = new PropertyDescriptorOptions();
+    options.category = "Assembly";
+    options.unit = type == AssemblyJointType.Prismatic ? "m" : "rad";
+    options.step = type == AssemblyJointType.Prismatic ? Math.max(0.0001, factor) : 0.01;
+    options.minimum = limits.lower == null ? null : limits.lower * factor;
+    options.maximum = limits.upper == null ? null : limits.upper * factor;
+    options.recordHistory = false;
+    options.validator = function(_, value) return switch (value) {
+      case PropertyValue.Float(number) if (Math.isFinite(number)): null;
+      case PropertyValue.Int(_): null;
+      default: "Joint coordinate must be finite";
+    };
+    return new PropertyDescriptor("assembly-joint:" + jointId, jointId, PropertyType.Float,
+      function(_) {
+        var state = assemblyRuntime;
+        if (state == null) throw "Assembly state is no longer available";
+        return PropertyValue.Float(state.joint(jointId) * factor);
+      }, function(_, value) {
+        var number:Float = switch (value) {
+          case PropertyValue.Float(next): next;
+          case PropertyValue.Int(next): next;
+          default: throw "Joint coordinate must be numeric";
+        };
+        setAssemblyJointCoordinate(jointId, number / factor);
+      }, options);
+  }
+
+  /** Change a tree-joint coordinate as one undoable editor operation. */
+  public function setAssemblyJointCoordinate(jointId:String, value:Float):Bool {
+    var state = assemblyRuntime;
+    if (state == null) throw "This project has no editable assembly state";
+    var before = state.joint(jointId);
+    if (!Math.isFinite(value)) throw "Joint coordinate must be finite";
+    if (before == value) return false;
+    return document.apply(new EditOperation("Set joint " + jointId,
+      function() applyAssemblyJointCoordinate(jointId, value),
+      function() applyAssemblyJointCoordinate(jointId, before)));
+  }
+
+  function applyAssemblyJointCoordinate(jointId:String, value:Float):Void {
+    var definition = projectAssemblyDefinition, current = assemblyRuntime;
+    var centers = assemblyLocalCentersByDefinition;
+    if (definition == null || current == null || centers == null)
+      throw "Assembly placement data is unavailable";
+    var candidate = new AssemblyState(definition, current.record());
+    candidate.setJoint(jointId, value);
+    var transforms:Array<{id:String, x:Float, y:Float, z:Float, rotation:Array<Float>}> = [];
+    for (occurrence in definition.occurrences) {
+      var center = centers.get(occurrence.definition);
+      if (center == null || center.length != 3)
+        throw 'Assembly component "${occurrence.definition}" has no local preview center';
+      var pose = candidate.worldPose(occurrence.id);
+      var world = AssemblyFrames.transformPoint(pose, center[0], center[1], center[2]);
+      transforms.push({id: "project:" + occurrence.id, x: world.x * assemblyMetresPerUnit,
+        y: world.y * assemblyMetresPerUnit, z: world.z * assemblyMetresPerUnit,
+        rotation: [pose.qx, pose.qy, pose.qz, pose.qw]});
+    }
+    var nextRecord = candidate.record();
+    var nextCompatibility = MateriaProjectRunner.legacySnapshot(definition, candidate);
+    scene.setAssemblyOccurrenceTransforms(transforms);
+    assemblyRuntime = candidate;
+    projectAssemblyState = nextRecord;
+    projectAssembly = nextCompatibility;
   }
 
   /** Publishes a validated candidate without touching the currently running simulation. */
@@ -234,6 +395,12 @@ class ProjectDocumentSession {
     projectReference = null;
     projectBaseline = null;
     projectAssembly = null;
+    projectAssemblyDefinition = null;
+    projectAssemblyState = null;
+    assemblyRuntime = null;
+    assemblyLocalCentersByDefinition = null;
+    assemblyMetresPerUnit = 1.0;
+    assemblyOccurrenceIds.clear();
     bim=nextBim;
     path = file;
     generation++;
@@ -285,7 +452,9 @@ class ProjectDocumentSession {
         if (item.type != source.type || item.meshSnapshot != source.meshSnapshot)
           throw 'Generated geometry for "${item.id}" must come from its project source';
         present.set(item.id, true);
-        if (!sameAppearance(item, source)) overrides.push(withoutMesh(item));
+        var assemblyManaged = assemblyOccurrenceIds.exists(item.id);
+        var unchanged = assemblyManaged ? sameAppearanceWithoutPose(item, source) : sameAppearance(item, source);
+        if (!unchanged) overrides.push(withoutMesh(item, !assemblyManaged));
       } else if (item.type == "cad-preview") {
         var origin:Null<SceneObjectData> = null;
         for (candidate in baseline) if (candidate.meshSnapshot == item.meshSnapshot) {
@@ -300,8 +469,11 @@ class ProjectDocumentSession {
     }
     var removed:Array<String> = [];
     for (item in baseline) if (!present.exists(item.id)) removed.push(item.id);
+    var savedAssemblyState = projectAssemblyDefinition == null || assemblyRuntime == null ? null
+      : AssemblyDefinitionCodec.encodeState(projectAssemblyDefinition, assemblyRuntime.record());
     return {record: {version: 1, reference: relativeReference(destination, reference),
-      overrides: overrides, removed: removed, instances: instances}, authored: authored};
+      overrides: overrides, removed: removed, instances: instances,
+      assemblyState: savedAssemblyState}, authored: authored};
   }
 
   static function materializeProject(baseline:Array<SceneObjectData>, project:ProjectSceneRecord,
@@ -365,13 +537,18 @@ class ProjectDocumentSession {
     return result;
   }
 
-  static function withoutMesh(item:SceneObjectData):Dynamic {
-    return {id: item.id, type: item.type, label: item.label,
-      x: item.x, y: item.y, z: item.z,
+  static function withoutMesh(item:SceneObjectData, includePose:Bool = true):Dynamic {
+    var result:Dynamic = {id: item.id, type: item.type, label: item.label,
       width: item.width, height: item.height, depth: item.depth,
       collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-      red: item.red, green: item.green, blue: item.blue, visible: item.visible,
-      rotation: item.rotation};
+      red: item.red, green: item.green, blue: item.blue, visible: item.visible};
+    if (includePose) {
+      Reflect.setField(result, "x", item.x);
+      Reflect.setField(result, "y", item.y);
+      Reflect.setField(result, "z", item.z);
+      Reflect.setField(result, "rotation", item.rotation);
+    }
+    return result;
   }
 
   static function sameAppearance(left:SceneObjectData, right:SceneObjectData):Bool
@@ -380,6 +557,12 @@ class ProjectDocumentSession {
       left.collisionEnabled == right.collisionEnabled && left.dynamicBody == right.dynamicBody &&
       left.mass == right.mass && left.red == right.red && left.green == right.green &&
       left.blue == right.blue && left.visible == right.visible && sameRotation(left.rotation, right.rotation);
+
+  static function sameAppearanceWithoutPose(left:SceneObjectData, right:SceneObjectData):Bool
+    return left.label == right.label && left.width == right.width && left.height == right.height &&
+      left.depth == right.depth && left.collisionEnabled == right.collisionEnabled &&
+      left.dynamicBody == right.dynamicBody && left.mass == right.mass && left.red == right.red &&
+      left.green == right.green && left.blue == right.blue && left.visible == right.visible;
 
   static function sameRotation(left:Null<Array<Float>>, right:Null<Array<Float>>):Bool {
     if (left == null || right == null) return left == right;

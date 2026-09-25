@@ -76,7 +76,7 @@ class EditorSceneViewport implements ViewportContent {
     var point = scenePoint(camera, x, y);
     var id = scene.pick(point.x, point.y);
     var item = scene.object(id);
-    if (item == null) return false;
+    if (item == null || !scene.canMoveInViewport(id)) return false;
     scene.select(id);
     drag = new EditorSceneDrag(id, item.x, item.y, item.x - point.x, item.y - point.y, snap);
     return true;

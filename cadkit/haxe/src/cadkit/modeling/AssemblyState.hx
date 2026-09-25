@@ -14,6 +14,8 @@ import materia.project.AssemblyDefinitionCodec;
 import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord.AssemblyConnector;
 import materia.project.AssemblyRecord.AssemblyFrame;
+import cadkit.modeling.AssemblyLoopSolver.AssemblyLoopSolveOptions;
+import cadkit.modeling.AssemblyLoopSolver.AssemblyLoopSolveResult;
 
 typedef AssemblyClosureResidual = {
 	var joint:String;
@@ -134,6 +136,11 @@ class AssemblyState {
 		}
 		return result;
 	}
+
+	/** Adjusts selected tree-joint coordinates until the assembly closures are satisfied. */
+	public function solveClosures(dependentJointIds:Array<String>,
+		?options:AssemblyLoopSolveOptions):AssemblyLoopSolveResult
+		return AssemblyLoopSolver.solve(this, dependentJointIds, options);
 
 	public function record():AssemblyStateRecord {
 		var values:Array<AssemblyJointCoordinate> = [];
