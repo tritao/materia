@@ -668,7 +668,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var documentLabel = shortenLabel(session.label(), compact ? 18 : 30);
     var status = minimal ? documentLabel : documentLabel + "  ·  World: " +
       (world == null ? "offline" : Std.string(world.status()));
-    items.push(new KeyedView("status", new Text(status, null, appearance.muted,
+    items.push(new KeyedView("status", new Text(status, null, appearance.theme.tokens.textSecondary,
       TextStyleOverride.text(12.0))));
     var more = new Button(compact ? "" : "More", null, function() {
       toolbarMenuVisible = !toolbarMenuVisible;
@@ -694,7 +694,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function toolbarGroup(key:String, label:String, actions:View, compact:Bool):View {
     if (compact) return actions;
     return new Row(key, [
-      new KeyedView("label", new Text(label, null, appearance.heading,
+      new KeyedView("label", new Text(label, null, appearance.theme.tokens.textSecondary,
         TextStyleOverride.text(10.0, 0.8))),
       new KeyedView("actions", actions)
     ], toolbarGroupStyle());
@@ -709,7 +709,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function toolbarDivider(key:String):View {
     var divider = new Spacer(key, LayoutAxis.fixed(1.0), LayoutAxis.fixed(20.0));
-    divider.style.background = appearance.divider;
+    divider.style.background = appearance.theme.tokens.border;
     return divider;
   }
 
@@ -747,7 +747,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function sensorPanel():View {
     var style=fillStyle();style.padding=new Insets(12.0,12.0,12.0,12.0);
-    style.background=appearance.surface;
+    style.background=appearance.theme.tokens.surface;
     var robotRows:Array<KeyedView> = [];
     var attachedIds = world.robotIds();
     var worldIds = attachedIds.copy();
@@ -826,7 +826,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
       new KeyedView("apply-state",new Text(simulation.pending(sensors,scene)
         ? "Pending changes · rebuild required"
-        : "Configuration applied",null,appearance.muted,TextStyleOverride.text(12.0))),
+        : "Configuration applied",null,appearance.theme.tokens.textSecondary,TextStyleOverride.text(12.0))),
       new KeyedView("simulation-mode",new Text("Mode: "+(simulation.isActive()
         ? (simulation.isRunning()?"Running":"Paused") : "Design"))),
       new KeyedView("ownership",ownership==null?new Text("Origin: document"):
@@ -925,7 +925,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function hierarchyPanel():View {
     var treeStyle = fillStyle();
     treeStyle.padding = new Insets(10.0, 10.0, 10.0, 10.0);
-    treeStyle.background = appearance.surface;
+    treeStyle.background = appearance.theme.tokens.surface;
     treeStyle.childGap = 6.0;
     var treeViewport = fillStyle();
     var tree = new TreeView("scene-hierarchy",
@@ -1132,7 +1132,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function inspectorPanel():View {
     var style = fillStyle();
     style.padding = new Insets(10.0, 10.0, 10.0, 10.0);
-    style.background = appearance.surface;
+    style.background = appearance.theme.tokens.surface;
     var selected = scene.object(scene.selectedId);
     if (selected == null)
       return new Column("inspector-empty", [
@@ -1232,7 +1232,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function consolePanel():View {
     var style = fillStyle();
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
-    style.background = appearance.surface;
+    style.background = appearance.theme.tokens.surface;
     var rows:Array<KeyedView> = [];
     for (index in 0...logLines.length) rows.push(new KeyedView(
       "log:" + index,
@@ -1267,7 +1267,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function telemetryPanel():View {
     var style = fillStyle();
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
-    style.background = appearance.surface;
+    style.background = appearance.theme.tokens.surface;
     var plotStyle = fillStyle();
     plotStyle.height = LayoutAxis.grow();
     var plot = new PlotView("frame-telemetry", telemetry, plotStyle, "Frame telemetry");
@@ -1293,7 +1293,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function sectionHeading(label:String):Text {
-    return new Text(label, null, appearance.heading, TextStyleOverride.text(11.0, 0.8));
+    return new Text(label, null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(11.0, 0.8));
   }
 
   function runSceneEdit(label:String, action:Void->Bool):Void {

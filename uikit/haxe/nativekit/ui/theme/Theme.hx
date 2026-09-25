@@ -106,6 +106,22 @@ class Theme {
 		tokens.navigationFocused = light ? rgba(0.76, 0.84, 0.94) : rgba(0.14, 0.25, 0.41);
 		tokens.navigationSelected = light ? rgba(0.74, 0.83, 0.95) : rgba(0.16, 0.29, 0.50);
 		tokens.navigationDisabled = light ? rgba(0.89, 0.90, 0.92) : rgba(0.10, 0.12, 0.16);
+		tokens.accentHover = tokens.buttonHover;
+		tokens.accentPressed = tokens.buttonPressed;
+		tokens.textPrimary = tokens.text;
+		tokens.textSecondary = tokens.mutedText;
+		tokens.textDisabled = tokens.disabledText;
+		tokens.textOnAccent = tokens.buttonText;
+		tokens.surface = tokens.panelBackground;
+		tokens.surfaceRaised = tokens.navigationBackground;
+		tokens.surfaceSunken = tokens.selectionField;
+		tokens.surfaceHover = tokens.navigationHover;
+		tokens.border = tokens.selectionBorder;
+		tokens.borderStrong = tokens.controlUnselected;
+		tokens.focusRing = tokens.buttonFocused;
+		tokens.selection = tokens.selectionHighlight;
+		tokens.info = tokens.accent;
+		tokens.deriveComponents();
 		var theme = new Theme(tokens);
 		theme.textCaret = tokens.text;
 		return theme;
@@ -356,6 +372,7 @@ class Theme {
 	function get_text():Color return body == null ? tokens.text : body.color;
 	function set_text(value:Color):Color {
 		tokens.text = value;
+		tokens.textPrimary = value;
 		if (body != null)
 			body.color = value;
 		return value;
@@ -363,15 +380,17 @@ class Theme {
 	function get_mutedText():Color return caption == null ? tokens.mutedText : caption.color;
 	function set_mutedText(value:Color):Color {
 		tokens.mutedText = value;
+		tokens.textSecondary = value;
 		if (caption != null)
 			caption.color = value;
 		return value;
 	}
 	function get_disabledText():Color return tokens.disabledText;
-	function set_disabledText(value:Color):Color { tokens.disabledText = value; return value; }
+	function set_disabledText(value:Color):Color { tokens.disabledText = value; tokens.textDisabled = value; return value; }
 	function get_buttonText():Color return button == null ? tokens.buttonText : button.color;
 	function set_buttonText(value:Color):Color {
 		tokens.buttonText = value;
+		tokens.textOnAccent = value;
 		if (button != null)
 			button.color = value;
 		return value;
@@ -397,7 +416,7 @@ class Theme {
 	function get_controlDisabled():Color return tokens.controlDisabled;
 	function set_controlDisabled(value:Color):Color { tokens.controlDisabled = value; return value; }
 	function get_panelBackground():Color return tokens.panelBackground;
-	function set_panelBackground(value:Color):Color { tokens.panelBackground = value; return value; }
+	function set_panelBackground(value:Color):Color { tokens.panelBackground = value; tokens.surface = value; return value; }
 	function get_overlayBackdrop():Color return tokens.overlayBackdrop;
 	function set_overlayBackdrop(value:Color):Color { tokens.overlayBackdrop = value; return value; }
 	function get_tooltipBackground():Color return tokens.tooltipBackground;

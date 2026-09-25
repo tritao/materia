@@ -1939,6 +1939,17 @@ class FrameworkSmoke {
 			theme.tokens.surface != theme.panelBackground || theme.tokens.focusRing != theme.buttonFocused ||
 			theme.tokens.radiusMedium != 6.0 || theme.tokens.spacingMedium != 8.0)
 			return 225;
+		var originalButton = theme.tokens.buttonBackground;
+		var originalControl = theme.tokens.controlUnselected;
+		theme.tokens.surfaceRaised = Color.rgba(0.31, 0.32, 0.33, 1.0);
+		theme.tokens.border = Color.rgba(0.41, 0.42, 0.43, 1.0);
+		if (theme.tokens.buttonBackground != originalButton ||
+			theme.tokens.controlUnselected != originalControl)
+			return 225;
+		theme.tokens.deriveComponents();
+		if (theme.tokens.navigationBackground != theme.tokens.surfaceRaised ||
+			theme.tokens.selectionBorder != theme.tokens.border)
+			return 225;
 		theme.body.color = Color.rgba(0.10, 0.14, 0.21, 1.0);
 		theme.button.color = Color.rgba(1.0, 1.0, 1.0, 1.0);
 		var styleTheme = new StyleSheet("StyleTheme");

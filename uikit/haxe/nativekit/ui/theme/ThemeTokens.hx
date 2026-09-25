@@ -43,12 +43,25 @@ class ThemeTokens {
 	public var spacingMedium:Float;
 	public var spacingLarge:Float;
 
-	public var surface(get, set):Color;
-	public var surfaceRaised(get, set):Color;
-	public var textPrimary(get, set):Color;
-	public var textSecondary(get, set):Color;
-	public var border(get, set):Color;
-	public var focusRing(get, set):Color;
+	// Application-independent visual meanings. Component defaults are derived below.
+	public var accentHover:Color;
+	public var accentPressed:Color;
+	public var textPrimary:Color;
+	public var textSecondary:Color;
+	public var textDisabled:Color;
+	public var textOnAccent:Color;
+	public var surface:Color;
+	public var surfaceRaised:Color;
+	public var surfaceSunken:Color;
+	public var surfaceHover:Color;
+	public var border:Color;
+	public var borderStrong:Color;
+	public var focusRing:Color;
+	public var info:Color;
+	public var success:Color;
+	public var warning:Color;
+	public var danger:Color;
+	public var selection:Color;
 
 	public function new() {
 		accent = Color.rgba(0.22, 0.48, 0.86, 1.0);
@@ -89,18 +102,56 @@ class ThemeTokens {
 		spacingSmall = 4.0;
 		spacingMedium = 8.0;
 		spacingLarge = 12.0;
+		accentHover = buttonHover;
+		accentPressed = buttonPressed;
+		textPrimary = text;
+		textSecondary = mutedText;
+		textDisabled = disabledText;
+		textOnAccent = buttonText;
+		surface = panelBackground;
+		surfaceRaised = navigationBackground;
+		surfaceSunken = selectionField;
+		surfaceHover = navigationHover;
+		border = selectionBorder;
+		borderStrong = controlUnselected;
+		focusRing = buttonFocused;
+		info = Color.rgba(0.25, 0.61, 0.89, 1.0);
+		success = Color.rgba(0.26, 0.72, 0.45, 1.0);
+		warning = Color.rgba(0.95, 0.68, 0.23, 1.0);
+		danger = Color.rgba(0.87, 0.32, 0.34, 1.0);
+		selection = selectionHighlight;
+		deriveComponents();
 	}
 
-	function get_surface():Color return panelBackground;
-	function set_surface(value:Color):Color { panelBackground = value; return value; }
-	function get_surfaceRaised():Color return buttonBackground;
-	function set_surfaceRaised(value:Color):Color { buttonBackground = value; return value; }
-	function get_textPrimary():Color return text;
-	function set_textPrimary(value:Color):Color { text = value; return value; }
-	function get_textSecondary():Color return mutedText;
-	function set_textSecondary(value:Color):Color { mutedText = value; return value; }
-	function get_border():Color return controlUnselected;
-	function set_border(value:Color):Color { controlUnselected = value; return value; }
-	function get_focusRing():Color return buttonFocused;
-	function set_focusRing(value:Color):Color { buttonFocused = value; return value; }
+	/** Set component defaults from the semantic palette. Call after changing palette colors. */
+	public function deriveComponents():Void {
+		text = textPrimary;
+		mutedText = textSecondary;
+		disabledText = textDisabled;
+		buttonText = textOnAccent;
+		disabledButtonText = textDisabled;
+		buttonBackground = accent;
+		buttonHover = accentHover;
+		buttonPressed = accentPressed;
+		buttonFocused = focusRing;
+		buttonSelected = selection;
+		buttonDisabled = surfaceSunken;
+		navigationBackground = surfaceRaised;
+		navigationHover = surfaceHover;
+		navigationPressed = surfaceSunken;
+		navigationFocused = focusRing;
+		navigationSelected = selection;
+		navigationDisabled = surface;
+		controlSelected = accent;
+		controlUnselected = borderStrong;
+		controlDisabled = border;
+		progressTrack = surfaceSunken;
+		progressFill = accent;
+		selectionField = surfaceSunken;
+		selectionHover = surfaceHover;
+		selectionPressed = surfaceRaised;
+		selectionHighlight = selection;
+		selectionBorder = border;
+		panelBackground = surface;
+	}
 }
