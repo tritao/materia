@@ -134,7 +134,13 @@ int main(void) {
     view.camera.view_projection.matrix[5] = 1.0f;
     view.camera.view_projection.matrix[10] = 1.0f;
     view.camera.view_projection.matrix[15] = 1.0f;
+    view.camera_view_pose_enabled = 1;
+    view.camera_world_position[2] = 2.0f;
+    view.camera_view_direction[2] = 1.0f;
     nkscene_render_plan plan = {0};
+    view.camera_view_direction[2] = 0.0f;
+    assert(nkscene_render_plan_compile(snapshot, &view, &plan) == NKS_ERROR_INVALID_ARGUMENT);
+    view.camera_view_direction[2] = 1.0f;
     assert(nkscene_render_plan_compile(snapshot, &view, &plan) == NKS_OK);
     uint64_t item_count = 0;
     assert(nkscene_render_plan_get_item_count(plan, &item_count) == NKS_OK);

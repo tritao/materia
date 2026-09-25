@@ -562,6 +562,10 @@ void scene_resource_camera_is_used_for_render_view() {
     const auto snapshot = scene->snapshot();
     const auto plan = nkscene::compile(snapshot, view);
     assert(plan.view_projection() != nkscene::SceneCamera{}.view_projection);
+    assert(plan.camera().has_view_pose);
+    assert(!plan.camera().orthographic);
+    assert(plan.camera().position == (std::array<float, 3>{0.0f, 0.0f, 0.0f}));
+    assert(plan.camera().view_direction == (std::array<float, 3>{1.0f, 0.0f, 0.0f}));
     const auto find_item = [&](nkscene::NodeId id) {
         return std::find_if(plan.items().begin(), plan.items().end(),
                             [id](const nkscene::RenderItem &item) {
@@ -572,6 +576,21 @@ void scene_resource_camera_is_used_for_render_view() {
                                      nkscene::RenderFlags::Culled));
     assert(nkscene::has_render_flag(find_item(hidden)->flags,
                                     nkscene::RenderFlags::Culled));
+    camera_resource.projection = nkscene::CameraProjection::Orthographic;
+    scene->publish();
+    auto refreshed_plan = plan;
+    const auto camera_refresh = nkscene::refresh(refreshed_plan, scene->snapshot(), view);
+    assert(camera_refresh.plan_rebuilt);
+    assert(refreshed_plan.camera().orthographic);
+    const auto orthographic_plan = nkscene::compile(scene->snapshot(), view);
+    assert(orthographic_plan.camera().has_view_pose);
+    assert(orthographic_plan.camera().orthographic);
+    Transaction move_camera(scene);
+    move_camera.add_transform(camera_node, translated(3.0f));
+    assert(scene->commit(move_camera, changes) == NKS_OK);
+    move_camera.close();
+    const auto moved_plan = nkscene::compile(scene->snapshot(), view);
+    assert(moved_plan.camera().position == (std::array<float, 3>{3.0f, 0.0f, 0.0f}));
 }
 
 void scene_view_clip_planes_are_incremental() {

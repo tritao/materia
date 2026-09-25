@@ -123,6 +123,11 @@ typedef struct nkscene_render_view {
     float studio_ambient_sky[4];
     float studio_ambient_ground[4];
     float studio_light_colors[12]; /* three RGB values, padded to vec4 */
+    /** Optional exact view pose for specular lighting with an explicit camera matrix. */
+    uint32_t camera_view_pose_enabled NK_BOOL32;
+    float camera_world_position[3];
+    float camera_view_direction[3]; /* unit vector from the scene toward the camera */
+    uint32_t camera_orthographic NK_BOOL32;
 } nkscene_render_view;
 
 /* ------------------------------------------------------------------------- */

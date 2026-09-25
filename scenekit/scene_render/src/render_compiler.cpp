@@ -131,7 +131,7 @@ RenderPlan compile(const SceneSnapshot &snapshot, const SceneView &view) {
     render_internal::capture_view_policy(plan, view);
     plan.view_root_ = view.root;
     plan.culling_signature_ = render_internal::culling_signature(view);
-    plan.camera_enabled_ = view.camera.enabled;
+    plan.camera_enabled_ = plan.camera_.enabled;
     plan.studio_lighting_ = view.studio_lighting;
     plan.geometry_revisions_.reserve(snapshot.geometries().size());
     for (const auto &resource : snapshot.geometries())
@@ -840,10 +840,10 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
     render_internal::capture_view_policy(plan, view);
     plan.view_root_ = view.root;
     plan.culling_signature_ = next_culling_signature;
-    plan.camera_enabled_ = view.camera.enabled;
     plan.studio_lighting_ = view.studio_lighting;
-    plan.view_projection_ =
-        view.camera.enabled ? view.camera.view_projection : SceneCamera{}.view_projection;
+    plan.camera_ = render_internal::camera_for_snapshot(snapshot, view);
+    plan.camera_enabled_ = plan.camera_.enabled;
+    plan.view_projection_ = plan.camera_.view_projection;
     plan.clip_plane_count_ = 0;
     for (const auto &plane : view.clip_planes) {
         if (!plane.enabled || plan.clip_plane_count_ == RenderPlan::max_clip_planes)
@@ -875,6 +875,14 @@ RenderUpdate update(RenderPlan &plan, const SceneSnapshot &snapshot, const Chang
 
 RenderUpdate refresh(RenderPlan &plan, const SceneSnapshot &snapshot, const SceneView &view) {
     RenderUpdate result;
+    if (!view.camera.enabled && view.camera_node.valid() &&
+        plan.camera() != render_internal::camera_for_snapshot(snapshot, view)) {
+        plan = compile(snapshot, view);
+        result.plan_rebuilt = true;
+        result.visible_items = plan.visible_items_;
+        result.culled_items = plan.culled_items_;
+        return result;
+    }
     if (plan.source_revision() == snapshot.revision() &&
         plan.geometry_resources_revision_ == snapshot.geometry_resources_revision() &&
         plan.material_resources_revision_ == snapshot.material_resources_revision() &&

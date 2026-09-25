@@ -16,6 +16,7 @@ cbuffer lighting_params : register(b3)
     float4 ambient_ground : packoffset(c129);
     float4 lighting_mode : packoffset(c130);
     float4 camera_position : packoffset(c131);
+    float4 camera_view_direction : packoffset(c132);
 };
 
 Texture2D base_color_texture : register(t0);
@@ -82,7 +83,9 @@ float4 main(SceneFragmentInput input) : SV_Target0
     float roughness = clamp(surface_params.y * metal_rough.g, 0.045f, 1.0f);
     float alpha_ggx = roughness * roughness;
     float alpha2 = alpha_ggx * alpha_ggx;
-    float3 V = normalize(camera_position.xyz - input.world_position);
+    float3 V = camera_position.w > 0.5f
+                   ? normalize(camera_position.xyz - input.world_position)
+                   : normalize(camera_view_direction.xyz);
     float NdotV = max(dot(N, V), 0.0001f);
     float3 F0 = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
     float3 ambient = lerp(ambient_ground.rgb, ambient_sky.rgb, hemisphere) *

@@ -205,6 +205,9 @@ int main() {
         nkscene::SceneView pbr_view = studio_view;
         pbr_view.camera.enabled = true;
         pbr_view.camera.view_projection[10] = -1.0f;
+        pbr_view.camera.has_view_pose = true;
+        pbr_view.camera.position = {0.0f, 0.0f, 2.0f};
+        pbr_view.camera.view_direction = {0.0f, 0.0f, 1.0f};
         pbr_view.studio_lighting.ambient_sky = {0.0f, 0.0f, 0.0f, 0.0f};
         pbr_view.studio_lighting.ambient_ground = {0.0f, 0.0f, 0.0f, 0.0f};
         const auto pbr_plan = nkscene::compile(scene->snapshot(), pbr_view);
@@ -217,6 +220,26 @@ int main() {
         material_resource.edit_state().roughness = 0.25f;
         scene->publish();
         const auto smooth_pixels = capture_pbr();
+        auto shifted_view = pbr_view;
+        shifted_view.camera.position[0] = 1.0f;
+        const auto shifted_plan = nkscene::compile(scene->snapshot(), shifted_view);
+        assert(shifted_plan.view_signature() != pbr_plan.view_signature());
+        std::vector<std::uint8_t> shifted_pixels;
+        assert(executor.capture_rgba8(shifted_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, shifted_pixels) == NKGPU_OK);
+        assert(shifted_pixels != smooth_pixels);
+        auto orthographic_view = pbr_view;
+        orthographic_view.camera.orthographic = true;
+        const auto ortho_plan = nkscene::compile(scene->snapshot(), orthographic_view);
+        std::vector<std::uint8_t> ortho_pixels;
+        assert(executor.capture_rgba8(ortho_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, ortho_pixels) == NKGPU_OK);
+        orthographic_view.camera.position[0] = 1.0f;
+        const auto shifted_ortho_plan = nkscene::compile(scene->snapshot(), orthographic_view);
+        std::vector<std::uint8_t> shifted_ortho_pixels;
+        assert(executor.capture_rgba8(shifted_ortho_plan, scene->snapshot(), options.width,
+                   options.height, {0.0f, 0.0f, 0.0f, 1.0f}, shifted_ortho_pixels) == NKGPU_OK);
+        assert(shifted_ortho_pixels == ortho_pixels);
         material_resource.edit_state().roughness = 0.9f;
         scene->publish();
         const auto rough_pixels = capture_pbr();

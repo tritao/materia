@@ -128,6 +128,10 @@ SceneCamera camera_from_node(const SceneNode &node,
                                    const CameraResource &resource) noexcept {
     SceneCamera result;
     result.enabled = true;
+    result.has_view_pose = true;
+    result.orthographic = resource.projection == CameraProjection::Orthographic;
+    result.position = column(node.world_transform.transform, 3);
+    result.view_direction = normalized(column(node.world_transform.transform, 0));
     result.view_projection = multiply(scene_camera_projection(resource),
                                       scene_camera_view(node.world_transform.transform));
     return result;
@@ -388,6 +392,14 @@ std::uint64_t view_signature(const SceneView &view) noexcept {
     add(view.camera_node.value);
     for (const auto value : view.camera.view_projection)
         add(std::hash<float>{}(value));
+    add(view.camera.has_view_pose ? 1 : 0);
+    if (view.camera.has_view_pose) {
+        add(view.camera.orthographic ? 1 : 0);
+        for (const auto value : view.camera.position)
+            add(std::hash<float>{}(value));
+        for (const auto value : view.camera.view_direction)
+            add(std::hash<float>{}(value));
+    }
     add(view.studio_lighting.enabled ? 1 : 0);
     if (view.studio_lighting.enabled) {
         for (const auto &light : view.studio_lighting.directions)
@@ -446,6 +458,7 @@ void build_items(RenderPlan &plan, const SceneSnapshot &snapshot, const SceneVie
     plan.visible_items_ = 0;
     plan.culled_items_ = 0;
     plan.view_projection_ = camera.view_projection;
+    plan.camera_ = camera;
     plan.items_.reserve(snapshot.nodes().size());
     plan.transforms_.reserve(snapshot.nodes().size());
     plan.item_sources_.reserve(snapshot.nodes().size());

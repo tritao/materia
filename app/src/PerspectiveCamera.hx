@@ -165,10 +165,15 @@ class PerspectiveCamera {
       ray.originY + ray.directionY * distance, planeZ);
   }
 
-  function eyePosition():Array<Float> {
+  public function eyePosition():Array<Float> {
     var cosPitch = Math.cos(pitch);
     return [targetX + distance * cosPitch * Math.cos(yaw),
       targetY + distance * cosPitch * Math.sin(yaw), targetZ + distance * Math.sin(pitch)];
+  }
+
+  public function viewDirection():Array<Float> {
+    var eye = eyePosition();
+    return normalize([eye[0] - targetX, eye[1] - targetY, eye[2] - targetZ]);
   }
 
   static function clipPoint(matrix:Transform, x:Float, y:Float, z:Float):Array<Float> {

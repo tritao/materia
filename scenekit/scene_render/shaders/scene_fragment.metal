@@ -20,6 +20,7 @@ struct SceneLightingParams
     float4 ambient_ground;
     float4 lighting_mode;
     float4 camera_position;
+    float4 camera_view_direction;
 };
 
 struct SceneClipParams
@@ -88,7 +89,9 @@ fragment float4 main0(SceneFragmentInput input [[stage_in]],
     float roughness = clamp(params.surface_params.y * metal_rough.g, 0.045, 1.0);
     float alpha_ggx = roughness * roughness;
     float alpha2 = alpha_ggx * alpha_ggx;
-    float3 V = normalize(lights.camera_position.xyz - input.world_position);
+    float3 V = lights.camera_position.w > 0.5
+                   ? normalize(lights.camera_position.xyz - input.world_position)
+                   : normalize(lights.camera_view_direction.xyz);
     float NdotV = max(dot(N, V), 0.0001);
     float3 F0 = mix(float3(0.04), albedo, metallic);
     float3 ambient = mix(lights.ambient_ground.rgb, lights.ambient_sky.rgb, hemisphere) *

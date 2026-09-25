@@ -43,12 +43,28 @@ class SceneView {
 		camera.set_enabled(1);
 		camera.set_view_projection(transform.nativeValue());
 		value.set_camera(camera);
+		value.set_camera_view_pose_enabled(0);
 		return this;
 	}
 
 	/** Disables bounds culling and restores the default identity projection. */
 	public function clearViewProjection():SceneView {
 		value.set_camera(new nkscene_render_camera());
+		value.set_camera_view_pose_enabled(0);
+		return this;
+	}
+
+	/** Supplies the exact eye and view direction for an explicit projection. */
+	public function setCameraViewPose(position:Array<Float>, viewDirection:Array<Float>,
+			orthographic:Bool = false):SceneView {
+		if (position.length != 3 || viewDirection.length != 3)
+			throw "invalid camera view pose";
+		value.set_camera_view_pose_enabled(1);
+		for (axis in 0...3) {
+			value.set_camera_world_position(axis, position[axis]);
+			value.set_camera_view_direction(axis, viewDirection[axis]);
+		}
+		value.set_camera_orthographic(orthographic ? 1 : 0);
 		return this;
 	}
 

@@ -129,8 +129,14 @@ struct ClipPlane {
 
 struct SceneCamera {
     bool enabled = false;
+    bool has_view_pose = false;
+    bool orthographic = false;
+    std::array<float, 3> position{};
+    /** World-space unit vector from the scene toward the camera. */
+    std::array<float, 3> view_direction{0.0f, 0.0f, 1.0f};
     std::array<float, 16> view_projection{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                                           0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    friend bool operator==(const SceneCamera &, const SceneCamera &) = default;
 };
 
 /** Runtime world transform supplied by a presentation without editing the scene. */
@@ -426,6 +432,7 @@ class RenderPlan {
     std::size_t visible_items() const noexcept { return visible_items_; }
     std::size_t culled_items() const noexcept { return culled_items_; }
     const std::array<float, 16> &view_projection() const noexcept { return view_projection_; }
+    const SceneCamera &camera() const noexcept { return camera_; }
     const StudioLighting &studio_lighting() const noexcept { return studio_lighting_; }
     std::span<const std::array<float, 4>> clip_planes() const noexcept {
         return {clip_planes_.data(), clip_plane_count_};
@@ -493,6 +500,7 @@ class RenderPlan {
     NodeId view_root_;
     std::array<float, 16> view_projection_ = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
                                               0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    SceneCamera camera_;
     StudioLighting studio_lighting_;
     bool camera_enabled_ = false;
     std::array<std::array<float, 4>, max_clip_planes> clip_planes_{};

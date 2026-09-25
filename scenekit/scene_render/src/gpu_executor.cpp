@@ -75,10 +75,11 @@ struct LightingUniformData {
     std::array<float, 4> ambient_sky{0.35f, 0.35f, 0.35f, 0.0f};
     std::array<float, 4> ambient_ground{0.35f, 0.35f, 0.35f, 0.0f};
     std::array<float, 4> lighting_mode{}; // x = studio shading, y = light count, z = environment reflection
-    std::array<float, 4> camera_position{}; // world-space near-plane center
+    std::array<float, 4> camera_position{}; // xyz = world-space eye, w = perspective
+    std::array<float, 4> camera_view_direction{0.0f, 0.0f, 1.0f, 0.0f};
 };
 
-static_assert(sizeof(LightingUniformData) == sizeof(float) * (32 * 4 * 4 + 16));
+static_assert(sizeof(LightingUniformData) == sizeof(float) * (32 * 4 * 4 + 20));
 
 struct PostProcessUniformData {
     std::array<float, 4> color_params{};
@@ -628,6 +629,8 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
             (result = nkgpu_shader_uniform(shader_builder, 3, 6, "lighting_mode",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform(shader_builder, 3, 7, "camera_position",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 8, "camera_view_direction",
                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                            "base_color_texture")) != NKGPU_OK ||
@@ -1899,6 +1902,18 @@ std::array<float, 4> camera_position_from_view_projection(const RenderPlan &plan
             homogeneous[2] / homogeneous[3], 1.0f};
 }
 
+void set_lighting_camera(LightingUniformData &lighting, const RenderPlan &plan) noexcept {
+    const auto &camera = plan.camera();
+    if (!camera.has_view_pose) {
+        lighting.camera_position = camera_position_from_view_projection(plan);
+        return;
+    }
+    lighting.camera_position = {camera.position[0], camera.position[1], camera.position[2],
+                                camera.orthographic ? 0.0f : 1.0f};
+    lighting.camera_view_direction = {camera.view_direction[0], camera.view_direction[1],
+                                      camera.view_direction[2], 0.0f};
+}
+
 bool unproject_pick_pixel(const RenderPlan &plan, std::uint32_t x, std::uint32_t y,
                           std::uint32_t width, std::uint32_t height, float depth,
                           Vec3 &world_position) noexcept {
@@ -2114,7 +2129,7 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
     }
     const auto clip_data = clip_uniform_data(plan);
     auto lighting_data = lighting_uniform_data(plan, snapshot);
-    lighting_data.camera_position = camera_position_from_view_projection(plan);
+    set_lighting_camera(lighting_data, plan);
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
         if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
@@ -2286,7 +2301,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
 
     const auto clip_data = clip_uniform_data(plan);
     auto lighting_data = lighting_uniform_data(plan, snapshot);
-    lighting_data.camera_position = camera_position_from_view_projection(plan);
+    set_lighting_camera(lighting_data, plan);
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
         if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)

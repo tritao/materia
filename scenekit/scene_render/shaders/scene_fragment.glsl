@@ -13,6 +13,7 @@ uniform vec4 ambient_sky;
 uniform vec4 ambient_ground;
 uniform vec4 lighting_mode;
 uniform vec4 camera_position;
+uniform vec4 camera_view_direction;
 uniform sampler2D base_color_texture;
 uniform sampler2D metallic_roughness_texture;
 uniform sampler2D normal_texture;
@@ -66,7 +67,9 @@ void main() {
     float roughness = clamp(material_params.y * metal_rough.g, 0.045, 1.0);
     float alpha_ggx = roughness * roughness;
     float alpha2 = alpha_ggx * alpha_ggx;
-    vec3 V = normalize(camera_position.xyz - world_position);
+    vec3 V = camera_position.w > 0.5
+                 ? normalize(camera_position.xyz - world_position)
+                 : normalize(camera_view_direction.xyz);
     float NdotV = max(dot(N, V), 0.0001);
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
     vec3 ambient = mix(ambient_ground.rgb, ambient_sky.rgb, hemisphere) *
