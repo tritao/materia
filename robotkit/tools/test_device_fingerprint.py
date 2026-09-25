@@ -28,6 +28,16 @@ class FingerprintTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             module.fingerprint(b"", lock)
 
+    def test_g474_bench_artifacts_match(self):
+        root = MODULE_PATH.parents[1]
+        deployment = root / "deployment/bench-nucleo-g474re"
+        robot = json.loads((deployment / "robot.json").read_text())
+        value = module.fingerprint((deployment / "layout.json").read_bytes(),
+                                   (deployment / "device_wire.lock.json").read_bytes())
+        self.assertEqual(robot["device"]["fingerprint"], value.hex())
+        self.assertEqual((root / "device_protocol/boards/nucleo-g474re/src/fingerprint.rs")
+                         .read_text(), module.rust_constant(value))
+
 
 if __name__ == "__main__":
     unittest.main()

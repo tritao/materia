@@ -1,0 +1,13 @@
+[package]
+name = "robotkit-nucleo-g474re"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+robotkit-device-protocol = { path = "../.." }
+stm32g4xx-hal = { version = "0.1.0", features = ["stm32g474"] }
+cortex-m = "0.7.7"
+cortex-m-rt = "0.7.5"
+panic-halt = "1.0"
+embedded-hal-old = { package = "embedded-hal", version = "0.2.7" }
+nb = "1.1"

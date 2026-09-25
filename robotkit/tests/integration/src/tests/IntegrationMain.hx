@@ -4,15 +4,27 @@ class IntegrationMain {
   public static function main():Void {
     var arguments = Sys.args();
     var port = parsePort(arguments);
-    if (arguments.indexOf("--smoke") >= 0) RobotClientSmoke.run("127.0.0.1", port);
+    var host = parseHost(arguments);
+    if (arguments.indexOf("--smoke") >= 0) RobotClientSmoke.run(host, port);
     else if (arguments.indexOf("--device") >= 0)
-      RobotSessionIntegration.runDevice("127.0.0.1", port);
+      RobotSessionIntegration.runDevice(host, port);
     else if (arguments.indexOf("--local-owner") >= 0)
-      RobotSessionIntegration.runLocalOwner("127.0.0.1", port);
-    else if (arguments.indexOf("--sessions") >= 0) RobotSessionIntegration.run("127.0.0.1", port);
+      RobotSessionIntegration.runLocalOwner(host, port);
+    else if (arguments.indexOf("--sessions") >= 0) RobotSessionIntegration.run(host, port);
     else if (arguments.indexOf("--restart-check") >= 0)
-      WorldTcpIntegration.runRestartCheck("127.0.0.1", port);
-    else WorldTcpIntegration.run("127.0.0.1", port);
+      WorldTcpIntegration.runRestartCheck(host, port);
+    else WorldTcpIntegration.run(host, port);
+  }
+
+  static function parseHost(arguments:Array<String>):String {
+    for (argument in arguments) {
+      if (argument.indexOf("--host=") == 0) {
+        var value = argument.substr(7);
+        if (value.length == 0) throw "RobotKit integration test requires a nonempty --host";
+        return value;
+      }
+    }
+    return "127.0.0.1";
   }
 
   static function parsePort(arguments:Array<String>):Int {

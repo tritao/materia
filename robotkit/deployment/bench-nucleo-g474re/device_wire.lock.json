@@ -1,0 +1,212 @@
+{
+  "constants": {
+    "MAX_JOINTS": {
+      "type": "u8",
+      "value": 64
+    },
+    "PROTOCOL_VERSION": {
+      "type": "u8",
+      "value": 5
+    }
+  },
+  "enums": {
+    "CommandKind": {
+      "underlying": "u8",
+      "values": {
+        "emergency_stop": 3,
+        "reset_safety": 4,
+        "stop": 2,
+        "targets": 1
+      }
+    },
+    "MessageType": {
+      "underlying": "u8",
+      "values": {
+        "command": 3,
+        "session_ack": 2,
+        "session_begin": 1,
+        "state": 4
+      }
+    },
+    "SessionStatus": {
+      "underlying": "u8",
+      "values": {
+        "latched_safe": 1,
+        "model_mismatch": 2
+      }
+    },
+    "TargetMode": {
+      "underlying": "u8",
+      "values": {
+        "effort": 3,
+        "position": 1,
+        "velocity": 2
+      }
+    }
+  },
+  "messages": {},
+  "packed_structs": {
+    "CommandHeader": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "target_count",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "reserved",
+          "type": "u16"
+        }
+      ],
+      "size": 20
+    },
+    "JointState": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "position",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "velocity",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "effort",
+          "type": "f32"
+        }
+      ],
+      "size": 12
+    },
+    "JointTarget": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "joint",
+          "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "mode",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "flags",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "value",
+          "type": "f32"
+        }
+      ],
+      "size": 8
+    },
+    "SessionAck": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 16,
+          "name": "device_fingerprint",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "status",
+          "type": "u8"
+        },
+        {
+          "length": 3,
+          "name": "reserved",
+          "type": "u8"
+        }
+      ],
+      "size": 28
+    },
+    "SessionBegin": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 16,
+          "name": "model_fingerprint",
+          "type": "u8"
+        }
+      ],
+      "size": 24
+    },
+    "StateHeader": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "timestamp_ns",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "accepted_sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "safety",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "fault",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "joint_count",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "reserved",
+          "type": "u8"
+        }
+      ],
+      "size": 28
+    }
+  },
+  "version": 1
+}

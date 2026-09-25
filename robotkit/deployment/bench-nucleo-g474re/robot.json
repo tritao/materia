@@ -1,0 +1,33 @@
+{
+  "name": "bench-nucleo-g474re",
+  "layout": "layout.json",
+  "schema_lock": "device_wire.lock.json",
+  "device": {
+    "path": "/dev/robotkit-mcu",
+    "baud": 460800,
+    "fingerprint": "dd4fff8c84fba2fabc96085ee0587059",
+    "target_error": 1e-06
+  },
+  "joints": [
+    {
+      "id": "joint/left-wheel",
+      "name": "left wheel",
+      "type": "continuous",
+      "limits": {
+        "lower": -100,
+        "upper": 100,
+        "effort": 100
+      }
+    },
+    {
+      "id": "joint/right-wheel",
+      "name": "right wheel",
+      "type": "continuous",
+      "limits": {
+        "lower": -100,
+        "upper": 100,
+        "effort": 100
+      }
+    }
+  ]
+}

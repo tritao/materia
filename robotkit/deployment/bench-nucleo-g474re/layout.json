@@ -1,0 +1,6 @@
+{
+  "channels": [
+    {"index": 0, "joint": "joint/left-wheel", "source": "virtual-state", "actuator": "none"},
+    {"index": 1, "joint": "joint/right-wheel", "source": "virtual-state", "actuator": "none"}
+  ]
+}
