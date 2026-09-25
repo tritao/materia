@@ -755,6 +755,28 @@ class RobotWorldTests {
     ], "odom"), profileBase, 0.5, 0.5, 0.1);
     check(reverseTrajectory.sampleAt(reverseTrajectory.durationSeconds * 0.5).twist.linear < 0.0,
       "Trajectory parameterization preserves reverse body velocity");
+    var reversingTrajectory = Trajectory.fromPath(new Path([
+      new Pose2(), new Pose2(-0.4, 0.0, 0.0), new Pose2(0.2, 0.0, 0.0)
+    ], "odom"), profileBase, 0.5, 0.5, 0.1);
+    var reversedBeforeCusp = false;
+    var stoppedAtCusp = false;
+    var forwardAfterCusp = false;
+    var reversingSamples = reversingTrajectory.samples();
+    for (sample in reversingSamples) {
+      if (sample.pose.x < -0.05 && sample.pose.x > -0.4 && sample.twist.linear < 0.0)
+        reversedBeforeCusp = true;
+      if (Math.abs(sample.pose.x + 0.4) < 1e-9 && Math.abs(sample.twist.linear) < 1e-9)
+        stoppedAtCusp = true;
+      if (sample.pose.x > -0.35 && sample.twist.linear > 0.0)
+        forwardAfterCusp = true;
+    }
+    check(reversedBeforeCusp && stoppedAtCusp && forwardAfterCusp,
+      "Trajectory stops at a gear-change cusp and resumes with the new travel direction");
+    var shortTrajectory = Trajectory.fromPath(new Path([
+      new Pose2(), new Pose2(0.04, 0.0, 0.0)
+    ], "odom"), profileBase, 0.5, 0.5, 0.1);
+    check(shortTrajectory.count() >= 3 && shortTrajectory.durationSeconds > 0.0,
+      "Trajectory profiles short paths with an interior acceleration sample");
     var ackermannProfileBase = new MobileBase(new FakeRobot("ackermann-profile"),
       new AckermannDrive(0, 1, 1.0, 0.1, 0.2), new MotionLimits(1.0, 1.0));
     throws(function() Trajectory.fromPath(new Path([

@@ -62,9 +62,16 @@ class Trajectory {
         poses.push(from);
         distances.push(distance);
         tangents.push(tangent);
+      } else {
+        // A corner belongs to its outgoing segment for direction selection.
+        // This lets a stop at a forward/reverse cusp occur at the waypoint.
+        tangents[tangents.length - 1] = tangent;
       }
       var subdivisions = Std.int(Math.ceil(length / sampleSpacing));
-      if (subdivisions < 1) subdivisions = 1;
+      // Endpoints can both be zero-speed (route endpoints or a gear-change
+      // cusp). An interior sample is needed to accelerate and decelerate over
+      // short segments instead of producing an untraversable zero-speed edge.
+      if (subdivisions < 2) subdivisions = 2;
       for (part in 1...subdivisions + 1) {
         var alongSegment = length * part / subdivisions;
         var absoluteDistance = distance + alongSegment;
@@ -117,7 +124,6 @@ class Trajectory {
     for (index in 1...direction.length) {
       if (direction[index] != direction[index - 1]) {
         speedCaps[index] = 0.0;
-        speedCaps[index - 1] = 0.0;
       }
     }
 
