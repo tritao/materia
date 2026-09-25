@@ -10,12 +10,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .model import Field, Message, Schema
-from .parser import parse_file
-from .validate import ValidationError, dump_normalized, normalized, validate_evolution
+from tools.wire.model import Field, Message, Schema
+from tools.wire.parser import parse_file
+from tools.wire.validate import ValidationError, dump_normalized, normalized, validate_evolution
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parent
 SCHEMA = ROOT / "schema/sensor_wire.nkw"
 EXAMPLES = ROOT / "schema/sensor_wire_examples.json"
 LOCK = ROOT / "schema/sensor_wire.lock.json"

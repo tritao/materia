@@ -27,8 +27,8 @@ set_target_properties(nativekit_sensor_io PROPERTIES
 find_package(Python3 3.10 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_custom_target(sensor_wire_generate
-        COMMAND ${Python3_EXECUTABLE} -B -m tools.wire.generate
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+        COMMAND ${Python3_EXECUTABLE} -B -m tools.wire generate --config sensorkit/wire.json
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
         COMMENT "Generate SensorKit wire artifacts from the canonical schema")
 endif()
 
@@ -46,14 +46,14 @@ endif()
 if(NK_BUILD_TESTS)
     if(Python3_Interpreter_FOUND)
         add_test(NAME sensor_wire_codegen
-            COMMAND ${Python3_EXECUTABLE} -B -m tools.wire.generate --check)
+            COMMAND ${Python3_EXECUTABLE} -B -m tools.wire check --config sensorkit/wire.json)
         set_tests_properties(sensor_wire_codegen PROPERTIES
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
             LABELS "sensor;wire;codegen" TIMEOUT 30)
         add_test(NAME sensor_wire_schema_tests
-            COMMAND ${Python3_EXECUTABLE} -B -m unittest tools.wire.tests.test_wire)
+            COMMAND ${Python3_EXECUTABLE} -B -m unittest sensorkit.tests.test_wire_schema)
         set_tests_properties(sensor_wire_schema_tests PROPERTIES
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
             LABELS "sensor;wire;codegen" TIMEOUT 30)
     endif()
     if(TARGET sensor_wire_haxe_vectors)

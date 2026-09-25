@@ -1,0 +1,5 @@
+{
+  "schema": "schema/sensor_wire.nkw",
+  "lock": "schema/sensor_wire.lock.json",
+  "generator": "sensorkit.wire_generate"
+}
