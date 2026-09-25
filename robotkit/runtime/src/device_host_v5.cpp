@@ -160,6 +160,7 @@ bool HostLink::begin_session() {
     session_id_ = 0;
     last_sent_sequence_ = 0;
     last_timestamp_ns_ = 0;
+    has_timestamp_ = false;
     last_session_status_ = 0;
     input_.clear();
     if (joint_count_ > device_wire::MAX_JOINTS || !response_deadline_us(baud_)) return false;
@@ -244,7 +245,7 @@ bool HostLink::read_state(HostState &state) {
         if (head.session != session_id_ || head.reserved || head.joint_count != joint_count_ ||
             head.safety > 3 || payload.size() != device_wire::StateHeader::SIZE +
             head.joint_count * device_wire::JointState::SIZE ||
-            head.timestamp_ns <= last_timestamp_ns_ ||
+            (has_timestamp_ && head.timestamp_ns <= last_timestamp_ns_) ||
             head.accepted_sequence > last_sent_sequence_ ||
             (head.accepted_sequence < last_sent_sequence_ && head.safety < 2)) continue;
         bool valid = true;
@@ -257,6 +258,7 @@ bool HostLink::read_state(HostState &state) {
         }
         if (!valid) continue;
         last_timestamp_ns_ = head.timestamp_ns;
+        has_timestamp_ = true;
         state = decoded;
         return true;
     }

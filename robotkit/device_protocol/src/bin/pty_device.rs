@@ -24,9 +24,10 @@ impl Device for FakeDevice {
     }
     fn reset_safety(&mut self) -> bool { self.resets += 1; true }
     fn read_state(&mut self, joints: &mut [JointState; MAX_JOINTS as usize]) -> StateMeta {
+        let timestamp_ns = self.timestamp;
         self.timestamp += 1;
         joints[0] = JointState { position: 1.0, velocity: -2.0, effort: 0.5 };
-        StateMeta { timestamp_ns: self.timestamp, safety: 0, fault: 0, joint_count: 1 }
+        StateMeta { timestamp_ns, safety: 0, fault: 0, joint_count: 1 }
     }
 }
 
@@ -58,8 +59,8 @@ fn main() {
     let start = Instant::now();
     let mut read_buffer = [0u8; 17];
     let mut frame = [0u8; MAX_FRAME_SIZE];
-    let mut ack = [0u8; MAX_FRAME_SIZE];
-    let mut ack_size = 0;
+    let mut outbound = [[0u8; MAX_FRAME_SIZE]; 2];
+    let mut outbound_size = [0usize; 2];
     loop {
         let mut control = [0u8; 1];
         match completion.read(&mut control) {
@@ -78,12 +79,14 @@ fn main() {
         match port.read(&mut read_buffer) {
             Ok(n) if n > 0 => {
                 let accepted = protocol.feed(&read_buffer[..n], now_ns, &mut device, |bytes| {
-                    ack[..bytes.len()].copy_from_slice(bytes);
-                    ack_size = bytes.len();
+                    let slot = outbound_size.iter().position(|size| *size == 0).unwrap();
+                    outbound[slot][..bytes.len()].copy_from_slice(bytes);
+                    outbound_size[slot] = bytes.len();
                 });
-                if ack_size != 0 {
-                    write_chunks(&mut port, &ack[..ack_size]);
-                    ack_size = 0;
+                for index in 0..outbound_size.len() {
+                    if outbound_size[index] == 0 { continue; }
+                    write_chunks(&mut port, &outbound[index][..outbound_size[index]]);
+                    outbound_size[index] = 0;
                 }
                 if accepted != 0 {
                     let size = protocol.encode_state(&mut device, &mut frame).unwrap();

@@ -55,7 +55,13 @@ model/layout mismatch; it is not an authentication mechanism.
 
 A matching session is acknowledged `latched_safe`. Motion remains forbidden
 until an explicit accepted `reset_safety` command, subject to device safety
-hardware and application checks. Sequence numbers must start above zero and
+hardware and application checks.
+The device sends an initial latched-safe `STATE` immediately after the
+`SESSION_ACK`, so the host can publish a complete joint snapshot before its
+first command. If the application cannot produce a valid state, it must remain
+safe; the host's initial sample will fail rather than invent joint values.
+
+Sequence numbers must start above zero and
 increase strictly within the session. Only a fully validated command accepted
 by the device application advances the watermark and refreshes the watchdog.
 Malformed, stale, wrong-session, mismatched-model, or rejected commands do

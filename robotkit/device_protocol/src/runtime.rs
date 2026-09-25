@@ -110,7 +110,7 @@ impl DeviceProtocol {
         false
     }
 
-    /// Calls `emit` synchronously for each session acknowledgement. The caller
+    /// Calls `emit` synchronously for each session ACK and initial safe STATE. The caller
     /// must copy or queue bytes before returning; the slice uses a local buffer.
     pub fn feed<D: Device>(&mut self, input: &[u8], now_ns: u64, device: &mut D,
                            mut emit: impl FnMut(&[u8])) -> usize {
@@ -220,6 +220,10 @@ impl DeviceProtocol {
                         let mut frame = [0u8; HEADER_SIZE + SessionAck::SIZE + CRC_SIZE];
                         if ack.encode(&mut body).is_ok() {
                             if let Ok(size) = encode_frame(2, &body, &mut frame) { emit(&frame[..size]); }
+                        }
+                        let mut state_frame = [0u8; MAX_FRAME_SIZE];
+                        if let Ok(size) = self.encode_state(device, &mut state_frame) {
+                            emit(&state_frame[..size]);
                         }
                     }
                 } else { self.stats.invalid += 1; }

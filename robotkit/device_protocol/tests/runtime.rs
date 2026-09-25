@@ -9,6 +9,7 @@ struct FakeDevice {
     accept_targets: bool,
     state_safety: u8,
     bad_state: bool,
+    joint_count: u8,
 }
 
 impl Device for FakeDevice {
@@ -22,7 +23,8 @@ impl Device for FakeDevice {
     }
     fn read_state(&mut self, joints: &mut [JointState; MAX_JOINTS as usize]) -> StateMeta {
         joints[0] = JointState { position: if self.bad_state { f32::NAN } else { 1.0 }, velocity: -2.0, effort: 0.5 };
-        StateMeta { timestamp_ns: 123456789, safety: self.state_safety, fault: 0, joint_count: 1 }
+        StateMeta { timestamp_ns: 123456789, safety: self.state_safety, fault: 0,
+            joint_count: if self.joint_count == 0 { 1 } else { self.joint_count } }
     }
 }
 
@@ -59,7 +61,7 @@ fn every_fragment_boundary_and_canonical_outputs() {
     let fingerprint = core::array::from_fn(|index| index as u8);
     for split in 0..=stream.len() {
         let mut core = DeviceProtocol::new(2, fingerprint).unwrap();
-        let mut device = FakeDevice { accept_reset: true, accept_targets: true, ..Default::default() };
+        let mut device = FakeDevice { accept_reset: true, accept_targets: true, joint_count: 2, ..Default::default() };
         let mut emitted = Vec::new();
         let first = core.feed(&stream[..split], 100, &mut device, |bytes| emitted.push(bytes.to_vec()));
         let second = core.feed(&stream[split..], 100, &mut device, |bytes| emitted.push(bytes.to_vec()));
@@ -68,8 +70,11 @@ fn every_fragment_boundary_and_canonical_outputs() {
         assert_eq!(device.applied, 1);
         assert_eq!(core.last_sequence(), 2);
         assert!(!core.latched());
-        assert_eq!(emitted.len(), 1);
+        assert_eq!(emitted.len(), 2);
         assert_eq!(emitted[0], fixture("session_ack"));
+        let initial = StateHeader::decode(&emitted[1][HEADER_SIZE..HEADER_SIZE + StateHeader::SIZE]).unwrap();
+        assert_eq!(initial.safety, 2);
+        assert_eq!(initial.accepted_sequence, 0);
     }
 
     let mut core = DeviceProtocol::new(1, fingerprint).unwrap();
@@ -97,7 +102,7 @@ fn rejected_traffic_never_changes_watermark_or_watchdog() {
     let session = 0x0102_0304_0506_0708;
     let fingerprint = core::array::from_fn(|index| index as u8);
     let mut core = DeviceProtocol::new(2, fingerprint).unwrap();
-    let mut device = FakeDevice { accept_reset: true, accept_targets: true, ..Default::default() };
+    let mut device = FakeDevice { accept_reset: true, accept_targets: true, joint_count: 2, ..Default::default() };
     let begin = fixture("session_begin");
     let reset = fixture("command_reset");
     let target = fixture("command_target");
@@ -139,7 +144,9 @@ fn rejected_traffic_never_changes_watermark_or_watchdog() {
     let mut wrong_frame = [0u8; HEADER_SIZE + SessionBegin::SIZE + CRC_SIZE];
     encode_frame(1, &wrong_payload, &mut wrong_frame).unwrap();
     let mut ack = Vec::new();
-    core.feed(&wrong_frame, 160, &mut device, |bytes| ack = bytes.to_vec());
+    core.feed(&wrong_frame, 160, &mut device, |bytes| {
+        if bytes[4] == 2 { ack = bytes.to_vec(); }
+    });
     assert_eq!(SessionAck::decode(&ack[HEADER_SIZE..HEADER_SIZE + SessionAck::SIZE]).unwrap().status, 2);
     assert!(!core.model_matches());
     assert_eq!(core.last_sequence(), 0);

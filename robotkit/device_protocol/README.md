@@ -9,10 +9,11 @@ Construct `DeviceProtocol` with the compiled joint count and 16-byte model
 fingerprint. Feed serial bytes and a monotonic receive time to `feed`. The
 `Device` adapter must synchronously stop outputs and clear targets in
 `stop_all`, validate and apply targets in `apply_targets`, decide whether a
-safety reset is allowed, and return a bounded joint snapshot. `feed` emits a
-complete `SESSION_ACK` frame through a callback; that callback must copy or
-queue its borrowed bytes before returning. `encode_state` writes a complete
-`STATE` frame into a caller-owned buffer.
+safety reset is allowed, and return a bounded joint snapshot. After a session
+begin, `feed` emits `SESSION_ACK` followed by an initial latched-safe `STATE`
+through a callback; that callback must copy or queue each borrowed frame
+before returning. `encode_state` writes later `STATE` frames into a
+caller-owned buffer.
 
 Call `poll_watchdog` from a device-local clock task with the configured timeout
 even when no bytes arrive. On expiry it calls `stop_all`, latches safety, and

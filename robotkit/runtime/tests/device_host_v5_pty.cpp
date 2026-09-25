@@ -40,8 +40,10 @@ int main(int argc, char **argv) {
     {
         auto link = v5::HostLink::open(slave, 115200, fingerprint, 1);
         CHECK(link && link->ready() && link->last_session_status() == 1);
-        CHECK(link->send_command(4));
         v5::HostState state{};
+        CHECK(link->read_state(state));
+        CHECK(state.header.safety == 2 && state.header.accepted_sequence == 0 && state.header.timestamp_ns == 0);
+        CHECK(link->send_command(4));
         CHECK(link->read_state(state));
         CHECK(state.header.safety == 0 && state.header.accepted_sequence == 1);
         const std::array<v5::HostTarget, 1> lossy{{{0, 2, 1.1}}};
@@ -64,6 +66,8 @@ int main(int argc, char **argv) {
         CHECK(previous_session != 0 && link->last_sent_sequence() == 2);
         CHECK(link->begin_session());
         CHECK(link->session_id() != previous_session && link->last_sent_sequence() == 0);
+        CHECK(link->read_state(state));
+        CHECK(state.header.safety == 2 && state.header.accepted_sequence == 0);
         CHECK(link->send_command(4) && link->read_state(state));
         CHECK(state.header.accepted_sequence == 1 && state.header.session == link->session_id());
     }

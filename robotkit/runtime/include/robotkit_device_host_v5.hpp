@@ -59,6 +59,7 @@ private:
     std::uint64_t session_id_ = 0;
     std::uint64_t last_sent_sequence_ = 0;
     std::uint64_t last_timestamp_ns_ = 0;
+    bool has_timestamp_ = false;
     std::uint8_t last_session_status_ = 0;
     bool ready_ = false;
 };
