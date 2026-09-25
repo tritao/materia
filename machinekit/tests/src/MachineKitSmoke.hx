@@ -12,6 +12,9 @@ import machinekit.standard.FlatWasher;
 import machinekit.standard.HexBolt;
 import machinekit.standard.HexNut;
 import machinekit.standard.ParallelKey;
+import machinekit.robotics.EndEffectorPlate;
+import machinekit.robotics.Pedestal;
+import machinekit.robotics.RobotFlange;
 import machinekit.standard.RetainingRing;
 import machinekit.standard.ShaftCollar;
 import machinekit.standard.SocketHeadCapScrew;
@@ -514,6 +517,55 @@ class MachineKitSmoke {
 		check(axis.bom().quantity(axis.bearing.designation) == 2, "linear axis bearing quantity");
 	}
 
+	static function robotics():Void {
+		var flange = new RobotFlange(50);
+		check(flange.designation == "ISO9409-50", "robot flange designation");
+		near(flange.thickness, 8, "robot flange thickness");
+		near(flange.pilotDiameter, 25, "robot flange pilot diameter");
+		near(flange.boltCircleDiameter, 39, "robot flange bolt circle");
+		check(flange.mountScrew == "M5", "robot flange mount screw size");
+		throws(() -> new RobotFlange(-1), "positive diameter");
+		throws(() -> new RobotFlange(50, 2), "at least 3 bolts");
+
+		var envelope = flange.geometry(Envelope);
+		solid(envelope, "robot flange envelope");
+		var envelopeVolume = envelope.volume();
+		near(envelopeVolume, Math.PI * 25 * 25 * 8 + Math.PI * 12.5 * 12.5 * 3, "robot flange envelope volume");
+		envelope.close();
+		var preview = flange.geometry();
+		solid(preview, "robot flange preview");
+		check(preview.volume() < envelopeVolume, "robot flange preview removes bolt and pin holes");
+		preview.close();
+		near(flange.connector("bolt1").frame.x, 19.5, "robot flange bolt1 x");
+		near(flange.connector("bolt2").frame.y, 19.5, "robot flange bolt2 y");
+
+		var eoat = new EndEffectorPlate(flange);
+		check(eoat.designation == "EOAT-50-8", "end effector plate designation");
+		near(eoat.thickness, flange.thickness, "end effector plate default thickness");
+		var eoatEnvelope = eoat.geometry(Envelope);
+		solid(eoatEnvelope, "end effector plate envelope");
+		near(eoatEnvelope.volume(), Math.PI * 25 * 25 * eoat.thickness, "end effector plate envelope volume");
+		eoatEnvelope.close();
+		var eoatPreview = eoat.geometry();
+		solid(eoatPreview, "end effector plate preview");
+		eoatPreview.close();
+		throws(() -> new EndEffectorPlate(flange, 1), "must be thicker than the flange's pilot boss");
+		near(eoat.connector("tool").frame.z, eoat.thickness, "end effector plate tool connector");
+
+		var pedestal = new Pedestal(flange, 300);
+		check(pedestal.designation == "PEDESTAL-50-300", "pedestal designation");
+		near(pedestal.baseDiameter, 80, "pedestal base diameter");
+		near(pedestal.columnDiameter, 50, "pedestal column diameter");
+		throws(() -> new Pedestal(flange, 5), "must clear the flange's pilot boss");
+		var pedestalEnvelope = pedestal.geometry(Envelope);
+		solid(pedestalEnvelope, "pedestal envelope");
+		pedestalEnvelope.close();
+		var pedestalPreview = pedestal.geometry();
+		solid(pedestalPreview, "pedestal preview");
+		pedestalPreview.close();
+		near(pedestal.connector("top").frame.z, 300, "pedestal top connector");
+	}
+
 	static function assembly():Void {
 		var example = new MotorShaftBearings();
 		check(example.screw.designation == "ISO4762-M3x10", "selected mount screw");
@@ -575,6 +627,7 @@ class MachineKitSmoke {
 		gears();
 		pillowBlock();
 		linearAxis();
+		robotics();
 		assembly();
 		trace("MachineKit smoke passed");
 	}

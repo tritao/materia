@@ -88,6 +88,23 @@ library classes rather than one-off scripts:
   both ends (a statically indeterminate assembly), which this simplified
   kinematic model does not attempt to capture.
 
+## Robotics
+
+`machinekit.robotics` has mechanical generators for mounting a robot arm and
+its tooling, not a link to `robotkit`'s runtime model (which references mesh
+files by path, not CadKit geometry, so the bridge is at the level of a shared
+`AssemblyModel`/BOM workflow, not a shared type):
+
+- `RobotFlange` is an ISO 9409-1 style tool flange (pilot boss, bolt circle,
+  and locating pin, sized proportionally to the flange diameter rather than
+  from a literal standard table), with a `mountingCutout()` companion like
+  `NemaStepper`'s.
+- `EndEffectorPlate` adapts a `RobotFlange`'s bolt pattern to a smaller tool
+  bolt circle, the same cut-and-expose-a-new-pattern shape as `MotorPlate` in
+  `MotorShaftBearings.hx`.
+- `Pedestal` is a column stand with a floor bolt pattern at its base and a
+  `RobotFlange`-matching mount at its top.
+
 Run the smoke tests after building CadKit's native library:
 
 ```sh
