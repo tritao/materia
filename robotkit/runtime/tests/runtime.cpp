@@ -248,6 +248,13 @@ int main() {
     mixed_blueprint.joint_count = 3;
     mixed_blueprint.link_count = 4;
     mixed_blueprint.joints[2] = {2, RK_RUNTIME_JOINT_REVOLUTE, 2, 3, -1.0, 1.0, 3.0};
+    mixed_blueprint.joints[2].parent_frame_rotation[3] = 1.0;
+    mixed_blueprint.joints[2].child_frame_rotation[3] = 1.0;
+    mixed_blueprint.joints[2].axis[2] = 1.0;
+    mixed_blueprint.links[3].mass = 1.0;
+    mixed_blueprint.links[3].inertia_tensor[0] = 1.0;
+    mixed_blueprint.links[3].inertia_tensor[4] = 1.0;
+    mixed_blueprint.links[3].inertia_tensor[8] = 1.0;
     auto mixed_endpoint = std::make_shared<robotkit::InMemoryRobot>(3);
     robotkit::RobotRuntime mixed_control(mixed_blueprint, mixed_endpoint,
                                          std::chrono::milliseconds(100));

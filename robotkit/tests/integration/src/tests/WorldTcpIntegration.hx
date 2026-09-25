@@ -89,10 +89,11 @@ class WorldTcpIntegration {
       var protocolId = remote.protocolRobotId();
       if (protocolId == null || Int64.compare(protocolId,
         Int64.ofInt(42)) != 0) throw 'expected protocol robot ID 42, got ${Std.string(protocolId)}';
-      var remoteCapabilities = remote.capabilities();
-      if (remoteCapabilities.jointCount != 3 || !remoteCapabilities.supportsPosition
-          || !remoteCapabilities.supportsVelocity || !remoteCapabilities.supportsEffort)
-        throw "robotd did not advertise all joint target modes";
+      waitUntil(runtime, function() {
+        var capabilities = remote.capabilities();
+        return capabilities.jointCount == 3 && capabilities.supportsPosition
+          && capabilities.supportsVelocity && capabilities.supportsEffort;
+      }, "robotd did not advertise all joint target modes");
 
       waitUntil(runtime, function() {
         var state = world.snapshot().robot(LOGICAL_ID);

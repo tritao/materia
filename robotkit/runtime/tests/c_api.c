@@ -9,6 +9,13 @@ int main(void) {
     blueprint.revision = 1;
     blueprint.joint_count = 1;
     blueprint.link_count = 2;
+    blueprint.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    for (uint32_t link = 0; link < blueprint.link_count; ++link) {
+        blueprint.links[link].mass = 1.0;
+        blueprint.links[link].inertia_tensor[0] = 1.0;
+        blueprint.links[link].inertia_tensor[4] = 1.0;
+        blueprint.links[link].inertia_tensor[8] = 1.0;
+    }
     blueprint.joints[0].joint = 0;
     blueprint.joints[0].type = RK_RUNTIME_JOINT_REVOLUTE;
     blueprint.joints[0].parent_link = 0;
@@ -16,6 +23,9 @@ int main(void) {
     blueprint.joints[0].lower_limit = -1.0;
     blueprint.joints[0].upper_limit = 1.0;
     blueprint.joints[0].max_effort = 3.0;
+    blueprint.joints[0].parent_frame_rotation[3] = 1.0;
+    blueprint.joints[0].child_frame_rotation[3] = 1.0;
+    blueprint.joints[0].axis[2] = 1.0;
 
     rk_robot_runtime runtime = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_robot_runtime_create(&blueprint, &runtime) == RK_OK);

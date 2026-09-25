@@ -138,6 +138,7 @@ int main() {
         crc32(checksum_input.data(), checksum_input.size()));
     command.targets[0].joint = RK_MAX_SERIAL_JOINTS;
     assert(endpoint->apply(command) == RK_ERROR_LIMIT);
+    command.targets[0].joint = 2;
 
     auto state_packet = state_frame(1234);
     const auto split = state_packet.size() / 2;
@@ -192,9 +193,20 @@ int main() {
     blueprint.revision = 1;
     blueprint.joint_count = 6;
     blueprint.link_count = 7;
-    for (std::uint32_t joint = 0; joint < blueprint.joint_count; ++joint)
+    blueprint.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    for (std::uint32_t link = 0; link < blueprint.link_count; ++link) {
+        blueprint.links[link].mass = 1.0;
+        blueprint.links[link].inertia_tensor[0] = 1.0;
+        blueprint.links[link].inertia_tensor[4] = 1.0;
+        blueprint.links[link].inertia_tensor[8] = 1.0;
+    }
+    for (std::uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
         blueprint.joints[joint] = {joint, RK_RUNTIME_JOINT_REVOLUTE, joint, joint + 1,
             -10.0, 10.0, 10.0};
+        blueprint.joints[joint].parent_frame_rotation[3] = 1.0;
+        blueprint.joints[joint].child_frame_rotation[3] = 1.0;
+        blueprint.joints[joint].axis[2] = 1.0;
+    }
     blueprint.sensor_count = 2;
     blueprint.sensors[0].kind = RK_SENSOR_IMU;
     blueprint.sensors[0].link = 0;

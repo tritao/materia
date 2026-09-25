@@ -129,6 +129,18 @@ def read_server_log(output):
     return output.read()
 
 
+def tcp_ready(port):
+    connection = socket.socket()
+    connection.settimeout(0.1)
+    try:
+        connection.connect(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        connection.close()
+
+
 def run():
     master, slave = pty.openpty()
     tty.setraw(slave)
@@ -170,13 +182,15 @@ def run():
                 deadline = time.monotonic() + 60
                 while time.monotonic() < deadline:
                     log = read_server_log(server_output)
-                    if "robotd: listening" in log:
+                    if tcp_ready(port):
                         break
                     if server.poll() is not None:
                         raise RuntimeError("robotd exited before listening:\n" + log)
                     time.sleep(0.05)
                 else:
                     raise RuntimeError("robotd did not start:\n" + read_server_log(server_output))
+                # Let robotd clear the probe connection before the real client arrives.
+                time.sleep(0.1)
 
                 client = subprocess.run(
                     client_args, cwd=ROOT, capture_output=True, text=True, timeout=60

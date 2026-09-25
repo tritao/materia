@@ -27,8 +27,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
-for _ in $(seq 1 100); do
-  if grep -q "robotd: listening" "$server_log" 2>/dev/null; then
+ready=0
+for _ in $(seq 1 1200); do
+  if python3 - "$port" <<'PY'
+import socket
+import sys
+
+connection = socket.socket()
+connection.settimeout(0.1)
+try:
+    connection.connect(("127.0.0.1", int(sys.argv[1])))
+except OSError:
+    sys.exit(1)
+finally:
+    connection.close()
+PY
+  then
+    ready=1
     break
   fi
   if ! kill -0 "$server_pid" 2>/dev/null; then
@@ -38,7 +53,13 @@ for _ in $(seq 1 100); do
   sleep 0.05
 done
 
-grep -q "robotd: listening" "$server_log"
+if [[ "$ready" != "1" ]]; then
+  cat "$server_log"
+  echo "robotd did not accept TCP connections on port $port" >&2
+  exit 1
+fi
+# Let robotd process the probe disconnect before the real controller connects.
+sleep 0.1
 "$repo_dir/haxeon/scripts/haxeon" run --project "$client_project" -- \
   --port="$port" $client_mode
 if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" ]]; then
