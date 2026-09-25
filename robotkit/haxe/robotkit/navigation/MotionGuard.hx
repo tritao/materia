@@ -59,8 +59,7 @@ class MotionGuard {
   /** Updates the obstacle set and advances one navigation control iteration. */
   public function update(perception:PerceptionSnapshot,
       durationSeconds:Float):MotionGuardState {
-    observations = perception;
-    evaluate(navigation.base.currentCommand());
+    updatePerception(perception);
     navigation.update(durationSeconds);
     return state;
   }
@@ -68,9 +67,16 @@ class MotionGuard {
   /** Updates localization and obstacle data from the same robot observation. */
   public function updateObservation(snapshot:robotkit.world.RobotSnapshot,
       perception:PerceptionSnapshot, durationSeconds:Float):MotionGuardState {
+    updatePerception(perception);
+    navigation.updateObservation(snapshot, durationSeconds);
+    return state;
+  }
+
+  /** Replaces guard observations without advancing Navigation. */
+  public function updatePerception(perception:PerceptionSnapshot):MotionGuardState {
+    if (perception == null) throw "MotionGuard requires a perception snapshot";
     observations = perception;
     evaluate(navigation.base.currentCommand());
-    navigation.updateObservation(snapshot, durationSeconds);
     return state;
   }
 

@@ -267,15 +267,19 @@ be passed directly to `Navigation.follow()`.
 
 ```haxe
 var costmap = new Costmap2(occupancy, base.footprint.radius);
-costmap.setDynamicObstacles(perception.obstacles());
 var planner = new AStarPlanner(costmap);
-navigation.follow(planner.plan(localization.state().pose, goal));
+var navigator = new Navigator(navigation, planner, costmap);
+navigator.navigateTo(new NavigationGoal(goal, occupancy.frameId));
+navigator.update(perception, 0.02);
 ```
 
-Pass start and goal poses in the grid frame. Call `costmap.refresh()` after
-editing the underlying occupancy grid. Dynamic obstacle detections must already
-use the grid frame. The first planner is a global grid planner; goal management
-and replanning belong in a later `Navigator` layer.
+Update localization before each navigator update. The navigator copies dynamic
+obstacles from each perception snapshot into the costmap, replans when any
+sample of the remaining path becomes blocked, and stops if no route exists. It
+retries a blocked goal periodically so it can resume when the map clears. Poses
+and perception obstacles must use the grid frame. Call `costmap.refresh()` after
+editing the underlying occupancy grid. `Navigation.follow(path)` remains
+available for direct path tracking.
 `robotkit.safety` exposes operator-facing phase, active restrictions, speed
 limit, and stopping envelope values; the native runtime continues to enforce
 hard safety. `LoadSafetyPolicy.refresh()` reduces `MobileBase` speed and

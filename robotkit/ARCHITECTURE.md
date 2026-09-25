@@ -268,8 +268,10 @@ collision avoidance and does not replace native or hardware safety.
 adds dynamic obstacle disks, conservative unknown handling, circular footprint
 inflation, and a soft proximity cost. `AStarPlanner` applies deterministic
 8-connected A* without diagonal corner cutting and converts its route into a
-`Path` for `Navigation`. It plans a route once; goal orchestration and replanning
-will live in a separate `Navigator`.
+`Path` for `Navigation`. `Navigator` owns a framed goal, refreshes dynamic
+obstacles, and checks the remaining path against the costmap before each control
+step. It replans blocked routes and stops/retries if no traversable path exists.
+`Navigation.follow(path)` remains the lower-level tracking API.
 
 `robotkit.material.Forks` is another explicit view over `Robot`. Its named axis
 configuration is resolved against `RobotDescription` once, then each lift,

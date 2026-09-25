@@ -87,6 +87,8 @@ import robotkit.navigation.OccupancyCell;
 import robotkit.navigation.GridCell2;
 import robotkit.navigation.Costmap2;
 import robotkit.navigation.AStarPlanner;
+import robotkit.navigation.Navigator;
+import robotkit.navigation.NavigatorStatus;
 import robotkit.material.ForkAxisConfig;
 import robotkit.material.ForkAxisState;
 import robotkit.material.ForkConfig;
@@ -136,6 +138,7 @@ class RobotWorldTests {
     testNavigation();
     testMotionGuard();
     testGridPlanning();
+    testNavigator();
     testForkMechanisms();
     testPerceptionSafetyPower();
     testLoadSafetyPolicy();
@@ -1255,6 +1258,157 @@ class RobotWorldTests {
     dynamicCostmap.clearDynamicObstacles();
     check(dynamicCostmap.isTraversable(2, 2) && dynamicCostmap.cellCost(3, 2) == 0.0,
       "costmap clears removed dynamic obstacles");
+  }
+
+  static function testNavigator():Void {
+    var recoveryRobot = new FakeRobot("navigator-recovery");
+    recoveryRobot.positions = [0.0, 0.0];
+    var recoveryBase = new MobileBase(recoveryRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 1.0));
+    var recoveryLocalization = new FixedLocalization(new LocalizationState(
+      Int64.ofInt(0), new Pose2(0.5, 0.5), "map", "base",
+      PoseCovariance2.zero(), Good, Int64.ofInt(0), Int64.ofInt(0),
+      "recovery-clock", "host-clock"));
+    var recoveryNavigation = new Navigation(recoveryBase, recoveryLocalization);
+    var recoveryGrid = new OccupancyGrid2(1.0, new Pose2(), 7, 1,
+      "map", OccupancyCell.Free);
+    var recoveryCostmap = new Costmap2(recoveryGrid, 0.0, false, 0.0, 0.0);
+    var recoveryNavigator = new Navigator(recoveryNavigation,
+      new AStarPlanner(recoveryCostmap), recoveryCostmap, 0.1);
+    var recoveryGoal = new NavigationGoal(recoveryGrid.cellCenter(6, 0), "map");
+    recoveryNavigator.navigateTo(recoveryGoal);
+    var blockingObstacle = new Obstacle(new Detection("recovery-blocker", "obstacle",
+      1.0, recoveryGrid.cellCenter(3, 0), "map", Int64.ofInt(1), Int64.ofInt(1),
+      Int64.ofInt(1), "recovery-clock", "host-clock"), 0.1);
+    var blockedStatus = recoveryNavigator.update(
+      new PerceptionSnapshot([], [blockingObstacle]), 0.1);
+    check(switch blockedStatus {
+      case NavigatorStatus.Blocked(_): true;
+      case _: false;
+    } && switch recoveryRobot.lastStop {
+      case Normal: true;
+      case _: false;
+    }, "Navigator stops and reports blocked when no route exists");
+    var recoveredStatus = recoveryNavigator.update(new PerceptionSnapshot(), 0.1);
+    check(recoveredStatus == NavigatorStatus.Navigating &&
+      recoveryNavigator.replanCount >= 2,
+      "Navigator retries and resumes when a blocked route becomes clear");
+    recoveryNavigator.cancel();
+
+    var model = new RobotModel("navigator-sim");
+    var baseLink = model.addLink(new Link("base", "link/base"));
+    var leftLink = model.addLink(new Link("left wheel", "link/left-wheel"));
+    var rightLink = model.addLink(new Link("right wheel", "link/right-wheel"));
+    var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink,
+      "joint/left-wheel");
+    left.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
+    model.addJoint(left);
+    var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink,
+      "joint/right-wheel");
+    right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
+    model.addJoint(right);
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
+        0.1, 0.5), 0.8, 1.5, 1.5, 2.0, 0.6, 0.4);
+    var lidarFrame = model.addFrame(new Frame("lidar mount", baseLink, "frame/lidar"));
+    lidarFrame.position = [0.3, 0.0, 0.2];
+    var lidar = model.addSensor(new Sensor("front lidar", "lidar", 0.0,
+      "sensor/front-lidar"));
+    lidar.frame = lidarFrame;
+    lidar.rayCount = 64;
+    lidar.maxRange = 4.0;
+
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var simulation = new Simulation(0.02);
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("navigator-sim", runtime, model.name,
+      [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var base = MobileBase.fromBlueprint(robot, blueprint);
+    var localization = new SimulationTruthLocalization(simulation, 0,
+      "map", baseLink.id);
+    var lidarPerception = LidarObstaclePerception.fromBlueprint(blueprint,
+      "sensor/front-lidar", 0.12, 0.05, 0.25, 0.4);
+    var framedPerception = new FrameAwarePerception(lidarPerception, localization);
+    var navigation = new Navigation(base, localization, 0.25, 0.55, 1.2);
+    var grid = new OccupancyGrid2(0.2, new Pose2(-2.0, -2.5),
+      50, 25, "map", OccupancyCell.Free);
+    var footprint:Footprint = cast base.footprint;
+    var costmap = new Costmap2(grid, footprint.radius, true, 0.3, 1.5);
+    var planner = new AStarPlanner(costmap);
+    var guard = new MotionGuard(navigation, footprint, 0.2, 1.5, 0.1, 0.4);
+    var navigator = new Navigator(navigation, planner, costmap, 0.2, guard);
+
+    // The current articulated simulator does not couple wheel joints to planar
+    // base translation, so this scenario supplies that kinematic plant while
+    // retaining SimKit sensors, runtime snapshots, localization, and perception.
+    var simulatedPose = new Pose2();
+    function observe(tick:Int):PerceptionSnapshot {
+      simulatedPose = simulatedPose.integrate(base.currentCommand(), 0.02);
+      var halfYaw = simulatedPose.yaw * 0.5;
+      simulation.teleportRobot(0, [simulatedPose.x, simulatedPose.y, 0.0],
+        [0.0, 0.0, Math.sin(halfYaw), Math.cos(halfYaw)]);
+      simulation.step(Int64.ofInt(tick));
+      return framedPerception.observeRobotSnapshot(robot.snapshot(), model,
+        blueprint, baseLink.id);
+    }
+    var initialPerception = observe(1);
+    equal(initialPerception.obstacles().length, 0,
+      "simulated navigation starts with a clear LiDAR observation");
+    var initialState:LocalizationState = cast localization.state();
+    var goalPose = new Pose2(initialState.pose.x + 3.5, initialState.pose.y, 0.0);
+    var goal = new NavigationGoal(goalPose, "map", 0.12, 0.15);
+    check(switch navigator.navigateTo(goal) {
+      case NavigatorStatus.Navigating: true;
+      case _: false;
+    }, "Navigator plans and starts a goal from current localization");
+
+    var status:NavigatorStatus = NavigatorStatus.Navigating;
+    for (tick in 2...42) {
+      var perception = observe(tick);
+      status = navigator.update(perception, 0.02);
+    }
+    var movingState:LocalizationState = cast localization.state();
+    check(movingState.pose.x > initialState.pose.x + 0.05,
+      "Navigator advances the simulated robot before an obstacle appears");
+    var obstaclePose = movingState.pose.compose(new Pose2(1.3, 0.0));
+    simulation.spawnBox([obstaclePose.x, obstaclePose.y, 0.2], [0.12, 0.12, 0.3]);
+
+    var detectedObstacle = false;
+    var pathDetoured = false;
+    for (tick in 42...1242) {
+      var perception = observe(tick);
+      if (perception.obstacles().length > 0) detectedObstacle = true;
+      status = navigator.update(perception, 0.02);
+      var currentPath:Null<Path> = navigator.activePath;
+      if (navigator.replanCount > 0 && currentPath != null) {
+        for (point in currentPath.poses())
+          if (Math.abs(point.y - goalPose.y) > 0.45) pathDetoured = true;
+      }
+      if (status == NavigatorStatus.Succeeded) break;
+    }
+    check(detectedObstacle,
+      "simulated LiDAR perception detects an obstacle during navigation");
+    check(navigator.replanCount > 0 && pathDetoured,
+      "Navigator replans onto a route around the detected obstacle");
+    var finalState:LocalizationState = cast localization.state();
+    var routeSummary:Array<String> = [];
+    var finalPath:Null<Path> = navigator.activePath;
+    if (finalPath != null) {
+      var routePoints = finalPath.poses();
+      for (index in 0...Std.int(Math.min(12, routePoints.length))) {
+        var point = routePoints[index];
+        routeSummary.push('${point.x},${point.y},${point.yaw}');
+      }
+    }
+    check(status == NavigatorStatus.Succeeded,
+      'Navigator reaches its goal after replanning (state: ${Std.string(status)}, pose: ${finalState.pose.x},${finalState.pose.y},${finalState.pose.yaw}, goal: ${goalPose.x},${goalPose.y}, replans: ${navigator.replanCount}, guard: ${Std.string(guard.state)}, command: ${Std.string(base.currentCommand().linear)},${Std.string(base.currentCommand().angular)}, path: ${routeSummary.join(";")})');
+    var finalDx = finalState.pose.x - goalPose.x;
+    var finalDy = finalState.pose.y - goalPose.y;
+    check(Math.sqrt(finalDx * finalDx + finalDy * finalDy) <= 0.16,
+      "replanned simulated route ends inside the goal position tolerance");
+    navigator.cancel();
+    robot.close();
+    simulation.dispose();
   }
 
   static function testForkMechanisms():Void {

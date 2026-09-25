@@ -100,7 +100,10 @@ class AStarPlanner implements Planner {
 
   function buildPath(start:Pose2, goal:Pose2, cells:Array<Int>):Path {
     var positions:Array<Pose2> = [start];
-    for (offset in 0...cells.length) {
+    // The exact start pose is already inside its start cell. Inserting that
+    // cell's center can add a short backwards segment when the robot starts off
+    // center, so only append the subsequent cell centers.
+    for (offset in 1...cells.length) {
       var index = cells[offset];
       var x = index % costmap.grid.width;
       var y = Std.int(index / costmap.grid.width);
