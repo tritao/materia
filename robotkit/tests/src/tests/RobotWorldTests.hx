@@ -19,6 +19,8 @@ import robotkit.model.JointLimits;
 import robotkit.model.Actuator;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
+import robotkit.model.Frame;
+import robotkit.model.Sensor;
 import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotMobileConfiguration;
 import robotkit.model.RobotForkConfiguration;
@@ -1067,28 +1069,28 @@ class RobotWorldTests {
   }
 
   static function testForkliftSkillsOnSimulationAndReplay():Void {
-    var jointNames = ["left-wheel", "right-wheel", "lift", "tilt", "spread"];
-    var linkNames = ["base", "left-wheel-link", "right-wheel-link", "mast", "fork-carriage", "forks"];
-    var blueprint = new RobotRuntimeBlueprint(1, 5, 6);
-    for (index in 0...5)
-      blueprint.addJoint(new RobotRuntimeJointBlueprint(index,
-        RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, index + 1,
-        -1000.0, 1000.0, 1000.0, 1000.0));
+    var model = configuredForkliftModel();
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var linkNames = [for (link in model.links) link.name];
+    var jointNames = [for (joint in model.joints) joint.name];
     var simulation = new Simulation(0.01);
     var recordingPath = '/tmp/robotkit-${Sys.getPid()}-forklift-skills.mcap';
     var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
-    var simulatedRobot = new RecordingRobot(new SimulatedRobot("forklift",
-      simulation.addRobot(blueprint), "simulated forklift", linkNames, jointNames), writer);
-    var motionLimits = new MotionLimits(0.5, 1.0);
-    var base = new MobileBase(simulatedRobot, new DifferentialDrive(0, 1, 0.1, 0.5),
-      motionLimits);
+    var sourceRobot = new SimulatedRobot("forklift", simulation.addRobot(blueprint),
+      "simulated forklift", linkNames, jointNames);
+    var simulatedRobot = new RecordingRobot(sourceRobot, writer);
+    var base = MobileBase.fromRobot(simulatedRobot, model);
     var localization = new WheelOdometryLocalization(base);
     var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
-    var forkConfig = new ForkConfig(new ForkAxisConfig("lift", 0.0, 1.5),
-      new LoadLimits(1000.0, 700.0, 1.5),
-      new ForkAxisConfig("tilt", -0.5, 0.5),
-      new ForkAxisConfig("spread", 0.0, 0.8));
-    var forks = new Forks(simulatedRobot, forkConfig);
+    var forks = Forks.fromRobot(simulatedRobot, model);
+    simulation.step(Int64.ofInt(1));
+    var configuredScan = sourceRobot.snapshot().sensors;
+    check(configuredScan.length == 1 &&
+      configuredScan.get(0).sensorId == "sensor/front-lidar" &&
+      configuredScan.get(0).frameId == "frame/front-lidar" &&
+      configuredScan.get(0).linkId == "link/base" &&
+      configuredScan.get(0).mountPosition.get(0) == 0.35,
+      "authored sensor frame and mount reach the simulated forklift observation");
     var path = new Path([new Pose2(0.0, 0.0, 0.0), new Pose2(0.18, 0.0, 0.0)], "odom");
     var goTo = new GoTo(navigation, path, new NavigationGoal(path.goal(), "odom", 0.02, 0.1));
     goTo.start();
@@ -1213,8 +1215,7 @@ class RobotWorldTests {
       linkNames, jointNames);
     var replayCapabilities = new RobotCapabilities("forklift", 5, true, true, true, false);
     var replay = new ReplayRobot("forklift", recording, replayDescription, replayCapabilities);
-    var replayBase = new MobileBase(replay, new DifferentialDrive(0, 1, 0.1, 0.5),
-      motionLimits);
+    var replayBase = MobileBase.fromBlueprint(replay, blueprint);
     var replayLocalization = new WheelOdometryLocalization(replayBase);
     var replayNavigation = new Navigation(replayBase, replayLocalization, 0.2, 0.2, 0.8);
     var replayGoTo = new GoTo(replayNavigation, path,
@@ -1240,7 +1241,7 @@ class RobotWorldTests {
       case Succeeded: true;
       case _: false;
     }, "Dock replays the same recorded approach");
-    var replayForks = new Forks(replay, forkConfig);
+    var replayForks = Forks.fromBlueprint(replay, blueprint);
     var replayPickPose = new Pose2(replayEstimateValue.pose.x + 0.02,
       replayEstimateValue.pose.y, replayEstimateValue.pose.yaw);
     var replayPallet = new Pallet(new Detection("pallet-17", "pallet", 0.98,
@@ -1380,6 +1381,43 @@ class RobotWorldTests {
     if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);
     if (sys.FileSystem.exists(recordingPath + ".incomplete.status"))
       sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
+  }
+
+  static function configuredForkliftModel():RobotModel {
+    var model = new RobotModel("authored-forklift");
+    var base = model.addLink(new Link("base", "link/base"));
+    var leftWheel = model.addLink(new Link("left wheel", "link/left-wheel"));
+    var rightWheel = model.addLink(new Link("right wheel", "link/right-wheel"));
+    var mast = model.addLink(new Link("mast", "link/mast"));
+    var carriage = model.addLink(new Link("fork carriage", "link/carriage"));
+    var forks = model.addLink(new Link("forks", "link/forks"));
+    function addJoint(id:String, name:String, type:JointType, child:robotkit.model.Link,
+        lower:Float, upper:Float, velocity:Float):Void {
+      var joint = new Joint(name, type, base, child, id);
+      joint.limits = new JointLimits(lower, upper, velocity, 1000.0);
+      model.addJoint(joint);
+    }
+    addJoint("joint/left-wheel", "left-wheel", JointType.Continuous,
+      leftWheel, -1000.0, 1000.0, 20.0);
+    addJoint("joint/right-wheel", "right-wheel", JointType.Continuous,
+      rightWheel, -1000.0, 1000.0, 20.0);
+    addJoint("joint/lift", "lift", JointType.Prismatic, mast, 0.0, 1.5, 1000.0);
+    addJoint("joint/tilt", "tilt", JointType.Revolute, carriage, -0.5, 0.5, 1000.0);
+    addJoint("joint/spread", "spread", JointType.Prismatic, forks, 0.0, 0.8, 1000.0);
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
+        0.1, 0.5), 0.5, 1.0, 2.0, 10.0, 2.0, 1.0);
+    model.forkMechanism = new RobotForkConfiguration("joint/lift",
+      1000.0, 700.0, 1.5, "joint/tilt", "joint/spread");
+    var lidarFrame = model.addFrame(new Frame("front lidar mount", base,
+      "frame/front-lidar"));
+    lidarFrame.position = [0.35, 0.0, 0.3];
+    var lidar = model.addSensor(new Sensor("front lidar", "lidar", 10.0,
+      "sensor/front-lidar"));
+    lidar.frame = lidarFrame;
+    lidar.rayCount = 32;
+    lidar.maxRange = 8.0;
+    return model;
   }
 
   static function testMcapRoundTrip():Void {
