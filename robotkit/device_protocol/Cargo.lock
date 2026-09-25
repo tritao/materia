@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "robotkit-device-wire"
+name = "robotkit-device-protocol"
 version = "0.1.0"

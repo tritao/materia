@@ -14,7 +14,7 @@ def _variant(name: str) -> str:
 def render(schema: Schema, norm: dict[str, Any]) -> str:
     lines = [
         "// Generated from a .wire.idl schema. Do not edit.",
-        "#![no_std]", "", "#[derive(Clone, Copy, Debug, PartialEq, Eq)]",
+        "", "#[derive(Clone, Copy, Debug, PartialEq, Eq)]",
         "pub enum Error { ShortBuffer, WrongLength }", "",
     ]
     for constant in schema.constants:

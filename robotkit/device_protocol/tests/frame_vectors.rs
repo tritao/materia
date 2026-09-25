@@ -1,4 +1,4 @@
-use robotkit_device_wire::*;
+use robotkit_device_protocol::*;
 
 fn fixture(name: &str) -> Vec<u8> {
     let text = include_str!("../../schema/device_frame_vectors.tsv");
@@ -37,6 +37,9 @@ fn complete_frame_vectors() {
     let fingerprint = core::array::from_fn(|index| index as u8);
     let begin = payload(&SessionBegin { session, model_fingerprint: fingerprint }, SessionBegin::SIZE, SessionBegin::encode);
     assert_eq!(frame(1, &begin), fixture("session_begin"));
+
+    let ack = payload(&SessionAck { session, device_fingerprint: fingerprint, status: 1, reserved: [0; 3] }, SessionAck::SIZE, SessionAck::encode);
+    assert_eq!(frame(2, &ack), fixture("session_ack"));
 
     let reset = payload(&CommandHeader { session, sequence: 1, kind: 4, target_count: 0, reserved: 0 }, CommandHeader::SIZE, CommandHeader::encode);
     assert_eq!(frame(3, &reset), fixture("command_reset"));

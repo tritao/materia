@@ -1,4 +1,4 @@
-use robotkit_device_wire::*;
+use robotkit_device_protocol::*;
 
 fn fixture(name: &str) -> Vec<u8> {
     let text = include_str!("../../schema/device_wire_vectors.tsv");

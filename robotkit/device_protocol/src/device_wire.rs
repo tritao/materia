@@ -1,5 +1,4 @@
 // Generated from a .wire.idl schema. Do not edit.
-#![no_std]
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
