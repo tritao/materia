@@ -349,8 +349,13 @@ current simple box representation, not an imported CAD collision model.
 `robotd` remains one robot. It assigns every connection a unique session ID,
 gives at most one controller a control lease, rejects commands from observers
 or stale sessions, and streams state/sensor/fault messages to read-only
-observers. Reconnection creates a new session and command sequence domain;
-world composition and multi-robot discovery remain in `RobotWorld`.
+observers. A controller's `Welcome` advertises a three-second lease timeout;
+`RobotClient` renews it with `ControlHeartbeat` every timeout/3. `robotd`
+measures heartbeat arrival with its own monotonic clock, so the client and host
+do not need synchronized clocks. Expiry emergency-stops the runtime, releases
+the owner, and closes that connection. A replacement controller receives a
+new session and must explicitly reset safety before motion can resume. World
+composition and multi-robot discovery remain in `RobotWorld`.
 
 Recording stores commands, snapshots, sensor-bearing world snapshots, faults,
 and world events. `ReplayRobot` and `WorldBehaviorRunner` consume the same

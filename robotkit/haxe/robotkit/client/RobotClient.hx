@@ -7,6 +7,7 @@ import NativeKitEvents;
 import NativeKitEvents.NativeKitEventSubscription;
 import NativeKitRuntime;
 import haxe.Int64;
+import robotkit.protocol.ControlHeartbeat;
 import robotkit.protocol.Fault;
 import robotkit.protocol.Hello;
 import robotkit.protocol.JointTarget;
@@ -52,6 +53,8 @@ class RobotClient {
   var sessionId:Int64 = Int64.ofInt(0);
   var commandSequence:Int64 = Int64.ofInt(0);
   var lastStateSequence:Int64 = Int64.ofInt(0);
+  var leaseRenewalIntervalNs:Int64 = Int64.ofInt(0);
+  var nextLeaseRenewalNs:Int64 = Int64.ofInt(0);
   var hasState:Bool = false;
   var connected:Bool = false;
   var failure:Null<String> = null;
@@ -72,6 +75,7 @@ class RobotClient {
     sessionId = Int64.ofInt(0);
     commandSequence = Int64.ofInt(0);
     lastStateSequence = Int64.ofInt(0);
+    resetLeaseRenewal();
     hasState = false;
     welcome = null;
     description = null;
@@ -118,6 +122,7 @@ class RobotClient {
     sessionId = Int64.ofInt(0);
     commandSequence = Int64.ofInt(0);
     lastStateSequence = Int64.ofInt(0);
+    resetLeaseRenewal();
     hasState = false;
     welcome = null;
     description = null;
@@ -151,6 +156,7 @@ class RobotClient {
     var hadEvent = false;
     while (events.poll())
       hadEvent = true;
+    renewControlLeaseIfDue();
     raiseFailure();
     return hadEvent;
   }
@@ -160,7 +166,16 @@ class RobotClient {
     var events = eventPump;
     if (events == null)
       throw "RobotKit client is not connected";
-    events.wait(timeoutSeconds);
+    renewControlLeaseIfDue();
+    var effectiveTimeout = timeoutSeconds;
+    if (Int64.compare(leaseRenewalIntervalNs, Int64.ofInt(0)) > 0) {
+      var remainingNs = Int64.sub(nextLeaseRenewalNs, NativeKit.nk_time_now_ns());
+      var remainingSeconds = Std.parseFloat(Int64.toStr(remainingNs)) / 1000000000.0;
+      if (remainingSeconds < 0.0) remainingSeconds = 0.0;
+      if (remainingSeconds < effectiveTimeout) effectiveTimeout = remainingSeconds;
+    }
+    events.wait(effectiveTimeout);
+    renewControlLeaseIfDue();
   }
 
   public function isConnected():Bool
@@ -250,27 +265,52 @@ class RobotClient {
       runtime.dispose();
   }
 
-  function onEvent(value:NativeKitEventValue):Void switch value {
-    case Raw(kind, source, _, _, _, _, _):
-      var currentTransport = transport;
-      if (currentTransport == null || source.rawValue() != currentTransport.rawValue())
-        return;
-      if (kind == EventKind.TransportConnected) {
-        connected = true;
-        var statusChanged = statusListener;
-        if (statusChanged != null)
-          statusChanged();
-        send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1", requestedRole)));
-      } else if (kind == EventKind.TransportData) {
-        receive(currentTransport);
-      } else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {
-        connected = false;
-        failure = "robotd closed the TCP connection";
-        var statusChanged = statusListener;
-        if (statusChanged != null)
-          statusChanged();
-      }
-    case _:
+  function onEvent(value:NativeKitEventValue):Void {
+    switch value {
+      case Raw(kind, source, _, _, _, _, _):
+        var currentTransport = transport;
+        if (currentTransport != null && source.rawValue() == currentTransport.rawValue()) {
+          if (kind == EventKind.TransportConnected) {
+            connected = true;
+            var statusChanged = statusListener;
+            if (statusChanged != null)
+              statusChanged();
+            send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1", requestedRole)));
+          } else if (kind == EventKind.TransportData) {
+            receive(currentTransport);
+          } else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {
+            connected = false;
+            failure = "robotd closed the TCP connection";
+            resetLeaseRenewal();
+            var statusChanged = statusListener;
+            if (statusChanged != null)
+              statusChanged();
+          }
+        }
+      case _:
+    }
+    // connectWithEvents clients share an application event loop, so renew on
+    // every dispatched event as well as through this client's poll()/wait().
+    renewControlLeaseIfDue();
+  }
+
+  function resetLeaseRenewal():Void {
+    leaseRenewalIntervalNs = Int64.ofInt(0);
+    nextLeaseRenewalNs = Int64.ofInt(0);
+  }
+
+  function renewControlLeaseIfDue():Void {
+    var currentWelcome = welcome;
+    if (!connected || closed || currentWelcome == null || !currentWelcome.controlGranted ||
+        Int64.compare(leaseRenewalIntervalNs, Int64.ofInt(0)) <= 0 ||
+        Int64.compare(nextLeaseRenewalNs, Int64.ofInt(0)) <= 0)
+      return;
+    var now = NativeKit.nk_time_now_ns();
+    if (Int64.compare(now, nextLeaseRenewalNs) < 0)
+      return;
+    send(RobotProtocol.controlHeartbeat(new ControlHeartbeat(currentWelcome.robotId,
+      currentWelcome.leaseId), sessionId, now));
+    nextLeaseRenewalNs = Int64.add(now, leaseRenewalIntervalNs);
   }
 
   function receive(currentTransport:TransportHandle):Void {
@@ -292,6 +332,14 @@ class RobotClient {
       }
       welcome = value;
       sessionId = value.sessionId;
+      resetLeaseRenewal();
+      if (value.controlGranted && value.leaseTimeoutMs > 0) {
+        var intervalMs = Std.int(value.leaseTimeoutMs / 3);
+        if (intervalMs < 1) intervalMs = 1;
+        leaseRenewalIntervalNs = Int64.fromFloat(intervalMs * 1000000.0);
+        nextLeaseRenewalNs = Int64.add(NativeKit.nk_time_now_ns(),
+          leaseRenewalIntervalNs);
+      }
     case RobotMessageType.RobotDescription:
       if (!validSession(frame))
         return;
@@ -354,6 +402,7 @@ class RobotClient {
     if (!hasControlLease())
       throw "RobotKit client does not hold the control lease";
     raiseFailure();
+    renewControlLeaseIfDue();
   }
 
   function raiseFailure():Void {

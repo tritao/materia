@@ -169,6 +169,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             nksim_joint joint = 0;
             require_sim(nksim_joint_create(world_, &desc, &joint), "nksim_joint_create");
             binding->joints_.push_back(joint);
+            binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED);
             joints_.push_back(joint);
         }
         const auto topology_result = nksim_world_end_topology_update(world_);

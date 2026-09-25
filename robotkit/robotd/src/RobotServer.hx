@@ -17,6 +17,7 @@ import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.Simulation;
 import robotkit.behavior.RobotBehavior;
 import robotkit.behavior.RobotBehaviorRunner;
+import robotkit.protocol.ControlHeartbeat;
 import robotkit.protocol.Fault;
 import robotkit.protocol.Hello;
 import robotkit.protocol.JointTarget;
@@ -43,6 +44,8 @@ private enum ControlOwner {
 
 /** Authoritative robot process boundary. RobotRuntime ownership stays off the network path. */
 class RobotServer {
+  public static inline final CONTROL_LEASE_TIMEOUT_MS:Int = 3000;
+
   final robot:RobotModel;
   final blueprint:RobotRuntimeBlueprint;
   final runtime:RobotRuntime;
@@ -73,6 +76,7 @@ class RobotServer {
   var behaviorPositions:Null<Array<Float>> = null;
   var controlOwner:ControlOwner = None;
   var runtimeSequence:Int64 = Int64.ofInt(0);
+  var lastLeaseRenewalNs:Int64 = Int64.ofInt(0);
   var behaviorStopped:Bool = false;
   var disposed:Bool = false;
 
@@ -115,8 +119,11 @@ class RobotServer {
         var hadEvent = false;
         while (nativeRuntime.events.poll())
           hadEvent = true;
-        if (!hadEvent)
+        checkControlLeaseTimeout();
+        if (!hadEvent) {
           nativeRuntime.events.wait(0.01);
+          checkControlLeaseTimeout();
+        }
         if (onceMode && servedState && client == null && observers.length == 0)
           stopped = true;
       }
@@ -133,6 +140,7 @@ class RobotServer {
     var hadEvent = false;
     while (nativeRuntime.events.poll())
       hadEvent = true;
+    checkControlLeaseTimeout();
     return hadEvent;
   }
 
@@ -279,6 +287,8 @@ class RobotServer {
           sendFault(422, 'safety reset rejected: $error', false);
         }
       }
+    case RobotMessageType.ControlHeartbeat:
+      handleControlHeartbeat(frame, RobotProtocol.decodeControlHeartbeat(frame));
     case _:
       sendFault(404, "unsupported RobotKit message", false);
     }
@@ -299,7 +309,7 @@ class RobotServer {
     if (value.protocolVersion != 1) return;
     sendTo(transport, observerSession, RobotProtocol.welcome(
       new robotkit.protocol.Welcome(1, "robotd", observerSession,
-        Int64.ofInt(robotId), false, Int64.ofInt(0)), observerSession));
+        Int64.ofInt(robotId), false, Int64.ofInt(0), 0), observerSession));
     sendTo(transport, observerSession, RobotProtocol.description(new RobotDescription(
       Int64.ofInt(robotId), robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), observerSession));
@@ -321,10 +331,14 @@ class RobotServer {
     }
     controllerGranted = value.requestedRole == "controller" &&
       switch controlOwner { case None: true; case _: false; };
-    if (controllerGranted) controlOwner = RemoteController(sessionId);
+    if (controllerGranted) {
+      controlOwner = RemoteController(sessionId);
+      lastLeaseRenewalNs = NativeKit.nk_time_now_ns();
+    }
     send(RobotProtocol.welcome(new robotkit.protocol.Welcome(1, "robotd",
       sessionId, Int64.ofInt(robotId), controllerGranted,
-      controllerGranted ? sessionId : Int64.ofInt(0)), sessionId));
+      controllerGranted ? sessionId : Int64.ofInt(0),
+      controllerGranted ? CONTROL_LEASE_TIMEOUT_MS : 0), sessionId));
     send(RobotProtocol.description(new RobotDescription(Int64.ofInt(robotId),
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
@@ -414,6 +428,31 @@ class RobotServer {
     } catch (error:Dynamic) {
       sendFault(422, 'command batch rejected: $error', false);
     }
+  }
+
+  function handleControlHeartbeat(frame:RobotFrame, value:ControlHeartbeat):Void {
+    if (!controllerGranted || !remoteOwnsControl() || !validSession(frame) ||
+        !sameRobot(value.robotId) || Int64.compare(value.leaseId, sessionId) != 0) {
+      sendFault(400, "invalid control lease heartbeat", false);
+      return;
+    }
+    lastLeaseRenewalNs = NativeKit.nk_time_now_ns();
+  }
+
+  function checkControlLeaseTimeout():Void {
+    if (!controllerGranted || !remoteOwnsControl() ||
+        Int64.compare(lastLeaseRenewalNs, Int64.ofInt(0)) <= 0)
+      return;
+    var elapsedNs = Int64.sub(NativeKit.nk_time_now_ns(), lastLeaseRenewalNs);
+    var timeoutNs = Int64.fromFloat(CONTROL_LEASE_TIMEOUT_MS * 1000000.0);
+    if (Int64.compare(elapsedNs, timeoutNs) < 0)
+      return;
+    Sys.println('robotd: control lease expired for session ${sessionId}');
+    var current = client;
+    if (current != null)
+      closeClient(current);
+    else
+      releaseRemoteOwner();
   }
 
   function validSession(frame:RobotFrame):Bool
@@ -553,6 +592,8 @@ class RobotServer {
       releaseRemoteOwner();
       client = null;
       helloComplete = false;
+      controllerGranted = false;
+      lastLeaseRenewalNs = Int64.ofInt(0);
     }
     try { NativeTransport.close(currentClient); } catch (_:Dynamic) {}
   }

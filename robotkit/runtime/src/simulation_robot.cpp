@@ -11,6 +11,16 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
     if (command.kind == RK_COMMAND_EMERGENCY_STOP) {
         stopped_ = true;
         pending_targets_.clear();
+        for (std::size_t index = 0; index < joints_.size(); ++index) {
+            if (index >= actuated_joints_.size() || !actuated_joints_[index])
+                continue;
+            nksim_joint_target target{};
+            target.struct_size = sizeof(target);
+            target.joint = joints_[index];
+            target.mode = NKSIM_JOINT_TARGET_VELOCITY;
+            target.target = 0.0;
+            pending_targets_.push_back(target);
+        }
         return RK_OK;
     }
     if (command.kind == RK_COMMAND_STOP) {

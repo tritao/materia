@@ -6,6 +6,8 @@ class IntegrationMain {
     var port = parsePort(arguments);
     var host = parseHost(arguments);
     if (arguments.indexOf("--smoke") >= 0) RobotClientSmoke.run(host, port);
+    else if (arguments.indexOf("--lease-timeout") >= 0)
+      RobotSessionIntegration.runLeaseTimeout(host, port);
     else if (arguments.indexOf("--device") >= 0)
       RobotSessionIntegration.runDevice(host, port);
     else if (arguments.indexOf("--local-owner") >= 0)

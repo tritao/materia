@@ -16,6 +16,10 @@ if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" == "1" ]]; then
   server_mode="--server"
   client_mode="--sessions"
 fi
+if [[ "${ROBOTKIT_TEST_LEASE_TIMEOUT:-0}" == "1" ]]; then
+  server_mode="--server"
+  client_mode="--lease-timeout"
+fi
 if [[ "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" == "1" ]]; then
   server_mode="--server --behavior=oscillate"
   client_mode="--local-owner"
@@ -66,7 +70,8 @@ fi
 sleep 0.1
 "$repo_dir/haxeon/scripts/haxeon" run --project "$client_project" -- \
   --port="$port" $client_mode
-if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" && "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" != "1" ]]; then
+if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" && "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" != "1" \
+    && "${ROBOTKIT_TEST_LEASE_TIMEOUT:-0}" != "1" ]]; then
   wait "$server_pid"
   trap - EXIT
 fi

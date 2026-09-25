@@ -36,6 +36,7 @@ private:
     std::vector<nkscene_node_id> nodes_;
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;
+    std::vector<uint8_t> actuated_joints_;
     std::vector<nksim_joint_target> pending_targets_;
     bool stopped_ = false;
     nksim_body base_body_ = 0;

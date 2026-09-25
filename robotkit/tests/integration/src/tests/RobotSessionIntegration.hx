@@ -1,6 +1,7 @@
 package tests;
 
 import haxe.Int64;
+import nativekit.ffi.NativeKit;
 import RobotKitRuntime;
 import NativeKitRuntime;
 import robotkit.client.RobotClient;
@@ -46,6 +47,91 @@ class RobotSessionIntegration {
     } catch (error:Dynamic) failure = error;
     first.close();
     second.close();
+    runtime.dispose();
+    if (failure != null) throw failure;
+  }
+
+  public static function runLeaseTimeout(host:String, port:Int):Void {
+    var runtime = NativeKitRuntime.start();
+    var controller = new RobotClient("silent-controller", "controller");
+    var replacement = new RobotClient("replacement-controller", "controller");
+    var failure:Dynamic = null;
+    try {
+      controller.connectWithEvents(host, port, runtime.events);
+      waitFor(controller, function() return controller.hasControlLease() &&
+        controller.latestState != null, "lease test controller did not connect");
+      var welcome = controller.welcome;
+      if (welcome == null || welcome.leaseTimeoutMs <= 0)
+        throw "robotd did not advertise a control lease timeout";
+      var timeoutMs = welcome.leaseTimeoutMs;
+
+      // Keep the normal event loop alive beyond one lease period to prove the
+      // client renews while its TCP connection is otherwise idle.
+      controller.stop("lease heartbeat test setup", true);
+      waitFor(controller, function() return safetyOf(controller) ==
+        RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP,
+        "lease test could not establish a stopped starting state");
+      controller.resetSafety();
+      waitFor(controller, function() return safetyOf(controller) ==
+        RobotKitRuntimeConstants.RK_SAFETY_READY,
+        "lease test controller could not reset safety");
+      controller.sendJointTarget(0, 2, 1.0);
+      waitFor(controller, function() return velocityOf(controller) == 1.0,
+        "lease test velocity command did not reach robotd");
+      var activeStart = NativeKit.nk_time_now_ns();
+      var activeDuration = Int64.fromFloat(timeoutMs * 1200000.0);
+      while (Int64.compare(Int64.sub(NativeKit.nk_time_now_ns(), activeStart),
+          activeDuration) < 0) {
+        var hadEvent = controller.poll();
+        if (!hadEvent) controller.wait(0.01);
+      }
+      if (!controller.hasControlLease() || velocityOf(controller) != 1.0)
+        throw "active RobotClient did not keep its control lease renewed";
+
+      // Do not poll, wait, or send anything during the silent interval. The
+      // controller socket stays open locally while robotd's monotonic timer
+      // expires the lease and applies emergency stop.
+      Sys.sleep((timeoutMs + 500) / 1000.0);
+      if (!controller.isConnected())
+        throw "silent controller observed a close before lease timeout";
+      var closeWaitStart = NativeKit.nk_time_now_ns();
+      var closeWaitLimit = Int64.fromFloat(1500000000.0);
+      while (controller.isConnected() && Int64.compare(Int64.sub(
+          NativeKit.nk_time_now_ns(), closeWaitStart), closeWaitLimit) < 0) {
+        try {
+          var hadEvent = controller.poll();
+          if (!hadEvent) controller.wait(0.01);
+        } catch (_:Dynamic) {}
+      }
+      if (controller.isConnected())
+        throw "robotd left the silent controller socket open after lease expiry";
+      controller.close();
+
+      replacement.connectWithEvents(host, port, runtime.events);
+      waitFor(replacement, function() return replacement.hasControlLease() &&
+        replacement.latestState != null,
+        "new controller did not receive the expired lease");
+      waitFor(replacement, function() return safetyOf(replacement) ==
+        RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP &&
+          velocityOf(replacement) == 0.0,
+        'lease expiry state mismatch: safety=${safetyOf(replacement)} '
+          + 'velocity=${velocityOf(replacement)} fault=${replacement.lastFault}');
+      var stoppedState = replacement.latestState;
+      if (stoppedState == null) throw "new controller has no stopped state";
+      var stoppedSequence = stoppedState.sequence;
+      replacement.sendJointTarget(0, 2, 0.5);
+      waitFor(replacement, function() return hasStateAfter(replacement, stoppedSequence) &&
+        safetyOf(replacement) == RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP &&
+        velocityOf(replacement) == 0.0,
+        "new lease owner moved the robot before resetting safety");
+      replacement.resetSafety();
+      waitFor(replacement, function() return safetyOf(replacement) ==
+        RobotKitRuntimeConstants.RK_SAFETY_READY,
+        "new lease owner could not explicitly reset the expired safety stop");
+      Sys.println('robotd lease heartbeat and timeout test passed (${timeoutMs}ms)');
+    } catch (error:Dynamic) failure = error;
+    controller.close();
+    replacement.close();
     runtime.dispose();
     if (failure != null) throw failure;
   }
@@ -183,6 +269,11 @@ class RobotSessionIntegration {
     var welcome = client.welcome;
     if (welcome == null) throw "RobotClient has no Welcome session";
     return welcome.sessionId;
+  }
+
+  static function hasStateAfter(client:RobotClient, sequence:Int64):Bool {
+    var state = client.latestState;
+    return state != null && Int64.compare(state.sequence, sequence) > 0;
   }
 
   static function positionOf(client:RobotClient):Float {

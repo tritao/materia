@@ -331,7 +331,9 @@ behavior targets test command counts, unchanged-snapshot suppression, settled
 joint positions, and encoder/IMU/LiDAR identities, mounts, and values. The
 fixture uses the deterministic simulation backend; independent clocks and
 sample sequences are deliberately not compared for equality. Run with
-`ROBOTKIT_TEST_SESSIONS=1` to check controller leases, observers, and reconnects.
+`ROBOTKIT_TEST_SESSIONS=1` to check controller leases, observers, and reconnects,
+or `ROBOTKIT_TEST_LEASE_TIMEOUT=1` to verify heartbeat renewal and emergency
+stop after a silent controller leaves its TCP socket open.
 
 Behavior hosting builds on that same boundary. `RobotBehaviorRunner` receives a
 `RobotSnapshot`, gives a behavior a read-only `RobotContext`, and publishes the
