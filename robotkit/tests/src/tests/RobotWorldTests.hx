@@ -860,6 +860,36 @@ class RobotWorldTests {
         case _: false;
       }, "Navigation reverses along a path whose authored body heading faces opposite its tangent");
 
+    var overshootRobot = new FakeRobot("nav-overshoot");
+    overshootRobot.positions = [0.0, 0.0];
+    var overshootBase = new MobileBase(overshootRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var overshootLocalization = new WheelOdometryLocalization(overshootBase);
+    overshootLocalization.update(new RobotSnapshot("nav-overshoot", Int64.ofInt(1),
+      Int64.ofInt(10), [0.0, 0.0], [], [], 1, 0, Int64.ofInt(11), [],
+      "overshoot-clock", "host"));
+    var overshootNavigation = new Navigation(overshootBase, overshootLocalization,
+      0.2, 0.5, 1.0);
+    var straightGoal = new NavigationGoal(new Pose2(1.0, 0.0, 0.0), "odom", 0.01, 0.1);
+    overshootNavigation.follow(new Path([new Pose2(), straightGoal.pose], "odom"), straightGoal);
+    var overshootStatus = overshootNavigation.updateObservation(new RobotSnapshot(
+      "nav-overshoot", Int64.ofInt(2), Int64.ofInt(20), [12.0, 12.0], [], [],
+      1, 0, Int64.ofInt(21), [], "overshoot-clock", "host"), 0.1);
+    check(switch overshootStatus { case Following: true; case _: false; } &&
+      switch overshootRobot.lastCommand {
+        case JointTargets(targets, _): targets.length == 2 &&
+          targets[0].target < 0.0 && targets[1].target < 0.0;
+        case _: false;
+      }, "Navigation reverses toward the goal if motion carries the robot past the path end");
+
+    var noReverseNavigation = new Navigation(overshootBase, overshootLocalization,
+      0.2, 0.5, 1.0, false);
+    noReverseNavigation.follow(new Path([new Pose2(), straightGoal.pose], "odom"), straightGoal);
+    check(switch noReverseNavigation.update(0.1) {
+      case Failed(message): message.indexOf("reverse motion is disabled") >= 0;
+      case _: false;
+    }, "Navigation reports an unrecoverable path-end overshoot when reverse is disabled");
+
     function commandedSpeedAt(x:Float, id:String):Float {
       var speedRobot = new FakeRobot(id);
       speedRobot.positions = [0.0, 0.0];

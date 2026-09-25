@@ -171,7 +171,10 @@ class Navigation {
     crossTrackError = projection.crossTrackError;
     var lookahead = Math.max(lookaheadDistance,
       Math.abs(commandedLinearSpeed) * lookaheadTime);
-    var target = path.poseAt(Math.min(path.length, progressDistance + lookahead));
+    var atPathEnd = progressDistance >= path.length - 1e-9;
+    var target = atPathEnd && goalDistance > goal.positionTolerance
+      ? goal.pose
+      : path.poseAt(Math.min(path.length, progressDistance + lookahead));
     var localTarget = target.relativeTo(state.pose);
     var distanceSquared = localTarget.x * localTarget.x + localTarget.y * localTarget.y;
     if (distanceSquared < 1e-9) return fail("Path lookahead collapsed at the robot pose");
@@ -179,6 +182,11 @@ class Navigation {
     var pathHeading = projection.pose.yaw;
     var pathDirection = Math.cos(Pose2.wrapAngle(projection.tangentYaw - pathHeading));
     var direction = allowReverse && pathDirection < 0.0 ? -1.0 : 1.0;
+    if (atPathEnd && goalDistance > goal.positionTolerance && localTarget.x < -1e-6) {
+      if (!allowReverse)
+        return fail("Navigation passed the path end and reverse motion is disabled");
+      direction = -1.0;
+    }
     var remainingDistance = Math.max(path.length - progressDistance,
       Math.max(0.0, goalDistance - goal.positionTolerance));
     var speed = Math.min(Math.min(cruiseSpeed, base.motionLimits.maxLinearSpeed),
