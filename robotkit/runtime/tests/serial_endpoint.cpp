@@ -78,16 +78,18 @@ void read_all(int descriptor, std::uint8_t *bytes, std::size_t size) {
         received += static_cast<std::size_t>(result);
     }
 }
-std::vector<std::uint8_t> state_frame(std::uint64_t timestamp_ns) {
+std::vector<std::uint8_t> state_frame(std::uint64_t timestamp_ns, std::uint32_t joint_count = 1) {
     const auto sensor_timestamp = timestamp_ns >= 10 ? timestamp_ns - 10 : timestamp_ns;
     const auto later_sensor_timestamp = timestamp_ns >= 5 ? timestamp_ns - 5 : timestamp_ns;
     std::vector<std::uint8_t> payload;
-    append_u32(payload, 1); // one joint
+    append_u32(payload, joint_count);
     append_u64(payload, timestamp_ns);
     append_u32(payload, 2); // IMU and LiDAR slots
-    append_double(payload, 0.25);
-    append_double(payload, 0.5);
-    append_double(payload, 1.5);
+    for (std::uint32_t joint = 0; joint < joint_count; ++joint) {
+        append_double(payload, 0.25 + joint);
+        append_double(payload, 0.5 + joint);
+        append_double(payload, 1.5 + joint);
+    }
     append_u64(payload, 3); append_u64(payload, sensor_timestamp); append_u32(payload, 6);
     for (double value : {0.0, 0.1, 0.2, 1.0, 2.0, 9.81}) append_double(payload, value);
     append_u64(payload, 4); append_u64(payload, later_sensor_timestamp); append_u32(payload, 3);
@@ -181,16 +183,54 @@ int main() {
     assert(!robotkit::SerialRobotEndpoint::open(serial_path, 12345));
     auto serial = robotkit::SerialRobotEndpoint::open(serial_path, 115200);
     assert(serial);
-    assert(serial->apply(command) == RK_OK);
+
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.revision = 1;
+    blueprint.joint_count = 6;
+    blueprint.link_count = 7;
+    for (std::uint32_t joint = 0; joint < blueprint.joint_count; ++joint)
+        blueprint.joints[joint] = {joint, RK_RUNTIME_JOINT_REVOLUTE, joint, joint + 1,
+            -10.0, 10.0, 10.0};
+    blueprint.sensor_count = 2;
+    blueprint.sensors[0].kind = RK_SENSOR_IMU;
+    blueprint.sensors[0].link = 0;
+    blueprint.sensors[0].rotation[3] = 1.0;
+    blueprint.sensors[1].kind = RK_SENSOR_LIDAR;
+    blueprint.sensors[1].link = 0;
+    blueprint.sensors[1].rotation[3] = 1.0;
+    blueprint.sensors[1].ray_count = 3;
+    blueprint.sensors[1].max_range = 10.0;
+    blueprint.sensors[1].field_of_view = 1.0;
+
+    robotkit::RobotRuntime serial_runtime(blueprint, serial, std::chrono::milliseconds(100));
+    assert(serial_runtime.submit(command) == RK_OK);
+    assert(serial_runtime.apply_pending_commands() == RK_OK);
     read_all(serial_master, command_header.data(), command_header.size());
     assert(command_header[0] == 'R' && command_header[1] == 'K'
         && command_header[2] == 'C' && command_header[3] == '3');
     command_tail.resize(read_u32(command_header.data() + 4) + 4);
     read_all(serial_master, command_tail.data(), command_tail.size());
-    auto serial_state = state_frame(2000);
+    const auto runtime_command = command_tail.data();
+    assert(read_u32(runtime_command) == RK_COMMAND_JOINT_TARGETS);
+    assert(read_u64(runtime_command + 4) == 1);
+    assert(read_u32(runtime_command + 12) == 2);
+    assert(read_u32(runtime_command + 20) == 2);
+    assert(read_u32(runtime_command + 24) == RK_TARGET_POSITION);
+    assert(read_double(runtime_command + 28) == 0.5);
+    assert(read_u32(runtime_command + 36) == 5);
+    assert(read_u32(runtime_command + 40) == RK_TARGET_EFFORT);
+    assert(read_double(runtime_command + 44) == 3.0);
+
+    auto serial_state = state_frame(2000, blueprint.joint_count);
     write_all(serial_master, serial_state.data(), serial_state.size());
-    assert(serial->sample(6000, state) == RK_OK);
-    assert(state.source_timestamp_ns == 2000 && state.sensor_count == 2);
+    assert(serial_runtime.publish_sample(6000) == RK_OK);
+    assert(serial_runtime.snapshot(state) == RK_OK);
+    assert(state.sequence == 1 && state.source_timestamp_ns == 2000);
+    assert(state.mode == RK_ROBOT_MODE_TRACKING && state.safety == RK_SAFETY_READY);
+    assert(state.joint_count == blueprint.joint_count && state.position[5] == 5.25);
+    assert(state.sensor_count == 2 && state.sensors[0].sequence == 3);
+    assert(state.sensors[1].sequence == 4 && state.sensors[1].values[2] == 1.6);
     serial.reset();
     ::close(serial_master);
 }
