@@ -68,6 +68,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_line(start: cad_vec3, end: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_loft(wires: ptr<const<cad_shape_ref>> @in_array("wire_count"), wire_count: u32, solid: u8, ruled: u8, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_loft_operation(wires: ptr<const<cad_shape_ref>> @in_array("wire_count"), wire_count: u32, solid: u8, ruled: u8, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
+	extern fn cad_mesh_copy_edge_segments_bytes(mesh: cad_mesh, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
 	extern fn cad_mesh_copy_face_ranges(mesh: cad_mesh, output: ptr<cad_mesh_face_range>, capacity: u32) -> cad_result;
 	extern fn cad_mesh_copy_indices(mesh: cad_mesh, output: ptr<u32>, capacity: u32) -> cad_result;
 	extern fn cad_mesh_copy_indices_bytes(mesh: cad_mesh, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;

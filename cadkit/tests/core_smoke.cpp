@@ -1,5 +1,6 @@
 #include "cadkit.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -369,15 +370,31 @@ int main() {
            CAD_ERROR_BUFFER_TOO_SMALL);
     assert(cad_mesh_copy_indices_bytes(mesh, nullptr, &index_bytes_size) ==
            CAD_ERROR_BUFFER_TOO_SMALL);
+    std::uint32_t edge_bytes_size = 0;
+    assert(cad_mesh_copy_edge_segments_bytes(mesh, nullptr, &edge_bytes_size) ==
+           CAD_ERROR_BUFFER_TOO_SMALL);
+    assert(edge_bytes_size > 0 && edge_bytes_size % (2 * sizeof(cad_vec3)) == 0);
     assert(vertex_bytes_size == vertex_count * sizeof(cad_vec3));
     assert(normal_bytes_size == vertex_count * sizeof(cad_vec3));
     assert(index_bytes_size == index_count * sizeof(std::uint32_t));
     std::vector<std::uint8_t> vertex_bytes(vertex_bytes_size);
     std::vector<std::uint8_t> normal_bytes(normal_bytes_size);
     std::vector<std::uint8_t> index_bytes(index_bytes_size);
+    std::vector<std::uint8_t> edge_bytes(edge_bytes_size);
     assert(cad_mesh_copy_vertices_bytes(mesh, vertex_bytes.data(), &vertex_bytes_size) == CAD_OK);
     assert(cad_mesh_copy_normals_bytes(mesh, normal_bytes.data(), &normal_bytes_size) == CAD_OK);
     assert(cad_mesh_copy_indices_bytes(mesh, index_bytes.data(), &index_bytes_size) == CAD_OK);
+    assert(cad_mesh_copy_edge_segments_bytes(mesh, edge_bytes.data(), &edge_bytes_size) == CAD_OK);
+    for (std::size_t offset = 0; offset < edge_bytes.size(); offset += sizeof(cad_vec3)) {
+        cad_vec3 endpoint{};
+        std::memcpy(&endpoint, edge_bytes.data() + offset, sizeof(endpoint));
+        const auto on_face_mesh = std::any_of(vertices.begin(), vertices.end(), [&](const auto& vertex) {
+            return std::abs(vertex.x - endpoint.x) < 1e-9 &&
+                   std::abs(vertex.y - endpoint.y) < 1e-9 &&
+                   std::abs(vertex.z - endpoint.z) < 1e-9;
+        });
+        assert(on_face_mesh);
+    }
     assert(std::memcmp(vertex_bytes.data(), vertices.data(), vertex_bytes.size()) == 0);
     assert(std::memcmp(normal_bytes.data(), normals.data(), normal_bytes.size()) == 0);
     assert(std::memcmp(index_bytes.data(), indices.data(), index_bytes.size()) == 0);
@@ -407,6 +424,21 @@ int main() {
     assert_close(bounds.max.x, 5.0);
     assert_close(bounds.max.y, 5.0);
     assert_close(bounds.max.z, 20.0);
+    cad_mesh coarse_cylinder = 0;
+    cad_mesh fine_cylinder = 0;
+    const cad_mesh_options coarse_options{0.5, 0.75};
+    const cad_mesh_options fine_options{0.02, 0.2};
+    assert(cad_shape_tessellate(cylinder, &coarse_options, &coarse_cylinder) == CAD_OK);
+    assert(cad_shape_tessellate(cylinder, &fine_options, &fine_cylinder) == CAD_OK);
+    std::uint32_t coarse_edge_bytes = 0;
+    std::uint32_t fine_edge_bytes = 0;
+    assert(cad_mesh_copy_edge_segments_bytes(coarse_cylinder, nullptr, &coarse_edge_bytes) ==
+           CAD_ERROR_BUFFER_TOO_SMALL);
+    assert(cad_mesh_copy_edge_segments_bytes(fine_cylinder, nullptr, &fine_edge_bytes) ==
+           CAD_ERROR_BUFFER_TOO_SMALL);
+    assert(fine_edge_bytes > coarse_edge_bytes);
+    cad_mesh_destroy(coarse_cylinder);
+    cad_mesh_destroy(fine_cylinder);
 
     cad_shape sphere = 0;
     assert(cad_sphere(3.0, &sphere) == CAD_OK);

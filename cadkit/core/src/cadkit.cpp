@@ -28,6 +28,9 @@
 #include <BRepFilletAPI_MakeChamfer.hxx>
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <GCPnts_QuasiUniformDeflection.hxx>
+#include <Poly_PolygonOnTriangulation.hxx>
+#include <Poly_Triangulation.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
@@ -94,6 +97,7 @@ struct MeshData {
     std::vector<cad_vec3> normals;
     std::vector<std::uint32_t> indices;
     std::vector<cad_mesh_face_range> face_ranges;
+    std::vector<cad_vec3> edge_segment_endpoints;
 };
 
 struct MeshEntry {
@@ -1377,6 +1381,42 @@ cad_result build_mesh(
             static_cast<std::uint32_t>(face_index - 1),
             static_cast<std::uint32_t>(first_index),
             static_cast<std::uint32_t>(face_index_count)});
+    }
+
+    NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher> edge_map;
+    TopExp::MapShapes(shape, TopAbs_EDGE, edge_map);
+    for (int edge_index = 1; edge_index <= edge_map.Extent(); ++edge_index) {
+        const auto edge = TopoDS::Edge(edge_map(edge_index));
+        occ::handle<Poly_PolygonOnTriangulation> polygon;
+        occ::handle<Poly_Triangulation> triangulation;
+        TopLoc_Location location;
+        BRep_Tool::PolygonOnTriangulation(edge, polygon, triangulation, location);
+        if (polygon.IsNull() || triangulation.IsNull()) {
+            BRepAdaptor_Curve curve(edge);
+            GCPnts_QuasiUniformDeflection points(curve, options.linear_deflection);
+            if (points.IsDone()) {
+                for (int point_index = 1; point_index < points.NbPoints(); ++point_index) {
+                    const auto first = points.Value(point_index);
+                    const auto second = points.Value(point_index + 1);
+                    if (first.SquareDistance(second) <= 1e-18)
+                        continue;
+                    out_mesh.edge_segment_endpoints.push_back({first.X(), first.Y(), first.Z()});
+                    out_mesh.edge_segment_endpoints.push_back({second.X(), second.Y(), second.Z()});
+                }
+            }
+            continue;
+        }
+        const auto transform = location.Transformation();
+        for (int node_index = 1; node_index < polygon->NbNodes(); ++node_index) {
+            auto first = triangulation->Node(polygon->Node(node_index));
+            auto second = triangulation->Node(polygon->Node(node_index + 1));
+            first.Transform(transform);
+            second.Transform(transform);
+            if (first.SquareDistance(second) <= 1e-18)
+                continue;
+            out_mesh.edge_segment_endpoints.push_back({first.X(), first.Y(), first.Z()});
+            out_mesh.edge_segment_endpoints.push_back({second.X(), second.Y(), second.Z()});
+        }
     }
 
     if (out_mesh.vertices.empty()) {
@@ -3005,6 +3045,16 @@ extern "C" CADKIT_API cad_result cad_mesh_copy_indices_bytes(
     clear_error();
     return copy_mesh_bytes<std::uint32_t>(mesh, output, byte_capacity, [](const MeshData& value) -> const auto& {
         return value.indices;
+    });
+}
+
+extern "C" CADKIT_API cad_result cad_mesh_copy_edge_segments_bytes(
+    cad_mesh mesh,
+    std::uint8_t* output,
+    std::uint32_t* byte_capacity) {
+    clear_error();
+    return copy_mesh_bytes<cad_vec3>(mesh, output, byte_capacity, [](const MeshData& value) -> const auto& {
+        return value.edge_segment_endpoints;
     });
 }
 

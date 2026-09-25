@@ -8,6 +8,8 @@ class Mesh {
 	public final vertices:Bytes;
 	public final normals:Bytes;
 	public final indices:Bytes;
+	/** Consecutive pairs of 3D points in the same units as vertices. */
+	public final edgeSegments:Bytes;
 	public final vertexCount:Int;
 	public final indexCount:Int;
 	public final faceRanges:Array<cadkit.MeshFaceRange>;
@@ -16,12 +18,14 @@ class Mesh {
 		vertices:Bytes,
 		normals:Bytes,
 		indices:Bytes,
+		edgeSegments:Bytes,
 		vertexCount:Int,
 		indexCount:Int,
 		faceRanges:Array<cadkit.MeshFaceRange>) {
 		this.vertices = vertices;
 		this.normals = normals;
 		this.indices = indices;
+		this.edgeSegments = edgeSegments;
 		this.vertexCount = vertexCount;
 		this.indexCount = indexCount;
 		this.faceRanges = faceRanges;
@@ -35,6 +39,7 @@ class Mesh {
 			var vertices = CadKit.meshCopyVerticesBytesChecked(native.borrow());
 			var normals = CadKit.meshCopyNormalsBytesChecked(native.borrow());
 			var indices = CadKit.meshCopyIndicesBytesChecked(native.borrow());
+			var edgeSegments = CadKit.meshCopyEdgeSegmentsBytesChecked(native.borrow());
 			var vertexCount = CadKit.meshVertexCountChecked(native.borrow());
 			var indexCount = CadKit.meshIndexCountChecked(native.borrow());
 			var faceRangeCount = CadKit.meshFaceRangeCountChecked(native.borrow());
@@ -50,6 +55,7 @@ class Mesh {
 				vertices,
 				normals,
 				indices,
+				edgeSegments,
 				vertexCount,
 				indexCount,
 				faceRanges);

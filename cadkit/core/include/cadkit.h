@@ -559,6 +559,13 @@ CADKIT_API cad_result cad_mesh_copy_indices_bytes(
     uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
     uint32_t* byte_capacity CADKIT_HXI_INOUT);
 
+/* Pairs of cad_vec3 endpoints in mesh coordinates, from OCCT edge polygons
+ * on the same triangulation used for the face stream. */
+CADKIT_API cad_result cad_mesh_copy_edge_segments_bytes(
+    cad_mesh mesh,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
 CADKIT_API void cad_shape_destroy(cad_shape shape);
 
 CADKIT_API void cad_mesh_destroy(cad_mesh mesh);

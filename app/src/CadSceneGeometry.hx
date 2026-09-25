@@ -60,8 +60,8 @@ class CadSceneGeometry {
     geometry.addStream(2, 2, normals, mesh.vertexCount, 12);
     for (range in mesh.faceRanges)
       geometry.addSubelement(Std.int(range.firstIndex / 3), Std.int(range.indexCount / 3), range.faceIndex);
+    appendMeshEdges(geometry, mesh);
     if (source != null) {
-      appendBrepEdges(geometry, source);
       var kernelBounds = source.bounds();
       var minimum = kernelBounds.get_min();
       var maximum = kernelBounds.get_max();
@@ -76,33 +76,19 @@ class CadSceneGeometry {
     return geometry;
   }
 
-  static function appendBrepEdges(geometry:GeometryData, source:Shape):Void {
-    var edgeCount = source.subshapeCount(CadKit.ShapeKind.Edge);
-    for (edgeIndex in 0...edgeCount) {
-      var edge = source.subshape(CadKit.ShapeKind.Edge, edgeIndex);
-      try {
-        if (edge.edgeLength() > 1e-9) {
-          var curve = edge.curveKind();
-          var steps = curve == CadKit.CurveKind.Line ? 1 :
-            (curve == CadKit.CurveKind.Circle || curve == CadKit.CurveKind.Ellipse ? 48 : 64);
-          var prior = edge.positionAt(0.0);
-          for (step in 1...(steps + 1)) {
-            var next = edge.positionAt(step / steps);
-            geometry.addStrokeSegment(
-              prior.get_x() * METRES_PER_MILLIMETRE,
-              prior.get_y() * METRES_PER_MILLIMETRE,
-              prior.get_z() * METRES_PER_MILLIMETRE,
-              next.get_x() * METRES_PER_MILLIMETRE,
-              next.get_y() * METRES_PER_MILLIMETRE,
-              next.get_z() * METRES_PER_MILLIMETRE);
-            prior = next;
-          }
-        }
-      } catch (error:Dynamic) {
-        edge.close();
-        throw error;
-      }
-      edge.close();
+  static function appendMeshEdges(geometry:GeometryData, mesh:Mesh):Void {
+    var segments = mesh.edgeSegments;
+    if (segments.length % 48 != 0)
+      throw "CadKit returned an inconsistent edge segment stream";
+    for (index in 0...Std.int(segments.length / 48)) {
+      var offset = index * 48;
+      geometry.addStrokeSegment(
+        segments.getDouble(offset) * METRES_PER_MILLIMETRE,
+        segments.getDouble(offset + 8) * METRES_PER_MILLIMETRE,
+        segments.getDouble(offset + 16) * METRES_PER_MILLIMETRE,
+        segments.getDouble(offset + 24) * METRES_PER_MILLIMETRE,
+        segments.getDouble(offset + 32) * METRES_PER_MILLIMETRE,
+        segments.getDouble(offset + 40) * METRES_PER_MILLIMETRE);
     }
   }
 }
