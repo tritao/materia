@@ -911,11 +911,14 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 	 */
 	extern fn nkui_text_layout_previous_grapheme(layout: nkui_resource, offset: i32, out_offset: ptr<i32> @out) -> nkui_result;
 	/**
+	 * Sets the color used when this retained text layout is drawn.
+	 */
+	extern fn nkui_text_layout_set_color(layout: nkui_resource, color: nkui_color) -> nkui_result;
+	/**
 	 * Re-shapes an existing layout with new UTF-8 text while retaining its handle and style; null text
 	 * is empty.
 	 */
 	extern fn nkui_text_layout_set_text(layout: nkui_resource, text: nullable<utf8>) -> nkui_result;
-	extern fn nkui_text_layout_set_color(layout: nkui_resource, color: nkui_color) -> nkui_result;
 	/**
 	 * Re-shapes an existing layout while retaining its native resource handle; null text is empty.
 	 */
