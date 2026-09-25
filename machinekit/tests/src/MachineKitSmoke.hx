@@ -5,6 +5,9 @@ import machinekit.motion.NemaStepper;
 import machinekit.motion.SteppedShaft;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.DeepGrooveBearing;
+import machinekit.standard.FlatWasher;
+import machinekit.standard.HexBolt;
+import machinekit.standard.HexNut;
 import machinekit.standard.ParallelKey;
 import machinekit.standard.SocketHeadCapScrew;
 import materia.project.AssemblyFrames;
@@ -141,6 +144,73 @@ class MachineKitSmoke {
 		cutout.close();
 	}
 
+	static function fasteners():Void {
+		var bolt = HexBolt.metric("M6", 25);
+		check(bolt.designation == "ISO4017-M6x25", "bolt designation");
+		near(bolt.pitch, 1, "M6 bolt pitch");
+		near(bolt.threadLength, 24, "M6 bolt thread length");
+		throws(() -> HexBolt.metric("M7", 20), 'Unknown hex bolt size "M7"');
+		throws(() -> HexBolt.metric("M6", 0), "positive length");
+
+		var corner = bolt.acrossCorners;
+		near(corner, 10 / Math.cos(Math.PI / 6), "bolt across corners");
+		var envelope = bolt.geometry(Envelope);
+		solid(envelope, "bolt envelope");
+		near(envelope.volume(), Math.PI * (corner / 2) * (corner / 2) * 4 + Math.PI * 9 * 25, "bolt envelope volume");
+		envelope.close();
+		var preview = bolt.geometry();
+		solid(preview, "bolt preview");
+		near(preview.volume(), Math.sqrt(3) / 2 * 100 * 4 + Math.PI * 9 * 25, "bolt preview volume");
+		var box = bounds(preview);
+		near(box.maxX, 5, "bolt head across flats");
+		near(box.minZ, -25, "bolt tip");
+		near(box.maxZ, 4, "bolt head top");
+		preview.close();
+		near(bolt.connector("head").frame.z, 0, "bolt head connector");
+		near(bolt.connector("tip").frame.z, -25, "bolt tip connector");
+
+		near(bolt.clearanceDiameter(Fine), 6.4, "bolt fine clearance");
+		var clearance = bolt.clearanceHole(10);
+		near(clearance.volume(), Math.PI * 3.3 * 3.3 * 10, "bolt clearance hole volume");
+		clearance.close();
+		var tap = bolt.tapHole(12);
+		near(tap.volume(), Math.PI * 2.5 * 2.5 * 12, "bolt tap hole volume");
+		tap.close();
+		var seatRadius = corner / 2 + 0.5;
+		var counterbore = bolt.counterboreHole(6);
+		solid(counterbore, "bolt counterbore tool");
+		near(counterbore.volume(), Math.PI * (seatRadius * seatRadius * 4.5 + 3.3 * 3.3 * 1.5), "bolt counterbore volume");
+		counterbore.close();
+		throws(() -> bolt.counterboreHole(4), "needs depth over");
+
+		var nut = HexNut.metric("M6");
+		check(nut.designation == "ISO4032-M6", "nut designation");
+		throws(() -> HexNut.metric("M7"), 'Unknown hex nut size "M7"');
+		var nutEnvelope = nut.geometry(Envelope);
+		solid(nutEnvelope, "nut envelope");
+		near(nutEnvelope.volume(), Math.sqrt(3) / 2 * 100 * 5.2, "nut envelope volume");
+		nutEnvelope.close();
+		var nutPreview = nut.geometry();
+		solid(nutPreview, "nut preview");
+		near(nutPreview.volume(), Math.sqrt(3) / 2 * 100 * 5.2 - Math.PI * 9 * 5.2, "nut preview volume");
+		nutPreview.close();
+		near(nut.connector("axis").frame.z, 2.6, "nut axis connector");
+		var pocket = nut.pocket(6);
+		solid(pocket, "nut pocket");
+		near(pocket.volume(), Math.sqrt(3) / 2 * 10.5 * 10.5 * 6, "nut pocket volume");
+		pocket.close();
+		throws(() -> nut.pocket(5), "needs depth at least");
+
+		var washer = FlatWasher.metric("M6");
+		check(washer.designation == "ISO7089-M6", "washer designation");
+		throws(() -> FlatWasher.metric("M7"), 'Unknown flat washer size "M7"');
+		var washerPart = washer.geometry();
+		solid(washerPart, "washer");
+		near(washerPart.volume(), Math.PI * (6 * 6 - 3.2 * 3.2) * 1.6, "washer volume");
+		washerPart.close();
+		near(washer.connector("axis").frame.z, 0.8, "washer axis connector");
+	}
+
 	static function shafts():Void {
 		var key = ParallelKey.forShaft(6, 6);
 		check(key.designation == "DIN6885-2x2x6", "key designation");
@@ -253,6 +323,7 @@ class MachineKitSmoke {
 		bearings();
 		screws();
 		motors();
+		fasteners();
 		shafts();
 		assembly();
 		trace("MachineKit smoke passed");

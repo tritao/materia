@@ -21,6 +21,9 @@ Each component also produces the machining it needs:
 | --- | --- | --- |
 | `DeepGrooveBearing` | 625–6205, ISO 15 boundary dimensions | `housingSeat()`, `journalDiameter()` |
 | `SocketHeadCapScrew` | M3–M12, ISO 4762 heads | `clearanceHole()` (ISO 273), `tapHole()`, `counterboreHole()` (DIN 974-1) |
+| `HexBolt` | M3–M12, ISO 4017 heads | `clearanceHole()`, `tapHole()`, `counterboreHole()` |
+| `HexNut` | M3–M12, ISO 4032 | `pocket()` for a trapped-nut recess |
+| `FlatWasher` | M3–M12, ISO 7089 | — |
 | `NemaStepper` | NEMA 17, 23, 34 | `mountingCutout()`, `mountScrew()`, `boltPattern()` |
 | `ParallelKey` | DIN 6885-1 form A, by shaft diameter | — |
 | `SteppedShaft` | — (built from arbitrary sections) | keyway and retaining-ring groove cuts, `diameterAt()` |
