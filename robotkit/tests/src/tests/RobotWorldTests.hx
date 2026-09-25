@@ -31,6 +31,7 @@ import robotkit.world.Robot;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.RobotStatus;
 import robotkit.world.RemoteRobot;
+import robotkit.world.SerialRobot;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.RecordingRobot;
 import robotkit.world.StopMode;
@@ -129,6 +130,7 @@ class RobotWorldTests {
     testSensorAndClockContracts();
     testSensorResetPublication();
     testConfiguredSensors();
+    testSerialRobotUnavailableDevice();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
   }
 
@@ -1530,6 +1532,17 @@ class RobotWorldTests {
     partial.fieldOfViewRadians = Math.PI;
     check(hasDiagnostic(diagnostics, "RK_FRAME_POSE"), "non-unit mount rotations rejected");
     check(hasDiagnostic(diagnostics, "RK_SENSOR_RATE"), "negative sample rates rejected");
+  }
+
+  static function testSerialRobotUnavailableDevice():Void {
+    var model = new RobotModel("serial probe");
+    model.addLink(new Link("base", "base"));
+    var robot:Null<SerialRobot> = null;
+    var failed = false;
+    try robot = new SerialRobot("serial-probe", model,
+      '/dev/robotkit-missing-${Sys.getPid()}') catch (_:Dynamic) failed = true;
+    if (robot != null) robot.close();
+    check(failed, "serial Robot adapter reports an unavailable device path");
   }
 
   static function testSensorResetPublication():Void {

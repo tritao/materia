@@ -32,6 +32,18 @@ class RobotRuntime {
     return new RobotRuntime(result.out_runtime, blueprint);
   }
 
+  /** Creates a standalone runtime over a POSIX serial robot endpoint. */
+  public static function createSerial(blueprint:RobotRuntimeBlueprint,
+      devicePath:String, ?baud:Int = 115200):RobotRuntime {
+    if (blueprint == null) throw "Serial runtime requires a compiled blueprint";
+    if (devicePath == null || StringTools.trim(devicePath).length == 0)
+      throw "Serial runtime requires a device path";
+    var result = RobotKitRuntime.rk_robot_runtime_create_serial(
+      blueprint.nativeValue(), devicePath, baud);
+    check(result.status, "runtime.createSerial");
+    return new RobotRuntime(result.out_runtime, blueprint);
+  }
+
   /** Starts a standalone runtime worker; Simulation-owned runtimes reject this. */
   public function start():Void {
     ensureLive();

@@ -79,9 +79,12 @@ ctest --test-dir /tmp/materia-mujoco --output-on-failure
 Select it with `new Simulation(0.01, 2, 1)`; backend `0` remains the test backend.
 
 `robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
-`Robot` interface used by `RemoteRobot`. It does not own or dispose the
-shared simulation, allowing one `RobotWorld` to contain local simulated robots
-and remote physical robots without backend-specific orchestration.
+`Robot` interface used by `RemoteRobot`. `robotkit.world.SerialRobot` compiles
+an authored `RobotModel`, opens a POSIX serial device, and owns its standalone
+runtime. Both can be attached to `RobotWorld` and used through the same command
+and snapshot interfaces. The first serial protocol version carries joint
+positions, velocities, efforts, and indexed target batches; it does not yet
+carry physical IMU or LiDAR samples.
 
 The complete ownership and tick model is documented in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).

@@ -12,14 +12,16 @@ RobotWorld
 └── Robot[]
     ├── RemoteRobot
     │   └── RobotClient ── RobotProtocol ── robotd / physical process
+    ├── SerialRobot
+    │   └── RuntimeRobotAdapter ── RobotRuntime ── SerialRobotEndpoint
     └── SimulatedRobot
-        └── RobotRuntime ──┐
-                            ▼
-                        Simulation
+        └── RuntimeRobotAdapter ── RobotRuntime ──┐
+                                                   ▼
+                                               Simulation
 ```
 
 `RobotWorld` owns the logical `Robot` collection. It does not know whether a
-robot is remote or simulated. It routes `RobotCommand`, collects
+robot is remote, serial-connected, or simulated. It routes `RobotCommand`, collects
 `RobotSnapshot`, tracks lifecycle changes, and builds `WorldSnapshot` values.
 The world has one application owner, recorded as a native thread token.
 Non-owner calls that would touch its maps, adapters, or observers are rejected.
@@ -122,7 +124,8 @@ lifecycle ownership to another layer.
 
 `RemoteRobot` owns a network client. `SimulatedRobot` is only an adapter over a
 `RobotRuntime` supplied by an externally owned `Simulation`; it never creates,
-steps, stops, or disposes that simulation.
+steps, stops, or disposes that simulation. `SerialRobot` compiles a model,
+creates and starts a serial-backed `RobotRuntime`, and disposes it on close.
 
 The ownership matrix is deliberately boring:
 
@@ -130,6 +133,7 @@ The ownership matrix is deliberately boring:
 | --- | --- | --- |
 | `RobotWorld` | attached adapters and world event delivery | simulation runtimes or remote process lifetime |
 | `Simulation` | SceneKit/SimKit state, clock, simulated runtimes and environment objects | `RobotWorld` adapters |
+| `SerialRobot` | serial runtime and open device descriptor | physical device firmware or controller state |
 | `robotd` | one deployed `RobotRuntime`, endpoint, protocol sessions and control lease | fleet/world composition |
 | `RobotClient`/`RemoteRobot` | its transport connection | the deployed runtime |
 

@@ -425,7 +425,7 @@ RK_API rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprin
                                            rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
 /** Creates a standalone runtime over RobotKit's framed POSIX serial endpoint. */
 RK_API rk_result RK_CALL rk_robot_runtime_create_serial(
-    const rk_robot_runtime_blueprint *blueprint, const char *device_path,
+    const rk_robot_runtime_blueprint *blueprint, const char *device_path RK_UTF8,
     uint32_t baud, rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
 /**
  * Stops and releases a standalone runtime handle.

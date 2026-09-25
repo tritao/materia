@@ -13,8 +13,10 @@ namespace robotkit {
  * Small framed serial endpoint for the first physical RobotKit backend.
  *
  * The wire format is deliberately fixed-width and documented by the packet
- * values below: command packets travel host-to-device and state packets travel
- * device-to-host. A device implementation can therefore be tested with a
+ * values below: version 2 command packets travel host-to-device and state
+ * packets travel device-to-host. Each target includes its compiled joint
+ * index, so sparse and mixed-mode batches retain their meaning. A device
+ * implementation can therefore be tested with a
  * serial loopback before it is attached to a particular motor controller.
  * RobotRuntime still owns validation, sequencing, limits, and safety state.
  */

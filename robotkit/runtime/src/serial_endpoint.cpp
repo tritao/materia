@@ -17,9 +17,9 @@
 namespace robotkit {
 namespace {
 
-constexpr std::array<std::uint8_t, 4> command_magic{'R', 'K', 'C', '1'};
-constexpr std::array<std::uint8_t, 4> state_magic{'R', 'K', 'S', '1'};
-constexpr std::size_t command_bytes = 4 + 4 + 8 + 4 + 4 + RK_MAX_SERIAL_JOINTS * (4 + 8);
+constexpr std::array<std::uint8_t, 4> command_magic{'R', 'K', 'C', '2'};
+constexpr std::array<std::uint8_t, 4> state_magic{'R', 'K', 'S', '2'};
+constexpr std::size_t command_bytes = 4 + 4 + 8 + 4 + 4 + RK_MAX_SERIAL_JOINTS * (4 + 4 + 8);
 constexpr std::size_t state_bytes = 4 + 4 + 8 + 4 + RK_MAX_SERIAL_JOINTS * 8 * 3;
 
 #pragma pack(push, 1)
@@ -29,7 +29,7 @@ struct WireCommand {
     std::uint64_t sequence;
     std::uint32_t target_count;
     std::uint32_t reserved;
-    struct Target { std::uint32_t mode; double value; } targets[RK_MAX_SERIAL_JOINTS];
+    struct Target { std::uint32_t joint; std::uint32_t mode; double value; } targets[RK_MAX_SERIAL_JOINTS];
 };
 struct WireState {
     std::uint8_t magic[4];
@@ -135,6 +135,7 @@ rk_result SerialRobotEndpoint::apply(const rk_robot_command &command) {
     packet.sequence = command.sequence;
     packet.target_count = command.target_count;
     for (uint32_t index = 0; index < command.target_count; ++index) {
+        packet.targets[index].joint = command.targets[index].joint;
         packet.targets[index].mode = command.targets[index].mode;
         packet.targets[index].value = command.targets[index].target;
     }

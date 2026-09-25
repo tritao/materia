@@ -14,7 +14,7 @@ struct WireCommand {
     std::uint64_t sequence;
     std::uint32_t target_count;
     std::uint32_t reserved;
-    struct Target { std::uint32_t mode; double value; } targets[RK_MAX_SERIAL_JOINTS];
+    struct Target { std::uint32_t joint; std::uint32_t mode; double value; } targets[RK_MAX_SERIAL_JOINTS];
 };
 struct WireState {
     std::uint8_t magic[4];
@@ -37,19 +37,25 @@ int main() {
     command.struct_size = sizeof(command);
     command.sequence = 7;
     command.kind = RK_COMMAND_JOINT_TARGETS;
-    command.target_count = 1;
-    command.targets[0] = {0, RK_TARGET_POSITION, 0.5, 0.0, 0.0};
+    command.target_count = 2;
+    command.targets[0] = {2, RK_TARGET_POSITION, 0.5, 0.0, 0.0};
+    command.targets[1] = {5, RK_TARGET_EFFORT, 3.0, 0.0, 0.0};
     assert(endpoint->apply(command) == RK_OK);
     WireCommand received{};
     assert(::read(sockets[1], &received, sizeof(received)) == sizeof(received));
-    assert(received.sequence == 7 && received.target_count == 1);
-    assert(received.targets[0].value == 0.5);
+    assert(received.magic[0] == 'R' && received.magic[1] == 'K'
+        && received.magic[2] == 'C' && received.magic[3] == '2');
+    assert(received.sequence == 7 && received.target_count == 2);
+    assert(received.targets[0].joint == 2 && received.targets[0].mode == RK_TARGET_POSITION
+        && received.targets[0].value == 0.5);
+    assert(received.targets[1].joint == 5 && received.targets[1].mode == RK_TARGET_EFFORT
+        && received.targets[1].value == 3.0);
     command.targets[0].joint = RK_MAX_SERIAL_JOINTS;
     assert(endpoint->apply(command) == RK_ERROR_LIMIT);
 
     WireState state_packet{};
     state_packet.magic[0] = 'R'; state_packet.magic[1] = 'K';
-    state_packet.magic[2] = 'S'; state_packet.magic[3] = '1';
+    state_packet.magic[2] = 'S'; state_packet.magic[3] = '2';
     state_packet.joint_count = 1;
     state_packet.source_timestamp_ns = 1234;
     state_packet.position[0] = 0.25;

@@ -221,7 +221,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Creates a standalone runtime over RobotKit's framed POSIX serial endpoint.
 	 */
-	extern fn rk_robot_runtime_create_serial(blueprint: ptr<const<rk_robot_runtime_blueprint>>, device_path: ptr<const<c_char>>, baud: u32, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
+	extern fn rk_robot_runtime_create_serial(blueprint: ptr<const<rk_robot_runtime_blueprint>>, device_path: utf8, baud: u32, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
 	/**
 	 * Stops and releases a standalone runtime handle.
 	 *
@@ -622,7 +622,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		start_angle: f64 @offset(96);
 		/**
-		 * < LiDAR angular coverage in radians, (0, 2*pi].
+		 * < LiDAR angular coverage in radians; zero selects 2*pi.
 		 */
 		field_of_view: f64 @offset(104);
 	}
