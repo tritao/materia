@@ -6,11 +6,11 @@ selects the packed backends; the lock records published field order and sizes.
 The [v5 device protocol](../runtime/DEVICE_PROTOCOL_V5.md) specifies framing,
 session behavior, limits, and timing around these records.
 
-The proposed v5 stream frame, CRC, session state machine, model-fingerprint
-comparison, command validation, and watchdog remain separate protocol work.
-This schema does not authorize motion by itself. The device must compare the
-16-byte `SessionBegin.model_fingerprint` with its compiled model identity and
-stay latched safe on mismatch.
+The hardware-independent Rust device core in `device_protocol/src/runtime.rs`
+now owns framing, CRC, session state, command validation, and watchdog state.
+The device adapter still owns physical stop outputs, safety inputs, and joint
+I/O. The MCU must compare the 16-byte `SessionBegin.model_fingerprint` with
+its compiled model identity and stay latched safe on mismatch.
 
 `COMMAND` payloads will be `CommandHeader` followed by exactly
 `target_count * JointTarget::SIZE` bytes. `STATE` payloads will be `StateHeader`

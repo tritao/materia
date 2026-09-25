@@ -97,6 +97,7 @@ int main(int argc, char **argv) {
     const auto reset = command(session, 1, 4);
     const auto target = command(session, 2, 1, {{1, 2, 0, 1.5f}});
     CHECK(begin == vectors.at("session_begin"));
+    CHECK(frame(2, payload(wire::SessionAck{session, fingerprint, 1, {0, 0, 0}})) == vectors.at("session_ack"));
     CHECK(reset == vectors.at("command_reset"));
     CHECK(target == vectors.at("command_target"));
     CHECK(frame(4, [&] {

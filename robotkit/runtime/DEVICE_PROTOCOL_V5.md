@@ -3,6 +3,10 @@
 This is the UART byte-stream protocol between a Linux host and a device MCU.
 Version 4 remains the active `SerialRobotEndpoint` protocol during migration.
 The fixed payload records come from `robotkit/schema/device_wire.wire.idl`.
+The hardware-independent Rust `robotkit-device-protocol` crate implements the
+device parser, session and watchdog state, and outgoing ACK/STATE encoding.
+The POSIX `HostLink` implements v5 negotiation, commands, and state sampling
+beside the v4 endpoint; its PTY test exercises a complete exchange.
 
 ## Frame
 

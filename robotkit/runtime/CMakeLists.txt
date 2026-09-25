@@ -3,6 +3,7 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/runtime.cpp
     src/runtime_c_api.cpp
     src/recording.cpp
+    src/device_host_v5.cpp
     src/serial_protocol.cpp
     src/serial_endpoint.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
@@ -33,6 +34,15 @@ if(RK_BUILD_TESTS)
         set_tests_properties(robotkit_device_wire_codegen PROPERTIES
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
             LABELS "robot;wire;codegen" TIMEOUT 30)
+    endif()
+    find_program(RK_CARGO_EXECUTABLE cargo)
+    if(RK_CARGO_EXECUTABLE)
+        add_test(NAME robotkit_device_protocol_rust
+            COMMAND ${RK_CARGO_EXECUTABLE} test
+                --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/Cargo.toml
+                --target-dir ${CMAKE_CURRENT_BINARY_DIR}/cargo-target)
+        set_tests_properties(robotkit_device_protocol_rust PROPERTIES
+            LABELS "robot;wire;rust" TIMEOUT 120)
     endif()
 
     add_executable(robotkit_device_wire_tests tests/device_wire.cpp)
@@ -76,6 +86,13 @@ if(RK_BUILD_TESTS)
     set_tests_properties(robotkit_recording PROPERTIES LABELS "robot;recording;mcap" TIMEOUT 30)
 
     if(NOT WIN32)
+        find_package(Threads REQUIRED)
+        add_executable(robotkit_device_host_v5_pty_tests tests/device_host_v5_pty.cpp)
+        target_compile_features(robotkit_device_host_v5_pty_tests PRIVATE cxx_std_20)
+        target_link_libraries(robotkit_device_host_v5_pty_tests PRIVATE RobotKit::runtime Threads::Threads)
+        add_test(NAME robotkit_device_host_v5_pty COMMAND robotkit_device_host_v5_pty_tests)
+        set_tests_properties(robotkit_device_host_v5_pty PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
+
         add_executable(robotkit_serial_protocol_tests tests/serial_protocol.cpp)
         target_compile_features(robotkit_serial_protocol_tests PRIVATE cxx_std_20)
         target_link_libraries(robotkit_serial_protocol_tests PRIVATE RobotKit::runtime)
