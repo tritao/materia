@@ -2,6 +2,21 @@ package tests;
 
 import NativeKitRuntime;
 import haxe.Int64;
+import materia.automation.facility.Facility;
+import materia.automation.facility.FacilityRouter;
+import materia.automation.facility.Lane;
+import materia.automation.facility.Station;
+import materia.automation.facility.Zone;
+import materia.automation.fleet.Dispatcher;
+import materia.automation.fleet.Fleet;
+import materia.automation.fleet.FleetAssignment;
+import materia.automation.mission.Mission;
+import materia.automation.mission.MissionExecutionStatus;
+import materia.automation.mission.MissionExecutor;
+import materia.automation.task.Task;
+import materia.automation.task.TaskKind;
+import materia.automation.task.Transport;
+import robotkit.material.Payload;
 import robotkit.world.RemoteRobot;
 import robotkit.world.RobotStatus;
 import robotkit.world.RobotWorld;
@@ -201,7 +216,45 @@ class WorldTcpIntegration {
           && state.velocities.get(1) > 0.0;
       }, "GoTo did not send an atomic two-wheel velocity target through robotd");
       goTo.cancel();
-      Sys.println("Shared behavior and GoTo passed: local simulation and robotd TCP");
+
+      var facility = new Facility("serial-facility", "Serial integration facility");
+      facility.addZone(new Zone("floor", "Floor", "map",
+        robotkit.mobile.Footprint.rectangle(5.0, 5.0)));
+      var receiving = new Station("receiving", "Receiving", "floor", "map", new Pose2());
+      var staging = new Station("staging", "Staging", "floor", "map", new Pose2(0.1, 0.0, 0.0));
+      facility.addStation(receiving);
+      facility.addStation(staging);
+      facility.addLane(new Lane("receiving-to-staging", receiving.id, staging.id,
+        new Path([receiving.pose, staging.pose], "map"), 1.5, 0.5));
+      var fleet = new Fleet("serial-fleet", world);
+      fleet.addRobot(LOGICAL_ID);
+      var mission = new Mission("serial-transport", "Serial robot transport", [
+        new Transport("transport-pallet", receiving.id, staging.id,
+          new Payload(100.0, 0.8, 0.6, 0.4, 0.4))
+      ]);
+      var assignmentValue = new Dispatcher(fleet).dispatch(mission);
+      if (assignmentValue == null) throw "serial robot was not assigned the facility mission";
+      var assignment:FleetAssignment = cast assignmentValue;
+      var missionFactory = new SerialTransportSkillFactory(model);
+      var executor = new MissionExecutor(fleet, assignment, facility, missionFactory);
+      executor.start();
+      var missionStatus = executor.status;
+      var missionTicks = 0;
+      while (switch missionStatus { case MissionExecutionStatus.Running: true; case _: false; } &&
+          missionTicks < 800) {
+        while (runtime.events.poll()) {}
+        world.pump();
+        missionStatus = executor.update(0.02);
+        missionTicks++;
+        if (switch missionStatus { case MissionExecutionStatus.Running: true; case _: false; })
+          runtime.events.wait(0.01);
+      }
+      if (!switch missionStatus { case MissionExecutionStatus.Succeeded: true; case _: false; })
+        throw 'RemoteRobot mission did not succeed: ${Std.string(missionStatus)}';
+      if (mission.status != materia.automation.mission.MissionStatus.Succeeded ||
+          fleet.availableRobotIds().indexOf(LOGICAL_ID) < 0)
+        throw "serial mission did not complete and release its fleet assignment";
+      Sys.println("Shared behavior, GoTo, and MissionExecutor passed: local simulation and robotd serial");
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();
@@ -218,5 +271,30 @@ class WorldTcpIntegration {
       runtime.events.wait(0.01);
     }
     throw failure;
+  }
+}
+
+private class SerialTransportSkillFactory implements materia.automation.mission.TaskSkillFactory {
+  final model:robotkit.model.RobotModel;
+
+  public function new(model:robotkit.model.RobotModel) this.model = model;
+
+  public function create(task:Task, robot:robotkit.world.Robot,
+      facility:Facility):robotkit.skill.Skill {
+    return switch task.kind {
+      case TaskKind.Transport:
+        var transport:Transport = cast task;
+        var route = new FacilityRouter(facility).route(
+          transport.pickupStationId, transport.destinationStationId);
+        var base = MobileBase.fromRobot(robot, model);
+        var localization = new WheelOdometryLocalization(base, route.path.frameId);
+        var navigation = new Navigation(base, localization, 0.2,
+          route.maximumSpeedMetersPerSecond, 1.0);
+        var goalStation = facility.station(transport.destinationStationId);
+        if (goalStation == null) throw "transport mission destination is missing";
+        new GoTo(navigation, route.path,
+          new NavigationGoal(goalStation.pose, goalStation.frameId, 0.02, 0.1));
+      case _: throw 'serial integration does not support task kind ${Std.string(task.kind)}';
+    }
   }
 }

@@ -199,7 +199,13 @@ class RobotServer {
 
   function receive(transport:TransportHandle):Void {
     while (true) {
-      var bytes = NativeTransport.receive(transport);
+      var bytes:haxe.io.Bytes;
+      try {
+        bytes = NativeTransport.receive(transport);
+      } catch (_:Dynamic) {
+        closeClient(transport);
+        return;
+      }
       if (bytes.length == 0)
         return;
       for (frame in stream.push(bytes))
@@ -211,7 +217,13 @@ class RobotServer {
     var observerStream = observerStreams.get(transport.rawValue());
     if (observerStream == null) return;
     while (true) {
-      var bytes = NativeTransport.receive(transport);
+      var bytes:haxe.io.Bytes;
+      try {
+        bytes = NativeTransport.receive(transport);
+      } catch (_:Dynamic) {
+        closeObserver(transport);
+        return;
+      }
       if (bytes.length == 0) return;
       var frames = observerStream.push(bytes);
       for (frame in frames) handleObserverFrame(transport, frame);

@@ -5,7 +5,8 @@
 	"sourceRoots": ["src"],
 	"dependencies": {
 		"nativekit": { "path": "../../../nativekit" },
-		"robotkit": { "path": "../.." }
+		"robotkit": { "path": "../.." },
+		"materia-automation": { "path": "../../../automationkit" }
 	},
 	"native": {
 		"cmake": {

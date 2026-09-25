@@ -57,6 +57,11 @@ def read_commands(pending, position, velocity, effort, target_seen):
         if len(payload) < 20:
             continue
         kind, _, target_count, _ = struct.unpack_from("<IQII", payload)
+        if kind in (2, 3, 4):
+            for joint in range(len(velocity)):
+                velocity[joint] = 0.0
+                effort[joint] = 0.0
+            continue
         if kind != 1 or len(payload) != 20 + target_count * 16:
             continue
         for index in range(target_count):
