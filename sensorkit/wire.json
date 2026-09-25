@@ -1,5 +1,37 @@
 {
   "schema": "schema/sensor_wire.nkw",
   "lock": "schema/sensor_wire.lock.json",
-  "generator": "sensorkit.wire_generate"
+  "generator": "sensorkit.wire_generate",
+  "haxe": {
+    "root": "sensor_io/haxe/materia/sensor/wire",
+    "package": "materia.sensor.wire",
+    "codec_name": "SensorWireCodec",
+    "constants_name": "SensorWireConstants",
+    "schema_label": "schema/sensor_wire.nkw",
+    "codec_comment": "/** Generated MessagePack-payload entry points; wrap or unwrap HMPK separately. */"
+  },
+  "cpp": {
+    "namespace": "nksensor::wire::generated",
+    "reader_namespace": "nksensor::wire::detail",
+    "generated_header": "nativekit_sensor_wire_generated.hpp",
+    "codec_header": "sensor_wire_codec.hpp",
+    "msgpack_header": "msgpack.hpp",
+    "aliases": {
+      "imu_packed_value_count": "24",
+      "imu_packed_data_size": "192",
+      "lidar_packed_return_size": "12"
+    }
+  },
+  "markdown": {
+    "title": "SensorKit wire schema",
+    "intro": "Generated from `schema/sensor_wire.nkw`. MessagePack fields use integer map keys; the HMPK envelope is version 1."
+  },
+  "outputs": {
+    "cpp_types": "sensor_io/include/nativekit_sensor_wire_generated.hpp",
+    "cpp_codec_header": "sensor_io/generated/cpp/sensor_wire_codec.hpp",
+    "cpp_codec_source": "sensor_io/generated/cpp/sensor_wire_generated.cpp",
+    "markdown": "sensor_io/generated/sensor_wire.md",
+    "vectors": "sensor_io/tests/fixtures/sensor_wire_vectors.tsv",
+    "haxe_vectors": "sensor_io/tests/haxe/SensorWireVectorCheck.hx"
+  }
 }
