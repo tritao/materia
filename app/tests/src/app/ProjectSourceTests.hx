@@ -13,20 +13,27 @@ class ProjectSourceTests {
   }
 
   public static function main():Int {
-    var root = FileSystem.exists("cadkit/examples/modeling/materia.project.json")
-      ? FileSystem.fullPath(".") : FileSystem.exists("../cadkit/examples/modeling/materia.project.json")
-      ? FileSystem.fullPath("..") : FileSystem.fullPath("../../..");
+    var root = Sys.getCwd();
+    while (!FileSystem.exists(root + "/cadkit/examples/modeling/materia.project.json")) {
+      var parent = haxe.io.Path.directory(root);
+      if (parent == root || parent.length == 0) throw "Could not locate Materia repository";
+      root = parent;
+    }
     Sys.setCwd(root);
     var manifest = root + "/cadkit/examples/modeling/materia.project.json";
     var generatedScene = MateriaProjectRunner.loadProject(manifest);
     var generated = generatedScene.objects;
     check(generated.length == 13, "project generates all excavator parts");
     var base = generated[0], removed = generated[1];
+    check(generatedScene.geometryBySnapshot.exists(base.meshSnapshot) &&
+      StringTools.startsWith(base.meshSnapshot, "materia.artifact-part/1:"),
+      "generated parts carry direct runtime geometry and a compact source identity");
     var session = new ProjectDocumentSession();
     var output = "/tmp/materia-project-source-" + Sys.getPid() + ".materia.json";
     var stage = "open generated scene";
     try {
-      session.openGeneratedScene(generated, manifest, generatedScene.assembly);
+      session.openGeneratedScene(generated, manifest, generatedScene.assembly,
+        generatedScene.geometryBySnapshot);
       session.scene.select(base.id);
       check(session.scene.nudgeSelected(0.1, 0.0), "generated part can be moved");
       check(session.scene.duplicateSelected(), "generated part can be instanced");

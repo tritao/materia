@@ -1,6 +1,7 @@
 package app;
 
 import haxe.Json;
+import haxe.crypto.Sha256;
 import haxe.io.Bytes;
 import haxe.io.Path as ProjectPath;
 import sys.io.AtomicFile;
@@ -9,6 +10,7 @@ import materia.project.SceneArtifact.SceneArtifactPart;
 import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord.AssemblyFrame;
 import materia.project.AssemblyRecord;
+import nativekit.scene.GeometryData;
 import sys.FileSystem;
 import sys.io.File;
 import sys.io.Process;
@@ -196,7 +198,9 @@ class MateriaProjectRunner {
 
   static function previewRecords(snapshot:Bytes):GeneratedAssemblyScene {
     var artifact = SceneArtifact.decode(snapshot);
+    var artifactHash = digestHex(Sha256.make(snapshot));
     var records:Array<SceneObjectData> = [];
+    var geometryBySnapshot:Map<String, GeometryData> = new Map();
     var scale = artifact.metresPerUnit;
     var poses = new Map<String, AssemblyFrame>();
     if (artifact.assembly != null)
@@ -210,14 +214,15 @@ class MateriaProjectRunner {
         minimum[axis] = Math.min(minimum[axis], coordinate);
         maximum[axis] = Math.max(maximum[axis], coordinate);
       }
-      var componentSnapshot = encodeSnapshot(component, minimum, maximum, scale);
-      if (componentSnapshot.length > 50000000) throw 'Project component "$label" exceeds the 50 MB mesh limit';
+      var geometry = CadPreviewGeometry.fromArtifact(component, minimum, maximum, scale);
       var centerX = (minimum[0] + maximum[0]) * 0.5;
       var centerY = (minimum[1] + maximum[1]) * 0.5;
       var centerZ = (minimum[2] + maximum[2]) * 0.5;
       var pose = poses.get(component.id);
       var center = pose == null ? {x: centerX, y: centerY, z: centerZ}
         : AssemblyFrames.transformPoint(pose, centerX, centerY, centerZ);
+      var geometryKey = "materia.artifact-part/1:" + artifactHash + ":" + component.id;
+      geometryBySnapshot.set(geometryKey, geometry);
       records.push({id: "project:" + component.id, label: label, type: "cad-preview",
         x: center.x * scale,
         y: center.y * scale,
@@ -227,25 +232,13 @@ class MateriaProjectRunner {
         depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
         collisionEnabled: false, dynamicBody: false, mass: 1.0,
         red: component.red, green: component.green, blue: component.blue,
-        visible: true, meshSnapshot: componentSnapshot,
+        visible: true,
+        meshSnapshot: geometryKey,
         rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]});
     }
-    return {objects: records, assembly: artifact.assembly};
+    return {objects: records, assembly: artifact.assembly,
+      geometryBySnapshot: geometryBySnapshot};
   }
-
-  static function encodeSnapshot(component:SceneArtifactPart, minimum:Array<Float>,
-      maximum:Array<Float>, scale:Float):String {
-    var ranges:Array<String> = [];
-    for (range in component.faceRanges)
-      ranges.push(range.faceIndex + "," + range.firstIndex + "," + range.indexCount);
-    return ["materia.geometry-preview/3", Std.string(scale), Std.string(component.vertexCount),
-      Std.string(component.indexCount), triple(minimum), triple(maximum), ranges.join(";"),
-      MateriaBase64.encode(component.vertices), MateriaBase64.encode(component.normals),
-      MateriaBase64.encode(component.indices)].join("|");
-  }
-
-  static function triple(values:Array<Float>):String
-    return Std.string(values[0]) + "," + Std.string(values[1]) + "," + Std.string(values[2]);
 
   static function projectToolsDirectory():String {
     var current = Sys.getCwd();
@@ -254,6 +247,16 @@ class MateriaProjectRunner {
     candidate = ProjectPath.join([current, "app", "tools", "MateriaProjectModuleBuild.hx"]);
     if (FileSystem.exists(candidate)) return ProjectPath.join([current, "app", "tools"]);
     throw "Could not locate MateriaProjectModuleBuild.hx next to the app source tree";
+  }
+
+  static function digestHex(bytes:Bytes):String {
+    var digits = "0123456789abcdef", result = new StringBuf();
+    for (index in 0...bytes.length) {
+      var value = bytes.get(index);
+      result.add(digits.charAt(value >>> 4));
+      result.add(digits.charAt(value & 15));
+    }
+    return result.toString();
   }
 
   static function resolveProjectPath(root:String, relative:String):String
@@ -292,4 +295,5 @@ class MateriaProjectRunner {
 typedef GeneratedAssemblyScene = {
   var objects:Array<SceneObjectData>;
   var assembly:Null<AssemblyRecord>;
+  var geometryBySnapshot:Map<String, GeometryData>;
 }

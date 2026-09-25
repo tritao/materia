@@ -75,6 +75,7 @@ class EditorScene {
   var scene(get, never):Scene;
   var objects:Array<EditorSceneObject>;
   var cadSessions:Map<String, CadDocumentSession>;
+  final generatedGeometry:Map<String, GeometryData>;
   var nextObjectId:Int = 1;
   var snapshot:SceneSnapshot;
   var spatial:SpatialIndex;
@@ -126,8 +127,9 @@ class EditorScene {
   }
 
   public function new(?data:Array<SceneObjectData>, ?sharedDocument:EditorDocument,
-      ?loadProfilePhases:Map<String, Float>) {
+      ?loadProfilePhases:Map<String, Float>, ?generatedGeometry:Map<String, GeometryData>) {
     this.loadProfilePhases = loadProfilePhases;
+    this.generatedGeometry = generatedGeometry == null ? new Map() : generatedGeometry;
     nextRevision++;
     revision = nextRevision;
     nextEnvironmentRevision++;
@@ -171,6 +173,14 @@ class EditorScene {
     }
   }
 
+  function previewGeometry(snapshot:String):GeometryData {
+    var generated = generatedGeometry.get(snapshot);
+    if (generated != null) return generated;
+    if (StringTools.startsWith(snapshot, "materia.artifact-part/1:"))
+      throw "Generated preview geometry is missing from its project source";
+    return CadPreviewGeometry.geometry(snapshot);
+  }
+
   function addObject(id:String, label:String, x:Float, y:Float, z:Float,
       width:Float, height:Float, depth:Float, red:Float, green:Float, blue:Float,
       visible:Bool = true,collisionEnabled:Bool=true,dynamicBody:Bool=false,mass:Float=1.0,
@@ -189,7 +199,7 @@ class EditorScene {
       geometryData = session.geometry();
     } else if (kind == "cad-preview") {
       if (meshSnapshot == null) throw "CAD preview object has no mesh snapshot";
-      geometryData = CadPreviewGeometry.geometry(meshSnapshot);
+      geometryData = previewGeometry(meshSnapshot);
     } else {
       geometryData = boxGeometry(width, height, depth);
     }
@@ -254,7 +264,7 @@ class EditorScene {
         cadSessions.set(item.id, session);
       } else if (item.type == "cad-preview") {
         if (item.meshSnapshot == null) throw "CAD preview object has no mesh snapshot";
-        geometry = CadPreviewGeometry.geometry(item.meshSnapshot);
+        geometry = previewGeometry(item.meshSnapshot);
       } else {
         geometry = boxGeometry(item.width, item.height, item.depth);
       }
@@ -1046,7 +1056,8 @@ class EditorScene {
       width: item.width, height: item.height, depth: item.depth,
       collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
       red: item.red, green: item.green, blue: item.blue,
-      visible: item.visible, cadGraph: item.cadGraph};
+      visible: item.visible, cadGraph: item.cadGraph,
+      meshSnapshot: item.meshSnapshot, rotation: item.rotation};
   }
 
   static function estimateSceneChanges(changes:Array<SceneRecordChange>):Int {
@@ -1267,7 +1278,7 @@ class EditorScene {
           var geometryData = session != null
             ? session.geometry()
             : (record.type == "cad-preview"
-              ? CadPreviewGeometry.geometry(record.meshSnapshot)
+              ? previewGeometry(record.meshSnapshot)
               : boxGeometry(record.width, record.height, record.depth));
           scene.setGeometryData(geometry, geometryData);
           failIfInjected("prepare.new-geometry");
@@ -1320,7 +1331,7 @@ class EditorScene {
             var geometryData = session != null
               ? session.geometry()
               : (record.type == "cad-preview"
-                ? CadPreviewGeometry.geometry(record.meshSnapshot)
+                ? previewGeometry(record.meshSnapshot)
                 : boxGeometry(record.width, record.height, record.depth));
             var geometry = scene.createGeometry();
             prepared.createdGeometry.push(geometry);

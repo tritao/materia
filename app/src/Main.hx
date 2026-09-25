@@ -390,7 +390,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
     if(projectPath!=null){
       var generated=MateriaProjectRunner.loadProject(projectPath);
-      session.openGeneratedScene(generated.objects, projectPath, generated.assembly);
+      session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
+        generated.geometryBySnapshot);
     }
     bimEditor = makeBimEditor();
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);

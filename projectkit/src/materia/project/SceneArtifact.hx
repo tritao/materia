@@ -21,6 +21,7 @@ typedef SceneArtifactPart = {
 	var vertices:Bytes;
 	var normals:Bytes;
 	var indices:Bytes;
+	@:optional var edgeSegments:Bytes;
 	var faceRanges:Array<SceneArtifactFaceRange>;
 }
 
@@ -33,7 +34,7 @@ typedef SceneArtifactData = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 3;
+	public static inline var VERSION:Int = 4;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -51,8 +52,9 @@ class SceneArtifact {
 			if (id.length == 0 || id.length > 4096 || name.length == 0 || name.length > 4096)
 				throw "Scene artifact has an invalid part ID or name";
 			names.push({id: id, name: name});
-			length += 32 + id.length + name.length + part.vertices.length + part.normals.length
-				+ part.indices.length + part.faceRanges.length * 12;
+			length += 36 + id.length + name.length + part.vertices.length + part.normals.length
+				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
+				+ part.faceRanges.length * 12;
 			if (length > MAX_BYTES) throw "Scene artifact exceeds the 150 MB limit";
 		}
 		var result = Bytes.alloc(length), offset = 0;
@@ -72,8 +74,13 @@ class SceneArtifact {
 			offset = putInt(result, offset, part.vertexCount);
 			offset = putInt(result, offset, part.indexCount);
 			offset = putInt(result, offset, part.faceRanges.length);
+			offset = putInt(result, offset, part.edgeSegments == null ? 0 : part.edgeSegments.length);
 			for (buffer in [part.vertices, part.normals, part.indices]) {
 				result.blit(offset, buffer, 0, buffer.length); offset += buffer.length;
+			}
+			if (part.edgeSegments != null) {
+				result.blit(offset, part.edgeSegments, 0, part.edgeSegments.length);
+				offset += part.edgeSegments.length;
 			}
 			for (range in part.faceRanges) {
 				offset = putInt(result, offset, range.faceIndex);
@@ -121,6 +128,13 @@ class SceneArtifact {
 			part.normals == null || part.normals.length != part.vertexCount * 24 ||
 			part.indices == null || part.indices.length != part.indexCount * 4)
 			throw 'Scene artifact part "${part.id}" has invalid mesh streams';
+		if (part.edgeSegments != null) {
+			if (part.edgeSegments.length % 48 != 0 || part.edgeSegments.length > MAX_BYTES)
+				throw 'Scene artifact part "${part.id}" has invalid edge segments';
+			for (offset in 0...Std.int(part.edgeSegments.length / 8))
+				if (!finite(part.edgeSegments.getDouble(offset * 8)))
+					throw 'Scene artifact part "${part.id}" has a non-finite edge endpoint';
+		}
 		for (color in [part.red, part.green, part.blue])
 			if (!finite(color) || color < 0.0 || color > 1.0)
 				throw 'Scene artifact part "${part.id}" has an invalid color';
@@ -159,7 +173,8 @@ private class SceneArtifactReader {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != 2 && version != SceneArtifact.VERSION) throw "Unsupported scene artifact version";
+		if (version != 2 && version != 3 && version != SceneArtifact.VERSION)
+			throw "Unsupported scene artifact version";
 		var metresPerUnit = readDouble();
 		var count = readInt();
 		if (!Math.isFinite(metresPerUnit) || metresPerUnit <= 0.0 || count <= 0 || count > 1000)
@@ -171,17 +186,19 @@ private class SceneArtifactReader {
 			ids.set(id, true);
 			var red = readFloat(), green = readFloat(), blue = readFloat();
 			var vertexCount = readInt(), indexCount = readInt(), rangeCount = readInt();
+			var edgeByteCount = version >= 4 ? readInt() : 0;
 			if (vertexCount <= 0 || vertexCount > 2000000 || indexCount <= 0 ||
-				indexCount % 3 != 0 || indexCount / 3 > 4000000 || rangeCount < 0 || rangeCount > 100000)
+				indexCount % 3 != 0 || indexCount / 3 > 4000000 || rangeCount < 0 || rangeCount > 100000 ||
+				edgeByteCount < 0 || edgeByteCount % 48 != 0 || edgeByteCount > SceneArtifact.MAX_BYTES)
 				throw 'Scene artifact part "$id" has invalid mesh counts';
 			var vertices = readBytes(vertexCount * 24), normals = readBytes(vertexCount * 24),
-				indices = readBytes(indexCount * 4);
+				indices = readBytes(indexCount * 4), edgeSegments = readBytes(edgeByteCount);
 			var faceRanges:Array<SceneArtifactFaceRange> = [];
 			for (_ in 0...rangeCount)
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
 			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
 				vertexCount: vertexCount, indexCount: indexCount, vertices: vertices, normals: normals,
-				indices: indices, faceRanges: faceRanges};
+				indices: indices, edgeSegments: edgeSegments, faceRanges: faceRanges};
 			@:privateAccess SceneArtifact.validatePart(part);
 			parts.push(part);
 		}

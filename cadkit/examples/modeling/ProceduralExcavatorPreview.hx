@@ -20,6 +20,7 @@ class ProceduralExcavatorPreview {
 					red: color[0], green: color[1], blue: color[2],
 					vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
 					vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
+					edgeSegments: mesh.edgeSegments,
 					faceRanges: [for (range in mesh.faceRanges) {
 						faceIndex: range.faceIndex, firstIndex: range.firstIndex, indexCount: range.indexCount
 					}]

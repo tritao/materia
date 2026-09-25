@@ -2,6 +2,7 @@ package app;
 
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
+import materia.project.SceneArtifact.SceneArtifactPart;
 
 /** Converts a code-generated CAD tessellation snapshot into SceneKit geometry. */
 class CadPreviewGeometry {
@@ -9,13 +10,55 @@ class CadPreviewGeometry {
   static inline var MAX_VERTICES:Int = 2000000;
   static inline var MAX_TRIANGLES:Int = 4000000;
 
+  /** Build generated geometry directly from the validated binary artifact. */
+  public static function fromArtifact(part:SceneArtifactPart, minimum:Array<Float>,
+      maximum:Array<Float>, scale:Float):GeometryData {
+    var geometry = new GeometryData();
+    var positions = Bytes.alloc(part.vertexCount * 12);
+    var normals = Bytes.alloc(part.vertexCount * 12);
+    var centerX = (minimum[0] + maximum[0]) * 0.5;
+    var centerY = (minimum[1] + maximum[1]) * 0.5;
+    var centerZ = (minimum[2] + maximum[2]) * 0.5;
+    for (index in 0...part.vertexCount) {
+      var source = index * 24, target = index * 12;
+      positions.setFloat(target, (part.vertices.getDouble(source) - centerX) * scale);
+      positions.setFloat(target + 4, (part.vertices.getDouble(source + 8) - centerY) * scale);
+      positions.setFloat(target + 8, (part.vertices.getDouble(source + 16) - centerZ) * scale);
+      normals.setFloat(target, part.normals.getDouble(source));
+      normals.setFloat(target + 4, part.normals.getDouble(source + 8));
+      normals.setFloat(target + 8, part.normals.getDouble(source + 16));
+    }
+    geometry.addStream(1, 2, positions, part.vertexCount, 12);
+    geometry.addStream(2, 2, normals, part.vertexCount, 12);
+    geometry.setIndexBuffer(part.indices, part.indexCount);
+    for (range in part.faceRanges)
+      geometry.addSubelement(Std.int(range.firstIndex / 3), Std.int(range.indexCount / 3), range.faceIndex);
+    var edges = part.edgeSegments;
+    if (edges != null) for (index in 0...Std.int(edges.length / 48)) {
+      var offset = index * 48;
+      geometry.addStrokeSegment(
+        (edges.getDouble(offset) - centerX) * scale,
+        (edges.getDouble(offset + 8) - centerY) * scale,
+        (edges.getDouble(offset + 16) - centerZ) * scale,
+        (edges.getDouble(offset + 24) - centerX) * scale,
+        (edges.getDouble(offset + 32) - centerY) * scale,
+        (edges.getDouble(offset + 40) - centerZ) * scale);
+    }
+    geometry.setBounds((minimum[0] - centerX) * scale,
+      (minimum[1] - centerY) * scale, (minimum[2] - centerZ) * scale,
+      (maximum[0] - centerX) * scale, (maximum[1] - centerY) * scale,
+      (maximum[2] - centerZ) * scale);
+    return geometry;
+  }
+
   public static function geometry(snapshot:String):GeometryData {
     if (snapshot == null || snapshot.length == 0 || snapshot.length > 50000000)
       throw "CAD preview snapshot is empty or too large";
     var fields = snapshot.split("|");
     var legacy = fields.length == 9 && fields[0] == "materia.geometry-preview/2";
     var current = fields.length == 10 && fields[0] == "materia.geometry-preview/3";
-    if (!legacy && !current)
+    var withEdges = fields.length == 11 && fields[0] == "materia.geometry-preview/4";
+    if (!legacy && !current && !withEdges)
       throw "Unsupported CAD preview snapshot format";
     var shift = legacy ? 0 : 1;
     var scale = legacy ? METRES_PER_MILLIMETRE : Std.parseFloat(fields[1]);
@@ -27,8 +70,9 @@ class CadPreviewGeometry {
     var vertices = MateriaBase64.decode(fields[6 + shift], MAX_VERTICES * 24);
     var normals = MateriaBase64.decode(fields[7 + shift], MAX_VERTICES * 24);
     var indices = MateriaBase64.decode(fields[8 + shift], MAX_TRIANGLES * 12);
+    var edges = withEdges ? MateriaBase64.decode(fields[10], 50000000) : Bytes.alloc(0);
     if (vertices.length != vertexCount * 24 || normals.length != vertexCount * 24 ||
-        indices.length != totalIndexCount * 4)
+        indices.length != totalIndexCount * 4 || edges.length % 48 != 0)
       throw "CAD preview snapshot has inconsistent mesh streams";
 
     var triangleCount = Std.int(totalIndexCount / 3);
@@ -88,6 +132,15 @@ class CadPreviewGeometry {
           firstIndex + indexCount > totalIndexCount)
         throw "CAD preview snapshot has an invalid face range";
       geometry.addSubelement(Std.int(firstIndex / 3), Std.int(indexCount / 3), faceIndex);
+    }
+    for (index in 0...Std.int(edges.length / 48)) {
+      var offset = index * 48;
+      var x0 = edges.getDouble(offset), y0 = edges.getDouble(offset + 8), z0 = edges.getDouble(offset + 16);
+      var x1 = edges.getDouble(offset + 24), y1 = edges.getDouble(offset + 32), z1 = edges.getDouble(offset + 40);
+      if (!finite(x0) || !finite(y0) || !finite(z0) || !finite(x1) || !finite(y1) || !finite(z1))
+        throw "CAD preview snapshot contains a non-finite edge endpoint";
+      geometry.addStrokeSegment((x0 - centerX) * scale, (y0 - centerY) * scale, (z0 - centerZ) * scale,
+        (x1 - centerX) * scale, (y1 - centerY) * scale, (z1 - centerZ) * scale);
     }
     geometry.setBounds((minimum[0] - centerX) * scale,
       (minimum[1] - centerY) * scale,

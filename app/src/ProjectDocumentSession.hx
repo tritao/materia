@@ -11,6 +11,7 @@ import nativekit.ui.editing.EditHistory;
 import bimkit.BimDocument;
 import app.ProjectSceneRecord.ProjectSceneInstance;
 import materia.project.AssemblyRecord;
+import nativekit.scene.GeometryData;
 
 /** Owns the current document; unsuccessful I/O leaves it and its history intact. */
 class ProjectDocumentSession {
@@ -120,12 +121,12 @@ class ProjectDocumentSession {
 
   /** Open generated geometry while retaining its source manifest. */
   public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
-      ?assembly:AssemblyRecord):Void {
+      ?assembly:AssemblyRecord, ?geometryBySnapshot:Map<String, GeometryData>):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
     var nextDocument = createDocument();
-    var next = new EditorScene(data, nextDocument);
+    var next = new EditorScene(data, nextDocument, null, geometryBySnapshot);
     var nextSensors:SensorConfiguration = null;
     var nextBim:BimDocument = null;
     try {
@@ -155,7 +156,7 @@ class ProjectDocumentSession {
     var nextDocument = createDocument();
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
     try {
-      next = new EditorScene(data, nextDocument);
+      next = new EditorScene(data, nextDocument, null, generated.geometryBySnapshot);
       nextSensors = new SensorConfiguration(SceneCodec.decodeSensors(text), nextDocument);
       nextBim = SceneCodec.decodeBim(text);
     } catch (error:Dynamic) {
