@@ -985,9 +985,26 @@ class RobotWorldTests {
       new Pose2(5.0, 2.0, Math.PI * 0.5), "map", "base",
       PoseCovariance2.zero(), Good, Int64.ofInt(140), Int64.ofInt(150),
       "robot-boot", "host-clock");
-    var perceptionFrames = new FrameTree2();
-    perceptionFrames.add(new FrameTransform2("base", "laser",
-      new Pose2(0.2, 0.0, Math.PI * 0.5)));
+    var perceptionModel = new RobotModel("framed-perception");
+    var perceptionBase = perceptionModel.addLink(new Link("base", "base"));
+    var mast = perceptionModel.addLink(new Link("mast", "mast"));
+    perceptionModel.addJoint(new Joint("mast-lift", JointType.Prismatic,
+      perceptionBase, mast));
+    var laserMount = perceptionModel.addFrame(new Frame("laser mount",
+      perceptionBase, "laser"));
+    laserMount.position = [0.2, 0.0, 0.3];
+    laserMount.rotation = [0.0, 0.0, Math.sin(Math.PI * 0.25),
+      Math.cos(Math.PI * 0.25)];
+    var mountedLidar = perceptionModel.addSensor(new Sensor("front-lidar", "lidar"));
+    mountedLidar.frame = laserMount;
+    perceptionModel.addFrame(new Frame("mast camera mount", mast, "mast-camera"));
+    var perceptionFrames = FrameTree2.fromRobotModel(perceptionModel, "base");
+    var authoredMount = perceptionFrames.lookup("base", "laser");
+    check(Math.abs(authoredMount.x - 0.2) < 1e-9 &&
+      Math.abs(authoredMount.yaw - Math.PI * 0.5) < 1e-9,
+      "planar frame tree compiles body sensor mounts from the robot model");
+    throws(function() perceptionFrames.lookup("base", "mast-camera"),
+      "model frame helper omits articulated-link mounts that need joint-state transforms");
     var framed = new FrameAwarePerception(perception,
       new FixedLocalization(mapEstimate), perceptionFrames);
     var framedLidar = framed.observe([new SensorFrame("front-lidar", "lidar",
@@ -1068,6 +1085,13 @@ class RobotWorldTests {
           Int64.ofInt(10), Int64.ofInt(160), [1.0], Int64.ofInt(170),
           "base-link", null, null, "robot-boot", "host-clock")]),
       "frame-aware perception refuses disconnected sensor frames");
+    var tiltedModel = new RobotModel("tilted-sensor");
+    var tiltedBase = tiltedModel.addLink(new Link("base", "base"));
+    var tiltedMount = tiltedModel.addFrame(new Frame("tilted laser", tiltedBase,
+      "tilted-laser"));
+    tiltedMount.rotation = [Math.sin(0.1), 0.0, 0.0, Math.cos(0.1)];
+    throws(function() FrameTree2.fromRobotModel(tiltedModel, "base"),
+      "planar frame tree rejects authored sensor mounts with roll or pitch");
     sceneTruth = new PerceptionSnapshot([], [obstacles[0]], [], []);
     check(truthPerception.observe([lidar]).obstacles()[0].detection.id ==
       obstacles[0].detection.id && truthPerception.observe([]).pallets().length == 0,
