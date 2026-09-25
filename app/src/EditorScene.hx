@@ -1496,6 +1496,14 @@ class EditorScene {
   public function canMoveInViewport(id:String):Bool
     return object(id) != null && !kinematicOccurrences.exists(id);
 
+  /** Rebuilds selected-object descriptors after project-owned assembly settings change. */
+  public function refreshAssemblyProperties():Void {
+    if (assemblyPropertyProvider == null) return;
+    selectionRevision++;
+    nextRevision++;
+    revision = nextRevision;
+  }
+
   /** Apply a full FK result as one native scene transaction. Positions are geometry-centre poses. */
   public function setAssemblyOccurrenceTransforms(
       transforms:Array<{id:String, x:Float, y:Float, z:Float, rotation:Array<Float>}>):Void {

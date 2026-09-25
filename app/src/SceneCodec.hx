@@ -36,6 +36,7 @@ class SceneCodec {
     var assemblyState = optionalText(value, "assemblyState");
     if (assemblyState != null && assemblyState.length > 2000000)
       throw "Generated project assembly state is too large";
+    var assemblyDependentJoints = optionalTextArray(value, "assemblyDependentJoints", 4000);
     var overrides:Dynamic = field(value, "overrides");
     var removed:Dynamic = field(value, "removed");
     var instances:Dynamic = field(value, "instances");
@@ -73,7 +74,8 @@ class SceneCodec {
       instanceRecords.push({sourceId: sourceId, object: object});
     }
     return {version: 1, reference: reference, overrides: cast overrides,
-      removed: removedIds, instances: instanceRecords, assemblyState: assemblyState};
+      removed: removedIds, instances: instanceRecords, assemblyState: assemblyState,
+      assemblyDependentJoints: assemblyDependentJoints};
   }
 
   public static function decodeScript(text:String):Null < ScriptOwnershipRecord > {
@@ -347,6 +349,25 @@ class SceneCodec {
     var result = Reflect.field(value, name);
     if (!Std.isOfType(result, String)) throw 'Scene field must be text: $name';
     return cast result;
+  }
+
+  static function optionalTextArray(value:Dynamic, name:String, maximum:Int):Null<Array<String>> {
+    if (!Reflect.hasField(value, name) || Reflect.field(value, name) == null) return null;
+    var raw:Dynamic = Reflect.field(value, name);
+    if (!Std.isOfType(raw, Array)) throw 'Scene field must be an array: $name';
+    var items:Array<Dynamic> = cast raw;
+    if (items.length > maximum) throw 'Scene field has too many entries: $name';
+    var result:Array<String> = [];
+    var seen = new Map<String, Bool>();
+    for (item in items) {
+      if (!Std.isOfType(item, String)) throw 'Scene field entries must be text: $name';
+      var id:String = cast item;
+      if (StringTools.trim(id).length == 0 || containsNul(id) || seen.exists(id))
+        throw 'Scene field contains an invalid or duplicate entry: $name';
+      seen.set(id, true);
+      result.push(id);
+    }
+    return result;
   }
 
   static function optionalRotation(value:Dynamic):Null<Array<Float>> {

@@ -22,6 +22,7 @@ import materia.project.AssemblyDefinition.AssemblyJointRole;
 import materia.project.AssemblyDefinition.AssemblyJointLimits;
 import materia.project.AssemblyDefinition.AssemblyJointType;
 import materia.project.AssemblyDefinition.AssemblyStateRecord;
+import materia.project.AssemblyDefinition.KinematicJoint;
 import materia.project.AssemblyDefinitionCodec;
 import materia.project.AssemblyFrames;
 import cadkit.modeling.AssemblyState;
@@ -48,6 +49,7 @@ class ProjectDocumentSession {
   var assemblyLocalCentersByDefinition:Null<Map<String, Array<Float>>> = null;
   var assemblyMetresPerUnit:Float = 1.0;
   final assemblyOccurrenceIds:Map<String, Bool> = new Map();
+  final assemblyDependentJoints:Map<String, Bool> = new Map();
   var projectBaseline:Null<Array<SceneObjectData>> = null;
   /** Application-owned runtime cleanup invoked only after replacement data validates. */
   public var beforeReplace:Null<Void->Void> = null;
@@ -184,6 +186,8 @@ class ProjectDocumentSession {
       : FilePath.join([FilePath.directory(absolute), project.reference]);
     reference = FileSystem.fullPath(reference);
     var generated = MateriaProjectRunner.loadProject(reference);
+    var dependentJoints = project.assemblyDependentJoints == null ? [] : project.assemblyDependentJoints.copy();
+    validateAssemblyDependentJoints(generated.assemblyDefinition, dependentJoints);
     var stateRecord = generated.assemblyState;
     if (project.assemblyState != null) {
       if (generated.assemblyDefinition == null)
@@ -222,7 +226,7 @@ class ProjectDocumentSession {
     projectBaseline = baseline;
     projectAssembly = generated.assembly;
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
-      generated.localCentersByDefinition, generated.metresPerUnit);
+      generated.localCentersByDefinition, generated.metresPerUnit, dependentJoints);
   }
 
   function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
@@ -233,8 +237,10 @@ class ProjectDocumentSession {
   }
 
   function installAssemblyRuntime(definition:Null<AssemblyDefinition>, state:Null<AssemblyState>,
-      centers:Null<Map<String, Array<Float>>>, metresPerUnit:Float):Void {
+      centers:Null<Map<String, Array<Float>>>, metresPerUnit:Float,
+      ?dependentJointIds:Array<String>):Void {
     assemblyOccurrenceIds.clear();
+    assemblyDependentJoints.clear();
     projectAssemblyDefinition = definition;
     assemblyRuntime = state;
     assemblyLocalCentersByDefinition = centers;
@@ -243,6 +249,9 @@ class ProjectDocumentSession {
       projectAssemblyState = null;
       return;
     }
+    var dependencies = dependentJointIds == null ? [] : dependentJointIds;
+    validateAssemblyDependentJoints(definition, dependencies);
+    for (id in dependencies) assemblyDependentJoints.set(id, true);
     for (occurrence in definition.occurrences) assemblyOccurrenceIds.set("project:" + occurrence.id, true);
     projectAssemblyState = state.record();
     projectAssembly = MateriaProjectRunner.legacySnapshot(definition, state);
@@ -257,12 +266,28 @@ class ProjectDocumentSession {
     var occurrence:Null<AssemblyComponentOccurrence> = null;
     for (item in definition.occurrences) if (item.id == occurrenceId) { occurrence = item; break; }
     if (occurrence == null) return result;
+    var hasClosure = false;
+    for (joint in definition.joints) if (joint.role == AssemblyJointRole.Closure) hasClosure = true;
     for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree &&
         (joint.parent == occurrenceId || joint.child == occurrenceId) &&
-        AssemblyDefinitionCodec.hasCoordinate(joint.type))
+        AssemblyDefinitionCodec.hasCoordinate(joint.type)) {
+      if (hasClosure) result.push(assemblyDependentProperty(joint.id));
       result.push(assemblyJointProperty(joint.id, joint.type, joint.limits,
         joint.type == AssemblyJointType.Prismatic ? assemblyMetresPerUnit : 1.0));
+    }
     return result;
+  }
+
+  function assemblyDependentProperty(jointId:String):PropertyDescriptor {
+    var options = new PropertyDescriptorOptions();
+    options.category = "Assembly";
+    options.recordHistory = false;
+    return new PropertyDescriptor("assembly-dependent:" + jointId, "Solved by closures",
+      PropertyType.Bool, function(_) return PropertyValue.Bool(assemblyDependentJoints.exists(jointId)),
+      function(_, value) switch (value) {
+        case PropertyValue.Bool(dependent): setAssemblyJointDependent(jointId, dependent);
+        default: throw "Assembly dependent setting must be boolean";
+      }, options);
   }
 
   function assemblyJointProperty(jointId:String, type:AssemblyJointType,
@@ -273,6 +298,7 @@ class ProjectDocumentSession {
     options.step = type == AssemblyJointType.Prismatic ? Math.max(0.0001, factor) : 0.01;
     options.minimum = limits.lower == null ? null : limits.lower * factor;
     options.maximum = limits.upper == null ? null : limits.upper * factor;
+    options.readOnly = assemblyDependentJoints.exists(jointId);
     options.recordHistory = false;
     options.validator = function(_, value) return switch (value) {
       case PropertyValue.Float(number) if (Math.isFinite(number)): null;
@@ -298,21 +324,72 @@ class ProjectDocumentSession {
   public function setAssemblyJointCoordinate(jointId:String, value:Float):Bool {
     var state = assemblyRuntime;
     if (state == null) throw "This project has no editable assembly state";
-    var before = state.joint(jointId);
+    if (assemblyDependentJoints.exists(jointId))
+      throw 'Joint "$jointId" is solved from assembly closures and cannot be driven directly';
     if (!Math.isFinite(value)) throw "Joint coordinate must be finite";
-    if (before == value) return false;
+    var before = state.record();
+    var after = evaluateAssemblyJointCoordinate(before, jointId, value);
+    if (sameAssemblyState(before, after)) return false;
     return document.apply(new EditOperation("Set joint " + jointId,
-      function() applyAssemblyJointCoordinate(jointId, value),
-      function() applyAssemblyJointCoordinate(jointId, before)));
+      function() applyAssemblyStateRecord(after),
+      function() applyAssemblyStateRecord(before)));
   }
 
-  function applyAssemblyJointCoordinate(jointId:String, value:Float):Void {
-    var definition = projectAssemblyDefinition, current = assemblyRuntime;
-    var centers = assemblyLocalCentersByDefinition;
-    if (definition == null || current == null || centers == null)
-      throw "Assembly placement data is unavailable";
-    var candidate = new AssemblyState(definition, current.record());
+  /** Select whether a tree coordinate is driven by the user or solved from loop closures. */
+  public function setAssemblyJointDependent(jointId:String, dependent:Bool):Bool {
+    if (projectAssemblyDefinition == null || assemblyRuntime == null)
+      throw "This project has no editable assembly definition";
+    var wasDependent = assemblyDependentJoints.exists(jointId);
+    if (wasDependent == dependent) return false;
+    var beforeIds = assemblyDependentJointIds();
+    var afterIds = beforeIds.copy();
+    if (dependent) afterIds.push(jointId);
+    else afterIds.remove(jointId);
+    validateAssemblyDependentJoints(projectAssemblyDefinition, afterIds);
+    var label = dependent ? "Make joint " + jointId + " dependent" : "Make joint " + jointId + " driven";
+    return document.apply(new EditOperation(label,
+      function() applyAssemblyDependentJoints(afterIds),
+      function() applyAssemblyDependentJoints(beforeIds)));
+  }
+
+  function evaluateAssemblyJointCoordinate(stateRecord:AssemblyStateRecord, jointId:String,
+      value:Float):AssemblyStateRecord {
+    var definition = projectAssemblyDefinition;
+    if (definition == null) throw "Assembly definition is unavailable";
+    var candidate = new AssemblyState(definition, stateRecord);
     candidate.setJoint(jointId, value);
+    return evaluateAssemblyConfigurationState(candidate, assemblyDependentJointIds());
+  }
+
+  function evaluateAssemblyConfigurationState(candidate:AssemblyState,
+      dependentJointIds:Array<String>):AssemblyStateRecord {
+    var definition = projectAssemblyDefinition;
+    if (definition == null) throw "Assembly definition is unavailable";
+    if (dependentJointIds.length > 0) {
+      var result = candidate.solveClosures(dependentJointIds);
+      if (!result.converged)
+        throw 'Assembly closure solve ${result.status}: ${result.message}; unresolved: ${result.closureIds.join(", ")}';
+    } else if (!assemblyClosuresSatisfied(candidate)) {
+      throw "Joint edit breaks an assembly closure; mark dependent joints in the inspector to solve the linkage";
+    }
+    return candidate.record();
+  }
+
+  function applyAssemblyDependentJoints(dependentJointIds:Array<String>):Void {
+    var definition = projectAssemblyDefinition;
+    if (definition == null) throw "Assembly definition is unavailable";
+    validateAssemblyDependentJoints(definition, dependentJointIds);
+    assemblyDependentJoints.clear();
+    for (id in dependentJointIds) assemblyDependentJoints.set(id, true);
+    scene.refreshAssemblyProperties();
+  }
+
+  function applyAssemblyStateRecord(stateRecord:AssemblyStateRecord):Void {
+    var definition = projectAssemblyDefinition;
+    var centers = assemblyLocalCentersByDefinition;
+    if (definition == null || centers == null)
+      throw "Assembly placement data is unavailable";
+    var candidate = new AssemblyState(definition, stateRecord);
     var transforms:Array<{id:String, x:Float, y:Float, z:Float, rotation:Array<Float>}> = [];
     for (occurrence in definition.occurrences) {
       var center = centers.get(occurrence.definition);
@@ -401,6 +478,7 @@ class ProjectDocumentSession {
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;
     assemblyOccurrenceIds.clear();
+    assemblyDependentJoints.clear();
     bim=nextBim;
     path = file;
     generation++;
@@ -473,8 +551,56 @@ class ProjectDocumentSession {
       : AssemblyDefinitionCodec.encodeState(projectAssemblyDefinition, assemblyRuntime.record());
     return {record: {version: 1, reference: relativeReference(destination, reference),
       overrides: overrides, removed: removed, instances: instances,
-      assemblyState: savedAssemblyState}, authored: authored};
+      assemblyState: savedAssemblyState,
+      assemblyDependentJoints: projectAssemblyDefinition == null ? null : assemblyDependentJointIds()},
+      authored: authored};
   }
+
+  function assemblyDependentJointIds():Array<String> {
+    var result:Array<String> = [];
+    var definition = projectAssemblyDefinition;
+    if (definition == null) return result;
+    for (joint in definition.joints)
+      if (assemblyDependentJoints.exists(joint.id)) result.push(joint.id);
+    return result;
+  }
+
+  static function validateAssemblyDependentJoints(definition:Null<AssemblyDefinition>,
+      dependentJointIds:Array<String>):Void {
+    if (dependentJointIds == null) throw "Assembly dependent-joint list is required";
+    if (dependentJointIds.length == 0) return;
+    if (definition == null || dependentJointIds.length > definition.joints.length)
+      throw "Assembly dependent joints need a matching assembly definition";
+    var joints = new Map<String, KinematicJoint>();
+    var hasClosure = false;
+    for (joint in definition.joints) {
+      joints.set(joint.id, joint);
+      if (joint.role == AssemblyJointRole.Closure) hasClosure = true;
+    }
+    if (!hasClosure) throw "Assembly dependent joints require at least one closure";
+    var seen = new Map<String, Bool>();
+    for (id in dependentJointIds) {
+      var joint = joints.get(id);
+      if (joint == null || seen.exists(id) || joint.role != AssemblyJointRole.Tree ||
+          !AssemblyDefinitionCodec.hasCoordinate(joint.type))
+        throw 'Assembly dependent joint "$id" is missing, duplicated, or not a movable tree joint';
+      seen.set(id, true);
+    }
+  }
+
+  static function assemblyClosuresSatisfied(state:AssemblyState):Bool {
+    var positionTolerance = 1e-3;
+    var angularTolerance = 1e-5;
+    var axisTolerance = 1 - Math.cos(angularTolerance);
+    var rotationTolerance = 1 - Math.cos(angularTolerance * 0.5);
+    for (residual in state.closureResiduals())
+      if (residual.position > positionTolerance || residual.axis > axisTolerance ||
+          residual.rotation > rotationTolerance) return false;
+    return true;
+  }
+
+  static function sameAssemblyState(first:AssemblyStateRecord, second:AssemblyStateRecord):Bool
+    return Json.stringify(first) == Json.stringify(second);
 
   static function materializeProject(baseline:Array<SceneObjectData>, project:ProjectSceneRecord,
       authored:Array<SceneObjectData>):Array<SceneObjectData> {

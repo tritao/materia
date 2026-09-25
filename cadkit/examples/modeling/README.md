@@ -152,8 +152,11 @@ scene object for each occurrence, and shares one SceneKit geometry resource for
 all occurrences of the same component definition. The compatibility record
 continues to supply the editor hierarchy and labels while older artifacts stay
 readable. The project inspector exposes each movable tree-joint coordinate;
-edits recompute FK poses as one undoable scene change and save the separate
-assembly state in the project document.
+each joint also has a `Solved by closures` setting. Mark dependent coordinates
+there, then edits to driven joints solve the closures and recompute FK poses as
+one undoable scene change. The project document saves both the separate
+assembly state and the selected dependent joints. Edits that would break a loop
+are rejected until enough dependent coordinates are selected.
 
 The viewport entrypoint opts into a generated artifact cache. Materia reuses the
 artifact when its Haxeon source graph, compiler sources, and native runtime build
