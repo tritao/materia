@@ -77,6 +77,20 @@ class SceneEditingTests {
     camera.fitClipRange([[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0]]);
     check(camera.clipNear > camera.distance * 0.5 && camera.clipFar < camera.distance * 2.0,
       "viewport depth range follows nearby scene bounds");
+    var overlayEye = camera.eyePosition(), backward = camera.viewDirection();
+    var beyondScene = camera.clipFar * 1.5;
+    var farX = overlayEye[0] - backward[0] * beyondScene;
+    var farY = overlayEye[1] - backward[1] * beyondScene;
+    var farZ = overlayEye[2] - backward[2] * beyondScene;
+    check(camera.projectSegmentWithMatrix(camera.viewProjection(1.0),
+      farX, farY, farZ, farX - backward[0], farY - backward[1], farZ - backward[2],
+      800, 600) == null,
+      "scene projection clips geometry beyond its fitted range");
+    check(camera.projectSegmentWithMatrix(camera.viewProjection(1.0,
+      Math.max(0.001, camera.distance / 10000.0), Math.max(100.0, camera.distance * 100.0)),
+      farX, farY, farZ, farX - backward[0], farY - backward[1], farZ - backward[2],
+      800, 600) != null,
+      "overlay projection retains grid lines beyond scene geometry");
     var eye = camera.eyePosition();
     camera.fitClipRange([[eye[0]-0.5, eye[1]-0.5, eye[2]-0.5,
       eye[0]+0.5, eye[1]+0.5, eye[2]+0.5]]);

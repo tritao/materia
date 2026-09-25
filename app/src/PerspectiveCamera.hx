@@ -96,7 +96,8 @@ class PerspectiveCamera {
     revision++;
   }
 
-  public function viewProjection(aspect:Float):Transform {
+  public function viewProjection(aspect:Float, nearOverride:Float = -1.0,
+      farOverride:Float = -1.0):Transform {
     var eye = eyePosition();
     var forward = normalize([targetX - eye[0], targetY - eye[1], targetZ - eye[2]]);
     var side = normalize(cross(forward, [0.0, 0.0, 1.0]));
@@ -105,7 +106,8 @@ class PerspectiveCamera {
       side[1], up[1], -forward[1], 0.0,
       side[2], up[2], -forward[2], 0.0,
       -dot(side, eye), -dot(up, eye), dot(forward, eye), 1.0];
-    var near = clipNear, far = clipFar;
+    var near = nearOverride > 0.0 ? nearOverride : clipNear;
+    var far = farOverride > near ? farOverride : clipFar;
     var scale = 1.0 / Math.tan(FOV_Y * Math.PI / 360.0);
     var projection = [scale / Math.max(0.01, aspect), 0.0, 0.0, 0.0,
       0.0, scale, 0.0, 0.0,

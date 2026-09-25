@@ -325,7 +325,11 @@ class EditorPerspectiveViewport implements View {
 
   function paintWorkplane(canvas:Canvas, width:Float, height:Float):Void {
     if (!gridVisible || gridStep <= 0.0) return;
-    var projection = camera.viewProjection(width / Math.max(1.0, height));
+    // The workplane is a UI overlay that extends beyond scene geometry. Its
+    // projection must not inherit the scene's tightly fitted depth range.
+    var projection = camera.viewProjection(width / Math.max(1.0, height),
+      Math.max(0.001, camera.distance / 10000.0),
+      Math.max(100.0, camera.distance * 100.0));
     var extent = Math.max(gridStep * 8.0, Math.min(500.0, camera.distance * 1.5));
     var spacing = gridStep;
     while (extent / spacing > 48.0) spacing *= 2.0;
