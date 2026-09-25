@@ -82,6 +82,11 @@ import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationStatus;
 import robotkit.navigation.MotionGuard;
 import robotkit.navigation.MotionGuardState;
+import robotkit.navigation.OccupancyGrid2;
+import robotkit.navigation.OccupancyCell;
+import robotkit.navigation.GridCell2;
+import robotkit.navigation.Costmap2;
+import robotkit.navigation.AStarPlanner;
 import robotkit.material.ForkAxisConfig;
 import robotkit.material.ForkAxisState;
 import robotkit.material.ForkConfig;
@@ -130,6 +135,7 @@ class RobotWorldTests {
     testLocalization();
     testNavigation();
     testMotionGuard();
+    testGridPlanning();
     testForkMechanisms();
     testPerceptionSafetyPower();
     testLoadSafetyPolicy();
@@ -1178,6 +1184,77 @@ class RobotWorldTests {
     guard.detach();
     robot.close();
     simulation.dispose();
+  }
+
+  static function testGridPlanning():Void {
+    var rotated = new OccupancyGrid2(0.5, new Pose2(10.0, 20.0, Math.PI * 0.5),
+      4, 3, "rotated-map", OccupancyCell.Free);
+    var worldCenter = rotated.cellCenter(2, 1);
+    var roundTrip = rotated.worldToCell(worldCenter);
+    check(roundTrip != null && roundTrip.x == 2 && roundTrip.y == 1,
+      "occupancy grid maps cell centers through rotated origins");
+    check(rotated.worldToCell(rotated.origin.compose(new Pose2(-0.01, 0.0))) == null,
+      "occupancy grid rejects poses outside its lower-left boundary");
+
+    var grid = new OccupancyGrid2(1.0, new Pose2(), 7, 7, "map", OccupancyCell.Free);
+    for (y in 0...5) grid.setCell(3, y, OccupancyCell.Occupied);
+    var costmap = new Costmap2(grid, 0.2, true, 0.5, 2.0);
+    check(!costmap.isTraversable(2, 2),
+      "costmap inflates static obstacles by the robot footprint");
+    check(costmap.isTraversable(3, 6),
+      "costmap preserves clearance beyond the inflated obstacle boundary");
+    var planner = new AStarPlanner(costmap);
+    var start = grid.cellCenter(0, 3);
+    var goalCenter = grid.cellCenter(6, 3);
+    var goal = new Pose2(goalCenter.x, goalCenter.y, 0.4);
+    var path = planner.plan(start, goal);
+    equal(path.frameId, "map", "grid planner frames its path in the map frame");
+    equal(path.goal().yaw, goal.yaw,
+      "grid planner preserves the requested final heading");
+    var visitsGap = false;
+    var pathSignature:Array<String> = [];
+    for (point in path.poses()) {
+      var mapped = grid.worldToCell(point);
+      check(mapped != null,
+        "A* path waypoints remain inside the occupancy grid");
+      var cell:GridCell2 = cast mapped;
+      check(costmap.isTraversable(cell.x, cell.y),
+        "A* path waypoints remain in traversable costmap cells");
+      if (cell.y >= 5) visitsGap = true;
+      pathSignature.push('${cell.x},${cell.y}');
+    }
+    check(visitsGap, "A* routes around a wall through its only open gap");
+    var repeatedPath = planner.plan(start, goal);
+    var repeatedSignature:Array<String> = [];
+    for (point in repeatedPath.poses()) {
+      var cell:GridCell2 = cast grid.worldToCell(point);
+      repeatedSignature.push('${cell.x},${cell.y}');
+    }
+    equal(repeatedSignature.join(";"), pathSignature.join(";"),
+      "A* uses deterministic tie-breaking for repeated plans");
+
+    var unknownGrid = new OccupancyGrid2(1.0, new Pose2(), 5, 1, "map", OccupancyCell.Free);
+    unknownGrid.setCell(2, 0, OccupancyCell.Unknown);
+    var unknownCostmap = new Costmap2(unknownGrid, 0.0, true, 0.0, 0.0);
+    var unknownPlanner = new AStarPlanner(unknownCostmap);
+    throws(function() unknownPlanner.plan(unknownGrid.cellCenter(0, 0),
+      unknownGrid.cellCenter(4, 0)),
+      "A* treats unknown cells as blocked by default");
+
+    var dynamicGrid = new OccupancyGrid2(1.0, new Pose2(), 5, 5, "map",
+      OccupancyCell.Free);
+    var dynamicCostmap = new Costmap2(dynamicGrid, 0.0, false, 1.0, 2.0);
+    var dynamicObstacle = new Obstacle(new Detection("dynamic-obstacle", "obstacle",
+      1.0, new Pose2(2.5, 2.5), "map", Int64.ofInt(1), Int64.ofInt(1),
+      Int64.ofInt(1), "sim-clock", "host-clock"), 0.1);
+    dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
+    check(!dynamicCostmap.isTraversable(2, 2),
+      "costmap rasterizes dynamic perception obstacles");
+    check(dynamicCostmap.isTraversable(3, 2) && dynamicCostmap.cellCost(3, 2) > 0.0,
+      "costmap assigns soft costs around dynamic obstacles");
+    dynamicCostmap.clearDynamicObstacles();
+    check(dynamicCostmap.isTraversable(2, 2) && dynamicCostmap.cellCost(3, 2) == 0.0,
+      "costmap clears removed dynamic obstacles");
   }
 
   static function testForkMechanisms():Void {

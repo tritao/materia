@@ -258,6 +258,24 @@ reference frame. It projects reference-frame detections into the current body
 pose, checks their circles against the footprint corridor, and uses
 `StoppingEnvelope` plus configured margin to choose clear, approaching, or
 blocked command behavior.
+`OccupancyGrid2` stores free, occupied, and unknown cells in a framed planar
+grid. `Costmap2` conservatively blocks unknown cells by default, inflates map
+and dynamic obstacle cells by a circular robot radius, and adds a soft cost
+around the inflated region. `AStarPlanner` implements deterministic 8-connected
+A* with diagonal corner-cutting disabled and returns a framed `Path` that can
+be passed directly to `Navigation.follow()`.
+
+```haxe
+var costmap = new Costmap2(occupancy, base.footprint.radius);
+costmap.setDynamicObstacles(perception.obstacles());
+var planner = new AStarPlanner(costmap);
+navigation.follow(planner.plan(localization.state().pose, goal));
+```
+
+Pass start and goal poses in the grid frame. Call `costmap.refresh()` after
+editing the underlying occupancy grid. Dynamic obstacle detections must already
+use the grid frame. The first planner is a global grid planner; goal management
+and replanning belong in a later `Navigator` layer.
 `robotkit.safety` exposes operator-facing phase, active restrictions, speed
 limit, and stopping envelope values; the native runtime continues to enforce
 hard safety. `LoadSafetyPolicy.refresh()` reduces `MobileBase` speed and

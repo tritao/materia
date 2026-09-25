@@ -264,6 +264,13 @@ envelope to pass, scale, or zero the requested twist. Obstacles in unresolved
 frames block motion until perception transforms them. The guard is software
 collision avoidance and does not replace native or hardware safety.
 
+`OccupancyGrid2` provides framed free/occupied/unknown cells, while `Costmap2`
+adds dynamic obstacle disks, conservative unknown handling, circular footprint
+inflation, and a soft proximity cost. `AStarPlanner` applies deterministic
+8-connected A* without diagonal corner cutting and converts its route into a
+`Path` for `Navigation`. It plans a route once; goal orchestration and replanning
+will live in a separate `Navigator`.
+
 `robotkit.material.Forks` is another explicit view over `Robot`. Its named axis
 configuration is resolved against `RobotDescription` once, then each lift,
 tilt, or spread request is validated and submitted as one `JointTargets` batch.
