@@ -16,6 +16,7 @@ endif()
 target_include_directories(robotkit_runtime
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/generated>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 set_target_properties(robotkit_runtime PROPERTIES
     EXPORT_NAME runtime
@@ -40,6 +41,14 @@ if(RK_BUILD_TESTS)
     add_test(NAME robotkit_device_wire COMMAND robotkit_device_wire_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/../schema/device_wire_vectors.tsv)
     set_tests_properties(robotkit_device_wire PROPERTIES LABELS "robot;wire;codegen" TIMEOUT 30)
+
+    add_executable(robotkit_device_protocol_v5_tests tests/device_protocol_v5.cpp)
+    target_compile_features(robotkit_device_protocol_v5_tests PRIVATE cxx_std_20)
+    target_include_directories(robotkit_device_protocol_v5_tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/generated)
+    add_test(NAME robotkit_device_protocol_v5 COMMAND robotkit_device_protocol_v5_tests
+        ${CMAKE_CURRENT_SOURCE_DIR}/../schema/device_frame_vectors.tsv)
+    set_tests_properties(robotkit_device_protocol_v5 PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
 
     add_executable(robotkit_validation_tests tests/validation.cpp)
     target_compile_features(robotkit_validation_tests PRIVATE cxx_std_20)
@@ -88,3 +97,4 @@ install(TARGETS robotkit_runtime EXPORT RobotKitTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES generated/device_wire.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

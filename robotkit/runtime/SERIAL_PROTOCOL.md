@@ -1,5 +1,8 @@
 # RobotKit serial protocol, version 4
 
+Version 4 remains the active endpoint. The proposed packed-record successor is
+specified in [DEVICE_PROTOCOL_V5.md](DEVICE_PROTOCOL_V5.md).
+
 This protocol connects SerialRobotEndpoint to a device controller over a
 POSIX serial port. Frames are little-endian. Floating-point fields use IEEE
 754 binary64. All payload lengths and array counts are checked before data is

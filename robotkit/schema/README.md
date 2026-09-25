@@ -3,6 +3,8 @@
 `device_wire.wire.idl` defines fixed binary payload records only. The generated
 C++ and Rust codecs have no MessagePack or transport dependency. `wire.json`
 selects the packed backends; the lock records published field order and sizes.
+The [v5 device protocol](../runtime/DEVICE_PROTOCOL_V5.md) specifies framing,
+session behavior, limits, and timing around these records.
 
 The proposed v5 stream frame, CRC, session state machine, model-fingerprint
 comparison, command validation, and watchdog remain separate protocol work.
