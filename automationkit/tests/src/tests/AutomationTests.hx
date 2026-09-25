@@ -25,23 +25,27 @@ import materia.automation.task.Task;
 import materia.automation.task.TaskKind;
 import materia.automation.task.Transport;
 import materia.automation.facility.Station;
+import robotkit.model.Joint;
+import robotkit.model.JointLimits;
+import robotkit.model.JointType;
+import robotkit.model.Link;
+import robotkit.model.RobotDriveConfiguration;
+import robotkit.model.RobotMobileConfiguration;
+import robotkit.model.RobotModel;
 import robotkit.material.Payload;
 import robotkit.localization.Localization;
 import robotkit.localization.LocalizationQuality;
 import robotkit.localization.LocalizationState;
 import robotkit.localization.PoseCovariance2;
 import robotkit.localization.WheelOdometryLocalization;
-import robotkit.mobile.DifferentialDrive;
 import robotkit.mobile.Footprint;
 import robotkit.mobile.MobileBase;
-import robotkit.mobile.MotionLimits;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Path;
 import robotkit.skill.GoTo;
-import robotkit.runtime.RobotRuntimeBlueprint;
-import robotkit.runtime.RobotRuntimeJointBlueprint;
+import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.world.Robot;
 import robotkit.world.RobotCapabilities;
@@ -70,7 +74,8 @@ class AutomationTests {
   static function main():Void {
     var nativeRuntime = NativeKitRuntime.start();
     var world = new RobotWorld();
-    var robot = new AutomationFakeRobot("forklift-1");
+    var robotModel = configuredMobileRobotModel();
+    var robot = new AutomationFakeRobot("forklift-1", robotModel);
     try {
       var payload = new Payload(500.0, 1.2, 0.8, 0.15, 0.6);
       var facility = new Facility("warehouse", "Warehouse A");
@@ -141,7 +146,7 @@ class AutomationTests {
       var secondMission = new Mission("mission-18", "Second order", [new Charge("charge-2", charger.id, 0.8)]);
       equal(dispatcher.dispatch(secondMission), null, "dispatcher leaves work queued when no robot is free");
 
-      var secondRobot = new AutomationFakeRobot("forklift-2");
+      var secondRobot = new AutomationFakeRobot("forklift-2", robotModel);
       world.attach(secondRobot);
       fleet.addRobot(secondRobot.id());
       var secondAssignment:FleetAssignment = cast dispatcher.dispatch(secondMission);
@@ -173,7 +178,7 @@ class AutomationTests {
       equal(fleet.availableRobotIds().length, 2, "terminal releases return robots to the fleet");
       equal(fleet.assignmentForMission(mission.id), null, "terminal release removes the assignment");
 
-      var thirdRobot = new AutomationFakeRobot("forklift-3");
+      var thirdRobot = new AutomationFakeRobot("forklift-3", robotModel);
       world.attach(thirdRobot);
       fleet.addRobot(thirdRobot.id());
       check(traffic.reserveRoute(route, robot.id(), 1),
@@ -271,7 +276,7 @@ class AutomationTests {
       ]);
       var transportAssignment:FleetAssignment = cast dispatcher.dispatch(transportMission);
       var transportExecutor = new MissionExecutor(fleet, transportAssignment, facility,
-        new FacilityTransportSkillFactory());
+        new FacilityTransportSkillFactory(robotModel));
       transportExecutor.start();
       check(switch transportExecutor.update(0.02) {
         case MissionExecutionStatus.Succeeded: true;
@@ -280,7 +285,7 @@ class AutomationTests {
       check(switch transportMission.status { case MissionStatus.Succeeded: true; case _: false; },
         "RobotKit skill completion finishes the facility transport mission");
 
-      testSimulatedMissionReplay();
+      testSimulatedMissionReplay(robotModel);
 
       world.close();
       world = null;
@@ -307,7 +312,28 @@ class AutomationTests {
     check(didThrow, message);
   }
 
-  static function testSimulatedMissionReplay():Void {
+  static function configuredMobileRobotModel():RobotModel {
+    var model = new RobotModel("authored-automation-forklift");
+    var base = model.addLink(new Link("base", "link/base"));
+    var lift = model.addLink(new Link("mast", "link/mast"));
+    var leftWheel = model.addLink(new Link("left wheel", "link/left-wheel"));
+    var rightWheel = model.addLink(new Link("right wheel", "link/right-wheel"));
+    var liftJoint = model.addJoint(new Joint("mast lift", JointType.Prismatic,
+      base, lift, "joint/lift"));
+    liftJoint.limits = new JointLimits(0.0, 1.0, 1.0, 100.0);
+    var leftJoint = model.addJoint(new Joint("left wheel joint", JointType.Continuous,
+      base, leftWheel, "joint/left-wheel"));
+    leftJoint.limits = new JointLimits(-100.0, 100.0, 100.0, 100.0);
+    var rightJoint = model.addJoint(new Joint("right wheel joint", JointType.Continuous,
+      base, rightWheel, "joint/right-wheel"));
+    rightJoint.limits = new JointLimits(-100.0, 100.0, 100.0, 100.0);
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
+        0.1, 0.5), 1.0, 1.0);
+    return model;
+  }
+
+  static function testSimulatedMissionReplay(model:RobotModel):Void {
     var simulation = new Simulation(0.01);
     var world = new RobotWorld();
     var replayWorld:Null<RobotWorld> = null;
@@ -316,12 +342,9 @@ class AutomationTests {
     var closed = false;
     try {
       writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
-      var linkNames = ["base", "left-wheel", "right-wheel"];
-      var jointNames = ["left-wheel", "right-wheel"];
-      var blueprint = new RobotRuntimeBlueprint(1, 2, 3);
-      for (index in 0...2) blueprint.addJoint(new RobotRuntimeJointBlueprint(index,
-        RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, index + 1,
-        -1000.0, 1000.0, 1000.0, 1000.0));
+      var linkNames = [for (link in model.links) link.name];
+      var jointNames = [for (joint in model.joints) joint.name];
+      var blueprint = RobotRuntimeCompiler.compile(model);
       var simulationRobot = new SimulatedRobot("mission-forklift", simulation.addRobot(blueprint),
         "mission forklift", linkNames, jointNames);
       var liveRobot = new RecordingRobot(simulationRobot, cast writer);
@@ -344,7 +367,7 @@ class AutomationTests {
         new Payload(100.0, 0.8, 0.6, 0.4, 0.4));
       var mission = new Mission("sim-mission", "Simulated station transfer", [task]);
       var assignment:FleetAssignment = cast dispatcher.dispatch(mission);
-      var liveFactory = new MobileTransportSkillFactory();
+      var liveFactory = new MobileTransportSkillFactory(model);
       var executor = new MissionExecutor(fleet, assignment, facility, liveFactory);
       executor.start();
       var executionStatus = executor.status;
@@ -378,7 +401,7 @@ class AutomationTests {
         "RecordingRobot captures the mission's observation stream in MCAP");
       var replay = new ReplayRobot(liveRobot.id(), recording,
         new RobotDescription(liveRobot.id(), "recorded mission forklift", linkNames, jointNames),
-        new RobotCapabilities(liveRobot.id(), 2, true, true, true, false));
+        new RobotCapabilities(liveRobot.id(), jointNames.length, true, true, true, false));
       replayWorld = new RobotWorld();
       replayWorld.attach(replay);
       var replayFleet = new Fleet("replay-fleet", replayWorld);
@@ -386,7 +409,7 @@ class AutomationTests {
       var replayDispatcher = new Dispatcher(replayFleet);
       var replayMission = new Mission("replay-mission", "Replay station transfer", [task]);
       var replayAssignment:FleetAssignment = cast replayDispatcher.dispatch(replayMission);
-      var replayFactory = new MobileTransportSkillFactory();
+      var replayFactory = new MobileTransportSkillFactory(model);
       var replayExecutor = new MissionExecutor(replayFleet, replayAssignment, facility, replayFactory);
       replayExecutor.start();
       var replayStatus = replayExecutor.status;
@@ -457,15 +480,26 @@ class AutomationTests {
 
 private class AutomationFakeRobot implements Robot {
   final logicalId:RobotId;
+  final descriptionValue:RobotDescription;
+  final capabilitiesValue:RobotCapabilities;
+  final snapshotValue:RobotSnapshot;
   var changeListener:Null<RobotId->Void> = null;
 
-  public function new(id:RobotId) logicalId = id;
+  public function new(id:RobotId, model:RobotModel) {
+    logicalId = id;
+    var links = [for (link in model.links) link.name];
+    var joints = [for (joint in model.joints) joint.name];
+    descriptionValue = new RobotDescription(logicalId, model.name, links, joints);
+    capabilitiesValue = new RobotCapabilities(logicalId, joints.length,
+      true, true, true, false);
+    snapshotValue = new RobotSnapshot(logicalId, Int64.ofInt(0), Int64.ofInt(0),
+      [for (_ in joints) 0.0], [for (_ in joints) 0.0], [for (_ in joints) 0.0], 0, 0);
+  }
   public function id():RobotId return logicalId;
   public function status():RobotStatus return Ready;
-  public function description():RobotDescription return new RobotDescription(logicalId, logicalId, [], []);
-  public function capabilities():RobotCapabilities return new RobotCapabilities(logicalId, 0, false, false, false, false);
-  public function snapshot():RobotSnapshot return new RobotSnapshot(logicalId, Int64.ofInt(0),
-    Int64.ofInt(0), [], [], [], 0, 0);
+  public function description():RobotDescription return descriptionValue;
+  public function capabilities():RobotCapabilities return capabilitiesValue;
+  public function snapshot():RobotSnapshot return snapshotValue;
   public function sensors():Array<SensorFrame> return [];
   public function fault():Null<RobotFault> return null;
   public function submit(command:RobotCommand):Void {}
@@ -512,7 +546,9 @@ private class ScriptedTaskSkill implements Skill {
 }
 
 private class FacilityTransportSkillFactory implements TaskSkillFactory {
-  public function new() {}
+  final model:RobotModel;
+
+  public function new(model:RobotModel) this.model = model;
 
   public function create(task:Task, robot:Robot, facility:Facility):Skill {
     return switch task.kind {
@@ -522,8 +558,7 @@ private class FacilityTransportSkillFactory implements TaskSkillFactory {
         var destination:Station = cast facility.station(transport.destinationStationId);
         if (pickup == null || destination == null)
           throw "transport task references an unknown facility station";
-        var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
-          new MotionLimits(1.0, 1.0));
+        var base = MobileBase.fromRobot(robot, model);
         var localization = new FixedPoseLocalization(destination.pose);
         var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
         var route = new FacilityRouter(facility).route(pickup.id, destination.id);
@@ -552,9 +587,10 @@ private class FixedPoseLocalization implements Localization {
 }
 
 private class MobileTransportSkillFactory implements TaskSkillFactory {
+  final model:RobotModel;
   public var lastNavigation(default, null):Null<Navigation> = null;
 
-  public function new() {}
+  public function new(model:RobotModel) this.model = model;
 
   public function create(task:Task, robot:Robot, facility:Facility):Skill {
     return switch task.kind {
@@ -564,8 +600,7 @@ private class MobileTransportSkillFactory implements TaskSkillFactory {
         var destination:Station = cast facility.station(transport.destinationStationId);
         if (pickup == null || destination == null)
           throw "transport task references an unknown facility station";
-        var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
-          new MotionLimits(0.5, 1.0));
+        var base = MobileBase.fromRobot(robot, model);
         var localization = new WheelOdometryLocalization(base, destination.frameId);
         var navigation = new Navigation(base, localization, 0.2, 0.2, 0.8);
         lastNavigation = navigation;
