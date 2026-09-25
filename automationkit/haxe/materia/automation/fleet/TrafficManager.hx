@@ -117,11 +117,18 @@ class TrafficManager {
     return true;
   }
 
-  /** Releases every lane and intersection acquired as one route bundle. */
+  /**
+   * Releases a held route bundle, or removes this robot's pending request for
+   * that exact route. The return value is true only when a held bundle released.
+   */
   public function releaseRoute(route:FacilityRoute, robotId:String):Bool {
-    if (route == null || route.facilityId != facility.id ||
-        routeSignatureByRobot.get(robotId) != routeSignature(route, route.legs()))
+    if (route == null || route.facilityId != facility.id) return false;
+    var legs = route.legs();
+    var signature = routeSignature(route, legs);
+    if (routeSignatureByRobot.get(robotId) != signature) {
+      removeWaiter(robotId, resourcesForRoute(legs));
       return false;
+    }
     var resources:Null<Array<String>> = routeResourcesByRobot.get(robotId);
     if (resources != null) {
       var values:Array<String> = cast resources;
@@ -202,6 +209,17 @@ class TrafficManager {
       routeResourcesByRobot.set(robotId, resources.copy());
     }
     return true;
+  }
+
+  function resourcesForRoute(legs:Array<FacilityRouteLeg>):Array<String> {
+    var resources:Array<String> = [];
+    for (index in 0...legs.length) {
+      resources.push(laneKey(legs[index].lane.id));
+      if (index < legs.length - 1)
+        resources.push(intersectionKey(legs[index].toStationId));
+    }
+    resources.sort(Reflect.compare);
+    return resources;
   }
 
   function ownerFor(resource:String):Null<String> {
