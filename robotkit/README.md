@@ -172,8 +172,10 @@ weights for planar position and heading. It reports an invalid estimate until
 the odometry frame can be anchored to the requested reference frame.
 `FrameTree2.fromRobotModel(model, bodyLinkId)` builds planar transforms for
 authored frames attached to that body link. It ignores mount height and rejects
-roll or pitch. Frames on other links are left out; resolving them requires
-traversing the robot's link and joint kinematics at the current joint state.
+roll or pitch. `RobotFrameTree2.fromSnapshot(model, blueprint, snapshot,
+bodyLinkId)` resolves the current link and frame poses from stable model IDs and
+joint positions. It leaves out nonplanar poses that `FrameTree2` cannot
+represent.
 
 `robotkit.navigation.Navigation` follows a framed `Path` using the latest
 localization state and an application-supplied update duration. `Trajectory`
@@ -224,9 +226,11 @@ a perception source and transforms detections, pallets, obstacles, and docking
 approach poses through `FrameTree2` and the latest valid localization estimate
 into one reference frame. Sensor-to-body transforms must be present in that
 planar frame tree; use `FrameTree2.fromRobotModel()` for authored body-mounted
-frames. Disconnected frames and invalid localization are rejected.
-Update localization from the matching robot observation before calling
-`observe()` so the dynamic robot pose corresponds to the sensor data.
+frames, or call the instance's `observeRobotSnapshot(snapshot, model, blueprint,
+bodyLinkId)` to update localization and model kinematics together before
+transforming the sensor observations. With `observe(sensorFrames)`, update
+localization from the matching robot observation first. Disconnected frames and
+invalid localization are rejected.
 `robotkit.safety` exposes operator-facing phase, active restrictions, speed
 limit, and stopping envelope values; the native runtime continues to enforce
 hard safety. `LoadSafetyPolicy.refresh()` reduces `MobileBase` speed and

@@ -4,25 +4,30 @@ import robotkit.localization.FrameTree2;
 import robotkit.localization.Localization;
 import robotkit.localization.LocalizationQuality;
 import robotkit.localization.LocalizationState;
+import robotkit.localization.RobotFrameTree2;
 import robotkit.mobile.Pose2;
+import robotkit.model.RobotModel;
+import robotkit.runtime.RobotRuntimeBlueprint;
+import robotkit.world.RobotSnapshot;
 import robotkit.world.SensorFrame;
 
 /**
- * Transforms sensor-frame perception values into the latest localization frame.
- * Update localization from the matching robot observation before calling observe.
+ * Transforms sensor-frame perception values into the localization frame.
+ * `observe()` expects matching localization state; `observeRobotSnapshot()`
+ * updates both localization and model frames from one robot observation.
  */
 class FrameAwarePerception implements Perception {
   public final source:Perception;
   public final localization:Localization;
-  public final frames:FrameTree2;
+  public var frames(default, null):FrameTree2;
 
   public function new(source:Perception, localization:Localization,
-      frames:FrameTree2) {
-    if (source == null || localization == null || frames == null)
-      throw "Frame-aware perception requires a source, localization, and frame tree";
+      ?frames:FrameTree2 = null) {
+    if (source == null || localization == null)
+      throw "Frame-aware perception requires a source and localization";
     this.source = source;
     this.localization = localization;
-    this.frames = frames;
+    this.frames = frames == null ? new FrameTree2() : frames;
   }
 
   public function observe(sensorFrames:Array<SensorFrame>):PerceptionSnapshot {
@@ -44,6 +49,20 @@ class FrameAwarePerception implements Perception {
         transformPose(value.approachPose, value.detection.frameId, estimate));
     }];
     return new PerceptionSnapshot(detections, obstacles, pallets, dockingTargets);
+  }
+
+  /**
+   * Updates localization and model kinematics from one observation, then
+   * transforms that observation's sensors into the resulting reference frame.
+   */
+  public function observeRobotSnapshot(snapshot:RobotSnapshot, model:RobotModel,
+      blueprint:RobotRuntimeBlueprint, bodyLinkId:String):PerceptionSnapshot {
+    if (snapshot == null) throw "Frame-aware perception requires a robot snapshot";
+    var currentFrames = RobotFrameTree2.fromSnapshot(model, blueprint, snapshot,
+      bodyLinkId);
+    localization.update(snapshot);
+    frames = currentFrames;
+    return observe(snapshot.sensors.toArray());
   }
 
   function transformDetection(value:Detection,

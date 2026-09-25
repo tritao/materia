@@ -68,6 +68,7 @@ import robotkit.localization.PoseCovariance2;
 import robotkit.localization.FrameTransform2;
 import robotkit.localization.FrameTree2;
 import robotkit.localization.PoseFusionLocalization;
+import robotkit.localization.RobotFrameTree2;
 import robotkit.localization.Localization;
 import robotkit.navigation.Path;
 import robotkit.navigation.Trajectory;
@@ -988,8 +989,9 @@ class RobotWorldTests {
     var perceptionModel = new RobotModel("framed-perception");
     var perceptionBase = perceptionModel.addLink(new Link("base", "base"));
     var mast = perceptionModel.addLink(new Link("mast", "mast"));
-    perceptionModel.addJoint(new Joint("mast-lift", JointType.Prismatic,
-      perceptionBase, mast));
+    var mastLift = perceptionModel.addJoint(new Joint("mast-lift",
+      JointType.Prismatic, perceptionBase, mast));
+    mastLift.limits = new JointLimits(0.0, 1.5, 0.5, 100.0);
     var laserMount = perceptionModel.addFrame(new Frame("laser mount",
       perceptionBase, "laser"));
     laserMount.position = [0.2, 0.0, 0.3];
@@ -997,7 +999,9 @@ class RobotWorldTests {
       Math.cos(Math.PI * 0.25)];
     var mountedLidar = perceptionModel.addSensor(new Sensor("front-lidar", "lidar"));
     mountedLidar.frame = laserMount;
-    perceptionModel.addFrame(new Frame("mast camera mount", mast, "mast-camera"));
+    var mastCameraMount = perceptionModel.addFrame(new Frame("mast camera mount",
+      mast, "mast-camera"));
+    mastCameraMount.position = [0.4, 0.0, 0.2];
     var perceptionFrames = FrameTree2.fromRobotModel(perceptionModel, "base");
     var authoredMount = perceptionFrames.lookup("base", "laser");
     check(Math.abs(authoredMount.x - 0.2) < 1e-9 &&
@@ -1005,17 +1009,51 @@ class RobotWorldTests {
       "planar frame tree compiles body sensor mounts from the robot model");
     throws(function() perceptionFrames.lookup("base", "mast-camera"),
       "model frame helper omits articulated-link mounts that need joint-state transforms");
-    var framed = new FrameAwarePerception(perception,
-      new FixedLocalization(mapEstimate), perceptionFrames);
-    var framedLidar = framed.observe([new SensorFrame("front-lidar", "lidar",
-      "laser", Int64.ofInt(9), Int64.ofInt(140), [1.0, 10.0, 10.0, 10.0],
-      Int64.ofInt(150), "base-link", null, null, "robot-boot", "host-clock")]);
+    var articulatedBlueprint = RobotRuntimeCompiler.compile(perceptionModel);
+    var articulatedTree = RobotFrameTree2.fromSnapshot(perceptionModel,
+      articulatedBlueprint, new RobotSnapshot("mast", Int64.ofInt(1),
+        Int64.ofInt(100), [0.75], [0.0], [0.0], 1, 0), "base");
+    var mastCamera = articulatedTree.lookup("base", "mast-camera");
+    check(Math.abs(mastCamera.x - 0.4) < 1e-9 &&
+      Math.abs(mastCamera.y) < 1e-9,
+      "snapshot frame tree resolves an elevated sensor through its current lift joint");
+
+    var rotatingModel = new RobotModel("rotating-frame");
+    var rotatingBase = rotatingModel.addLink(new Link("base", "base"));
+    var turret = rotatingModel.addLink(new Link("turret", "turret"));
+    var turretJoint = rotatingModel.addJoint(new Joint("turret-yaw",
+      JointType.Revolute, rotatingBase, turret));
+    turretJoint.limits = new JointLimits(-Math.PI, Math.PI, 2.0, 100.0);
+    var turretFrame = rotatingModel.addFrame(new Frame("turret sensor", turret,
+      "turret-sensor"));
+    turretFrame.position = [1.0, 0.0, 0.0];
+    var rotatingBlueprint = RobotRuntimeCompiler.compile(rotatingModel);
+    var rotatingTree = RobotFrameTree2.fromSnapshot(rotatingModel,
+      rotatingBlueprint, new RobotSnapshot("turret", Int64.ofInt(1),
+        Int64.ofInt(100), [Math.PI * 0.5], [0.0], [0.0], 1, 0), "base");
+    var turretSensor = rotatingTree.lookup("base", "turret-sensor");
+    check(Math.abs(turretSensor.x) < 1e-9 &&
+      Math.abs(turretSensor.y - 1.0) < 1e-9 &&
+      Math.abs(turretSensor.yaw - Math.PI * 0.5) < 1e-9,
+      "snapshot frame tree composes revolute joint motion with an authored sensor mount");
+    var fixedLocalization = new FixedLocalization(mapEstimate);
+    var framed = new FrameAwarePerception(perception, fixedLocalization);
+    var framedSensor = new SensorFrame("front-lidar", "lidar", "laser",
+      Int64.ofInt(9), Int64.ofInt(140), [1.0, 10.0, 10.0, 10.0],
+      Int64.ofInt(150), "base", [0.2, 0.0, 0.3], laserMount.rotation,
+      "robot-boot", "host-clock");
+    var framedLidar = framed.observeRobotSnapshot(new RobotSnapshot("framed-lidar",
+      Int64.ofInt(9), Int64.ofInt(140), [0.75], [0.0], [0.0], 1, 0,
+      Int64.ofInt(150), [framedSensor], "robot-boot", "host-clock"),
+      perceptionModel, articulatedBlueprint, "base");
     var framedObstacle = framedLidar.obstacles()[0];
     check(framedObstacle.detection.frameId == "map" &&
       Math.abs(framedObstacle.detection.pose.x - 4.0) < 1e-9 &&
       Math.abs(framedObstacle.detection.pose.y - 2.2) < 1e-9 &&
       Math.abs(Pose2.wrapAngle(framedObstacle.detection.pose.yaw - Math.PI)) < 1e-9,
       "frame-aware perception composes localization and sensor mount transforms");
+    equal(fixedLocalization.updateCount, 1,
+      "robot-snapshot perception updates localization from the same observation");
     equal(framedObstacle.radiusMeters, obstacles[0].radiusMeters,
       "frame-aware perception retains obstacle geometry");
     equal(lidar.frameId, "base", "frame-aware perception does not mutate input sensor frames");
@@ -2292,11 +2330,13 @@ private class FakePower implements Power {
 
 private class FixedLocalization implements Localization {
   var current:Null<LocalizationState>;
+  public var updateCount:Int = 0;
 
   public function new(state:LocalizationState) current = state;
 
   public function update(snapshot:RobotSnapshot):LocalizationState {
     if (current == null) throw "Fixed test localization has no state";
+    updateCount++;
     return cast current;
   }
 
