@@ -15,7 +15,8 @@ explicit fingerprint and target conversion budget. It verifies and caches the
 initial safe state before opening. The existing C ABI serial constructor still
 selects v4. An explicit runtime no-op heartbeat maps to v5 normal stop, since
 v5 has no no-op command kind and a stopped device may safely refresh its
-watchdog.
+watchdog. The PTY test also drives this adapter through `RobotRuntime` to check
+the initial safe snapshot, safety reset, targets, and state publication.
 
 ## Frame
 
