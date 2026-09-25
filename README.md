@@ -88,6 +88,8 @@ For in-process Haxe code updates, use the development entry point:
 Compatible function edits patch the running module between event pump steps.
 Changes to its structure reload the module and transfer the open document,
 selection, and workspace. Native or manifest changes still restart the process.
+Structural reload starts a new undo history and resets the running simulation
+and viewport camera; compatible function patches keep those in-memory states.
 
 The host supports a headless workspace snapshot and deterministic diagnostics:
 
