@@ -1161,7 +1161,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function viewportWithControls(content:View, perspective:Bool):View {
-    var options = new Button(Std.string(gridSpacing) + " m ▾", null, null, "viewport-options");
+    var spacingTenths = Std.int(Math.round(gridSpacing * 10.0));
+    var options = new Button(Std.string(Std.int(spacingTenths / 10)) + "." +
+      Std.string(spacingTenths % 10) + " m ▾", null, null, "viewport-options");
     options.variant = ButtonVariant.Secondary;
     options.onClickEvent = function(event) {
       var bounds = menuTriggerBounds(event);
@@ -1177,9 +1179,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (perspective) controls.push(new KeyedView("reset",
       sceneAction("viewport-reset", "scene.reset-perspective", "Reset", IconName.Cube)));
     controls.push(new KeyedView("grid", sceneAction("viewport-grid", "scene.toggle-grid",
-      gridVisible ? "Grid ✓" : "Grid", IconName.Grid)));
+      "Grid", IconName.Grid)));
     controls.push(new KeyedView("snap", sceneAction("viewport-snap", "scene.toggle-grid-snap",
-      gridSnapEnabled ? "Snap ✓" : "Snap", IconName.Plus)));
+      "Snap", IconName.Plus)));
     controls.push(new KeyedView("options", options));
     var style = actionRowStyle();
     style.width = LayoutAxis.fit();

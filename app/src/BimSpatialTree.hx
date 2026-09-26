@@ -7,6 +7,8 @@ import cadkit.parametric.ElementId;
 import cadkit.parametric.TypedProperty;
 import nativekit.ui.core.View;
 import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.text.MiddleEllipsisText;
+import nativekit.ui.widgets.overlays.Tooltip;
 import nativekit.ui.widgets.collections.TreeRootMetadata;
 import nativekit.ui.widgets.collections.TreeViewModel;
 
@@ -79,9 +81,18 @@ class BimSpatialTree implements TreeViewModel {
 	public function buildItem(nodeKey:String):View {
 		var element = elementForKey(nodeKey);
 		if (element == null)
-			return new Text(nodeKey);
+			return label(nodeKey, nodeKey);
 		var classification = bimClass(element);
-		return new Text(element.name + (classification == "" ? "" : "  ·  " + classification));
+		var value = element.name + (classification == "" ? "" : "  ·  " + classification);
+		return label(nodeKey, value);
+	}
+
+	private function label(key:String, value:String):View {
+		var text = new MiddleEllipsisText("label:" + key, value);
+		var tooltip = new Tooltip("label-tooltip:" + key, text, new Text(value));
+		tooltip.fillAnchor = true;
+		tooltip.showWhen = function() return text.truncated;
+		return tooltip;
 	}
 
 	public function revision():Int {

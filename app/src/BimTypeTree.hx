@@ -8,6 +8,8 @@ import cadkit.parametric.InstanceElement;
 import cadkit.parametric.TypedProperty;
 import nativekit.ui.core.View;
 import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.text.MiddleEllipsisText;
+import nativekit.ui.widgets.overlays.Tooltip;
 import nativekit.ui.widgets.collections.TreeRootMetadata;
 import nativekit.ui.widgets.collections.TreeViewModel;
 
@@ -73,9 +75,17 @@ class BimTypeTree implements TreeViewModel {
 	public function buildItem(key:String):View {
 		var definition = definitionForKey(key);
 		if (definition != null)
-			return new Text(definition.name + "  ·  Type");
+			return label(key, definition.name + "  ·  Type");
 		var instance = instanceForKey(key);
-		return new Text(instance == null ? key : instance.name);
+		return label(key, instance == null ? key : instance.name);
+	}
+
+	private function label(key:String, value:String):View {
+		var text = new MiddleEllipsisText("label:" + key, value);
+		var tooltip = new Tooltip("label-tooltip:" + key, text, new Text(value));
+		tooltip.fillAnchor = true;
+		tooltip.showWhen = function() return text.truncated;
+		return tooltip;
 	}
 
 	public function revision():Int {
