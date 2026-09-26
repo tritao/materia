@@ -1116,12 +1116,32 @@ class MachineKitSmoke {
 		var coupling = new ShaftCoupling(5, 8);
 		check(coupling.designation == "COUPLING-5x8-14.4x24", "shaft coupling designation");
 		check(coupling.setScrew == "M3", "shaft coupling set screw size");
+		check(coupling.setScrews.length == 2, "shaft coupling default set screws");
+		near(coupling.setScrewHoleDiameter, 2.5, "shaft coupling tap drill");
 		throws(() -> new ShaftCoupling(-1, 8), "positive bore diameters");
+		var couplingEnvelope = coupling.geometry(Envelope);
 		var couplingPart = coupling.geometry();
+		solid(couplingEnvelope, "shaft coupling envelope");
 		solid(couplingPart, "shaft coupling");
 		check(couplingPart.volume() < Math.PI * 7.2 * 7.2 * 24, "shaft coupling removes both bores");
+		check(couplingPart.volume() < couplingEnvelope.volume(), "shaft coupling set screw holes");
+		check(coupling.connector("setScrew1").role == Mount, "shaft coupling set screw connector");
+		near(AssemblyFrames.transformVector(coupling.connector("setScrew1").frame, 0, 1, 0).x, 1,
+			"shaft coupling set screw radial axis");
 		couplingPart.close();
+		couplingEnvelope.close();
 		near(coupling.connector("sideB").frame.z, 24, "shaft coupling sideB connector");
+		var couplingBom = coupling.billOfMaterials(8);
+		check(couplingBom.quantity(coupling.designation) == 1, "shaft coupling BOM body");
+		check(couplingBom.quantity(coupling.setScrewPart(8).designation) == 2, "shaft coupling set screw BOM");
+		var customCoupling = new ShaftCoupling(5, 8, null, null,
+			[{z: 4, angle: 0}, {z: 20, angle: Math.PI / 2}]);
+		check(customCoupling.setScrews.length == 2, "custom shaft coupling set screws");
+		var customPart = customCoupling.geometry();
+		solid(customPart, "custom shaft coupling holes");
+		customPart.close();
+		throws(() -> new ShaftCoupling(5, 8, null, null, [{z: 24, angle: 0}]), "within its length");
+		throws(() -> new ShaftCoupling(5, 8, null, null, [{z: 4, angle: 0}, {z: 4, angle: 0}]), "must be unique");
 
 		var linearBearing = LinearBearing.metric("LM8UU");
 		check(linearBearing.designation == "LM8UU", "linear bearing designation");

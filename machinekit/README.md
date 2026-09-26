@@ -46,7 +46,7 @@ Each component also produces the machining it needs:
 | `FlangeBearingHousing` | — (sized from a `DeepGrooveBearing`) | `mountScrewPart()` |
 | `PillowBlock` | Koyo/JTEKT UCP204–UCP213 base-mounted units | mounting connectors and hole envelope; `mountScrewPart()` and `billOfMaterials(true, length)` for mounting hardware |
 | `Bushing` | — (proportional to bore diameter) | — |
-| `ShaftCoupling` | — (proportional to the larger bore) | `setScrewPart()` |
+| `ShaftCoupling` | — (proportional to the larger bore) | radial set-screw holes/connectors, `setScrewPart()`, `billOfMaterials()` |
 | `LinearBearing` | LM8UU–LM20UU | `housingSeat()` with named housing fits; Preview adds end rims and seal tracks |
 | `LeadScrewThread` | semantic metric trapezoidal or ACME family, diameter, pitch, starts and hand | `lead = pitch × starts` |
 | `LeadScrew` | nominal cylindrical thread envelope | `input`, `output` connectors |
@@ -143,6 +143,10 @@ library classes rather than one-off scripts:
 - `PillowBlock` is the base-mounted UCP-style unit. Its UCP204–UCP213 catalog
   rows carry the shaft height, base envelope, two-bolt spacing, and mounting
   interface; its connectors expose the shaft axis, base, and bolt centres.
+- `ShaftCoupling` is a reducer-capable rigid sleeve with independent bores and
+  configurable radial tapped set-screw holes. Preview cuts one hole per
+  configured screw, while Envelope keeps the turned sleeve and bores. Set-screw
+  threads remain semantic; `billOfMaterials()` adds one screw per hole.
 - `LinearAxis` drives a semantic `LeadScrew` through a `ShaftCoupling` and
   matching `LeadScrewNut`. Its `LinearGuideSystem` keeps two round guide rods, `LM8UU` linear
   bearings, and their shaft/housing fit intent together. `setTravel(state, millimetres)` couples screw rotation to carriage

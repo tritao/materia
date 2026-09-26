@@ -55,6 +55,24 @@ class Solids {
 		}
 	}
 
+	/** Cylinder starting at `origin` and extending along a finite direction vector. */
+	public static function cylinderAlong(radius:Float, origin:Vector, direction:Vector, length:Float):Part {
+		if (!(radius > 0) || !(length > 0) || origin == null || direction == null)
+			throw "Cylinder needs a positive radius and length";
+		var axis = direction.normalized();
+		var reference = Math.abs(axis.z) < 0.9 ? Vector.Z() : Vector.X();
+		var xDirection = reference.subtract(axis.scale(reference.dot(axis))).normalized();
+		var base = Part.cylinder(radius, length);
+		try {
+			var result = base.placed(new Location(new Plane(origin, xDirection, axis)));
+			base.close();
+			return result;
+		} catch (error:Dynamic) {
+			base.close();
+			throw error;
+		}
+	}
+
 	/** Extrudes a local XY polygon from z0 to z1. */
 	public static function prism(points:Array<Vector>, z0:Float, z1:Float):Part {
 		var sketch = Sketch.polygon(points, Plane.XY().offset(z0));
