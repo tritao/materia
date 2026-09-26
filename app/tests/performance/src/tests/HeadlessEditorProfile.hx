@@ -196,10 +196,7 @@ class HeadlessEditorProfile {
 
       var invalidInput = measuredClick(editor, positionKey, "property-invalid");
       editor.ui.key(UiEventKind.KeyDown, UiKey.A, UiModifier.Control);
-      // HashLink's Std.parseFloat accepts a nonnumeric prefix as zero; NaN is
-      // unambiguously rejected by the property parser and still exercises the
-      // validation-row invalidation path.
-      editor.ui.text(UiEventKind.TextInput, "nan");
+      editor.ui.text(UiEventKind.TextInput, "not-a-number");
       editor.ui.key(UiEventKind.KeyDown, UiKey.Enter);
       submit(editor, frame, frames, "property-invalid", cycle, invalidInput);
       action(actions, "property-invalid", cycle);
