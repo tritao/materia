@@ -40,7 +40,11 @@ class WorldSnapshot {
           value.sensors.toArray(),
           value.sourceClockId,
           value.receivedClockId,
-          value.safety
+          value.safety,
+          value.trajectoryQueueDepth,
+          value.trajectoryActive,
+          value.trajectoryTimeNs,
+          value.trajectoryDurationNs
         )
       );
     }

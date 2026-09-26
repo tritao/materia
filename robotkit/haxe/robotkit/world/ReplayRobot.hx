@@ -104,7 +104,9 @@ class ReplayRobot implements Robot {
     return new RobotSnapshot(value.id, value.sourceSequence, value.sourceTimestampNs,
       value.positions.toArray(), value.velocities.toArray(), value.efforts.toArray(),
       value.mode, faultCode, value.receivedTimestampNs, sensors,
-      value.sourceClockId, value.receivedClockId, value.safety);
+      value.sourceClockId, value.receivedClockId, value.safety,
+      value.trajectoryQueueDepth, value.trajectoryActive,
+      value.trajectoryTimeNs, value.trajectoryDurationNs);
 
   function ensureLive():Void if (closed) throw "ReplayRobot has been closed";
 }

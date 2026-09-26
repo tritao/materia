@@ -65,7 +65,9 @@ class RuntimeRobotAdapter implements Robot {
     return new RobotSnapshot(logicalId, value.sequence, value.sourceTimestampNs,
       value.q.toArray(), value.dq.toArray(), value.effort.toArray(), value.mode,
       value.faultCode, value.receivedTimestampNs, currentSensors,
-      "unspecified", "robotkit.monotonic", value.safety);
+      "unspecified", "robotkit.monotonic", value.safety,
+      value.trajectoryQueueDepth, value.trajectoryActive,
+      value.trajectoryTimeNs, value.trajectoryDurationNs);
   }
 
   public function fault():Null<RobotFault> {

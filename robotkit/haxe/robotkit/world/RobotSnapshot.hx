@@ -18,6 +18,14 @@ class RobotSnapshot {
   public final faultCode:Int;
   /** Current runtime safety state: ready, stopping, emergency-stop, or fault. */
   public final safety:Int;
+  /** Number of timestamped trajectory points currently owned by the runtime. */
+  public final trajectoryQueueDepth:Int;
+  /** Whether the runtime is currently consuming a timestamped trajectory. */
+  public final trajectoryActive:Bool;
+  /** Runtime trajectory clock, in the runtime's owner timebase. */
+  public final trajectoryTimeNs:Int64;
+  /** Timestamp of the last point currently owned by the runtime. */
+  public final trajectoryDurationNs:Int64;
 
   /** Compatibility alias; new code should name the clock explicitly. */
   public var timestampNs(get, never):Int64;
@@ -35,7 +43,11 @@ class RobotSnapshot {
     ?sensors:Array<SensorFrame>,
     ?sourceClockId:String = "unspecified",
     ?receivedClockId:String = "robotkit.monotonic",
-    ?safety:Int = 0
+    ?safety:Int = 0,
+    ?trajectoryQueueDepth:Int = 0,
+    ?trajectoryActive:Bool = false,
+    ?trajectoryTimeNs:Int64,
+    ?trajectoryDurationNs:Int64
   ) {
     this.id = id;
     this.sourceSequence = sourceSequence;
@@ -52,6 +64,11 @@ class RobotSnapshot {
     this.mode = mode;
     this.faultCode = faultCode;
     this.safety = safety;
+    this.trajectoryQueueDepth = trajectoryQueueDepth == null ? 0 : trajectoryQueueDepth;
+    this.trajectoryActive = trajectoryActive == true;
+    this.trajectoryTimeNs = trajectoryTimeNs == null ? Int64.ofInt(0) : trajectoryTimeNs;
+    this.trajectoryDurationNs = trajectoryDurationNs == null
+      ? Int64.ofInt(0) : trajectoryDurationNs;
   }
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;

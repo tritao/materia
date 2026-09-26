@@ -6,13 +6,21 @@ import motionkit.MachineKitRobotCompiler;
 import motionkit.MotionOptions;
 import motionkit.MotionSystem;
 import motionkit.Pose;
+import motionkit.axis.MotionAxisBlueprint;
+import motionkit.axis.MotionSystemBlueprint;
 import motionkit.path.ArcSegment;
 import motionkit.path.GeometricPath;
 import motionkit.path.PathPoint;
 import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
 import motionkit.planner.TrapezoidalPlanner;
+import motionkit.trajectory.JointTrajectory;
+import motionkit.trajectory.JointTrajectorySample;
 import motionkit.trajectory.MotionLimits;
+import robotkit.model.Joint;
+import robotkit.model.JointType;
+import robotkit.model.Link;
+import robotkit.model.RobotModel;
 import robotkit.runtime.Simulation;
 import robotkit.world.RecordingRobot;
 import robotkit.world.RobotRecording;
@@ -29,7 +37,9 @@ class MotionKitBootstrapTests {
     testLinearAxisCompilesToRobotModel();
     testCompiledAxisRunsThroughSimulation();
     testCompiledXYZGantryRunsThroughSimulation();
+    testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
+    testLongBufferedExecution();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
   }
 
@@ -256,6 +266,41 @@ class MotionKitBootstrapTests {
     simulation.dispose();
   }
 
+  static function testDualMotorAxisRunsThroughSimulation():Void {
+    var model = new RobotModel("dual-motor-x");
+    var base = model.addLink(new Link("gantry.base"));
+    var left = model.addLink(new Link("gantry.left"));
+    var right = model.addLink(new Link("gantry.right"));
+    var leftJoint = model.addJoint(new Joint("x.left", JointType.Prismatic, base, left, "x.left"));
+    var rightJoint = model.addJoint(new Joint("x.right", JointType.Prismatic, left, right, "x.right"));
+    for (joint in [leftJoint, rightJoint]) {
+      joint.limits.lower = 0.0;
+      joint.limits.upper = 0.08;
+      joint.limits.velocity = 0.1;
+    }
+    var blueprint = MotionSystemBlueprint.fromRobotModel(model, [
+      new MotionAxisBlueprint("x", ["x.left", "x.right"], 0.0, 0.08, 0.08, 0.4)
+    ]);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("dual-motor-x", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var logicalAxis = machine.axis("x");
+    check(logicalAxis != null && logicalAxis.jointIndices.length == 2,
+      "one logical axis exposes both dual-motor joints");
+
+    machine.home();
+    runMotion(machine, simulation);
+    machine.moveAxes([new AxisTarget("x", 0.035)], new MotionOptions(0.08, 0.4));
+    runMotion(machine, simulation);
+    var snapshot = robot.snapshot();
+    near(snapshot.positions.get(0), 0.035, "dual-motor axis reaches its logical target on motor one", 1e-5);
+    near(snapshot.positions.get(1), 0.035, "dual-motor axis reaches its logical target on motor two", 1e-5);
+    simulation.dispose();
+  }
+
   static function runMotion(machine:MotionSystem, simulation:Simulation):Void {
     var tick = 0;
     while (machine.isMoving()) {
@@ -347,6 +392,50 @@ class MotionKitBootstrapTests {
     check(machine.queueDepth() == 0 && !machine.isMoving(),
       "abort clears active and waiting trajectories");
     check(!machine.isHolding(), "abort clears controlled hold state");
+    simulation.dispose();
+  }
+
+  static function testLongBufferedExecution():Void {
+    var axis = new LinearAxis(23, 10, 80);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("long-buffer", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var recording = new RobotRecording();
+    var instrumented = new RecordingRobot(robot, recording);
+    var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
+    var samples:Array<JointTrajectorySample> = [];
+    for (index in 0...601)
+      samples.push(new JointTrajectorySample(index * 0.01, [0.05 * index / 600.0]));
+    var trajectory = new JointTrajectory(samples);
+    machine.queueTrajectory(trajectory);
+    check(recording.commands.length == 1, "long trajectory starts with one bounded native chunk");
+
+    var tick = 0;
+    machine.update();
+    check(recording.commands.length == 1,
+      "streamer waits for the owner cycle before appending a second chunk");
+    simulation.step(Int64.ofInt(tick++));
+    while (machine.isMoving()) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+      if (tick > 1200) throw "long buffered trajectory did not complete";
+    }
+    for (_ in 0...4) simulation.step(Int64.ofInt(tick++));
+    check(recording.commands.length >= 3,
+      "long trajectory refills native chunks before the queue drains");
+    for (command in recording.commands) switch command {
+      case RobotCommand.TrajectoryChunk(chunk):
+        check(chunk.points.length <= robotkit.world.TrajectoryChunk.MAX_POINTS,
+          "streamed trajectory chunks stay within the native point limit");
+      case RobotCommand.JointTargets(_, _):
+        throw "long trajectory unexpectedly fell back to sample-by-sample targets";
+    }
+    near(instrumented.snapshot().positions.get(0), 0.05,
+      "streamed trajectory reaches its final position", 1e-5);
+    near(machine.progress(), 1.0, "streamed trajectory reports completed progress");
     simulation.dispose();
   }
 

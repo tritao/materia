@@ -40,6 +40,11 @@ class MotionSystem {
   var bufferedCompletedSeconds:Float = 0.0;
   var plannedEndPositions:Null<Array<Float>> = null;
   var trajectorySubmitted:Bool = false;
+  /** Source-sample index used as the boundary of the next native chunk. */
+  var trajectoryNextSampleIndex:Int = 0;
+  var trajectoryChunkEndSeconds:Float = 0.0;
+  var trajectoryChunkStartSeconds:Float = 0.0;
+  var trajectoryChunkInitialPositions:Null<Array<Float>> = null;
 
   public static function fromBlueprint(robot:Robot, blueprint:MotionSystemBlueprint):MotionSystem
     return new MotionSystem(robot, blueprint);
@@ -162,7 +167,10 @@ class MotionSystem {
     if (held) return;
     held = true;
     if (activeTrajectory != null) {
-      if (usesTrajectoryChunks(activeTrajectory)) trajectorySubmitted = false;
+      if (usesTrajectoryChunks(activeTrajectory)) {
+        trajectorySubmitted = false;
+        trajectoryChunkInitialPositions = null;
+      }
       robot.stop(StopMode.Normal);
     }
   }
@@ -170,8 +178,10 @@ class MotionSystem {
   /** Resumes a held buffer at its current deterministic trajectory time. */
   public function resume():Void {
     held = false;
-    if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory))
+    if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory)) {
+      prepareTrajectoryResume();
       submitActiveTrajectoryChunk();
+    }
     activateNextTrajectory();
   }
 
@@ -342,7 +352,7 @@ class MotionSystem {
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
     var trajectory = activeTrajectory;
     if (usesTrajectoryChunks(trajectory)) {
-      submitActiveTrajectoryChunk();
+      if (!trajectorySubmitted || shouldRefillTrajectory(dt)) submitActiveTrajectoryChunk();
     } else {
       var sample = trajectory.sample(elapsedSeconds);
       var targets:Array<JointTarget> = [];
@@ -396,6 +406,7 @@ class MotionSystem {
     bufferedTotalSeconds = trajectoryValue.durationSeconds;
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(trajectoryValue);
+    resetTrajectoryChunkState();
     if (usesTrajectoryChunks(trajectoryValue)) submitActiveTrajectoryChunk();
   }
 
@@ -415,6 +426,7 @@ class MotionSystem {
     activeTrajectory = queuedTrajectories.shift();
     elapsedSeconds = 0.0;
     trajectorySubmitted = false;
+    resetTrajectoryChunkState();
     if (usesTrajectoryChunks(activeTrajectory)) submitActiveTrajectoryChunk();
   }
 
@@ -427,33 +439,105 @@ class MotionSystem {
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = null;
     trajectorySubmitted = false;
+    resetTrajectoryChunkState();
   }
 
   function usesTrajectoryChunks(trajectoryValue:JointTrajectory):Bool {
     if (trajectoryValue == null) return false;
-    return trajectoryValue.samples.length <= TrajectoryChunk.MAX_POINTS &&
-      robot.capabilities().supportsTrajectoryQueue &&
+    return robot.capabilities().supportsTrajectoryQueue &&
       trajectoryValue.jointCount <= TrajectoryPoint.MAX_JOINTS;
   }
 
   function submitActiveTrajectoryChunk():Void {
     var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || trajectorySubmitted) return;
-    var startTime = elapsedSeconds;
+    if (trajectoryValue == null) return;
+    var startIndex = trajectoryNextSampleIndex;
+    var resuming = trajectoryChunkInitialPositions != null;
+    var startTime = resuming ? trajectoryChunkStartSeconds :
+      (startIndex == 0 ? 0.0 : trajectoryValue.samples[startIndex].timeSeconds);
+    var initialPositions = resuming ? trajectoryChunkInitialPositions :
+      trajectoryValue.sample(startTime).positions;
     var points:Array<TrajectoryPoint> = [];
-    var initial = trajectoryValue.sample(startTime);
-    points.push(new TrajectoryPoint(Int64.ofInt(0), initial.positions));
-    for (sample in trajectoryValue.samples) {
-      if (sample.timeSeconds <= startTime + 1e-9) continue;
+    points.push(new TrajectoryPoint(Int64.ofInt(0), cast initialPositions));
+    var pointLimit = TrajectoryChunk.MAX_POINTS;
+    if (startIndex > 0 || resuming) {
+      var observation = robot.snapshot();
+      if (observation.trajectoryActive && observation.trajectoryQueueDepth > 0)
+        pointLimit = Std.int(Math.max(0,
+          TrajectoryChunk.MAX_POINTS - observation.trajectoryQueueDepth));
+    }
+    if (pointLimit < 2) return;
+    var endIndex = startIndex > trajectoryValue.samples.length - 1
+      ? trajectoryValue.samples.length - 1 : startIndex;
+    var maximumEnd:Int = Std.int(Math.min(trajectoryValue.samples.length - 1,
+      startIndex + pointLimit - (resuming ? 2 : 1)));
+    var firstFutureIndex = resuming ? startIndex : startIndex + 1;
+    for (index in firstFutureIndex...(maximumEnd + 1)) {
+      var sample = trajectoryValue.samples[index];
       points.push(new TrajectoryPoint(secondsToNanoseconds(sample.timeSeconds - startTime),
         sample.positions));
+      endIndex = index;
     }
     robot.submit(RobotCommand.TrajectoryChunk(new TrajectoryChunk(points)));
     trajectorySubmitted = true;
+    trajectoryChunkInitialPositions = null;
+    trajectoryNextSampleIndex = endIndex;
+    trajectoryChunkStartSeconds = startTime;
+    trajectoryChunkEndSeconds = resuming && startIndex > trajectoryValue.samples.length - 1
+      ? trajectoryValue.durationSeconds : trajectoryValue.samples[endIndex].timeSeconds;
   }
 
-  static function secondsToNanoseconds(seconds:Float):Int64
-    return Int64.fromFloat(Math.round(seconds * 1000000000.0));
+  function prepareTrajectoryResume():Void {
+    var trajectoryValue = activeTrajectory;
+    if (trajectoryValue == null) return;
+    var nextIndex = 0;
+    while (nextIndex < trajectoryValue.samples.length &&
+        trajectoryValue.samples[nextIndex].timeSeconds <= elapsedSeconds + 1e-9)
+      nextIndex++;
+    trajectoryNextSampleIndex = nextIndex;
+    trajectoryChunkStartSeconds = elapsedSeconds;
+    trajectoryChunkInitialPositions = robot.snapshot().positions.toArray();
+    trajectoryChunkEndSeconds = elapsedSeconds;
+  }
+
+  function shouldRefillTrajectory(dt:Float):Bool {
+    var trajectoryValue = activeTrajectory;
+    if (trajectoryValue == null || trajectoryNextSampleIndex >= trajectoryValue.samples.length - 1)
+      return false;
+    var lead = Math.max(fixedTimestepSeconds, dt) * 2.0;
+    if (trajectoryChunkEndSeconds - elapsedSeconds <= lead + 1e-9) return true;
+    // If an owner cycle drained the native window before the host update,
+    // refill immediately from the deterministic source trajectory.
+    // At t=0 the first chunk may still be in the runtime mailbox, so its
+    // snapshot quite correctly reports an empty queue until the owner cycle
+    // accepts that command.
+    if (elapsedSeconds <= 1e-9) return false;
+    var observation = robot.snapshot();
+    return !observation.trajectoryActive || observation.trajectoryQueueDepth == 0;
+  }
+
+  function resetTrajectoryChunkState():Void {
+    trajectoryNextSampleIndex = 0;
+    trajectoryChunkEndSeconds = 0.0;
+    trajectoryChunkStartSeconds = 0.0;
+    trajectoryChunkInitialPositions = null;
+  }
+
+  static function secondsToNanoseconds(seconds:Float):Int64 {
+    if (!Math.isFinite(seconds) || seconds < 0.0)
+      throw "Trajectory timestamp must be finite and non-negative";
+    // Int64.fromFloat and Math.round follow the host Int range on some Haxe
+    // targets. Parse the integral decimal representation so windows longer
+    // than 2.147 s do not wrap before they reach the native trajectory ABI.
+    // Positive truncation after adding 0.5 implements rounding without the
+    // Haxe Math.round/floor helpers, whose return type is the host Int.
+    var value:Float = seconds * 1000000000.0 + 0.5;
+    var high = Std.int(value / 4294967296.0);
+    var lowValue = value - high * 4294967296.0;
+    var low = lowValue >= 2147483648.0
+      ? Std.int(lowValue - 4294967296.0) : Std.int(lowValue);
+    return Int64.make(high, low);
+  }
 
   static function trajectoryEnd(trajectoryValue:JointTrajectory):Array<Float>
     return trajectoryValue.samples[trajectoryValue.samples.length - 1].positions.copy();

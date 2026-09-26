@@ -13,7 +13,8 @@ RobotKit execution. The bootstrap package currently provides:
 - a MachineKit `LinearAxis` compiler that produces a two-link prismatic
   RobotModel and a runtime-ready MotionSystem blueprint.
 - buffered trajectory execution with a native timestamped-chunk path when the
-  RobotKit runtime advertises queue support.
+  RobotKit runtime advertises queue support, including bounded streaming for
+  trajectories longer than one native chunk.
 
 MachineKit dimensions are authored in millimetres. The compiler converts them
 to RobotKit metres, places the logical zero at the axis's lower travel limit,
@@ -48,11 +49,12 @@ machine.movePath(GeometricPath.lines([
 ]), PathPlanningOptions.blend(0.001));
 ```
 
-The runtime interpolates timestamped trajectory chunks on its owner clock,
-reports queue progress, and performs a short controlled deceleration for a
-normal hold. It retains a deterministic position-target fallback when a
-backend does not support buffered chunks. CNC semantics and G-code remain
-outside MotionKit.
+The runtime interpolates timestamped trajectory chunks on its owner clock and
+publishes queue depth and timestamp progress through `RobotSnapshot`. MotionKit
+refills long trajectories before the native window drains, and performs a
+short controlled deceleration for a normal hold. It retains a deterministic
+position-target fallback when a backend does not support buffered chunks. CNC
+semantics and G-code remain outside MotionKit.
 
 Run the focused native-backed test with:
 

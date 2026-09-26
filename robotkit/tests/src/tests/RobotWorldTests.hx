@@ -4089,6 +4089,7 @@ class RobotWorldTests {
   static function commandSummary(command:RobotCommand):String return switch command {
     case JointTargets(targets, _): [for (target in targets)
       '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
+    case TrajectoryChunk(chunk): 'trajectory:${chunk.points.length}';
   };
 
   static function advanceReplaySample(replay:ReplayRobot):Bool {
