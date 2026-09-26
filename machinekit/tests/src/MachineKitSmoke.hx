@@ -160,17 +160,19 @@ class MachineKitSmoke {
 			var preview = motor.geometry();
 			solid(preview, 'NEMA $frame preview');
 			var box = bounds(preview);
-			near(box.maxX, motor.spec.face / 2, 'NEMA $frame face');
+			near(box.maxX, motor.variant.bodyFace / 2, 'NEMA $frame face');
 			near(box.minZ, -motor.bodyLength, 'NEMA $frame body');
-			near(box.maxZ, motor.spec.shaftLength, 'NEMA $frame shaft');
+			near(box.maxZ, motor.variant.shaftLength, 'NEMA $frame shaft');
 			preview.close();
 		}
 		var motor = NemaStepper.frame(17, 40);
-		check(motor.designation == "NEMA17-40", "motor designation");
+		check(NemaStepper.model("23HS22-2804S").variant.shaftDiameter == 6.35, "named motor variant shaft");
+		check(NemaStepper.frame(23).spec.boltSpacing == 47.14, "NEMA frame bolt spacing");
+		check(motor.designation == "GENERIC-NEMA17-L40", "motor designation");
 		throws(() -> NemaStepper.frame(11), 'Unknown NEMA frame "11"');
 		var envelope = motor.geometry(Envelope);
 		var shaftBeyondPilot = Math.PI * 2.5 * 2.5 * (24 - 2);
-		near(envelope.volume(), 42.3 * 42.3 * 40 + Math.PI * 11 * 11 * 2 + shaftBeyondPilot, "motor envelope volume");
+		near(envelope.volume(), 42 * 42 * 40 + Math.PI * 11 * 11 * 2 + shaftBeyondPilot, "motor envelope volume");
 		envelope.close();
 		near(motor.connector("bolt1").frame.x, 15.5, "bolt connector x");
 		near(motor.connector("bolt3").frame.y, -15.5, "bolt connector y");
@@ -674,7 +676,7 @@ class MachineKitSmoke {
 
 	static function linearAxis():Void {
 		var axis = new LinearAxis();
-		check(axis.motor.designation == "NEMA23-56", "linear axis motor designation");
+		check(axis.motor.designation == "23HS22-2804S", "linear axis motor designation");
 		check(axis.bearing.designation == "6000-2Z", "linear axis default bearing matches the 10 mm screw");
 		check(axis.coupling.designation == "COUPLING-6.35x10-18x30", "linear axis coupling joins motor and screw");
 		near(axis.carriage.boreDiameter, 10, "linear axis carriage bore");
@@ -1087,7 +1089,7 @@ class MachineKitSmoke {
 		var bom = example.bom();
 		check(bom.quantity("ISO4762-M3x10") == 4, "screw quantity");
 		check(bom.quantity("608-2Z") == 2, "bearing quantity");
-		check(bom.quantity("NEMA17-48") == 1, "motor quantity");
+		check(bom.quantity("17HS19-1684S1") == 1, "motor quantity");
 		check(bom.quantity("DIN6885-B-2x2x6") == 1, "key quantity");
 		check(bom.quantity("DIN471-8") == 1, "ring quantity");
 		var duplicate = new Bom();
@@ -1100,8 +1102,8 @@ class MachineKitSmoke {
 		check(RetainingRing.catalog().metadata("8").dimensionKind == Nominal, "ring dimension metadata");
 		check(RobotFlange.catalog().metadata("50").conformance == GenericApproximation,
 			"raised-pilot flange is a generic approximation");
-		check(NemaStepper.catalog().metadata("17").dimensionKind == Mixed,
-			"NEMA dimensions mix frame and motor variant");
+		check(NemaStepper.catalog().metadata("17").dimensionKind == Unverified,
+			"NEMA frame dimensions await edition verification");
 		metadataComplete(DeepGrooveBearing.catalog());
 		metadataComplete(FlatWasher.catalog());
 		metadataComplete(HexBolt.catalog());
@@ -1112,6 +1114,7 @@ class MachineKitSmoke {
 		metadataComplete(SocketHeadCapScrew.catalog());
 		metadataComplete(LinearBearing.catalog());
 		metadataComplete(NemaStepper.catalog());
+		metadataComplete(NemaStepper.variantCatalog());
 		metadataComplete(RobotFlange.catalog());
 		metadataComplete(Sprocket.chainCatalog());
 	}
@@ -1125,6 +1128,7 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		MachineKitReferenceTests.run();
 		dimensions();
 		catalogMetadata();
 		bearings();

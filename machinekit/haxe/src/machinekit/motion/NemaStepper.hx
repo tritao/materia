@@ -13,68 +13,92 @@ import machinekit.component.Solids;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.SocketHeadCapScrew;
 
-/** NEMA ICS 16 hybrid stepper frame in millimetres. `mountHoleDepth` is the tapped or flange depth. */
-typedef NemaFrameSpec = {
-	var frame:Int;
-	var face:Float;
-	var boltSpacing:Float;
-	var mountScrew:String;
-	var tappedMount:Bool;
-	var mountHoleDepth:Float;
-	var pilotDiameter:Float;
-	var pilotHeight:Float;
-	var shaftDiameter:Float;
-	var shaftLength:Float;
-	var bodyLength:Float;
-}
-
-/** Stepper motor with standard face, pilot, bolt pattern, and output shaft.
+/** Stepper motor built from a NEMA mounting interface and a named motor variant.
  * CAD frame: mounting face at z=0, body toward -Z, shaft along +Z.
- * Connectors: `mountFace`, `shaftAxis` (rotor axis at the face), `shaftTip`, and `bolt1`..`bolt4`,
- * all with +Y along +Z.
  */
 class NemaStepper extends MachineComponent {
-	static var table:Null<Catalog<NemaFrameSpec>>;
+	static var frameTable:Null<Catalog<NemaFrameInterface>>;
+	static var variantTable:Null<Catalog<StepperMotorVariant>>;
 
-	public final spec:NemaFrameSpec;
+	/** Frame mounting dimensions; kept as `spec` for existing callers. */
+	public final spec:NemaFrameInterface;
+	public final variant:StepperMotorVariant;
 	public final bodyLength:Float;
 
-	static function rows():Array<NemaFrameSpec>
-		return [
-			{frame: 17, face: 42.3, boltSpacing: 31.0, mountScrew: "M3", tappedMount: true,
-				mountHoleDepth: 4.5, pilotDiameter: 22.0, pilotHeight: 2.0, shaftDiameter: 5.0,
-				shaftLength: 24.0, bodyLength: 48.0},
-			{frame: 23, face: 56.4, boltSpacing: 47.14, mountScrew: "M5", tappedMount: false,
-				mountHoleDepth: 5.0, pilotDiameter: 38.1, pilotHeight: 1.6, shaftDiameter: 6.35,
-				shaftLength: 21.0, bodyLength: 56.0},
-			{frame: 34, face: 86.0, boltSpacing: 69.6, mountScrew: "M6", tappedMount: false,
-				mountHoleDepth: 8.0, pilotDiameter: 73.0, pilotHeight: 1.6, shaftDiameter: 14.0,
-				shaftLength: 32.0, bodyLength: 80.0},
-		];
-
-	public static function catalog():Catalog<NemaFrameSpec> {
-		if (table == null)
-			table = new Catalog("NEMA frame", spec -> Std.string(spec.frame), rows(), _ -> ({source: "MachineKit mixed NEMA interface and representative motor dimensions; source verification pending", standard: null,
-				standardEdition: null, dimensionKind: Mixed, conformance: GenericApproximation}));
-		return table;
+	public static function catalog():Catalog<NemaFrameInterface> {
+		if (frameTable == null)
+			frameTable = new Catalog("NEMA frame", spec -> Std.string(spec.frame), [
+				{frame: 17, face: 42.3, boltSpacing: 31.0, pilotDiameter: 22.0},
+				{frame: 23, face: 56.4, boltSpacing: 47.14, pilotDiameter: 38.1},
+				{frame: 34, face: 86.0, boltSpacing: 69.6, pilotDiameter: 73.0},
+			], _ -> ({source: "MachineKit NEMA frame reference; edition verification pending", standard: "NEMA ICS 16",
+				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
+		return frameTable;
 	}
 
-	public static function frame(size:Int, ?bodyLength:Float):NemaStepper
-		return new NemaStepper(catalog().get(Std.string(size)), bodyLength);
+	public static function variantCatalog():Catalog<StepperMotorVariant> {
+		if (variantTable == null)
+			variantTable = new Catalog("stepper motor variant", spec -> spec.designation, [
+				{designation: "17HS19-1684S1", frame: 17, bodyFace: 42.0, bodyLength: 48.0,
+					shaftDiameter: 5.0, shaftLength: 24.0, pilotHeight: 2.0,
+					mountScrew: "M3", tappedMount: true, mountHoleDepth: 4.5},
+				{designation: "23HS22-2804S", frame: 23, bodyFace: 57.3, bodyLength: 56.0,
+					shaftDiameter: 6.35, shaftLength: 21.0, pilotHeight: 1.6,
+					mountScrew: "M5", tappedMount: false, mountHoleDepth: 5.0},
+				{designation: "34HS31-5504S", frame: 34, bodyFace: 86.0, bodyLength: 80.0,
+					shaftDiameter: 14.0, shaftLength: 35.0, pilotHeight: 1.6,
+					mountScrew: "M6", tappedMount: false, mountHoleDepth: 8.0},
+			], spec -> ({source: switch (spec.designation) {
+				case "17HS19-1684S1": "https://www.omc-stepperonline.com/nema-17-bipolar-1-8deg-45ncm-64oz-in-1-68a-2-8v-42x42x48mm-4-wires-17hs19-1684s1";
+				case "23HS22-2804S": "https://www.omc-stepperonline.com/nema-23-bipolar-1-8deg-1-26nm-178-4oz-in-2-8a-2-5v-57x57x56mm-4-wires-23hs22-2804s";
+				default: "https://www.omc-stepperonline.com/nema-34-cnc-stepper-motor-4-5nm-637-25oz-in-5-5a-86x86x80mm-key-way-shaft-34hs31-5504s";
+			}, standard: null, standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
+				verifiedFields: ["bodyFace", "bodyLength", "shaftDiameter", "shaftLength"]}));
+		return variantTable;
+	}
 
-	public function new(spec:NemaFrameSpec, ?bodyLength:Float) {
-		var length = bodyLength == null ? spec.bodyLength : bodyLength;
-		if (!(length > spec.mountHoleDepth)) throw 'NEMA ${spec.frame} body is too short';
-		if (!(spec.boltSpacing > 0) || !(spec.face > spec.boltSpacing) || !(spec.pilotDiameter > spec.shaftDiameter)
-			|| !(spec.pilotDiameter < spec.boltSpacing * Math.sqrt(2)) || !(spec.shaftDiameter > 0) || !(spec.shaftLength > 0))
-			throw 'NEMA ${spec.frame} frame has inconsistent dimensions';
-		var bodyText = Dimension.format(length);
-		super('NEMA${spec.frame}-$bodyText', 'NEMA ${spec.frame} stepper motor, $bodyText mm body', null);
+	/** Named manufacturer variant. */
+	public static function model(designation:String):NemaStepper {
+		var variant = variantCatalog().get(designation);
+		return new NemaStepper(catalog().get(Std.string(variant.frame)), variant);
+	}
+
+	/** Default named variant for a frame. A length override creates a generic preview variant. */
+	public static function frame(size:Int, ?bodyLength:Float):NemaStepper {
+		var spec = catalog().get(Std.string(size));
+		var name = switch (size) {
+			case 17: "17HS19-1684S1";
+			case 23: "23HS22-2804S";
+			case 34: "34HS31-5504S";
+			default: throw 'No default NEMA $size motor variant';
+		};
+		var base = variantCatalog().get(name);
+		if (bodyLength == null) return new NemaStepper(spec, base);
+		var custom:StepperMotorVariant = {
+			designation: 'GENERIC-NEMA$size-L${Dimension.format(bodyLength)}', frame: size,
+			bodyFace: base.bodyFace, bodyLength: bodyLength, shaftDiameter: base.shaftDiameter,
+			shaftLength: base.shaftLength, pilotHeight: base.pilotHeight, mountScrew: base.mountScrew,
+			tappedMount: base.tappedMount, mountHoleDepth: base.mountHoleDepth,
+		};
+		return new NemaStepper(spec, custom);
+	}
+
+	public function new(spec:NemaFrameInterface, variant:StepperMotorVariant) {
+		if (spec.frame != variant.frame) throw "Stepper motor variant frame does not match its mounting interface";
+		if (!(variant.bodyLength > variant.mountHoleDepth) || !(variant.bodyFace > spec.boltSpacing))
+			throw 'NEMA ${spec.frame} motor body is too short or narrow';
+		if (!(spec.boltSpacing > 0) || !(spec.face > spec.boltSpacing) || !(spec.pilotDiameter > variant.shaftDiameter)
+			|| !(spec.pilotDiameter < spec.boltSpacing * Math.sqrt(2)) || !(variant.shaftDiameter > 0)
+			|| !(variant.shaftLength > variant.pilotHeight) || !(variant.pilotHeight > 0))
+			throw 'NEMA ${spec.frame} interface or motor variant has inconsistent dimensions';
+		SocketHeadCapScrew.catalog().get(variant.mountScrew);
+		super(variant.designation, '${variant.designation} NEMA ${spec.frame} stepper motor', null);
 		this.spec = spec;
-		this.bodyLength = length;
+		this.variant = variant;
+		bodyLength = variant.bodyLength;
 		addConnector("mountFace", Mount, Solids.axial(0, 0, 0));
 		addConnector("shaftAxis", Axis, Solids.axial(0, 0, 0));
-		addConnector("shaftTip", Shaft, Solids.axial(0, 0, spec.shaftLength));
+		addConnector("shaftTip", Shaft, Solids.axial(0, 0, variant.shaftLength));
 		var i = 1;
 		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
 	}
@@ -86,30 +110,29 @@ class NemaStepper extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var half = spec.face / 2;
+		var half = variant.bodyFace / 2;
 		var parts:Array<Part> = [];
 		if (detail == Envelope) {
 			parts.push(Solids.prism([new Vector(-half, -half), new Vector(half, -half),
 				new Vector(half, half), new Vector(-half, half)], -bodyLength, 0));
 		} else {
-			var c = 0.08 * spec.face;
+			var c = 0.08 * variant.bodyFace;
 			var body = Solids.prism([new Vector(-half + c, -half), new Vector(half - c, -half),
 				new Vector(half, -half + c), new Vector(half, half - c), new Vector(half - c, half),
 				new Vector(-half + c, half), new Vector(-half, half - c), new Vector(-half, -half + c)],
 				-bodyLength, 0);
 			var screw = mountScrew(10);
-			var holeDiameter = spec.tappedMount ? screw.spec.tapDrill : screw.clearanceDiameter(Medium);
+			var holeDiameter = variant.tappedMount ? screw.spec.tapDrill : screw.clearanceDiameter(Medium);
 			parts.push(Solids.cut(body, [for (point in boltPattern())
-				Solids.cylinder(holeDiameter / 2, -spec.mountHoleDepth, 0.1, point.x, point.y)]));
+				Solids.cylinder(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y)]));
 		}
-		parts.push(Solids.cylinder(spec.pilotDiameter / 2, 0, spec.pilotHeight));
-		parts.push(Solids.cylinder(spec.shaftDiameter / 2, 0, spec.shaftLength));
+		parts.push(Solids.cylinder(spec.pilotDiameter / 2, 0, variant.pilotHeight));
+		parts.push(Solids.cylinder(variant.shaftDiameter / 2, 0, variant.shaftLength));
 		return Solids.union(parts);
 	}
 
-	/** Screw that fits the motor's mounting holes. */
 	public function mountScrew(length:Float):SocketHeadCapScrew
-		return SocketHeadCapScrew.metric(spec.mountScrew, length);
+		return SocketHeadCapScrew.metric(variant.mountScrew, length);
 
 	/** Cutting tool for a plate in front of the face (z=0..thickness): pilot and bolt clearances. */
 	public function mountingCutout(thickness:Float, pilotClearance:Float = 0.2, fit:ClearanceFit = Medium):Part {

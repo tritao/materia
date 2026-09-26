@@ -54,7 +54,7 @@ class MotorShaftBearings {
 	public function new() {
 		plate = new MotorPlate(motor, PLATE_THICKNESS);
 		// Engage at least 1.3 d without bottoming out in the tapped hole.
-		var engagement = motor.spec.mountHoleDepth - 0.5;
+		var engagement = motor.variant.mountHoleDepth - 0.5;
 		screw = motor.mountScrew(Math.ffloor(PLATE_THICKNESS + engagement));
 		if (screw.length - PLATE_THICKNESS < 1.3 * screw.diameter) throw "Mount screw engagement is too short";
 		shaft = new SteppedShaft(

@@ -23,4 +23,6 @@ typedef CatalogMetadata = {
 	var standardEdition:Null<String>;
 	var dimensionKind:DimensionKind;
 	var conformance:Conformance;
+	/** Fields checked against `source` when the rest of a row remains unverified. */
+	@:optional var verifiedFields:Array<String>;
 }

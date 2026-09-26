@@ -126,7 +126,7 @@ class LinearAxis {
 		bearing = bearingDesignation == null ? matchingBearing(screwDiameter) : DeepGrooveBearing.metric(bearingDesignation);
 		if (!(Math.abs(bearing.bore - screwDiameter) < 1e-9))
 			throw 'Bearing "${bearing.spec.designation}" bore does not match the screw diameter';
-		coupling = new ShaftCoupling(motor.spec.shaftDiameter, screwDiameter);
+		coupling = new ShaftCoupling(motor.variant.shaftDiameter, screwDiameter);
 		if (thread == null && screwDiameter != 10)
 			throw "Linear axis needs an explicit thread for a nondefault screw diameter";
 		var threadSpec = thread == null ? new LeadScrewThread(MetricTrapezoidal, 10, 2) : thread;

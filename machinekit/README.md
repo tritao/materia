@@ -17,10 +17,12 @@ not modelled.
 Standard sizes live in typed `Catalog` tables, separate from the generators.
 Each catalog entry also exposes `catalog().metadata(designation)` with its source,
 standard, verified edition (or `null`), dimension kind, and conformance level.
-`Unverified` means the embedded dimensions still need an independent source check;
+`Unverified` means the embedded dimensions still need a complete independent source check;
+`verifiedFields` lists any fields already checked in an otherwise unverified row;
 `GenericApproximation` means the generated part does not claim a complete standard
 interface. The ISO 9409 bolt-pattern flange and representative NEMA motor are
-marked this way. Metadata describes the catalog entry, not manufacturing
+marked this way. The 608 and 6000 bearing boundary rows have independent NTN
+checks; the M5 screw row has a partial Accu check. Metadata describes the catalog entry, not manufacturing
 certification of a generated part.
 
 Each component also produces the machining it needs:
@@ -32,7 +34,7 @@ Each component also produces the machining it needs:
 | `HexBolt` | M3–M12, ISO 4017 (fully threaded) | `clearanceHole()`, `tapHole()`, `counterboreHole()` |
 | `HexNut` | M3–M12, ISO 4032 | `pocket()` for a trapped-nut recess |
 | `FlatWasher` | M3–M12, ISO 7089 | — |
-| `NemaStepper` | NEMA 17, 23, 34 | `mountingCutout()`, `mountScrew()`, `boltPattern()` |
+| `NemaStepper` | NEMA 17, 23, 34 frame interfaces plus named motor variants | `mountingCutout()`, `mountScrew()`, `boltPattern()` |
 | `ParallelKey` | DIN 6885-1 form B (square ends), by shaft diameter | — |
 | `RetainingRing` | DIN 471 external, by shaft diameter | `grooveSpec()` (d2, m) |
 | `ShaftCollar` | set-screw type, by bore diameter | — |

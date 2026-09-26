@@ -52,8 +52,12 @@ class DeepGrooveBearing extends MachineComponent {
 
 	public static function catalog():Catalog<DeepGrooveBearingSpec> {
 		if (table == null)
-			table = new Catalog("deep groove bearing", spec -> spec.designation, rows(), _ -> ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 15",
-				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
+			table = new Catalog("deep groove bearing", spec -> spec.designation, rows(), spec -> switch (spec.designation) {
+				case "608" | "6000": {source: 'https://eshop.ntn-snr.com/en/product/${spec.designation}-NTN/${spec.designation}',
+					standard: "ISO 15", standardEdition: null, dimensionKind: Mixed, conformance: NominalEnvelope};
+				default: {source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 15",
+					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope};
+			});
 		return table;
 	}
 
