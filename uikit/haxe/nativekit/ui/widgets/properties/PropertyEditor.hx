@@ -17,6 +17,7 @@ import LayoutStyle;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.CommandContext;
 import nativekit.ui.core.Key;
+import nativekit.ui.core.RetainedView;
 import nativekit.ui.properties.PropertyDescriptor;
 import nativekit.ui.properties.PropertyBinding;
 import nativekit.ui.properties.PropertyEditResult;
@@ -118,6 +119,35 @@ class PropertyEditor implements View {
 
 	function errorFor(id:String):Null<String>
 		return errors.get(id);
+
+	/**
+	 * Rows are rebuilt by the parent inspector when its model revision changes.
+	 * Keep the revision at the row boundary so an edit to one property does not
+	 * recreate every editor control in the inspector.
+	 */
+	function rowRevision(descriptor:PropertyDescriptor, value:PropertyValue):String {
+		var result = descriptor.id + ":value=" + valueKey(value) +
+			":enabled=" + enabled + ":labelWidth=" + labelWidth;
+		if (drafts.exists(descriptor.id))
+			result += ":draft=" + drafts.get(descriptor.id);
+		var error = errors.get(descriptor.id);
+		if (error != null)
+			result += ":error=" + error;
+		return result;
+	}
+
+	static function valueKey(value:PropertyValue):String {
+		return switch (value) {
+			case Unavailable: "unavailable";
+			case Mixed: "mixed";
+			case Bool(data): "bool:" + data;
+			case Int(data): "int:" + data;
+			case Float(data): "float:" + Std.string(data);
+			case Text(data): "text:" + data;
+			case Enum(data): "enum:" + data;
+			case Custom(typeId, data): "custom:" + typeId + ":" + Std.string(data);
+		};
+	}
 
 	function editorView(context:BuildContext, descriptor:PropertyDescriptor,
 			value:PropertyValue):View {
@@ -274,9 +304,29 @@ private class PropertyEditorRow implements View {
 	}
 
 	public function build(context:BuildContext):RenderNode {
+		var value = descriptor.readValue(context.commandContext);
+		var revision = owner.rowRevision(descriptor, value);
+		var retained = new RetainedView("property-row:" + descriptor.id,
+			function(_) return new PropertyEditorRowContent(owner, descriptor, value),
+			function() return revision);
+		return retained.build(context);
+	}
+}
+
+private class PropertyEditorRowContent implements View {
+	final owner:PropertyEditor;
+	final descriptor:PropertyDescriptor;
+	final value:PropertyValue;
+
+	public function new(owner:PropertyEditor, descriptor:PropertyDescriptor, value:PropertyValue) {
+		this.owner = owner;
+		this.descriptor = descriptor;
+		this.value = value;
+	}
+
+	public function build(context:BuildContext):RenderNode {
 		var observed = context.buildProbe != null;
 		var started = observed ? Sys.time() : 0.0;
-		var value = descriptor.readValue(context.commandContext);
 		var labelStyle = new LayoutStyle();
 		labelStyle.width = LayoutAxis.fixed(owner.labelWidth);
 		var rowStyle = new LayoutStyle();
