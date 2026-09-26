@@ -76,6 +76,7 @@ import robotkit.localization.FrameTree2;
 import robotkit.localization.PoseFusionLocalization;
 import robotkit.localization.PoseFusionOptions;
 import robotkit.localization.RobotFrameTree2;
+import robotkit.localization.GnssPoseLocalization;
 import robotkit.localization.Localization;
 import robotkit.navigation.Path;
 import robotkit.navigation.Trajectory;
@@ -142,6 +143,7 @@ class RobotWorldTests {
     testModelDrivenConfiguration();
     testRobotModelCodec();
     testLocalization();
+    testGnssLocalization();
     testNavigation();
     testMotionGuard();
     testGridPlanning();
@@ -735,6 +737,100 @@ class RobotWorldTests {
     Reflect.setField(brokenJoints[0], "parentLink", "link/missing");
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(brokenReference))),
       "RobotModel codec rejects unresolved link references");
+  }
+
+  static function testGnssLocalization():Void {
+    // 8.9832e-6 degrees of longitude is one metre east at the equator.
+    var oneMetreEast = 0.000008983152841195214;
+    var gnss = new GnssPoseLocalization("gnss-front", "map", "base", 0.0, 0.0,
+      new Pose2(1.0, 0.0, 0.0), 0.04, 0.01, 500000000.0);
+    function fixSnapshot(sequence:Int, timestamp:Int, latitude:Float, longitude:Float,
+        yaw:Float, sampleTimestamp:Int, fixClock:String, fixReceivedClock:String,
+        frameId:String):RobotSnapshot {
+      var fix = new SensorFrame("gnss-front", "gnss_pose", frameId, Int64.ofInt(sequence),
+        Int64.ofInt(sampleTimestamp), [latitude, longitude, yaw],
+        Int64.ofInt(sampleTimestamp + 5), "antenna-link", null, null, fixClock, fixReceivedClock);
+      return new RobotSnapshot("gnss-base", Int64.ofInt(sequence), Int64.ofInt(timestamp),
+        [], [], [], 1, 0, Int64.ofInt(timestamp + 10), [fix], "gnss-clock", "host-clock");
+    }
+    var state = gnss.update(fixSnapshot(1, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "gnss-clock", "host-clock", "gnss-antenna"));
+    check(Math.abs(state.pose.x - 1.0) < 1e-4 && Math.abs(state.pose.y + 1.0) < 1e-4 &&
+      Math.abs(state.pose.yaw - Math.PI * 0.5) < 1e-8 && state.referenceFrame == "map",
+      "GNSS converts a geodetic fix to local ENU and removes the antenna lever arm");
+    check(Math.abs(state.covariance.xx - 0.05) < 1e-8 &&
+      Math.abs(state.covariance.xYaw - 0.01) < 1e-8 && state.sourceTimestampNs == Int64.ofInt(100),
+      "GNSS propagates heading variance through the lever arm and keeps the fix time");
+    check(gnss.update(fixSnapshot(2, 700000000, 0.0, oneMetreEast, Math.PI * 0.5, 100, "gnss-clock", "host-clock", "gnss-antenna")).quality ==
+      LocalizationQuality.Invalid, "GNSS rejects a fix outside its age window");
+    check(gnss.update(fixSnapshot(3, 100, 0.0, oneMetreEast, Math.PI * 0.5, 150, "gnss-clock", "host-clock", "gnss-antenna")).quality !=
+      LocalizationQuality.Invalid, "GNSS accepts a fix newer than the robot state");
+    check(gnss.update(fixSnapshot(4, 100, 0.0, oneMetreEast, Math.PI * 0.5, 900000000, "receiver-clock", "host-clock", "gnss-antenna")).quality == LocalizationQuality.Invalid,
+      "GNSS ages a fix on its own receiver clock by the shared receive clock");
+    check(gnss.update(fixSnapshot(5, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "receiver-clock", "host-clock", "gnss-antenna")).quality != LocalizationQuality.Invalid,
+      "GNSS accepts a receiver-clock fix received close to the robot state");
+    check(gnss.update(fixSnapshot(6, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "receiver-clock", "other-host", "gnss-antenna")).quality == LocalizationQuality.Invalid,
+      "GNSS ignores a fix that shares no clock with the robot state");
+    gnss.reset(new Pose2(4.0, 5.0, 0.25));
+    var aligned = gnss.update(fixSnapshot(7, 200, 0.0, oneMetreEast, Math.PI * 0.5, 200, "gnss-clock", "host-clock", "gnss-antenna"));
+    check(Math.abs(aligned.pose.x - 4.0) < 1e-8 && Math.abs(aligned.pose.y - 5.0) < 1e-8 &&
+      Math.abs(aligned.pose.yaw - 0.25) < 1e-8,
+      "GNSS reset establishes a new local alignment");
+
+    // Model-driven: the antenna lever arm and frame come from the authored mount.
+    var model = new RobotModel("gnss robot");
+    var baseLink = model.addLink(new Link("base", "gnss/base"));
+    var mast = model.addLink(new Link("mast", "gnss/mast"));
+    var mastJoint = new Joint("mast joint", JointType.Fixed, baseLink, mast, "gnss/mast-joint");
+    model.addJoint(mastJoint);
+    var antenna = model.addFrame(new Frame("antenna", baseLink, "gnss-antenna"));
+    antenna.position = [1.0, 0.0, 0.8];
+    var sensor = model.addSensor(new Sensor("gnss", "gnss_pose", 10.0, "gnss-front"));
+    sensor.frame = antenna;
+    var authored = GnssPoseLocalization.fromRobotModel(model, "gnss-front", "gnss/base",
+      "map", "base", 0.0, 0.0, 0.04, 0.01, 500000000.0);
+    var authoredState = authored.update(fixSnapshot(1, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "gnss-clock", "host-clock", "gnss-antenna"));
+    check(Math.abs(authoredState.pose.x - 1.0) < 1e-4 && Math.abs(authoredState.pose.y + 1.0) < 1e-4,
+      "model-driven GNSS takes its lever arm from the authored antenna frame");
+    check(authored.update(fixSnapshot(2, 100, 0.0, oneMetreEast, Math.PI * 0.5, 100, "gnss-clock", "host-clock", "other-antenna")).quality == LocalizationQuality.Invalid,
+      "model-driven GNSS rejects fixes from another sensor frame");
+    var mastAntenna = model.addFrame(new Frame("mast antenna", mast, "mast-antenna"));
+    var mastSensor = model.addSensor(new Sensor("mast gnss", "gnss_pose", 10.0, "mast-gnss"));
+    mastSensor.frame = mastAntenna;
+    throws(function() GnssPoseLocalization.fromRobotModel(model, "mast-gnss", "gnss/base",
+      "map", "base", 0.0, 0.0), "must be mounted on body link");
+
+    // End to end: a receiver publishes through the runtime, and the fix corrects fusion.
+    var simulated = new RobotModel("gnss sim");
+    var simBase = simulated.addLink(new Link("base", "sim/base"));
+    var simAntenna = simulated.addFrame(new Frame("antenna", simBase, "sim/antenna"));
+    simAntenna.position = [1.0, 0.0, 0.8];
+    var simSensor = simulated.addSensor(new Sensor("gnss", "gnss_pose", 10.0, "sim/gnss"));
+    simSensor.frame = simAntenna;
+    var simulation = new Simulation();
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(simulated));
+    var robot = new SimulatedRobot("gnss-sim", runtime, simulated.name, [simBase.name], []);
+    simulation.step(Int64.ofInt(1));
+    simulation.step(Int64.ofInt(2));
+    runtime.publishSensorFrame("sim/gnss", [0.0, oneMetreEast, Math.PI * 0.5], Int64.ofInt(1),
+      Int64.ofInt(987654321), "gnss.receiver");
+    var observed = robot.snapshot();
+    var receiver = GnssPoseLocalization.fromRobotModel(simulated, "sim/gnss", "sim/base",
+      "map", "base", 0.0, 0.0);
+    var fix = receiver.update(observed);
+    check(fix.quality != LocalizationQuality.Invalid && Math.abs(fix.pose.x - 1.0) < 1e-4 &&
+      Math.abs(fix.pose.y + 1.0) < 1e-4,
+      "a fix published through the runtime localizes the robot despite its own receiver clock");
+    var odometry = new FixedLocalization(new LocalizationState(observed.sourceSequence,
+      new Pose2(), "odom", "base", new PoseCovariance2(0.01, 0.0, 0.0, 0.01, 0.0, 0.01),
+      LocalizationQuality.Good, observed.sourceTimestampNs, observed.receivedTimestampNs,
+      observed.sourceClockId, observed.receivedClockId));
+    var fusion = new PoseFusionLocalization(odometry, new FrameTree2(), "map", "base");
+    fusion.update(observed);
+    var fused = fusion.fuse(fix);
+    check(fused.quality != LocalizationQuality.Invalid && Math.abs(fused.pose.x - 1.0) < 1e-3 &&
+      Math.abs(fused.pose.y + 1.0) < 1e-3, "GNSS fixes anchor pose fusion in the map frame");
+    robot.close();
+    simulation.dispose();
   }
 
   static function testLocalization():Void {

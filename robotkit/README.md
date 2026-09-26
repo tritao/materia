@@ -208,6 +208,11 @@ the odometry frame can be anchored to the requested reference frame. Its
 and per-update correction; stale absolute localization degrades quality and
 grows covariance, while accepted measurements must advance per-source sequence
 and timestamp. Receive-time checks require a shared local clock ID.
+`GnssPoseLocalization` converts a `gnss_pose` sensor's latitude, longitude,
+and ENU heading into a local map pose, accounting for the antenna mount in the
+robot model. It accepts fixes within a symmetric age window on the shared
+source clock or local receive clock. Feed its valid states to
+`PoseFusionLocalization.fuse()` to anchor wheel odometry to the map frame.
 `FrameTree2.fromRobotModel(model, bodyLinkId)` builds planar transforms for
 authored frames attached to that body link. It ignores mount height and rejects
 roll or pitch. `RobotFrameTree2.fromSnapshot(model, blueprint, snapshot,
