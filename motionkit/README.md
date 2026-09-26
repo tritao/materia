@@ -65,9 +65,19 @@ already speeding up or braking. Before stopping, a hold tops up the queued path
 to at least v/a. If a stop still runs out of queued path, the runtime finishes
 it on a straight, acceleration-limited ramp. A chunk that arrives while a stop
 is running only extends that stop. Resume starts from the runtime-reported stop
-tag and time. MotionKit retains a deterministic position-target fallback when a
-backend does not support buffered chunks. CNC semantics and G-code remain
-outside MotionKit.
+tag and time and speeds back up along the path within the same limits
+(`TimeScaling`). The runtime rejects chunks that would move a joint faster than
+its velocity limit, including a jump away from the end of the queued path, and
+bounds the total queued points.
+
+Every change of speed obeys the joint limits. An immediate move, jog, or normal
+abort issued while the machine is moving first slows to rest along the current
+path; the new move is then planned from where it stopped, so `moveAxes`,
+`moveLinear`, `jog` and `home` return null in that case rather than a plan.
+`movePath` needs the machine at rest, since a path must start where the machine
+is. MotionKit retains a position-target fallback when a backend does not support
+buffered chunks; it holds, resumes, and replaces motion with the same
+host-side re-timing. CNC semantics and G-code remain outside MotionKit.
 
 Queued trajectories currently run back to back with a 1–2 control-cycle pause
 between them: the next one is only sent once the runtime has drained the

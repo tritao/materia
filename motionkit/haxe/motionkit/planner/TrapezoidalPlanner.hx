@@ -108,8 +108,13 @@ class TrapezoidalPlanner implements TrajectoryPlanner {
       velocityAlong = velocity - acceleration * afterCruise;
       accelerationAlong = -acceleration;
     }
+    // Rounding must never carry a sample past the goal: a goal on a travel
+    // limit would otherwise yield a target just outside it. The final sample
+    // lands on the goal exactly.
+    var position = time >= duration ? goal
+      : start + sign * Math.max(0.0, Math.min(distance, distanceAlong));
     return {
-      position: start + sign * distanceAlong,
+      position: position,
       velocity: sign * velocityAlong,
       acceleration: sign * accelerationAlong
     };

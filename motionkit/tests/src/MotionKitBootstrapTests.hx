@@ -28,6 +28,7 @@ import robotkit.world.RecordingRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.RobotCommand;
+import robotkit.world.RuntimeRobotAdapter;
 
 class MotionKitBootstrapTests {
   static var assertions:Int = 0;
@@ -48,6 +49,7 @@ class MotionKitBootstrapTests {
     testHoldDecelerationStaysWithinLimitsThroughoutMove();
     testRuntimeSynchronizedHolding();
     testImmediateMotionReplacesNativeQueue();
+    testMotionChangesStayWithinLimits();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
   }
 
@@ -249,7 +251,7 @@ class MotionKitBootstrapTests {
     runMotion(machine, simulation);
     near(robot.snapshot().positions.get(0), 0.0, "homing returns the axis to its authored home", 1e-5);
 
-    var forward = machine.jog("x", 0.02, 1.0);
+    var forward = planned(machine.jog("x", 0.02, 1.0));
     near(forward.samples[0].velocities[0], 0.0,
       "jog starts at rest");
     near(forward.samples[forward.samples.length - 1].velocities[0], 0.0,
@@ -268,7 +270,7 @@ class MotionKitBootstrapTests {
     near(robot.snapshot().positions.get(0), 0.015,
       "negative jog follows the same logical axis API", 1e-5);
 
-    var clamped = machine.jog("x", 0.1, 2.0);
+    var clamped = planned(machine.jog("x", 0.1, 2.0));
     near(clamped.samples[clamped.samples.length - 1].positions[0], 0.08,
       "jog clamps its endpoint to the authored upper limit");
     runMotion(machine, simulation);
@@ -292,16 +294,16 @@ class MotionKitBootstrapTests {
       [for (joint in blueprint.model.joints) joint.name]);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     var options = new MotionOptions(0.2, 2.0);
-    var xOnly = machine.moveLinear(Pose.xyz(0.02, 0.0, 0.0),
-      Feed.metresPerSecond(0.2), options);
+    var xOnly = planned(machine.moveLinear(Pose.xyz(0.02, 0.0, 0.0),
+      Feed.metresPerSecond(0.2), options));
     var peakAcceleration = 0.0;
     for (sample in xOnly.samples)
       peakAcceleration = Math.max(peakAcceleration, Math.abs(sample.accelerations[0]));
     check(peakAcceleration > 1.9,
       "moveLinear uses an authored 2 m/s² acceleration limit");
 
-    var diagonal = machine.moveLinear(Pose.xyz(0.03, 0.03, 0.03),
-      Feed.metresPerSecond(0.2), options);
+    var diagonal = planned(machine.moveLinear(Pose.xyz(0.03, 0.03, 0.03),
+      Feed.metresPerSecond(0.2), options));
     for (sample in diagonal.samples) {
       for (joint in 0...3)
         check(Math.abs(sample.accelerations[joint]) <= 2.0 + 1e-9,
@@ -379,7 +381,7 @@ class MotionKitBootstrapTests {
     near(firstMove.positions.get(1), 0.01, "XYZ gantry reaches Y axis target", 1e-5);
     near(firstMove.positions.get(2), 0.015, "XYZ gantry reaches Z axis target", 1e-5);
 
-    var linear = machine.moveLinear(Pose.xyz(0.03, 0.02, 0.025), Feed.mmPerSecond(50));
+    var linear = planned(machine.moveLinear(Pose.xyz(0.03, 0.02, 0.025), Feed.mmPerSecond(50)));
     var midpoint = linear.sample(linear.durationSeconds * 0.5);
     var xAlpha = (midpoint.positions[0] - 0.02) / 0.01;
     var yAlpha = (midpoint.positions[1] - 0.01) / 0.01;
@@ -466,8 +468,8 @@ class MotionKitBootstrapTests {
     check(machine.robot.capabilities().supportsTrajectoryQueue,
       "simulation runtime advertises trajectory queue support");
 
-    var first = machine.queueAxes([new AxisTarget("x", 0.02)], options);
-    var second = machine.queueAxes([new AxisTarget("x", 0.04)], options);
+    var first = planned(machine.queueAxes([new AxisTarget("x", 0.02)], options));
+    var second = planned(machine.queueAxes([new AxisTarget("x", 0.04)], options));
     check(machine.queueDepth() == 2, "buffer reports active and waiting trajectories");
     check(machine.queuedDurationSeconds() > first.durationSeconds,
       "buffer reports the duration of waiting motion");
@@ -609,7 +611,7 @@ class MotionKitBootstrapTests {
     var options = new MotionOptions(0.05, 0.2);
     var tick = 0;
 
-    var move = machine.moveAxes([new AxisTarget("x", 0.06)], options);
+    var move = planned(machine.moveAxes([new AxisTarget("x", 0.06)], options));
     var previousProgress = machine.progress();
     for (_ in 0...8) {
       machine.update();
@@ -838,8 +840,8 @@ class MotionKitBootstrapTests {
         [for (link in blueprint.model.links) link.name],
         [for (joint in blueprint.model.joints) joint.name]);
       var machine = MotionSystem.fromBlueprint(robot, blueprint);
-      var move = machine.moveAxes([new AxisTarget("x", target)],
-        new MotionOptions(0.05, limit));
+      var move = planned(machine.moveAxes([new AxisTarget("x", target)],
+        new MotionOptions(0.05, limit)));
       if (moveTicks == 0) moveTicks = Math.ceil(move.durationSeconds / 0.01);
       var tick = 0;
       var positions:Array<Float> = [];
@@ -911,6 +913,122 @@ class MotionKitBootstrapTests {
     near(robot.snapshot().positions.get(0), 0.01,
       "immediate motion replaces stale native trajectory motion", 1e-5);
     simulation.dispose();
+  }
+
+  /**
+   * Starts a streamed x move, injects an event at eventTick, optionally
+   * resumes once the machine has come to rest, and runs until everything has
+   * settled. Returns the observed x position after every tick.
+   */
+  static function gantryTrial(queueSupport:Bool, eventTick:Int, event:MotionSystem -> Void,
+      resumeAfterStop:Bool):Array<Float> {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
+      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new RuntimeRobotAdapter("limits", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name], false, false,
+      "simulated runtime fault", queueSupport);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    machine.moveAxes([new AxisTarget("x", 0.15)], new MotionOptions(0.05, 0.4));
+    var positions:Array<Float> = [];
+    var tick = 0;
+    var stillTicks = 0;
+    function step():Void {
+      machine.update();
+      try simulation.step(Int64.ofInt(tick++)) catch (error:Dynamic)
+        throw 'gantry trial (queue $queueSupport, event at $eventTick) failed at tick $tick: $error';
+      var position = robot.snapshot().positions.get(0);
+      stillTicks = positions.length > 0 &&
+        Math.abs(position - positions[positions.length - 1]) < 1e-12 ? stillTicks + 1 : 0;
+      positions.push(position);
+      if (tick > 3000) throw 'gantry trial at tick $eventTick did not settle';
+    }
+    for (_ in 0...eventTick) step();
+    event(machine);
+    if (resumeAfterStop) {
+      stillTicks = 0;
+      while (stillTicks < 3) step();
+      machine.resume();
+    }
+    stillTicks = 0;
+    while (machine.isMoving() || stillTicks < 3) step();
+    simulation.dispose();
+    return positions;
+  }
+
+  static function peakSecondDifference(positions:Array<Float>):Float {
+    var peak = 0.0;
+    for (index in 2...positions.length)
+      peak = Math.max(peak, Math.abs(positions[index] - 2.0 * positions[index - 1] +
+        positions[index - 2]) / (0.01 * 0.01));
+    return peak;
+  }
+
+  /**
+   * Replacing motion while moving and resuming after a hold must both stay
+   * within the joint acceleration limit, whether the robot executes buffered
+   * chunks or MotionKit streams position targets itself.
+   */
+  static function testMotionChangesStayWithinLimits():Void {
+    var limit = 0.4;
+    for (queueSupport in [true, false]) {
+      var label = queueSupport ? "buffered" : "position-target";
+      var worstReplace = 0.0;
+      var worstJog = 0.0;
+      var worstResume = 0.0;
+      var worstReplaceTick = -1;
+      var worstJogTick = -1;
+      var worstResumeTick = -1;
+      var eventTick = 4;
+      while (eventTick < 330) {
+        var replaced = gantryTrial(queueSupport, eventTick,
+          machine -> machine.moveAxes([new AxisTarget("x", 0.02)],
+            new MotionOptions(0.05, limit)), false);
+        var replacePeak = peakSecondDifference(replaced);
+        if (replacePeak > worstReplace) {
+          worstReplace = replacePeak;
+          worstReplaceTick = eventTick;
+        }
+        near(replaced[replaced.length - 1], 0.02,
+          '$label move replaced at tick $eventTick reaches its new target', 1e-5);
+        var furthest = 0.0;
+        for (position in replaced) furthest = Math.max(furthest, position);
+        check(furthest <= 0.15 + 1e-9,
+          '$label move replaced at tick $eventTick stays within the first move');
+
+        var jogged = gantryTrial(queueSupport, eventTick,
+          machine -> machine.jog("x", -0.05, 0.5), false);
+        var jogPeak = peakSecondDifference(jogged);
+        if (jogPeak > worstJog) {
+          worstJog = jogPeak;
+          worstJogTick = eventTick;
+        }
+
+        var resumed = gantryTrial(queueSupport, eventTick, machine -> machine.hold(), true);
+        var resumePeak = peakSecondDifference(resumed);
+        if (resumePeak > worstResume) {
+          worstResume = resumePeak;
+          worstResumeTick = eventTick;
+        }
+        near(resumed[resumed.length - 1], 0.15,
+          '$label move held and resumed at tick $eventTick reaches its target', 1e-5);
+        eventTick += 8;
+      }
+      check(worstReplace <= limit * 1.05,
+        '$label move replaced while moving stays within the limit (worst $worstReplace at tick $worstReplaceTick)');
+      check(worstJog <= limit * 1.05,
+        '$label jog while moving stays within the limit (worst $worstJog at tick $worstJogTick)');
+      check(worstResume <= limit * 1.05,
+        '$label resume stays within the limit (worst $worstResume at tick $worstResumeTick)');
+    }
+  }
+
+  /** Unwraps a move that started at once because the machine was at rest. */
+  static function planned(value:Null<JointTrajectory>):JointTrajectory {
+    if (value == null) throw "Move was deferred behind a stop but was expected to start at once";
+    return cast value;
   }
 
   static function check(value:Bool, message:String):Void {
