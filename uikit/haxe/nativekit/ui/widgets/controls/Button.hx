@@ -118,23 +118,25 @@ class Button implements View {
 			: context.theme.buttonLabelColor(enabled, resolvedStyle.background);
 		if (leadingIcon != null)
 			node.add(new Icon("leading-icon", leadingIcon, iconSize, foreground).build(context));
-		var labelNode = context.withScope(new Key("label"), function() {
-			var text = new RenderNode(context.id("label"), LayoutVisualKind.Text);
-			text.layout.text = label;
-			var labelStyle = context.resolveTextRole(TextRole.Button,
-				TextStyleOverride.paragraph(TextWrap.None));
-			var fontSource = computed.source(StyleProperty.FontSize);
-			var letterSource = computed.source(StyleProperty.LetterSpacing);
-			labelStyle = labelStyle.merge(new TextStyleOverride(null,
-				fontSource != null && fontSource.layer != "framework"
-					? computed.get(StyleProperty.FontSize) : null,
-				letterSource != null && letterSource.layer != "framework"
-					? computed.get(StyleProperty.LetterSpacing) : null));
-			labelStyle = labelStyle.withTextColor(foreground);
-			text.applyTextStyle(labelStyle);
-			return text;
-		});
-		node.add(labelNode);
+		if (label.length > 0) {
+			var labelNode = context.withScope(new Key("label"), function() {
+				var text = new RenderNode(context.id("label"), LayoutVisualKind.Text);
+				text.layout.text = label;
+				var labelStyle = context.resolveTextRole(TextRole.Button,
+					TextStyleOverride.paragraph(TextWrap.None));
+				var fontSource = computed.source(StyleProperty.FontSize);
+				var letterSource = computed.source(StyleProperty.LetterSpacing);
+				labelStyle = labelStyle.merge(new TextStyleOverride(null,
+					fontSource != null && fontSource.layer != "framework"
+						? computed.get(StyleProperty.FontSize) : null,
+					letterSource != null && letterSource.layer != "framework"
+						? computed.get(StyleProperty.LetterSpacing) : null));
+				labelStyle = labelStyle.withTextColor(foreground);
+				text.applyTextStyle(labelStyle);
+				return text;
+			});
+			node.add(labelNode);
+		}
 		if (trailingIcon != null)
 			node.add(new Icon("trailing-icon", trailingIcon, iconSize, foreground).build(context));
 		return node;

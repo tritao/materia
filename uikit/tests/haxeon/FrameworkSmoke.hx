@@ -368,6 +368,21 @@ class FrameworkSmoke {
 			searchInputSemantics.label != "Search components…" ||
 			searchClearSemantics.label != "Clear search")
 			return 227;
+		var searchInput:ResolvedLayoutItem = cast searchRoot.children[1].resolved;
+		var searchIconBounds:ResolvedLayoutItem = cast searchIcon.resolved;
+		var clearButton = searchRoot.children[2];
+		var clearBounds:ResolvedLayoutItem = cast clearButton.resolved;
+		var clearIconBounds:ResolvedLayoutItem = cast clearButton.children[0].resolved;
+		if (clearButton.children.length != 1 ||
+			!near(searchIconBounds.y + searchIconBounds.height / 2.0,
+				searchInput.y + searchInput.height / 2.0) ||
+			!near(searchInput.y + searchInput.height / 2.0,
+				clearBounds.y + clearBounds.height / 2.0) ||
+			!near(clearIconBounds.y + clearIconBounds.height / 2.0,
+				clearBounds.y + clearBounds.height / 2.0) ||
+			!near(clearIconBounds.x + clearIconBounds.width / 2.0,
+				clearBounds.x + clearBounds.width / 2.0))
+			return 227;
 		if (!context.accessibilityAction(searchRoot.children[2].id.value,
 			AccessibilityAction.Activate, null, -1, -1, 1) || search.value != "" ||
 			searchChange != "")

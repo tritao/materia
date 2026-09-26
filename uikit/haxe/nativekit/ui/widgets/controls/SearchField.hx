@@ -9,6 +9,7 @@ import Insets;
 import LayoutAlignmentX;
 import LayoutAlignmentY;
 import LayoutAxis;
+import LayoutDistribution;
 import LayoutStyle;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
@@ -55,7 +56,7 @@ class SearchField implements View {
 
 			var inputStyle = new LayoutStyle();
 			inputStyle.width = LayoutAxis.grow();
-			inputStyle.height = LayoutAxis.grow();
+			inputStyle.height = LayoutAxis.fixed(24.0);
 			inputStyle.padding = new Insets(0.0, 0.0, 0.0, 0.0);
 			inputStyle.background = Color.rgba(0.0, 0.0, 0.0, 0.0);
 			var input = new TextField("input", value, function(next) {
@@ -76,6 +77,7 @@ class SearchField implements View {
 				clearStyle.width = LayoutAxis.fixed(24.0);
 				clearStyle.height = LayoutAxis.fixed(24.0);
 				clearStyle.padding = new Insets(2.0, 2.0, 2.0, 2.0);
+				clearStyle.childDistribution = LayoutDistribution.Center;
 				clearStyle.background = Color.rgba(0.0, 0.0, 0.0, 0.0);
 				var clear = new Button("", clearStyle, function() {
 					value = "";
