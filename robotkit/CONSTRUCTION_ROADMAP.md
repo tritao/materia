@@ -1261,3 +1261,8 @@ limits of 5 cm and 5 degrees; pure reorientation segments receive a timed
 profile as well. Process tests cover a 20 m segment, a 90-degree rotation,
 the time bound, and the coarse unreachable case. The Haxe world suite passed
 with 4,337 assertions.
+
+**F10**: Added the generated `cadkit/examples/modeling/build/`,
+`robotkit/worldd/build/`, and `simkit/.cache/` directories to the root ignore
+file. They no longer appear in status after local builds; `exosuit/` remains
+unignored owner work as required.

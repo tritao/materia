@@ -7,8 +7,12 @@
 /robotkit/tests/mujoco/build/
 /robotkit/build/
 /robotkit/cadbridge/tests/build/
+/robotkit/worldd/build/
 /automationkit/tests/build/
 /motionkit/tests/build/
+
+/cadkit/examples/modeling/build/
+/simkit/.cache/
 
 /app/tests/build/
 /build/
