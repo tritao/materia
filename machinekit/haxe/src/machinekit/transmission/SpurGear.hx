@@ -2,6 +2,7 @@ package machinekit.transmission;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.component.Dimension;
 import machinekit.component.Solids;
 
 /** External involute spur gear, standard full-depth teeth (addendum = module, dedendum = 1.25
@@ -14,6 +15,9 @@ import machinekit.component.Solids;
  */
 class SpurGear {
 	public static inline var STANDARD_PRESSURE_ANGLE:Float = 0.3490658503988659; // 20 degrees
+	/** Accepted pressure-angle range, 14.5 to 25 degrees: the standard involute systems. */
+	public static inline var MIN_PRESSURE_ANGLE:Float = 0.25307274153917777; // 14.5 degrees
+	public static inline var MAX_PRESSURE_ANGLE:Float = 0.4363323129985824; // 25 degrees
 
 	static inline var FLANK_SAMPLES:Int = 6;
 	static inline var TIP_SAMPLES:Int = 3;
@@ -34,8 +38,7 @@ class SpurGear {
 		if (!(moduleSize > 0)) throw "Spur gear needs a positive module";
 		if (teeth < 6) throw "Spur gear needs at least 6 teeth to avoid severe undercut";
 		if (!(faceWidth > 0)) throw "Spur gear needs a positive face width";
-		if (!(pressureAngle > 0) || !(pressureAngle < Math.PI / 2))
-			throw "Spur gear pressure angle must be between 0 and 90 degrees";
+		if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
 		this.moduleSize = moduleSize;
 		this.teeth = teeth;
 		this.pressureAngle = pressureAngle;
@@ -45,9 +48,14 @@ class SpurGear {
 		outsideDiameter = pitchDiameter + 2 * moduleSize;
 		rootDiameter = pitchDiameter - 2.5 * moduleSize;
 		if (!(rootDiameter > 0)) throw "Spur gear root diameter must be positive; use a larger module or more teeth";
-		designation = 'SPUR-M${moduleSize}-${teeth}T';
-		description = 'Spur gear module ${moduleSize}, ${teeth} teeth';
+		var moduleText = Dimension.format(moduleSize);
+		designation = 'SPUR-M$moduleText-${teeth}T';
+		description = 'Spur gear module $moduleText, ${teeth} teeth';
 	}
+
+	/** True for pressure angles within `MIN_PRESSURE_ANGLE`..`MAX_PRESSURE_ANGLE` (radians). */
+	public static function validPressureAngle(angle:Float):Bool
+		return angle >= MIN_PRESSURE_ANGLE - 1e-12 && angle <= MAX_PRESSURE_ANGLE + 1e-12;
 
 	/** Centre distance to mesh with `other` at the standard (no profile shift) pitch. Both gears
 	 * must share a module.

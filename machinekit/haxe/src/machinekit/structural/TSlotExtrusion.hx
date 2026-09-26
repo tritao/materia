@@ -2,12 +2,14 @@ package machinekit.structural;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.component.Dimension;
 import machinekit.component.Solids;
 
 /** Square T-slot aluminium extrusion profile (2020/4040-style), with a T-slot channel centred
  * on each of its four faces and a central bore, extruded along local +Z from z=0 to z=`length`.
- * Slot dimensions are proportional to `size`, not from a vendor's literal table, sized with
- * margin so adjacent faces' slot heads and the bore never intersect and sever the corner posts.
+ * Slot dimensions are fixed fractions of `size`, not from a vendor's literal table, chosen so
+ * adjacent faces' slot heads (inner edge at 0.25 size from the centre, half-width 0.175 size) and
+ * the bore (radius 0.075 size) never intersect and sever the corner posts at any size.
  */
 class TSlotExtrusion implements StructuralProfile {
 	public final designation:String;
@@ -27,10 +29,9 @@ class TSlotExtrusion implements StructuralProfile {
 		tWidth = 0.35 * size;
 		headDepth = 0.1 * size;
 		boreDiameter = 0.15 * size;
-		if (!(throatDepth + headDepth < size / 2)) throw "T-slot extrusion size is too small for its slot proportions";
-		if (!(tWidth < size)) throw "T-slot extrusion size is too small for its slot proportions";
-		designation = 'TSLOT-${size}x${size}';
-		description = 'T-slot extrusion ${size}x${size}';
+		var sizeText = Dimension.format(size);
+		designation = 'TSLOT-${sizeText}x$sizeText';
+		description = 'T-slot extrusion ${sizeText}x$sizeText';
 	}
 
 	public function profileDesignation():String
@@ -46,7 +47,7 @@ class TSlotExtrusion implements StructuralProfile {
 			new Vector(-half, -half), new Vector(half, -half), new Vector(half, half), new Vector(-half, half),
 		], 0, length);
 		var tools = [Solids.cylinder(boreDiameter / 2, -0.1, length + 0.1)];
-		for (face in 0...4) tools.push(Solids.prism(slotPoints(face), 0, length));
+		for (face in 0...4) tools.push(Solids.prism(slotPoints(face), -0.1, length + 0.1));
 		return Solids.cut(body, tools);
 	}
 

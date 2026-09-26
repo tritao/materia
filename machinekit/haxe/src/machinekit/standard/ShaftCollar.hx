@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
@@ -33,16 +34,19 @@ class ShaftCollar extends MachineComponent {
 
 	public static function catalog():Catalog<ShaftCollarSpec> {
 		if (table == null)
-			table = new Catalog("shaft collar bore diameter", spec -> Std.string(Std.int(spec.boreDiameter)), rows());
+			table = new Catalog("shaft collar bore diameter", spec -> Dimension.format(spec.boreDiameter), rows());
 		return table;
 	}
 
+	/** Collar for exactly `boreDiameter`; throws when the catalog has no such size. */
 	public static function forShaft(boreDiameter:Float):ShaftCollar
-		return new ShaftCollar(catalog().get(Std.string(Std.int(boreDiameter))));
+		return new ShaftCollar(catalog().get(Dimension.format(boreDiameter)));
 
 	public function new(spec:ShaftCollarSpec) {
-		super('COLLAR-${spec.boreDiameter}', 'Shaft collar for ${spec.boreDiameter} mm shaft, ${spec.setScrew} set screw',
-			"steel");
+		if (!(spec.boreDiameter > 0) || !(spec.outerDiameter > spec.boreDiameter) || !(spec.width > 0))
+			throw 'Shaft collar for ${Dimension.format(spec.boreDiameter)} mm shaft has inconsistent dimensions';
+		var bore = Dimension.format(spec.boreDiameter);
+		super('COLLAR-$bore', 'Shaft collar for $bore mm shaft, ${spec.setScrew} set screw', "steel");
 		this.spec = spec;
 		addConnector("front", Face, Solids.axial(0, 0, 0));
 		addConnector("axis", Axis, Solids.axial(0, 0, spec.width / 2));

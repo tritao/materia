@@ -2,6 +2,7 @@ package machinekit.structural;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.component.Dimension;
 import machinekit.component.Solids;
 
 /** C-section channel, extruded along local +Z from z=0 to z=`length`. The web sits at local
@@ -22,8 +23,9 @@ class Channel implements StructuralProfile {
 		this.height = height;
 		this.flangeWidth = flangeWidth;
 		this.thickness = thickness;
-		designation = 'CHANNEL-${height}x${flangeWidth}x${thickness}';
-		description = 'Channel ${height}x${flangeWidth}x${thickness}';
+		var size = '${Dimension.format(height)}x${Dimension.format(flangeWidth)}x${Dimension.format(thickness)}';
+		designation = 'CHANNEL-$size';
+		description = 'Channel $size';
 	}
 
 	public function geometry(length:Float):Part {

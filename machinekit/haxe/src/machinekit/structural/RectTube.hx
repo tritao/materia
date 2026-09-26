@@ -2,6 +2,7 @@ package machinekit.structural;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.component.Dimension;
 import machinekit.component.Solids;
 
 /** Rectangular (or, with `width == height`, square) hollow structural tube, extruded along
@@ -20,8 +21,9 @@ class RectTube implements StructuralProfile {
 		this.width = width;
 		this.height = height;
 		this.wall = wall;
-		designation = 'RECT-${width}x${height}x${wall}';
-		description = 'Rectangular tube ${width}x${height}x${wall}';
+		var size = '${Dimension.format(width)}x${Dimension.format(height)}x${Dimension.format(wall)}';
+		designation = 'RECT-$size';
+		description = 'Rectangular tube $size';
 	}
 
 	public function geometry(length:Float):Part {

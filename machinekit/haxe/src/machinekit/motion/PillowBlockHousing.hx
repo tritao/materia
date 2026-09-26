@@ -25,10 +25,12 @@ class PillowBlockHousing extends MachineComponent {
 
 	public function new(bearing:DeepGrooveBearing, allowance:Float = 0.05) {
 		var wall = Math.max(6, bearing.outside * 0.2);
-		var face = bearing.outside + 2 * wall;
 		var depth = bearing.width + wall;
 		var mountScrew = bearing.bore <= 12 ? "M5" : bearing.bore <= 20 ? "M6" : "M8";
-		var boltSpacing = face - wall;
+		// Bolts sit mid-wall on the diagonal; the face grows so each screw head keeps 1 mm of edge.
+		var boltSpacing = bearing.outside + wall;
+		var edge = Math.max(wall / 2, SocketHeadCapScrew.catalog().get(mountScrew).headDiameter / 2 + 1);
+		var face = boltSpacing + 2 * edge;
 		super('PILLOWBLOCK-${bearing.designation}', 'Flange bearing housing for ${bearing.designation}', "cast iron");
 		this.bearing = bearing;
 		this.face = face;

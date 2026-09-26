@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.standard.ParallelKey;
@@ -54,9 +55,8 @@ class SteppedShaft extends MachineComponent {
 				throw "Stepped shaft section needs a positive diameter and length";
 		var total = 0.0;
 		for (section in sections) total += section.length;
-		var name = "SHAFT-" + [for (section in sections) '${section.diameter}x${section.length}'].join("-");
-		super(name, "Stepped shaft " + [for (section in sections) '${section.diameter}x${section.length}'].join(" / "),
-			"steel C45");
+		var sizes = [for (section in sections) '${Dimension.format(section.diameter)}x${Dimension.format(section.length)}'];
+		super("SHAFT-" + sizes.join("-"), "Stepped shaft " + sizes.join(" / "), "steel C45");
 		this.sections = sections.copy();
 		totalLength = total;
 		addConnector("input", Axis, Solids.axial(0, 0, 0));
@@ -70,11 +70,13 @@ class SteppedShaft extends MachineComponent {
 		for (keyway in this.keyways) {
 			var end = keyway.z0 + keyway.key.length;
 			if (keyway.z0 < 0 || end > total) throw 'Keyway "${keyway.name}" lies outside the shaft';
-			if (diameterAt(keyway.z0) != diameterAt(end - 1e-6))
+			if (!withinOneSection(keyway.z0, end))
 				throw 'Keyway "${keyway.name}" must lie within one shaft section';
 			var radius = diameterAt(keyway.z0) / 2;
 			if (!(keyway.key.spec.shaftDepth < radius))
 				throw 'Keyway "${keyway.name}" is deeper than the shaft radius';
+			if (!(keyway.key.spec.width < radius))
+				throw 'Keyway "${keyway.name}" is too wide for the shaft';
 			addConnector(keyway.name, Face, Solids.axial(0, radius - keyway.key.spec.shaftDepth,
 				keyway.z0 + keyway.key.length / 2));
 		}
@@ -82,7 +84,7 @@ class SteppedShaft extends MachineComponent {
 		for (groove in this.grooves) {
 			if (!(groove.width > 0)) throw "Retaining ring groove needs a positive width";
 			if (groove.z0 < 0 || groove.z0 + groove.width > total) throw "Retaining ring groove lies outside the shaft";
-			if (diameterAt(groove.z0) != diameterAt(groove.z0 + groove.width - 1e-6))
+			if (!withinOneSection(groove.z0, groove.z0 + groove.width))
 				throw "Retaining ring groove must lie within one shaft section";
 			if (!(groove.diameter > 0) || !(groove.diameter < diameterAt(groove.z0)))
 				throw "Retaining ring groove diameter must be smaller than the shaft";
@@ -103,6 +105,16 @@ class SteppedShaft extends MachineComponent {
 		throw 'Shaft position $z is outside 0..$totalLength';
 	}
 
+	/** True when no shoulder lies strictly inside z0..z1. */
+	function withinOneSection(z0:Float, z1:Float):Bool {
+		var boundary = 0.0;
+		for (i in 0...sections.length - 1) {
+			boundary += sections[i].length;
+			if (boundary > z0 + 1e-6 && boundary < z1 - 1e-6) return false;
+		}
+		return true;
+	}
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var z = 0.0, parts:Array<Part> = [];
 		for (section in sections) {
@@ -113,8 +125,14 @@ class SteppedShaft extends MachineComponent {
 		if (detail == Envelope) return body;
 		var tools:Array<Part> = [];
 		for (keyway in keyways) tools.push(keywayTool(keyway));
-		for (groove in grooves) tools.push(Solids.cylinder(groove.diameter / 2, groove.z0, groove.z0 + groove.width));
+		for (groove in grooves) tools.push(grooveTool(groove));
 		return tools.length == 0 ? body : Solids.cut(body, tools);
+	}
+
+	/** Annulus from the groove diameter out past the shaft surface. */
+	function grooveTool(groove:ShaftGroove):Part {
+		var inner = groove.diameter / 2, outer = diameterAt(groove.z0) / 2 + 1, z1 = groove.z0 + groove.width;
+		return Solids.revolve([{r: inner, z: groove.z0}, {r: outer, z: groove.z0}, {r: outer, z: z1}, {r: inner, z: z1}]);
 	}
 
 	function keywayTool(keyway:ShaftKeyway):Part {

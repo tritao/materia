@@ -2,6 +2,7 @@ import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.NemaStepper;
@@ -18,7 +19,7 @@ class MotorPlate extends MachineComponent {
 	public final size:Float;
 
 	public function new(motor:NemaStepper, thickness:Float, margin:Float = 10) {
-		super('PLATE-${motor.designation}-${thickness}', 'Motor plate for ${motor.designation}', "aluminium 6061");
+		super('PLATE-${motor.designation}-${Dimension.format(thickness)}', 'Motor plate for ${motor.designation}', "aluminium 6061");
 		this.motor = motor;
 		this.thickness = thickness;
 		size = motor.spec.face + 2 * margin;

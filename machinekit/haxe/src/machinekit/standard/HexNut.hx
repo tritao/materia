@@ -40,6 +40,8 @@ class HexNut extends MachineComponent {
 		return new HexNut(catalog().get(size));
 
 	public function new(spec:HexNutSpec) {
+		if (!(spec.diameter > 0) || !(spec.acrossFlats > spec.diameter) || !(spec.height > 0))
+			throw 'Hex nut ${spec.size} has inconsistent dimensions';
 		super('ISO4032-${spec.size}', 'Hex nut ${spec.size}', "steel 8");
 		this.spec = spec;
 		addConnector("front", Face, Solids.axial(0, 0, 0));

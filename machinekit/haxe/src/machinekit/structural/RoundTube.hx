@@ -1,6 +1,7 @@
 package machinekit.structural;
 
 import cadkit.modeling.Part;
+import machinekit.component.Dimension;
 import machinekit.component.Solids;
 
 /** Round hollow structural tube, extruded along local +Z from z=0 to z=`length`. */
@@ -15,8 +16,9 @@ class RoundTube implements StructuralProfile {
 		if (!(2 * wall < outerDiameter)) throw "Round tube wall is too thick for its diameter";
 		this.outerDiameter = outerDiameter;
 		this.wall = wall;
-		designation = 'ROUND-${outerDiameter}x${wall}';
-		description = 'Round tube ${outerDiameter} OD x ${wall} wall';
+		var od = Dimension.format(outerDiameter), wallText = Dimension.format(wall);
+		designation = 'ROUND-${od}x$wallText';
+		description = 'Round tube $od OD x $wallText wall';
 	}
 
 	public function geometry(length:Float):Part {

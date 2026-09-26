@@ -40,6 +40,8 @@ class FlatWasher extends MachineComponent {
 		return new FlatWasher(catalog().get(size));
 
 	public function new(spec:FlatWasherSpec) {
+		if (!(spec.innerDiameter > 0) || !(spec.outerDiameter > spec.innerDiameter) || !(spec.thickness > 0))
+			throw 'Flat washer ${spec.size} has inconsistent dimensions';
 		super('ISO7089-${spec.size}', 'Flat washer ${spec.size}', "steel");
 		this.spec = spec;
 		addConnector("front", Face, Solids.axial(0, 0, 0));

@@ -1,12 +1,17 @@
 import cadkit.modeling.AssemblyModel;
+import cadkit.modeling.Location;
 import cadkit.modeling.Part;
+import cadkit.modeling.Plane;
+import cadkit.modeling.Vector;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.PillowBlock;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
+import machinekit.component.Dimension;
 import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LinearBearing;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.PillowBlockHousing;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
 import machinekit.standard.Bushing;
@@ -35,6 +40,7 @@ import machinekit.transmission.Sprocket;
 import machinekit.transmission.SpurGear;
 import machinekit.transmission.TimingPulley;
 import materia.project.AssemblyFrames;
+import materia.project.AssemblyRecord.AssemblyFrame;
 
 class MachineKitSmoke {
 	static function check(value:Bool, message:String):Void {
@@ -172,7 +178,7 @@ class MachineKitSmoke {
 		var bolt = HexBolt.metric("M6", 25);
 		check(bolt.designation == "ISO4017-M6x25", "bolt designation");
 		near(bolt.pitch, 1, "M6 bolt pitch");
-		near(bolt.threadLength, 24, "M6 bolt thread length");
+		near(bolt.threadLength, 25, "ISO 4017 bolts are fully threaded");
 		throws(() -> HexBolt.metric("M7", 20), 'Unknown hex bolt size "M7"');
 		throws(() -> HexBolt.metric("M6", 0), "positive length");
 
@@ -200,7 +206,7 @@ class MachineKitSmoke {
 		var tap = bolt.tapHole(12);
 		near(tap.volume(), Math.PI * 2.5 * 2.5 * 12, "bolt tap hole volume");
 		tap.close();
-		var seatRadius = corner / 2 + 0.5;
+		var seatRadius = (corner + 0.5) / 2;
 		var counterbore = bolt.counterboreHole(6);
 		solid(counterbore, "bolt counterbore tool");
 		near(counterbore.volume(), Math.PI * (seatRadius * seatRadius * 4.5 + 3.3 * 3.3 * 1.5), "bolt counterbore volume");
@@ -235,6 +241,16 @@ class MachineKitSmoke {
 		near(washer.connector("axis").frame.z, 0.8, "washer axis connector");
 	}
 
+	static function dimensions():Void {
+		check(Dimension.format(12.7) == "12.7", "12.7 formats without binary noise");
+		check(Dimension.format(0.1 + 0.2) == "0.3", "0.1 + 0.2 formats as 0.3");
+		check(Dimension.format(20) == "20", "whole numbers format without a decimal point");
+		check(Dimension.format(6.35) == "6.35", "6.35 formats exactly");
+		check(Dimension.format(0.0625) == "0.063", "values round to 0.001");
+		check(Dimension.format(-2.5) == "-2.5", "negative values keep their sign");
+		check(Dimension.format(-0.0001) == "0", "values rounding to zero lose their sign");
+	}
+
 	static function shafts():Void {
 		var key = ParallelKey.forShaft(6, 6);
 		check(key.designation == "DIN6885-2x2x6", "key designation");
@@ -245,12 +261,13 @@ class MachineKitSmoke {
 		keyPreview.close();
 		throws(() -> ParallelKey.metric("9x9", 10), 'Unknown parallel key "9x9"');
 		throws(() -> ParallelKey.forShaft(100, 10), "No DIN 6885-1 key fits shaft diameter 100");
+		throws(() -> ParallelKey.forShaft(0, 10), "positive shaft diameter");
 
 		var shaft = new SteppedShaft(
 			[{diameter: 8, length: 51.5}, {diameter: 6, length: 8.5}],
 			[{name: "bearingA", z: 10}, {name: "bearingB", z: 43}],
 			[{name: "outputKey", z0: 52, key: key}],
-			[{name: "ring", z0: 50, width: 1.2, diameter: 7.4}]
+			[{name: "ring", z0: 50, width: 1.2, diameter: 7.6}]
 		);
 		near(shaft.totalLength, 60, "shaft total length");
 		near(shaft.diameterAt(0), 8, "shaft start diameter");
@@ -265,8 +282,17 @@ class MachineKitSmoke {
 		envelope.close();
 		var preview = shaft.geometry();
 		solid(preview, "shaft preview");
-		check(preview.volume() < Math.PI * 16 * 51.5 + Math.PI * 9 * 8.5, "preview removes keyway and groove material");
+		// Groove: an outer annulus 7.6..8 wide 1.2. Keyway: the 2 mm slot's circular segment above y=1.8.
+		var grooveVolume = Math.PI * (16 - 3.8 * 3.8) * 1.2;
+		var keywayVolume = 6 * (Math.sqrt(8) + 9 * Math.atan2(1, Math.sqrt(8)) - 3.6);
+		near(preview.volume(), Math.PI * 16 * 51.5 + Math.PI * 9 * 8.5 - grooveVolume - keywayVolume,
+			"preview removes the outer groove annulus and keyway", 1e-3);
+		var previewBox = bounds(preview);
+		near(previewBox.maxX, 4, "groove leaves the shaft's outer surface elsewhere");
 		preview.close();
+		check(shaft.designation == "SHAFT-8x51.5-6x8.5", "shaft designation");
+		check(new SteppedShaft([{diameter: 6.35, length: 20}]).designation == "SHAFT-6.35x20",
+			"fractional shaft designation is rounded, not a raw float");
 
 		near(shaft.connector("input").frame.z, 0, "shaft input connector");
 		near(shaft.connector("output").frame.z, 60, "shaft output connector");
@@ -293,21 +319,31 @@ class MachineKitSmoke {
 			[{z0: 8, width: 4, diameter: 5}]), "Retaining ring groove must lie within one shaft section");
 		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], null, null,
 			[{z0: 0, width: 2, diameter: 9}]), "Retaining ring groove diameter must be smaller than the shaft");
+		throws(() -> new SteppedShaft(
+			[{diameter: 10, length: 10}, {diameter: 12, length: 2}, {diameter: 10, length: 10}], null,
+			[{name: "k", z0: 8, key: ParallelKey.forShaft(10, 6)}]), 'Keyway "k" must lie within one shaft section');
+		throws(() -> new SteppedShaft(
+			[{diameter: 10, length: 10}, {diameter: 12, length: 2}, {diameter: 10, length: 10}], null, null,
+			[{z0: 9, width: 4, diameter: 9}]), "Retaining ring groove must lie within one shaft section");
+		throws(() -> new SteppedShaft([{diameter: 12, length: 40}], null,
+			[{name: "k", z0: 0, key: ParallelKey.metric("10x8", 20)}]), 'Keyway "k" is too wide for the shaft');
 	}
 
 	static function shaftHardware():Void {
 		var ring = RetainingRing.forShaft(8);
 		check(ring.designation == "DIN471-8", "ring designation");
-		check(ring.spec.grooveDiameter == 7.4 && ring.spec.outerDiameter == 12.2, "ring dimensions");
+		check(ring.spec.grooveDiameter == 7.6 && ring.spec.outerDiameter == 12.2, "ring dimensions (DIN 471 d2)");
 		throws(() -> RetainingRing.forShaft(9), 'Unknown retaining ring shaft diameter "9"');
+		throws(() -> RetainingRing.forShaft(8.5), 'Unknown retaining ring shaft diameter "8.5"');
+		check(RetainingRing.forShaft(12).spec.grooveDiameter == 11.5, "12 mm ring groove diameter");
 
 		var envelope = ring.geometry(Envelope);
 		solid(envelope, "ring envelope");
-		near(envelope.volume(), annulus(12.2, 7.4, 0.8), "ring envelope volume");
+		near(envelope.volume(), annulus(12.2, 7.6, 0.8), "ring envelope volume");
 		envelope.close();
 		var preview = ring.geometry();
 		solid(preview, "ring preview");
-		near(preview.volume(), annulus(12.2, 7.4, 0.8) * 8 / 9, "ring preview volume (gapped)");
+		near(preview.volume(), annulus(12.2, 7.6, 0.8) * 8 / 9, "ring preview volume (gapped)");
 		preview.close();
 		near(ring.connector("seat").frame.z, 0.4, "ring seat connector");
 
@@ -315,6 +351,7 @@ class MachineKitSmoke {
 		check(collar.designation == "COLLAR-8", "collar designation");
 		check(collar.spec.setScrew == "M4", "collar set screw size");
 		throws(() -> ShaftCollar.forShaft(9), 'Unknown shaft collar bore diameter "9"');
+		throws(() -> ShaftCollar.forShaft(6.35), 'Unknown shaft collar bore diameter "6.35"');
 		var collarPart = collar.geometry();
 		solid(collarPart, "collar");
 		near(collarPart.volume(), Math.PI * (8 * 8 - 4 * 4) * 11, "collar volume");
@@ -376,7 +413,11 @@ class MachineKitSmoke {
 		var tslotVolume = tslotPart.volume();
 		check(tslotVolume < 20 * 20 * 100, "t-slot removes material for slots and bore");
 		check(tslotVolume > 10 * 20 * 100, "t-slot keeps most of its cross-section");
+		// Four slots (3 mm x 6 mm throat plus 2 mm x 7 mm head) and a 3 mm bore, cut end to end.
+		near(tslotVolume, (20 * 20 - 4 * (3 * 6 + 2 * 7) - Math.PI * 1.5 * 1.5) * 100, "t-slot volume");
 		tslotPart.close();
+		check(new FlatBar(12.7, 3.2).designation == "FLAT-12.7x3.2", "fractional flat bar designation");
+		check(new TSlotExtrusion(25.4).designation == "TSLOT-25.4x25.4", "fractional t-slot designation");
 
 		var frame = new FrameAssembly();
 		frame.point("A", 0, 0, 0);
@@ -417,6 +458,30 @@ class MachineKitSmoke {
 		near(beamBox.maxZ, 520, "beam cross-section high");
 		beam.close();
 
+		// Section orientation: the channel's local +Y (its 40 mm height) follows the reference;
+		// local +X (the 20 mm flanges) is reference x member axis.
+		var channelFrame = new FrameAssembly();
+		channelFrame.point("P", 0, 0, 0);
+		channelFrame.point("Q", 100, 0, 0);
+		channelFrame.member("up", "P", "Q", channel);
+		channelFrame.member("side", "P", "Q", channel, new Vector(0, 1, 0));
+		channelFrame.member("parallel", "P", "Q", channel, new Vector(2, 0, 0));
+		throws(() -> channelFrame.member("zeroRef", "P", "Q", channel, new Vector(0, 0, 0)), "reference has zero length");
+		var upChannel = channelFrame.geometry("up");
+		var upBox = bounds(upChannel);
+		near(upBox.minX, 0, "channel member start");
+		near(upBox.maxX, 100, "channel member end");
+		near(upBox.minZ, 0, "channel height starts on the member axis");
+		near(upBox.maxZ, 40, "channel height follows the default +Z reference");
+		upChannel.close();
+		var sideChannel = channelFrame.geometry("side");
+		var sideBox = bounds(sideChannel);
+		// Reference +Y: local X = Y x X = -Z, so the flanges hang below the member axis.
+		near(sideBox.minZ, -20, "channel flanges follow reference x axis");
+		near(sideBox.maxZ, 0, "channel web on the member axis");
+		sideChannel.close();
+		throws(() -> channelFrame.geometry("parallel"), "reference is parallel to its axis");
+
 		var cutList = frame.cutList();
 		check(cutList.length == 2, "cut list groups by profile");
 		for (line in cutList) {
@@ -456,6 +521,23 @@ class MachineKitSmoke {
 		near(pair.centerDistance, (pinion.pitchDiameter + gear.pitchDiameter) / 2, "gear pair centre distance");
 		near(pair.ratio(), gear.teeth / pinion.teeth, "gear pair ratio");
 		near(pair.pose().x, pair.centerDistance, "gear pair pose offset");
+		// SpurGear centres a tooth on local angle 0, so `a` points a tooth at the mesh point and
+		// `b` must present a tooth space at its local angle pi: (pi - turn) / pitch angle = k + 1/2.
+		for (teeth in [20, 21]) {
+			var meshed = GearPair.mesh(pinion, new SpurGear(2, teeth, 12));
+			var meshedPose = meshed.pose();
+			var turn = 2 * Math.atan2(meshedPose.qz, meshedPose.qw);
+			near(turn, teeth % 2 == 0 ? Math.PI / teeth : 0.0, 'gear pair turn for $teeth teeth', 1e-9);
+			near(meshed.bRotation, turn, 'gear pair bRotation for $teeth teeth', 1e-9);
+			var phase = (Math.PI - turn) / (2 * Math.PI / teeth);
+			near(phase - Math.ffloor(phase), 0.5, 'gear with $teeth teeth has a tooth space at the mesh point', 1e-9);
+			near(meshedPose.x, meshed.centerDistance, 'gear pair offset for $teeth teeth');
+		}
+		throws(() -> new SpurGear(2, 20, 12, 0.1), "between 14.5 and 25 degrees");
+		throws(() -> new SpurGear(2, 20, 12, 0.5), "between 14.5 and 25 degrees");
+		check(new SpurGear(2, 20, 12, 14.5 * Math.PI / 180).teeth == 20, "14.5 degree pressure angle accepted");
+		check(new SpurGear(2, 20, 12, 25 * Math.PI / 180).teeth == 20, "25 degree pressure angle accepted");
+		check(new SpurGear(0.8, 20, 5).designation == "SPUR-M0.8-20T", "fractional module designation");
 
 		var rack = new Rack(2, 10, 12);
 		check(rack.designation == "RACK-M2-10T", "rack designation");
@@ -469,21 +551,43 @@ class MachineKitSmoke {
 		near(rackBox.maxX, 12, "rack face width");
 		near(rackBox.minZ, 0, "rack length start");
 		near(rackBox.maxZ, rack.length, "rack length end");
+		// Square ends: a 0.01 mm slice at each end is the full bar section below the root line
+		// (faceWidth x barHeight); the nearest tooth flank starts about 0.66 mm in.
+		for (end in [0.0, 1.0]) {
+			var slab = Part.box(100, 100, 1.01);
+			var placedSlab = slab.translated(new Vector(0, 0, end == 0 ? -1 : rack.length - 0.01));
+			slab.close();
+			var cap = rackPart.intersect(placedSlab);
+			placedSlab.close();
+			near(cap.volume(), 12 * rack.barHeight * 0.01, end == 0 ? "rack start face is square" : "rack end face is square", 1e-3);
+			cap.close();
+		}
 		rackPart.close();
+		throws(() -> new Rack(2, 10, 12, 0.5), "between 14.5 and 25 degrees");
+		check(new Rack(0.8, 10, 5).designation == "RACK-M0.8-10T", "fractional rack designation");
 	}
 
 	static function pillowBlock():Void {
 		var bearing = DeepGrooveBearing.metric("6204");
 		var block = new PillowBlock(bearing);
 		check(block.housing.mountScrew == "M6", "pillow block mount screw size");
-		near(block.housing.face, 65.8, "pillow block face");
+		near(block.housing.face, 68.4, "pillow block face leaves 1 mm around the M6 heads");
 		near(block.housing.depth, 23.4, "pillow block depth");
 		near(block.housing.boltSpacing, 56.4, "pillow block bolt spacing");
+		for (designation in ["608", "6000", "6001", "6002", "6003", "6204"]) {
+			var housing = new PillowBlockHousing(DeepGrooveBearing.metric(designation));
+			var screw = housing.mountScrewPart(10).spec, edge = (housing.face - housing.boltSpacing) / 2;
+			check(edge >= screw.headDiameter / 2 + 1 - 1e-9, 'housing for $designation keeps screw heads on the face');
+			check(edge > screw.clearanceCoarse / 2, 'housing for $designation bolt holes stay inside the edge');
+			var part = housing.geometry();
+			solid(part, 'housing for $designation');
+			part.close();
+		}
 
 		var envelope = block.housing.geometry(Envelope);
 		solid(envelope, "pillow block envelope");
 		var envelopeVolume = envelope.volume();
-		near(envelopeVolume, 65.8 * 65.8 * 23.4 - Math.PI * 23.525 * 23.525 * 23.4, "pillow block envelope volume");
+		near(envelopeVolume, 68.4 * 68.4 * 23.4 - Math.PI * 23.525 * 23.525 * 23.4, "pillow block envelope volume");
 		envelope.close();
 		var preview = block.housing.geometry();
 		solid(preview, "pillow block preview");
@@ -498,7 +602,22 @@ class MachineKitSmoke {
 		var definition = model.definition("pillow-block");
 		check(definition.joints.length == 5, "pillow block joint count");
 		var state = model.initialState("pillow-block");
-		near(state.worldConnector("pb-bearing", "axis").z, 18.7, "bearing centred in housing, offset by half its width");
+		var depth = block.housing.depth;
+		near(state.worldConnector("pb-bearing", "axis").z, depth / 2, "bearing centred in the housing depth");
+		near(state.worldConnector("pb-bearing", "front").z, depth / 2 - bearing.width / 2, "bearing front inside the housing");
+		// Screws seat on the outer face and reach through the mounting face into the frame.
+		near(block.screw.length, 35, "pillow block screw: next standard length over depth + 1.5 d");
+		check(block.screw.length >= depth + 1.5 * block.screw.diameter, "pillow block screw engagement");
+		for (i in 1...5) {
+			var head = state.worldConnector('pb-screw$i', "head");
+			var bolt = block.housing.connector('bolt$i').frame;
+			near(head.x, bolt.x, 'pillow block screw$i on its bolt x');
+			near(head.y, bolt.y, 'pillow block screw$i on its bolt y');
+			near(head.z, depth, 'pillow block screw$i head on the outer face');
+			check(state.worldConnector('pb-screw$i', "tip").z < 0, 'pillow block screw$i tip below the mounting face');
+		}
+		near(PillowBlock.standardScrewLength(20), 20, "standard screw length exact");
+		near(PillowBlock.standardScrewLength(20.1), 25, "standard screw length rounds up");
 
 		var lines = block.bom().lines();
 		check(lines.length == 3, "pillow block BOM line count");
@@ -513,11 +632,23 @@ class MachineKitSmoke {
 	static function linearAxis():Void {
 		var axis = new LinearAxis();
 		check(axis.motor.designation == "NEMA23-56", "linear axis motor designation");
-		near(axis.length, 240, "linear axis screw length");
-		near(axis.screw.totalLength, 240, "linear axis screw total length");
+		check(axis.bearing.designation == "6000-2Z", "linear axis default bearing matches the 10 mm screw");
+		check(axis.coupling.designation == "COUPLING-6.35x10-18x30", "linear axis coupling joins motor and screw");
 		near(axis.carriage.boreDiameter, 10, "linear axis carriage bore");
+		// Layout from the screw input: coupling half (15) + gap (2) + housing (depth), margin (20),
+		// carriage (60) + stroke (200), margin (20), housing (depth) flush with the screw end.
+		var depth = axis.pillowBlockA.housing.depth;
+		near(depth, 14, "6000 housing depth");
+		near(axis.bearingAPosition, 15 + 2 + depth / 2, "pillow block A just past the coupling");
+		near(axis.travelMin, 15 + 2 + depth + 20 + 30, "carriage travel starts a margin past pillow block A");
+		near(axis.travelMax - axis.travelMin, 200, "carriage travel equals the stroke");
+		near(axis.bearingBPosition, axis.travelMax + 30 + 20 + depth / 2, "pillow block B a margin past the travel end");
+		near(axis.length, 345, "linear axis screw length");
+		near(axis.screw.totalLength, axis.length, "linear axis screw total length");
 		throws(() -> new LinearAxis(23, 10, -1), "positive stroke");
-		throws(() -> new LinearAxis(23, 50, 200, "6001"), "bore is smaller than the screw diameter");
+		throws(() -> new LinearAxis(23, 10, 200, "6001"), "bore does not match the screw diameter");
+		throws(() -> new LinearAxis(23, 50), "No catalog deep groove bearing has a 50 mm bore");
+		throws(() -> new LinearAxis(23, 10, 200, null, 2), "must clear the pillow block screw heads");
 
 		for (entry in axis.components()) {
 			var part = entry.component.geometry(Envelope);
@@ -526,27 +657,58 @@ class MachineKitSmoke {
 		}
 		var rail = axis.frame.geometry("rail");
 		solid(rail, "linear axis rail");
+		var railBox = rail.shape.bounds();
+		near(railBox.get_min().get_z(), 21, "rail starts at the screw input");
+		near(railBox.get_max().get_z(), 21 + 345, "rail ends at the screw end");
+		// Beside the screw, clear of the housings (and their screw heads) and the carriage.
+		var housing = axis.pillowBlockA.housing;
+		check(railBox.get_max().get_y() <= -housing.face / 2 - 1, "rail clears the pillow block housings");
+		check(railBox.get_max().get_y() <= -(housing.boltSpacing + axis.pillowBlockA.screw.spec.headDiameter) / 2 - 1,
+			"rail clears the pillow block screw heads");
+		check(railBox.get_max().get_y() <= -axis.carriage.width / 2 - 1, "rail clears the carriage");
 		rail.close();
 		var cutList = axis.frame.cutList();
 		check(cutList.length == 1, "linear axis frame cut list");
-		near(cutList[0].totalLength, 240, "linear axis rail length");
+		near(cutList[0].totalLength, 345, "linear axis rail length");
 
 		var model = axis.assembly();
 		var definition = model.definition("linear-axis");
-		check(definition.joints.length == 12, "linear axis joint count");
+		check(definition.joints.length == 13, "linear axis joint count");
+		for (joint in definition.joints) if (joint.id == "carriage-slide") {
+			check(joint.limits.lower != null && joint.limits.lower == axis.travelMin, "carriage lower limit");
+			check(joint.limits.upper != null && joint.limits.upper == axis.travelMax, "carriage upper limit");
+		}
 		var state = model.initialState("linear-axis");
+		near(state.worldConnector("coupling", "axis").z, 21, "coupling centred on the motor shaft tip");
 		near(state.worldConnector("screw", "input").z, 21, "screw seats on the motor shaft");
-		near(state.worldConnector("carriage", "bore").z, 71, "carriage starts clear of the screw ends");
-		near(state.worldConnector("pillowA-bearing", "axis").z, 14, "pillow block A bearing centred");
-		near(state.worldConnector("pillowB-bearing", "axis").z, 234, "pillow block B bearing centred");
+		near(state.worldConnector("carriage", "bore").z, 21 + axis.travelMin, "carriage starts at its lower travel limit");
+		near(state.worldConnector("pillowA-bearing", "axis").z, 21 + axis.bearingAPosition, "pillow block A bearing on the screw");
+		near(state.worldConnector("pillowB-bearing", "axis").z, 21 + axis.bearingBPosition, "pillow block B bearing on the screw");
+		near(state.worldConnector("pillowA-bearing", "axis").z, 45, "pillow block A bearing position");
+		near(state.worldConnector("pillowB-bearing", "axis").z, 359, "pillow block B bearing position");
+		// Housing A mounts toward the motor, housing B is turned over to mount toward the far end:
+		// both screw heads face the carriage and their tips point outboard.
+		near(state.worldConnector("pillowA-screw1", "head").z, 21 + axis.bearingAPosition + depth / 2, "pillow A screw heads inboard");
+		check(state.worldConnector("pillowA-screw1", "tip").z < 21 + axis.bearingAPosition - depth / 2, "pillow A screw tips outboard");
+		near(state.worldConnector("pillowB-screw1", "head").z, 21 + axis.bearingBPosition - depth / 2, "pillow B screw heads inboard");
+		check(state.worldConnector("pillowB-screw1", "tip").z > 21 + axis.length, "pillow B screw tips outboard");
 
 		state.setJoint("carriage-slide", 100);
 		state.forwardKinematics();
 		near(state.worldConnector("carriage", "bore").z, 121, "carriage travels along the screw");
+		state.setJoint("carriage-slide", axis.travelMax);
+		state.forwardKinematics();
+		var carriageEnd = state.worldConnector("carriage", "bore").z + axis.carriage.length / 2;
+		near(state.worldConnector("pillowB-bearing", "axis").z - depth / 2 - carriageEnd, 20,
+			"carriage stops a margin short of pillow block B");
 
-		var lines = axis.bom().lines();
-		check(lines.length == 6, "linear axis BOM line count");
-		check(axis.bom().quantity(axis.bearing.designation) == 2, "linear axis bearing quantity");
+		var bom = axis.bom();
+		var lines = bom.lines();
+		check(lines.length == 8, "linear axis BOM line count");
+		check(bom.quantity(axis.bearing.designation) == 2, "linear axis bearing quantity");
+		check(bom.quantity(axis.coupling.designation) == 1, "linear axis coupling in the BOM");
+		check(bom.quantity("RECT-20x15x2-L345") == 1, "linear axis rail in the BOM");
+		check(bom.quantity(axis.pillowBlockA.screw.designation) == 8, "linear axis pillow block screws");
 	}
 
 	static function catalogExtras():Void {
@@ -580,6 +742,12 @@ class MachineKitSmoke {
 		var sprocket = new Sprocket(12.7, 20, 8, 6);
 		check(sprocket.designation == "SPROCKET-P12.7-20T", "sprocket designation");
 		near(sprocket.pitchDiameter, 12.7 / Math.sin(Math.PI / 20), "sprocket pitch diameter");
+		near(sprocket.rollerDiameter, 0.625 * 12.7, "sprocket default roller diameter");
+		near(sprocket.rootDiameter, sprocket.pitchDiameter - 0.625 * 12.7, "sprocket root = pitch - roller diameter");
+		near(sprocket.outsideDiameter, 12.7 * (0.6 + Math.cos(Math.PI / 20) / Math.sin(Math.PI / 20)),
+			"sprocket outside diameter p(0.6 + cot(pi/z))");
+		near(new Sprocket(12.7, 20, 8, 6, 7.92).rootDiameter, sprocket.pitchDiameter - 7.92, "sprocket roller override");
+		throws(() -> new Sprocket(12.7, 20, 8, 6, 13), "roller diameter must be positive and less than the pitch");
 		throws(() -> new Sprocket(12.7, 5, 8, 6), "at least 8 teeth");
 		throws(() -> new Sprocket(12.7, 8, 40, 6), "must clear the bore");
 		var sprocketPart = sprocket.geometry();
@@ -592,6 +760,12 @@ class MachineKitSmoke {
 		var pulley = new TimingPulley(2, 20, 5, 6);
 		check(pulley.designation == "PULLEY-P2-20T", "timing pulley designation");
 		near(pulley.pitchDiameter, 2 * 20 / Math.PI, "timing pulley pitch diameter");
+		near(pulley.pitchLineDifferential, 0.254, "GT2 pitch line differential");
+		near(pulley.outsideDiameter, 2 * 20 / Math.PI - 2 * 0.254, "timing pulley OD = PD - 2 PLD");
+		near(new TimingPulley(3, 20, 5, 6).pitchLineDifferential, 0.381, "3 mm pitch line differential");
+		near(new TimingPulley(5, 20, 5, 6).pitchLineDifferential, 0.5715, "5 mm pitch line differential");
+		near(new TimingPulley(5.08, 20, 5, 6, 0.254).outsideDiameter, 5.08 * 20 / Math.PI - 0.508, "explicit PLD");
+		check(new TimingPulley(2.032, 20, 5, 6).designation == "PULLEY-P2.032-20T", "fractional pulley designation");
 		throws(() -> new TimingPulley(2, 5, 5, 6), "at least 8 teeth");
 		throws(() -> new TimingPulley(2, 8, 11, 6), "must clear the bore");
 		var pulleyPart = pulley.geometry();
@@ -603,7 +777,7 @@ class MachineKitSmoke {
 
 		var nut = new LeadScrewNut(8, 2);
 		check(nut.designation == "LEADNUT-D8-L2", "lead screw nut designation");
-		check(nut.mountScrew == "M4", "lead screw nut mount screw size");
+		check(nut.mountScrew == "M3", "lead screw nut mount screw size");
 		near(nut.travelPerRevolution(), 2, "lead screw nut travel per revolution");
 		near(nut.rotationFor(10), 10 / 2 * 2 * Math.PI, "lead screw nut rotation for a travel distance");
 		throws(() -> new LeadScrewNut(-1, 2), "positive screw diameter");
@@ -612,7 +786,7 @@ class MachineKitSmoke {
 
 		var nutEnvelope = nut.geometry(Envelope);
 		solid(nutEnvelope, "lead screw nut envelope");
-		near(nutEnvelope.volume(), Math.PI * 7.2 * 7.2 * 16 + Math.PI * 12 * 12 * 3 - Math.PI * 4 * 4 * 19,
+		near(nutEnvelope.volume(), Math.PI * 5.2 * 5.2 * 16 + Math.PI * 12 * 12 * 3 - Math.PI * 4 * 4 * 19,
 			"lead screw nut envelope volume");
 		nutEnvelope.close();
 		var nutPreview = nut.geometry();
@@ -620,49 +794,129 @@ class MachineKitSmoke {
 		nutPreview.close();
 		near(nut.connector("bore").frame.z, 8, "lead screw nut bore connector");
 		near(nut.connector("mount1").frame.z, 19, "lead screw nut mount connector z");
-		near(nut.connector("mount1").frame.x, 9, "lead screw nut mount connector x");
+		near(nut.connector("mount1").frame.x, 7.9, "lead screw nut mount connector x");
+		for (size in [6.0, 8.0, 10.0, 12.0, 16.0, 20.0, 25.0]) {
+			var sized = new LeadScrewNut(size, 2);
+			var screw = sized.mountScrewPart(10).spec, r = sized.boltCircleDiameter / 2;
+			check(r - screw.clearanceMedium / 2 >= sized.bodyDiameter / 2 + 1 - 1e-9,
+				'lead screw nut D$size mount holes clear the body');
+			check(r + screw.headDiameter / 2 <= sized.flangeDiameter / 2 - 1 + 1e-9,
+				'lead screw nut D$size mount screw heads stay on the flange');
+		}
+		check(new LeadScrewNut(6.35, 3.175).designation == "LEADNUT-D6.35-L3.175", "fractional nut designation");
+	}
+
+	/** `part` (closed) moved to the assembly pose `frame`. */
+	static function placedAt(part:Part, frame:AssemblyFrame):Part {
+		var x = AssemblyFrames.transformVector(frame, 1, 0, 0), z = AssemblyFrames.transformVector(frame, 0, 0, 1);
+		try {
+			var result = part.placed(new Location(new Plane(new Vector(frame.x, frame.y, frame.z), new Vector(x.x, x.y, x.z),
+				new Vector(z.x, z.y, z.z))));
+			part.close();
+			return result;
+		} catch (error:Dynamic) {
+			part.close();
+			throw error;
+		}
+	}
+
+	/** Checks the fused volume of `a` and `b` is their summed volume less `overlap`; closes both. */
+	static function checkOverlap(a:Part, b:Part, overlap:Float, message:String):Void {
+		var expected = a.volume() + b.volume() - overlap;
+		var fused = a.combine(b);
+		a.close();
+		b.close();
+		near(fused.volume(), expected, message, 1e-6);
+		fused.close();
 	}
 
 	static function robotics():Void {
 		var flange = new RobotFlange(50);
-		check(flange.designation == "ISO9409-50", "robot flange designation");
-		near(flange.thickness, 8, "robot flange thickness");
-		near(flange.pilotDiameter, 25, "robot flange pilot diameter");
-		near(flange.boltCircleDiameter, 39, "robot flange bolt circle");
-		check(flange.mountScrew == "M5", "robot flange mount screw size");
+		check(flange.designation == "ISO9409-1-50-4-M6", "robot flange designation");
+		check(flange.boltCount == 4, "robot flange ISO bolt count");
+		check(flange.mountScrew == "M6", "robot flange mount screw size");
+		near(flange.boltCircleDiameter, 50, "robot flange pitch circle");
+		near(flange.pilotDiameter, 31.5, "robot flange pilot diameter");
+		near(flange.pinDiameter, 6, "robot flange pin diameter");
+		near(flange.flangeDiameter, 70, "robot flange outer diameter");
+		near(flange.thickness, 9, "robot flange thickness");
+		near(flange.pilotHeight, 3, "robot flange pilot height");
+		var small = new RobotFlange(31.5);
+		check(small.designation == "ISO9409-1-31.5-4-M5", "smallest ISO flange designation");
+		near(small.pilotDiameter, 20, "31.5 flange pilot");
+		near(small.pinDiameter, 5, "31.5 flange pin");
+		var large = new RobotFlange(80);
+		check(large.boltCount == 6 && large.mountScrew == "M8", "80 flange uses 6 x M8");
+		check(new RobotFlange(50, 6).designation == "FLANGE-50-6-M6", "non-standard bolt count drops the ISO prefix");
 		throws(() -> new RobotFlange(-1), "positive diameter");
+		throws(() -> new RobotFlange(45), 'Unknown ISO 9409-1 flange size "45"');
 		throws(() -> new RobotFlange(50, 2), "at least 3 bolts");
+		throws(() -> new RobotFlange(50, 12), "too many bolts for its pitch circle");
 
 		var envelope = flange.geometry(Envelope);
 		solid(envelope, "robot flange envelope");
 		var envelopeVolume = envelope.volume();
-		near(envelopeVolume, Math.PI * 25 * 25 * 8 + Math.PI * 12.5 * 12.5 * 3, "robot flange envelope volume");
+		near(envelopeVolume, Math.PI * 35 * 35 * 9 + Math.PI * 15.75 * 15.75 * 3, "robot flange envelope volume");
 		envelope.close();
 		var preview = flange.geometry();
 		solid(preview, "robot flange preview");
-		check(preview.volume() < envelopeVolume, "robot flange preview removes bolt and pin holes");
+		near(envelopeVolume - preview.volume(), Math.PI * (4 * 3.3 * 3.3 + 3 * 3) * 9, "robot flange bolt and pin holes");
+		var flangeBox = bounds(preview);
+		near(flangeBox.minZ, -9, "robot flange plate behind its face");
+		near(flangeBox.maxZ, 3, "robot flange pilot boss in front of its face");
 		preview.close();
-		near(flange.connector("bolt1").frame.x, 19.5, "robot flange bolt1 x");
-		near(flange.connector("bolt2").frame.y, 19.5, "robot flange bolt2 y");
+		near(flange.connector("bolt1").frame.x, 25, "robot flange bolt1 x");
+		near(flange.connector("bolt2").frame.y, 25, "robot flange bolt2 y");
+		near(flange.connector("face").frame.z, 0, "robot flange face connector");
 
 		var eoat = new EndEffectorPlate(flange);
-		check(eoat.designation == "EOAT-50-8", "end effector plate designation");
+		check(eoat.designation == "EOAT-50-9-4xM5-PCD70.5", "end effector plate designation");
 		near(eoat.thickness, flange.thickness, "end effector plate default thickness");
+		// Default tool circle: flange bolt circle + flange head + tool head + 2 mm web.
+		near(eoat.toolBoltCircleDiameter, 50 + 10 + 8.5 + 2, "end effector tool bolt circle clears the flange heads");
+		near(eoat.diameter, 70.5 + 8.5 + 2, "end effector plate grows to carry the tool bolts");
 		var eoatEnvelope = eoat.geometry(Envelope);
 		solid(eoatEnvelope, "end effector plate envelope");
-		near(eoatEnvelope.volume(), Math.PI * 25 * 25 * eoat.thickness, "end effector plate envelope volume");
+		var eoatEnvelopeVolume = eoatEnvelope.volume();
+		near(eoatEnvelopeVolume, Math.PI * 40.5 * 40.5 * 9, "end effector plate envelope volume");
 		eoatEnvelope.close();
 		var eoatPreview = eoat.geometry();
 		solid(eoatPreview, "end effector plate preview");
+		// Every hole removes its own full volume: the pilot recess (31.7 x 3.2 deep), 4 flange bolt
+		// holes (6.6), the pin hole (6.2), and 4 tool bolt holes (5.5), none overlapping.
+		near(eoatEnvelopeVolume - eoatPreview.volume(),
+			Math.PI * (15.85 * 15.85 * 3.2 + (4 * 3.3 * 3.3 + 3.1 * 3.1 + 4 * 2.75 * 2.75) * 9),
+			"end effector plate tool bolt holes remove material");
 		eoatPreview.close();
-		throws(() -> new EndEffectorPlate(flange, 1), "must be thicker than the flange's pilot boss");
+		throws(() -> new EndEffectorPlate(flange, 5), "must be thicker than the flange's pilot boss");
+		throws(() -> new EndEffectorPlate(flange, null, 30), "must clear the flange's pilot recess");
+		throws(() -> new EndEffectorPlate(flange, null, 50), "must clear the flange's bolt holes");
+		throws(() -> new EndEffectorPlate(flange, null, 70.5, 40), "too close together");
 		near(eoat.connector("tool").frame.z, eoat.thickness, "end effector plate tool connector");
 
+		// Flange -> plate: the plate stacks on the flange face, the pilot boss sits in its recess.
+		var plateModel = new AssemblyModel();
+		flange.addTo(plateModel, "flange");
+		eoat.addTo(plateModel, "plate");
+		plateModel.mate("tool-mount", "fixed", "flange", "face", "plate", "robot");
+		var platePose = plateModel.pose("plate");
+		near(platePose.z, 0, "plate sits on the flange face");
+		checkOverlap(flange.geometry(), placedAt(eoat.geometry(), platePose), 0, "flange and plate stack without overlap");
+		// A plate without the recess would overlap exactly the boss: the boss engages the recess.
+		checkOverlap(flange.geometry(Envelope), placedAt(eoat.geometry(Envelope), platePose),
+			Math.PI * 15.75 * 15.75 * 3, "flange pilot boss reaches into the plate");
+
 		var pedestal = new Pedestal(flange, 300);
-		check(pedestal.designation == "PEDESTAL-50-300", "pedestal designation");
-		near(pedestal.baseDiameter, 80, "pedestal base diameter");
-		near(pedestal.columnDiameter, 50, "pedestal column diameter");
-		throws(() -> new Pedestal(flange, 5), "must clear the flange's pilot boss");
+		check(pedestal.designation == "PEDESTAL-50-D70x300", "pedestal designation");
+		near(pedestal.columnDiameter, 70, "pedestal column defaults to the flange diameter");
+		check(pedestal.floorMountScrew == "M10", "pedestal floor screw size");
+		near(pedestal.floorBoltCircleDiameter, 70 + 2 * 16, "pedestal floor bolt circle");
+		near(pedestal.baseDiameter, 102 + 2 * 16, "pedestal base diameter");
+		// Floor screw heads (16 mm) clear the column and stay on the base.
+		check(pedestal.floorBoltCircleDiameter / 2 - 8 >= pedestal.columnDiameter / 2 + 1, "floor bolt heads clear the column");
+		check(pedestal.floorBoltCircleDiameter / 2 + 8 <= pedestal.baseDiameter / 2, "floor bolt heads stay on the base");
+		throws(() -> new Pedestal(flange, 15), "must clear the flange's pilot boss");
+		throws(() -> new Pedestal(flange, 300, 55), "wider than the flange bolt circle plus a screw head");
 		var pedestalEnvelope = pedestal.geometry(Envelope);
 		solid(pedestalEnvelope, "pedestal envelope");
 		pedestalEnvelope.close();
@@ -670,6 +924,26 @@ class MachineKitSmoke {
 		solid(pedestalPreview, "pedestal preview");
 		pedestalPreview.close();
 		near(pedestal.connector("top").frame.z, 300, "pedestal top connector");
+		near(AssemblyFrames.transformVector(pedestal.connector("top").frame, 0, 1, 0).z, -1, "pedestal top points into the pedestal");
+
+		// Pedestal -> flange: the flange turns over onto the top face, its boss in the top recess.
+		var pedestalModel = new AssemblyModel();
+		pedestal.addTo(pedestalModel, "pedestal");
+		flange.addTo(pedestalModel, "flange");
+		pedestalModel.mate("robot-mount", "fixed", "pedestal", "top", "flange", "face");
+		var flangePose = pedestalModel.pose("flange");
+		var mountedFlange = placedAt(flange.geometry(), flangePose);
+		var mountedBox = bounds(mountedFlange);
+		near(mountedBox.minZ, 300 - 3, "flange pilot boss drops into the pedestal");
+		near(mountedBox.maxZ, 300 + 9, "flange plate sits on the pedestal top");
+		// The flange turns over about X, so its pin (and pedestal's matching hole) lands at -y.
+		var pinWorld = AssemblyFrames.transformPoint(flangePose, flange.pinPoint().x, flange.pinPoint().y, 0);
+		near(pinWorld.x, flange.pinPoint().x, "flange pin x on the pedestal");
+		near(pinWorld.y, -flange.pinPoint().y, "flange pin y mirrored on the pedestal");
+		near(pinWorld.z, 300, "flange pin on the pedestal top face");
+		checkOverlap(mountedFlange, pedestal.geometry(), 0, "flange and pedestal stack without overlap");
+		checkOverlap(placedAt(flange.geometry(Envelope), flangePose), pedestal.geometry(Envelope),
+			Math.PI * 15.75 * 15.75 * 3, "flange pilot boss reaches into the pedestal");
 	}
 
 	static function assembly():Void {
@@ -723,6 +997,7 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		dimensions();
 		bearings();
 		screws();
 		motors();

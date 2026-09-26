@@ -5,6 +5,7 @@ import cadkit.modeling.Vector;
 import machinekit.catalog.Catalog;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.standard.ClearanceFit;
@@ -61,8 +62,11 @@ class NemaStepper extends MachineComponent {
 	public function new(spec:NemaFrameSpec, ?bodyLength:Float) {
 		var length = bodyLength == null ? spec.bodyLength : bodyLength;
 		if (!(length > spec.mountHoleDepth)) throw 'NEMA ${spec.frame} body is too short';
-		var name = 'NEMA${spec.frame}-${Math.round(length)}';
-		super(name, 'NEMA ${spec.frame} stepper motor, ${length} mm body', null);
+		if (!(spec.boltSpacing > 0) || !(spec.face > spec.boltSpacing) || !(spec.pilotDiameter > spec.shaftDiameter)
+			|| !(spec.pilotDiameter < spec.boltSpacing * Math.sqrt(2)) || !(spec.shaftDiameter > 0) || !(spec.shaftLength > 0))
+			throw 'NEMA ${spec.frame} frame has inconsistent dimensions';
+		var bodyText = Dimension.format(length);
+		super('NEMA${spec.frame}-$bodyText', 'NEMA ${spec.frame} stepper motor, $bodyText mm body', null);
 		this.spec = spec;
 		this.bodyLength = length;
 		addConnector("mountFace", Mount, Solids.axial(0, 0, 0));

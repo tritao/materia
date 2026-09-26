@@ -2,6 +2,7 @@ package machinekit.structural;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import machinekit.component.Dimension;
 import machinekit.component.Solids;
 
 /** Solid rectangular bar, extruded along local +Z from z=0 to z=`length`, cross-section centred
@@ -17,8 +18,9 @@ class FlatBar implements StructuralProfile {
 		if (!(width > 0) || !(thickness > 0)) throw "Flat bar needs a positive width and thickness";
 		this.width = width;
 		this.thickness = thickness;
-		designation = 'FLAT-${width}x${thickness}';
-		description = 'Flat bar ${width}x${thickness}';
+		var size = '${Dimension.format(width)}x${Dimension.format(thickness)}';
+		designation = 'FLAT-$size';
+		description = 'Flat bar $size';
 	}
 
 	public function geometry(length:Float):Part {

@@ -40,6 +40,8 @@ class LinearBearing extends MachineComponent {
 		return new LinearBearing(catalog().get(designation));
 
 	public function new(spec:LinearBearingSpec) {
+		if (!(spec.boreDiameter > 0) || !(spec.outerDiameter > spec.boreDiameter) || !(spec.length > 0))
+			throw 'Linear bearing ${spec.designation} has inconsistent dimensions';
 		super(spec.designation, 'Linear ball bearing ${spec.designation}', "steel");
 		this.spec = spec;
 		addConnector("front", Face, Solids.axial(0, 0, 0));

@@ -3,6 +3,7 @@ package machinekit.motion;
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.standard.ClearanceFit;
@@ -31,19 +32,24 @@ class LeadScrewNut extends MachineComponent {
 		if (!(screwDiameter > 0)) throw "Lead screw nut needs a positive screw diameter";
 		if (!(lead > 0)) throw "Lead screw nut needs a positive lead";
 		if (boltCount < 3) throw "Lead screw nut needs at least 3 mounting bolts";
-		var bodyDia = screwDiameter * 1.8;
+		// Proportioned on the common T8 nut (10.2 mm body, 16 mm bolt circle, 22 mm flange, M3).
+		var bodyDia = screwDiameter * 1.3;
 		var bodyLen = screwDiameter * 2;
-		var flangeDia = screwDiameter * 3;
 		var flangeThick = Math.max(3, screwDiameter * 0.3);
-		var mountScrewSize = flangeDia <= 20 ? "M3" : flangeDia <= 35 ? "M4" : "M5";
-		super('LEADNUT-D${screwDiameter}-L${lead}', 'Lead screw nut, ${screwDiameter} mm screw, ${lead} mm lead', "bronze");
+		var mountScrewSize = screwDiameter <= 8 ? "M3" : screwDiameter <= 12 ? "M4" : "M5";
+		var screw = SocketHeadCapScrew.catalog().get(mountScrewSize);
+		// Holes keep 1 mm of material to the body and the screw heads 1 mm to the flange rim.
+		var boltRadius = bodyDia / 2 + screw.clearanceMedium / 2 + 1;
+		var flangeDia = 2 * Math.max(screwDiameter * 1.5, boltRadius + screw.headDiameter / 2 + 1);
+		var diameterText = Dimension.format(screwDiameter), leadText = Dimension.format(lead);
+		super('LEADNUT-D$diameterText-L$leadText', 'Lead screw nut, $diameterText mm screw, $leadText mm lead', "bronze");
 		this.screwDiameter = screwDiameter;
 		this.lead = lead;
 		bodyDiameter = bodyDia;
 		bodyLength = bodyLen;
 		flangeDiameter = flangeDia;
 		flangeThickness = flangeThick;
-		boltCircleDiameter = flangeDia * 0.75;
+		boltCircleDiameter = 2 * boltRadius;
 		this.boltCount = boltCount;
 		mountScrew = mountScrewSize;
 		addConnector("bore", Axis, Solids.axial(0, 0, bodyLength / 2));

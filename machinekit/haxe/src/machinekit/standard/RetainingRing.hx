@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
@@ -23,29 +24,33 @@ class RetainingRing extends MachineComponent {
 
 	static function rows():Array<RetainingRingSpec>
 		return [
-			{shaftDiameter: 5, grooveDiameter: 4.7, outerDiameter: 8.7, thickness: 0.6},
-			{shaftDiameter: 6, grooveDiameter: 5.6, outerDiameter: 10.0, thickness: 0.7},
-			{shaftDiameter: 8, grooveDiameter: 7.4, outerDiameter: 12.2, thickness: 0.8},
-			{shaftDiameter: 10, grooveDiameter: 9.3, outerDiameter: 15.0, thickness: 1.0},
-			{shaftDiameter: 12, grooveDiameter: 11.0, outerDiameter: 18.0, thickness: 1.0},
-			{shaftDiameter: 15, grooveDiameter: 14.0, outerDiameter: 21.0, thickness: 1.0},
-			{shaftDiameter: 17, grooveDiameter: 16.0, outerDiameter: 24.0, thickness: 1.0},
+			{shaftDiameter: 5, grooveDiameter: 4.8, outerDiameter: 8.7, thickness: 0.6},
+			{shaftDiameter: 6, grooveDiameter: 5.7, outerDiameter: 10.0, thickness: 0.7},
+			{shaftDiameter: 8, grooveDiameter: 7.6, outerDiameter: 12.2, thickness: 0.8},
+			{shaftDiameter: 10, grooveDiameter: 9.6, outerDiameter: 15.0, thickness: 1.0},
+			{shaftDiameter: 12, grooveDiameter: 11.5, outerDiameter: 18.0, thickness: 1.0},
+			{shaftDiameter: 15, grooveDiameter: 14.3, outerDiameter: 21.0, thickness: 1.0},
+			{shaftDiameter: 17, grooveDiameter: 16.2, outerDiameter: 24.0, thickness: 1.0},
 			{shaftDiameter: 20, grooveDiameter: 19.0, outerDiameter: 27.0, thickness: 1.2},
 			{shaftDiameter: 25, grooveDiameter: 23.9, outerDiameter: 34.0, thickness: 1.2},
 		];
 
 	public static function catalog():Catalog<RetainingRingSpec> {
 		if (table == null)
-			table = new Catalog("retaining ring shaft diameter", spec -> Std.string(Std.int(spec.shaftDiameter)), rows());
+			table = new Catalog("retaining ring shaft diameter", spec -> Dimension.format(spec.shaftDiameter), rows());
 		return table;
 	}
 
+	/** Ring for exactly `shaftDiameter`; throws when the catalog has no such size. */
 	public static function forShaft(shaftDiameter:Float):RetainingRing
-		return new RetainingRing(catalog().get(Std.string(Std.int(shaftDiameter))));
+		return new RetainingRing(catalog().get(Dimension.format(shaftDiameter)));
 
 	public function new(spec:RetainingRingSpec) {
-		super('DIN471-${spec.shaftDiameter}', 'External retaining ring for ${spec.shaftDiameter} mm shaft',
-			"spring steel");
+		if (!(spec.thickness > 0) || !(spec.grooveDiameter > 0) || !(spec.grooveDiameter < spec.shaftDiameter)
+			|| !(spec.outerDiameter > spec.shaftDiameter))
+			throw 'Retaining ring for ${Dimension.format(spec.shaftDiameter)} mm shaft has inconsistent dimensions';
+		var shaft = Dimension.format(spec.shaftDiameter);
+		super('DIN471-$shaft', 'External retaining ring for $shaft mm shaft', "spring steel");
 		this.spec = spec;
 		addConnector("seat", Axis, Solids.axial(0, 0, spec.thickness / 2));
 	}

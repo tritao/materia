@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
@@ -63,7 +64,8 @@ class DeepGrooveBearing extends MachineComponent {
 			throw 'Invalid deep groove bearing "${spec.designation}"';
 		super(spec.designation + (shielded ? "-2Z" : ""),
 			'Deep groove ball bearing ${spec.designation}${shielded ? " shielded" : ""} ' +
-			'${spec.bore}x${spec.outside}x${spec.width}', "bearing steel");
+			'${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}',
+			"bearing steel");
 		this.spec = spec;
 		this.shielded = shielded;
 		addConnector("front", Face, Solids.axial(0, 0, 0));

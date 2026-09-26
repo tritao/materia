@@ -3,6 +3,7 @@ package machinekit.motion;
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.standard.SocketHeadCapScrew;
@@ -29,8 +30,8 @@ class ShaftCoupling extends MachineComponent {
 		var len = length == null ? maxBore * 3 : length;
 		if (!(od > maxBore)) throw "Shaft coupling outer diameter must be larger than both bores";
 		if (!(len > 0)) throw "Shaft coupling needs a positive length";
-		super('COUPLING-${boreA}x${boreB}-${od}x${len}', 'Shaft coupling ${boreA} to ${boreB} mm, ${od}x${len}',
-			"aluminium 6061");
+		var a = Dimension.format(boreA), b = Dimension.format(boreB), size = '${Dimension.format(od)}x${Dimension.format(len)}';
+		super('COUPLING-${a}x$b-$size', 'Shaft coupling $a to $b mm, $size', "aluminium 6061");
 		this.boreA = boreA;
 		this.boreB = boreB;
 		this.outerDiameter = od;

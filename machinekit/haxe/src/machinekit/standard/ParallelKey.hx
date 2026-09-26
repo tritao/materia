@@ -5,6 +5,7 @@ import cadkit.modeling.Vector;
 import machinekit.catalog.Catalog;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
@@ -41,6 +42,7 @@ class ParallelKey extends MachineComponent {
 
 	/** Key sized for the smallest DIN 6885-1 range that covers `shaftDiameter`. */
 	public static function forShaft(shaftDiameter:Float, length:Float):ParallelKey {
+		if (!(shaftDiameter > 0)) throw "Key needs a positive shaft diameter";
 		for (designation in catalog().designations()) {
 			var spec = catalog().get(designation);
 			if (shaftDiameter <= spec.maxShaft) return new ParallelKey(spec, length);
@@ -50,8 +52,9 @@ class ParallelKey extends MachineComponent {
 
 	public function new(spec:ParallelKeySpec, length:Float) {
 		if (!(length > 0) || !Math.isFinite(length)) throw "Key needs a positive length";
-		super('DIN6885-${spec.width}x${spec.height}x${length}',
-			'Parallel key ${spec.width}x${spec.height}, ${length} mm long', "steel C45");
+		var size = '${Dimension.format(spec.width)}x${Dimension.format(spec.height)}';
+		super('DIN6885-${size}x${Dimension.format(length)}', 'Parallel key $size, ${Dimension.format(length)} mm long',
+			"steel C45");
 		this.spec = spec;
 		this.length = length;
 		addConnector("seat", Face, Solids.axial(0, 0, length / 2));

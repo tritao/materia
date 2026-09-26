@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
@@ -44,7 +45,11 @@ class SocketHeadCapScrew extends MachineComponent {
 
 	public function new(spec:MetricScrewSpec, length:Float, material:String = "steel 12.9") {
 		if (!(length > 0) || !Math.isFinite(length)) throw 'Screw ${spec.size} needs a positive length';
-		var name = '${spec.size}x${formatLength(length)}';
+		if (!(spec.diameter > 0) || !(spec.headDiameter > spec.diameter) || !(spec.headHeight > spec.socketDepth)
+			|| !(spec.tapDrill < spec.diameter) || !(spec.clearanceFine > spec.diameter)
+			|| !(spec.counterboreDiameter > spec.headDiameter) || !(spec.counterboreDepth > spec.headHeight))
+			throw 'Screw ${spec.size} has inconsistent dimensions';
+		var name = '${spec.size}x${Dimension.format(length)}';
 		super('ISO4762-$name', 'Socket head cap screw $name', material);
 		this.spec = spec;
 		this.length = length;
@@ -90,9 +95,6 @@ class SocketHeadCapScrew extends MachineComponent {
 	function get_diameter():Float return spec.diameter;
 	function get_pitch():Float return spec.pitch;
 	function get_threadLength():Float return Math.min(length, spec.threadLength);
-
-	static function formatLength(value:Float):String
-		return value == Math.ffloor(value) ? Std.string(Std.int(value)) : Std.string(value);
 
 	static function row(size:String, diameter:Float, pitch:Float, headDiameter:Float, headHeight:Float,
 			socketSize:Float, socketDepth:Float, threadLength:Float, tapDrill:Float, fine:Float,

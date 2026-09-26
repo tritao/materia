@@ -4,16 +4,21 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
 /** Roller chain sprocket with a simplified tooth outline (straight flanks between root and tip
  * radii, not the true ANSI B29.1 seating-curve profile), extruded along local +Z.
+ * Diameters follow the standard relations: pitch diameter p / sin(pi/z), root (seating) diameter
+ * pitch diameter minus the roller diameter, outside diameter p * (0.6 + cot(pi/z)). The roller
+ * diameter defaults to 0.625 p (ANSI #40..#240 proportion); pass the chain's actual roller.
  * CAD frame: front face at z=0, back face at z=thickness, matching `DeepGrooveBearing`.
  * Connectors: `front`, `back` (faces) and `axis` (mid-thickness), all with +Y along +Z.
  */
 class Sprocket extends MachineComponent {
 	public final pitch:Float;
+	public final rollerDiameter:Float;
 	public final teeth:Int;
 	public final boreDiameter:Float;
 	public final thickness:Float;
@@ -21,19 +26,22 @@ class Sprocket extends MachineComponent {
 	public final outsideDiameter:Float;
 	public final rootDiameter:Float;
 
-	public function new(pitch:Float, teeth:Int, boreDiameter:Float, thickness:Float) {
+	public function new(pitch:Float, teeth:Int, boreDiameter:Float, thickness:Float, ?rollerDiameter:Float) {
 		if (!(pitch > 0)) throw "Sprocket needs a positive chain pitch";
 		if (teeth < 8) throw "Sprocket needs at least 8 teeth";
 		if (!(boreDiameter > 0)) throw "Sprocket needs a positive bore diameter";
 		if (!(thickness > 0)) throw "Sprocket needs a positive thickness";
+		var roller = rollerDiameter == null ? 0.625 * pitch : rollerDiameter;
+		if (!(roller > 0) || !(roller < pitch)) throw "Sprocket roller diameter must be positive and less than the pitch";
 		var pitchDia = pitch / Math.sin(Math.PI / teeth);
-		var outsideDia = pitchDia + 0.8 * pitch;
-		var rootDia = pitchDia - pitch;
+		var outsideDia = pitch * (0.6 + Math.cos(Math.PI / teeth) / Math.sin(Math.PI / teeth));
+		var rootDia = pitchDia - roller;
 		if (!(rootDia > boreDiameter))
-			throw "Sprocket root diameter must clear the bore; use fewer teeth or a smaller bore";
-		var pitchText = formatDecimal(pitch);
+			throw "Sprocket root diameter must clear the bore; use more teeth or a smaller bore";
+		var pitchText = Dimension.format(pitch);
 		super('SPROCKET-P$pitchText-${teeth}T', 'Sprocket, $pitchText mm pitch, ${teeth} teeth', "steel");
 		this.pitch = pitch;
+		this.rollerDiameter = roller;
 		this.teeth = teeth;
 		this.boreDiameter = boreDiameter;
 		this.thickness = thickness;
@@ -48,20 +56,6 @@ class Sprocket extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Solids.prism(profile(), 0, thickness);
 		return Solids.cut(body, [Solids.cylinder(boreDiameter / 2, -0.1, thickness + 0.1)]);
-	}
-
-	/** Rounds to 3 decimal places and trims trailing zeros; avoids printing a binary float's full
-	 * imprecise expansion (e.g. 12.7) for designations built from non-power-of-two pitches.
-	 */
-	static function formatDecimal(value:Float):String {
-		var scaled:Int = Math.round(value * 1000);
-		var whole:Int = Std.int(scaled / 1000);
-		var frac = scaled - whole * 1000;
-		if (frac == 0) return Std.string(whole);
-		var digits = Std.string(frac);
-		while (digits.length < 3) digits = "0" + digits;
-		while (digits.length > 1 && digits.charAt(digits.length - 1) == "0") digits = digits.substr(0, digits.length - 1);
-		return '$whole.$digits';
 	}
 
 	function profile():Array<Vector> {

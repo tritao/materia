@@ -3,6 +3,7 @@ package machinekit.standard;
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
+import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
@@ -24,7 +25,8 @@ class Bushing extends MachineComponent {
 		var len = length == null ? boreDiameter * 1.5 : length;
 		if (!(od > boreDiameter)) throw "Bushing outer diameter must be larger than the bore";
 		if (!(len > 0)) throw "Bushing needs a positive length";
-		super('BUSHING-${boreDiameter}x${od}x${len}', 'Plain bushing ${boreDiameter}x${od}x${len}', "bronze");
+		var size = '${Dimension.format(boreDiameter)}x${Dimension.format(od)}x${Dimension.format(len)}';
+		super('BUSHING-$size', 'Plain bushing $size', "bronze");
 		this.boreDiameter = boreDiameter;
 		this.outerDiameter = od;
 		this.length = len;

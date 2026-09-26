@@ -15,7 +15,10 @@ interface StructuralProfile {
 	function geometry(length:Float):Part;
 }
 
-/** Lengths of one profile aggregated across every member that uses it. */
+/** Lengths of one profile aggregated across every member that uses it. `totalLength` sums the
+ * members' centreline (node-to-node) lengths: members are not trimmed or mitred at joints, so
+ * the stock actually cut is shorter by whatever the joint detailing removes.
+ */
 typedef CutListLine = {
 	var designation:String;
 	var description:String;
@@ -27,10 +30,15 @@ typedef CutListLine = {
  * between two points. A frame is one rigid weldment, not a kinematic mechanism, so members carry
  * no assembly joints: `geometry(name)` returns the member's `Part` already placed in world space.
  *
- * A member's local +X (a channel's open side, an angle's leg corner, ...) follows `reference`
- * projected perpendicular to the member's axis; `reference` defaults to +Z, or +Y when the member
- * is nearly vertical, matching the axis-picking convention CadKit's own examples use for
- * arbitrary-direction placement.
+ * Members are placed by centreline, node to node: they overlap where they meet (no trimming,
+ * mitring, or coping), and `length`/`cutList` report those untrimmed centreline lengths.
+ *
+ * Section orientation: the profile's local +Z runs from `start` to `end`, its local +Y (a
+ * channel's `height`, an angle's `legB`, a tube's `height`) follows `reference` projected
+ * perpendicular to the member's axis, and its local +X is +Y x +Z. `reference` defaults to +Z,
+ * or +Y when the member is nearly vertical, matching the axis-picking convention CadKit's own
+ * examples use for arbitrary-direction placement; a `reference` parallel to the member is an
+ * error.
  */
 typedef FrameMember = {
 	var name:String;
@@ -57,10 +65,11 @@ class FrameAssembly {
 		if (!points.exists(start)) throw 'Unknown frame point "$start"';
 		if (!points.exists(end)) throw 'Unknown frame point "$end"';
 		if (start == end) throw 'Member "$name" needs distinct endpoints';
+		if (reference != null && !(reference.length() > 1e-9)) throw 'Member "$name" reference has zero length';
 		members.push({name: name, start: start, end: end, profile: profile, reference: reference});
 	}
 
-	/** Straight-line distance between a member's endpoints. */
+	/** Straight-line (centreline, untrimmed) distance between a member's endpoints. */
 	public function length(name:String):Float {
 		var m = find(name);
 		return points.get(m.end).subtract(points.get(m.start)).length();
@@ -76,7 +85,12 @@ class FrameAssembly {
 		var direction = axis.scale(1 / len);
 		var reference = m.reference != null ? m.reference
 			: (Math.abs(direction.dot(Vector.Z())) < 0.9 ? Vector.Z() : Vector.Y());
-		var sideways = direction.cross(reference).normalized();
+		// Local X = reference x direction makes local Y = direction x X the reference's
+		// component perpendicular to the member.
+		var sideways = reference.cross(direction);
+		if (!(sideways.length() > 1e-6 * reference.length()))
+			throw 'Member "$name" reference is parallel to its axis; pick a reference across the member';
+		sideways = sideways.normalized();
 		var body = m.profile.geometry(len);
 		try {
 			var placed = body.placed(new Location(new Plane(start, sideways, direction)));
@@ -88,7 +102,7 @@ class FrameAssembly {
 		}
 	}
 
-	/** Lengths aggregated by profile designation, in first-used order. */
+	/** Centreline (untrimmed) lengths aggregated by profile designation, in first-used order. */
 	public function cutList():Array<CutListLine> {
 		var byDesignation:Map<String, CutListLine> = new Map();
 		var order:Array<String> = [];
