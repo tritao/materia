@@ -380,8 +380,15 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
         target.max_force = targets[index].max_force;
         backend_targets.push_back(target);
     }
-    return backend->set_joint_targets(backend_targets.empty() ? nullptr : backend_targets.data(),
-                                      static_cast<std::uint32_t>(backend_targets.size()));
+    const auto result = backend->set_joint_targets(
+        backend_targets.empty() ? nullptr : backend_targets.data(),
+        static_cast<std::uint32_t>(backend_targets.size()));
+    if (result != NKSIM_OK)
+        return result;
+    // F4: an instant position-mode target can move a body kinematically in
+    // the backend right away; pull that back so an immediate
+    // get_body_state/get_joint_state observes it, not just the next step().
+    return read_backend_state();
 }
 
 nksim_result World::snapshot(std::shared_ptr<Snapshot> &out_snapshot) const {
@@ -520,8 +527,12 @@ nksim_result World::set_body_state(nksim_body body, const nksim_body_state &stat
     value->state.body = body;
     value->state.node = value->desc.node;
     const auto result = set_backend_body_state(*value);
-    if (result != NKSIM_OK) value->state = previous;
-    return result;
+    if (result != NKSIM_OK) { value->state = previous; return result; }
+    // F4: a root's new pose (or a reset child's zeroed joint) can move other
+    // bodies kinematically in the backend; pull every body/joint's resulting
+    // state back so an immediate get_body_state/get_joint_state observes it,
+    // not just the next step().
+    return read_backend_state();
 }
 
 nksim_result World::reset_body(nksim_body body) {
@@ -533,8 +544,8 @@ nksim_result World::reset_body(nksim_body body) {
     const auto previous = value->state;
     value->state = value->initial_state;
     const auto result = set_backend_body_state(*value);
-    if (result != NKSIM_OK) value->state = previous;
-    return result;
+    if (result != NKSIM_OK) { value->state = previous; return result; }
+    return read_backend_state();
 }
 
 nksim_result World::reset() {
@@ -556,7 +567,10 @@ nksim_result World::reset() {
     });
     clock.time = 0.0;
     clock.step_index = 0;
-    return NKSIM_OK;
+    // F4: re-derive every body's pose from the now-reset backend joint/body
+    // state (a joint-connected body's rest pose may depend on another
+    // body's, so this is not simply each body's own initial_state again).
+    return read_backend_state();
 }
 
 namespace {

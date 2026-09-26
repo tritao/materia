@@ -445,6 +445,39 @@ Self-collision within one robot is not modelled at all (no pair excluded
 by this rule can ever contact another member of the same robot); a real
 robot-self-collision model is future work, not part of this milestone.
 
+### Default backend kinematic link placement (M8.5, F4)
+
+The default (test) `PhysicsBackend` used to track a joint's position as a
+bare number: a joint-connected `DYNAMIC` body never moved with it and
+instead free-fell under gravity like an unconnected body.
+`TestPhysicsBackend::recompute_articulated_poses` now recomputes every
+joint-connected `DYNAMIC` body's world pose from its parent and current
+joint position, in topological order:
+`world_T_child = world_T_parent . T(anchor_a, rotation_a) . M(q) . T(anchor_b, rotation_b)^-1`
+(`M(q)` built from the joint-frame axis recovered from `axis_a`/`rotation_a`,
+the same composition `KinematicChain`'s FK and F1's rest-pose fix use). A
+joint-connected `DYNAMIC` body no longer accumulates gravity/force in
+`step()`; its linear/angular velocity is instead set by finite difference
+from the recompute so IMU-style consumers on arm links still read something
+physical. A `KINEMATIC`/`STATIC` body with an "incoming joint" (e.g. an
+externally-scripted second link, as one existing test uses) is left alone —
+only a `DYNAMIC` child's pose is derived this way. The recompute runs after
+every substep in `step()`, after `set_joint_targets` (an instant
+position-mode target moves the body right away, since this backend applies
+targets exactly with no interpolation), and after `body_set_state` (a root's
+new pose carries its whole subtree; a constrained `DYNAMIC` child can only
+be reset to its declared rest pose, which zeroes its incoming joint,
+mirroring the MuJoCo backend's own convention — never teleported
+independently). It rejects a cyclic joint graph with
+`NKSIM_ERROR_INVALID_ARGUMENT`, and clamps a joint's position to
+`[lower_limit, upper_limit]` whenever `lower_limit < upper_limit`. Because a
+kinematic cascade triggered by `body_set_state`/`set_joint_targets` can move
+other bodies the caller never touched directly, `World::set_body_state`,
+`World::reset_body`, `World::reset`, and `World::set_joint_targets` now
+re-read every body's and joint's state back from the backend afterward, so
+an immediate `nksim_body_get_state`/`nksim_joint_get_state` observes the
+cascade rather than only the next `step()`.
+
 ## Deployment boundary
 
 `robotd` remains one robot. It assigns every connection a unique session ID,

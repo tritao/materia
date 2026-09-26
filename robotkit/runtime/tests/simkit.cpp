@@ -94,8 +94,12 @@ void shared_world_steps_once() {
     assert(first_state.received_timestamp_ns > 1000);
     assert(second_state.received_timestamp_ns >= first_state.received_timestamp_ns);
     assert(first_state.sensors[1].sequence == 0); // IMU derivative needs two samples.
-    assert(std::abs(first_state.sensors[2].values[0] - 0.95) < 1e-9);
-    assert(std::abs(second_state.sensors[2].values[4] - 0.95) < 1e-9);
+    // F4: joint-connected links now genuinely rotate with their commanded
+    // joint position instead of staying at their identity rest orientation,
+    // so each robot's small link box presents a slightly different face to
+    // the other robot's LIDAR ray than the pre-F4 (always axis-aligned) box.
+    assert(std::abs(first_state.sensors[2].values[0] - 0.947662419923) < 1e-9);
+    assert(std::abs(second_state.sensors[2].values[4] - 0.945714778581) < 1e-9);
     assert(first_state.sensors[2].values[4] == 10.0); // Own geometry excluded.
     assert(std::abs(first_state.position[0] - 0.4) < 1e-12);
     assert(std::abs(second_state.position[0] + 0.3) < 1e-12);

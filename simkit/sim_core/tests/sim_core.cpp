@@ -361,6 +361,95 @@ void batched_joint_targets_are_accepted() {
     nkscene_scene_destroy(scene);
 }
 
+void joint_child_bodies_follow_their_joint_in_default_backend() {
+    // F4: the default (test) backend used to track joint positions as
+    // numbers only; a joint-connected DYNAMIC body never moved with its
+    // joint and instead free-fell under gravity like an unconnected body.
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto base_node = make_node(scene, 0.0);
+    const auto arm_node = make_node(scene, 1.0);
+
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 1;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+
+    nksim_body_desc base_desc{};
+    base_desc.struct_size = sizeof(base_desc);
+    base_desc.node = base_node;
+    base_desc.motion_type = NKSIM_MOTION_STATIC;
+    nksim_body base = 0;
+    assert(nksim_body_create(world, &base_desc, &base) == NKSIM_OK);
+
+    nksim_body_desc arm_desc{};
+    arm_desc.struct_size = sizeof(arm_desc);
+    arm_desc.node = arm_node;
+    arm_desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    arm_desc.mass = 1.0;
+    nksim_body arm = 0;
+    assert(nksim_body_create(world, &arm_desc, &arm) == NKSIM_OK);
+
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = base;
+    joint_desc.body_b = arm;
+    joint_desc.axis_a[2] = 1.0;
+    joint_desc.anchor_b[0] = -1.0; // Pivot at the base's origin; the arm's rest pose is 1m out.
+    joint_desc.max_force = 1000.0;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = joint;
+    target.mode = NKSIM_JOINT_TARGET_POSITION;
+    target.target = 1.5707963267948966; // pi/2
+    target.max_force = 1000.0;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+
+    for (int index = 0; index < 5; ++index) {
+        nksim_step_result step{};
+        step.struct_size = sizeof(step);
+        assert(nksim_world_step(world, &step) == NKSIM_OK);
+        nkscene_change_set_destroy(step.scene_changes);
+    }
+
+    nksim_joint_state joint_state{};
+    joint_state.struct_size = sizeof(joint_state);
+    assert(nksim_joint_get_state(world, joint, &joint_state) == NKSIM_OK);
+    nksim_body_state arm_state{};
+    arm_state.struct_size = sizeof(arm_state);
+    assert(nksim_body_get_state(world, arm, &arm_state) == NKSIM_OK);
+    // The arm swings with the joint, from the base's pivot, and does not
+    // free-fall independently under gravity.
+    assert(std::abs(arm_state.position[0] - std::cos(joint_state.position)) < 1e-6);
+    assert(std::abs(arm_state.position[1] - std::sin(joint_state.position)) < 1e-6);
+    assert(std::abs(arm_state.position[2]) < 1e-9);
+
+    // Teleporting the (static) root carries the arm along with it.
+    nksim_body_state base_state{};
+    base_state.struct_size = sizeof(base_state);
+    assert(nksim_body_get_state(world, base, &base_state) == NKSIM_OK);
+    base_state.position[0] = 5.0;
+    base_state.position[1] = 2.0;
+    assert(nksim_body_set_state(world, base, &base_state) == NKSIM_OK);
+    assert(nksim_body_get_state(world, arm, &arm_state) == NKSIM_OK);
+    assert(std::abs(arm_state.position[0] - (5.0 + std::cos(joint_state.position))) < 1e-6);
+    assert(std::abs(arm_state.position[1] - (2.0 + std::sin(joint_state.position))) < 1e-6);
+
+    nksim_joint_destroy(world, joint);
+    nksim_body_destroy(world, arm);
+    nksim_body_destroy(world, base);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -368,5 +457,6 @@ int main() {
     nested_dynamic_body_updates_local_transform();
     repeated_replays_are_identical();
     batched_joint_targets_are_accepted();
+    joint_child_bodies_follow_their_joint_in_default_backend();
     return 0;
 }

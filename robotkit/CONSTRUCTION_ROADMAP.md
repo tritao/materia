@@ -702,6 +702,41 @@ pair of bodies within one group is excluded, not just adjacent ones. `ctest
 -L sim` and the MuJoCo-enabled native robotd build are green except the
 same pre-existing `robotkit_mujoco_tests` failure logged under F1.
 
+**M8.5 F4** (default backend never moved joint-connected bodies): wrote a
+failing test first
+(`joint_child_bodies_follow_their_joint_in_default_backend` in
+`simkit/sim_core/tests/sim_core.cpp` — a base+arm revolute joint commanded
+to pi/2 should swing the arm from the base's pivot and a root teleport
+should carry it, but the arm's position never moved at all) then
+implemented `TestPhysicsBackend::recompute_articulated_poses`
+(`simkit/sim_core/src/physics_backend.cpp`) per the plan's formula, gated
+`step()`'s gravity/force integration to skip a `DYNAMIC` body with an
+incoming joint, and wired the recompute into `step()` (per substep),
+`set_joint_targets`, and `body_set_state`. Two deviations from a literal
+reading of the plan, both logged: (1) a body with an incoming joint is only
+kinematically driven when it is itself `DYNAMIC` — `batched_joint_targets_are_accepted`
+(`simkit/sim_core/tests/sim_core.cpp`) deliberately uses a `KINEMATIC`
+second body to model an externally-scripted link, and the plan's literal
+"recompute each child body" would have zeroed that joint every tick via
+`refresh_kinematic_bodies`'s own `body_set_state` calls, breaking that
+existing, intentional use; (2) `World::set_body_state`/`reset_body`/`reset`/
+`set_joint_targets` (`simkit/sim_core/src/world.cpp`) now call
+`read_backend_state()` after the backend call succeeds — without it, the
+recompute happens correctly inside the backend but the *world's own cached*
+body/joint state (what `nksim_body_get_state`/`nksim_joint_get_state`
+actually read) stayed stale until the next `step()`, silently failing the
+plan's own "Teleporting the root carries the arm in both" acceptance
+criterion. `robotkit/runtime/tests/simkit.cpp`'s `shared_world_steps_once`
+asserted an exact LIDAR ray distance calibrated against the old (never
+rotating) link geometry; updated the two expected constants to the new,
+correct values now that a commanded joint position genuinely rotates its
+link (recomputed by stepping and printing, not guessed) — noted here per
+the plan's "adjust any test that assumed otherwise" allowance.
+`ctest -L sim`, the full Haxe suite (674 assertions, unchanged), and the
+MuJoCo-enabled native robotd build are green except the same pre-existing
+`robotkit_mujoco_tests` failure logged under F1 (unrelated to the default
+backend).
+
 **M5**: added `robotkit/haxe/robotkit/work/` (`Point2`, `Polygon2`,
 `WorkSurfaceId`, `SourceKind`, `Provenance`, `WorkSurface`,
 `RasterToolpathGenerator`, `CoverageMap`) and
