@@ -4107,13 +4107,13 @@ class FrameworkSmoke {
 				node.styleType == "text-field") centeredSearch = node;
 		});
 		if (centeredSearch == null) return false;
-		var caretAbovePanel = false;
+		var localCaretLayer = false;
 		centeredSearch.walk(function(node) {
 			if (node.layout.visualKind == LayoutVisualKind.Custom &&
-				node.layout.style.zIndex > centeredPanel.layout.style.zIndex)
-				caretAbovePanel = true;
+				node.layout.style.zIndex == 2)
+				localCaretLayer = true;
 		});
-		if (!caretAbovePanel) return false;
+		if (!localCaretLayer) return false;
 		uiContext.key(UiEventKind.KeyDown, UiKey.Down);
 		uiContext.key(UiEventKind.KeyDown, UiKey.R, UiModifier.Control);
 		if (sceneNudges != 0 || surfaceRuns != 1)

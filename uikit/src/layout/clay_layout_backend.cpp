@@ -389,7 +389,7 @@ Clay_ElementId element_id(uint32_t id) {
     return Clay_GetElementIdWithIndex(CLAY_STRING("NativeKitNode"), id);
 }
 
-Clay_ElementDeclaration declaration_for(const LayoutNode &node) {
+Clay_ElementDeclaration declaration_for(const LayoutNode &node, int32_t layer_z) {
     Clay_ElementDeclaration declaration{};
     declaration.layout.sizing.width = clay_axis(node.style.width);
     declaration.layout.sizing.height = clay_axis(node.style.height);
@@ -413,7 +413,7 @@ Clay_ElementDeclaration declaration_for(const LayoutNode &node) {
     declaration.aspectRatio.aspectRatio = node.style.aspect_ratio;
     if (node.style.positioning == LayoutPositioning::Absolute) {
         declaration.floating.offset = {node.style.position_x, node.style.position_y};
-        declaration.floating.zIndex = static_cast<int16_t>(node.style.z_index);
+        declaration.floating.zIndex = static_cast<int16_t>(layer_z);
         declaration.floating.attachPoints = {CLAY_ATTACH_POINT_LEFT_TOP,
                                              CLAY_ATTACH_POINT_LEFT_TOP};
         declaration.floating.attachTo = CLAY_ATTACH_TO_PARENT;
@@ -431,11 +431,12 @@ Clay_ElementDeclaration declaration_for(const LayoutNode &node) {
     return declaration;
 }
 
-template <typename LayoutState> void append_node(LayoutState &state, std::size_t index) {
+template <typename LayoutState> void append_node(LayoutState &state, std::size_t index,
+                                                const std::vector<int32_t> &layers) {
     const auto &node = (*state.nodes)[index];
     const Clay_ElementId id = state.element_ids[index];
     Clay__OpenElementWithId(id);
-    Clay__ConfigureOpenElement(declaration_for(node));
+    Clay__ConfigureOpenElement(declaration_for(node, layers[index]));
 
     if (node.visual_kind == LayoutVisualKind::Text) {
         Clay_TextElementConfig text_config{};
@@ -452,7 +453,7 @@ template <typename LayoutState> void append_node(LayoutState &state, std::size_t
     }
 
     for (const std::size_t child : state.children[index])
-        append_node(state, child);
+        append_node(state, child, layers);
 
     Clay__CloseElement();
 }
@@ -751,9 +752,59 @@ bool LayoutEngine::Impl::layout(const std::vector<LayoutNode> &nodes, float widt
         return false;
     }
 
+    // Clay has one global floating z-index space. Assign ranks to nested
+    // floating contexts so every child stays within its parent's layer and
+    // sibling contexts retain their local z-index and declaration order.
+    std::vector<std::vector<std::size_t>> floating_children(nodes.size());
+    const auto collect_floating = [&](auto &&self, std::size_t index,
+                                      std::size_t owner) -> void {
+        if (index != root && nodes[index].style.positioning == LayoutPositioning::Absolute) {
+            floating_children[owner].push_back(index);
+            owner = index;
+        }
+        for (const std::size_t child : state.children[index])
+            self(self, child, owner);
+    };
+    collect_floating(collect_floating, root, root);
+    std::vector<std::size_t> context_order;
+    const auto order_floating = [&](auto &&self, std::size_t owner) -> void {
+        auto &children = floating_children[owner];
+        std::stable_sort(children.begin(), children.end(), [&](std::size_t left,
+                                                               std::size_t right) {
+            return nodes[left].style.z_index < nodes[right].style.z_index;
+        });
+        for (const std::size_t child : children)
+            if (nodes[child].style.z_index < 0) self(self, child);
+        context_order.push_back(owner);
+        for (const std::size_t child : children)
+            if (nodes[child].style.z_index >= 0) self(self, child);
+    };
+    order_floating(order_floating, root);
+    const auto root_order = std::find(context_order.begin(), context_order.end(), root);
+    std::vector<int32_t> layers(nodes.size(), 0);
+    for (std::size_t order = 0; order < context_order.size(); ++order) {
+        const auto rank = static_cast<int64_t>(order) - (root_order - context_order.begin());
+        if (rank < std::numeric_limits<int16_t>::min() ||
+            rank > std::numeric_limits<int16_t>::max()) {
+            if (error)
+                error->message = "layout has too many floating layers";
+            return false;
+        }
+        layers[context_order[order]] = static_cast<int32_t>(rank);
+    }
+    const auto assign_layers = [&](auto &&self, std::size_t index,
+                                   int32_t owner_layer) -> void {
+        if (index != root && nodes[index].style.positioning == LayoutPositioning::Absolute)
+            owner_layer = layers[index];
+        layers[index] = owner_layer;
+        for (const std::size_t child : state.children[index])
+            self(self, child, owner_layer);
+    };
+    assign_layers(assign_layers, root, 0);
+
     Clay_SetLayoutDimensions({width, height});
     Clay_BeginLayout();
-    append_node(state, root);
+    append_node(state, root, layers);
     const Clay_RenderCommandArray commands = Clay_EndLayout(delta_seconds);
     if (!state.clay_error.empty()) {
         if (error)
@@ -981,7 +1032,7 @@ bool LayoutEngine::Impl::layout(const std::vector<LayoutNode> &nodes, float widt
         const auto &node = nodes[index];
         const uint64_t node_order = traversal_order++;
         if (node.style.positioning == LayoutPositioning::Absolute) {
-            layer_z = node.style.z_index;
+            layer_z = layers[index];
             floating = true;
             owner_order = node_order;
         }

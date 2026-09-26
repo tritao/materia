@@ -265,6 +265,86 @@ int main(int argc, char **argv) {
         equal_first_draw >= equal_second_draw)
         return 30;
 
+    // A floating decoration belongs to its modal panel's layer even when its
+    // local z-index is smaller than the modal backdrop's root-level z-index.
+    LayoutNode overlay_root = box(406, -1);
+    overlay_root.style.width = {LayoutSizing::Fixed, 100.0f};
+    overlay_root.style.height = {LayoutSizing::Fixed, 80.0f};
+    LayoutNode overlay = box(407, 0);
+    overlay.style.positioning = LayoutPositioning::Absolute;
+    overlay.style.z_index = 1000;
+    overlay.style.width = {LayoutSizing::Fixed, 100.0f};
+    overlay.style.height = {LayoutSizing::Fixed, 80.0f};
+    LayoutNode backdrop = box(408, 1);
+    backdrop.style.positioning = LayoutPositioning::Absolute;
+    backdrop.style.z_index = 1000;
+    backdrop.style.width = {LayoutSizing::Fixed, 100.0f};
+    backdrop.style.height = {LayoutSizing::Fixed, 80.0f};
+    backdrop.style.background = {0.0f, 0.0f, 0.0f, 1.0f};
+    LayoutNode modal_panel = box(409, 1);
+    modal_panel.style.positioning = LayoutPositioning::Absolute;
+    modal_panel.style.z_index = 1001;
+    modal_panel.style.width = {LayoutSizing::Fixed, 80.0f};
+    modal_panel.style.height = {LayoutSizing::Fixed, 60.0f};
+    modal_panel.style.background = {1.0f, 1.0f, 1.0f, 1.0f};
+    LayoutNode field = box(413, 3);
+    field.style.width = {LayoutSizing::Fixed, 60.0f};
+    field.style.height = {LayoutSizing::Fixed, 20.0f};
+    LayoutNode caret = box(414, 4);
+    caret.style.positioning = LayoutPositioning::Absolute;
+    caret.style.z_index = 2;
+    caret.style.width = {LayoutSizing::Fixed, 2.0f};
+    caret.style.height = {LayoutSizing::Fixed, 16.0f};
+    caret.style.background = {1.0f, 0.0f, 0.0f, 1.0f};
+    std::vector<LayoutNode> overlay_nodes{overlay_root, overlay, backdrop, modal_panel, field, caret};
+    if (!engine.layout(overlay_nodes, 100.0f, 80.0f, 1.0f / 60.0f, snapshot, &error))
+        return 58;
+    const auto *backdrop_item = snapshot.find(408);
+    const auto *modal_panel_item = snapshot.find(409);
+    const auto *caret_item = snapshot.find(414);
+    auto caret_draw = std::find_if(snapshot.primitives.begin(), snapshot.primitives.end(),
+        [](const LayoutPrimitive &primitive) {
+            return primitive.node_id == 414 && primitive.kind == LayoutPrimitiveKind::Rectangle;
+        });
+    const auto panel_draw = std::find_if(snapshot.primitives.begin(), snapshot.primitives.end(),
+        [](const LayoutPrimitive &primitive) {
+            return primitive.node_id == 409 && primitive.kind == LayoutPrimitiveKind::Rectangle;
+        });
+    if (!backdrop_item || !modal_panel_item || !caret_item ||
+        caret_item->paint_order <= backdrop_item->paint_order ||
+        caret_item->paint_order <= modal_panel_item->paint_order ||
+        caret_draw == snapshot.primitives.end() || panel_draw == snapshot.primitives.end() ||
+        caret_draw <= panel_draw)
+        return 59;
+
+    // A nested decoration must also stay below a later sibling context,
+    // regardless of how large its local z-index is.
+    LayoutNode later_popup = box(415, 0);
+    later_popup.style.positioning = LayoutPositioning::Absolute;
+    later_popup.style.z_index = 1002;
+    later_popup.style.width = {LayoutSizing::Fixed, 60.0f};
+    later_popup.style.height = {LayoutSizing::Fixed, 40.0f};
+    later_popup.style.background = {0.0f, 0.0f, 1.0f, 1.0f};
+    overlay_nodes[5].style.z_index = 32000;
+    overlay_nodes.push_back(later_popup);
+    if (!engine.layout(overlay_nodes, 100.0f, 80.0f, 1.0f / 60.0f, snapshot, &error))
+        return 60;
+    const auto *later_popup_item = snapshot.find(415);
+    caret_item = snapshot.find(414);
+    caret_draw = std::find_if(snapshot.primitives.begin(), snapshot.primitives.end(),
+        [](const LayoutPrimitive &primitive) {
+            return primitive.node_id == 414 && primitive.kind == LayoutPrimitiveKind::Rectangle;
+        });
+    const auto later_popup_draw = std::find_if(snapshot.primitives.begin(), snapshot.primitives.end(),
+        [](const LayoutPrimitive &primitive) {
+            return primitive.node_id == 415 && primitive.kind == LayoutPrimitiveKind::Rectangle;
+        });
+    if (!later_popup_item || !caret_item ||
+        caret_item->paint_order >= later_popup_item->paint_order ||
+        caret_draw == snapshot.primitives.end() || later_popup_draw == snapshot.primitives.end() ||
+        caret_draw >= later_popup_draw)
+        return 61;
+
     LayoutNode clip_root = box(410, -1);
     clip_root.style.width = {LayoutSizing::Fixed, 100.0f};
     clip_root.style.height = {LayoutSizing::Fixed, 80.0f};

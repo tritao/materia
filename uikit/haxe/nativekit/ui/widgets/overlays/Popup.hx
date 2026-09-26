@@ -118,11 +118,6 @@ class Popup implements View {
 			panel.computedStyle = panelComputed;
 			var content = context.withStyleParent(panelComputed, function() return
 				context.withScope(new Key("content"), function() return child.build(context)));
-			// Floating child decorations use layer numbers local to the popup panel.
-			// Clay compares floating layers globally, so include the panel's layer
-			// before submitting the subtree. This keeps carets and selection above
-			// the modal backdrop even when the popup uses a high layer number.
-			if (layerZIndex != 0) offsetFloatingLayers(content, layerZIndex + 1);
 			panel.add(content);
 			root.add(panel);
 			root.on(UiEventKind.KeyDown, function(event) {
@@ -137,14 +132,4 @@ class Popup implements View {
 
 	static inline function finite(value:Float):Bool
 		return value == value && value - value == 0.0;
-
-	static function offsetFloatingLayers(node:RenderNode, base:Int):Void {
-		if (node.layout.style.positioning == LayoutPositioning.Absolute) {
-			base += node.layout.style.zIndex;
-			if (base < -32768 || base > 32767)
-				throw "Popup child layer exceeds the supported z-index range";
-			node.layout.style.zIndex = base;
-		}
-		for (child in node.children) offsetFloatingLayers(child, base);
-	}
 }
