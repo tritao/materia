@@ -480,6 +480,52 @@ already implements for the planar frame tree; `robotkit.manipulation`'s
 forward kinematics is the full-3D version of that same read, not a new
 convention.
 
+## Kinematic chains and IK
+
+`robotkit.manipulation` sits above `robotkit.spatial` and below the future
+`robotkit.tool`/`robotkit.process` layers (milestones 3-4); it does not
+touch `Robot`, `RobotRuntime`, or the native runtime.
+
+`KinematicChain` walks a `RobotModel`'s `Joint`s from a base `LinkId` to a
+tip, which is either a link's own origin or a mounted `Frame`
+(`ChainTip.Link`/`ChainTip.Frame`), using the joint-frame convention
+documented above. Revolute and continuous joints become rotational degrees
+of freedom, prismatic joints become translational ones, fixed joints fold
+into constant transforms, and any other joint type (`Floating`, or an
+unrecognized value) is a construction error — the same restriction
+`RobotRuntimeCompiler` enforces. `forwardKinematics(q)` returns
+`base_T_tip`; `allLinkTransforms(q)` returns `base_T_link` for the base
+link and every link visited along the chain; `jacobian(q)` returns the
+geometric Jacobian as 6 rows (linear x/y/z, then angular x/y/z) by `n`
+degrees of freedom, expressed in the base frame — the same row order as
+`Twist3`'s `(linear, angular)` fields.
+
+`JointGroup` is an ordered, named joint/limit selection independent of any
+one chain (`JointGroup.fromChain` is the common case). A joint whose
+limits have `lower >= upper` — `JointLimits`'s own default, and the
+existing convention for continuous joints — is treated as unlimited and is
+never clamped.
+
+`InverseKinematics.solve` is damped least squares (Levenberg-Marquardt
+style) against the normal equations `(J^T J + λ^2 I) dq = J^T e`, with
+joint limits clamped every iteration. The orientation error is the exact
+axis-angle (log-map) rotation from the current tip orientation to the
+target, not a small-angle linearization, so it remains well-defined for
+large initial errors. It always returns an `IKResult`
+(`converged`, `q`, `positionError`, `orientationError`, `iterations`); it
+never throws for non-convergence. Like most redundant-looking wrists, this
+chain family has more than one joint configuration reaching the same pose,
+so a solver seeded far from the intended configuration can converge to a
+different, still-valid, solution branch — callers that care which branch
+they land in should seed close to their last known configuration.
+
+`Manipulator` pairs a `KinematicChain` (whose tip must be a `Frame`, the
+flange) with the compiled joint indices `toJointTargets(q)` needs: it
+looks up each chain joint's position in `RobotModel.joints`, which is the
+same index `RobotRuntimeCompiler` assigns as the runtime joint index, and
+emits one `robotkit.world.JointTarget.position(...)` per degree of
+freedom — the existing typed joint-command boundary, unchanged.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A

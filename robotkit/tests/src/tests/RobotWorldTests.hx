@@ -162,6 +162,7 @@ class RobotWorldTests {
     testConfiguredSensors();
     testSerialRobotUnavailableDevice();
     assertions += SpatialTests.run();
+    assertions += KinematicsTests.run();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
   }
 

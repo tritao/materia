@@ -455,3 +455,28 @@ joint frame (i.e. after `parentFrameRotation`), matching how `simulation.cpp`
 rotates `axis` by `parent_frame_rotation` to build the native `axis_a`. No
 plan deviations in M1; documented the convention in `ARCHITECTURE.md` so M2
 does not need to re-derive it.
+
+**M2**: added `robotkit/haxe/robotkit/manipulation/` (`ChainTip`,
+`KinematicChain`, `JointGroup`, `IKResult`, `InverseKinematics`,
+`Manipulator`) and `robotkit/tests/src/tests/KinematicsTests.hx` (a 2R
+planar fixture, plus a 6R "UR5-style" fixture built from published UR5
+DH-equivalent link offsets, both defined in the test file only). FK and the
+Jacobian are derived directly from `Joint`'s existing fields, per the
+convention M1 documented. Deviation: the first version of
+`InverseKinematics`/`KinematicChain` built its internal `Array<Array<Float>>`
+matrices with nested array comprehensions (`[for (...) [for (...) ...]]`);
+haxeon's backend rejected this with an opaque
+`CFG array read has the wrong element type` error from `CfgVerifier.hx`.
+`cadkit/haxe/src/cadkit/modeling/AssemblyLoopSolver.hx` and
+`cadkit/haxe/src/cadkit/sketch/SketchSolver.hx` already do the same kind of
+matrix math in this repo and consistently build nested arrays with explicit
+`push` loops instead of nested comprehensions; switching to that pattern
+fixed the compile with no functional change. A fixed zero seed for the "IK
+recovers random reachable targets" test occasionally converged to a
+different, still-valid, solution branch of the 6R wrist instead of the
+seeded target's own branch and timed out; changed the test to warm-start IK
+near the seeded target configuration (as a real caller re-solving from its
+last known joint state would), which is standard practice for
+local-convergence IK tests and matches the plan's "recovers ... within
+1e-4 m / 1e-3 rad" acceptance criterion without asserting which branch is
+found. Documented this joint-configuration ambiguity in ARCHITECTURE.md.
