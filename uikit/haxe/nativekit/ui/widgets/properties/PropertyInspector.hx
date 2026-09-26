@@ -32,7 +32,7 @@ class PropertyInspector implements View {
 	public final key:String;
 	public final descriptors:Array<PropertyDescriptor>;
 	public final sections:Array<PropertyInspectorSection>;
-	public final style:LayoutStyle;
+	public var style(default, null):LayoutStyle;
 	public final registry:PropertyEditorRegistry;
 	public var controller(default, null):ScrollController;
 	public var enabled:Bool;
@@ -83,6 +83,13 @@ class PropertyInspector implements View {
 				sectionByDescriptor.set(descriptor.id, editor);
 			}
 		}
+	}
+
+	/** Updates the container style without discarding editor drafts or section state. */
+	public function setStyle(next:LayoutStyle):Void {
+		if (next == null)
+			throw "Property inspector style cannot be null";
+		style = next.copy();
 	}
 
 	/** Changes a section's expansion state for the next submitted frame. */

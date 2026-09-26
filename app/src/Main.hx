@@ -1326,6 +1326,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       inspectorSelectionRevision = scene.selectionRevision;
     }
     var inspector = sceneInspector;
+    inspector.setStyle(style);
     inspector.labelWidth = viewportWidth < 760.0 ? 56.0 :
       viewportWidth < 1180.0 ? 76.0 : 108.0;
     var ownership=session.scriptOwnership;
