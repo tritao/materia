@@ -35,6 +35,7 @@ import nativekit.ui.properties.PropertyInspectorSection;
 import nativekit.ui.properties.PropertyType;
 import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.RetainedView;
 import nativekit.ui.core.Shortcut;
 import nativekit.ui.core.UiContext;
 import nativekit.ui.core.UiEvent;
@@ -496,7 +497,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var shellStyle = fillStyle();
     shellStyle.background = appearance.canvas;
     var shell = new AppShell("reference-editor-shell", new Stack("overlay-host", layers),
-      topBar(), null, null, shellStyle, null, statusBar());
+      new RetainedView("editor-top-bar", function(_) return topBar(),
+        function() return chromeRevisionKey()),
+      null, null, shellStyle, null,
+      new RetainedView("editor-status-bar", function(_) return statusBar(),
+        function() return chromeRevisionKey()));
     var windowLayers:Array<StackChild> = [new StackChild("shell", shell, 0.0, 0.0, 0,
       LayoutAxis.grow(), LayoutAxis.grow())];
     if (toolbarMenuVisible && documentDialog == null) {
@@ -783,6 +788,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
     more.selected = toolbarMenuVisible;
     items.push(new KeyedView("more", more));
     return new Row("editor-toolbar-row", items, barStyle);
+  }
+
+  function chromeRevisionKey():String {
+    var presentationRevision = framePresentation == null ? -1 : framePresentation.revision;
+    return "generation=" + sceneGeneration + ":scene=" + scene.revision +
+      ":selection=" + scene.selectionRevision + ":simulation=" + simulation.appliedRevision +
+      ":active=" + simulation.isActive() + ":running=" + simulation.isRunning() +
+      ":error=" + (simulation.error == null ? "" : simulation.error) +
+      ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision +
+      ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled +
+      ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
+      ":viewport=" + viewportWidth + "x" + viewportHeight;
   }
 
   function statusBar():View {
