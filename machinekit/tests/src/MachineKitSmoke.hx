@@ -19,7 +19,7 @@ import machinekit.motion.LinearBearing;
 import machinekit.motion.LinearGuideSystem;
 import machinekit.motion.LinearRailSystem;
 import machinekit.motion.NemaStepper;
-import machinekit.motion.PillowBlockHousing;
+import machinekit.motion.FlangeBearingHousing;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
 import machinekit.standard.Bushing;
@@ -650,7 +650,7 @@ class MachineKitSmoke {
 		near(block.housing.depth, 23.4, "pillow block depth");
 		near(block.housing.boltSpacing, 56.4, "pillow block bolt spacing");
 		for (designation in ["608", "6000", "6001", "6002", "6003", "6204"]) {
-			var housing = new PillowBlockHousing(DeepGrooveBearing.metric(designation));
+			var housing = new FlangeBearingHousing(DeepGrooveBearing.metric(designation));
 			var screw = housing.mountScrewPart(10).spec, edge = (housing.face - housing.boltSpacing) / 2;
 			check(edge >= screw.headDiameter / 2 + 1 - 1e-9, 'housing for $designation keeps screw heads on the face');
 			check(edge > screw.clearanceCoarse / 2, 'housing for $designation bolt holes stay inside the edge');

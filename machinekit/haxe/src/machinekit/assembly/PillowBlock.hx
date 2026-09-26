@@ -3,7 +3,7 @@ package machinekit.assembly;
 import cadkit.modeling.AssemblyModel;
 import machinekit.component.Bom;
 import machinekit.component.MachineComponent;
-import machinekit.motion.PillowBlockHousing;
+import machinekit.motion.FlangeBearingHousing;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.SocketHeadCapScrew;
 import materia.project.AssemblyRecord.AssemblyFrame;
@@ -23,13 +23,13 @@ import materia.project.AssemblyRecord.AssemblyFrame;
 class PillowBlock {
 	public static inline var ENGAGEMENT_DIAMETERS:Float = 1.5;
 
-	public final housing:PillowBlockHousing;
+	public final housing:FlangeBearingHousing;
 	public final bearing:DeepGrooveBearing;
 	public final screw:SocketHeadCapScrew;
 
 	public function new(bearing:DeepGrooveBearing) {
 		this.bearing = bearing;
-		housing = new PillowBlockHousing(bearing);
+		housing = new FlangeBearingHousing(bearing);
 		var diameter = housing.mountScrewPart(10).diameter;
 		screw = housing.mountScrewPart(standardScrewLength(housing.depth + ENGAGEMENT_DIAMETERS * diameter));
 	}

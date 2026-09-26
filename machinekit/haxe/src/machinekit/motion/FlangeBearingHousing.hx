@@ -17,7 +17,7 @@ import machinekit.standard.SocketHeadCapScrew;
  * CAD frame: mounting face at z=0, flange toward +Z. Connectors: `bore` (axis, mid-depth) for the
  * bearing, and `bolt1`..`bolt4` (mount), all with +Y along +Z.
  */
-class PillowBlockHousing extends MachineComponent {
+class FlangeBearingHousing extends MachineComponent {
 	public final bearing:DeepGrooveBearing;
 	public final face:Float;
 	public final depth:Float;

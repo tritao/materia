@@ -43,7 +43,7 @@ Each component also produces the machining it needs:
 | `RetainingRing` | DIN 471 external, by shaft diameter | `grooveSpec()` (d2, m) |
 | `ShaftCollar` | set-screw type, by bore diameter | — |
 | `SteppedShaft` | — (built from arbitrary sections) | keyway and retaining-ring groove cuts, `diameterAt()` |
-| `PillowBlockHousing` | — (sized from a `DeepGrooveBearing`) | `mountScrewPart()` |
+| `FlangeBearingHousing` | — (sized from a `DeepGrooveBearing`) | `mountScrewPart()` |
 | `Bushing` | — (proportional to bore diameter) | — |
 | `ShaftCoupling` | — (proportional to the larger bore) | `setScrewPart()` |
 | `LinearBearing` | LM8UU–LM20UU | — |
@@ -118,8 +118,8 @@ less twice that profile's pitch-line differential.
 machines, the same way `examples/MotorShaftBearings.hx` does, but as reusable
 library classes rather than one-off scripts:
 
-- `PillowBlock` mounts a `DeepGrooveBearing` in a flange-style
-  `PillowBlockHousing` (bore and four screws along the same axis, like
+- `PillowBlock` mounts a `DeepGrooveBearing` in a
+  `FlangeBearingHousing` (bore and four screws along the same axis, like
   `NemaStepper`'s mounting face — not a classic two-bolt base-mount housing)
   with four `SocketHeadCapScrew`s. `addTo(model, id, ?pose)` places the whole
   block, centres the bearing in the bore, and seats the screws with their heads
