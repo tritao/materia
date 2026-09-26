@@ -530,6 +530,37 @@ class MachineKitSmoke {
 		near(pair.centerDistance, (pinion.pitchDiameter + gear.pitchDiameter) / 2, "gear pair centre distance");
 		near(pair.ratio(), gear.teeth / pinion.teeth, "gear pair ratio");
 		near(pair.pose().x, pair.centerDistance, "gear pair pose offset");
+		var aSolid = pinion.geometry(), bSolid = gear.geometry();
+		var maxPenetration = 0.0;
+		for (sample in 0...17) {
+			var aAngle = 2 * Math.PI * sample / (pinion.teeth * 16);
+			var bAngle = pair.bRotation - aAngle * pinion.teeth / gear.teeth;
+			var aPlaced = aSolid.placed(new Location(new Plane(new Vector(0, 0, 0),
+				new Vector(Math.cos(aAngle), Math.sin(aAngle), 0), Vector.Z())));
+			var bPlaced = bSolid.placed(new Location(new Plane(new Vector(pair.centerDistance, 0, 0),
+				new Vector(Math.cos(bAngle), Math.sin(bAngle), 0), Vector.Z())));
+			var overlap = aPlaced.intersect(bPlaced);
+			maxPenetration = Math.max(maxPenetration, overlap.volume());
+			overlap.close();
+			aPlaced.close();
+			bPlaced.close();
+		}
+		aSolid.close();
+		bSolid.close();
+		// The polyline tooth flanks and CAD booleans can leave tiny numerical overlap.
+		check(maxPenetration <= 0.05, 'gear mesh penetrates by $maxPenetration mm^3 over one tooth pitch');
+		var badA = pinion.geometry();
+		var badBBase = gear.geometry();
+		var badB = badBBase.placed(new Location(new Plane(new Vector(pair.centerDistance, 0, 0),
+			new Vector(Math.cos(pair.bRotation + Math.PI / gear.teeth),
+				Math.sin(pair.bRotation + Math.PI / gear.teeth), 0), Vector.Z())));
+		var badOverlap = badA.intersect(badB);
+		check(badOverlap.volume() > 1, "wrong tooth phase must produce detectable interference");
+		badOverlap.close();
+		badA.close();
+		badB.close();
+		badBBase.close();
+
 		// SpurGear centres a tooth on local angle 0, so `a` points a tooth at the mesh point and
 		// `b` must present a tooth space at its local angle pi: (pi - turn) / pitch angle = k + 1/2.
 		for (teeth in [20, 21]) {
