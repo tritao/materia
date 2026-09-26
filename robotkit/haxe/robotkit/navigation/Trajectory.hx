@@ -229,7 +229,8 @@ class Trajectory {
           from.pose.y + (to.pose.y - from.pose.y) * alpha,
           from.pose.yaw + yawDelta * alpha),
         new Twist2(from.twist.linear + (to.twist.linear - from.twist.linear) * alpha,
-          from.twist.angular + (to.twist.angular - from.twist.angular) * alpha));
+          from.twist.angular + (to.twist.angular - from.twist.angular) * alpha,
+          from.twist.lateral + (to.twist.lateral - from.twist.lateral) * alpha));
     }
     return copy(last);
   }

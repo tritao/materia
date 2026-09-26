@@ -22,7 +22,10 @@ class DifferentialDrive implements DriveModel {
     this.trackWidth = trackWidth;
   }
 
-  public function constrain(twist:Twist2):Twist2 return twist;
+  public function constrain(twist:Twist2):Twist2 {
+    rejectLateral(twist);
+    return twist;
+  }
 
   public function maxCurvature():Float return 1.0e300;
 
@@ -33,10 +36,17 @@ class DifferentialDrive implements DriveModel {
 
   public function targets(twist:Twist2):Array<JointTarget> {
     if (twist == null) throw "Differential drive requires a twist";
+    rejectLateral(twist);
     var halfTurnSpeed = twist.angular * trackWidth * 0.5;
     return [
       JointTarget.velocity(leftWheelJoint, (twist.linear - halfTurnSpeed) / wheelRadius),
       JointTarget.velocity(rightWheelJoint, (twist.linear + halfTurnSpeed) / wheelRadius)
     ];
+  }
+
+  static function rejectLateral(twist:Twist2):Void {
+    if (twist == null) throw "Differential drive requires a twist";
+    if (Math.abs(twist.lateral) > 1e-9)
+      throw "Differential drive cannot execute a lateral command";
   }
 }

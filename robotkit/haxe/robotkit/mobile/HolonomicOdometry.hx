@@ -5,23 +5,20 @@ import robotkit.world.RobotSnapshot;
 
 /**
  * Wheel-position odometry for a three-wheel omni/kiwi base (see
- * `HolonomicDrive`). A real three-wheel base has one more wheel than the
- * two degrees of freedom a planar `Twist2` command even carries (forward
- * speed and yaw rate, never a lateral term — see `HolonomicDrive`'s own
- * doc), so recovering a pose update from wheel encoders is an
- * over-determined least-squares fit against the same per-wheel tangential
- * speed relationship `HolonomicDrive.targets()` uses
- * (`s_i = (-sin(theta_i) * distance + baseRadius * headingChange) / wheelRadius`),
- * not an exact three-equation solve. The three wheel angles are 120 degrees
- * apart, so the normal equations decouple exactly (their sines sum to
- * zero): `distance` and `headingChange` are each a plain weighted average
- * over the three wheels, independent of one another.
+ * `HolonomicDrive`). The three wheel angles are 120 degrees apart, so the
+ * inverse of the same tangential speed relationship used by
+ * `HolonomicDrive.targets()` decouples exactly:
+ * `s_i = -sin(theta_i) * distance + cos(theta_i) * lateralDistance +
+ * baseRadius * headingChange`. Forward and lateral displacement are weighted
+ * sums of the wheel distances, while heading change is their average divided
+ * by the base radius.
  */
 class HolonomicOdometry {
   public final wheelJoints:Array<Int>;
   public final wheelRadius:Float;
   public final baseRadius:Float;
   public var lastDistance(default, null):Float = 0.0;
+  public var lastLateralDistance(default, null):Float = 0.0;
   public var lastHeadingChange(default, null):Float = 0.0;
 
   final wheelAngles:Array<Float>;
@@ -59,6 +56,7 @@ class HolonomicOdometry {
       current.push(positions.get(joint));
     }
     lastDistance = 0.0;
+    lastLateralDistance = 0.0;
     lastHeadingChange = 0.0;
     var clockChanged = previousClock != null && previousClock != snapshot.sourceClockId;
     var timestampRegressed = previousTimestamp != null &&
@@ -68,27 +66,20 @@ class HolonomicOdometry {
       setBaseline(snapshot, current);
       return pose;
     }
-    var sumAA = 0.0, sumAB = 0.0, sumBB = 0.0, sumAW = 0.0, sumBW = 0.0;
+    var forwardSum = 0.0, lateralSum = 0.0, yawSum = 0.0;
     for (i in 0...3) {
       var wheelDistance = (current[i] - previousPositions[i]) * wheelRadius;
-      var a = -Math.sin(wheelAngles[i]);
-      var b = baseRadius;
-      sumAA += a * a;
-      sumAB += a * b;
-      sumBB += b * b;
-      sumAW += a * wheelDistance;
-      sumBW += b * wheelDistance;
+      forwardSum += -Math.sin(wheelAngles[i]) * wheelDistance;
+      lateralSum += Math.cos(wheelAngles[i]) * wheelDistance;
+      yawSum += wheelDistance;
     }
-    var determinant = sumAA * sumBB - sumAB * sumAB;
-    var distance = 0.0;
-    var headingChange = 0.0;
-    if (Math.abs(determinant) > 1e-9) {
-      distance = (sumAW * sumBB - sumBW * sumAB) / determinant;
-      headingChange = (sumAA * sumBW - sumAB * sumAW) / determinant;
-    }
+    var distance = forwardSum / 1.5;
+    var lateralDistance = lateralSum / 1.5;
+    var headingChange = yawSum / (3.0 * baseRadius);
     lastDistance = distance;
+    lastLateralDistance = lateralDistance;
     lastHeadingChange = headingChange;
-    pose = pose.integrateDisplacement(distance, headingChange);
+    pose = pose.integrateDisplacement(distance, headingChange, lateralDistance);
     setBaseline(snapshot, current);
     return pose;
   }
@@ -101,6 +92,7 @@ class HolonomicOdometry {
     previousTimestamp = null;
     previousClock = null;
     lastDistance = 0.0;
+    lastLateralDistance = 0.0;
     lastHeadingChange = 0.0;
   }
 

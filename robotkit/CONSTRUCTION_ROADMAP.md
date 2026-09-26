@@ -1209,3 +1209,13 @@ The flat-map capsule test matches its analytic volume within 2%; the M12
 scenario now completes in three cycles at 0.64 m³ for the 0.60 m³ design
 volume, with no below-design or outside-footprint lowering. Haxe world tests:
 4,327 assertions passed.
+
+**F3**: `Twist2` now carries an optional body-frame lateral velocity, with
+exact constant-twist integration in `Pose2`, independent lateral speed and
+acceleration limits, full three-wheel holonomic mapping, and matching
+three-wheel odometry. Differential and Ackermann drives reject lateral
+commands explicitly. The simulation plant already decoded all three omni
+components; its Haxe path and trajectory/motion-guard copies now preserve the
+new component. Tests cover pure strafe, diagonal translation with yaw, wheel
+odometry recovery, and plant/odometry agreement. Haxe world tests: 4,327
+assertions passed.

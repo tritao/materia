@@ -15,6 +15,6 @@ class TrajectorySample {
       throw "Trajectory samples require a finite time, pose, and twist";
     this.timeFromStartSeconds = timeFromStartSeconds;
     this.pose = new Pose2(pose.x, pose.y, pose.yaw);
-    this.twist = new Twist2(twist.linear, twist.angular);
+    this.twist = new Twist2(twist.linear, twist.angular, twist.lateral);
   }
 }

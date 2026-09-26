@@ -36,25 +36,29 @@ class Pose2 {
     if (twist == null || !Math.isFinite(durationSeconds) || durationSeconds < 0.0)
       throw "Pose2 integration requires a finite non-negative duration";
     return integrateDisplacement(twist.linear * durationSeconds,
-      twist.angular * durationSeconds);
+      twist.angular * durationSeconds, twist.lateral * durationSeconds);
   }
 
-  /** Integrates forward distance and heading change along a constant-curvature arc. */
-  public function integrateDisplacement(distance:Float, headingChange:Float):Pose2 {
-    if (!Math.isFinite(distance) || !Math.isFinite(headingChange))
+  /** Integrates body-frame forward/lateral displacement and heading change exactly. */
+  public function integrateDisplacement(distance:Float, headingChange:Float,
+      lateralDistance:Float = 0.0):Pose2 {
+    if (!Math.isFinite(distance) || !Math.isFinite(headingChange) || !Math.isFinite(lateralDistance))
       throw "Pose2 displacement must be finite";
     var nextYaw = yaw + headingChange;
-    var dx:Float;
-    var dy:Float;
+    var localX:Float;
+    var localY:Float;
     if (Math.abs(headingChange) < 1e-9) {
-      dx = distance * Math.cos(yaw);
-      dy = distance * Math.sin(yaw);
+      localX = distance;
+      localY = lateralDistance;
     } else {
-      var radius = distance / headingChange;
-      dx = radius * (Math.sin(nextYaw) - Math.sin(yaw));
-      dy = -radius * (Math.cos(nextYaw) - Math.cos(yaw));
+      var sine = Math.sin(headingChange);
+      var versine = 1.0 - Math.cos(headingChange);
+      localX = (distance * sine - lateralDistance * versine) / headingChange;
+      localY = (distance * versine + lateralDistance * sine) / headingChange;
     }
-    return new Pose2(x + dx, y + dy, nextYaw);
+    var c = Math.cos(yaw), s = Math.sin(yaw);
+    return new Pose2(x + c * localX - s * localY,
+      y + s * localX + c * localY, nextYaw);
   }
 
   public static function wrapAngle(value:Float):Float {

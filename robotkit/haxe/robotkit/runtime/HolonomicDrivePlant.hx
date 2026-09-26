@@ -18,7 +18,7 @@ import robotkit.world.RobotSnapshot;
  * targets whether they came from MobileBase or were submitted straight to the
  * robot, and they are zero after a normal or emergency stop or a safety
  * reset, so the chassis follows every stop with no added latency, and wheels
- * driven directly can strafe even though `Twist2` has no lateral term.
+ * driven directly can strafe through the full `Twist2` command.
  */
 class HolonomicDrivePlant {
   public final simulation:Simulation;

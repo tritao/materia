@@ -7,12 +7,9 @@ import robotkit.world.RobotSnapshot;
 /**
  * Wheel odometry for a three-wheel omni/kiwi base exposed as an `odom` to
  * `base` localization service, mirroring `WheelOdometryLocalization`.
- * `HolonomicDrive.createOdometry()` returns `null` (a three-wheel omni base
- * has no two-wheel differential relationship to decode, and `DriveModel`'s
- * `createOdometry()` is typed to `DifferentialOdometry` specifically), so
- * this takes the wheel joints/geometry directly instead of going through
- * `MobileBase.driveModel` — the same information a caller already has from
- * authoring the `RobotDriveConfiguration.Holonomic` role.
+ * `HolonomicDrive.createOdometry()` returns `null` because the common drive
+ * interface is typed to differential odometry, so this takes the wheel
+ * joints/geometry directly from the authored holonomic role.
  */
 class HolonomicOdometryLocalization implements Localization {
   public final referenceFrame:String;
@@ -42,7 +39,7 @@ class HolonomicOdometryLocalization implements Localization {
   public function update(snapshot:RobotSnapshot):LocalizationState {
     var pose = odometry.update(snapshot);
     varianceX += variancePerMeter * Math.abs(odometry.lastDistance);
-    varianceY += variancePerMeter * Math.abs(odometry.lastDistance);
+    varianceY += variancePerMeter * Math.abs(odometry.lastLateralDistance);
     varianceYaw += yawVariancePerRadian * Math.abs(odometry.lastHeadingChange);
     currentState = new LocalizationState(snapshot.sourceSequence, pose,
       referenceFrame, bodyFrame,

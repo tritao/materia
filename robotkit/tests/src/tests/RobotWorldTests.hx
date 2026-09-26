@@ -74,6 +74,7 @@ import robotkit.mobile.MobileBase;
 import robotkit.mobile.DifferentialDrive;
 import robotkit.mobile.AckermannDrive;
 import robotkit.mobile.DifferentialOdometry;
+import robotkit.mobile.HolonomicOdometry;
 import robotkit.localization.WheelOdometryLocalization;
 import robotkit.localization.WheelImuLocalization;
 import robotkit.localization.SimulationTruthLocalization;
@@ -390,6 +391,12 @@ class RobotWorldTests {
     var curve = new Pose2().integrate(new Twist2(1.0, 1.0), Math.PI * 0.5);
     check(Math.abs(curve.x - 1.0) < 1e-9 && Math.abs(curve.y - 1.0) < 1e-9,
       "Pose2 integrates constant-curvature motion");
+    var bodyArc = new Pose2(2.0, -1.0, 0.4).integrate(new Twist2(1.0, 0.5, 0.25), 2.0);
+    var expectedBodyArc = new Pose2(2.0, -1.0, 0.4).integrateDisplacement(2.0, 1.0, 0.5);
+    check(Math.abs(bodyArc.x - expectedBodyArc.x) < 1e-9 &&
+      Math.abs(bodyArc.y - expectedBodyArc.y) < 1e-9 &&
+      Math.abs(Pose2.wrapAngle(bodyArc.yaw - expectedBodyArc.yaw)) < 1e-9,
+      "Pose2 integrates forward, lateral, and yaw motion as one constant body twist");
 
     var footprint = Footprint.rectangle(2.0, 1.0);
     equal(footprint.vertices().length, 4, "rectangular footprint exposes copied vertices");
@@ -466,6 +473,8 @@ class RobotWorldTests {
     }, "Ackermann drive submits steering position and wheel velocity together");
     throws(function() ackermann.command(new Twist2(0.0, 1.0)),
       "Ackermann drive rejects a turn-in-place request");
+    throws(function() ackermann.command(new Twist2(1.0, 0.0, 0.1)),
+      "Ackermann drive rejects a lateral command");
     ackermann.command(Twist2.zero());
     check(switch ackermannRobot.lastCommand {
       case JointTargets(targets, _): targets[0].target == 0.0 && targets[1].target == 0.0;
@@ -493,6 +502,12 @@ class RobotWorldTests {
     var sumOfSpeeds = straightTargets[0].target + straightTargets[1].target + straightTargets[2].target;
     check(Math.abs(sumOfSpeeds) < 1e-9,
       "holonomic wheel speeds sum to zero for pure translation (three wheels at 120 degrees)");
+    var lateralTargets = new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).targets(new Twist2(0.0, 0.0, 1.0));
+    for (i in 0...3) {
+      var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
+      check(Math.abs(lateralTargets[i].target - Math.cos(angle) / 0.05) < 1e-9,
+        "holonomic drive maps body lateral velocity to each wheel's tangent");
+    }
     var spinTargets = new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).targets(new Twist2(0.0, 2.0));
     for (target in spinTargets)
       check(Math.abs(target.target - 0.3 * 2.0 / 0.05) < 1e-9,
@@ -501,6 +516,8 @@ class RobotWorldTests {
       "holonomic drive supports in-place rotation");
     throws(function() new robotkit.mobile.HolonomicDrive([0, 1, 1], 0.05, 0.3),
       "holonomic drive rejects duplicate wheel joint indices");
+    throws(function() differential.command(new Twist2(0.0, 0.0, 0.1)),
+      "differential drive rejects a lateral command");
 
     var odometry = new DifferentialOdometry(0, 1, 0.1, 0.5);
     function sample(time:Int, left:Float, right:Float, clock:String):RobotSnapshot
@@ -522,6 +539,34 @@ class RobotWorldTests {
     var afterStale = odometry.update(sample(3, 4.3, 4.3, "source-B"));
     check(Math.abs(afterStale.x - afterClockReset.x) < 0.03,
       "wheel odometry ignores stale timestamps without moving its baseline");
+
+    var holonomicOdometry = new HolonomicOdometry([0, 1, 2], 0.05, 0.3);
+    function omniSample(time:Int, positions:Array<Float>):RobotSnapshot
+      return new RobotSnapshot("omni-odom", Int64.ofInt(time), Int64.ofInt(time),
+        positions, [], [], 1, 0, null, [], "omni-clock", "host");
+    holonomicOdometry.update(omniSample(10, [0.0, 0.0, 0.0]));
+    var lateralDistance = 0.1;
+    var lateralPositions = [for (i in 0...3) {
+      var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
+      Math.cos(angle) * lateralDistance / 0.05;
+    }];
+    var lateralPose = holonomicOdometry.update(omniSample(20, lateralPositions));
+    check(Math.abs(lateralPose.x) < 1e-9 && Math.abs(lateralPose.y - lateralDistance) < 1e-9 &&
+      Math.abs(holonomicOdometry.lastLateralDistance - lateralDistance) < 1e-9,
+      "holonomic odometry recovers pure body lateral travel");
+    var forwardDistance = 0.2, nextLateral = 0.1, headingChange = 0.3;
+    var diagonalPositions = [for (i in 0...3) {
+      var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
+      var wheelDistance = -Math.sin(angle) * forwardDistance +
+        Math.cos(angle) * nextLateral + 0.3 * headingChange;
+      lateralPositions[i] + wheelDistance / 0.05;
+    }];
+    var diagonalPose = holonomicOdometry.update(omniSample(30, diagonalPositions));
+    var expectedDiagonal = lateralPose.integrateDisplacement(forwardDistance, headingChange, nextLateral);
+    check(Math.abs(diagonalPose.x - expectedDiagonal.x) < 1e-9 &&
+      Math.abs(diagonalPose.y - expectedDiagonal.y) < 1e-9 &&
+      Math.abs(Pose2.wrapAngle(diagonalPose.yaw - expectedDiagonal.yaw)) < 1e-9,
+      "holonomic odometry recovers diagonal translation and yaw");
   }
 
   static function testModelDrivenConfiguration():Void {
@@ -2225,8 +2270,33 @@ class RobotWorldTests {
     // Wheels driven straight on the robot can strafe, which Twist2 cannot
     // express: 0.3 m/s along body +Y for ten ticks is 0.06 m to the left.
     base.stop();
-    plant.step(Int64.ofInt(tick++));
+    var strafeBaseline = plant.step(Int64.ofInt(tick++));
     var strafeStart = plant.pose;
+    var strafeOdometry = new HolonomicOdometry([0, 1, 2], wheelRadius, baseRadius, strafeStart);
+    strafeOdometry.update(strafeBaseline);
+    base.command(new Twist2(0.0, 0.0, 0.3));
+    for (_ in 0...10) snapshot = plant.step(Int64.ofInt(tick++));
+    var expectedStrafe = strafeStart.integrate(new Twist2(0.0, 0.0, 0.3), 0.2);
+    check(Math.abs(plant.pose.x - expectedStrafe.x) < 1e-9 &&
+      Math.abs(plant.pose.y - expectedStrafe.y) < 1e-9 &&
+      Math.abs(plant.pose.yaw - expectedStrafe.yaw) < 1e-9,
+      "HolonomicDrivePlant drives a pure lateral twist along body +Y");
+    strafeOdometry.update(snapshot);
+    check(Math.abs(strafeOdometry.current().x - plant.pose.x) < 1e-9 &&
+      Math.abs(strafeOdometry.current().y - plant.pose.y) < 1e-9 &&
+      Math.abs(strafeOdometry.current().yaw - plant.pose.yaw) < 1e-9,
+      "Holonomic odometry agrees with the simulated pure lateral drive");
+    base.command(new Twist2(0.2, 0.5, 0.15));
+    var diagonalStart = plant.pose;
+    for (_ in 0...10) snapshot = plant.step(Int64.ofInt(tick++));
+    var expectedDiagonal = diagonalStart.integrate(new Twist2(0.2, 0.5, 0.15), 0.2);
+    check(Math.abs(plant.pose.x - expectedDiagonal.x) < 1e-9 &&
+      Math.abs(plant.pose.y - expectedDiagonal.y) < 1e-9 &&
+      Math.abs(plant.pose.yaw - expectedDiagonal.yaw) < 1e-9,
+      "HolonomicDrivePlant integrates diagonal translation with yaw");
+    base.stop();
+    plant.step(Int64.ofInt(tick++));
+    var wheelStart = plant.pose;
     var strafe = [for (i in 0...3) {
       var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
       robotkit.world.JointTarget.velocity(i, Math.cos(angle) * 0.3 / wheelRadius);
@@ -2234,9 +2304,9 @@ class RobotWorldTests {
     robot.submit(RobotCommand.JointTargets(strafe, null));
     for (_ in 0...10) plant.step(Int64.ofInt(tick++));
     check(base.currentCommand().linear == 0.0 &&
-      Math.abs(plant.pose.x - (strafeStart.x - 0.06 * Math.sin(strafeStart.yaw))) < 1e-9 &&
-      Math.abs(plant.pose.y - (strafeStart.y + 0.06 * Math.cos(strafeStart.yaw))) < 1e-9 &&
-      Math.abs(plant.pose.yaw - strafeStart.yaw) < 1e-9,
+      Math.abs(plant.pose.x - (wheelStart.x - 0.06 * Math.sin(wheelStart.yaw))) < 1e-9 &&
+      Math.abs(plant.pose.y - (wheelStart.y + 0.06 * Math.cos(wheelStart.yaw))) < 1e-9 &&
+      Math.abs(plant.pose.yaw - wheelStart.yaw) < 1e-9,
       "HolonomicDrivePlant strafes with wheel targets submitted directly to the robot");
 
     // A stop issued directly on the robot halts the chassis at once, even

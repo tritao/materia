@@ -154,7 +154,7 @@ class MotionGuard {
     var scale = (nearestClearance - marginMeters) / slowdownRange;
     scale = Math.max(0.0, Math.min(1.0, scale));
     state = Approaching(nearest.detection.id, nearestClearance, scale);
-    return new Twist2(desired.linear * scale, desired.angular * scale);
+    return new Twist2(desired.linear * scale, desired.angular * scale, desired.lateral * scale);
   }
 
   function block(reason:String):Twist2 {

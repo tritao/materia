@@ -83,7 +83,9 @@ class MobileBase {
     if (limits.maxLinearSpeed > nominalMotionLimits.maxLinearSpeed ||
         limits.maxAngularSpeed > nominalMotionLimits.maxAngularSpeed ||
         limits.maxLinearAcceleration > nominalMotionLimits.maxLinearAcceleration ||
-        limits.maxAngularAcceleration > nominalMotionLimits.maxAngularAcceleration)
+        limits.maxAngularAcceleration > nominalMotionLimits.maxAngularAcceleration ||
+        limits.maxLateralSpeed > nominalMotionLimits.maxLateralSpeed ||
+        limits.maxLateralAcceleration > nominalMotionLimits.maxLateralAcceleration)
       throw "Safety motion limits cannot exceed the authored mobile-base limits";
     motionLimits = limits;
   }
@@ -94,7 +96,7 @@ class MobileBase {
   public function applySafetyStop(required:Bool):Void safetyStopRequired = required;
 
   public function currentCommand():Twist2
-    return new Twist2(previousCommand.linear, previousCommand.angular);
+    return new Twist2(previousCommand.linear, previousCommand.angular, previousCommand.lateral);
 
   /** Limits a body command and submits all drive joints as one RobotCommand. */
   public function command(twist:Twist2, ?durationSeconds:Float):Twist2 {

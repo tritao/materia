@@ -5,12 +5,8 @@ import robotkit.world.JointTarget;
 /**
  * Omnidirectional ("kiwi") drive: three wheels mounted at 120-degree
  * intervals around the base center, each rolling tangentially. `targets`
- * only ever receives a `Twist2` (forward speed + yaw rate, the same planar
- * command `Navigator`/`GoTo` produce), so the lateral term of the general
- * three-wheel omni kinematics is always zero here; the mechanism itself is
- * still genuinely holonomic (each wheel is commanded independently, and a
- * caller driving the wheels directly could strafe), but no planner in this
- * codebase currently issues a lateral command. See ARCHITECTURE.md.
+ * accepts the full `Twist2` body velocity. Navigator/GoTo continue to produce
+ * lateral = 0, while direct callers and work planners can command a strafe.
  */
 class HolonomicDrive implements DriveModel {
   public final wheelJoints:Array<Int>;
@@ -52,9 +48,10 @@ class HolonomicDrive implements DriveModel {
     if (twist == null) throw "Holonomic drive requires a twist";
     var result:Array<JointTarget> = [];
     for (i in 0...3) {
-      // Tangential wheel speed for a body moving at (vx, vy=0) and yawing at
+      // Tangential wheel speed for a body moving at (vx, vy) and yawing at
       // omega: s_i = -sin(theta_i)*vx + cos(theta_i)*vy + baseRadius*omega.
-      var wheelSpeed = -Math.sin(wheelAngles[i]) * twist.linear + baseRadius * twist.angular;
+      var wheelSpeed = -Math.sin(wheelAngles[i]) * twist.linear +
+        Math.cos(wheelAngles[i]) * twist.lateral + baseRadius * twist.angular;
       result.push(JointTarget.velocity(wheelJoints[i], wheelSpeed / wheelRadius));
     }
     return result;

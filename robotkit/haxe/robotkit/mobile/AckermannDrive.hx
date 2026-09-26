@@ -28,6 +28,8 @@ class AckermannDrive implements DriveModel {
 
   public function constrain(twist:Twist2):Twist2 {
     if (twist == null) throw "Ackermann drive requires a twist";
+    if (Math.abs(twist.lateral) > 1e-9)
+      throw "Ackermann drive cannot execute a lateral command";
     if (Math.abs(twist.linear) < 1e-9) {
       if (Math.abs(twist.angular) > 1e-9)
         throw "Ackermann drive cannot turn in place";
@@ -47,6 +49,8 @@ class AckermannDrive implements DriveModel {
 
   public function targets(twist:Twist2):Array<JointTarget> {
     if (twist == null) throw "Ackermann drive requires a twist";
+    if (Math.abs(twist.lateral) > 1e-9)
+      throw "Ackermann drive cannot execute a lateral command";
     var limited = constrain(twist);
     if (Math.abs(limited.linear) < 1e-9 && Math.abs(limited.angular) < 1e-9)
       return [JointTarget.position(steeringJoint, 0.0),
