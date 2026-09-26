@@ -44,7 +44,9 @@ class WorldSnapshot {
           value.trajectoryQueueDepth,
           value.trajectoryActive,
           value.trajectoryTimeNs,
-          value.trajectoryDurationNs
+          value.trajectoryDurationNs,
+          value.trajectoryTag,
+          value.trajectoryTagTimeNs
         )
       );
     }

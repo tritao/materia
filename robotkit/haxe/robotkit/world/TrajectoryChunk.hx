@@ -7,8 +7,9 @@ class TrajectoryChunk {
   public static inline final MAX_POINTS:Int = 256;
   public final points:Array<TrajectoryPoint>;
   public final jointCount:Int;
+  public final tag:Int64;
 
-  public function new(points:Array<TrajectoryPoint>) {
+  public function new(points:Array<TrajectoryPoint>, ?tag:Int64) {
     if (points == null || points.length == 0 || points.length > MAX_POINTS)
       throw 'Trajectory chunk needs one to $MAX_POINTS points';
     var first = points[0];
@@ -27,7 +28,8 @@ class TrajectoryChunk {
       copied.push(point.copy());
     }
     this.points = copied;
+    this.tag = tag == null ? Int64.ofInt(0) : tag;
   }
 
-  public function copy():TrajectoryChunk return new TrajectoryChunk(points);
+  public function copy():TrajectoryChunk return new TrajectoryChunk(points, tag);
 }

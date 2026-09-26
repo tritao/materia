@@ -145,6 +145,12 @@ public:
 
     bool running() const;
 
+    struct RuntimeTrajectoryPoint {
+        rk_trajectory_point point{};
+        uint64_t chunk_base_time_ns = 0;
+        uint64_t tag = 0;
+    };
+
     /** Internal phases used by Simulation to coordinate multiple runtimes. */
     rk_result apply_pending_commands();
     rk_result publish_sample(uint64_t timestamp_ns);
@@ -158,9 +164,14 @@ private:
         double position_reference[RK_MAX_JOINTS]{};
         bool active[RK_MAX_JOINTS]{};
         bool reference_initialized[RK_MAX_JOINTS]{};
-        std::deque<rk_trajectory_point> trajectory;
+        std::deque<RuntimeTrajectoryPoint> trajectory;
         uint64_t trajectory_time_ns = 0;
         bool trajectory_active = false;
+        uint64_t trajectory_tag = 0;
+        uint64_t trajectory_tag_time_ns = 0;
+        double trajectory_rate = 1.0;
+        double trajectory_rate_deceleration = 0.0;
+        double trajectory_time_remainder_ns = 0.0;
         uint64_t stop_ramp_time_ns = 0;
         uint64_t stop_ramp_duration_ns = 0;
         double stop_ramp_positions[RK_MAX_JOINTS]{};

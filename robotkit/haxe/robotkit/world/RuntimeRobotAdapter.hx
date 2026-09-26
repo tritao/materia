@@ -71,7 +71,8 @@ class RuntimeRobotAdapter implements Robot {
       value.faultCode, value.receivedTimestampNs, currentSensors,
       "unspecified", "robotkit.monotonic", value.safety,
       value.trajectoryQueueDepth, value.trajectoryActive,
-      value.trajectoryTimeNs, value.trajectoryDurationNs);
+      value.trajectoryTimeNs, value.trajectoryDurationNs,
+      value.trajectoryTag, value.trajectoryTagTimeNs);
   }
 
   public function fault():Null<RobotFault> {

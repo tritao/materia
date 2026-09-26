@@ -26,6 +26,10 @@ class RobotSnapshot {
   public final trajectoryTimeNs:Int64;
   /** Timestamp of the last point currently owned by the runtime. */
   public final trajectoryDurationNs:Int64;
+  /** Stable identity of the chunk currently running or last stopped. */
+  public final trajectoryTag:Int64;
+  /** Time within trajectoryTag, in nanoseconds. */
+  public final trajectoryTagTimeNs:Int64;
 
   /** Compatibility alias; new code should name the clock explicitly. */
   public var timestampNs(get, never):Int64;
@@ -47,7 +51,9 @@ class RobotSnapshot {
     ?trajectoryQueueDepth:Int = 0,
     ?trajectoryActive:Bool = false,
     ?trajectoryTimeNs:Int64,
-    ?trajectoryDurationNs:Int64
+    ?trajectoryDurationNs:Int64,
+    ?trajectoryTag:Int64,
+    ?trajectoryTagTimeNs:Int64
   ) {
     this.id = id;
     this.sourceSequence = sourceSequence;
@@ -69,6 +75,9 @@ class RobotSnapshot {
     this.trajectoryTimeNs = trajectoryTimeNs == null ? Int64.ofInt(0) : trajectoryTimeNs;
     this.trajectoryDurationNs = trajectoryDurationNs == null
       ? Int64.ofInt(0) : trajectoryDurationNs;
+    this.trajectoryTag = trajectoryTag == null ? Int64.ofInt(0) : trajectoryTag;
+    this.trajectoryTagTimeNs = trajectoryTagTimeNs == null
+      ? Int64.ofInt(0) : trajectoryTagTimeNs;
   }
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;

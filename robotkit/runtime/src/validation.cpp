@@ -82,8 +82,9 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             joint.type > RK_RUNTIME_JOINT_PRISMATIC || joint.parent_link >= blueprint->link_count ||
             joint.child_link >= blueprint->link_count || joint.parent_link == joint.child_link ||
             !is_finite(joint.lower_limit) || !is_finite(joint.upper_limit) ||
-            !is_finite(joint.max_effort) || joint.lower_limit > joint.upper_limit ||
-            joint.max_effort < 0.0)
+            !is_finite(joint.max_effort) || !is_finite(joint.max_acceleration) ||
+            joint.lower_limit > joint.upper_limit || joint.max_effort < 0.0 ||
+            joint.max_acceleration < 0.0)
             return RK_ERROR_INVALID_ARGUMENT;
         for (double value : joint.parent_frame_position) if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT;
         for (double value : joint.child_frame_position) if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT;

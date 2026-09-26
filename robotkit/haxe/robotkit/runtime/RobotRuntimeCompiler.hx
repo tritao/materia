@@ -74,7 +74,8 @@ class RobotRuntimeCompiler {
       result.addJoint(new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
         joint.limits.lower, joint.limits.upper, maxEffort, maxRate,
         joint.parentFramePosition, joint.parentFrameRotation,
-        joint.childFramePosition, joint.childFrameRotation, joint.axis));
+        joint.childFramePosition, joint.childFrameRotation, joint.axis,
+        joint.limits.maxAcceleration));
     }
     var children = [for (joint in robot.joints) joint.child];
     var root = robot.links[0];

@@ -420,7 +420,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * realtime code is running and lets Simulation build several runtimes before
 	 * its first shared tick.
 	 */
-	struct rk_robot_runtime_blueprint @layout(197560, 8) {
+	struct rk_robot_runtime_blueprint @layout(201656, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -444,17 +444,17 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		collision_approximation: u32 @offset(28);
 		reserved: array<u64, 2> @offset(32);
 		joints: array<rk_robot_runtime_joint, 512> @offset(48);
-		links: array<rk_robot_runtime_link, 1024> @offset(90160);
+		links: array<rk_robot_runtime_link, 1024> @offset(94256);
 		/**
 		 * < Zero selects the default base-mounted simulation sensors.
 		 */
-		sensor_count: u32 @offset(196656);
-		sensors: array<rk_sensor_config, 8> @offset(196664);
+		sensor_count: u32 @offset(200752);
+		sensors: array<rk_sensor_config, 8> @offset(200760);
 	}
 	/**
 	 * One compiled joint and its limits in a RobotRuntimeBlueprint.
 	 */
-	struct rk_robot_runtime_joint @layout(176, 8) {
+	struct rk_robot_runtime_joint @layout(184, 8) {
 		/**
 		 * < Stable index of this joint within the blueprint.
 		 */
@@ -497,6 +497,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * < Unit vector in the parent joint frame.
 		 */
 		axis: array<f64, 3> @offset(152);
+		/**
+		 * < Maximum joint acceleration, or zero when unspecified.
+		 */
+		max_acceleration: f64 @offset(176);
 	}
 	struct rk_robot_runtime_link @layout(104, 8) {
 		mass: f64 @offset(0);
@@ -509,7 +513,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Immutable published runtime snapshot; native handles never enter this ABI.
 	 */
-	struct rk_robot_snapshot @layout(16856, 8) {
+	struct rk_robot_snapshot @layout(16872, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -598,11 +602,13 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		trajectory_duration_ns: u64 @offset(12488);
 		sensor_count: u32 @offset(12496);
 		sensors: array<rk_sensor_sample, 8> @offset(12504);
+		trajectory_tag: u64 @offset(16856);
+		trajectory_tag_time_ns: u64 @offset(16864);
 	}
 	/**
 	 * Mutable native state used internally while a runtime publishes a snapshot.
 	 */
-	struct rk_robot_state @layout(16720, 8) {
+	struct rk_robot_state @layout(16736, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -653,6 +659,8 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		trajectory_duration_ns: u64 @offset(12352);
 		sensor_count: u32 @offset(12360);
 		sensors: array<rk_sensor_sample, 8> @offset(12368);
+		trajectory_tag: u64 @offset(16720);
+		trajectory_tag_time_ns: u64 @offset(16728);
 	}
 	/**
 	 * Compiled sensor slot. Semantic IDs live in the immutable host mapping.
@@ -728,10 +736,11 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Bounded trajectory payload submitted alongside trajectory metadata.
 	 */
-	struct rk_trajectory_chunk @layout(135176, 8) {
+	struct rk_trajectory_chunk @layout(135184, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		point_count: u32 @offset(4);
 		points: array<rk_trajectory_point, 256> @offset(8);
+		tag: u64 @offset(135176);
 	}
 	/**
 	 * Kind of command batch submitted to a runtime mailbox.

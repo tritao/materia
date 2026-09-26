@@ -80,7 +80,7 @@ enum {
     RK_MAX_TRAJECTORY_JOINTS = 64, /**< Maximum joints represented by one trajectory chunk. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 7 /**< Version of the RobotKit C data contract (physical model v2, configured LiDAR coverage, timestamped trajectory execution, queue status, and split trajectory payloads). */
+    RK_API_VERSION = 7 /**< Version of the RobotKit C data contract (physical model v2, configured LiDAR coverage, timestamped trajectory execution, queue status, split trajectory payloads, and tagged trajectory progress). */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -248,6 +248,7 @@ typedef struct rk_robot_runtime_joint {
     double child_frame_position[3];
     double child_frame_rotation[4]; /**< Unit quaternion xyzw. */
     double axis[3]; /**< Unit vector in the parent joint frame. */
+    double max_acceleration; /**< Maximum joint acceleration, or zero when unspecified. */
 } rk_robot_runtime_joint;
 
 enum { RK_COLLISION_APPROXIMATION_NONE = 0, RK_COLLISION_APPROXIMATION_BOUNDS_BOX = 1 };
@@ -330,6 +331,7 @@ typedef struct rk_trajectory_chunk {
     uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
     uint32_t point_count; /**< Number of valid points in points. */
     rk_trajectory_point points[RK_MAX_TRAJECTORY_POINTS];
+    uint64_t tag; /**< Stable caller-selected identity for this chunk. */
 } rk_trajectory_chunk;
 
 /** Command metadata and optional fixed-capacity joint-target payload. */
@@ -361,6 +363,8 @@ typedef struct rk_robot_state {
     uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final sample. */
     uint32_t sensor_count;
     rk_sensor_sample sensors[RK_MAX_SENSORS];
+    uint64_t trajectory_tag; /**< Chunk identity currently running or last stopped. */
+    uint64_t trajectory_tag_time_ns; /**< Time within trajectory_tag, in nanoseconds. */
 } rk_robot_state;
 
 /** Immutable published runtime snapshot; native handles never enter this ABI. */
@@ -390,6 +394,8 @@ typedef struct rk_robot_snapshot {
     uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final sample. */
     uint32_t sensor_count;
     rk_sensor_sample sensors[RK_MAX_SENSORS];
+    uint64_t trajectory_tag; /**< Chunk identity currently running or last stopped. */
+    uint64_t trajectory_tag_time_ns; /**< Time within trajectory_tag, in nanoseconds. */
 } rk_robot_snapshot;
 
 /** Static control capabilities reported by a RobotRuntime endpoint. */

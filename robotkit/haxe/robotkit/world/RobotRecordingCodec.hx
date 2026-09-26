@@ -28,6 +28,7 @@ class RobotRecordingCodec {
             expiryNs:expiryNs == null ? null : Int64.toStr(expiryNs)});
         case TrajectoryChunk(chunk):
           Reflect.setField(root, "payload", {kind:"trajectoryChunk",
+            tag:Int64.toStr(chunk.tag),
             points:[for (point in chunk.points) {
               timeFromStartNs:Int64.toStr(point.timeFromStartNs),
               positions:point.positions
@@ -69,12 +70,13 @@ class RobotRecordingCodec {
               targets.push(new JointTarget(fieldInt(item, "joint"),
                 readJointTargetMode(string(item, "mode")), fieldFloat(item, "target")));
             Command(JointTargets(JointTarget.copyBatch(targets), expiry));
-          case "trajectoryChunk" if (version == VERSION):
+          case "trajectoryChunk" if (version >= 2):
             var points:Array<TrajectoryPoint> = [];
             for (item in array(payload, "points"))
               points.push(new TrajectoryPoint(wide(item, "timeFromStartNs"),
                 floats(item, "positions")));
-            Command(TrajectoryChunk(new TrajectoryChunk(points)));
+            Command(TrajectoryChunk(new TrajectoryChunk(points,
+              nullableWide(payload, "tag"))));
           case _: throw "Unsupported RobotKit command payload";
         }
       case "snapshot": RobotSnapshot(readSnapshot(payload));
@@ -93,9 +95,9 @@ class RobotRecordingCodec {
       wide(root, "recordingTimestampNs"), version);
   }
 
-  static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,safety:v.safety,trajectoryQueueDepth:v.trajectoryQueueDepth,trajectoryActive:v.trajectoryActive,trajectoryTimeNs:Int64.toStr(v.trajectoryTimeNs),trajectoryDurationNs:Int64.toStr(v.trajectoryDurationNs),sensors:[for(s in v.sensors.toArray()) sensor(s)]};
+  static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,safety:v.safety,trajectoryQueueDepth:v.trajectoryQueueDepth,trajectoryActive:v.trajectoryActive,trajectoryTimeNs:Int64.toStr(v.trajectoryTimeNs),trajectoryDurationNs:Int64.toStr(v.trajectoryDurationNs),trajectoryTag:Int64.toStr(v.trajectoryTag),trajectoryTagTimeNs:Int64.toStr(v.trajectoryTagTimeNs),sensors:[for(s in v.sensors.toArray()) sensor(s)]};
   static function sensor(v:SensorFrame):Dynamic return {sensorId:v.sensorId,kind:v.kind,frameId:v.frameId,sequence:Int64.toStr(v.sequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,values:v.values.toArray(),linkId:v.linkId,mountPosition:v.mountPosition.toArray(),mountRotation:v.mountRotation.toArray(),image:v.image==null?null:cameraImage(v.image)};
-  static function readSnapshot(v:Dynamic):RobotSnapshot return new RobotSnapshot(string(v,"id"),wide(v,"sourceSequence"),wide(v,"sourceTimestampNs"),floats(v,"positions"),floats(v,"velocities"),floats(v,"efforts"),fieldInt(v,"mode"),fieldInt(v,"faultCode"),wide(v,"receivedTimestampNs"),[for(s in array(v,"sensors")) readSensor(s)],string(v,"sourceClockId"),string(v,"receivedClockId"),optionalFieldInt(v,"safety",0),optionalFieldInt(v,"trajectoryQueueDepth",0),optionalFieldBool(v,"trajectoryActive",false),nullableWide(v,"trajectoryTimeNs"),nullableWide(v,"trajectoryDurationNs"));
+  static function readSnapshot(v:Dynamic):RobotSnapshot return new RobotSnapshot(string(v,"id"),wide(v,"sourceSequence"),wide(v,"sourceTimestampNs"),floats(v,"positions"),floats(v,"velocities"),floats(v,"efforts"),fieldInt(v,"mode"),fieldInt(v,"faultCode"),wide(v,"receivedTimestampNs"),[for(s in array(v,"sensors")) readSensor(s)],string(v,"sourceClockId"),string(v,"receivedClockId"),optionalFieldInt(v,"safety",0),optionalFieldInt(v,"trajectoryQueueDepth",0),optionalFieldBool(v,"trajectoryActive",false),nullableWide(v,"trajectoryTimeNs"),nullableWide(v,"trajectoryDurationNs"),nullableWide(v,"trajectoryTag"),nullableWide(v,"trajectoryTagTimeNs"));
   static function readSensor(v:Dynamic):SensorFrame {
     var position = floats(v, "mountPosition");
     var rotation = floats(v, "mountRotation");

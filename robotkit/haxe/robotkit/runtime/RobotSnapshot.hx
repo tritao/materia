@@ -30,6 +30,8 @@ class RobotSnapshot {
   public final trajectoryActive:Bool;
   public final trajectoryTimeNs:Int64;
   public final trajectoryDurationNs:Int64;
+  public final trajectoryTag:Int64;
+  public final trajectoryTagTimeNs:Int64;
 
   /** Compatibility alias; source time is the runtime's primary observation clock. */
   public var timestampNs(get, never):Int64;
@@ -39,7 +41,8 @@ class RobotSnapshot {
       q:Array<Float>, dq:Array<Float>, effort:Array<Float>,
       ?receivedTimestampNs:Int64, ?sensors:Array<SensorFrame>,
       ?trajectoryQueueDepth:Int, ?trajectoryActive:Bool,
-      ?trajectoryTimeNs:Int64, ?trajectoryDurationNs:Int64) {
+      ?trajectoryTimeNs:Int64, ?trajectoryDurationNs:Int64,
+      ?trajectoryTag:Int64, ?trajectoryTagTimeNs:Int64) {
     this.robotId = robotId;
     this.sequence = sequence;
     this.sourceTimestampNs = sourceTimestampNs;
@@ -59,6 +62,9 @@ class RobotSnapshot {
     this.trajectoryTimeNs = trajectoryTimeNs == null ? Int64.ofInt(0) : trajectoryTimeNs;
     this.trajectoryDurationNs = trajectoryDurationNs == null
       ? Int64.ofInt(0) : trajectoryDurationNs;
+    this.trajectoryTag = trajectoryTag == null ? Int64.ofInt(0) : trajectoryTag;
+    this.trajectoryTagTimeNs = trajectoryTagTimeNs == null
+      ? Int64.ofInt(0) : trajectoryTagTimeNs;
   }
 
   /** Converts the native ABI value while leaving the semantic robot ID unset. */
@@ -96,14 +102,16 @@ class RobotSnapshot {
       value.get_mode(), value.get_safety(), value.get_endpoint(), value.get_fault_code(),
       positions, velocities, efforts, value.get_received_timestamp_ns(), frames,
       value.get_trajectory_queue_depth(), value.get_trajectory_active() != 0,
-      value.get_trajectory_time_ns(), value.get_trajectory_duration_ns());
+      value.get_trajectory_time_ns(), value.get_trajectory_duration_ns(),
+      value.get_trajectory_tag(), value.get_trajectory_tag_time_ns());
   }
 
   /** Returns an immutable copy associated with a caller-provided robot ID. */
   public function withRobotId(value:Int64):RobotSnapshot
     return new RobotSnapshot(value, sequence, sourceTimestampNs, mode, safety, endpoint, faultCode,
       q.toArray(), dq.toArray(), effort.toArray(), receivedTimestampNs, sensors.toArray(),
-      trajectoryQueueDepth, trajectoryActive, trajectoryTimeNs, trajectoryDurationNs);
+      trajectoryQueueDepth, trajectoryActive, trajectoryTimeNs, trajectoryDurationNs,
+      trajectoryTag, trajectoryTagTimeNs);
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;
 }

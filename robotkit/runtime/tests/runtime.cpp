@@ -191,9 +191,10 @@ rk_robot_command trajectory_command(uint64_t sequence) {
 }
 
 rk_trajectory_chunk trajectory_batch(
-    std::initializer_list<std::pair<uint64_t, double>> points) {
+    std::initializer_list<std::pair<uint64_t, double>> points, uint64_t tag = 0) {
     rk_trajectory_chunk value{};
     value.struct_size = sizeof(value);
+    value.tag = tag;
     for (const auto &[time, position] : points) {
         auto &point = value.points[value.point_count++];
         point.time_from_start_ns = time;
@@ -259,6 +260,68 @@ void normal_stop_decelerates_active_trajectory(const rk_robot_runtime_blueprint 
     state = apply_cycle(runtime, timestamp);
     assert(std::abs(state.position[0] - 0.75) < 1e-6);
     assert(state.mode == RK_ROBOT_MODE_STOPPING);
+}
+
+void trajectory_stop_follows_path_and_reports_tag(
+    const rk_robot_runtime_blueprint &blueprint) {
+    auto slow_blueprint = blueprint;
+    for (auto &joint : slow_blueprint.joints)
+        joint.max_acceleration = 1.0;
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(slow_blueprint.joint_count);
+    robotkit::RobotRuntime runtime(slow_blueprint, endpoint, std::chrono::milliseconds(100));
+    uint64_t timestamp = 0;
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {1'000'000'000, 1.0}}, 42)) == RK_OK);
+    auto state = apply_cycle(runtime, timestamp);
+    assert(state.trajectory_active == 1 && state.trajectory_tag == 42);
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.1) < 1e-9);
+
+    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
+    const auto stop_start = state.position[0];
+    auto stop_state = apply_cycle(runtime, timestamp);
+    assert(stop_state.trajectory_active == 1 && stop_state.trajectory_tag == 42);
+    double previous_position = stop_state.position[0];
+    int stop_cycles = 1;
+    while (stop_state.trajectory_active) {
+        stop_state = apply_cycle(runtime, timestamp);
+        ++stop_cycles;
+        assert(stop_state.position[0] + 1e-9 >= previous_position);
+        assert(stop_state.position[0] <= 1.0 + 1e-9);
+        previous_position = stop_state.position[0];
+        assert(stop_cycles < 30);
+    }
+    assert(stop_cycles >= 8 && stop_cycles <= 14);
+    assert(stop_state.trajectory_tag == 42);
+    assert(stop_state.trajectory_tag_time_ns > 0);
+    assert(std::abs(stop_state.position[0] -
+        static_cast<double>(stop_state.trajectory_tag_time_ns) / 1'000'000'000.0) < 0.11);
+    assert(stop_state.position[0] > stop_start);
+}
+
+void trajectory_chunk_cancels_slowdown(
+    const rk_robot_runtime_blueprint &blueprint) {
+    auto slow_blueprint = blueprint;
+    for (auto &joint : slow_blueprint.joints)
+        joint.max_acceleration = 1.0;
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(slow_blueprint.joint_count);
+    robotkit::RobotRuntime runtime(slow_blueprint, endpoint, std::chrono::milliseconds(100));
+    uint64_t timestamp = 0;
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {1'000'000'000, 1.0}}, 7)) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    apply_cycle(runtime, timestamp);
+    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    auto state = apply_cycle(runtime, timestamp);
+    const auto slowed_time = state.trajectory_time_ns;
+    assert(runtime.submit_trajectory(trajectory_command(3),
+        trajectory_batch({{0, 1.0}, {1'000'000'000, 0.0}}, 8)) == RK_OK);
+    state = apply_cycle(runtime, timestamp);
+    assert(state.trajectory_active == 1);
+    state = apply_cycle(runtime, timestamp);
+    assert(state.trajectory_time_ns > slowed_time);
+    assert(state.trajectory_tag == 7 || state.trajectory_tag == 8);
 }
 
 void faulted_batch_skips_commands_before_reset(
@@ -441,6 +504,8 @@ int main() {
     partial_targets_and_ordered_trajectory_commands(blueprint);
     timestamped_trajectory_interpolates_and_reports_progress(blueprint);
     normal_stop_decelerates_active_trajectory(blueprint);
+    trajectory_stop_follows_path_and_reports_tag(blueprint);
+    trajectory_chunk_cancels_slowdown(blueprint);
     faulted_batch_skips_commands_before_reset(blueprint);
     invalid_trajectory_chunk_is_atomic(blueprint);
 

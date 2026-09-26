@@ -48,6 +48,9 @@ class RobotModelCodec {
       finite(joint.limits.upper, "joint limits.upper");
       finite(joint.limits.velocity, "joint limits.velocity");
       finite(joint.limits.effort, "joint limits.effort");
+      finite(joint.limits.maxAcceleration, "joint limits.maxAcceleration");
+      if (joint.limits.maxAcceleration < 0.0)
+        throw "joint limits.maxAcceleration must be non-negative";
       jointTypeName(joint.type);
       validateActuator(joint.drive);
     }
@@ -83,7 +86,8 @@ class RobotModelCodec {
         id: joint.id, name: joint.name, type: jointTypeName(joint.type),
         parentLink: joint.parent.id, childLink: joint.child.id,
         limits: {lower: joint.limits.lower, upper: joint.limits.upper,
-          velocity: joint.limits.velocity, effort: joint.limits.effort},
+          velocity: joint.limits.velocity, effort: joint.limits.effort,
+          maxAcceleration: joint.limits.maxAcceleration},
         drive: encodeActuator(joint.drive),
         parentFramePosition: joint.parentFramePosition,
         parentFrameRotation: joint.parentFrameRotation,
@@ -153,8 +157,10 @@ class RobotModelCodec {
       var joint = model.addJoint(new Joint(text(record, "name"),
         readJointType(text(record, "type")), parent, child, id));
       var limits:Dynamic = required(record, "limits");
+      var maxAcceleration = Reflect.hasField(limits, "maxAcceleration")
+        ? number(limits, "maxAcceleration") : 0.0;
       joint.limits = new JointLimits(number(limits, "lower"), number(limits, "upper"),
-        number(limits, "velocity"), number(limits, "effort"));
+        number(limits, "velocity"), number(limits, "effort"), maxAcceleration);
       joint.drive = readActuator(Reflect.field(record, "drive"));
       joint.parentFramePosition = vectorField(record, "parentFramePosition", 3);
       joint.parentFrameRotation = vectorField(record, "parentFrameRotation", 4);
