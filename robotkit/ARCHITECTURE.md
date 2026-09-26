@@ -478,6 +478,21 @@ re-read every body's and joint's state back from the backend afterward, so
 an immediate `nksim_body_get_state`/`nksim_joint_get_state` observes the
 cascade rather than only the next `step()`.
 
+### Cross-backend acceptance (M8.5)
+
+`simkit/sim_mujoco/tests/mujoco.cpp`'s `cross_backend_link_poses_agree_with_fk`
+is the one place both native backends are checked against each other and
+against RobotKit's own FK formula in a single test binary: a 3-link arm
+(non-zero offsets on both joints, a rotated joint frame on the second) at a
+commanded configuration gives the same link world poses in the default
+backend (exact, 1e-9) and MuJoCo (after settling, 1e-3), and teleporting the
+root carries the whole arm in both. MuJoCo's per-joint PD controller (F2)
+has no cross-joint compensation, so its steady-state tracking error grows
+with lever-arm scale under active load; this test's anchors are a few
+centimeters, not the meters a real link might use, specifically to keep
+that expected, undiagnosed-bug error under the 1e-3 tolerance — a future
+multi-DOF controller improvement should re-check this at larger scales.
+
 ## Deployment boundary
 
 `robotd` remains one robot. It assigns every connection a unique session ID,

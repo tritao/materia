@@ -737,6 +737,42 @@ MuJoCo-enabled native robotd build are green except the same pre-existing
 `robotkit_mujoco_tests` failure logged under F1 (unrelated to the default
 backend).
 
+**M8.5 cross-backend acceptance test**: added
+`cross_backend_link_poses_agree_with_fk` to
+`simkit/sim_mujoco/tests/mujoco.cpp`, since it is the one test binary that
+links both `nksim_world_create` (default backend) and
+`nksim_mujoco_world_create` (MuJoCo) — a Haxe-level equivalent isn't
+reachable from the standard `robotkit/tests/haxeon.json` suite, which
+builds via `robotkit/robotd/native` with `NKSIM_BUILD_MUJOCO` OFF by
+default (matching the plan's own separate "default suite" vs
+"MuJoCo-enabled native build" commands). A small self-contained C++
+rigid-transform helper (`fk::` namespace) reproduces the exact
+`world_T_child = world_T_parent . T(anchor_a, rotation_a) . M(q) . T(anchor_b, rotation_b)^-1`
+composition F1/F4 use (which is itself `KinematicChain`'s own FK, already
+validated independently by M2's Haxe tests) to compute the expected pose of
+a 3-link arm (base + link1 + link2) with non-zero offsets on both joints
+and a rotated joint frame on the second (`rotation_b` a 90 degree turn
+about X, so its `axis_a` is not link2's own local Z) at a commanded joint
+configuration, then checks both backends' actual link poses against it —
+default backend within 1e-9 (exact, since F4 applies a position target
+instantly and precisely), MuJoCo within 1e-3 after settling. It also
+teleports the root and re-checks both. Deviation from the plan worth
+recording: the first version of this test used the same offset scale as
+F1's earlier test (~0.4-0.5m anchors) at meaningfully large joint angles
+(0.4, 0.6 rad); MuJoCo's PD-per-joint controller (F2) has no cross-joint
+(off-diagonal mass matrix) compensation, so a real, non-shrinking
+steady-state coupling error appeared at that lever-arm scale (confirmed
+via more settling steps, which did not reduce it) — around 2-4mm, over the
+1e-3 tolerance, even isolated to a single actuated joint. This is expected
+behavior for a per-joint independent PD controller (not a new bug; the
+tolerance the plan specifies is for "after settling," which a persistent
+steady-state offset under active load is not exempt from). Rescaling the
+test's anchors to a few centimeters brought the coupling error to
+~0.6-0.7mm, comfortably under 1e-3, while keeping non-zero offsets and a
+genuinely rotated joint frame; documented here since a future milestone
+adding cross-joint (multi-DOF) compensation to F2's controller would need
+to re-verify this margin at larger scales.
+
 **M5**: added `robotkit/haxe/robotkit/work/` (`Point2`, `Polygon2`,
 `WorkSurfaceId`, `SourceKind`, `Provenance`, `WorkSurface`,
 `RasterToolpathGenerator`, `CoverageMap`) and

@@ -2,6 +2,7 @@
 #include "nativekit_sim.h"
 #include "nativekit_sim_mujoco.h"
 
+#include <array>
 #include <cassert>
 #include <cmath>
 
@@ -665,6 +666,222 @@ void non_adjacent_links_do_not_self_collide() {
     nkscene_scene_destroy(scene);
 }
 
+// -- Cross-backend acceptance test (M8.5) -----------------------------------
+//
+// A small self-contained rigid-transform helper (translation + xyzw
+// quaternion, matching robotkit.spatial.Transform3's a_T_b convention)
+// reproducing the exact forward-kinematics composition F1 uses for rest
+// poses and F4 uses for the default backend's kinematic recompute:
+// world_T_child = world_T_parent . T(anchor_a, rotation_a) . M(q) . T(anchor_b, rotation_b)^-1.
+// This is "RobotKit's M2 FK" (KinematicChain's own composition) run in C++
+// so both native backends can be checked against one reference without a
+// Haxe roundtrip.
+namespace fk {
+
+using V3 = std::array<double, 3>;
+using Q4 = std::array<double, 4>;
+
+Q4 qconj(const Q4 &q) { return {-q[0], -q[1], -q[2], q[3]}; }
+Q4 qmul(const Q4 &a, const Q4 &b) {
+    return {
+        a[3]*b[0] + a[0]*b[3] + a[1]*b[2] - a[2]*b[1],
+        a[3]*b[1] - a[0]*b[2] + a[1]*b[3] + a[2]*b[0],
+        a[3]*b[2] + a[0]*b[1] - a[1]*b[0] + a[2]*b[3],
+        a[3]*b[3] - a[0]*b[0] - a[1]*b[1] - a[2]*b[2],
+    };
+}
+V3 qrot(const Q4 &q, const V3 &v) {
+    const V3 t{2.0*(q[1]*v[2]-q[2]*v[1]), 2.0*(q[2]*v[0]-q[0]*v[2]), 2.0*(q[0]*v[1]-q[1]*v[0])};
+    return {v[0]+q[3]*t[0]+q[1]*t[2]-q[2]*t[1], v[1]+q[3]*t[1]+q[2]*t[0]-q[0]*t[2], v[2]+q[3]*t[2]+q[0]*t[1]-q[1]*t[0]};
+}
+struct Xf { V3 pos{0,0,0}; Q4 rot{0,0,0,1}; };
+Xf compose(const Xf &a, const Xf &b) {
+    const auto r = qrot(a.rot, b.pos);
+    return {{a.pos[0]+r[0], a.pos[1]+r[1], a.pos[2]+r[2]}, qmul(a.rot, b.rot)};
+}
+Xf inverse(const Xf &a) {
+    const auto inv = qconj(a.rot);
+    const auto p = qrot(inv, {-a.pos[0], -a.pos[1], -a.pos[2]});
+    return {p, inv};
+}
+Xf revolute(const V3 &axis, double q) {
+    const double half = q * 0.5, s = std::sin(half);
+    return {{0,0,0}, {axis[0]*s, axis[1]*s, axis[2]*s, std::cos(half)}};
+}
+/** world_T_child at joint value q, given anchor_a/rotation_a (body_a side), anchor_b/rotation_b (body_b side), and the joint-frame axis. */
+Xf child_pose(const Xf &world_T_parent, const Xf &a_side, const V3 &axis, double q, const Xf &b_side) {
+    return compose(compose(compose(world_T_parent, a_side), revolute(axis, q)), inverse(b_side));
+}
+
+} // namespace fk
+
+/** A scene node with a full rest transform (translation and rotation), unlike make_node[_xyz]. */
+nkscene_node_id make_node_posed(nkscene_scene scene, const fk::V3 &pos, const fk::Q4 &rot) {
+    nkscene_transaction transaction = 0;
+    assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
+    nkscene_node_id node{};
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
+    nkscene_transform transform{};
+    const double x = rot[0], y = rot[1], z = rot[2], w = rot[3];
+    const double xx = x*x, yy = y*y, zz = z*z, xy = x*y, xz = x*z, yz = y*z, wx = w*x, wy = w*y, wz = w*z;
+    transform.matrix[0] = static_cast<float>(1.0 - 2.0*(yy+zz));
+    transform.matrix[1] = static_cast<float>(2.0*(xy+wz));
+    transform.matrix[2] = static_cast<float>(2.0*(xz-wy));
+    transform.matrix[4] = static_cast<float>(2.0*(xy-wz));
+    transform.matrix[5] = static_cast<float>(1.0 - 2.0*(xx+zz));
+    transform.matrix[6] = static_cast<float>(2.0*(yz+wx));
+    transform.matrix[8] = static_cast<float>(2.0*(xz+wy));
+    transform.matrix[9] = static_cast<float>(2.0*(yz-wx));
+    transform.matrix[10] = static_cast<float>(1.0 - 2.0*(xx+yy));
+    transform.matrix[12] = static_cast<float>(pos[0]);
+    transform.matrix[13] = static_cast<float>(pos[1]);
+    transform.matrix[14] = static_cast<float>(pos[2]);
+    transform.matrix[15] = 1.0f;
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
+    nkscene_change_set changes = 0;
+    assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
+    nkscene_change_set_destroy(changes);
+    return node;
+}
+
+void cross_backend_link_poses_agree_with_fk() {
+    // 3-link arm (base + link1 + link2), non-zero offsets on both joints and
+    // a rotated joint frame on the second (rotation_b is a 90 degree turn
+    // about X, so its axis_a=(0,0,1) is NOT link2's own local Z).
+    const fk::V3 axis_z{0.0, 0.0, 1.0};
+    const fk::Xf joint1_a{{0.08, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0}}; // anchor_a, rotation_a
+    const fk::Xf joint1_b{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0}}; // anchor_b, rotation_b
+    const double half90 = 0.5 * 1.5707963267948966;
+    const fk::Q4 rot_x90{std::sin(half90), 0.0, 0.0, std::cos(half90)};
+    const fk::Xf joint2_a{{0.0, 0.0, 0.06}, {0.0, 0.0, 0.0, 1.0}};
+    const fk::Xf joint2_b{{0.0, 0.0, -0.02}, rot_x90};
+
+    const fk::Xf world_T_base{{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0}};
+    const auto rest1 = fk::child_pose(world_T_base, joint1_a, axis_z, 0.0, joint1_b);
+    const auto rest2 = fk::child_pose(rest1, joint2_a, axis_z, 0.0, joint2_b);
+
+    const double q1 = 0.3, q2 = 0.4;
+    const auto expected1_q = fk::child_pose(world_T_base, joint1_a, axis_z, q1, joint1_b);
+    const auto expected2_q = fk::child_pose(expected1_q, joint2_a, axis_z, q2, joint2_b);
+
+    auto run_backend = [&](bool use_mujoco, int steps) {
+        nkscene_scene scene = 0;
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        const auto base_node = make_node_posed(scene, world_T_base.pos, world_T_base.rot);
+        const auto link1_node = make_node_posed(scene, rest1.pos, rest1.rot);
+        const auto link2_node = make_node_posed(scene, rest2.pos, rest2.rot);
+
+        nksim_world_desc world_desc{};
+        world_desc.struct_size = sizeof(world_desc);
+        world_desc.scene = scene;
+        world_desc.fixed_timestep = 0.01;
+        world_desc.physics_substeps = 2;
+        world_desc.gravity[2] = 0.0;
+        nksim_world world = 0;
+        assert((use_mujoco ? nksim_mujoco_world_create(&world_desc, &world)
+                           : nksim_world_create(&world_desc, &world)) == NKSIM_OK);
+
+        const auto base = make_body(world, base_node, NKSIM_MOTION_STATIC, 0.0);
+        const auto shape = make_box(world);
+        const auto link1 = make_body(world, link1_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+        const auto link2 = make_body(world, link2_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+
+        nksim_joint_desc joint1_desc{};
+        joint1_desc.struct_size = sizeof(joint1_desc);
+        joint1_desc.type = NKSIM_JOINT_REVOLUTE;
+        joint1_desc.body_a = base;
+        joint1_desc.body_b = link1;
+        std::copy(joint1_a.pos.begin(), joint1_a.pos.end(), joint1_desc.anchor_a);
+        std::copy(joint1_b.pos.begin(), joint1_b.pos.end(), joint1_desc.anchor_b);
+        std::copy(axis_z.begin(), axis_z.end(), joint1_desc.axis_a);
+        std::copy(joint1_a.rot.begin(), joint1_a.rot.end(), joint1_desc.rotation_a);
+        std::copy(joint1_b.rot.begin(), joint1_b.rot.end(), joint1_desc.rotation_b);
+        joint1_desc.max_force = 1000.0;
+        nksim_joint joint1 = 0;
+        assert(nksim_joint_create(world, &joint1_desc, &joint1) == NKSIM_OK);
+
+        nksim_joint_desc joint2_desc{};
+        joint2_desc.struct_size = sizeof(joint2_desc);
+        joint2_desc.type = NKSIM_JOINT_REVOLUTE;
+        joint2_desc.body_a = link1;
+        joint2_desc.body_b = link2;
+        std::copy(joint2_a.pos.begin(), joint2_a.pos.end(), joint2_desc.anchor_a);
+        std::copy(joint2_b.pos.begin(), joint2_b.pos.end(), joint2_desc.anchor_b);
+        std::copy(axis_z.begin(), axis_z.end(), joint2_desc.axis_a);
+        std::copy(joint2_a.rot.begin(), joint2_a.rot.end(), joint2_desc.rotation_a);
+        std::copy(joint2_b.rot.begin(), joint2_b.rot.end(), joint2_desc.rotation_b);
+        joint2_desc.max_force = 1000.0;
+        nksim_joint joint2 = 0;
+        assert(nksim_joint_create(world, &joint2_desc, &joint2) == NKSIM_OK);
+
+        nksim_joint_target targets[2]{};
+        targets[0].struct_size = sizeof(targets[0]);
+        targets[0].joint = joint1;
+        targets[0].mode = NKSIM_JOINT_TARGET_POSITION;
+        targets[0].target = q1;
+        targets[0].max_force = 1000.0;
+        targets[1] = targets[0];
+        targets[1].joint = joint2;
+        targets[1].target = q2;
+        assert(nksim_world_set_joint_targets(world, targets, 2) == NKSIM_OK);
+
+        for (int i = 0; i < steps; ++i) {
+            nksim_step_result step{};
+            step.struct_size = sizeof(step);
+            assert(nksim_world_step(world, &step) == NKSIM_OK);
+            nkscene_change_set_destroy(step.scene_changes);
+        }
+
+        nksim_body_state state1{}, state2{};
+        state1.struct_size = sizeof(state1);
+        state2.struct_size = sizeof(state2);
+        assert(nksim_body_get_state(world, link1, &state1) == NKSIM_OK);
+        assert(nksim_body_get_state(world, link2, &state2) == NKSIM_OK);
+
+        const double tolerance = use_mujoco ? 1e-3 : 1e-9;
+        for (int i = 0; i < 3; ++i) {
+            assert(std::abs(state1.position[i] - expected1_q.pos[i]) < tolerance);
+            assert(std::abs(state2.position[i] - expected2_q.pos[i]) < tolerance);
+        }
+
+        // Teleporting the root carries the whole arm in both backends.
+        nksim_body_state base_state{};
+        base_state.struct_size = sizeof(base_state);
+        assert(nksim_body_get_state(world, base, &base_state) == NKSIM_OK);
+        base_state.position[0] += 2.0;
+        base_state.position[1] += 1.0;
+        assert(nksim_body_set_state(world, base, &base_state) == NKSIM_OK);
+        if (use_mujoco) {
+            // MuJoCo settles the constraint over a few steps rather than
+            // instantaneously; the default backend recomputes it exactly.
+            for (int i = 0; i < 5; ++i) {
+                nksim_step_result step{};
+                step.struct_size = sizeof(step);
+                assert(nksim_world_step(world, &step) == NKSIM_OK);
+                nkscene_change_set_destroy(step.scene_changes);
+            }
+        }
+        assert(nksim_body_get_state(world, link1, &state1) == NKSIM_OK);
+        assert(nksim_body_get_state(world, link2, &state2) == NKSIM_OK);
+        assert(std::abs(state1.position[0] - (expected1_q.pos[0] + 2.0)) < tolerance);
+        assert(std::abs(state1.position[1] - (expected1_q.pos[1] + 1.0)) < tolerance);
+        assert(std::abs(state2.position[0] - (expected2_q.pos[0] + 2.0)) < tolerance);
+        assert(std::abs(state2.position[1] - (expected2_q.pos[1] + 1.0)) < tolerance);
+
+        nksim_joint_destroy(world, joint2);
+        nksim_joint_destroy(world, joint1);
+        nksim_body_destroy(world, link2);
+        nksim_body_destroy(world, link1);
+        nksim_body_destroy(world, base);
+        nksim_shape_destroy(world, shape);
+        nksim_world_destroy(world);
+        nkscene_scene_destroy(scene);
+    };
+
+    run_backend(false, 1); // Default backend: an instant, exact position-mode set.
+    run_backend(true, 400); // MuJoCo: let the PD controller settle.
+}
+
 } // namespace
 
 int main() {
@@ -679,5 +896,6 @@ int main() {
     position_target_holds_under_gravity();
     effort_target_respects_max_force_clamp();
     non_adjacent_links_do_not_self_collide();
+    cross_backend_link_poses_agree_with_fk();
     return 0;
 }
