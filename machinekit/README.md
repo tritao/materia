@@ -16,13 +16,17 @@ not modelled.
 
 Standard sizes live in typed `Catalog` tables, separate from the generators.
 Each catalog entry also exposes `catalog().metadata(designation)` with its source,
-standard, verified edition (or `null`), dimension kind, and conformance level.
+optional supplementary sources, standard, verified edition (or `null`), dimension
+kind, and conformance level.
 `Unverified` means the embedded dimensions still need a complete independent source check;
 `verifiedFields` lists any fields already checked in an otherwise unverified row;
 `GenericApproximation` means the generated part does not claim a complete standard
-interface. The ISO 9409 bolt-pattern flange and representative NEMA motor are
-marked this way. The 608 and 6000 bearing boundary rows have independent NTN
-checks; the M5 screw row has a partial Accu check. Metadata describes the catalog entry, not manufacturing
+interface. The ISO 9409 bolt-pattern flange remains marked this way; NEMA motor
+variants use a nominal manufacturer envelope. The 608 and 6000 bearing boundary rows have independent NTN
+checks; the M5 screw row has independent Accu and Norelem checks for its listed
+fields. NEMA frame rows use manufacturer drawing envelopes and retain `Mixed`
+dimension metadata because drawing limits and nominal interface values differ.
+Metadata describes the catalog entry, not manufacturing
 certification of a generated part.
 
 Each component also produces the machining it needs:

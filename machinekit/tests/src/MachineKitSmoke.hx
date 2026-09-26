@@ -1114,8 +1114,8 @@ class MachineKitSmoke {
 		check(RetainingRing.catalog().metadata("8").dimensionKind == Nominal, "ring dimension metadata");
 		check(RobotFlange.catalog().metadata("50").conformance == GenericApproximation,
 			"raised-pilot flange is a generic approximation");
-		check(NemaStepper.catalog().metadata("17").dimensionKind == Unverified,
-			"NEMA frame dimensions await edition verification");
+		check(NemaStepper.catalog().metadata("17").dimensionKind == Mixed,
+			"NEMA frame dimensions carry manufacturer drawing provenance");
 		metadataComplete(DeepGrooveBearing.catalog());
 		metadataComplete(FlatWasher.catalog());
 		metadataComplete(HexBolt.catalog());
@@ -1136,6 +1136,9 @@ class MachineKitSmoke {
 			var metadata = catalog.metadata(designation);
 			check(metadata.source != null && metadata.source.length > 0,
 				'catalog metadata source missing for $designation');
+			if (metadata.sources != null)
+				for (source in metadata.sources)
+					check(source != null && source.length > 0, 'catalog metadata supplementary source missing for $designation');
 		}
 	}
 

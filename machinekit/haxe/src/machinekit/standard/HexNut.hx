@@ -34,8 +34,10 @@ class HexNut extends MachineComponent {
 
 	public static function catalog():Catalog<HexNutSpec> {
 		if (table == null)
-			table = new Catalog("hex nut size", spec -> spec.size, rows(), _ -> ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 4032",
-				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
+			table = new Catalog("hex nut size", spec -> spec.size, rows(), _ -> ({source: "https://www.bossard.com/in-en/eshop/hex-nuts/hex-nuts-type-1/p/1984/", standard: "ISO 4032",
+				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
+				sources: ["https://www.scribd.com/document/816804171/M-FHN-4032-8-Z-3U-03"],
+				verifiedFields: ["acrossFlats", "height"]}));
 		return table;
 	}
 

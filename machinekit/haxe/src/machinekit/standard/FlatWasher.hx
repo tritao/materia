@@ -34,8 +34,10 @@ class FlatWasher extends MachineComponent {
 
 	public static function catalog():Catalog<FlatWasherSpec> {
 		if (table == null)
-			table = new Catalog("flat washer size", spec -> spec.size, rows(), _ -> ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 7089",
-				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
+			table = new Catalog("flat washer size", spec -> spec.size, rows(), _ -> ({source: "https://www.bossard.com/eshop/global-en/washers/washers-flat-without-chamfer/flat-washers-without-chamfer/p/713/", standard: "ISO 7089",
+				standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope,
+				sources: ["https://5.imimg.com/data5/LQ/IQ/BZ/SELLER-10566774/bossard-3092280-washers-and-securing-element.pdf"],
+				verifiedFields: ["innerDiameter", "outerDiameter", "thickness"]}));
 		return table;
 	}
 

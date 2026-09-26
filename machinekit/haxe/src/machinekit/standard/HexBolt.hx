@@ -47,8 +47,13 @@ class HexBolt extends MachineComponent {
 
 	public static function catalog():Catalog<HexBoltSpec> {
 		if (table == null)
-			table = new Catalog("hex bolt size", spec -> spec.size, rows(), _ -> ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 4017",
-				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
+			table = new Catalog("hex bolt size", spec -> spec.size, rows(), spec -> spec.size == "M5"
+				? ({source: "https://catalogue.wurth.com.au/frontend/catalogs/803200/10/pdf/save/bk_1563.pdf", standard: "ISO 4017",
+					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
+					sources: ["https://norelem.co.uk/medias/Technische-Hinweise-Schrauben-Muttern-EN.pdf"],
+					verifiedFields: ["acrossFlats", "headHeight", "tapDrill", "clearanceFine", "clearanceMedium"]})
+				: ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 4017",
+					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
 		return table;
 	}
 

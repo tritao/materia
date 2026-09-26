@@ -39,9 +39,11 @@ class SocketHeadCapScrew extends MachineComponent {
 	public static function catalog():Catalog<MetricScrewSpec> {
 		if (table == null)
 			table = new Catalog("metric screw size", spec -> spec.size, rows(), spec -> spec.size == "M5"
-				? ({source: "https://www.accu.co.uk/api/product-datasheet?id=652689", standard: "ISO 4762",
+			? ({source: "https://www.accu.co.uk/api/product-datasheet?id=652689", standard: "ISO 4762",
 					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
-					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength"]})
+					sources: ["https://norelem.co.uk/medias/Technische-Hinweise-Schrauben-Muttern-EN.pdf?context=bWFzdGVyfHJvb3R8MjAxMTYxfGFwcGxpY2F0aW9uL3BkZnxhR1UyTDJoaU1pODVNamc1TURNd05UTXpNVFV3TDFSbFkyaHVhWE5qYUdVdFNHbHVkMlZwYzJVdFUyTm9jbUYxWW1WdUxVMTFkSFJsY201ZlJVNHVjR1JtfDNkOGZmNzZiMzAyMDRjZGQzMzIzZWIzNGEzY2I5NjA0MzkxNjY2ZTdkMDNmZjU2NDg2YWY3N2YyODUxZmFlMTA"],
+					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength",
+						"tapDrill", "clearanceFine", "clearanceMedium", "counterboreDiameter"]})
 				: ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 4762",
 					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
 		return table;

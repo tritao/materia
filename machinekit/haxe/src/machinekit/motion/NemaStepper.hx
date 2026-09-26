@@ -31,8 +31,11 @@ class NemaStepper extends MachineComponent {
 				{frame: 17, face: 42.3, boltSpacing: 31.0, pilotDiameter: 22.0},
 				{frame: 23, face: 56.4, boltSpacing: 47.14, pilotDiameter: 38.1},
 				{frame: 34, face: 86.0, boltSpacing: 69.6, pilotDiameter: 73.0},
-			], _ -> ({source: "MachineKit NEMA frame reference; edition verification pending", standard: "NEMA ICS 16",
-				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
+			], spec -> ({source: switch (spec.frame) {
+				case 17 | 23: "https://www.nanotec.com/fileadmin/files/Katalog/linear-actuators-en.pdf";
+				default: "https://www.nanotec.com/fileadmin/files/Baureihenuebersichten/Plug_Drive/Product_Overview_PD6-C.pdf";
+			}, standard: null, standardEdition: null, dimensionKind: Mixed, conformance: NominalEnvelope,
+				verifiedFields: ["face", "boltSpacing", "pilotDiameter"]}));
 		return frameTable;
 	}
 

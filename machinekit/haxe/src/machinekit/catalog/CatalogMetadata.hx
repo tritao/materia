@@ -23,6 +23,8 @@ typedef CatalogMetadata = {
 	var standardEdition:Null<String>;
 	var dimensionKind:DimensionKind;
 	var conformance:Conformance;
-	/** Fields checked against `source` when the rest of a row remains unverified. */
+	/** Additional sources when one row combines independent standard and product tables. */
+	@:optional var sources:Array<String>;
+	/** Fields checked against `source` and optional `sources` when the row remains partial. */
 	@:optional var verifiedFields:Array<String>;
 }
