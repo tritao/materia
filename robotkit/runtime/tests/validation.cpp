@@ -41,6 +41,27 @@ int main() {
     command.targets[1].target = NAN;
     assert(rk_robot_command_validate(&command) == RK_ERROR_INVALID_ARGUMENT);
 
+    rk_robot_command trajectory{};
+    trajectory.struct_size = sizeof(trajectory);
+    trajectory.sequence = 2;
+    trajectory.kind = RK_COMMAND_TRAJECTORY_CHUNK;
+    trajectory.trajectory_count = 2;
+    trajectory.trajectory[0].joint_count = 2;
+    trajectory.trajectory[0].positions[0] = 0.0;
+    trajectory.trajectory[0].positions[1] = 0.0;
+    trajectory.trajectory[1].time_from_start_ns = 10000000;
+    trajectory.trajectory[1].joint_count = 2;
+    trajectory.trajectory[1].positions[0] = 0.1;
+    trajectory.trajectory[1].positions[1] = -0.1;
+    assert(rk_robot_command_validate_for_blueprint(&trajectory, &blueprint) == RK_OK);
+    trajectory.trajectory[1].time_from_start_ns = 0;
+    trajectory.trajectory[0].time_from_start_ns = 1;
+    assert(rk_robot_command_validate(&trajectory) == RK_ERROR_INVALID_ARGUMENT);
+    trajectory.trajectory[0].time_from_start_ns = 0;
+    trajectory.trajectory[1].time_from_start_ns = 10000000;
+    trajectory.trajectory[1].joint_count = 1;
+    assert(rk_robot_command_validate_for_blueprint(&trajectory, &blueprint) == RK_ERROR_INVALID_ARGUMENT);
+
     rk_robot_state state{};
     state.struct_size = sizeof(state);
     state.joint_count = 2;
@@ -96,6 +117,7 @@ int main() {
     capabilities.struct_size = sizeof(capabilities);
     capabilities.joint_count = 2;
     capabilities.supports_position_targets = 1;
+    capabilities.supports_trajectory_queue = 1;
     capabilities.supports_prediction = 1;
     assert(rk_robot_capabilities_validate(&capabilities) == RK_OK);
     return 0;

@@ -19,7 +19,7 @@ class SerialRobot implements Robot {
       maxTargetError, baud);
     adapter = new RuntimeRobotAdapter(id, runtime, model.name,
       [for (link in model.links) link.id], [for (joint in model.joints) joint.id],
-      true, true, "serial endpoint fault");
+      true, true, "serial endpoint fault", false);
   }
 
   public function id():RobotId return adapter.id();

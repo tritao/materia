@@ -23,6 +23,7 @@ public:
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool reports_safety_state() const noexcept override { return true; }
     rk_safety_state initial_safety_state() const noexcept override { return RK_SAFETY_EMERGENCY_STOP; }
+    bool supports_trajectory_queue() const noexcept override { return false; }
 
 private:
     DeviceSerialEndpoint(std::unique_ptr<device::HostLink> link, std::uint8_t joint_count,

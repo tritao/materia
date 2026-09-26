@@ -104,6 +104,8 @@ class RemoteRobot implements Robot {
   public function submit(command:RobotCommand):Void switch command {
     case JointTargets(targets, expiryNs):
       client.sendJointTargets(targets, expiryNs);
+    case TrajectoryChunk(_):
+      throw "RemoteRobot does not support buffered trajectory chunks yet";
   }
 
   public function stop(mode:StopMode):Void {

@@ -165,6 +165,7 @@ rk_result RK_CALL rk_robot_runtime_capabilities(rk_robot_runtime runtime,
     out_capabilities->supports_velocity_targets = 1;
     out_capabilities->supports_effort_targets = 1;
     out_capabilities->supports_prediction = 0;
+    out_capabilities->supports_trajectory_queue = value->supports_trajectory_queue();
     for (auto &reserved : out_capabilities->reserved)
         reserved = 0;
     rk_robot_state state{};

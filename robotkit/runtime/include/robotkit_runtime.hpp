@@ -67,6 +67,9 @@ public:
     /** Initial endpoint safety state, used before the first state sample. */
     virtual rk_safety_state initial_safety_state() const noexcept { return RK_SAFETY_READY; }
 
+    /** Returns true when the endpoint accepts timestamped trajectory chunks. */
+    virtual bool supports_trajectory_queue() const noexcept { return true; }
+
     /**
      * Rolls back command effects staged during a failed simulation tick.
      *
@@ -129,6 +132,10 @@ public:
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
     rk_result snapshot_full(rk_robot_snapshot &out_snapshot) const;
+    /** Reports whether the endpoint accepts buffered trajectory chunks. */
+    bool supports_trajectory_queue() const noexcept {
+        return endpoint_ != nullptr && endpoint_->supports_trajectory_queue();
+    }
 
     bool running() const;
 
@@ -145,6 +152,7 @@ private:
         double position_reference[RK_MAX_JOINTS]{};
         bool active[RK_MAX_JOINTS]{};
         bool reference_initialized[RK_MAX_JOINTS]{};
+        std::deque<rk_trajectory_point> trajectory;
     };
 
     void run();

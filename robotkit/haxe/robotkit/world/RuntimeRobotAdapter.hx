@@ -13,6 +13,7 @@ class RuntimeRobotAdapter implements Robot {
   final robotCapabilities:RobotCapabilities;
   final ownsRuntime:Bool;
   final faultMessage:String;
+  final supportsTrajectoryQueue:Bool;
   var changeListener:Null < RobotId -> Void > = null;
   var commandSequence:Int = 0;
   var observedSequence:Int64 = Int64.ofInt(-1);
@@ -22,7 +23,8 @@ class RuntimeRobotAdapter implements Robot {
 
   public function new(id:RobotId, runtime:RobotRuntime, name:String,
       links:Array<String>, joints:Array<String>, ?ownsRuntime:Bool = false,
-      ?startRuntime:Bool = false, ?faultMessage:String = "robot runtime fault") {
+      ?startRuntime:Bool = false, ?faultMessage:String = "robot runtime fault",
+      ?supportsTrajectoryQueue:Bool = true) {
     if (id == null || id.length == 0)
       throw "RuntimeRobotAdapter requires a non-empty logical ID";
     if (runtime == null)
@@ -31,9 +33,11 @@ class RuntimeRobotAdapter implements Robot {
     this.runtime = runtime;
     this.ownsRuntime = ownsRuntime;
     this.faultMessage = faultMessage;
+    this.supportsTrajectoryQueue = supportsTrajectoryQueue;
     robotDescription = new RobotDescription(id, name, links, joints);
     robotCapabilities = new RobotCapabilities(
-      id, joints == null ? 0 : joints.length, true, true, true, false);
+      id, joints == null ? 0 : joints.length, true, true, true, false,
+      supportsTrajectoryQueue);
     if (startRuntime) {
       try runtime.start() catch (error:Dynamic) {
         if (ownsRuntime) runtime.dispose();
@@ -80,6 +84,11 @@ class RuntimeRobotAdapter implements Robot {
           throw "Runtime command deadlines are not supported; use bounded local intents";
         commandSequence++;
         runtime.submitTargets(targets, commandSequence);
+      case TrajectoryChunk(chunk):
+        if (!supportsTrajectoryQueue)
+          throw "Runtime endpoint does not support buffered trajectories";
+        commandSequence++;
+        runtime.submitTrajectory(chunk, commandSequence);
     }
   }
 

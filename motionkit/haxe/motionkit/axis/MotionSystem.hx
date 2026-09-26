@@ -1,5 +1,6 @@
 package motionkit.axis;
 
+import haxe.Int64;
 import motionkit.Feed;
 import motionkit.path.PathPoint;
 import motionkit.planner.TrajectoryPlanner;
@@ -11,6 +12,8 @@ import robotkit.world.JointTarget;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.StopMode;
+import robotkit.world.TrajectoryChunk;
+import robotkit.world.TrajectoryPoint;
 
 /**
  * Semantic machine-axis view over an ordinary RobotKit robot.
@@ -32,6 +35,7 @@ class MotionSystem {
   var bufferedTotalSeconds:Float = 0.0;
   var bufferedCompletedSeconds:Float = 0.0;
   var plannedEndPositions:Null<Array<Float>> = null;
+  var trajectorySubmitted:Bool = false;
 
   public static function fromBlueprint(robot:Robot, blueprint:MotionSystemBlueprint):MotionSystem
     return new MotionSystem(robot, blueprint);
@@ -133,12 +137,17 @@ class MotionSystem {
   public function hold():Void {
     if (held) return;
     held = true;
-    if (activeTrajectory != null) robot.stop(StopMode.Normal);
+    if (activeTrajectory != null) {
+      if (usesTrajectoryChunks(activeTrajectory)) trajectorySubmitted = false;
+      robot.stop(StopMode.Normal);
+    }
   }
 
   /** Resumes a held buffer at its current deterministic trajectory time. */
   public function resume():Void {
     held = false;
+    if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory))
+      submitActiveTrajectoryChunk();
     activateNextTrajectory();
   }
 
@@ -220,11 +229,15 @@ class MotionSystem {
     var dt = dtSeconds < 0.0 ? fixedTimestepSeconds : dtSeconds;
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
     var trajectory = activeTrajectory;
-    var sample = trajectory.sample(elapsedSeconds);
-    var targets:Array<JointTarget> = [];
-    for (i in 0...sample.positions.length)
-      targets.push(JointTarget.position(i, sample.positions[i]));
-    robot.submit(RobotCommand.JointTargets(targets, null));
+    if (usesTrajectoryChunks(trajectory)) {
+      submitActiveTrajectoryChunk();
+    } else {
+      var sample = trajectory.sample(elapsedSeconds);
+      var targets:Array<JointTarget> = [];
+      for (i in 0...sample.positions.length)
+        targets.push(JointTarget.position(i, sample.positions[i]));
+      robot.submit(RobotCommand.JointTargets(targets, null));
+    }
     if (elapsedSeconds >= trajectory.durationSeconds) {
       bufferedCompletedSeconds += trajectory.durationSeconds;
       activeTrajectory = null;
@@ -267,9 +280,11 @@ class MotionSystem {
   function beginImmediate(trajectoryValue:JointTrajectory):Void {
     activeTrajectory = trajectoryValue;
     elapsedSeconds = 0.0;
+    trajectorySubmitted = false;
     bufferedTotalSeconds = trajectoryValue.durationSeconds;
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(trajectoryValue);
+    if (usesTrajectoryChunks(trajectoryValue)) submitActiveTrajectoryChunk();
   }
 
   function enqueueTrajectory(trajectoryValue:JointTrajectory):Void {
@@ -287,6 +302,8 @@ class MotionSystem {
     if (held || activeTrajectory != null || queuedTrajectories.length == 0) return;
     activeTrajectory = queuedTrajectories.shift();
     elapsedSeconds = 0.0;
+    trajectorySubmitted = false;
+    if (usesTrajectoryChunks(activeTrajectory)) submitActiveTrajectoryChunk();
   }
 
   function clearBufferedMotion():Void {
@@ -297,7 +314,34 @@ class MotionSystem {
     bufferedTotalSeconds = 0.0;
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = null;
+    trajectorySubmitted = false;
   }
+
+  function usesTrajectoryChunks(trajectoryValue:JointTrajectory):Bool {
+    if (trajectoryValue == null) return false;
+    return trajectoryValue.samples.length <= TrajectoryChunk.MAX_POINTS &&
+      robot.capabilities().supportsTrajectoryQueue &&
+      trajectoryValue.jointCount <= TrajectoryPoint.MAX_JOINTS;
+  }
+
+  function submitActiveTrajectoryChunk():Void {
+    var trajectoryValue = activeTrajectory;
+    if (trajectoryValue == null || trajectorySubmitted) return;
+    var startTime = elapsedSeconds;
+    var points:Array<TrajectoryPoint> = [];
+    var initial = trajectoryValue.sample(startTime);
+    points.push(new TrajectoryPoint(Int64.ofInt(0), initial.positions));
+    for (sample in trajectoryValue.samples) {
+      if (sample.timeSeconds <= startTime + 1e-9) continue;
+      points.push(new TrajectoryPoint(secondsToNanoseconds(sample.timeSeconds - startTime),
+        sample.positions));
+    }
+    robot.submit(RobotCommand.TrajectoryChunk(new TrajectoryChunk(points)));
+    trajectorySubmitted = true;
+  }
+
+  static function secondsToNanoseconds(seconds:Float):Int64
+    return Int64.fromFloat(Math.round(seconds * 1000000000.0));
 
   static function trajectoryEnd(trajectoryValue:JointTrajectory):Array<Float>
     return trajectoryValue.samples[trajectoryValue.samples.length - 1].positions.copy();

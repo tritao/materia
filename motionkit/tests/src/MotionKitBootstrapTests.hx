@@ -11,7 +11,10 @@ import motionkit.path.PathPoint;
 import motionkit.planner.TrapezoidalPlanner;
 import motionkit.trajectory.MotionLimits;
 import robotkit.runtime.Simulation;
+import robotkit.world.RecordingRobot;
+import robotkit.world.RobotRecording;
 import robotkit.world.SimulatedRobot;
+import robotkit.world.RobotCommand;
 
 class MotionKitBootstrapTests {
   static var assertions:Int = 0;
@@ -188,8 +191,12 @@ class MotionKitBootstrapTests {
     var robot = new SimulatedRobot("buffered-gantry", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
-    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var recording = new RobotRecording();
+    var instrumented = new RecordingRobot(robot, recording);
+    var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
     var options = new MotionOptions(0.05, 0.2);
+    check(machine.robot.capabilities().supportsTrajectoryQueue,
+      "simulation runtime advertises trajectory queue support");
 
     var first = machine.queueAxes([new AxisTarget("x", 0.02)], options);
     var second = machine.queueAxes([new AxisTarget("x", 0.04)], options);
@@ -199,6 +206,13 @@ class MotionKitBootstrapTests {
     near(second.samples[0].positions[0], 0.02,
       "queued axis motion starts at the previous trajectory endpoint");
     near(machine.progress(), 0.0, "buffer starts with zero progress");
+    check(recording.commands.length == 1, "buffer submits the first move as one chunk");
+    switch recording.commands[0] {
+      case TrajectoryChunk(chunk):
+        check(chunk.points.length > 1, "trajectory chunk carries timestamped samples");
+      case JointTargets(_, _):
+        throw "buffer unexpectedly fell back to sample-by-sample targets";
+    }
 
     var tick = 0;
     for (_ in 0...5) {

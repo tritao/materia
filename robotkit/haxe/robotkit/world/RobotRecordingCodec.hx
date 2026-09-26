@@ -26,6 +26,12 @@ class RobotRecordingCodec {
             targets:[for (target in targets) {joint:target.joint,
               mode:jointTargetMode(target.mode), target:target.target}],
             expiryNs:expiryNs == null ? null : Int64.toStr(expiryNs)});
+        case TrajectoryChunk(chunk):
+          Reflect.setField(root, "payload", {kind:"trajectoryChunk",
+            points:[for (point in chunk.points) {
+              timeFromStartNs:Int64.toStr(point.timeFromStartNs),
+              positions:point.positions
+            }]});
         }
       case RobotSnapshot(value): Reflect.setField(root, "type", "snapshot"); Reflect.setField(root, "payload", snapshot(value));
       case Sensor(robotId, value): Reflect.setField(root, "type", "sensor"); Reflect.setField(root, "robotId", robotId); Reflect.setField(root, "payload", sensor(value));
@@ -63,6 +69,12 @@ class RobotRecordingCodec {
               targets.push(new JointTarget(fieldInt(item, "joint"),
                 readJointTargetMode(string(item, "mode")), fieldFloat(item, "target")));
             Command(JointTargets(JointTarget.copyBatch(targets), expiry));
+          case "trajectoryChunk" if (version == VERSION):
+            var points:Array<TrajectoryPoint> = [];
+            for (item in array(payload, "points"))
+              points.push(new TrajectoryPoint(wide(item, "timeFromStartNs"),
+                floats(item, "positions")));
+            Command(TrajectoryChunk(new TrajectoryChunk(points)));
           case _: throw "Unsupported RobotKit command payload";
         }
       case "snapshot": RobotSnapshot(readSnapshot(payload));

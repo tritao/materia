@@ -16,7 +16,8 @@ uint64_t monotonic_now_ns() {
 }
 
 bool lifecycle_kind(rk_command_kind kind) {
-    return kind != RK_COMMAND_NONE && kind != RK_COMMAND_JOINT_TARGETS;
+    return kind != RK_COMMAND_NONE && kind != RK_COMMAND_JOINT_TARGETS &&
+        kind != RK_COMMAND_TRAJECTORY_CHUNK;
 }
 
 /**
@@ -39,6 +40,8 @@ rk_robot_command arbitrate(const std::deque<rk_robot_command> &commands) {
         return *emergency;
     const auto &newest = commands.back();
     if (lifecycle_kind(newest.kind))
+        return newest;
+    if (newest.kind == RK_COMMAND_TRAJECTORY_CHUNK)
         return newest;
 
     std::size_t first = 0;
@@ -302,6 +305,8 @@ rk_result RobotRuntime::apply_pending_commands() {
     }
 
     if (has_command && command.kind == RK_COMMAND_JOINT_TARGETS) {
+        control_.trajectory.clear();
+        std::fill_n(control_.active, RK_MAX_JOINTS, false);
         rk_robot_state current{};
         {
             std::lock_guard state_lock(state_mutex_);
@@ -336,10 +341,25 @@ rk_result RobotRuntime::apply_pending_commands() {
                     target.max_effort, control_.targets[joint].target);
             control_.active[joint] = true;
         }
+    } else if (has_command && command.kind == RK_COMMAND_TRAJECTORY_CHUNK) {
+        std::fill_n(control_.active, RK_MAX_JOINTS, false);
+        for (uint32_t index = 0; index < command.trajectory_count; ++index) {
+            const auto &point = command.trajectory[index];
+            for (uint32_t joint = 0; joint < point.joint_count; ++joint) {
+                const auto &limits = blueprint_.joints[joint];
+                if (point.positions[joint] < limits.lower_limit ||
+                    point.positions[joint] > limits.upper_limit) {
+                    latch_fault();
+                    return RK_ERROR_LIMIT;
+                }
+            }
+            control_.trajectory.push_back(point);
+        }
     }
 
     const bool lifecycle_command = has_command && command.kind != RK_COMMAND_NONE &&
-        command.kind != RK_COMMAND_JOINT_TARGETS;
+        command.kind != RK_COMMAND_JOINT_TARGETS &&
+        command.kind != RK_COMMAND_TRAJECTORY_CHUNK;
     if (lifecycle_command) {
         control_ = {};
     }
@@ -350,6 +370,18 @@ rk_result RobotRuntime::apply_pending_commands() {
     if (lifecycle_command) {
         output.kind = command.kind;
         output.target_count = 0;
+    } else if (!control_.trajectory.empty()) {
+        const auto point = control_.trajectory.front();
+        control_.trajectory.pop_front();
+        output.kind = RK_COMMAND_JOINT_TARGETS;
+        output.target_count = point.joint_count;
+        for (uint32_t joint = 0; joint < point.joint_count; ++joint) {
+            output.targets[joint].joint = joint;
+            output.targets[joint].mode = RK_TARGET_POSITION;
+            output.targets[joint].target = point.positions[joint];
+            output.targets[joint].max_rate = 0.0;
+            output.targets[joint].max_effort = 0.0;
+        }
     } else {
         output.kind = RK_COMMAND_JOINT_TARGETS;
         const auto period_seconds = std::chrono::duration<double>(period_).count();
@@ -407,7 +439,8 @@ rk_result RobotRuntime::apply_pending_commands() {
     } else if (lifecycle_command && command.kind == RK_COMMAND_RESET_SAFETY) {
         state_.mode = RK_ROBOT_MODE_IDLE;
         state_.safety = RK_SAFETY_READY;
-    } else if (has_command && command.kind == RK_COMMAND_JOINT_TARGETS) {
+    } else if (has_command && (command.kind == RK_COMMAND_JOINT_TARGETS ||
+                               command.kind == RK_COMMAND_TRAJECTORY_CHUNK)) {
         state_.mode = RK_ROBOT_MODE_TRACKING;
         state_.safety = RK_SAFETY_READY;
     }

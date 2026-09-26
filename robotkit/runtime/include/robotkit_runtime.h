@@ -76,9 +76,11 @@ enum {
     RK_MAX_JOINTS = 512, /**< Maximum joints carried by one fixed-size ABI value. */
     RK_MAX_LINKS = 1024,
     RK_MAX_SERIAL_JOINTS = 64, /**< Capacity of the current serial wire protocol. */
+    RK_MAX_TRAJECTORY_POINTS = 256, /**< Maximum samples in one buffered trajectory chunk. */
+    RK_MAX_TRAJECTORY_JOINTS = 64, /**< Maximum joints represented by one trajectory chunk. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 4 /**< Version of the RobotKit C data contract (physical model v2 and configured LiDAR coverage). */
+    RK_API_VERSION = 5 /**< Version of the RobotKit C data contract (physical model v2, configured LiDAR coverage, and trajectory chunks). */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -208,7 +210,8 @@ enum {
     RK_COMMAND_JOINT_TARGETS = 1, /**< Apply the included joint target array. */
     RK_COMMAND_STOP = 2, /**< Request a normal stop and clear active targets. */
     RK_COMMAND_EMERGENCY_STOP = 3, /**< Request an emergency stop. */
-    RK_COMMAND_RESET_SAFETY = 4 /**< Clear a latched stop after application acknowledgement. */
+    RK_COMMAND_RESET_SAFETY = 4, /**< Clear a latched stop after application acknowledgement. */
+    RK_COMMAND_TRAJECTORY_CHUNK = 5 /**< Append timestamped position samples to the runtime queue. */
 };
 
 /** Control interpretation of one joint target value. */
@@ -314,6 +317,14 @@ typedef struct rk_joint_target {
     double max_effort; /**< Optional effort limit; zero means backend default. */
 } rk_joint_target;
 
+/** One timestamped, full-joint position sample in a buffered trajectory. */
+typedef struct rk_trajectory_point {
+    uint64_t time_from_start_ns; /**< Relative sample time within this chunk. */
+    uint32_t joint_count; /**< Number of valid entries in positions. */
+    uint32_t reserved0;
+    double positions[RK_MAX_TRAJECTORY_JOINTS]; /**< Joint positions in SI units. */
+} rk_trajectory_point;
+
 /** Complete command batch submitted atomically to one RobotRuntime mailbox. */
 typedef struct rk_robot_command {
     uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
@@ -322,6 +333,8 @@ typedef struct rk_robot_command {
     rk_command_kind kind; /**< Operation represented by this batch. */
     uint32_t target_count; /**< Number of valid entries in targets. */
     rk_joint_target targets[RK_MAX_JOINTS]; /**< Fixed-capacity target payload. */
+    uint32_t trajectory_count; /**< Number of valid entries in trajectory. */
+    rk_trajectory_point trajectory[RK_MAX_TRAJECTORY_POINTS]; /**< Timestamped position samples. */
 } rk_robot_command;
 
 /** Mutable native state used internally while a runtime publishes a snapshot. */
@@ -374,7 +387,8 @@ typedef struct rk_robot_capabilities {
     uint32_t supports_velocity_targets; /**< Non-zero when velocity targets work. */
     uint32_t supports_effort_targets; /**< Non-zero when effort targets work. */
     uint32_t supports_prediction; /**< Non-zero when predictive state is available. */
-    uint32_t reserved[3];
+    uint32_t supports_trajectory_queue; /**< Non-zero when timestamped trajectory chunks work. */
+    uint32_t reserved[2];
 } rk_robot_capabilities;
 
 /* ------------------------------------------------------------------------- */

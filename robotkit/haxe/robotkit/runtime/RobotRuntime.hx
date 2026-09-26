@@ -5,6 +5,7 @@ import haxe.Int64;
 import nativekit.ffi.NativeKit;
 import robotkit.world.CameraImage;
 import robotkit.world.SensorFrame;
+import robotkit.world.TrajectoryChunk;
 import sys.thread.Mutex;
 
 /**
@@ -88,6 +89,7 @@ class RobotRuntime {
     command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_JOINT_TARGETS);
     command.set_target_count(batch.length);
+    command.set_trajectory_count(0);
     for (index in 0...batch.length) {
       var targetValue = batch[index];
       var target = new rk_joint_target();
@@ -106,6 +108,37 @@ class RobotRuntime {
     }
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.submitTargets");
+  }
+
+  /** Appends a timestamped position chunk to the native runtime queue. */
+  public function submitTrajectory(chunk:TrajectoryChunk, sequence:Int,
+      ?timestampNs:haxe.Int64):Void {
+    submitTrajectory64(chunk, haxe.Int64.ofInt(sequence), timestampNs);
+  }
+
+  public function submitTrajectory64(chunk:TrajectoryChunk, sequence:haxe.Int64,
+      ?timestampNs:haxe.Int64):Void {
+    ensureLive();
+    if (chunk == null) throw "Trajectory chunk is required";
+    var command = new rk_robot_command();
+    command.set_struct_size(rk_robot_command.size());
+    command.set_sequence(sequence);
+    command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
+    command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_CHUNK);
+    command.set_target_count(0);
+    command.set_trajectory_count(chunk.points.length);
+    for (index in 0...chunk.points.length) {
+      var source = chunk.points[index];
+      var point = new rk_trajectory_point();
+      point.set_time_from_start_ns(source.timeFromStartNs);
+      point.set_joint_count(source.positions.length);
+      point.set_reserved0(0);
+      for (joint in 0...source.positions.length)
+        point.set_positions(joint, source.positions[joint]);
+      command.set_trajectory(index, point);
+    }
+    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+      "runtime.submitTrajectory");
   }
 
   /** Submits all position targets in one native call. */
@@ -144,6 +177,7 @@ class RobotRuntime {
       ? RobotKitRuntimeConstants.RK_COMMAND_EMERGENCY_STOP
       : RobotKitRuntimeConstants.RK_COMMAND_STOP);
     command.set_target_count(0);
+    command.set_trajectory_count(0);
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.submitStop");
   }
@@ -161,6 +195,7 @@ class RobotRuntime {
     command.set_timestamp_ns(haxe.Int64.ofInt(0));
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_RESET_SAFETY);
     command.set_target_count(0);
+    command.set_trajectory_count(0);
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.resetSafety");
   }

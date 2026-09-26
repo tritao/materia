@@ -21,6 +21,11 @@ class RobotRecording implements RobotRecordingSink {
         commands.push(copy);
         events.push(RobotRecordingEvent.Command(copy));
         append(RobotRecordingEvent.Command(copy), robotId);
+      case TrajectoryChunk(chunk):
+        var copy = RobotCommand.TrajectoryChunk(chunk.copy());
+        commands.push(copy);
+        events.push(RobotRecordingEvent.Command(copy));
+        append(RobotRecordingEvent.Command(copy), robotId);
     }
   }
 
