@@ -517,3 +517,32 @@ point placed far outside the reachable workspace with a tight
 documents the workaround (a coarse `sampleInterval` collapses a segment to
 its single final sample) rather than changing the sampler, since M5's
 raster-generated toolpaths keep points close together by construction.
+
+**M5**: added `robotkit/haxe/robotkit/work/` (`Point2`, `Polygon2`,
+`WorkSurfaceId`, `SourceKind`, `Provenance`, `WorkSurface`,
+`RasterToolpathGenerator`, `CoverageMap`) and
+`robotkit/tests/src/tests/WorkTests.hx`, called from
+`RobotWorldTests.main()`. Deviation from the plan's literal reading of
+"boundary minus exclusions": clipping each row only at its exact scanline
+(where it geometrically crosses an exclusion) is not enough to guarantee
+"0% of the exclusion" covered, because a row whose *centerline* misses an
+exclusion can still have it inside its *footprint radius* band
+(`rowY ± toolWidth/2`); an early version of this milestone clipped rows by
+scanline only and a coverage test (a small surface with a notch close to,
+but not crossing, one row) caught ~30% exclusion coverage from that row's
+disk footprint. Fixed by subtracting an exclusion's bounding-box X-range
+from any row whose footprint band reaches the exclusion's Y bounds, not
+just rows whose exact scanline crosses it (exact for axis-aligned
+rectangles, conservative otherwise — documented in ARCHITECTURE.md). A
+second, related fix: only an interval end created by cutting into an
+exclusion is pulled inward by `toolWidth/2` before laying down points; an
+end that is the true outer boundary is left alone (a footprint bulging past
+the wall edge is harmless), which was needed to hit the ≥99%-covered
+acceptance bar — shrinking every interval end unconditionally left an
+unreachable margin along the entire outer perimeter, not just around
+exclusions. With both fixes, the door-wall test (3m×2.5m wall, 0.9m×2.1m
+door, toolWidth 0.1m) reaches ≥99% coverage of the allowed area and ≤0.01%
+of the exclusion; a second test builds one `CoverageMap` from the raw
+`Toolpath` and another by sampling `CartesianTrajectory`, and checks their
+coverage fractions agree within 1%. No haxeon compile issues in this
+milestone; all the iteration above was geometry logic, not the compiler.

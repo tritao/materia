@@ -594,6 +594,64 @@ tool on/off from that flag is the caller's job (e.g. a future skill calling
 `SurfaceTool.enable`/`disable`), keeping `robotkit.process` independent of
 which capability interface a given tool implements.
 
+## Work geometry
+
+`robotkit.work` sits above `robotkit.process` (it builds `Toolpath` values)
+but stays independent of `robotkit.tool`/`robotkit.manipulation`; it does
+not touch `Robot`, `RobotRuntime`, or the native runtime, and geometry stays
+planar (`Point2`/`Polygon2`, no curved surfaces).
+
+A `WorkSurface` is a planar region to run a process over: `boundary` and
+`exclusions` are `Polygon2` values (simple, counter-clockwise, positive
+area) in the surface's own local plane, `+Z` outward. `frameId` is the
+frame this surface is registered against (e.g. a BIM wall's frame or a
+robot's world frame); `surfaceFrameId` names the surface's *own* local
+plane frame, and `frame_T_surface` is the `frameId -> surfaceFrameId` edge
+a caller registers into a `FrameTree3` via `WorkSurface.frameEdge()`.
+`boundary`/`exclusions`, and every `Toolpath` a generator builds over the
+surface, are expressed directly in `surfaceFrameId` — a generated
+`Toolpath.frameId` is literally `surface.surfaceFrameId`, so `work_T_tcp`
+in the plan's naming is exactly `surface_T_tcp`. `Provenance` (design
+element id + `SourceKind`: `design`/`observed`/`work`) traces a surface
+back to the design element it came from; M7 will add `observed`/`work`
+surfaces derived from registration.
+
+`Polygon2.scanlineIntervals(y)` returns the X-intervals where a horizontal
+line at `y` is inside the polygon (even-odd rule); `contains(point)` is the
+matching point-in-polygon test. `RasterToolpathGenerator.generate(surface,
+toolWidth, overlap, standoff, feedRate, leadInOut)` builds a boustrophedon
+`Toolpath`: rows are spaced `toolWidth * (1 - overlap)` apart, with the
+first and last row placed exactly `toolWidth / 2` inside the boundary's Y
+extent so the tool's own footprint radius (not just its centerline) can
+still reach the top/bottom edges. Each row's boundary interval has an
+exclusion's bounding-box X-range subtracted whenever the row's *footprint
+band* (`rowY ± toolWidth/2`), not just its exact scanline, reaches the
+exclusion's Y bounds — a row that doesn't cross an exclusion can still
+graze it with the tool's radius, so this is a reach-aware conservative cut
+that is exact for axis-aligned rectangular exclusions (the case a BIM
+window/door produces) and merely conservative otherwise. An interval end
+created by such a cut is pulled inward by `toolWidth / 2` before points are
+placed, so the tool footprint stays clear of the exclusion; an end that is
+the outer boundary itself is left alone, since a footprint bulging past the
+boundary edge doesn't violate anything. This is a 1D stand-in for a full
+polygon offset — adequate for this milestone's axis-aligned/rectangular
+surfaces, not a general Minkowski shrink. The tool is off while transiting
+between rows and across exclusion gaps within a row; a lead-in point (off,
+before the first process point) and a lead-out point (off, after the last)
+bracket the whole path, so `Toolpath.segmentByProcess()` recovers a proper
+approach/process/retract split.
+
+`CoverageMap(surface, cellSize)` grids the surface's boundary bounding box
+and classifies every cell once, by its center, as `allowed` (inside the
+boundary, no exclusion), `excluded` (inside the boundary and inside an
+exclusion), or neither (outside the boundary). `markFootprint`/`markSweep`
+mark cells within a radius of a point/segment as covered, regardless of
+classification; `coverageFraction()` reports covered-allowed /
+allowed-total, and `exclusionCoverageFraction()` reports covered-excluded /
+excluded-total independent of cells that are simply outside the
+boundary — so it is a direct test of whether the process ever touched an
+excluded region, not of the raster's ordinary edge margin.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A
