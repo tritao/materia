@@ -342,8 +342,11 @@ class FrameworkSmoke {
 		if (!blinkEditor.isCaretVisible(10.49) || blinkEditor.isCaretVisible(10.5) ||
 			!blinkEditor.isCaretVisible(11.0))
 			return 225;
+		if (Math.abs(blinkEditor.nextCaretBlinkTime(10.49) - 10.5) > 0.0001 ||
+			Math.abs(blinkEditor.nextCaretBlinkTime(10.5) - 11.0) > 0.0001)
+			return 304;
 		blinkEditor.focused = false;
-		if (blinkEditor.isCaretVisible(11.1))
+		if (blinkEditor.isCaretVisible(11.1) || blinkEditor.nextCaretBlinkTime(11.1) >= 0.0)
 			return 226;
 		blinkEditor.dispose();
 		var editedValue = "";

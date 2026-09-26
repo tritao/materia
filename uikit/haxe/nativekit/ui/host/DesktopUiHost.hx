@@ -111,6 +111,7 @@ class DesktopUiHost {
 			var framePending = false;
 			var frameRequested = false;
 			var frameRequestedAt = -1.0;
+			var nextCaretFrameAt = -1.0;
 			var frameRequestReason = "none";
 			var frameRequestSerial = 0;
 			var incrementCount = function(counts:Map<String, Int>, key:String):Void {
@@ -184,6 +185,7 @@ class DesktopUiHost {
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
 									var frameStartedAt = Sys.time();
 									runtime.render(Sys.time());
+									nextCaretFrameAt = runtime.app().context().textInput.takeCaretFrameAt();
 									if (options.captureSeconds > 0.0 && captureState.startedAt < 0.0 && runtime.rendered > 0)
 										captureState.startedAt = frameStartedAt;
 									if (options.captureDirectory != null) {
@@ -259,6 +261,11 @@ class DesktopUiHost {
 					writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime,
 						eventHistory, frameHistory, eventCounts, frameRequestCounts);
 					session.stop();
+				}
+				if (active && surfaceAvailable && nextCaretFrameAt >= 0.0 &&
+					Sys.time() >= nextCaretFrameAt) {
+					nextCaretFrameAt = -1.0;
+					scheduleFrameWithReason("text-caret");
 				}
 				if (active && surfaceAvailable && frameRequested && !framePending) {
 					if (NativeKit.nk_surface_request_frame(surface) != Result.Ok)

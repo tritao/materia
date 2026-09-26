@@ -14,6 +14,7 @@ class TextInputBridge {
 	var surface:Null<NativeKitSurface>;
 	var requestedActive:Bool;
 	var activeOwner:Null<WidgetId>;
+	var nextCaretFrameAt:Float = -1.0;
 	public var platformActive(default, null):Bool;
 	public var platformSupported(default, null):Bool;
 	public var platformChecked(default, null):Bool;
@@ -69,6 +70,20 @@ class TextInputBridge {
 	/** Returns whether this control owns the current active text-editor session. */
 	public function isOwner(owner:WidgetId):Bool
 		return owner != null && activeOwner != null && activeOwner.equals(owner);
+
+	/** Request one host frame when a focused caret next changes visibility. */
+	public function requestCaretFrameAt(timeSeconds:Float):Void {
+		if (requestedActive && Math.isFinite(timeSeconds) && timeSeconds >= 0.0 &&
+			(nextCaretFrameAt < 0.0 || timeSeconds < nextCaretFrameAt))
+			nextCaretFrameAt = timeSeconds;
+	}
+
+	/** Consume the deadline produced by the latest paint pass. */
+	public function takeCaretFrameAt():Float {
+		var result = nextCaretFrameAt;
+		nextCaretFrameAt = -1.0;
+		return result;
+	}
 
 	/** Publishes the active document, selection, composition and screen caret. */
 	public function update(window:TextInputWindow, documentLength:Int, selectionStart:Int,

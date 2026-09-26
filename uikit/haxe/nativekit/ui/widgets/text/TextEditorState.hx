@@ -676,6 +676,14 @@ class TextEditorState {
 		return Std.int(elapsed / caretBlinkHalfPeriod) % 2 == 0;
 	}
 
+	/** Wall-clock deadline for the next caret visibility change. */
+	public function nextCaretBlinkTime(timeSeconds:Float):Float {
+		if (!focused || !finite(timeSeconds)) return -1.0;
+		var elapsed = Math.max(0.0, timeSeconds - caretBlinkResetTime);
+		return caretBlinkResetTime + (Math.floor(elapsed / caretBlinkHalfPeriod) + 1.0)
+			* caretBlinkHalfPeriod;
+	}
+
 	/** Returns the shaped rectangles used to paint the active IME preedit underline. */
 	public function compositionRects():Array<Rect> {
 		if (compositionStart < 0 || compositionEnd <= compositionStart)

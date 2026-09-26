@@ -117,7 +117,7 @@ class TextField implements View {
 				? editor.syncDocument(document)
 				: editor.syncExternal(value);
 			if (documentChanged)
-				editor.resetCaretBlink(context.gestures.timeSeconds());
+				editor.resetCaretBlink(Sys.time());
 			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
 
 			var flags = context.interactionStates.get(id);
@@ -219,9 +219,13 @@ class TextField implements View {
 					LayoutVisualKind.Custom, paintStyle);
 				paintNode.hitTestSelf = false;
 				paintNode.onPaint(function(canvas, _) {
-					if (!editor.isDisposed())
-						paintEditorDecorations(canvas, editor, context.textInput.isOwner(id),
-							context.theme, context.gestures.timeSeconds());
+					if (!editor.isDisposed()) {
+						var now = Sys.time();
+						var active = context.textInput.isOwner(id);
+						if (active && editor.selectionStart == editor.selectionEnd)
+							context.textInput.requestCaretFrameAt(editor.nextCaretBlinkTime(now));
+						paintEditorDecorations(canvas, editor, active, context.theme, now);
+					}
 				});
 				editorContent.add(paintNode);
 			}
@@ -315,7 +319,7 @@ class TextField implements View {
 				if (!enabled)
 					return;
 				editor.focused = true;
-				editor.resetCaretBlink(context.gestures.timeSeconds());
+				editor.resetCaretBlink(Sys.time());
 				semantics.states |= AccessibilityState.Focused;
 				stored.update(editor);
 				context.textInput.activate(id);
@@ -346,7 +350,7 @@ class TextField implements View {
 				var point = geometry.viewportToLayout(event.x, event.y);
 				var position = editor.hitTest(point.x - geometry.x,
 					point.y - geometry.y + editor.scrollOffsetY);
-				editor.resetCaretBlink(context.gestures.timeSeconds());
+				editor.resetCaretBlink(Sys.time());
 				var extend = (event.modifiers & UiModifier.Shift) != 0;
 				if (extend)
 					editor.cancelPointerClick();
@@ -371,7 +375,7 @@ class TextField implements View {
 				var position = editor.hitTest(point.x - geometry.x,
 					point.y - geometry.y + editor.scrollOffsetY);
 				if (editor.placeCaretAt(position, true)) {
-					editor.resetCaretBlink(context.gestures.timeSeconds());
+					editor.resetCaretBlink(Sys.time());
 					editor.cancelPointerClick();
 					updateState();
 				}
@@ -419,7 +423,7 @@ class TextField implements View {
 							return;
 						var beforePaste = editor.documentRevision();
 						if (editor.insert(pasted)) {
-							editor.resetCaretBlink(context.gestures.timeSeconds());
+							editor.resetCaretBlink(Sys.time());
 							publishTextChange(beforePaste);
 						}
 					});
@@ -472,7 +476,7 @@ class TextField implements View {
 						updateState();
 				}
 				if (handled) {
-					editor.resetCaretBlink(context.gestures.timeSeconds());
+					editor.resetCaretBlink(Sys.time());
 					event.preventDefault();
 				}
 			};
@@ -482,7 +486,7 @@ class TextField implements View {
 			node.on(UiEventKind.TextInput, function(event) {
 				var previousRevision = editor.documentRevision();
 				if (enabled && editor.insert(event.text)) {
-					editor.resetCaretBlink(context.gestures.timeSeconds());
+					editor.resetCaretBlink(Sys.time());
 					publishTextChange(previousRevision);
 				}
 			});
@@ -492,14 +496,14 @@ class TextField implements View {
 				var edit:NativeKitTextEdit = cast event.data;
 				var previousRevision = editor.documentRevision();
 				if (editor.applyTextEdit(edit)) {
-					editor.resetCaretBlink(context.gestures.timeSeconds());
+					editor.resetCaretBlink(Sys.time());
 					publishTextChange(previousRevision);
 				}
 			});
 			node.on(UiEventKind.AccessibilitySetValue, function(event) {
 				var previousRevision = editor.documentRevision();
 				if (enabled && editor.replace(0, editor.documentLength(), event.text)) {
-					editor.resetCaretBlink(context.gestures.timeSeconds());
+					editor.resetCaretBlink(Sys.time());
 					publishTextChange(previousRevision);
 				}
 			});
@@ -508,7 +512,7 @@ class TextField implements View {
 					return;
 				var request:AccessibilityActionData = cast event.data;
 				if (editor.setSelection(request.selectionStart, request.selectionEnd)) {
-					editor.resetCaretBlink(context.gestures.timeSeconds());
+					editor.resetCaretBlink(Sys.time());
 					updateState();
 				}
 			});
