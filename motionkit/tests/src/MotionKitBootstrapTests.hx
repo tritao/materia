@@ -43,6 +43,7 @@ class MotionKitBootstrapTests {
     testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
     testLongBufferedExecution();
+    testRuntimeSynchronizedHolding();
     testImmediateMotionReplacesNativeQueue();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
   }
@@ -464,11 +465,20 @@ class MotionKitBootstrapTests {
     var heldPosition = robot.snapshot().positions.get(0);
     check(heldPosition > beforeHold && heldPosition < 0.02,
       "controlled hold decelerates before coming to rest");
-    for (_ in 0...5) {
+    var holdTicks = 0;
+    while (runtime.snapshot().trajectoryActive) {
       check(!machine.update(), "held buffer remains paused after deceleration");
       simulation.step(Int64.ofInt(tick++));
+      holdTicks += 1;
+      if (holdTicks > 200) throw "controlled hold did not settle";
     }
-    near(robot.snapshot().positions.get(0), heldPosition,
+    var stoppedPosition = robot.snapshot().positions.get(0);
+    check(stoppedPosition >= heldPosition,
+      "controlled hold follows the path while slowing down");
+    for (_ in 0...2) {
+      simulation.step(Int64.ofInt(tick++));
+    }
+    near(robot.snapshot().positions.get(0), stoppedPosition,
       "controlled hold remains stopped after deceleration", 1e-5);
 
     machine.resume();
@@ -541,6 +551,175 @@ class MotionKitBootstrapTests {
       "streamed trajectory reaches its final position", 1e-5);
     near(machine.progress(), 1.0, "streamed trajectory reports completed progress");
     simulation.dispose();
+  }
+
+  static function testRuntimeSynchronizedHolding():Void {
+    var axis = new LinearAxis(23, 10, 80);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.2);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("runtime-synchronized-hold", runtime,
+      blueprint.model.name, [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var options = new MotionOptions(0.05, 0.2);
+    var tick = 0;
+
+    var move = machine.moveAxes([new AxisTarget("x", 0.06)], options);
+    var previousProgress = machine.progress();
+    for (_ in 0...8) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+      var progress = machine.progress();
+      check(progress + 1e-9 >= previousProgress,
+        "runtime-synchronized progress never moves backwards");
+      previousProgress = progress;
+      var snapshot = runtime.snapshot();
+      if (Int64.compare(snapshot.trajectoryTag, Int64.ofInt(0)) != 0) {
+        var runtimeTime = Std.parseFloat(Int64.toStr(snapshot.trajectoryTagTimeNs)) /
+          1000000000.0;
+        check(Math.abs(progress - Math.min(1.0, runtimeTime / move.durationSeconds)) < 1e-6,
+          "progress follows the runtime trajectory tag clock");
+      }
+    }
+
+    for (cycle in 0...2) {
+      machine.hold();
+      var stopTicks = 0;
+      while (runtime.snapshot().trajectoryActive) {
+        check(!machine.update(), "held motion does not submit host-clock samples");
+        simulation.step(Int64.ofInt(tick++));
+        stopTicks += 1;
+        if (stopTicks > 200) throw "runtime stop did not settle";
+      }
+      var heldPosition = robot.snapshot().positions.get(0);
+      machine.resume();
+      while (machine.isHolding()) {
+        machine.update();
+        simulation.step(Int64.ofInt(tick++));
+        stopTicks += 1;
+        if (stopTicks > 400) throw "held motion did not resume";
+      }
+      near(robot.snapshot().positions.get(0), heldPosition,
+        "resume starts at the runtime-reported stop position", 1e-4);
+      check(machine.progress() + 1e-9 >= previousProgress,
+        'progress never moves backwards across hold/resume cycle $cycle');
+      previousProgress = machine.progress();
+      for (_ in 0...4) {
+        machine.update();
+        simulation.step(Int64.ofInt(tick++));
+        var progress = machine.progress();
+        check(progress + 1e-9 >= previousProgress,
+          "progress remains monotonic after resuming");
+        previousProgress = progress;
+      }
+    }
+    while (machine.isMoving()) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+      if (tick > 2000) throw "held trajectory did not complete";
+    }
+    check(!machine.isHolding() && machine.queueDepth() == 0,
+      "repeated hold/resume leaves no buffered motion");
+    near(robot.snapshot().positions.get(0), 0.06,
+      "repeated hold/resume reaches the planned endpoint", 1e-5);
+    simulation.dispose();
+
+    var queuedBlueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.2);
+    var queuedSimulation = new Simulation(0.01);
+    var queuedRuntime = queuedSimulation.addRobot(queuedBlueprint.runtime);
+    var queuedRobot = new SimulatedRobot("queued-hold", queuedRuntime,
+      queuedBlueprint.model.name, [for (link in queuedBlueprint.model.links) link.name],
+      [for (joint in queuedBlueprint.model.joints) joint.name]);
+    var recording = new RobotRecording();
+    var queuedMachine = MotionSystem.fromBlueprint(new RecordingRobot(queuedRobot, recording),
+      queuedBlueprint);
+    queuedMachine.queueAxes([new AxisTarget("x", 0.02)], options);
+    queuedMachine.queueAxes([new AxisTarget("x", 0.05)], options);
+    var firstTag = switch (recording.commands[0]) {
+      case RobotCommand.TrajectoryChunk(chunk): chunk.tag;
+      case _: Int64.ofInt(0);
+    };
+    tick = 0;
+    while (Int64.compare(queuedRuntime.snapshot().trajectoryTag, firstTag) == 0 ||
+        Int64.compare(queuedRuntime.snapshot().trajectoryTag, Int64.ofInt(0)) == 0) {
+      queuedMachine.update();
+      queuedSimulation.step(Int64.ofInt(tick++));
+      if (tick > 2000) throw "queued trajectory did not reach its second move";
+    }
+    queuedMachine.hold();
+    while (queuedRuntime.snapshot().trajectoryActive) {
+      queuedMachine.update();
+      queuedSimulation.step(Int64.ofInt(tick++));
+      if (tick > 2200) throw "second queued trajectory did not stop";
+    }
+    var queuedHoldPosition = queuedRobot.snapshot().positions.get(0);
+    queuedMachine.resume();
+    while (queuedMachine.isMoving()) {
+      queuedMachine.update();
+      queuedSimulation.step(Int64.ofInt(tick++));
+      if (tick > 3000) throw "second queued trajectory did not resume";
+    }
+    check(queuedRobot.snapshot().positions.get(0) >= queuedHoldPosition - 1e-4,
+      "second queued trajectory resumes from its stop path");
+    near(queuedRobot.snapshot().positions.get(0), 0.05,
+      "hold during a queued trajectory preserves later motion", 1e-5);
+    queuedSimulation.dispose();
+
+    var squareBlueprint = MachineKitRobotCompiler.compileXYZGantry(
+      new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
+      new LinearAxis(23, 10, 80), 0.08, 0.2);
+    var squareSimulation = new Simulation(0.01);
+    var squareRuntime = squareSimulation.addRobot(squareBlueprint.runtime);
+    var squareRobot = new SimulatedRobot("square-hold", squareRuntime,
+      squareBlueprint.model.name, [for (link in squareBlueprint.model.links) link.name],
+      [for (joint in squareBlueprint.model.joints) joint.name]);
+    var squareMachine = MotionSystem.fromBlueprint(squareRobot, squareBlueprint);
+    squareMachine.movePath(GeometricPath.lines([
+      new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.02, 0.0, 0.0),
+      new PathPoint(0.02, 0.02, 0.0), new PathPoint(0.0, 0.02, 0.0),
+      new PathPoint(0.0, 0.0, 0.0)
+    ]), PathPlanningOptions.exactStopMode(), new MotionOptions(0.04, 0.2));
+    tick = 0;
+    var reachedThirdLeg = false;
+    while (squareMachine.isMoving()) {
+      squareMachine.update();
+      squareSimulation.step(Int64.ofInt(tick++));
+      var position = squareRobot.snapshot().positions;
+      if (position.get(1) > 0.019 && position.get(0) < 0.019) {
+        reachedThirdLeg = true;
+        break;
+      }
+      if (tick > 3000) throw "square path did not reach its third leg";
+    }
+    check(reachedThirdLeg, "square hold test reaches the third path leg");
+    squareMachine.hold();
+    while (squareRuntime.snapshot().trajectoryActive) {
+      squareMachine.update();
+      squareSimulation.step(Int64.ofInt(tick++));
+      if (tick > 3400) throw "square third-leg stop did not settle";
+    }
+    var stopped = squareRobot.snapshot().positions;
+    squareMachine.resume();
+    var previousX = stopped.get(0);
+    while (squareMachine.isMoving()) {
+      squareMachine.update();
+      squareSimulation.step(Int64.ofInt(tick++));
+      var position = squareRobot.snapshot().positions;
+      if (previousX > 0.0001 && position.get(0) > 0.0001) {
+        check(Math.abs(position.get(1) - 0.02) < 0.001,
+          "square resume stays on the third path leg");
+        check(position.get(0) <= previousX + 1e-5,
+          "square resume does not jump backwards along the third leg");
+      }
+      previousX = position.get(0);
+      if (tick > 5000) throw "square path did not complete after resume";
+    }
+    near(squareRobot.snapshot().positions.get(0), 0.0,
+      "square path resumes to its final X endpoint", 1e-5);
+    near(squareRobot.snapshot().positions.get(1), 0.0,
+      "square path resumes to its final Y endpoint", 1e-5);
+    squareSimulation.dispose();
   }
 
   static function testImmediateMotionReplacesNativeQueue():Void {

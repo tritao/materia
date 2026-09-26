@@ -14,6 +14,7 @@ import motionkit.trajectory.MotionLimits;
 import robotkit.world.JointTarget;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
+import robotkit.world.RobotSnapshot;
 import robotkit.world.StopMode;
 import robotkit.world.TrajectoryChunk;
 import robotkit.world.TrajectoryPoint;
@@ -44,6 +45,11 @@ class MotionSystem {
   var trajectoryChunkEndSeconds:Float = 0.0;
   var trajectoryChunkStartSeconds:Float = 0.0;
   var trajectoryChunkInitialPositions:Null<Array<Float>> = null;
+  var nextTrajectoryTag:Int64 = Int64.ofInt(1);
+  var trajectoryChunkReferences:Map<String, TrajectoryChunkReference> = new Map();
+  var trajectoryFinalTag:Int64 = Int64.ofInt(0);
+  var trajectoryFinalEndSeconds:Float = 0.0;
+  var resumeRequested:Bool = false;
 
   public static function fromBlueprint(robot:Robot, blueprint:MotionSystemBlueprint):MotionSystem
     return new MotionSystem(robot, blueprint);
@@ -95,6 +101,8 @@ class MotionSystem {
 
   /** Completion fraction of the currently buffered motion, in the range [0, 1]. */
   public function progress():Float {
+    if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory))
+      syncFromRuntime();
     if (bufferedTotalSeconds <= 0.0) return 1.0;
     var completed = bufferedCompletedSeconds +
       (activeTrajectory == null ? 0.0 : Math.min(activeTrajectory.durationSeconds, elapsedSeconds));
@@ -164,12 +172,8 @@ class MotionSystem {
   /** Holds buffered motion and requests a controlled stop without discarding it. */
   public function hold():Void {
     if (held) return;
+    resumeRequested = false;
     if (activeTrajectory != null) {
-      if (usesTrajectoryChunks(activeTrajectory)) {
-        synchronizeElapsedWithRuntime();
-        trajectorySubmitted = false;
-        trajectoryChunkInitialPositions = null;
-      }
       robot.stop(StopMode.Normal);
     }
     held = true;
@@ -177,12 +181,9 @@ class MotionSystem {
 
   /** Resumes a held buffer at its current deterministic trajectory time. */
   public function resume():Void {
-    held = false;
-    if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory)) {
-      prepareTrajectoryResume();
-      submitActiveTrajectoryChunk();
-    }
-    activateNextTrajectory();
+    if (!held) return;
+    resumeRequested = true;
+    tryResume();
   }
 
   /** Aborts buffered motion and separates a controlled stop from emergency stop. */
@@ -386,13 +387,25 @@ class MotionSystem {
    * batch. Pass no duration to use the compiled fixed timestep.
    */
   public function update(?dtSeconds:Float = -1.0):Bool {
-    if (held) return false;
+    if (held) {
+      if (resumeRequested) tryResume();
+      if (held) return false;
+    }
     if (activeTrajectory == null) activateNextTrajectory();
     if (activeTrajectory == null) return false;
     var dt = dtSeconds < 0.0 ? fixedTimestepSeconds : dtSeconds;
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
     var trajectory = activeTrajectory;
+    if (trajectory.durationSeconds <= 0.0) {
+      completeActiveTrajectory();
+      return activeTrajectory != null;
+    }
     if (usesTrajectoryChunks(trajectory)) {
+      var observation = syncFromRuntime();
+      if (trajectoryFinishedInRuntime(observation)) {
+        completeActiveTrajectory();
+        return activeTrajectory != null;
+      }
       if (!trajectorySubmitted || shouldRefillTrajectory(dt)) submitActiveTrajectoryChunk();
     } else {
       var sample = trajectory.sample(elapsedSeconds);
@@ -401,14 +414,12 @@ class MotionSystem {
         targets.push(JointTarget.position(i, sample.positions[i]));
       robot.submit(RobotCommand.JointTargets(targets, null));
     }
-    if (elapsedSeconds >= trajectory.durationSeconds) {
-      bufferedCompletedSeconds += trajectory.durationSeconds;
-      activeTrajectory = null;
-      elapsedSeconds = 0.0;
-      activateNextTrajectory();
+    if (!usesTrajectoryChunks(trajectory) && elapsedSeconds >= trajectory.durationSeconds) {
+      completeActiveTrajectory();
       return activeTrajectory != null;
     }
-    elapsedSeconds = Math.min(trajectory.durationSeconds, elapsedSeconds + dt);
+    if (!usesTrajectoryChunks(trajectory))
+      elapsedSeconds = Math.min(trajectory.durationSeconds, elapsedSeconds + dt);
     return true;
   }
 
@@ -447,7 +458,11 @@ class MotionSystem {
     bufferedTotalSeconds = trajectoryValue.durationSeconds;
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(trajectoryValue);
+    resumeRequested = false;
     resetTrajectoryChunkState();
+    trajectoryChunkReferences = new Map();
+    trajectoryFinalTag = Int64.ofInt(0);
+    trajectoryFinalEndSeconds = 0.0;
     if (usesTrajectoryChunks(trajectoryValue)) {
       // A direct move replaces the native runtime's queue as well as this
       // local buffer. The position batch is an ordered flush marker; the
@@ -482,7 +497,11 @@ class MotionSystem {
     activeTrajectory = queuedTrajectories.shift();
     elapsedSeconds = 0.0;
     trajectorySubmitted = false;
+    resumeRequested = false;
     resetTrajectoryChunkState();
+    trajectoryChunkReferences = new Map();
+    trajectoryFinalTag = Int64.ofInt(0);
+    trajectoryFinalEndSeconds = 0.0;
     if (usesTrajectoryChunks(activeTrajectory)) submitActiveTrajectoryChunk();
   }
 
@@ -495,7 +514,11 @@ class MotionSystem {
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = null;
     trajectorySubmitted = false;
+    resumeRequested = false;
     resetTrajectoryChunkState();
+    trajectoryChunkReferences = new Map();
+    trajectoryFinalTag = Int64.ofInt(0);
+    trajectoryFinalEndSeconds = 0.0;
   }
 
   function usesTrajectoryChunks(trajectoryValue:JointTrajectory):Bool {
@@ -534,59 +557,103 @@ class MotionSystem {
         sample.positions));
       endIndex = index;
     }
-    robot.submit(RobotCommand.TrajectoryChunk(new TrajectoryChunk(points)));
+    var tag = nextTrajectoryTag;
+    nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
+    robot.submit(RobotCommand.TrajectoryChunk(new TrajectoryChunk(points, tag)));
     trajectorySubmitted = true;
     trajectoryChunkInitialPositions = null;
     trajectoryNextSampleIndex = endIndex;
     trajectoryChunkStartSeconds = startTime;
     trajectoryChunkEndSeconds = resuming && startIndex > trajectoryValue.samples.length - 1
       ? trajectoryValue.durationSeconds : trajectoryValue.samples[endIndex].timeSeconds;
+    trajectoryChunkReferences.set(Int64.toStr(tag),
+      new TrajectoryChunkReference(trajectoryValue, startTime));
+    trajectoryFinalTag = tag;
+    trajectoryFinalEndSeconds = trajectoryChunkEndSeconds;
   }
 
   function prepareTrajectoryResume():Void {
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return;
-    var actualPositions = robot.snapshot().positions.toArray();
     var nextIndex = 0;
     while (nextIndex < trajectoryValue.samples.length &&
         trajectoryValue.samples[nextIndex].timeSeconds <= elapsedSeconds + 1e-9)
       nextIndex++;
-    if (nextIndex < trajectoryValue.samples.length) {
-      var reference = trajectoryValue.sample(elapsedSeconds).positions;
-      while (nextIndex < trajectoryValue.samples.length &&
-          resumeSampleIsBehind(actualPositions, reference,
-            trajectoryValue.samples[nextIndex].positions))
-        nextIndex++;
-    }
     trajectoryNextSampleIndex = nextIndex;
     trajectoryChunkStartSeconds = elapsedSeconds;
-    trajectoryChunkInitialPositions = actualPositions;
+    trajectoryChunkInitialPositions = trajectoryValue.sample(elapsedSeconds).positions;
     trajectoryChunkEndSeconds = elapsedSeconds;
   }
 
-  static function resumeSampleIsBehind(actual:Array<Float>, reference:Array<Float>,
-      candidate:Array<Float>):Bool {
-    var count = Std.int(Math.min(actual.length, Math.min(reference.length, candidate.length)));
-    for (joint in 0...count) {
-      var direction = candidate[joint] - reference[joint];
-      if (Math.abs(direction) <= 1e-9) continue;
-      if (direction > 0.0 && candidate[joint] < actual[joint] - 1e-9)
-        return true;
-      if (direction < 0.0 && candidate[joint] > actual[joint] + 1e-9)
-        return true;
+  function syncFromRuntime():RobotSnapshot {
+    var observation = robot.snapshot();
+    var trajectoryValue = activeTrajectory;
+    if (trajectoryValue == null || !usesTrajectoryChunks(trajectoryValue)) return observation;
+    var reference = trajectoryChunkReferences.get(Int64.toStr(observation.trajectoryTag));
+    if (reference != null && reference.trajectory == trajectoryValue) {
+      var runtimeSeconds = Std.parseFloat(Int64.toStr(observation.trajectoryTagTimeNs)) /
+        1000000000.0;
+      if (Math.isFinite(runtimeSeconds))
+        elapsedSeconds = Math.min(trajectoryValue.durationSeconds,
+          Math.max(0.0, reference.startSeconds + runtimeSeconds));
     }
-    return false;
+    return observation;
   }
 
-  function synchronizeElapsedWithRuntime():Void {
+  function trajectoryFinishedInRuntime(observation:RobotSnapshot):Bool {
+    if (activeTrajectory == null || !trajectorySubmitted ||
+        Int64.compare(trajectoryFinalTag, Int64.ofInt(0)) == 0)
+      return false;
+    if (Int64.compare(observation.trajectoryTag, trajectoryFinalTag) != 0)
+      return false;
+    var finalTime = Std.parseFloat(Int64.toStr(observation.trajectoryTagTimeNs)) /
+      1000000000.0;
+    var reachedEnd = Math.isFinite(finalTime) &&
+      trajectoryFinalEndSeconds - trajectoryChunkStartSeconds <= finalTime + 1e-9;
+    return reachedEnd && !observation.trajectoryActive &&
+      observation.trajectoryQueueDepth == 0;
+  }
+
+  function tryResume():Void {
     var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null) return;
-    var observation = robot.snapshot();
-    if (!observation.trajectoryActive) return;
-    var runtimeSeconds = nanosecondsToSeconds(observation.trajectoryTimeNs);
-    if (!Math.isFinite(runtimeSeconds)) return;
-    elapsedSeconds = Math.min(trajectoryValue.durationSeconds,
-      Math.max(0.0, runtimeSeconds));
+    if (trajectoryValue == null) {
+      held = false;
+      resumeRequested = false;
+      activateNextTrajectory();
+      return;
+    }
+    if (usesTrajectoryChunks(trajectoryValue)) {
+      var observation = syncFromRuntime();
+      if (observation.trajectoryActive) return;
+      if (elapsedSeconds >= trajectoryValue.durationSeconds - 1e-9) {
+        held = false;
+        resumeRequested = false;
+        completeActiveTrajectory();
+        return;
+      }
+      prepareTrajectoryResume();
+      trajectorySubmitted = false;
+      held = false;
+      resumeRequested = false;
+      submitActiveTrajectoryChunk();
+    } else {
+      held = false;
+      resumeRequested = false;
+    }
+    activateNextTrajectory();
+  }
+
+  function completeActiveTrajectory():Void {
+    if (activeTrajectory == null) return;
+    bufferedCompletedSeconds += activeTrajectory.durationSeconds;
+    activeTrajectory = null;
+    elapsedSeconds = 0.0;
+    trajectorySubmitted = false;
+    resetTrajectoryChunkState();
+    trajectoryChunkReferences = new Map();
+    trajectoryFinalTag = Int64.ofInt(0);
+    trajectoryFinalEndSeconds = 0.0;
+    activateNextTrajectory();
   }
 
   function shouldRefillTrajectory(dt:Float):Bool {
@@ -628,9 +695,6 @@ class MotionSystem {
     return Int64.make(high, low);
   }
 
-  static function nanosecondsToSeconds(nanoseconds:Int64):Float
-    return Std.parseFloat(Int64.toStr(nanoseconds)) / 1000000000.0;
-
   static function trajectoryEnd(trajectoryValue:JointTrajectory):Array<Float>
     return trajectoryValue.samples[trajectoryValue.samples.length - 1].positions.copy();
 
@@ -656,5 +720,15 @@ class MotionSystem {
         maxAcceleration = maxAcceleration <= 0.0 ? axisAcceleration : Math.min(maxAcceleration, axisAcceleration);
     }
     return new MotionLimits(maxVelocity, maxAcceleration, maxJerk);
+  }
+}
+
+private class TrajectoryChunkReference {
+  public final trajectory:JointTrajectory;
+  public final startSeconds:Float;
+
+  public function new(trajectory:JointTrajectory, startSeconds:Float) {
+    this.trajectory = trajectory;
+    this.startSeconds = startSeconds;
   }
 }
