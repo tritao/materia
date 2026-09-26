@@ -91,7 +91,7 @@ class HeadlessEditorProfile {
       submit(editor, frame, frames, "initial");
       if (scenario == "tab-matrix") {
         var groups = [["hierarchy", "sensors"],
-          ["viewport", "perspective", "console", "telemetry"]];
+          ["console", "telemetry"]];
         for (cycle in 0...cycles) {
           for (group in groups) for (from in group) for (to in group) {
             if (from == to) continue;

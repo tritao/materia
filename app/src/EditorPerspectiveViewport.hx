@@ -206,6 +206,9 @@ class EditorPerspectiveViewport implements View {
 
   public function resetView():Void camera.reset();
 
+  public function setViewAngle(yaw:Float, pitch:Float):Void camera.setAngle(yaw, pitch);
+  public function viewAngleLabel():String return camera.angleLabel();
+
   public function setPlacementOptions(snap:Bool, step:Float, ?visible:Bool = true):Void {
     if (gridStep != step || gridVisible != visible) renderedRevision = -1;
     gridSnapEnabled = snap;

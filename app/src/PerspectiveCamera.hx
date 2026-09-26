@@ -63,6 +63,20 @@ class PerspectiveCamera {
     revision++;
   }
 
+  /** Set a standard camera angle without changing the current focus or zoom. */
+  public function setAngle(nextYaw:Float, nextPitch:Float):Void {
+    yaw = nextYaw;
+    pitch = clamp(nextPitch, -1.48, 1.48);
+    revision++;
+  }
+
+  public function angleLabel():String {
+    if (Math.abs(pitch - 1.48) < 0.02) return "Top";
+    if (Math.abs(pitch) < 0.02 && Math.abs(yaw + Math.PI / 2) < 0.02) return "Front";
+    if (Math.abs(pitch) < 0.02 && Math.abs(yaw) < 0.02) return "Right";
+    return "Perspective";
+  }
+
   public function pan(deltaX:Float, deltaY:Float, viewportHeight:Float):Void {
     var scale = 2.0 * distance * Math.tan(FOV_Y * Math.PI / 360.0) /
       Math.max(1.0, viewportHeight);
