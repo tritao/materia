@@ -4139,6 +4139,7 @@ class FrameworkSmoke {
 	static function dockWorkspaceValid(uiContext:UiContext):Bool {
 		var hierarchyBuilds = 0;
 		var viewportBuilds = 0;
+		var viewportDockWidth = 0.0;
 		var inspectorBuilds = 0;
 		var consoleBuilds = 0;
 		var model = new DockWorkspaceModel();
@@ -4152,7 +4153,10 @@ class FrameworkSmoke {
 				return new Text("Hierarchy");
 			}),
 			new DockPanelContent("viewport", function(_) {
+				throw "Width-aware viewport builder was bypassed";
+			}, function(_, width) {
 				viewportBuilds++;
+				viewportDockWidth = width;
 				return new Text("Viewport");
 			}),
 			new DockPanelContent("inspector", function(_) {
@@ -4355,6 +4359,7 @@ class FrameworkSmoke {
 		var workspace = new DockWorkspace("editor-workspace", model, panelContents);
 		var workspaceRoot = uiContext.submit(workspace, new LayoutFrame(640.0, 480.0));
 		if (workspaceRoot == null || hierarchyBuilds != 1 || viewportBuilds != 1 ||
+			viewportDockWidth < 300.0 || viewportDockWidth > 640.0 ||
 			inspectorBuilds != 0 || consoleBuilds != 0 || model.activePanelId != "hierarchy")
 			return false;
 		if (!model.activate("inspector") || changes != 1)

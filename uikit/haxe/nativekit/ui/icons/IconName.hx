@@ -25,4 +25,5 @@ enum abstract IconName(Int) from Int to Int {
 	var Radar = 20;
 	var Terminal = 21;
 	var Activity = 22;
+	var Magnet = 23;
 }

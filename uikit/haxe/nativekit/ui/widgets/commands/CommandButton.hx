@@ -23,6 +23,8 @@ class CommandButton implements View {
 	public var variant:ButtonVariant;
 	public var displayLabel:Null<String>;
 	public var leadingIcon:Null<IconName>;
+	/** Additional presentation classes for toolbar and other command surfaces. */
+	public var classes:Array<String>;
 	public var onResult:Null<CommandResult->Void>;
 
 	public function new(key:String, commandId:String, ?registry:CommandRegistry,
@@ -38,6 +40,7 @@ class CommandButton implements View {
 		variant = ButtonVariant.Secondary;
 		displayLabel = null;
 		leadingIcon = null;
+		classes = [];
 		this.onResult = onResult;
 	}
 
@@ -61,7 +64,7 @@ class CommandButton implements View {
 			button.accessibilityLabel = command.label;
 		button.enabled = command.isEnabled(actualContext);
 		button.selected = command.isChecked(actualContext);
-		button.classes = ["command-button"];
+		button.classes = ["command-button"].concat(classes);
 		return button.build(context);
 	}
 }

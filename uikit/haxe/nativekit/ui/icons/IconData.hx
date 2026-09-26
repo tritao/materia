@@ -20,6 +20,7 @@ class IconData {
 			case IconName.Radar: radar();
 			case IconName.Terminal: terminal();
 			case IconName.Activity: activity();
+			case IconName.Magnet: magnet();
 			case IconName.ChevronDown: new PathBuilder().moveTo(6, 9).lineTo(12, 15).lineTo(18, 9).build();
 			case IconName.ChevronRight: new PathBuilder().moveTo(9, 6).lineTo(15, 12).lineTo(9, 18).build();
 			case IconName.Plus: new PathBuilder().moveTo(12, 5).lineTo(12, 19)
@@ -47,6 +48,18 @@ class IconData {
 			case _: throw "Unsupported icon name";
 		};
 	}
+
+	static function magnet():Path
+		return new PathBuilder()
+			.moveTo(4.0, 4.0).lineTo(4.0, 13.0)
+			.cubicTo(4.0, 18.0, 7.5, 21.0, 12.0, 21.0)
+			.cubicTo(16.5, 21.0, 20.0, 18.0, 20.0, 13.0)
+			.lineTo(20.0, 4.0).lineTo(15.0, 4.0).lineTo(15.0, 13.0)
+			.cubicTo(15.0, 15.0, 13.8, 16.0, 12.0, 16.0)
+			.cubicTo(10.2, 16.0, 9.0, 15.0, 9.0, 13.0)
+			.lineTo(9.0, 4.0).lineTo(4.0, 4.0)
+			.moveTo(4.0, 8.0).lineTo(9.0, 8.0)
+			.moveTo(15.0, 8.0).lineTo(20.0, 8.0).build();
 
 	static function search():Path {
 		var k = 4.4182779984;

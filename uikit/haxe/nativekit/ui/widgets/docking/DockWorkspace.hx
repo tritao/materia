@@ -123,7 +123,7 @@ class DockWorkspace implements View {
 		var showAllLabels = visiblePanels.length <= 1 || allWidth <= availableWidth;
 		var showSelectedLabel = showAllLabels || selectedWidth <= availableWidth;
 		for (descriptor in visiblePanels)
-			items.push(new TabItem(descriptor.id, descriptor.title, panelView(descriptor.id),
+			items.push(new TabItem(descriptor.id, descriptor.title, panelView(descriptor.id, availableWidth),
 				descriptor.enabled, descriptor.icon,
 				!showAllLabels && descriptor.icon != null &&
 					(descriptor.id != selectedId || !showSelectedLabel) ? "" : null));
@@ -220,11 +220,12 @@ class DockWorkspace implements View {
 			options);
 	}
 
-	function panelView(panelId:String):View {
+	function panelView(panelId:String, availableWidth:Float):View {
 		var descriptor = model.get(panelId);
 		var content = panelContents.get(panelId);
 		return descriptor == null ? new Text("Missing panel: " + panelId) : content == null ?
-			new Text("Missing panel content: " + panelId) : new DockPanelView(descriptor, content);
+			new Text("Missing panel content: " + panelId) :
+			new DockPanelView(descriptor, content, availableWidth);
 	}
 
 	function targetView(targetPanelId:String, child:View):View
@@ -288,16 +289,21 @@ private class DockWorkspaceMount {
 private class DockPanelView implements View {
 	final descriptor:DockPanelDescriptor;
 	final content:DockPanelContent;
+	final availableWidth:Float;
 
-	public function new(descriptor:DockPanelDescriptor, content:DockPanelContent) {
+	public function new(descriptor:DockPanelDescriptor, content:DockPanelContent,
+			availableWidth:Float) {
 		this.descriptor = descriptor;
 		this.content = content;
+		this.availableWidth = availableWidth;
 	}
 
 	public function build(context:BuildContext):RenderNode {
 		var observed = context.buildProbe != null;
 		var preparationStarted = observed ? Sys.time() : 0.0;
-		var view = content.build(context);
+		var widthBuilder = content.buildWithWidth;
+		var view = widthBuilder == null ? content.build(context) :
+			widthBuilder(context, availableWidth);
 		if (view == null)
 			view = new Text("Panel returned no content: " + descriptor.id);
 		var buildStarted = observed ? Sys.time() : 0.0;

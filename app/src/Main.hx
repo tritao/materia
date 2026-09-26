@@ -68,6 +68,7 @@ import nativekit.ui.widgets.collections.ListViewModel;
 import nativekit.ui.widgets.overlays.Menu;
 import nativekit.ui.widgets.overlays.MenuItem;
 import nativekit.ui.widgets.overlays.Popup;
+import nativekit.ui.widgets.overlays.Tooltip;
 import nativekit.ui.widgets.plotting.PlotView;
 import nativekit.ui.widgets.properties.PropertyInspector;
 import nativekit.ui.widgets.layout.Row;
@@ -804,8 +805,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspacePanelContents = [
       new DockPanelContent("hierarchy", function(_) return hierarchyPanel()),
       new DockPanelContent("bim", function(_) return bimEditor),
-      new DockPanelContent("viewport", function(_) return viewportPanel()),
-      new DockPanelContent("perspective", function(_) return perspectivePanel()),
+      new DockPanelContent("viewport", function(_) return viewportPanel(),
+        function(_, width) return viewportPanel(width)),
+      new DockPanelContent("perspective", function(_) return perspectivePanel(),
+        function(_, width) return perspectivePanel(width)),
       new DockPanelContent("inspector", function(_) return inspectorPanel()),
       new DockPanelContent("sensors", function(_) return sensorPanel()),
       new DockPanelContent("console", function(_) return consolePanel()),
@@ -1130,7 +1133,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return style;
   }
 
-  function viewportPanel():View {
+  function viewportPanel(availableWidth:Float = 0.0):View {
     var frame = framePresentation;
     viewportContent.setSimulationState(simulation.isActive(),frame == null ? [] : frame.environment,
       frame == null ? 0 : frame.revision);
@@ -1138,9 +1141,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
       sceneViewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0),
         Color.rgba(0.16, 0.24, 0.36, 0.75), viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
       sceneViewport.setBackgroundGradient(ViewportBackground.top(), ViewportBackground.bottom());
-      return viewportWithControls(sceneViewport, false);
+      return viewportWithControls(sceneViewport, false, availableWidth);
     }
     var viewportStyle = fillStyle();
+    viewportStyle.width = LayoutAxis.stretch();
+    viewportStyle.height = LayoutAxis.stretch();
     viewportStyle.background = Color.rgba(0.025, 0.035, 0.055, 1.0);
     var viewport = new GpuViewport(
       "scene-gpu-viewport",
@@ -1212,12 +1217,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.refresh();
     });
     sceneViewport = viewport;
-    return viewportWithControls(viewport, false);
+    return viewportWithControls(viewport, false, availableWidth);
   }
 
-  function viewportWithControls(content:View, perspective:Bool):View {
-    var options = new Button(gridSpacingLabel() + " m", null, null, "viewport-options");
-    options.variant = ButtonVariant.Secondary;
+  function viewportWithControls(content:View, perspective:Bool, availableWidth:Float):View {
+    var compact = availableWidth > 0.0 && availableWidth < 400.0;
+    var tiny = availableWidth > 0.0 && availableWidth < 235.0;
+    var options = new Button(gridSpacingLabel() + (tiny ? "" : " m"), null, null,
+      "viewport-options");
+    options.variant = ButtonVariant.Navigation;
+    options.classes = ["viewport-tool"];
+    options.accessibilityLabel = "Grid spacing: " + gridSpacingLabel() + " m";
     options.trailingIcon = IconName.ChevronDown;
     options.iconSize = 12.0;
     options.selected = viewportOptionsVisible && viewportOptionsPerspective == perspective;
@@ -1234,23 +1244,48 @@ class ReferenceEditorApp implements DesktopUiApplication {
       viewportOptionsVisible = true;
       commands.refresh();
     };
-    var controls:Array<KeyedView> = [
-      new KeyedView("frame", sceneAction("viewport-frame", "scene.frame-selected", "Frame", IconName.Inspect))
-    ];
-    if (perspective) controls.push(new KeyedView("reset",
-      sceneAction("viewport-reset", "scene.reset-perspective", "Reset", IconName.Cube)));
-    controls.push(new KeyedView("grid", sceneAction("viewport-grid", "scene.toggle-grid",
-      "Grid", IconName.Grid)));
-    controls.push(new KeyedView("snap", sceneAction("viewport-snap", "scene.toggle-grid-snap",
-      "Snap", null)));
+    var controls:Array<KeyedView> = [new KeyedView("frame",
+      viewportToolbarAction("viewport-frame", "scene.frame-selected", "Frame", IconName.Inspect, compact))];
+    if (perspective && !tiny) controls.push(new KeyedView("reset",
+      viewportToolbarAction("viewport-reset", "scene.reset-perspective", "Reset", IconName.Cube, compact)));
+    var groupDivider = new Spacer("viewport-toolbar-group-divider", LayoutAxis.fixed(1.0),
+      LayoutAxis.fixed(20.0));
+    groupDivider.style.background = appearance.theme.tokens.border;
+    controls.push(new KeyedView("group-divider", groupDivider));
+    controls.push(new KeyedView("grid", viewportToolbarAction("viewport-grid",
+      "scene.toggle-grid", "Grid", IconName.Grid, compact)));
+    controls.push(new KeyedView("snap", viewportToolbarAction("viewport-snap",
+      "scene.toggle-grid-snap", "Snap", IconName.Magnet, compact)));
     controls.push(new KeyedView("options", options));
-    var style = actionRowStyle();
-    style.width = LayoutAxis.fit();
-    style.wrapMode = LayoutWrapMode.NoWrap;
-    return new Stack(perspective ? "perspective-with-controls" : "viewport-with-controls", [
-      new StackChild("canvas", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
-      new StackChild("controls", new Row("viewport-actions", controls, style), 12.0, 12.0, 1)
-    ]);
+    var barStyle = new LayoutStyle();
+    barStyle.width = LayoutAxis.grow();
+    barStyle.height = LayoutAxis.fixed(38.0);
+    barStyle.direction = LayoutDirection.LeftToRight;
+    barStyle.childAlignY = LayoutAlignmentY.Center;
+    barStyle.childGap = tiny ? 2.0 : 4.0;
+    barStyle.padding = new Insets(tiny ? 4.0 : 8.0, 4.0, tiny ? 4.0 : 8.0, 4.0);
+    barStyle.background = appearance.theme.tokens.surfaceRaised;
+    var toolbar = new Row("viewport-toolbar", controls, barStyle);
+    var divider = new Spacer("viewport-toolbar-bottom-divider", LayoutAxis.grow(),
+      LayoutAxis.fixed(1.0));
+    divider.style.background = appearance.theme.tokens.border;
+    var panelStyle = fillStyle();
+    return new Column(perspective ? "perspective-with-toolbar" : "viewport-with-toolbar", [
+      new KeyedView("toolbar", toolbar),
+      new KeyedView("divider", divider),
+      new KeyedView("canvas", new SizedBox("viewport-canvas-slot", content,
+        LayoutAxis.grow(), LayoutAxis.grow()))
+    ], panelStyle);
+  }
+
+  function viewportToolbarAction(key:String, commandId:String, label:String,
+      icon:IconName, compact:Bool):View {
+    var action = new CommandButton(key, commandId, commands);
+    action.displayLabel = compact ? "" : label;
+    action.leadingIcon = icon;
+    action.variant = ButtonVariant.Navigation;
+    action.classes = ["viewport-tool"];
+    return compact ? new Tooltip(key + "-tooltip", action, new Text(label), 0.0, 34.0) : action;
   }
 
   function gridSpacingLabel():String {
@@ -1307,7 +1342,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
     a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]];
 
-  function perspectivePanel():View {
+  function perspectivePanel(availableWidth:Float = 0.0):View {
     if (perspectiveViewport != null) {
       perspectiveViewport.setPlacementOptions(gridSnapEnabled, gridSpacing, gridVisible);
       var frame = framePresentation;
@@ -1316,7 +1351,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }
     return perspectiveViewport == null
       ? new Text("Perspective rendering requires the desktop GPU host.")
-      : viewportWithControls(perspectiveViewport, true);
+      : viewportWithControls(perspectiveViewport, true, availableWidth);
   }
 
   function inspectorPanel():View {

@@ -192,6 +192,30 @@ class Theme {
 			[StyleValue.background(tokens.surfaceRaised)]);
 		styles.rule(StyleSelector.widget("button").className("tab-header").state(StyleState.Focused),
 			[StyleValue.borderColor(tokens.focusRing), StyleValue.borderWidth(1.0)]);
+		styles.rule(StyleSelector.widget("button").className("viewport-tool"), [
+			StyleValue.height(LayoutAxis.fixed(30.0)),
+			StyleValue.padding(new Insets(7.0, 5.0, 7.0, 5.0)),
+			StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 0.0)),
+			StyleValue.borderWidth(0.0),
+			StyleValue.radius(StyleProperty.RadiusTopLeft, 0.0),
+			StyleValue.radius(StyleProperty.RadiusTopRight, 0.0),
+			StyleValue.radius(StyleProperty.RadiusBottomRight, 0.0),
+			StyleValue.radius(StyleProperty.RadiusBottomLeft, 0.0)
+		]);
+		styles.rule(StyleSelector.widget("button").className("viewport-tool").state(StyleState.Hovered),
+			[StyleValue.background(tokens.selectionHover)]);
+		styles.rule(StyleSelector.widget("button").className("viewport-tool").state(StyleState.Pressed),
+			[StyleValue.background(tokens.selectionPressed)]);
+		styles.rule(StyleSelector.widget("button").className("viewport-tool").state(StyleState.Selected),
+			[StyleValue.background(tokens.selectionHighlight)]);
+		styles.rule(StyleSelector.widget("button").className("viewport-tool").state(StyleState.Focused),
+			[StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 0.0)),
+				StyleValue.borderColor(tokens.focusRing), StyleValue.borderWidth(1.0)]);
+		styles.rule(StyleSelector.widget("button").className("viewport-tool")
+			.state(StyleState.Selected).state(StyleState.Focused),
+			[StyleValue.background(tokens.selectionHighlight)]);
+		styles.rule(StyleSelector.widget("button").className("viewport-tool").state(StyleState.Disabled),
+			[StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 0.0))]);
 		styles.rule(StyleSelector.widget("button").className("inspector-section-header"), [
 			StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 0.0)),
 			StyleValue.borderWidth(0.0)
