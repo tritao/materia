@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "package": { "name": "motionkit-tests" },
+  "entry": "MotionKitBootstrapTests",
+  "sourceRoots": ["src"],
+  "dependencies": {
+    "machinekit": { "path": "../../machinekit" },
+    "motionkit": { "path": ".." },
+    "nativekit": { "path": "../../nativekit" },
+    "robotkit": { "path": "../../robotkit" }
+  },
+  "native": {
+    "cmake": {
+      "source": "../../robotkit/robotd/native",
+      "target": "robotd_native",
+      "inputs": [
+        "../../robotkit/robotd/native/CMakeLists.txt",
+        "../../robotkit/CMakeLists.txt",
+        "../../robotkit/runtime/CMakeLists.txt",
+        "../../robotkit/runtime/include/robotkit_runtime.h",
+        "../../robotkit/runtime/include/robotkit_simkit.h",
+        "../../nativekit/CMakeLists.txt",
+        "../../simkit/CMakeLists.txt"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

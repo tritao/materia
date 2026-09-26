@@ -8,6 +8,7 @@
 /robotkit/build/
 /robotkit/cadbridge/tests/build/
 /automationkit/tests/build/
+/motionkit/tests/build/
 
 /app/tests/build/
 /build/

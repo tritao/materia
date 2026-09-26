@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "package": { "name": "motionkit" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "machinekit": { "path": "../machinekit" },
+    "robotkit": { "path": "../robotkit" }
+  },
+  "target": "host"
+}
