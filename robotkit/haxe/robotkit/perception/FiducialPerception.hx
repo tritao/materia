@@ -1,6 +1,7 @@
 package robotkit.perception;
 
 import robotkit.localization.FrameTree2;
+import robotkit.localization.FrameTransform2;
 import robotkit.mobile.Pose2;
 import robotkit.mobile.Pose3;
 import robotkit.model.RobotModel;
@@ -53,6 +54,9 @@ class FiducialPerception implements Perception {
       targets:Array<FiducialTargetConfig>, ?minConfidence:Float = 0.5):FiducialPerception {
     if (model == null || sensorId == null || sensorId.length == 0)
       throw "Model-driven fiducial configuration requires a robot model and sensor ID";
+    var bodyCount = 0;
+    for (link in model.links) if (link != null && link.id == bodyLinkId) bodyCount++;
+    if (bodyCount != 1) throw 'Fiducial body link "$bodyLinkId" is missing or ambiguous';
     var sensor:Null<robotkit.model.Sensor> = null;
     for (candidate in model.sensors) if (candidate != null && candidate.id == sensorId) {
       if (sensor != null) throw 'Camera sensor ID "$sensorId" is ambiguous';
@@ -74,10 +78,12 @@ class FiducialPerception implements Perception {
         configuredSensor.frame.rotation[1], configuredSensor.frame.rotation[2],
         configuredSensor.frame.rotation[3]);
     var tree:Null<FrameTree2> = null;
-    if (configuredSensor.frame == null ||
-        (Math.abs(configuredSensor.frame.rotation[0]) < 1e-6 &&
-         Math.abs(configuredSensor.frame.rotation[1]) < 1e-6))
-      tree = FrameTree2.fromRobotModel(model, bodyLinkId);
+    if (configuredSensor.frame != null &&
+        Math.abs(configuredSensor.frame.rotation[0]) < 1e-6 &&
+        Math.abs(configuredSensor.frame.rotation[1]) < 1e-6) {
+      tree = new FrameTree2();
+      tree.add(new FrameTransform2(bodyLinkId, sourceFrame, mountPose.planarPose()));
+    }
     return new FiducialPerception(sensorId, targets, minConfidence, tree,
       tree == null ? null : bodyLinkId, sourceFrame, mountPose, bodyLinkId);
   }
