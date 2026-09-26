@@ -463,6 +463,73 @@ void invalid_trajectory_chunk_is_atomic(
     assert(state.trajectory_active == 0 && state.trajectory_queue_depth == 0);
 }
 
+void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &blueprint) {
+    auto limited = blueprint;
+    for (auto &joint : limited.joints)
+        joint.max_velocity = 1.0;
+
+    {
+        // 0.1 m in 100 ms is 1 m/s: exactly at the limit.
+        auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
+        robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(50));
+        uint64_t timestamp = 0;
+        assert(runtime.submit_trajectory(trajectory_command(1),
+            trajectory_batch({{0, 0.0}, {100'000'000, 0.1}})) == RK_OK);
+        auto state = apply_cycle(runtime, timestamp);
+        assert(state.safety == RK_SAFETY_READY && state.trajectory_active == 1);
+
+        // Continuing from where the queue ends is accepted; jumping away is not.
+        assert(runtime.submit_trajectory(trajectory_command(2),
+            trajectory_batch({{0, 0.1}, {100'000'000, 0.2}})) == RK_OK);
+        state = apply_cycle(runtime, timestamp);
+        assert(state.safety == RK_SAFETY_READY && state.trajectory_queue_depth > 0);
+        assert(runtime.submit_trajectory(trajectory_command(3),
+            trajectory_batch({{0, 0.5}, {100'000'000, 0.5}})) == RK_OK);
+        assert(runtime.apply_pending_commands() == RK_ERROR_LIMIT);
+        assert(runtime.snapshot(state) == RK_OK);
+        assert(state.safety == RK_SAFETY_FAULT);
+        assert(state.trajectory_active == 0 && state.trajectory_queue_depth == 0);
+    }
+
+    {
+        // 0.2 m in 100 ms is 2 m/s: twice the limit.
+        auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
+        robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(50));
+        assert(runtime.submit_trajectory(trajectory_command(1),
+            trajectory_batch({{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
+        assert(runtime.apply_pending_commands() == RK_ERROR_LIMIT);
+        rk_robot_state state{};
+        state.struct_size = sizeof(state);
+        assert(runtime.snapshot(state) == RK_OK);
+        assert(state.safety == RK_SAFETY_FAULT && state.trajectory_queue_depth == 0);
+    }
+}
+
+void trajectory_queue_is_bounded(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    rk_trajectory_chunk full{};
+    full.struct_size = sizeof(full);
+    for (uint32_t index = 0; index < RK_MAX_TRAJECTORY_POINTS; ++index) {
+        auto &point = full.points[full.point_count++];
+        point.time_from_start_ns = static_cast<uint64_t>(index) * 1'000'000;
+        point.joint_count = 2;
+    }
+    const uint32_t chunks = RK_MAX_TRAJECTORY_QUEUE_POINTS / RK_MAX_TRAJECTORY_POINTS;
+    uint64_t sequence = 1;
+    for (uint32_t index = 0; index < chunks; ++index)
+        assert(runtime.submit_trajectory(trajectory_command(sequence++), full) == RK_OK);
+    // Pending mailbox chunks count towards the bound before the owner runs.
+    assert(runtime.submit_trajectory(trajectory_command(sequence++), full) == RK_ERROR_QUEUE_FULL);
+    assert(runtime.apply_pending_commands() == RK_OK);
+    rk_robot_state state{};
+    state.struct_size = sizeof(state);
+    assert(runtime.snapshot(state) == RK_OK);
+    assert(state.trajectory_queue_depth <= RK_MAX_TRAJECTORY_QUEUE_POINTS);
+    // Once queued, the published depth keeps the bound.
+    assert(runtime.submit_trajectory(trajectory_command(sequence++), full) == RK_ERROR_QUEUE_FULL);
+}
+
 void same_cycle_target_batches_merge_per_joint(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
@@ -610,6 +677,8 @@ int main() {
     stop_beyond_queued_path_ramps_within_limits(blueprint);
     faulted_batch_skips_commands_before_reset(blueprint);
     invalid_trajectory_chunk_is_atomic(blueprint);
+    trajectory_chunk_speed_is_limited(blueprint);
+    trajectory_queue_is_bounded(blueprint);
 
     // Zero is a valid source epoch, not a missing-timestamp sentinel.
     auto clock_endpoint = std::make_shared<FaultEndpoint>();

@@ -264,11 +264,24 @@ rk_result RobotRuntime::submit_trajectory(const rk_robot_command &command,
         rk_robot_command_validate_for_blueprint(&command, &blueprint_) != RK_OK ||
         rk_trajectory_chunk_validate_for_blueprint(&chunk, &blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
+    // The published depth may lag the owner, which only ever shrinks the
+    // queue between cycles, so this bound is conservative.
+    uint32_t queued_points = 0;
+    {
+        std::lock_guard state_lock(state_mutex_);
+        queued_points = state_.trajectory_queue_depth;
+    }
     try {
         std::lock_guard lock(queue_mutex_);
         if (command.sequence == 0 || command.sequence <= last_command_sequence_)
             return RK_ERROR_STALE_COMMAND;
         if (commands_.size() >= 128)
+            return RK_ERROR_QUEUE_FULL;
+        uint64_t pending_points = queued_points;
+        for (const auto &pending : commands_)
+            if (pending.trajectory != nullptr)
+                pending_points += pending.trajectory->point_count;
+        if (pending_points + chunk.point_count > RK_MAX_TRAJECTORY_QUEUE_POINTS)
             return RK_ERROR_QUEUE_FULL;
         auto payload = std::make_shared<rk_trajectory_chunk>(chunk);
         last_command_sequence_ = command.sequence;
@@ -744,6 +757,39 @@ rk_result RobotRuntime::apply_pending_commands() {
                         }
                     }
                 }
+                // The speed implied between consecutive points, including the
+                // step from the end of the queued path into this chunk, must
+                // stay within each joint's velocity limit: a jump between
+                // points at the same time is an unbounded speed.
+                const rk_trajectory_point *previous = control_.trajectory.empty()
+                    ? nullptr : &control_.trajectory.back().point;
+                uint64_t previous_time = base_time;
+                for (uint32_t point_index = 0;
+                     point_index < queued.trajectory->point_count; ++point_index) {
+                    const auto &point = queued.trajectory->points[point_index];
+                    const auto time = base_time + point.time_from_start_ns;
+                    if (previous != nullptr) {
+                        const double seconds =
+                            static_cast<double>(time - previous_time) / 1'000'000'000.0;
+                        for (uint32_t joint = 0; joint < point.joint_count; ++joint) {
+                            const double limit = blueprint_.joints[joint].max_velocity;
+                            if (limit <= 0.0)
+                                continue;
+                            const double distance =
+                                std::abs(point.positions[joint] - previous->positions[joint]);
+                            if (distance > limit * seconds * (1.0 + 1e-6) + 1e-9) {
+                                latch_fault();
+                                return RK_ERROR_LIMIT;
+                            }
+                        }
+                    }
+                    previous = &point;
+                    previous_time = time;
+                }
+                // Submission already bounds the queue; this guards the owner.
+                if (control_.trajectory.size() + queued.trajectory->point_count >
+                    RK_MAX_TRAJECTORY_QUEUE_POINTS)
+                    return RK_ERROR_QUEUE_FULL;
                 // While a path-following stop runs, a chunk only extends the
                 // path the stop may use; the stop keeps its current rate and
                 // still ends at rest. Resuming means waiting for the stop to

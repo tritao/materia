@@ -2,7 +2,11 @@ package robotkit.runtime;
 
 import RobotKitRuntime;
 
-/** Compiled joint limits and default control rate for one runtime joint. */
+/**
+ * Compiled joint limits and default control rate for one runtime joint.
+ * `maxRate` is the joint's speed limit; the runtime also enforces it on
+ * buffered trajectory chunks.
+ */
 class RobotRuntimeJointBlueprint {
   public final joint:Int;
   public final type:Int;
@@ -51,6 +55,7 @@ class RobotRuntimeJointBlueprint {
     value.set_upper_limit(upperLimit);
     value.set_max_effort(maxEffort);
     value.set_max_acceleration(maxAcceleration);
+    value.set_max_velocity(maxRate);
     for (i in 0...3) {
       value.set_parent_frame_position(i, parentFramePosition[i]);
       value.set_child_frame_position(i, childFramePosition[i]);

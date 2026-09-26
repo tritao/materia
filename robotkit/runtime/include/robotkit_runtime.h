@@ -78,6 +78,7 @@ enum {
     RK_MAX_SERIAL_JOINTS = 64, /**< Capacity of the current serial wire protocol. */
     RK_MAX_TRAJECTORY_POINTS = 256, /**< Maximum samples in one buffered trajectory chunk. */
     RK_MAX_TRAJECTORY_JOINTS = 64, /**< Maximum joints represented by one trajectory chunk. */
+    RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum points queued across all chunks. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
     RK_API_VERSION = 7 /**< Version of the RobotKit C data contract (physical model v2, configured LiDAR coverage, timestamped trajectory execution, queue status, split trajectory payloads, and tagged trajectory progress). */
@@ -249,6 +250,7 @@ typedef struct rk_robot_runtime_joint {
     double child_frame_rotation[4]; /**< Unit quaternion xyzw. */
     double axis[3]; /**< Unit vector in the parent joint frame. */
     double max_acceleration; /**< Maximum joint acceleration, or zero when unspecified. */
+    double max_velocity; /**< Maximum joint speed, or zero when unspecified. */
 } rk_robot_runtime_joint;
 
 enum { RK_COLLISION_APPROXIMATION_NONE = 0, RK_COLLISION_APPROXIMATION_BOUNDS_BOX = 1 };
