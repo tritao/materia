@@ -36,6 +36,7 @@ class MotionKitBootstrapTests {
     testLineLookaheadPlanner();
     testLinearAxisCompilesToRobotModel();
     testCompiledAxisRunsThroughSimulation();
+    testHomingAndJogging();
     testCompiledXYZGantryRunsThroughSimulation();
     testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
@@ -190,6 +191,45 @@ class MotionKitBootstrapTests {
     for (_ in 0...4) simulation.step(Int64.ofInt(tick++));
     var snapshot = robot.snapshot();
     near(snapshot.positions.get(0), 0.04, "simulated robot reaches the MotionKit axis target", 1e-5);
+    simulation.dispose();
+  }
+
+  static function testHomingAndJogging():Void {
+    var axis = new LinearAxis(23, 10, 80);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("jog-axis", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+
+    machine.home();
+    runMotion(machine, simulation);
+    near(robot.snapshot().positions.get(0), 0.0, "homing returns the axis to its authored home", 1e-5);
+
+    var forward = machine.jog("x", 0.02, 1.0);
+    near(forward.samples[forward.samples.length - 1].positions[0], 0.02,
+      "jog plans the requested logical displacement");
+    runMotion(machine, simulation);
+    near(robot.snapshot().positions.get(0), 0.02,
+      "positive jog reaches its target", 1e-5);
+
+    machine.jog("x", -0.01, 0.5);
+    runMotion(machine, simulation);
+    near(robot.snapshot().positions.get(0), 0.015,
+      "negative jog follows the same logical axis API", 1e-5);
+
+    var clamped = machine.jog("x", 0.1, 2.0);
+    near(clamped.samples[clamped.samples.length - 1].positions[0], 0.08,
+      "jog clamps its endpoint to the authored upper limit");
+    runMotion(machine, simulation);
+    near(robot.snapshot().positions.get(0), 0.08,
+      "clamped jog stops at the axis limit", 1e-5);
+    throws(function() machine.jog("x", 0.1001, 1.0),
+      "jog rejects a velocity above the axis rate limit");
+    throws(function() machine.jog("x", 0.0, 1.0),
+      "jog rejects a zero velocity");
     simulation.dispose();
   }
 

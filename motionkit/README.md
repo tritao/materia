@@ -10,6 +10,7 @@ RobotKit execution. The bootstrap package currently provides:
   public limits API, plus tangent-aware line/arc lookahead with exact-stop and
   blend modes;
 - a semantic `MotionSystem`/`MotionAxis` view over any RobotKit `Robot`;
+- authored homing plus bounded timed jogging through the same logical-axis API;
 - a MachineKit `LinearAxis` compiler that produces a two-link prismatic
   RobotModel and a runtime-ready MotionSystem blueprint.
 - buffered trajectory execution with a native timestamped-chunk path when the
@@ -32,6 +33,12 @@ var machine = MotionSystem.fromBlueprint(robot, blueprint);
 
 machine.home();
 machine.moveAxes([new AxisTarget("x", 0.04)], new MotionOptions(0.08, 0.4));
+while (machine.isMoving()) {
+  machine.update();
+  simulation.step(nextTimestamp);
+}
+
+machine.jog("x", 0.02, 1.0);
 while (machine.isMoving()) {
   machine.update();
   simulation.step(nextTimestamp);

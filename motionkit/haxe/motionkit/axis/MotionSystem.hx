@@ -341,6 +341,47 @@ class MotionSystem {
   }
 
   /**
+   * Plans a bounded timed jog in one logical axis. The endpoint is clamped to
+   * the authored axis limits, while all physical joints in a coordinated axis
+   * group receive the same logical displacement and scaled velocity.
+   */
+  public function jog(axisId:String, velocity:Float, durationSeconds:Float):JointTrajectory {
+    var axisValue = axis(axisId);
+    if (axisValue == null) throw 'Unknown motion axis "$axisId"';
+    if (!Math.isFinite(velocity) || velocity == 0.0)
+      throw "Jog velocity must be finite and non-zero";
+    if (!Math.isFinite(durationSeconds) || durationSeconds <= 0.0)
+      throw "Jog duration must be finite and positive";
+    if (axisValue.maxVelocity > 0.0 && Math.abs(velocity) > axisValue.maxVelocity + 1e-12)
+      throw 'Jog velocity $velocity exceeds axis "$axisId" maximum ${axisValue.maxVelocity}';
+
+    var start = robot.snapshot().positions.toArray();
+    var startLogical = axisValue.logicalPosition(start);
+    var requestedEnd = startLogical + velocity * durationSeconds;
+    var endLogical = Math.max(axisValue.lowerLimit,
+      Math.min(axisValue.upperLimit, requestedEnd));
+    var displacement = endLogical - startLogical;
+    var effectiveDuration = Math.abs(displacement) <= 1e-12
+      ? 0.0 : Math.abs(displacement / velocity);
+    var end = start.copy();
+    axisValue.writeLogicalPosition(end, endLogical);
+    var startVelocities:Array<Float> = [for (_ in start) 0.0];
+    var endVelocities:Array<Float> = [for (_ in start) 0.0];
+    if (effectiveDuration > 0.0) {
+      writeLogicalVector(axisValue, startVelocities, velocity);
+      writeLogicalVector(axisValue, endVelocities, velocity);
+    }
+    var samples = effectiveDuration <= 0.0
+      ? [new JointTrajectorySample(0.0, start)]
+      : [new JointTrajectorySample(0.0, start, startVelocities),
+        new JointTrajectorySample(effectiveDuration, end, endVelocities)];
+    var trajectoryValue = new JointTrajectory(samples);
+    clearBufferedMotion();
+    beginImmediate(trajectoryValue);
+    return trajectoryValue;
+  }
+
+  /**
    * Advances the local deterministic clock and submits one complete position
    * batch. Pass no duration to use the compiled fixed timestep.
    */
