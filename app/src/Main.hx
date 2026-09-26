@@ -1015,7 +1015,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     );
   }
 
-  function sceneAction(key:String, commandId:String, label:String, icon:IconName):CommandButton {
+  function sceneAction(key:String, commandId:String, label:String, icon:Null<IconName>):CommandButton {
     var action = new CommandButton(key, commandId, commands);
     action.displayLabel = label;
     action.leadingIcon = icon;
@@ -1163,8 +1163,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function viewportWithControls(content:View, perspective:Bool):View {
     var spacingTenths = Std.int(Math.round(gridSpacing * 10.0));
     var options = new Button(Std.string(Std.int(spacingTenths / 10)) + "." +
-      Std.string(spacingTenths % 10) + " m ▾", null, null, "viewport-options");
+      Std.string(spacingTenths % 10) + " m", null, null, "viewport-options");
     options.variant = ButtonVariant.Secondary;
+    options.trailingIcon = IconName.ChevronDown;
+    options.iconSize = 12.0;
     options.onClickEvent = function(event) {
       var bounds = menuTriggerBounds(event);
       viewportOptionsX = Math.max(8.0, Math.min(viewportWidth - 228.0, bounds.x));
@@ -1181,13 +1183,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     controls.push(new KeyedView("grid", sceneAction("viewport-grid", "scene.toggle-grid",
       "Grid", IconName.Grid)));
     controls.push(new KeyedView("snap", sceneAction("viewport-snap", "scene.toggle-grid-snap",
-      "Snap", IconName.Plus)));
+      "Snap", null)));
     controls.push(new KeyedView("options", options));
     var style = actionRowStyle();
     style.width = LayoutAxis.fit();
     style.wrapMode = LayoutWrapMode.NoWrap;
-    style.background = appearance.theme.tokens.surface;
-    style.padding = new Insets(4.0, 4.0, 4.0, 4.0);
     return new Stack(perspective ? "perspective-with-controls" : "viewport-with-controls", [
       new StackChild("canvas", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
       new StackChild("controls", new Row("viewport-actions", controls, style), 12.0, 12.0, 1)
