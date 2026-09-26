@@ -702,14 +702,14 @@ class SceneEditingTests {
     check(session.sensors.selectRobot("materia/robot-b"),"sensor workflow adds a second robot target");
     new PropertyBinding(session.sensors.properties()[2],session.sensors.context()).apply(PropertyValue.Float(10.0));
     var arm=session.sensors.model.addLink(new Link("Arm","arm"));
-    arm.mass=2.5;arm.centerOfMass=[0.1,0.2,0.3];arm.inertiaTensor=[2.0,0.0,0.0,0.0,3.0,0.0,0.0,0.0,4.0];
+    // The COM shares the X-axis joint's Y coordinate below, so gravity does
+    // not mask the commanded arm motion with a static torque around that axis.
+    arm.mass=2.5;arm.centerOfMass=[0.1,0.1,0.3];arm.inertiaTensor=[2.0,0.0,0.0,0.0,3.0,0.0,0.0,0.0,4.0];
     arm.visualGeometry="geometry/arm-visual";arm.collisionGeometry="geometry/arm-collision";
     var joint=new Joint("Arm joint",JointType.Revolute,session.sensors.model.links[0],arm,"joint/arm");
-    // The 2.5 kg link has a 0.2 m COM offset from its X axis: gravity alone
-    // needs about 4.9 Nm. Leave enough torque for the position command to lift it.
-    joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=10.0;
+    joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=3.0;
     joint.parentFramePosition=[0.25,0.0,0.0];joint.childFramePosition=[0.0,0.1,0.0];joint.axis=[1.0,0.0,0.0];
-    joint.drive=new Actuator("Arm drive",10.0,2.0);session.sensors.model.addJoint(joint);
+    joint.drive=new Actuator("Arm drive",3.0,2.0);session.sensors.model.addJoint(joint);
     var armMount=session.sensors.model.addFrame(new Frame("Arm LiDAR mount",arm,"arm/lidar"));
     armMount.position=[0.4,0.0,0.0];session.sensors.model.sensors[0].frame=armMount;
     check(session.sensors.setRobotPose("materia/robot-b",[0.0,3.0,0.0],[0.0,0.0,0.0,1.0]),
@@ -724,11 +724,12 @@ class SceneEditingTests {
     var restoredJoint=session.sensors.model.joints[0];
     check(restoredJoint.id=="joint/arm"&&
       restoredJoint.parent.id=="base"&&restoredJoint.child.id=="arm"&&restoredJoint.limits.lower==-1.0&&
-      restoredJoint.limits.upper==1.0&&restoredJoint.drive!=null&&restoredJoint.drive.maxEffort==10.0&&
+      restoredJoint.limits.upper==1.0&&restoredJoint.drive!=null&&restoredJoint.drive.maxEffort==3.0&&
       session.sensors.robotPosition("materia/robot-b")[1]==3.0&&
       session.sensors.robotPosition("materia/robot")[1]==0.0,
       "joint topology, actuator settings, and robot pose survive reload");
     check(session.sensors.model.links[1].mass==2.5&&
+      session.sensors.model.links[1].centerOfMass[1]==0.1&&
       session.sensors.model.links[1].centerOfMass[2]==0.3&&
       session.sensors.model.links[1].inertiaTensor[8]==4.0&&
       session.sensors.model.links[1].visualGeometry=="geometry/arm-visual"&&
@@ -870,6 +871,9 @@ class SceneEditingTests {
     for(index in 0...4)if(Math.abs(movedArm.rotation[index]-initialArm.rotation[index])>0.00001)armMoved=true;
     check(movedObstacleZ<initialObstacleZ,
       'runtime overlay follows falling obstacle (Z: $initialObstacleZ -> $movedObstacleZ)');
+    check(movedMounted.positions.get(0)>mountedRobot.positions.get(0)+0.00001,
+      'position command moves the arm joint (${mountedRobot.positions.get(0)} -> '
+      + '${movedMounted.positions.get(0)}, effort: ${movedMounted.efforts.get(0)})');
     check(armMoved,
       'runtime overlay follows commanded arm (rotation: ${initialArm.rotation} -> '
       + '${movedArm.rotation}; joint position: ${movedMounted.positions.get(0)}, '
