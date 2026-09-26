@@ -544,55 +544,40 @@ rk_result Simulation::advance_drives() {
         if (!binding) return RK_ERROR_INVALID_HANDLE;
         for (uint32_t wheel = 0; wheel < drive.wheel_count; ++wheel)
             drive.rates[wheel] = binding->applied_velocity(drive.joints[wheel]);
-        // World-frame twist at the end of the tick.
-        double linear[3] = {0.0, 0.0, 0.0};
-        double turn_rate = 0.0;
+        // Body twist (forward, lateral, yaw rate) decoded from the applied rates.
+        double forward = 0.0, lateral = 0.0, turn_rate = 0.0;
         if (drive.kind == DrivePlant::Kind::Differential) {
-            const double left = drive.rates[0] * drive.wheel_radius * fixed_timestep_;
-            const double right = drive.rates[1] * drive.wheel_radius * fixed_timestep_;
-            const double distance = (left + right) * 0.5;
-            const double turn = (right - left) / drive.track_width;
-            // A stopped plant sends nothing: the base holds its pose at rest.
-            if (distance == 0.0 && turn == 0.0) continue;
-            const double next_yaw = drive.yaw + turn;
-            if (std::abs(turn) < 1e-9) {
-                drive.x += distance * std::cos(drive.yaw);
-                drive.y += distance * std::sin(drive.yaw);
-            } else {
-                const double radius = distance / turn;
-                drive.x += radius * (std::sin(next_yaw) - std::sin(drive.yaw));
-                drive.y -= radius * (std::cos(next_yaw) - std::cos(drive.yaw));
-            }
-            drive.yaw = next_yaw;
-            // Constant speed along the new heading.
-            const double speed = distance / fixed_timestep_;
-            linear[0] = speed * std::cos(drive.yaw);
-            linear[1] = speed * std::sin(drive.yaw);
-            turn_rate = turn / fixed_timestep_;
+            const double left = drive.rates[0] * drive.wheel_radius;
+            const double right = drive.rates[1] * drive.wheel_radius;
+            forward = (left + right) * 0.5;
+            turn_rate = (right - left) / drive.track_width;
         } else {
-            // Decode the body twist (forward, lateral, yaw rate) from the rim speeds.
             double body[3] = {0.0, 0.0, 0.0};
             for (int row = 0; row < 3; ++row)
                 for (int wheel = 0; wheel < 3; ++wheel)
                     body[row] += drive.inverse[row][wheel] * drive.rates[wheel] * drive.wheel_radius;
-            const double forward = body[0], lateral = body[1];
+            forward = body[0];
+            lateral = body[1];
             turn_rate = body[2];
-            if (forward == 0.0 && lateral == 0.0 && turn_rate == 0.0) continue;
-            // Exact motion under a constant body twist: the twist integrated
-            // along the turning heading.
-            const double turn = turn_rate * fixed_timestep_;
-            double along = forward * fixed_timestep_, across = lateral * fixed_timestep_;
-            if (std::abs(turn) >= 1e-9) {
-                const double sine = std::sin(turn), versine = 1.0 - std::cos(turn);
-                along = (forward * sine - lateral * versine) / turn_rate;
-                across = (forward * versine + lateral * sine) / turn_rate;
-            }
-            drive.x += along * std::cos(drive.yaw) - across * std::sin(drive.yaw);
-            drive.y += along * std::sin(drive.yaw) + across * std::cos(drive.yaw);
-            drive.yaw += turn;
-            linear[0] = forward * std::cos(drive.yaw) - lateral * std::sin(drive.yaw);
-            linear[1] = forward * std::sin(drive.yaw) + lateral * std::cos(drive.yaw);
         }
+        // A stopped plant sends nothing: the base holds its pose at rest.
+        if (forward == 0.0 && lateral == 0.0 && turn_rate == 0.0) continue;
+        // Exact motion under a constant body twist over the tick: the twist
+        // integrated along the turning heading (an arc when lateral is zero).
+        const double turn = turn_rate * fixed_timestep_;
+        double along = forward * fixed_timestep_, across = lateral * fixed_timestep_;
+        if (std::abs(turn) >= 1e-9) {
+            const double sine = std::sin(turn), versine = 1.0 - std::cos(turn);
+            along = (forward * sine - lateral * versine) / turn_rate;
+            across = (forward * versine + lateral * sine) / turn_rate;
+        }
+        drive.x += along * std::cos(drive.yaw) - across * std::sin(drive.yaw);
+        drive.y += along * std::sin(drive.yaw) + across * std::cos(drive.yaw);
+        drive.yaw += turn;
+        // World-frame twist at the end of the tick.
+        const double linear[3] = {forward * std::cos(drive.yaw) - lateral * std::sin(drive.yaw),
+                                  forward * std::sin(drive.yaw) + lateral * std::cos(drive.yaw),
+                                  0.0};
         // The wheels roll on the level floor, so the base translates in the
         // world XY plane at its seeded height and turns about world Z; its
         // authored roll and pitch (the tilt) turn with the heading.
