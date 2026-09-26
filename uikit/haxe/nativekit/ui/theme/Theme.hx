@@ -91,7 +91,7 @@ class Theme {
 		tokens.controlDisabled = light ? rgba(0.82, 0.84, 0.88) : rgba(0.20, 0.21, 0.24);
 		tokens.progressTrack = light ? rgba(0.78, 0.84, 0.92) : rgba(0.20, 0.25, 0.33);
 		tokens.progressFill = tokens.accent;
-		tokens.selectionField = light ? rgba(0.98, 0.99, 1.0) : rgba(0.12, 0.15, 0.20);
+		tokens.selectionField = light ? rgba(0.93, 0.95, 0.98) : rgba(0.12, 0.15, 0.20);
 		tokens.selectionHover = light ? rgba(0.91, 0.94, 0.98) : rgba(0.18, 0.23, 0.31);
 		tokens.selectionPressed = light ? rgba(0.85, 0.90, 0.97) : rgba(0.15, 0.20, 0.28);
 		tokens.selectionHighlight = light ? rgba(0.82, 0.89, 0.98) : rgba(0.16, 0.29, 0.50);
@@ -260,9 +260,14 @@ class Theme {
 			[StyleValue.background(tokens.selectionHover)]);
 		styles.rule(StyleSelector.widget("button").className("selection-option").state(StyleState.Selected),
 			[StyleValue.background(tokens.selectionHighlight)]);
-		styles.rule(StyleSelector.widget("text-field"), [StyleValue.textColor(text)]);
+		styles.rule(StyleSelector.widget("text-field"), [
+			StyleValue.textColor(text), StyleValue.background(tokens.surfaceSunken),
+			StyleValue.borderColor(tokens.border), StyleValue.borderWidth(1.0)
+		]);
 		styles.rule(StyleSelector.widget("text-field").state(StyleState.Disabled),
 			[StyleValue.textColor(disabledText)]);
+		styles.rule(StyleSelector.widget("text-field").state(StyleState.Focused),
+			[StyleValue.borderColor(tokens.focusRing)]);
 		styles.rule(StyleSelector.widget("text-field").className("property-input"), [
 			StyleValue.height(LayoutAxis.fixed(32.0)),
 			StyleValue.padding(new Insets(8.0, 5.0, 8.0, 5.0)),

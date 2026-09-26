@@ -288,6 +288,8 @@ class FrameworkSmoke {
 		var context = new UiContext(session, fonts);
 		if (!propertyInputContrastValid(fonts))
 			return 301;
+		if (!defaultTextFieldContrastValid(fonts))
+			return 303;
 		if (!tabHierarchyValid(fonts))
 			return 302;
 		if (context.buildContext.fonts != fonts)
@@ -3257,6 +3259,24 @@ class FrameworkSmoke {
 			}
 		}
 		context.dispose();
+		return true;
+	}
+
+	static function defaultTextFieldContrastValid(fonts:FontCollection):Bool {
+		for (theme in [nativekit.ui.theme.Theme.light(), nativekit.ui.theme.Theme.dark()]) {
+			var context = new UiContext(null, fonts, theme);
+			var root = context.submit(new TextField("default-field", "Rename me"),
+				new LayoutFrame(280.0, 48.0));
+			var background:Color = root.computedStyle.get(nativekit.ui.style.StyleProperty.Background);
+			var foreground:Color = root.children[0].children[0].layout.textColor;
+			var valid = background != null && foreground != null &&
+				background.red == theme.tokens.surfaceSunken.red &&
+				background.green == theme.tokens.surfaceSunken.green &&
+				background.blue == theme.tokens.surfaceSunken.blue &&
+				contrastRatio(foreground, background) >= 4.5;
+			context.dispose();
+			if (!valid) return false;
+		}
 		return true;
 	}
 

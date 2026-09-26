@@ -600,7 +600,6 @@ class TextField implements View {
 		result.width = LayoutAxis.fixed(240.0);
 		result.height = LayoutAxis.fixed(multiline ? 120.0 : 40.0);
 		result.padding = new Insets(10.0, 8.0, 10.0, 8.0);
-		result.background = Color.rgba(0.11, 0.13, 0.17, 1.0);
 		result.radiusTopLeft = result.radiusTopRight = 5.0;
 		result.radiusBottomLeft = result.radiusBottomRight = 5.0;
 		result.clipHorizontal = true;

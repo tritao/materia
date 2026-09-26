@@ -1105,6 +1105,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function renameDialog():View {
     var field = new TextField("rename-name", renameValue, function(value) renameValue = value);
+    field.style.width = LayoutAxis.stretch();
+    field.label = "Object name";
     field.onSubmit = function(_) finishRename();
     var confirm = new Button("Rename", null, finishRename, "rename-confirm");
     confirm.variant = ButtonVariant.Primary;
@@ -1113,7 +1115,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView("actions", new Row("rename-actions", [
         new KeyedView("save", confirm),
         new KeyedView("cancel", new Button("Cancel", null, function() renameId = null, "rename-cancel"))
-      ]))
+      ], actionRowStyle()))
     ], actionColumnStyle());
     return new Dialog("rename-object", "Rename object", content, function() renameId = null, 360.0);
   }
