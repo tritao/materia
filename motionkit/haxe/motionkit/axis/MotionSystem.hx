@@ -136,16 +136,19 @@ class MotionSystem {
   }
 
   /** Plans a straight Cartesian move for a direct XYZ gantry. */
-  public function moveLinear(target:PathPoint, feed:Feed):JointTrajectory {
-    var trajectoryValue = planLinearFrom(robot.snapshot().positions.toArray(), target, feed);
+  public function moveLinear(target:PathPoint, feed:Feed,
+      ?options:MotionOptions):JointTrajectory {
+    var trajectoryValue = planLinearPathFrom(robot.snapshot().positions.toArray(), target,
+      feed, options);
     clearBufferedMotion();
     beginImmediate(trajectoryValue);
     return trajectoryValue;
   }
 
   /** Adds a straight Cartesian move behind all motion already in the buffer. */
-  public function queueLinear(target:PathPoint, feed:Feed):JointTrajectory {
-    var trajectoryValue = planLinearFrom(planningStartPositions(), target, feed);
+  public function queueLinear(target:PathPoint, feed:Feed,
+      ?options:MotionOptions):JointTrajectory {
+    var trajectoryValue = planLinearPathFrom(planningStartPositions(), target, feed, options);
     enqueueTrajectory(trajectoryValue);
     return trajectoryValue;
   }
@@ -192,60 +195,20 @@ class MotionSystem {
     robot.stop(mode);
   }
 
-  function planLinearFrom(start:Array<Float>, target:PathPoint, feed:Feed):JointTrajectory {
+  function planLinearPathFrom(start:Array<Float>, target:PathPoint, feed:Feed,
+      options:Null<MotionOptions>):JointTrajectory {
     if (target == null || feed == null) throw "Linear move needs a target and feed";
-    var goal = start.copy();
     var xAxis = requireAxis("x");
     var yAxis = requireAxis("y");
     var zAxis = requireAxis("z");
-    var starts = [xAxis.logicalPosition(start), yAxis.logicalPosition(start),
-      zAxis.logicalPosition(start)];
-    var goals = [target.x, target.y, target.z];
-    var axes = [xAxis, yAxis, zAxis];
-    for (i in 0...3) {
-      if (goals[i] < axes[i].lowerLimit || goals[i] > axes[i].upperLimit)
-        throw 'Axis "${axes[i].id}" target ${goals[i]} is outside its limits';
-      axes[i].writeLogicalPosition(goal, goals[i]);
-    }
-
-    var dx = goals[0] - starts[0];
-    var dy = goals[1] - starts[1];
-    var dz = goals[2] - starts[2];
-    var distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (distance <= 0.0) {
-      return new JointTrajectory([new JointTrajectorySample(0.0, goal)]);
-    }
-
-    var scalarFeed = feed.value;
-    var scalarAcceleration = 1.0;
-    for (i in 0...3) {
-      var displacement = Math.abs(goals[i] - starts[i]);
-      if (displacement <= 0.0) continue;
-      if (axes[i].maxVelocity > 0.0)
-        scalarFeed = Math.min(scalarFeed, axes[i].maxVelocity * distance / displacement);
-      if (axes[i].maxAcceleration > 0.0)
-        scalarAcceleration = Math.min(scalarAcceleration,
-          axes[i].maxAcceleration * distance / displacement);
-    }
-
-    var scalarTrajectory = planner.plan([0.0], [distance],
-      new MotionLimits(scalarFeed, scalarAcceleration));
-    var mapped:Array<JointTrajectorySample> = [];
-    for (sample in scalarTrajectory.samples) {
-      var alpha = sample.positions[0] / distance;
-      var positions:Array<Float> = [];
-      var velocities:Array<Float> = [];
-      var accelerations:Array<Float> = [];
-      for (j in 0...start.length) {
-        var delta = goal[j] - start[j];
-        positions.push(start[j] + delta * alpha);
-        velocities.push(delta * sample.velocities[0] / distance);
-        accelerations.push(delta * sample.accelerations[0] / distance);
-      }
-      mapped.push(new JointTrajectorySample(sample.timeSeconds, positions,
-        velocities, accelerations));
-    }
-    return new JointTrajectory(mapped);
+    var current = new PathPoint(xAxis.logicalPosition(start), yAxis.logicalPosition(start),
+      zAxis.logicalPosition(start));
+    var chosen = options == null ? new MotionOptions(feed.value, 0.0, 0.0) : options;
+    var maxVelocity = chosen.maxVelocity <= 0.0
+      ? feed.value : Math.min(feed.value, chosen.maxVelocity);
+    var resolved = new MotionOptions(maxVelocity, chosen.maxAcceleration, chosen.maxJerk);
+    return planPathFrom(start, GeometricPath.lines([current, target]),
+      PathPlanningOptions.exactStopMode(), resolved);
   }
 
   function planPathFrom(start:Array<Float>, path:GeometricPath,
@@ -346,7 +309,8 @@ class MotionSystem {
    * the authored axis limits, while all physical joints in a coordinated axis
    * group receive the same logical displacement and scaled velocity.
    */
-  public function jog(axisId:String, velocity:Float, durationSeconds:Float):JointTrajectory {
+  public function jog(axisId:String, velocity:Float, durationSeconds:Float,
+      ?maxAcceleration:Float):JointTrajectory {
     var axisValue = axis(axisId);
     if (axisValue == null) throw 'Unknown motion axis "$axisId"';
     if (!Math.isFinite(velocity) || velocity == 0.0)
@@ -355,28 +319,19 @@ class MotionSystem {
       throw "Jog duration must be finite and positive";
     if (axisValue.maxVelocity > 0.0 && Math.abs(velocity) > axisValue.maxVelocity + 1e-12)
       throw 'Jog velocity $velocity exceeds axis "$axisId" maximum ${axisValue.maxVelocity}';
+    var acceleration = maxAcceleration == null ? axisValue.maxAcceleration : maxAcceleration;
+    if (!Math.isFinite(acceleration) || acceleration <= 0.0)
+      throw 'Jog axis "$axisId" needs a positive acceleration limit';
 
     var start = robot.snapshot().positions.toArray();
     var startLogical = axisValue.logicalPosition(start);
     var requestedEnd = startLogical + velocity * durationSeconds;
     var endLogical = Math.max(axisValue.lowerLimit,
       Math.min(axisValue.upperLimit, requestedEnd));
-    var displacement = endLogical - startLogical;
-    var effectiveDuration = Math.abs(displacement) <= 1e-12
-      ? 0.0 : Math.abs(displacement / velocity);
     var end = start.copy();
     axisValue.writeLogicalPosition(end, endLogical);
-    var startVelocities:Array<Float> = [for (_ in start) 0.0];
-    var endVelocities:Array<Float> = [for (_ in start) 0.0];
-    if (effectiveDuration > 0.0) {
-      writeLogicalVector(axisValue, startVelocities, velocity);
-      writeLogicalVector(axisValue, endVelocities, velocity);
-    }
-    var samples = effectiveDuration <= 0.0
-      ? [new JointTrajectorySample(0.0, start)]
-      : [new JointTrajectorySample(0.0, start, startVelocities),
-        new JointTrajectorySample(effectiveDuration, end, endVelocities)];
-    var trajectoryValue = new JointTrajectory(samples);
+    var trajectoryValue = planner.plan(start, end,
+      new MotionLimits(Math.abs(velocity), acceleration));
     clearBufferedMotion();
     beginImmediate(trajectoryValue);
     return trajectoryValue;

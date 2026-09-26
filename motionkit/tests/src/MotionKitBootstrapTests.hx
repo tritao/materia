@@ -39,6 +39,7 @@ class MotionKitBootstrapTests {
     testLinearAxisCompilesToRobotModel();
     testCompiledAxisRunsThroughSimulation();
     testHomingAndJogging();
+    testMoveLinearUsesPlannerLimits();
     testCompiledXYZGantryRunsThroughSimulation();
     testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
@@ -242,6 +243,13 @@ class MotionKitBootstrapTests {
     near(robot.snapshot().positions.get(0), 0.0, "homing returns the axis to its authored home", 1e-5);
 
     var forward = machine.jog("x", 0.02, 1.0);
+    near(forward.samples[0].velocities[0], 0.0,
+      "jog starts at rest");
+    near(forward.samples[forward.samples.length - 1].velocities[0], 0.0,
+      "jog ends at rest");
+    for (sample in forward.samples)
+      check(Math.abs(sample.accelerations[0]) <= 0.4 + 1e-9,
+        "jog respects its acceleration limit");
     near(forward.samples[forward.samples.length - 1].positions[0], 0.02,
       "jog plans the requested logical displacement");
     runMotion(machine, simulation);
@@ -263,6 +271,35 @@ class MotionKitBootstrapTests {
       "jog rejects a velocity above the axis rate limit");
     throws(function() machine.jog("x", 0.0, 1.0),
       "jog rejects a zero velocity");
+    simulation.dispose();
+  }
+
+  static function testMoveLinearUsesPlannerLimits():Void {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
+      new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
+      new LinearAxis(23, 10, 80), 0.2, 2.0);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("linear-planner-limits", runtime,
+      blueprint.model.name, [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var options = new MotionOptions(0.2, 2.0);
+    var xOnly = machine.moveLinear(Pose.xyz(0.02, 0.0, 0.0),
+      Feed.metresPerSecond(0.2), options);
+    var peakAcceleration = 0.0;
+    for (sample in xOnly.samples)
+      peakAcceleration = Math.max(peakAcceleration, Math.abs(sample.accelerations[0]));
+    check(peakAcceleration > 1.9,
+      "moveLinear uses an authored 2 m/s² acceleration limit");
+
+    var diagonal = machine.moveLinear(Pose.xyz(0.03, 0.03, 0.03),
+      Feed.metresPerSecond(0.2), options);
+    for (sample in diagonal.samples) {
+      for (joint in 0...3)
+        check(Math.abs(sample.accelerations[joint]) <= 2.0 + 1e-9,
+          "diagonal moveLinear samples stay within per-axis acceleration caps");
+    }
     simulation.dispose();
   }
 
