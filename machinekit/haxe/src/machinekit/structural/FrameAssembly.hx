@@ -15,9 +15,18 @@ interface StructuralProfile {
 	function geometry(length:Float):Part;
 }
 
+/** End treatment for one structural member. `setback` is the stock removed from a member's
+ * centreline endpoint for the frame's cut-length envelope. The profile remains an idealized
+ * extrusion; detailed sloped mitre and curved cope surfaces belong to a later manufacturing pass.
+ */
+enum FrameEndCut {
+	Square;
+	Mitre(setback:Float);
+	Cope(setback:Float);
+}
+
 /** Lengths of one profile aggregated across every member that uses it. `totalLength` sums the
- * members' centreline (node-to-node) lengths: members are not trimmed or mitred at joints, so
- * the stock actually cut is shorter by whatever the joint detailing removes.
+ * members' cut lengths after their explicit end setbacks.
  */
 typedef CutListLine = {
 	var designation:String;
@@ -30,8 +39,9 @@ typedef CutListLine = {
  * between two points. A frame is one rigid weldment, not a kinematic mechanism, so members carry
  * no assembly joints: `geometry(name)` returns the member's `Part` already placed in world space.
  *
- * Members are placed by centreline, node to node: they overlap where they meet (no trimming,
- * mitring, or coping), and `length`/`cutList` report those untrimmed centreline lengths.
+ * Members are placed by centreline, node to node. Square ends preserve that envelope; mitre and
+ * cope treatments remove the requested stock setback from the corresponding endpoint. `length`
+ * remains the node-to-node distance, while `cutLength` and `cutList` report stock lengths.
  *
  * Section orientation: the profile's local +Z runs from `start` to `end`, its local +Y (a
  * channel's `height`, an angle's `legB`, a tube's `height`) follows `reference` projected
@@ -46,6 +56,8 @@ typedef FrameMember = {
 	var end:String;
 	var profile:StructuralProfile;
 	var reference:Null<Vector>;
+	var startCut:FrameEndCut;
+	var endCut:FrameEndCut;
 }
 
 class FrameAssembly {
@@ -59,20 +71,33 @@ class FrameAssembly {
 		points.set(name, new Vector(x, y, z));
 	}
 
-	public function member(name:String, start:String, end:String, profile:StructuralProfile, ?reference:Vector):Void {
+	public function member(name:String, start:String, end:String, profile:StructuralProfile, ?reference:Vector,
+			?startCut:FrameEndCut, ?endCut:FrameEndCut):Void {
 		if (name == null || name.length == 0) throw "Frame member needs a name";
 		for (existing in members) if (existing.name == name) throw 'Duplicate frame member "$name"';
 		if (!points.exists(start)) throw 'Unknown frame point "$start"';
 		if (!points.exists(end)) throw 'Unknown frame point "$end"';
 		if (start == end) throw 'Member "$name" needs distinct endpoints';
 		if (reference != null && !(reference.length() > 1e-9)) throw 'Member "$name" reference has zero length';
-		members.push({name: name, start: start, end: end, profile: profile, reference: reference});
+		var resolvedStartCut = startCut == null ? Square : startCut;
+		var resolvedEndCut = endCut == null ? Square : endCut;
+		var centerline = points.get(end).subtract(points.get(start)).length();
+		var stockLength = centerline - cutBack(resolvedStartCut) - cutBack(resolvedEndCut);
+		if (centerline > 1e-9 && !(stockLength > 1e-9)) throw 'Member "$name" end cuts consume its length';
+		members.push({name: name, start: start, end: end, profile: profile, reference: reference,
+			startCut: resolvedStartCut, endCut: resolvedEndCut});
 	}
 
 	/** Straight-line (centreline, untrimmed) distance between a member's endpoints. */
 	public function length(name:String):Float {
 		var m = find(name);
 		return points.get(m.end).subtract(points.get(m.start)).length();
+	}
+
+	/** Stock length after the member's start and end cut setbacks. */
+	public function cutLength(name:String):Float {
+		var m = find(name);
+		return length(name) - cutBack(m.startCut) - cutBack(m.endCut);
 	}
 
 	/** The member's `Part`, extruded to its length and placed in world space along its endpoints. */
@@ -91,9 +116,12 @@ class FrameAssembly {
 		if (!(sideways.length() > 1e-6 * reference.length()))
 			throw 'Member "$name" reference is parallel to its axis; pick a reference across the member';
 		sideways = sideways.normalized();
-		var body = m.profile.geometry(len);
+		var startSetback = cutBack(m.startCut);
+		var stockLength = len - startSetback - cutBack(m.endCut);
+		var body = m.profile.geometry(stockLength);
 		try {
-			var placed = body.placed(new Location(new Plane(start, sideways, direction)));
+			var cutStart = start.add(direction.scale(startSetback));
+			var placed = body.placed(new Location(new Plane(cutStart, sideways, direction)));
 			body.close();
 			return placed;
 		} catch (error:Dynamic) {
@@ -102,13 +130,13 @@ class FrameAssembly {
 		}
 	}
 
-	/** Centreline (untrimmed) lengths aggregated by profile designation, in first-used order. */
+	/** Cut lengths aggregated by profile designation, in first-used order. */
 	public function cutList():Array<CutListLine> {
 		var byDesignation:Map<String, CutListLine> = new Map();
 		var order:Array<String> = [];
 		for (m in members) {
 			var designation = m.profile.profileDesignation();
-			var len = length(m.name);
+			var len = cutLength(m.name);
 			var line = byDesignation.get(designation);
 			if (line == null) {
 				byDesignation.set(designation, {designation: designation, description: m.profile.profileDescription(),
@@ -126,5 +154,14 @@ class FrameAssembly {
 	function find(name:String):FrameMember {
 		for (m in members) if (m.name == name) return m;
 		throw 'Unknown frame member "$name"';
+	}
+
+	static function cutBack(cut:FrameEndCut):Float {
+		return switch (cut) {
+			case Square: 0;
+			case Mitre(setback) | Cope(setback):
+				if (!(setback > 0) || !Math.isFinite(setback)) throw "Frame end-cut setback must be positive";
+				setback;
+		};
 	}
 }

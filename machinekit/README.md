@@ -84,14 +84,17 @@ profiles; those entries retain their slot, bore, and cross-section dimensions
 and provenance.
 
 `FrameAssembly` registers named points with `point(name, x, y, z)`, then
-members with `member(name, start, end, profile)`. `geometry(name)` extrudes
-and places a member in world space between its two points; a member's local
+members with `member(name, start, end, profile)`. Optional `FrameEndCut.Mitre(setback)`
+and `FrameEndCut.Cope(setback)` treatments remove stock from either endpoint;
+`Square` is the default. `geometry(name)` extrudes
+and places the resulting member envelope in world space between its two points; a member's local
 +Y (a channel's web-to-flange direction, a tube's height, ...) follows an
 optional `reference` vector projected perpendicular to the member's axis,
 defaulting to +Z (or +Y for a nearly vertical member); a reference parallel to
-the member is rejected. `cutList()` aggregates member lengths by profile
-designation. Members run point to point and are not trimmed at joints, so
-lengths and the cut list are centreline lengths, not saw-cut lengths.
+the member is rejected. `length()` reports the node-to-node distance, while
+`cutLength()` and `cutList()` aggregate the post-cut stock lengths by profile
+designation. The cut treatments currently describe trimmed profile envelopes;
+sloped mitre and curved cope surfaces remain manufacturing-detail work.
 
 ## Transmission
 

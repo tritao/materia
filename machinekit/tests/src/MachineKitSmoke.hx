@@ -42,6 +42,7 @@ import machinekit.structural.Angle;
 import machinekit.structural.Channel;
 import machinekit.structural.FlatBar;
 import machinekit.structural.FrameAssembly;
+import machinekit.structural.FrameAssembly.FrameEndCut;
 import machinekit.structural.RectTube;
 import machinekit.structural.RoundTube;
 import machinekit.structural.TSlotExtrusion;
@@ -542,6 +543,25 @@ class MachineKitSmoke {
 				throw 'unexpected cut list designation "${line.designation}"';
 			}
 		}
+
+		var detailedFrame = new FrameAssembly();
+		detailedFrame.point("A", 0, 0, 0);
+		detailedFrame.point("B", 0, 0, 100);
+		detailedFrame.member("detailed", "A", "B", tube, null, Mitre(10), Cope(5));
+		near(detailedFrame.length("detailed"), 100, "detailed frame centreline length");
+		near(detailedFrame.cutLength("detailed"), 85, "detailed frame cut length");
+		var detailedPart = detailedFrame.geometry("detailed");
+		solid(detailedPart, "detailed frame member");
+		var detailedBox = bounds(detailedPart);
+		near(detailedBox.minZ, 10, "detailed frame start setback");
+		near(detailedBox.maxZ, 95, "detailed frame end setback");
+		near(detailedPart.volume(), (40 * 40 - 34 * 34) * 85, "detailed frame volume");
+		detailedPart.close();
+		near(detailedFrame.cutList()[0].totalLength, 85, "detailed frame cut list length");
+		throws(() -> detailedFrame.member("badCut", "A", "B", tube, null, Mitre(60), Cope(50)),
+			"end cuts consume its length");
+		throws(() -> detailedFrame.member("badSetback", "A", "B", tube, null, Mitre(0), null),
+			"end-cut setback must be positive");
 	}
 
 	static function gears():Void {
