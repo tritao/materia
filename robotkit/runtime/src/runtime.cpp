@@ -1,6 +1,7 @@
 #include "robotkit_runtime.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 
@@ -14,34 +15,57 @@ uint64_t monotonic_now_ns() {
         std::chrono::duration_cast<std::chrono::nanoseconds>(now).count());
 }
 
-bool newer_command(const rk_robot_command &candidate, const rk_robot_command &current) {
-    return candidate.sequence > current.sequence;
+bool lifecycle_kind(rk_command_kind kind) {
+    return kind != RK_COMMAND_NONE && kind != RK_COMMAND_JOINT_TARGETS;
 }
 
 /**
- * Reduce one mailbox drain to one owner-cycle intent. Emergency stop always
- * wins; otherwise the newest command wins. This prevents a stale target earlier
- * in the same cycle from running after a stop, while preserving explicit
- * command ordering for a controller that deliberately submits a later target.
+ * Reduce one mailbox drain to one owner-cycle intent. Submission accepts only
+ * increasing sequences, so the drain is already in sequence order. Emergency
+ * stop always wins. A newest stop or safety reset wins alone, so a stale
+ * target earlier in the same cycle never runs after it. Otherwise every
+ * joint-target batch newer than the latest stop or reset merges per joint, a
+ * newer batch replacing an older one's target for the same joint: batches are
+ * partial updates, so a caller may command a drive and an arm with separate
+ * batches in one cycle without the later batch discarding the earlier one's
+ * joints.
  */
 rk_robot_command arbitrate(const std::deque<rk_robot_command> &commands) {
-    rk_robot_command selected{};
-    bool has_selected = false;
-    bool has_emergency = false;
-    for (const auto &command : commands) {
-        if (command.kind == RK_COMMAND_EMERGENCY_STOP) {
-            if (!has_emergency || newer_command(command, selected)) {
-                selected = command;
-                has_emergency = true;
-            }
+    const rk_robot_command *emergency = nullptr;
+    for (const auto &command : commands)
+        if (command.kind == RK_COMMAND_EMERGENCY_STOP)
+            emergency = &command;
+    if (emergency)
+        return *emergency;
+    const auto &newest = commands.back();
+    if (lifecycle_kind(newest.kind))
+        return newest;
+
+    std::size_t first = 0;
+    for (std::size_t index = 0; index < commands.size(); ++index)
+        if (lifecycle_kind(commands[index].kind))
+            first = index + 1;
+    rk_robot_command merged = newest;
+    merged.kind = RK_COMMAND_NONE;
+    merged.target_count = 0;
+    std::array<int, RK_MAX_JOINTS> slot;
+    slot.fill(-1);
+    for (std::size_t index = first; index < commands.size(); ++index) {
+        const auto &batch = commands[index];
+        if (batch.kind != RK_COMMAND_JOINT_TARGETS)
             continue;
-        }
-        if (!has_emergency && (!has_selected || newer_command(command, selected))) {
-            selected = command;
-            has_selected = true;
+        merged.kind = RK_COMMAND_JOINT_TARGETS;
+        for (uint32_t target = 0; target < batch.target_count; ++target) {
+            const auto &value = batch.targets[target];
+            // Submission validation bounds joints by the blueprint, itself
+            // within RK_MAX_JOINTS.
+            auto &position = slot[value.joint];
+            if (position < 0)
+                position = static_cast<int>(merged.target_count++);
+            merged.targets[position] = value;
         }
     }
-    return selected;
+    return merged;
 }
 
 } // namespace

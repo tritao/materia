@@ -453,6 +453,13 @@ RK_API rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime);
  * owner-thread phase; in a shared Simulation that phase is part of the next
  * rk_simulation_step() or realtime simulation tick.
  *
+ * A joint-target batch is a partial update: joints it omits keep their current
+ * targets. When several batches arrive before one owner phase, an emergency
+ * stop among them wins; a newest stop or safety reset wins alone; otherwise
+ * the joint-target batches since the latest stop or reset merge per joint, the
+ * newer batch winning for a joint both set. So a drive and an arm may be
+ * commanded with separate batches in the same cycle.
+ *
  * @param runtime Runtime receiving the command.
  * @param command Complete command value to copy into the mailbox.
  * @return RK_OK when queued, or a validation/state/queue error.

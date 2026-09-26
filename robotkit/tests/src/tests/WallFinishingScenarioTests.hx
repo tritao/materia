@@ -249,13 +249,9 @@ class WallFinishingScenarioTests {
       // Hold the chassis perfectly still for the arm-only phase: the plant
       // rolls the base by whatever wheel targets the robot applies, so
       // navigation's last small correction must be replaced by an explicit
-      // zero twist. Step once so the robot applies it: the runtime keeps only
-      // the latest command batch per tick, so the arm's joint targets below
-      // would otherwise replace the zero wheel targets before they took effect
-      // and leave the wheels turning through the whole raster.
+      // zero twist. The arm's joint-target batch submitted below in the same
+      // tick merges with it per joint rather than replacing it.
       base.command(new Twist2(0.0, 0.0));
-      latestSnapshot = plant.step(Int64.ofInt(tick++));
-      localization.update(latestSnapshot);
 
       // -- execute --
       var localizationState = localization.state();

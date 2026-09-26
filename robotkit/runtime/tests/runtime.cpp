@@ -3,8 +3,10 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <initializer_list>
 #include <memory>
 #include <thread>
+#include <utility>
 
 namespace {
 
@@ -153,6 +155,75 @@ void wait_for_sequence(robotkit::RobotRuntime &runtime, uint64_t sequence) {
     assert(false && "RobotRuntime worker did not publish a sample");
 }
 
+rk_robot_command velocity_batch(uint64_t sequence,
+                                std::initializer_list<std::pair<uint32_t, double>> targets) {
+    rk_robot_command value{};
+    value.struct_size = sizeof(value);
+    value.sequence = sequence;
+    value.kind = RK_COMMAND_JOINT_TARGETS;
+    for (const auto &[joint, velocity] : targets)
+        value.targets[value.target_count++] = {joint, RK_TARGET_VELOCITY, velocity, 0.0, 0.0};
+    return value;
+}
+
+rk_robot_command lifecycle_command(uint64_t sequence, rk_command_kind kind) {
+    rk_robot_command value{};
+    value.struct_size = sizeof(value);
+    value.sequence = sequence;
+    value.kind = kind;
+    return value;
+}
+
+rk_robot_state apply_cycle(robotkit::RobotRuntime &runtime, uint64_t &timestamp) {
+    assert(runtime.apply_pending_commands() == RK_OK);
+    assert(runtime.publish_sample(timestamp += 100'000'000) == RK_OK);
+    rk_robot_state state{};
+    assert(runtime.snapshot(state) == RK_OK);
+    return state;
+}
+
+void same_cycle_target_batches_merge_per_joint(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    uint64_t timestamp = 0;
+
+    // Separate batches for different joints in one cycle both apply, like a
+    // drive and an arm commanded independently.
+    assert(runtime.submit(velocity_batch(1, {{0, 0.2}})) == RK_OK);
+    assert(runtime.submit(velocity_batch(2, {{1, -0.3}})) == RK_OK);
+    auto state = apply_cycle(runtime, timestamp);
+    assert(state.velocity[0] == 0.2 && state.velocity[1] == -0.3);
+
+    // For a joint both batches set, the newer target wins; a joint neither
+    // batch names keeps its target.
+    assert(runtime.submit(velocity_batch(3, {{0, 0.5}})) == RK_OK);
+    assert(runtime.submit(velocity_batch(4, {{0, 0.1}})) == RK_OK);
+    state = apply_cycle(runtime, timestamp);
+    assert(state.velocity[0] == 0.1 && state.velocity[1] == -0.3);
+
+    // A newest stop wins alone: the earlier target in the cycle never runs.
+    assert(runtime.submit(velocity_batch(5, {{1, 0.4}})) == RK_OK);
+    assert(runtime.submit(lifecycle_command(6, RK_COMMAND_STOP)) == RK_OK);
+    state = apply_cycle(runtime, timestamp);
+    assert(state.velocity[0] == 0.0 && state.velocity[1] == 0.0);
+
+    // Only batches newer than the latest stop merge.
+    assert(runtime.submit(velocity_batch(7, {{0, 0.3}, {1, 0.3}})) == RK_OK);
+    assert(runtime.submit(lifecycle_command(8, RK_COMMAND_STOP)) == RK_OK);
+    assert(runtime.submit(velocity_batch(9, {{0, 0.2}})) == RK_OK);
+    assert(runtime.submit(velocity_batch(10, {{1, 0.25}})) == RK_OK);
+    state = apply_cycle(runtime, timestamp);
+    assert(state.velocity[0] == 0.2 && state.velocity[1] == 0.25);
+
+    // An emergency stop anywhere in the cycle wins over every batch.
+    assert(runtime.submit(velocity_batch(11, {{0, 0.4}})) == RK_OK);
+    assert(runtime.submit(lifecycle_command(12, RK_COMMAND_EMERGENCY_STOP)) == RK_OK);
+    assert(runtime.submit(velocity_batch(13, {{1, 0.4}})) == RK_OK);
+    state = apply_cycle(runtime, timestamp);
+    assert(state.safety == RK_SAFETY_EMERGENCY_STOP);
+    assert(state.velocity[0] == 0.0 && state.velocity[1] == 0.0);
+}
+
 } // namespace
 
 int main() {
@@ -172,6 +243,7 @@ int main() {
         joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
         joint.axis[2] = 1.0;
     }
+    same_cycle_target_batches_merge_per_joint(blueprint);
 
     // Zero is a valid source epoch, not a missing-timestamp sentinel.
     auto clock_endpoint = std::make_shared<FaultEndpoint>();
