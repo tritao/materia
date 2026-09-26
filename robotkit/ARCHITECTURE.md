@@ -1282,6 +1282,85 @@ assertion-like, is invisible to that analysis. The existing codebase's own
 `KinematicChain`, `WorkPatchPlanner`, etc.) is what actually narrows, so
 `TerrainTests.testCellsAtGradeReported` uses that idiom instead.
 
+## Simulated excavator (M12)
+
+The excavator fixture (built in `robotkit/tests/src/tests/ExcavatorTests.hx`,
+not the library, per the same "fixtures live in tests" convention M2's UR5
+fixture established) is a tracked-base machine reduced to the joints that
+actually matter for digging: `slew_joint` (revolute, `+Z`), then
+`boom_joint`, `stick_joint`, `bucket_joint` (revolute, all `+Y`, i.e.
+parallel to each other and perpendicular to the slew axis), each folded
+straight onto the previous link with no rotation offset. The undercarriage
+itself is a single fixed link with no drive joints -- `RobotDriveConfiguration`
+has no "tracked" variant, and modeling track propulsion (or the machine
+repositioning between passes) is out of scope for this milestone's bounded
+skills, which operate from one stationary base pose. The chain's tip is a
+`Frame` at the bucket pivot; a `Tool` (`flange_T_tcp`, mass, a `Box`
+collision shape) carries the constant translation from that pivot out to the
+bucket's cutting edge, giving `KinematicChain`/`Manipulator`/`InverseKinematics`
+a 4-DOF chain reused completely unchanged from M2 -- no new manipulation code
+was needed for this milestone.
+
+**IK approach (the plan's "task-space weighting... or a closed-form planar
+solver, your choice, log it"):** because `boom`/`stick`/`bucket` all turn
+about *parallel* axes, `KinematicChain.evaluate`'s own rotation composition
+(traced by hand against its source: each step's `motion` rotates about the
+joint's local axis, and consecutive rotations about a shared axis commute and
+add) means the chain's tip orientation is *always* exactly
+`Rz(slew) * Ry(boomAngle + stickAngle + bucketAngle)` -- a two-parameter
+family (`slew`, total pitch), regardless of how the three angles individually
+split that pitch. `DigCyclePlanner.poseAt(x, y, z, pitch)` builds every
+waypoint's orientation as `Rz(atan2(y, x)) * Ry(pitch)`, i.e. always exactly
+on that manifold (`atan2(y, x)` is also the position's own required slew, so
+position and orientation are never in conflict). With every target already
+on the manifold, the existing generic 6-DOF damped-least-squares
+`InverseKinematics.solve` converges to near-zero residual in *both* position
+and orientation with **no code changes and no weighting scheme** -- simpler
+than either alternative the plan offered, since there is no free orientation
+DOF left over to weight or solve for separately once slew and pitch are
+fixed. This is verified directly: `ExcavatorTests.testFourDofIkRecoversManifoldTargets`
+warm-starts across a short sequence of `poseAt`-built targets and checks
+both position (`< 1e-3` m) and orientation (`< 1e-2` rad) convergence.
+
+**Joint limits are deliberately wide** (`boom` +/-2.2 rad, `stick`/`bucket`
++/-3.0 rad) compared with a real machine: an early, tighter set (+/-1.5 /
++/-2.8 / +/-2.8, closer to a real excavator's working envelope) made one
+otherwise-reasonable trench waypoint (a modest reach, moderate depth,
+`digPitch = -0.4`) genuinely infeasible -- not an IK convergence problem but
+a real one, confirmed independently in Python by a closed-form 2R sub-solve
+(`P2 = target - bucketLength * direction(pitch)`, then a standard two-link
+IK for `boom`/`stick` reaching `P2`) that found the *closest* achievable
+point under those limits still ~6.5cm off, with `boom` pinned at its limit.
+Widening the limits (still well short of a full rotation on any joint) made
+every cycle's waypoints exactly reachable. This fixture is for exercising the
+planning/skill machinery, not certifying a real machine's working envelope, so
+robustness of the solver took priority over tight real-world limits; a real
+excavator's controller would enforce its own certified limits underneath
+`RobotRuntime` regardless (see the safety note below).
+
+**`DigCyclePlanner`** (`robotkit.work`, alongside `HeightMap`/`EarthworkRegion`/
+`BucketSweep`, since it plays the same "produces a `process.Toolpath`" role
+`RasterToolpathGenerator` already does from that package) builds one dig
+cycle -- entry, cut, curl, lift, N dense swing waypoints, descend (still
+curled), open -- as a `Toolpath` plus a `DigCyclePlan`'s sweep parameters
+(`BucketSweep.apply`'s own arguments) for the caller to apply once execution
+succeeds. Two things worth noting: (1) the swing phase is deliberately *dense*
+(`swingSteps` intermediate `poseAt` waypoints, not just the two endpoints) --
+`CartesianTrajectory`'s straight-line position lerp / rotation slerp between
+two *far apart* manifold-consistent points does not itself stay on the
+manifold at intermediate fractions (slerp interpolates the shortest quaternion
+arc, which is not `Rz(slew(t)) * Ry(pitch(t))` for an arbitrary two
+endpoints), so a wide, sparse swing can fail IK partway through; dense
+waypoints keep every consecutive pair's implied slew delta small enough that
+the interpolation error stays under tolerance. (2) the final "dump" is *two*
+points (descend at `curlPitch`, then open to `dumpPitch` at the same
+position), not one combined move, for the same reason -- changing position
+and a large pitch amount simultaneously through a single lerp/slerp segment
+risks the identical manifold-drift problem; splitting so each move changes
+either position or pitch (not a large amount of both) sidesteps it without
+adding any manifold-specific logic to the generic `CartesianTrajectory`/
+`ToolpathExecutor` machinery.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A
