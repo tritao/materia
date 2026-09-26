@@ -685,6 +685,23 @@ consequence of a more responsive controller, not a masked regression.
 `robotkit_mujoco_tests` failure logged under F1 (unaffected by F2, since it
 doesn't touch actuation).
 
+**M8.5 F3** (MuJoCo self-collision only excluded adjacent pairs): wrote a
+failing test first (`non_adjacent_links_do_not_self_collide` in
+`simkit/sim_mujoco/tests/mujoco.cpp` — a 3-body chain, base-link1-link2,
+where link2's rest pose overlaps the base again; confirmed it failed
+against F1+F2-only code, with link2 visibly pushed and rotated by an
+unexcluded contact). The first geometry attempt put both joint pivots
+exactly at the affected body's own center of mass, so a contact force
+there produced zero net torque and the test passed regardless of whether
+exclusion was correct — a reminder to place a lever arm before trusting a
+physical test's silence. Fixed by replacing the direct-joint-pairs-only
+exclude loop with `MujocoBackend::add_self_collision_excludes`
+(`simkit/sim_mujoco/src/mujoco_backend.cpp`): a small union-find over
+`body_order`/`joint_order` groups each weakly-connected robot, and every
+pair of bodies within one group is excluded, not just adjacent ones. `ctest
+-L sim` and the MuJoCo-enabled native robotd build are green except the
+same pre-existing `robotkit_mujoco_tests` failure logged under F1.
+
 **M5**: added `robotkit/haxe/robotkit/work/` (`Point2`, `Polygon2`,
 `WorkSurfaceId`, `SourceKind`, `Provenance`, `WorkSurface`,
 `RasterToolpathGenerator`, `CoverageMap`) and

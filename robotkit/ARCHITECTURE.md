@@ -429,6 +429,22 @@ longer sags under a fixed `kp`, and the same gains produce a comparable
 response regardless of the joint's inertia. Defaults are `ωn = 2π*10 rad/s`,
 `ζ = 1`, `kv = 50 s⁻¹`.
 
+### MuJoCo self-collision (M8.5, F3)
+
+Only direct joint (parent/child) pairs were excluded from contact; after
+F1's rest-pose fix every link sits at its real offset, so two non-adjacent
+links of the same robot can genuinely overlap by construction (a folded
+arm, for instance) and, unexcluded, would fight each other through
+contact. `MujocoBackend::rebuild` now excludes every pair of bodies
+reachable from each other through the joint graph — one weakly-connected
+robot's own articulation, found with a small union-find over `body_order`
+and `joint_order` — not just adjacent pairs. A body with no joints at all
+(an unconnected environment object) is its own singleton component and
+gets no excludes, so it still collides normally with everything else.
+Self-collision within one robot is not modelled at all (no pair excluded
+by this rule can ever contact another member of the same robot); a real
+robot-self-collision model is future work, not part of this milestone.
+
 ## Deployment boundary
 
 `robotd` remains one robot. It assigns every connection a unique session ID,

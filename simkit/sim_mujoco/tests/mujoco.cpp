@@ -585,6 +585,86 @@ void effort_target_respects_max_force_clamp() {
     assert(std::abs(clamped) > 1e-6); // The clamp still lets it move.
 }
 
+void non_adjacent_links_do_not_self_collide() {
+    // F3: only parent/child joint pairs were excluded from contact, but
+    // after F1's rest-pose fix every link sits at its real offset, so two
+    // NON-adjacent links of the same robot (base and link2 here) can
+    // genuinely overlap and must still not push on each other.
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto base_node = make_node(scene, 0.0);
+    const auto link1_node = make_node(scene, 0.6);
+    const auto link2_node = make_node(scene, 0.1); // Overlaps the base's own box again.
+
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 1;
+    world_desc.gravity[2] = 0.0; // Isolate contact response from gravity.
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+
+    const double base_half[] = {0.5, 0.5, 0.5};
+    const double link_half[] = {0.05, 0.05, 0.05};
+    nksim_shape base_shape = 0, link_shape = 0;
+    assert(nksim_shape_create_box(world, base_half, &base_shape) == NKSIM_OK);
+    assert(nksim_shape_create_box(world, link_half, &link_shape) == NKSIM_OK);
+    const auto base = make_body(world, base_node, NKSIM_MOTION_STATIC, 0.0, base_shape);
+    const auto link1 = make_body(world, link1_node, NKSIM_MOTION_DYNAMIC, 1.0, link_shape);
+    const auto link2 = make_body(world, link2_node, NKSIM_MOTION_DYNAMIC, 1.0, link_shape);
+
+    nksim_joint_desc joint1_desc{};
+    joint1_desc.struct_size = sizeof(joint1_desc);
+    joint1_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint1_desc.body_a = base;
+    joint1_desc.body_b = link1;
+    joint1_desc.axis_a[2] = 1.0;
+    joint1_desc.anchor_a[0] = 0.6; // Pivot at link1's own rest center.
+    nksim_joint joint1 = 0;
+    assert(nksim_joint_create(world, &joint1_desc, &joint1) == NKSIM_OK);
+
+    nksim_joint_desc joint2_desc{};
+    joint2_desc.struct_size = sizeof(joint2_desc);
+    joint2_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint2_desc.body_a = link1;
+    joint2_desc.body_b = link2;
+    joint2_desc.axis_a[1] = 1.0; // About Y, so an X-direction contact push (see below) produces torque.
+    // Pivot at world (0.1, 0, 0.4): offset from link2's own rest center
+    // (0.1, 0, 0) along Z, so a contact force separating base and link2
+    // along X (their minimum-penetration axis) has a real lever arm
+    // instead of passing straight through link2's center.
+    joint2_desc.anchor_a[0] = -0.5;
+    joint2_desc.anchor_a[2] = 0.4;
+    joint2_desc.anchor_b[2] = 0.4;
+    nksim_joint joint2 = 0;
+    assert(nksim_joint_create(world, &joint2_desc, &joint2) == NKSIM_OK);
+
+    step_world(world, 20);
+
+    nksim_joint_state state1{}, state2{};
+    state1.struct_size = sizeof(state1);
+    state2.struct_size = sizeof(state2);
+    assert(nksim_joint_get_state(world, joint1, &state1) == NKSIM_OK);
+    assert(nksim_joint_get_state(world, joint2, &state2) == NKSIM_OK);
+    // No gravity, no actuation, no adjacent overlap: with base and link2
+    // correctly excluded from contact, nothing should move either joint.
+    assert(std::abs(state1.position) < 1e-6);
+    assert(std::abs(state2.position) < 1e-6);
+    assert(std::abs(state1.velocity) < 1e-6);
+    assert(std::abs(state2.velocity) < 1e-6);
+
+    nksim_joint_destroy(world, joint2);
+    nksim_joint_destroy(world, joint1);
+    nksim_body_destroy(world, link2);
+    nksim_body_destroy(world, link1);
+    nksim_body_destroy(world, base);
+    nksim_shape_destroy(world, link_shape);
+    nksim_shape_destroy(world, base_shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -598,5 +678,6 @@ int main() {
     wheel_velocity_target_does_not_stall();
     position_target_holds_under_gravity();
     effort_target_respects_max_force_clamp();
+    non_adjacent_links_do_not_self_collide();
     return 0;
 }

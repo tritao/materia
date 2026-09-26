@@ -538,13 +538,9 @@ private:
         }
         if (added.size() != bodies.size())
             return NKSIM_ERROR_INVALID_STATE;
-        for (const auto id : joint_order) {
-            const auto &joint = joints.at(id);
-            auto *exclude = mjs_addExclude(spec);
-            if (!exclude) return NKSIM_ERROR_OUT_OF_MEMORY;
-            mjs_setString(exclude->bodyname1, bodies.at(joint.desc.body_a).name.c_str());
-            mjs_setString(exclude->bodyname2, bodies.at(joint.desc.body_b).name.c_str());
-        }
+        const auto exclude_result = add_self_collision_excludes();
+        if (exclude_result != NKSIM_OK)
+            return exclude_result;
         const auto actuator_result = add_joint_actuators();
         if (actuator_result != NKSIM_OK)
             return actuator_result;
@@ -580,6 +576,49 @@ private:
     // velocity actuators, whose bias (-kp*q - kv*qdot for a position
     // actuator) applies even at ctrl=0 — an idle position actuator dragged a
     // velocity- or effort-commanded joint back toward q=0.
+    // F3: after F1's rest-pose fix every link sits at its real offset, so
+    // non-adjacent links of the same robot (not just direct joint pairs) can
+    // genuinely overlap. Exclude every pair of bodies reachable from each
+    // other through the joint graph (a robot's own weakly-connected
+    // articulation), not just parent/child pairs; self-collision within one
+    // robot is not modelled (see ARCHITECTURE.md). A body with no joints at
+    // all (e.g. an unconnected environment object) is its own singleton
+    // component and gets no excludes.
+    nksim_result add_self_collision_excludes() {
+        std::unordered_map<std::uint64_t, std::uint64_t> parent_of;
+        for (const auto body_id : body_order)
+            parent_of[body_id] = body_id;
+        auto find_root = [&](std::uint64_t id) {
+            while (parent_of[id] != id) {
+                parent_of[id] = parent_of[parent_of[id]];
+                id = parent_of[id];
+            }
+            return id;
+        };
+        for (const auto joint_id : joint_order) {
+            const auto &joint = joints.at(joint_id);
+            const auto root_a = find_root(joint.desc.body_a);
+            const auto root_b = find_root(joint.desc.body_b);
+            if (root_a != root_b)
+                parent_of[root_a] = root_b;
+        }
+        std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> components;
+        for (const auto body_id : body_order)
+            components[find_root(body_id)].push_back(body_id);
+        for (const auto &entry : components) {
+            const auto &members = entry.second;
+            for (std::size_t i = 0; i < members.size(); ++i) {
+                for (std::size_t j = i + 1; j < members.size(); ++j) {
+                    auto *exclude = mjs_addExclude(spec);
+                    if (!exclude) return NKSIM_ERROR_OUT_OF_MEMORY;
+                    mjs_setString(exclude->bodyname1, bodies.at(members[i]).name.c_str());
+                    mjs_setString(exclude->bodyname2, bodies.at(members[j]).name.c_str());
+                }
+            }
+        }
+        return NKSIM_OK;
+    }
+
     nksim_result add_joint_actuators() {
         for (const auto joint_id : joint_order) {
             const auto &joint = joints.at(joint_id);
