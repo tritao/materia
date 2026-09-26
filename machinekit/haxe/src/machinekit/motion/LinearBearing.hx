@@ -57,9 +57,36 @@ class LinearBearing extends MachineComponent {
 		addConnector("back", Face, Solids.axial(0, 0, spec.length));
 	}
 
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.cut(Solids.cylinder(outerDiameter / 2, 0, length),
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var envelope = Solids.cut(Solids.cylinder(outerDiameter / 2, 0, length),
 			[Solids.cylinder(boreDiameter / 2, -0.1, length + 0.1)]);
+		if (detail == Envelope) return envelope;
+
+		// The envelope is a plain catalog cylinder. Preview adds the raised outer end rims and
+		// recessed seal tracks that identify an LMUU bearing without pretending to model its balls.
+		var rimWidth = Math.min(1.2, length / 8);
+		var rimRise = Math.min(0.2, outerDiameter * 0.02);
+		var rimInner = outerDiameter / 2 - Math.min(0.3, (outerDiameter - boreDiameter) * 0.15);
+		var rimOuter = outerDiameter / 2 + rimRise;
+		var rims = [annulus(rimOuter, rimInner, 0, rimWidth),
+			annulus(rimOuter, rimInner, length - rimWidth, length)];
+		var detailed = Solids.union([envelope, rims[0], rims[1]]);
+
+		var sealWidth = Math.min(0.8, length / 12);
+		var sealInner = boreDiameter / 2 + Math.min(0.6, (outerDiameter - boreDiameter) * 0.2);
+		var sealOuter = Math.min(outerDiameter / 2 - 0.5, sealInner + 0.8);
+		if (sealOuter > sealInner) {
+			var seals = [annulus(sealOuter, sealInner, -0.05, sealWidth),
+				annulus(sealOuter, sealInner, length - sealWidth, length + 0.05)];
+			detailed = Solids.cut(detailed, seals);
+		}
+		return detailed;
+	}
+
+	static function annulus(outerRadius:Float, innerRadius:Float, z0:Float, z1:Float):Part {
+		return Solids.cut(Solids.cylinder(outerRadius, z0, z1),
+			[Solids.cylinder(innerRadius, z0 - 0.05, z1 + 0.05)]);
+	}
 
 	/** Diameter of the round guide rod for a named shaft fit. The allowance is diametral. */
 	public function guideRodDiameter(fit:BearingShaftFit = Slip):Float

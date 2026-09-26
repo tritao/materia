@@ -47,7 +47,7 @@ Each component also produces the machining it needs:
 | `PillowBlock` | Koyo/JTEKT UCP204–UCP213 base-mounted units | mounting connectors and hole envelope; `mountScrewPart()` and `billOfMaterials(true, length)` for mounting hardware |
 | `Bushing` | — (proportional to bore diameter) | — |
 | `ShaftCoupling` | — (proportional to the larger bore) | `setScrewPart()` |
-| `LinearBearing` | LM8UU–LM20UU | — |
+| `LinearBearing` | LM8UU–LM20UU | `housingSeat()` with named housing fits; Preview adds end rims and seal tracks |
 | `LeadScrewThread` | semantic metric trapezoidal or ACME family, diameter, pitch, starts and hand | `lead = pitch × starts` |
 | `LeadScrew` | nominal cylindrical thread envelope | `input`, `output` connectors |
 | `LeadScrewNut` | flanged preview sized from a `LeadScrewThread` | `travelPerRevolution()`, `rotationFor()`, `mountScrewPart()` |

@@ -1059,10 +1059,16 @@ class MachineKitSmoke {
 		near(linearSeat.volume(), Math.PI * Math.pow((15 - 0.015) / 2, 2) * 10, "linear bearing housing seat tool");
 		linearSeat.close();
 		throws(() -> LinearBearing.metric("LM9UU"), 'Unknown linear bearing "LM9UU"');
+		var linearEnvelope = linearBearing.geometry(Envelope);
+		solid(linearEnvelope, "linear bearing envelope");
+		near(linearEnvelope.volume(), Math.PI * (7.5 * 7.5 - 4 * 4) * 24, "linear bearing envelope volume");
 		var linearBearingPart = linearBearing.geometry();
-		solid(linearBearingPart, "linear bearing");
-		near(linearBearingPart.volume(), Math.PI * (7.5 * 7.5 - 4 * 4) * 24, "linear bearing volume");
+		solid(linearBearingPart, "linear bearing preview");
+		check(linearBearingPart.volume() < linearEnvelope.volume(), "linear bearing preview seal tracks");
+		check(bounds(linearBearingPart).maxX > bounds(linearEnvelope).maxX,
+			"linear bearing preview end rims");
 		linearBearingPart.close();
+		linearEnvelope.close();
 
 		var sprocket = new Sprocket(12.7, 20, 8, 6);
 		check(sprocket.designation == "GENERIC-SPROCKET-P12.7-20T", "sprocket designation");
