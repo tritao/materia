@@ -11,13 +11,14 @@ import machinekit.standard.SocketHeadCapScrew;
 
 /** ACME/trapezoidal lead screw nut: a flanged block with a bore matching the screw diameter and
  * a mounting bolt pattern on the flange face, for driving a carriage. The thread itself is
- * semantic (screw diameter and lead only, not modelled), matching the project's convention.
+ * semantic (`LeadScrewThread` family, diameter, pitch, starts and hand), not modelled.
  * `travelPerRevolution()`/`rotationFor()` convert between screw rotation and nut travel.
  * CAD frame: axis along +Z, body from z=0 to z=bodyLength, flange from there to
  * z=bodyLength+flangeThickness. Connectors: `bore` (axis, mid-body) and `mount1`..`mountN` (on
  * the flange face), all with +Y along +Z.
  */
 class LeadScrewNut extends MachineComponent {
+	public final thread:LeadScrewThread;
 	public final screwDiameter:Float;
 	public final lead:Float;
 	public final bodyDiameter:Float;
@@ -28,9 +29,10 @@ class LeadScrewNut extends MachineComponent {
 	public final boltCount:Int;
 	public final mountScrew:String;
 
-	public function new(screwDiameter:Float, lead:Float, boltCount:Int = 4) {
-		if (!(screwDiameter > 0)) throw "Lead screw nut needs a positive screw diameter";
-		if (!(lead > 0)) throw "Lead screw nut needs a positive lead";
+	public function new(thread:LeadScrewThread, boltCount:Int = 4) {
+		if (thread == null) throw "Lead screw nut needs a thread specification";
+		var screwDiameter = thread.screwDiameter;
+		var lead = thread.lead;
 		if (boltCount < 3) throw "Lead screw nut needs at least 3 mounting bolts";
 		// Proportioned on the common T8 nut (10.2 mm body, 16 mm bolt circle, 22 mm flange, M3).
 		var bodyDia = screwDiameter * 1.3;
@@ -42,7 +44,8 @@ class LeadScrewNut extends MachineComponent {
 		var boltRadius = bodyDia / 2 + screw.clearanceMedium / 2 + 1;
 		var flangeDia = 2 * Math.max(screwDiameter * 1.5, boltRadius + screw.headDiameter / 2 + 1);
 		var diameterText = Dimension.format(screwDiameter), leadText = Dimension.format(lead);
-		super('LEADNUT-D$diameterText-L$leadText', 'Lead screw nut, $diameterText mm screw, $leadText mm lead', "bronze");
+		super('LEADNUT-${thread.designation}', 'Lead screw nut, ${thread.designation}, $leadText mm lead', "bronze");
+		this.thread = thread;
 		this.screwDiameter = screwDiameter;
 		this.lead = lead;
 		bodyDiameter = bodyDia;
@@ -68,13 +71,13 @@ class LeadScrewNut extends MachineComponent {
 		}];
 	}
 
-	/** Linear travel for one screw revolution. */
+	/** Signed axial travel for one positive screw revolution. */
 	public function travelPerRevolution():Float
-		return lead;
+		return thread.signedLead();
 
 	/** Screw rotation, in radians, needed to travel `distance`. */
 	public function rotationFor(distance:Float):Float
-		return distance / lead * 2 * Math.PI;
+		return distance / thread.signedLead() * 2 * Math.PI;
 
 	/** Screw that fits the nut's mounting holes. */
 	public function mountScrewPart(length:Float):SocketHeadCapScrew

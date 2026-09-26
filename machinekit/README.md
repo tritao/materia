@@ -41,7 +41,9 @@ Each component also produces the machining it needs:
 | `Bushing` | — (proportional to bore diameter) | — |
 | `ShaftCoupling` | — (proportional to the larger bore) | `setScrewPart()` |
 | `LinearBearing` | LM8UU–LM20UU | — |
-| `LeadScrewNut` | — (proportional to screw diameter) | `travelPerRevolution()`, `rotationFor()`, `mountScrewPart()` |
+| `LeadScrewThread` | semantic metric trapezoidal or ACME family, diameter, pitch, starts and hand | `lead = pitch × starts` |
+| `LeadScrew` | nominal cylindrical thread envelope | `input`, `output` connectors |
+| `LeadScrewNut` | flanged preview sized from a `LeadScrewThread` | `travelPerRevolution()`, `rotationFor()`, `mountScrewPart()` |
 
 `SteppedShaft` stacks coaxial cylindrical sections along +Z, producing square
 shoulders at each diameter change. Keyways are cut on the shaft's local +Y
@@ -111,14 +113,17 @@ library classes rather than one-off scripts:
   on the housing's outer face, long enough to pass through it. The bearing's own
   `front`/`axis`/`back` connectors stay reachable as `'<id>-bearing'` for
   mating a shaft through it.
-- `LinearAxis` drives a `SteppedShaft` screw through a `ShaftCoupling` and
-  `LeadScrewNut`. Its carriage runs on two round guide rods with `LM8UU` linear
+- `LinearAxis` drives a semantic `LeadScrew` through a `ShaftCoupling` and
+  matching `LeadScrewNut`. Its carriage runs on two round guide rods with `LM8UU` linear
   bearings. `setTravel(state, millimetres)` couples screw rotation to carriage
-  translation through the nut lead and enforces the stroke. The carriage slide
+  translation through the nut lead (pitch × starts, with handedness) and enforces the stroke. The carriage slide
   is parented to the fixed motor frame, so the carriage stays oriented while
   the screw rotates. Two `PillowBlock`s support the screw near its ends; a
   `RectTube` member remains the layout frame rail. Guide and housing mounting
-  details are still a preview rather than a structurally designed frame.
+  details are still a preview rather than a structurally designed frame. The
+  default axis uses a right-hand Tr10 × 2 single-start thread; other screw
+  diameters need an explicit `LeadScrewThread`. Thread flanks are not modelled,
+  and a family label does not assert a verified standard size.
 
 ## Robotics
 

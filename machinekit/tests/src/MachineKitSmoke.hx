@@ -12,6 +12,9 @@ import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.motion.LeadScrewNut;
+import machinekit.motion.LeadScrewThread;
+import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
+import machinekit.motion.LeadScrewThread.LeadScrewHand;
 import machinekit.motion.LinearBearing;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.PillowBlockHousing;
@@ -676,6 +679,8 @@ class MachineKitSmoke {
 		check(axis.coupling.designation == "COUPLING-6.35x10-18x30", "linear axis coupling joins motor and screw");
 		near(axis.carriage.boreDiameter, 10, "linear axis carriage bore");
 		check(axis.nut.lead == 2, "linear axis lead nut");
+		check(axis.nut.thread.designation == "TR-D10-P2-S1-RH", "axis default thread is explicit");
+		check(axis.screw.thread.designation == axis.nut.thread.designation, "axis screw and nut share thread specification");
 		check(axis.guideBearingA.designation == "LM8UU", "linear axis round guide bearing");
 		var carriagePreview = axis.carriage.geometry();
 		solid(carriagePreview, "carriage with nut and guide seats");
@@ -696,6 +701,9 @@ class MachineKitSmoke {
 		throws(() -> new LinearAxis(23, 10, 200, "6001"), "bore does not match the screw diameter");
 		throws(() -> new LinearAxis(23, 50), "No catalog deep groove bearing has a 50 mm bore");
 		throws(() -> new LinearAxis(23, 10, 200, null, 2), "must clear the pillow block screw heads and lead nut");
+		throws(() -> new LinearAxis(23, 8), "explicit thread for a nondefault screw diameter");
+		throws(() -> new LinearAxis(23, 8, 200, null, 30, new LeadScrewThread(MetricTrapezoidal, 10, 2)),
+			"thread diameter must match the screw diameter");
 
 		for (entry in axis.components()) {
 			var part = entry.component.geometry(Envelope);
@@ -754,6 +762,18 @@ class MachineKitSmoke {
 		near(state.joint("coupling"), 2 * Math.PI, "one screw turn advances by lead");
 		near(state.worldPose("carriage").qz, unturned.qz, "carriage does not rotate with screw");
 		throws(() -> axis.setTravel(state, axis.stroke + 1), "outside its stroke");
+		var multiAxis = new LinearAxis(23, 10, 200, null, 30,
+			new LeadScrewThread(MetricTrapezoidal, 10, 2, 4));
+		var multiState = multiAxis.assembly().initialState("linear-axis");
+		multiAxis.setTravel(multiState, 8);
+		near(multiState.joint("coupling"), 2 * Math.PI, "multi-start axis moves 8 mm per turn");
+		near(multiState.worldConnector("carriage", "bore").z, 21 + multiAxis.travelMin + 8,
+			"multi-start carriage travel");
+		var leftAxis = new LinearAxis(23, 10, 200, null, 30,
+			new LeadScrewThread(MetricTrapezoidal, 10, 2, 4, LeftHand));
+		var leftState = leftAxis.assembly().initialState("linear-axis");
+		leftAxis.setTravel(leftState, 8);
+		near(leftState.joint("coupling"), -2 * Math.PI, "left-hand axis reverses rotation");
 		state.setJoint("carriage-slide", axis.travelMax);
 		state.forwardKinematics();
 		var carriageEnd = state.worldConnector("carriage", "bore").z + axis.carriage.length / 2;
@@ -766,6 +786,7 @@ class MachineKitSmoke {
 		check(bom.quantity(axis.bearing.designation) == 2, "linear axis bearing quantity");
 		check(bom.quantity(axis.coupling.designation) == 1, "linear axis coupling in the BOM");
 		check(bom.quantity(axis.nut.designation) == 1, "linear axis lead nut in the BOM");
+		check(bom.quantity(axis.screw.designation) == 1, "thread-specific lead screw in the BOM");
 		check(bom.quantity(axis.guideRodA.designation) == 2, "linear axis guide rods in the BOM");
 		check(bom.quantity(axis.guideBearingA.designation) == 2, "linear axis guide bearings in the BOM");
 		check(bom.quantity("RECT-20x15x2-L365") == 1, "linear axis rail in the BOM");
@@ -844,14 +865,23 @@ class MachineKitSmoke {
 		check(pulleyBox.maxX > pulley.grooveDiameter / 2, "timing pulley lands extend past the groove circle");
 		pulleyPart.close();
 
-		var nut = new LeadScrewNut(8, 2);
-		check(nut.designation == "LEADNUT-D8-L2", "lead screw nut designation");
+		var thread = new LeadScrewThread(MetricTrapezoidal, 8, 2);
+		var nut = new LeadScrewNut(thread);
+		check(nut.designation == "LEADNUT-TR-D8-P2-S1-RH", "lead screw nut designation");
+		check(nut.thread.pitch == 2 && nut.thread.starts == 1, "nut carries pitch and starts");
 		check(nut.mountScrew == "M3", "lead screw nut mount screw size");
 		near(nut.travelPerRevolution(), 2, "lead screw nut travel per revolution");
 		near(nut.rotationFor(10), 10 / 2 * 2 * Math.PI, "lead screw nut rotation for a travel distance");
-		throws(() -> new LeadScrewNut(-1, 2), "positive screw diameter");
-		throws(() -> new LeadScrewNut(8, -1), "positive lead");
-		throws(() -> new LeadScrewNut(8, 2, 2), "at least 3 mounting bolts");
+		throws(() -> new LeadScrewThread(MetricTrapezoidal, -1, 2), "positive screw diameter");
+		throws(() -> new LeadScrewThread(MetricTrapezoidal, 8, -1), "positive pitch");
+		throws(() -> new LeadScrewThread(MetricTrapezoidal, 8, 2, 0), "at least one start");
+		throws(() -> new LeadScrewNut(thread, 2), "at least 3 mounting bolts");
+		var multi = new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, 8, 2, 4));
+		check(multi.designation == "LEADNUT-TR-D8-P2-S4-RH", "multi-start nut designation");
+		near(multi.lead, 8, "four-start lead is four times pitch");
+		near(multi.travelPerRevolution(), 8, "four-start travel per positive revolution");
+		var left = new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, 8, 2, 4, LeftHand));
+		near(left.travelPerRevolution(), -8, "left-hand nut travels opposite on positive revolution");
 
 		var nutEnvelope = nut.geometry(Envelope);
 		solid(nutEnvelope, "lead screw nut envelope");
@@ -865,14 +895,14 @@ class MachineKitSmoke {
 		near(nut.connector("mount1").frame.z, 19, "lead screw nut mount connector z");
 		near(nut.connector("mount1").frame.x, 7.9, "lead screw nut mount connector x");
 		for (size in [6.0, 8.0, 10.0, 12.0, 16.0, 20.0, 25.0]) {
-			var sized = new LeadScrewNut(size, 2);
+			var sized = new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, size, 2));
 			var screw = sized.mountScrewPart(10).spec, r = sized.boltCircleDiameter / 2;
 			check(r - screw.clearanceMedium / 2 >= sized.bodyDiameter / 2 + 1 - 1e-9,
 				'lead screw nut D$size mount holes clear the body');
 			check(r + screw.headDiameter / 2 <= sized.flangeDiameter / 2 - 1 + 1e-9,
 				'lead screw nut D$size mount screw heads stay on the flange');
 		}
-		check(new LeadScrewNut(6.35, 3.175).designation == "LEADNUT-D6.35-L3.175", "fractional nut designation");
+		check(new LeadScrewNut(new LeadScrewThread(Acme, 6.35, 3.175)).designation == "LEADNUT-ACME-D6.35-P3.175-S1-RH", "fractional nut designation");
 	}
 
 	/** `part` (closed) moved to the assembly pose `frame`. */

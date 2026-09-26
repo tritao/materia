@@ -10,8 +10,12 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LeadScrewTransmission;
+import machinekit.motion.LeadScrewThread;
+import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
+import machinekit.motion.LeadScrewThread.LeadScrewHand;
 import machinekit.motion.LinearBearing;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.ShaftCoupling;
@@ -80,7 +84,7 @@ class LinearAxis {
 
 	public final motor:NemaStepper;
 	public final coupling:ShaftCoupling;
-	public final screw:SteppedShaft;
+	public final screw:LeadScrew;
 	public final nut:LeadScrewNut;
 	public final transmission:LeadScrewTransmission;
 	public final guideRodA:SteppedShaft;
@@ -109,9 +113,10 @@ class LinearAxis {
 	/** `bearingDesignation` defaults to the first catalog deep groove bearing whose bore equals
 	 * `screwDiameter` (6000 for 10 mm); a given bearing must match the screw diameter. `margin` is
 	 * the clearance between the carriage at either travel limit and the adjacent pillow block.
+	 * The default screw is right-hand Tr10 × 2, single-start. Other diameters require `thread`.
 	 */
 	public function new(motorFrame:Int = 23, screwDiameter:Float = 10, stroke:Float = 200,
-			?bearingDesignation:String, margin:Float = 30, lead:Float = 2) {
+			?bearingDesignation:String, margin:Float = 30, ?thread:LeadScrewThread) {
 		if (!(screwDiameter > 0)) throw "Linear axis needs a positive screw diameter";
 		if (!(stroke > 0)) throw "Linear axis needs a positive stroke";
 		if (!(margin > 0)) throw "Linear axis needs a positive end margin";
@@ -122,7 +127,12 @@ class LinearAxis {
 		if (!(Math.abs(bearing.bore - screwDiameter) < 1e-9))
 			throw 'Bearing "${bearing.spec.designation}" bore does not match the screw diameter';
 		coupling = new ShaftCoupling(motor.spec.shaftDiameter, screwDiameter);
-		nut = new LeadScrewNut(screwDiameter, lead);
+		if (thread == null && screwDiameter != 10)
+			throw "Linear axis needs an explicit thread for a nondefault screw diameter";
+		var threadSpec = thread == null ? new LeadScrewThread(MetricTrapezoidal, 10, 2) : thread;
+		if (Math.abs(threadSpec.screwDiameter - screwDiameter) > 1e-9)
+			throw "Linear axis thread diameter must match the screw diameter";
+		nut = new LeadScrewNut(threadSpec);
 		guideBearingA = LinearBearing.metric("LM8UU");
 		guideBearingB = LinearBearing.metric("LM8UU");
 		guideSpacing = Math.max(25, screwDiameter * 2.5);
@@ -137,11 +147,11 @@ class LinearAxis {
 		bearingAPosition = coupling.length / 2 + COUPLING_GAP + depth / 2;
 		travelMin = bearingAPosition + depth / 2 + margin + carriage.length / 2;
 		travelMax = travelMin + stroke;
-		transmission = new LeadScrewTransmission("coupling", "carriage-slide", nut.lead, travelMin, stroke);
+		transmission = new LeadScrewTransmission("coupling", "carriage-slide", nut.lead, travelMin, stroke, threadSpec.hand == RightHand ? 1 : -1);
 		bearingBPosition = travelMax + carriage.length / 2 + margin + depth / 2;
 		length = bearingBPosition + depth / 2;
 		screwStart = motor.connector("shaftTip").frame.z;
-		screw = new SteppedShaft([{diameter: screwDiameter, length: length}]);
+		screw = new LeadScrew(threadSpec, length);
 		guideRodA = new SteppedShaft([{diameter: guideBearingA.boreDiameter, length: length}]);
 		guideRodB = new SteppedShaft([{diameter: guideBearingB.boreDiameter, length: length}]);
 		rail = new RectTube(Math.max(20, screwDiameter * 2), Math.max(15, screwDiameter * 1.5), 2);
