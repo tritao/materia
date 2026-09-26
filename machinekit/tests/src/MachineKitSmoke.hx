@@ -42,6 +42,7 @@ import machinekit.transmission.Rack;
 import machinekit.transmission.Sprocket;
 import machinekit.transmission.SpurGear;
 import machinekit.transmission.TimingPulley;
+import machinekit.transmission.TimingBeltProfile;
 import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord.AssemblyFrame;
 
@@ -511,6 +512,8 @@ class MachineKitSmoke {
 		near(gear.rootDiameter, 35, "spur gear root diameter");
 		throws(() -> new SpurGear(-1, 20, 12), "positive module");
 		throws(() -> new SpurGear(2, 5, 12), "at least 6 teeth");
+		check(SpurGear.minimumUnshiftedTeeth(SpurGear.STANDARD_PRESSURE_ANGLE) == 18, "20 degree undercut limit");
+		throws(() -> new SpurGear(2, 17, 12), "would require undercut");
 		throws(() -> new SpurGear(2, 20, -1), "positive face width");
 
 		var part = gear.geometry();
@@ -520,7 +523,7 @@ class MachineKitSmoke {
 		check(box.maxX > gear.pitchDiameter / 2, "spur gear teeth extend past the pitch circle");
 		part.close();
 
-		var pinion = new SpurGear(2, 12, 12);
+		var pinion = new SpurGear(2, 18, 12);
 		throws(() -> pinion.centerDistance(new SpurGear(2.5, 20, 12)), "share a module");
 		throws(() -> GearPair.mesh(pinion, new SpurGear(2, 20, 12, 25 * Math.PI / 180)), "share a pressure angle");
 		var pair = GearPair.mesh(pinion, gear);
@@ -541,7 +544,7 @@ class MachineKitSmoke {
 		}
 		throws(() -> new SpurGear(2, 20, 12, 0.1), "between 14.5 and 25 degrees");
 		throws(() -> new SpurGear(2, 20, 12, 0.5), "between 14.5 and 25 degrees");
-		check(new SpurGear(2, 20, 12, 14.5 * Math.PI / 180).teeth == 20, "14.5 degree pressure angle accepted");
+		check(new SpurGear(2, 33, 12, 14.5 * Math.PI / 180).teeth == 33, "14.5 degree pressure angle accepted");
 		check(new SpurGear(2, 20, 12, 25 * Math.PI / 180).teeth == 20, "25 degree pressure angle accepted");
 		check(new SpurGear(0.8, 20, 5).designation == "SPUR-M0.8-20T", "fractional module designation");
 
@@ -746,13 +749,19 @@ class MachineKitSmoke {
 		linearBearingPart.close();
 
 		var sprocket = new Sprocket(12.7, 20, 8, 6);
-		check(sprocket.designation == "SPROCKET-P12.7-20T", "sprocket designation");
+		check(sprocket.designation == "GENERIC-SPROCKET-P12.7-20T", "sprocket designation");
 		near(sprocket.pitchDiameter, 12.7 / Math.sin(Math.PI / 20), "sprocket pitch diameter");
 		near(sprocket.rollerDiameter, 0.625 * 12.7, "sprocket default roller diameter");
 		near(sprocket.rootDiameter, sprocket.pitchDiameter - 0.625 * 12.7, "sprocket root = pitch - roller diameter");
 		near(sprocket.outsideDiameter, 12.7 * (0.6 + Math.cos(Math.PI / 20) / Math.sin(Math.PI / 20)),
 			"sprocket outside diameter p(0.6 + cot(pi/z))");
 		near(new Sprocket(12.7, 20, 8, 6, 7.92).rootDiameter, sprocket.pitchDiameter - 7.92, "sprocket roller override");
+		var ansi40 = Sprocket.forChain("ANSI40", 20, 8, 6);
+		check(ansi40.designation == "SPROCKET-ANSI40-20T", "chain family designation");
+		near(ansi40.rollerDiameter, 7.92, "ANSI40 roller from catalog");
+		near(Sprocket.forChain("ANSI35", 20, 6, 6).pitch, 9.525, "ANSI35 pitch from catalog");
+		throws(() -> Sprocket.forChain("ANSI45", 20, 8, 6), "Unknown roller chain");
+		throws(() -> new Sprocket(12.7, 20, 8, 6, 7.8, "ANSI40"), "must match its catalog entry");
 		throws(() -> new Sprocket(12.7, 20, 8, 6, 13), "roller diameter must be positive and less than the pitch");
 		throws(() -> new Sprocket(12.7, 5, 8, 6), "at least 8 teeth");
 		throws(() -> new Sprocket(12.7, 8, 40, 6), "must clear the bore");
@@ -763,17 +772,19 @@ class MachineKitSmoke {
 		check(sprocketBox.maxX > sprocket.pitchDiameter / 2, "sprocket teeth extend past the pitch circle");
 		sprocketPart.close();
 
-		var pulley = new TimingPulley(2, 20, 5, 6);
-		check(pulley.designation == "PULLEY-P2-20T", "timing pulley designation");
+		var pulley = new TimingPulley(GT2, 20, 5, 6);
+		check(pulley.designation == "PULLEY-GT2-20T", "timing pulley designation");
 		near(pulley.pitchDiameter, 2 * 20 / Math.PI, "timing pulley pitch diameter");
 		near(pulley.pitchLineDifferential, 0.254, "GT2 pitch line differential");
 		near(pulley.outsideDiameter, 2 * 20 / Math.PI - 2 * 0.254, "timing pulley OD = PD - 2 PLD");
-		near(new TimingPulley(3, 20, 5, 6).pitchLineDifferential, 0.381, "3 mm pitch line differential");
-		near(new TimingPulley(5, 20, 5, 6).pitchLineDifferential, 0.5715, "5 mm pitch line differential");
-		near(new TimingPulley(5.08, 20, 5, 6, 0.254).outsideDiameter, 5.08 * 20 / Math.PI - 0.508, "explicit PLD");
-		check(new TimingPulley(2.032, 20, 5, 6).designation == "PULLEY-P2.032-20T", "fractional pulley designation");
-		throws(() -> new TimingPulley(2, 5, 5, 6), "at least 8 teeth");
-		throws(() -> new TimingPulley(2, 8, 11, 6), "must clear the bore");
+		near(new TimingPulley(HTD3M, 20, 5, 6).pitchLineDifferential, 0.381, "3 mm pitch line differential");
+		near(new TimingPulley(HTD5M, 20, 5, 6).pitchLineDifferential, 0.5715, "5 mm pitch line differential");
+		check(new TimingPulley(T5, 20, 5, 6).designation == "PULLEY-T5-20T", "T5 family has its own designation");
+		near(new TimingPulley(T5, 20, 5, 6).pitchLineDifferential, 0.5, "T5 PLD differs from HTD5M");
+		near(new TimingPulley(XL, 20, 5, 6).outsideDiameter, 5.08 * 20 / Math.PI - 0.508, "explicit PLD");
+		check(new TimingPulley(Custom("CUSTOM2032", 2.032, 0.254), 20, 5, 6).designation == "PULLEY-CUSTOM-CUSTOM2032-P2.032-PLD0.254-20T", "fractional pulley designation");
+		throws(() -> new TimingPulley(GT2, 5, 5, 6), "at least 8 teeth");
+		throws(() -> new TimingPulley(GT2, 8, 11, 6), "must clear the bore");
 		var pulleyPart = pulley.geometry();
 		solid(pulleyPart, "timing pulley");
 		var pulleyBox = bounds(pulleyPart);
@@ -1020,6 +1031,7 @@ class MachineKitSmoke {
 		metadataComplete(LinearBearing.catalog());
 		metadataComplete(NemaStepper.catalog());
 		metadataComplete(RobotFlange.catalog());
+		metadataComplete(Sprocket.chainCatalog());
 	}
 
 	static function metadataComplete<T>(catalog:Catalog<T>):Void {

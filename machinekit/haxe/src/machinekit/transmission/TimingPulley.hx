@@ -8,15 +8,12 @@ import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
-/** Timing belt pulley with a simplified tooth outline (shallow straight-flank grooves cut into a
- * near-pitch-diameter cylinder, not the true rounded-trapezoid GT2/HTD profile), extruded along
- * local +Z. CAD frame and connectors match `Sprocket`.
- * The pitch line lies in the belt's tension cords, outside the pulley, so the outside diameter is
- * the pitch diameter minus twice the pitch line differential (PLD). The PLD defaults by pitch for
- * the curvilinear HTD/GT2 families (0.254 mm up to 2.5 mm pitch, then 0.381 for 3 mm, 0.5715 for
- * 5 mm, 0.686 for 8 mm, 1.397 for 14 mm); pass it explicitly for other belts (T5: 0.5, XL: 0.254).
+/** Timing belt pulley with an explicit belt family and a simplified tooth outline. The
+ * groove is a straight-flank preview, not a belt manufacturer's tooth profile. The pitch line
+ * lies in the belt cords outside the pulley, so OD = pitch diameter - 2 * PLD.
  */
 class TimingPulley extends MachineComponent {
+	public final beltProfile:TimingBeltProfile;
 	public final pitch:Float;
 	public final pitchLineDifferential:Float;
 	public final teeth:Int;
@@ -26,12 +23,15 @@ class TimingPulley extends MachineComponent {
 	public final outsideDiameter:Float;
 	public final grooveDiameter:Float;
 
-	public function new(pitch:Float, teeth:Int, boreDiameter:Float, thickness:Float, ?pitchLineDifferential:Float) {
-		if (!(pitch > 0)) throw "Timing pulley needs a positive belt pitch";
+	public function new(beltProfile:TimingBeltProfile, teeth:Int, boreDiameter:Float, thickness:Float) {
+		var dimensions = profileDimensions(beltProfile);
+		var pitch = dimensions.pitch;
+		var pld = dimensions.pld;
+		if (!(pitch > 0) || !Math.isFinite(pitch)) throw "Timing pulley needs a positive belt pitch";
 		if (teeth < 8) throw "Timing pulley needs at least 8 teeth";
 		if (!(boreDiameter > 0)) throw "Timing pulley needs a positive bore diameter";
 		if (!(thickness > 0)) throw "Timing pulley needs a positive thickness";
-		var pld = pitchLineDifferential == null ? defaultPitchLineDifferential(pitch) : pitchLineDifferential;
+
 		if (!(pld >= 0) || !(pld < 0.25 * pitch)) throw "Timing pulley pitch line differential must be between 0 and a quarter pitch";
 		var pitchDia = pitch * teeth / Math.PI;
 		var grooveDepth = 0.2 * pitch;
@@ -40,7 +40,8 @@ class TimingPulley extends MachineComponent {
 		if (!(grooveDia > boreDiameter))
 			throw "Timing pulley groove diameter must clear the bore; use more teeth or a smaller bore";
 		var pitchText = Dimension.format(pitch);
-		super('PULLEY-P$pitchText-${teeth}T', 'Timing pulley, $pitchText mm pitch, ${teeth} teeth', "aluminium 6061");
+		super('PULLEY-${dimensions.name}-${teeth}T', '${dimensions.name} timing pulley, $pitchText mm pitch, ${teeth} teeth', "aluminium 6061");
+		this.beltProfile = beltProfile;
 		this.pitch = pitch;
 		this.pitchLineDifferential = pld;
 		this.teeth = teeth;
@@ -54,9 +55,19 @@ class TimingPulley extends MachineComponent {
 		addConnector("back", Face, Solids.axial(0, 0, thickness));
 	}
 
-	/** Pitch line differential of the HTD/GT2 belt family with this pitch. */
-	public static function defaultPitchLineDifferential(pitch:Float):Float
-		return pitch <= 2.5 ? 0.254 : pitch <= 3.5 ? 0.381 : pitch <= 6 ? 0.5715 : pitch <= 10 ? 0.686 : 1.397;
+	static function profileDimensions(profile:TimingBeltProfile):{name:String, pitch:Float, pld:Float}
+		return switch (profile) {
+			case GT2: {name: "GT2", pitch: 2.0, pld: 0.254};
+			case HTD3M: {name: "HTD3M", pitch: 3.0, pld: 0.381};
+			case HTD5M: {name: "HTD5M", pitch: 5.0, pld: 0.5715};
+			case HTD8M: {name: "HTD8M", pitch: 8.0, pld: 0.686};
+			case HTD14M: {name: "HTD14M", pitch: 14.0, pld: 1.397};
+			case T5: {name: "T5", pitch: 5.0, pld: 0.5};
+			case XL: {name: "XL", pitch: 5.08, pld: 0.254};
+			case Custom(family, pitch, pld):
+				if (family == null || family.length == 0) throw "Custom timing belt needs a family name";
+				{name: 'CUSTOM-${family}-P${Dimension.format(pitch)}-PLD${Dimension.format(pld)}', pitch: pitch, pld: pld};
+		};
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Solids.prism(profile(), 0, thickness);

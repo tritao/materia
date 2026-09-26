@@ -82,19 +82,20 @@ lengths and the cut list are centreline lengths, not saw-cut lengths.
 `machinekit.transmission` has `SpurGear` (standard full-depth involute teeth,
 sampled as a polyline profile, extruded along +Z) and `Rack` (its straight-flank,
 infinite-radius limit, extruded along +X with teeth along +Z). `GearPair.mesh(a, b)`
-computes the standard centre distance and ratio for two same-module gears and a
+computes the standard centre distance and ratio for two gears with matching module and pressure angle and a
 placement pose for `b` relative to `a`, rotated so a tooth space of `b` meets
 `a`'s tooth at the mesh point. Pressure angles are limited to 14.5°–25°.
+Unshifted full-depth gears below `ceil(2 / sin²(pressureAngle))` teeth are
+rejected because this generator does not model undercut or profile shift.
 
 `Sprocket` (roller chain) and `TimingPulley` (belt) use a coarser simplified
 tooth outline than `SpurGear` — straight flanks between two radii rather than
 sampled involute curves — since neither the ANSI B29.1 seating-curve nor the
-rounded-trapezoid GT2/HTD profile is modelled exactly. Both are parametric by
-pitch and tooth count, not a vendor catalog. `Sprocket` derives its root and
-outside diameters from an optional roller diameter (default 0.625 × pitch);
-`TimingPulley`'s outside diameter is the pitch diameter less twice the belt's
-pitch-line differential (defaulted by pitch for the GT2/HTD family, 0.254 mm
-for 2 mm GT2).
+rounded-trapezoid GT2/HTD profile is modelled exactly. `Sprocket.forChain()` uses tabulated ANSI 25/35/40/50 pitch and roller
+diameter from Renold; the free-form constructor is marked generic. `TimingPulley`
+requires a `TimingBeltProfile` (GT2, HTD, T5, XL, or explicit Custom) and puts
+the belt family in its designation. Its outside diameter is the pitch diameter
+less twice that profile's pitch-line differential.
 
 ## Assembly
 

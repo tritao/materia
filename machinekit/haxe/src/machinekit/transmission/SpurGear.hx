@@ -10,8 +10,8 @@ import machinekit.component.Solids;
  *
  * Tooth flanks are sampled points along the true involute-of-a-circle curve, not exact curves;
  * that is enough fidelity to mesh visually while keeping the outline a single closed polygon.
- * Below the base circle (common for small tooth counts) the flank drops to the root circle on a
- * straight radial step rather than a fillet.
+ * Below the base circle the flank drops to the root circle on a straight radial step rather
+ * than a fillet. Tooth counts that require undercut in an unshifted gear are rejected.
  */
 class SpurGear {
 	public static inline var STANDARD_PRESSURE_ANGLE:Float = 0.3490658503988659; // 20 degrees
@@ -36,9 +36,11 @@ class SpurGear {
 
 	public function new(moduleSize:Float, teeth:Int, faceWidth:Float, pressureAngle:Float = STANDARD_PRESSURE_ANGLE) {
 		if (!(moduleSize > 0)) throw "Spur gear needs a positive module";
-		if (teeth < 6) throw "Spur gear needs at least 6 teeth to avoid severe undercut";
+		if (teeth < 6) throw "Spur gear needs at least 6 teeth";
 		if (!(faceWidth > 0)) throw "Spur gear needs a positive face width";
 		if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
+		if (teeth < minimumUnshiftedTeeth(pressureAngle))
+			throw "Unshifted spur gear would require undercut; use more teeth or a profile-shifted generator";
 		this.moduleSize = moduleSize;
 		this.teeth = teeth;
 		this.pressureAngle = pressureAngle;
@@ -51,6 +53,13 @@ class SpurGear {
 		var moduleText = Dimension.format(moduleSize);
 		designation = 'SPUR-M$moduleText-${teeth}T';
 		description = 'Spur gear module $moduleText, ${teeth} teeth';
+	}
+
+	/** Conservative no-undercut full-depth limit: ceil(2 / sin(pressureAngle)^2). */
+	public static function minimumUnshiftedTeeth(pressureAngle:Float):Int {
+		if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
+		var sine = Math.sin(pressureAngle);
+		return Math.ceil(2 / (sine * sine));
 	}
 
 	/** True for pressure angles within `MIN_PRESSURE_ANGLE`..`MAX_PRESSURE_ANGLE` (radians). */
