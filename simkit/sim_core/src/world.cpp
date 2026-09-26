@@ -405,6 +405,65 @@ nksim_result World::read_backend_state() {
     return NKSIM_OK;
 }
 
+nksim_result World::pull_backend_state() {
+    const auto result = read_backend_state();
+    if (result == NKSIM_OK)
+        carry_kinematic_root_twists();
+    return result;
+}
+
+// Backends pin a kinematic root without degrees of freedom, so the bodies
+// articulated beneath it report only their motion relative to it. Their world
+// twist adds the root's: v = v_root + w_root x (p - p_root) + v_rel and
+// w = w_root + w_rel.
+void World::carry_kinematic_root_twists() noexcept {
+    if (joints.empty())
+        return;
+    const auto parent_of = [&](nksim_body child) {
+        nksim_body parent = 0;
+        joints.for_each([&](nksim_joint, const Joint &joint) {
+            if (joint.desc.body_b == child)
+                parent = joint.desc.body_a;
+        });
+        return parent;
+    };
+    bodies.for_each([&](nksim_body handle, Body &body) {
+        if (body.desc.motion_type == NKSIM_MOTION_KINEMATIC)
+            return;
+        nksim_body current = handle;
+        const Body *root = nullptr;
+        // Joint graphs are acyclic (backends reject cycles); the bound only
+        // guards the walk.
+        for (int depth = 0; depth < 1024; ++depth) {
+            const auto parent = parent_of(current);
+            if (!parent)
+                break;
+            const auto *parent_body = bodies.get(parent);
+            if (!parent_body)
+                return;
+            if (parent_body->desc.motion_type == NKSIM_MOTION_KINEMATIC) {
+                if (!parent_of(parent))
+                    root = parent_body;
+                break;
+            }
+            current = parent;
+        }
+        if (!root)
+            return;
+        const auto &w = root->state.angular_velocity;
+        double r[3];
+        for (int axis = 0; axis < 3; ++axis)
+            r[axis] = body.state.position[axis] - root->state.position[axis];
+        const double transport[3] = {w[1] * r[2] - w[2] * r[1], w[2] * r[0] - w[0] * r[2],
+                                     w[0] * r[1] - w[1] * r[0]};
+        for (int axis = 0; axis < 3; ++axis) {
+            body.state.linear_velocity[axis] +=
+                root->state.linear_velocity[axis] + transport[axis];
+            body.state.angular_velocity[axis] += w[axis];
+        }
+    });
+}
+
 nksim_result World::step(nksim_step_result *out_result) {
     if (!out_result || !valid_struct_size(out_result->struct_size, sizeof(*out_result)))
         return NKSIM_ERROR_INVALID_ARGUMENT;
@@ -423,6 +482,7 @@ nksim_result World::step(nksim_step_result *out_result) {
     if (result != NKSIM_OK)
         return result;
     commit_kinematic_targets();
+    carry_kinematic_root_twists();
     nkscene_change_set changes = 0;
     result = synchronize_scene(&changes);
     if (result != NKSIM_OK)
@@ -485,7 +545,7 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
     // F4: an instant position-mode target can move a body kinematically in
     // the backend right away; pull that back so an immediate
     // get_body_state/get_joint_state observes it, not just the next step().
-    return read_backend_state();
+    return pull_backend_state();
 }
 
 nksim_result World::snapshot(std::shared_ptr<Snapshot> &out_snapshot) const {
@@ -631,7 +691,7 @@ nksim_result World::set_body_state(nksim_body body, const nksim_body_state &stat
     // bodies kinematically in the backend; pull every body/joint's resulting
     // state back so an immediate get_body_state/get_joint_state observes it,
     // not just the next step().
-    return read_backend_state();
+    return pull_backend_state();
 }
 
 nksim_result World::drive_body(nksim_body body, const nksim_body_state &state) {
@@ -673,7 +733,7 @@ nksim_result World::reset_body(nksim_body body) {
     if (result != NKSIM_OK) { value->state = previous; return result; }
     value->kinematic_continuous = false;
     value->kinematic_drive_pending = false;
-    return read_backend_state();
+    return pull_backend_state();
 }
 
 nksim_result World::reset() {
@@ -700,7 +760,7 @@ nksim_result World::reset() {
     // F4: re-derive every body's pose from the now-reset backend joint/body
     // state (a joint-connected body's rest pose may depend on another
     // body's, so this is not simply each body's own initial_state again).
-    return read_backend_state();
+    return pull_backend_state();
 }
 
 namespace {

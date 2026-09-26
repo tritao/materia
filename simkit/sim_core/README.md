@@ -45,7 +45,8 @@ velocity carries roughly one float ulp of position per tick of noise (about
 moves the body continuously to the given double-precision pose and reports
 exactly the given twist. Without a drive the body follows its node again; a
 node left where the drive put it holds the body there at rest, and node
-motion is differenced against the previous node pose. After backend state is read, dynamic
+motion is differenced against the previous node pose. Bodies articulated beneath
+a kinematic root report its twist added to their motion relative to it. After backend state is read, dynamic
 body poses are committed to the scene in one transaction and the owned
 `nkscene_change_set` is returned in the step result.
 

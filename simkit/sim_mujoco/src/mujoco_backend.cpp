@@ -718,6 +718,10 @@ private:
                     body.fullinertia[4] = m[2];
                     body.fullinertia[5] = m[5];
                 } else {
+                    // Centre of mass at the body origin. Left undefined, MuJoCo
+                    // copies the body's parent-relative position into ipos and
+                    // displaces the centre of mass by that offset.
+                    std::fill(body.ipos, body.ipos + 3, 0.0);
                     body.inertia[0] = body.inertia[1] = body.inertia[2] = 1.0;
                 }
             }

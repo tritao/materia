@@ -23,7 +23,16 @@ module. Structural body and joint changes rebuild the internal model; ordinary
 ticks use the compiled model/data pair.
 
 The current adapter supports free bodies plus fixed, revolute, and prismatic
-NativeKit joints. Position, velocity, and effort targets are batched through
+NativeKit joints.
+
+A kinematic body is pinned like static geometry, without mass or degrees of
+freedom, and SimKit places it at its prescribed pose before each step; SimKit
+adds its twist to the velocities reported for the links articulated beneath
+it. Contacts see no velocity for it, so a moving kinematic platform does not
+drag resting bodies along by friction. A body without explicit inertial
+properties has its centre of mass at its origin.
+
+Position, velocity, and effort targets are batched through
 the internal backend seam and applied through private MuJoCo actuators and
 `mjData.ctrl`. MuJoCo actuator objects and types are intentionally not part of
 the NativeKit API.

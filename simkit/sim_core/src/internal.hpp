@@ -289,6 +289,8 @@ public:
 private:
     nksim_result refresh_kinematic_bodies();
     nksim_result read_backend_state();
+    nksim_result pull_backend_state();
+    void carry_kinematic_root_twists() noexcept;
     nksim_result synchronize_scene(nkscene_change_set *out_changes);
     nksim_result node_pose(nkscene_node_id node,
                                  std::array<double, 3> &position,

@@ -698,6 +698,82 @@ void driven_kinematic_body_is_exact_far_from_origin() {
     nkscene_scene_destroy(scene);
 }
 
+// A kinematic root has no degrees of freedom in the backend, so the links
+// articulated beneath it move relative to it; the World adds the root's twist
+// so their reported world velocity includes the base's motion.
+void kinematic_root_twist_carries_to_its_links() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto base_node = make_node(scene, 0.0);
+    const auto arm_node = make_node(scene, 0.0);
+    set_node_pose(scene, arm_node, 1.0, 0.0, 0.0);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    nksim_body_desc body_desc{};
+    body_desc.struct_size = sizeof(body_desc);
+    body_desc.motion_type = NKSIM_MOTION_KINEMATIC;
+    body_desc.mass = 1.0;
+    body_desc.node = base_node;
+    nksim_body base = 0;
+    assert(nksim_body_create(world, &body_desc, &base) == NKSIM_OK);
+    body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    body_desc.node = arm_node;
+    nksim_body arm = 0;
+    assert(nksim_body_create(world, &body_desc, &arm) == NKSIM_OK);
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = base;
+    joint_desc.body_b = arm;
+    joint_desc.axis_a[2] = 1.0;
+    joint_desc.anchor_b[0] = -1.0; // Pivot at the base origin.
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = joint;
+    target.mode = NKSIM_JOINT_TARGET_VELOCITY;
+    target.target = 0.5;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+
+    const double dt = world_desc.fixed_timestep, speed = 2.0, yaw_rate = 0.3;
+    auto base_state = step_and_read(world, base);
+    for (int tick = 1; tick <= 20; ++tick) {
+        const double time = tick * dt;
+        auto drive = base_state;
+        drive.position[0] = speed * time;
+        drive.rotation[2] = std::sin(0.5 * yaw_rate * time);
+        drive.rotation[3] = std::cos(0.5 * yaw_rate * time);
+        drive.linear_velocity[0] = speed;
+        drive.angular_velocity[2] = yaw_rate;
+        set_node_pose(scene, base_node, drive.position[0], 0.0, yaw_rate * time);
+        assert(nksim_body_drive(world, base, &drive) == NKSIM_OK);
+        base_state = step_and_read(world, base);
+        nksim_body_state arm_state{};
+        arm_state.struct_size = sizeof(arm_state);
+        assert(nksim_body_get_state(world, arm, &arm_state) == NKSIM_OK);
+        assert(near(arm_state.angular_velocity[2], yaw_rate + 0.5, 1e-9));
+        // v = v_base + (w_base + w_hinge) x r, r the arm's offset from the
+        // pivot; the relative part is a chord over the tick.
+        const double r[2] = {arm_state.position[0] - base_state.position[0],
+                             arm_state.position[1] - base_state.position[1]};
+        assert(near(r[0] * r[0] + r[1] * r[1], 1.0, 1e-9));
+        assert(near(arm_state.linear_velocity[0], speed - (yaw_rate + 0.5) * r[1], 1e-2));
+        assert(near(arm_state.linear_velocity[1], (yaw_rate + 0.5) * r[0], 1e-2));
+    }
+
+    nksim_joint_destroy(world, joint);
+    nksim_body_destroy(world, arm);
+    nksim_body_destroy(world, base);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -708,5 +784,6 @@ int main() {
     joint_child_bodies_follow_their_joint_in_default_backend();
     kinematic_body_velocity_follows_node_motion();
     driven_kinematic_body_is_exact_far_from_origin();
+    kinematic_root_twist_carries_to_its_links();
     return 0;
 }

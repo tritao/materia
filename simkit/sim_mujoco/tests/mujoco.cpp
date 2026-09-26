@@ -138,7 +138,9 @@ void revolute_joint_is_owned_by_nativekit() {
     target.max_force = 20.0;
     assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
 
-    for (int index = 0; index < 40; ++index) {
+    // The 20 N m clamp saturates the controller while the arm accelerates, so
+    // it overshoots the target into the 0.6 limit before settling at 0.5.
+    for (int index = 0; index < 100; ++index) {
         nksim_step_result step{};
         step.struct_size = sizeof(step);
         assert(nksim_world_step(world, &step) == NKSIM_OK);
@@ -1072,6 +1074,276 @@ void cross_backend_link_poses_agree_with_fk() {
     run_backend(true, 400); // MuJoCo: let the PD controller settle.
 }
 
+void set_node_pose(nkscene_scene scene, nkscene_node_id node, double x, double y, double z,
+                   double yaw) {
+    nkscene_transaction transaction = 0;
+    assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
+    nkscene_transform transform{};
+    transform.matrix[0] = static_cast<float>(std::cos(yaw));
+    transform.matrix[1] = static_cast<float>(std::sin(yaw));
+    transform.matrix[4] = static_cast<float>(-std::sin(yaw));
+    transform.matrix[5] = static_cast<float>(std::cos(yaw));
+    transform.matrix[10] = 1.0f;
+    transform.matrix[12] = static_cast<float>(x);
+    transform.matrix[13] = static_cast<float>(y);
+    transform.matrix[14] = static_cast<float>(z);
+    transform.matrix[15] = 1.0f;
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
+    nkscene_change_set changes = 0;
+    assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
+    nkscene_change_set_destroy(changes);
+}
+
+nksim_body make_box_body(nksim_world world, nkscene_node_id node, uint32_t motion_type,
+                         double mass, double hx, double hy, double hz) {
+    const double half_extents[] = {hx, hy, hz};
+    nksim_shape shape = 0;
+    assert(nksim_shape_create_box(world, half_extents, &shape) == NKSIM_OK);
+    return make_body(world, node, motion_type, mass, shape);
+}
+
+struct HingeRig {
+    nkscene_scene scene = 0;
+    nkscene_node_id base_node{};
+    nksim_world world = 0;
+    nksim_body floor = 0;
+    nksim_body base = 0;
+    nksim_body arm = 0;
+    nksim_joint joint = 0;
+};
+
+// A 0.3 m box base with a unit-mass, unit-inertia arm hinged about z at x = 1
+// and driven by a 10 N m effort target. The base overlaps a static floor.
+HingeRig make_hinge_rig(uint32_t base_motion) {
+    HingeRig rig;
+    assert(nkscene_scene_create(&rig.scene) == NKS_OK);
+    const auto floor_node = make_node_xyz(rig.scene, 0.0, 0.0, 0.0);
+    rig.base_node = make_node_xyz(rig.scene, 0.0, 0.0, 0.0);
+    const auto arm_node = make_node_xyz(rig.scene, 1.0, 0.0, 0.0);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = rig.scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    assert(nksim_mujoco_world_create(&world_desc, &rig.world) == NKSIM_OK);
+    const double normal[] = {0.0, 0.0, 1.0};
+    nksim_shape floor_shape = 0;
+    assert(nksim_shape_create_plane(rig.world, normal, -0.2, &floor_shape) == NKSIM_OK);
+    rig.floor = make_body(rig.world, floor_node, NKSIM_MOTION_STATIC, 0.0, floor_shape);
+    rig.base = make_box_body(rig.world, rig.base_node, base_motion,
+                             base_motion == NKSIM_MOTION_STATIC ? 0.0 : 1.0, 0.3, 0.3, 0.3);
+    rig.arm = make_box_body(rig.world, arm_node, NKSIM_MOTION_DYNAMIC, 1.0, 0.1, 0.1, 0.1);
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = rig.base;
+    joint_desc.body_b = rig.arm;
+    joint_desc.axis_a[2] = 1.0;
+    joint_desc.anchor_a[0] = 1.0; // The hinge sits at the arm's origin.
+    joint_desc.max_force = 100.0;
+    assert(nksim_joint_create(rig.world, &joint_desc, &rig.joint) == NKSIM_OK);
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = rig.joint;
+    target.mode = NKSIM_JOINT_TARGET_EFFORT;
+    target.target = 10.0;
+    target.max_force = 100.0;
+    assert(nksim_world_set_joint_targets(rig.world, &target, 1) == NKSIM_OK);
+    return rig;
+}
+
+void destroy_hinge_rig(HingeRig &rig) {
+    nksim_joint_destroy(rig.world, rig.joint);
+    nksim_body_destroy(rig.world, rig.arm);
+    nksim_body_destroy(rig.world, rig.base);
+    nksim_body_destroy(rig.world, rig.floor);
+    nksim_world_destroy(rig.world);
+    nkscene_scene_destroy(rig.scene);
+}
+
+nksim_joint_state joint_state_of(nksim_world world, nksim_joint joint) {
+    nksim_joint_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_joint_get_state(world, joint, &state) == NKSIM_OK);
+    return state;
+}
+
+nksim_body_state body_state_of(nksim_world world, nksim_body body) {
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_body_get_state(world, body, &state) == NKSIM_OK);
+    return state;
+}
+
+// A kinematic root is prescribed motion: the reaction torque of the motor on
+// its hinged child must not spin it (a free unit-inertia base would take half
+// the motor's work and roughly halve the hinge rate), so the hinge moves as it
+// does on a static base (to about one part in 1e6, the armature ratio), and
+// the arm's world angular velocity is exactly the base's prescribed rate plus
+// the hinge rate.
+void kinematic_base_is_not_moved_by_child_reaction() {
+    auto kinematic = make_hinge_rig(NKSIM_MOTION_KINEMATIC);
+    auto reference = make_hinge_rig(NKSIM_MOTION_STATIC);
+    for (int tick = 0; tick < 10; ++tick) {
+        step_world(kinematic.world, 1);
+        step_world(reference.world, 1);
+        const auto joint = joint_state_of(kinematic.world, kinematic.joint);
+        const auto expected = joint_state_of(reference.world, reference.joint);
+        const auto arm = body_state_of(kinematic.world, kinematic.arm);
+        assert(std::abs(joint.velocity - expected.velocity) < 1e-6);
+        assert(std::abs(joint.position - expected.position) < 1e-6);
+        assert(std::abs(arm.angular_velocity[2] - joint.velocity) < 1e-9);
+        assert(std::abs(arm.angular_velocity[0]) < 1e-9);
+        assert(std::abs(arm.angular_velocity[1]) < 1e-9);
+        for (int axis = 0; axis < 3; ++axis)
+            assert(std::abs(arm.linear_velocity[axis]) < 1e-9);
+        assert(std::abs(arm.position[0] - 1.0) < 1e-9);
+        assert(std::abs(arm.position[1]) < 1e-9 && std::abs(arm.position[2]) < 1e-9);
+    }
+    assert(joint_state_of(kinematic.world, kinematic.joint).velocity > 0.1);
+
+    // Drive the base along x while it yaws about the hinge axis. The arm rides
+    // on it: its world rate is the base rate plus the hinge rate, its velocity
+    // is the base twist carried to the arm origin, and (the arm's centre of
+    // mass being on the hinge axis) the hinge still matches the static base.
+    const double dt = 0.01, speed = 2.0, yaw_rate = 0.5;
+    auto base = body_state_of(kinematic.world, kinematic.base);
+    for (int tick = 1; tick <= 20; ++tick) {
+        const double time = tick * dt;
+        auto drive = base;
+        drive.position[0] = speed * time;
+        drive.position[1] = drive.position[2] = 0.0;
+        drive.rotation[0] = drive.rotation[1] = 0.0;
+        drive.rotation[2] = std::sin(0.5 * yaw_rate * time);
+        drive.rotation[3] = std::cos(0.5 * yaw_rate * time);
+        drive.linear_velocity[0] = speed;
+        drive.linear_velocity[1] = drive.linear_velocity[2] = 0.0;
+        drive.angular_velocity[0] = drive.angular_velocity[1] = 0.0;
+        drive.angular_velocity[2] = yaw_rate;
+        set_node_pose(kinematic.scene, kinematic.base_node, drive.position[0], 0.0, 0.0,
+                      yaw_rate * time);
+        assert(nksim_body_drive(kinematic.world, kinematic.base, &drive) == NKSIM_OK);
+        step_world(kinematic.world, 1);
+        step_world(reference.world, 1);
+        base = body_state_of(kinematic.world, kinematic.base);
+        const auto arm = body_state_of(kinematic.world, kinematic.arm);
+        const auto joint = joint_state_of(kinematic.world, kinematic.joint);
+        const auto expected = joint_state_of(reference.world, reference.joint);
+        assert(std::abs(base.position[0] - drive.position[0]) < 1e-12);
+        assert(std::abs(base.rotation[2] - drive.rotation[2]) < 1e-12);
+        assert(std::abs(joint.velocity - expected.velocity) < 1e-6);
+        assert(std::abs(arm.angular_velocity[2] - (yaw_rate + joint.velocity)) < 1e-9);
+        const double yaw = yaw_rate * time;
+        const double offset[2] = {std::cos(yaw), std::sin(yaw)};
+        assert(std::abs(arm.position[0] - (drive.position[0] + offset[0])) < 1e-9);
+        assert(std::abs(arm.position[1] - offset[1]) < 1e-9);
+        assert(std::abs(arm.linear_velocity[0] - (speed - yaw_rate * offset[1])) < 1e-9);
+        assert(std::abs(arm.linear_velocity[1] - yaw_rate * offset[0]) < 1e-9);
+        assert(std::abs(arm.linear_velocity[2]) < 1e-9);
+    }
+    destroy_hinge_rig(kinematic);
+    destroy_hinge_rig(reference);
+}
+
+// Contacts see a kinematic body's twist: friction carries a box resting on a
+// moving kinematic platform along with it.
+//
+// DISABLED, known limitation: a kinematic body is pinned in MuJoCo without
+// degrees of freedom and moved between steps through body_pos/body_quat. A
+// contact's velocity is J * qvel, and a body with no DOFs contributes nothing
+// to it, so the platform slides out from under the box (which stays at x = 0
+// with zero velocity) instead of dragging it by friction. Mocap bodies are
+// welded to the world the same way and behave identically. Carrying resting
+// bodies needs the kinematic body to own DOFs whose qvel is its twist (a free
+// joint held on the prescribed motion), which is the competing design this
+// backend does not use. Not run from main().
+[[maybe_unused]] void kinematic_platform_carries_resting_box() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto platform_node = make_node_xyz(scene, 0.0, 0.0, 0.0);
+    const auto box_node = make_node_xyz(scene, 0.0, 0.0, 0.2);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    const auto platform = make_box_body(world, platform_node, NKSIM_MOTION_KINEMATIC, 1.0,
+                                        2.0, 2.0, 0.1);
+    const auto box = make_box_body(world, box_node, NKSIM_MOTION_DYNAMIC, 1.0, 0.1, 0.1, 0.1);
+    step_world(world, 20); // Settle.
+    nksim_body_state platform_state{}, box_state{};
+    platform_state.struct_size = box_state.struct_size = sizeof(nksim_body_state);
+    assert(nksim_body_get_state(world, platform, &platform_state) == NKSIM_OK);
+    const double speed = 0.5;
+    for (int tick = 1; tick <= 100; ++tick) {
+        const double x = speed * world_desc.fixed_timestep * tick;
+        set_node_x(scene, platform_node, x);
+        auto drive = platform_state;
+        drive.position[0] = x;
+        drive.linear_velocity[0] = speed;
+        assert(nksim_body_drive(world, platform, &drive) == NKSIM_OK);
+        step_world(world, 1);
+        assert(nksim_body_get_state(world, platform, &platform_state) == NKSIM_OK);
+        assert(platform_state.position[0] == x && platform_state.position[2] == 0.0);
+    }
+    assert(nksim_body_get_state(world, box, &box_state) == NKSIM_OK);
+    assert(std::abs(box_state.linear_velocity[0] - speed) < 0.01);
+    assert(box_state.position[0] > 0.45);
+    // Resting on the kinematic platform as on static ground, not sinking.
+    assert(box_state.position[2] > 0.199 && box_state.position[2] < 0.201);
+
+    nksim_body_destroy(world, box);
+    nksim_body_destroy(world, platform);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+// A body without explicit inertial properties has its centre of mass at its
+// origin. Left undefined, MuJoCo copied the body's parent-relative position
+// into its inertial frame, displacing the centre of mass by that offset: an
+// unactuated arm hinged at its own origin then swung under gravity.
+void body_without_inertials_has_center_of_mass_at_origin() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto base_node = make_node(scene, 0.0);
+    const auto arm_node = make_node(scene, 1.0);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    const auto base = make_body(world, base_node, NKSIM_MOTION_STATIC, 0.0);
+    const auto shape = make_box(world);
+    const auto arm = make_body(world, arm_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = base;
+    joint_desc.body_b = arm;
+    joint_desc.axis_a[1] = 1.0;
+    joint_desc.anchor_a[0] = 1.0; // Hinged about y at the arm's own origin.
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+    step_world(world, 50);
+    const auto state = joint_state_of(world, joint);
+    assert(std::abs(state.position) < 1e-9 && std::abs(state.velocity) < 1e-9);
+    const auto arm_state = body_state_of(world, arm);
+    assert(std::abs(arm_state.position[0] - 1.0) < 1e-9 && std::abs(arm_state.position[2]) < 1e-9);
+    nksim_joint_destroy(world, joint);
+    nksim_body_destroy(world, arm);
+    nksim_body_destroy(world, base);
+    nksim_shape_destroy(world, shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -1089,5 +1361,7 @@ int main() {
     cross_backend_link_poses_agree_with_fk();
     kinematic_root_child_velocity_matches_joint_across_substeps();
     two_joint_arm_on_kinematic_base_holds_position_under_gravity();
+    kinematic_base_is_not_moved_by_child_reaction();
+    body_without_inertials_has_center_of_mass_at_origin();
     return 0;
 }
