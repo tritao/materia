@@ -128,7 +128,9 @@ class DockWorkspace implements View {
 				!showAllLabels && descriptor.icon != null &&
 					(descriptor.id != selectedId || !showSelectedLabel) ? "" : null));
 		var tabsStyle = new LayoutStyle();
-		tabsStyle.width = LayoutAxis.grow();
+		// The panel must follow its split pane even when the active tab's content
+		// has a larger intrinsic width (for example, sensor property rows).
+		tabsStyle.width = LayoutAxis.stretch();
 		tabsStyle.height = LayoutAxis.grow();
 		var options = new TabsOptions();
 		options.style = tabsStyle;

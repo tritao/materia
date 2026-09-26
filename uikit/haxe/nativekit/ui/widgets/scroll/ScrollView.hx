@@ -71,7 +71,7 @@ class ScrollView implements View {
 			});
 
 			var contentStyle = new LayoutStyle();
-			contentStyle.width = axis == ScrollAxis.Vertical ? LayoutAxis.grow() : LayoutAxis.fit();
+			contentStyle.width = axis == ScrollAxis.Vertical ? LayoutAxis.stretch() : LayoutAxis.fit();
 			contentStyle.height = axis == ScrollAxis.Horizontal ? LayoutAxis.grow() : LayoutAxis.fit();
 			contentStyle.transform = Transform2D.identity().translated(-controller.offsetX,
 				-controller.offsetY);

@@ -186,7 +186,7 @@ class Tabs implements View {
 				var item:TabItem = cast selectedItem;
 				var panel = context.withScope(new Key("panel:" + item.key), function() {
 					var panelStyle = new LayoutStyle();
-					panelStyle.width = LayoutAxis.grow();
+					panelStyle.width = LayoutAxis.stretch();
 					panelStyle.height = LayoutAxis.grow();
 					var node = new RenderNode(context.id("tab-panel"), LayoutVisualKind.Box,
 						panelStyle);
