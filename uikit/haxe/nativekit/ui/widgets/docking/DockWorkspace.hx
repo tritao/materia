@@ -100,12 +100,24 @@ class DockWorkspace implements View {
 		var items:Array<TabItem> = [];
 		var compact = panelIds != null && panelIds.length > 1 &&
 			availableWidth < panelIds.length * 100.0;
+		var selectedLabelFits = false;
+		if (compact) {
+			var selected = model.get(activePanelId);
+			if (selected != null && selected.icon != null) {
+				// Tab headers have 20 px horizontal padding, a 14 px icon, and a 4 px strip gap.
+				// Reserve the icon-only tabs before spending the remaining width on the active label.
+				var requiredWidth = (panelIds.length * 34.0) + ((panelIds.length - 1) * 4.0)
+					+ 8.0 + (selected.title.length * 8.0);
+				selectedLabelFits = availableWidth >= requiredWidth;
+			}
+		}
 		if (panelIds != null)
 			for (panelId in panelIds) {
 				var descriptor = model.get(panelId);
 				if (descriptor != null)
 					items.push(new TabItem(panelId, descriptor.title, panelView(panelId),
-						descriptor.enabled, descriptor.icon, compact && descriptor.icon != null ? "" : null));
+						descriptor.enabled, descriptor.icon,
+						compact && descriptor.icon != null && (panelId != activePanelId || !selectedLabelFits) ? "" : null));
 			}
 		var tabsStyle = new LayoutStyle();
 		tabsStyle.width = LayoutAxis.grow();
