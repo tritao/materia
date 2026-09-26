@@ -205,6 +205,7 @@ class DockWorkspace implements View {
 		options.minimumExtent = minimum;
 		options.maximumExtent = maximum;
 		options.dividerExtent = divider;
+		options.dividerVisualExtent = 3.0;
 		options.onResize = function(next) {
 			model.setSplitRatio(path, next / available);
 		};

@@ -173,14 +173,18 @@ class Theme {
 		styles.rule(StyleSelector.widget("button").className("secondary").state(StyleState.Pressed),
 			[StyleValue.background(tokens.surfaceSunken)]);
 		styles.rule(StyleSelector.widget("button").className("secondary").state(StyleState.Focused),
-			[StyleValue.borderColor(tokens.focusRing)]);
+			[StyleValue.background(tokens.surfaceRaised), StyleValue.borderColor(tokens.focusRing)]);
 		styles.rule(StyleSelector.widget("button").className("secondary").state(StyleState.Selected),
 			[StyleValue.background(tokens.selection)]);
 		styles.rule(StyleSelector.widget("button").className("secondary").state(StyleState.Disabled),
 			[StyleValue.background(tokens.surfaceSunken)]);
 		styles.rule(StyleSelector.widget("button").className("tab-header"), [
 			StyleValue.background(Color.rgba(0.0, 0.0, 0.0, 0.0)),
-			StyleValue.padding(new Insets(10.0, 6.0, 10.0, 6.0))
+			StyleValue.padding(new Insets(10.0, 6.0, 10.0, 6.0)),
+			StyleValue.radius(StyleProperty.RadiusTopLeft, 0.0),
+			StyleValue.radius(StyleProperty.RadiusTopRight, 0.0),
+			StyleValue.radius(StyleProperty.RadiusBottomRight, 0.0),
+			StyleValue.radius(StyleProperty.RadiusBottomLeft, 0.0)
 		]);
 		styles.rule(StyleSelector.widget("button").className("tab-header").state(StyleState.Hovered),
 			[StyleValue.background(tokens.surfaceHover)]);

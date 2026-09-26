@@ -2,6 +2,8 @@ package nativekit.ui.widgets.layout;
 
 import Color;
 import LayoutAxis;
+import LayoutAlignmentX;
+import LayoutAlignmentY;
 import LayoutDirection;
 import LayoutDistribution;
 import LayoutStyle;
@@ -35,6 +37,7 @@ class SplitView implements View {
 	public final minimumExtent:Float;
 	public final maximumExtent:Float;
 	public final dividerExtent:Float;
+	public final dividerVisualExtent:Float;
 	public final onResize:Null<Float->Void>;
 	public final onCollapsedChanged:Null<Bool->Void>;
 	public final style:LayoutStyle;
@@ -54,7 +57,10 @@ class SplitView implements View {
 			!finite(resolved.extent) || !finite(resolved.minimumExtent) ||
 			!finite(resolved.maximumExtent) || !finite(resolved.dividerExtent) ||
 			resolved.minimumExtent < 0.0 || resolved.maximumExtent < resolved.minimumExtent ||
-			resolved.dividerExtent < 0.0)
+			resolved.dividerExtent < 0.0 ||
+			(resolved.dividerVisualExtent != null &&
+				(!finite(resolved.dividerVisualExtent) || resolved.dividerVisualExtent < 0.0 ||
+				resolved.dividerVisualExtent > resolved.dividerExtent)))
 			throw "SplitView extent policy is invalid";
 		this.key = new Key(key);
 		this.leading = leading;
@@ -64,6 +70,8 @@ class SplitView implements View {
 		this.minimumExtent = resolved.minimumExtent;
 		this.maximumExtent = resolved.maximumExtent;
 		this.dividerExtent = resolved.dividerExtent;
+		this.dividerVisualExtent = resolved.dividerVisualExtent == null ?
+			resolved.dividerExtent : resolved.dividerVisualExtent;
 		this.extent = clamp(resolved.extent, minimumExtent, maximumExtent);
 		this.collapsed = resolved.collapsed;
 		this.onResize = resolved.onResize;
@@ -105,6 +113,19 @@ class SplitView implements View {
 					null, ["split-divider"]);
 				divider.states = dividerStates;
 				divider.computedStyle = dividerComputed;
+				if (dividerVisualExtent < dividerExtent) {
+					var visualStyle = new LayoutStyle();
+					visualStyle.width = horizontal ? LayoutAxis.fixed(dividerVisualExtent) : LayoutAxis.grow();
+					visualStyle.height = horizontal ? LayoutAxis.grow() : LayoutAxis.fixed(dividerVisualExtent);
+					visualStyle.background = divider.layout.style.background;
+					divider.layout.style.background = Color.rgba(0.0, 0.0, 0.0, 0.0);
+					divider.layout.style.childAlignX = LayoutAlignmentX.Center;
+					divider.layout.style.childAlignY = LayoutAlignmentY.Center;
+					var visual = new RenderNode(context.id("divider-visual"), LayoutVisualKind.Box,
+						visualStyle);
+					visual.hitTestSelf = false;
+					divider.add(visual);
+				}
 				divider.focusable = true;
 				divider.cursor = horizontal ? CursorShape.HorizontalResize : CursorShape.VerticalResize;
 				var sideName = resizableSide == SplitSide.Leading ? "Leading" : "Trailing";

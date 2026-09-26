@@ -11,6 +11,8 @@ class SplitViewOptions {
 	public var maximumExtent:Float;
 	public var collapsed:Bool;
 	public var dividerExtent:Float;
+	/** Visible divider width; null uses the full draggable extent. */
+	public var dividerVisualExtent:Null<Float>;
 	public var style:Null<LayoutStyle>;
 	public var dividerStyle:Null<LayoutStyle>;
 	public var onResize:Null<Float->Void>;
@@ -24,6 +26,7 @@ class SplitViewOptions {
 		maximumExtent = 480.0;
 		collapsed = false;
 		dividerExtent = 8.0;
+		dividerVisualExtent = null;
 		style = null;
 		dividerStyle = null;
 		onResize = null;

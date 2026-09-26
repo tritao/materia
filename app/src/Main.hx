@@ -1003,7 +1003,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function hierarchyPanel():View {
     treeModel.setFilter(hierarchySearch);
-    var addButton = new Button("Add", null, function() {
+    var addStyle = new LayoutStyle();
+    addStyle.padding = new Insets(6.0, 8.0, 6.0, 8.0);
+    addStyle.childGap = 5.0;
+    var addButton = new Button("Add", addStyle, function() {
       hierarchyAddVisible = true;
       commands.refresh();
     }, "hierarchy-add");
@@ -1217,7 +1220,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     options.variant = ButtonVariant.Secondary;
     options.trailingIcon = IconName.ChevronDown;
     options.iconSize = 12.0;
+    options.selected = viewportOptionsVisible && viewportOptionsPerspective == perspective;
     options.onClickEvent = function(event) {
+      if (viewportOptionsVisible && viewportOptionsPerspective == perspective) {
+        viewportOptionsVisible = false;
+        commands.refresh();
+        return;
+      }
       var bounds = menuTriggerBounds(event);
       viewportOptionsX = Math.max(8.0, Math.min(viewportWidth - 228.0, bounds.x));
       viewportOptionsY = Math.max(8.0, Math.min(viewportHeight - 245.0, bounds.y + bounds.height));

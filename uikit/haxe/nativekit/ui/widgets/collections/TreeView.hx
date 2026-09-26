@@ -787,7 +787,7 @@ private class TreeDisclosure implements View {
 			node.on(UiEventKind.Click, activate);
 			node.on(UiEventKind.Activate, activate);
 			node.add(new Icon("glyph", expanded ? IconName.ChevronDown : IconName.ChevronRight,
-				13.0, context.theme.tokens.textSecondary).build(context));
+				16.0, context.theme.tokens.textPrimary).build(context));
 			return node;
 		});
 	}
