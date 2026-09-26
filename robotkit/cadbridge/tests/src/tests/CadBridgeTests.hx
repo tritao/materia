@@ -3,6 +3,9 @@ package tests;
 import CadKit;
 import cadkit.Shape;
 import cadkit.Geometry;
+import cadkit.modeling.Sketch;
+import cadkit.modeling.Curve;
+import cadkit.modeling.Vector;
 import cadkit.parametric.ElementReference;
 import bimkit.BimDocument;
 import robotkit.spatial.Vec3;
@@ -28,6 +31,7 @@ class CadBridgeTests {
 
   public static function main():Void {
     testFaceBridgeOnPlainBoxFace();
+    testFaceBridgePreservesConcaveWireOrder();
     testWallBridgeAreaNormalAndExclusion();
     testBimFrameHierarchy();
     testBimWallToPatchPlanEndToEnd();
@@ -139,6 +143,60 @@ class CadBridgeTests {
     check(surface.surfaceFrameId == "top" && surface.frameId == "world", "generated surface keeps the requested id and frame id");
     top.close();
     box.close();
+  }
+
+  static function testFaceBridgePreservesConcaveWireOrder():Void {
+    var outer = closedCurve([
+      new Vector(-3.0, -3.0, 0.0), new Vector(3.0, -3.0, 0.0),
+      new Vector(3.0, 3.0, 0.0), new Vector(1.0, 3.0, 0.0),
+      new Vector(1.0, 1.0, 0.0), new Vector(-3.0, 1.0, 0.0)
+    ]);
+    var opening = closedCurve([
+      new Vector(-2.0, -2.0, 0.0), new Vector(0.5, -2.0, 0.0),
+      new Vector(0.5, -1.5, 0.0), new Vector(-1.5, -1.5, 0.0),
+      new Vector(-1.5, -0.5, 0.0), new Vector(-2.0, -0.5, 0.0)
+    ]);
+    var faceModel = Sketch.face(outer, [opening]);
+    var face = new cadkit.Face(faceModel.shape.subshape(CadKit.ShapeKind.Face, 0));
+    var bridged = FaceBridge.toWorkSurface(face, "concave", "world");
+    check(bridged.boundary.vertices().length == 6,
+      "concave outer wire retains every source vertex");
+    check(approx(bridged.boundary.area(), 28.0, 1e-9),
+      'concave outer wire keeps its connected-loop area (got ${bridged.boundary.area()})');
+    check(reflexVertices(bridged.boundary.vertices()) == 1,
+      "concave outer wire retains its single reflex corner");
+    check(bridged.exclusions.length == 1 && bridged.exclusions[0].vertices().length == 6,
+      "concave opening becomes one connected six-vertex exclusion");
+    check(approx(bridged.exclusions[0].area(), 1.75, 1e-9),
+      'concave opening keeps its connected-loop area (got ${bridged.exclusions[0].area()})');
+    check(reflexVertices(bridged.exclusions[0].vertices()) == 1,
+      "concave opening retains its single reflex corner");
+    face.close();
+    faceModel.close();
+    outer.close();
+    opening.close();
+  }
+
+  static function closedCurve(points:Array<Vector>):Curve {
+    var edges:Array<Curve> = [];
+    for (i in 0...points.length)
+      edges.push(Curve.line(points[i], points[(i + 1) % points.length]));
+    var result = Curve.wire(edges);
+    for (edge in edges) edge.close();
+    return result;
+  }
+
+  static function reflexVertices(points:Array<robotkit.work.Point2>):Int {
+    var result = 0;
+    for (i in 0...points.length) {
+      var previous = points[(i + points.length - 1) % points.length];
+      var current = points[i];
+      var next = points[(i + 1) % points.length];
+      var cross = (current.x - previous.x) * (next.y - current.y) -
+        (current.y - previous.y) * (next.x - current.x);
+      if (cross < -1e-9) result++;
+    }
+    return result;
   }
 
   static function testWallBridgeAreaNormalAndExclusion():Void {

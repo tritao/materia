@@ -52,7 +52,7 @@ class FaceBridge {
     var areas:Array<Float> = [];
     for (i in 0...wireCount) {
       var wireShape = faceShape.subshape(CadKit.ShapeKind.Wire, i);
-      var points = sortByAngle(wirePoints(wireShape, center, basisU, basisV, scale));
+      var points = wirePoints(wireShape, center, basisU, basisV, scale);
       wireShape.close();
       var area = shoelaceArea(points);
       if (area < 0.0) {
@@ -81,42 +81,69 @@ class FaceBridge {
   }
 
   static function wirePoints(wireShape:Shape, center:Vec3, basisU:Vec3, basisV:Vec3, scale:Float):Array<Point2> {
-    var vertexCount = wireShape.subshapeCount(CadKit.ShapeKind.Vertex);
+    var edgeCount = wireShape.subshapeCount(CadKit.ShapeKind.Edge);
+    if (edgeCount < 3) throw "Planar face wire must contain at least three edges";
+    var starts:Array<Vec3> = [];
+    var ends:Array<Vec3> = [];
+    for (i in 0...edgeCount) {
+      var edgeShape = wireShape.subshape(CadKit.ShapeKind.Edge, i);
+      try {
+        if (edgeShape.subshapeCount(CadKit.ShapeKind.Vertex) != 2)
+          throw "Face bridge requires two endpoints for every wire edge";
+        var startShape = edgeShape.subshape(CadKit.ShapeKind.Vertex, 0);
+        var endShape = edgeShape.subshape(CadKit.ShapeKind.Vertex, 1);
+        starts.push(toVec3(startShape.position(), scale));
+        ends.push(toVec3(endShape.position(), scale));
+        startShape.close();
+        endShape.close();
+      } catch (error:Dynamic) {
+        edgeShape.close();
+        throw error;
+      }
+      edgeShape.close();
+    }
+
+    var tolerance = 1e-7 * Math.max(1.0, scale);
+    var first = starts[0];
+    var current = ends[0];
+    var used = [for (_ in 0...edgeCount) false];
+    used[0] = true;
+    var ordered:Array<Vec3> = [first];
+    for (_ in 1...edgeCount) {
+      var nextIndex = -1;
+      var next:Null<Vec3> = null;
+      for (candidate in 0...edgeCount) if (!used[candidate]) {
+        if (samePoint(current, starts[candidate], tolerance)) {
+          nextIndex = candidate;
+          next = ends[candidate];
+          break;
+        }
+        if (samePoint(current, ends[candidate], tolerance)) {
+          nextIndex = candidate;
+          next = starts[candidate];
+          break;
+        }
+      }
+      if (nextIndex < 0 || next == null)
+        throw "Face bridge could not follow a connected wire edge chain";
+      ordered.push(current);
+      used[nextIndex] = true;
+      current = next;
+    }
+    if (!samePoint(current, first, tolerance))
+      throw "Face bridge wire edge chain does not close";
+
     var points:Array<Point2> = [];
-    for (i in 0...vertexCount) {
-      var vertexShape = wireShape.subshape(CadKit.ShapeKind.Vertex, i);
-      var position = toVec3(vertexShape.position(), scale);
-      vertexShape.close();
+    for (position in ordered) {
       var local = position.sub(center);
       points.push(new Point2(local.dot(basisU), local.dot(basisV)));
     }
     return points;
   }
 
-  /** Orders a convex wire's vertices counter-clockwise around their centroid. */
-  static function sortByAngle(points:Array<Point2>):Array<Point2> {
-    var centroidX = 0.0, centroidY = 0.0;
-    for (p in points) {
-      centroidX += p.x;
-      centroidY += p.y;
-    }
-    centroidX /= points.length;
-    centroidY /= points.length;
-    var angles:Array<Float> = [for (p in points) Math.atan2(p.y - centroidY, p.x - centroidX)];
-    var ordered = points.copy();
-    for (i in 1...ordered.length) {
-      var angle = angles[i];
-      var point = ordered[i];
-      var j = i - 1;
-      while (j >= 0 && angles[j] > angle) {
-        angles[j + 1] = angles[j];
-        ordered[j + 1] = ordered[j];
-        j--;
-      }
-      angles[j + 1] = angle;
-      ordered[j + 1] = point;
-    }
-    return ordered;
+  static function samePoint(a:Vec3, b:Vec3, tolerance:Float):Bool {
+    var delta = a.sub(b);
+    return delta.dot(delta) <= tolerance * tolerance;
   }
 
   static function shoelaceArea(points:Array<Point2>):Float {

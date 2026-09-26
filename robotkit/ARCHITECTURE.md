@@ -872,10 +872,12 @@ concepts meet RobotKit; `robotkit/haxeon.json` itself still depends only on
 
 `cadbridge.FaceBridge.toWorkSurface(face, id, frameId, ?provenance,
 ?surfaceFrameId, ?scale)` converts any CadKit planar `Face` into a design
-`WorkSurface`: it walks the face's wires and, for each, its vertices, sorts
-them counter-clockwise by angle around their centroid, and picks the
-largest-area wire as the boundary (`Polygon2`) and every other wire as an
-exclusion — one exclusion per inner wire/opening. `cadkit.Face`
+`WorkSurface`: it walks each wire's edge endpoints to preserve the authored
+connected loop, normalizes the resulting loop to counter-clockwise, and picks
+the largest-area wire as the boundary (`Polygon2`) and every other wire as an
+exclusion — one exclusion per inner wire/opening. If an edge does not expose
+two endpoints or the endpoint walk cannot close, the bridge raises an error
+instead of guessing an order. `cadkit.Face`
 (`cadkit/haxe/src/cadkit/Face.hx`) does not itself expose wire or vertex
 enumeration, but `Face.cloneShape()` already returns a full `Shape` scoped
 to just that face, and `Shape.subshapeCount`/`subshape` already walk any

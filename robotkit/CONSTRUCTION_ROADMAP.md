@@ -1246,3 +1246,10 @@ rotated and concave polygons without bounding-box over-cutting. Added work
 tests cover a 45-degree diamond and an L-shaped exclusion; allowed coverage is
 at least 98% with no excluded cell touched. The Haxe world suite passed with
 4,333 assertions.
+
+**F7**: `FaceBridge` now follows each wire by matching consecutive edge
+endpoints, preserving connected concave loops and rejecting edges that cannot
+be traversed or closed. The centroid angle sort is gone. CAD bridge tests now
+cover a concave outer L-shaped wire and a concave opening, checking vertex
+counts, areas, and reflex corners. The CAD bridge suite passed with 33
+assertions.
