@@ -144,6 +144,10 @@ library classes rather than one-off scripts:
   joint per block, and its BOM contains the cut rail and matching blocks. The
   generated solids are nominal envelopes; catalog provenance and connector
   frames carry the interface dimensions used for layout.
+- `LinearAxis.forRailProfile("MGN12C", ...)` selects that guide for the
+  lead-screw axis. The carriage mounts the rail block through a fixed joint,
+  the rail-to-block interface is recorded as a prismatic closure, and the
+  axis travel limits and BOM include the profile rail hardware.
 
 ## Robotics
 

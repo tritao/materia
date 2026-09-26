@@ -841,6 +841,37 @@ class MachineKitSmoke {
 		check(bom.quantity(axis.guideBearingA.designation) == 2, "linear axis guide bearings in the BOM");
 		check(bom.quantity("RECT-20x15x2-L365") == 1, "linear axis rail in the BOM");
 		check(bom.quantity(axis.pillowBlockA.screw.designation) == 8, "linear axis pillow block screws");
+
+		var railAxis = LinearAxis.forRailProfile("MGN12C");
+		var railGuide:machinekit.motion.LinearRailSystem = cast railAxis.railGuide;
+		check(railGuide != null, "profile rail axis selects a rail guide");
+		near(railGuide.railLength, 254.7, "profile rail axis cut length");
+		near(railGuide.stroke, railAxis.stroke, "profile rail axis stroke");
+		near(railAxis.railGuideOffset, railAxis.travelMin - railGuide.travelMin,
+			"profile rail axis guide offset");
+		check(railAxis.carriage.hasRailMount, "profile rail axis carriage mount");
+		var railCarriagePart = railAxis.carriage.geometry();
+		solid(railCarriagePart, "profile rail axis carriage");
+		railCarriagePart.close();
+		var railModel = railAxis.assembly();
+		var railDefinition = railModel.definition("linear-rail-axis");
+		check(railDefinition.joints.length == 16, "profile rail axis joint count");
+		var railState = railModel.initialState("linear-rail-axis");
+		near(railState.worldConnector("profileBlock1", "rail").z, 21 + railAxis.travelMin,
+			"profile block follows carriage at lower travel");
+		near(railState.worldConnector("profileRail", "axis").z + railGuide.travelMin,
+			21 + railAxis.travelMin, "profile rail lower limit aligns with axis");
+		check(railState.closureResiduals().length == 1, "profile rail closure recorded");
+		near(railState.closureResiduals()[0].position, 0, "profile rail closure has no transverse error");
+		railAxis.setTravel(railState, railAxis.stroke);
+		near(railState.worldConnector("profileBlock1", "rail").z, 21 + railAxis.travelMax,
+			"profile block follows carriage at upper travel");
+		near(railState.worldConnector("profileRail", "axis").z + railGuide.travelMax,
+			21 + railAxis.travelMax, "profile rail upper limit aligns with axis");
+		var railBom = railAxis.bom();
+		check(railBom.quantity(railGuide.rail.designation) == 1, "profile rail axis rail in BOM");
+		check(railBom.quantity(railGuide.blocks[0].designation) == 1, "profile rail axis block in BOM");
+		throws(() -> LinearAxis.forRailProfile("MGN99C"), 'Unknown linear rail profile "MGN99C"');
 	}
 
 	static function linearRailGuide():Void {
