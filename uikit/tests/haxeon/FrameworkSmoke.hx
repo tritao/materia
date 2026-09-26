@@ -3782,6 +3782,18 @@ class FrameworkSmoke {
 			composedRoot.children[0].children.length == 0 ||
 			composedRoot.children[0].children[0].children.length != 3)
 			return false;
+		composedInspector.scrollable = false;
+		composedRoot = uiContext.submit(composedInspector, new LayoutFrame(480.0, 320.0));
+		if (composedRoot.styleType != "column" || composedRoot.semantics == null ||
+			composedRoot.semantics.role != AccessibilityRole.Group ||
+			composedRoot.semantics.label != "Inspector")
+			return false;
+		var embeddedScrolls = 0;
+		composedRoot.walk(function(node) {
+			if (node.styleType == "scroll-view") embeddedScrolls++;
+		});
+		if (embeddedScrolls != 0)
+			return false;
 		var appliedMass = inspector.applyValue(uiContext.buildContext, massProperty,
 			PropertyValue.Float(4.0));
 		if (!appliedMass || mass != 4.0 || !document.isDirty)

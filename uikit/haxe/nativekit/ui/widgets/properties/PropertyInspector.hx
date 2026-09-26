@@ -37,6 +37,8 @@ class PropertyInspector implements View {
 	public var controller(default, null):ScrollController;
 	public var enabled:Bool;
 	public var labelWidth:Float;
+	/** Disable when a parent pane already owns scrolling. */
+	public var scrollable:Bool;
 	public var showScrollbar:Bool;
 	public var label:Null<String>;
 	public var onSectionExpanded:Null<String->Bool->Void>;
@@ -62,6 +64,7 @@ class PropertyInspector implements View {
 		this.controller = controller == null ? new ScrollController() : controller;
 		this.enabled = true;
 		this.labelWidth = 140.0;
+		this.scrollable = true;
 		this.showScrollbar = true;
 		this.label = label == null ? "Inspector" : label;
 		this.onSectionExpanded = null;
@@ -125,11 +128,18 @@ class PropertyInspector implements View {
 				if (section.expanded)
 					children.push(new KeyedView("section:" + section.id + ":body", editor));
 			}
-			var contentStyle = new LayoutStyle();
-			contentStyle.width = LayoutAxis.grow();
-			contentStyle.height = LayoutAxis.fit();
+			var contentStyle = scrollable ? new LayoutStyle() : style.copy();
+			if (scrollable) {
+				contentStyle.width = LayoutAxis.grow();
+				contentStyle.height = LayoutAxis.fit();
+			}
 			contentStyle.childGap = 6.0;
 			var content = new Column("sections", children, contentStyle);
+			if (!scrollable) {
+				var root = content.build(context);
+				root.semantics = new Semantics(AccessibilityRole.Group, label);
+				return root;
+			}
 			var scroll = new ScrollView("viewport", content, style, ScrollAxis.Vertical, controller);
 			scroll.showScrollbar = showScrollbar;
 			var root = scroll.build(context);

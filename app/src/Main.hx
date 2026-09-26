@@ -986,7 +986,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         sensors.properties(),null,null,null,null,"Sensor configuration");
       sensorInspector.style.width=LayoutAxis.stretch();
       sensorInspector.style.height=LayoutAxis.fit();
-      sensorInspector.showScrollbar=false;
+      sensorInspector.scrollable=false;
       sensorInspector.labelWidth=viewportWidth < 820.0 ? 76.0 : 100.0;
       sensorInspector.enabled=ownership==null;
       content.push(new KeyedView("properties",sensorInspector));
