@@ -80,7 +80,7 @@ enum {
     RK_MAX_TRAJECTORY_JOINTS = 64, /**< Maximum joints represented by one trajectory chunk. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 6 /**< Version of the RobotKit C data contract (physical model v2, configured LiDAR coverage, timestamped trajectory execution, and queue status). */
+    RK_API_VERSION = 7 /**< Version of the RobotKit C data contract (physical model v2, configured LiDAR coverage, timestamped trajectory execution, queue status, and split trajectory payloads). */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -325,7 +325,14 @@ typedef struct rk_trajectory_point {
     double positions[RK_MAX_TRAJECTORY_JOINTS]; /**< Joint positions in SI units. */
 } rk_trajectory_point;
 
-/** Complete command batch submitted atomically to one RobotRuntime mailbox. */
+/** Bounded trajectory payload submitted alongside a trajectory command. */
+typedef struct rk_trajectory_chunk {
+    uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
+    uint32_t point_count; /**< Number of valid points in points. */
+    rk_trajectory_point points[RK_MAX_TRAJECTORY_POINTS];
+} rk_trajectory_chunk;
+
+/** Command metadata and optional fixed-capacity joint-target payload. */
 typedef struct rk_robot_command {
     uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
     uint64_t sequence; /**< Monotonic command sequence chosen by the caller. */
@@ -333,8 +340,6 @@ typedef struct rk_robot_command {
     rk_command_kind kind; /**< Operation represented by this batch. */
     uint32_t target_count; /**< Number of valid entries in targets. */
     rk_joint_target targets[RK_MAX_JOINTS]; /**< Fixed-capacity target payload. */
-    uint32_t trajectory_count; /**< Number of valid entries in trajectory. */
-    rk_trajectory_point trajectory[RK_MAX_TRAJECTORY_POINTS]; /**< Timestamped position samples. */
 } rk_robot_command;
 
 /** Mutable native state used internally while a runtime publishes a snapshot. */
@@ -411,6 +416,11 @@ RK_API rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *comma
 /** Validates a command against the joint count in a compiled blueprint. */
 RK_API rk_result RK_CALL rk_robot_command_validate_for_blueprint(
     const rk_robot_command *command, const rk_robot_runtime_blueprint *blueprint);
+/** Validates a bounded timestamped trajectory payload. */
+RK_API rk_result RK_CALL rk_trajectory_chunk_validate(const rk_trajectory_chunk *chunk);
+/** Validates a trajectory payload against the joint count in a compiled blueprint. */
+RK_API rk_result RK_CALL rk_trajectory_chunk_validate_for_blueprint(
+    const rk_trajectory_chunk *chunk, const rk_robot_runtime_blueprint *blueprint);
 /** Validates a mutable native state value and its array counts. */
 RK_API rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state);
 /** Validates an immutable published snapshot and its array counts. */
@@ -488,6 +498,18 @@ RK_API rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime);
  */
 RK_API rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime,
                                            const rk_robot_command *command);
+
+/**
+ * Submits trajectory metadata and its bounded payload as separate values.
+ *
+ * Keeping the payload out of rk_robot_command makes ordinary target and
+ * lifecycle commands small enough for realtime mailboxes and worker stacks.
+ * The runtime copies the chunk before returning, so both arguments may be
+ * caller-owned temporaries.
+ */
+RK_API rk_result RK_CALL rk_robot_runtime_submit_trajectory(
+    rk_robot_runtime runtime, const rk_robot_command *command,
+    const rk_trajectory_chunk *chunk);
 
 /**
  * Copies the latest state into the caller-provided value.

@@ -129,8 +129,11 @@ public:
     rk_result start();
     /** Stops the private endpoint worker, if one is running. */
     rk_result stop();
-    /** Queues one complete command batch for the next owner-thread phase. */
+    /** Queues command metadata and joint-target payload for the next owner-thread phase. */
     rk_result submit(const rk_robot_command &command);
+    /** Queues trajectory metadata and its separately allocated payload. */
+    rk_result submit_trajectory(const rk_robot_command &command,
+                                const rk_trajectory_chunk &chunk);
     /** Copies the latest robot state without advancing endpoint time. */
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
@@ -165,6 +168,11 @@ private:
         bool stop_ramp_active = false;
     };
 
+    struct QueuedCommand {
+        rk_robot_command command{};
+        std::shared_ptr<rk_trajectory_chunk> trajectory;
+    };
+
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
     void latch_fault();
@@ -176,7 +184,7 @@ private:
     rk_robot_state state_{};
     mutable std::mutex queue_mutex_;
     std::condition_variable queue_condition_;
-    std::deque<rk_robot_command> commands_;
+    std::deque<QueuedCommand> commands_;
     std::thread worker_;
     bool running_ = false;
     bool stopping_ = false;

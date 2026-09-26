@@ -89,7 +89,6 @@ class RobotRuntime {
     command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_JOINT_TARGETS);
     command.set_target_count(batch.length);
-    command.set_trajectory_count(0);
     for (index in 0...batch.length) {
       var targetValue = batch[index];
       var target = new rk_joint_target();
@@ -126,7 +125,9 @@ class RobotRuntime {
     command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_CHUNK);
     command.set_target_count(0);
-    command.set_trajectory_count(chunk.points.length);
+    var payload = new rk_trajectory_chunk();
+    payload.set_struct_size(rk_trajectory_chunk.size());
+    payload.set_point_count(chunk.points.length);
     for (index in 0...chunk.points.length) {
       var source = chunk.points[index];
       var point = new rk_trajectory_point();
@@ -135,9 +136,9 @@ class RobotRuntime {
       point.set_reserved0(0);
       for (joint in 0...source.positions.length)
         point.set_positions(joint, source.positions[joint]);
-      command.set_trajectory(index, point);
+      payload.set_points(index, point);
     }
-    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+    check(RobotKitRuntime.rk_robot_runtime_submit_trajectory(owner.borrow(), command, payload),
       "runtime.submitTrajectory");
   }
 
@@ -177,7 +178,6 @@ class RobotRuntime {
       ? RobotKitRuntimeConstants.RK_COMMAND_EMERGENCY_STOP
       : RobotKitRuntimeConstants.RK_COMMAND_STOP);
     command.set_target_count(0);
-    command.set_trajectory_count(0);
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.submitStop");
   }
@@ -195,7 +195,6 @@ class RobotRuntime {
     command.set_timestamp_ns(haxe.Int64.ofInt(0));
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_RESET_SAFETY);
     command.set_target_count(0);
-    command.set_trajectory_count(0);
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.resetSafety");
   }

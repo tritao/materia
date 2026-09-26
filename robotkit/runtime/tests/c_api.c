@@ -61,6 +61,25 @@ int main(void) {
     assert(capabilities.joint_count == 1);
     assert(capabilities.supports_position_targets != 0);
 
+    rk_robot_command trajectory_command = {0};
+    trajectory_command.struct_size = sizeof(trajectory_command);
+    trajectory_command.sequence = 2;
+    trajectory_command.kind = RK_COMMAND_TRAJECTORY_CHUNK;
+    rk_trajectory_chunk trajectory = {0};
+    trajectory.struct_size = sizeof(trajectory);
+    trajectory.point_count = 2;
+    trajectory.points[0].joint_count = 1;
+    trajectory.points[0].positions[0] = state.position[0];
+    trajectory.points[1].time_from_start_ns = 100000000;
+    trajectory.points[1].joint_count = 1;
+    trajectory.points[1].positions[0] = 0.5;
+    assert(rk_trajectory_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_OK);
+    assert(rk_robot_runtime_submit(runtime, &trajectory_command) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_robot_runtime_submit_trajectory(runtime, &trajectory_command, &trajectory) == RK_OK);
+    assert(rk_robot_runtime_start(runtime) == RK_OK);
+    nanosleep(&delay, NULL);
+    assert(rk_robot_runtime_stop(runtime) == RK_OK);
+
     rk_robot_runtime_destroy(runtime);
     assert(rk_robot_runtime_snapshot(runtime, &state) == RK_ERROR_INVALID_HANDLE);
     return 0;

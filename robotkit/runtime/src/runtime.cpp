@@ -5,6 +5,8 @@
 #include <cmath>
 #include <iterator>
 #include <limits>
+#include <new>
+#include <utility>
 
 namespace robotkit {
 
@@ -174,17 +176,50 @@ rk_result RobotRuntime::stop() {
 }
 
 rk_result RobotRuntime::submit(const rk_robot_command &command) {
+    if (command.kind == RK_COMMAND_TRAJECTORY_CHUNK)
+        return RK_ERROR_INVALID_ARGUMENT;
     if (rk_robot_command_validate_for_blueprint(&command, &blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
-    std::lock_guard lock(queue_mutex_);
-    if (command.sequence == 0 || command.sequence <= last_command_sequence_)
-        return RK_ERROR_STALE_COMMAND;
-    if (commands_.size() >= 128)
-        return RK_ERROR_QUEUE_FULL;
-    last_command_sequence_ = command.sequence;
-    commands_.push_back(command);
-    queue_condition_.notify_all();
-    return RK_OK;
+    try {
+        std::lock_guard lock(queue_mutex_);
+        if (command.sequence == 0 || command.sequence <= last_command_sequence_)
+            return RK_ERROR_STALE_COMMAND;
+        if (commands_.size() >= 128)
+            return RK_ERROR_QUEUE_FULL;
+        last_command_sequence_ = command.sequence;
+        QueuedCommand queued;
+        queued.command = command;
+        commands_.push_back(std::move(queued));
+        queue_condition_.notify_all();
+        return RK_OK;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    }
+}
+
+rk_result RobotRuntime::submit_trajectory(const rk_robot_command &command,
+                                          const rk_trajectory_chunk &chunk) {
+    if (command.kind != RK_COMMAND_TRAJECTORY_CHUNK ||
+        rk_robot_command_validate_for_blueprint(&command, &blueprint_) != RK_OK ||
+        rk_trajectory_chunk_validate_for_blueprint(&chunk, &blueprint_) != RK_OK)
+        return RK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::lock_guard lock(queue_mutex_);
+        if (command.sequence == 0 || command.sequence <= last_command_sequence_)
+            return RK_ERROR_STALE_COMMAND;
+        if (commands_.size() >= 128)
+            return RK_ERROR_QUEUE_FULL;
+        auto payload = std::make_shared<rk_trajectory_chunk>(chunk);
+        last_command_sequence_ = command.sequence;
+        QueuedCommand queued;
+        queued.command = command;
+        queued.trajectory = std::move(payload);
+        commands_.push_back(std::move(queued));
+        queue_condition_.notify_all();
+        return RK_OK;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    }
 }
 
 rk_result RobotRuntime::snapshot(rk_robot_state &out_state) const {
@@ -264,7 +299,7 @@ void RobotRuntime::latch_fault() {
 }
 
 rk_result RobotRuntime::apply_pending_commands() {
-    std::deque<rk_robot_command> commands;
+    std::deque<QueuedCommand> commands;
     {
         std::lock_guard queue_lock(queue_mutex_);
         commands.swap(commands_);
@@ -309,7 +344,8 @@ rk_result RobotRuntime::apply_pending_commands() {
     // commands are then applied in mailbox order so a reset/flush/chunk
     // sequence and multiple trajectory chunks retain their meaning.
     const rk_robot_command *emergency = nullptr;
-    for (const auto &value : commands) {
+    for (const auto &queued : commands) {
+        const auto &value = queued.command;
         if (value.kind == RK_COMMAND_EMERGENCY_STOP) {
             emergency = &value;
             break;
@@ -359,10 +395,11 @@ rk_result RobotRuntime::apply_pending_commands() {
         safety = RK_SAFETY_EMERGENCY_STOP;
     } else {
         for (std::size_t index = 0; index < commands.size(); ++index) {
-            auto &value = commands[index];
+            auto &queued = commands[index];
+            auto &value = queued.command;
             bool has_later_effective_command = false;
             for (std::size_t next = index + 1; next < commands.size(); ++next) {
-                if (commands[next].kind != RK_COMMAND_NONE) {
+                if (commands[next].command.kind != RK_COMMAND_NONE) {
                     has_later_effective_command = true;
                     break;
                 }
@@ -452,13 +489,16 @@ rk_result RobotRuntime::apply_pending_commands() {
             }
 
             if (value.kind == RK_COMMAND_TRAJECTORY_CHUNK) {
+                if (queued.trajectory == nullptr)
+                    return RK_ERROR_INVALID_ARGUMENT;
                 std::fill_n(control_.active, RK_MAX_JOINTS, false);
                 std::fill_n(control_.reference_initialized, RK_MAX_JOINTS, false);
                 control_.stop_ramp_active = false;
                 const auto base_time = control_.trajectory.empty()
                     ? uint64_t{0} : control_.trajectory.back().time_from_start_ns;
-                for (uint32_t point_index = 0; point_index < value.trajectory_count; ++point_index) {
-                    auto point = value.trajectory[point_index];
+                for (uint32_t point_index = 0;
+                     point_index < queued.trajectory->point_count; ++point_index) {
+                    auto point = queued.trajectory->points[point_index];
                     if (base_time > std::numeric_limits<uint64_t>::max() - point.time_from_start_ns)
                         return RK_ERROR_INVALID_ARGUMENT;
                     point.time_from_start_ns += base_time;

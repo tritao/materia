@@ -182,14 +182,20 @@ rk_robot_state apply_cycle(robotkit::RobotRuntime &runtime, uint64_t &timestamp)
     return state;
 }
 
-rk_robot_command trajectory_batch(uint64_t sequence,
-                                  std::initializer_list<std::pair<uint64_t, double>> points) {
+rk_robot_command trajectory_command(uint64_t sequence) {
     rk_robot_command value{};
     value.struct_size = sizeof(value);
     value.sequence = sequence;
     value.kind = RK_COMMAND_TRAJECTORY_CHUNK;
+    return value;
+}
+
+rk_trajectory_chunk trajectory_batch(
+    std::initializer_list<std::pair<uint64_t, double>> points) {
+    rk_trajectory_chunk value{};
+    value.struct_size = sizeof(value);
     for (const auto &[time, position] : points) {
-        auto &point = value.trajectory[value.trajectory_count++];
+        auto &point = value.points[value.point_count++];
         point.time_from_start_ns = time;
         point.joint_count = 2;
         point.positions[0] = position;
@@ -203,8 +209,9 @@ void timestamped_trajectory_interpolates_and_reports_progress(
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
     uint64_t timestamp = 0;
-    assert(runtime.submit(trajectory_batch(1, {{0, 0.0}, {100'000'000, 0.5},
-                                               {200'000'000, 1.0}})) == RK_OK);
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {100'000'000, 0.5},
+                          {200'000'000, 1.0}})) == RK_OK);
 
     auto state = apply_cycle(runtime, timestamp);
     assert(state.position[0] == 0.0);
@@ -233,7 +240,8 @@ void normal_stop_decelerates_active_trajectory(const rk_robot_runtime_blueprint 
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
     uint64_t timestamp = 0;
-    assert(runtime.submit(trajectory_batch(1, {{0, 0.0}, {200'000'000, 1.0}})) == RK_OK);
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {200'000'000, 1.0}})) == RK_OK);
     auto state = apply_cycle(runtime, timestamp);
     assert(state.position[0] == 0.0);
     state = apply_cycle(runtime, timestamp);
@@ -327,8 +335,10 @@ void partial_targets_and_ordered_trajectory_commands(
 
     // Multiple chunks in one mailbox drain append in sequence order instead
     // of the newest chunk replacing the earlier one.
-    assert(runtime.submit(trajectory_batch(3, {{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
-    assert(runtime.submit(trajectory_batch(4, {{0, 0.2}, {100'000'000, 0.4}})) == RK_OK);
+    assert(runtime.submit_trajectory(trajectory_command(3),
+        trajectory_batch({{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
+    assert(runtime.submit_trajectory(trajectory_command(4),
+        trajectory_batch({{0, 0.2}, {100'000'000, 0.4}})) == RK_OK);
     state = apply_cycle(runtime, timestamp);
     assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 4);
     assert(state.trajectory_duration_ns == 200'000'000);
@@ -342,7 +352,8 @@ void partial_targets_and_ordered_trajectory_commands(
     // A stop followed by a replacement chunk clears the old queue before the
     // new motion is accepted; the final owner output is the new trajectory.
     assert(runtime.submit(lifecycle_command(5, RK_COMMAND_STOP)) == RK_OK);
-    assert(runtime.submit(trajectory_batch(6, {{0, 0.1}, {100'000'000, 0.3}})) == RK_OK);
+    assert(runtime.submit_trajectory(trajectory_command(6),
+        trajectory_batch({{0, 0.1}, {100'000'000, 0.3}})) == RK_OK);
     state = apply_cycle(runtime, timestamp);
     assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
     assert(std::abs(state.position[0] - 0.1) < 1e-9);
@@ -357,7 +368,8 @@ void partial_targets_and_ordered_trajectory_commands(
     state = apply_cycle(reset_runtime, timestamp);
     assert(state.safety == RK_SAFETY_EMERGENCY_STOP);
     assert(reset_runtime.submit(lifecycle_command(2, RK_COMMAND_RESET_SAFETY)) == RK_OK);
-    assert(reset_runtime.submit(trajectory_batch(3, {{0, 0.0}, {100'000'000, 0.25}})) == RK_OK);
+    assert(reset_runtime.submit_trajectory(trajectory_command(3),
+        trajectory_batch({{0, 0.0}, {100'000'000, 0.25}})) == RK_OK);
     state = apply_cycle(reset_runtime, timestamp);
     assert(state.safety == RK_SAFETY_READY);
     assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
@@ -366,6 +378,10 @@ void partial_targets_and_ordered_trajectory_commands(
 } // namespace
 
 int main() {
+    static_assert(sizeof(rk_robot_command) < 20'000,
+        "trajectory payload must not be embedded in the command mailbox value");
+    static_assert(sizeof(rk_trajectory_chunk) > 130'000,
+        "trajectory payload remains explicitly bounded and independently allocated");
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.revision = 1;
