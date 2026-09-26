@@ -33,6 +33,7 @@ Each component also produces the machining it needs:
 | `Bushing` | — (proportional to bore diameter) | — |
 | `ShaftCoupling` | — (proportional to the larger bore) | `setScrewPart()` |
 | `LinearBearing` | LM8UU–LM20UU | — |
+| `LeadScrewNut` | — (proportional to screw diameter) | `travelPerRevolution()`, `rotationFor()`, `mountScrewPart()` |
 
 `SteppedShaft` stacks coaxial cylindrical sections along +Z, producing square
 shoulders at each diameter change. Keyways are cut on the shaft's local +Y

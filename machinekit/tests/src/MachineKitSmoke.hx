@@ -4,6 +4,7 @@ import machinekit.assembly.LinearAxis;
 import machinekit.assembly.PillowBlock;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
+import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LinearBearing;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.ShaftCoupling;
@@ -599,6 +600,27 @@ class MachineKitSmoke {
 		check(pulleyBox.maxX <= pulley.outsideDiameter / 2 + 1e-6, "timing pulley stays within its outside radius");
 		check(pulleyBox.maxX > pulley.grooveDiameter / 2, "timing pulley lands extend past the groove circle");
 		pulleyPart.close();
+
+		var nut = new LeadScrewNut(8, 2);
+		check(nut.designation == "LEADNUT-D8-L2", "lead screw nut designation");
+		check(nut.mountScrew == "M4", "lead screw nut mount screw size");
+		near(nut.travelPerRevolution(), 2, "lead screw nut travel per revolution");
+		near(nut.rotationFor(10), 10 / 2 * 2 * Math.PI, "lead screw nut rotation for a travel distance");
+		throws(() -> new LeadScrewNut(-1, 2), "positive screw diameter");
+		throws(() -> new LeadScrewNut(8, -1), "positive lead");
+		throws(() -> new LeadScrewNut(8, 2, 2), "at least 3 mounting bolts");
+
+		var nutEnvelope = nut.geometry(Envelope);
+		solid(nutEnvelope, "lead screw nut envelope");
+		near(nutEnvelope.volume(), Math.PI * 7.2 * 7.2 * 16 + Math.PI * 12 * 12 * 3 - Math.PI * 4 * 4 * 19,
+			"lead screw nut envelope volume");
+		nutEnvelope.close();
+		var nutPreview = nut.geometry();
+		solid(nutPreview, "lead screw nut preview");
+		nutPreview.close();
+		near(nut.connector("bore").frame.z, 8, "lead screw nut bore connector");
+		near(nut.connector("mount1").frame.z, 19, "lead screw nut mount connector z");
+		near(nut.connector("mount1").frame.x, 9, "lead screw nut mount connector x");
 	}
 
 	static function robotics():Void {
