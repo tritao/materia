@@ -410,6 +410,25 @@ silently expanding scope; `robotkit_mujoco_backend` (the lower-level SimKit
 MuJoCo suite) and every other regression suite listed in this milestone are
 green.
 
+### MuJoCo joint actuation (M8.5, F2)
+
+Each non-fixed joint has exactly one MuJoCo motor actuator (`mjs_setToMotor`),
+not one each for position/velocity/effort: a MuJoCo position actuator's bias
+(`-kp*q - kv*qdot`) applies even at `ctrl = 0`, so an idle position actuator
+previously dragged a velocity- or effort-commanded joint back toward `q = 0`
+and stalled it (and, symmetrically, an idle velocity actuator added damping
+to a position-commanded joint). `MujocoBackend::apply_joint_targets` computes
+the actual torque every substep instead:
+`position: m_ii*(ωn²*(q*-q) - 2ζωn*qdot) + bias`,
+`velocity: m_ii*kv*(qdot*-qdot) + bias`, `effort: target`, clamped to
+`max_force` when positive. `m_ii` is the joint's own diagonal of MuJoCo's
+sparse mass matrix (`data->M[model->dof_Madr[dof]]`), and `bias` is
+`data->qfrc_bias` (gravity/Coriolis compensation), so the response no longer
+depends on a fixed gain fighting a link's actual mass — a heavier arm no
+longer sags under a fixed `kp`, and the same gains produce a comparable
+response regardless of the joint's inertia. Defaults are `ωn = 2π*10 rad/s`,
+`ζ = 1`, `kv = 50 s⁻¹`.
+
 ## Deployment boundary
 
 `robotd` remains one robot. It assigns every connection a unique session ID,

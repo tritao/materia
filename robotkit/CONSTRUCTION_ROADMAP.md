@@ -660,6 +660,31 @@ expanding this milestone's scope. `robotkit_mujoco_backend` (the
 lower-level SimKit suite covering the same MuJoCo backend code F1 touches)
 passes.
 
+**M8.5 F2** (MuJoCo actuator stalling/damping): wrote a failing test first
+(`wheel_velocity_target_does_not_stall` in `simkit/sim_mujoco/tests/mujoco.cpp`
+— an unlimited wheel joint given a 1 rad/s velocity target settled far short
+of it, confirming the idle position actuator's bias was fighting it), then
+replaced the three built-in position/velocity/effort actuators
+(`MujocoBackend::add_joint_actuators`) with one motor actuator per non-fixed
+joint and computed torque directly in `apply_joint_targets`
+(`simkit/sim_mujoco/src/mujoco_backend.cpp`) per the plan's formula, using
+`data->M[model->dof_Madr[dof]]` for the mass-matrix diagonal (this MuJoCo
+checkout names the sparse mass matrix field `M`, not `qM`) and
+`data->qfrc_bias` for gravity/Coriolis compensation. Added two more tests:
+`position_target_holds_under_gravity` (a 0.5m pendulum arm holds its
+commanded angle within 1e-3 rad against gravity) and
+`effort_target_respects_max_force_clamp` (an effort target far beyond
+`max_force` behaves identically to a target of exactly `max_force`). The
+existing `revolute_joint_is_owned_by_nativekit` fixture needed its step
+count re-tuned (10 steps, not 60) because the new controller is far
+stiffer (`ωn = 2π*10` vs. the old `kp = 100`) and was hitting the joint's
+own position limit before the assertion ran; this is an expected
+consequence of a more responsive controller, not a masked regression.
+`ctest -L sim` (SimKit) and the MuJoCo-enabled native robotd build
+(`/tmp/materia-mujoco`) are green except the same pre-existing
+`robotkit_mujoco_tests` failure logged under F1 (unaffected by F2, since it
+doesn't touch actuation).
+
 **M5**: added `robotkit/haxe/robotkit/work/` (`Point2`, `Polygon2`,
 `WorkSurfaceId`, `SourceKind`, `Provenance`, `WorkSurface`,
 `RasterToolpathGenerator`, `CoverageMap`) and

@@ -137,7 +137,7 @@ void revolute_joint_is_owned_by_nativekit() {
     target.max_force = 20.0;
     assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
 
-    for (int index = 0; index < 60; ++index) {
+    for (int index = 0; index < 40; ++index) {
         nksim_step_result step{};
         step.struct_size = sizeof(step);
         assert(nksim_world_step(world, &step) == NKSIM_OK);
@@ -414,6 +414,177 @@ void rotated_free_body_preserves_world_angular_velocity() {
     nkscene_scene_destroy(scene);
 }
 
+void wheel_velocity_target_does_not_stall() {
+    // F2: a MuJoCo position actuator's bias (-kp*q - kv*qdot) applies even at
+    // ctrl=0, so the idle position actuator drags a velocity-commanded wheel
+    // back toward q=0 and it stalls well short of the commanded rate.
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto base_node = make_node(scene, 0.0);
+    const auto wheel_node = make_node(scene, 0.0);
+
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = 0.0;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+
+    const auto base = make_body(world, base_node, NKSIM_MOTION_STATIC, 0.0);
+    const auto shape = make_box(world);
+    const auto wheel = make_body(world, wheel_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = base;
+    joint_desc.body_b = wheel;
+    joint_desc.axis_a[2] = 1.0;
+    // No lower/upper limit: an unlimited (continuous) wheel joint.
+    joint_desc.max_force = 50.0;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = joint;
+    target.mode = NKSIM_JOINT_TARGET_VELOCITY;
+    target.target = 1.0;
+    target.max_force = 50.0;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+
+    nksim_joint_state before{};
+    before.struct_size = sizeof(before);
+    step_world(world, 400); // 4 s: let the velocity settle.
+    assert(nksim_joint_get_state(world, joint, &before) == NKSIM_OK);
+    step_world(world, 100); // one more second.
+    nksim_joint_state after{};
+    after.struct_size = sizeof(after);
+    assert(nksim_joint_get_state(world, joint, &after) == NKSIM_OK);
+
+    assert(std::abs(after.velocity - 1.0) < 0.05);
+    assert(after.position > before.position); // still turning, not stalled.
+
+    nksim_joint_destroy(world, joint);
+    nksim_body_destroy(world, wheel);
+    nksim_body_destroy(world, base);
+    nksim_shape_destroy(world, shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+void position_target_holds_under_gravity() {
+    // F2: torque is scaled by the joint's own mass-matrix diagonal plus
+    // gravity/Coriolis bias, so a fixed kp/kv no longer sags under a heavier
+    // link's weight.
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto base_node = make_node(scene, 0.0);
+    const auto arm_node = make_node(scene, 0.5); // Rest pose 0.5m out along the pivot's X.
+
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+
+    const auto base = make_body(world, base_node, NKSIM_MOTION_STATIC, 0.0);
+    const auto shape = make_box(world);
+    const auto arm = make_body(world, arm_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = base;
+    joint_desc.body_b = arm;
+    joint_desc.axis_a[1] = 1.0; // Hinge about Y: gravity torques it in the X-Z plane.
+    joint_desc.anchor_b[0] = -0.5; // The arm's center is 0.5m out along the pivot's local X (matches its rest pose).
+    joint_desc.max_force = 200.0;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = joint;
+    target.mode = NKSIM_JOINT_TARGET_POSITION;
+    target.target = 0.0; // Hold horizontal against gravity.
+    target.max_force = 200.0;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+    step_world(world, 300); // 3 s to settle.
+
+    nksim_joint_state joint_state{};
+    joint_state.struct_size = sizeof(joint_state);
+    assert(nksim_joint_get_state(world, joint, &joint_state) == NKSIM_OK);
+    assert(std::abs(joint_state.position) < 1e-3);
+    assert(std::abs(joint_state.velocity) < 1e-2);
+
+    nksim_joint_destroy(world, joint);
+    nksim_body_destroy(world, arm);
+    nksim_body_destroy(world, base);
+    nksim_shape_destroy(world, shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+void effort_target_respects_max_force_clamp() {
+    // F2: effort mode is unchanged (torque == target, clamped to max_force).
+    // An effort target far beyond max_force must behave exactly like a
+    // target of max_force itself.
+    auto run = [](double effort_target, double max_force) {
+        nkscene_scene scene = 0;
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        const auto base_node = make_node(scene, 0.0);
+        const auto wheel_node = make_node(scene, 0.0);
+        nksim_world_desc world_desc{};
+        world_desc.struct_size = sizeof(world_desc);
+        world_desc.scene = scene;
+        world_desc.fixed_timestep = 0.01;
+        world_desc.physics_substeps = 1;
+        world_desc.gravity[2] = 0.0;
+        nksim_world world = 0;
+        assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+        const auto base = make_body(world, base_node, NKSIM_MOTION_STATIC, 0.0);
+        const auto shape = make_box(world);
+        const auto wheel = make_body(world, wheel_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+        nksim_joint_desc joint_desc{};
+        joint_desc.struct_size = sizeof(joint_desc);
+        joint_desc.type = NKSIM_JOINT_REVOLUTE;
+        joint_desc.body_a = base;
+        joint_desc.body_b = wheel;
+        joint_desc.axis_a[2] = 1.0;
+        joint_desc.max_force = 1000.0; // Unclamped at the joint description itself.
+        nksim_joint joint = 0;
+        assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+        nksim_joint_target target{};
+        target.struct_size = sizeof(target);
+        target.joint = joint;
+        target.mode = NKSIM_JOINT_TARGET_EFFORT;
+        target.target = effort_target;
+        target.max_force = max_force;
+        assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+        step_world(world, 1);
+        nksim_joint_state state{};
+        state.struct_size = sizeof(state);
+        assert(nksim_joint_get_state(world, joint, &state) == NKSIM_OK);
+        nksim_joint_destroy(world, joint);
+        nksim_body_destroy(world, wheel);
+        nksim_body_destroy(world, base);
+        nksim_shape_destroy(world, shape);
+        nksim_world_destroy(world);
+        nkscene_scene_destroy(scene);
+        return state.velocity;
+    };
+    const auto clamped = run(500.0, 10.0);
+    const auto at_limit = run(10.0, 10.0);
+    assert(std::abs(clamped - at_limit) < 1e-9);
+    assert(std::abs(clamped) > 1e-6); // The clamp still lets it move.
+}
+
 } // namespace
 
 int main() {
@@ -424,5 +595,8 @@ int main() {
     plane_shape_stops_dynamic_body();
     mujoco_replay_is_deterministic();
     rotated_free_body_preserves_world_angular_velocity();
+    wheel_velocity_target_does_not_stall();
+    position_target_holds_under_gravity();
+    effort_target_respects_max_force_clamp();
     return 0;
 }

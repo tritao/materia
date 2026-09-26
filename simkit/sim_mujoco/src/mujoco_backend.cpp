@@ -573,46 +573,31 @@ private:
         return NKSIM_OK;
     }
 
+    // F2: a single motor actuator per non-fixed joint. apply_joint_targets
+    // computes the actual torque every substep (position/velocity gains
+    // scaled by the joint's own mass-matrix diagonal, plus gravity/Coriolis
+    // compensation), rather than relying on MuJoCo's built-in position and
+    // velocity actuators, whose bias (-kp*q - kv*qdot for a position
+    // actuator) applies even at ctrl=0 — an idle position actuator dragged a
+    // velocity- or effort-commanded joint back toward q=0.
     nksim_result add_joint_actuators() {
         for (const auto joint_id : joint_order) {
             const auto &joint = joints.at(joint_id);
             if (joint.desc.type == NKSIM_JOINT_FIXED)
                 continue;
-            const auto result = add_actuator(joint, "position", NKSIM_JOINT_TARGET_POSITION);
-            if (result != NKSIM_OK)
-                return result;
-            const auto velocity_result = add_actuator(
-                joint, "velocity", NKSIM_JOINT_TARGET_VELOCITY);
-            if (velocity_result != NKSIM_OK)
-                return velocity_result;
-            const auto effort_result = add_actuator(joint, "effort", NKSIM_JOINT_TARGET_EFFORT);
-            if (effort_result != NKSIM_OK)
-                return effort_result;
+            auto *actuator = mjs_addActuator(spec, nullptr);
+            if (!actuator)
+                return NKSIM_ERROR_OUT_OF_MEMORY;
+            const auto name = joint.name + "_motor";
+            if (mjs_setName(actuator->element, name.c_str()) != 0)
+                return NKSIM_ERROR_BACKEND;
+            actuator->trntype = mjTRN_JOINT;
+            mjs_setString(actuator->target, joint.name.c_str());
+            const char *error = mjs_setToMotor(actuator);
+            if (error && error[0] != '\0')
+                return NKSIM_ERROR_BACKEND;
         }
         return NKSIM_OK;
-    }
-
-    nksim_result add_actuator(const JointRecord &joint, const char *mode,
-                              std::uint32_t target_mode) {
-        auto *actuator = mjs_addActuator(spec, nullptr);
-        if (!actuator)
-            return NKSIM_ERROR_OUT_OF_MEMORY;
-        const auto name = joint.name + "_" + mode;
-        if (mjs_setName(actuator->element, name.c_str()) != 0)
-            return NKSIM_ERROR_BACKEND;
-        actuator->trntype = mjTRN_JOINT;
-        mjs_setString(actuator->target, joint.name.c_str());
-
-        const char *error = nullptr;
-        if (target_mode == NKSIM_JOINT_TARGET_POSITION) {
-            double kv = 10.0;
-            error = mjs_setToPosition(actuator, 100.0, &kv, nullptr, nullptr, 0.0);
-        } else if (target_mode == NKSIM_JOINT_TARGET_VELOCITY) {
-            error = mjs_setToVelocity(actuator, 20.0);
-        } else {
-            error = mjs_setToMotor(actuator);
-        }
-        return error && error[0] != '\0' ? NKSIM_ERROR_BACKEND : NKSIM_OK;
     }
 
     nksim_result add_body(std::uint64_t id, mjsBody *parent,
@@ -818,32 +803,45 @@ private:
             const auto type = model->jnt_type[model_id];
             if (type != mjJNT_HINGE && type != mjJNT_SLIDE)
                 continue;
+            const auto actuator = model_actuator_id(joint, "motor");
+            if (actuator < 0)
+                continue;
+
+            const auto dof = model->jnt_dofadr[model_id];
+            // The mass matrix is stored sparse; the diagonal entry for dof i
+            // lives at M[dof_Madr[i]] (the roadmap's "m_ii ... via
+            // dof_Madr", avoiding a dense mj_fullM expansion every substep).
+            const auto m_ii = data->M[model->dof_Madr[dof]];
+            const auto bias = data->qfrc_bias[dof];
+            const auto q = data->qpos[model->jnt_qposadr[model_id]];
+            const auto qdot = data->qvel[dof];
+
+            double torque = 0.0;
+            switch (joint.target_mode) {
+            case NKSIM_JOINT_TARGET_POSITION: {
+                constexpr double omega_n = 2.0 * 3.14159265358979323846 * 10.0;
+                constexpr double zeta = 1.0;
+                torque = m_ii * (omega_n * omega_n * (joint.target - q) - 2.0 * zeta * omega_n * qdot) + bias;
+                break;
+            }
+            case NKSIM_JOINT_TARGET_VELOCITY: {
+                constexpr double kv = 50.0;
+                torque = m_ii * kv * (joint.target - qdot) + bias;
+                break;
+            }
+            case NKSIM_JOINT_TARGET_EFFORT:
+            default:
+                torque = joint.target;
+                break;
+            }
+
             const auto max_force = joint.target_max_force > 0.0
                 ? joint.target_max_force : joint.desc.max_force;
-            const auto position_actuator = model_actuator_id(joint, "position");
-            const auto velocity_actuator = model_actuator_id(joint, "velocity");
-            const auto effort_actuator = model_actuator_id(joint, "effort");
-            const auto set_limit = [&](int actuator) {
-                if (actuator < 0)
-                    return;
-                model->actuator_forcelimited[actuator] = max_force > 0.0;
-                if (max_force > 0.0) {
-                    model->actuator_forcerange[actuator * 2] = -max_force;
-                    model->actuator_forcerange[actuator * 2 + 1] = max_force;
-                }
-            };
-            set_limit(position_actuator);
-            set_limit(velocity_actuator);
-            set_limit(effort_actuator);
-            int actuator = -1;
-            if (joint.target_mode == NKSIM_JOINT_TARGET_POSITION)
-                actuator = position_actuator;
-            else if (joint.target_mode == NKSIM_JOINT_TARGET_VELOCITY)
-                actuator = velocity_actuator;
-            else
-                actuator = effort_actuator;
-            if (actuator >= 0)
-                data->ctrl[actuator] = joint.target;
+            if (max_force > 0.0) {
+                if (torque > max_force) torque = max_force;
+                if (torque < -max_force) torque = -max_force;
+            }
+            data->ctrl[actuator] = torque;
         }
     }
 
