@@ -8,16 +8,15 @@ import robotkit.process.Toolpath;
 
 /**
  * Boustrophedon raster over a `WorkSurface`'s boundary minus its exclusions,
- * clipped row by row with polygon scanline intersection. An interval end
- * created by cutting into an exclusion is pulled inward by half the tool
- * width before laying down points, so the tool's own footprint radius (not
- * just its center) stays clear of the exclusion; an end that is the outer
- * boundary itself is left alone, since a footprint bulging past the
- * boundary edge is harmless. This is a 1D stand-in for a full polygon
- * offset, adequate for the axis-aligned/rectangular surfaces this milestone
- * targets. The tool is off while transiting between rows and across
- * exclusion gaps; lead-in/lead-out points bracket the whole path
- * off-process. Curved surfaces are out of scope; geometry stays planar.
+ * clipped row by row with polygon scanline intersection. Each exclusion is
+ * expanded by the tool radius before its intervals are removed. The expanded
+ * intervals are the exact horizontal slices of the polygon's Minkowski sum
+ * with a disk: the polygon interior, an offset strip around every edge, and a
+ * disk around every vertex are unioned. This handles rotated and concave
+ * exclusions without relying on their bounding boxes. The tool is off while
+ * transiting between rows and across exclusion gaps; lead-in/lead-out points
+ * bracket the whole path off-process. Curved surfaces are out of scope;
+ * geometry stays planar.
  */
 class RasterToolpathGenerator {
   public static function generate(surface:WorkSurface, toolWidth:Float, overlap:Float,
@@ -53,22 +52,15 @@ class RasterToolpathGenerator {
 
     for (rowY in rows) {
       var allowed:Array<Interval1D> = [];
-      for (raw in surface.boundary.scanlineIntervals(rowY)) allowed.push(new Interval1D(raw[0], raw[1], false, false));
-      // Subtract by the exclusion's own bounding-box X-range whenever the
-      // row's *footprint band* (not just its centerline) reaches the
-      // exclusion's Y bounds: a row whose scanline misses a nearby
-      // exclusion can still graze it with the tool's radius. This is exact
-      // for axis-aligned rectangular exclusions and conservative otherwise.
-      for (exclusion in surface.exclusions) {
-        var exclusionBounds = exclusion.bounds();
-        if (rowY + halfWidth >= exclusionBounds.minY && rowY - halfWidth <= exclusionBounds.maxY)
-          allowed = subtractIntervals(allowed, [[exclusionBounds.minX, exclusionBounds.maxX]]);
-      }
+      for (raw in surface.boundary.scanlineIntervals(rowY))
+        allowed.push(new Interval1D(raw[0], raw[1]));
+      var forbidden:Array<Array<Float>> = [];
+      for (exclusion in surface.exclusions)
+        forbidden = forbidden.concat(expandedExclusionIntervals(exclusion, rowY, halfWidth));
+      allowed = subtractIntervals(allowed, mergeIntervals(forbidden));
       var kept:Array<Array<Float>> = [];
       for (interval in allowed) {
-        var start = interval.start + (interval.startIsExclusion ? halfWidth : 0.0);
-        var end = interval.end - (interval.endIsExclusion ? halfWidth : 0.0);
-        if (end - start > 1e-6) kept.push([start, end]);
+        if (interval.end - interval.start > 1e-6) kept.push([interval.start, interval.end]);
       }
       if (kept.length == 0) continue;
       if (!forward) kept.reverse();
@@ -105,40 +97,81 @@ class RasterToolpathGenerator {
     return new Transform3(new Vec3(x, y, standoff), faceSurface);
   }
 
-  /**
-   * Subtracts raw exclusion intervals from `base`. A remainder edge created
-   * by the cut is flagged `IsExclusion = true`; an untouched original edge
-   * keeps its existing flag.
-   */
-  static function subtractIntervals(base:Array<Interval1D>, remove:Array<Array<Float>>):Array<Interval1D> {
-    var result = base;
-    for (r in remove) {
-      var next:Array<Interval1D> = [];
-      for (b in result) {
-        if (r[1] <= b.start || r[0] >= b.end) {
-          next.push(b);
-          continue;
-        }
-        if (r[0] > b.start) next.push(new Interval1D(b.start, Math.min(r[0], b.end), b.startIsExclusion, true));
-        if (r[1] < b.end) next.push(new Interval1D(Math.max(r[1], b.start), b.end, true, b.endIsExclusion));
+  /** Returns the horizontal slice of an exclusion expanded by `radius`. */
+  static function expandedExclusionIntervals(exclusion:Polygon2, y:Float,
+      radius:Float):Array<Array<Float>> {
+    var intervals = exclusion.scanlineIntervals(y);
+    var vertices = exclusion.vertices();
+    for (index in 0...vertices.length) {
+      var a = vertices[index];
+      var b = vertices[(index + 1) % vertices.length];
+      var dy = y - a.y;
+      if (Math.abs(dy) <= radius + 1e-12) {
+        var halfChord = Math.sqrt(Math.max(0.0, radius * radius - dy * dy));
+        intervals.push([a.x - halfChord, a.x + halfChord]);
       }
-      result = next;
+
+      var edgeX = b.x - a.x, edgeY = b.y - a.y;
+      var edgeLength = Math.sqrt(edgeX * edgeX + edgeY * edgeY);
+      if (edgeLength <= 1e-12) continue;
+      var normalX = -edgeY / edgeLength, normalY = edgeX / edgeLength;
+      var strip = new Polygon2([
+        new Point2(a.x - normalX * radius, a.y - normalY * radius),
+        new Point2(b.x - normalX * radius, b.y - normalY * radius),
+        new Point2(b.x + normalX * radius, b.y + normalY * radius),
+        new Point2(a.x + normalX * radius, a.y + normalY * radius)
+      ]);
+      intervals = intervals.concat(strip.scanlineIntervals(y));
+    }
+    return mergeIntervals(intervals);
+  }
+
+  /** Merges overlapping or touching horizontal intervals in ascending order. */
+  static function mergeIntervals(input:Array<Array<Float>>):Array<Array<Float>> {
+    var sorted:Array<Array<Float>> = [];
+    for (interval in input) if (interval != null && interval.length >= 2 &&
+        interval[1] - interval[0] > 1e-12)
+      sorted.push([interval[0], interval[1]]);
+    sorted.sort(function(left, right) {
+      if (left[0] != right[0]) return left[0] < right[0] ? -1 : 1;
+      return left[1] < right[1] ? -1 : (left[1] > right[1] ? 1 : 0);
+    });
+    var result:Array<Array<Float>> = [];
+    for (interval in sorted) {
+      if (result.length == 0 || interval[0] > result[result.length - 1][1] + 1e-10) {
+        result.push(interval);
+      } else if (interval[1] > result[result.length - 1][1]) {
+        result[result.length - 1][1] = interval[1];
+      }
+    }
+    return result;
+  }
+
+  /** Subtracts sorted, disjoint removal intervals from the base intervals. */
+  static function subtractIntervals(base:Array<Interval1D>, remove:Array<Array<Float>>):Array<Interval1D> {
+    var result:Array<Interval1D> = [];
+    for (b in base) {
+      var cursor = b.start;
+      for (r in remove) {
+        if (r[1] <= cursor + 1e-10) continue;
+        if (r[0] >= b.end - 1e-10) break;
+        if (r[0] > cursor) result.push(new Interval1D(cursor, Math.min(r[0], b.end)));
+        if (r[1] > cursor) cursor = r[1];
+        if (cursor >= b.end - 1e-10) break;
+      }
+      if (cursor < b.end - 1e-10) result.push(new Interval1D(cursor, b.end));
     }
     return result;
   }
 }
 
-/** A 1D interval with per-end provenance: does this end touch an exclusion cut, or the outer boundary? */
+/** A 1D interval left after clipping a scanline. */
 private class Interval1D {
   public final start:Float;
   public final end:Float;
-  public final startIsExclusion:Bool;
-  public final endIsExclusion:Bool;
 
-  public function new(start:Float, end:Float, startIsExclusion:Bool, endIsExclusion:Bool) {
+  public function new(start:Float, end:Float) {
     this.start = start;
     this.end = end;
-    this.startIsExclusion = startIsExclusion;
-    this.endIsExclusion = endIsExclusion;
   }
 }

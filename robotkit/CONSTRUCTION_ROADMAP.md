@@ -1238,3 +1238,11 @@ the descriptor through an optional `Pose2`, while null preserves the existing
 indexed default pose. Tests cover reset after teleport, full simulation reset,
 and the driven differential-base path; the Haxe world suite passed with 4,329
 assertions.
+
+**F6**: `RasterToolpathGenerator` now clips scanlines against each exclusion
+expanded by the tool radius. The expanded slice is formed from the polygon's
+interior, edge offset strips, and vertex disks, with interval unioning handling
+rotated and concave polygons without bounding-box over-cutting. Added work
+tests cover a 45-degree diamond and an L-shaped exclusion; allowed coverage is
+at least 98% with no excluded cell touched. The Haxe world suite passed with
+4,333 assertions.

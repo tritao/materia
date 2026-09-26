@@ -18,6 +18,7 @@ class WorkTests {
     testPolygonScanlineAndContains();
     testWorkSurfaceFrameRegistration();
     testRasterCoversWallWithDoorExclusion();
+    testRasterOffsetsRotatedAndConcaveExclusions();
     testCoverageFromSimulatedExecutionMatchesPlanned();
     Sys.println('RobotKit work tests passed ($assertions assertions)');
     return assertions;
@@ -93,6 +94,37 @@ class WorkTests {
       'Simulated-execution coverage (${simulated.coverageFraction()}) matches planned coverage (${planned.coverageFraction()})');
     check(planned.exclusionCoverageFraction() <= 0.0001, "Planned coverage avoids the exclusion");
     check(simulated.exclusionCoverageFraction() <= 0.0001, "Simulated execution also avoids the exclusion");
+  }
+
+  static function testRasterOffsetsRotatedAndConcaveExclusions():Void {
+    var diamond = new Polygon2([
+      new Point2(1.5, 0.85), new Point2(2.15, 1.5),
+      new Point2(1.5, 2.15), new Point2(0.85, 1.5)
+    ]);
+    var diamondSurface = new WorkSurface("rotated-exclusion", "panel", Transform3.identity(),
+      rect(0.0, 0.0, 3.0, 3.0), [diamond]);
+    assertRasterAvoidsExclusion(diamondSurface,
+      "Raster offsets a 45-degree exclusion without process-on contact");
+
+    var concave = new Polygon2([
+      new Point2(0.8, 0.8), new Point2(2.2, 0.8), new Point2(2.2, 1.3),
+      new Point2(1.3, 1.3), new Point2(1.3, 2.2), new Point2(0.8, 2.2)
+    ]);
+    var concaveSurface = new WorkSurface("concave-exclusion", "panel", Transform3.identity(),
+      rect(0.0, 0.0, 3.0, 3.0), [concave]);
+    assertRasterAvoidsExclusion(concaveSurface,
+      "Raster offsets an L-shaped exclusion without process-on contact");
+  }
+
+  static function assertRasterAvoidsExclusion(surface:WorkSurface, label:String):Void {
+    var toolWidth = 0.2;
+    var toolpath = RasterToolpathGenerator.generate(surface, toolWidth, 0.4, 0.05, 0.2, 0.03);
+    var coverage = new CoverageMap(surface, 0.025);
+    sweepProcessMoves(coverage, toolpath, toolWidth * 0.5, 0.005);
+    check(coverage.coverageFraction() >= 0.98,
+      '$label while covering the allowed area (got ${coverage.coverageFraction()})');
+    check(coverage.exclusionCoverageFraction() <= 0.0001,
+      '$label (got ${coverage.exclusionCoverageFraction()})');
   }
 
   // -- helpers -----------------------------------------------------------

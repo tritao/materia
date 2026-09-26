@@ -840,23 +840,17 @@ toolWidth, overlap, standoff, feedRate, leadInOut)` builds a boustrophedon
 `Toolpath`: rows are spaced `toolWidth * (1 - overlap)` apart, with the
 first and last row placed exactly `toolWidth / 2` inside the boundary's Y
 extent so the tool's own footprint radius (not just its centerline) can
-still reach the top/bottom edges. Each row's boundary interval has an
-exclusion's bounding-box X-range subtracted whenever the row's *footprint
-band* (`rowY ± toolWidth/2`), not just its exact scanline, reaches the
-exclusion's Y bounds — a row that doesn't cross an exclusion can still
-graze it with the tool's radius, so this is a reach-aware conservative cut
-that is exact for axis-aligned rectangular exclusions (the case a BIM
-window/door produces) and merely conservative otherwise. An interval end
-created by such a cut is pulled inward by `toolWidth / 2` before points are
-placed, so the tool footprint stays clear of the exclusion; an end that is
-the outer boundary itself is left alone, since a footprint bulging past the
-boundary edge doesn't violate anything. This is a 1D stand-in for a full
-polygon offset — adequate for this milestone's axis-aligned/rectangular
-surfaces, not a general Minkowski shrink. The tool is off while transiting
-between rows and across exclusion gaps within a row; a lead-in point (off,
-before the first process point) and a lead-out point (off, after the last)
-bracket the whole path, so `Toolpath.segmentByProcess()` recovers a proper
-approach/process/retract split.
+still reach the top/bottom edges. Each exclusion is expanded by
+`toolWidth / 2` before its scanline intervals are subtracted. The expanded
+slice is built from the exclusion interior, an offset strip around every
+edge, and a radius disk around every vertex, then the pieces are unioned.
+This is the exact horizontal slice of the exclusion's Minkowski sum with a
+disk, so rotated and concave exclusions receive the same tool clearance as
+rectangular ones. The tool is off while transiting between rows and across
+exclusion gaps within a row; a lead-in point (off, before the first process
+point) and a lead-out point (off, after the last) bracket the whole path, so
+`Toolpath.segmentByProcess()` recovers a proper approach/process/retract
+split.
 
 `CoverageMap(surface, cellSize)` grids the surface's boundary bounding box
 and classifies every cell once, by its center, as `allowed` (inside the
