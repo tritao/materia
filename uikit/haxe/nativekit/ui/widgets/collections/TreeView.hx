@@ -1,5 +1,5 @@
 package nativekit.ui.widgets.collections;
-import nativekit.ui.widgets.controls.IconButton;
+import nativekit.ui.widgets.Icon;
 
 import Color;
 import LayoutAxis;
@@ -9,6 +9,10 @@ import LayoutDirection;
 import LayoutStyle;
 import LayoutVisualKind;
 import Insets;
+import LayoutPositioning;
+import PathBuilder;
+import LineCap;
+import LineJoin;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
@@ -379,8 +383,10 @@ class TreeView implements View {
 		rootOffsets = [0];
 		expandedBranches = new Map();
 		visibleCount = 0;
-		for (rootKey in roots) {
-			var branch = buildBranch(rootKey, null, 0, visibleKeys);
+		for (rootIndex in 0...roots.length) {
+			var rootKey = roots[rootIndex];
+			var branch = buildBranch(rootKey, null, 0, visibleKeys, [],
+				rootIndex < roots.length - 1);
 			if (branch == null)
 				visibleCount++;
 			else {
@@ -412,14 +418,15 @@ class TreeView implements View {
 	}
 
 	function buildBranch(nodeKey:String, parentKey:Null<String>, depth:Int,
-			visibleKeys:Map<String, Bool>):Null<TreeBranch> {
+			visibleKeys:Map<String, Bool>, guideContinuation:Array<Bool>, hasNextSibling:Bool):Null<TreeBranch> {
 		var requestedExpanded = expansionFor(nodeKey);
 		if (!requestedExpanded)
 			return null;
 		var childCount = model.childCount(nodeKey);
 		if (childCount < 0)
 			throw 'TreeView child count for $nodeKey must be non-negative';
-		var branch = new TreeBranch(nodeKey, parentKey, depth, cachedEstimatedExtent);
+		var branch = new TreeBranch(nodeKey, parentKey, depth, cachedEstimatedExtent,
+			guideContinuation, hasNextSibling);
 		branch.detailsKnown = true;
 		branch.hasChildren = childCount > 0;
 		if (!branch.hasChildren) {
@@ -434,9 +441,13 @@ class TreeView implements View {
 			if (visibleKeys.exists(childKey))
 				throw 'TreeView contains a duplicate visible key $childKey';
 			visibleKeys.set(childKey, true);
-			var nested = buildBranch(childKey, nodeKey, depth + 1, visibleKeys);
+			var childGuides = guideContinuation.concat([hasNextSibling]);
+			var childHasNext = childIndex < childCount - 1;
+			var nested = buildBranch(childKey, nodeKey, depth + 1, visibleKeys,
+				childGuides, childHasNext);
 			branch.children.push(nested == null
-				? new TreeBranch(childKey, nodeKey, depth + 1, cachedEstimatedExtent)
+				? new TreeBranch(childKey, nodeKey, depth + 1, cachedEstimatedExtent,
+					childGuides, childHasNext)
 				: nested);
 		}
 		branch.visibleCount = 1;
@@ -605,9 +616,12 @@ private class TreeEntry {
 	public var expanded:Bool;
 	public var extent:Float;
 	public var detailsKnown:Bool;
+	public final guideContinuation:Array<Bool>;
+	public final hasNextSibling:Bool;
 
 	public function new(key:String, parentKey:Null<String>, depth:Int,
-			hasChildren:Bool, expanded:Bool, extent:Float, detailsKnown:Bool = true) {
+			hasChildren:Bool, expanded:Bool, extent:Float, detailsKnown:Bool = true,
+			?guideContinuation:Array<Bool>, hasNextSibling:Bool = false) {
 		this.key = key;
 		this.parentKey = parentKey;
 		this.depth = depth;
@@ -615,6 +629,8 @@ private class TreeEntry {
 		this.expanded = expanded;
 		this.extent = extent;
 		this.detailsKnown = detailsKnown;
+		this.guideContinuation = guideContinuation == null ? [] : guideContinuation;
+		this.hasNextSibling = hasNextSibling;
 	}
 }
 
@@ -622,8 +638,10 @@ private class TreeBranch extends TreeEntry {
 	public final children:Array<TreeBranch>;
 	public var visibleCount:Int;
 
-	public function new(key:String, parentKey:Null<String>, depth:Int, extent:Float) {
-		super(key, parentKey, depth, false, false, extent, false);
+	public function new(key:String, parentKey:Null<String>, depth:Int, extent:Float,
+			guideContinuation:Array<Bool>, hasNextSibling:Bool) {
+		super(key, parentKey, depth, false, false, extent, false,
+			guideContinuation, hasNextSibling);
 		children = [];
 		visibleCount = 1;
 	}
@@ -667,6 +685,7 @@ private class TreeViewRow implements View {
 			style.height = LayoutAxis.fixed(entry.extent);
 			style.direction = LayoutDirection.LeftToRight;
 			style.childAlignY = LayoutAlignmentY.Center;
+			style.childGap = 6.0;
 			style.padding = new Insets(entry.depth * 16.0, 0.0, 0.0, 0.0);
 			style.background = selected ? context.theme.tokens.selectionHighlight :
 				StyleStateUtil.contains(flags, StyleState.Hovered)
@@ -699,6 +718,31 @@ private class TreeViewRow implements View {
 					event.stopPropagation();
 				}
 			});
+			if (entry.depth > 0) {
+				var guides = new LayoutStyle();
+				guides.positioning = LayoutPositioning.Absolute;
+				guides.width = LayoutAxis.grow();
+				guides.height = LayoutAxis.grow();
+				var guideNode = new RenderNode(context.id("branch-guides"), LayoutVisualKind.Custom, guides);
+				guideNode.hitTestSelf = false;
+				var depth = entry.depth;
+				var continuation = entry.guideContinuation;
+				var hasNext = entry.hasNextSibling;
+				var guideColor = context.theme.tokens.border;
+				guideNode.onPaint(function(canvas, geometry) {
+					var path = new PathBuilder();
+					var centerY = geometry.height * 0.5;
+					for (level in 1...depth) if (continuation[level]) {
+						var x = (level - 1) * 16.0 + 8.0;
+						path.moveTo(x, 0.0).lineTo(x, geometry.height);
+					}
+					var x = (depth - 1) * 16.0 + 8.0;
+					path.moveTo(x, 0.0).lineTo(x, hasNext ? geometry.height : centerY);
+					path.moveTo(x, centerY).lineTo(x + 8.0, centerY);
+					canvas.strokeTransient(path.build(), guideColor, 1.0, LineCap.Butt, LineJoin.Miter);
+				});
+				node.add(guideNode);
+			}
 
 			var disclosure:View = entry.hasChildren
 				? new TreeDisclosure("disclosure-control", entry.expanded, onToggle)
@@ -731,8 +775,20 @@ private class TreeDisclosure implements View {
 			style.childAlignY = LayoutAlignmentY.Center;
 			style.padding = new Insets(0.0, 0.0, 0.0, 0.0);
 			style.background = Color.rgba(0.0, 0.0, 0.0, 0.0);
-			return new IconButton("disclosure", expanded ? IconName.ChevronDown : IconName.ChevronRight,
-				expanded ? "Collapse" : "Expand", onToggle, style).build(context);
+			var node = new RenderNode(context.id("disclosure"), LayoutVisualKind.Box, style);
+			node.focusable = true;
+			var semantics = new Semantics(AccessibilityRole.Button, expanded ? "Collapse" : "Expand");
+			semantics.actions = AccessibilityAction.Activate;
+			node.semantics = semantics;
+			var activate = function(event:UiEvent) {
+				onToggle();
+				event.stopPropagation();
+			};
+			node.on(UiEventKind.Click, activate);
+			node.on(UiEventKind.Activate, activate);
+			node.add(new Icon("glyph", expanded ? IconName.ChevronDown : IconName.ChevronRight,
+				13.0, context.theme.tokens.textSecondary).build(context));
+			return node;
 		});
 	}
 }

@@ -1003,11 +1003,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function hierarchyPanel():View {
     treeModel.setFilter(hierarchySearch);
-    var addButton = new Button("+ Add ▾", null, function() {
+    var addButton = new Button("Add", null, function() {
       hierarchyAddVisible = true;
       commands.refresh();
     }, "hierarchy-add");
     addButton.variant = ButtonVariant.Secondary;
+    addButton.leadingIcon = IconName.Plus;
+    addButton.trailingIcon = IconName.ChevronDown;
     addButton.onClickEvent = function(event) {
       var bounds = menuTriggerBounds(event);
       hierarchyAddX = Math.max(8.0, Math.min(viewportWidth - 228.0, bounds.x));

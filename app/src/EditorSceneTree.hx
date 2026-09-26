@@ -7,6 +7,8 @@ import nativekit.ui.widgets.overlays.Tooltip;
 import nativekit.ui.widgets.Icon;
 import nativekit.ui.widgets.KeyedView;
 import nativekit.ui.widgets.layout.Row;
+import LayoutAlignmentY;
+import LayoutStyle;
 import nativekit.ui.icons.IconName;
 import nativekit.ui.widgets.collections.TreeRootMetadata;
 import nativekit.ui.widgets.collections.TreeViewModel;
@@ -109,24 +111,29 @@ class EditorSceneTree implements TreeViewModel {
     tooltip.showWhen = function() return text.truncated;
     return tooltip;
   }
+  function iconLabeledItem(key:String, label:String, icon:IconName):View {
+    var rowStyle = new LayoutStyle();
+    rowStyle.childAlignY = LayoutAlignmentY.Center;
+    rowStyle.childGap = 6.0;
+    return new Row("item-row:" + key, [
+      new KeyedView("icon", new Icon("item-icon:" + key, icon, 15.0)),
+      new KeyedView("label", labeledItem(key, label))
+    ], rowStyle);
+  }
   public function buildItem(key:String):View {
     var item=scene.object(key);
     if(item!=null) {
       var joint = incoming.get(item.id);
-      return new Row("object-row:" + key, [
-        new KeyedView("icon", new Icon("object-icon:" + key,
-          scene.isCadPart(item.id) ? IconName.Cube : IconName.Hierarchy, 15.0)),
-        new KeyedView("label", labeledItem(key, item.label + (joint == null ? "" : " · " + joint.kind) +
-          (item.visible ? "" : " (hidden)")))
-      ]);
+      return iconLabeledItem(key, item.label + (joint == null ? "" : " · " + joint.kind) +
+        (item.visible ? "" : " (hidden)"), IconName.Cube);
     }
     var marker=key.indexOf(":feature:");
     if(marker>=0){
       var id=key.substr(0,marker),index=Std.parseInt(key.substr(marker+9));
-      return labeledItem(key, index==null||index<0||index>=scene.cadFeatureCount(id)?"Feature":
-        "Feature "+(index+1)+" · "+scene.cadFeatureNameAt(id,index));
+      return iconLabeledItem(key, index==null||index<0||index>=scene.cadFeatureCount(id)?"Feature":
+        "Feature "+(index+1)+" · "+scene.cadFeatureNameAt(id,index), IconName.Grid);
     }
-    return labeledItem(key, "Scene");
+    return iconLabeledItem(key, "Scene", IconName.Hierarchy);
   }
   public function revision():Int return scene.revision + filterRevision * 1000000;
 }
