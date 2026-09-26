@@ -424,6 +424,15 @@ class RobotRuntimeCompiler {
           if (!Math.isFinite(maxSteeringAngle) || maxSteeringAngle <= 0.0 || maxSteeringAngle >= Math.PI * 0.5)
             diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_VALUE", "mobileBase.drive.maxSteeringAngle",
               "steering angle must be finite and between zero and pi/2"));
+        case Holonomic(wheelIds, radius, baseRadius):
+          if (wheelIds == null || wheelIds.length != 3)
+            diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_JOINT", "mobileBase.drive.wheelJointIds",
+              "holonomic drive requires exactly three wheel joint IDs"));
+          else for (index in 0...wheelIds.length)
+            resolveRole(wheelIds[index], 'mobileBase.drive.wheelJointIds[$index]',
+              [JointType.Revolute, JointType.Continuous]);
+          positive(radius, "mobileBase.drive.wheelRadius");
+          positive(baseRadius, "mobileBase.drive.baseRadius");
         case null:
           diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_DRIVE", "mobileBase.drive",
             "mobile base drive configuration is missing"));
@@ -462,6 +471,10 @@ class RobotRuntimeCompiler {
           var steeringIndex = jointIndex(steeringId), driveIndex = jointIndex(driveId);
           RobotRuntimeDriveConfiguration.Ackermann(steeringIndex, robot.joints[steeringIndex].name,
             driveIndex, robot.joints[driveIndex].name, wheelBase, radius, maxAngle);
+        case Holonomic(wheelIds, radius, baseRadius):
+          var indices = [for (id in wheelIds) jointIndex(id)];
+          var names = [for (index in indices) robot.joints[index].name];
+          RobotRuntimeDriveConfiguration.Holonomic(indices, names, radius, baseRadius);
         case null: throw "Validated robot configuration has no drive";
       };
       mobileConfig = new RobotRuntimeMobileConfiguration(drive,

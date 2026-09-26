@@ -444,6 +444,32 @@ class RobotWorldTests {
     check(wideTargets[0].target > 1.1 && wideTargets[0].target < 1.2,
       "Ackermann curvature mapping handles steering ratios above one");
 
+    var holonomicRobot = new FakeRobot("holonomic-base");
+    holonomicRobot.positions = [0.0, 0.0, 0.0];
+    var holonomic = new MobileBase(holonomicRobot,
+      new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3), new MotionLimits(1.0, 2.0));
+    holonomic.command(new Twist2(0.4, 0.5));
+    check(switch holonomicRobot.lastCommand {
+      case JointTargets(targets, _):
+        targets.length == 3 && targets[0].joint == 0 && targets[1].joint == 1 && targets[2].joint == 2 &&
+          targets[0].mode == robotkit.world.JointTargetMode.Velocity &&
+          targets[1].mode == robotkit.world.JointTargetMode.Velocity &&
+          targets[2].mode == robotkit.world.JointTargetMode.Velocity;
+      case _: false;
+    }, "holonomic drive submits all three wheel velocities as one atomic command");
+    var straightTargets = new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).targets(new Twist2(1.0, 0.0));
+    var sumOfSpeeds = straightTargets[0].target + straightTargets[1].target + straightTargets[2].target;
+    check(Math.abs(sumOfSpeeds) < 1e-9,
+      "holonomic wheel speeds sum to zero for pure translation (three wheels at 120 degrees)");
+    var spinTargets = new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).targets(new Twist2(0.0, 2.0));
+    for (target in spinTargets)
+      check(Math.abs(target.target - 0.3 * 2.0 / 0.05) < 1e-9,
+        "holonomic in-place rotation drives every wheel at the same tangential rate");
+    check(new robotkit.mobile.HolonomicDrive([0, 1, 2], 0.05, 0.3).supportsInPlaceRotation(),
+      "holonomic drive supports in-place rotation");
+    throws(function() new robotkit.mobile.HolonomicDrive([0, 1, 1], 0.05, 0.3),
+      "holonomic drive rejects duplicate wheel joint indices");
+
     var odometry = new DifferentialOdometry(0, 1, 0.1, 0.5);
     function sample(time:Int, left:Float, right:Float, clock:String):RobotSnapshot
       return new RobotSnapshot("odom", Int64.ofInt(time), Int64.ofInt(time),

@@ -19,4 +19,10 @@ enum RobotRuntimeDriveConfiguration {
     wheelRadius:Float,
     maxSteeringAngle:Float
   );
+  Holonomic(
+    wheelJoints:Array<Int>,
+    wheelNames:Array<String>,
+    wheelRadius:Float,
+    baseRadius:Float
+  );
 }

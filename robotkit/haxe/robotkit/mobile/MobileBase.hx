@@ -48,6 +48,9 @@ class MobileBase {
         requireJoint(robot, driveIndex, driveName);
         new AckermannDrive(steeringIndex, driveIndex, wheelBase,
           wheelRadius, maxSteeringAngle);
+      case RobotRuntimeDriveConfiguration.Holonomic(wheelIndices, wheelNames, wheelRadius, baseRadius):
+        for (index in 0...wheelIndices.length) requireJoint(robot, wheelIndices[index], wheelNames[index]);
+        new HolonomicDrive(wheelIndices, wheelRadius, baseRadius);
     };
     var footprint = config.footprintLength == null ? null : Footprint.rectangle(
       config.footprintLength, cast config.footprintWidth);

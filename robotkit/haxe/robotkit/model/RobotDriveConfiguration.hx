@@ -10,4 +10,6 @@ enum RobotDriveConfiguration {
     wheelRadius:Float,
     maxSteeringAngle:Float
   );
+  /** Three wheel joints at 120-degree intervals; see robotkit.mobile.HolonomicDrive. */
+  Holonomic(wheelJointIds:Array<JointId>, wheelRadius:Float, baseRadius:Float);
 }
