@@ -705,9 +705,11 @@ class SceneEditingTests {
     arm.mass=2.5;arm.centerOfMass=[0.1,0.2,0.3];arm.inertiaTensor=[2.0,0.0,0.0,0.0,3.0,0.0,0.0,0.0,4.0];
     arm.visualGeometry="geometry/arm-visual";arm.collisionGeometry="geometry/arm-collision";
     var joint=new Joint("Arm joint",JointType.Revolute,session.sensors.model.links[0],arm,"joint/arm");
-    joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=3.0;
+    // The 2.5 kg link has a 0.2 m COM offset from its X axis: gravity alone
+    // needs about 4.9 Nm. Leave enough torque for the position command to lift it.
+    joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=10.0;
     joint.parentFramePosition=[0.25,0.0,0.0];joint.childFramePosition=[0.0,0.1,0.0];joint.axis=[1.0,0.0,0.0];
-    joint.drive=new Actuator("Arm drive",3.0,2.0);session.sensors.model.addJoint(joint);
+    joint.drive=new Actuator("Arm drive",10.0,2.0);session.sensors.model.addJoint(joint);
     var armMount=session.sensors.model.addFrame(new Frame("Arm LiDAR mount",arm,"arm/lidar"));
     armMount.position=[0.4,0.0,0.0];session.sensors.model.sensors[0].frame=armMount;
     check(session.sensors.setRobotPose("materia/robot-b",[0.0,3.0,0.0],[0.0,0.0,0.0,1.0]),
@@ -722,7 +724,7 @@ class SceneEditingTests {
     var restoredJoint=session.sensors.model.joints[0];
     check(restoredJoint.id=="joint/arm"&&
       restoredJoint.parent.id=="base"&&restoredJoint.child.id=="arm"&&restoredJoint.limits.lower==-1.0&&
-      restoredJoint.limits.upper==1.0&&restoredJoint.drive!=null&&restoredJoint.drive.maxEffort==3.0&&
+      restoredJoint.limits.upper==1.0&&restoredJoint.drive!=null&&restoredJoint.drive.maxEffort==10.0&&
       session.sensors.robotPosition("materia/robot-b")[1]==3.0&&
       session.sensors.robotPosition("materia/robot")[1]==0.0,
       "joint topology, actuator settings, and robot pose survive reload");
@@ -862,10 +864,16 @@ class SceneEditingTests {
     var movedArm=[for(link in movedVisual.links)if(link.id=="arm")link][0];
     var movedObstacleZ=[for(object in mujocoSimulation.environmentVisualState())
       if(object.id=="tower")object.position[2]][0];
+    var movedMounted=mujocoObservation.robot("materia/robot-b");
+    if(movedMounted==null)throw "MuJoCo world lost the moving articulated robot";
     var armMoved=false;
     for(index in 0...4)if(Math.abs(movedArm.rotation[index]-initialArm.rotation[index])>0.00001)armMoved=true;
-    check(movedObstacleZ<initialObstacleZ&&armMoved,
-      "runtime overlays follow the moving obstacle and articulated sensor link");
+    check(movedObstacleZ<initialObstacleZ,
+      'runtime overlay follows falling obstacle (Z: $initialObstacleZ -> $movedObstacleZ)');
+    check(armMoved,
+      'runtime overlay follows commanded arm (rotation: ${initialArm.rotation} -> '
+      + '${movedArm.rotation}; joint position: ${movedMounted.positions.get(0)}, '
+      + 'effort: ${movedMounted.efforts.get(0)}, safety: ${movedMounted.safety})');
       check(mujocoSimulation.reset(),"MuJoCo simulation resets through the shared lifecycle");
       check(mujocoSimulation.visualState()[1].position[1]==3.0,
         "MuJoCo reset restores the persisted robot pose");
