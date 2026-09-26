@@ -172,6 +172,12 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < Normal stop is in progress.
 	 */
 	const RK_SAFETY_STOPPING = 1;
+	/**
+	 * < Preserve the enabled default.
+	 */
+	const RK_SELF_COLLISION_DEFAULT = 0;
+	const RK_SELF_COLLISION_DISABLED = 2;
+	const RK_SELF_COLLISION_ENABLED = 1;
 	const RK_SENSOR_ENCODER = 1;
 	const RK_SENSOR_IMU = 2;
 	const RK_SENSOR_LIDAR = 3;
@@ -456,6 +462,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		frame_count: u32 @offset(24);
 		collision_approximation: u32 @offset(28);
+		/**
+		 * < RK_SELF_COLLISION_*; zero preserves enabled-by-default.
+		 */
 		self_collision: u32 @offset(32);
 		reserved0: u32 @offset(36);
 		reserved: array<u64, 1> @offset(40);
