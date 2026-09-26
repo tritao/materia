@@ -16,10 +16,13 @@ import LayoutPositioning;
 import LayoutStyle;
 import LayoutVisualKind;
 import Rect;
+import TextLayout;
+import TextWrap;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.State;
+import nativekit.ui.core.TextStyleOverride;
 import nativekit.ui.core.View;
 import nativekit.ui.docking.DockDropZone;
 import nativekit.ui.docking.DockNode;
@@ -30,6 +33,7 @@ import nativekit.ui.widgets.docking.DockDropTarget;
 import nativekit.ui.widgets.docking.DockTabDropTarget;
 import nativekit.ui.widgets.docking.DockWorkspaceInteraction;
 import nativekit.ui.widgets.controls.TabsOptions;
+import nativekit.ui.theme.TextRole;
 
 /** Renders a DockWorkspaceModel using split panes, tab groups, and lazy panels. */
 class DockWorkspace implements View {
@@ -98,27 +102,31 @@ class DockWorkspace implements View {
 	function buildTabs(panelIds:Array<String>, activePanelId:String,
 		context:BuildContext, nodeKey:String, availableWidth:Float):View {
 		var items:Array<TabItem> = [];
-		var compact = panelIds != null && panelIds.length > 1 &&
-			availableWidth < panelIds.length * 100.0;
-		var selectedLabelFits = false;
-		if (compact) {
-			var selected = model.get(activePanelId);
-			if (selected != null && selected.icon != null) {
-				// Tab headers have 20 px horizontal padding, a 14 px icon, and a 4 px strip gap.
-				// Reserve the icon-only tabs before spending the remaining width on the active label.
-				var requiredWidth = (panelIds.length * 34.0) + ((panelIds.length - 1) * 4.0)
-					+ 8.0 + (selected.title.length * 8.0);
-				selectedLabelFits = availableWidth >= requiredWidth;
-			}
-		}
+		var visiblePanels:Array<DockPanelDescriptor> = [];
 		if (panelIds != null)
 			for (panelId in panelIds) {
 				var descriptor = model.get(panelId);
 				if (descriptor != null)
-					items.push(new TabItem(panelId, descriptor.title, panelView(panelId),
-						descriptor.enabled, descriptor.icon,
-						compact && descriptor.icon != null && (panelId != activePanelId || !selectedLabelFits) ? "" : null));
+					visiblePanels.push(descriptor);
 			}
+		var selectedId = activePanelId == null && visiblePanels.length > 0 ? visiblePanels[0].id : activePanelId;
+		var allWidth = Math.max(0, visiblePanels.length - 1) * 4.0;
+		var selectedWidth = allWidth;
+		for (descriptor in visiblePanels) {
+			var iconWidth = 20.0 + (descriptor.icon == null ? 0.0 : 14.0);
+			var labelWidth = tabLabelWidth(descriptor.title, context);
+			var labelledWidth = iconWidth + (descriptor.icon == null ? 0.0 : 8.0) + labelWidth;
+			allWidth += labelledWidth;
+			selectedWidth += descriptor.id == selectedId || descriptor.icon == null
+				? labelledWidth : iconWidth;
+		}
+		var showAllLabels = visiblePanels.length <= 1 || allWidth <= availableWidth;
+		var showSelectedLabel = showAllLabels || selectedWidth <= availableWidth;
+		for (descriptor in visiblePanels)
+			items.push(new TabItem(descriptor.id, descriptor.title, panelView(descriptor.id),
+				descriptor.enabled, descriptor.icon,
+				!showAllLabels && descriptor.icon != null &&
+					(descriptor.id != selectedId || !showSelectedLabel) ? "" : null));
 		var tabsStyle = new LayoutStyle();
 		tabsStyle.width = LayoutAxis.grow();
 		tabsStyle.height = LayoutAxis.grow();
@@ -159,6 +167,17 @@ class DockWorkspace implements View {
 		return nativekit.ui.widgets.controls.Tabs.withOptions(nodeKey, items, activePanelId, function(next) {
 			model.activate(next);
 		}, options);
+	}
+
+	function tabLabelWidth(label:String, context:BuildContext):Float {
+		if (context.fonts == null) return label.length * 8.0;
+		var style = context.resolveTextRole(TextRole.Button,
+			TextStyleOverride.paragraph(TextWrap.None));
+		var layout = TextLayout.createStyled(context.fonts, label, 100000.0,
+			style.textStyle, style.paragraphStyle);
+		var width = layout.measure().width;
+		layout.dispose();
+		return width;
 	}
 
 	function buildSplit(axis:DockSplitAxis, ratio:Float, first:DockNode, second:DockNode,
