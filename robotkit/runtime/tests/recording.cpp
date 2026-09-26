@@ -7,8 +7,8 @@
 int main(){
   const std::string path="robotkit-recording-test.mcap"; rk_recording_writer_handle w{};
   assert(rk_recording_writer_create(path.c_str(),1024,&w)==RK_OK);
-  const char data[]="{\"version\":2,\"ordinal\":\"18446744073709551614\",\"type\":\"sensor\"}";
-  assert(rk_recording_writer_enqueue(w,RK_RECORDING_SENSOR,2,UINT64_MAX-1,123456789,
+  const char data[]="{\"version\":3,\"ordinal\":\"18446744073709551614\",\"type\":\"sensor\"}";
+  assert(rk_recording_writer_enqueue(w,RK_RECORDING_SENSOR,3,UINT64_MAX-1,123456789,
     reinterpret_cast<const uint8_t*>(data),sizeof(data)-1)==RK_OK);
   assert(rk_recording_writer_finish(w)==RK_OK); rk_recording_writer_destroy(w);
   rk_recording_reader_handle r{}; assert(rk_recording_reader_open(path.c_str(),&r)==RK_OK);

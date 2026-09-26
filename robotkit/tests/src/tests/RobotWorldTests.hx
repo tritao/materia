@@ -240,7 +240,7 @@ class RobotWorldTests {
     var opened=RobotKitRuntime.rk_recording_writer_create(mismatchPath,Int64.ofInt(4096));
     equal(opened.status,RobotKitRuntimeConstants.RK_OK,"schema mismatch fixture opens");
     var payload=RobotRecordingCodec.encode(mismatchEntry);
-    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,2,
+    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,3,
       mismatchEntry.ordinal,mismatchEntry.recordingTimestampNs,payload),RobotKitRuntimeConstants.RK_OK,
       "schema mismatch fixture writes payload to wrong channel");
     equal(RobotKitRuntime.rk_recording_writer_finish(opened.out_writer.borrow()),RobotKitRuntimeConstants.RK_OK,
@@ -3189,9 +3189,15 @@ class RobotWorldTests {
       Int64.parseString("9007199254740993"), Int64.parseString("9223372036854775000"),
       [1.25, 2.5], Int64.parseString("9223372036854775001"), "link/base",
       [0.1, 0.2, 0.3], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2", "host.monotonic");
+    var cameraBytes = haxe.io.Bytes.alloc(6);
+    for (index in 0...6) cameraBytes.set(index, index + 1);
+    var camera = new SensorFrame("camera/front", "camera", "frame/camera-front",
+      Int64.ofInt(9), Int64.ofInt(150), [], Int64.ofInt(160), "link/base",
+      [0.2, 0.0, 0.8], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2",
+      "host.monotonic", new CameraImage(2, 1, "rgb8", cameraBytes));
     var first = new RobotSnapshot("robot-a", Int64.parseString("9007199254740995"),
       Int64.parseString("9223372036854775000"), [0.5], [0.25], [0.125], 1, 0,
-      Int64.parseString("9223372036854775002"), [sensor], "robot-a.reset-2", "host.monotonic",
+      Int64.parseString("9223372036854775002"), [sensor, camera], "robot-a.reset-2", "host.monotonic",
       RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP);
     var second = new RobotSnapshot("robot-b", Int64.ofInt(3), Int64.ofInt(10),
       [0.75], [], [], 1, 0, Int64.ofInt(20), [], "robot-b.boot-1", "host.monotonic");
@@ -3227,6 +3233,11 @@ class RobotWorldTests {
     equal(loaded.snapshots[0].safety, first.safety, "MCAP preserves robot safety state");
     equal(loaded.snapshots[0].sensors.get(0).frameId, "frame/front", "MCAP preserves sensor frame identity");
     equal(loaded.snapshots[0].sensors.get(0).mountPosition.get(2), 0.3, "MCAP preserves sensor mount");
+    var recordedCamera:CameraImage = cast loaded.snapshots[0].sensors.get(1).image;
+    check(recordedCamera != null && recordedCamera.width == 2 &&
+      recordedCamera.encoding == "rgb8" && recordedCamera.bytes().get(0) == 1 &&
+      recordedCamera.bytes().get(5) == 6,
+      "MCAP preserves camera dimensions, encoding, and pixels");
     equal(loaded.worlds[0].robotIds().length, 2, "MCAP preserves multiple robots");
     for (index in 0...loaded.entries.length) equal(loaded.entries[index].ordinal, Int64.ofInt(index), "MCAP uses arrival ordinals");
     var replay = new ReplayRobot("robot-a", loaded);
@@ -3235,7 +3246,10 @@ class RobotWorldTests {
     replay.close();
     if (Sys.getEnv("ROBOTKIT_KEEP_MCAP") == null) sys.FileSystem.deleteFile(path);
     else Sys.println('RobotKit MCAP fixture: $path');
-    var unsupported = haxe.io.Bytes.ofString('{"version":3,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
+    var unsupported = haxe.io.Bytes.ofString('{"version":4,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
+    var legacyV2 = RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
+      '{"version":2,"ordinal":"0","recordingTimestampNs":"1","robotId":"x","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}'));
+    equal(legacyV2.schemaVersion, 2, "recording reader accepts schema v2");
     throws(function() RobotRecordingCodec.decode(unsupported), "unsupported recording schema rejected");
     throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString("{")), "malformed recording payload rejected");
     var invalidMount:Dynamic = haxe.Json.parse(RobotRecordingCodec.encode(loaded.entries[2]).toString());

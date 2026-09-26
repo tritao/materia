@@ -6,7 +6,7 @@ import haxe.io.Bytes;
 
 /** Stable JSON payload contract stored inside MCAP messages. Wide integers are strings. */
 class RobotRecordingCodec {
-  public static inline final VERSION:Int = 2;
+  public static inline final VERSION:Int = 3;
 
   public static function encode(entry:RobotRecordingEntry):Bytes {
     var root:Dynamic = {
@@ -46,7 +46,7 @@ class RobotRecordingCodec {
     var root:Dynamic;
     try root = Json.parse(bytes.toString()) catch (_:Dynamic) throw "Malformed RobotKit recording payload";
     var version = fieldInt(root, "version");
-    if (version != 1 && version != VERSION) throw "Unsupported RobotKit recording schema";
+    if (version < 1 || version > VERSION) throw "Unsupported RobotKit recording schema";
     var ordinal = wide(root, "ordinal"), robotId = string(root, "robotId");
     var sequence = wide(root, "sourceSequence"), timestamp = wide(root, "sourceTimestampNs");
     var clock = string(root, "sourceClockId"), payload:Dynamic = Reflect.field(root, "payload");
@@ -57,7 +57,7 @@ class RobotRecordingCodec {
           case "jointPosition" if (version == 1):
             Command(JointTargets([JointTarget.position(fieldInt(payload,"joint"),
               fieldFloat(payload,"target"))], expiry));
-          case "jointTargets" if (version == VERSION):
+          case "jointTargets" if (version >= 2):
             var targets:Array<JointTarget> = [];
             for (item in array(payload, "targets"))
               targets.push(new JointTarget(fieldInt(item, "joint"),
@@ -82,7 +82,7 @@ class RobotRecordingCodec {
   }
 
   static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,safety:v.safety,sensors:[for(s in v.sensors.toArray()) sensor(s)]};
-  static function sensor(v:SensorFrame):Dynamic return {sensorId:v.sensorId,kind:v.kind,frameId:v.frameId,sequence:Int64.toStr(v.sequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,values:v.values.toArray(),linkId:v.linkId,mountPosition:v.mountPosition.toArray(),mountRotation:v.mountRotation.toArray()};
+  static function sensor(v:SensorFrame):Dynamic return {sensorId:v.sensorId,kind:v.kind,frameId:v.frameId,sequence:Int64.toStr(v.sequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,values:v.values.toArray(),linkId:v.linkId,mountPosition:v.mountPosition.toArray(),mountRotation:v.mountRotation.toArray(),image:v.image==null?null:cameraImage(v.image)};
   static function readSnapshot(v:Dynamic):RobotSnapshot return new RobotSnapshot(string(v,"id"),wide(v,"sourceSequence"),wide(v,"sourceTimestampNs"),floats(v,"positions"),floats(v,"velocities"),floats(v,"efforts"),fieldInt(v,"mode"),fieldInt(v,"faultCode"),wide(v,"receivedTimestampNs"),[for(s in array(v,"sensors")) readSensor(s)],string(v,"sourceClockId"),string(v,"receivedClockId"),optionalFieldInt(v,"safety",0));
   static function readSensor(v:Dynamic):SensorFrame {
     var position = floats(v, "mountPosition");
@@ -96,7 +96,73 @@ class RobotRecordingCodec {
     return new SensorFrame(string(v,"sensorId"),string(v,"kind"),string(v,"frameId"),
       wide(v,"sequence"),wide(v,"sourceTimestampNs"),floats(v,"values"),
       wide(v,"receivedTimestampNs"),string(v,"linkId"),position,rotation,
-      string(v,"sourceClockId"),string(v,"receivedClockId"));
+      string(v,"sourceClockId"),string(v,"receivedClockId"),readCameraImage(v));
+  }
+  static function cameraImage(value:CameraImage):Dynamic return {width:value.width,
+    height:value.height,encoding:value.encoding,bytes:encodeBase64(value.bytes())};
+  static function readCameraImage(value:Dynamic):Null<CameraImage> {
+    var image = Reflect.field(value, "image");
+    if (image == null) return null;
+    var width = fieldInt(image, "width");
+    var height = fieldInt(image, "height");
+    var encoding = string(image, "encoding");
+    var encoded = string(image, "bytes");
+    try {
+      return new CameraImage(width, height, encoding, decodeBase64(encoded));
+    } catch (_:Dynamic) {
+      throw "Malformed camera image in RobotKit recording";
+    }
+  }
+  static inline var BASE64_ALPHABET:String =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  static function encodeBase64(bytes:Bytes):String {
+    var result = new StringBuf();
+    var index = 0;
+    while (index < bytes.length) {
+      var first = bytes.get(index++);
+      var hasSecond = index < bytes.length;
+      var second = hasSecond ? bytes.get(index++) : 0;
+      var hasThird = index < bytes.length;
+      var third = hasThird ? bytes.get(index++) : 0;
+      var packed = (first << 16) | (second << 8) | third;
+      result.addChar(BASE64_ALPHABET.charCodeAt((packed >>> 18) & 63));
+      result.addChar(BASE64_ALPHABET.charCodeAt((packed >>> 12) & 63));
+      result.addChar(hasSecond ? BASE64_ALPHABET.charCodeAt((packed >>> 6) & 63) : 61);
+      result.addChar(hasThird ? BASE64_ALPHABET.charCodeAt(packed & 63) : 61);
+    }
+    return result.toString();
+  }
+  static function decodeBase64(value:String):Bytes {
+    if (value == null || value.length == 0 || value.length % 4 != 0)
+      throw "Invalid base64 length";
+    var padding = value.charAt(value.length - 1) == "=" ? 1 : 0;
+    if (value.charAt(value.length - 2) == "=") padding++;
+    var outputLength = Std.int(value.length / 4) * 3 - padding;
+    var result = Bytes.alloc(outputLength);
+    var outputIndex = 0;
+    for (index in 0...Std.int(value.length / 4)) {
+      var offset = index * 4;
+      var last = index == Std.int(value.length / 4) - 1;
+      var first = base64Digit(value.charAt(offset));
+      var second = base64Digit(value.charAt(offset + 1));
+      var thirdChar = value.charAt(offset + 2);
+      var fourthChar = value.charAt(offset + 3);
+      if (first < 0 || second < 0 || (!last && (thirdChar == "=" || fourthChar == "=")) ||
+          (thirdChar == "=" && fourthChar != "="))
+        throw "Invalid base64 data";
+      var third = thirdChar == "=" ? 0 : base64Digit(thirdChar);
+      var fourth = fourthChar == "=" ? 0 : base64Digit(fourthChar);
+      if (third < 0 || fourth < 0) throw "Invalid base64 data";
+      var packed = (first << 18) | (second << 12) | (third << 6) | fourth;
+      if (outputIndex < outputLength) result.set(outputIndex++, (packed >>> 16) & 255);
+      if (outputIndex < outputLength) result.set(outputIndex++, (packed >>> 8) & 255);
+      if (outputIndex < outputLength) result.set(outputIndex++, packed & 255);
+    }
+    return result;
+  }
+  static function base64Digit(value:String):Int {
+    if (value.length != 1) return -1;
+    return BASE64_ALPHABET.indexOf(value);
   }
   static function jointTargetMode(value:JointTargetMode):String return switch value {
     case Position: "position";
