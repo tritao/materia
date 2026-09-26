@@ -104,6 +104,9 @@ class TSlotExtrusion implements StructuralProfile {
 	public function profileDescription():String
 		return description;
 
+	public function sectionBounds():SectionBounds
+		return {minX: -size / 2, maxX: size / 2, minY: -height / 2, maxY: height / 2};
+
 	public function geometry(length:Float):Part {
 		if (!(length > 0)) throw "T-slot extrusion needs a positive length";
 		var half = size / 2, halfHeight = height / 2;

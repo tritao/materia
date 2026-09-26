@@ -29,4 +29,6 @@ class RoundTube implements StructuralProfile {
 
 	public function profileDesignation():String return designation;
 	public function profileDescription():String return description;
+	public function sectionBounds():SectionBounds
+		return {minX: -outerDiameter / 2, maxX: outerDiameter / 2, minY: -outerDiameter / 2, maxY: outerDiameter / 2};
 }

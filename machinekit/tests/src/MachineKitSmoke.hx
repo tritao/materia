@@ -555,7 +555,8 @@ class MachineKitSmoke {
 		var detailedBox = bounds(detailedPart);
 		near(detailedBox.minZ, 10, "detailed frame start setback");
 		near(detailedBox.maxZ, 95, "detailed frame end setback");
-		near(detailedPart.volume(), (40 * 40 - 34 * 34) * 85, "detailed frame volume");
+		check(detailedPart.volume() > 0 && detailedPart.volume() < (40 * 40 - 34 * 34) * 85,
+			"detailed frame end cuts remove material");
 		detailedPart.close();
 		near(detailedFrame.cutList()[0].totalLength, 85, "detailed frame cut list length");
 		throws(() -> detailedFrame.member("badCut", "A", "B", tube, null, Mitre(60), Cope(50)),

@@ -3,7 +3,16 @@ package machinekit.structural;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
+import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
+import machinekit.component.Solids;
+
+typedef SectionBounds = {
+	var minX:Float;
+	var maxX:Float;
+	var minY:Float;
+	var maxY:Float;
+}
 
 /** A cross-section factory for `FrameAssembly` members: `geometry(length)` extrudes the section
  * along local +Z from z=0 to z=length, matching every other machinekit generator's axis
@@ -12,12 +21,13 @@ import cadkit.modeling.Vector;
 interface StructuralProfile {
 	function profileDesignation():String;
 	function profileDescription():String;
+	function sectionBounds():SectionBounds;
 	function geometry(length:Float):Part;
 }
 
 /** End treatment for one structural member. `setback` is the stock removed from a member's
- * centreline endpoint for the frame's cut-length envelope. The profile remains an idealized
- * extrusion; detailed sloped mitre and curved cope surfaces belong to a later manufacturing pass.
+ * centreline endpoint for the frame's cut-length envelope. Mitres use a sloped end plane and
+ * copes use a curved notch sized from the profile envelope.
  */
 enum FrameEndCut {
 	Square;
@@ -120,6 +130,9 @@ class FrameAssembly {
 		var stockLength = len - startSetback - cutBack(m.endCut);
 		var body = m.profile.geometry(stockLength);
 		try {
+			var section = m.profile.sectionBounds();
+			body = applyEndCut(body, m.startCut, true, stockLength, section);
+			body = applyEndCut(body, m.endCut, false, stockLength, section);
 			var cutStart = start.add(direction.scale(startSetback));
 			var placed = body.placed(new Location(new Plane(cutStart, sideways, direction)));
 			body.close();
@@ -163,5 +176,60 @@ class FrameAssembly {
 				if (!(setback > 0) || !Math.isFinite(setback)) throw "Frame end-cut setback must be positive";
 				setback;
 		};
+	}
+
+	static function applyEndCut(body:Part, cut:FrameEndCut, atStart:Bool, length:Float, bounds:SectionBounds):Part {
+		return switch (cut) {
+			case Square: body;
+			case Mitre(setback):
+				var tool = mitreTool(length, bounds, atStart, setback);
+				intersectClosing(body, tool);
+			case Cope(setback):
+				var radius = Math.min(setback, Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY));
+				var yMargin = Math.max(1, (bounds.maxY - bounds.minY) * 0.1);
+				var tool = Part.cylinder(radius, bounds.maxY - bounds.minY + 2 * yMargin);
+				var origin = new Location(new Plane(new Vector((bounds.minX + bounds.maxX) / 2,
+					bounds.minY - yMargin, atStart ? 0 : length), Vector.X(), Vector.Y()));
+				var placed = tool.placed(origin);
+				tool.close();
+				var result = Solids.cut(body, [placed]);
+				result;
+		};
+	}
+
+	static function mitreTool(length:Float, bounds:SectionBounds, atStart:Bool, setback:Float):Part {
+		var xSpan = bounds.maxX - bounds.minX;
+		var xMargin = Math.max(1, xSpan * 0.1);
+		var x0 = bounds.minX - xMargin, x1 = bounds.maxX + xMargin;
+		var z0 = atStart ? setback * (x0 - bounds.minX) / xSpan : 0;
+		var z1 = atStart ? setback * (x1 - bounds.minX) / xSpan : length - setback * (x1 - bounds.minX) / xSpan;
+		var far = length + setback + 1;
+		var points = atStart
+			? [new Vector(x0, z0), new Vector(x1, z1), new Vector(x1, far), new Vector(x0, far)]
+			: [new Vector(x0, -1), new Vector(x1, -1), new Vector(x1, z1), new Vector(x0, length - setback * (x0 - bounds.minX) / xSpan)];
+		var yMargin = Math.max(1, (bounds.maxY - bounds.minY) * 0.1);
+		var plane = new Plane(new Vector(0, bounds.maxY + yMargin, 0), Vector.X(), Vector.Y().scale(-1));
+		var sketch = Sketch.polygon(points, plane);
+		try {
+			var result = sketch.extrude(bounds.maxY - bounds.minY + 2 * yMargin);
+			sketch.close();
+			return result;
+		} catch (error:Dynamic) {
+			sketch.close();
+			throw error;
+		}
+	}
+
+	static function intersectClosing(base:Part, tool:Part):Part {
+		try {
+			var result = base.intersect(tool);
+			base.close();
+			tool.close();
+			return result;
+		} catch (error:Dynamic) {
+			base.close();
+			tool.close();
+			throw error;
+		}
 	}
 }

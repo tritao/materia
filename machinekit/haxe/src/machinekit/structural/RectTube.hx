@@ -35,6 +35,8 @@ class RectTube implements StructuralProfile {
 
 	public function profileDesignation():String return designation;
 	public function profileDescription():String return description;
+	public function sectionBounds():SectionBounds
+		return {minX: -width / 2, maxX: width / 2, minY: -height / 2, maxY: height / 2};
 
 	static function rectangle(width:Float, height:Float):Array<Vector>
 		return [new Vector(-width / 2, -height / 2), new Vector(width / 2, -height / 2),

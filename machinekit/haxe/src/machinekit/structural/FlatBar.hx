@@ -33,4 +33,6 @@ class FlatBar implements StructuralProfile {
 
 	public function profileDesignation():String return designation;
 	public function profileDescription():String return description;
+	public function sectionBounds():SectionBounds
+		return {minX: -width / 2, maxX: width / 2, minY: -thickness / 2, maxY: thickness / 2};
 }

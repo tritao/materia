@@ -36,4 +36,6 @@ class Angle implements StructuralProfile {
 
 	public function profileDesignation():String return designation;
 	public function profileDescription():String return description;
+	public function sectionBounds():SectionBounds
+		return {minX: 0, maxX: legA, minY: 0, maxY: legB};
 }

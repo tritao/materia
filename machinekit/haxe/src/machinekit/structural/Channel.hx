@@ -39,4 +39,6 @@ class Channel implements StructuralProfile {
 
 	public function profileDesignation():String return designation;
 	public function profileDescription():String return description;
+	public function sectionBounds():SectionBounds
+		return {minX: 0, maxX: flangeWidth, minY: 0, maxY: height};
 }

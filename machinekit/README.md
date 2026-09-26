@@ -94,7 +94,8 @@ defaulting to +Z (or +Y for a nearly vertical member); a reference parallel to
 the member is rejected. `length()` reports the node-to-node distance, while
 `cutLength()` and `cutList()` aggregate the post-cut stock lengths by profile
 designation. The cut treatments currently describe trimmed profile envelopes;
-sloped mitre and curved cope surfaces remain manufacturing-detail work.
+mitres are clipped with a profile-aware sloped plane and copes remove a curved
+notch sized from the profile envelope.
 
 ## Transmission
 
