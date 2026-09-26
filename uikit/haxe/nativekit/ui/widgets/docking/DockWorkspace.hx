@@ -195,7 +195,7 @@ class DockWorkspace implements View {
 		labelWidths:DockTextWidthCache):Float {
 		if (context.fonts == null) return label.length * 8.0;
 		var style = context.resolveTextRole(TextRole.Button,
-			TextStyleOverride.paragraph(TextWrap.None));
+			new TextStyleOverride(null, 14.0, null, TextWrap.None));
 		return labelWidths.measure(context.fonts, label, style.textStyle, style.paragraphStyle);
 	}
 
