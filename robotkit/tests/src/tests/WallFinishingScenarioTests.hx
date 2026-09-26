@@ -175,7 +175,7 @@ class WallFinishingScenarioTests {
     // candidate search has no notion of a separate wheeled-base height: the
     // 3D candidate pose it verifies reachable (before `.toPose2()` drops Z
     // for navigation) sits at map Z = translation.z + patchCenterY exactly,
-    // and HolonomicDrivePlant always teleports the chassis to map Z = 0. With
+    // and HolonomicDrivePlant keeps the chassis at its authored map Z = 0. With
     // the boundary centered at local Y = 0 (patchCenterY = 0) and this
     // translation's Z = 0, those two heights coincide exactly, so the
     // candidate WorkPatchPlanner verified reachable is the same one the real
@@ -246,12 +246,16 @@ class WallFinishingScenarioTests {
         navSteps++;
       }
       check(status == SkillStatus.Succeeded, 'Base navigates to patch base pose (status $status)');
-      // Hold the chassis perfectly still for the arm-only phase: plant.step()
-      // keeps re-teleporting from base.currentCommand() every tick (the same
-      // shared-simulation-tick pattern the forklift scenario uses even while
-      // only its forks move), so an explicit zero twist is required once
-      // navigation succeeds.
+      // Hold the chassis perfectly still for the arm-only phase: the plant
+      // rolls the base by whatever wheel targets the robot applies, so
+      // navigation's last small correction must be replaced by an explicit
+      // zero twist. Step once so the robot applies it: the runtime keeps only
+      // the latest command batch per tick, so the arm's joint targets below
+      // would otherwise replace the zero wheel targets before they took effect
+      // and leave the wheels turning through the whole raster.
       base.command(new Twist2(0.0, 0.0));
+      latestSnapshot = plant.step(Int64.ofInt(tick++));
+      localization.update(latestSnapshot);
 
       // -- execute --
       var localizationState = localization.state();

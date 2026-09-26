@@ -4,84 +4,75 @@ import haxe.Int64;
 import robotkit.mobile.HolonomicDrive;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.Pose2;
-import robotkit.world.JointTargetMode;
 import robotkit.world.RobotSnapshot;
 
 /**
  * Ideal rolling-kinematics plant for an omnidirectional-base robot in
- * SimKit, in the style of `DifferentialDrivePlant`: articulated joints and
- * sensors still advance through the shared native simulation, while the
- * chassis pose is integrated from the commanded body twist and teleported.
+ * SimKit, the three-omni-wheel counterpart of `DifferentialDrivePlant`.
  *
- * `Twist2` (shared with `Navigator`/`GoTo`) carries only forward speed and
- * yaw rate, never a lateral term, so `HolonomicDrive.targets()` always
- * encodes a body motion with zero lateral component; decoding the three
- * wheel rates back through the general omni-kinematics inverse would
- * therefore reproduce exactly `twist.linear`/`twist.angular` (the encode is
- * invertible and lossless for that domain), the same relationship
- * `DifferentialDrivePlant`'s own wheel-rate reconstruction reduces to for a
- * differential pair. This plant integrates directly from the commanded
- * twist and only re-derives the wheel targets to validate that the drive
- * model's three wheel joints are the ones actually configured.
+ * Couples the robot's wheel joints to its kinematic base through the native
+ * simulation: every tick, after the robot applies its commands and before
+ * physics advances, the base moves by the full planar body twist (forward,
+ * lateral, and yaw rate) decoded from the wheel velocity targets the robot
+ * actually applied for that tick. Those are the runtime's rate-clamped
+ * targets whether they came from MobileBase or were submitted straight to the
+ * robot, and they are zero after a normal or emergency stop or a safety
+ * reset, so the chassis follows every stop with no added latency, and wheels
+ * driven directly can strafe even though `Twist2` has no lateral term.
  */
 class HolonomicDrivePlant {
   public final simulation:Simulation;
   public final robotIndex:Int;
   public final base:MobileBase;
-  public var pose(default, null):Pose2;
-
-  final drive:HolonomicDrive;
+  /**
+   * Planar base pose after the latest step or teleport: position on the floor
+   * and heading (unwrapped). The base keeps its authored roll and pitch.
+   */
+  public var pose(get, never):Pose2;
+  /** Base height, preserved while the plant drives the planar pose. */
+  public var baseHeight(get, never):Float;
 
   public function new(simulation:Simulation, robotIndex:Int, base:MobileBase,
       ?initialPose:Pose2) {
     if (simulation == null || robotIndex < 0 || base == null)
       throw "Holonomic-drive plant requires a simulation, robot index, and mobile base";
-    var configuredDrive:HolonomicDrive = cast(base.driveModel, HolonomicDrive);
-    if (configuredDrive == null)
+    var drive:HolonomicDrive = cast(base.driveModel, HolonomicDrive);
+    if (drive == null)
       throw "Holonomic-drive plant requires a holonomic drive model";
     this.simulation = simulation;
     this.robotIndex = robotIndex;
     this.base = base;
-    drive = configuredDrive;
-    pose = initialPose == null
-      ? new Pose2()
-      : new Pose2(initialPose.x, initialPose.y, initialPose.yaw);
+    simulation.setOmniDrive(robotIndex, drive.wheelJoints, drive.wheelAngles, drive.wheelRadius,
+      drive.baseRadius);
+    if (initialPose != null) teleport(initialPose);
   }
 
-  /** Sets the chassis pose while preserving the current wheel targets. */
+  /**
+   * Jumps the chassis for the next tick while keeping wheel targets, sensor
+   * history, and the chassis velocity; the jump itself does not read as motion.
+   * The chassis keeps its height and its roll and pitch relative to its
+   * heading, as the native plant does while it drives.
+   */
   public function teleport(pose:Pose2):Void {
     if (pose == null) throw "Holonomic-drive plant pose cannot be null";
-    var value = new Pose2(pose.x, pose.y, pose.yaw);
-    applyPose(value);
-    this.pose = value;
+    BasePlacement.place(simulation, robotIndex, pose, baseHeight);
   }
 
-  /** Advances one fixed simulation step from the mobile base's commanded twist. */
+  /** Advances one fixed simulation step and returns the robot's snapshot. */
   public function step(timestampNs:Int64):RobotSnapshot {
-    var twist = base.currentCommand();
-    var targets = drive.targets(twist);
-    var seenWheels = new Map<Int, Bool>();
-    for (target in targets) {
-      if (target.mode != JointTargetMode.Velocity)
-        throw "Holonomic-drive plant requires wheel velocity targets";
-      seenWheels.set(target.joint, true);
-    }
-    for (wheelJoint in drive.wheelJoints)
-      if (!seenWheels.exists(wheelJoint))
-        throw "Holonomic-drive plant did not receive every wheel target";
-
-    var distance = twist.linear * simulation.fixedTimestepSeconds;
-    var headingChange = twist.angular * simulation.fixedTimestepSeconds;
-    var nextPose = pose.integrateDisplacement(distance, headingChange);
-    applyPose(nextPose);
-    pose = nextPose;
     simulation.step(timestampNs);
     return base.robot.snapshot();
   }
 
-  function applyPose(value:Pose2):Void {
-    var halfYaw = value.yaw * 0.5;
-    simulation.teleportRobot(robotIndex, [value.x, value.y, 0.0],
-      [0.0, 0.0, Math.sin(halfYaw), Math.cos(halfYaw)]);
+  /** Wheel rates, in rad/s, the robot applied during the latest step. */
+  public function appliedWheelRates():Array<Float>
+    return simulation.omniDriveState(robotIndex).wheelRates;
+
+  function get_pose():Pose2 {
+    var state = simulation.omniDriveState(robotIndex);
+    return new Pose2(state.x, state.y, state.yaw);
   }
+
+  function get_baseHeight():Float
+    return simulation.omniDriveState(robotIndex).height;
 }

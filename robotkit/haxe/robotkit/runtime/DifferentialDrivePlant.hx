@@ -53,29 +53,7 @@ class DifferentialDrivePlant {
    */
   public function teleport(pose:Pose2):Void {
     if (pose == null) throw "Differential-drive plant pose cannot be null";
-    var q = simulation.robotPose(robotIndex).rotation;
-    // Tilt = Rz(-heading) * rotation: the current rotation with its heading
-    // (the body x axis projected on the floor) removed.
-    var heading = Math.atan2(2.0 * (q[3] * q[2] + q[0] * q[1]),
-      1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2]));
-    var tilt = multiply(yawRotation(-heading), q);
-    simulation.placeRobotBase(robotIndex, [pose.x, pose.y, baseHeight],
-      multiply(yawRotation(pose.yaw), tilt));
-  }
-
-  static function yawRotation(yaw:Float):Array<Float> {
-    var half = yaw * 0.5;
-    return [0.0, 0.0, Math.sin(half), Math.cos(half)];
-  }
-
-  // Hamilton product of xyzw quaternions, normalized.
-  static function multiply(a:Array<Float>, b:Array<Float>):Array<Float> {
-    var x = a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1];
-    var y = a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0];
-    var z = a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3];
-    var w = a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2];
-    var norm = Math.sqrt(x * x + y * y + z * z + w * w);
-    return [x / norm, y / norm, z / norm, w / norm];
+    BasePlacement.place(simulation, robotIndex, pose, baseHeight);
   }
 
   /** Advances one fixed simulation step and returns the robot's snapshot. */

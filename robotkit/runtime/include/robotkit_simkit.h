@@ -121,6 +121,43 @@ typedef struct rk_simulation_differential_drive_state {
     uint64_t reserved[2];
 } rk_simulation_differential_drive_state;
 
+/**
+ * Ideal rolling omni-wheel coupling for one robot's kinematic base.
+ *
+ * Three omni wheels, each at mount angle wheel_angles[i] (radians about +Z
+ * from the base's x axis) and base_radius metres from the base centre, roll
+ * tangentially: for a body twist (vx, vy, omega) in the base frame, wheel i's
+ * rim speed is -sin(a_i) vx + cos(a_i) vy + base_radius omega, and its joint
+ * rate is that speed over wheel_radius. A kiwi drive uses angles
+ * pi/2 + i * 2pi/3. The wheel joints are robot joint indices of actuated
+ * wheel joints; the wheels must span every planar motion.
+ */
+typedef struct rk_simulation_omni_drive_desc {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t wheel_joints[3];
+    double wheel_angles[3];
+    double wheel_radius;
+    double base_radius;
+    uint64_t reserved[2];
+} rk_simulation_omni_drive_desc;
+
+/**
+ * Omni-wheel plant state after the latest completed tick, with the same
+ * x, y, yaw, and height meaning as rk_simulation_differential_drive_state.
+ * The wheel rates are the velocity targets, in rad/s, the robot applied for
+ * that tick after runtime clamping.
+ */
+typedef struct rk_simulation_omni_drive_state {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t enabled; /**< Nonzero while the coupling is active. */
+    double x;
+    double y;
+    double yaw;
+    double height;
+    double wheel_rates[3];
+    uint64_t reserved[2];
+} rk_simulation_omni_drive_state;
+
 /** Immutable copied presentation snapshot captured under one simulation lock. */
 typedef uint32_t rk_simulation_presentation RK_HANDLE RK_HANDLE_DESTROY(rk_simulation_presentation_destroy);
 #define RK_INVALID_SIMULATION_PRESENTATION ((rk_simulation_presentation)0)
@@ -297,13 +334,36 @@ RK_API rk_result RK_CALL rk_simulation_place_robot_base(
 RK_API rk_result RK_CALL rk_simulation_set_differential_drive(
     rk_simulation simulation, uint32_t robot_index,
     const rk_simulation_differential_drive_desc *desc);
-/** Removes a robot's differential-drive coupling; its base stays where it is. */
+/** Removes a robot's differential-drive coupling, if it has one; its base stays where it is. */
 RK_API rk_result RK_CALL rk_simulation_clear_differential_drive(
     rk_simulation simulation, uint32_t robot_index);
 /** Reads one robot's differential-drive plant state. */
 RK_API rk_result RK_CALL rk_simulation_get_differential_drive_state(
     rk_simulation simulation, uint32_t robot_index,
     rk_simulation_differential_drive_state *out_state RK_INOUT);
+/**
+ * Couples one robot's three omni-wheel velocity targets to its kinematic base.
+ *
+ * Behaves like rk_simulation_set_differential_drive, including its floor,
+ * tilt, and zero-latency rules, but the body twist decoded from the applied
+ * wheel rates may include a lateral component, so the base can strafe. A
+ * robot has one drive coupling: this replaces a differential one and vice
+ * versa.
+ *
+ * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed,
+ * missing, or repeated wheel joint, non-positive or non-finite geometry, or
+ * wheel angles that cannot span every planar motion.
+ */
+RK_API rk_result RK_CALL rk_simulation_set_omni_drive(
+    rk_simulation simulation, uint32_t robot_index,
+    const rk_simulation_omni_drive_desc *desc);
+/** Removes a robot's omni-wheel coupling, if it has one; its base stays where it is. */
+RK_API rk_result RK_CALL rk_simulation_clear_omni_drive(
+    rk_simulation simulation, uint32_t robot_index);
+/** Reads one robot's omni-wheel plant state. */
+RK_API rk_result RK_CALL rk_simulation_get_omni_drive_state(
+    rk_simulation simulation, uint32_t robot_index,
+    rk_simulation_omni_drive_state *out_state RK_INOUT);
 /** Reads one robot base pose from the latest physics state. */
 RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
     rk_simulation simulation, uint32_t robot_index,

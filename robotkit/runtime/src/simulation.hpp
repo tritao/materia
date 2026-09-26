@@ -58,6 +58,11 @@ public:
     rk_result clear_differential_drive(uint32_t robot_index);
     rk_result get_differential_drive_state(
         uint32_t robot_index, rk_simulation_differential_drive_state &out_state) const;
+    /** Couples one robot's three applied omni-wheel velocity targets to its base pose. */
+    rk_result set_omni_drive(uint32_t robot_index, const rk_simulation_omni_drive_desc &desc);
+    rk_result clear_omni_drive(uint32_t robot_index);
+    rk_result get_omni_drive_state(uint32_t robot_index,
+                                   rk_simulation_omni_drive_state &out_state) const;
     rk_result get_robot_pose(uint32_t robot_index, rk_simulation_pose &out_pose) const;
     rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
                             rk_simulation_pose &out_pose) const;
@@ -81,12 +86,12 @@ private:
     rk_result read_body_pose(nksim_body body, rk_simulation_pose &out_pose) const;
     /**
      * Writes one robot base's scene node, which its kinematic body follows on
-     * the next tick, and re-seeds any differential-drive plant from it.
+     * the next tick, and re-seeds any drive plant from it.
      */
     rk_result set_robot_base_node_pose(uint32_t robot_index, const rk_simulation_pose &pose);
     rk_result write_robot_base_node(uint32_t robot_index, const rk_simulation_pose &pose);
-    /** Re-seeds a robot's differential-drive plant (pose, heading, tilt). */
-    void seed_differential_drive(uint32_t robot_index, const rk_simulation_pose &pose);
+    /** Re-seeds a robot's drive plant (pose, heading, tilt). */
+    void seed_drive(uint32_t robot_index, const rk_simulation_pose &pose);
     /**
      * Moves a robot base continuously to `pose` over the next tick with the
      * exact double-precision twist given (world frame), writing its scene node
@@ -97,21 +102,29 @@ private:
                                     const double linear_velocity[3],
                                     const double angular_velocity[3]);
     /** Integrates every enabled drive plant from its robot's applied wheel targets. */
-    rk_result advance_differential_drives();
+    rk_result advance_drives();
+    rk_result valid_wheel_joints(uint32_t robot_index, const uint32_t *joints,
+                                 uint32_t count) const;
+    /** Removes a robot's drive plant when it is of `kind`; its base stays put. */
+    rk_result clear_drive(uint32_t robot_index, int kind);
     void run();
 
     /**
-     * Ideal rolling differential-drive plant for one robot. Each tick it rolls
-     * the base along a constant-curvature arc from the wheel velocity targets
-     * the robot applied for that tick, before physics advances, so the base
-     * responds with zero latency and follows every stop the robot applies.
+     * Ideal rolling drive plant for one robot's kinematic base. Each tick it
+     * turns the wheel velocity targets the robot applied for that tick into a
+     * constant body twist and rolls the base along it, before physics
+     * advances, so the base responds with zero latency and follows every stop
+     * the robot applies. A robot has at most one plant, of either kind.
      */
-    struct DifferentialDrive {
-        bool enabled = false;
-        uint32_t left_joint = 0;
-        uint32_t right_joint = 0;
+    struct DrivePlant {
+        enum class Kind { None, Differential, Omni };
+        Kind kind = Kind::None;
+        uint32_t wheel_count = 0;
+        uint32_t joints[3] = {0, 0, 0};
         double wheel_radius = 0.0;
-        double track_width = 0.0;
+        double track_width = 0.0; // Differential only.
+        // Omni only: maps wheel rim speeds to the body twist (vx, vy, omega).
+        double inverse[3][3] = {};
         double x = 0.0;
         double y = 0.0;
         double yaw = 0.0; // Unwrapped, continuous across re-seeding.
@@ -123,8 +136,7 @@ private:
          * level floor.
          */
         double tilt[4] = {0.0, 0.0, 0.0, 1.0};
-        double left_rate = 0.0;
-        double right_rate = 0.0;
+        double rates[3] = {0.0, 0.0, 0.0};
     };
 
     nkscene_scene scene_ = 0;
@@ -151,7 +163,7 @@ private:
     // (or after a placement, teleport, or reset); a drive's motion is
     // measured from it.
     std::vector<rk_simulation_pose> robot_tick_poses_;
-    std::vector<DifferentialDrive> drives_;
+    std::vector<DrivePlant> drives_;
     struct EnvironmentObject {
         nkscene_node_id node{};
         nksim_shape shape = 0;

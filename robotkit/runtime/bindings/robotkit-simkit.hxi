@@ -25,9 +25,13 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_capture_presentation(simulation: rk_simulation, out_presentation: ptr<rk_simulation_presentation> @out @owned) -> rk_result;
 	/**
-	 * Removes a robot's differential-drive coupling; its base stays where it is.
+	 * Removes a robot's differential-drive coupling, if it has one; its base stays where it is.
 	 */
 	extern fn rk_simulation_clear_differential_drive(simulation: rk_simulation, robot_index: u32) -> rk_result;
+	/**
+	 * Removes a robot's omni-wheel coupling, if it has one; its base stays where it is.
+	 */
+	extern fn rk_simulation_clear_omni_drive(simulation: rk_simulation, robot_index: u32) -> rk_result;
 	/**
 	 * Creates one shared simulated universe and its fixed-step clock.
 	 *
@@ -88,6 +92,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Reads one environment object's pose from the latest physics state.
 	 */
 	extern fn rk_simulation_get_object_pose(simulation: rk_simulation, object: rk_simulation_object, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
+	/**
+	 * Reads one robot's omni-wheel plant state.
+	 */
+	extern fn rk_simulation_get_omni_drive_state(simulation: rk_simulation, robot_index: u32, out_state: ptr<rk_simulation_omni_drive_state> @inout) -> rk_result;
 	/**
 	 * Reads one robot base pose from the latest physics state.
 	 */
@@ -153,6 +161,20 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * missing wheel joint, identical wheels, or non-positive geometry.
 	 */
 	extern fn rk_simulation_set_differential_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_differential_drive_desc>>) -> rk_result;
+	/**
+	 * Couples one robot's three omni-wheel velocity targets to its kinematic base.
+	 *
+	 * Behaves like rk_simulation_set_differential_drive, including its floor,
+	 * tilt, and zero-latency rules, but the body twist decoded from the applied
+	 * wheel rates may include a lateral component, so the base can strafe. A
+	 * robot has one drive coupling: this replaces a differential one and vice
+	 * versa.
+	 *
+	 * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed,
+	 * missing, or repeated wheel joint, non-positive or non-finite geometry, or
+	 * wheel angles that cannot span every planar motion.
+	 */
+	extern fn rk_simulation_set_omni_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_omni_drive_desc>>) -> rk_result;
 	/**
 	 * Adds one environment body from the editable scene while stopped.
 	 */
@@ -286,6 +308,44 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		half_extents: array<f64, 3> @offset(64);
 		mass: f64 @offset(88);
 		reserved: array<u64, 2> @offset(96);
+	}
+	/**
+	 * Ideal rolling omni-wheel coupling for one robot's kinematic base.
+	 *
+	 * Three omni wheels, each at mount angle wheel_angles[i] (radians about +Z
+	 * from the base's x axis) and base_radius metres from the base centre, roll
+	 * tangentially: for a body twist (vx, vy, omega) in the base frame, wheel i's
+	 * rim speed is -sin(a_i) vx + cos(a_i) vy + base_radius omega, and its joint
+	 * rate is that speed over wheel_radius. A kiwi drive uses angles
+	 * pi/2 + i * 2pi/3. The wheel joints are robot joint indices of actuated
+	 * wheel joints; the wheels must span every planar motion.
+	 */
+	struct rk_simulation_omni_drive_desc @layout(72, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		wheel_joints: array<u32, 3> @offset(4);
+		wheel_angles: array<f64, 3> @offset(16);
+		wheel_radius: f64 @offset(40);
+		base_radius: f64 @offset(48);
+		reserved: array<u64, 2> @offset(56);
+	}
+	/**
+	 * Omni-wheel plant state after the latest completed tick, with the same
+	 * x, y, yaw, and height meaning as rk_simulation_differential_drive_state.
+	 * The wheel rates are the velocity targets, in rad/s, the robot applied for
+	 * that tick after runtime clamping.
+	 */
+	struct rk_simulation_omni_drive_state @layout(80, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < Nonzero while the coupling is active.
+		 */
+		enabled: u32 @offset(4);
+		x: f64 @offset(8);
+		y: f64 @offset(16);
+		yaw: f64 @offset(24);
+		height: f64 @offset(32);
+		wheel_rates: array<f64, 3> @offset(40);
+		reserved: array<u64, 2> @offset(64);
 	}
 	struct rk_simulation_pose @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;

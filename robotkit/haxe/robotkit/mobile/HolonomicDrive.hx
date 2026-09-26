@@ -17,7 +17,8 @@ class HolonomicDrive implements DriveModel {
   public final wheelRadius:Float;
   public final baseRadius:Float;
 
-  final wheelAngles:Array<Float>;
+  /** Mount angle of each wheel about +Z from the base's x axis, in radians. */
+  public final wheelAngles:Array<Float>;
 
   public function new(wheelJoints:Array<Int>, wheelRadius:Float, baseRadius:Float) {
     if (wheelJoints == null || wheelJoints.length != 3)
@@ -42,7 +43,7 @@ class HolonomicDrive implements DriveModel {
   /** Every heading is reachable while driving straight, like in-place rotation. */
   public function maxCurvature():Float return 1.0e300;
 
-  /** No two-wheel differential relationship to decode; see HolonomicDrivePlant. */
+  /** No two-wheel differential relationship to decode; HolonomicDrivePlant uses wheelAngles. */
   public function createOdometry():Null<DifferentialOdometry> return null;
 
   public function supportsInPlaceRotation():Bool return true;

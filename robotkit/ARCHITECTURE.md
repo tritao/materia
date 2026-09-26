@@ -257,11 +257,12 @@ least-squares fit against the same per-wheel tangential-speed relationship
 apart makes the normal equations decouple exactly (their sines sum to zero),
 so `distance` and `headingChange` are each a plain weighted average over the
 three wheels. `runtime.HolonomicDrivePlant` mirrors `DifferentialDrivePlant`:
-since the wheel-rate encoding of a zero-lateral-component twist is exactly
-invertible, the plant integrates chassis motion directly from the commanded
-twist (not by decoding wheel rates) and only re-derives wheel targets to
-validate that the configured wheel joints are the ones actually present,
-then teleports the chassis as `DifferentialDrivePlant` does.
+it couples the three wheel joints to the base natively
+(`Simulation.setOmniDrive`), and every tick decodes the full planar body
+twist -- forward, lateral, and yaw rate -- from the wheel targets the robot
+actually applied, so stops, rate clamps, and wheels driven directly (which can
+strafe, although `Twist2` has no lateral term) all move the chassis exactly as
+they would the real base.
 
 `Pose2` and `Twist2` describe planar geometry and body velocity. The initial
 wheel odometry utility consumes immutable snapshots and uses source clock IDs

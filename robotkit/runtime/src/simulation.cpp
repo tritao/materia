@@ -340,7 +340,8 @@ rk_result Simulation::reset() {
             robot_initial_poses_[index].rotation)!=RK_OK)return RK_ERROR_BACKEND;
         // Kinematic bases follow their scene node on every tick, so a pose
         // driven by drive_robot_base() or a drive plant is restored there too.
-        drives_[index].yaw = drives_[index].left_rate = drives_[index].right_rate = 0.0;
+        drives_[index].yaw = 0.0;
+        std::fill(std::begin(drives_[index].rates), std::end(drives_[index].rates), 0.0);
         if (set_robot_base_node_pose(static_cast<uint32_t>(index),
                                      robot_initial_poses_[index]) != RK_OK)
             return RK_ERROR_BACKEND;
@@ -367,7 +368,8 @@ rk_result Simulation::reset_robot(uint32_t robot_index) {
     if(set_body_pose(world_,robot_base_bodies_[robot_index],robot_initial_poses_[robot_index].position,
         robot_initial_poses_[robot_index].rotation)!=RK_OK)return RK_ERROR_BACKEND;
     auto &drive = drives_[robot_index];
-    drive.yaw = drive.left_rate = drive.right_rate = 0.0;
+    drive.yaw = 0.0;
+    std::fill(std::begin(drive.rates), std::end(drive.rates), 0.0);
     if (set_robot_base_node_pose(robot_index, robot_initial_poses_[robot_index]) != RK_OK)
         return RK_ERROR_BACKEND;
     binding->reset();
@@ -494,11 +496,11 @@ rk_result Simulation::set_robot_base_node_pose(uint32_t robot_index,
     const auto result = write_robot_base_node(robot_index, pose);
     if (result != RK_OK) return result;
     robot_tick_poses_[robot_index] = pose;
-    seed_differential_drive(robot_index, pose);
+    seed_drive(robot_index, pose);
     return RK_OK;
 }
 
-void Simulation::seed_differential_drive(uint32_t robot_index, const rk_simulation_pose &pose) {
+void Simulation::seed_drive(uint32_t robot_index, const rk_simulation_pose &pose) {
     auto &drive = drives_[robot_index];
     drive.x = pose.position[0];
     drive.y = pose.position[1];
@@ -534,30 +536,63 @@ rk_result Simulation::drive_robot_base_body(uint32_t robot_index, const rk_simul
     return driven == NKSIM_OK ? RK_OK : RK_ERROR_BACKEND;
 }
 
-rk_result Simulation::advance_differential_drives() {
+rk_result Simulation::advance_drives() {
     for (uint32_t index = 0; index < drives_.size(); ++index) {
         auto &drive = drives_[index];
-        if (!drive.enabled) continue;
+        if (drive.kind == DrivePlant::Kind::None) continue;
         const auto binding = bindings_[index].lock();
         if (!binding) return RK_ERROR_INVALID_HANDLE;
-        drive.left_rate = binding->applied_velocity(drive.left_joint);
-        drive.right_rate = binding->applied_velocity(drive.right_joint);
-        const double left = drive.left_rate * drive.wheel_radius * fixed_timestep_;
-        const double right = drive.right_rate * drive.wheel_radius * fixed_timestep_;
-        const double distance = (left + right) * 0.5;
-        const double turn = (right - left) / drive.track_width;
-        // A stopped plant sends nothing: the base holds its pose at rest.
-        if (distance == 0.0 && turn == 0.0) continue;
-        const double next_yaw = drive.yaw + turn;
-        if (std::abs(turn) < 1e-9) {
-            drive.x += distance * std::cos(drive.yaw);
-            drive.y += distance * std::sin(drive.yaw);
+        for (uint32_t wheel = 0; wheel < drive.wheel_count; ++wheel)
+            drive.rates[wheel] = binding->applied_velocity(drive.joints[wheel]);
+        // World-frame twist at the end of the tick.
+        double linear[3] = {0.0, 0.0, 0.0};
+        double turn_rate = 0.0;
+        if (drive.kind == DrivePlant::Kind::Differential) {
+            const double left = drive.rates[0] * drive.wheel_radius * fixed_timestep_;
+            const double right = drive.rates[1] * drive.wheel_radius * fixed_timestep_;
+            const double distance = (left + right) * 0.5;
+            const double turn = (right - left) / drive.track_width;
+            // A stopped plant sends nothing: the base holds its pose at rest.
+            if (distance == 0.0 && turn == 0.0) continue;
+            const double next_yaw = drive.yaw + turn;
+            if (std::abs(turn) < 1e-9) {
+                drive.x += distance * std::cos(drive.yaw);
+                drive.y += distance * std::sin(drive.yaw);
+            } else {
+                const double radius = distance / turn;
+                drive.x += radius * (std::sin(next_yaw) - std::sin(drive.yaw));
+                drive.y -= radius * (std::cos(next_yaw) - std::cos(drive.yaw));
+            }
+            drive.yaw = next_yaw;
+            // Constant speed along the new heading.
+            const double speed = distance / fixed_timestep_;
+            linear[0] = speed * std::cos(drive.yaw);
+            linear[1] = speed * std::sin(drive.yaw);
+            turn_rate = turn / fixed_timestep_;
         } else {
-            const double radius = distance / turn;
-            drive.x += radius * (std::sin(next_yaw) - std::sin(drive.yaw));
-            drive.y -= radius * (std::cos(next_yaw) - std::cos(drive.yaw));
+            // Decode the body twist (forward, lateral, yaw rate) from the rim speeds.
+            double body[3] = {0.0, 0.0, 0.0};
+            for (int row = 0; row < 3; ++row)
+                for (int wheel = 0; wheel < 3; ++wheel)
+                    body[row] += drive.inverse[row][wheel] * drive.rates[wheel] * drive.wheel_radius;
+            const double forward = body[0], lateral = body[1];
+            turn_rate = body[2];
+            if (forward == 0.0 && lateral == 0.0 && turn_rate == 0.0) continue;
+            // Exact motion under a constant body twist: the twist integrated
+            // along the turning heading.
+            const double turn = turn_rate * fixed_timestep_;
+            double along = forward * fixed_timestep_, across = lateral * fixed_timestep_;
+            if (std::abs(turn) >= 1e-9) {
+                const double sine = std::sin(turn), versine = 1.0 - std::cos(turn);
+                along = (forward * sine - lateral * versine) / turn_rate;
+                across = (forward * versine + lateral * sine) / turn_rate;
+            }
+            drive.x += along * std::cos(drive.yaw) - across * std::sin(drive.yaw);
+            drive.y += along * std::sin(drive.yaw) + across * std::cos(drive.yaw);
+            drive.yaw += turn;
+            linear[0] = forward * std::cos(drive.yaw) - lateral * std::sin(drive.yaw);
+            linear[1] = forward * std::sin(drive.yaw) + lateral * std::cos(drive.yaw);
         }
-        drive.yaw = next_yaw;
         // The wheels roll on the level floor, so the base translates in the
         // world XY plane at its seeded height and turns about world Z; its
         // authored roll and pitch (the tilt) turn with the heading.
@@ -569,11 +604,7 @@ rk_result Simulation::advance_differential_drives() {
         double heading[4];
         yaw_rotation(drive.yaw, heading);
         sensors::multiply(heading, drive.tilt, pose.rotation);
-        // Exact twist at the end of the arc: constant speed along the new
-        // heading and a constant turn rate about world Z.
-        const double speed = distance / fixed_timestep_;
-        const double linear[3] = {speed * std::cos(drive.yaw), speed * std::sin(drive.yaw), 0.0};
-        const double angular[3] = {0.0, 0.0, turn / fixed_timestep_};
+        const double angular[3] = {0.0, 0.0, turn_rate};
         const auto result = drive_robot_base_body(index, pose, linear, angular);
         if (result != RK_OK) return result;
     }
@@ -587,28 +618,92 @@ rk_result Simulation::set_differential_drive(
         !valid_drive_geometry(desc.wheel_radius) || !valid_drive_geometry(desc.track_width) ||
         desc.left_wheel_joint == desc.right_wheel_joint)
         return RK_ERROR_INVALID_ARGUMENT;
-    const auto binding = bindings_[robot_index].lock();
-    if (!binding) return RK_ERROR_INVALID_HANDLE;
-    for (const auto joint : {desc.left_wheel_joint, desc.right_wheel_joint})
-        if (joint >= binding->joints_.size() || joint >= binding->actuated_joints_.size() ||
-            !binding->actuated_joints_[joint])
-            return RK_ERROR_INVALID_ARGUMENT;
+    const uint32_t joints[2] = {desc.left_wheel_joint, desc.right_wheel_joint};
+    const auto valid = valid_wheel_joints(robot_index, joints, 2);
+    if (valid != RK_OK) return valid;
     auto &drive = drives_[robot_index];
-    drive.enabled = true;
-    drive.left_joint = desc.left_wheel_joint;
-    drive.right_joint = desc.right_wheel_joint;
+    drive.kind = DrivePlant::Kind::Differential;
+    drive.wheel_count = 2;
+    std::copy_n(joints, 2, drive.joints);
     drive.wheel_radius = desc.wheel_radius;
     drive.track_width = desc.track_width;
-    drive.left_rate = drive.right_rate = 0.0;
+    std::fill(std::begin(drive.rates), std::end(drive.rates), 0.0);
     return set_robot_base_node_pose(robot_index, robot_base_poses_[robot_index]);
 }
 
-rk_result Simulation::clear_differential_drive(uint32_t robot_index) {
+rk_result Simulation::set_omni_drive(uint32_t robot_index,
+                                     const rk_simulation_omni_drive_desc &desc) {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (desc.struct_size < sizeof(desc) || robot_index >= drives_.size() ||
+        !valid_drive_geometry(desc.wheel_radius) || !valid_drive_geometry(desc.base_radius))
+        return RK_ERROR_INVALID_ARGUMENT;
+    for (const double angle : desc.wheel_angles)
+        if (!std::isfinite(angle)) return RK_ERROR_INVALID_ARGUMENT;
+    const auto &j = desc.wheel_joints;
+    if (j[0] == j[1] || j[0] == j[2] || j[1] == j[2]) return RK_ERROR_INVALID_ARGUMENT;
+    const auto valid = valid_wheel_joints(robot_index, j, 3);
+    if (valid != RK_OK) return valid;
+    // Wheel i's rim speed is -sin(a_i) vx + cos(a_i) vy + base_radius * omega
+    // for a body twist (vx, vy, omega); invert that map once here.
+    double forward[3][3];
+    for (int wheel = 0; wheel < 3; ++wheel) {
+        forward[wheel][0] = -std::sin(desc.wheel_angles[wheel]);
+        forward[wheel][1] = std::cos(desc.wheel_angles[wheel]);
+        forward[wheel][2] = desc.base_radius;
+    }
+    const double determinant =
+        forward[0][0] * (forward[1][1] * forward[2][2] - forward[1][2] * forward[2][1]) -
+        forward[0][1] * (forward[1][0] * forward[2][2] - forward[1][2] * forward[2][0]) +
+        forward[0][2] * (forward[1][0] * forward[2][1] - forward[1][1] * forward[2][0]);
+    // The wheels must span every planar motion (no two parallel, not all
+    // through one point); scale the check by base_radius, the matrix's units.
+    if (!(std::abs(determinant) > 1e-6 * desc.base_radius)) return RK_ERROR_INVALID_ARGUMENT;
+    auto &drive = drives_[robot_index];
+    for (int row = 0; row < 3; ++row)
+        for (int column = 0; column < 3; ++column) {
+            const int r0 = (column + 1) % 3, r1 = (column + 2) % 3;
+            const int c0 = (row + 1) % 3, c1 = (row + 2) % 3;
+            drive.inverse[row][column] =
+                (forward[r0][c0] * forward[r1][c1] - forward[r0][c1] * forward[r1][c0]) /
+                determinant;
+        }
+    drive.kind = DrivePlant::Kind::Omni;
+    drive.wheel_count = 3;
+    std::copy_n(j, 3, drive.joints);
+    drive.wheel_radius = desc.wheel_radius;
+    drive.track_width = 0.0;
+    std::fill(std::begin(drive.rates), std::end(drive.rates), 0.0);
+    return set_robot_base_node_pose(robot_index, robot_base_poses_[robot_index]);
+}
+
+rk_result Simulation::valid_wheel_joints(uint32_t robot_index, const uint32_t *joints,
+                                         uint32_t count) const {
+    const auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    for (uint32_t index = 0; index < count; ++index)
+        if (joints[index] >= binding->joints_.size() ||
+            joints[index] >= binding->actuated_joints_.size() ||
+            !binding->actuated_joints_[joints[index]])
+            return RK_ERROR_INVALID_ARGUMENT;
+    return RK_OK;
+}
+
+rk_result Simulation::clear_drive(uint32_t robot_index, int kind) {
     std::lock_guard tick_lock(tick_mutex_);
     if (robot_index >= drives_.size()) return RK_ERROR_INVALID_ARGUMENT;
-    drives_[robot_index].enabled = false;
-    drives_[robot_index].left_rate = drives_[robot_index].right_rate = 0.0;
+    auto &drive = drives_[robot_index];
+    if (static_cast<int>(drive.kind) != kind) return RK_OK;
+    drive.kind = DrivePlant::Kind::None;
+    std::fill(std::begin(drive.rates), std::end(drive.rates), 0.0);
     return RK_OK;
+}
+
+rk_result Simulation::clear_differential_drive(uint32_t robot_index) {
+    return clear_drive(robot_index, static_cast<int>(DrivePlant::Kind::Differential));
+}
+
+rk_result Simulation::clear_omni_drive(uint32_t robot_index) {
+    return clear_drive(robot_index, static_cast<int>(DrivePlant::Kind::Omni));
 }
 
 rk_result Simulation::get_differential_drive_state(
@@ -617,13 +712,29 @@ rk_result Simulation::get_differential_drive_state(
     if (out_state.struct_size < sizeof(out_state) || robot_index >= drives_.size())
         return RK_ERROR_INVALID_ARGUMENT;
     const auto &drive = drives_[robot_index];
-    out_state.enabled = drive.enabled ? 1u : 0u;
+    out_state.enabled = drive.kind == DrivePlant::Kind::Differential ? 1u : 0u;
     out_state.x = drive.x;
     out_state.y = drive.y;
     out_state.yaw = drive.yaw;
     out_state.height = drive.height;
-    out_state.left_wheel_rate = drive.left_rate;
-    out_state.right_wheel_rate = drive.right_rate;
+    out_state.left_wheel_rate = out_state.enabled ? drive.rates[0] : 0.0;
+    out_state.right_wheel_rate = out_state.enabled ? drive.rates[1] : 0.0;
+    return RK_OK;
+}
+
+rk_result Simulation::get_omni_drive_state(uint32_t robot_index,
+                                           rk_simulation_omni_drive_state &out_state) const {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (out_state.struct_size < sizeof(out_state) || robot_index >= drives_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto &drive = drives_[robot_index];
+    out_state.enabled = drive.kind == DrivePlant::Kind::Omni ? 1u : 0u;
+    out_state.x = drive.x;
+    out_state.y = drive.y;
+    out_state.yaw = drive.yaw;
+    out_state.height = drive.height;
+    for (int wheel = 0; wheel < 3; ++wheel)
+        out_state.wheel_rates[wheel] = out_state.enabled ? drive.rates[wheel] : 0.0;
     return RK_OK;
 }
 
@@ -644,7 +755,7 @@ rk_result Simulation::drive_robot_base(uint32_t robot_index, const rk_simulation
         linear[axis] = (pose.position[axis] - from.position[axis]) / fixed_timestep_;
     angular_velocity_between(from.rotation, pose.rotation, fixed_timestep_, angular);
     const auto result = drive_robot_base_body(robot_index, pose, linear, angular);
-    if (result == RK_OK) seed_differential_drive(robot_index, pose);
+    if (result == RK_OK) seed_drive(robot_index, pose);
     return result;
 }
 
@@ -978,7 +1089,7 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
         ++it;
     }
     // Targets taken above are the ones every robot applied for this tick.
-    const auto drive_result = advance_differential_drives();
+    const auto drive_result = advance_drives();
     if (drive_result != RK_OK)
         return drive_result;
     nksim_step_result result{};

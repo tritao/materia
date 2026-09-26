@@ -7,6 +7,7 @@ import sys.thread.Thread;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.DifferentialDrivePlant;
+import robotkit.runtime.HolonomicDrivePlant;
 import robotkit.runtime.RobotRuntimeJointBlueprint;
 import robotkit.runtime.RobotCompileException;
 import robotkit.runtime.RobotRuntimeConfiguration;
@@ -146,6 +147,7 @@ class RobotWorldTests {
     testNavigator();
     testGoToBlockedTimeout();
     testDifferentialDrivePlantKinematics();
+    testHolonomicDrivePlantKinematics();
     testForkMechanisms();
     testPerceptionSafetyPower();
     testLoadSafetyPolicy();
@@ -1809,6 +1811,116 @@ class RobotWorldTests {
     check(Math.abs(reset.position[0] - 1.0) < 1e-6 && Math.abs(reset.position[1] - 2.0) < 1e-6 &&
       Math.abs(reset.position[2] - 0.3) < 1e-6,
       "resetRobot restores the authored base pose after the plant drove it");
+    robot.close();
+    simulation.dispose();
+  }
+
+  static function testHolonomicDrivePlantKinematics():Void {
+    var model = new RobotModel("omni-plant-kinematics");
+    var baseLink = model.addLink(new Link("base", "link/base"));
+    var wheelRadius = 0.05, baseRadius = 0.3;
+    var wheelIds:Array<String> = [];
+    for (i in 0...3) {
+      var wheel = model.addLink(new Link('wheel$i', 'link/wheel$i'));
+      var joint = new Joint('wheel$i', JointType.Continuous, baseLink, wheel, 'joint/wheel$i');
+      joint.limits = new JointLimits(-1000.0, 1000.0, 10.0, 100.0);
+      model.addJoint(joint);
+      wheelIds.push(joint.id);
+    }
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Holonomic(wheelIds, wheelRadius, baseRadius), 0.8, 1.5, 100.0, 100.0);
+    var imu = model.addSensor(new Sensor("base imu", "imu", 0.0, "sensor/imu"));
+    imu.frame = model.addFrame(new Frame("imu mount", baseLink, "frame/imu"));
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var simulation = new Simulation(0.02);
+    var robot = new SimulatedRobot("omni-plant-kinematics", simulation.addRobot(blueprint),
+      model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var base = MobileBase.fromBlueprint(robot, blueprint);
+    var startYaw = 0.5;
+    simulation.teleportRobot(0, [1.0, 2.0, 0.3],
+      [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
+    var plant = new HolonomicDrivePlant(simulation, 0, base);
+    check(Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9 &&
+      Math.abs(plant.pose.yaw - startYaw) < 1e-9 && Math.abs(plant.baseHeight - 0.3) < 1e-9,
+      "HolonomicDrivePlant starts from the simulated base pose and authored height");
+    var tick = 1;
+    function imuFrame(snapshot:RobotSnapshot):Null<SensorFrame> {
+      for (index in 0...snapshot.sensors.length)
+        if (snapshot.sensors.get(index).sensorId == "sensor/imu")
+          return snapshot.sensors.get(index);
+      return null;
+    }
+    function imuSequence(snapshot:RobotSnapshot):Int64 {
+      var frame = imuFrame(snapshot);
+      return frame == null ? Int64.ofInt(0) : frame.sequence;
+    }
+    function imuValue(snapshot:RobotSnapshot, index:Int):Float {
+      var frame = imuFrame(snapshot);
+      if (frame == null) throw "IMU sample was not published";
+      return frame.values.get(index);
+    }
+
+    // Forward at 0.3 m/s: ten 0.02 s ticks move 0.06 m along the heading.
+    base.command(new Twist2(0.3, 0.0));
+    var firstImu = imuSequence(plant.step(Int64.ofInt(tick++)));
+    var snapshot = plant.step(Int64.ofInt(tick++));
+    for (_ in 0...8) snapshot = plant.step(Int64.ofInt(tick++));
+    check(Math.abs(plant.pose.x - (1.0 + 0.06 * Math.cos(startYaw))) < 1e-9 &&
+      Math.abs(plant.pose.y - (2.0 + 0.06 * Math.sin(startYaw))) < 1e-9 &&
+      Math.abs(plant.pose.yaw - startYaw) < 1e-9,
+      "HolonomicDrivePlant drives a forward twist along the heading for v*dt per tick");
+    var physics = simulation.robotPose(0);
+    check(Math.abs(physics.position[0] - plant.pose.x) < 1e-6 &&
+      Math.abs(physics.position[1] - plant.pose.y) < 1e-6 &&
+      Math.abs(physics.position[2] - 0.3) < 1e-6,
+      "HolonomicDrivePlant drives the physics base and preserves its authored height");
+    check(Int64.compare(imuSequence(snapshot), Int64.add(firstImu, Int64.ofInt(9))) == 0,
+      "IMU keeps publishing every tick while the holonomic plant drives the base");
+
+    // An arc at 0.3 m/s and 1 rad/s turns 0.02 rad per tick.
+    base.command(new Twist2(0.3, 1.0));
+    var arcStart = plant.pose;
+    for (_ in 0...5) snapshot = plant.step(Int64.ofInt(tick++));
+    check(Math.abs(plant.pose.yaw - arcStart.yaw - 0.1) < 1e-9 &&
+      Math.abs(imuValue(snapshot, 2) - 1.0) < 1e-3,
+      "HolonomicDrivePlant turns at the commanded yaw rate and the gyro reads it");
+
+    // Wheels driven straight on the robot can strafe, which Twist2 cannot
+    // express: 0.3 m/s along body +Y for ten ticks is 0.06 m to the left.
+    base.stop();
+    plant.step(Int64.ofInt(tick++));
+    var strafeStart = plant.pose;
+    var strafe = [for (i in 0...3) {
+      var angle = Math.PI * 0.5 + i * Math.PI * 2.0 / 3.0;
+      robotkit.world.JointTarget.velocity(i, Math.cos(angle) * 0.3 / wheelRadius);
+    }];
+    robot.submit(RobotCommand.JointTargets(strafe, null));
+    for (_ in 0...10) plant.step(Int64.ofInt(tick++));
+    check(base.currentCommand().linear == 0.0 &&
+      Math.abs(plant.pose.x - (strafeStart.x - 0.06 * Math.sin(strafeStart.yaw))) < 1e-9 &&
+      Math.abs(plant.pose.y - (strafeStart.y + 0.06 * Math.cos(strafeStart.yaw))) < 1e-9 &&
+      Math.abs(plant.pose.yaw - strafeStart.yaw) < 1e-9,
+      "HolonomicDrivePlant strafes with wheel targets submitted directly to the robot");
+
+    // A stop issued directly on the robot halts the chassis at once, even
+    // though MobileBase still caches its last command.
+    base.command(new Twist2(0.3, 0.0));
+    plant.step(Int64.ofInt(tick++));
+    robot.stop(StopMode.Emergency);
+    var stopped = plant.pose;
+    for (_ in 0...4) plant.step(Int64.ofInt(tick++));
+    var rates = plant.appliedWheelRates();
+    check(base.currentCommand().linear > 0.0 &&
+      Math.abs(plant.pose.x - stopped.x) < 1e-12 && Math.abs(plant.pose.y - stopped.y) < 1e-12 &&
+      rates[0] == 0.0 && rates[1] == 0.0 && rates[2] == 0.0,
+      "HolonomicDrivePlant does not move a robot under a direct emergency stop");
+
+    // Teleport keeps the authored height.
+    plant.teleport(new Pose2(3.0, 4.0, 0.0));
+    plant.step(Int64.ofInt(tick++));
+    check(Math.abs(plant.pose.x - 3.0) < 1e-9 && Math.abs(plant.pose.y - 4.0) < 1e-9 &&
+      Math.abs(simulation.robotPose(0).position[2] - 0.3) < 1e-6,
+      "HolonomicDrivePlant teleports to a planar pose at the authored height");
     robot.close();
     simulation.dispose();
   }

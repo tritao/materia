@@ -862,6 +862,150 @@ void differential_drive_keeps_authored_tilt() {
     rk_simulation_destroy(simulation);
 }
 
+rk_robot_runtime_blueprint omni_blueprint() {
+    auto value = wheeled_blueprint();
+    value.joint_count = 3;
+    value.link_count = 4;
+    value.links[3] = value.links[1];
+    value.joints[2] = value.joints[1];
+    value.joints[2].joint = 2;
+    value.joints[2].child_link = 3;
+    assert(rk_robot_runtime_blueprint_validate(&value) == RK_OK);
+    return value;
+}
+
+constexpr double omni_wheel_radius = 0.1;
+constexpr double omni_base_radius = 0.2;
+
+double omni_angle(int wheel) { return 1.5707963267948966 + wheel * 2.0943951023931957; }
+
+// Joint targets that move the base at body twist (vx, vy, omega).
+rk_robot_command omni_targets(double vx, double vy, double omega, uint64_t sequence) {
+    rk_robot_command value{};
+    value.struct_size = sizeof(value);
+    value.sequence = sequence;
+    value.kind = RK_COMMAND_JOINT_TARGETS;
+    value.target_count = 3;
+    for (uint32_t wheel = 0; wheel < 3; ++wheel) {
+        const double angle = omni_angle(static_cast<int>(wheel));
+        const double speed =
+            -std::sin(angle) * vx + std::cos(angle) * vy + omni_base_radius * omega;
+        value.targets[wheel] = {wheel, RK_TARGET_VELOCITY, speed / omni_wheel_radius, 0.0, 0.0};
+    }
+    return value;
+}
+
+rk_simulation_omni_drive_state omni_state(rk_simulation simulation) {
+    rk_simulation_omni_drive_state value{};
+    value.struct_size = sizeof(value);
+    assert(rk_simulation_get_omni_drive_state(simulation, 0, &value) == RK_OK);
+    return value;
+}
+
+void omni_drive_follows_applied_wheel_targets() {
+    constexpr double dt = 0.02;
+    auto simulation = make_simulation(dt);
+    const auto model = omni_blueprint();
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    const double start_yaw = 0.5;
+    rk_simulation_pose start{};
+    start.struct_size = sizeof(start);
+    start.position[0] = 1.0;
+    start.position[1] = 2.0;
+    start.position[2] = 0.3;
+    start.rotation[2] = std::sin(start_yaw * 0.5);
+    start.rotation[3] = std::cos(start_yaw * 0.5);
+    assert(rk_simulation_teleport_robot(simulation, 0, &start) == RK_OK);
+
+    rk_simulation_omni_drive_desc drive{};
+    drive.struct_size = sizeof(drive);
+    for (uint32_t wheel = 0; wheel < 3; ++wheel) {
+        drive.wheel_joints[wheel] = wheel;
+        drive.wheel_angles[wheel] = omni_angle(static_cast<int>(wheel));
+    }
+    drive.wheel_radius = omni_wheel_radius;
+    drive.base_radius = omni_base_radius;
+    auto invalid = drive;
+    invalid.wheel_joints[2] = 0;
+    assert(rk_simulation_set_omni_drive(simulation, 0, &invalid) == RK_ERROR_INVALID_ARGUMENT);
+    invalid = drive;
+    invalid.wheel_joints[2] = 3;
+    assert(rk_simulation_set_omni_drive(simulation, 0, &invalid) == RK_ERROR_INVALID_ARGUMENT);
+    invalid = drive;
+    invalid.wheel_angles[1] = invalid.wheel_angles[2] = invalid.wheel_angles[0];
+    assert(rk_simulation_set_omni_drive(simulation, 0, &invalid) == RK_ERROR_INVALID_ARGUMENT);
+    invalid = drive;
+    invalid.base_radius = 0.0;
+    assert(rk_simulation_set_omni_drive(simulation, 0, &invalid) == RK_ERROR_INVALID_ARGUMENT);
+    invalid = drive;
+    invalid.struct_size = 0;
+    assert(rk_simulation_set_omni_drive(simulation, 0, &invalid) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_set_omni_drive(simulation, 0, nullptr) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_set_omni_drive(simulation, 0, &drive) == RK_OK);
+    auto plant = omni_state(simulation);
+    assert(plant.enabled == 1 && plant.x == 1.0 && plant.y == 2.0 && plant.height == 0.3);
+    assert(std::abs(plant.yaw - start_yaw) < 1e-12);
+    // One coupling per robot: the differential view reports it disabled.
+    assert(drive_state(simulation).enabled == 0);
+
+    // Strafe: 0.5 m/s along the body's +Y for 10 ticks is 0.1 m to the left
+    // of the heading, with no turn.
+    uint64_t sequence = 0;
+    uint64_t time = 0;
+    auto command = omni_targets(0.0, 0.5, 0.0, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    for (int tick = 0; tick < 10; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    plant = omni_state(simulation);
+    for (uint32_t wheel = 0; wheel < 3; ++wheel)
+        assert(plant.wheel_rates[wheel] == command.targets[wheel].target);
+    assert(std::abs(plant.x - (1.0 - 0.1 * std::sin(start_yaw))) < 1e-9);
+    assert(std::abs(plant.y - (2.0 + 0.1 * std::cos(start_yaw))) < 1e-9);
+    assert(std::abs(plant.yaw - start_yaw) < 1e-12 && plant.height == 0.3);
+    rk_simulation_pose observed{};
+    observed.struct_size = sizeof(observed);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
+    assert(std::abs(observed.position[0] - plant.x) < 1e-6);
+    assert(std::abs(observed.position[1] - plant.y) < 1e-6);
+
+    // A constant body twist with a turn traces a circle about a fixed centre:
+    // the centre sits at R(yaw) * (-vy, vx) / omega from the base.
+    const double vx = 0.3, vy = 0.2, omega = 1.0;
+    const double center_x = plant.x + (-std::cos(plant.yaw) * vy - std::sin(plant.yaw) * vx) / omega;
+    const double center_y = plant.y + (-std::sin(plant.yaw) * vy + std::cos(plant.yaw) * vx) / omega;
+    const double arc_start_yaw = plant.yaw;
+    command = omni_targets(vx, vy, omega, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    for (int tick = 0; tick < 25; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    plant = omni_state(simulation);
+    const double end_yaw = arc_start_yaw + 25 * dt * omega;
+    assert(std::abs(plant.yaw - end_yaw) < 1e-9);
+    assert(std::abs(plant.x - (center_x + (std::cos(end_yaw) * vy + std::sin(end_yaw) * vx) / omega)) < 1e-9);
+    assert(std::abs(plant.y - (center_y + (std::sin(end_yaw) * vy - std::cos(end_yaw) * vx) / omega)) < 1e-9);
+    // The IMU reads the yaw rate while turning.
+    const auto imu = snapshot(robot).sensors[1];
+    assert(std::abs(imu.values[2] - omega) < 1e-3);
+
+    // A normal stop halts the base on the tick it is applied.
+    command = lifecycle(RK_COMMAND_STOP, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    const auto before_stop = omni_state(simulation);
+    for (int tick = 0; tick < 3; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    plant = omni_state(simulation);
+    for (uint32_t wheel = 0; wheel < 3; ++wheel) assert(plant.wheel_rates[wheel] == 0.0);
+    assert(plant.x == before_stop.x && plant.y == before_stop.y && plant.yaw == before_stop.yaw);
+
+    // Clearing the coupling (only the matching kind clears it) disables it.
+    assert(rk_simulation_clear_differential_drive(simulation, 0) == RK_OK);
+    assert(omni_state(simulation).enabled == 1);
+    assert(rk_simulation_clear_omni_drive(simulation, 0) == RK_OK);
+    assert(omni_state(simulation).enabled == 0);
+    rk_simulation_destroy(simulation);
+}
+
 } // namespace
 
 int main() {
@@ -875,5 +1019,6 @@ int main() {
     differential_drive_follows_applied_wheel_targets();
     driven_base_far_from_origin_reads_exact_imu();
     differential_drive_keeps_authored_tilt();
+    omni_drive_follows_applied_wheel_targets();
     return 0;
 }

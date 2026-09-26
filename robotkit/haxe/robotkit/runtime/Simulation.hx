@@ -170,6 +170,60 @@ class Simulation {
     };
   }
 
+  /**
+   * Couples one robot's three omni-wheel velocity targets to its kinematic
+   * base, like setDifferentialDrive but decoding a full planar body twist, so
+   * the base can strafe. `wheelAngles` are the wheels' mount angles about +Z
+   * from the base's x axis; see rk_simulation_set_omni_drive.
+   */
+  public function setOmniDrive(robotIndex:Int, wheelJoints:Array<Int>,
+      wheelAngles:Array<Float>, wheelRadius:Float, baseRadius:Float):Void {
+    ensureLive();
+    if (wheelJoints == null || wheelJoints.length != 3 || wheelAngles == null ||
+        wheelAngles.length != 3)
+      throw "Simulation.setOmniDrive requires three wheel joints and three wheel angles";
+    for (joint in wheelJoints)
+      if (joint < 0) throw "Simulation.setOmniDrive requires wheel joint indices";
+    var desc = new rk_simulation_omni_drive_desc();
+    desc.set_struct_size(rk_simulation_omni_drive_desc.size());
+    for (index in 0...3) {
+      desc.set_wheel_joints(index, wheelJoints[index]);
+      desc.set_wheel_angles(index, wheelAngles[index]);
+    }
+    desc.set_wheel_radius(wheelRadius);
+    desc.set_base_radius(baseRadius);
+    check(RobotKitSimKit.rk_simulation_set_omni_drive(owner.borrow(), robotIndex, desc),
+      "simulation.setOmniDrive");
+  }
+
+  /** Removes a robot's omni-wheel coupling; the base stays in place. */
+  public function clearOmniDrive(robotIndex:Int):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_clear_omni_drive(owner.borrow(), robotIndex),
+      "simulation.clearOmniDrive");
+  }
+
+  /**
+   * Reads a robot's omni-wheel plant after the latest tick: its planar pose
+   * (yaw unwrapped) and the three wheel rates the robot applied.
+   */
+  public function omniDriveState(robotIndex:Int):SimulationOmniDriveState {
+    ensureLive();
+    var state = new rk_simulation_omni_drive_state();
+    state.set_struct_size(rk_simulation_omni_drive_state.size());
+    var result = RobotKitSimKit.rk_simulation_get_omni_drive_state(owner.borrow(), robotIndex,
+      state);
+    check(result.status, "simulation.omniDriveState");
+    return {
+      enabled: state.get_enabled() != 0,
+      x: state.get_x(),
+      y: state.get_y(),
+      yaw: state.get_yaw(),
+      height: state.get_height(),
+      wheelRates: [for (index in 0...3) state.get_wheel_rates(index)]
+    };
+  }
+
   /** Reads one robot base pose without mutating physics or the editable model. */
   public function robotPose(robotIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
     ensureLive();var pose=new rk_simulation_pose();pose.set_struct_size(rk_simulation_pose.size());
@@ -304,6 +358,16 @@ class Simulation {
     if (status != RobotKitRuntimeConstants.RK_OK) throw '$operation failed with RobotKit status $status';
   }
 }
+
+/** Omni-wheel plant state; see Simulation.omniDriveState. */
+typedef SimulationOmniDriveState = {
+  enabled:Bool,
+  x:Float,
+  y:Float,
+  yaw:Float,
+  height:Float,
+  wheelRates:Array<Float>
+};
 
 /** Differential-drive plant state; see Simulation.differentialDriveState. */
 typedef SimulationDifferentialDriveState = {

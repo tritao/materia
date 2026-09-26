@@ -69,7 +69,10 @@ backend, so wheels, odometry, and chassis all stop on the tick the stop is
 applied. The plant hands SimKit its exact double-precision twist, so the IMU
 reads no scene-rounding noise far from the origin. It models wheels rolling on
 a level floor: the chassis translates in the world XY plane at its height and
-turns about world Z while keeping the roll and pitch it was placed with. Each simulated robot publishes transport-neutral joint
+turns about world Z while keeping the roll and pitch it was placed with.
+`Simulation.setOmniDrive` (wrapped by `HolonomicDrivePlant`) does the same for
+a three-omni-wheel base, decoding the full planar twist, lateral motion
+included, from the applied wheel targets. Each simulated robot publishes transport-neutral joint
 encoder, IMU, and LiDAR frames with the same source clock, frame IDs, and
 sequences used by the remote path.
 
