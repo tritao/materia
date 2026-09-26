@@ -480,3 +480,19 @@ last known joint state would), which is standard practice for
 local-convergence IK tests and matches the plan's "recovers ... within
 1e-4 m / 1e-3 rad" acceptance criterion without asserting which branch is
 found. Documented this joint-configuration ambiguity in ARCHITECTURE.md.
+
+**M3**: added `robotkit/haxe/robotkit/tool/` (`ToolId`, `ToolCollisionShape`,
+`Tool`, the `SurfaceTool`/`Sander`/`Sprayer`/`Gripper` capability interfaces,
+and their `Simulated*` implementations) and
+`robotkit/tests/src/tests/ToolTests.hx`, called from `RobotWorldTests.main()`.
+`Manipulator` gained `flangeTTcp` (identity when unset), `tcpPose(q)`, and
+`solveIkForTcp` per the plan. Deviation: `model.CollisionApproximation` is a
+link-geometry derivation *policy* (`none`/`bounds-box`), not a shape value,
+so it could not be reused as-is for tool collision; added a small
+`ToolCollisionShape` enum (`NoCollision`/`Box`/`Cylinder`) instead, as the
+plan's fallback anticipated. Every simulated capability command takes an
+explicit `timestampNs:Int64` argument rather than reading a wall clock, so
+`ToolTests`' history assertions stay deterministic; this also means
+`ToolpathExecutor` (M4) can drive tool on/off state at trajectory-sample
+time without a hidden clock dependency. No haxeon compile issues in this
+milestone.

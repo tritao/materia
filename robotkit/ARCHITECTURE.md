@@ -526,6 +526,35 @@ same index `RobotRuntimeCompiler` assigns as the runtime joint index, and
 emits one `robotkit.world.JointTarget.position(...)` per degree of
 freedom — the existing typed joint-command boundary, unchanged.
 
+## Tools and TCP
+
+`robotkit.tool` sits above `robotkit.manipulation`; it does not touch
+`Robot`, `RobotRuntime`, or the native runtime. A `Tool` is a mounted end
+effector: `id`, `flangeTTcp` (the tool center point's pose in the flange
+frame, per the `a_T_b` convention — `flange_T_tcp` maps tool-tip coordinates
+into the flange frame), a `ToolCollisionShape` (`NoCollision`, `Box`, or
+`Cylinder`, since `model.CollisionApproximation` is a link-geometry
+derivation policy, not a shape), and `mass`.
+
+Capability control surfaces are typed interfaces, not
+`Map<String, Dynamic>` commands, per haxeon's structural-typing rules:
+`SurfaceTool` (enable/disable, standoff), `Sander` (speed, contact force),
+`Sprayer` (flow, pressure), and `Gripper` (open/close, observed grasp
+state). Every command method takes the caller's `timestampNs` explicitly —
+simulated implementations never read a wall clock, keeping planners
+deterministic. `Simulated*` classes implement each interface by recording
+every commanded state change, with its timestamp, into a `history` array
+(e.g. `SimulatedSprayer.history:Array<SprayerEvent>`) so tests and coverage
+tracking can observe exactly what was commanded and when.
+
+`Manipulator` carries the mounted tool's `flangeTTcp` (identity when no
+tool is attached) and exposes it at the TCP level: `tcpPose(q)` is
+`chain.forwardKinematics(q).compose(flangeTTcp)`, and
+`solveIkForTcp(target, seed, ...)` converts a TCP-frame target to the
+equivalent flange target (`target.compose(flangeTTcp.inverse())`) before
+delegating to `InverseKinematics.solve`, so callers can work entirely in
+tool-center-point coordinates without re-deriving the flange offset.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A
