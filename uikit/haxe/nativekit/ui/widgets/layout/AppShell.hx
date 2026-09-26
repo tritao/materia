@@ -20,6 +20,7 @@ import nativekit.ui.widgets.layout.SizedBox;
 class AppShell implements View {
 	final key:Key;
 	final topBar:Null<View>;
+	final bottomBar:Null<View>;
 	final sidebar:Null<View>;
 	final content:View;
 	final inspector:Null<View>;
@@ -27,12 +28,13 @@ class AppShell implements View {
 	public final bodyStyle:LayoutStyle;
 
 	public function new(key:String, content:View, ?topBar:View, ?sidebar:View,
-			?inspector:View, ?style:LayoutStyle, ?bodyStyle:LayoutStyle) {
+			?inspector:View, ?style:LayoutStyle, ?bodyStyle:LayoutStyle, ?bottomBar:View) {
 		if (content == null)
 			throw "AppShell requires a content view";
 		this.key = new Key(key);
 		this.content = content;
 		this.topBar = topBar;
+		this.bottomBar = bottomBar;
 		this.sidebar = sidebar;
 		this.inspector = inspector;
 		this.style = style == null ? defaultStyle() : style.copy();
@@ -54,6 +56,8 @@ class AppShell implements View {
 			if (topBar != null)
 				children.push(new KeyedView("top-bar", topBar));
 			children.push(new KeyedView("body", new Row("body", bodyChildren, bodyStyle)));
+			if (bottomBar != null)
+				children.push(new KeyedView("bottom-bar", bottomBar));
 			return new Column("root", children, style).build(context);
 		});
 	}

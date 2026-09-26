@@ -50,6 +50,7 @@ import nativekit.ui.core.ViewportCamera;
 import nativekit.ui.core.ViewportContent;
 import nativekit.ui.widgets.layout.Align;
 import nativekit.ui.widgets.layout.AppShell;
+import robotkit.world.RobotStatus;
 import nativekit.ui.widgets.controls.Button;
 import nativekit.ui.widgets.controls.ButtonVariant;
 import nativekit.ui.widgets.layout.Column;
@@ -324,6 +325,7 @@ private class ReferenceEditorLaunchOptions {
 class ReferenceEditorApp implements DesktopUiApplication {
   public static inline var WORKSPACE_KEY:String = "reference-editor";
   static inline var TOOLBAR_HEIGHT:Float = 44.0;
+  static inline var STATUS_HEIGHT:Float = 28.0;
 
   public final ui:UiContext;
   final appearance:EditorAppearance;
@@ -454,7 +456,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     framePresentation = simulation.capturePresentationSnapshot();
     var workspaceView = new DockWorkspace("reference-workspace", workspace,
       workspacePanelContents);
-    workspaceView.availableHeight = Math.max(0.0, viewportHeight - TOOLBAR_HEIGHT);
+    workspaceView.availableHeight = Math.max(0.0, viewportHeight - TOOLBAR_HEIGHT - STATUS_HEIGHT);
     var layers:Array<StackChild> = [new StackChild(
       "workspace",
       workspaceView,
@@ -503,7 +505,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var shellStyle = fillStyle();
     shellStyle.background = appearance.canvas;
     var shell = new AppShell("reference-editor-shell", new Stack("overlay-host", layers),
-      topBar(), null, null, shellStyle);
+      topBar(), null, null, shellStyle, null, statusBar());
     var windowLayers:Array<StackChild> = [new StackChild("shell", shell, 0.0, 0.0, 0,
       LayoutAxis.grow(), LayoutAxis.grow())];
     if (toolbarMenuVisible && documentDialog == null) {
@@ -735,6 +737,44 @@ class ReferenceEditorApp implements DesktopUiApplication {
     more.selected = toolbarMenuVisible;
     items.push(new KeyedView("more", more));
     return new Row("editor-toolbar-row", items, barStyle);
+  }
+
+  function statusBar():View {
+    var style = new LayoutStyle();
+    style.width = LayoutAxis.grow();
+    style.height = LayoutAxis.fixed(STATUS_HEIGHT);
+    style.direction = LayoutDirection.LeftToRight;
+    style.childAlignY = LayoutAlignmentY.Center;
+    style.childGap = 12.0;
+    style.padding = new Insets(10.0, 3.0, 10.0, 3.0);
+    style.background = appearance.toolbar;
+
+    var selected = scene.object(scene.selectedId);
+    var left = simulation.error != null ? "Simulation error: " + simulation.error :
+      selected == null ? "Ready" : selected.label + " selected";
+    var mode = simulation.isRunning() ? "Running" : simulation.isActive() ? "Paused" : "Design";
+    if (simulation.isActive() && simulation.pending(sensors, scene)) mode += " · Rebuild pending";
+    var worldLabel = switch (world.status()) {
+      case RobotStatus.Disconnected: "World Offline";
+      case RobotStatus.Connecting: "World Connecting";
+      case RobotStatus.Ready: "World Ready";
+      case RobotStatus.Fault: "World Fault";
+    };
+    var right = mode + (viewportWidth >= 700.0 ? " · " + simulation.userBackendName() : "") +
+      " · " + worldLabel;
+    var items:Array<KeyedView> = [
+      new KeyedView("selection", new Text(shortenLabel(left, viewportWidth < 700.0 ? 20 : 48),
+        null, simulation.error == null ? appearance.theme.tokens.textSecondary :
+          appearance.theme.tokens.danger, TextStyleOverride.text(12.0))),
+      new KeyedView("space", new Spacer("status-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0)))
+    ];
+    if (viewportWidth >= 900.0)
+      items.push(new KeyedView("grid", new Text("Grid " + gridSpacingLabel() +
+        " m · Snap " + (gridSnapEnabled ? "On" : "Off"), null,
+        appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
+    items.push(new KeyedView("runtime", new Text(right, null,
+      appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
+    return new Row("editor-status-bar", items, style);
   }
 
   function toolbarAction(key:String, commandId:String, label:String, icon:IconName,
@@ -1161,9 +1201,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function viewportWithControls(content:View, perspective:Bool):View {
-    var spacingTenths = Std.int(Math.round(gridSpacing * 10.0));
-    var options = new Button(Std.string(Std.int(spacingTenths / 10)) + "." +
-      Std.string(spacingTenths % 10) + " m", null, null, "viewport-options");
+    var options = new Button(gridSpacingLabel() + " m", null, null, "viewport-options");
     options.variant = ButtonVariant.Secondary;
     options.trailingIcon = IconName.ChevronDown;
     options.iconSize = 12.0;
@@ -1192,6 +1230,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new StackChild("canvas", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
       new StackChild("controls", new Row("viewport-actions", controls, style), 12.0, 12.0, 1)
     ]);
+  }
+
+  function gridSpacingLabel():String {
+    var tenths = Std.int(Math.round(gridSpacing * 10.0));
+    return Std.string(Std.int(tenths / 10)) + "." + Std.string(tenths % 10);
   }
 
   function menuTriggerBounds(event:UiEvent):Rect {

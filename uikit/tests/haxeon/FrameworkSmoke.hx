@@ -2468,6 +2468,16 @@ class FrameworkSmoke {
 			appShellContentSlot.resolved.width <= 0.0 ||
 			appShellContentSlot.resolved.height <= 0.0)
 			return 225;
+		var shellWithBottom = new AppShell("app-shell-bottom-smoke", new Text("Content"),
+			new Text("Top bar"), null, null, null, null, new Text("Bottom bar"));
+		var bottomRoot = context.submit(shellWithBottom, new LayoutFrame(320.0, 192.0));
+		var bottomBody = bottomRoot.children[1].resolved;
+		var bottomBar = bottomRoot.children[2].resolved;
+		if (bottomRoot.children.length != 3 ||
+			bottomRoot.children[2].layout.text != "Bottom bar" ||
+			bottomBody == null || bottomBar == null ||
+			bottomBody.y + bottomBody.height > bottomBar.y)
+			return 228;
 		for (mask in 0...8) {
 			var hasTopBar = (mask & 1) != 0;
 			var hasSidebar = (mask & 2) != 0;
