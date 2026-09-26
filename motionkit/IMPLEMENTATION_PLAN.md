@@ -604,3 +604,12 @@ NativeKit and MuJoCo commits had to be fetched from the shared checkout because
 their remotes did not provide them. MotionKit and RobotKit Haxe tests and the
 RobotKit native tests passed; TCP integration passed in default, session and
 lease-timeout modes.
+
+### P2 — Reject unsupported trajectory queues
+
+The runtime now rejects trajectory chunks when the endpoint does not advertise
+queue support, before enqueue and at owner application, without latching a
+fault. Added a native regression with an endpoint lacking queue support; it
+failed before the runtime change and now passes. Commit: the commit containing
+this entry. MotionKit and RobotKit Haxe tests, all nine RobotKit native tests,
+and TCP integration in default, session and lease-timeout modes passed.

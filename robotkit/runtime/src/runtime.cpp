@@ -302,6 +302,8 @@ rk_result RobotRuntime::submit_trajectory(const rk_robot_command &command,
         rk_robot_command_validate_for_blueprint(&command, &blueprint_) != RK_OK ||
         rk_trajectory_chunk_validate_for_blueprint(&chunk, &blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
+    if (!supports_trajectory_queue())
+        return RK_ERROR_UNSUPPORTED;
     // The published depth may lag the owner, which only ever shrinks the
     // queue between cycles, so this bound is conservative.
     uint32_t queued_points = 0;
@@ -799,6 +801,8 @@ rk_result RobotRuntime::apply_pending_commands() {
             if (value.kind == RK_COMMAND_TRAJECTORY_CHUNK) {
                 if (queued.trajectory == nullptr)
                     return RK_ERROR_INVALID_ARGUMENT;
+                if (!supports_trajectory_queue())
+                    return RK_ERROR_UNSUPPORTED;
                 // A splice replaces queued motion from a point still ahead of
                 // the trajectory clock. Points before it stay queued; a splice
                 // that arrives too late is dropped so the current path, which

@@ -536,6 +536,8 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime,
  * that path, a chunk only extends the path the stop may use and the stop
  * still ends at rest; to resume, wait until trajectory_active is zero, or
  * send a joint-target batch first to replace the stopping motion.
+ * Returns RK_ERROR_UNSUPPORTED without queuing or latching a fault when the
+ * endpoint does not support timestamped trajectory queues.
  */
 RK_API rk_result RK_CALL rk_robot_runtime_submit_trajectory(
     rk_robot_runtime runtime, const rk_robot_command *command,

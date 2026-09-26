@@ -40,7 +40,10 @@ public:
 
 class EchoEndpoint final : public robotkit::RobotEndpoint {
 public:
-    explicit EchoEndpoint(uint32_t joint_count) : joint_count_(joint_count) {}
+    explicit EchoEndpoint(uint32_t joint_count, bool queue_support = true)
+        : joint_count_(joint_count), queue_support_(queue_support) {}
+
+    bool supports_trajectory_queue() const noexcept override { return queue_support_; }
 
     rk_result apply(const rk_robot_command &command) override {
         ++apply_count;
@@ -80,6 +83,7 @@ public:
 
 private:
     uint32_t joint_count_ = 0;
+    bool queue_support_ = true;
     double position_[RK_MAX_JOINTS]{};
     bool stopped_ = false;
 };
@@ -205,6 +209,21 @@ rk_trajectory_chunk trajectory_batch(
         point.positions[1] = -position;
     }
     return value;
+}
+
+void unsupported_trajectory_queue_is_rejected(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count, false);
+    robotkit::RobotRuntime runtime(blueprint, endpoint);
+    assert(!runtime.supports_trajectory_queue());
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {100'000'000, 0.1}})) == RK_ERROR_UNSUPPORTED);
+    assert(runtime.apply_pending_commands() == RK_OK);
+    rk_robot_state state{};
+    assert(runtime.snapshot(state) == RK_OK);
+    assert(state.trajectory_queue_depth == 0);
+    assert(state.trajectory_active == 0);
+    assert(state.safety == RK_SAFETY_READY);
+    assert(endpoint->apply_count == 0);
 }
 
 void timestamped_trajectory_interpolates_and_reports_progress(
@@ -757,6 +776,7 @@ int main() {
     }
     same_cycle_target_batches_merge_per_joint(blueprint);
     partial_targets_and_ordered_trajectory_commands(blueprint);
+    unsupported_trajectory_queue_is_rejected(blueprint);
     timestamped_trajectory_interpolates_and_reports_progress(blueprint);
     normal_stop_decelerates_active_trajectory(blueprint);
     trajectory_stop_follows_path_and_reports_tag(blueprint);
