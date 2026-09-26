@@ -740,6 +740,14 @@ class UiContext {
 		updateCursor();
 	}
 
+	/** Ends a captured drag if the platform reports its button released on re-entry. */
+	public function pointerReenter(buttonPressed:Bool, x:Float, y:Float,
+			pointerId:Int = 0):Void {
+		ensureLive();
+		if (!buttonPressed && events.hasCapturedPointer(pointerId))
+			pointerCancel(pointerId, x, y);
+	}
+
 	/** Installs the platform bridge that applies the context's effective cursor. */
 	public function setCursorHandler(handler:Null<CursorShape->Void>):Void {
 		ensureLive();

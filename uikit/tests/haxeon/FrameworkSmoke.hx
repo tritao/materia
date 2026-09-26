@@ -2646,6 +2646,14 @@ class FrameworkSmoke {
 		if (!context.events.hasPointerCapture(captureDivider.id) || platformCaptureStates.length != 1 ||
 			!platformCaptureStates[0])
 			return 248;
+		context.pointerLeave();
+		if (!context.events.hasPointerCapture(captureDivider.id) ||
+			platformCaptureStates.length != 1)
+			return 248;
+		context.pointerMove(captureDividerX - 15.0, captureDividerY);
+		if (captureSplit.extent != 175.0)
+			return 248;
+		context.pointerMove(captureDividerX, captureDividerY);
 		// Physical capture is shared by the window, while logical capture stays
 		// independent per pointer. Releasing pointer 1 must not release pointer 0.
 		context.pointerDown(captureDividerX, captureDividerY, 0, 0, 1);
@@ -2706,6 +2714,25 @@ class FrameworkSmoke {
 		context.setPointerCaptureHandler(null);
 		if (!checkSplitKeyboard(context))
 			return 247;
+		var reentryOptions = new SplitViewOptions();
+		reentryOptions.extent = 200.0;
+		var reentrySplit = new SplitView("reentry-split", new Text("First"),
+			new Text("Second"), reentryOptions);
+		var reentryRoot = context.submit(reentrySplit, new LayoutFrame(400.0, 192.0));
+		var reentryDivider = reentryRoot.children[1];
+		var reentryGeometry:ResolvedLayoutItem = cast reentryDivider.resolved;
+		var reentryX = reentryGeometry.x + reentryGeometry.width * 0.5;
+		var reentryY = reentryGeometry.y + reentryGeometry.height * 0.5;
+		context.pointerDown(reentryX, reentryY, 0);
+		context.pointerLeave();
+		if (!context.events.hasPointerCapture(reentryDivider.id))
+			return 248;
+		context.pointerReenter(false, reentryX, reentryY);
+		if (context.events.hasPointerCapture(reentryDivider.id))
+			return 248;
+		context.pointerMove(reentryX - 20.0, reentryY);
+		if (reentrySplit.extent != 200.0)
+			return 248;
 		var inheritedColor = Color.rgba(0.24, 0.31, 0.42, 1.0);
 		var nestedColor = Color.rgba(0.76, 0.42, 0.18, 1.0);
 		var typography = new DefaultTextStyle(new Column("typography", [

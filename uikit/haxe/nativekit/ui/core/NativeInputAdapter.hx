@@ -97,6 +97,17 @@ class NativeInputAdapter {
 			case PointerEnter(eventSource, entered) if (matches(eventSource)):
 				if (!entered)
 					context.pointerLeave();
+				else if (context.events.hasCapturedPointer()) {
+					// A release outside the window may be missed when native capture is
+					// unavailable. Reconcile the drag against the platform button state.
+					var button = context.events.capturedPointerButton();
+					try {
+						if (button != null)
+							context.pointerReenter(
+								NativeKit.nk_pointer_button_get_state_checked(window, cast button) ==
+								InputAction.Press, pointerX, pointerY);
+					} catch (_:Dynamic) {}
+				}
 				true;
 			case WindowStateChanged(eventSource, flags) if (matches(eventSource)):
 				if ((flags & WindowStateFlags.Active) == 0)

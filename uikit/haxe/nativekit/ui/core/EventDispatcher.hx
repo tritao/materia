@@ -18,6 +18,7 @@ class EventDispatcher {
 	final pressedIds:Map<Int, WidgetId>;
 	final capturedIds:Map<Int, WidgetId>;
 	final nativeCapturedIds:Map<Int, Bool>;
+	final pressedButtons:Map<Int, Int>;
 	final suppressedClicks:Map<Int, Bool>;
 	var hitTestProvider:Null<Float->Float->Array<RenderNode>>;
 	var pointerCaptureHandler:Null<Bool->Void>;
@@ -41,6 +42,7 @@ class EventDispatcher {
 		pressedIds = new Map();
 		capturedIds = new Map();
 		nativeCapturedIds = new Map();
+		pressedButtons = new Map();
 		suppressedClicks = new Map();
 		hitTestProvider = null;
 		pointerCaptureHandler = null;
@@ -90,8 +92,10 @@ class EventDispatcher {
 			if (root == null || id == null || root.find(id) == null)
 				stale.push(pointerId);
 		}
-		for (pointerId in stale)
+		for (pointerId in stale) {
 			pressedIds.remove(pointerId);
+			pressedButtons.remove(pointerId);
+		}
 		for (pointerId in pointerLocations.keys()) {
 			var location = pointerLocations.get(pointerId);
 			if (location == null)
@@ -128,6 +132,8 @@ class EventDispatcher {
 
 	public function pointerDown(x:Float, y:Float, button:Int, modifiers:Int = 0,
 			pointerId:Int = 0, data:Dynamic = null, timestamp:Float = -1.0):Void {
+		if (capturedIds.exists(pointerId))
+			pointerCancel(pointerId, x, y, modifiers, data);
 		rememberPointer(pointerId, x, y);
 		var path = hitPath(x, y);
 		if (root != null)
@@ -136,6 +142,7 @@ class EventDispatcher {
 			return;
 		var target = path[path.length - 1];
 		pressedIds.set(pointerId, target.id);
+		pressedButtons.set(pointerId, button);
 		var index = path.length - 1;
 		while (index >= 0) {
 			if (path[index].focusable && path[index].enabled && changeFocus(path[index].id))
@@ -193,6 +200,7 @@ class EventDispatcher {
 			path = pressedPath(pointerId);
 		clearPointerCapture(pointerId);
 		pressedIds.remove(pointerId);
+		pressedButtons.remove(pointerId);
 		suppressedClicks.remove(pointerId);
 		if (path.length > 0) {
 			var target = path[path.length - 1];
@@ -227,6 +235,7 @@ class EventDispatcher {
 			path = pressedPath(pointerId);
 		clearPointerCapture(pointerId);
 		pressedIds.remove(pointerId);
+		pressedButtons.remove(pointerId);
 		suppressedClicks.remove(pointerId);
 		if (path.length > 0) {
 			updatePathState(path, StyleState.Pressed, false);
@@ -341,16 +350,18 @@ class EventDispatcher {
 	}
 
 	public function clearPointer(pointerId:Int = 0):Void {
-		if (capturedIds.exists(pointerId) && !nativeCapturedIds.exists(pointerId)) {
-			// Keep logical drags alive across a native window boundary. Deliver a
-			// final outside move so clients clear transient drop previews; re-entry
-			// continues routing through the same captured node.
-			var path = capturedPath(pointerId);
-			if (path.length > 0) {
-				var target = path[path.length - 1];
-				var event = new UiEvent(UiEventKind.PointerMove, target.id, -1.0, -1.0,
-					0.0, 0.0, 0, 0, 0, null, null, 0, pointerId);
-				dispatchPath(path, event);
+		if (capturedIds.exists(pointerId)) {
+			// A window boundary clears hover, not the pressed button or drag owner.
+			// Logical captures still receive an outside move to clear drop previews.
+			// Native captures keep their last position until a real move arrives.
+			if (!nativeCapturedIds.exists(pointerId)) {
+				var path = capturedPath(pointerId);
+				if (path.length > 0) {
+					var target = path[path.length - 1];
+					var event = new UiEvent(UiEventKind.PointerMove, target.id, -1.0, -1.0,
+						0.0, 0.0, 0, 0, 0, null, null, 0, pointerId);
+					dispatchPath(path, event);
+				}
 			}
 			updateHover(pointerId, [], -1.0, -1.0);
 			return;
@@ -358,6 +369,7 @@ class EventDispatcher {
 		updateHover(pointerId, [], 0.0, 0.0);
 		clearPointerCapture(pointerId);
 		pressedIds.remove(pointerId);
+		pressedButtons.remove(pointerId);
 		suppressedClicks.remove(pointerId);
 		pointerLocations.remove(pointerId);
 	}
@@ -400,6 +412,14 @@ class EventDispatcher {
 		var captured = capturedIds.get(pointerId);
 		return captured != null && id != null && captured.equals(id);
 	}
+
+	/** Whether a pointer currently has a logical drag owner. */
+	public function hasCapturedPointer(pointerId:Int = 0):Bool
+		return capturedIds.exists(pointerId);
+
+	/** Button that started this pointer's drag, if it is still held. */
+	public function capturedPointerButton(pointerId:Int = 0):Null<Int>
+		return capturedIds.exists(pointerId) ? pressedButtons.get(pointerId) : null;
 
 	/** Returns the deepest cursor intent for the hovered or captured pointer path. */
 	public function cursorShape(pointerId:Int = 0):UiCursorShape {
