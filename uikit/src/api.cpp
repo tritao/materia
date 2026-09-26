@@ -140,6 +140,20 @@ void tint_text_glyphs(nkui::PreparedGlyphs &glyphs, const nkui_color &color) {
     }
 }
 
+/**
+ * Converts a resource's text color into the tint TextEngine::published_glyphs expects.
+ *
+ * A default-constructed GlyphTint is opaque white, so a published/owned glyph
+ * snapshot silently renders untinted unless the caller threads the layout's
+ * current color through explicitly.
+ */
+nkui::GlyphTint glyph_tint_from_color(const nkui_color &color) {
+    return nkui::GlyphTint{static_cast<uint8_t>(std::lround(color.red * 255.0f)),
+                           static_cast<uint8_t>(std::lround(color.green * 255.0f)),
+                           static_cast<uint8_t>(std::lround(color.blue * 255.0f)),
+                           static_cast<uint8_t>(std::lround(color.alpha * 255.0f))};
+}
+
 struct PathCacheKey {
     uint32_t path = 0;
     std::array<uint32_t, 6> transform{};
@@ -3220,6 +3234,7 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
         float pixel_scale = 1.0f;
         nkui::GlyphMode mode = nkui::GlyphMode::Alpha;
         uint64_t content_generation = 0;
+        nkui_color color{1.0f, 1.0f, 1.0f, 1.0f};
     };
     std::vector<OwnedTextBind> owned_text_binds;
     uint16_t prepared_slot = 1;
@@ -3422,7 +3437,8 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
                                                 nkui::GlyphMode::Alpha,
                                                 (static_cast<uint64_t>(source_resource) << 32) ^
                                                     layout->text->layout_generation() ^
-                                                    layout->text->font_collection_generation()});
+                                                    layout->text->font_collection_generation(),
+                                                layout->text_color});
                 command.resource = prepared_id;
                 // Skribidi's pixel scale changes atlas raster density while
                 // preserving layout geometry. Keep the draw origin in layout
@@ -3508,7 +3524,8 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
         if (!sealable)
             break;
         auto snapshot = bind.engine->published_glyphs(bind.engine->active_layout_id(), 0.0f, 0.0f,
-                                                      bind.pixel_scale, bind.mode);
+                                                      bind.pixel_scale, bind.mode,
+                                                      glyph_tint_from_color(bind.color));
         if (!snapshot ||
             !owned_resources.bind_text(bind.id, std::move(snapshot), bind.content_generation))
             sealable = false;
@@ -3929,9 +3946,9 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                                                       layout->text->layout_generation() ^
                                                       layout->text->font_collection_generation());
                 if (valid) {
-                    auto snapshot =
-                        layout->text->published_glyphs(layout->text->active_layout_id(), 0.0f, 0.0f,
-                                                       raster_scale, nkui::GlyphMode::Alpha);
+                    auto snapshot = layout->text->published_glyphs(
+                        layout->text->active_layout_id(), 0.0f, 0.0f, raster_scale,
+                        nkui::GlyphMode::Alpha, glyph_tint_from_color(layout->text_color));
                     if (!snapshot ||
                         !owned_resources.bind_text(prepared_id, std::move(snapshot),
                                                    (static_cast<uint64_t>(source_resource) << 32) ^

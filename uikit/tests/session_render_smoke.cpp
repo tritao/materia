@@ -572,7 +572,103 @@ int main() {
                 result = 35;
             }
         }
+        /*
+         * A custom-paint node that draws a retained TextLayout (the path
+         * TextField/TextArea use for their editable content) must paint the
+         * layout's current color, not the shaping engine's untinted glyphs.
+         * Regression coverage for the layout-session owned/sealed glyph
+         * snapshot silently defaulting to opaque white.
+         */
+        nkui_resource text_layout{};
+        nkui_display_list text_list{};
+        if (!result) {
+            if (nkui_text_layout_create(fonts, "Hg", 140.0f, 40.0f, &text_layout) != NKUI_OK ||
+                nkui_text_layout_set_color(text_layout, {0.0f, 0.85f, 0.0f, 1.0f}) != NKUI_OK ||
+                nkui_display_list_create(&text_list) != NKUI_OK)
+                result = 37;
+        }
+        if (!result) {
+            // custom_tree's node index 2 is the "Press" label rendered white
+            // (transaction()'s own NKUI_LAYOUT_NODE_TEXT_COLOR_OFFSET). It is
+            // still a normal child of the reused custom node and would
+            // overlap the sampled region, so hide it for this sub-test.
+            auto text_tree = custom_tree;
+            constexpr std::size_t third_record =
+                NKUI_LAYOUT_TRANSACTION_HEADER_BYTES + 2 * NKUI_LAYOUT_NODE_RECORD_BYTES;
+            write_u32(text_tree, third_record + NKUI_LAYOUT_NODE_FLAGS_OFFSET, 0);
+            std::vector<uint8_t> text_commands;
+            append_bytes(text_commands,
+                        nkui_transform_command{{NKUI_COMMAND_SET_TRANSFORM, NKUI_COMMAND_VERSION,
+                                                sizeof(nkui_transform_command)},
+                                               {1.0f, 0.0f, 0.0f, 1.0f, 8.0f, 45.0f}});
+            append_bytes(text_commands,
+                        nkui_draw_rect_command{{NKUI_COMMAND_DRAW_TEXT_LAYOUT, NKUI_COMMAND_VERSION,
+                                                sizeof(nkui_draw_rect_command)},
+                                               text_layout, 0.0f, 0.0f, 0.0f, 0.0f});
+            if (nkui_display_list_submit(text_list, text_commands.data(),
+                                         static_cast<uint32_t>(text_commands.size())) != NKUI_OK ||
+                nkui_layout_session_submit(session, text_tree.data(),
+                                           static_cast<uint32_t>(text_tree.size()),
+                                           &frame) != NKUI_OK ||
+                nkui_layout_session_set_custom_paint(session, 2, text_list) != NKUI_OK ||
+                nkui_layout_session_set_cache_policy(session, 2, NKUI_LAYOUT_CACHE_RASTER) !=
+                    NKUI_OK)
+                result = 38;
+        }
+        if (!result &&
+            nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK)
+            result = 39;
+        if (!result) {
+            /* Node 2 again covers framebuffer x 12..172, y (bottom-up) 108..172. */
+            std::array<uint8_t, 160 * 64 * 4> block{};
+            glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
+            int best_green = -1;
+            uint8_t best_rgba[4] = {0, 0, 0, 0};
+            for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
+                const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[1] > best_green) {
+                    best_green = rgba[1];
+                    std::memcpy(best_rgba, rgba, 4);
+                }
+            }
+            // Opaque white glyphs (the untinted-snapshot bug) leave red and blue as high
+            // as green; a correctly tinted green layout keeps them low.
+            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80) {
+                std::fprintf(stderr,
+                             "custom-paint text layout did not render its set color: "
+                             "peak rgba = %d,%d,%d,%d\n",
+                             best_rgba[0], best_rgba[1], best_rgba[2], best_rgba[3]);
+                result = 40;
+            }
+        }
+        // Re-render to ensure the retained raster cache keeps the tinted color
+        // on frames that reuse the sealed plan instead of recompiling it.
+        if (!result &&
+            nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK)
+            result = 41;
+        if (!result) {
+            std::array<uint8_t, 160 * 64 * 4> block{};
+            glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
+            int best_green = -1;
+            uint8_t best_rgba[4] = {0, 0, 0, 0};
+            for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
+                const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[1] > best_green) {
+                    best_green = rgba[1];
+                    std::memcpy(best_rgba, rgba, 4);
+                }
+            }
+            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80) {
+                std::fprintf(stderr,
+                             "custom-paint text layout lost its set color on a cached repaint: "
+                             "peak rgba = %d,%d,%d,%d\n",
+                             best_rgba[0], best_rgba[1], best_rgba[2], best_rgba[3]);
+                result = 42;
+            }
+        }
         nkui_layout_session_clear_custom_paints(session);
+        nkui_display_list_destroy(text_list);
+        nkui_resource_destroy(text_layout);
         nkui_display_list_destroy(custom_list);
         nkui_resource_destroy(custom_path);
         nkui_resource_destroy(custom_paint);
