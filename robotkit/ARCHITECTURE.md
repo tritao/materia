@@ -1129,6 +1129,76 @@ never reach a `new Simulation(dt, substeps, 1)` call on a build where MuJoCo
 support is compiled out (`RK_ERROR_UNSUPPORTED`, not a silent fallback, per
 the "One simulation tick" section above).
 
+## Construction skills (M10)
+
+`robotkit.skill` gains five compositions over the M1-M9 layers, all run
+through the existing `SkillRunner` and following `GoTo`/`PickPallet`'s
+pattern of a `start()`/`update()`/`cancel()` lifecycle backed by
+`SkillLifecycle`:
+
+`ScanSurface` dwells for a configured number of `update()` calls (a
+stationary scan pass takes real time on a real sensor), then captures one
+`PointCloud` from a caller-supplied `scan:Void->PointCloud` closure —
+keeping the skill independent of any one scanning technique (a real
+accumulated LiDAR scan, `SimulatedSurfaceScanner.scan`, or a replayed cloud
+all fit the same shape). The closure must be deterministic given the
+observations already available to the caller, matching every other
+simulated capability's no-wall-clock rule, so a replay reproduces it.
+
+`RegisterSurface` runs `SurfaceRegistration.register` against an
+already-captured cloud (typically `ScanSurface.cloud`); registration is a
+closed-form computation, not a physical action, so it completes within
+`start()` the way `GoTo` completes immediately when already at its goal.
+
+`FinishSurface(surface, spec:FinishSpec)` drives M8's `WorkPatchPlanner`
+through M4's `ToolpathExecutor`: plan patches once in `start()`, then for
+each patch navigate the base (`Navigator`/`GoTo`, unchanged, per the plan's
+base-motion boundary) and execute its raster, toggling a caller-supplied
+`setProcessOn:(Bool, Int64)->Void` callback around each step's `processOn`
+flag. `FinishSpec` is a pure-data anonymous typedef (per haxeon's
+structural-typing rules) carrying every `RasterToolpathGenerator`/
+`WorkPatchPlanner`/`CartesianTrajectory`/`ToolpathExecutor` parameter the
+plan's raster geometry and tolerances need. `FinishSurface` itself never
+depends on which capability interface the mounted tool implements — `Paint`
+binds `setProcessOn` to `Sprayer.setFlow`/`setPressure`, and `Sand` binds it
+to `Sander.setSpeed`/`setContactForce` (a contact-force setpoint while
+sanding, per the plan), each a thin thirty-line wrapper delegating every
+`Skill` method to an internal `FinishSurface`. Coverage is tracked from the
+*planned* TCP pose (`Manipulator.tcpPose` at each executed step's joint
+solution): unlike the M9 scenario test, a skill has no `Simulation` to
+cross-check against and must work identically over a `RemoteRobot`,
+`SimulatedRobot`, or `ReplayRobot`.
+
+`Drill` (point operations at surface positions) was not built: nothing in
+this milestone's acceptance needs it, and the plan marks it optional.
+**`LayTile` is out of scope for this plan.** It would need: an inventory
+model (tile stock, size, and orientation), a `Gripper`-based pick-and-place
+sequence analogous to `PickPallet`/`PlacePallet` but for individual tiles
+against a laid course, adhesive/mortar process state (a new capability
+interface alongside `SurfaceTool`/`Sander`/`Sprayer`), and force control
+during placement (seating a tile against a substrate without cracking it or
+leaving a proud edge) that this codebase has no capability interface or
+simulated contact-force model for yet. `robotkit.work.WorkPatchPlanner`'s
+axis-aligned patch geometry would also need a per-tile course/coursing-offset
+layer above the raster it already produces.
+
+`robotkit/tests/src/tests/ConstructionSkillTests.hx` exercises `ScanSurface`,
+`RegisterSurface`, `Paint`, and `Sand` through `SkillRunner` against an M9-style
+simulated robot, then replays `Paint` against a `ReplayRobot` of the
+recording, mirroring the forklift skills' pattern. Replay needs its own fresh
+`MobileBase`/`Navigation`/`Navigator` over the `ReplayRobot` (not the live
+run's, whose underlying `RecordingRobot` is closed): `SimulationTruthLocalization`
+reads a live `Simulation`'s own owned base pose directly, which a `ReplayRobot`
+does not have, so replay instead uses `HolonomicOdometryLocalization` (an
+`odom`-to-`base` estimate from the three wheel joints' recorded positions, the
+holonomic equivalent of `WheelOdometryLocalization`). The replayed run is not
+asserted bit-identical to the live run's coverage: it drives its own
+freshly built A* route and pure-pursuit tracking from the same recorded
+observations, which can converge to a very slightly different final base
+pose (still within `GoTo`'s own tolerance) with no nondeterminism in the
+replayed observations themselves; both runs independently reaching strong
+coverage is the meaningful check.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A

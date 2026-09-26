@@ -918,3 +918,57 @@ drive model itself = 681, + 22 from `WallFinishingScenarioTests` = 703);
 (12 M6 baseline + 15 new); native `ctest -L sim` and the MuJoCo-enabled
 robotd native build stay green.
 
+**M10**: added `robotkit/haxe/robotkit/skill/ScanSurface.hx`,
+`RegisterSurface.hx`, `FinishSurface.hx` (+ its `FinishSpec` typedef),
+`Paint.hx`, `Sand.hx`, and `robotkit/tests/src/tests/ConstructionSkillTests.hx`,
+called from `RobotWorldTests.main()`. Each is a thin composition over
+existing pieces per the plan: `ScanSurface` wraps a caller-supplied
+deterministic `scan` closure with a configurable dwell; `RegisterSurface`
+wraps `SurfaceRegistration.register`; `FinishSurface(surface, FinishSpec)`
+drives M8's `WorkPatchPlanner` through M4's `ToolpathExecutor` per patch,
+toggling a `setProcessOn` callback around each step's `processOn` flag; and
+`Paint`/`Sand` bind that callback to `Sprayer`/`Sander` (`Sand` adding a
+contact-force setpoint, per the plan). `Drill` was left out (optional per the
+plan, and nothing in this milestone's acceptance needs it); `LayTile` is
+explicitly out of scope, with a note on what it would need
+(inventory/course-adhesive/force-control capability this codebase doesn't
+have yet) added to `ARCHITECTURE.md`'s "Construction skills (M10)" section
+rather than repeated here. `robotkit.manipulation.WorkPatch`/
+`WorkPatchPlanResult` and `robotkit.perception.SurfaceRegistrationResult`
+moved out of `WorkPatchPlanner.hx`/`SurfaceRegistration.hx` into their own
+files (mechanical moves, no behavior change) — the same "haxeon requires an
+explicitly-imported class to be its file's own module" constraint M8's log
+already flagged, needed here because `FinishSurface`/`RegisterSurface` import
+those result types directly rather than only through their producing class.
+
+`ConstructionSkillTests` runs `ScanSurface`/`RegisterSurface`/`Paint`/`Sand`
+through `SkillRunner` against an M9-style simulated robot (the same
+holonomic-base + UR5-arm shape, built locally in the test), then replays
+`Paint` against a `ReplayRobot` of the recording, mirroring the forklift
+skills' pattern. Replay needed a genuinely new piece,
+`robotkit.mobile.HolonomicOdometry` / `robotkit.localization.HolonomicOdometryLocalization`
+(an `odom`-to-`base` wheel-odometry estimate for a three-wheel omni base,
+mirroring `WheelOdometryLocalization`): the live run's
+`SimulationTruthLocalization` reads a live `Simulation`'s own owned base
+pose directly, which a `ReplayRobot` has no equivalent of, so replay needs a
+localization source driven only from recorded joint positions. Deviation
+worth logging: an early version of this test's `FinishSurface` execution call
+used a `1e-3` m IK position tolerance (tighter than the M9 scenario test's
+own proven-converging `2e-3`, and tighter than `WorkSurface`'s own default
+`2e-3` `tolerance` field) and intermittently failed with `Unreachable` at a
+near-limit raster pose — a rebuild-sensitive flake (the same class of
+cold-start/near-limit IK sensitivity M2/M8's logs already documented, not a
+new bug), reproducible enough to be worth fixing rather than shrugging off.
+Widened `FinishSurface.beginExecution`'s IK tolerance to `2e-3` (matching the
+M9 scenario test and `WorkSurface`'s own tolerance field) rather than
+touching `InverseKinematics`/`ToolpathExecutor`; stable across repeated runs
+afterward. `robotkit/tests/haxeon.json`: 715 assertions total (all suites,
+including M9/M10, run together — see M9 above for the breakdown); `cmake -S
+robotkit -B robotkit/build && ctest`: 9/9; the MuJoCo-enabled native build
+(`/tmp/materia-mujoco`, per `robotkit/README.md`): 12/12; `ctest -L sim`
+(simkit): 4/4; `robotkit/tests/mujoco` (the M9 MuJoCo scenario): 22
+assertions, coverage 99.27%; `robotkit/cadbridge/tests`: 27 assertions
+(12 M6 baseline + 15 from M9's `testBimWallToPatchPlanEndToEnd`);
+`robotkit/tests/world-tcp.sh` plain and with `ROBOTKIT_TEST_LEASE_TIMEOUT=1`:
+both pass. This closes the milestone list through M10; M11 (terrain height
+map) and M12 (simulated excavator) are unstarted, as scoped.
