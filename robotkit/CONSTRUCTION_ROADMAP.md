@@ -979,3 +979,41 @@ assertions, coverage 99.27%; `robotkit/cadbridge/tests`: 27 assertions
 `robotkit/tests/world-tcp.sh` plain and with `ROBOTKIT_TEST_LEASE_TIMEOUT=1`:
 both pass. This closes the milestone list through M10; M11 (terrain height
 map) and M12 (simulated excavator) are unstarted, as scoped.
+
+**M11**: added `robotkit/haxe/robotkit/work/HeightMap.hx` (+ `VolumeResult.hx`),
+`EarthworkRegion.hx`, `BucketSweep.hx` (+ `BucketSweepResult.hx`), and
+`robotkit/tests/src/tests/TerrainTests.hx`, called from
+`RobotWorldTests.main()`. `HeightMap` stores elevation at grid *vertices*
+(unlike `CoverageMap`/`DeviationMap`'s cell-center grids) so bilinear
+sampling and per-cell trapezoidal cut/fill volume are well defined without an
+extra half-cell offset; it is mutable state, like `CoverageMap.covered`, not
+an immutable value type, since it models terrain a `BucketSweep` physically
+changes. `EarthworkRegion` pairs an existing/design `HeightMap` pair
+(validated to share one grid) with exclusion polygons and a grade tolerance,
+and exposes the `isAtGrade`/`gradeFraction`/`worstVertex` queries M12's
+`GradeRegion` needs. `BucketSweep.apply` lowers every grid vertex within a
+capsule footprint of a swept segment down to the cutting edge height and
+reports removed volume as a box/Voronoi area approximation - no soil
+mechanics, fill-factor, or repose-angle model, per the plan's explicit scope
+boundary. Two haxeon findings, both logged in `ARCHITECTURE.md`'s "Terrain
+height maps (M11)" section rather than repeated here: (1) an anonymous
+function literal passed as an argument cannot carry an explicit return-type
+annotation (`function(col:Int, row:Int):Bool { ... }` fails to parse;
+`Parser.hx`'s anonymous-function path has no `:Type` production, only
+`parseFunction`/`parseFunctionBody` for declarations/methods do) - fixed by
+dropping the annotation and letting the return type infer, as every other
+lambda in this codebase already does; (2) field access on a `Null<T>` value
+already guarded by a `check(value != null, ...)` runtime-assertion call is
+still rejected at compile time, because haxeon's flow-sensitive null
+narrowing (`FlowAnalysis.narrowedScope`) only tracks actual `if`/`||`/`&&`
+control flow, not an assertion helper call - fixed by using the codebase's
+own existing `if (x == null) throw ...; use(x.field);` guard-clause idiom
+instead. `TerrainTests.testVolumeOfKnownTrench` uses a trench whose vertical
+faces land exactly on grid columns and which spans the grid's full extent in
+the other axis, so the trapezoidal cell average reproduces the trench's
+*exact* geometric volume (the two boundary "half-cut" columns' contributions
+sum to exactly one full column) - checked bit-for-bit rather than within a
+tolerance, per a short derivation in `ARCHITECTURE.md`. `robotkit/tests/haxeon.json`:
+737 assertions (718 M10 baseline + 19 new `TerrainTests`); native
+`ctest --test-dir robotkit/build`: 9/9. No plan deviations beyond the two
+haxeon findings above.

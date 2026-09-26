@@ -1207,6 +1207,81 @@ pose (still within `GoTo`'s own tolerance) with no nondeterminism in the
 replayed observations themselves; both runs independently reaching strong
 coverage is the meaningful check.
 
+## Terrain height maps (M11)
+
+`robotkit.work` gains a second grid family alongside `CoverageMap`/
+`DeviationMap`, for the excavator milestone. Where those two grids classify
+or accumulate samples at *cell centers* over a `WorkSurface`'s boundary,
+`HeightMap` stores elevation at grid *vertices* (`columns x rows` points,
+`cellSize` apart, from `(originX, originY)`) in a named frame, because a
+vertex grid is what makes bilinear interpolation and per-cell trapezoidal
+volume well defined without an extra half-cell offset to reason about.
+Like `CoverageMap.covered`, a `HeightMap`'s elevation array is mutable state
+(`lowerTo`/`setElevation`), not an immutable value type: it models terrain
+that a `BucketSweep` physically changes over time, not a pose or transform.
+
+`HeightMap.bilinearSample(x, y)` interpolates within the grid's extent and
+throws outside it (the same strict-validation style as `WorkSurface`'s own
+constructors) rather than clamping, so a caller's own bounds mistake is
+visible immediately instead of silently reading an edge value.
+
+`HeightMap.volumeBetween(existing, design, ?skipCell)` requires both maps to
+share the same frame and grid geometry (`HeightMap.ensureSameGrid`) and sums,
+over every `(columns - 1) x (rows - 1)` cell, the average of its four
+corners' signed `existing - design` difference times the cell's plan area,
+splitting the result into `cut` (existing above design) and `fill` (existing
+below design) in a `VolumeResult`. `skipCell` (by grid cell, i.e. its
+lower-left vertex indices) lets `EarthworkRegion.remainingVolume` omit any
+cell touching an exclusion polygon without duplicating the summation. For a
+trench whose vertical faces land exactly on grid columns and which spans a
+grid's full extent in the other axis, this trapezoidal average reproduces
+the trench's exact geometric volume with no discretization error — the two
+"half-cut" boundary columns each contribute exactly half a full column's
+volume, together equal to one full column — which is what
+`TerrainTests.testVolumeOfKnownTrench` checks bit-for-bit rather than within
+a tolerance.
+
+`EarthworkRegion` pairs an `existing` and `design` `HeightMap` (validated to
+share one grid) with exclusion polygons (`robotkit.work.Polygon2`, the same
+type `WorkSurface` uses for its own exclusions) and a `gradeTolerance`.
+`isAtGrade(col, row)` is true when a vertex's excluded, or its
+`|existing - design|` delta is within tolerance; `gradeFraction()` and
+`worstVertex()` (the largest-magnitude non-excluded, out-of-tolerance delta)
+are the two queries `GradeRegion` (M12) needs to decide where to dig next and
+when to stop.
+
+`BucketSweep.apply(map, from, to, halfWidth, edgeHeight)` is deliberately not
+a soil model: it lowers every grid vertex within `halfWidth` of the swept
+segment (a capsule footprint) that is currently above `edgeHeight` down to
+`edgeHeight`, and reports `removedVolume` as
+`sum(oldElevation - edgeHeight) * cellSize^2` — a box/Voronoi area
+approximation per vertex, with no fill-factor, spillage, or repose-angle
+modeling. Sweeping twice at the same `edgeHeight` removes nothing further,
+which is the closest thing to a physical invariant this approximation needs
+to satisfy.
+
+One haxeon-specific finding while writing `EarthworkRegion.remainingVolume`:
+an anonymous function passed as an argument (e.g.
+`function(col:Int, row:Int) { ... }`) cannot carry an explicit return-type
+annotation the way a named function or method can — `function(col:Int,
+row:Int):Bool { ... }` fails to parse (`E0002: Expected expression` at the
+`:`), because `Parser.hx`'s anonymous-function-literal path
+(`TokenKind.Function` in `parsePrimary`) goes straight from the closing
+`)` of the argument list to the function body with no `:Type` production in
+between (only `parseFunction`/`parseFunctionBody`, used for declarations and
+methods, parse a return type). The fix is simply to omit the annotation and
+let the return type be inferred, as every other lambda in this codebase
+already does. A related, separately-discovered finding while writing
+`TerrainTests`: field access on a `Null<T>` value — even one already guarded
+by a prior `check(value != null, ...)` runtime-assertion call — is rejected
+at compile time (`E1005: Field "..." requires an object`) unless the
+narrowing comes from an actual `if`/`||`/`&&` control-flow construct
+`FlowAnalysis.narrowedScope` tracks; a `check(...)` helper call, however
+assertion-like, is invisible to that analysis. The existing codebase's own
+`if (x == null) throw ...; use(x.field);` guard-clause idiom (seen throughout
+`KinematicChain`, `WorkPatchPlanner`, etc.) is what actually narrows, so
+`TerrainTests.testCellsAtGradeReported` uses that idiom instead.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A
