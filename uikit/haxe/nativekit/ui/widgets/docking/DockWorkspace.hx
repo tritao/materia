@@ -153,6 +153,10 @@ class DockWorkspace implements View {
 			var indicator = new RenderNode(context.id("tab-drop-indicator:" + panelId),
 				LayoutVisualKind.Custom, indicatorStyle);
 			indicator.hitTestSelf = false;
+			var tabPreview = interaction.preview;
+			var tabPreviewKey = tabPreview == null ? "none" :
+				tabPreview.sourcePanelId + ":" + tabPreview.targetPanelId + ":" +
+				Std.string(tabPreview.zone);
 			indicator.onPaint(function(canvas, geometry) {
 				var preview = interaction.preview;
 				if (preview == null || preview.targetPanelId != panelId ||
@@ -163,7 +167,7 @@ class DockWorkspace implements View {
 					Math.max(0.0, geometry.width - indicatorWidth);
 				canvas.fillRectIfPositive(new Rect(x, 0.0, indicatorWidth, geometry.height),
 					Color.rgba(0.18, 0.52, 0.95, 0.9));
-			});
+			}, "tab-drop-indicator:" + panelId + ":" + tabPreviewKey);
 			node.add(indicator);
 		};
 		return nativekit.ui.widgets.controls.Tabs.withOptions(nodeKey, items, activePanelId, function(next) {
@@ -345,13 +349,15 @@ private class DockDropTargetView implements View {
 				LayoutVisualKind.Custom, previewStyle);
 			previewNode.setStyleIdentity("dock-drop-preview", targetPanelId);
 			previewNode.hitTestSelf = false;
+			var previewKey = activePreview.sourcePanelId + ":" + activePreview.targetPanelId + ":" +
+				Std.string(activePreview.zone);
 			previewNode.onPaint(function(canvas, geometry) {
 				var preview = interaction.preview;
 				if (preview == null || preview.targetPanelId != targetPanelId)
 					return;
 				canvas.fillRectIfPositive(previewRect(preview.zone, geometry.width, geometry.height),
 					Color.rgba(0.18, 0.52, 0.95, 0.22));
-			});
+			}, "dock-drop-preview:" + previewKey);
 			node.add(previewNode);
 		}
 		return node;

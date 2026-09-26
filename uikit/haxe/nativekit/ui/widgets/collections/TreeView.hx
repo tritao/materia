@@ -729,6 +729,9 @@ private class TreeViewRow implements View {
 				var continuation = entry.guideContinuation;
 				var hasNext = entry.hasNextSibling;
 				var guideColor = context.theme.tokens.border;
+				var guideKey = "tree-guide:" + depth + ":" + (hasNext ? "1" : "0") + ":";
+				for (level in 1...depth)
+					guideKey += continuation[level] ? "1" : "0";
 				guideNode.onPaint(function(canvas, geometry) {
 					var path = new PathBuilder();
 					var centerY = geometry.height * 0.5;
@@ -740,7 +743,8 @@ private class TreeViewRow implements View {
 					path.moveTo(x, 0.0).lineTo(x, hasNext ? geometry.height : centerY);
 					path.moveTo(x, centerY).lineTo(x + 8.0, centerY);
 					canvas.strokeTransient(path.build(), guideColor, 1.0, LineCap.Butt, LineJoin.Miter);
-				});
+				}, guideKey + ":" + guideColor.red + ":" + guideColor.green + ":" +
+					guideColor.blue + ":" + guideColor.alpha);
 				node.add(guideNode);
 			}
 

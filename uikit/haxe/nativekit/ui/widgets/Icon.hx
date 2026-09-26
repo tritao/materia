@@ -42,6 +42,8 @@ class Icon implements View {
 			var node = new RenderNode(context.id("icon"), LayoutVisualKind.Custom, style);
 			node.hitTestSelf = false;
 			var paintColor = color == null ? context.theme.text : color;
+			var paintKey = "icon:" + Std.string(name) + ":" + paintColor.red + ":" +
+				paintColor.green + ":" + paintColor.blue + ":" + paintColor.alpha;
 			node.onPaint(function(canvas, geometry:ResolvedLayoutItem) {
 				if (geometry.width <= 0.0 || geometry.height <= 0.0)
 					return;
@@ -50,7 +52,7 @@ class Icon implements View {
 					target.strokeTransient(IconData.build(name), paintColor, 2.0,
 						LineCap.Round, LineJoin.Round);
 				});
-			});
+			}, paintKey);
 			if (label != null)
 				node.semantics = new Semantics(AccessibilityRole.Image, label);
 			return node;
