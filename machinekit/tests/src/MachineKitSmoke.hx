@@ -165,6 +165,12 @@ class MachineKitSmoke {
 		near(counterbore.volume(), Math.PI * (3.3 * 3.3 * (15 - 6.4) + 5.5 * 5.5 * 6.4), "counterbore volume");
 		counterbore.close();
 		throws(() -> screw.counterboreHole(5), "needs depth");
+		for (size in ["M14", "M16", "M20"]) {
+			var large = SocketHeadCapScrew.metric(size, 40);
+			var largePart = large.geometry(Preview);
+			solid(largePart, size + " screw preview");
+			largePart.close();
+		}
 	}
 
 	static function motors():Void {
@@ -746,6 +752,9 @@ class MachineKitSmoke {
 		bom.addComponent(block);
 		check(bom.quantity("UCP204") == 1, "UCP pillow block BOM");
 		check(block.mountScrewPart(20).designation == "ISO4762-M10x20", "UCP mounting screw companion");
+		var mountingBom = block.billOfMaterials(true, 20);
+		check(mountingBom.quantity("UCP204") == 1, "UCP mounting BOM unit");
+		check(mountingBom.quantity("ISO4762-M10x20") == 2, "UCP mounting BOM screws");
 		for (reference in [
 			{name: "UCP205", bore: 25, length: 140, height: 36.5, boltSpacing: 105, screw: "M10"},
 			{name: "UCP206", bore: 30, length: 165, height: 42.9, boltSpacing: 121, screw: "M14"},
@@ -762,6 +771,11 @@ class MachineKitSmoke {
 			near(candidate.shaftHeight, reference.height, reference.name + " shaft height");
 			near(candidate.boltSpacing, reference.boltSpacing, reference.name + " bolt spacing");
 			check(candidate.mountScrew == reference.screw, reference.name + " mounting screw");
+			check(candidate.mountScrewPart(40).designation == 'ISO4762-${reference.screw}x40',
+				reference.name + " mounting screw companion");
+			var candidateBom = candidate.billOfMaterials(true, 40);
+			check(candidateBom.quantity('ISO4762-${reference.screw}x40') == 2,
+				reference.name + " mounting screw BOM quantity");
 			var candidatePart = candidate.geometry(Envelope);
 			solid(candidatePart, reference.name + " envelope");
 			candidatePart.close();

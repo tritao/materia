@@ -34,18 +34,31 @@ class SocketHeadCapScrew extends MachineComponent {
 			row("M8", 8, 1.25, 13, 8, 6, 4, 28, 6.8, 8.4, 9, 10, 15, 8.6),
 			row("M10", 10, 1.5, 16, 10, 8, 5, 32, 8.5, 10.5, 11, 12, 18, 10.6),
 			row("M12", 12, 1.75, 18, 12, 10, 6, 36, 10.2, 13, 13.5, 14.5, 20, 12.6),
+			row("M14", 14, 2.0, 21, 14, 12, 7, 40, 12.0, 15, 15.5, 16, 24, 14.8),
+			row("M16", 16, 2.0, 24, 16, 14, 8, 44, 14.0, 17, 17.5, 18, 27, 16.8),
+			row("M20", 20, 2.5, 30, 20, 17, 10, 52, 17.5, 21, 22, 24, 33, 21),
 		];
 
 	public static function catalog():Catalog<MetricScrewSpec> {
 		if (table == null)
-			table = new Catalog("metric screw size", spec -> spec.size, rows(), spec -> spec.size == "M5"
-			? ({source: "https://www.accu.co.uk/api/product-datasheet?id=652689", standard: "ISO 4762",
+			table = new Catalog("metric screw size", spec -> spec.size, rows(), spec -> switch (spec.size) {
+				case "M5": ({source: "https://www.accu.co.uk/api/product-datasheet?id=652689", standard: "ISO 4762",
 					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
 					sources: ["https://norelem.co.uk/medias/Technische-Hinweise-Schrauben-Muttern-EN.pdf?context=bWFzdGVyfHJvb3R8MjAxMTYxfGFwcGxpY2F0aW9uL3BkZnxhR1UyTDJoaU1pODVNamc1TURNd05UTXpNVFV3TDFSbFkyaHVhWE5qYUdVdFNHbHVkMlZwYzJVdFUyTm9jbUYxWW1WdUxVMTFkSFJsY201ZlJVNHVjR1JtfDNkOGZmNzZiMzAyMDRjZGQzMzIzZWIzNGEzY2I5NjA0MzkxNjY2ZTdkMDNmZjU2NDg2YWY3N2YyODUxZmFlMTA"],
 					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength",
-						"tapDrill", "clearanceFine", "clearanceMedium", "counterboreDiameter"]})
-				: ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 4762",
-					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
+						"tapDrill", "clearanceFine", "clearanceMedium", "counterboreDiameter"]});
+				case "M14": ({source: "https://www.accu.co.uk/metric-cap-head-screws/3248-SSC-M14-65-A4", standard: "ISO 4762",
+					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
+					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength"]});
+				case "M16": ({source: "https://www.accu.co.uk/metric-cap-head-screws/3260-SSC-M16-65-A4", standard: "ISO 4762",
+					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
+					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength"]});
+				case "M20": ({source: "https://www.accu.co.uk/metric-cap-head-screws/15854-SSC-M20-75-A2", standard: "ISO 4762",
+					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
+					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength"]});
+				default: ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 4762",
+					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope})
+			});
 		return table;
 	}
 

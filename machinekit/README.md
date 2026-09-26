@@ -34,7 +34,7 @@ Each component also produces the machining it needs:
 | Component | Catalog | Companion geometry |
 | --- | --- | --- |
 | `DeepGrooveBearing` | 625–6205, ISO 15 boundary dimensions | `housingSeat()` / `journalDiameter()` with named fits, plus explicit allowance helpers |
-| `SocketHeadCapScrew` | M3–M12, ISO 4762 heads | `clearanceHole()` (ISO 273), `tapHole()`, `counterboreHole()` (DIN 974-1) |
+| `SocketHeadCapScrew` | M3–M20, ISO 4762 heads | `clearanceHole()` (ISO 273), `tapHole()`, `counterboreHole()` (DIN 974-1) |
 | `HexBolt` | M3–M12, ISO 4017 (fully threaded) | `clearanceHole()`, `tapHole()`, `counterboreHole()` |
 | `HexNut` | M3–M12, ISO 4032 | `pocket()` for a trapped-nut recess |
 | `FlatWasher` | M3–M12, ISO 7089 | — |
@@ -44,7 +44,7 @@ Each component also produces the machining it needs:
 | `ShaftCollar` | set-screw type, by bore diameter | — |
 | `SteppedShaft` | — (built from arbitrary sections) | keyway and retaining-ring groove cuts, `diameterAt()` |
 | `FlangeBearingHousing` | — (sized from a `DeepGrooveBearing`) | `mountScrewPart()` |
-| `PillowBlock` | Koyo/JTEKT UCP204–UCP213 base-mounted units | mounting connectors and hole envelope; `mountScrewPart()` for cataloged screw sizes |
+| `PillowBlock` | Koyo/JTEKT UCP204–UCP213 base-mounted units | mounting connectors and hole envelope; `mountScrewPart()` and `billOfMaterials(true, length)` for mounting hardware |
 | `Bushing` | — (proportional to bore diameter) | — |
 | `ShaftCoupling` | — (proportional to the larger bore) | `setScrewPart()` |
 | `LinearBearing` | LM8UU–LM20UU | — |

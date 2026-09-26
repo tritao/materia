@@ -5,6 +5,7 @@ import cadkit.modeling.Align;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
+import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.MachineComponent;
@@ -125,4 +126,12 @@ class PillowBlock extends MachineComponent {
 	/** Socket-head mounting screw sized for this unit's base holes. */
 	public function mountScrewPart(length:Float):SocketHeadCapScrew
 		return SocketHeadCapScrew.metric(mountScrew, length);
+
+	/** Returns this unit's BOM, optionally including its two mounting screws. */
+	public function billOfMaterials(includeMountingScrews:Bool = false, screwLength:Float = 40):Bom {
+		var result = new Bom();
+		result.addComponent(this);
+		if (includeMountingScrews) result.addComponent(mountScrewPart(screwLength), 2);
+		return result;
+	}
 }

@@ -176,6 +176,22 @@ class MachineKitReferenceTests {
 		var metadata = SocketHeadCapScrew.catalog().metadata("M5");
 		if (metadata.dimensionKind != Unverified || metadata.verifiedFields == null || metadata.verifiedFields.length != 11)
 			throw "M5 partial verification metadata";
+		for (reference in [
+				{name: "M14", diameter: 14.0, pitch: 2.0, headDiameter: 21.0, headHeight: 14.0, socketSize: 12.0, socketDepth: 7.0, threadLength: 40.0},
+				{name: "M16", diameter: 16.0, pitch: 2.0, headDiameter: 24.0, headHeight: 16.0, socketSize: 14.0, socketDepth: 8.0, threadLength: 44.0},
+				{name: "M20", diameter: 20.0, pitch: 2.5, headDiameter: 30.0, headHeight: 20.0, socketSize: 17.0, socketDepth: 10.0, threadLength: 52.0}]) {
+			var screw = SocketHeadCapScrew.catalog().get(reference.name);
+			equal(screw.diameter, reference.diameter, reference.name + " diameter");
+			equal(screw.pitch, reference.pitch, reference.name + " pitch");
+			equal(screw.headDiameter, reference.headDiameter, reference.name + " head diameter");
+			equal(screw.headHeight, reference.headHeight, reference.name + " head height");
+			equal(screw.socketSize, reference.socketSize, reference.name + " socket size");
+			equal(screw.socketDepth, reference.socketDepth, reference.name + " socket depth");
+			equal(screw.threadLength, reference.threadLength, reference.name + " thread length");
+			var screwMetadata = SocketHeadCapScrew.catalog().metadata(reference.name);
+			if (screwMetadata.dimensionKind != Unverified || screwMetadata.verifiedFields == null)
+				throw reference.name + " partial verification metadata";
+		}
 		var bolt = HexBolt.catalog().get("M5");
 		equal(bolt.acrossFlats, 8, "M5 hex bolt across flats");
 		equal(bolt.headHeight, 3.5, "M5 hex bolt head height");
