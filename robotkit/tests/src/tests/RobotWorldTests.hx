@@ -104,9 +104,12 @@ import robotkit.material.LoadLimits;
 import robotkit.material.LoadState;
 import robotkit.material.Payload;
 import robotkit.perception.Detection;
+import robotkit.perception.DepthCameraObstaclePerception;
 import robotkit.perception.Obstacle;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.LidarObstaclePerception;
+import robotkit.perception.PinholeCameraIntrinsics;
+import robotkit.perception.PointCloudObstaclePerception;
 import robotkit.perception.GroundTruthPerception;
 import robotkit.perception.FrameAwarePerception;
 import robotkit.perception.Pallet;
@@ -146,6 +149,7 @@ class RobotWorldTests {
     testLocalization();
     testWheelImuLocalization();
     testGnssLocalization();
+    testDepthObstaclePerception();
     testNavigation();
     testMotionGuard();
     testGridPlanning();
@@ -833,6 +837,54 @@ class RobotWorldTests {
       Math.abs(fused.pose.y + 1.0) < 1e-3, "GNSS fixes anchor pose fusion in the map frame");
     robot.close();
     simulation.dispose();
+  }
+
+  static function testDepthObstaclePerception():Void {
+    var cloudFrame = new SensorFrame("depth-front", "point_cloud", "depth-camera",
+      Int64.ofInt(10), Int64.ofInt(150), [
+        1.0, 0.0, 0.5, 1.04, 0.0, 0.5, 1.0, 0.04, 0.4,
+        3.0, 0.0, 0.4, 3.04, 0.0, 0.4,
+        0.5, 0.0, 3.0, 8.0, 0.0, 0.2
+      ], Int64.ofInt(160), "depth-link", null, null, "robot-boot", "host-clock");
+    var cloudObstacles = new PointCloudObstaclePerception(5.0, 0.15, 0.05,
+      0.9, 0.12, 0.1, 1.0, 2, 100).observe([cloudFrame]).obstacles();
+    check(cloudObstacles.length == 2 &&
+      Math.abs(cloudObstacles[0].detection.pose.x - 1.0133333333) < 1e-6 &&
+      Math.abs(cloudObstacles[0].detection.pose.y - 0.0133333333) < 1e-6 &&
+      cloudObstacles[0].detection.frameId == "depth-camera",
+      "point-cloud perception clusters XYZ returns in the source frame");
+    throws(function() new PointCloudObstaclePerception(5.0, 0.15).observe([
+      new SensorFrame("malformed-depth", "point_cloud", "camera",
+        Int64.ofInt(1), Int64.ofInt(1), [1.0, 2.0], Int64.ofInt(1))]),
+      "point-cloud perception rejects incomplete XYZ triples");
+
+    var depthModel = new RobotModel("mounted depth camera");
+    var depthBaseLink = depthModel.addLink(new Link("base", "base-link"));
+    var opticalMount = new Frame("depth optical mount", depthBaseLink,
+      "depth-optical");
+    opticalMount.position = [0.5, 0.0, 1.2];
+    opticalMount.rotation = [-0.5, 0.5, -0.5, 0.5];
+    depthModel.addFrame(opticalMount);
+    var depthSensor = new Sensor("front-depth", "camera");
+    depthSensor.frame = opticalMount;
+    depthModel.addSensor(depthSensor);
+    var depthPerception = DepthCameraObstaclePerception.fromRobotModel(
+      depthModel, "front-depth", "base-link", "base", "base-link",
+      new PinholeCameraIntrinsics(100.0, 100.0, 1.0, 1.0),
+      5.0, 0.1, 0.1, 0.8, 0.1, -0.25, 2.5, 3, 8);
+    var depthPixels = haxe.io.Bytes.alloc(4 * 4 * 4);
+    for (index in 0...16) depthPixels.setFloat(index * 4, 2.0);
+    var depthFrame = new SensorFrame("front-depth", "camera", "depth-optical",
+      Int64.ofInt(7), Int64.ofInt(250), [], Int64.ofInt(260), "base-link",
+      null, null, "camera-clock", "host-clock",
+      new CameraImage(4, 4, "depth32f", depthPixels));
+    var depthObstacles = depthPerception.observe([depthFrame]).obstacles();
+    check(depthObstacles.length == 1 &&
+      Math.abs(depthObstacles[0].detection.pose.x - 2.5) < 1e-8 &&
+      Math.abs(depthObstacles[0].detection.pose.y) < 1e-8 &&
+      depthObstacles[0].detection.frameId == "base-link" &&
+      depthObstacles[0].detection.sourceSequence == Int64.ofInt(7),
+      "depth images unproject through the authored mount into body-frame obstacles");
   }
 
   static function testWheelImuLocalization():Void {

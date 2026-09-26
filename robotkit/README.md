@@ -225,6 +225,13 @@ bodyLinkId)` resolves the current link and frame poses from stable model IDs and
 joint positions. It leaves out nonplanar poses that `FrameTree2` cannot
 represent.
 
+`PointCloudObstaclePerception` clusters XYZ sensor returns into circular
+obstacles after range and height filtering. `DepthCameraObstaclePerception`
+unprojects `depth32f` images through pinhole calibration and the authored 3D
+camera mount before clustering. Both publish detections in their source or body
+frame; wrap them with `FrameAwarePerception` to use the current robot frame tree
+and localization estimate for map-frame obstacles.
+
 `robotkit.navigation.Navigation` follows a framed `Path` using the latest
 localization state and an application-supplied update duration. `Trajectory`
 stores time-parameterized pose/twist samples, and `NavigationGoal` defines final
