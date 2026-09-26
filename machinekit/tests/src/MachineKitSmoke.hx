@@ -253,7 +253,7 @@ class MachineKitSmoke {
 
 	static function shafts():Void {
 		var key = ParallelKey.forShaft(6, 6);
-		check(key.designation == "DIN6885-2x2x6", "key designation");
+		check(key.designation == "DIN6885-B-2x2x6", "key designation");
 		check(key.spec.width == 2 && key.spec.height == 2, "key cross-section");
 		var keyPreview = key.geometry();
 		solid(keyPreview, "key preview");
@@ -333,6 +333,8 @@ class MachineKitSmoke {
 		var ring = RetainingRing.forShaft(8);
 		check(ring.designation == "DIN471-8", "ring designation");
 		check(ring.spec.grooveDiameter == 7.6 && ring.spec.outerDiameter == 12.2, "ring dimensions (DIN 471 d2)");
+		check(ring.thickness == 0.8 && ring.grooveSpec().width == 0.9, "ring thickness differs from groove width");
+		check(ring.grooveSpec().diameter == 7.6, "ring groove diameter");
 		throws(() -> RetainingRing.forShaft(9), 'Unknown retaining ring shaft diameter "9"');
 		throws(() -> RetainingRing.forShaft(8.5), 'Unknown retaining ring shaft diameter "8.5"');
 		check(RetainingRing.forShaft(12).spec.grooveDiameter == 11.5, "12 mm ring groove diameter");
@@ -517,6 +519,7 @@ class MachineKitSmoke {
 
 		var pinion = new SpurGear(2, 12, 12);
 		throws(() -> pinion.centerDistance(new SpurGear(2.5, 20, 12)), "share a module");
+		throws(() -> GearPair.mesh(pinion, new SpurGear(2, 20, 12, 25 * Math.PI / 180)), "share a pressure angle");
 		var pair = GearPair.mesh(pinion, gear);
 		near(pair.centerDistance, (pinion.pitchDiameter + gear.pitchDiameter) / 2, "gear pair centre distance");
 		near(pair.ratio(), gear.teeth / pinion.teeth, "gear pair ratio");
@@ -832,7 +835,7 @@ class MachineKitSmoke {
 
 	static function robotics():Void {
 		var flange = new RobotFlange(50);
-		check(flange.designation == "ISO9409-1-50-4-M6", "robot flange designation");
+		check(flange.designation == "ISO9409-PATTERN-50-4-M6", "robot flange designation");
 		check(flange.boltCount == 4, "robot flange ISO bolt count");
 		check(flange.mountScrew == "M6", "robot flange mount screw size");
 		near(flange.boltCircleDiameter, 50, "robot flange pitch circle");
@@ -842,7 +845,7 @@ class MachineKitSmoke {
 		near(flange.thickness, 9, "robot flange thickness");
 		near(flange.pilotHeight, 3, "robot flange pilot height");
 		var small = new RobotFlange(31.5);
-		check(small.designation == "ISO9409-1-31.5-4-M5", "smallest ISO flange designation");
+		check(small.designation == "ISO9409-PATTERN-31.5-4-M5", "smallest ISO flange designation");
 		near(small.pilotDiameter, 20, "31.5 flange pilot");
 		near(small.pinDiameter, 5, "31.5 flange pin");
 		var large = new RobotFlange(80);
@@ -989,7 +992,7 @@ class MachineKitSmoke {
 		check(bom.quantity("ISO4762-M3x10") == 4, "screw quantity");
 		check(bom.quantity("608-2Z") == 2, "bearing quantity");
 		check(bom.quantity("NEMA17-48") == 1, "motor quantity");
-		check(bom.quantity("DIN6885-2x2x6") == 1, "key quantity");
+		check(bom.quantity("DIN6885-B-2x2x6") == 1, "key quantity");
 		check(bom.quantity("DIN471-8") == 1, "ring quantity");
 		var duplicate = new Bom();
 		duplicate.add({partNumber: "X", description: "a", quantity: 1, material: null});

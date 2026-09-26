@@ -21,15 +21,15 @@ typedef RobotFlangeSpec = {
 	var pinDiameter:Float;
 }
 
-/** ISO 9409-1 robot tool flange: a round plate with a centring pilot, a bolt circle, and a
+/** Robot tool flange using the ISO 9409-1 bolt pattern: a round plate with a centring pilot, a bolt circle, and a
  * locating pin hole. The flange is sized by its pitch circle (`new RobotFlange(50)` is
- * ISO 9409-1-50-4-M6): pitch circle, bolt count and thread, pilot and pin diameters come from the
+ * based on the ISO 9409-1-50-4-M6 pattern): pitch circle, bolt count and thread, pilot and pin diameters come from the
  * standard's table; the outer diameter (pitch circle plus two screw-head diameters), plate
  * thickness (1.5 screw diameters), and pilot height (half a screw diameter) are proportional. The
  * pilot is modelled as a raised boss that engages a recess in the mating part (ISO specifies the
  * robot side's d2 as an H7 recess; the boss/recess roles are swapped here for a simpler mate).
  * Passing a `boltCount` that differs from the table gives a non-standard pattern whose
- * designation drops the ISO prefix.
+ * designation drops the ISO pattern prefix.
  *
  * CAD frame: mounting face at z=0, flange plate behind it (z=-thickness..0), pilot boss toward +Z
  * (z=0..pilotHeight). Connectors: `face` (the mounting face), `bolt1`..`boltN` and `pin`, all at
@@ -86,9 +86,9 @@ class RobotFlange extends MachineComponent {
 			!(boltToBolt >= screw.spec.headDiameter + MIN_WEB))
 			throw 'Robot flange ${Dimension.format(spec.pitchCircle)} has too many bolts for its pitch circle';
 		var size = '${Dimension.format(spec.pitchCircle)}-$count-${spec.screw}';
-		var standard = count == spec.boltCount;
-		super(standard ? 'ISO9409-1-$size' : 'FLANGE-$size',
-			standard ? 'ISO 9409-1-$size robot flange' : 'Robot flange $size (non-standard ISO 9409-1 bolt count)',
+		var standardPattern = count == spec.boltCount;
+		super(standardPattern ? 'ISO9409-PATTERN-$size' : 'FLANGE-$size',
+			standardPattern ? 'Robot flange with ISO 9409-1-$size bolt pattern and raised pilot' : 'Robot flange $size (non-standard ISO 9409-1 bolt count)',
 			"steel");
 		this.spec = spec;
 		this.boltCount = count;

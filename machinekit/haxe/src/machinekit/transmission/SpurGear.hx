@@ -58,10 +58,12 @@ class SpurGear {
 		return angle >= MIN_PRESSURE_ANGLE - 1e-12 && angle <= MAX_PRESSURE_ANGLE + 1e-12;
 
 	/** Centre distance to mesh with `other` at the standard (no profile shift) pitch. Both gears
-	 * must share a module.
+	 * must share a module and pressure angle.
 	 */
 	public function centerDistance(other:SpurGear):Float {
 		if (moduleSize != other.moduleSize) throw "Meshing gears must share a module";
+		if (Math.abs(pressureAngle - other.pressureAngle) > 1e-10)
+			throw "Meshing gears must share a pressure angle";
 		return (pitchDiameter + other.pitchDiameter) / 2;
 	}
 

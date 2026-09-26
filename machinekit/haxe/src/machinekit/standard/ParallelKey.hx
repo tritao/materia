@@ -9,7 +9,7 @@ import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 
-/** Rectangular key stock sized by DIN 6885-1. Square ends; rounded-end (form B) stock is not modelled.
+/** DIN 6885-1 Form B parallel key with square ends. Rounded Form A ends are not modelled.
  * CAD frame: width along X (centred), height along Y with the seat floor at y=0, length along Z.
  * Connector: `seat` (face) at the bottom, mid-length, with +Y along +Z as usual. A `SteppedShaft`
  * keyway connector shares this convention, so mating the two with a fixed joint seats the key flush.
@@ -53,7 +53,7 @@ class ParallelKey extends MachineComponent {
 	public function new(spec:ParallelKeySpec, length:Float) {
 		if (!(length > 0) || !Math.isFinite(length)) throw "Key needs a positive length";
 		var size = '${Dimension.format(spec.width)}x${Dimension.format(spec.height)}';
-		super('DIN6885-${size}x${Dimension.format(length)}', 'Parallel key $size, ${Dimension.format(length)} mm long',
+		super('DIN6885-B-${size}x${Dimension.format(length)}', 'Form B parallel key $size, ${Dimension.format(length)} mm long',
 			"steel C45");
 		this.spec = spec;
 		this.length = length;

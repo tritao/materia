@@ -25,8 +25,8 @@ Each component also produces the machining it needs:
 | `HexNut` | M3–M12, ISO 4032 | `pocket()` for a trapped-nut recess |
 | `FlatWasher` | M3–M12, ISO 7089 | — |
 | `NemaStepper` | NEMA 17, 23, 34 | `mountingCutout()`, `mountScrew()`, `boltPattern()` |
-| `ParallelKey` | DIN 6885-1 form A, by shaft diameter | — |
-| `RetainingRing` | DIN 471 external, by shaft diameter | — |
+| `ParallelKey` | DIN 6885-1 form B (square ends), by shaft diameter | — |
+| `RetainingRing` | DIN 471 external, by shaft diameter | `grooveSpec()` (d2, m) |
 | `ShaftCollar` | set-screw type, by bore diameter | — |
 | `SteppedShaft` | — (built from arbitrary sections) | keyway and retaining-ring groove cuts, `diameterAt()` |
 | `PillowBlockHousing` | — (sized from a `DeepGrooveBearing`) | `mountScrewPart()` |
@@ -119,12 +119,13 @@ its tooling, not a link to `robotkit`'s runtime model (which references mesh
 files by path, not CadKit geometry, so the bridge is at the level of a shared
 `AssemblyModel`/BOM workflow, not a shared type):
 
-- `RobotFlange` is an ISO 9409-1 tool flange sized by pitch-circle diameter
+- `RobotFlange` uses an ISO 9409-1 bolt pattern sized by pitch-circle diameter
   from the standard's table (bolt count and size, pilot diameter, pin), with
   proportional outer diameter and thickness. Its mounting face is z=0 with the
   pilot boss standing proud of it; `mountingCutout()` cuts the matching blind
-  pilot recess, bolt and pin holes. Overriding the bolt count drops the ISO
-  designation.
+  pilot recess, bolt and pin holes. The raised pilot swaps the ISO interface
+  roles, so its designation says pattern. Overriding the bolt count drops that
+  pattern designation.
 - `EndEffectorPlate` adapts a `RobotFlange`'s bolt pattern to a tool bolt
   circle outside the flange's bolts, the same cut-and-expose-a-new-pattern
   shape as `MotorPlate` in `MotorShaftBearings.hx`.

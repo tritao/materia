@@ -1,6 +1,6 @@
 package machinekit.standard;
 
-/** DIN 6885-1 form A parallel key cross-section, in millimetres.
+/** DIN 6885-1 form B parallel key cross-section, in millimetres.
  * `maxShaft` is the upper bound (inclusive) of the shaft diameter range this size fits.
  */
 typedef ParallelKeySpec = {
