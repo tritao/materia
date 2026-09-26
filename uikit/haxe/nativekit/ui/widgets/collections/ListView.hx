@@ -56,16 +56,19 @@ class ListView implements View {
 	var extentIndex:Null<VirtualExtentIndex>;
 	var itemIds:Map<Int, WidgetId>;
 	var itemKeys:Map<Int, String>;
+	final itemMetadata:Null<ListViewItemMetadata>;
 
 	public function new(key:String, model:ListViewModel, ?viewportStyle:LayoutStyle,
 			?controller:ScrollController, viewportHeight:Float = 300.0,
 			selectedIndex:Int = -1, ?onSelectionChanged:Int->Void,
-			?onItemActivated:Int->Void, ?virtualization:VirtualizationPolicy) {
+			?onItemActivated:Int->Void, ?virtualization:VirtualizationPolicy,
+			?itemMetadata:ListViewItemMetadata) {
 		if (key == null || key.length == 0 || model == null || viewportHeight <= 0.0 ||
 			!finite(viewportHeight) || selectedIndex < -1)
 			throw "ListView requires a stable key, model, and valid viewport height";
 		this.key = key;
 		this.model = model;
+		this.itemMetadata = itemMetadata;
 		this.viewportStyle = viewportStyle == null ? defaultViewportStyle(viewportHeight) :
 			viewportStyle.copy();
 		this.controller = controller == null ? new ScrollController() : controller;
@@ -94,6 +97,8 @@ class ListView implements View {
 		ensureModelMetrics();
 		if (index < -1 || index >= cachedCount)
 			throw "ListView selection index is out of range";
+		if (index >= 0 && !itemEnabled(index))
+			return false;
 		if (index == selectedIndex)
 			return false;
 		selectedIndex = index;
@@ -121,6 +126,8 @@ class ListView implements View {
 			var state:State<Int> = context.state(context.id("selected-index"), selectedIndex);
 			selectedState = state;
 			if (state.value < -1 || state.value >= cachedCount)
+				state.update(-1);
+			if (state.value >= 0 && !itemEnabled(state.value))
 				state.update(-1);
 			selectedIndex = state.value;
 			itemIds = new Map();
@@ -150,6 +157,8 @@ class ListView implements View {
 						throw 'ListView model returned null for index $itemIndex';
 					var row = new ListViewRow("row", itemKey, item, cachedCount, itemIndex,
 						window.extentAt(itemIndex), selectedIndex == itemIndex,
+						itemMetadata == null ? null : itemMetadata.labelAt(itemIndex),
+						itemEnabled(itemIndex),
 						function() { select(itemIndex); },
 						function() { if (onItemActivated != null) onItemActivated(itemIndex); },
 						function(event) { handleItemKey(context, itemIndex, event); },
@@ -197,6 +206,12 @@ class ListView implements View {
 		if (cachedCount == 0)
 			return;
 		next = Std.int(Math.max(0, Math.min(cachedCount - 1, next)));
+		var step = event.key == UiKey.Up || event.key == UiKey.End ||
+			event.key == UiKey.PageUp ? -1 : 1;
+		while (next >= 0 && next < cachedCount && !itemEnabled(next))
+			next += step;
+		if (next < 0 || next >= cachedCount)
+			return;
 		if (next == index)
 			return;
 		event.preventDefault();
@@ -206,6 +221,9 @@ class ListView implements View {
 		if (target != null)
 			context.requestFocus(target);
 	}
+
+	function itemEnabled(index:Int):Bool
+		return itemMetadata == null || itemMetadata.enabledAt(index);
 
 	function visibleItemCount():Int {
 		if (extentIndex == null)
@@ -341,13 +359,16 @@ private class ListViewRow implements View {
 	final index:Int;
 	final extent:Float;
 	final selected:Bool;
+	final label:Null<String>;
+	final enabled:Bool;
 	final onSelect:Void->Void;
 	final onActivate:Void->Void;
 	final onKey:UiEvent->Void;
 	final onBuilt:WidgetId->Void;
 
 	public function new(key:String, itemKey:String, child:View, setSize:Int, index:Int, extent:Float,
-			selected:Bool, onSelect:Void->Void, onActivate:Void->Void,
+			selected:Bool, label:Null<String>, enabled:Bool,
+			onSelect:Void->Void, onActivate:Void->Void,
 			onKey:UiEvent->Void, onBuilt:WidgetId->Void) {
 		this.key = key;
 		this.itemKey = itemKey;
@@ -356,6 +377,8 @@ private class ListViewRow implements View {
 		this.index = index;
 		this.extent = extent;
 		this.selected = selected;
+		this.label = label;
+		this.enabled = enabled;
 		this.onSelect = onSelect;
 		this.onActivate = onActivate;
 		this.onKey = onKey;
@@ -370,19 +393,25 @@ private class ListViewRow implements View {
 			style.background = selected ? context.theme.tokens.selectionHighlight :
 				Color.rgba(0.0, 0.0, 0.0, 0.0);
 			var node = new RenderNode(context.id("list-item"), LayoutVisualKind.Box, style);
-			node.focusable = true;
-			var semantics = new Semantics(AccessibilityRole.CollectionItem);
-			semantics.actions = AccessibilityAction.Activate | AccessibilityAction.Select;
-			semantics.states |= AccessibilityState.Focusable;
+			node.focusable = enabled;
+			node.enabled = enabled;
+			var semantics = new Semantics(AccessibilityRole.CollectionItem, label);
+			if (enabled) {
+				semantics.actions = AccessibilityAction.Activate | AccessibilityAction.Select;
+				semantics.states |= AccessibilityState.Focusable;
+			} else
+				semantics.states |= AccessibilityState.Disabled;
 			if (selected)
 				semantics.states |= AccessibilityState.Selected;
 			semantics.setSize = setSize;
 			semantics.positionInSet = index + 1;
 			node.semantics = semantics;
-			node.on(UiEventKind.Click, function(_) { onSelect(); });
-			node.on(UiEventKind.Activate, function(_) { onSelect(); onActivate(); });
-			node.on(UiEventKind.KeyDown, onKey);
-			node.on(UiEventKind.KeyRepeat, onKey);
+			if (enabled) {
+				node.on(UiEventKind.Click, function(_) { onSelect(); });
+				node.on(UiEventKind.Activate, function(_) { onSelect(); onActivate(); });
+				node.on(UiEventKind.KeyDown, onKey);
+				node.on(UiEventKind.KeyRepeat, onKey);
+			}
 			node.add(new KeyedView('item:$itemKey', child).build(context));
 			onBuilt(node.id);
 			return node;

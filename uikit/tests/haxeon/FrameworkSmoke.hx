@@ -4049,6 +4049,19 @@ class FrameworkSmoke {
 		if (paletteRoot == null || paletteRoot.semantics == null ||
 			paletteRoot.semantics.label != "Command palette")
 			return false;
+		var resultRows = 0;
+		var nestedButtons = 0;
+		paletteRoot.walk(function(node) {
+			if (node.semantics != null &&
+				node.semantics.role == AccessibilityRole.CollectionItem) {
+				resultRows++;
+				if (node.semantics.label == null || node.semantics.label.length == 0)
+					nestedButtons++;
+			}
+			if (node.styleType == "button") nestedButtons++;
+		});
+		if (resultRows != 2 || nestedButtons != 0)
+			return false;
 		var centeredPalette = new CommandPalette("centered-palette", surfaceRegistry);
 		centeredPalette.centered = true;
 		var centeredRoot = uiContext.submit(centeredPalette, new LayoutFrame(480.0, 360.0));
@@ -4068,6 +4081,30 @@ class FrameworkSmoke {
 		uiContext.key(UiEventKind.KeyDown, UiKey.Up);
 		uiContext.key(UiEventKind.KeyDown, UiKey.Enter);
 		if (surfaceRuns != 2)
+			return false;
+		var disabledRuns = 0;
+		surfaceRegistry.register(new Command("surface.disabled", "Unavailable", function() {
+			disabledRuns++;
+		}, null, function() return false));
+		var disabledPalette = new CommandPalette("disabled-palette", surfaceRegistry,
+			null, 0.0, 0.0, "Unavailable");
+		var disabledRoot = uiContext.submit(disabledPalette,
+			new LayoutFrame(480.0, 360.0));
+		var disabledRow:Null<RenderNode> = null;
+		disabledRoot.walk(function(node) {
+			if (node.semantics != null &&
+				node.semantics.role == AccessibilityRole.CollectionItem)
+				disabledRow = node;
+		});
+		if (disabledRow == null)
+			return false;
+		var disabledSemantics:Semantics = cast disabledRow.semantics;
+		if (disabledSemantics.label != "Unavailable" ||
+			(disabledSemantics.states & AccessibilityState.Disabled) == 0 ||
+			disabledRow.focusable)
+			return false;
+		uiContext.key(UiEventKind.KeyDown, UiKey.Enter);
+		if (disabledRuns != 0)
 			return false;
 		return true;
 	}

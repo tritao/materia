@@ -1,12 +1,15 @@
 package nativekit.ui.widgets.commands;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.controls.Button;
-import nativekit.ui.widgets.controls.ButtonVariant;
 import nativekit.ui.widgets.controls.SearchField;
+import nativekit.ui.widgets.layout.Align;
 import nativekit.ui.widgets.layout.Column;
+import nativekit.ui.widgets.layout.Row;
 import nativekit.ui.widgets.overlays.Popup;
+import nativekit.ui.widgets.text.Text;
 
 import Insets;
+import LayoutAlignmentX;
+import LayoutAlignmentY;
 import LayoutAxis;
 import LayoutStyle;
 import nativekit.ui.core.BuildContext;
@@ -21,6 +24,7 @@ import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.View;
 import nativekit.ui.widgets.collections.ListView;
+import nativekit.ui.widgets.collections.ListViewItemMetadata;
 import nativekit.ui.widgets.collections.ListViewModel;
 
 /** Searchable, virtualized command launcher suitable for editor key palettes. */
@@ -58,6 +62,9 @@ class CommandPalette implements View {
 			var actualContext = invocationContext == null ? context.commandContext : invocationContext;
 			var queryState:State<String> = context.state(context.id("query"), query);
 			query = queryState.value;
+			var selectionQuery:State<String> = context.state(context.id("selection-query"), query);
+			var queryChanged = selectionQuery.value != query;
+			if (queryChanged) selectionQuery.update(query);
 			var model = new CommandPaletteModel(commands, actualContext, query);
 			var searchStyle = new LayoutStyle();
 			searchStyle.width = LayoutAxis.grow();
@@ -71,7 +78,7 @@ class CommandPalette implements View {
 			var listHeight = centered ? Math.min(320.0, Math.max(120.0, context.viewportHeight - 102.0)) : 320.0;
 			listStyle.height = LayoutAxis.fixed(listHeight);
 			var activate = function(index:Int) {
-				if (index < 0 || index >= model.commands.length)
+				if (index < 0 || index >= model.commands.length || !model.enabledAt(index))
 					return;
 				var result = commands.executeContext(model.commands[index].id, actualContext);
 				if (onResult != null)
@@ -79,9 +86,11 @@ class CommandPalette implements View {
 				if (result.succeeded && onDismiss != null)
 					onDismiss();
 			};
-			var list = new ListView("commands", model, listStyle, null, listHeight, 0,
-				null, activate);
-			search.onSubmit = function(_) activate(list.selectedIndex < 0 ? 0 : list.selectedIndex);
+			var list = new ListView("commands", model, listStyle, null, listHeight,
+				model.firstEnabledIndex(),
+				null, activate, null, model);
+			search.onSubmit = function(_) activate(list.selectedIndex < 0
+				? model.firstEnabledIndex() : list.selectedIndex);
 			var contentStyle = new LayoutStyle();
 			var contentWidth = centered ? Math.min(480.0, Math.max(200.0, context.viewportWidth - 32.0)) : 480.0;
 			contentStyle.width = LayoutAxis.fixed(contentWidth);
@@ -100,17 +109,23 @@ class CommandPalette implements View {
 			popup.dimBackdrop = true;
 			if (centered) popup.layerZIndex = 1000;
 			var root = popup.build(context);
+			if (queryChanged)
+				list.select(model.firstEnabledIndex());
 			var navigate = function(event:nativekit.ui.core.UiEvent) {
 				if (event.defaultPrevented ||
 					(event.key != UiKey.Up && event.key != UiKey.Down))
 					return;
-				if (model.commands.length == 0) {
+				if (model.firstEnabledIndex() < 0) {
 					event.preventDefault();
 					return;
 				}
-				var next = list.selectedIndex + (event.key == UiKey.Down ? 1 : -1);
-				if (next < 0) next = model.commands.length - 1;
-				if (next >= model.commands.length) next = 0;
+				var step = event.key == UiKey.Down ? 1 : -1;
+				var next = list.selectedIndex;
+				if (next < 0 && step < 0) next = 0;
+				for (_ in 0...model.commands.length) {
+					next = (next + step + model.commands.length) % model.commands.length;
+					if (model.enabledAt(next)) break;
+				}
 				list.select(next);
 				list.scrollTo(next);
 				event.preventDefault();
@@ -122,7 +137,7 @@ class CommandPalette implements View {
 	}
 }
 
-private class CommandPaletteModel implements ListViewModel {
+private class CommandPaletteModel implements ListViewModel implements ListViewItemMetadata {
 	public final commands:Array<Command>;
 	final context:CommandContext;
 
@@ -143,6 +158,18 @@ private class CommandPaletteModel implements ListViewModel {
 	public function keyAt(index:Int):String
 		return commands[index].id;
 
+	public function labelAt(index:Int):String
+		return commands[index].label;
+
+	public function enabledAt(index:Int):Bool
+		return commands[index].isEnabled(context);
+
+	public function firstEnabledIndex():Int {
+		for (index in 0...commands.length)
+			if (enabledAt(index)) return index;
+		return -1;
+	}
+
 	public function estimatedExtent():Float
 		return 36.0;
 
@@ -160,12 +187,8 @@ private class CommandPaletteModel implements ListViewModel {
 
 	public function buildItem(index:Int):View {
 		var command = commands[index];
-		var button = new Button(command.label, null, null, command.id);
-		button.enabled = command.isEnabled(context);
-		button.selected = command.isChecked(context);
-		button.classes = ["command-palette-item"];
-		button.variant = ButtonVariant.Navigation;
-		return button;
+		return new CommandPaletteItem(command.label, enabledAt(index),
+			command.isChecked(context));
 	}
 
 	public function revision():Int
@@ -174,5 +197,39 @@ private class CommandPaletteModel implements ListViewModel {
 	static function matches(command:Command, needle:String):Bool {
 		return command.id.toLowerCase().indexOf(needle) >= 0 ||
 			command.label.toLowerCase().indexOf(needle) >= 0;
+	}
+}
+
+private class CommandPaletteItem implements View {
+	final label:String;
+	final enabled:Bool;
+	final checked:Bool;
+
+	public function new(label:String, enabled:Bool, checked:Bool) {
+		this.label = label;
+		this.enabled = enabled;
+		this.checked = checked;
+	}
+
+	public function build(context:BuildContext):RenderNode {
+		var color = enabled ? context.theme.tokens.textPrimary : context.theme.tokens.textDisabled;
+		var rowStyle = new LayoutStyle();
+		rowStyle.width = LayoutAxis.grow();
+		rowStyle.height = LayoutAxis.fixed(36.0);
+		rowStyle.padding = new Insets(12.0, 0.0, 12.0, 0.0);
+		rowStyle.childGap = 8.0;
+		rowStyle.childAlignY = LayoutAlignmentY.Center;
+		var children:Array<KeyedView> = [
+			new KeyedView("label", new Text(label, null, color))
+		];
+		if (checked) {
+			var checkStyle = new LayoutStyle();
+			checkStyle.width = LayoutAxis.grow();
+			checkStyle.height = LayoutAxis.fixed(16.0);
+			children.push(new KeyedView("check", new Align("check", new Text("✓", null,
+				color), LayoutAlignmentX.End,
+				LayoutAlignmentY.Center, checkStyle)));
+		}
+		return new Row("command-result", children, rowStyle).build(context);
 	}
 }
