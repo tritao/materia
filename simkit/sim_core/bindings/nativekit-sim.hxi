@@ -26,6 +26,19 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	const NKSIM_SNAPSHOT_PAGE_CAPACITY = 64;
 	extern fn nksim_body_create(world: nksim_world, desc: ptr<const<nksim_body_desc>>, out_body: ptr<nksim_body> @out) -> nksim_result;
 	extern fn nksim_body_destroy(world: nksim_world, body: nksim_body) -> void;
+	/**
+	 * Drives a kinematic body continuously on the world owner thread: the next
+	 * tick moves the body from its current pose to the state's pose and reports
+	 * the state's linear and angular velocity as its twist, both exactly as given
+	 * in double precision. Unlike nksim_body_set_state() this is not a
+	 * discontinuity. Keep the body's scene node at the same pose; while a drive is
+	 * pending it takes precedence over the node. After the driven tick the body
+	 * follows its node again: a node left where the drive put it holds the body
+	 * at the driven pose with zero twist, and a node that moves is differenced
+	 * against its previous pose. Drive every tick for continuous exact motion.
+	 * Returns NKSIM_ERROR_INVALID_STATE for a body that is not kinematic.
+	 */
+	extern fn nksim_body_drive(world: nksim_world, body: nksim_body, state: ptr<const<nksim_body_state>>) -> nksim_result;
 	extern fn nksim_body_get_state(world: nksim_world, body: nksim_body, out_state: ptr<nksim_body_state> @inout) -> nksim_result;
 	extern fn nksim_body_reset(world: nksim_world, body: nksim_body) -> nksim_result;
 	/**

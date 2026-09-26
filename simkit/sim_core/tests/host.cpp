@@ -249,6 +249,16 @@ void host_body_state_writes_teleport_kinematic_bodies() {
     assert(nksim_host_submit_body_states(host, &invalid, 1) == NKSIM_ERROR_INVALID_ARGUMENT);
     assert(nksim_host_submit_body_states(host, nullptr, 1) == NKSIM_ERROR_INVALID_ARGUMENT);
     assert(nksim_host_submit_body_states(host, nullptr, 0) == NKSIM_OK);
+
+    // A queued drive is continuous motion with the exact supplied twist.
+    auto drive = state;
+    drive.position[0] = 5.05;
+    drive.linear_velocity[0] = 3.0;
+    set_node_x(scene, node, 5.05);
+    assert(nksim_host_submit_body_drives(host, &drive, 1) == NKSIM_OK);
+    state = host_step_and_read(host);
+    assert(state.position[0] == 5.05 && state.linear_velocity[0] == 3.0);
+    assert(nksim_host_submit_body_drives(host, nullptr, 1) == NKSIM_ERROR_INVALID_ARGUMENT);
     assert(nksim_host_stop(host) == NKSIM_OK);
     nksim_host_destroy(host);
     nksim_body_destroy(world, body);

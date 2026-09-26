@@ -581,6 +581,123 @@ void kinematic_body_velocity_follows_node_motion() {
     nkscene_scene_destroy(scene);
 }
 
+// Scene nodes are single precision: 1000 m from the origin one ulp is about
+// 6e-5 m, so differencing node poses at 100 Hz carries ~6e-3 m/s velocity
+// noise. A drive supplies the pose and twist exactly in double precision.
+void driven_kinematic_body_is_exact_far_from_origin() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto node = make_node(scene, 0.0);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    nksim_body_desc body_desc{};
+    body_desc.struct_size = sizeof(body_desc);
+    body_desc.motion_type = NKSIM_MOTION_KINEMATIC;
+    body_desc.mass = 1.0;
+    body_desc.node = node;
+    nksim_body body = 0;
+    assert(nksim_body_create(world, &body_desc, &body) == NKSIM_OK);
+
+    const double dt = world_desc.fixed_timestep;
+    const double origin[2] = {1000.0, -1000.0};
+    const double velocity[2] = {1.3, 0.7};
+    const double yaw_rate = 0.4;
+    set_node_pose(scene, node, origin[0], origin[1], 0.0);
+    auto state = step_and_read(world, body);
+
+    double previous_velocity[3] = {0.0, 0.0, 0.0};
+    double previous_angular = 0.0;
+    for (int tick = 1; tick <= 300; ++tick) {
+        const double time = tick * dt;
+        nksim_body_state drive = state;
+        drive.position[0] = origin[0] + velocity[0] * time;
+        drive.position[1] = origin[1] + velocity[1] * time;
+        drive.position[2] = 0.0;
+        drive.rotation[0] = drive.rotation[1] = 0.0;
+        drive.rotation[2] = std::sin(0.5 * yaw_rate * time);
+        drive.rotation[3] = std::cos(0.5 * yaw_rate * time);
+        drive.linear_velocity[0] = velocity[0];
+        drive.linear_velocity[1] = velocity[1];
+        drive.linear_velocity[2] = 0.0;
+        drive.angular_velocity[0] = drive.angular_velocity[1] = 0.0;
+        drive.angular_velocity[2] = yaw_rate;
+        set_node_pose(scene, node, drive.position[0], drive.position[1], yaw_rate * time);
+        assert(nksim_body_drive(world, body, &drive) == NKSIM_OK);
+        state = step_and_read(world, body);
+        for (int axis = 0; axis < 3; ++axis)
+            assert(near(state.position[axis], drive.position[axis], 1e-9));
+        for (int axis = 0; axis < 4; ++axis)
+            assert(near(state.rotation[axis], drive.rotation[axis], 1e-12));
+        for (int axis = 0; axis < 3; ++axis)
+            assert(state.linear_velocity[axis] == drive.linear_velocity[axis] &&
+                   state.angular_velocity[axis] == drive.angular_velocity[axis]);
+        if (tick > 1) {
+            // Constant twist: zero acceleration (gravity does not act on a
+            // kinematic body), well inside 1e-6.
+            for (int axis = 0; axis < 3; ++axis)
+                assert(near((state.linear_velocity[axis] - previous_velocity[axis]) / dt, 0.0,
+                            1e-6));
+            assert(near((state.angular_velocity[2] - previous_angular) / dt, 0.0, 1e-6));
+        }
+        std::copy(std::begin(state.linear_velocity), std::end(state.linear_velocity),
+                  previous_velocity);
+        previous_angular = state.angular_velocity[2];
+    }
+
+    // With no further drive and the node left where the drive put it, the
+    // body holds the exact driven pose at rest rather than snapping to the
+    // rounded node or reading the rounding as a velocity.
+    const auto held = state;
+    state = step_and_read(world, body);
+    for (int axis = 0; axis < 3; ++axis) {
+        assert(state.position[axis] == held.position[axis]);
+        assert(state.linear_velocity[axis] == 0.0 && state.angular_velocity[axis] == 0.0);
+    }
+
+    // Without a drive, node motion is differenced against the previous node
+    // pose (not the double-precision driven pose), within float resolution.
+    set_node_pose(scene, node, held.position[0] + 0.05, held.position[1], yaw_rate * 3.0);
+    state = step_and_read(world, body);
+    assert(near(state.linear_velocity[0], 5.0, 1e-2));
+    assert(near(state.linear_velocity[1], 0.0, 1e-2));
+
+    // A state write after a drive is a teleport and cancels the drive.
+    nksim_body_state drive = state;
+    drive.position[0] += 1.0;
+    drive.linear_velocity[0] = 100.0;
+    assert(nksim_body_drive(world, body, &drive) == NKSIM_OK);
+    nksim_body_state teleport = state;
+    teleport.linear_velocity[0] = 0.25;
+    assert(nksim_body_set_state(world, body, &teleport) == NKSIM_OK);
+    state = step_and_read(world, body);
+    assert(state.linear_velocity[0] == 0.25);
+
+    // Only kinematic bodies can be driven.
+    const auto dynamic_node = make_node(scene, 5.0);
+    nksim_body_desc dynamic_desc = body_desc;
+    dynamic_desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    dynamic_desc.node = dynamic_node;
+    nksim_body dynamic = 0;
+    assert(nksim_body_create(world, &dynamic_desc, &dynamic) == NKSIM_OK);
+    nksim_body_state dynamic_state{};
+    dynamic_state.struct_size = sizeof(dynamic_state);
+    assert(nksim_body_get_state(world, dynamic, &dynamic_state) == NKSIM_OK);
+    assert(nksim_body_drive(world, dynamic, &dynamic_state) == NKSIM_ERROR_INVALID_STATE);
+    drive.linear_velocity[0] = std::nan("");
+    assert(nksim_body_drive(world, body, &drive) == NKSIM_ERROR_INVALID_ARGUMENT);
+
+    nksim_body_destroy(world, dynamic);
+    nksim_body_destroy(world, body);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -590,5 +707,6 @@ int main() {
     batched_joint_targets_are_accepted();
     joint_child_bodies_follow_their_joint_in_default_backend();
     kinematic_body_velocity_follows_node_motion();
+    driven_kinematic_body_is_exact_far_from_origin();
     return 0;
 }

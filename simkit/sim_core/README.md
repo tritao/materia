@@ -39,7 +39,13 @@ previous and new node pose, angular velocity from the relative rotation); the
 first tick after `nksim_body_set_state`, `nksim_host_submit_body_states`,
 `nksim_body_reset`, or `nksim_world_reset` is a teleport that carries the
 written twist instead. Scene poses are single precision, so the inferred
-velocity carries roughly one float ulp of position per tick of noise. After backend state is read, dynamic
+velocity carries roughly one float ulp of position per tick of noise (about
+6e-5 m 1000 m from the origin). A writer that knows its motion exactly calls
+`nksim_body_drive` (or `nksim_host_submit_body_drives`) instead: the next tick
+moves the body continuously to the given double-precision pose and reports
+exactly the given twist. Without a drive the body follows its node again; a
+node left where the drive put it holds the body there at rest, and node
+motion is differenced against the previous node pose. After backend state is read, dynamic
 body poses are committed to the scene in one transaction and the owned
 `nkscene_change_set` is returned in the step result.
 

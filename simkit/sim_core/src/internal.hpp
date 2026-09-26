@@ -225,6 +225,20 @@ struct Body {
      * keeps the twist carried by that state instead (zero after a reset).
      */
     bool kinematic_continuous = false;
+    /**
+     * Pending nksim_body_drive(): the exact pose and twist for the next step,
+     * which take precedence over the scene node for that step.
+     */
+    nksim_body_state kinematic_drive{};
+    bool kinematic_drive_pending = false;
+    /**
+     * The scene-node pose seen on the previous step. Scene nodes are single
+     * precision, so node motion is differenced against the previous node pose
+     * rather than against state, which a drive may have set in double
+     * precision.
+     */
+    std::array<double, 3> kinematic_node_position{};
+    std::array<double, 4> kinematic_node_rotation{0.0, 0.0, 0.0, 1.0};
 };
 
 struct Joint {
@@ -263,6 +277,7 @@ public:
     nksim_result destroy_body(nksim_body body);
     nksim_result get_body_state(nksim_body body, nksim_body_state *out_state) const;
     nksim_result set_body_state(nksim_body body, const nksim_body_state &state);
+    nksim_result drive_body(nksim_body body, const nksim_body_state &state);
     nksim_result reset_body(nksim_body body);
     nksim_result reset();
     nksim_result create_joint(const nksim_joint_desc &desc, nksim_joint *out_joint);

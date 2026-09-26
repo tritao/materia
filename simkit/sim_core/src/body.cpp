@@ -30,6 +30,14 @@ nksim_result NKSIM_CALL nksim_body_set_state(nksim_world world, nksim_body body,
     return value ? value->set_body_state(body, *state) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
+nksim_result NKSIM_CALL nksim_body_drive(nksim_world world, nksim_body body,
+                                         const nksim_body_state *state) {
+    if (!state)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::resolve_world(world);
+    return value ? value->drive_body(body, *state) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result NKSIM_CALL nksim_world_reset(nksim_world world) {
     const auto value = nksim::resolve_world(world);
     return value ? value->reset() : NKSIM_ERROR_INVALID_HANDLE;

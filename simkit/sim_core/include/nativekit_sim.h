@@ -58,6 +58,9 @@ enum {
     // new pose), except on the first tick after nksim_body_set_state(),
     // nksim_body_reset(), or nksim_world_reset(), which carries the twist
     // those writes supplied so a teleport does not read as a velocity.
+    // nksim_body_drive() instead supplies the next tick's pose and twist
+    // exactly in double precision, free of the single-precision scene node's
+    // rounding.
     NKSIM_MOTION_KINEMATIC = 1,
     NKSIM_MOTION_DYNAMIC = 2
 };
@@ -248,6 +251,20 @@ NKSIM_API nksim_result NKSIM_CALL nksim_body_get_state(
  * velocities instead of inferring them from the scene-node pose change.
  */
 NKSIM_API nksim_result NKSIM_CALL nksim_body_set_state(
+    nksim_world world, nksim_body body, const nksim_body_state *state);
+/**
+ * Drives a kinematic body continuously on the world owner thread: the next
+ * tick moves the body from its current pose to the state's pose and reports
+ * the state's linear and angular velocity as its twist, both exactly as given
+ * in double precision. Unlike nksim_body_set_state() this is not a
+ * discontinuity. Keep the body's scene node at the same pose; while a drive is
+ * pending it takes precedence over the node. After the driven tick the body
+ * follows its node again: a node left where the drive put it holds the body
+ * at the driven pose with zero twist, and a node that moves is differenced
+ * against its previous pose. Drive every tick for continuous exact motion.
+ * Returns NKSIM_ERROR_INVALID_STATE for a body that is not kinematic.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_body_drive(
     nksim_world world, nksim_body body, const nksim_body_state *state);
 NKSIM_API nksim_result NKSIM_CALL nksim_body_reset(nksim_world world, nksim_body body);
 /** Restores body state and the fixed-step clock to their initial values. */

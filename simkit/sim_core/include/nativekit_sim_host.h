@@ -84,6 +84,13 @@ NKSIM_HOST_API nksim_result NKSIM_HOST_CALL nksim_host_submit_joint_targets(
  */
 NKSIM_HOST_API nksim_result NKSIM_HOST_CALL nksim_host_submit_body_states(
     nksim_host host, const nksim_body_state *states NK_IN_ARRAY(count), uint32_t count);
+/**
+ * Queue kinematic body drives applied on the owner thread before the next
+ * tick, with the same semantics as nksim_body_drive(): continuous motion to
+ * the supplied pose with exactly the supplied twist.
+ */
+NKSIM_HOST_API nksim_result NKSIM_HOST_CALL nksim_host_submit_body_drives(
+    nksim_host host, const nksim_body_state *states NK_IN_ARRAY(count), uint32_t count);
 
 /** Return the latest immutable snapshot published by the owner thread. */
 NKSIM_HOST_API nksim_result NKSIM_HOST_CALL nksim_host_get_snapshot(
