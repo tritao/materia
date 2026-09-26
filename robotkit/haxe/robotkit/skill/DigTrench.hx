@@ -11,6 +11,7 @@ import robotkit.work.BucketSweep;
 import robotkit.work.DigCyclePlan;
 import robotkit.work.DigCyclePlanner;
 import robotkit.work.HeightMap;
+import robotkit.work.Polygon2;
 import robotkit.work.Point2;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
@@ -75,6 +76,11 @@ class DigTrench implements Skill {
   public final depth:Float;
   public final gradeTolerance:Float;
   public final spec:DigTrenchSpec;
+  /** Design surface used to clamp every executed cut. */
+  public var designMap(default, null):Null<HeightMap>;
+  /** Planar trench footprint used to reject sweep vertices outside the work region. */
+  public var footprint(default, null):Null<Polygon2>;
+  public final footprintTolerance:Float;
 
   /** Dig cycles completed so far. */
   public var cyclesCompleted(default, null):Int = 0;
@@ -92,7 +98,8 @@ class DigTrench implements Skill {
 
   public function new(manipulator:Manipulator, robot:Robot, heightMap:HeightMap, frameId:String,
       lineFrom:Point2, lineTo:Point2, width:Float, depth:Float, gradeTolerance:Float,
-      spec:DigTrenchSpec, seed:Array<Float>) {
+      spec:DigTrenchSpec, seed:Array<Float>, ?designMap:HeightMap, ?footprint:Polygon2,
+      ?footprintTolerance:Float = -1.0) {
     if (manipulator == null || robot == null || heightMap == null || frameId == null || frameId.length == 0 ||
         lineFrom == null || lineTo == null || spec == null || seed == null)
       throw "DigTrench requires a manipulator, robot, height map, frame id, line, spec, and seed";
@@ -111,12 +118,20 @@ class DigTrench implements Skill {
     this.spec = spec;
     this.initialSeed = seed.copy();
     this.lastQ = seed.copy();
+    if (designMap != null) HeightMap.ensureSameGrid(heightMap, designMap);
+    if (!Math.isFinite(footprintTolerance) || footprintTolerance < -1.0)
+      throw "DigTrench footprint tolerance must be finite and non-negative";
+    this.designMap = designMap;
+    this.footprint = footprint;
+    this.footprintTolerance = footprintTolerance < 0.0 ? heightMap.cellSize * 0.5 : footprintTolerance;
   }
 
   public function start():Void {
     lifecycle.begin();
     try {
       originalGroundZ = heightMap.bilinearSample(lineFrom.x, lineFrom.y);
+      if (footprint == null) footprint = makeFootprint(lineFrom, lineTo, width * 0.5);
+      if (designMap == null) designMap = makeDesignMap();
       cyclesCompleted = 0;
       totalRemovedVolume = 0.0;
       stage = PreparingCycle;
@@ -153,14 +168,14 @@ class DigTrench implements Skill {
   /** Worst-case remaining cut (current elevation - design elevation) sampled along the line. */
   public function remainingDepthError():Float {
     var worst = 0.0;
-    var targetZ = originalGroundZ - depth;
     var samples = spec.progressSamples < 1 ? 1 : spec.progressSamples;
     for (i in 0...(samples + 1)) {
       var t = i / samples;
       var x = lineFrom.x + (lineTo.x - lineFrom.x) * t;
       var y = lineFrom.y + (lineTo.y - lineFrom.y) * t;
       var current = heightMap.bilinearSample(x, y);
-      var remaining = current - targetZ;
+      var target = designMap == null ? originalGroundZ - depth : designMap.bilinearSample(x, y);
+      var remaining = current - target;
       if (remaining > worst) worst = remaining;
     }
     return worst;
@@ -179,7 +194,7 @@ class DigTrench implements Skill {
     }
     try {
       var currentZ = heightMap.bilinearSample(lineFrom.x, lineFrom.y);
-      var targetZ = originalGroundZ - depth;
+      var targetZ = designMap == null ? originalGroundZ - depth : designMap.bilinearSample(lineFrom.x, lineFrom.y);
       var remaining = currentZ - targetZ;
       var cut = remaining < spec.maxCutPerPass ? remaining : spec.maxCutPerPass;
       var plan = DigCyclePlanner.planCycle(frameId, lineFrom, lineTo, currentZ, cut,
@@ -213,7 +228,9 @@ class DigTrench implements Skill {
     if (stepIndex >= currentSteps.length) {
       var sweep = currentSweep;
       if (sweep != null)
-        totalRemovedVolume += BucketSweep.apply(heightMap, sweep.sweepFrom, sweep.sweepTo, sweep.sweepHalfWidth, sweep.sweepEdgeHeight).removedVolume;
+        totalRemovedVolume += BucketSweep.apply(heightMap, sweep.sweepFrom, sweep.sweepTo,
+          sweep.sweepHalfWidth, sweep.sweepEdgeHeight, designMap, footprint,
+          footprintTolerance).removedVolume;
       cyclesCompleted++;
       stage = PreparingCycle;
       beginNextCycle();
@@ -231,5 +248,31 @@ class DigTrench implements Skill {
       case Discontinuity(index, joint, delta): 'discontinuity at sample $index joint $joint (delta=$delta)';
       case null: "unknown failure";
     };
+  }
+
+  function makeDesignMap():HeightMap {
+    var result = heightMap.copy();
+    var region = footprint;
+    if (region == null) throw "DigTrench has no footprint for its generated design map";
+    for (row in 0...result.rows) for (col in 0...result.columns) {
+      var point = new Point2(result.worldX(col), result.worldY(row));
+      if (region.containsOrWithin(point, 1e-9))
+        result.setElevation(col, row, heightMap.elevationAt(col, row) - depth);
+    }
+    return result;
+  }
+
+  static function makeFootprint(from:Point2, to:Point2, halfWidth:Float):Polygon2 {
+    var dx = to.x - from.x, dy = to.y - from.y;
+    var length = Math.sqrt(dx * dx + dy * dy);
+    if (!Math.isFinite(length) || length <= 1e-9)
+      throw "DigTrench line must have non-zero length";
+    var normalX = -dy / length, normalY = dx / length;
+    return new Polygon2([
+      new Point2(from.x - normalX * halfWidth, from.y - normalY * halfWidth),
+      new Point2(to.x - normalX * halfWidth, to.y - normalY * halfWidth),
+      new Point2(to.x + normalX * halfWidth, to.y + normalY * halfWidth),
+      new Point2(from.x + normalX * halfWidth, from.y + normalY * halfWidth)
+    ]);
   }
 }

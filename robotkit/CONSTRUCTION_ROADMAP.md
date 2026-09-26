@@ -1198,3 +1198,14 @@ signs. The commit does not yet provide lateral commands or holonomic odometry,
 and its tests check wheel algebra rather than a drive-forward/rotate/odometry
 round trip; those are precisely the behavior gaps handled by F3. Within the
 M9 scope of the commit, no wheel-sign defect was found.
+
+**F2**: `BucketSweep` now measures removal from the integrated before/after
+height maps, clamps each vertex to an optional design surface, and clips the
+sweep to an optional polygon footprint with a half-cell tolerance. `DigTrench`
+now retains a generated design map and footprint, and `DigCyclePlanner` keeps
+the engaged cutting edge inset by half the bucket width at both longitudinal
+walls while the full bucket sweep is accounted for inside the design region.
+The flat-map capsule test matches its analytic volume within 2%; the M12
+scenario now completes in three cycles at 0.64 m³ for the 0.60 m³ design
+volume, with no below-design or outside-footprint lowering. Haxe world tests:
+4,327 assertions passed.

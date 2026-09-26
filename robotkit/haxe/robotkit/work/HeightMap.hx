@@ -67,6 +67,10 @@ class HeightMap {
     elevation[row * columns + col] = z;
   }
 
+  /** Returns an independent mutable copy with the same grid and elevations. */
+  public function copy():HeightMap
+    return new HeightMap(frameId, originX, originY, cellSize, columns, rows, elevation);
+
   /** Bilinearly-interpolated elevation at an arbitrary in-plane point; throws outside the grid's extent. */
   public function bilinearSample(x:Float, y:Float):Float {
     if (!Math.isFinite(x) || !Math.isFinite(y)) throw "Height map sample point must be finite";

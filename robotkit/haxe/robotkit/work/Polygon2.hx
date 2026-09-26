@@ -80,4 +80,32 @@ class Polygon2 {
     }
     return inside;
   }
+
+  /** Point-in-polygon with a finite distance tolerance around the boundary. */
+  public function containsOrWithin(point:Point2, tolerance:Float):Bool {
+    if (point == null) throw "Polygon containment requires a point";
+    if (!Math.isFinite(tolerance) || tolerance < 0.0)
+      throw "Polygon containment tolerance must be finite and non-negative";
+    if (contains(point)) return true;
+    if (tolerance == 0.0) return false;
+    var limitSquared = tolerance * tolerance;
+    for (index in 0...points.length) {
+      var a = points[index];
+      var b = points[(index + 1) % points.length];
+      if (segmentDistanceSquared(point, a, b) <= limitSquared) return true;
+    }
+    return false;
+  }
+
+  static function segmentDistanceSquared(point:Point2, a:Point2, b:Point2):Float {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var lengthSquared = dx * dx + dy * dy;
+    var t = lengthSquared <= 1e-12 ? 0.0 :
+      ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared;
+    if (t < 0.0) t = 0.0;
+    if (t > 1.0) t = 1.0;
+    var x = a.x + t * dx, y = a.y + t * dy;
+    var offsetX = point.x - x, offsetY = point.y - y;
+    return offsetX * offsetX + offsetY * offsetY;
+  }
 }

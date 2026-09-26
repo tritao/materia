@@ -17,6 +17,7 @@ class TerrainTests {
     testBilinearSampleMatchesPlane();
     testVolumeOfKnownTrench();
     testBucketSweepRemovesExpectedVolume();
+    testBucketSweepClampsToDesignAndFootprint();
     testCellsAtGradeReported();
     Sys.println('RobotKit terrain tests passed ($assertions assertions)');
     return assertions;
@@ -64,13 +65,14 @@ class TerrainTests {
   }
 
   static function testBucketSweepRemovesExpectedVolume():Void {
-    var cellSize = 0.05;
-    var columns = 41, rows = 21; // 2m x 1m extent
+    var cellSize = 0.01;
+    var columns = 601, rows = 401; // 6m x 4m extent
     var map = new HeightMap("ground", 0.0, 0.0, cellSize, columns, rows);
-    var from = new Point2(0.5, 0.5);
-    var to = new Point2(1.5, 0.5);
-    var halfWidth = 0.3;
+    var from = new Point2(1.0, 2.0);
+    var to = new Point2(4.0, 2.0);
+    var halfWidth = 0.4;
     var depth = 0.3;
+    var before = map.copy();
     var result = BucketSweep.apply(map, from, to, halfWidth, -depth);
 
     check(result.verticesLowered > 0, "Bucket sweep lowers at least one vertex");
@@ -80,8 +82,12 @@ class TerrainTests {
     var capsuleArea = length * (2.0 * halfWidth) + Math.PI * halfWidth * halfWidth;
     var expectedVolume = capsuleArea * depth;
     var relativeError = Math.abs(result.removedVolume - expectedVolume) / expectedVolume;
-    check(relativeError < 0.1,
-      'Bucket sweep removed volume (${result.removedVolume}) approximates the swept capsule volume (${expectedVolume}) within 10%');
+    check(relativeError < 0.02,
+      'Bucket sweep removed volume (${result.removedVolume}) matches the swept capsule volume (${expectedVolume}) within 2%');
+
+    check(approx(result.removedVolume,
+      HeightMap.volumeBetween(before, map).cut, 1e-9),
+      "Bucket sweep volume equals the integrated height-map cut volume");
 
     // Sweeping again with the same edge height removes nothing further.
     var second = BucketSweep.apply(map, from, to, halfWidth, -depth);
@@ -90,6 +96,33 @@ class TerrainTests {
 
     // Cells far from the sweep are untouched.
     check(map.elevationAt(0, 0) == 0.0, "A vertex far outside the swept capsule is untouched");
+  }
+
+  static function testBucketSweepClampsToDesignAndFootprint():Void {
+    var cellSize = 0.1;
+    var columns = 61, rows = 31;
+    var map = new HeightMap("ground", -1.0, -1.5, cellSize, columns, rows);
+    var design = map.copy();
+    var footprint = new Polygon2([
+      new Point2(0.0, -0.4), new Point2(3.0, -0.4),
+      new Point2(3.0, 0.4), new Point2(0.0, 0.4)
+    ]);
+    for (row in 0...design.rows) for (col in 0...design.columns) {
+      var point = new Point2(design.worldX(col), design.worldY(row));
+      if (footprint.containsOrWithin(point, 1e-9)) design.setElevation(col, row, -0.3);
+    }
+
+    var result = BucketSweep.apply(map, new Point2(0.0, 0.0), new Point2(3.0, 0.0),
+      0.4, -0.8, design, footprint, cellSize * 0.5);
+    check(result.verticesLowered > 0, "Clamped bucket sweep lowers vertices inside its design footprint");
+    for (row in 0...map.rows) for (col in 0...map.columns) {
+      var point = new Point2(map.worldX(col), map.worldY(row));
+      var actual = map.elevationAt(col, row);
+      check(actual >= design.elevationAt(col, row) - 1e-9,
+        "Bucket sweep never lowers a height-map vertex below the design surface");
+      if (!footprint.containsOrWithin(point, cellSize * 0.5))
+        check(actual == 0.0, "Bucket sweep leaves vertices outside the tolerated footprint untouched");
+    }
   }
 
   static function testCellsAtGradeReported():Void {

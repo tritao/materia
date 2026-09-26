@@ -37,9 +37,13 @@ class DigCyclePlanner {
    * built from `poseAt`, so the swing stays on the reachable manifold rather
    * than relying on `CartesianTrajectory`'s slerp across a wide arc) to
    * `dump` at `dumpZ`, then opens to `dumpPitch`. Returns both the
-   * `Toolpath` and the swept-segment parameters
+   * `Toolpath` and the full swept-segment parameters
    * (`BucketSweep.apply(heightMap, sweepFrom, sweepTo, sweepHalfWidth,
    * sweepEdgeHeight)`) a caller applies once the cycle's execution succeeds.
+   * The engaged cutting edge is inset by half the bucket width at each
+   * longitudinal trench wall, while the material sweep remains clipped to the
+   * authored region. This keeps the tool out of the wall and accounts for the
+   * whole bucket footprint in the terrain update.
    */
   public static function planCycle(frameId:String, entry:Point2, exit:Point2, groundZ:Float, depth:Float,
       clearanceZ:Float, dump:Point2, dumpZ:Float, bucketHalfWidth:Float,
@@ -55,20 +59,30 @@ class DigCyclePlanner {
     if (swingSteps < 1) throw "Dig cycle swing requires at least one step";
 
     var cutDepthZ = groundZ - depth;
+    var sweepFrom = entry;
+    var sweepTo = exit;
+    var dx = exit.x - entry.x, dy = exit.y - entry.y;
+    var length = Math.sqrt(dx * dx + dy * dy);
+    if (length > 2.0 * bucketHalfWidth + 1e-9) {
+      var offsetX = dx / length * bucketHalfWidth;
+      var offsetY = dy / length * bucketHalfWidth;
+      sweepFrom = new Point2(entry.x + offsetX, entry.y + offsetY);
+      sweepTo = new Point2(exit.x - offsetX, exit.y - offsetY);
+    }
     var points:Array<ToolpathPoint> = [];
     // 1. Entry: cutting edge just above the ground at the entry point.
-    points.push(new ToolpathPoint(poseAt(entry.x, entry.y, groundZ + 0.05, digPitch), feedRate, false));
+    points.push(new ToolpathPoint(poseAt(sweepFrom.x, sweepFrom.y, groundZ + 0.05, digPitch), feedRate, false));
     // 2. Cut: advance along the trench line down to the target depth, engaged with the ground.
-    points.push(new ToolpathPoint(poseAt(exit.x, exit.y, cutDepthZ, digPitch), feedRate, true));
+    points.push(new ToolpathPoint(poseAt(sweepTo.x, sweepTo.y, cutDepthZ, digPitch), feedRate, true));
     // 3. Curl: still engaged, rotate the bucket closed to retain the cut material.
-    points.push(new ToolpathPoint(poseAt(exit.x, exit.y, cutDepthZ, curlPitch), feedRate, true));
+    points.push(new ToolpathPoint(poseAt(sweepTo.x, sweepTo.y, cutDepthZ, curlPitch), feedRate, true));
     // 4. Lift: raise clear of the trench, bucket still closed.
-    points.push(new ToolpathPoint(poseAt(exit.x, exit.y, clearanceZ, curlPitch), feedRate, false));
+    points.push(new ToolpathPoint(poseAt(sweepTo.x, sweepTo.y, clearanceZ, curlPitch), feedRate, false));
     // 5. Swing: sweep toward the dump point at clearance height, dense enough to stay on the manifold.
     for (step in 1...(swingSteps + 1)) {
       var t = step / swingSteps;
-      var x = exit.x + (dump.x - exit.x) * t;
-      var y = exit.y + (dump.y - exit.y) * t;
+      var x = sweepTo.x + (dump.x - sweepTo.x) * t;
+      var y = sweepTo.y + (dump.y - sweepTo.y) * t;
       points.push(new ToolpathPoint(poseAt(x, y, clearanceZ, curlPitch), feedRate, false));
     }
     // 6. Descend to the dump elevation, still curled (holding the material).
@@ -81,6 +95,6 @@ class DigCyclePlanner {
     points.push(new ToolpathPoint(poseAt(dump.x, dump.y, dumpZ, dumpPitch), feedRate, false));
 
     var toolpath = new Toolpath(frameId, points);
-    return new DigCyclePlan(toolpath, entry, exit, bucketHalfWidth, cutDepthZ);
+    return new DigCyclePlan(toolpath, entry, exit, bucketHalfWidth, cutDepthZ, sweepFrom, sweepTo);
   }
 }

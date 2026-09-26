@@ -107,9 +107,9 @@ class ExcavatorTests {
     check(points[1].processOn, "Cut point is engaged with the ground");
     check(points[2].processOn, "Curl point is engaged with the ground");
     check(!points[3].processOn, "Lift point is not engaged with the ground");
-    check(approx(points[1].work_T_tcp.translation.x, exit.x, 1e-9) &&
+    check(approx(points[1].work_T_tcp.translation.x, exit.x - 0.4, 1e-9) &&
       approx(points[1].work_T_tcp.translation.z, -0.3, 1e-9),
-      "Cut point reaches the exit position at the target depth");
+      "Cut point reaches the inward offset from the exit wall at target depth");
     var descend = points[points.length - 2];
     var open = points[points.length - 1];
     check(approx(descend.work_T_tcp.translation.x, dump.x, 1e-9) &&
@@ -122,7 +122,11 @@ class ExcavatorTests {
       "Open point stays at the dump position and elevation");
     check(descend.work_T_tcp.rotation.angularDistance(open.work_T_tcp.rotation) > 0.1,
       "Open point's pitch differs from the descend point's curled pitch");
-    check(plan.sweepFrom == entry && plan.sweepTo == exit, "Dig cycle plan carries the sweep endpoints");
+    check(plan.sweepFrom == entry && plan.sweepTo == exit,
+      "Dig cycle plan retains the full authored sweep segment for material accounting");
+    check(approx(plan.cuttingEdgeFrom.x, entry.x + 0.4, 1e-9) &&
+      approx(plan.cuttingEdgeTo.x, exit.x - 0.4, 1e-9),
+      "Dig cycle plan insets the cutting edge by half the bucket width at both walls");
     check(approx(plan.sweepHalfWidth, 0.4, 1e-9), "Dig cycle plan carries the sweep half-width");
     check(approx(plan.sweepEdgeHeight, -0.3, 1e-9), "Dig cycle plan carries the cut depth as the sweep edge height");
   }
@@ -182,8 +186,22 @@ class ExcavatorTests {
     check(dig.remainingDepthError() <= gradeTolerance,
       'DigTrench reaches the design depth within grade tolerance (remaining=${dig.remainingDepthError()})');
     var expectedVolume = (lineTo.x - lineFrom.x) * width * depth;
-    check(dig.totalRemovedVolume > 0.0 && dig.totalRemovedVolume < expectedVolume * 3.0,
-      'DigTrench reports a plausible removed volume (${dig.totalRemovedVolume} m^3, trench footprint ~$expectedVolume m^3)');
+    check(dig.totalRemovedVolume >= expectedVolume * 0.9 && dig.totalRemovedVolume <= expectedVolume * 1.1,
+      'DigTrench removed volume (${dig.totalRemovedVolume} m^3) stays within 10% of the design volume ($expectedVolume m^3)');
+    var design = dig.designMap;
+    var trenchFootprint = dig.footprint;
+    if (design == null || trenchFootprint == null) throw "DigTrench did not retain its generated design region";
+    var belowDesign = false;
+    var outsideFootprint = false;
+    for (row in 0...heightMap.rows) for (col in 0...heightMap.columns) {
+      var point = new Point2(heightMap.worldX(col), heightMap.worldY(row));
+      var actual = heightMap.elevationAt(col, row);
+      if (actual < design.elevationAt(col, row) - gradeTolerance - 1e-9) belowDesign = true;
+      if (!trenchFootprint.containsOrWithin(point, heightMap.cellSize * 0.5) && actual < groundZ - 1e-9)
+        outsideFootprint = true;
+    }
+    check(!belowDesign, "DigTrench does not cut below the design surface beyond grade tolerance");
+    check(!outsideFootprint, "DigTrench does not lower vertices outside the footprint plus half a cell");
     Sys.println('M12 trench scenario: cycles=${dig.cyclesCompleted} finalDepthError=${dig.remainingDepthError()} removedVolume=${dig.totalRemovedVolume}');
     simulation.dispose();
   }
