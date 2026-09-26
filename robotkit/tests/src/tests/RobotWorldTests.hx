@@ -67,6 +67,7 @@ import robotkit.mobile.DifferentialDrive;
 import robotkit.mobile.AckermannDrive;
 import robotkit.mobile.DifferentialOdometry;
 import robotkit.localization.WheelOdometryLocalization;
+import robotkit.localization.WheelImuLocalization;
 import robotkit.localization.SimulationTruthLocalization;
 import robotkit.localization.LocalizationQuality;
 import robotkit.localization.LocalizationState;
@@ -143,6 +144,7 @@ class RobotWorldTests {
     testModelDrivenConfiguration();
     testRobotModelCodec();
     testLocalization();
+    testWheelImuLocalization();
     testGnssLocalization();
     testNavigation();
     testMotionGuard();
@@ -831,6 +833,61 @@ class RobotWorldTests {
       Math.abs(fused.pose.y + 1.0) < 1e-3, "GNSS fixes anchor pose fusion in the map frame");
     robot.close();
     simulation.dispose();
+  }
+
+  static function testWheelImuLocalization():Void {
+    var robot = new FakeRobot("wheel-imu");
+    robot.positions = [0.0, 0.0];
+    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(1.0, 2.0));
+    var localization = new WheelImuLocalization(base, "imu", "odom", "base",
+      1.0, 0.01, 200000000.0, "imu-frame");
+    function observation(sequence:Int, timestamp:Int, left:Float, right:Float,
+        gyro:Float, ?frameId:String = "imu-frame", ?sampleTimestamp:Int = -1,
+        ?sourceClock:String = "clock", ?receiveClock:String = "host"):RobotSnapshot {
+      if (sampleTimestamp < 0) sampleTimestamp = timestamp;
+      var sensor = new SensorFrame("imu", "imu", frameId, Int64.ofInt(sequence),
+        Int64.ofInt(sampleTimestamp), [0.0, 0.0, gyro, 0.0, 0.0, 9.81],
+        Int64.ofInt(timestamp + 1), "base", null, null, sourceClock, receiveClock);
+      return new RobotSnapshot("wheel-imu", Int64.ofInt(sequence), Int64.ofInt(timestamp),
+        [left, right], [], [], 1, 0, Int64.ofInt(timestamp + 2), [sensor], "clock", "host");
+    }
+    localization.update(observation(1, 100, 0.0, 0.0, 0.0, "imu-frame", -1, "clock", "host"));
+    var corrected = localization.update(observation(2, 100000100, 0.0, 1.0, 2.0, "imu-frame", -1, "clock", "host"));
+    check(Math.abs(corrected.pose.yaw - 0.2) < 1e-8 &&
+      Math.abs(corrected.pose.x - 0.05) < 0.01,
+      "IMU gyro rate corrects wheel heading while wheel travel supplies distance");
+    var fallback = localization.update(observation(3, 200000100, 0.0, 2.0, 9.0,
+      "other-frame", -1, "clock", "host"));
+    check(Math.abs(fallback.pose.yaw - 0.4) < 1e-8,
+      "IMU localization falls back to wheel heading for another sensor frame");
+    var receiver = new WheelImuLocalization(base, "imu", "odom", "base", 1.0);
+    receiver.update(observation(1, 100, 0.0, 0.0, 0.0, "imu-frame", -1, "clock", "host"));
+    var received = receiver.update(observation(2, 100000100, 0.0, 1.0, 2.0,
+      "imu-frame", 100000100, "receiver", "host"));
+    check(Math.abs(received.pose.yaw - 0.2) < 1e-8,
+      "IMU samples on a receiver clock use the shared local receive clock");
+    var model = new RobotModel("imu robot");
+    var body = model.addLink(new Link("base", "imu/base"));
+    var frame = model.addFrame(new Frame("imu mount", body, "imu-frame"));
+    var sensor = model.addSensor(new Sensor("imu", "imu", 20.0, "imu"));
+    sensor.frame = frame;
+    var authored = WheelImuLocalization.fromRobotModel(base, model, "imu", "imu/base");
+    authored.update(observation(1, 100, 0.0, 0.0, 0.0, "imu-frame", -1, "clock", "host"));
+    check(Math.abs(authored.update(observation(2, 100000100, 0.0, 1.0, 4.0, "imu-frame", -1, "clock", "host")).pose.yaw - 0.3) < 1e-8,
+      "model-driven IMU localization resolves its sensor frame and blends rate with wheels");
+    frame.rotation = [Math.sqrt(0.5), 0.0, 0.0, Math.sqrt(0.5)];
+    var tilted = WheelImuLocalization.fromRobotModel(base, model, "imu", "imu/base",
+      "odom", "base", 1.0);
+    tilted.update(observation(1, 100, 0.0, 0.0, 0.0, "imu-frame", -1, "clock", "host"));
+    var tiltedSample = new SensorFrame("imu", "imu", "imu-frame", Int64.ofInt(2),
+      Int64.ofInt(100000100), [0.0, 2.0, 0.0, 0.0, 0.0, 9.81],
+      Int64.ofInt(100000101), "imu/base", null, null, "clock", "host");
+    var tiltedSnapshot = new RobotSnapshot("wheel-imu", Int64.ofInt(2),
+      Int64.ofInt(100000100), [0.0, 1.0], [], [], 1, 0,
+      Int64.ofInt(100000102), [tiltedSample], "clock", "host");
+    check(Math.abs(tilted.update(tiltedSnapshot).pose.yaw - 0.2) < 1e-8,
+      "a tilted IMU mount rotates angular velocity into the body yaw axis");
   }
 
   static function testLocalization():Void {

@@ -199,6 +199,11 @@ covariance, quality, and both source and receive clock identities.
 `WheelOdometryLocalization` derives an `odom` to `base` estimate from a
 differential `MobileBase`; `SimulationTruthLocalization` projects a
 simulation-owned robot pose into `map` to `base` for deterministic scenarios.
+`WheelImuLocalization` keeps wheel-derived travel and blends each wheel heading
+change with the IMU's integrated angular velocity. Its model factory resolves
+the sensor frame and rotates readings from a tilted mount into the body frame.
+It accepts recent samples on a shared source or receive clock, and can serve
+as the odometry input to `PoseFusionLocalization`.
 `FrameTree2` stores static parent-child transforms and exposes explicit
 `target_T_source` lookup direction. `PoseFusionLocalization` combines wheel
 odometry with transformed external pose observations using separate covariance
