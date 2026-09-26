@@ -79,6 +79,15 @@ is. MotionKit retains a position-target fallback when a backend does not support
 buffered chunks; it holds, resumes, and replaces motion with the same
 host-side re-timing. CNC semantics and G-code remain outside MotionKit.
 
+A `jog` issued while the same axis is already jogging changes speed or
+direction without stopping: MotionKit plans a `JogProfile` from the jog's state
+a few periods ahead and splices it into the runtime queue there. If the splice
+reaches the runtime too late, the runtime keeps the old jog and MotionKit falls
+back to stopping and starting the new jog from rest.
+
+Axis moves are planned in logical axis units and mapped onto joints, so the
+motors of a geared or dual-motor axis stay in proportion throughout a move.
+
 Queued trajectories currently run back to back with a 1–2 control-cycle pause
 between them: the next one is only sent once the runtime has drained the
 previous one. Planned moves start and end at rest, so this costs throughput

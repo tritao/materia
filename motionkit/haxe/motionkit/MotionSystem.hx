@@ -6,6 +6,7 @@ import motionkit.axis.MotionAxis;
 import motionkit.axis.MotionSystemBlueprint;
 import motionkit.path.PathPoint;
 import motionkit.path.GeometricPath;
+import motionkit.planner.JogProfile;
 import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
 import motionkit.planner.TrajectoryPlanner;
@@ -69,6 +70,13 @@ class MotionSystem {
   var stoppingForReplacement:Bool = false;
   /** Work deferred until a replacement stop reaches rest, in order. */
   var afterStop:Array<Void -> Void> = [];
+  /** Logical axis of the active jog, which a further jog can change without stopping. */
+  var activeJogAxis:Null<String> = null;
+  /** Splice point for the next submitted chunk; a zero tag appends. */
+  var nextChunkSpliceTag:Int64 = Int64.ofInt(0);
+  var nextChunkSpliceTimeNs:Int64 = Int64.ofInt(0);
+  /** A jog splice the runtime has not yet taken over, with how to recover if dropped. */
+  var pendingSplice:Null<PendingSplice> = null;
   /** Per-joint acceleration limits from the logical axes; zero is unconstrained. */
   final jointAccelerationLimits:Array<Float>;
 
@@ -273,16 +281,19 @@ class MotionSystem {
    * Starts `planned` now when the machine is at rest. Otherwise stops along
    * the current path and starts a fresh `replan` from where it came to rest.
    */
-  function replaceMotion(planned:JointTrajectory, replan:Void -> JointTrajectory):Null<JointTrajectory> {
+  function replaceMotion(planned:JointTrajectory, replan:Void -> JointTrajectory,
+      ?jogAxis:String):Null<JointTrajectory> {
     if (!isMotionInProgress()) {
       clearBufferedMotion();
       beginImmediate(planned);
+      activeJogAxis = jogAxis;
       return planned;
     }
     queuedTrajectories = [];
     afterStop = [() -> {
       clearBufferedMotion();
       beginImmediate(replan());
+      activeJogAxis = jogAxis;
     }];
     held = false;
     resumeRequested = false;
@@ -518,17 +529,149 @@ class MotionSystem {
     if (!Math.isFinite(acceleration) || acceleration <= 0.0)
       throw 'Jog axis "$axisId" needs a positive acceleration limit';
 
+    var continued = continueJog(axisValue, velocity, durationSeconds, acceleration);
+    if (continued != null) return continued;
     function planJog():JointTrajectory {
       var start = robot.snapshot().positions.toArray();
       var startLogical = axisValue.logicalPosition(start);
       var requestedEnd = startLogical + velocity * durationSeconds;
       var endLogical = Math.max(axisValue.lowerLimit,
         Math.min(axisValue.upperLimit, requestedEnd));
-      var end = start.copy();
-      axisValue.writeLogicalPosition(end, endLogical);
-      return planner.plan(start, end, new MotionLimits(Math.abs(velocity), acceleration));
+      return planLogical(start, [axisValue], [endLogical],
+        new MotionLimits(Math.abs(velocity), acceleration));
     }
-    return replaceMotion(planJog(), planJog);
+    return replaceMotion(planJog(), planJog, axisValue.id);
+  }
+
+  /**
+   * Changes a running jog on the same axis without stopping: plans from the
+   * jog's position and velocity a few periods ahead and splices the new
+   * profile in there, so speed and direction change within the acceleration
+   * limit. Returns null when the jog cannot be continued this way.
+   */
+  function continueJog(axisValue:MotionAxis, velocity:Float, durationSeconds:Float,
+      acceleration:Float):Null<JointTrajectory> {
+    var executing = activeTrajectory;
+    if (executing == null || activeJogAxis != axisValue.id || held || stoppingForReplacement ||
+        hostStopping || afterStop.length > 0 || queuedTrajectories.length > 0 ||
+        pendingSplice != null)
+      return null;
+    var buffered = usesTrajectoryChunks(executing);
+    var spliceSeconds = elapsedSeconds;
+    var spliceTag = Int64.ofInt(0);
+    var spliceTimeNs = Int64.ofInt(0);
+    if (buffered) {
+      var observation = syncFromRuntime();
+      if (!observation.trajectoryActive) return null;
+      var reference = trajectoryChunkReferences.get(Int64.toStr(observation.trajectoryTag));
+      if (reference == null || reference.trajectory != executing) return null;
+      // Leave a few periods for the command to reach the runtime before the
+      // splice point; a splice that still arrives late is dropped safely.
+      var tagSeconds = Std.parseFloat(Int64.toStr(observation.trajectoryTagTimeNs)) / 1000000000.0 +
+        3.0 * fixedTimestepSeconds;
+      spliceSeconds = reference.startSeconds + tagSeconds;
+      if (spliceSeconds >= trajectoryChunkEndSeconds) return null;
+      spliceTag = observation.trajectoryTag;
+      spliceTimeNs = secondsToNanoseconds(tagSeconds);
+    }
+    if (spliceSeconds >= executing.durationSeconds - fixedTimestepSeconds) return null;
+
+    var start = executing.sample(spliceSeconds).positions;
+    var startLogical = axisValue.logicalPosition(start);
+    var startVelocity = logicalVelocityAt(executing, axisValue, spliceSeconds);
+    var requestedEnd = Math.max(axisValue.lowerLimit,
+      Math.min(axisValue.upperLimit, startLogical + velocity * durationSeconds));
+    var profile = new JogProfile(startLogical, startVelocity, requestedEnd, Math.abs(velocity),
+      acceleration);
+    // Braking from the current speed may not fit before a travel limit.
+    if (profile.endPosition < axisValue.lowerLimit - 1e-12 ||
+        profile.endPosition > axisValue.upperLimit + 1e-12)
+      return null;
+    var samples:Array<JointTrajectorySample> = [];
+    var count = Std.int(Math.max(1.0, Math.ceil(profile.durationSeconds / fixedTimestepSeconds)));
+    for (index in 0...(count + 1)) {
+      var time = index == count ? profile.durationSeconds : index * fixedTimestepSeconds;
+      var positions = start.copy();
+      var logical = Math.max(axisValue.lowerLimit,
+        Math.min(axisValue.upperLimit, profile.positionAt(time)));
+      axisValue.writeLogicalPosition(positions, logical);
+      var velocities = [for (_ in start) 0.0];
+      axisValue.writeLogicalDelta(velocities, profile.velocityAt(time));
+      samples.push(new JointTrajectorySample(time, positions, velocities));
+    }
+    var trajectoryValue = new JointTrajectory(samples);
+
+    setActive(trajectoryValue);
+    bufferedTotalSeconds = trajectoryValue.durationSeconds;
+    bufferedCompletedSeconds = 0.0;
+    plannedEndPositions = trajectoryEnd(trajectoryValue);
+    activeJogAxis = axisValue.id;
+    if (buffered) {
+      nextChunkSpliceTag = spliceTag;
+      nextChunkSpliceTimeNs = spliceTimeNs;
+      submitActiveTrajectoryChunk();
+      pendingSplice = new PendingSplice(spliceTag, spliceTimeNs, () -> {
+        activeJogAxis = null;
+        jog(axisValue.id, velocity, durationSeconds, acceleration);
+      });
+    }
+    return trajectoryValue;
+  }
+
+  /**
+   * Logical velocity of `trajectoryValue` at `timeSeconds`. A segment's chord
+   * velocity is exact at its midpoint, so this interpolates between the
+   * chords of the neighbouring segments rather than taking the chord ahead,
+   * which would be half a sample late while the trajectory accelerates.
+   */
+  static function logicalVelocityAt(trajectoryValue:JointTrajectory, axisValue:MotionAxis,
+      timeSeconds:Float):Float {
+    var samples = trajectoryValue.samples;
+    var midpoints:Array<Float> = [];
+    var chords:Array<Float> = [];
+    for (index in 0...(samples.length - 1)) {
+      var before = samples[index];
+      var after = samples[index + 1];
+      if (after.timeSeconds <= before.timeSeconds) continue;
+      midpoints.push(0.5 * (before.timeSeconds + after.timeSeconds));
+      chords.push((axisValue.logicalPosition(after.positions) -
+        axisValue.logicalPosition(before.positions)) / (after.timeSeconds - before.timeSeconds));
+    }
+    if (chords.length == 0) return 0.0;
+    if (chords.length == 1 || timeSeconds <= midpoints[0]) return chords[0];
+    var last = chords.length - 1;
+    if (timeSeconds >= midpoints[last]) return chords[last];
+    var index = 0;
+    while (index + 1 < last && midpoints[index + 1] <= timeSeconds) index++;
+    var alpha = (timeSeconds - midpoints[index]) / (midpoints[index + 1] - midpoints[index]);
+    return chords[index] + (chords[index + 1] - chords[index]) * alpha;
+  }
+
+  /**
+   * Confirms a pending jog splice once the runtime runs the new profile, or
+   * recovers when the runtime dropped it for arriving late: the old jog is
+   * still running, so stop along it and start the requested jog from rest.
+   */
+  function checkPendingSplice(observation:RobotSnapshot):Void {
+    var pending = pendingSplice;
+    if (pending == null) return;
+    if (trajectoryChunkReferences.exists(Int64.toStr(observation.trajectoryTag))) {
+      pendingSplice = null;
+      return;
+    }
+    var passed = Int64.compare(observation.trajectoryTag, pending.oldTag) == 0 &&
+      Int64.compare(observation.trajectoryTagTimeNs, pending.spliceTimeNs) >= 0;
+    if (!passed && observation.trajectoryActive) return;
+    pendingSplice = null;
+    queuedTrajectories = [];
+    afterStop = [() -> {
+      clearBufferedMotion();
+      pending.retry();
+    }];
+    held = false;
+    resumeRequested = false;
+    stoppingForReplacement = true;
+    robot.stop(StopMode.Normal);
   }
 
   /**
@@ -572,6 +715,8 @@ class MotionSystem {
     }
     if (usesTrajectoryChunks(trajectory)) {
       var observation = syncFromRuntime();
+      checkPendingSplice(observation);
+      if (stoppingForReplacement) return true;
       if (trajectoryFinishedInRuntime(observation)) {
         completeActiveTrajectory();
         return activeTrajectory != null;
@@ -617,6 +762,7 @@ class MotionSystem {
     activeTrajectory = trajectoryValue;
     activeSource = trajectoryValue;
     activeTiming = null;
+    activeJogAxis = null;
     resetExecutionState();
   }
 
@@ -640,7 +786,8 @@ class MotionSystem {
   function planAxesFrom(start:Array<Float>, targets:Array<AxisTarget>,
       options:Null<MotionOptions>):JointTrajectory {
     if (targets == null || targets.length == 0) throw "Axis move needs at least one target";
-    var goal = start.copy();
+    var movedAxes:Array<MotionAxis> = [];
+    var logicalGoal:Array<Float> = [];
     var seen = new Map<String, Bool>();
     for (target in targets) {
       if (target == null) throw "Axis move cannot contain a null target";
@@ -649,11 +796,40 @@ class MotionSystem {
       if (seen.exists(target.axis)) throw 'Axis move targets "${target.axis}" more than once';
       if (target.position < axisValue.lowerLimit || target.position > axisValue.upperLimit)
         throw 'Axis "${target.axis}" target ${target.position} is outside its limits';
-      axisValue.writeLogicalPosition(goal, target.position);
+      movedAxes.push(axisValue);
+      logicalGoal.push(target.position);
       seen.set(target.axis, true);
     }
     var chosenOptions = options == null ? new MotionOptions() : options;
-    return planner.plan(start, goal, resolveLimits(targets, chosenOptions));
+    return planLogical(start, movedAxes, logicalGoal, resolveLimits(targets, chosenOptions));
+  }
+
+  /**
+   * Plans in logical axis units and maps each sample onto the joints. The
+   * limits are the axes' authored units, and every joint of an axis follows
+   * that axis's one profile, so the motors of a geared or dual-motor axis stay
+   * in proportion throughout the move. Joints of other axes keep `start`.
+   */
+  function planLogical(start:Array<Float>, movedAxes:Array<MotionAxis>, logicalGoal:Array<Float>,
+      limits:MotionLimits):JointTrajectory {
+    var logicalStart = [for (axisValue in movedAxes) axisValue.logicalPosition(start)];
+    var logical = planner.plan(logicalStart, logicalGoal, limits);
+    var samples:Array<JointTrajectorySample> = [];
+    for (sample in logical.samples) {
+      var positions = start.copy();
+      var velocities = [for (_ in start) 0.0];
+      var accelerations = [for (_ in start) 0.0];
+      for (index in 0...movedAxes.length) {
+        var axisValue = movedAxes[index];
+        axisValue.writeLogicalPosition(positions, Math.max(axisValue.lowerLimit,
+          Math.min(axisValue.upperLimit, sample.positions[index])));
+        axisValue.writeLogicalDelta(velocities, sample.velocities[index]);
+        axisValue.writeLogicalDelta(accelerations, sample.accelerations[index]);
+      }
+      samples.push(new JointTrajectorySample(sample.timeSeconds, positions, velocities,
+        accelerations));
+    }
+    return new JointTrajectory(samples);
   }
 
   function planningStartPositions():Array<Float> {
@@ -713,6 +889,8 @@ class MotionSystem {
     held = false;
     stoppingForReplacement = false;
     afterStop = [];
+    pendingSplice = null;
+    activeJogAxis = null;
     bufferedTotalSeconds = 0.0;
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = null;
@@ -752,7 +930,10 @@ class MotionSystem {
     }
     var tag = nextTrajectoryTag;
     nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
-    robot.submit(RobotCommand.TrajectoryChunk(new TrajectoryChunk(points, tag)));
+    robot.submit(RobotCommand.TrajectoryChunk(new TrajectoryChunk(points, tag,
+      nextChunkSpliceTag, nextChunkSpliceTimeNs)));
+    nextChunkSpliceTag = Int64.ofInt(0);
+    nextChunkSpliceTimeNs = Int64.ofInt(0);
     trajectorySubmitted = true;
     trajectoryNextSampleIndex = endIndex;
     trajectoryChunkStartSeconds = startTime;
@@ -913,6 +1094,18 @@ class MotionSystem {
         maxAcceleration = maxAcceleration <= 0.0 ? axisAcceleration : Math.min(maxAcceleration, axisAcceleration);
     }
     return new MotionLimits(maxVelocity, maxAcceleration, maxJerk);
+  }
+}
+
+private class PendingSplice {
+  public final oldTag:Int64;
+  public final spliceTimeNs:Int64;
+  public final retry:Void -> Void;
+
+  public function new(oldTag:Int64, spliceTimeNs:Int64, retry:Void -> Void) {
+    this.oldTag = oldTag;
+    this.spliceTimeNs = spliceTimeNs;
+    this.retry = retry;
   }
 }
 

@@ -10,6 +10,7 @@ import motionkit.axis.MotionAxisBlueprint;
 import motionkit.axis.MotionSystemBlueprint;
 import motionkit.path.ArcSegment;
 import motionkit.path.GeometricPath;
+import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
 import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
@@ -28,7 +29,17 @@ import robotkit.world.RecordingRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.RobotCommand;
+import robotkit.world.Robot;
+import robotkit.world.RobotCapabilities;
+import robotkit.world.RobotDescription;
+import robotkit.world.RobotFault;
+import robotkit.world.RobotId;
+import robotkit.world.RobotSnapshot;
+import robotkit.world.RobotStatus;
 import robotkit.world.RuntimeRobotAdapter;
+import robotkit.world.SensorFrame;
+import robotkit.world.StopMode;
+import motionkit.planner.JogProfile;
 
 class MotionKitBootstrapTests {
   static var assertions:Int = 0;
@@ -50,6 +61,11 @@ class MotionKitBootstrapTests {
     testRuntimeSynchronizedHolding();
     testImmediateMotionReplacesNativeQueue();
     testMotionChangesStayWithinLimits();
+    testJogProfile();
+    testContinuousJog();
+    testLateJogSpliceFallsBackToStop();
+    testPathHoldsStayOnPathWithinLimits();
+    testDualMotorAxisChangesStayWithinJointLimits();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
   }
 
@@ -921,7 +937,7 @@ class MotionKitBootstrapTests {
    * settled. Returns the observed x position after every tick.
    */
   static function gantryTrial(queueSupport:Bool, eventTick:Int, event:MotionSystem -> Void,
-      resumeAfterStop:Bool):Array<Float> {
+      resumeAfterStop:Bool, ?begin:MotionSystem -> Void):Array<Float> {
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
       new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
     var simulation = new Simulation(0.01);
@@ -931,7 +947,8 @@ class MotionKitBootstrapTests {
       [for (joint in blueprint.model.joints) joint.name], false, false,
       "simulated runtime fault", queueSupport);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
-    machine.moveAxes([new AxisTarget("x", 0.15)], new MotionOptions(0.05, 0.4));
+    if (begin == null) machine.moveAxes([new AxisTarget("x", 0.15)], new MotionOptions(0.05, 0.4));
+    else begin(machine);
     var positions:Array<Float> = [];
     var tick = 0;
     var stillTicks = 0;
@@ -1025,6 +1042,320 @@ class MotionKitBootstrapTests {
     }
   }
 
+  static function testJogProfile():Void {
+    var limit = 0.4;
+    function checkProfile(label:String, profile:JogProfile, start:Float, startVelocity:Float,
+        expectedEnd:Float):Void {
+      near(profile.positionAt(0.0), start, '$label starts at its position', 1e-12);
+      near(profile.velocityAt(0.0), startVelocity, '$label starts at its velocity', 1e-12);
+      near(profile.endPosition, expectedEnd, '$label rests at its end', 1e-12);
+      near(profile.velocityAt(profile.durationSeconds), 0.0, '$label ends at rest', 1e-12);
+      var step = 0.001;
+      var count = Std.int(profile.durationSeconds / step) + 2;
+      for (index in 1...count) {
+        var change = Math.abs(profile.velocityAt(index * step) - profile.velocityAt((index - 1) * step));
+        check(change <= limit * step * (1.0 + 1e-9) + 1e-12, '$label stays within its acceleration');
+      }
+    }
+    checkProfile("jog from rest", new JogProfile(0.0, 0.0, 0.1, 0.05, limit), 0.0, 0.0, 0.1);
+    checkProfile("slowing jog", new JogProfile(0.0, 0.08, 0.2, 0.02, limit), 0.0, 0.08, 0.2);
+    checkProfile("speeding jog", new JogProfile(0.0, 0.02, 0.2, 0.08, limit), 0.0, 0.02, 0.2);
+    checkProfile("reversing jog", new JogProfile(0.05, 0.05, 0.0, 0.05, limit), 0.05, 0.05, 0.0);
+    // Braking from 0.05 m/s at 0.4 m/s^2 needs 3.125 mm, past a 1 mm target.
+    checkProfile("overrunning jog", new JogProfile(0.0, 0.05, 0.001, 0.05, limit), 0.0, 0.05,
+      0.05 * 0.05 / (2.0 * limit));
+  }
+
+  /**
+   * A jog issued while the same axis is jogging changes speed or direction
+   * without stopping first, within the acceleration limit, on both paths.
+   */
+  static function testContinuousJog():Void {
+    var limit = 0.4;
+    for (queueSupport in [true, false]) {
+      var label = queueSupport ? "buffered" : "position-target";
+      for (secondVelocity in [0.08, 0.02, -0.05]) {
+        var eventTick = 10;
+        while (eventTick <= 150) {
+          var continued = false;
+          var positions = gantryTrial(queueSupport, eventTick, machine -> {
+            continued = machine.jog("x", secondVelocity, 1.0) != null;
+          }, false, machine -> machine.jog("x", 0.05, 2.0));
+          var context = '$label jog changed to $secondVelocity at tick $eventTick';
+          check(continued, '$context continues without stopping first');
+          check(peakSecondDifference(positions) <= limit * 1.05,
+            '$context stays within the limit (peak ${peakSecondDifference(positions)})');
+          // Count ticks at rest before the motion finally settles.
+          var settled = positions.length - 1;
+          while (settled > 0 && Math.abs(positions[settled] - positions[settled - 1]) < 1e-12)
+            settled--;
+          var pauses = 0;
+          for (index in (eventTick + 1)...settled)
+            if (Math.abs(positions[index] - positions[index - 1]) < 1e-12) pauses++;
+          // A reversal passes through zero speed, but never dwells there.
+          check(pauses <= (secondVelocity < 0.0 ? 1 : 0), '$context never pauses ($pauses)');
+          eventTick += 20;
+        }
+      }
+    }
+  }
+
+  /**
+   * When a jog change reaches the runtime after its splice point, the
+   * runtime keeps the old jog and MotionKit recovers by stopping along it and
+   * starting the new jog from rest, still within the limit.
+   */
+  static function testLateJogSpliceFallsBackToStop():Void {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
+      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new LaggingRobot(new SimulatedRobot("late-splice", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]));
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    machine.jog("x", 0.05, 2.0);
+    var positions:Array<Float> = [];
+    var tick = 0;
+    function step():Void {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+      positions.push(robot.snapshot().positions.get(0));
+      if (tick > 2000) throw "late jog splice did not settle";
+    }
+    for (_ in 0...40) step();
+    robot.lagging = true;
+    check(machine.jog("x", 0.02, 1.0) != null, "jog change is planned as a continuation");
+    for (_ in 0...8) step();
+    robot.release();
+    var stillTicks = 0;
+    while (machine.isMoving() || stillTicks < 3) {
+      step();
+      var count = positions.length;
+      stillTicks = Math.abs(positions[count - 1] - positions[count - 2]) < 1e-12 ? stillTicks + 1 : 0;
+    }
+    check(peakSecondDifference(positions) <= 0.4 * 1.05,
+      'late jog splice recovery stays within the limit (peak ${peakSecondDifference(positions)})');
+    var rested = false;
+    var movedAfterRest = false;
+    for (index in 49...(positions.length - 3)) {
+      var moving = Math.abs(positions[index] - positions[index - 1]) >= 1e-12;
+      if (!moving) rested = true;
+      else if (rested) movedAfterRest = true;
+    }
+    check(rested && movedAfterRest, "late jog splice stops, then starts the new jog from rest");
+    simulation.dispose();
+  }
+
+  /**
+   * Like gantryTrial, over any rig, recording every joint each tick: begin a
+   * motion, inject an event at eventTick, optionally resume once at rest, and
+   * run until settled.
+   */
+  static function rigTrial(rig:TrialRig, eventTick:Int, event:MotionSystem -> Void,
+      resumeAfterStop:Bool, begin:MotionSystem -> Void):Array<Array<Float>> {
+    var machine = rig.machine;
+    begin(machine);
+    var positions:Array<Array<Float>> = [];
+    var tick = 0;
+    var stillTicks = 0;
+    function step():Void {
+      machine.update();
+      rig.simulation.step(Int64.ofInt(tick++));
+      var current = rig.robot.snapshot().positions.toArray();
+      var still = positions.length > 0;
+      if (still)
+        for (joint in 0...current.length)
+          if (Math.abs(current[joint] - positions[positions.length - 1][joint]) >= 1e-12) still = false;
+      stillTicks = still ? stillTicks + 1 : 0;
+      positions.push(current);
+      if (tick > 4000) throw 'rig trial at tick $eventTick did not settle';
+    }
+    for (_ in 0...eventTick) step();
+    event(machine);
+    if (resumeAfterStop) {
+      stillTicks = 0;
+      while (stillTicks < 3) step();
+      machine.resume();
+    }
+    stillTicks = 0;
+    while (machine.isMoving() || stillTicks < 3) step();
+    rig.simulation.dispose();
+    return positions;
+  }
+
+  static function jointPeak(positions:Array<Array<Float>>, joint:Int):Float {
+    var peak = 0.0;
+    for (index in 2...positions.length)
+      peak = Math.max(peak, Math.abs(positions[index][joint] - 2.0 * positions[index - 1][joint] +
+        positions[index - 2][joint]) / (0.01 * 0.01));
+    return peak;
+  }
+
+  static function gantryRig(queueSupport:Bool):TrialRig {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
+      new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new RuntimeRobotAdapter("rig", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name], false, false,
+      "simulated runtime fault", queueSupport);
+    return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulation, robot);
+  }
+
+  static function segmentDistance(x:Float, y:Float, ax:Float, ay:Float, bx:Float, by:Float):Float {
+    var dx = bx - ax, dy = by - ay;
+    var alpha = Math.max(0.0, Math.min(1.0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+    var px = ax + alpha * dx - x, py = ay + alpha * dy - y;
+    return Math.sqrt(px * px + py * py);
+  }
+
+  /**
+   * Holding and resuming along a path with an arc, and along a blended
+   * corner, stays on the path and within the joint limits.
+   */
+  static function testPathHoldsStayOnPathWithinLimits():Void {
+    var limit = 0.4;
+    // A line, a quarter arc tangent to it, and a line tangent to the arc.
+    function arcPath():GeometricPath
+      return new GeometricPath([
+        new LineSegment(new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.05, 0.0, 0.0)),
+        new ArcSegment(new PathPoint(0.05, 0.03, 0.0), 0.03, -Math.PI * 0.5, Math.PI * 0.5),
+        new LineSegment(new PathPoint(0.08, 0.03, 0.0), new PathPoint(0.08, 0.06, 0.0))
+      ]);
+    function arcDistance(x:Float, y:Float):Float {
+      var angle = Math.atan2(y - 0.03, x - 0.05);
+      var radial = Math.sqrt((x - 0.05) * (x - 0.05) + (y - 0.03) * (y - 0.03));
+      var onArc = angle >= -Math.PI * 0.5 && angle <= 0.0 ? Math.abs(radial - 0.03) : 1.0;
+      return Math.min(onArc, Math.min(segmentDistance(x, y, 0.0, 0.0, 0.05, 0.0),
+        segmentDistance(x, y, 0.08, 0.03, 0.08, 0.06)));
+    }
+    function cornerDistance(x:Float, y:Float):Float
+      return Math.min(segmentDistance(x, y, 0.0, 0.0, 0.05, 0.0),
+        segmentDistance(x, y, 0.05, 0.0, 0.05, 0.05));
+    var cases:Array<{label:String, begin:MotionSystem -> Void, distance:(Float, Float) -> Float}> = [
+      {label: "arc path", distance: arcDistance, begin: machine -> machine.movePath(arcPath(),
+        PathPlanningOptions.exactStopMode(), new MotionOptions(0.05, limit))},
+      {label: "blended corner", distance: cornerDistance, begin: machine -> machine.movePath(
+        GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.05, 0.0, 0.0),
+          new PathPoint(0.05, 0.05, 0.0)]), PathPlanningOptions.blend(0.001),
+        new MotionOptions(0.05, limit))}
+    ];
+    for (queueSupport in [true, false]) {
+      var mode = queueSupport ? "buffered" : "position-target";
+      for (entry in cases) {
+        // Blend mode changes velocity at a corner by design, so compare with
+        // the uninterrupted move rather than the bare limit.
+        var baseline = rigTrial(gantryRig(queueSupport), 0, _ -> {}, false, entry.begin);
+        var allowed = [for (joint in 0...2) Math.max(limit, jointPeak(baseline, joint)) * 1.05];
+        var eventTicks = baseline.length;
+        var eventTick = 3;
+        while (eventTick < eventTicks) {
+          var positions = rigTrial(gantryRig(queueSupport), eventTick,
+            machine -> machine.hold(), true, entry.begin);
+          var context = '$mode ${entry.label} held at tick $eventTick';
+          for (joint in 0...2)
+            check(jointPeak(positions, joint) <= allowed[joint],
+              '$context keeps joint $joint within its limit (peak ${jointPeak(positions, joint)})');
+          var furthest = 0.0;
+          for (position in positions)
+            furthest = Math.max(furthest, entry.distance(position[0], position[1]));
+          check(furthest <= 2e-5, '$context stays on the path (off by $furthest)');
+          var end = positions[positions.length - 1], expectedEnd = baseline[baseline.length - 1];
+          check(Math.abs(end[0] - expectedEnd[0]) <= 1e-5 && Math.abs(end[1] - expectedEnd[1]) <= 1e-5,
+            '$context reaches the path end');
+          eventTick += 9;
+        }
+      }
+    }
+  }
+
+  static function dualMotorRig(queueSupport:Bool):TrialRig {
+    // The second motor is geared 2:1 and mounted reversed, so its joint moves
+    // twice as far, the other way, with twice the speed and acceleration.
+    var model = new RobotModel("dual-motor-geared");
+    var base = model.addLink(new Link("gantry.base"));
+    var left = model.addLink(new Link("gantry.left"));
+    var right = model.addLink(new Link("gantry.right"));
+    var leftJoint = model.addJoint(new Joint("x.left", JointType.Prismatic, base, left, "x.left"));
+    var rightJoint = model.addJoint(new Joint("x.right", JointType.Prismatic, left, right, "x.right"));
+    leftJoint.limits.lower = 0.0;
+    leftJoint.limits.upper = 0.08;
+    leftJoint.limits.velocity = 0.1;
+    leftJoint.limits.maxAcceleration = 0.4;
+    rightJoint.limits.lower = -0.16;
+    rightJoint.limits.upper = 0.0;
+    rightJoint.limits.velocity = 0.2;
+    rightJoint.limits.maxAcceleration = 0.8;
+    var blueprint = MotionSystemBlueprint.fromRobotModel(model, [
+      new MotionAxisBlueprint("x", ["x.left", "x.right"], 0.0, 0.08, 0.08, 0.4, 0.0,
+        [1.0, -2.0], [0.0, 0.0])
+    ]);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var recording = new RobotRecording();
+    var robot = new RecordingRobot(new RuntimeRobotAdapter("dual-motor-geared", runtime,
+      blueprint.model.name, [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name], false, false,
+      "simulated runtime fault", queueSupport), recording);
+    return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulation, robot, recording);
+  }
+
+  /**
+   * A dual-motor axis whose motors have different gearing keeps each joint
+   * within its own limits, and the motors coordinated, through holds,
+   * resumes, and replacement moves.
+   */
+  static function testDualMotorAxisChangesStayWithinJointLimits():Void {
+    var limits = [0.4, 0.8];
+    var begin:MotionSystem -> Void = machine -> {
+      machine.moveAxes([new AxisTarget("x", 0.06)], new MotionOptions(0.08, 0.4));
+    };
+    for (queueSupport in [true, false]) {
+      var mode = queueSupport ? "buffered" : "position-target";
+      var baseline = rigTrial(dualMotorRig(queueSupport), 0, _ -> {}, false, begin);
+      var eventTick = 3;
+      while (eventTick < baseline.length) {
+        var trials = [
+          {label: "held", resume: true, event: (machine:MotionSystem) -> machine.hold()},
+          {label: "replaced", resume: false, event: (machine:MotionSystem) -> {
+            machine.moveAxes([new AxisTarget("x", 0.01)], new MotionOptions(0.08, 0.4));
+          }}
+        ];
+        for (trial in trials) {
+          var rig = dualMotorRig(queueSupport);
+          var positions = rigTrial(rig, eventTick, trial.event, trial.resume, begin);
+          var context = '$mode dual-motor axis ${trial.label} at tick $eventTick';
+          for (joint in 0...2)
+            check(jointPeak(positions, joint) <= limits[joint] * 1.05,
+              '$context keeps joint $joint within its limit (peak ${jointPeak(positions, joint)})');
+          // The simulated motors track with different loads, so coordination
+          // is checked on every commanded position rather than the measured one.
+          var worstSkew = 0.0;
+          var recording = rig.recording;
+          if (recording != null)
+            for (command in recording.commands)
+              switch command {
+                // On the buffered path, target batches are only the flush at
+                // rest, which holds the measured pose.
+                case JointTargets(_, _) if (queueSupport):
+                case JointTargets(targets, _):
+                  var byJoint = [0.0, 0.0];
+                  for (target in targets) byJoint[target.joint] = target.target;
+                  worstSkew = Math.max(worstSkew, Math.abs(byJoint[1] + 2.0 * byJoint[0]));
+                case TrajectoryChunk(chunk):
+                  for (point in chunk.points)
+                    worstSkew = Math.max(worstSkew,
+                      Math.abs(point.positions[1] + 2.0 * point.positions[0]));
+              }
+          check(worstSkew <= 1e-12, '$context commands the motors coordinated (skew $worstSkew)');
+        }
+        eventTick += 6;
+      }
+    }
+  }
+
   /** Unwraps a move that started at once because the machine was at rest. */
   static function planned(value:Null<JointTrajectory>):JointTrajectory {
     if (value == null) throw "Move was deferred behind a stop but was expected to start at once";
@@ -1046,5 +1377,53 @@ class MotionKitBootstrapTests {
     var didThrow = false;
     try action() catch (_:Dynamic) didThrow = true;
     check(didThrow, message);
+  }
+}
+
+/** Robot wrapper that can hold submitted commands back, to simulate transport delay. */
+private class LaggingRobot implements Robot {
+  public var lagging:Bool = false;
+  final inner:Robot;
+  var heldCommands:Array<RobotCommand> = [];
+
+  public function new(inner:Robot) this.inner = inner;
+
+  public function release():Void {
+    lagging = false;
+    for (command in heldCommands) inner.submit(command);
+    heldCommands = [];
+  }
+
+  public function id():RobotId return inner.id();
+  public function status():RobotStatus return inner.status();
+  public function description():RobotDescription return inner.description();
+  public function capabilities():RobotCapabilities return inner.capabilities();
+  public function snapshot():RobotSnapshot return inner.snapshot();
+  public function sensors():Array<SensorFrame> return inner.sensors();
+  public function fault():Null<RobotFault> return inner.fault();
+  public function submit(command:RobotCommand):Void {
+    if (lagging) heldCommands.push(command);
+    else inner.submit(command);
+  }
+  public function stop(mode:StopMode):Void inner.stop(mode);
+  public function resetSafety():Void inner.resetSafety();
+  public function setChangeListener(listener:Null < RobotId -> Void >):Void
+    inner.setChangeListener(listener);
+  public function close():Void inner.close();
+}
+
+/** A simulated machine for sweep trials. */
+private class TrialRig {
+  public final machine:MotionSystem;
+  public final simulation:Simulation;
+  public final robot:Robot;
+  public final recording:Null<RobotRecording>;
+
+  public function new(machine:MotionSystem, simulation:Simulation, robot:Robot,
+      ?recording:RobotRecording) {
+    this.machine = machine;
+    this.simulation = simulation;
+    this.robot = robot;
+    this.recording = recording;
   }
 }
