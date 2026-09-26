@@ -175,7 +175,7 @@ private:
 
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
-    void latch_fault();
+    void latch_fault(bool clear_control = true);
 
     rk_robot_runtime_blueprint blueprint_{};
     std::shared_ptr<RobotEndpoint> endpoint_;

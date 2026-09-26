@@ -285,13 +285,14 @@ rk_result RobotRuntime::step_owner(uint64_t timestamp_ns) {
     return publish_sample(timestamp_ns);
 }
 
-void RobotRuntime::latch_fault() {
+void RobotRuntime::latch_fault(bool clear_control) {
     rk_robot_command emergency_stop{};
     emergency_stop.struct_size = sizeof(emergency_stop);
     emergency_stop.sequence = ++endpoint_command_sequence_;
     emergency_stop.kind = RK_COMMAND_EMERGENCY_STOP;
     endpoint_->apply(emergency_stop);
-    control_ = {};
+    if (clear_control)
+        control_ = {};
     std::lock_guard state_lock(state_mutex_);
     state_.mode = RK_ROBOT_MODE_FAULT;
     state_.safety = RK_SAFETY_FAULT;
@@ -352,6 +353,11 @@ rk_result RobotRuntime::apply_pending_commands() {
         }
     }
 
+    std::size_t last_reset_index = commands.size();
+    for (std::size_t index = 0; index < commands.size(); ++index)
+        if (commands[index].command.kind == RK_COMMAND_RESET_SAFETY)
+            last_reset_index = index;
+
     bool controlled_stop = false;
     auto begin_controlled_stop = [&]() {
         if (!control_.trajectory_active || control_.trajectory.empty()) {
@@ -394,6 +400,12 @@ rk_result RobotRuntime::apply_pending_commands() {
         final_timestamp_ns = emergency->timestamp_ns;
         safety = RK_SAFETY_EMERGENCY_STOP;
     } else {
+        if ((safety == RK_SAFETY_EMERGENCY_STOP || safety == RK_SAFETY_FAULT) &&
+            last_reset_index == commands.size()) {
+            std::lock_guard state_lock(state_mutex_);
+            state_backup_valid_ = false;
+            return RK_ERROR_SAFETY_STOPPED;
+        }
         for (std::size_t index = 0; index < commands.size(); ++index) {
             auto &queued = commands[index];
             auto &value = queued.command;
@@ -408,6 +420,8 @@ rk_result RobotRuntime::apply_pending_commands() {
 
             if ((safety == RK_SAFETY_EMERGENCY_STOP || safety == RK_SAFETY_FAULT) &&
                 value.kind != RK_COMMAND_RESET_SAFETY) {
+                if (index < last_reset_index)
+                    continue;
                 std::lock_guard state_lock(state_mutex_);
                 state_backup_valid_ = false;
                 return RK_ERROR_SAFETY_STOPPED;
@@ -491,25 +505,29 @@ rk_result RobotRuntime::apply_pending_commands() {
             if (value.kind == RK_COMMAND_TRAJECTORY_CHUNK) {
                 if (queued.trajectory == nullptr)
                     return RK_ERROR_INVALID_ARGUMENT;
-                std::fill_n(control_.active, RK_MAX_JOINTS, false);
-                std::fill_n(control_.reference_initialized, RK_MAX_JOINTS, false);
-                control_.stop_ramp_active = false;
                 const auto base_time = control_.trajectory.empty()
                     ? uint64_t{0} : control_.trajectory.back().time_from_start_ns;
                 for (uint32_t point_index = 0;
                      point_index < queued.trajectory->point_count; ++point_index) {
-                    auto point = queued.trajectory->points[point_index];
+                    const auto &point = queued.trajectory->points[point_index];
                     if (base_time > std::numeric_limits<uint64_t>::max() - point.time_from_start_ns)
                         return RK_ERROR_INVALID_ARGUMENT;
-                    point.time_from_start_ns += base_time;
                     for (uint32_t joint = 0; joint < point.joint_count; ++joint) {
                         const auto &limits = blueprint_.joints[joint];
                         if (point.positions[joint] < limits.lower_limit ||
                             point.positions[joint] > limits.upper_limit) {
-                            latch_fault();
+                            latch_fault(false);
                             return RK_ERROR_LIMIT;
                         }
                     }
+                }
+                std::fill_n(control_.active, RK_MAX_JOINTS, false);
+                std::fill_n(control_.reference_initialized, RK_MAX_JOINTS, false);
+                control_.stop_ramp_active = false;
+                for (uint32_t point_index = 0;
+                     point_index < queued.trajectory->point_count; ++point_index) {
+                    auto point = queued.trajectory->points[point_index];
+                    point.time_from_start_ns += base_time;
                     control_.trajectory.push_back(point);
                 }
                 control_.trajectory_active = true;

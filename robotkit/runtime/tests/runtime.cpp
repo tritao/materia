@@ -261,6 +261,45 @@ void normal_stop_decelerates_active_trajectory(const rk_robot_runtime_blueprint 
     assert(state.mode == RK_ROBOT_MODE_STOPPING);
 }
 
+void faulted_batch_skips_commands_before_reset(
+    const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    uint64_t timestamp = 0;
+
+    auto invalid = velocity_batch(1, {{0, 0.2}});
+    invalid.targets[0].mode = RK_TARGET_POSITION;
+    invalid.targets[0].target = 2.0;
+    assert(runtime.submit(invalid) == RK_OK);
+    assert(runtime.apply_pending_commands() == RK_ERROR_LIMIT);
+
+    assert(runtime.submit(velocity_batch(2, {{1, -0.7}})) == RK_OK);
+    assert(runtime.submit(lifecycle_command(3, RK_COMMAND_RESET_SAFETY)) == RK_OK);
+    assert(runtime.submit(velocity_batch(4, {{0, 0.25}})) == RK_OK);
+    auto state = apply_cycle(runtime, timestamp);
+    assert(state.safety == RK_SAFETY_READY);
+    assert(state.velocity[0] == 0.25);
+    assert(state.velocity[1] == 0.0);
+}
+
+void invalid_trajectory_chunk_is_atomic(
+    const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    uint64_t timestamp = 0;
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
+    auto state = apply_cycle(runtime, timestamp);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
+
+    auto invalid = trajectory_batch({{0, 0.2}, {100'000'000, 2.0}});
+    assert(runtime.submit_trajectory(trajectory_command(2), invalid) == RK_OK);
+    assert(runtime.apply_pending_commands() == RK_ERROR_LIMIT);
+    assert(runtime.snapshot(state) == RK_OK);
+    assert(state.safety == RK_SAFETY_FAULT);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
+}
+
 void same_cycle_target_batches_merge_per_joint(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
@@ -402,6 +441,8 @@ int main() {
     partial_targets_and_ordered_trajectory_commands(blueprint);
     timestamped_trajectory_interpolates_and_reports_progress(blueprint);
     normal_stop_decelerates_active_trajectory(blueprint);
+    faulted_batch_skips_commands_before_reset(blueprint);
+    invalid_trajectory_chunk_is_atomic(blueprint);
 
     // Zero is a valid source epoch, not a missing-timestamp sentinel.
     auto clock_endpoint = std::make_shared<FaultEndpoint>();
