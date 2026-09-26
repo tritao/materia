@@ -512,6 +512,11 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime,
  * lifecycle commands small enough for realtime mailboxes and worker stacks.
  * The runtime copies the chunk before returning, so both arguments may be
  * caller-owned temporaries.
+ *
+ * A chunk appends to the queued path. While a normal stop is slowing along
+ * that path, a chunk only extends the path the stop may use and the stop
+ * still ends at rest; to resume, wait until trajectory_active is zero, or
+ * send a joint-target batch first to replace the stopping motion.
  */
 RK_API rk_result RK_CALL rk_robot_runtime_submit_trajectory(
     rk_robot_runtime runtime, const rk_robot_command *command,

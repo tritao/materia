@@ -45,6 +45,7 @@ class MotionKitBootstrapTests {
     testBufferedExecution();
     testLongBufferedExecution();
     testHoldRefillsNearChunkBoundary();
+    testHoldDecelerationStaysWithinLimitsThroughoutMove();
     testRuntimeSynchronizedHolding();
     testImmediateMotionReplacesNativeQueue();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
@@ -807,11 +808,74 @@ class MotionKitBootstrapTests {
       stopTicks += 1;
       if (stopTicks > 200) throw "near-boundary controlled hold did not settle";
     }
-    check(peakAcceleration <= 0.4 * 1.25,
+    check(peakAcceleration <= 0.4 * 1.05,
       "hold near a streamed refill boundary keeps deceleration bounded");
     check(previousPosition > beforeHold,
       "hold near a streamed refill boundary continues along the path to rest");
     simulation.dispose();
+  }
+
+  /**
+   * Holds at every other tick of one streamed move and checks each stop. The
+   * move accelerates and brakes at the joint limit itself, so holds during
+   * those phases catch a stop that adds its own deceleration on top, and
+   * holds around the streaming refill points catch a stop that runs out of
+   * queued path.
+   */
+  static function testHoldDecelerationStaysWithinLimitsThroughoutMove():Void {
+    var limit = 0.4;
+    var target = 0.15;
+    var moveTicks = 0;
+    var holdTick = 2;
+    var worstAcceleration = 0.0;
+    var worstTick = -1;
+    while (moveTicks == 0 || holdTick < moveTicks) {
+      var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
+        new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, limit);
+      var simulation = new Simulation(0.01);
+      var runtime = simulation.addRobot(blueprint.runtime);
+      var robot = new SimulatedRobot("hold-sweep", runtime, blueprint.model.name,
+        [for (link in blueprint.model.links) link.name],
+        [for (joint in blueprint.model.joints) joint.name]);
+      var machine = MotionSystem.fromBlueprint(robot, blueprint);
+      var move = machine.moveAxes([new AxisTarget("x", target)],
+        new MotionOptions(0.05, limit));
+      if (moveTicks == 0) moveTicks = Math.ceil(move.durationSeconds / 0.01);
+      var tick = 0;
+      var positions:Array<Float> = [];
+      for (_ in 0...holdTick) {
+        machine.update();
+        simulation.step(Int64.ofInt(tick++));
+        positions.push(robot.snapshot().positions.get(0));
+      }
+      machine.hold();
+      for (_ in 0...40) {
+        machine.update();
+        simulation.step(Int64.ofInt(tick++));
+        positions.push(robot.snapshot().positions.get(0));
+      }
+      var peak = 0.0;
+      var backwards = false;
+      for (index in 2...positions.length) {
+        peak = Math.max(peak, Math.abs(positions[index] - 2.0 * positions[index - 1] +
+          positions[index - 2]) / (0.01 * 0.01));
+        if (positions[index] < positions[index - 1] - 1e-9) backwards = true;
+      }
+      if (peak > worstAcceleration) {
+        worstAcceleration = peak;
+        worstTick = holdTick;
+      }
+      check(!backwards, 'hold at tick $holdTick never reverses along the path');
+      var last = positions[positions.length - 1];
+      check(last <= target + 1e-9, 'hold at tick $holdTick stops within the planned move');
+      check(Math.abs(last - positions[positions.length - 2]) < 1e-9,
+        'hold at tick $holdTick comes to rest');
+      check(!runtime.snapshot().trajectoryActive, 'hold at tick $holdTick finishes its stop');
+      simulation.dispose();
+      holdTick += 2;
+    }
+    check(worstAcceleration <= limit * 1.05,
+      'every hold stays within the joint acceleration limit (worst ${worstAcceleration} at tick $worstTick)');
   }
 
   static function testImmediateMotionReplacesNativeQueue():Void {

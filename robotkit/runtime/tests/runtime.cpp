@@ -1,5 +1,6 @@
 #include "robotkit_runtime.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -7,6 +8,7 @@
 #include <memory>
 #include <thread>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -299,7 +301,33 @@ void trajectory_stop_follows_path_and_reports_tag(
     assert(stop_state.position[0] > stop_start);
 }
 
-void trajectory_chunk_cancels_slowdown(
+/** Samples position(t) every step_ns over [0, duration_ns] into one chunk. */
+template <typename Position>
+rk_trajectory_chunk sampled_batch(Position position, uint64_t duration_ns, uint64_t step_ns,
+                                  uint64_t tag) {
+    rk_trajectory_chunk value{};
+    value.struct_size = sizeof(value);
+    value.tag = tag;
+    for (uint64_t time = 0; time <= duration_ns; time += step_ns) {
+        auto &point = value.points[value.point_count++];
+        point.time_from_start_ns = time;
+        point.joint_count = 2;
+        point.positions[0] = position(static_cast<double>(time) / 1'000'000'000.0);
+        point.positions[1] = -point.positions[0];
+    }
+    return value;
+}
+
+/** Largest |second difference| / dt^2 over consecutive observed positions. */
+double peak_acceleration(const std::vector<double> &positions, double period_seconds) {
+    double peak = 0.0;
+    for (std::size_t index = 2; index < positions.size(); ++index)
+        peak = std::max(peak, std::abs(positions[index] - 2.0 * positions[index - 1] +
+            positions[index - 2]) / (period_seconds * period_seconds));
+    return peak;
+}
+
+void trajectory_chunk_extends_running_stop(
     const rk_robot_runtime_blueprint &blueprint) {
     auto slow_blueprint = blueprint;
     for (auto &joint : slow_blueprint.joints)
@@ -310,18 +338,90 @@ void trajectory_chunk_cancels_slowdown(
     assert(runtime.submit_trajectory(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 1.0}}, 7)) == RK_OK);
     apply_cycle(runtime, timestamp);
-    apply_cycle(runtime, timestamp);
-    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
-    apply_cycle(runtime, timestamp);
     auto state = apply_cycle(runtime, timestamp);
-    const auto slowed_time = state.trajectory_time_ns;
-    assert(runtime.submit_trajectory(trajectory_command(3),
-        trajectory_batch({{0, 1.0}, {1'000'000'000, 0.0}}, 8)) == RK_OK);
-    state = apply_cycle(runtime, timestamp);
-    assert(state.trajectory_active == 1);
-    state = apply_cycle(runtime, timestamp);
-    assert(state.trajectory_time_ns > slowed_time);
-    assert(state.trajectory_tag == 7 || state.trajectory_tag == 8);
+    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
+    double previous_position = state.position[0];
+    double previous_step = 1.0;
+    uint64_t sequence = 3;
+    for (int cycle = 0; cycle < 40; ++cycle) {
+        if (cycle == 2) {
+            // More path arriving mid-stop, which would turn back towards 0,
+            // must extend the stop without resuming full speed.
+            assert(runtime.submit_trajectory(trajectory_command(sequence++),
+                trajectory_batch({{0, 1.0}, {1'000'000'000, 0.0}}, 8)) == RK_OK);
+        }
+        if (cycle == 4) {
+            // A repeated stop continues the running one instead of restarting it.
+            assert(runtime.submit(lifecycle_command(sequence++, RK_COMMAND_STOP)) == RK_OK);
+        }
+        state = apply_cycle(runtime, timestamp);
+        const double step = state.position[0] - previous_position;
+        assert(step >= -1e-9);
+        assert(step <= previous_step + 1e-9);
+        previous_step = step;
+        previous_position = state.position[0];
+        if (!state.trajectory_active)
+            break;
+    }
+    assert(state.trajectory_active == 0 && state.trajectory_queue_depth == 0);
+    assert(state.trajectory_tag == 7);
+    assert(state.position[0] < 1.0);
+}
+
+void trajectory_stop_counts_trajectory_braking(
+    const rk_robot_runtime_blueprint &blueprint) {
+    // The trajectory cruises at 0.5 for 0.2 s, then brakes at the joint limit.
+    // A stop that lands in that braking must not add its own deceleration.
+    constexpr double limit = 1.0;
+    auto limited = blueprint;
+    for (auto &joint : limited.joints)
+        joint.max_acceleration = limit;
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
+    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    uint64_t timestamp = 0;
+    const auto profile = [](double t) {
+        if (t <= 0.2)
+            return 0.5 * t;
+        const double braking = std::min(t - 0.2, 0.5);
+        return 0.1 + 0.5 * braking - 0.5 * braking * braking;
+    };
+    const double end = profile(0.7);
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        sampled_batch(profile, 700'000'000, 10'000'000, 1)) == RK_OK);
+    std::vector<double> positions;
+    for (int cycle = 0; cycle < 22; ++cycle)
+        positions.push_back(apply_cycle(runtime, timestamp).position[0]);
+    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
+    for (int cycle = 0; cycle < 120; ++cycle)
+        positions.push_back(apply_cycle(runtime, timestamp).position[0]);
+    assert(peak_acceleration(positions, 0.01) <= limit * 1.05);
+    assert(positions.back() <= end + 1e-9);
+    assert(std::abs(positions.back() - positions[positions.size() - 2]) < 1e-12);
+}
+
+void stop_beyond_queued_path_ramps_within_limits(
+    const rk_robot_runtime_blueprint &blueprint) {
+    // Only 0.1 s of path is queued at 1 m/s, but stopping at 1 m/s^2 needs
+    // 1 s. The stop must finish on a limited ramp instead of stopping dead.
+    constexpr double limit = 1.0;
+    auto limited = blueprint;
+    for (auto &joint : limited.joints)
+        joint.max_acceleration = limit;
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
+    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    uint64_t timestamp = 0;
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        sampled_batch([](double t) { return t; }, 100'000'000, 10'000'000, 1)) == RK_OK);
+    std::vector<double> positions;
+    for (int cycle = 0; cycle < 6; ++cycle)
+        positions.push_back(apply_cycle(runtime, timestamp).position[0]);
+    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
+    for (int cycle = 0; cycle < 150; ++cycle)
+        positions.push_back(apply_cycle(runtime, timestamp).position[0]);
+    assert(peak_acceleration(positions, 0.01) <= limit * 1.05);
+    // Stopping distance from 1 m/s at 1 m/s^2 is 0.5 m.
+    assert(positions.back() > 0.5 && positions.back() < 0.6);
+    assert(std::abs(positions.back() - positions[positions.size() - 2]) < 1e-12);
 }
 
 void faulted_batch_skips_commands_before_reset(
@@ -505,7 +605,9 @@ int main() {
     timestamped_trajectory_interpolates_and_reports_progress(blueprint);
     normal_stop_decelerates_active_trajectory(blueprint);
     trajectory_stop_follows_path_and_reports_tag(blueprint);
-    trajectory_chunk_cancels_slowdown(blueprint);
+    trajectory_chunk_extends_running_stop(blueprint);
+    trajectory_stop_counts_trajectory_braking(blueprint);
+    stop_beyond_queued_path_ramps_within_limits(blueprint);
     faulted_batch_skips_commands_before_reset(blueprint);
     invalid_trajectory_chunk_is_atomic(blueprint);
 

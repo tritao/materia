@@ -180,9 +180,10 @@ class MotionSystem {
     resumeRequested = false;
     if (activeTrajectory != null) {
       if (usesTrajectoryChunks(activeTrajectory)) {
-        // A native controlled stop needs enough future path to decelerate. A
-        // hold can arrive just after the normal refill lead, so top up the
-        // runtime queue before the stop command is consumed.
+        // The runtime stops by slowing along the queued path, which takes at
+        // most v/a of trajectory time. A hold can arrive when less than that
+        // is queued, so top up the queue before the stop command. Should the
+        // queue still run out, the runtime finishes on a limited ramp.
         syncFromRuntime();
         refillTrajectoryForHold();
       }
@@ -372,14 +373,11 @@ class MotionSystem {
    */
   public function update(?dtSeconds:Float = -1.0):Bool {
     if (held) {
-      if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory)) {
-        var heldObservation = syncFromRuntime();
-        if (heldObservation.trajectoryActive && refillTrajectoryForHold())
-          // Appending a chunk is intentionally ordered before a fresh stop:
-          // the runtime's existing semantics treat a chunk as resuming the
-          // path, so the stop must remain the final command in this cycle.
-          robot.stop(StopMode.Normal);
-      }
+      // No refills while held: hold() already queued enough path for the
+      // whole stop, and a late chunk could otherwise land after the stop
+      // finished and be taken as a resume.
+      if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory))
+        syncFromRuntime();
       if (resumeRequested) tryResume();
       if (held) return false;
     }
@@ -671,14 +669,13 @@ class MotionSystem {
 
   /**
    * Keeps enough source trajectory queued for the runtime's path-following
-   * stop. This is mainly used at the hold boundary, where the ordinary two
-   * tick streaming lead may be shorter than v/a.
+   * stop. Used at the hold boundary, where the ordinary two-tick streaming
+   * lead may be shorter than v/a.
    */
-  function refillTrajectoryForHold():Bool {
+  function refillTrajectoryForHold():Void {
     var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || !usesTrajectoryChunks(trajectoryValue)) return false;
+    if (trajectoryValue == null || !usesTrajectoryChunks(trajectoryValue)) return;
     var requiredLead = holdStopLeadSeconds();
-    var submitted = false;
     var attempts = 0;
     while (trajectoryNextSampleIndex < trajectoryValue.samples.length - 1 &&
         trajectoryChunkEndSeconds - elapsedSeconds < requiredLead - 1e-9 &&
@@ -687,9 +684,7 @@ class MotionSystem {
       submitActiveTrajectoryChunk();
       attempts += 1;
       if (trajectoryChunkEndSeconds <= previousEnd + 1e-9) break;
-      submitted = true;
     }
-    return submitted;
   }
 
   function holdStopLeadSeconds():Float {

@@ -169,13 +169,15 @@ private:
         bool trajectory_active = false;
         uint64_t trajectory_tag = 0;
         uint64_t trajectory_tag_time_ns = 0;
+        /** Trajectory clock rate; below 1 only while a path-following stop runs. */
         double trajectory_rate = 1.0;
-        double trajectory_rate_deceleration = 0.0;
         double trajectory_time_remainder_ns = 0.0;
         uint64_t stop_ramp_time_ns = 0;
         uint64_t stop_ramp_duration_ns = 0;
         double stop_ramp_positions[RK_MAX_JOINTS]{};
         double stop_ramp_velocities[RK_MAX_JOINTS]{};
+        /** Last forward estimate of the queued path's acceleration during a stop. */
+        double stop_path_accelerations[RK_MAX_TRAJECTORY_JOINTS]{};
         bool stop_ramp_active = false;
     };
 

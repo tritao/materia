@@ -59,10 +59,21 @@ machine.movePath(GeometricPath.lines([
 The runtime interpolates timestamped trajectory chunks on its owner clock and
 publishes queue depth and tagged timestamp progress through `RobotSnapshot`.
 MotionKit refills long trajectories before the native window drains. A normal
-hold slows the trajectory clock along the planned path using the configured
-acceleration limits; resume starts from the runtime-reported stop tag and time.
-MotionKit retains a deterministic position-target fallback when a backend does
-not support buffered chunks. CNC semantics and G-code remain outside MotionKit.
+hold slows the trajectory clock along the planned path, keeping every joint
+within its acceleration limit even when the hold lands while the trajectory is
+already speeding up or braking. Before stopping, a hold tops up the queued path
+to at least v/a. If a stop still runs out of queued path, the runtime finishes
+it on a straight, acceleration-limited ramp. A chunk that arrives while a stop
+is running only extends that stop. Resume starts from the runtime-reported stop
+tag and time. MotionKit retains a deterministic position-target fallback when a
+backend does not support buffered chunks. CNC semantics and G-code remain
+outside MotionKit.
+
+Queued trajectories currently run back to back with a 1–2 control-cycle pause
+between them: the next one is only sent once the runtime has drained the
+previous one. Planned moves start and end at rest, so this costs throughput
+rather than smoothness. Sending the next trajectory ahead of time is the next
+buffered-execution increment.
 
 Run the focused native-backed test with:
 
