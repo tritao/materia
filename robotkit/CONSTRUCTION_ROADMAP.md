@@ -555,6 +555,33 @@ same redundant-but-required pattern already used by
 Did not touch cadkit/bimkit source, so their own test suites were not run
 (the plan's instruction to run them is conditioned on touching them).
 
+**M7**: added `robotkit/haxe/robotkit/perception/` (`PointCloud`,
+`PlaneEstimate`, `SeededRandom`, `EigenDecomposition`, `JacobiEigenSolver`,
+`PlaneFit`, `SimulatedSurfaceScanner`, `SurfaceRegistration` +
+`SurfaceRegistrationResult`), `robotkit/haxe/robotkit/work/DeviationMap.hx`,
+and `robotkit/tests/src/tests/PerceptionTests.hx`, called from
+`RobotWorldTests.main()`. `JacobiEigenSolver` is the classic cyclic Jacobi
+eigenvalue algorithm for small symmetric matrices, general over N even though
+`PlaneFit` only calls it at N=3 for the point-covariance plane fit; `PlaneFit`
+also implements seeded RANSAC via the new library-level `SeededRandom`
+(promoted from a private test helper `KinematicsTests` already had, so
+`PlaneFit` and `SimulatedSurfaceScanner` share one seeded, wall-clock-free
+random source). Deviation from a literal reading of the plan: haxeon's
+`Math.hx` has no `Math.log`, so `SeededRandom.nextGaussian` sums twelve
+uniforms (Irwin-Hall/CLT) instead of Box-Muller — noted in `ARCHITECTURE.md`.
+A second, test-only finding: `SimulatedSurfaceScanner` demeans its injected
+bow over every sampled point so a plane fit isn't biased by it, but the first
+version of `PerceptionTests`' offset/yaw-recovery test used RANSAC's default
+inlier threshold, which silently dropped the bow's most negative (post-demean)
+corner samples from the consensus set and reintroduced a ~1.2mm bias — over
+the plan's 1mm tolerance. Fixed by widening that one test's inlier threshold
+to keep the whole demeaned population in the consensus set (documented at the
+call site and in `ARCHITECTURE.md`), not by changing the scanner or
+`PlaneFit`; a much larger bow is still exercised, deliberately without
+registration, in the dedicated deviation-map test. No other plan deviations;
+RANSAC ignoring 20% outliers, oversize-correction rejection, and the
+deviation map's center-vs-edge bow signature all matched the plan directly.
+
 **M5**: added `robotkit/haxe/robotkit/work/` (`Point2`, `Polygon2`,
 `WorkSurfaceId`, `SourceKind`, `Provenance`, `WorkSurface`,
 `RasterToolpathGenerator`, `CoverageMap`) and

@@ -704,6 +704,71 @@ by its separate CMake/OCCT build (`cadkit/build/debug/core/libcadkit-core.so`),
 not by haxeon, so running cadbridge tests requires that directory on
 `LD_LIBRARY_PATH` (haxeon preserves and extends the caller's existing value).
 
+## As-built registration
+
+`robotkit.perception` (plus a `robotkit.work` addition) sits above
+`robotkit.work`; it does not touch `Robot`, `RobotRuntime`, or the native
+runtime. `PointCloud` is a set of `Vec3` points in one named frame with the
+same source/receive clock provenance as `SensorFrame`
+(`sourceTimestampNs`/`receivedTimestampNs`, `sourceClockId`/`receivedClockId`).
+`PlaneEstimate` is a fitted plane `normal . x = offset` (in the cloud's own
+frame) plus its inlier count and RMS residual.
+
+`PlaneFit.fit` is total least squares: the normal is the smallest-eigenvalue
+eigenvector of the 3x3 point covariance, found by `JacobiEigenSolver` — the
+classic cyclic Jacobi eigenvalue algorithm, implemented directly (no external
+linear-algebra library) and kept general over N even though `PlaneFit` only
+ever calls it at N=3. `PlaneFit.fitRansac` is seeded RANSAC: it repeatedly
+samples three points to build a candidate plane, keeps the candidate with the
+most inliers within a threshold, then calls `fit` again over just that
+consensus set for the final estimate — deterministic for a fixed seed via the
+library's own `SeededRandom` (the same linear-congruential recurrence
+`KinematicsTests`' IK fixture already used, promoted here so `PlaneFit` and
+`SimulatedSurfaceScanner` share one seeded, wall-clock-free source of
+randomness). `SeededRandom.nextGaussian` sums twelve uniforms (an
+Irwin-Hall/CLT approximation) rather than Box-Muller, since
+`haxeon/stdlib/Math.hx` has no `Math.log`.
+
+`SimulatedSurfaceScanner.scan` samples a design `WorkSurface`'s boundary
+(skipping exclusions, as a real scanner would see through an opening) from a
+"true" wall offset from design by a small rigid `surface_T_trueSurface`
+transform plus a smooth bow. The bow term is re-centered to exactly zero mean
+over the actual sampled points *before* the rigid transform and noise are
+applied, so a plane fit recovers the injected offset/rotation rather than a
+bow-biased plane; the bow remains visible as a spatial pattern to a
+`DeviationMap`. A generous RANSAC inlier threshold is required to recover the
+injected offset/rotation to the plan's 1mm/0.05° tolerance: a tight threshold
+can silently drop the bow's most extreme (and therefore most negative, after
+demeaning) samples from the consensus set, reintroducing the bias the
+demeaning was meant to remove.
+
+`SurfaceRegistration.register(design, cloud, seed, ...)` fits a plane (seeded
+RANSAC, oriented by the design's own `+Z`) and derives the *minimal* rigid
+correction between the design plane (`z = 0` in the surface's own frame) and
+the fitted plane: a rotation about `(0,0,1) x normal` by the angle between
+them (identity when they already agree — this is exactly what recovers an
+installation yaw error, i.e. a rotation of the wall about its own vertical
+axis that tilts its normal), and a translation of `offset` along that normal
+— purely out-of-plane. In-plane shift and rotation about the normal are not
+observable from a plane fit alone and are left as identity; this is a
+deliberate scope limit, not an oversight. A correction whose translation or
+rotation magnitude exceeds configured limits is rejected
+(`SurfaceRegistrationResult.accepted == false`, `registered == null`,
+`rejectionReason` set) instead of silently applied. An accepted registration
+produces a `work` `WorkSurface`: same boundary/exclusions (their in-plane
+shape is unaffected by an out-of-plane correction) at
+`design.frame_T_surface.compose(correction)`, with `provenance` retaining the
+design element id under `SourceKind.Work`.
+
+`robotkit.work.DeviationMap(surface, cellSize)` mirrors `CoverageMap`'s grid
+(cells classified by the surface's boundary bounding box), but accumulates
+the *mean* signed deviation reported for each cell instead of a covered flag.
+A caller adds samples already expressed in the surface's own local plane
+(`addPoints` for a raw point cloud, treating each point's `x, y` as location
+and `z` as the deviation) so a smooth bow shows up as a spatial pattern
+(higher near the bow's center, lower near the boundary) rather than
+collapsing to one scalar.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A
