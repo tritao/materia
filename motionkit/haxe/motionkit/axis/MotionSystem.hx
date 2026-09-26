@@ -3,6 +3,9 @@ package motionkit.axis;
 import haxe.Int64;
 import motionkit.Feed;
 import motionkit.path.PathPoint;
+import motionkit.path.GeometricPath;
+import motionkit.planner.LineLookaheadPlanner;
+import motionkit.planner.PathPlanningOptions;
 import motionkit.planner.TrajectoryPlanner;
 import motionkit.planner.TrapezoidalPlanner;
 import motionkit.trajectory.JointTrajectory;
@@ -28,6 +31,7 @@ class MotionSystem {
   public final axes:Array<MotionAxis>;
   public final fixedTimestepSeconds:Float;
   public final planner:TrajectoryPlanner;
+  public final linePlanner:LineLookaheadPlanner;
   var activeTrajectory:Null<JointTrajectory> = null;
   var queuedTrajectories:Array<JointTrajectory> = [];
   var elapsedSeconds:Float = 0.0;
@@ -53,6 +57,7 @@ class MotionSystem {
     this.robot = robot;
     this.fixedTimestepSeconds = blueprint.fixedTimestepSeconds;
     this.planner = planner == null ? new TrapezoidalPlanner(fixedTimestepSeconds) : planner;
+    this.linePlanner = new LineLookaheadPlanner(fixedTimestepSeconds);
     this.axes = [];
     var axisIds = new Map<String, Bool>();
     for (axisBlueprint in blueprint.axes) {
@@ -129,6 +134,25 @@ class MotionSystem {
   /** Adds a straight Cartesian move behind all motion already in the buffer. */
   public function queueLinear(target:PathPoint, feed:Feed):JointTrajectory {
     var trajectoryValue = planLinearFrom(planningStartPositions(), target, feed);
+    enqueueTrajectory(trajectoryValue);
+    return trajectoryValue;
+  }
+
+  /** Plans a connected Cartesian polyline for a direct XYZ machine. */
+  public function movePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
+      ?motionOptions:MotionOptions):JointTrajectory {
+    var trajectoryValue = planPathFrom(robot.snapshot().positions.toArray(), path,
+      pathOptions, motionOptions);
+    clearBufferedMotion();
+    beginImmediate(trajectoryValue);
+    return trajectoryValue;
+  }
+
+  /** Adds a connected Cartesian polyline behind motion already in the buffer. */
+  public function queuePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
+      ?motionOptions:MotionOptions):JointTrajectory {
+    var trajectoryValue = planPathFrom(planningStartPositions(), path,
+      pathOptions, motionOptions);
     enqueueTrajectory(trajectoryValue);
     return trajectoryValue;
   }
@@ -211,6 +235,96 @@ class MotionSystem {
         velocities, accelerations));
     }
     return new JointTrajectory(mapped);
+  }
+
+  function planPathFrom(start:Array<Float>, path:GeometricPath,
+      pathOptions:Null<PathPlanningOptions>, motionOptions:Null<MotionOptions>):JointTrajectory {
+    if (path == null) throw "Cartesian path is required";
+    var xAxis = requireAxis("x");
+    var yAxis = requireAxis("y");
+    var zAxis = requireAxis("z");
+    var first = path.primitives[0].pointAt(0.0);
+    var starts = [xAxis.logicalPosition(start), yAxis.logicalPosition(start),
+      zAxis.logicalPosition(start)];
+    var startCoordinates = [first.x, first.y, first.z];
+    for (i in 0...3) {
+      if (Math.abs(starts[i] - startCoordinates[i]) > 1e-8)
+        throw 'Cartesian path starts at ${startCoordinates[i]} but axis ${["x", "y", "z"][i]} is at ${starts[i]}';
+    }
+
+    var limits = resolvePathLimits(path, [xAxis, yAxis, zAxis],
+      motionOptions == null ? new MotionOptions() : motionOptions);
+    validatePathLimits(path, [xAxis, yAxis, zAxis]);
+    var cartesian = linePlanner.planPath(path, limits, pathOptions);
+    var mapped:Array<JointTrajectorySample> = [];
+    for (sample in cartesian.samples) {
+      var positions = start.copy();
+      var velocities = [for (_ in start) 0.0];
+      var accelerations = [for (_ in start) 0.0];
+      xAxis.writeLogicalPosition(positions, sample.positions[0]);
+      yAxis.writeLogicalPosition(positions, sample.positions[1]);
+      zAxis.writeLogicalPosition(positions, sample.positions[2]);
+      writeLogicalVector(xAxis, velocities, sample.velocities[0]);
+      writeLogicalVector(yAxis, velocities, sample.velocities[1]);
+      writeLogicalVector(zAxis, velocities, sample.velocities[2]);
+      writeLogicalVector(xAxis, accelerations, sample.accelerations[0]);
+      writeLogicalVector(yAxis, accelerations, sample.accelerations[1]);
+      writeLogicalVector(zAxis, accelerations, sample.accelerations[2]);
+      mapped.push(new JointTrajectorySample(sample.timeSeconds, positions, velocities,
+        accelerations));
+    }
+    return new JointTrajectory(mapped);
+  }
+
+  function resolvePathLimits(path:GeometricPath, directAxes:Array<MotionAxis>,
+      options:MotionOptions):MotionLimits {
+    var maxVelocity = options.maxVelocity;
+    var maxAcceleration = options.maxAcceleration;
+    for (primitive in path.primitives) {
+      var line = primitive;
+      var length = line.length();
+      if (length <= 1e-12) continue;
+      var startPoint = line.pointAt(0.0);
+      var endPoint = line.pointAt(length);
+      var deltas = [endPoint.x - startPoint.x, endPoint.y - startPoint.y,
+        endPoint.z - startPoint.z];
+      for (i in 0...3) {
+        var fraction = Math.abs(deltas[i]) / length;
+        if (fraction <= 1e-12) continue;
+        var axisVelocity = directAxes[i].maxVelocity;
+        var axisAcceleration = directAxes[i].maxAcceleration;
+        if (axisVelocity > 0.0) {
+          var projectedVelocity = axisVelocity / fraction;
+          maxVelocity = maxVelocity <= 0.0 ? projectedVelocity : Math.min(maxVelocity,
+            projectedVelocity);
+        }
+        if (axisAcceleration > 0.0) {
+          var projectedAcceleration = axisAcceleration / fraction;
+          maxAcceleration = maxAcceleration <= 0.0 ? projectedAcceleration :
+            Math.min(maxAcceleration, projectedAcceleration);
+        }
+      }
+    }
+    return new MotionLimits(maxVelocity, maxAcceleration, options.maxJerk);
+  }
+
+  function validatePathLimits(path:GeometricPath, directAxes:Array<MotionAxis>):Void {
+    for (primitive in path.primitives) {
+      var line = primitive;
+      var points = [line.pointAt(0.0), line.pointAt(line.length())];
+      for (point in points) {
+        var coordinates = [point.x, point.y, point.z];
+        for (i in 0...3) {
+          if (coordinates[i] < directAxes[i].lowerLimit ||
+              coordinates[i] > directAxes[i].upperLimit)
+            throw 'Axis "${["x", "y", "z"][i]}" path point ${coordinates[i]} is outside its limits';
+        }
+      }
+    }
+  }
+
+  static function writeLogicalVector(axis:MotionAxis, joints:Array<Float>, value:Float):Void {
+    axis.writeLogicalDelta(joints, value);
   }
 
   /** Software homing for the bootstrap: move to each authored home coordinate. */

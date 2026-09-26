@@ -49,4 +49,11 @@ class MotionAxis {
     for (i in 0...jointIndices.length)
       jointPositions[jointIndices[i]] = jointOffsets[i] + jointScales[i] * logicalPosition;
   }
+
+  /** Writes a logical velocity or acceleration into all physical joints. */
+  public function writeLogicalDelta(jointValues:Array<Float>, logicalValue:Float):Void {
+    if (jointValues == null) throw "Joint values are required";
+    for (i in 0...jointIndices.length)
+      jointValues[jointIndices[i]] = jointScales[i] * logicalValue;
+  }
 }

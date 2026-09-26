@@ -5,11 +5,13 @@ RobotKit execution. The bootstrap package currently provides:
 
 - reusable Cartesian path points, line primitives, and ordered geometric paths;
 - immutable timed joint trajectory samples;
-- a deterministic synchronized velocity/acceleration planner with jerk in the
-  public limits API;
+- deterministic synchronized velocity/acceleration planning with jerk in the
+  public limits API, plus line-path lookahead with exact-stop and blend modes;
 - a semantic `MotionSystem`/`MotionAxis` view over any RobotKit `Robot`;
 - a MachineKit `LinearAxis` compiler that produces a two-link prismatic
   RobotModel and a runtime-ready MotionSystem blueprint.
+- buffered trajectory execution with a native timestamped-chunk path when the
+  RobotKit runtime advertises queue support.
 
 MachineKit dimensions are authored in millimetres. The compiler converts them
 to RobotKit metres, places the logical zero at the axis's lower travel limit,
@@ -33,9 +35,20 @@ while (machine.isMoving()) {
 }
 ```
 
-The bootstrap submits one position batch per deterministic update. Buffered
-trajectory commands, continuous-path lookahead, Cartesian paths, and CNC
-semantics are intentionally subsequent increments.
+For a direct XYZ machine, the same system can plan and buffer a Cartesian
+polyline:
+
+```haxe
+machine.movePath(GeometricPath.lines([
+  new PathPoint(0.0, 0.0, 0.0),
+  new PathPoint(0.1, 0.0, 0.0),
+  new PathPoint(0.1, 0.1, 0.0)
+]), PathPlanningOptions.blend(0.001));
+```
+
+The runtime uses timestamped trajectory chunks where supported and retains a
+deterministic position-target fallback. CNC semantics and G-code remain
+outside MotionKit.
 
 Run the focused native-backed test with:
 

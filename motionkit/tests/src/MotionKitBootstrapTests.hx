@@ -8,6 +8,8 @@ import motionkit.MotionSystem;
 import motionkit.Pose;
 import motionkit.path.GeometricPath;
 import motionkit.path.PathPoint;
+import motionkit.planner.LineLookaheadPlanner;
+import motionkit.planner.PathPlanningOptions;
 import motionkit.planner.TrapezoidalPlanner;
 import motionkit.trajectory.MotionLimits;
 import robotkit.runtime.Simulation;
@@ -22,6 +24,7 @@ class MotionKitBootstrapTests {
   public static function main():Void {
     testGeometricPathPrimitives();
     testPlannerIsDeterministicAndBounded();
+    testLineLookaheadPlanner();
     testLinearAxisCompilesToRobotModel();
     testCompiledAxisRunsThroughSimulation();
     testCompiledXYZGantryRunsThroughSimulation();
@@ -59,6 +62,55 @@ class MotionKitBootstrapTests {
     near(first.sample(0.0).positions[0], 0.0, "trajectory starts at the requested position");
     near(first.sample(first.durationSeconds).positions[0], 1.0,
       "trajectory ends at the requested position");
+  }
+
+  static function testLineLookaheadPlanner():Void {
+    var path = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
+      new PathPoint(0.1, 0.0, 0.0), new PathPoint(0.1, 0.1, 0.0)]);
+    var planner = new LineLookaheadPlanner(0.01);
+    var limits = new MotionLimits(1.0, 2.0, 0.0);
+    var exact = planner.planPath(path, limits, PathPlanningOptions.exactStopMode());
+    var blend = planner.planPath(path, limits, PathPlanningOptions.blend(0.01));
+    check(exact.durationSeconds > blend.durationSeconds,
+      "blending shortens a cornered path without changing its endpoints");
+
+    var exactCorner = findCornerSample(exact);
+    var blendCorner = findCornerSample(blend);
+    near(exactCorner.velocities[0], 0.0, "exact-stop corner has no X velocity");
+    near(exactCorner.velocities[1], 0.0, "exact-stop corner has no Y velocity");
+    check(Math.sqrt(blendCorner.velocities[0] * blendCorner.velocities[0] +
+      blendCorner.velocities[1] * blendCorner.velocities[1]) > 1e-6,
+      "blend corner retains continuous path speed");
+
+    for (trajectory in [exact, blend]) {
+      for (i in 0...101) {
+        var sample = trajectory.sample(trajectory.durationSeconds * i / 100.0);
+        var onFirst = Math.abs(sample.positions[1]) <= 1e-7 &&
+          sample.positions[0] >= -1e-7 && sample.positions[0] <= 0.1000001;
+        var onSecond = Math.abs(sample.positions[0] - 0.1) <= 1e-7 &&
+          sample.positions[1] >= -1e-7 && sample.positions[1] <= 0.1000001;
+        check(onFirst || onSecond, "lookahead samples stay on the authored polyline");
+      }
+    }
+
+    var repeated = planner.planPath(path, limits, PathPlanningOptions.blend(0.01));
+    check(repeated.samples.length == blend.samples.length,
+      "lookahead planning is deterministic");
+    for (i in 0...blend.samples.length) {
+      near(repeated.samples[i].timeSeconds, blend.samples[i].timeSeconds,
+        "lookahead sample time is deterministic");
+      near(repeated.samples[i].positions[0], blend.samples[i].positions[0],
+        "lookahead position is deterministic");
+      near(repeated.samples[i].positions[1], blend.samples[i].positions[1],
+        "lookahead corner position is deterministic");
+    }
+  }
+
+  static function findCornerSample(trajectory:motionkit.trajectory.JointTrajectory):motionkit.trajectory.JointTrajectorySample {
+    for (sample in trajectory.samples)
+      if (Math.abs(sample.positions[0] - 0.1) <= 1e-7 && Math.abs(sample.positions[1]) <= 1e-7)
+        return sample;
+    throw "lookahead trajectory did not emit its corner sample";
   }
 
   static function testLinearAxisCompilesToRobotModel():Void {
@@ -168,6 +220,16 @@ class MotionKitBootstrapTests {
     near(linearMove.positions.get(0), 0.03, "Cartesian move reaches X target", 1e-5);
     near(linearMove.positions.get(1), 0.02, "Cartesian move reaches Y target", 1e-5);
     near(linearMove.positions.get(2), 0.025, "Cartesian move reaches Z target", 1e-5);
+
+    var cornerPath = GeometricPath.lines([new PathPoint(0.03, 0.02, 0.025),
+      new PathPoint(0.04, 0.02, 0.025), new PathPoint(0.04, 0.03, 0.025)]);
+    var cornerMove = machine.movePath(cornerPath, PathPlanningOptions.blend(0.001),
+      new MotionOptions(0.05, 0.2));
+    check(cornerMove.samples.length > 2, "MotionSystem exposes buffered line-path planning");
+    runMotion(machine, simulation);
+    var cornerEnd = robot.snapshot();
+    near(cornerEnd.positions.get(0), 0.04, "line path reaches its X endpoint", 1e-5);
+    near(cornerEnd.positions.get(1), 0.03, "line path reaches its Y endpoint", 1e-5);
     simulation.dispose();
   }
 
