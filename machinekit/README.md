@@ -30,6 +30,9 @@ Each component also produces the machining it needs:
 | `ShaftCollar` | set-screw type, by bore diameter | — |
 | `SteppedShaft` | — (built from arbitrary sections) | keyway and retaining-ring groove cuts, `diameterAt()` |
 | `PillowBlockHousing` | — (sized from a `DeepGrooveBearing`) | `mountScrewPart()` |
+| `Bushing` | — (proportional to bore diameter) | — |
+| `ShaftCoupling` | — (proportional to the larger bore) | `setScrewPart()` |
+| `LinearBearing` | LM8UU–LM20UU | — |
 
 `SteppedShaft` stacks coaxial cylindrical sections along +Z, producing square
 shoulders at each diameter change. Keyways are cut on the shaft's local +Y
@@ -70,6 +73,12 @@ sampled as a polyline profile, extruded along +Z) and `Rack` (its straight-flank
 infinite-radius limit, extruded along +X with teeth along +Z). `GearPair.mesh(a, b)`
 computes the standard centre distance and ratio for two same-module gears and a
 placement pose for `b` relative to `a`.
+
+`Sprocket` (roller chain) and `TimingPulley` (belt) use a coarser simplified
+tooth outline than `SpurGear` — straight flanks between two radii rather than
+sampled involute curves — since neither the ANSI B29.1 seating-curve nor the
+rounded-trapezoid GT2/HTD profile is modelled exactly. Both are parametric by
+pitch and tooth count, not a vendor catalog.
 
 ## Assembly
 

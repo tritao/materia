@@ -4,8 +4,11 @@ import machinekit.assembly.LinearAxis;
 import machinekit.assembly.PillowBlock;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
+import machinekit.motion.LinearBearing;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
+import machinekit.standard.Bushing;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.FlatWasher;
@@ -27,7 +30,9 @@ import machinekit.structural.RoundTube;
 import machinekit.structural.TSlotExtrusion;
 import machinekit.transmission.GearPair;
 import machinekit.transmission.Rack;
+import machinekit.transmission.Sprocket;
 import machinekit.transmission.SpurGear;
+import machinekit.transmission.TimingPulley;
 import materia.project.AssemblyFrames;
 
 class MachineKitSmoke {
@@ -543,6 +548,59 @@ class MachineKitSmoke {
 		check(axis.bom().quantity(axis.bearing.designation) == 2, "linear axis bearing quantity");
 	}
 
+	static function catalogExtras():Void {
+		var bushing = new Bushing(8);
+		check(bushing.designation == "BUSHING-8x11x12", "bushing designation");
+		throws(() -> new Bushing(-1), "positive bore diameter");
+		var bushingPart = bushing.geometry();
+		solid(bushingPart, "bushing");
+		near(bushingPart.volume(), Math.PI * (5.5 * 5.5 - 4 * 4) * 12, "bushing volume");
+		bushingPart.close();
+		near(bushing.connector("axis").frame.z, 6, "bushing axis connector");
+
+		var coupling = new ShaftCoupling(5, 8);
+		check(coupling.designation == "COUPLING-5x8-14.4x24", "shaft coupling designation");
+		check(coupling.setScrew == "M3", "shaft coupling set screw size");
+		throws(() -> new ShaftCoupling(-1, 8), "positive bore diameters");
+		var couplingPart = coupling.geometry();
+		solid(couplingPart, "shaft coupling");
+		check(couplingPart.volume() < Math.PI * 7.2 * 7.2 * 24, "shaft coupling removes both bores");
+		couplingPart.close();
+		near(coupling.connector("sideB").frame.z, 24, "shaft coupling sideB connector");
+
+		var linearBearing = LinearBearing.metric("LM8UU");
+		check(linearBearing.designation == "LM8UU", "linear bearing designation");
+		throws(() -> LinearBearing.metric("LM9UU"), 'Unknown linear bearing "LM9UU"');
+		var linearBearingPart = linearBearing.geometry();
+		solid(linearBearingPart, "linear bearing");
+		near(linearBearingPart.volume(), Math.PI * (7.5 * 7.5 - 4 * 4) * 24, "linear bearing volume");
+		linearBearingPart.close();
+
+		var sprocket = new Sprocket(12.7, 20, 8, 6);
+		check(sprocket.designation == "SPROCKET-P12.7-20T", "sprocket designation");
+		near(sprocket.pitchDiameter, 12.7 / Math.sin(Math.PI / 20), "sprocket pitch diameter");
+		throws(() -> new Sprocket(12.7, 5, 8, 6), "at least 8 teeth");
+		throws(() -> new Sprocket(12.7, 8, 40, 6), "must clear the bore");
+		var sprocketPart = sprocket.geometry();
+		solid(sprocketPart, "sprocket");
+		var sprocketBox = bounds(sprocketPart);
+		check(sprocketBox.maxX <= sprocket.outsideDiameter / 2 + 1e-6, "sprocket stays within its outside radius");
+		check(sprocketBox.maxX > sprocket.pitchDiameter / 2, "sprocket teeth extend past the pitch circle");
+		sprocketPart.close();
+
+		var pulley = new TimingPulley(2, 20, 5, 6);
+		check(pulley.designation == "PULLEY-P2-20T", "timing pulley designation");
+		near(pulley.pitchDiameter, 2 * 20 / Math.PI, "timing pulley pitch diameter");
+		throws(() -> new TimingPulley(2, 5, 5, 6), "at least 8 teeth");
+		throws(() -> new TimingPulley(2, 8, 11, 6), "must clear the bore");
+		var pulleyPart = pulley.geometry();
+		solid(pulleyPart, "timing pulley");
+		var pulleyBox = bounds(pulleyPart);
+		check(pulleyBox.maxX <= pulley.outsideDiameter / 2 + 1e-6, "timing pulley stays within its outside radius");
+		check(pulleyBox.maxX > pulley.grooveDiameter / 2, "timing pulley lands extend past the groove circle");
+		pulleyPart.close();
+	}
+
 	static function robotics():Void {
 		var flange = new RobotFlange(50);
 		check(flange.designation == "ISO9409-50", "robot flange designation");
@@ -653,6 +711,7 @@ class MachineKitSmoke {
 		gears();
 		pillowBlock();
 		linearAxis();
+		catalogExtras();
 		robotics();
 		assembly();
 		trace("MachineKit smoke passed");
