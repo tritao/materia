@@ -75,10 +75,12 @@ one rigid weldment, not a kinematic mechanism, so members carry no assembly
 joints. Each cross-section (`RectTube`, `RoundTube`, `Angle`, `Channel`,
 `FlatBar`, `TSlotExtrusion`) implements `StructuralProfile` and extrudes
 itself along local +Z to a caller-chosen length, the same axis convention as
-every other generator. `TSlotExtrusion` is a square 2020/4040-style profile
-with a T-slot channel on each face and a centre bore, all proportional to its
-`size` rather than a vendor's literal table, sized with margin so adjacent
-faces' slot heads and the bore never intersect and sever the corner posts.
+every other generator. The numeric `TSlotExtrusion(size)` constructor is a
+generic square 2020/4040-style profile with a T-slot channel on each face and
+a centre bore, all proportional to its `size` rather than a vendor's literal
+table. Use `TSlotExtrusion.forProfile()` for catalog-backed MISUMI HFS5
+profiles; those entries retain their slot, bore, and cross-section dimensions
+and provenance.
 
 `FrameAssembly` registers named points with `point(name, x, y, z)`, then
 members with `member(name, start, end, profile)`. `geometry(name)` extrudes

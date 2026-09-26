@@ -8,6 +8,7 @@ import machinekit.standard.FlatWasher;
 import machinekit.standard.HexBolt;
 import machinekit.standard.HexNut;
 import machinekit.standard.SocketHeadCapScrew;
+import machinekit.structural.TSlotExtrusion;
 
 /** Independent manufacturer reference values, separate from generator formulas. */
 class MachineKitReferenceTests {
@@ -78,6 +79,23 @@ class MachineKitReferenceTests {
 			if (flangeMetadata.standard != "ISO 9409-1" || flangeMetadata.standardEdition != "2004" ||
 				flangeMetadata.dimensionKind != Nominal || flangeMetadata.conformance != GenericApproximation)
 				throw reference.name + " ISO flange metadata";
+		}
+		// MISUMI HFS5 catalog: cross-section and slot dimensions, in mm.
+		for (reference in [{name: "HFS5-2020", width: 20.0, height: 20.0},
+				{name: "HFS5-2040", width: 20.0, height: 40.0},
+				{name: "HFS5-2060", width: 20.0, height: 60.0},
+				{name: "HFS5-4040", width: 40.0, height: 40.0}]) {
+			var profile = TSlotExtrusion.catalog().get(reference.name);
+			equal(profile.width, reference.width, reference.name + " width");
+			equal(profile.height, reference.height, reference.name + " height");
+			equal(profile.slotWidth, 6, reference.name + " slot width");
+			equal(profile.slotDepth, 6, reference.name + " slot depth");
+			equal(profile.tWidth, 12, reference.name + " slot head");
+			equal(profile.boreDiameter, 4.2, reference.name + " bore");
+			var profileMetadata = TSlotExtrusion.catalog().metadata(reference.name);
+			if (profileMetadata.dimensionKind != Nominal || profileMetadata.conformance != NominalEnvelope ||
+				profileMetadata.verifiedFields == null)
+				throw reference.name + " profile metadata";
 		}
 		// Accu ISO 4762 M5 product sheet: these fields have been cross-checked.
 		var m5 = SocketHeadCapScrew.catalog().get("M5");

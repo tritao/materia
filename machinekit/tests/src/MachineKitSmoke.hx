@@ -423,7 +423,7 @@ class MachineKitSmoke {
 		barPart.close();
 
 		var tslot = new TSlotExtrusion(20);
-		check(tslot.designation == "TSLOT-20x20", "t-slot designation");
+		check(tslot.designation == "GENERIC-TSLOT-20x20", "generic t-slot designation");
 		throws(() -> new TSlotExtrusion(-1), "positive size");
 		var tslotPart = tslot.geometry(100);
 		solid(tslotPart, "t-slot extrusion");
@@ -438,7 +438,24 @@ class MachineKitSmoke {
 		near(tslotVolume, (20 * 20 - 4 * (3 * 6 + 2 * 7) - Math.PI * 1.5 * 1.5) * 100, "t-slot volume");
 		tslotPart.close();
 		check(new FlatBar(12.7, 3.2).designation == "FLAT-12.7x3.2", "fractional flat bar designation");
-		check(new TSlotExtrusion(25.4).designation == "TSLOT-25.4x25.4", "fractional t-slot designation");
+		check(new TSlotExtrusion(25.4).designation == "GENERIC-TSLOT-25.4x25.4", "fractional generic t-slot designation");
+		var hfs = TSlotExtrusion.forProfile("HFS5-2020");
+		check(hfs.designation == "HFS5-2020" && hfs.family == "MISUMI HFS5", "catalog t-slot designation");
+		near(hfs.slotWidth, 6, "HFS5 slot opening");
+		near(hfs.tWidth, 12, "HFS5 slot head width");
+		near(hfs.boreDiameter, 4.2, "HFS5 centre bore");
+		var hfsPart = hfs.geometry(100);
+		solid(hfsPart, "catalog t-slot extrusion");
+		near(bounds(hfsPart).maxX, 10, "catalog t-slot outer boundary");
+		check(hfsPart.volume() < 20 * 20 * 100, "catalog t-slot removes slot material");
+		hfsPart.close();
+		var hfs2040 = TSlotExtrusion.forProfile("HFS5-2040");
+		check(hfs2040.height == 40, "catalog rectangular t-slot height");
+		var hfs2040Part = hfs2040.geometry(50);
+		solid(hfs2040Part, "catalog rectangular t-slot extrusion");
+		check(hfs2040Part.volume() < 20 * 40 * 50, "catalog rectangular t-slot removes material");
+		hfs2040Part.close();
+		throws(() -> TSlotExtrusion.forProfile("HFS5-3030"), 'Unknown T-slot profile "HFS5-3030"');
 
 		var frame = new FrameAssembly();
 		frame.point("A", 0, 0, 0);
@@ -1151,6 +1168,9 @@ class MachineKitSmoke {
 		metadataComplete(NemaStepper.variantCatalog());
 		metadataComplete(RobotFlange.catalog());
 		metadataComplete(Sprocket.chainCatalog());
+		check(TSlotExtrusion.catalog().metadata("HFS5-2020").conformance == NominalEnvelope,
+			"HFS5 profile carries nominal-envelope metadata");
+		metadataComplete(TSlotExtrusion.catalog());
 	}
 
 	static function metadataComplete<T>(catalog:Catalog<T>):Void {
