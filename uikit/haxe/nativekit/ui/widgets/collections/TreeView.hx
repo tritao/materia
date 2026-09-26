@@ -46,6 +46,8 @@ class TreeView implements View {
 	public var selectedKey(default, null):Null<String>;
 	public var onSelectionChanged:Null<String->Void>;
 	public var onItemActivated:Null<String->Void>;
+	public var onItemContextMenu:Null<String->UiEvent->Void>;
+	public var onItemRename:Null<String->Void>;
 	public var onExpandedChanged:Null<String->Bool->Void>;
 
 	final fallbackViewportHeight:Float;
@@ -84,6 +86,8 @@ class TreeView implements View {
 		this.selectedKey = selectedKey;
 		this.onSelectionChanged = onSelectionChanged;
 		this.onItemActivated = onItemActivated;
+		onItemContextMenu = null;
+		onItemRename = null;
 		this.onExpandedChanged = onExpandedChanged;
 		this.virtualization = virtualization == null ? new VirtualizationPolicy() : virtualization;
 		materializedFirst = 0;
@@ -235,7 +239,8 @@ class TreeView implements View {
 						function() { if (onItemActivated != null) onItemActivated(nodeKey); },
 						function() { toggleExpanded(nodeKey); },
 						function(event) { handleNodeKey(context, entry, event); },
-						function(id) { itemIds.set(nodeKey, id); });
+						function(id) { itemIds.set(nodeKey, id); },
+						function(event) { if (onItemContextMenu != null) onItemContextMenu(nodeKey, event); });
 					var slotKey = virtualization.recycleSlots ? 'slot:${index - window.first}' :
 						'item:$nodeKey';
 					rowViews.push(new KeyedView(slotKey, row));
@@ -266,6 +271,11 @@ class TreeView implements View {
 	}
 
 	function handleNodeKey(context:BuildContext, entry:TreeEntry, event:UiEvent):Void {
+		if (event.key == UiKey.F2 && onItemRename != null) {
+			event.preventDefault();
+			onItemRename(entry.key);
+			return;
+		}
 		var nextKey:Null<String> = null;
 		switch (event.key) {
 			case UiKey.Up: nextKey = adjacentKey(entry.key, -1);
@@ -626,10 +636,11 @@ private class TreeViewRow implements View {
 	final onToggle:Void->Void;
 	final onKey:UiEvent->Void;
 	final onBuilt:WidgetId->Void;
+	final onContextMenu:UiEvent->Void;
 
 	public function new(key:String, itemKey:String, child:View, entry:TreeEntry, selected:Bool,
 			onSelect:Void->Void, onActivate:Void->Void, onToggle:Void->Void,
-			onKey:UiEvent->Void, onBuilt:WidgetId->Void) {
+			onKey:UiEvent->Void, onBuilt:WidgetId->Void, onContextMenu:UiEvent->Void) {
 		this.key = key;
 		this.itemKey = itemKey;
 		this.child = child;
@@ -640,6 +651,7 @@ private class TreeViewRow implements View {
 		this.onToggle = onToggle;
 		this.onKey = onKey;
 		this.onBuilt = onBuilt;
+		this.onContextMenu = onContextMenu;
 	}
 
 	public function build(context:BuildContext):RenderNode {
@@ -675,6 +687,14 @@ private class TreeViewRow implements View {
 			node.on(UiEventKind.Activate, function(_) { onSelect(); onActivate(); });
 			node.on(UiEventKind.KeyDown, onKey);
 			node.on(UiEventKind.KeyRepeat, onKey);
+			node.on(UiEventKind.PointerDown, function(event) {
+				if (event.button == 1) {
+					onSelect();
+					onContextMenu(event);
+					event.preventDefault();
+					event.stopPropagation();
+				}
+			});
 
 			var disclosure:View = entry.hasChildren
 				? new TreeDisclosure("disclosure-control", entry.expanded, onToggle)

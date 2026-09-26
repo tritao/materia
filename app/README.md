@@ -23,8 +23,8 @@ or the Scene root to clear object selection.
 - The hierarchy's Add menu groups primitive, CAD, feature, and import commands.
   Search filters objects by name or type and includes matching CAD features.
   Duplicate (`Ctrl+D`) and Delete sit beside Add; double-click a tree row to frame
-  it. Rename through the inspector's Name field. Edits support undo/redo and mark
-  the document as unsaved.
+  it. F2 or the object context menu opens Rename; the context menu also offers
+  Duplicate, Delete, and Frame. Edits support undo/redo and mark the document as unsaved.
 - Create and duplicate select the new object; duplicates retain appearance and
   visibility with a small XY offset. Delete selects a neighbour or the Scene root.
   Undo restores the previous objects, order, and selection; redo retains object IDs.
@@ -32,8 +32,8 @@ or the Scene root to clear object selection.
   previews live, and release creates one undo step. Escape cancels the active drag.
 - Saving commits an active drag before writing. New, Open, and Close cancel it before
   continuing through the normal unsaved-change confirmation.
-- Optional grid snapping is available from the viewport context menu with 0.1,
-  0.2, and 0.5 m spacing choices.
+- Viewport controls expose Frame, Grid, Snap, and 0.1, 0.2, and 0.5 m spacing.
+  The perspective view also exposes Reset and lighting presets.
 - Hold Shift while dragging to lock movement to the first dominant axis. Arrow
   keys nudge by 0.1 m; Shift+Arrow nudges by 1 m. Each nudge is independently undoable.
 - Positive finite dimension edits rebuild geometry and picking bounds together;

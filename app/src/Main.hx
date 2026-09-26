@@ -361,6 +361,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var contextMenuVisible:Bool;
   var hierarchyAddVisible:Bool = false;
   var hierarchySearch:String = "";
+  var hierarchyMenuVisible:Bool = false;
+  var hierarchyMenuX:Float = 0.0;
+  var hierarchyMenuY:Float = 0.0;
+  var hierarchyAddX:Float = 12.0;
+  var hierarchyAddY:Float = 120.0;
+  var renameId:Null<String> = null;
+  var renameValue:String = "";
+  var viewportOptionsVisible:Bool = false;
+  var viewportOptionsPerspective:Bool = false;
+  var viewportOptionsX:Float = 0.0;
+  var viewportOptionsY:Float = 0.0;
   var contextMenuX:Float;
   var contextMenuY:Float;
   var componentLab:Null<ComponentLab>;
@@ -526,9 +537,34 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.create-extrusion", "scene.add-face-hole", "scene.create-pocket",
         "scene.create-vertical-fillet"]);
       addSection("Import", ["scene.import-step"]);
-      var addMenu = new Menu("hierarchy-add-menu", items, 12.0, TOOLBAR_HEIGHT + 66.0,
+      var addMenu = new Menu("hierarchy-add-menu", items, hierarchyAddX, hierarchyAddY,
         function() { hierarchyAddVisible = false; commands.refresh(); });
       windowLayers.push(new StackChild("hierarchy-add-menu", addMenu, 0.0, 0.0, 25));
+    }
+    if (hierarchyMenuVisible && documentDialog == null) {
+      var objectMenu = new Menu("hierarchy-object-menu", [
+        new MenuItem("rename", "Rename (F2)", function() startRename(scene.selectedId), canEditObjects()),
+        new MenuItem("duplicate", "Duplicate", function() commands.execute("scene.duplicate"),
+          commands.get("scene.duplicate").isEnabled(ui.commandContext)),
+        new MenuItem("delete", "Delete", function() commands.execute("scene.delete"),
+          commands.get("scene.delete").isEnabled(ui.commandContext)),
+        new MenuItem("frame", "Frame selected", function() commands.execute("scene.frame-selected"))
+      ], hierarchyMenuX, hierarchyMenuY, function() { hierarchyMenuVisible = false; commands.refresh(); });
+      windowLayers.push(new StackChild("hierarchy-object-menu", objectMenu, 0.0, 0.0, 26));
+    }
+    if (renameId != null && documentDialog == null) {
+      windowLayers.push(new StackChild("hierarchy-rename-dialog", renameDialog(), 0.0, 0.0, 40,
+        LayoutAxis.grow(), LayoutAxis.grow()));
+    }
+    if (viewportOptionsVisible && documentDialog == null) {
+      var optionIds = ["scene.grid-spacing-0.1", "scene.grid-spacing-0.2", "scene.grid-spacing-0.5"];
+      if (viewportOptionsPerspective) optionIds = optionIds.concat([
+        "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast"]);
+      var options = new CommandMenu("viewport-options-menu", optionIds,
+        viewportOptionsX, viewportOptionsY, commands, ui.commandContext,
+        function() { viewportOptionsVisible = false; commands.refresh(); },
+        function(_) { viewportOptionsVisible = false; commands.refresh(); });
+      windowLayers.push(new StackChild("viewport-options-menu", options, 0.0, 0.0, 25));
     }
     return new Stack("window-overlay-host", windowLayers);
   }
@@ -924,6 +960,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.refresh();
     }, "hierarchy-add");
     addButton.variant = ButtonVariant.Secondary;
+    addButton.onClickEvent = function(event) {
+      var bounds = menuTriggerBounds(event);
+      hierarchyAddX = Math.max(8.0, Math.min(viewportWidth - 228.0, bounds.x));
+      hierarchyAddY = Math.max(8.0, Math.min(viewportHeight - 560.0, bounds.y + bounds.height));
+      hierarchyAddVisible = true;
+      commands.refresh();
+    };
     var treeStyle = fillStyle();
     treeStyle.padding = new Insets(10.0, 10.0, 10.0, 10.0);
     treeStyle.background = appearance.theme.tokens.surface;
@@ -941,6 +984,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.execute("scene.frame-selected");
       log("Framed " + id);
     }, null, null);
+    tree.onItemContextMenu = function(id, event) {
+      if (scene.object(id) == null) return;
+      hierarchyMenuX = Math.max(8.0, Math.min(viewportWidth - 228.0, event.x));
+      hierarchyMenuY = Math.max(8.0, Math.min(viewportHeight - 180.0, event.y));
+      hierarchyMenuVisible = true;
+      commands.refresh();
+    };
+    tree.onItemRename = startRename;
     return new Column(
       "hierarchy-panel",
       [
@@ -972,6 +1023,39 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return action;
   }
 
+  function startRename(id:String):Void {
+    var item = scene.object(id);
+    if (item == null || !canEditObjects()) return;
+    renameId = id;
+    renameValue = item.label;
+    hierarchyMenuVisible = false;
+    commands.refresh();
+  }
+
+  function finishRename():Void {
+    var id = renameId;
+    if (id == null) return;
+    try {
+      scene.setName(id, renameValue);
+      updateCommandContext();
+      renameId = null;
+      commands.refresh();
+    } catch (error:Dynamic) log("Rename failed: " + Std.string(error));
+  }
+
+  function renameDialog():View {
+    var field = new TextField("rename-name", renameValue, function(value) renameValue = value);
+    field.onSubmit = function(_) finishRename();
+    var content = new Column("rename-content", [
+      new KeyedView("name", field),
+      new KeyedView("actions", new Row("rename-actions", [
+        new KeyedView("save", new Button("Rename", null, finishRename, "rename-confirm")),
+        new KeyedView("cancel", new Button("Cancel", null, function() renameId = null, "rename-cancel"))
+      ]))
+    ], actionColumnStyle());
+    return new Dialog("rename-object", "Rename object", content, function() renameId = null, 360.0);
+  }
+
   static function textLines(key:String, lines:Array<String>):View return new Column(key,
     [for (index in 0...lines.length) new KeyedView("line:"+index,new Text(lines[index]))]);
 
@@ -999,7 +1083,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       sceneViewport.setAppearance(Color.rgba(0.025, 0.035, 0.055, 1.0),
         Color.rgba(0.16, 0.24, 0.36, 0.75), viewportContent.gridStep * EditorSceneViewport.SCALE, gridVisible);
       sceneViewport.setBackgroundGradient(ViewportBackground.top(), ViewportBackground.bottom());
-      return sceneViewport;
+      return viewportWithControls(sceneViewport, false);
     }
     var viewportStyle = fillStyle();
     viewportStyle.background = Color.rgba(0.025, 0.035, 0.055, 1.0);
@@ -1073,7 +1157,46 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.refresh();
     });
     sceneViewport = viewport;
-    return viewport;
+    return viewportWithControls(viewport, false);
+  }
+
+  function viewportWithControls(content:View, perspective:Bool):View {
+    var options = new Button(Std.string(gridSpacing) + " m ▾", null, null, "viewport-options");
+    options.variant = ButtonVariant.Secondary;
+    options.onClickEvent = function(event) {
+      var bounds = menuTriggerBounds(event);
+      viewportOptionsX = Math.max(8.0, Math.min(viewportWidth - 228.0, bounds.x));
+      viewportOptionsY = Math.max(8.0, Math.min(viewportHeight - 245.0, bounds.y + bounds.height));
+      viewportOptionsPerspective = perspective;
+      viewportOptionsVisible = true;
+      commands.refresh();
+    };
+    var controls:Array<KeyedView> = [
+      new KeyedView("frame", sceneAction("viewport-frame", "scene.frame-selected", "Frame", IconName.Inspect))
+    ];
+    if (perspective) controls.push(new KeyedView("reset",
+      sceneAction("viewport-reset", "scene.reset-perspective", "Reset", IconName.Cube)));
+    controls.push(new KeyedView("grid", sceneAction("viewport-grid", "scene.toggle-grid",
+      gridVisible ? "Grid ✓" : "Grid", IconName.Grid)));
+    controls.push(new KeyedView("snap", sceneAction("viewport-snap", "scene.toggle-grid-snap",
+      gridSnapEnabled ? "Snap ✓" : "Snap", IconName.Plus)));
+    controls.push(new KeyedView("options", options));
+    var style = actionRowStyle();
+    style.width = LayoutAxis.fit();
+    style.wrapMode = LayoutWrapMode.NoWrap;
+    style.background = appearance.theme.tokens.surface;
+    style.padding = new Insets(4.0, 4.0, 4.0, 4.0);
+    return new Stack(perspective ? "perspective-with-controls" : "viewport-with-controls", [
+      new StackChild("canvas", content, 0.0, 0.0, 0, LayoutAxis.grow(), LayoutAxis.grow()),
+      new StackChild("controls", new Row("viewport-actions", controls, style), 12.0, 12.0, 1)
+    ]);
+  }
+
+  function menuTriggerBounds(event:UiEvent):Rect {
+    var root = ui.root;
+    var node = root == null || event.currentTarget == null ? null : root.find(event.currentTarget);
+    return node == null || node.resolved == null
+      ? new Rect(event.x, event.y, 0.0, 0.0) : node.resolved.clippedViewportBounds();
   }
 
   function paintSimulationOverlay(canvas:Canvas):Void {
@@ -1127,7 +1250,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }
     return perspectiveViewport == null
       ? new Text("Perspective rendering requires the desktop GPU host.")
-      : perspectiveViewport;
+      : viewportWithControls(perspectiveViewport, true);
   }
 
   function inspectorPanel():View {

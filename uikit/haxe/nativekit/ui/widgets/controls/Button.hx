@@ -48,6 +48,8 @@ class Button implements View {
 	/** Action capabilities override used by composite controls. */
 	public var semanticActions:Int;
 	public var onClick:Void->Void;
+	/** Optional event-aware activation, useful for positioning a menu by its trigger. */
+	public var onClickEvent:Null<UiEvent->Void>;
 
 	public function new(label:String, ?style:LayoutStyle, ?onClick:Void->Void, ?key:String) {
 		this.label = label == null ? "" : label;
@@ -63,6 +65,7 @@ class Button implements View {
 		classes = [];
 		variant = ButtonVariant.Primary;
 		this.onClick = onClick;
+		onClickEvent = null;
 		enabled = true;
 		selected = false;
 		leadingIcon = null;
@@ -102,9 +105,10 @@ class Button implements View {
 		if (selected)
 			semantics.states |= AccessibilityState.Selected;
 		node.semantics = semantics;
-		if (enabled && onClick != null) {
-			var activate = function(_:UiEvent) {
-				onClick();
+		if (enabled && (onClick != null || onClickEvent != null)) {
+			var activate = function(event:UiEvent) {
+				if (onClickEvent != null) onClickEvent(event);
+				else onClick();
 			};
 			node.on(UiEventKind.Click, activate);
 			node.on(UiEventKind.Activate, activate);
