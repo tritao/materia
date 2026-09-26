@@ -582,6 +582,37 @@ registration, in the dedicated deviation-map test. No other plan deviations;
 RANSAC ignoring 20% outliers, oversize-correction rejection, and the
 deviation map's center-vs-edge bow signature all matched the plan directly.
 
+**M8**: added `robotkit/haxe/robotkit/manipulation/ReachabilityChecker.hx`
+(+ `ReachabilityResult`), `WorkPatchPlanner.hx` (+ `WorkPatch`,
+`WorkPatchPlanResult`), `BaseObstacle.hx` (split into its own file: haxeon
+requires an explicitly-imported class to be its file's own module, unlike
+mainstream Haxe's "any class in an imported file" rule — the same "diagnose
+before workaround" class of issue M2's log already flagged, confirmed by the
+compiler's `E2001: Missing module` error naming the class directly), and
+`robotkit/tests/src/tests/PlacementTests.hx`, called from
+`RobotWorldTests.main()`. `ReachabilityChecker` seeds each point from the
+*previous converged* solution rather than the previous attempt's raw
+(possibly non-converged) result; an early version seeded from whatever IK
+last returned, and a direct unit test (reachable, unreachable, reachable)
+caught it immediately, since chasing the unreachable point's failed iterate
+poisoned the seed for the following, otherwise-trivial, reachable point.
+Building `PlacementTests`' 6m-wall/base-search scenario also surfaced a real
+`InverseKinematics` characteristic already documented from M2 (cold-start
+sensitivity/local-optimum branches): a raster's lead-in point, sitting a
+`leadInOut` distance beyond the first process point, occasionally failed to
+converge from a cold seed while the very next point (1cm away) converged
+immediately and precisely from the *same* seed. This is the solver behaving
+as documented, not a bug in `ReachabilityChecker`/`WorkPatchPlanner`, so the
+fix is in the test fixture: `PlacementTests` uses `leadInOut = 0.0` (a valid,
+already-supported value) so the lead-in point coincides with the first
+process point instead of sitting at a separate, seed-sensitive location. No
+change to `InverseKinematics`, `RasterToolpathGenerator`, or the planner was
+needed or made. With that fixed, the 6m wall splits into (patch-width-driven)
+several patches, every patch is fully reachable from its searched base pose,
+and placing a `BaseObstacle` at the otherwise-best candidate forces a
+different, still-fully-reachable, pose — matching the plan's acceptance
+criteria directly.
+
 **M5**: added `robotkit/haxe/robotkit/work/` (`Point2`, `Polygon2`,
 `WorkSurfaceId`, `SourceKind`, `Provenance`, `WorkSurface`,
 `RasterToolpathGenerator`, `CoverageMap`) and

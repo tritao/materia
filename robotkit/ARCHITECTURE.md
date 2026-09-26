@@ -769,6 +769,45 @@ and `z` as the deviation) so a smooth bow shows up as a spatial pattern
 (higher near the bow's center, lower near the boundary) rather than
 collapsing to one scalar.
 
+## Base placement and reachability
+
+`robotkit.manipulation` gains `ReachabilityChecker` and `WorkPatchPlanner`,
+still above `Robot`/`RobotRuntime`/the native runtime, and still not
+performing any joint base+arm optimization: base motion is the plan's
+existing planar `Navigator`/`GoTo`, driven by a `Pose2` each planner produces
+via `Transform3.toPose2`.
+
+`ReachabilityChecker.check(manipulator, toolpath, base_T_work, seed, ...)`
+solves IK for every point of a `Toolpath` from one candidate base placement
+(folded into `base_T_work`, the same "manipulator base frame to toolpath
+frame" convention `ToolpathExecutor` uses), seeded by continuation from the
+previous point's *converged* solution — not a failed attempt's own wandering
+final iterate, which can land far from any good configuration and would
+otherwise poison every following point's seed. It reports the reachable
+fraction and the index of the first unreachable point rather than aborting,
+unlike `ToolpathExecutor`, which is used only after a placement has already
+been chosen.
+
+`WorkPatchPlanner.plan(design, map_T_surface, manipulator, maxPatchWidth,
+...)` splits a `WorkSurface` into axis-aligned column patches no wider than
+`maxPatchWidth` (mirroring `RasterToolpathGenerator`'s own axis-aligned
+scope: a patch's boundary/exclusions are the design's own bounding-box
+rectangles clipped to the column, exact for the rectangular walls this
+milestone targets), builds each patch's raster `Toolpath`
+(`RasterToolpathGenerator`), and searches a grid of candidate base
+placements — positioned in front of the wall along the surface's outward
+normal within a standoff distance band, at lateral offsets across the
+patch's width, all projected into `map_T_surface`'s frame and then down to a
+`Pose2` via a `Transform3` built purely from a yaw computed toward the wall
+— to find one from which the whole patch is reachable. A candidate within a
+`BaseObstacle`'s radius plus the search's `clearance` is skipped outright, so
+an obstacle at the otherwise-best candidate forces the search onto a
+different one. Each returned `WorkPatch` carries its own sub-`WorkSurface`,
+`Toolpath`, and the chosen `basePose`; `WorkPatchPlanResult.fullyPlanned` is
+false if any patch's best candidate fell short of full reachability. Base
+motion between patches is left entirely to the existing `Navigator`/`GoTo`
+against each patch's `basePose`.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A

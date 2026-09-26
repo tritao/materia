@@ -167,6 +167,7 @@ class RobotWorldTests {
     assertions += ProcessTests.run();
     assertions += WorkTests.run();
     assertions += PerceptionTests.run();
+    assertions += PlacementTests.run();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
   }
 
