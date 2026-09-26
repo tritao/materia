@@ -605,6 +605,29 @@ class SceneEditingTests {
       "sensor UI removes the selected sensor");
     check(sensors.document.undo()&&sensors.model.sensors.length==2,
       "sensor add/remove operations participate in undo");
+    var camera=sensors.add("camera");
+    camera.updateRate=30.0;
+    var cameraMount=sensors.model.addFrame(new Frame("Front camera mount",
+      sensors.model.links[0],"front-camera-mount"));
+    cameraMount.position=[0.4,0.0,1.1];
+    camera.frame=cameraMount;
+    check(sensors.model.sensors.length==3&&camera.kind=="camera"&&
+      sensors.diagnostics().length==0,
+      "sensor editor adds a mounted camera");
+    var cameraScene=new EditorScene();
+    var cameraRestored=new SensorConfiguration(SceneCodec.decodeSensors(
+      SceneCodec.encode(cameraScene,sensors)));
+    var restoredCamera=cameraRestored.model.sensors[2];
+    check(restoredCamera.kind=="camera"&&restoredCamera.updateRate==30.0&&
+      restoredCamera.frame!=null&&restoredCamera.frame.id=="front-camera-mount"&&
+      restoredCamera.frame.position[2]==1.1,
+      "scene JSON preserves camera rate and mount");
+    cameraRestored.dispose();
+    cameraScene.dispose();
+    check(sensors.removeSelected()&&sensors.model.sensors.length==2,
+      "sensor editor removes its selected camera");
+    check(sensors.document.undo()&&sensors.model.sensors.length==3,
+      "camera add and remove participate in undo");
     check(sensors.diagnostics().length==0,"sensor UI produces a runtime-valid model");
     var scene=new EditorScene();
     var world=new RobotWorld();

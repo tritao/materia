@@ -765,12 +765,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var ownership=session.scriptOwnership;
     var addLidar=new Button("LiDAR",null,function(){sensors.add("lidar");commands.refresh();},"sensor-add-lidar");
     var addImu=new Button("IMU",null,function(){sensors.add("imu");commands.refresh();},"sensor-add-imu");
+    var addCamera=new Button("Camera",null,function(){sensors.add("camera");commands.refresh();},"sensor-add-camera");
     var removeSensor=new Button("Remove",null,function(){sensors.removeSelected();commands.refresh();},"sensor-remove");
-    addLidar.leadingIcon=IconName.Plus;addImu.leadingIcon=IconName.Plus;
+    addLidar.leadingIcon=IconName.Plus;addImu.leadingIcon=IconName.Plus;addCamera.leadingIcon=IconName.Plus;
     removeSensor.leadingIcon=IconName.Trash;
-    addLidar.enabled=ownership==null;addImu.enabled=ownership==null;removeSensor.enabled=ownership==null;
+    addLidar.enabled=ownership==null;addImu.enabled=ownership==null;addCamera.enabled=ownership==null;removeSensor.enabled=ownership==null;
     var actions=new Row("sensor-actions",[
-      new KeyedView("add-lidar",addLidar),new KeyedView("add-imu",addImu),
+      new KeyedView("add-lidar",addLidar),new KeyedView("add-imu",addImu),new KeyedView("add-camera",addCamera),
       new KeyedView("remove",removeSensor)
     ],actionRowStyle());
     var runtimeActions=new Column("sensor-runtime-actions",[

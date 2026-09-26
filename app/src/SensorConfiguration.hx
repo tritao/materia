@@ -157,7 +157,7 @@ class SensorConfiguration {
   }
 
   function createSensor(kind:String):Sensor {
-    if(kind!="lidar"&&kind!="imu"&&kind!="joint_encoder")throw "Unsupported sensor kind";
+    if(kind!="lidar"&&kind!="imu"&&kind!="joint_encoder"&&kind!="camera")throw "Unsupported sensor kind";
     var sensor=new Sensor(kind+" "+nextId,kind,0.0,"sensor/"+nextId++);
     sensor.frame=model.frames[0];
     return sensor;
@@ -254,6 +254,10 @@ class SensorConfiguration {
     case Ackermann(steeringId, driveId, wheelBase, wheelRadius, maxSteeringAngle): {
       kind:"ackermann", steeringJointId:steeringId, driveWheelJointId:driveId,
       wheelBase:wheelBase, wheelRadius:wheelRadius, maxSteeringAngle:maxSteeringAngle
+    };
+    case Holonomic(wheelJointIds, wheelRadius, baseRadius): {
+      kind:"holonomic", wheelJointIds:wheelJointIds.copy(),
+      wheelRadius:wheelRadius, baseRadius:baseRadius
     };
   };
 
@@ -366,6 +370,19 @@ class SensorConfiguration {
           requiredString(driveData, "driveWheelJointId"),
           finite(driveData, "wheelBase"), finite(driveData, "wheelRadius"),
           finite(driveData, "maxSteeringAngle"));
+        case "holonomic":
+          var ids:Dynamic = Reflect.field(driveData, "wheelJointIds");
+          if (!Std.isOfType(ids, Array))
+            throw "Holonomic drive requires three wheel joint IDs";
+          var idsArray:Array<Dynamic> = cast ids;
+          if (idsArray.length != 3)
+            throw "Holonomic drive requires three wheel joint IDs";
+          RobotDriveConfiguration.Holonomic(
+            [for (id in idsArray) {
+              if (!Std.isOfType(id, String) || id.length == 0)
+                throw "Holonomic wheel joint ID must be a non-empty string";
+              Std.string(id);
+            }], finite(driveData, "wheelRadius"), finite(driveData, "baseRadius"));
         default: throw "Unsupported mobile-base drive configuration";
       };
       model.mobileBase = new RobotMobileConfiguration(drive,
