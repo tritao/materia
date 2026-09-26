@@ -44,6 +44,7 @@ class MotionKitBootstrapTests {
     testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
     testLongBufferedExecution();
+    testHoldRefillsNearChunkBoundary();
     testRuntimeSynchronizedHolding();
     testImmediateMotionReplacesNativeQueue();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
@@ -762,6 +763,55 @@ class MotionKitBootstrapTests {
     near(squareRobot.snapshot().positions.get(1), 0.0,
       "square path resumes to its final Y endpoint", 1e-5);
     squareSimulation.dispose();
+  }
+
+  static function testHoldRefillsNearChunkBoundary():Void {
+    var axis = new LinearAxis(23, 10, 80);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("hold-refill-boundary", runtime,
+      blueprint.model.name, [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var samples:Array<JointTrajectorySample> = [];
+    for (index in 0...2001)
+      samples.push(new JointTrajectorySample(index * 0.005, [0.06 * index / 2000.0]));
+    machine.queueTrajectory(new JointTrajectory(samples));
+
+    var tick = 0;
+    var previousPreHoldPosition = 0.0;
+    var preHoldPosition = 0.0;
+    for (_ in 0...252) {
+      previousPreHoldPosition = preHoldPosition;
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+      preHoldPosition = robot.snapshot().positions.get(0);
+    }
+    var beforeHoldSnapshot = robot.snapshot();
+    var beforeHold = beforeHoldSnapshot.positions.get(0);
+    machine.hold();
+    var previousPosition = beforeHold;
+    var previousVelocity = (beforeHold - previousPreHoldPosition) / 0.01;
+    var peakAcceleration = 0.0;
+    var stopTicks = 0;
+    while (runtime.snapshot().trajectoryActive) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+      var position = robot.snapshot().positions.get(0);
+      var velocity = (position - previousPosition) / 0.01;
+      peakAcceleration = Math.max(peakAcceleration,
+        Math.abs(velocity - previousVelocity) / 0.01);
+      previousPosition = position;
+      previousVelocity = velocity;
+      stopTicks += 1;
+      if (stopTicks > 200) throw "near-boundary controlled hold did not settle";
+    }
+    check(peakAcceleration <= 0.4 * 1.25,
+      "hold near a streamed refill boundary keeps deceleration bounded");
+    check(previousPosition > beforeHold,
+      "hold near a streamed refill boundary continues along the path to rest");
+    simulation.dispose();
   }
 
   static function testImmediateMotionReplacesNativeQueue():Void {

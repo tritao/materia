@@ -360,7 +360,7 @@ void invalid_trajectory_chunk_is_atomic(
     assert(runtime.apply_pending_commands() == RK_ERROR_LIMIT);
     assert(runtime.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
-    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
+    assert(state.trajectory_active == 0 && state.trajectory_queue_depth == 0);
 }
 
 void same_cycle_target_batches_merge_per_joint(const rk_robot_runtime_blueprint &blueprint) {

@@ -296,6 +296,14 @@ void RobotRuntime::latch_fault(bool clear_control) {
     if (clear_control)
         control_ = {};
     std::lock_guard state_lock(state_mutex_);
+    if (clear_control) {
+        state_.trajectory_queue_depth = 0;
+        state_.trajectory_active = 0;
+        state_.trajectory_time_ns = 0;
+        state_.trajectory_duration_ns = 0;
+        state_.trajectory_tag = 0;
+        state_.trajectory_tag_time_ns = 0;
+    }
     state_.mode = RK_ROBOT_MODE_FAULT;
     state_.safety = RK_SAFETY_FAULT;
     state_backup_valid_ = false;
@@ -572,7 +580,12 @@ rk_result RobotRuntime::apply_pending_commands() {
                         const auto &limits = blueprint_.joints[joint];
                         if (point.positions[joint] < limits.lower_limit ||
                             point.positions[joint] > limits.upper_limit) {
-                            latch_fault(false);
+                            // A rejected chunk must not partially append, but
+                            // the limit fault must still stop any trajectory
+                            // that was already queued. Keeping that queue
+                            // executable after latching the fault lets the
+                            // next owner cycle drive the endpoint again.
+                            latch_fault();
                             return RK_ERROR_LIMIT;
                         }
                     }

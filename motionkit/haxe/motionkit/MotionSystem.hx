@@ -179,6 +179,13 @@ class MotionSystem {
     if (held) return;
     resumeRequested = false;
     if (activeTrajectory != null) {
+      if (usesTrajectoryChunks(activeTrajectory)) {
+        // A native controlled stop needs enough future path to decelerate. A
+        // hold can arrive just after the normal refill lead, so top up the
+        // runtime queue before the stop command is consumed.
+        syncFromRuntime();
+        refillTrajectoryForHold();
+      }
       robot.stop(StopMode.Normal);
     }
     held = true;
@@ -365,6 +372,14 @@ class MotionSystem {
    */
   public function update(?dtSeconds:Float = -1.0):Bool {
     if (held) {
+      if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory)) {
+        var heldObservation = syncFromRuntime();
+        if (heldObservation.trajectoryActive && refillTrajectoryForHold())
+          // Appending a chunk is intentionally ordered before a fresh stop:
+          // the runtime's existing semantics treat a chunk as resuming the
+          // path, so the stop must remain the final command in this cycle.
+          robot.stop(StopMode.Normal);
+      }
       if (resumeRequested) tryResume();
       if (held) return false;
     }
@@ -652,6 +667,55 @@ class MotionSystem {
     if (elapsedSeconds <= 1e-9) return false;
     var observation = robot.snapshot();
     return !observation.trajectoryActive || observation.trajectoryQueueDepth == 0;
+  }
+
+  /**
+   * Keeps enough source trajectory queued for the runtime's path-following
+   * stop. This is mainly used at the hold boundary, where the ordinary two
+   * tick streaming lead may be shorter than v/a.
+   */
+  function refillTrajectoryForHold():Bool {
+    var trajectoryValue = activeTrajectory;
+    if (trajectoryValue == null || !usesTrajectoryChunks(trajectoryValue)) return false;
+    var requiredLead = holdStopLeadSeconds();
+    var submitted = false;
+    var attempts = 0;
+    while (trajectoryNextSampleIndex < trajectoryValue.samples.length - 1 &&
+        trajectoryChunkEndSeconds - elapsedSeconds < requiredLead - 1e-9 &&
+        attempts < 8) {
+      var previousEnd = trajectoryChunkEndSeconds;
+      submitActiveTrajectoryChunk();
+      attempts += 1;
+      if (trajectoryChunkEndSeconds <= previousEnd + 1e-9) break;
+      submitted = true;
+    }
+    return submitted;
+  }
+
+  function holdStopLeadSeconds():Float {
+    var result = Math.max(fixedTimestepSeconds * 2.0, fixedTimestepSeconds);
+    var trajectoryValue = activeTrajectory;
+    if (trajectoryValue == null) return result;
+    var current = trajectoryValue.sample(elapsedSeconds);
+    var nextTime = Math.min(trajectoryValue.durationSeconds,
+      elapsedSeconds + Math.max(fixedTimestepSeconds, 1e-6));
+    var next = trajectoryValue.sample(nextTime);
+    for (axisValue in axes) {
+      if (axisValue.maxAcceleration <= 0.0) continue;
+      for (joint in axisValue.jointIndices) {
+        if (joint >= current.positions.length || joint >= next.positions.length) continue;
+        var sampledVelocity = joint < current.velocities.length
+          ? Math.abs(current.velocities[joint]) : 0.0;
+        var finiteDifference = nextTime > elapsedSeconds
+          ? Math.abs(next.positions[joint] - current.positions[joint]) /
+            (nextTime - elapsedSeconds) : 0.0;
+        var velocity = Math.max(sampledVelocity, finiteDifference);
+        result = Math.max(result, velocity / axisValue.maxAcceleration);
+      }
+    }
+    // Leave two owner periods of margin for mailbox and simulation phase
+    // ordering. The runtime itself enforces the acceleration bound.
+    return result + fixedTimestepSeconds * 2.0;
   }
 
   function resetTrajectoryChunkState():Void {
