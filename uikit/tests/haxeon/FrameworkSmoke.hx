@@ -4101,6 +4101,19 @@ class FrameworkSmoke {
 			centeredGeometry.y < 7.0 ||
 			centeredGeometry.y + centeredGeometry.height > 353.0)
 			return false;
+		var centeredSearch:Null<RenderNode> = null;
+		centeredRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.label == "Search commands" &&
+				node.styleType == "text-field") centeredSearch = node;
+		});
+		if (centeredSearch == null) return false;
+		var caretAbovePanel = false;
+		centeredSearch.walk(function(node) {
+			if (node.layout.visualKind == LayoutVisualKind.Custom &&
+				node.layout.style.zIndex > centeredPanel.layout.style.zIndex)
+				caretAbovePanel = true;
+		});
+		if (!caretAbovePanel) return false;
 		uiContext.key(UiEventKind.KeyDown, UiKey.Down);
 		uiContext.key(UiEventKind.KeyDown, UiKey.R, UiModifier.Control);
 		if (sceneNudges != 0 || surfaceRuns != 1)
