@@ -4,6 +4,10 @@ import nativekit.ui.core.View;
 import nativekit.ui.widgets.text.Text;
 import nativekit.ui.widgets.text.MiddleEllipsisText;
 import nativekit.ui.widgets.overlays.Tooltip;
+import nativekit.ui.widgets.Icon;
+import nativekit.ui.widgets.KeyedView;
+import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.icons.IconName;
 import nativekit.ui.widgets.collections.TreeRootMetadata;
 import nativekit.ui.widgets.collections.TreeViewModel;
 import materia.project.AssemblyRecord;
@@ -13,6 +17,40 @@ class EditorSceneTree implements TreeViewModel {
   final scene:EditorScene;
   final children:Map<String, Array<String>> = [];
   final incoming:Map<String, AssemblyJoint> = [];
+  var filter:String = "";
+  var filterRevision:Int = 0;
+  public function setFilter(value:String):Void {
+    var next = StringTools.trim(value == null ? "" : value).toLowerCase();
+    if (next != filter) { filter = next; filterRevision++; }
+  }
+  function matches(key:String):Bool {
+    if (filter == "") return true;
+    var item = scene.object(key);
+    if (item != null) {
+      if (item.label.toLowerCase().indexOf(filter) >= 0 || item.kind.toLowerCase().indexOf(filter) >= 0) return true;
+      var nested = children.get(key);
+      if (nested != null) for (child in nested) if (matches(child)) return true;
+      for (index in 0...scene.cadFeatureCount(key))
+        if (scene.cadFeatureNameAt(key, index).toLowerCase().indexOf(filter) >= 0) return true;
+      return false;
+    }
+    return key == "scene";
+  }
+  function visibleChildren(parentKey:String):Array<String> {
+    var result:Array<String> = [];
+    if (parentKey == "scene") {
+      for (item in scene.items()) if (!incoming.exists(item.id) && matches(item.id)) result.push(item.id);
+    } else {
+      var nested = children.get(parentKey);
+      if (nested != null) for (child in nested) if (matches(child)) result.push(child);
+      for (index in 0...scene.cadFeatureCount(parentKey)) {
+        var key = parentKey + ":feature:" + index;
+        if (filter == "" || scene.cadFeatureNameAt(parentKey, index).toLowerCase().indexOf(filter) >= 0)
+          result.push(key);
+      }
+    }
+    return result;
+  }
   public function new(scene:EditorScene, ?assembly:AssemblyRecord) {
     this.scene = scene;
     if (assembly == null) return;
@@ -30,6 +68,7 @@ class EditorSceneTree implements TreeViewModel {
     return start <= 0 && count > 0 ? [new TreeRootMetadata("scene", true)] : [];
   public function rootKeyAt(index:Int):String return "scene";
   public function childCount(parentKey:String):Int {
+    if (filter != "") return visibleChildren(parentKey).length;
     if (parentKey == "scene") {
       var count = 0;
       for (item in scene.items()) if (!incoming.exists(item.id)) count++;
@@ -39,6 +78,7 @@ class EditorSceneTree implements TreeViewModel {
     return (nested == null ? 0 : nested.length) + scene.cadFeatureCount(parentKey);
   }
   public function childKeyAt(parentKey:String, index:Int):String {
+    if (filter != "") return visibleChildren(parentKey)[index];
     if (parentKey == "scene") {
       for (item in scene.items()) if (!incoming.exists(item.id)) {
         if (index == 0) return item.id;
@@ -54,6 +94,7 @@ class EditorSceneTree implements TreeViewModel {
     return parentKey+":feature:"+index;
   }
   public function initiallyExpanded(key:String):Bool {
+    if (filter != "") return true;
     if(key=="scene")return true;
     var item=scene.object(key);
     return item!=null&&(scene.isCadPart(item.id)||children.exists(item.id));
@@ -72,8 +113,12 @@ class EditorSceneTree implements TreeViewModel {
     var item=scene.object(key);
     if(item!=null) {
       var joint = incoming.get(item.id);
-      return labeledItem(key, item.label + (joint == null ? "" : " · " + joint.kind) +
-        (item.visible ? "" : " (hidden)"));
+      return new Row("object-row:" + key, [
+        new KeyedView("icon", new Icon("object-icon:" + key,
+          scene.isCadPart(item.id) ? IconName.Cube : IconName.Hierarchy, 15.0)),
+        new KeyedView("label", labeledItem(key, item.label + (joint == null ? "" : " · " + joint.kind) +
+          (item.visible ? "" : " (hidden)")))
+      ]);
     }
     var marker=key.indexOf(":feature:");
     if(marker>=0){
@@ -83,5 +128,5 @@ class EditorSceneTree implements TreeViewModel {
     }
     return labeledItem(key, "Scene");
   }
-  public function revision():Int return scene.revision;
+  public function revision():Int return scene.revision + filterRevision * 1000000;
 }

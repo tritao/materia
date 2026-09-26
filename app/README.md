@@ -20,9 +20,11 @@ tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
 Hidden objects remain selectable in the hierarchy. Click empty viewport space
 or the Scene root to clear object selection.
 
-- Add rectangle, Duplicate (`Ctrl+D`), and Delete are available in the hierarchy
-  panel, viewport context menu, and command palette. Rename through the inspector's
-  Name field. These edits support undo/redo and mark the document as unsaved.
+- The hierarchy's Add menu groups primitive, CAD, feature, and import commands.
+  Search filters objects by name or type and includes matching CAD features.
+  Duplicate (`Ctrl+D`) and Delete sit beside Add; double-click a tree row to frame
+  it. Rename through the inspector's Name field. Edits support undo/redo and mark
+  the document as unsaved.
 - Create and duplicate select the new object; duplicates retain appearance and
   visibility with a small XY offset. Delete selects a neighbour or the Scene root.
   Undo restores the previous objects, order, and selection; redo retains object IDs.

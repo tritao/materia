@@ -359,6 +359,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var viewportHeight:Float = 900.0;
   var toolbarDensity:EditorToolbarDensity = Full;
   var contextMenuVisible:Bool;
+  var hierarchyAddVisible:Bool = false;
+  var hierarchySearch:String = "";
   var contextMenuX:Float;
   var contextMenuY:Float;
   var componentLab:Null<ComponentLab>;
@@ -503,6 +505,30 @@ class ReferenceEditorApp implements DesktopUiApplication {
         function() { toolbarMenuVisible = false; commands.refresh(); },
         function(_) { toolbarMenuVisible = false; commands.refresh(); });
       windowLayers.push(new StackChild("editor-more-menu", toolbarMenu, 0.0, 0.0, 25));
+    }
+    if (hierarchyAddVisible && documentDialog == null) {
+      var items:Array<MenuItem> = [];
+      var addSection = function(name:String, ids:Array<String>) {
+        items.push(new MenuItem("heading:" + name, name.toUpperCase(), null, false));
+        for (id in ids) {
+          var command = commands.get(id);
+          if (command == null) continue;
+          var selectedId = id;
+          items.push(new MenuItem(id, command.label, function() {
+            commands.executeContext(selectedId, ui.commandContext);
+            commands.refresh();
+          }, command.isEnabled(ui.commandContext)));
+        }
+      };
+      addSection("Primitive", ["scene.create"]);
+      addSection("CAD", ["scene.create-part", "scene.create-plate", "scene.create-bracket"]);
+      addSection("Feature", ["scene.create-sketch", "scene.create-face-sketch",
+        "scene.create-extrusion", "scene.add-face-hole", "scene.create-pocket",
+        "scene.create-vertical-fillet"]);
+      addSection("Import", ["scene.import-step"]);
+      var addMenu = new Menu("hierarchy-add-menu", items, 12.0, TOOLBAR_HEIGHT + 66.0,
+        function() { hierarchyAddVisible = false; commands.refresh(); });
+      windowLayers.push(new StackChild("hierarchy-add-menu", addMenu, 0.0, 0.0, 25));
     }
     return new Stack("window-overlay-host", windowLayers);
   }
@@ -891,12 +917,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function hierarchyPanel():View {
+    treeModel.setFilter(hierarchySearch);
+    var addButton = new Button("+ Add ▾", null, function() {
+      hierarchyAddVisible = true;
+      commands.refresh();
+    }, "hierarchy-add");
+    addButton.variant = ButtonVariant.Secondary;
     var treeStyle = fillStyle();
     treeStyle.padding = new Insets(10.0, 10.0, 10.0, 10.0);
     treeStyle.background = appearance.theme.tokens.surface;
     treeStyle.childGap = 6.0;
     var treeViewport = fillStyle();
-    var tree = new TreeView("scene-hierarchy",
+    var tree = new TreeView(hierarchySearch == "" ? "scene-hierarchy" : "scene-hierarchy-filtered",
       treeModel, treeViewport, null, 420.0, scene.treeSelectionKey(), ["scene"], function(id) {
       scene.selectTreeKey(id);
       log("Selected " + id);
@@ -904,25 +936,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.refresh();
     }, function(id) {
       scene.selectTreeKey(id);
-      log("Activated " + id);
       updateCommandContext();
+      commands.execute("scene.frame-selected");
+      log("Framed " + id);
     }, null, null);
     return new Column(
       "hierarchy-panel",
       [
         new KeyedView("heading", sectionHeading("SCENE")),
-        new KeyedView("actions", new Column("scene-object-actions", [
-          new KeyedView("create", new Row("scene-create-actions", [
-            new KeyedView("rectangle", sceneAction("scene-create", "scene.create", "Rectangle", IconName.Plus)),
-            new KeyedView("cad-part", sceneAction("scene-create-part", "scene.create-part", "Part", IconName.Plus)),
-            new KeyedView("plate", sceneAction("scene-create-plate", "scene.create-plate", "Plate", IconName.Plus)),
-            new KeyedView("hole", sceneAction("scene-add-face-hole", "scene.add-face-hole", "Hole", IconName.Plus))
-          ], actionRowStyle())),
-          new KeyedView("edit", new Row("scene-edit-actions", [
-            new KeyedView("duplicate", sceneAction("scene-duplicate", "scene.duplicate", "Duplicate", IconName.Copy)),
-            new KeyedView("delete", sceneAction("scene-delete", "scene.delete", "Delete", IconName.Trash))
-          ], actionRowStyle()))
-        ], actionColumnStyle())),
+        new KeyedView("actions", new Row("scene-object-actions", [
+          new KeyedView("add", addButton),
+          new KeyedView("duplicate", sceneAction("scene-duplicate", "scene.duplicate", "", IconName.Copy)),
+          new KeyedView("delete", sceneAction("scene-delete", "scene.delete", "", IconName.Trash))
+        ], actionRowStyle())),
+        new KeyedView("search", new SearchField("hierarchy-search", hierarchySearch, function(value) {
+          hierarchySearch = value;
+          treeModel.setFilter(value);
+          commands.refresh();
+        }, null, "Search objects...")),
         new KeyedView(
           "tree",
           tree
