@@ -57,19 +57,25 @@ class LineLookaheadPlanner {
     var startDirections:Array<Array<Float>> = [];
     var endDirections:Array<Array<Float>> = [];
     var segmentVelocityLimits:Array<Float> = [];
+    var segmentAccelerationLimits:Array<Float> = [];
     for (segment in segments) {
       var length = segment.length();
       lengths.push(length);
       startDirections.push(normalize(segment.tangentAt(0.0)));
       endDirections.push(normalize(segment.tangentAt(length)));
       var segmentMaxVelocity = limits.maxVelocity;
+      var segmentMaxAcceleration = limits.maxAcceleration;
       for (sampleIndex in 0...65) {
         var curvature = Math.abs(segment.curvatureAt(length * sampleIndex / 64.0));
         if (curvature > EPSILON)
           segmentMaxVelocity = Math.min(segmentMaxVelocity,
-            Math.sqrt(limits.maxAcceleration / curvature));
+            Math.sqrt((limits.maxAcceleration / Math.sqrt(2.0)) / curvature));
+        if (curvature > EPSILON)
+          segmentMaxAcceleration = Math.min(segmentMaxAcceleration,
+            limits.maxAcceleration / Math.sqrt(2.0));
       }
       segmentVelocityLimits.push(segmentMaxVelocity);
+      segmentAccelerationLimits.push(segmentMaxAcceleration);
     }
 
     var boundarySpeeds:Array<Float> = [for (_ in 0...(segments.length + 1)) 0.0];
@@ -77,7 +83,8 @@ class LineLookaheadPlanner {
       boundarySpeeds[i] = chosenOptions.exactStop || chosenOptions.blendTolerance <= 0.0
         ? 0.0
         : cornerSpeed(endDirections[i - 1], startDirections[i], chosenOptions.blendTolerance,
-          limits.maxVelocity, limits.maxAcceleration);
+          limits.maxVelocity, Math.min(segmentAccelerationLimits[i - 1],
+            segmentAccelerationLimits[i]));
       boundarySpeeds[i] = Math.min(boundarySpeeds[i],
         Math.min(segmentVelocityLimits[i - 1], segmentVelocityLimits[i]));
     }
@@ -86,14 +93,14 @@ class LineLookaheadPlanner {
     // the acceleration limit across the whole path.
     for (i in 0...segments.length) {
       var reachable = Math.sqrt(boundarySpeeds[i] * boundarySpeeds[i] +
-        2.0 * limits.maxAcceleration * lengths[i]);
+        2.0 * segmentAccelerationLimits[i] * lengths[i]);
       boundarySpeeds[i + 1] = Math.min(boundarySpeeds[i + 1],
         Math.min(limits.maxVelocity, reachable));
     }
     for (offset in 0...segments.length) {
       var i = segments.length - 1 - offset;
       var reachable = Math.sqrt(boundarySpeeds[i + 1] * boundarySpeeds[i + 1] +
-        2.0 * limits.maxAcceleration * lengths[i]);
+        2.0 * segmentAccelerationLimits[i] * lengths[i]);
       boundarySpeeds[i] = Math.min(boundarySpeeds[i],
         Math.min(limits.maxVelocity, reachable));
     }
@@ -102,7 +109,7 @@ class LineLookaheadPlanner {
     for (i in 0...segments.length) {
       profiles.push(new PathProfile(segments[i], startDirections[i], lengths[i],
         boundarySpeeds[i], boundarySpeeds[i + 1], segmentVelocityLimits[i],
-        limits.maxAcceleration));
+        segmentAccelerationLimits[i]));
     }
 
     var segmentStartTimes:Array<Float> = [];

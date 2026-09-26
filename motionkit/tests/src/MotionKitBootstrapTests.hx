@@ -164,6 +164,11 @@ class MotionKitBootstrapTests {
       var dy = sample.positions[1] - 0.1;
       near(Math.sqrt(dx * dx + dy * dy), 0.1,
         "arc lookahead source samples stay on the authored circle", 1e-5);
+      var accelerationNorm = Math.sqrt(sample.accelerations[0] * sample.accelerations[0] +
+        sample.accelerations[1] * sample.accelerations[1] +
+        sample.accelerations[2] * sample.accelerations[2]);
+      check(accelerationNorm <= 1.0 + 1e-6,
+        "arc acceleration stays within the combined acceleration budget");
     }
     near(arcTrajectory.samples[arcTrajectory.samples.length - 1].positions[0], 0.2,
       "arc planner reaches its endpoint");

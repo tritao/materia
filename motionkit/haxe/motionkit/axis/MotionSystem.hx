@@ -259,20 +259,40 @@ class MotionSystem {
       if (length <= 1e-12) continue;
       for (sampleIndex in 0...65) {
         var tangent = primitive.tangentAt(length * sampleIndex / 64.0);
+        var curvature = Math.abs(primitive.curvatureAt(length * sampleIndex / 64.0));
+        var normal = [
+          curvature <= 1e-12 ? 0.0 : -tangent[1],
+          curvature <= 1e-12 ? 0.0 : tangent[0],
+          0.0
+        ];
+        for (i in 0...3) {
+          var axisAcceleration = directAxes[i].maxAcceleration;
+          if (axisAcceleration > 0.0 && curvature > 1e-12) {
+            var normalCoefficient = Math.abs(normal[i]) * curvature;
+            if (normalCoefficient > 1e-12) {
+              var centripetalVelocity = Math.sqrt(axisAcceleration / normalCoefficient);
+              maxVelocity = maxVelocity <= 0.0 ? centripetalVelocity :
+                Math.min(maxVelocity, centripetalVelocity);
+            }
+          }
+        }
         for (i in 0...3) {
           var fraction = Math.min(1.0, Math.abs(tangent[i]) + 1e-6);
-          if (fraction <= 1e-12) continue;
           var axisVelocity = directAxes[i].maxVelocity;
           var axisAcceleration = directAxes[i].maxAcceleration;
-          if (axisVelocity > 0.0) {
+          if (fraction > 1e-12 && axisVelocity > 0.0) {
             var projectedVelocity = axisVelocity / fraction;
             maxVelocity = maxVelocity <= 0.0 ? projectedVelocity : Math.min(maxVelocity,
               projectedVelocity);
           }
           if (axisAcceleration > 0.0) {
-            var projectedAcceleration = axisAcceleration / fraction;
-            maxAcceleration = maxAcceleration <= 0.0 ? projectedAcceleration :
-              Math.min(maxAcceleration, projectedAcceleration);
+            var centripetal = Math.abs(normal[i] * curvature) * maxVelocity * maxVelocity;
+            var available = axisAcceleration - centripetal;
+            if (fraction > 1e-12 && available > 0.0) {
+              var projectedAcceleration = available / fraction;
+              maxAcceleration = maxAcceleration <= 0.0 ? projectedAcceleration :
+                Math.min(maxAcceleration, projectedAcceleration);
+            }
           }
         }
       }
