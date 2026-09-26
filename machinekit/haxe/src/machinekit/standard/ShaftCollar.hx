@@ -2,6 +2,8 @@ package machinekit.standard;
 
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
+import machinekit.catalog.CatalogMetadata.DimensionKind;
+import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
@@ -34,7 +36,8 @@ class ShaftCollar extends MachineComponent {
 
 	public static function catalog():Catalog<ShaftCollarSpec> {
 		if (table == null)
-			table = new Catalog("shaft collar bore diameter", spec -> Dimension.format(spec.boreDiameter), rows());
+			table = new Catalog("shaft collar bore diameter", spec -> Dimension.format(spec.boreDiameter), rows(), _ -> ({source: "MachineKit generic preview dimensions", standard: null,
+				standardEdition: null, dimensionKind: Unverified, conformance: GenericApproximation}));
 		return table;
 	}
 

@@ -15,6 +15,14 @@ with simplified internals. Threads are semantic (size, pitch, length) and are
 not modelled.
 
 Standard sizes live in typed `Catalog` tables, separate from the generators.
+Each catalog entry also exposes `catalog().metadata(designation)` with its source,
+standard, verified edition (or `null`), dimension kind, and conformance level.
+`Unverified` means the embedded dimensions still need an independent source check;
+`GenericApproximation` means the generated part does not claim a complete standard
+interface. The ISO 9409 bolt-pattern flange and representative NEMA motor are
+marked this way. Metadata describes the catalog entry, not manufacturing
+certification of a generated part.
+
 Each component also produces the machining it needs:
 
 | Component | Catalog | Companion geometry |

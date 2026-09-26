@@ -4,14 +4,16 @@ package machinekit.catalog;
 class Catalog<T> {
 	public final kind:String;
 	final entries:Map<String, T> = [];
+	final metadataEntries:Map<String, CatalogMetadata> = [];
 	final order:Array<String> = [];
 
-	public function new(kind:String, designation:T->String, rows:Array<T>) {
+	public function new(kind:String, designation:T->String, rows:Array<T>, metadata:T->CatalogMetadata) {
 		this.kind = kind;
 		for (row in rows) {
 			var key = designation(row);
 			if (entries.exists(key)) throw 'Duplicate $kind "$key"';
 			entries.set(key, row);
+			metadataEntries.set(key, metadata(row));
 			order.push(key);
 		}
 	}
@@ -19,6 +21,11 @@ class Catalog<T> {
 	public function get(designation:String):T {
 		if (!entries.exists(designation)) throw 'Unknown $kind "$designation"; known: ${order.join(", ")}';
 		return entries.get(designation);
+	}
+
+	public function metadata(designation:String):CatalogMetadata {
+		get(designation);
+		return metadataEntries.get(designation);
 	}
 
 	public function exists(designation:String):Bool return entries.exists(designation);

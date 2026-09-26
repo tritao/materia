@@ -2,6 +2,8 @@ package machinekit.standard;
 
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
+import machinekit.catalog.CatalogMetadata.DimensionKind;
+import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
@@ -37,7 +39,8 @@ class RetainingRing extends MachineComponent {
 
 	public static function catalog():Catalog<RetainingRingSpec> {
 		if (table == null)
-			table = new Catalog("retaining ring shaft diameter", spec -> Dimension.format(spec.shaftDiameter), rows());
+			table = new Catalog("retaining ring shaft diameter", spec -> Dimension.format(spec.shaftDiameter), rows(), _ -> ({source: "https://fasten.it/en/norms/norm/din_471", standard: "DIN 471",
+				standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope}));
 		return table;
 	}
 

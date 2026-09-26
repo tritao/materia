@@ -3,6 +3,8 @@ package machinekit.motion;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.catalog.Catalog;
+import machinekit.catalog.CatalogMetadata.DimensionKind;
+import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
@@ -52,7 +54,8 @@ class NemaStepper extends MachineComponent {
 
 	public static function catalog():Catalog<NemaFrameSpec> {
 		if (table == null)
-			table = new Catalog("NEMA frame", spec -> Std.string(spec.frame), rows());
+			table = new Catalog("NEMA frame", spec -> Std.string(spec.frame), rows(), _ -> ({source: "MachineKit mixed NEMA interface and representative motor dimensions; source verification pending", standard: null,
+				standardEdition: null, dimensionKind: Mixed, conformance: GenericApproximation}));
 		return table;
 	}
 

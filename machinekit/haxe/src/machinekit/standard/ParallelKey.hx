@@ -3,6 +3,8 @@ package machinekit.standard;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.catalog.Catalog;
+import machinekit.catalog.CatalogMetadata.DimensionKind;
+import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
@@ -33,7 +35,8 @@ class ParallelKey extends MachineComponent {
 
 	public static function catalog():Catalog<ParallelKeySpec> {
 		if (table == null)
-			table = new Catalog("parallel key", spec -> '${spec.width}x${spec.height}', rows());
+			table = new Catalog("parallel key", spec -> '${spec.width}x${spec.height}', rows(), _ -> ({source: "https://www.opac.net/pdf/DIN%206885%20G.pdf", standard: "DIN 6885-1",
+				standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope}));
 		return table;
 	}
 

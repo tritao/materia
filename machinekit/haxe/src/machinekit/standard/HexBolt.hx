@@ -2,6 +2,8 @@ package machinekit.standard;
 
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
+import machinekit.catalog.CatalogMetadata.DimensionKind;
+import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
@@ -45,7 +47,8 @@ class HexBolt extends MachineComponent {
 
 	public static function catalog():Catalog<HexBoltSpec> {
 		if (table == null)
-			table = new Catalog("hex bolt size", spec -> spec.size, rows());
+			table = new Catalog("hex bolt size", spec -> spec.size, rows(), _ -> ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 4017",
+				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
 		return table;
 	}
 

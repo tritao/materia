@@ -5,6 +5,9 @@ import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.PillowBlock;
+import machinekit.catalog.Catalog;
+import machinekit.catalog.CatalogMetadata.Conformance;
+import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
@@ -999,8 +1002,37 @@ class MachineKitSmoke {
 		throws(() -> duplicate.add({partNumber: "X", description: "b", quantity: 1, material: null}), "conflicting");
 	}
 
+	static function catalogMetadata():Void {
+		check(ParallelKey.catalog().metadata("2x2").standard == "DIN 6885-1", "key standard metadata");
+		check(RetainingRing.catalog().metadata("8").dimensionKind == Nominal, "ring dimension metadata");
+		check(RobotFlange.catalog().metadata("50").conformance == GenericApproximation,
+			"raised-pilot flange is a generic approximation");
+		check(NemaStepper.catalog().metadata("17").dimensionKind == Mixed,
+			"NEMA dimensions mix frame and motor variant");
+		metadataComplete(DeepGrooveBearing.catalog());
+		metadataComplete(FlatWasher.catalog());
+		metadataComplete(HexBolt.catalog());
+		metadataComplete(HexNut.catalog());
+		metadataComplete(ParallelKey.catalog());
+		metadataComplete(RetainingRing.catalog());
+		metadataComplete(ShaftCollar.catalog());
+		metadataComplete(SocketHeadCapScrew.catalog());
+		metadataComplete(LinearBearing.catalog());
+		metadataComplete(NemaStepper.catalog());
+		metadataComplete(RobotFlange.catalog());
+	}
+
+	static function metadataComplete<T>(catalog:Catalog<T>):Void {
+		for (designation in catalog.designations()) {
+			var metadata = catalog.metadata(designation);
+			check(metadata.source != null && metadata.source.length > 0,
+				'catalog metadata source missing for $designation');
+		}
+	}
+
 	static function main():Void {
 		dimensions();
+		catalogMetadata();
 		bearings();
 		screws();
 		motors();

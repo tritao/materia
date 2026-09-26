@@ -2,6 +2,8 @@ package machinekit.motion;
 
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
+import machinekit.catalog.CatalogMetadata.DimensionKind;
+import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.MachineComponent;
@@ -32,7 +34,8 @@ class LinearBearing extends MachineComponent {
 
 	public static function catalog():Catalog<LinearBearingSpec> {
 		if (table == null)
-			table = new Catalog("linear bearing", spec -> spec.designation, rows());
+			table = new Catalog("linear bearing", spec -> spec.designation, rows(), _ -> ({source: "MachineKit embedded LMUU nominal table; source verification pending", standard: null,
+				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
 		return table;
 	}
 

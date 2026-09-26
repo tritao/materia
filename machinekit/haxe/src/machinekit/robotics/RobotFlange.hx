@@ -2,6 +2,8 @@ package machinekit.robotics;
 
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
+import machinekit.catalog.CatalogMetadata.DimensionKind;
+import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
@@ -66,7 +68,8 @@ class RobotFlange extends MachineComponent {
 	/** ISO 9409-1 sizes keyed by pitch circle diameter text ("31.5", "50", ...). */
 	public static function catalog():Catalog<RobotFlangeSpec> {
 		if (table == null)
-			table = new Catalog("ISO 9409-1 flange size", spec -> Dimension.format(spec.pitchCircle), rows());
+			table = new Catalog("ISO 9409-1 flange size", spec -> Dimension.format(spec.pitchCircle), rows(), _ -> ({source: "MachineKit ISO 9409-1 pattern table; source verification pending", standard: "ISO 9409-1",
+				standardEdition: null, dimensionKind: Unverified, conformance: GenericApproximation}));
 		return table;
 	}
 
