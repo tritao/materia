@@ -118,7 +118,7 @@ less twice that profile's pitch-line differential.
 machines, the same way `examples/MotorShaftBearings.hx` does, but as reusable
 library classes rather than one-off scripts:
 
-- `PillowBlock` mounts a `DeepGrooveBearing` in a
+- `FlangeBearingAssembly` mounts a `DeepGrooveBearing` in a
   `FlangeBearingHousing` (bore and four screws along the same axis, like
   `NemaStepper`'s mounting face — not a classic two-bolt base-mount housing)
   with four `SocketHeadCapScrew`s. `addTo(model, id, ?pose)` places the whole
@@ -131,7 +131,7 @@ library classes rather than one-off scripts:
   bearings, and their shaft/housing fit intent together. `setTravel(state, millimetres)` couples screw rotation to carriage
   translation through the nut lead (pitch × starts, with handedness) and enforces the stroke. The carriage slide
   is parented to the fixed motor frame, so the carriage stays oriented while
-  the screw rotates. Two `PillowBlock`s support the screw near its ends; a
+  the screw rotates. Two `FlangeBearingAssembly`s support the screw near its ends; a
   `RectTube` member remains the layout frame rail. Guide and housing mounting
   details are still a preview rather than a structurally designed frame. The
   default axis uses a right-hand Tr10 × 2 single-start thread; other screw

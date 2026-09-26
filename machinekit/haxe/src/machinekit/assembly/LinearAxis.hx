@@ -86,14 +86,14 @@ class Carriage extends MachineComponent {
  * bearings carried by the carriage; `forRailProfile()` selects a catalog-backed profile rail
  * and block closure instead. The nut's flange mounts on the carriage's motor-facing side.
  *
- * Layout along the screw: coupling, pillow block A, end margin, carriage travel, end margin,
- * then pillow block B. The margin clears the nut protruding from the carriage. Pillow block
+ * Layout along the screw: coupling, flange bearing A, end margin, carriage travel, end margin,
+ * then flange bearing B. The margin clears the nut protruding from the carriage. Flange bearing
  * housings, guide rods and the frame rail are fixed roots in the assembly. The `LinearGuideSystem`
  * keeps the guide bearing catalog row and shaft/seat fit intent with those parts. Their real
  * mounting structure and screw bearing closure remain outside this kinematic preview.
  */
 class LinearAxis {
-	/** Axial gap between the coupling's end and pillow block A's housing. */
+	/** Axial gap between the coupling's end and flange bearing A's housing. */
 	public static inline var COUPLING_GAP:Float = 2;
 	/** Gap between the rail and the widest part around the screw. */
 	public static inline var RAIL_GAP:Float = 5;
@@ -116,8 +116,8 @@ class LinearAxis {
 	public final guideSpacing:Float;
 	public final bearing:DeepGrooveBearing;
 	public final carriage:Carriage;
-	public final pillowBlockA:PillowBlock;
-	public final pillowBlockB:PillowBlock;
+	public final flangeBearingA:FlangeBearingAssembly;
+	public final flangeBearingB:FlangeBearingAssembly;
 	public final rail:RectTube;
 	public final frame:FrameAssembly;
 	public final stroke:Float;
@@ -125,7 +125,7 @@ class LinearAxis {
 	public final length:Float;
 	/** World z of the screw's input end, with the motor at the identity pose. */
 	public final screwStart:Float;
-	/** Pillow block bearing centres, measured from the screw's input end. */
+	/** Flange bearing centres, measured from the screw's input end. */
 	public final bearingAPosition:Float;
 	public final bearingBPosition:Float;
 	/** Carriage joint limits: bore centre measured from the screw's input end. */
@@ -134,7 +134,7 @@ class LinearAxis {
 
 	/** `bearingDesignation` defaults to the first catalog deep groove bearing whose bore equals
 	 * `screwDiameter` (6000 for 10 mm); a given bearing must match the screw diameter. `margin` is
-	 * the clearance between the carriage at either travel limit and the adjacent pillow block.
+	 * the clearance between the carriage at either travel limit and the adjacent flange bearing.
 	 * The default screw is right-hand Tr10 × 2, single-start. Other diameters require `thread`.
 	 */
 	public function new(motorFrame:Int = 23, screwDiameter:Float = 10, stroke:Float = 200,
@@ -169,11 +169,11 @@ class LinearAxis {
 		carriage = new Carriage(screwDiameter, carriageWidth, carriageLength,
 			guideSpacing, guideSeatDiameter, nut, guideSeatFit,
 			profileSpec == null ? null : -(carriageWidth / 2 + profileSpec.blockHeight));
-		pillowBlockA = new PillowBlock(bearing);
-		pillowBlockB = new PillowBlock(bearing);
-		if (!(margin > Math.max(pillowBlockA.screw.spec.headHeight, nut.bodyLength + nut.flangeThickness)))
-			throw "Linear axis end margin must clear the pillow block screw heads and lead nut";
-		var depth = pillowBlockA.housing.depth;
+		flangeBearingA = new FlangeBearingAssembly(bearing);
+		flangeBearingB = new FlangeBearingAssembly(bearing);
+		if (!(margin > Math.max(flangeBearingA.screw.spec.headHeight, nut.bodyLength + nut.flangeThickness)))
+			throw "Linear axis end margin must clear the flange housing screw heads and lead nut";
+		var depth = flangeBearingA.housing.depth;
 		bearingAPosition = coupling.length / 2 + COUPLING_GAP + depth / 2;
 		travelMin = bearingAPosition + depth / 2 + margin + carriage.length / 2;
 		travelMax = travelMin + stroke;
@@ -204,8 +204,8 @@ class LinearAxis {
 			railGuideOffset = travelMin - railGuide.travelMin;
 		}
 		rail = new RectTube(Math.max(20, screwDiameter * 2), Math.max(15, screwDiameter * 1.5), 2);
-		var housing = pillowBlockA.housing;
-		var screwHeadReach = housing.boltSpacing / 2 + pillowBlockA.screw.spec.headDiameter / 2;
+		var housing = flangeBearingA.housing;
+		var screwHeadReach = housing.boltSpacing / 2 + flangeBearingA.screw.spec.headDiameter / 2;
 		var reach = Math.max(Math.max(housing.face / 2, screwHeadReach), Math.max(carriage.width, coupling.outerDiameter) / 2);
 		var railY = -(reach + RAIL_GAP + rail.height / 2);
 		frame = new FrameAssembly();
@@ -260,13 +260,13 @@ class LinearAxis {
 					{x: 0, y: 1, z: 0});
 			}
 		}
-		var depth = pillowBlockA.housing.depth;
+		var depth = flangeBearingA.housing.depth;
 		// Housing A: mounting face (local z=0) toward the motor.
 		var poseA:AssemblyFrame = {x: 0, y: 0, z: screwStart + bearingAPosition - depth / 2, qx: 0, qy: 0, qz: 0, qw: 1};
-		pillowBlockA.addTo(model, "pillowA", poseA);
+		flangeBearingA.addTo(model, "flangeA", poseA);
 		// Housing B: turned half a turn about X so its mounting face points at the far end.
 		var poseB:AssemblyFrame = {x: 0, y: 0, z: screwStart + bearingBPosition + depth / 2, qx: 1, qy: 0, qz: 0, qw: 0};
-		pillowBlockB.addTo(model, "pillowB", poseB);
+		flangeBearingB.addTo(model, "flangeB", poseB);
 		return model;
 	}
 
@@ -300,8 +300,8 @@ class LinearAxis {
 			for (block in railGuide.blocks) result.addComponent(block);
 		}
 		result.add(railBomItem());
-		for (line in pillowBlockA.bom().lines()) result.add(line);
-		for (line in pillowBlockB.bom().lines()) result.add(line);
+		for (line in flangeBearingA.bom().lines()) result.add(line);
+		for (line in flangeBearingB.bom().lines()) result.add(line);
 		return result;
 	}
 
@@ -322,8 +322,8 @@ class LinearAxis {
 			for (i in 0...railGuide.blocks.length)
 				result.push({id: 'profileBlock${i + 1}', component: railGuide.blocks[i]});
 		}
-		for (entry in pillowBlockA.components()) result.push({id: 'pillowA-${entry.id}', component: entry.component});
-		for (entry in pillowBlockB.components()) result.push({id: 'pillowB-${entry.id}', component: entry.component});
+		for (entry in flangeBearingA.components()) result.push({id: 'flangeA-${entry.id}', component: entry.component});
+		for (entry in flangeBearingB.components()) result.push({id: 'flangeB-${entry.id}', component: entry.component});
 		return result;
 	}
 }

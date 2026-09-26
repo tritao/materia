@@ -4,7 +4,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import machinekit.assembly.LinearAxis;
-import machinekit.assembly.PillowBlock;
+import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
@@ -641,14 +641,14 @@ class MachineKitSmoke {
 		check(new Rack(0.8, 10, 5).designation == "RACK-M0.8-10T", "fractional rack designation");
 	}
 
-	static function pillowBlock():Void {
+	static function flangeBearingAssembly():Void {
 		var bearing = DeepGrooveBearing.metric("6204");
-		var block = new PillowBlock(bearing);
-		check(block.housing.fit == BearingHousingFit.Slip, "pillow block uses a named housing fit");
-		check(block.housing.mountScrew == "M6", "pillow block mount screw size");
-		near(block.housing.face, 68.4, "pillow block face leaves 1 mm around the M6 heads");
-		near(block.housing.depth, 23.4, "pillow block depth");
-		near(block.housing.boltSpacing, 56.4, "pillow block bolt spacing");
+		var block = new FlangeBearingAssembly(bearing);
+		check(block.housing.fit == BearingHousingFit.Slip, "flange assembly uses a named housing fit");
+		check(block.housing.mountScrew == "M6", "flange assembly mount screw size");
+		near(block.housing.face, 68.4, "flange housing face leaves 1 mm around the M6 heads");
+		near(block.housing.depth, 23.4, "flange housing depth");
+		near(block.housing.boltSpacing, 56.4, "flange housing bolt spacing");
 		for (designation in ["608", "6000", "6001", "6002", "6003", "6204"]) {
 			var housing = new FlangeBearingHousing(DeepGrooveBearing.metric(designation));
 			var screw = housing.mountScrewPart(10).spec, edge = (housing.face - housing.boltSpacing) / 2;
@@ -660,44 +660,44 @@ class MachineKitSmoke {
 		}
 
 		var envelope = block.housing.geometry(Envelope);
-		solid(envelope, "pillow block envelope");
+		solid(envelope, "flange housing envelope");
 		var envelopeVolume = envelope.volume();
 		near(envelopeVolume, 68.4 * 68.4 * 23.4 - Math.PI * Math.pow((47 + block.housing.allowance) / 2, 2) * 23.4,
-			"pillow block envelope volume");
+			"flange housing envelope volume");
 		envelope.close();
 		var preview = block.housing.geometry();
-		solid(preview, "pillow block preview");
+		solid(preview, "flange housing preview");
 		check(preview.volume() < envelopeVolume, "preview also removes bolt holes");
 		preview.close();
 
-		near(block.housing.connector("bore").frame.z, 11.7, "pillow block bore connector");
-		near(block.housing.connector("bolt1").frame.x, 28.2, "pillow block bolt connector x");
+		near(block.housing.connector("bore").frame.z, 11.7, "flange housing bore connector");
+		near(block.housing.connector("bolt1").frame.x, 28.2, "flange housing bolt connector x");
 
 		var model = new AssemblyModel();
-		block.addTo(model, "pb");
-		var definition = model.definition("pillow-block");
-		check(definition.joints.length == 5, "pillow block joint count");
-		var state = model.initialState("pillow-block");
+		block.addTo(model, "flange");
+		var definition = model.definition("flange-bearing-assembly");
+		check(definition.joints.length == 5, "flange assembly joint count");
+		var state = model.initialState("flange-bearing-assembly");
 		var depth = block.housing.depth;
-		near(state.worldConnector("pb-bearing", "axis").z, depth / 2, "bearing centred in the housing depth");
-		near(state.worldConnector("pb-bearing", "front").z, depth / 2 - bearing.width / 2, "bearing front inside the housing");
+		near(state.worldConnector("flange-bearing", "axis").z, depth / 2, "bearing centred in the housing depth");
+		near(state.worldConnector("flange-bearing", "front").z, depth / 2 - bearing.width / 2, "bearing front inside the housing");
 		// Screws seat on the outer face and reach through the mounting face into the frame.
-		near(block.screw.length, 35, "pillow block screw: next standard length over depth + 1.5 d");
-		check(block.screw.length >= depth + 1.5 * block.screw.diameter, "pillow block screw engagement");
+		near(block.screw.length, 35, "flange assembly screw: next standard length over depth + 1.5 d");
+		check(block.screw.length >= depth + 1.5 * block.screw.diameter, "flange assembly screw engagement");
 		for (i in 1...5) {
-			var head = state.worldConnector('pb-screw$i', "head");
+			var head = state.worldConnector('flange-screw$i', "head");
 			var bolt = block.housing.connector('bolt$i').frame;
-			near(head.x, bolt.x, 'pillow block screw$i on its bolt x');
-			near(head.y, bolt.y, 'pillow block screw$i on its bolt y');
-			near(head.z, depth, 'pillow block screw$i head on the outer face');
-			check(state.worldConnector('pb-screw$i', "tip").z < 0, 'pillow block screw$i tip below the mounting face');
+			near(head.x, bolt.x, 'flange assembly screw$i on its bolt x');
+			near(head.y, bolt.y, 'flange assembly screw$i on its bolt y');
+			near(head.z, depth, 'flange assembly screw$i head on the outer face');
+			check(state.worldConnector('flange-screw$i', "tip").z < 0, 'flange assembly screw$i tip below the mounting face');
 		}
-		near(PillowBlock.standardScrewLength(20), 20, "standard screw length exact");
-		near(PillowBlock.standardScrewLength(20.1), 25, "standard screw length rounds up");
+		near(FlangeBearingAssembly.standardScrewLength(20), 20, "standard screw length exact");
+		near(FlangeBearingAssembly.standardScrewLength(20.1), 25, "standard screw length rounds up");
 
 		var lines = block.bom().lines();
-		check(lines.length == 3, "pillow block BOM line count");
-		check(block.bom().quantity(block.screw.designation) == 4, "pillow block screw quantity");
+		check(lines.length == 3, "flange assembly BOM line count");
+		check(block.bom().quantity(block.screw.designation) == 4, "flange assembly screw quantity");
 		for (entry in block.components()) {
 			var part = entry.component.geometry(Envelope);
 			check(part.valid(), '${entry.id} envelope is invalid');
@@ -731,18 +731,18 @@ class MachineKitSmoke {
 		carriagePreview.close();
 		// Layout from the screw input: coupling half (15) + gap (2) + housing (depth), margin (20),
 		// carriage (60) + stroke (200), margin (20), housing (depth) flush with the screw end.
-		var depth = axis.pillowBlockA.housing.depth;
+		var depth = axis.flangeBearingA.housing.depth;
 		near(depth, 14, "6000 housing depth");
-		near(axis.bearingAPosition, 15 + 2 + depth / 2, "pillow block A just past the coupling");
-		near(axis.travelMin, 15 + 2 + depth + 30 + 30, "carriage travel starts a margin past pillow block A");
+		near(axis.bearingAPosition, 15 + 2 + depth / 2, "flange bearing A just past the coupling");
+		near(axis.travelMin, 15 + 2 + depth + 30 + 30, "carriage travel starts a margin past flange bearing A");
 		near(axis.travelMax - axis.travelMin, 200, "carriage travel equals the stroke");
-		near(axis.bearingBPosition, axis.travelMax + 30 + 30 + depth / 2, "pillow block B a margin past the travel end");
+		near(axis.bearingBPosition, axis.travelMax + 30 + 30 + depth / 2, "flange bearing B a margin past the travel end");
 		near(axis.length, 365, "linear axis screw length");
 		near(axis.screw.totalLength, axis.length, "linear axis screw total length");
 		throws(() -> new LinearAxis(23, 10, -1), "positive stroke");
 		throws(() -> new LinearAxis(23, 10, 200, "6001"), "bore does not match the screw diameter");
 		throws(() -> new LinearAxis(23, 50), "No catalog deep groove bearing has a 50 mm bore");
-		throws(() -> new LinearAxis(23, 10, 200, null, 2), "must clear the pillow block screw heads and lead nut");
+		throws(() -> new LinearAxis(23, 10, 200, null, 2), "must clear the flange housing screw heads and lead nut");
 		throws(() -> new LinearAxis(23, 8), "explicit thread for a nondefault screw diameter");
 		throws(() -> new LinearAxis(23, 8, 200, null, 30, new LeadScrewThread(MetricTrapezoidal, 10, 2)),
 			"thread diameter must match the screw diameter");
@@ -758,10 +758,10 @@ class MachineKitSmoke {
 		near(railBox.get_min().get_z(), 21, "rail starts at the screw input");
 		near(railBox.get_max().get_z(), 21 + axis.length, "rail ends at the screw end");
 		// Beside the screw, clear of the housings (and their screw heads) and the carriage.
-		var housing = axis.pillowBlockA.housing;
-		check(railBox.get_max().get_y() <= -housing.face / 2 - 1, "rail clears the pillow block housings");
-		check(railBox.get_max().get_y() <= -(housing.boltSpacing + axis.pillowBlockA.screw.spec.headDiameter) / 2 - 1,
-			"rail clears the pillow block screw heads");
+		var housing = axis.flangeBearingA.housing;
+		check(railBox.get_max().get_y() <= -housing.face / 2 - 1, "rail clears the flange housings");
+		check(railBox.get_max().get_y() <= -(housing.boltSpacing + axis.flangeBearingA.screw.spec.headDiameter) / 2 - 1,
+			"rail clears the flange housing screw heads");
 		check(railBox.get_max().get_y() <= -axis.carriage.width / 2 - 1, "rail clears the carriage");
 		rail.close();
 		var cutList = axis.frame.cutList();
@@ -787,16 +787,16 @@ class MachineKitSmoke {
 		near(state.worldConnector("guideBearingA", "axis").x, -axis.guideSpacing, "first bearing follows guide rod");
 		near(state.worldConnector("leadNut", "mountFace").z, state.worldConnector("carriage", "nutMount").z,
 			"lead nut mounts to the carriage face");
-		near(state.worldConnector("pillowA-bearing", "axis").z, 21 + axis.bearingAPosition, "pillow block A bearing on the screw");
-		near(state.worldConnector("pillowB-bearing", "axis").z, 21 + axis.bearingBPosition, "pillow block B bearing on the screw");
-		near(state.worldConnector("pillowA-bearing", "axis").z, 45, "pillow block A bearing position");
-		near(state.worldConnector("pillowB-bearing", "axis").z, 379, "pillow block B bearing position");
+		near(state.worldConnector("flangeA-bearing", "axis").z, 21 + axis.bearingAPosition, "flange bearing A on the screw");
+		near(state.worldConnector("flangeB-bearing", "axis").z, 21 + axis.bearingBPosition, "flange bearing B on the screw");
+		near(state.worldConnector("flangeA-bearing", "axis").z, 45, "flange bearing A position");
+		near(state.worldConnector("flangeB-bearing", "axis").z, 379, "flange bearing B position");
 		// Housing A mounts toward the motor, housing B is turned over to mount toward the far end:
 		// both screw heads face the carriage and their tips point outboard.
-		near(state.worldConnector("pillowA-screw1", "head").z, 21 + axis.bearingAPosition + depth / 2, "pillow A screw heads inboard");
-		check(state.worldConnector("pillowA-screw1", "tip").z < 21 + axis.bearingAPosition - depth / 2, "pillow A screw tips outboard");
-		near(state.worldConnector("pillowB-screw1", "head").z, 21 + axis.bearingBPosition - depth / 2, "pillow B screw heads inboard");
-		check(state.worldConnector("pillowB-screw1", "tip").z > 21 + axis.length, "pillow B screw tips outboard");
+		near(state.worldConnector("flangeA-screw1", "head").z, 21 + axis.bearingAPosition + depth / 2, "flange A screw heads inboard");
+		check(state.worldConnector("flangeA-screw1", "tip").z < 21 + axis.bearingAPosition - depth / 2, "flange A screw tips outboard");
+		near(state.worldConnector("flangeB-screw1", "head").z, 21 + axis.bearingBPosition - depth / 2, "flange B screw heads inboard");
+		check(state.worldConnector("flangeB-screw1", "tip").z > 21 + axis.length, "flange B screw tips outboard");
 
 		axis.setTravel(state, 100);
 		near(state.joint("coupling"), axis.nut.rotationFor(100), "screw rotation follows nut lead");
@@ -827,8 +827,8 @@ class MachineKitSmoke {
 		near(state.worldConnector("guideBearingB", "axis").z, state.worldConnector("carriage", "bore").z,
 			"second guide bearing is aligned at the upper stroke end");
 		var carriageEnd = state.worldConnector("carriage", "bore").z + axis.carriage.length / 2;
-		near(state.worldConnector("pillowB-bearing", "axis").z - depth / 2 - carriageEnd, 30,
-			"carriage stops a margin short of pillow block B");
+		near(state.worldConnector("flangeB-bearing", "axis").z - depth / 2 - carriageEnd, 30,
+			"carriage stops a margin short of flange bearing B");
 
 		var bom = axis.bom();
 		var lines = bom.lines();
@@ -840,7 +840,7 @@ class MachineKitSmoke {
 		check(bom.quantity(axis.guideRodA.designation) == 2, "linear axis guide rods in the BOM");
 		check(bom.quantity(axis.guideBearingA.designation) == 2, "linear axis guide bearings in the BOM");
 		check(bom.quantity("RECT-20x15x2-L365") == 1, "linear axis rail in the BOM");
-		check(bom.quantity(axis.pillowBlockA.screw.designation) == 8, "linear axis pillow block screws");
+		check(bom.quantity(axis.flangeBearingA.screw.designation) == 8, "linear axis flange assembly screws");
 
 		var railAxis = LinearAxis.forRailProfile("MGN12C");
 		var railGuide:machinekit.motion.LinearRailSystem = cast railAxis.railGuide;
@@ -1288,7 +1288,7 @@ class MachineKitSmoke {
 		shaftHardware();
 		structural();
 		gears();
-		pillowBlock();
+		flangeBearingAssembly();
 		linearAxis();
 		linearRailGuide();
 		catalogExtras();

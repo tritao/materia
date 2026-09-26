@@ -20,7 +20,7 @@ import materia.project.AssemblyRecord.AssemblyFrame;
  * instance for each screw seat. The bearing's own `front`/`axis`/`back` connectors (named
  * `'<id>-bearing'`) stay reachable for mating a shaft through it.
  */
-class PillowBlock {
+class FlangeBearingAssembly {
 	public static inline var ENGAGEMENT_DIAMETERS:Float = 1.5;
 
 	public final housing:FlangeBearingHousing;
