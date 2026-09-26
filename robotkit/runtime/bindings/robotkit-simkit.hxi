@@ -16,6 +16,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 *
 	 * @param simulation Shared simulation owner.
 	 * @param blueprint Compiled robot topology and joint metadata.
+	 * @param robot_desc Optional versioned initial-pose descriptor. A null pointer
+	 * uses the existing default pose `(robot_index, 0, 0)` with identity yaw.
 	 * @param out_runtime Receives an owned runtime handle bound to this simulation.
 	 * @return RK_OK on success, or an invalid-state/argument/backend error.
 	 */
@@ -215,6 +217,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	extern fn rk_simulation_teleport_object(simulation: rk_simulation, object: rk_simulation_object, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
 	/**
 	 * Teleports one attached robot's base while the simulation is stopped.
+	 * This does not change the pose restored by reset or resetRobot.
 	 */
 	extern fn rk_simulation_teleport_robot(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
 	/**
@@ -353,15 +356,6 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		position: array<f64, 3> @offset(8);
 		rotation: array<f64, 4> @offset(32);
 	}
-	struct rk_simulation_robot_desc @layout(88, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		reserved0: u32 @offset(4);
-		initial_struct_size: u32 @offset(8);
-		initial_reserved0: u32 @offset(12);
-		initial_position: array<f64, 3> @offset(16);
-		initial_rotation: array<f64, 4> @offset(40);
-		reserved: array<u64, 2> @offset(72);
-	}
 	struct rk_simulation_presentation_info @layout(40, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		step_index: u64 @offset(8);
@@ -378,6 +372,15 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		reserved: array<u32, 3> @offset(20);
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
+	}
+	/**
+	 * Optional initial pose for one robot added to a Simulation.
+	 */
+	struct rk_simulation_robot_desc @layout(88, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		reserved0: u32 @offset(4);
+		initial_pose: rk_simulation_pose @offset(8);
+		reserved: array<u64, 2> @offset(72);
 	}
 	/**
 	 * Opaque handle for one shared simulation universe and clock.

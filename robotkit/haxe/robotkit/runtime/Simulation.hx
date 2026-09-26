@@ -39,11 +39,8 @@ class Simulation {
     if (initialPose != null) {
       robotDesc = new rk_simulation_robot_desc();
       robotDesc.set_struct_size(rk_simulation_robot_desc.size());
-      robotDesc.set_initial_struct_size(rk_simulation_pose.size());
-      var pose = makePose([initialPose.x, initialPose.y, 0.0],
-        [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]);
-      for (index in 0...3) robotDesc.set_initial_position(index, pose.get_position(index));
-      for (index in 0...4) robotDesc.set_initial_rotation(index, pose.get_rotation(index));
+      robotDesc.set_initial_pose(makePose([initialPose.x, initialPose.y, 0.0],
+        [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]));
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
