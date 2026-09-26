@@ -410,6 +410,76 @@ deadlines are currently rejected rather than ignored or translated without a
 clock mapping. Local runtime behaviors may use bounded `IntentBuffer` expiry;
 source timestamps are never silently reused as receive or command time.
 
+## 3D spatial types
+
+`robotkit.spatial` is the one place full rigid-body geometry lives above
+`Robot`; `Pose2`/`FrameTree2`/`Navigator` are unchanged and remain the
+planar stack used by `mobile`, `navigation`, and `localization`.
+
+`Vec3` and `Quat` (x, y, z, w, per the frames-and-units rules above) are
+immutable value types. `Quat`'s constructor always normalizes, so every
+live `Quat` is unit length; there is no separate "unnormalized quaternion"
+state to reason about. `Transform3` pairs a `Vec3` translation with a
+`Quat` rotation and is the one 3D pose/transform type in RobotKit: a value
+named `a_T_b` maps coordinates expressed in frame `b` into frame `a`, and
+`compose` follows `a_T_c = (a_T_b).compose(b_T_c)`, matching
+`world_T_sensor = world_T_link * link_T_sensor`. `toColumnMajorArray()`
+exports the usual 4x4 column-major matrix; `Quat.toRotationMatrix()`
+exports the 3x3 block the same way. `Transform3.fromPose2(pose, z)` and
+`transform.toPose2()` are the only bridge to the planar stack: `toPose2()`
+is a lossy yaw projection (it does not reject roll/pitch the way
+`FrameTree2`'s planar frame import does), meant for driving `Navigator`
+from an approximate 3D heading, not for round-tripping arbitrary
+orientations.
+
+`Twist3` (linear, angular) and `Wrench3` (force, torque) are plain spatial
+vectors. `Transform3.transformTwist`/`transformWrench` apply the rigid-body
+adjoint: if `this` is `a_T_b`, a twist or wrench known in `b` becomes the
+equivalent value in `a` via `angular' = R * angular`,
+`linear' = R * linear + p x angular'` (force/torque use the same block
+structure). `Transform3.integrate(twist, dt)` composes a first-order
+body-frame motion for `dt`; it is exact only as `dt -> 0`, which is what
+the adjoint-consistency test in `SpatialTests` checks: transforming a body
+twist into a rigidly-offset frame and then integrating it there agrees
+with integrating the twist in its own frame and then transporting the
+resulting pose, to first order in `dt`.
+
+`FrameTree3` mirrors `FrameTree2` for full 3D poses: `FrameTransform3`
+edges store `parent_T_child`, `add()` rejects a second parent or a cycle,
+and `lookup(target, source)` returns `target_T_source` by walking both
+frames to their common root. Unrelated frame graphs can share one tree
+through a single registration edge — for example a BIM hierarchy
+(`project -> building -> storey -> room -> wall`) and a robot's own frame
+chain (`map -> base -> ... -> flange -> tcp`) joined by one
+`project_T_map` edge, as milestone 6's CAD/BIM bridge will do.
+
+### Joint-frame convention (read from `Joint`)
+
+`FK` (milestone 2) reads `Joint.parentFramePosition`/`parentFrameRotation`,
+`childFramePosition`/`childFrameRotation`, and `axis` directly; there is no
+parallel joint description. These fields already have one authoritative
+interpretation, used identically by `RobotFrameTree2` (planar) and by the
+native runtime (`simulation.cpp` / MuJoCo backend):
+
+- `parent_T_jointFrame = Transform3.fromArrays(parentFramePosition, parentFrameRotation)`
+  and `child_T_jointFrame = Transform3.fromArrays(childFramePosition, childFrameRotation)`
+  both place a "joint frame" relative to their respective link.
+- `axis` is a unit vector expressed **in the joint frame** (i.e. after
+  `parentFrameRotation`, before any joint motion) — this is exactly the
+  vector `simulation.cpp` rotates by `parent_frame_rotation` to build
+  `axis_a` (the joint axis in the parent body's frame) for the native
+  physics joint.
+- Joint motion at value `q` is a pure rotation about `axis` by `q`
+  (revolute/continuous) or a pure translation along `axis` by `q`
+  (prismatic), expressed in the joint frame; fixed joints contribute
+  identity motion.
+- `parent_T_child = parent_T_jointFrame.compose(motion(q)).compose(child_T_jointFrame.inverse())`.
+
+This is the same composition `RobotFrameTree2.jointMotion`/`compose` chain
+already implements for the planar frame tree; `robotkit.manipulation`'s
+forward kinematics is the full-3D version of that same read, not a new
+convention.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A
