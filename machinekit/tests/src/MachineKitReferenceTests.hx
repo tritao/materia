@@ -3,6 +3,7 @@ import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.motion.LinearBearing;
 import machinekit.motion.LinearRailSystem;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.PillowBlock;
 import machinekit.robotics.RobotFlange;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.FlatWasher;
@@ -110,10 +111,25 @@ class MachineKitReferenceTests {
 			throw "MGN12C mounting screw size";
 		equal(rail.railHolePitch, 25, "MGN12C rail hole pitch");
 		equal(rail.railEndMargin, 10, "MGN12C rail end margin");
-	var railMetadata = LinearRailSystem.catalog().metadata("MGN12C");
+		var railMetadata = LinearRailSystem.catalog().metadata("MGN12C");
 		if (railMetadata.dimensionKind != Nominal || railMetadata.conformance != NominalEnvelope ||
 			railMetadata.verifiedFields == null)
 			throw "MGN12C reference metadata";
+		// Koyo/JTEKT UCP204 product page: base-mounted unit dimensions, in mm.
+		var pillow = PillowBlock.catalog().get("UCP204");
+		equal(pillow.boreDiameter, 20, "UCP204 bore");
+		equal(pillow.baseWidth, 38, "UCP204 base width");
+		equal(pillow.length, 127, "UCP204 length");
+		equal(pillow.shaftHeight, 33.3, "UCP204 shaft height");
+		equal(pillow.baseHeight, 16, "UCP204 base height");
+		equal(pillow.overallHeight, 64.5, "UCP204 overall height");
+		equal(pillow.boltSpacing, 95, "UCP204 bolt spacing");
+	if (pillow.mountScrew != "M10" || pillow.bearingDesignation != "6204")
+		throw "UCP204 bearing unit interface";
+	var pillowMetadata = PillowBlock.catalog().metadata("UCP204");
+	if (pillowMetadata.dimensionKind != Nominal || pillowMetadata.conformance != NominalEnvelope ||
+		pillowMetadata.verifiedFields == null)
+		throw "UCP204 reference metadata";
 		// Accu ISO 4762 M5 product sheet: these fields have been cross-checked.
 		var m5 = SocketHeadCapScrew.catalog().get("M5");
 		equal(m5.diameter, 5, "M5 diameter");

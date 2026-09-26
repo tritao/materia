@@ -20,6 +20,7 @@ import machinekit.motion.LinearGuideSystem;
 import machinekit.motion.LinearRailSystem;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.FlangeBearingHousing;
+import machinekit.motion.PillowBlock;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
 import machinekit.standard.Bushing;
@@ -705,6 +706,48 @@ class MachineKitSmoke {
 		}
 	}
 
+	static function pillowBlock():Void {
+		var block = PillowBlock.metric("UCP204");
+		check(block.designation == "UCP204", "UCP pillow block designation");
+		check(block.bearing.designation == "6204-2Z", "UCP pillow block insert bearing");
+		near(block.boreDiameter, 20, "UCP pillow block bore");
+		near(block.baseWidth, 38, "UCP pillow block base width");
+		near(block.length, 127, "UCP pillow block length");
+		near(block.shaftHeight, 33.3, "UCP pillow block shaft height");
+		near(block.baseHeight, 16, "UCP pillow block base height");
+		near(block.overallHeight, 64.5, "UCP pillow block overall height");
+		near(block.boltSpacing, 95, "UCP pillow block bolt spacing");
+		check(block.mountScrew == "M10", "UCP pillow block mounting screw");
+		var envelope = block.geometry(Envelope);
+		solid(envelope, "UCP pillow block envelope");
+		var envelopeBounds = envelope.shape.bounds();
+		near(envelopeBounds.get_min().get_y(), 0, "UCP pillow block base bottom");
+		near(envelopeBounds.get_max().get_y(), 64.5, "UCP pillow block top");
+		near(envelopeBounds.get_min().get_z(), -63.5, "UCP pillow block input end");
+		near(envelopeBounds.get_max().get_z(), 63.5, "UCP pillow block output end");
+		var envelopeVolume = envelope.volume();
+		envelope.close();
+		var preview = block.geometry();
+		solid(preview, "UCP pillow block preview");
+		check(preview.volume() < envelopeVolume, "UCP preview removes mounting holes");
+		preview.close();
+		near(block.connector("axis").frame.y, 33.3, "UCP shaft axis connector height");
+		near(block.connector("input").frame.z, -63.5, "UCP input connector");
+		near(block.connector("output").frame.z, 63.5, "UCP output connector");
+		near(block.connector("bolt1").frame.z, -47.5, "UCP first bolt connector");
+		near(block.connector("bolt2").frame.z, 47.5, "UCP second bolt connector");
+		var model = new AssemblyModel();
+		block.addTo(model, "ucp");
+		var state = model.initialState("ucp");
+		near(state.worldConnector("ucp", "axis").y, 33.3, "UCP axis assembly height");
+		near(state.worldConnector("ucp", "base").y, 0, "UCP base assembly face");
+		var bom = new Bom();
+		bom.addComponent(block);
+		check(bom.quantity("UCP204") == 1, "UCP pillow block BOM");
+		check(block.mountScrewPart(20).designation == "ISO4762-M10x20", "UCP mounting screw companion");
+		throws(() -> PillowBlock.metric("UCP205"), 'Unknown pillow block unit "UCP205"');
+	}
+
 	static function linearAxis():Void {
 		var axis = new LinearAxis();
 		check(axis.motor.designation == "23HS22-2804S", "linear axis motor designation");
@@ -1263,6 +1306,7 @@ class MachineKitSmoke {
 			"HFS5 profile carries nominal-envelope metadata");
 		metadataComplete(TSlotExtrusion.catalog());
 		metadataComplete(LinearRailSystem.catalog());
+		metadataComplete(PillowBlock.catalog());
 	}
 
 	static function metadataComplete<T>(catalog:Catalog<T>):Void {
@@ -1289,6 +1333,7 @@ class MachineKitSmoke {
 		structural();
 		gears();
 		flangeBearingAssembly();
+		pillowBlock();
 		linearAxis();
 		linearRailGuide();
 		catalogExtras();

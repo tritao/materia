@@ -1,6 +1,7 @@
 package machinekit.component;
 
 import cadkit.modeling.Axis;
+import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
@@ -31,6 +32,21 @@ class Solids {
 		var base = Part.cylinder(radius, z1 - z0);
 		try {
 			var result = base.translated(new Vector(x, y, z0));
+			base.close();
+			return result;
+		} catch (error:Dynamic) {
+			base.close();
+			throw error;
+		}
+	}
+
+	/** Cylinder about a +Y axis through (x, z), spanning y0..y1. */
+	public static function cylinderAlongY(radius:Float, y0:Float, y1:Float, x:Float = 0, z:Float = 0):Part {
+		if (!(radius > 0) || !(y1 > y0)) throw "Cylinder needs a positive radius and length";
+		var base = Part.cylinder(radius, y1 - y0);
+		try {
+			var placement = Location.translation(new Vector(x, y0, z)).compose(Location.rotation(Axis.X(), -Math.PI / 2));
+			var result = base.placed(placement);
 			base.close();
 			return result;
 		} catch (error:Dynamic) {
