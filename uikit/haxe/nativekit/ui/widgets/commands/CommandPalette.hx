@@ -17,6 +17,8 @@ import nativekit.ui.core.CommandResult;
 import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.State;
+import nativekit.ui.core.UiEventKind;
+import nativekit.ui.core.UiKey;
 import nativekit.ui.core.View;
 import nativekit.ui.widgets.collections.ListView;
 import nativekit.ui.widgets.collections.ListViewModel;
@@ -68,16 +70,18 @@ class CommandPalette implements View {
 			listStyle.width = LayoutAxis.grow();
 			var listHeight = centered ? Math.min(320.0, Math.max(120.0, context.viewportHeight - 102.0)) : 320.0;
 			listStyle.height = LayoutAxis.fixed(listHeight);
+			var activate = function(index:Int) {
+				if (index < 0 || index >= model.commands.length)
+					return;
+				var result = commands.executeContext(model.commands[index].id, actualContext);
+				if (onResult != null)
+					onResult(result);
+				if (result.succeeded && onDismiss != null)
+					onDismiss();
+			};
 			var list = new ListView("commands", model, listStyle, null, listHeight, 0,
-				null, function(index) {
-					if (index < 0 || index >= model.commands.length)
-						return;
-					var result = commands.executeContext(model.commands[index].id, actualContext);
-					if (onResult != null)
-						onResult(result);
-					if (result.succeeded && onDismiss != null)
-						onDismiss();
-				});
+				null, activate);
+			search.onSubmit = function(_) activate(list.selectedIndex < 0 ? 0 : list.selectedIndex);
 			var contentStyle = new LayoutStyle();
 			var contentWidth = centered ? Math.min(480.0, Math.max(200.0, context.viewportWidth - 32.0)) : 480.0;
 			contentStyle.width = LayoutAxis.fixed(contentWidth);
@@ -95,7 +99,25 @@ class CommandPalette implements View {
 			popup.modal = true;
 			popup.dimBackdrop = true;
 			if (centered) popup.layerZIndex = 1000;
-			return popup.build(context);
+			var root = popup.build(context);
+			var navigate = function(event:nativekit.ui.core.UiEvent) {
+				if (event.defaultPrevented ||
+					(event.key != UiKey.Up && event.key != UiKey.Down))
+					return;
+				if (model.commands.length == 0) {
+					event.preventDefault();
+					return;
+				}
+				var next = list.selectedIndex + (event.key == UiKey.Down ? 1 : -1);
+				if (next < 0) next = model.commands.length - 1;
+				if (next >= model.commands.length) next = 0;
+				list.select(next);
+				list.scrollTo(next);
+				event.preventDefault();
+			};
+			root.on(UiEventKind.KeyDown, navigate);
+			root.on(UiEventKind.KeyRepeat, navigate);
+			return root;
 		});
 	}
 }

@@ -266,7 +266,13 @@ class EventDispatcher {
 			cancelCapturedPointerFor(node.id);
 		if (event.defaultPrevented)
 			return;
-		if (kind == UiEventKind.KeyDown && routeCommand(key, modifiers, path)) {
+		// A modal focus trap owns keyboard input, including keys its focused child
+		// does not handle. Do not let those keys invoke commands behind the modal.
+		var inModal = false;
+		for (entry in path)
+			if (entry.focusTrap)
+				inModal = true;
+		if (!inModal && kind == UiEventKind.KeyDown && routeCommand(key, modifiers, path)) {
 			event.preventDefault();
 			return;
 		}

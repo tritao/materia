@@ -4034,6 +4034,14 @@ class FrameworkSmoke {
 			centeredGeometry.y < 7.0 ||
 			centeredGeometry.y + centeredGeometry.height > 353.0)
 			return false;
+		uiContext.key(UiEventKind.KeyDown, UiKey.Down);
+		uiContext.key(UiEventKind.KeyDown, UiKey.R, UiModifier.Control);
+		if (sceneNudges != 0 || surfaceRuns != 1)
+			return false;
+		uiContext.key(UiEventKind.KeyDown, UiKey.Up);
+		uiContext.key(UiEventKind.KeyDown, UiKey.Enter);
+		if (surfaceRuns != 2)
+			return false;
 		return true;
 	}
 

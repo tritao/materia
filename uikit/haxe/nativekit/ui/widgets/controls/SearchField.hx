@@ -16,7 +16,6 @@ import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.View;
 import nativekit.ui.icons.IconName;
 import nativekit.ui.widgets.Icon;
-import nativekit.ui.widgets.controls.IconButton;
 
 /** Reusable single-line search input with leading affordance and clear action. */
 class SearchField implements View {
@@ -27,6 +26,7 @@ class SearchField implements View {
 	public var enabled:Bool;
 	public final style:LayoutStyle;
 	public var onChange:Null<String->Void>;
+	public var onSubmit:Null<String->Void>;
 
 	public function new(key:String, value:String = "", ?onChange:String->Void,
 			?style:LayoutStyle, placeholder:String = "Search") {
@@ -35,10 +35,12 @@ class SearchField implements View {
 		this.key = key;
 		this.value = value == null ? "" : value;
 		this.onChange = onChange;
+		onSubmit = null;
 		this.placeholder = placeholder == null || placeholder.length == 0 ? "Search" : placeholder;
 		label = this.placeholder;
 		enabled = true;
 		this.style = style == null ? defaultStyle() : style.copy();
+		this.style.childAlignY = LayoutAlignmentY.Center;
 	}
 
 	public function build(context:BuildContext):RenderNode {
@@ -47,7 +49,7 @@ class SearchField implements View {
 				context.theme.mutedText);
 			var leadingStyle = new LayoutStyle();
 			leadingStyle.width = LayoutAxis.fixed(18.0);
-			leadingStyle.height = LayoutAxis.grow();
+			leadingStyle.height = LayoutAxis.fixed(18.0);
 			var leading = new Align("leading", icon, LayoutAlignmentX.Center,
 				LayoutAlignmentY.Center, leadingStyle);
 
@@ -63,6 +65,7 @@ class SearchField implements View {
 			}, inputStyle, label);
 			input.placeholder = placeholder;
 			input.enabled = enabled;
+			input.onSubmit = onSubmit;
 
 			var children:Array<KeyedView> = [
 				new KeyedView("icon", leading),
@@ -71,14 +74,17 @@ class SearchField implements View {
 			if (value.length > 0) {
 				var clearStyle = new LayoutStyle();
 				clearStyle.width = LayoutAxis.fixed(24.0);
-				clearStyle.height = LayoutAxis.grow();
+				clearStyle.height = LayoutAxis.fixed(24.0);
 				clearStyle.padding = new Insets(2.0, 2.0, 2.0, 2.0);
 				clearStyle.background = Color.rgba(0.0, 0.0, 0.0, 0.0);
-				var clear = new IconButton("clear", IconName.Close, "Clear search", function() {
+				var clear = new Button("", clearStyle, function() {
 					value = "";
 					if (onChange != null)
 						onChange("");
-				}, clearStyle);
+				}, "clear");
+				clear.accessibilityLabel = "Clear search";
+				clear.leadingIcon = IconName.Close;
+				clear.variant = ButtonVariant.Navigation;
 				clear.enabled = enabled;
 				children.push(new KeyedView("clear", clear));
 			}
