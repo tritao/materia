@@ -518,6 +518,43 @@ documents the workaround (a coarse `sampleInterval` collapses a segment to
 its single final sample) rather than changing the sampler, since M5's
 raster-generated toolpaths keep points close together by construction.
 
+**M6**: added `robotkit/cadbridge/` as its own haxeon project
+(`FaceBridge`, `WallBridge`, `BimFrameBridge`) plus
+`robotkit/cadbridge/tests/` (entry `tests.CadBridgeTests`). No CadKit
+change was needed: the plan anticipated possibly adding a face-boundary
+accessor, but `cadkit.Face.cloneShape()` already returns a full `Shape`
+scoped to just that face, and `Shape`'s existing generic
+`subshapeCount`/`subshape(ShapeKind.Wire | Vertex, ...)` were enough to
+enumerate a face's wires and their vertices without any native or CadKit
+Haxe change — confirmed by reading `cadkit/core/src/cadkit.cpp`'s
+`collect_subshapes` (`TopExp::MapShapes` scoped to whatever shape it's
+given) before writing any bridge code, per the "diagnose before workaround"
+practice. `FaceBridge` orders each wire's vertices by angle around their
+centroid (correct for the convex rectangular wires this milestone's
+surfaces produce) rather than relying on native wire-edge ordering, and
+picks the largest-area wire as the boundary. Deviation from a literal
+reading of the plan: BimKit's dimensions are millimeters
+(`bimkit.BimSchema` quantities) while RobotKit is meters, so `WallBridge`
+passes `FaceBridge` a `scale = 0.001`; `FaceBridge` itself stays
+unit-agnostic (a `scale` parameter, default 1.0), since plain CadKit has no
+inherent unit. `BimFrameBridge` covers the plan's literal "project ->
+building -> storey" as the actual `BimSchema.Aggregates` chain, which is
+one level deeper (project -> site -> building -> storey); every edge is
+identity except a storey with a base `Level`, which gets a Z-only
+translation from that level's elevation. Running cadbridge's tests needed
+`LD_LIBRARY_PATH` pointing at CadKit's separately-CMake-built
+`cadkit/build/debug/core` (not something a haxeon.json field can express;
+confirmed via `haxeon/src/tools/HaxeonCli.hx`'s `configureRuntimeLibraryPath`,
+which preserves and extends the caller's existing value) and a `native.cmake`
+block mirroring `robotkit/tests/haxeon.json`'s for RobotKit's own runtime;
+haxeon's `dependencies` are not transitive for source resolution, so
+`robotkit/cadbridge/tests/haxeon.json` explicitly lists `nativekit`,
+`projectkit`, `robotkit`, `cadkit`, `bimkit`, and `cadbridge`, matching the
+same redundant-but-required pattern already used by
+`robotkit/tests/haxeon.json` and `cadkit/examples/modeling/haxeon.json`.
+Did not touch cadkit/bimkit source, so their own test suites were not run
+(the plan's instruction to run them is conditioned on touching them).
+
 **M5**: added `robotkit/haxe/robotkit/work/` (`Point2`, `Polygon2`,
 `WorkSurfaceId`, `SourceKind`, `Provenance`, `WorkSurface`,
 `RasterToolpathGenerator`, `CoverageMap`) and

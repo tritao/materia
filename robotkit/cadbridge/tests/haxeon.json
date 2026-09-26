@@ -1,0 +1,31 @@
+{
+	"version": 1,
+	"package": { "name": "cadbridge-tests" },
+	"entry": "tests.CadBridgeTests",
+	"sourceRoots": ["src"],
+	"dependencies": {
+		"nativekit": { "path": "../../../nativekit" },
+		"projectkit": { "path": "../../../projectkit" },
+		"robotkit": { "path": "../.." },
+		"cadkit": { "path": "../../../cadkit" },
+		"bimkit": { "path": "../../../bimkit" },
+		"cadbridge": { "path": ".." }
+	},
+	"native": {
+		"cmake": {
+			"source": "../../robotd/native",
+			"target": "robotd_native",
+			"inputs": [
+				"../../robotd/native/CMakeLists.txt",
+				"../../CMakeLists.txt",
+				"../../runtime/CMakeLists.txt",
+				"../../runtime/include/robotkit_runtime.h",
+				"../../runtime/include/robotkit_simkit.h",
+				"../../../nativekit/CMakeLists.txt",
+				"../../../simkit/CMakeLists.txt"
+			]
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

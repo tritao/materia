@@ -652,6 +652,58 @@ excluded-total independent of cells that are simply outside the
 boundary — so it is a direct test of whether the process ever touched an
 excluded region, not of the raster's ordinary edge margin.
 
+## CAD/BIM bridge (`robotkit/cadbridge`, separate project)
+
+`robotkit/cadbridge` is its own haxeon project (`robotkit/cadbridge/haxeon.json`),
+depending on `robotkit`, `cadkit`, and `bimkit`. It is the *only* place CAD/BIM
+concepts meet RobotKit; `robotkit/haxeon.json` itself still depends only on
+`nativekit`, per the plan's CAD-agnostic-core rule.
+
+`cadbridge.FaceBridge.toWorkSurface(face, id, frameId, ?provenance,
+?surfaceFrameId, ?scale)` converts any CadKit planar `Face` into a design
+`WorkSurface`: it walks the face's wires and, for each, its vertices, sorts
+them counter-clockwise by angle around their centroid, and picks the
+largest-area wire as the boundary (`Polygon2`) and every other wire as an
+exclusion — one exclusion per inner wire/opening. `cadkit.Face`
+(`cadkit/haxe/src/cadkit/Face.hx`) does not itself expose wire or vertex
+enumeration, but `Face.cloneShape()` already returns a full `Shape` scoped
+to just that face, and `Shape.subshapeCount`/`subshape` already walk any
+`CadKit.ShapeKind`, including `Wire` and `Vertex` — reading a face's
+boundary loops needed no CadKit change. The surface's local plane frame
+(`frame_T_surface`) is built directly from the face's own `center()` and
+`normal()`: `basisU = normal x up`, `basisV = normal x basisU`, so the
+rotation's columns `(basisU, basisV, normal)` make the surface's local +Z
+exactly the face's outward normal. `scale` converts the shape's own linear
+units into meters; CadKit itself is unit-agnostic.
+
+`cadbridge.WallBridge.wallToWorkSurface(bim, wallId, id, frameId,
+?sideNormal)` finds a `BimSchema.Wall` element's side face (the planar face
+whose normal is closest to `sideNormal`, default `+Y`) on its *cut* shape —
+`bimkit.BimDocument.rebuildWall` already boolean-cuts a wall's body with
+every hosted window/door, so that face's inner wires already are the
+openings, and `FaceBridge` turns each into one exclusion automatically.
+Provenance references the wall's BIM element id (`SourceKind.Design`).
+BimKit's own convention is millimeter dimensions (`bimkit.BimSchema`
+quantities), so `WallBridge` calls `FaceBridge` with `scale = 0.001`.
+
+`cadbridge.BimFrameBridge.registerHierarchy(bim, tree)` walks a BIM
+document's spatial aggregation edges (`BimSchema.Aggregates`: project ->
+site -> building -> storey) and adds one `FrameTree3` edge per relationship,
+named `"bim:" + elementId.value`. Project/site/building objects are generic
+classified CadKit objects with no geometry of their own, so their edges are
+identity; a storey with a base `Level` gets a Z-only translation from that
+level's elevation (BimKit millimeters -> RobotKit meters).
+
+`robotkit/cadbridge/tests` is its own nested haxeon project (entry
+`tests.CadBridgeTests`), mirroring `robotkit/tests/haxeon.json`'s
+`native.cmake` block (for RobotKit's own native runtime) and declaring
+`cadkit`/`bimkit`/`projectkit`/`nativekit` alongside `robotkit`/`cadbridge`
+as explicit dependencies — haxeon's dependency declarations are not
+transitive for source resolution. CadKit's own native library is prebuilt
+by its separate CMake/OCCT build (`cadkit/build/debug/core/libcadkit-core.so`),
+not by haxeon, so running cadbridge tests requires that directory on
+`LD_LIBRARY_PATH` (haxeon preserves and extends the caller's existing value).
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A
