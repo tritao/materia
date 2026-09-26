@@ -83,6 +83,7 @@ import nativekit.ui.core.HitTestBehavior;
 import nativekit.ui.core.InteractionStateStore;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.State;
+import nativekit.ui.core.StateStore;
 import nativekit.ui.core.UiContext;
 import nativekit.ui.core.UiDirtyFlag;
 import nativekit.ui.core.UiEventKind;
@@ -286,6 +287,8 @@ class FrameworkSmoke {
 		clippingEditor.dispose();
 		var session = LayoutSession.create();
 		var context = new UiContext(session, fonts);
+		if (!retainedStateUsageValid())
+			return 305;
 		if (!propertyInputContrastValid(fonts))
 			return 301;
 		if (!defaultTextFieldContrastValid(fonts))
@@ -3281,6 +3284,29 @@ class FrameworkSmoke {
 			if (!valid) return false;
 		}
 		return true;
+	}
+
+	static function retainedStateUsageValid():Bool {
+		var store = new StateStore();
+		var id = new WidgetId(90501);
+		var disposals = 0;
+		store.beginFrame();
+		store.initialize(id, "editor");
+		store.onUnmount(id, function() disposals++);
+		store.endFrame();
+		store.beginFrame();
+		var parentMarker = store.usageMarker();
+		store.retain([id.value]);
+		var parentIds = store.usedIdsSince(parentMarker);
+		store.endFrame();
+		store.beginFrame();
+		store.retain(parentIds);
+		store.endFrame();
+		var retained = parentIds.length == 1 && parentIds[0] == id.value &&
+			store.contains(id) && disposals == 0;
+		store.beginFrame();
+		store.endFrame();
+		return retained && !store.contains(id) && disposals == 1;
 	}
 
 	static function tabHierarchyValid(fonts:FontCollection):Bool {

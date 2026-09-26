@@ -184,8 +184,11 @@ class DesktopUiHost {
 									frameRequested = false;
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
 									var frameStartedAt = Sys.time();
-									runtime.render(Sys.time());
-									nextCaretFrameAt = runtime.app().context().textInput.takeCaretFrameAt();
+									var rendered = runtime.render(Sys.time());
+									if (!rendered) return;
+									var renderedApp = runtime.app();
+									nextCaretFrameAt = renderedApp != null
+										? renderedApp.context().textInput.takeCaretFrameAt() : -1.0;
 									if (options.captureSeconds > 0.0 && captureState.startedAt < 0.0 && runtime.rendered > 0)
 										captureState.startedAt = frameStartedAt;
 									if (options.captureDirectory != null) {

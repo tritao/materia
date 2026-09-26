@@ -69,8 +69,10 @@ class StateStore {
 			return;
 		for (id in ids)
 			if (values.exists(id))
-				if (frameActive)
+				if (frameActive) {
 					frameUsed.set(id, true);
+					frameUseOrder.push(id);
+				}
 	}
 
 	/** Marks an initialized state as used by the current render tree. */
