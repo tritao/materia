@@ -27,6 +27,7 @@ class ProcessTests {
     testTrapezoidalTimingSingleSegment();
     testTrapezoidalTimingTriangleSegment();
     testTrapezoidalTimingMultiSegment();
+    testAdaptiveCartesianSampling();
     testExecutorOnSmallRasterYieldsContinuousJoints();
     testExecutorReportsUnreachableIndex();
     Sys.println('RobotKit process tests passed ($assertions assertions)');
@@ -92,6 +93,33 @@ class ProcessTests {
       "Samples carry the departing toolpath point's segment index");
   }
 
+  static function testAdaptiveCartesianSampling():Void {
+    var identity = Quat.identity();
+    var longPath = new Toolpath("work", [
+      new ToolpathPoint(new Transform3(Vec3.zero(), identity), 1.0, true),
+      new ToolpathPoint(new Transform3(new Vec3(20.0, 0.0, 0.0), identity), 1.0, true)
+    ]);
+    var linear = CartesianTrajectory.build(longPath, 1.0, 0.1, 0.05, Math.PI / 36.0);
+    check(linear.samples.length == 401,
+      '20m segment uses one sample per 5cm step (got ${linear.samples.length})');
+    var largestTimeGap = 0.0;
+    for (i in 1...linear.samples.length)
+      largestTimeGap = Math.max(largestTimeGap, linear.samples[i].time - linear.samples[i - 1].time);
+    check(largestTimeGap <= 0.1 + 1e-12,
+      'spatially dense samples still honor the time interval upper bound (got $largestTimeGap)');
+
+    var reorientation = new Toolpath("work", [
+      new ToolpathPoint(new Transform3(Vec3.zero(), identity), 1.0, true),
+      new ToolpathPoint(new Transform3(Vec3.zero(), Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), Math.PI * 0.5)), 1.0, true)
+    ]);
+    var angular = CartesianTrajectory.build(reorientation, 1.0, 10.0, 1.0, Math.PI / 36.0);
+    check(angular.samples.length >= 19,
+      '90-degree reorientation uses at least one sample per 5 degrees (got ${angular.samples.length})');
+    check(angular.samples[angular.samples.length - 1].work_T_tcp.rotation.angularDistance(
+      reorientation.points[1].work_T_tcp.rotation) < 1e-9,
+      "adaptive angular samples reach the requested final orientation");
+  }
+
   static function testExecutorOnSmallRasterYieldsContinuousJoints():Void {
     var fixture = buildUR5Fixture();
     var manipulator = new Manipulator(fixture.model, fixture.chain);
@@ -128,9 +156,9 @@ class ProcessTests {
     var reachable = new ToolpathPoint(referencePose, 5.0, true);
     var unreachable = new ToolpathPoint(new Transform3(new Vec3(100.0, 100.0, 100.0), referencePose.rotation), 5.0, true);
     var toolpath = new Toolpath("base", [reachable, unreachable]);
-    // A long sample interval collapses each segment to a single final sample,
-    // so this two-point path yields exactly two trajectory samples.
-    var trajectory = CartesianTrajectory.build(toolpath, 10.0, 1000.0);
+    // A long sample interval and large spatial limits collapse each segment to
+    // a single final sample, so this two-point path yields exactly two samples.
+    var trajectory = CartesianTrajectory.build(toolpath, 10.0, 1000.0, 1000.0, Math.PI);
     check(trajectory.samples.length == 2, "Coarse sampling collapses the far segment to exactly two samples");
 
     var result = ToolpathExecutor.execute(manipulator, trajectory, Transform3.identity(), referenceQ, 0.5);

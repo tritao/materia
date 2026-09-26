@@ -1253,3 +1253,11 @@ be traversed or closed. The centroid angle sort is gone. CAD bridge tests now
 cover a concave outer L-shaped wire and a concave opening, checking vertex
 counts, areas, and reflex corners. The CAD bridge suite passed with 33
 assertions.
+
+**F8**: `CartesianTrajectory` now takes the maximum of the time, linear
+distance, and rotation-angle sample counts for each segment. The existing
+sample interval remains an upper bound on time gaps, with default spatial
+limits of 5 cm and 5 degrees; pure reorientation segments receive a timed
+profile as well. Process tests cover a 20 m segment, a 90-degree rotation,
+the time bound, and the coarse unreachable case. The Haxe world suite passed
+with 4,337 assertions.

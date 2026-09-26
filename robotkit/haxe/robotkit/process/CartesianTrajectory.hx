@@ -6,10 +6,11 @@ import robotkit.spatial.Transform3;
  * Time-parameterized TCP samples built from a `Toolpath`: each consecutive
  * pair of points gets its own independent trapezoidal (or triangular, if too
  * short to reach cruise speed) velocity profile toward the *arriving*
- * point's feed rate, capped by `maxAcceleration`. Position is linearly
- * interpolated along the straight line between the two points; rotation is
- * slerped using the same normalized arc-length fraction, so translation and
- * rotation always reach their segment endpoint together.
+ * point's feed rate, capped by `maxAcceleration`. Samples are bounded by the
+ * requested time interval, linear distance step, and rotation angle step.
+ * Position is linearly interpolated along the straight line between the two
+ * points; rotation is slerped using the same normalized profile fraction, so
+ * translation and rotation always reach their segment endpoint together.
  */
 class CartesianTrajectory {
   public final toolpath:Toolpath;
@@ -24,12 +25,17 @@ class CartesianTrajectory {
 
   public function duration():Float return samples.length == 0 ? 0.0 : samples[samples.length - 1].time;
 
-  public static function build(toolpath:Toolpath, maxAcceleration:Float, sampleInterval:Float):CartesianTrajectory {
+  public static function build(toolpath:Toolpath, maxAcceleration:Float, sampleInterval:Float,
+      ?maxLinearStep:Float = 0.05, ?maxAngularStep:Float = Math.PI / 36.0):CartesianTrajectory {
     if (toolpath == null) throw "Cartesian trajectory requires a toolpath";
     if (!Math.isFinite(maxAcceleration) || maxAcceleration <= 0.0)
       throw "Cartesian trajectory max acceleration must be positive and finite";
     if (!Math.isFinite(sampleInterval) || sampleInterval <= 0.0)
       throw "Cartesian trajectory sample interval must be positive and finite";
+    if (!Math.isFinite(maxLinearStep) || maxLinearStep <= 0.0)
+      throw "Cartesian trajectory max linear step must be positive and finite";
+    if (!Math.isFinite(maxAngularStep) || maxAngularStep <= 0.0)
+      throw "Cartesian trajectory max angular step must be positive and finite";
     var points = toolpath.points;
     var samples:Array<CartesianTrajectorySample> = [];
     if (points.length == 0) return new CartesianTrajectory(toolpath, maxAcceleration, samples);
@@ -41,13 +47,21 @@ class CartesianTrajectory {
       var to = points[i + 1];
       var delta = to.work_T_tcp.translation.sub(from.work_T_tcp.translation);
       var distance = delta.norm();
-      var profile = new TrapezoidalProfile(distance, to.feedRate, maxAcceleration);
-      var steps = profile.duration <= 0.0 ? 1 : Math.ceil(profile.duration / sampleInterval);
+      var rotationAngle = from.work_T_tcp.rotation.angularDistance(to.work_T_tcp.rotation);
+      // A pure reorientation still needs a timed profile. Feed rate is the
+      // only per-point rate available at this layer, so angular distance is
+      // profiled in the same units when there is no linear travel.
+      var profiledDistance = distance <= 1e-12 ? rotationAngle : distance;
+      var profile = new TrapezoidalProfile(profiledDistance, to.feedRate, maxAcceleration);
+      var timeSteps = profile.duration <= 0.0 ? 1 : Math.ceil(profile.duration / sampleInterval);
+      var linearSteps = Math.ceil(distance / maxLinearStep);
+      var angularSteps = Math.ceil(rotationAngle / maxAngularStep);
+      var steps = Math.max(1, Math.max(timeSteps, Math.max(linearSteps, angularSteps)));
       if (steps < 1) steps = 1;
       var step = 1;
       while (step <= steps) {
-        var elapsed = step == steps ? profile.duration : step * sampleInterval;
-        var fraction = distance <= 1e-12 ? 1.0 : profile.distanceAt(elapsed) / distance;
+        var elapsed = step == steps ? profile.duration : profile.duration * step / steps;
+        var fraction = profiledDistance <= 1e-12 ? 1.0 : profile.distanceAt(elapsed) / profiledDistance;
         var translation = from.work_T_tcp.translation.add(delta.scale(fraction));
         var rotation = from.work_T_tcp.rotation.slerp(to.work_T_tcp.rotation, fraction);
         var sampleTime = elapsedTotal + elapsed;

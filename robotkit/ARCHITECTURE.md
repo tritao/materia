@@ -786,15 +786,19 @@ convention `CartesianTrajectory` samples use.
 (`processOn == false`), a `process` run from the first to the last
 `processOn == true` point inclusive, and a trailing `retract` run.
 
-`CartesianTrajectory.build(toolpath, maxAcceleration, sampleInterval)` gives
-each consecutive pair of points its own independent symmetric trapezoidal
-(or triangular, when the distance is too short to reach cruise speed)
-velocity profile toward the *arriving* point's feed rate. Position is
+`CartesianTrajectory.build(toolpath, maxAcceleration, sampleInterval,
+?maxLinearStep, ?maxAngularStep)` gives each consecutive pair of points its
+own independent symmetric trapezoidal (or triangular, when the distance is
+too short to reach cruise speed) velocity profile toward the *arriving*
+point's feed rate. The default spatial limits are 5 cm and 5 degrees. Each
+segment uses the greatest of the time, linear-distance, and rotation-angle
+sample counts, so `sampleInterval` remains an upper bound on the time between
+samples without under-sampling long moves or pure reorientations. Position is
 linearly interpolated along the straight line between the two points, and
-rotation is slerped using the same normalized arc-length fraction the
-velocity profile produces, so translation and rotation always reach a
-waypoint together. Every segment's final sample lands exactly at that
-segment's closed-form duration; `duration()` is the last sample's time.
+rotation is slerped using the same normalized profile fraction, so translation
+and rotation always reach a waypoint together. Every segment's final sample
+lands exactly at that segment's closed-form duration; `duration()` is the last
+sample's time.
 
 `ToolpathExecutor.execute(manipulator, trajectory, base_T_work, seed, ...)`
 samples the trajectory and solves `Manipulator.solveIkForTcp` for each
