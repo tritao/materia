@@ -382,6 +382,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var sensorInspectorSensor:Dynamic = null;
   var sensorInspectorModel:Dynamic = null;
   var framePresentation:Null<ApplicationPresentationSnapshot> = null;
+  var cachedSubmitKey:String = "";
+  var cachedSubmitSceneGeneration:Int = -1;
+  var cachedSubmitSceneRevision:Int = -1;
+  var cachedSubmitEnvironmentRevision:Int = -1;
+  var cachedSubmitSensorRevision:Int = -1;
+  var cachedSubmitSimulationRevision:Int = -1;
+  final externalWorldHasRobots:Bool;
   public var sensors(get, never):SensorConfiguration;
   function get_sensors():SensorConfiguration return session.sensors;
 
@@ -392,6 +399,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     ui = new UiContext(null, fonts, appearance.theme);
     commands = ui.commands;
     this.world = world == null ? new RobotWorld() : world;
+    externalWorldHasRobots = this.world.robotIds().length > 0;
     simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
     session = new ProjectDocumentSession(BimEditorDemo.create());
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
@@ -600,7 +608,34 @@ class ReferenceEditorApp implements DesktopUiApplication {
       else
         scene.advanceCadMeshRefinement();
     }
-    return ui.submit(view(), frame);
+    // A stable editor frame does not need to reconstruct its declarative tree.
+    // Keep live simulation, component stories, and externally populated worlds
+    // on the normal path because their presentation can change independently
+    // of the UI revision counters.
+    if (componentLab != null || simulation.isActive() || externalWorldHasRobots)
+      return ui.submit(view(), frame);
+    return ui.submitCached(function() return view(), frame, editorSubmitKey());
+  }
+
+  function editorSubmitKey():String {
+    var sceneRevision = scene.revision;
+    var environmentRevision = scene.environmentRevision;
+    var sensorRevision = sensors.revision();
+    var simulationRevision = simulation.appliedRevision;
+    if (cachedSubmitSceneGeneration != sceneGeneration ||
+        cachedSubmitSceneRevision != sceneRevision ||
+        cachedSubmitEnvironmentRevision != environmentRevision ||
+        cachedSubmitSensorRevision != sensorRevision ||
+        cachedSubmitSimulationRevision != simulationRevision) {
+      cachedSubmitSceneGeneration = sceneGeneration;
+      cachedSubmitSceneRevision = sceneRevision;
+      cachedSubmitEnvironmentRevision = environmentRevision;
+      cachedSubmitSensorRevision = sensorRevision;
+      cachedSubmitSimulationRevision = simulationRevision;
+      cachedSubmitKey = "editor:" + sceneGeneration + ":" + sceneRevision + ":" +
+        environmentRevision + ":" + sensorRevision + ":" + simulationRevision;
+    }
+    return cachedSubmitKey;
   }
 
   public function context():UiContext return ui;
