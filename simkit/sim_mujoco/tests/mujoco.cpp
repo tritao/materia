@@ -1344,6 +1344,91 @@ void body_without_inertials_has_center_of_mass_at_origin() {
     nkscene_scene_destroy(scene);
 }
 
+nksim_body_force body_force(nksim_body body, std::array<double, 3> force,
+                            std::array<double, 3> torque) {
+    nksim_body_force value{};
+    value.struct_size = sizeof(value);
+    value.body = body;
+    for (int axis = 0; axis < 3; ++axis) {
+        value.force[axis] = force[axis];
+        value.torque[axis] = torque[axis];
+    }
+    return value;
+}
+
+void applied_force_and_torque_act_on_their_own_axes() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto pushed_node = make_node(scene, 0.0);
+    const auto twisted_node = make_node(scene, 5.0);
+
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    const auto shape = make_box(world);
+    const auto pushed = make_body(world, pushed_node, NKSIM_MOTION_DYNAMIC, 2.0, shape);
+    // Explicit inertia, so the torque's effect is exact: I = 0.02 kg m^2 on every axis.
+    nksim_body_desc twisted_desc{};
+    twisted_desc.struct_size = sizeof(twisted_desc);
+    twisted_desc.node = twisted_node;
+    twisted_desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    twisted_desc.mass = 2.0;
+    twisted_desc.shape = shape;
+    twisted_desc.collision_layer = 1;
+    twisted_desc.collision_mask = 1;
+    twisted_desc.has_inertial_properties = 1;
+    twisted_desc.inertia_tensor[0] = twisted_desc.inertia_tensor[4] =
+        twisted_desc.inertia_tensor[8] = 0.02;
+    nksim_body twisted = 0;
+    assert(nksim_body_create(world, &twisted_desc, &twisted) == NKSIM_OK);
+
+    // Two forces on the pushed body must sum, as in the default backend.
+    const std::array<nksim_body_force, 3> forces{
+        body_force(pushed, {4.0, 0.0, 0.0}, {0.0, 0.0, 0.0}),
+        body_force(pushed, {4.0, 0.0, 0.0}, {0.0, 0.0, 0.0}),
+        body_force(twisted, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.5}),
+    };
+    assert(nksim_world_apply_forces(world, forces.data(),
+                                    static_cast<uint32_t>(forces.size())) == NKSIM_OK);
+    step_world(world, 1);
+
+    nksim_body_state pushed_state{};
+    pushed_state.struct_size = sizeof(pushed_state);
+    assert(nksim_body_get_state(world, pushed, &pushed_state) == NKSIM_OK);
+    // 8 N on 2 kg for 0.01 s along +X, with no rotation.
+    assert(std::abs(pushed_state.linear_velocity[0] - 0.04) < 1e-9);
+    assert(std::abs(pushed_state.linear_velocity[1]) < 1e-12);
+    assert(std::abs(pushed_state.linear_velocity[2]) < 1e-12);
+    for (int axis = 0; axis < 3; ++axis)
+        assert(std::abs(pushed_state.angular_velocity[axis]) < 1e-12);
+
+    nksim_body_state twisted_state{};
+    twisted_state.struct_size = sizeof(twisted_state);
+    assert(nksim_body_get_state(world, twisted, &twisted_state) == NKSIM_OK);
+    // 0.5 N m about +Z on 0.02 kg m^2 for 0.01 s spins it at 0.25 rad/s and pushes it nowhere.
+    assert(std::abs(twisted_state.angular_velocity[2] - 0.25) < 1e-9);
+    assert(std::abs(twisted_state.angular_velocity[0]) < 1e-12);
+    assert(std::abs(twisted_state.angular_velocity[1]) < 1e-12);
+    for (int axis = 0; axis < 3; ++axis)
+        assert(std::abs(twisted_state.linear_velocity[axis]) < 1e-12);
+
+    // Forces are cleared after each step.
+    const auto before = pushed_state.linear_velocity[0];
+    step_world(world, 1);
+    assert(nksim_body_get_state(world, pushed, &pushed_state) == NKSIM_OK);
+    assert(std::abs(pushed_state.linear_velocity[0] - before) < 1e-12);
+
+    nksim_body_destroy(world, twisted);
+    nksim_body_destroy(world, pushed);
+    nksim_shape_destroy(world, shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -1363,5 +1448,6 @@ int main() {
     two_joint_arm_on_kinematic_base_holds_position_under_gravity();
     kinematic_base_is_not_moved_by_child_reaction();
     body_without_inertials_has_center_of_mass_at_origin();
+    applied_force_and_torque_act_on_their_own_axes();
     return 0;
 }

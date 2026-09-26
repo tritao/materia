@@ -279,9 +279,13 @@ public:
             const auto body_id = model_body_id(forces[index].backend_body);
             if (body_id < 0)
                 return NKSIM_ERROR_INVALID_HANDLE;
+            // xfrc_applied is force then torque, applied at the body's centre of mass.
+            // Accumulate, like the default backend, so several forces on one body sum.
             auto *external = data->xfrc_applied + body_id * 6;
-            std::copy(forces[index].torque.begin(), forces[index].torque.end(), external);
-            std::copy(forces[index].force.begin(), forces[index].force.end(), external + 3);
+            for (int axis = 0; axis < 3; ++axis) {
+                external[axis] += forces[index].force[axis];
+                external[axis + 3] += forces[index].torque[axis];
+            }
         }
         return NKSIM_OK;
     }
