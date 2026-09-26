@@ -19,6 +19,8 @@ class RobotRuntimeBlueprint {
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+  /** MuJoCo self-collision is enabled unless this opt-out is set false. */
+  public var selfCollision:Bool = true;
   /** Compiled user-layer roles; null for manually assembled native blueprints. */
   public final configuration:Null<RobotRuntimeConfiguration>;
 
@@ -91,6 +93,7 @@ class RobotRuntimeBlueprint {
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);
     value.set_collision_approximation(collisionApproximation);
+    value.set_self_collision(selfCollision ? 1 : 2);
     var layout = nativeSensorLayout();
     if (layout.length > RobotKitRuntimeConstants.RK_MAX_SENSORS) throw "Too many sensors";
     value.set_sensor_count(layout.length);

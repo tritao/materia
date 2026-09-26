@@ -1219,3 +1219,13 @@ components; its Haxe path and trajectory/motion-guard copies now preserve the
 new component. Tests cover pure strafe, diagonal translation with yaw, wheel
 odometry recovery, and plant/odometry agreement. Haxe world tests: 4,327
 assertions passed.
+
+**F4**: MuJoCo self-collision filtering now excludes only direct
+parent/child pairs and pairs whose rest-pose geometries overlap. Oriented box
+geometry uses a separating-axis test, with conservative sphere/capsule bounds
+for the other native shapes. Non-adjacent links that start clear can therefore
+stop against one another when an arm folds. `RobotRuntimeBlueprint` carries a
+default-enabled `selfCollision` flag; disabling it uses a separate collision
+category that retains environment contact. The MuJoCo native suite passed,
+including the folded three-link contact regression, and the Haxe world suite
+passed with 4,327 assertions.

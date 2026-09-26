@@ -254,6 +254,12 @@ typedef struct rk_robot_runtime_joint {
 } rk_robot_runtime_joint;
 
 enum { RK_COLLISION_APPROXIMATION_NONE = 0, RK_COLLISION_APPROXIMATION_BOUNDS_BOX = 1 };
+/** Self-collision policy for one compiled RobotRuntime blueprint. */
+enum {
+    RK_SELF_COLLISION_DEFAULT = 0, /**< Preserve the enabled default. */
+    RK_SELF_COLLISION_ENABLED = 1,
+    RK_SELF_COLLISION_DISABLED = 2
+};
 typedef struct rk_robot_runtime_link {
     double mass;
     double center_of_mass[3];
@@ -300,7 +306,9 @@ typedef struct rk_robot_runtime_blueprint {
     uint32_t link_count; /**< Number of links referenced by the joints. */
     uint32_t frame_count; /**< Number of compiled reference frames. */
     uint32_t collision_approximation;
-    uint64_t reserved[2];
+    uint32_t self_collision; /**< RK_SELF_COLLISION_*; zero preserves enabled-by-default. */
+    uint32_t reserved0;
+    uint64_t reserved[1];
     rk_robot_runtime_joint joints[RK_MAX_JOINTS];
     rk_robot_runtime_link links[RK_MAX_LINKS];
     uint32_t sensor_count; /**< Zero selects the default base-mounted simulation sensors. */

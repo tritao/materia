@@ -238,31 +238,23 @@ safety remain authoritative below this application-level mapping.
 
 `HolonomicDrive` (M9) adds a third `DriveModel`: an omnidirectional ("kiwi")
 base with three wheels at 120-degree intervals, each rolling tangentially.
-`Twist2` (shared with `Navigator`/`GoTo`) carries only forward speed and yaw
-rate, never a lateral term, so `targets()` always encodes a body motion with
-zero lateral component — the mechanism itself is genuinely holonomic (a
-caller driving the three wheels directly could strafe), but no planner in
-this codebase currently issues a lateral command; that is a deliberate scope
-limit, not an oversight, consistent with the plan's "no joint base+arm
-whole-body optimization." `DriveModel.createOdometry()` is typed to return
+`Twist2` now carries forward speed, body +Y lateral speed, and yaw rate.
+`Navigator` and `GoTo` continue to produce zero lateral speed, while direct
+callers can use the full holonomic map. `DriveModel.createOdometry()` is typed to return
 `Null<DifferentialOdometry>` specifically (a pre-existing, differential-drive-
 specific signature), so `HolonomicDrive.createOdometry()` returns `null`
 (matching `AckermannDrive`) and `robotkit.mobile.HolonomicOdometry` /
 `robotkit.localization.HolonomicOdometryLocalization` take the three wheel
 joints and geometry directly instead, mirroring `WheelOdometryLocalization`.
-Because the base has one more wheel than `Twist2`'s two degrees of freedom,
-recovering a pose update from wheel encoders is an over-determined
-least-squares fit against the same per-wheel tangential-speed relationship
-`HolonomicDrive.targets()` uses; the three wheel angles being 120 degrees
-apart makes the normal equations decouple exactly (their sines sum to zero),
-so `distance` and `headingChange` are each a plain weighted average over the
-three wheels. `runtime.HolonomicDrivePlant` mirrors `DifferentialDrivePlant`:
+The three wheel angles being 120 degrees apart make the inverse map decouple
+exactly, so forward and lateral distance are weighted wheel sums and heading
+change is their average divided by the base radius. `runtime.HolonomicDrivePlant` mirrors `DifferentialDrivePlant`:
 it couples the three wheel joints to the base natively
 (`Simulation.setOmniDrive`), and every tick decodes the full planar body
 twist -- forward, lateral, and yaw rate -- from the wheel targets the robot
-actually applied, so stops, rate clamps, and wheels driven directly (which can
-strafe, although `Twist2` has no lateral term) all move the chassis exactly as
-they would the real base.
+actually applied, so stops, rate clamps, and wheels driven directly all move
+the chassis exactly as they would the real base. Differential and Ackermann
+models reject non-zero lateral commands explicitly.
 
 `Pose2` and `Twist2` describe planar geometry and body velocity. The initial
 wheel odometry utility consumes immutable snapshots and uses source clock IDs
@@ -401,9 +393,11 @@ collision response, angular limits in radians, world-oriented body velocities,
 and deterministic replay. Rebuilds preserve articulated rest transforms;
 reset clears native joint state and targets. Unsupported independent teleports
 of constrained links fail without replacing the cached body state.
-Adjacent joint-connected bodies are excluded from
-self contact, including static-root pairs. The robot geometry remains the
-current simple box representation, not an imported CAD collision model.
+Direct parent/child pairs and pairs whose authored rest-pose geometries
+overlap are excluded from self contact, including static-root pairs. Other
+link pairs remain collision-enabled, so a folded arm can contact its own base.
+The robot geometry remains the current simple box representation, not an
+imported CAD collision model.
 
 ### Link rest poses (M8.5, F1)
 
@@ -533,21 +527,19 @@ longer sags under a fixed `kp`, and the same gains produce a comparable
 response regardless of the joint's inertia. Defaults are `ωn = 2π*10 rad/s`,
 `ζ = 1`, `kv = 50 s⁻¹`.
 
-### MuJoCo self-collision (M8.5, F3)
+### MuJoCo self-collision (M8.5, F4)
 
-Only direct joint (parent/child) pairs were excluded from contact; after
-F1's rest-pose fix every link sits at its real offset, so two non-adjacent
-links of the same robot can genuinely overlap by construction (a folded
-arm, for instance) and, unexcluded, would fight each other through
-contact. `MujocoBackend::rebuild` now excludes every pair of bodies
-reachable from each other through the joint graph — one weakly-connected
-robot's own articulation, found with a small union-find over `body_order`
-and `joint_order` — not just adjacent pairs. A body with no joints at all
-(an unconnected environment object) is its own singleton component and
-gets no excludes, so it still collides normally with everything else.
-Self-collision within one robot is not modelled at all (no pair excluded
-by this rule can ever contact another member of the same robot); a real
-robot-self-collision model is future work, not part of this milestone.
+After F1's rest-pose fix, every link sits at its real offset, so two
+non-adjacent links of the same robot can genuinely overlap by construction
+(a folded arm, for instance). `MujocoBackend::rebuild` now excludes only
+direct parent/child pairs and pairs whose rest-pose geometries overlap. The
+box path uses an oriented-box separating-axis test; sphere/capsule pairs use
+their conservative rest-pose bounds. A folded non-adjacent link therefore
+stops against the base instead of passing through it. `RobotRuntimeBlueprint`
+has `selfCollision`, enabled by default; setting it false assigns the robot
+to a collision category that still contacts ordinary environment geometry
+while disabling contacts between its own links. This opt-out is for models
+whose simple box approximation is too coarse.
 
 ### Default backend kinematic link placement (M8.5, F4)
 

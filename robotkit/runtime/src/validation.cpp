@@ -45,7 +45,8 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
     if (!has_full_struct(blueprint) || blueprint->joint_count > RK_MAX_JOINTS ||
         blueprint->link_count == 0 || blueprint->link_count > RK_MAX_LINKS ||
         blueprint->sensor_count > RK_MAX_SENSORS ||
-        blueprint->collision_approximation > RK_COLLISION_APPROXIMATION_BOUNDS_BOX)
+        blueprint->collision_approximation > RK_COLLISION_APPROXIMATION_BOUNDS_BOX ||
+        blueprint->self_collision > RK_SELF_COLLISION_DISABLED)
         return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t i = 0; i < blueprint->link_count; ++i) {
         const auto &link = blueprint->links[i];

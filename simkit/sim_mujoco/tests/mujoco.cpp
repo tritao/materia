@@ -779,15 +779,14 @@ void two_joint_arm_on_kinematic_base_holds_position_under_gravity() {
 }
 
 void non_adjacent_links_do_not_self_collide() {
-    // F3: only parent/child joint pairs were excluded from contact, but
-    // after F1's rest-pose fix every link sits at its real offset, so two
-    // NON-adjacent links of the same robot (base and link2 here) can
-    // genuinely overlap and must still not push on each other.
+    // F4: link2 is separated from the base at rest, then the second joint
+    // folds it back through the base. Direct parent/child pairs remain
+    // excluded, but this non-adjacent contact must stop the fold.
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
     const auto base_node = make_node(scene, 0.0);
     const auto link1_node = make_node(scene, 0.6);
-    const auto link2_node = make_node(scene, 0.1); // Overlaps the base's own box again.
+    const auto link2_node = make_node(scene, 1.2); // 0.65m clear of the base at rest.
 
     nksim_world_desc world_desc{};
     world_desc.struct_size = sizeof(world_desc);
@@ -823,29 +822,35 @@ void non_adjacent_links_do_not_self_collide() {
     joint2_desc.body_a = link1;
     joint2_desc.body_b = link2;
     joint2_desc.axis_a[1] = 1.0; // About Y, so an X-direction contact push (see below) produces torque.
-    // Pivot at world (0.1, 0, 0.4): offset from link2's own rest center
-    // (0.1, 0, 0) along Z, so a contact force separating base and link2
-    // along X (their minimum-penetration axis) has a real lever arm
-    // instead of passing straight through link2's center.
-    joint2_desc.anchor_a[0] = -0.5;
-    joint2_desc.anchor_a[2] = 0.4;
-    joint2_desc.anchor_b[2] = 0.4;
+    // Pivot at link1's rest center; link2's rest center is 0.6m along +X.
+    // Folding around +Y therefore drives it through the base at q=pi.
+    joint2_desc.anchor_b[0] = -0.6;
+    joint2_desc.lower_limit = -3.2;
+    joint2_desc.upper_limit = 3.2;
+    joint2_desc.max_force = 100.0;
     nksim_joint joint2 = 0;
     assert(nksim_joint_create(world, &joint2_desc, &joint2) == NKSIM_OK);
 
-    step_world(world, 20);
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = joint2;
+    target.mode = NKSIM_JOINT_TARGET_POSITION;
+    target.target = 3.0;
+    target.max_force = 100.0;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+    step_world(world, 300);
 
     nksim_joint_state state1{}, state2{};
     state1.struct_size = sizeof(state1);
     state2.struct_size = sizeof(state2);
     assert(nksim_joint_get_state(world, joint1, &state1) == NKSIM_OK);
     assert(nksim_joint_get_state(world, joint2, &state2) == NKSIM_OK);
-    // No gravity, no actuation, no adjacent overlap: with base and link2
-    // correctly excluded from contact, nothing should move either joint.
+    // The target folds link2 toward the base, but contact stops it before the
+    // requested angle. A whole-component exclusion would incorrectly reach
+    // the target and let the link pass through the base.
     assert(std::abs(state1.position) < 1e-6);
-    assert(std::abs(state2.position) < 1e-6);
-    assert(std::abs(state1.velocity) < 1e-6);
-    assert(std::abs(state2.velocity) < 1e-6);
+    assert(state2.position > 0.5);
+    assert(state2.position < 2.5);
 
     nksim_joint_destroy(world, joint2);
     nksim_joint_destroy(world, joint1);

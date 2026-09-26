@@ -456,7 +456,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		frame_count: u32 @offset(24);
 		collision_approximation: u32 @offset(28);
-		reserved: array<u64, 2> @offset(32);
+		self_collision: u32 @offset(32);
+		reserved0: u32 @offset(36);
+		reserved: array<u64, 1> @offset(40);
 		joints: array<rk_robot_runtime_joint, 512> @offset(48);
 		links: array<rk_robot_runtime_link, 1024> @offset(98352);
 		/**

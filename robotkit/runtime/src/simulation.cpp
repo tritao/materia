@@ -234,7 +234,11 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             std::copy_n(blueprint.links[index].center_of_mass, 3, desc.center_of_mass);
             std::copy_n(blueprint.links[index].inertia_tensor, 9, desc.inertia_tensor);
             desc.shape = shape_;
-            desc.collision_layer = 1;
+            // Layer 2 is an opt-out category for a robot's own links. It
+            // still collides with ordinary layer-1 environment geometry,
+            // while two opt-out links do not collide with one another.
+            const bool self_collision_disabled = blueprint.self_collision == RK_SELF_COLLISION_DISABLED;
+            desc.collision_layer = self_collision_disabled ? 2 : 1;
             desc.collision_mask = blueprint.collision_approximation == RK_COLLISION_APPROXIMATION_NONE ? 0 : 1;
             nksim_body body = 0;
             require_sim(nksim_body_create(world_, &desc, &body), "nksim_body_create");

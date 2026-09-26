@@ -118,6 +118,11 @@ ctest --test-dir /tmp/materia-mujoco --output-on-failure
 ```
 
 Select it with `new Simulation(0.01, 2, 1)`; backend `0` remains the test backend.
+MuJoCo self-collision excludes direct parent/child pairs and links that
+already overlap in their authored rest pose, while other link pairs can make
+contact. Set `blueprint.selfCollision = false` for a model whose simple box
+collision approximation is too coarse; it keeps environment collision while
+disabling contacts between that robot's own links.
 
 `robotkit.world.SimulatedRobot` adapts one simulation-owned runtime to the same
 `Robot` interface used by `RemoteRobot`. `robotkit.world.SerialRobot` compiles

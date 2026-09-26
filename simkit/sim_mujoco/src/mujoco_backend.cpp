@@ -28,6 +28,12 @@ struct BodyRecord {
     std::string name;
 };
 
+struct RestBox {
+    Vec3 center{};
+    Vec3 half{};
+    Vec3 axis[3]{};
+};
+
 struct JointRecord {
     nksim::BackendJointDesc desc{};
     nksim::BackendJointState state{};
@@ -39,6 +45,12 @@ struct JointRecord {
 
 double dot(const Vec3 &a, const Vec3 &b) {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+Vec3 cross(const Vec3 &a, const Vec3 &b) {
+    return {a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0]};
 }
 
 Vec3 subtract(const Vec3 &a, const Vec3 &b) {
@@ -93,6 +105,91 @@ Vec3 rotate(const Quat &rotation, const Vec3 &value) {
     const Quat vector{value[0], value[1], value[2], 0.0};
     const auto rotated = multiply(multiply(rotation, vector), conjugate(rotation));
     return {rotated[0], rotated[1], rotated[2]};
+}
+
+RestBox rest_box(const BodyRecord &body) {
+    RestBox result;
+    result.center = {body.desc.position[0], body.desc.position[1], body.desc.position[2]};
+    result.half = {body.desc.shape_parameters[0], body.desc.shape_parameters[1],
+                   body.desc.shape_parameters[2]};
+    const auto rotation = normalize(Quat{body.desc.rotation[0], body.desc.rotation[1],
+                                         body.desc.rotation[2], body.desc.rotation[3]});
+    for (int axis = 0; axis < 3; ++axis) {
+        Vec3 local{0.0, 0.0, 0.0};
+        local[axis] = 1.0;
+        result.axis[axis] = rotate(rotation, local);
+    }
+    return result;
+}
+
+bool rest_boxes_overlap(const RestBox &a, const RestBox &b) {
+    double rotation[3][3]{};
+    double absolute[3][3]{};
+    for (int i = 0; i < 3; ++i) for (int j = 0; j < 3; ++j) {
+        rotation[i][j] = dot(a.axis[i], b.axis[j]);
+        absolute[i][j] = std::abs(rotation[i][j]) + 1e-10;
+    }
+    const auto delta = subtract(b.center, a.center);
+    double translated_a[3]{};
+    double translated_b[3]{};
+    for (int i = 0; i < 3; ++i) {
+        translated_a[i] = dot(delta, a.axis[i]);
+        translated_b[i] = dot(delta, b.axis[i]);
+    }
+    for (int i = 0; i < 3; ++i) {
+        double extent_b = 0.0;
+        for (int j = 0; j < 3; ++j) extent_b += b.half[j] * absolute[i][j];
+        if (std::abs(translated_a[i]) > a.half[i] + extent_b)
+            return false;
+    }
+    for (int j = 0; j < 3; ++j) {
+        double extent_a = 0.0;
+        for (int i = 0; i < 3; ++i) extent_a += a.half[i] * absolute[i][j];
+        if (std::abs(translated_b[j]) > extent_a + b.half[j])
+            return false;
+    }
+    for (int i = 0; i < 3; ++i) for (int j = 0; j < 3; ++j) {
+        const auto separating_axis = cross(a.axis[i], b.axis[j]);
+        const auto axis_length = std::sqrt(dot(separating_axis, separating_axis));
+        if (axis_length < 1e-12) continue;
+        const auto axis = normalize(separating_axis);
+        double extent_a = 0.0, extent_b = 0.0;
+        for (int k = 0; k < 3; ++k) {
+            extent_a += a.half[k] * std::abs(dot(a.axis[k], axis));
+            extent_b += b.half[k] * std::abs(dot(b.axis[k], axis));
+        }
+        if (std::abs(dot(delta, axis)) > extent_a + extent_b)
+            return false;
+    }
+    return true;
+}
+
+double rest_shape_radius(const BodyRecord &body) {
+    switch (body.desc.shape_type) {
+    case NKSIM_SHAPE_BOX:
+        return std::sqrt(body.desc.shape_parameters[0] * body.desc.shape_parameters[0] +
+                         body.desc.shape_parameters[1] * body.desc.shape_parameters[1] +
+                         body.desc.shape_parameters[2] * body.desc.shape_parameters[2]);
+    case NKSIM_SHAPE_SPHERE:
+        return body.desc.shape_parameters[0];
+    case NKSIM_SHAPE_CAPSULE:
+        return std::sqrt(body.desc.shape_parameters[0] * body.desc.shape_parameters[0] +
+                         0.25 * body.desc.shape_parameters[1] * body.desc.shape_parameters[1]);
+    default:
+        return 0.0;
+    }
+}
+
+bool geometries_overlap_at_rest(const BodyRecord &a, const BodyRecord &b) {
+    if (a.desc.shape_type == NKSIM_SHAPE_BOX && b.desc.shape_type == NKSIM_SHAPE_BOX)
+        return rest_boxes_overlap(rest_box(a), rest_box(b));
+    const auto radius_a = rest_shape_radius(a), radius_b = rest_shape_radius(b);
+    if (radius_a <= 0.0 || radius_b <= 0.0) return false;
+    const Vec3 center_a{a.desc.position[0], a.desc.position[1], a.desc.position[2]};
+    const Vec3 center_b{b.desc.position[0], b.desc.position[1], b.desc.position[2]};
+    const auto delta = subtract(center_b, center_a);
+    const auto distance = std::sqrt(dot(delta, delta));
+    return distance <= radius_a + radius_b;
 }
 
 // Both sides of a joint describe the same physical pivot: anchor_a/rotation_a
@@ -580,44 +677,33 @@ private:
     // velocity actuators, whose bias (-kp*q - kv*qdot for a position
     // actuator) applies even at ctrl=0 — an idle position actuator dragged a
     // velocity- or effort-commanded joint back toward q=0.
-    // F3: after F1's rest-pose fix every link sits at its real offset, so
-    // non-adjacent links of the same robot (not just direct joint pairs) can
-    // genuinely overlap. Exclude every pair of bodies reachable from each
-    // other through the joint graph (a robot's own weakly-connected
-    // articulation), not just parent/child pairs; self-collision within one
-    // robot is not modelled (see ARCHITECTURE.md). A body with no joints at
-    // all (e.g. an unconnected environment object) is its own singleton
-    // component and gets no excludes.
+    // F4: keep direct parent/child pairs out of contact, and keep pairs that
+    // already overlap in the authored rest pose out of contact. Other links
+    // in one articulation remain collision-enabled, so a folded arm can
+    // contact its own base instead of passing through it. Rest-pose geometry
+    // is tested with an oriented-box SAT for the shapes RobotKit supplies;
+    // the generic sphere/capsule fallback is conservative for those shapes.
     nksim_result add_self_collision_excludes() {
-        std::unordered_map<std::uint64_t, std::uint64_t> parent_of;
-        for (const auto body_id : body_order)
-            parent_of[body_id] = body_id;
-        auto find_root = [&](std::uint64_t id) {
-            while (parent_of[id] != id) {
-                parent_of[id] = parent_of[parent_of[id]];
-                id = parent_of[id];
+        auto is_parent_child = [&](std::uint64_t first, std::uint64_t second) {
+            for (const auto joint_id : joint_order) {
+                const auto &joint = joints.at(joint_id);
+                if ((joint.desc.body_a == first && joint.desc.body_b == second) ||
+                    (joint.desc.body_a == second && joint.desc.body_b == first))
+                    return true;
             }
-            return id;
+            return false;
         };
-        for (const auto joint_id : joint_order) {
-            const auto &joint = joints.at(joint_id);
-            const auto root_a = find_root(joint.desc.body_a);
-            const auto root_b = find_root(joint.desc.body_b);
-            if (root_a != root_b)
-                parent_of[root_a] = root_b;
-        }
-        std::unordered_map<std::uint64_t, std::vector<std::uint64_t>> components;
-        for (const auto body_id : body_order)
-            components[find_root(body_id)].push_back(body_id);
-        for (const auto &entry : components) {
-            const auto &members = entry.second;
-            for (std::size_t i = 0; i < members.size(); ++i) {
-                for (std::size_t j = i + 1; j < members.size(); ++j) {
-                    auto *exclude = mjs_addExclude(spec);
-                    if (!exclude) return NKSIM_ERROR_OUT_OF_MEMORY;
-                    mjs_setString(exclude->bodyname1, bodies.at(members[i]).name.c_str());
-                    mjs_setString(exclude->bodyname2, bodies.at(members[j]).name.c_str());
-                }
+        for (std::size_t i = 0; i < body_order.size(); ++i) {
+            for (std::size_t j = i + 1; j < body_order.size(); ++j) {
+                const auto first = body_order[i], second = body_order[j];
+                const auto &body_a = bodies.at(first), &body_b = bodies.at(second);
+                if (!is_parent_child(first, second) &&
+                    !geometries_overlap_at_rest(body_a, body_b))
+                    continue;
+                auto *exclude = mjs_addExclude(spec);
+                if (!exclude) return NKSIM_ERROR_OUT_OF_MEMORY;
+                mjs_setString(exclude->bodyname1, body_a.name.c_str());
+                mjs_setString(exclude->bodyname2, body_b.name.c_str());
             }
         }
         return NKSIM_OK;
