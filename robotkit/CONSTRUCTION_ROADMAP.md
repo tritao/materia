@@ -944,8 +944,13 @@ those result types directly rather than only through their producing class.
 `ConstructionSkillTests` runs `ScanSurface`/`RegisterSurface`/`Paint`/`Sand`
 through `SkillRunner` against an M9-style simulated robot (the same
 holonomic-base + UR5-arm shape, built locally in the test), then replays
-`Paint` against a `ReplayRobot` of the recording, mirroring the forklift
-skills' pattern. Replay needed a genuinely new piece,
+every one of them against a `ReplayRobot` of the recording, mirroring the
+forklift skills' pattern of replaying each individual skill (not just one
+representative skill). `ScanSurface`/`RegisterSurface` submit no
+`RobotCommand`, so their replay exercises the `SkillRunner` lifecycle
+against the `ReplayRobot`'s observations only; `Paint` and `Sand` were
+recorded back to back in one continuous MCAP stream, so their replays share
+one `ReplayRobot` cursor. Replay needed a genuinely new piece,
 `robotkit.mobile.HolonomicOdometry` / `robotkit.localization.HolonomicOdometryLocalization`
 (an `odom`-to-`base` wheel-odometry estimate for a three-wheel omni base,
 mirroring `WheelOdometryLocalization`): the live run's
@@ -962,8 +967,10 @@ new bug), reproducible enough to be worth fixing rather than shrugging off.
 Widened `FinishSurface.beginExecution`'s IK tolerance to `2e-3` (matching the
 M9 scenario test and `WorkSurface`'s own tolerance field) rather than
 touching `InverseKinematics`/`ToolpathExecutor`; stable across repeated runs
-afterward. `robotkit/tests/haxeon.json`: 715 assertions total (all suites,
-including M9/M10, run together — see M9 above for the breakdown); `cmake -S
+afterward. `robotkit/tests/haxeon.json`: 718 assertions total (all suites,
+including M9/M10, run together — 703 M9 baseline + 15 from
+`ConstructionSkillTests`, 3 more than the original 12 once every skill,
+not just `Paint`, was replayed); `cmake -S
 robotkit -B robotkit/build && ctest`: 9/9; the MuJoCo-enabled native build
 (`/tmp/materia-mujoco`, per `robotkit/README.md`): 12/12; `ctest -L sim`
 (simkit): 4/4; `robotkit/tests/mujoco` (the M9 MuJoCo scenario): 22

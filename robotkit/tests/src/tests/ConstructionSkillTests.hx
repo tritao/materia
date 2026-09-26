@@ -200,6 +200,26 @@ class ConstructionSkillTests {
       replayLocalization.update(snapshot);
       return new PerceptionSnapshot();
     };
+    // ScanSurface/RegisterSurface submit no RobotCommand, so replaying them
+    // does not consume any of the replay cursor's recorded command/snapshot
+    // pairs Paint/Sand need below; still run each through its own
+    // SkillRunner against the ReplayRobot's observations, per the plan's
+    // "each skill runs ... against a ReplayRobot of a recording".
+    var replayScan = new ScanSurface(function() {
+      return SimulatedSurfaceScanner.scan(design, trueOffset, 0.0015, 0.02, 0.0003, 5, Int64.ofInt(0));
+    });
+    var replayScanRunner = new SkillRunner();
+    var replayScanStatus = replayScanRunner.start(replayScan);
+    while (replayScanStatus == SkillStatus.Running)
+      replayScanStatus = replayScanRunner.update(replay.snapshot(), timestep);
+    check(replayScanStatus == SkillStatus.Succeeded,
+      "ScanSurface replays to completion against a ReplayRobot's observations");
+    var replayRegister = new RegisterSurface(design, replayScan.cloud, 5);
+    var replayRegisterRunner = new SkillRunner();
+    var replayRegisterStatus = replayRegisterRunner.start(replayRegister);
+    check(replayRegisterStatus == SkillStatus.Succeeded,
+      "RegisterSurface replays to completion against a ReplayRobot's observations");
+
     var replaySprayer = new SimulatedSprayer();
     var replayPaint = new Paint(replayNavigator, manipulator, replay, registered.frame_T_surface, registered,
       spec, replayObserve, replaySprayer, 0.3, 2.0, seed);
@@ -221,6 +241,19 @@ class ConstructionSkillTests {
     var replayFraction = replayCoverage == null ? -1.0 : replayCoverage.coverageFraction();
     check(replayCoverage != null && replayFraction >= 0.85,
       'replayed Paint reaches strong coverage on its own recomputed plan (live=$liveFraction, replay=$replayFraction)');
+
+    // -- Sand replay: continue the same ReplayRobot cursor into the
+    // recorded Sand run (Paint and Sand were recorded back to back in one
+    // continuous MCAP stream during the live run above). --
+    var replaySander = new SimulatedSander();
+    var replaySand = new Sand(replayNavigator, manipulator, replay, registered.frame_T_surface, registered,
+      spec, replayObserve, replaySander, 8000.0, 15.0, seed);
+    var replaySandRunner = new SkillRunner();
+    var replaySandStatus = replaySandRunner.start(replaySand);
+    while (replaySandStatus == SkillStatus.Running && replay.advance())
+      replaySandStatus = replaySandRunner.update(replay.snapshot(), timestep);
+    check(replaySandStatus == SkillStatus.Succeeded,
+      'Sand replays to completion against a ReplayRobot of the recording (status $replaySandStatus)');
     replay.close();
 
     if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);

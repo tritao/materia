@@ -1184,8 +1184,16 @@ layer above the raster it already produces.
 
 `robotkit/tests/src/tests/ConstructionSkillTests.hx` exercises `ScanSurface`,
 `RegisterSurface`, `Paint`, and `Sand` through `SkillRunner` against an M9-style
-simulated robot, then replays `Paint` against a `ReplayRobot` of the
-recording, mirroring the forklift skills' pattern. Replay needs its own fresh
+simulated robot, then replays every one of them against a `ReplayRobot` of
+the recording, mirroring the forklift skills' pattern
+(`testForkliftSkillsOnSimulationAndReplay` replays each of its own skills
+individually, not just one representative skill). `ScanSurface`/
+`RegisterSurface` submit no `RobotCommand`, so replaying them exercises only
+their own `SkillRunner` lifecycle against the `ReplayRobot`'s observations,
+not the recorded command stream; `Paint` and `Sand` were recorded back to
+back in one continuous MCAP stream during the live run, so their replays
+share one `ReplayRobot` cursor, continuing straight from where `Paint`'s
+replay leaves off into `Sand`'s recorded commands. Replay needs its own fresh
 `MobileBase`/`Navigation`/`Navigator` over the `ReplayRobot` (not the live
 run's, whose underlying `RecordingRobot` is closed): `SimulationTruthLocalization`
 reads a live `Simulation`'s own owned base pose directly, which a `ReplayRobot`
