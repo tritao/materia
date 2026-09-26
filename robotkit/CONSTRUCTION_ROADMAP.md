@@ -1107,4 +1107,54 @@ first commit's intermediate, verified-green state genuinely excludes
 real compiler quirk worth a future "diagnose before workaround" look, but not
 this milestone's to fix. `robotkit/tests/haxeon.json`: 770 assertions (737 M11
 baseline + 33 new `ExcavatorTests`); native `ctest --test-dir robotkit/build`:
-9/9.
+9/9. End-of-milestone full-suite confirmation: `robotkit/tests/mujoco` (M9's
+MuJoCo scenario, unaffected by M11/M12): 22 assertions, coverage 99.27%;
+`robotkit/cadbridge/tests`: 27 assertions; `robotkit/tests/world-tcp.sh` plain
+and with `ROBOTKIT_TEST_LEASE_TIMEOUT=1`: both pass. No native code changed in
+M11/M12, so `ctest -L sim` and the MuJoCo native build were not re-run beyond
+what M8.5/M9 already established (per the plan's own "if you touch native
+code" condition).
+
+**Roadmap complete (M0-M12).** Every milestone in this plan's original scope
+is done, reviewed, and committed on `robotkit-construction`: M0 (lease
+timeout, verified, no code), M1 (3D spatial types), M2 (kinematic chains and
+damped-least-squares IK), M3 (tools/TCP), M4 (toolpaths and Cartesian
+trajectories), M5 (work geometry: raster generation, coverage), M6
+(CAD/BIM to `WorkSurface` bridge, `robotkit/cadbridge`), M7 (as-built
+registration: plane fitting, RANSAC, deviation maps), M8 (base placement and
+reachability search), M8.5 (four authorized simulator articulation fixes,
+F1-F4, plus a cross-backend acceptance test and two pre-M9 MuJoCo fixes), M9
+(the end-to-end simulated wall-finishing robot, on both the default backend
+and MuJoCo), M10 (construction skills: scan/register/finish/paint/sand), M11
+(terrain height maps: `HeightMap`/`EarthworkRegion`/`BucketSweep`), and M12
+(the simulated excavator: a 4-DOF slew/boom/stick/bucket chain reusing M2's
+`KinematicChain`/`InverseKinematics` unchanged, `DigCyclePlanner`, and the
+`DigTrench`/`GradeRegion`/`DumpAt` skills). The ground rules held throughout:
+Cartesian/tool/work concepts stayed layered strictly above `Robot`/
+`RobotRuntime` (the one sanctioned exception, M8.5, added no Cartesian/IK
+concepts to the runtime itself); `robotkit/haxeon.json` still depends only on
+`nativekit`; every pose/transform uses `Transform3` (no parallel pose type
+appeared); and the planar navigation stack (`Pose2`/`FrameTree2`/`Costmap2`/
+`Navigator`) was extended (`HolonomicDrive` alongside `DifferentialDrive`) but
+never replaced. Every milestone left a documented, working end-to-end
+capability behind it rather than a partial one: M9's wall-finishing robot and
+M12's excavator are both complete design-to-executed-motion pipelines with
+their own passing scenario tests, not just component libraries. The most
+consequential real findings along the way, all logged in their own
+milestone's entry and in `ARCHITECTURE.md` rather than repeated here: M8.5's
+four simulator articulation bugs (link rest poses, MuJoCo actuator stalling,
+MuJoCo self-collision, default-backend kinematic placement) were real,
+independently reproduced with a failing test first, and fixed at the smallest
+scope the plan authorized; M2/M8/M12's recurring finding that this
+damped-least-squares `InverseKinematics` is a real, well-behaved but
+*local* solver (cold-start/near-limit sensitivity is expected behavior, not a
+bug, and is worked around at the call site every time it appears); and M9's
+MuJoCo integration needing a small, isolated build-system addition
+(`robotkit/robotd/native-mujoco`) rather than a change to the default build.
+Explicitly out-of-scope items (soil mechanics, hydraulic/engine control,
+curved/freeform surfaces, tiling, whole-body base+arm optimization, and any
+change to the device protocol or `robotd` beyond M0/M8.5) were left alone, as
+the plan directed. `LayTile` and fill/embankment grading are the two
+concretely-scoped "not yet" items, each with a short note (in `ARCHITECTURE.md`'s
+M10 and M12 sections respectively) on what capability they would need that
+this codebase does not have today.
