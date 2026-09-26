@@ -42,7 +42,7 @@ Each component also produces the machining it needs:
 | `ParallelKey` | DIN 6885-1 form B (square ends), by shaft diameter | — |
 | `RetainingRing` | DIN 471 external, by shaft diameter | `grooveSpec()` (d2, m) |
 | `ShaftCollar` | set-screw type, by bore diameter | — |
-| `SteppedShaft` | — (built from arbitrary sections) | keyway and retaining-ring groove cuts, `diameterAt()` |
+| `SteppedShaft` | — (built from arbitrary sections) | keyway/groove cuts, end chamfers, shoulder fillets/reliefs, semantic threaded ends, `journalDiameterAt()` |
 | `FlangeBearingHousing` | — (sized from a `DeepGrooveBearing`) | `mountScrewPart()` |
 | `PillowBlock` | Koyo/JTEKT UCP204–UCP213 base-mounted units | mounting connectors and hole envelope; `mountScrewPart()` and `billOfMaterials(true, length)` for mounting hardware |
 | `Bushing` | — (proportional to bore diameter) | — |
@@ -61,7 +61,11 @@ explicit allowance helpers when a drawing supplies its own limits.
 shoulders at each diameter change. Keyways are cut on the shaft's local +Y
 side, so a `ParallelKey` mated through the keyway's connector with a fixed
 joint sits flush in the slot. Retaining-ring grooves add a connector of their
-own name when given one, for a `RetainingRing` mated the same way.
+own name when given one, for a `RetainingRing` mated the same way. Optional
+`ShaftDetail` data adds end chamfers, shoulder fillets and relief roots, plus
+semantic reduced-diameter threaded ends; thread flanks remain unmodelled.
+`journalDiameterAt()` and `journalDiameterAllowance()` make the selected fit
+allowance explicit for a journal position.
 
 `examples/MotorShaftBearings.hx` mounts a NEMA 17 motor on a plate with four
 M3 screws and carries an output shaft on two 608 bearings through a continuous

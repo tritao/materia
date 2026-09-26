@@ -330,6 +330,26 @@ class MachineKitSmoke {
 		near(seat.z, 55, "keyway connector z");
 		near(seat.y, 3 - 1.2, "keyway connector floor");
 		near(shaft.connector("ring").frame.z, 50.6, "groove connector z");
+		near(shaft.journalDiameterAt(10, BearingShaftFit.Slip), 7.99, "shaft slip journal fit");
+		near(shaft.journalDiameterAllowance(10, 0.02), 8.02, "shaft explicit journal allowance");
+
+		var detailedShaft = new SteppedShaft(
+			[{diameter: 12, length: 20}, {diameter: 8, length: 20}], null, null, null,
+			{inputChamfer: 1, outputChamfer: 0.5,
+				inputThread: {diameter: 10, pitch: 1.5, length: 6},
+				outputThread: {diameter: 6, pitch: 1, length: 5},
+				shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]});
+		check(detailedShaft.designation == "SHAFT-12x20-8x20-TI10x1.5x6-TO6x1x5", "detailed shaft designation");
+		near(detailedShaft.connector("inputThread").frame.z, 3, "input thread connector");
+		near(detailedShaft.connector("outputThread").frame.z, 37.5, "output thread connector");
+		var detailedEnvelope = detailedShaft.geometry(Envelope);
+		var detailedPreview = detailedShaft.geometry();
+		solid(detailedEnvelope, "detailed shaft envelope");
+		solid(detailedPreview, "detailed shaft preview");
+		check(detailedPreview.volume() < detailedEnvelope.volume(), "detailed shaft machining features");
+		check(bounds(detailedPreview).maxX <= 6.001, "detailed shaft shoulder envelope");
+		detailedPreview.close();
+		detailedEnvelope.close();
 
 		throws(() -> new SteppedShaft([{diameter: -1, length: 10}]), "positive diameter and length");
 		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], [{name: "x", z: 20}]),
@@ -356,6 +376,12 @@ class MachineKitSmoke {
 			[{z0: 9, width: 4, diameter: 9}]), "Retaining ring groove must lie within one shaft section");
 		throws(() -> new SteppedShaft([{diameter: 12, length: 40}], null,
 			[{name: "k", z0: 0, key: ParallelKey.metric("10x8", 20)}]), 'Keyway "k" is too wide for the shaft');
+		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], null, null, null,
+			{inputChamfer: 4.1}), "smaller than its radius");
+		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], null, null, null,
+			{inputThread: {diameter: 8, pitch: 1, length: 4}}), "below the shaft diameter");
+		throws(() -> new SteppedShaft([{diameter: 8, length: 10}, {diameter: 6, length: 10}], null, null, null,
+			{shoulders: [{z: 5, reliefWidth: 1, reliefDiameter: 4}]}), "not a section boundary");
 	}
 
 	static function shaftHardware():Void {
