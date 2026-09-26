@@ -20,6 +20,7 @@ class UiKey {
 	public static inline var A:Int = 65;
 	public static inline var C:Int = 67;
 	public static inline var K:Int = 75;
+	public static inline var P:Int = 80;
 	public static inline var R:Int = 82;
 	public static inline var S:Int = 83;
 	public static inline var Y:Int = 89;

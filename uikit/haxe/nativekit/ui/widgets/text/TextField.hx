@@ -179,9 +179,9 @@ class TextField implements View {
 			}
 			var showsPlaceholder = editor.documentLength() == 0 && placeholder != null &&
 				placeholder.length > 0;
-			// Compact property values use the standard text renderer so their theme
-			// foreground reaches the pixels, including while the editor has focus.
-			var useTextNode = showsPlaceholder || (!multiline && classes.indexOf("property-input") >= 0);
+			// Single-line fields use the text node so their full value and theme
+			// foreground update together as the editor content changes.
+			var useTextNode = showsPlaceholder || !multiline;
 			var textNode = new RenderNode(context.id("text"),
 				useTextNode ? LayoutVisualKind.Text : LayoutVisualKind.Custom, textNodeStyle);
 			if (showsPlaceholder)

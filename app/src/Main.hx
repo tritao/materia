@@ -487,18 +487,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       );
       layers.push(new StackChild("context-menu", menu, 0.0, 0.0, 20));
     }
-    if (paletteVisible) {
-      var palette = new CommandPalette("reference-command-palette",
-        commands, ui.commandContext, 260.0, 96.0, "", function() {
-        paletteVisible = false;
-        commands.refresh();
-      }, function(_) {
-        log("Command executed from palette");
-        commands.refresh();
-      }
-      );
-      layers.push(new StackChild("command-palette", palette, 0.0, 0.0, 30));
-    }
     var documentDialog = makeDocumentDialog();
     if (documentDialog != null) layers.push(new StackChild("document-dialog", documentDialog,
       0.0, 0.0, 100, LayoutAxis.grow(), LayoutAxis.grow()));
@@ -567,6 +555,19 @@ class ReferenceEditorApp implements DesktopUiApplication {
         function() { viewportOptionsVisible = false; commands.refresh(); },
         function(_) { viewportOptionsVisible = false; commands.refresh(); });
       windowLayers.push(new StackChild("viewport-options-menu", options, 0.0, 0.0, 25));
+    }
+    if (paletteVisible && documentDialog == null) {
+      var palette = new CommandPalette("reference-command-palette",
+        commands, ui.commandContext, 0.0, 0.0, "", function() {
+          paletteVisible = false;
+          commands.refresh();
+        }, function(_) {
+          log("Command executed from palette");
+          commands.refresh();
+        });
+      palette.centered = true;
+      windowLayers.push(new StackChild("command-palette", palette, 0.0, 0.0, 1000,
+        LayoutAxis.grow(), LayoutAxis.grow()));
     }
     return new Stack("window-overlay-host", windowLayers);
   }
@@ -1611,11 +1612,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
       saveWorkspace();
       log("Workspace saved");
     }));
-    commands.register(new Command("editor.command-palette", "Open command palette", function() {
+    var openPalette = new Command("editor.command-palette", "Open command palette", function() {
       paletteVisible = true;
       contextMenuVisible = false;
       commands.refresh();
-    }, new Shortcut(UiKey.K, UiModifier.Control), function() return !documents.blocked()));
+    }, new Shortcut(UiKey.K, UiModifier.Control), function() return !documents.blocked());
+    openPalette.addShortcut(new Shortcut(UiKey.P, UiModifier.Control));
+    commands.register(openPalette);
     commands.register(new Command("scene.frame-selected", "Frame selected", function() {
       if (workspace.activePanelId == "perspective" && perspectiveViewport != null)
         perspectiveViewport.frameSelected();

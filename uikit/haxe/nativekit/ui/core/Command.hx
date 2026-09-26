@@ -5,6 +5,7 @@ class Command {
 	public final id:String;
 	public final label:String;
 	public final shortcut:Null<Shortcut>;
+	final alternateShortcuts:Array<Shortcut>;
 	final action:Void->Void;
 	var contextualAction:Null<CommandContext->CommandResult>;
 	final enabledPredicate:Null<Void->Bool>;
@@ -21,10 +22,28 @@ class Command {
 		this.action = action;
 		this.contextualAction = null;
 		this.shortcut = shortcut;
+		alternateShortcuts = [];
 		this.enabledPredicate = enabled;
 		this.checkedPredicate = checked;
 		this.contextualEnabledPredicate = null;
 		this.contextualCheckedPredicate = null;
+	}
+
+	/** Adds another chord for the same command without duplicating it in menus or palettes. */
+	public function addShortcut(value:Shortcut):Command {
+		if (value == null)
+			throw "Alternate shortcuts cannot be null";
+		if ((shortcut == null || !shortcut.equals(value)) &&
+			!Lambda.exists(alternateShortcuts, function(existing) return existing.equals(value)))
+			alternateShortcuts.push(value);
+		return this;
+	}
+
+	public function matchesShortcut(key:Int, modifiers:Int):Bool {
+		if (shortcut != null && shortcut.matches(key, modifiers)) return true;
+		for (alternate in alternateShortcuts)
+			if (alternate.matches(key, modifiers)) return true;
+		return false;
 	}
 
 	/** Creates a command whose action and predicates receive invocation context. */

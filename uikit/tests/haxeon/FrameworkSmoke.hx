@@ -385,8 +385,8 @@ class FrameworkSmoke {
 		if (fieldRoot.children.length != 1 ||
 			fieldRoot.children[0].layout.visualKind != LayoutVisualKind.Box ||
 			fieldRoot.children[0].children.length != 1 ||
-			fieldRoot.children[0].children[0].layout.visualKind != LayoutVisualKind.Custom ||
-			fieldRoot.children[0].children[0].layout.intrinsicContent == null ||
+			fieldRoot.children[0].children[0].layout.visualKind != LayoutVisualKind.Text ||
+			fieldRoot.children[0].children[0].layout.text != "hello" ||
 			fieldRoot.children[0].children[0].layout.style.zIndex != 1)
 			return 201;
 		if (fieldRoot.semantics == null || fieldRoot.semantics.role != AccessibilityRole.TextField ||
@@ -3703,6 +3703,15 @@ class FrameworkSmoke {
 		enabled = false;
 		if (registry.dispatch(UiKey.S, UiModifier.Control))
 			return false;
+		var paletteRuns = 0;
+		var paletteCommand = new Command("palette", "Open palette", function() paletteRuns++,
+			new Shortcut(UiKey.K, UiModifier.Control));
+		paletteCommand.addShortcut(new Shortcut(UiKey.P, UiModifier.Control));
+		registry.register(paletteCommand);
+		if (!registry.dispatch(UiKey.K, UiModifier.Control) ||
+			!registry.dispatch(UiKey.P, UiModifier.Control) || paletteRuns != 2 ||
+			registry.ids().length != 3)
+			return false;
 
 		var parameters = new CommandParameters();
 		parameters.setString("property", "mass");
@@ -4012,6 +4021,18 @@ class FrameworkSmoke {
 		var paletteRoot = uiContext.submit(palette, new LayoutFrame(640.0, 480.0));
 		if (paletteRoot == null || paletteRoot.semantics == null ||
 			paletteRoot.semantics.label != "Command palette")
+			return false;
+		var centeredPalette = new CommandPalette("centered-palette", surfaceRegistry);
+		centeredPalette.centered = true;
+		var centeredRoot = uiContext.submit(centeredPalette, new LayoutFrame(480.0, 360.0));
+		var centeredPanel = centeredRoot.children[1];
+		var centeredGeometry = centeredPanel.resolved;
+		if (centeredRoot.children[0].layout.style.zIndex != 1000 ||
+			centeredPanel.layout.style.zIndex != 1001 || centeredGeometry == null ||
+			centeredGeometry.x < 7.0 ||
+			centeredGeometry.x + centeredGeometry.width > 473.0 ||
+			centeredGeometry.y < 7.0 ||
+			centeredGeometry.y + centeredGeometry.height > 353.0)
 			return false;
 		return true;
 	}

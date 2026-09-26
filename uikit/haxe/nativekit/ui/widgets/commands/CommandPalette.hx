@@ -29,6 +29,8 @@ class CommandPalette implements View {
 	public final x:Float;
 	public final y:Float;
 	public var query:String;
+	/** Center the palette in the viewport, fitting its list into smaller windows. */
+	public var centered:Bool;
 	public var onDismiss:Null<Void->Void>;
 	public var onResult:Null<CommandResult->Void>;
 
@@ -43,6 +45,7 @@ class CommandPalette implements View {
 		this.x = x;
 		this.y = y;
 		this.query = query == null ? "" : query;
+		centered = false;
 		this.onDismiss = onDismiss;
 		this.onResult = onResult;
 	}
@@ -56,14 +59,16 @@ class CommandPalette implements View {
 			var model = new CommandPaletteModel(commands, actualContext, query);
 			var searchStyle = new LayoutStyle();
 			searchStyle.width = LayoutAxis.grow();
+			if (centered) searchStyle.height = LayoutAxis.fixed(38.0);
 			var search = new SearchField("search", query, function(next) {
 				query = next;
 				queryState.update(next);
 			}, searchStyle, "Search commands");
 			var listStyle = new LayoutStyle();
 			listStyle.width = LayoutAxis.grow();
-			listStyle.height = LayoutAxis.fixed(320.0);
-			var list = new ListView("commands", model, listStyle, null, 320.0, 0,
+			var listHeight = centered ? Math.min(320.0, Math.max(120.0, context.viewportHeight - 102.0)) : 320.0;
+			listStyle.height = LayoutAxis.fixed(listHeight);
+			var list = new ListView("commands", model, listStyle, null, listHeight, 0,
 				null, function(index) {
 					if (index < 0 || index >= model.commands.length)
 						return;
@@ -74,7 +79,8 @@ class CommandPalette implements View {
 						onDismiss();
 				});
 			var contentStyle = new LayoutStyle();
-			contentStyle.width = LayoutAxis.fixed(480.0);
+			var contentWidth = centered ? Math.min(480.0, Math.max(200.0, context.viewportWidth - 32.0)) : 480.0;
+			contentStyle.width = LayoutAxis.fixed(contentWidth);
 			contentStyle.padding = new Insets(12.0, 12.0, 12.0, 12.0);
 			contentStyle.childGap = 8.0;
 			contentStyle.background = context.theme.panelBackground;
@@ -82,10 +88,13 @@ class CommandPalette implements View {
 				new KeyedView("search", search),
 				new KeyedView("commands", list)
 			], contentStyle);
-			var popup = new Popup(key, content, x, y, null, onDismiss);
+			var popupX = centered ? Math.max(8.0, (context.viewportWidth - contentWidth - 16.0) / 2.0) : x;
+			var popupY = centered ? Math.max(8.0, (context.viewportHeight - listHeight - 86.0) / 2.0) : y;
+			var popup = new Popup(key, content, popupX, popupY, null, onDismiss);
 			popup.label = "Command palette";
 			popup.modal = true;
 			popup.dimBackdrop = true;
+			if (centered) popup.layerZIndex = 1000;
 			return popup.build(context);
 		});
 	}

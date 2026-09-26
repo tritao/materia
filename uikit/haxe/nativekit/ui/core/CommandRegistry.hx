@@ -179,7 +179,7 @@ class CommandRegistry {
 				var id = commandOrder[commandIndex];
 				var command = commands.get(id);
 				if (command != null && commandScopes.get(id) == scope &&
-					command.shortcut != null && command.shortcut.matches(key, normalized)) {
+					command.matchesShortcut(key, normalized)) {
 					if (!command.isEnabled(actual)) {
 						disabled = CommandResult.disabled();
 						break;

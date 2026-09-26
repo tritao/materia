@@ -31,6 +31,8 @@ class Popup implements View {
 	public var dismissOnOutside:Bool;
 	public var dismissOnEscape:Bool;
 	public var backdropColor:Null<Color>;
+	/** Absolute layer shared by the backdrop; content paints one layer above it. */
+	public var layerZIndex:Int;
 	public var onDismiss:Void->Void;
 	public var hasDismissHandler(default, null):Bool;
 	public function new(key:String, child:View, x:Float = 0.0, y:Float = 0.0,
@@ -48,6 +50,7 @@ class Popup implements View {
 		dismissOnOutside = true;
 		dismissOnEscape = true;
 		backdropColor = null;
+		layerZIndex = 0;
 		hasDismissHandler = onDismiss != null;
 		this.onDismiss = onDismiss == null ? function() {} : onDismiss;
 	}
@@ -74,6 +77,7 @@ class Popup implements View {
 			backdropStyle.width = LayoutAxis.grow();
 			backdropStyle.height = LayoutAxis.grow();
 			backdropStyle.positioning = LayoutPositioning.Absolute;
+			backdropStyle.zIndex = layerZIndex;
 			backdropStyle.visible = modal || dismissOnOutside;
 			var color = backdropColor == null ? context.theme.overlayBackdrop : cast backdropColor;
 			backdropStyle.background = modal && dimBackdrop
@@ -102,7 +106,7 @@ class Popup implements View {
 			panelStyle.positioning = LayoutPositioning.Absolute;
 			panelStyle.positionX = x;
 			panelStyle.positionY = y;
-			panelStyle.zIndex = 1;
+			panelStyle.zIndex = layerZIndex + 1;
 			var panelId = context.id("popup-content");
 			var panelComputed = context.resolveStyle(
 				new StyleTarget("popup-content", key.value, key.value, null, ["popup"],
