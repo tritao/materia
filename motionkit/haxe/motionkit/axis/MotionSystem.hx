@@ -26,7 +26,12 @@ class MotionSystem {
   public final fixedTimestepSeconds:Float;
   public final planner:TrajectoryPlanner;
   var activeTrajectory:Null<JointTrajectory> = null;
+  var queuedTrajectories:Array<JointTrajectory> = [];
   var elapsedSeconds:Float = 0.0;
+  var held:Bool = false;
+  var bufferedTotalSeconds:Float = 0.0;
+  var bufferedCompletedSeconds:Float = 0.0;
+  var plannedEndPositions:Null<Array<Float>> = null;
 
   public static function fromBlueprint(robot:Robot, blueprint:MotionSystemBlueprint):MotionSystem
     return new MotionSystem(robot, blueprint);
@@ -63,39 +68,92 @@ class MotionSystem {
 
   public function trajectory():Null<JointTrajectory> return activeTrajectory;
 
+  /** Number of active and waiting trajectories currently owned by the system. */
+  public function queueDepth():Int
+    return (activeTrajectory == null ? 0 : 1) + queuedTrajectories.length;
+
+  /** Remaining duration across the active trajectory and all queued trajectories. */
+  public function queuedDurationSeconds():Float {
+    var result = activeTrajectory == null ? 0.0 :
+      Math.max(0.0, activeTrajectory.durationSeconds - elapsedSeconds);
+    for (trajectoryValue in queuedTrajectories) result += trajectoryValue.durationSeconds;
+    return result;
+  }
+
+  /** Completion fraction of the currently buffered motion, in the range [0, 1]. */
+  public function progress():Float {
+    if (bufferedTotalSeconds <= 0.0) return 1.0;
+    var completed = bufferedCompletedSeconds +
+      (activeTrajectory == null ? 0.0 : Math.min(activeTrajectory.durationSeconds, elapsedSeconds));
+    return Math.min(1.0, Math.max(0.0, completed / bufferedTotalSeconds));
+  }
+
+  public function isHolding():Bool return held;
+
   /** Plans a coordinated move while leaving unspecified axes at their current positions. */
   public function moveAxes(targets:Array<AxisTarget>, ?options:MotionOptions):JointTrajectory {
-    if (targets == null || targets.length == 0) throw "Axis move needs at least one target";
-    var snapshot = robot.snapshot();
-    var start = snapshot.positions.toArray();
-    var goal = start.copy();
-    var seen = new Map<String, Bool>();
-    for (target in targets) {
-      if (target == null) throw "Axis move cannot contain a null target";
-      var axisValue = axis(target.axis);
-      if (axisValue == null) throw 'Unknown motion axis "${target.axis}"';
-      if (seen.exists(target.axis)) throw 'Axis move targets "${target.axis}" more than once';
-      if (target.position < axisValue.lowerLimit || target.position > axisValue.upperLimit)
-        throw 'Axis "${target.axis}" target ${target.position} is outside its limits';
-      axisValue.writeLogicalPosition(goal, target.position);
-      seen.set(target.axis, true);
-    }
-    var chosenOptions = options == null ? new MotionOptions() : options;
-    var limits = resolveLimits(targets, chosenOptions);
-    activeTrajectory = planner.plan(start, goal, limits);
-    elapsedSeconds = 0.0;
-    return activeTrajectory;
+    var trajectoryValue = planAxesFrom(robot.snapshot().positions.toArray(), targets, options);
+    clearBufferedMotion();
+    beginImmediate(trajectoryValue);
+    return trajectoryValue;
+  }
+
+  /** Adds a coordinated axis move behind all motion already in the buffer. */
+  public function queueAxes(targets:Array<AxisTarget>, ?options:MotionOptions):JointTrajectory {
+    var trajectoryValue = planAxesFrom(planningStartPositions(), targets, options);
+    enqueueTrajectory(trajectoryValue);
+    return trajectoryValue;
+  }
+
+  /** Adds an already planned joint trajectory to the execution buffer. */
+  public function queueTrajectory(trajectoryValue:JointTrajectory):Void {
+    if (trajectoryValue == null) throw "Queued trajectory is required";
+    var jointCount = robot.description().joints.length;
+    if (trajectoryValue.jointCount != jointCount)
+      throw 'Queued trajectory has ${trajectoryValue.jointCount} joints; robot has $jointCount';
+    enqueueTrajectory(trajectoryValue);
   }
 
   /** Plans a straight Cartesian move for a direct XYZ gantry. */
   public function moveLinear(target:PathPoint, feed:Feed):JointTrajectory {
+    var trajectoryValue = planLinearFrom(robot.snapshot().positions.toArray(), target, feed);
+    clearBufferedMotion();
+    beginImmediate(trajectoryValue);
+    return trajectoryValue;
+  }
+
+  /** Adds a straight Cartesian move behind all motion already in the buffer. */
+  public function queueLinear(target:PathPoint, feed:Feed):JointTrajectory {
+    var trajectoryValue = planLinearFrom(planningStartPositions(), target, feed);
+    enqueueTrajectory(trajectoryValue);
+    return trajectoryValue;
+  }
+
+  /** Holds buffered motion and requests a controlled stop without discarding it. */
+  public function hold():Void {
+    if (held) return;
+    held = true;
+    if (activeTrajectory != null) robot.stop(StopMode.Normal);
+  }
+
+  /** Resumes a held buffer at its current deterministic trajectory time. */
+  public function resume():Void {
+    held = false;
+    activateNextTrajectory();
+  }
+
+  /** Aborts buffered motion and separates a controlled stop from emergency stop. */
+  public function abort(?mode:StopMode = StopMode.Normal):Void {
+    clearBufferedMotion();
+    robot.stop(mode);
+  }
+
+  function planLinearFrom(start:Array<Float>, target:PathPoint, feed:Feed):JointTrajectory {
     if (target == null || feed == null) throw "Linear move needs a target and feed";
+    var goal = start.copy();
     var xAxis = requireAxis("x");
     var yAxis = requireAxis("y");
     var zAxis = requireAxis("z");
-    var snapshot = robot.snapshot();
-    var start = snapshot.positions.toArray();
-    var goal = start.copy();
     var starts = [xAxis.logicalPosition(start), yAxis.logicalPosition(start),
       zAxis.logicalPosition(start)];
     var goals = [target.x, target.y, target.z];
@@ -111,9 +169,7 @@ class MotionSystem {
     var dz = goals[2] - starts[2];
     var distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
     if (distance <= 0.0) {
-      activeTrajectory = new JointTrajectory([new JointTrajectorySample(0.0, goal)]);
-      elapsedSeconds = 0.0;
-      return activeTrajectory;
+      return new JointTrajectory([new JointTrajectorySample(0.0, goal)]);
     }
 
     var scalarFeed = feed.value;
@@ -145,9 +201,7 @@ class MotionSystem {
       mapped.push(new JointTrajectorySample(sample.timeSeconds, positions,
         velocities, accelerations));
     }
-    activeTrajectory = new JointTrajectory(mapped);
-    elapsedSeconds = 0.0;
-    return activeTrajectory;
+    return new JointTrajectory(mapped);
   }
 
   /** Software homing for the bootstrap: move to each authored home coordinate. */
@@ -160,6 +214,8 @@ class MotionSystem {
    * batch. Pass no duration to use the compiled fixed timestep.
    */
   public function update(?dtSeconds:Float = -1.0):Bool {
+    if (held) return false;
+    if (activeTrajectory == null) activateNextTrajectory();
     if (activeTrajectory == null) return false;
     var dt = dtSeconds < 0.0 ? fixedTimestepSeconds : dtSeconds;
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
@@ -170,18 +226,81 @@ class MotionSystem {
       targets.push(JointTarget.position(i, sample.positions[i]));
     robot.submit(RobotCommand.JointTargets(targets, null));
     if (elapsedSeconds >= trajectory.durationSeconds) {
+      bufferedCompletedSeconds += trajectory.durationSeconds;
       activeTrajectory = null;
-      return false;
+      elapsedSeconds = 0.0;
+      activateNextTrajectory();
+      return activeTrajectory != null;
     }
     elapsedSeconds = Math.min(trajectory.durationSeconds, elapsedSeconds + dt);
     return true;
   }
 
   public function stop(?mode:StopMode = StopMode.Normal):Void {
-    activeTrajectory = null;
-    elapsedSeconds = 0.0;
-    robot.stop(mode);
+    abort(mode);
   }
+
+  function planAxesFrom(start:Array<Float>, targets:Array<AxisTarget>,
+      options:Null<MotionOptions>):JointTrajectory {
+    if (targets == null || targets.length == 0) throw "Axis move needs at least one target";
+    var goal = start.copy();
+    var seen = new Map<String, Bool>();
+    for (target in targets) {
+      if (target == null) throw "Axis move cannot contain a null target";
+      var axisValue = axis(target.axis);
+      if (axisValue == null) throw 'Unknown motion axis "${target.axis}"';
+      if (seen.exists(target.axis)) throw 'Axis move targets "${target.axis}" more than once';
+      if (target.position < axisValue.lowerLimit || target.position > axisValue.upperLimit)
+        throw 'Axis "${target.axis}" target ${target.position} is outside its limits';
+      axisValue.writeLogicalPosition(goal, target.position);
+      seen.set(target.axis, true);
+    }
+    var chosenOptions = options == null ? new MotionOptions() : options;
+    return planner.plan(start, goal, resolveLimits(targets, chosenOptions));
+  }
+
+  function planningStartPositions():Array<Float> {
+    if (plannedEndPositions != null) return plannedEndPositions.copy();
+    return robot.snapshot().positions.toArray();
+  }
+
+  function beginImmediate(trajectoryValue:JointTrajectory):Void {
+    activeTrajectory = trajectoryValue;
+    elapsedSeconds = 0.0;
+    bufferedTotalSeconds = trajectoryValue.durationSeconds;
+    bufferedCompletedSeconds = 0.0;
+    plannedEndPositions = trajectoryEnd(trajectoryValue);
+  }
+
+  function enqueueTrajectory(trajectoryValue:JointTrajectory):Void {
+    if (activeTrajectory == null && queuedTrajectories.length == 0) {
+      bufferedTotalSeconds = 0.0;
+      bufferedCompletedSeconds = 0.0;
+    }
+    queuedTrajectories.push(trajectoryValue);
+    bufferedTotalSeconds += trajectoryValue.durationSeconds;
+    plannedEndPositions = trajectoryEnd(trajectoryValue);
+    activateNextTrajectory();
+  }
+
+  function activateNextTrajectory():Void {
+    if (held || activeTrajectory != null || queuedTrajectories.length == 0) return;
+    activeTrajectory = queuedTrajectories.shift();
+    elapsedSeconds = 0.0;
+  }
+
+  function clearBufferedMotion():Void {
+    activeTrajectory = null;
+    queuedTrajectories = [];
+    elapsedSeconds = 0.0;
+    held = false;
+    bufferedTotalSeconds = 0.0;
+    bufferedCompletedSeconds = 0.0;
+    plannedEndPositions = null;
+  }
+
+  static function trajectoryEnd(trajectoryValue:JointTrajectory):Array<Float>
+    return trajectoryValue.samples[trajectoryValue.samples.length - 1].positions.copy();
 
   function requireAxis(id:String):MotionAxis {
     var result = axis(id);

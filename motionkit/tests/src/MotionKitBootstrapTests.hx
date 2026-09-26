@@ -22,6 +22,7 @@ class MotionKitBootstrapTests {
     testLinearAxisCompilesToRobotModel();
     testCompiledAxisRunsThroughSimulation();
     testCompiledXYZGantryRunsThroughSimulation();
+    testBufferedExecution();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
   }
 
@@ -175,6 +176,65 @@ class MotionKitBootstrapTests {
       if (tick > 2000) throw "MotionKit trajectory did not complete";
     }
     for (_ in 0...4) simulation.step(Int64.ofInt(tick++));
+  }
+
+  static function testBufferedExecution():Void {
+    var xAxis = new LinearAxis(23, 10, 80);
+    var yAxis = new LinearAxis(23, 10, 60);
+    var zAxis = new LinearAxis(23, 10, 40);
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(xAxis, yAxis, zAxis, 0.1, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("buffered-gantry", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var options = new MotionOptions(0.05, 0.2);
+
+    var first = machine.queueAxes([new AxisTarget("x", 0.02)], options);
+    var second = machine.queueAxes([new AxisTarget("x", 0.04)], options);
+    check(machine.queueDepth() == 2, "buffer reports active and waiting trajectories");
+    check(machine.queuedDurationSeconds() > first.durationSeconds,
+      "buffer reports the duration of waiting motion");
+    near(second.samples[0].positions[0], 0.02,
+      "queued axis motion starts at the previous trajectory endpoint");
+    near(machine.progress(), 0.0, "buffer starts with zero progress");
+
+    var tick = 0;
+    for (_ in 0...5) {
+      check(machine.update(), "buffer remains active while its first move is running");
+      simulation.step(Int64.ofInt(tick++));
+    }
+    var beforeHold = robot.snapshot().positions.get(0);
+    machine.hold();
+    check(machine.isHolding(), "buffer reports controlled hold");
+    check(machine.queueDepth() == 2, "hold preserves active and waiting trajectories");
+    for (_ in 0...5) {
+      check(!machine.update(), "held buffer does not submit motion commands");
+      simulation.step(Int64.ofInt(tick++));
+    }
+    near(robot.snapshot().positions.get(0), beforeHold,
+      "controlled hold keeps the simulated axis stopped", 1e-5);
+
+    machine.resume();
+    check(!machine.isHolding(), "buffer resumes from controlled hold");
+    while (machine.isMoving()) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+      if (tick > 2000) throw "buffered MotionKit trajectory did not complete";
+    }
+    near(robot.snapshot().positions.get(0), 0.04,
+      "buffered trajectories execute in order", 1e-5);
+    check(machine.queueDepth() == 0, "buffer empties after the final trajectory");
+    near(machine.progress(), 1.0, "buffer reports completed progress");
+
+    machine.queueAxes([new AxisTarget("x", 0.01)], options);
+    check(machine.queueDepth() == 1, "buffer accepts a new trajectory after completion");
+    machine.abort();
+    check(machine.queueDepth() == 0 && !machine.isMoving(),
+      "abort clears active and waiting trajectories");
+    check(!machine.isHolding(), "abort clears controlled hold state");
+    simulation.dispose();
   }
 
   static function check(value:Bool, message:String):Void {
