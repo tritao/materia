@@ -32,6 +32,19 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+To run the complete available RobotKit suite, including the Haxe world tests,
+native tests, CAD bridge tests, the MuJoCo wall-finishing scenario, and both
+world TCP modes, use:
+
+```sh
+robotkit/tests/run-all.sh
+```
+
+The runner builds CadKit's shared core when it is missing, adds its directory
+to `LD_LIBRARY_PATH` for the CAD bridge process, initializes the vendored
+MuJoCo submodule when possible, and reports a clear skip if MuJoCo is not
+available.
+
 The canonical native CMake target is `RobotKit::runtime`.
 
 `robotd/native` enables the SimKit simulation and builds the native dependency
