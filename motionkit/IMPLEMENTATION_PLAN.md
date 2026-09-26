@@ -168,8 +168,11 @@ Why:
 
 Segment boundaries are shared across joints. Consequences:
 
-- Sampled trajectories are the degree-1 special case, so the existing chunk
-  path maps onto it with no behaviour change.
+- Position samples in the existing runtime chunk path are the degree-1
+  special case, so their position interpolation maps onto it without a
+  behaviour change. Haxe `JointTrajectory.sample` separately interpolates
+  authored velocity and acceleration arrays; those derivative values are not
+  equivalent to derivatives of the degree-1 position polynomial.
 - Trapezoids are exact at degree 2 and Ruckig at degree 3; degree 5 is
   reserved for quintic blends.
 - Position, velocity, acceleration and jerk are all analytic, so validation
@@ -252,8 +255,9 @@ Do:
   - `mk_trajectory_evaluate(t, time_ns, out position/velocity/acceleration/jerk)`;
   - `mk_trajectory_duration_ns`, `mk_trajectory_segment_count`,
     `mk_trajectory_destroy`;
-  - `mk_trajectory_from_samples(times_ns, positions)`, which builds degree-1
-    segments equivalent to today's linear interpolation.
+- `mk_trajectory_from_samples(times_ns, positions)`, which builds degree-1
+  segments equivalent to today's linear position interpolation. Its velocity
+  is each segment's chord velocity and its acceleration and jerk are zero.
 - Continuity report: the maximum C0, C1 and C2 jump at each boundary,
   reported rather than enforced.
 - Bindings:
@@ -265,15 +269,17 @@ Do:
 - Haxe wrapper `motionkit.trajectory.Trajectory`, which owns a native handle
   and provides `evaluate`, `durationSeconds`, `jointCount` and
   `fromJointTrajectory(JointTrajectory)` (degree 1). The existing sampled
-  `JointTrajectory` stays for now.
+  `JointTrajectory` stays for now; this conversion preserves sampled positions
+  and times, not its independently stored velocity and acceleration arrays.
 - Add `motionkit/native` to `robotkit/robotd/native/CMakeLists.txt` (and to
   the native `inputs` lists in the haxeon.json files that build it), so Haxe
   tests load the library.
 
 Tests (native):
 - evaluating a hand-built cubic matches the analytic values;
-- `from_samples` matches Haxe `JointTrajectory.sample` on the same data to
-  1e-12;
+- `from_samples` positions match Haxe `JointTrajectory.sample` on the same
+  data to 1e-12; native velocity equals each chord slope, and native
+  acceleration and jerk are zero within each segment;
 - boundary lookup at exact knot times is right-continuous and deterministic;
 - the rejection cases above.
 
@@ -613,3 +619,12 @@ fault. Added a native regression with an endpoint lacking queue support; it
 failed before the runtime change and now passes. Commit: the commit containing
 this entry. MotionKit and RobotKit Haxe tests, all nine RobotKit native tests,
 and TCP integration in default, session and lease-timeout modes passed.
+
+### P3 — Plan correction before implementation
+
+Stopped before writing P3 code. `JointTrajectory.sample` interpolates stored
+positions, velocities and accelerations independently, so a degree-1 position
+polynomial cannot match all three values as P3's original test required. The
+smallest correction above limits the equivalence claim to position and states
+the native analytic derivative semantics. No P3 implementation or tests have
+been started. Commit: the commit containing this entry.
