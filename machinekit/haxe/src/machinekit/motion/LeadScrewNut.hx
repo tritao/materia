@@ -53,6 +53,7 @@ class LeadScrewNut extends MachineComponent {
 		this.boltCount = boltCount;
 		mountScrew = mountScrewSize;
 		addConnector("bore", Axis, Solids.axial(0, 0, bodyLength / 2));
+		addConnector("mountFace", Face, Solids.axial(0, 0, bodyLength + flangeThickness));
 		var i = 1;
 		for (point in boltPattern())
 			addConnector('mount${i++}', Mount, Solids.axial(point.x, point.y, bodyLength + flangeThickness));

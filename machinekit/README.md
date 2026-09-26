@@ -111,15 +111,14 @@ library classes rather than one-off scripts:
   on the housing's outer face, long enough to pass through it. The bearing's own
   `front`/`axis`/`back` connectors stay reachable as `'<id>-bearing'` for
   mating a shaft through it.
-- `LinearAxis` drives a `SteppedShaft` lead screw from a `NemaStepper` through
-  a `ShaftCoupling`, with a `Carriage` riding it on a prismatic joint whose
-  limits keep it between the two `PillowBlock`s. The pillow blocks (whose
-  bearing bore must match the screw) sit near each end of the screw, and a
-  `RectTube` rail (via `FrameAssembly`) runs alongside it, clear of the
-  carriage, housings and screw heads. They are placed from the screw's layout in
-  the same `AssemblyModel` rather than mated to it, since a real frame
-  constrains the screw at both ends (a statically indeterminate assembly),
-  which this simplified kinematic model does not attempt to capture.
+- `LinearAxis` drives a `SteppedShaft` screw through a `ShaftCoupling` and
+  `LeadScrewNut`. Its carriage runs on two round guide rods with `LM8UU` linear
+  bearings. `setTravel(state, millimetres)` couples screw rotation to carriage
+  translation through the nut lead and enforces the stroke. The carriage slide
+  is parented to the fixed motor frame, so the carriage stays oriented while
+  the screw rotates. Two `PillowBlock`s support the screw near its ends; a
+  `RectTube` member remains the layout frame rail. Guide and housing mounting
+  details are still a preview rather than a structurally designed frame.
 
 ## Robotics
 

@@ -644,20 +644,27 @@ class MachineKitSmoke {
 		check(axis.bearing.designation == "6000-2Z", "linear axis default bearing matches the 10 mm screw");
 		check(axis.coupling.designation == "COUPLING-6.35x10-18x30", "linear axis coupling joins motor and screw");
 		near(axis.carriage.boreDiameter, 10, "linear axis carriage bore");
+		check(axis.nut.lead == 2, "linear axis lead nut");
+		check(axis.guideBearingA.designation == "LM8UU", "linear axis round guide bearing");
+		var carriagePreview = axis.carriage.geometry();
+		solid(carriagePreview, "carriage with nut and guide seats");
+		check(carriagePreview.volume() < axis.carriage.width * axis.carriage.width * axis.carriage.length,
+			"carriage preview cuts mounting and guide holes");
+		carriagePreview.close();
 		// Layout from the screw input: coupling half (15) + gap (2) + housing (depth), margin (20),
 		// carriage (60) + stroke (200), margin (20), housing (depth) flush with the screw end.
 		var depth = axis.pillowBlockA.housing.depth;
 		near(depth, 14, "6000 housing depth");
 		near(axis.bearingAPosition, 15 + 2 + depth / 2, "pillow block A just past the coupling");
-		near(axis.travelMin, 15 + 2 + depth + 20 + 30, "carriage travel starts a margin past pillow block A");
+		near(axis.travelMin, 15 + 2 + depth + 30 + 30, "carriage travel starts a margin past pillow block A");
 		near(axis.travelMax - axis.travelMin, 200, "carriage travel equals the stroke");
-		near(axis.bearingBPosition, axis.travelMax + 30 + 20 + depth / 2, "pillow block B a margin past the travel end");
-		near(axis.length, 345, "linear axis screw length");
+		near(axis.bearingBPosition, axis.travelMax + 30 + 30 + depth / 2, "pillow block B a margin past the travel end");
+		near(axis.length, 365, "linear axis screw length");
 		near(axis.screw.totalLength, axis.length, "linear axis screw total length");
 		throws(() -> new LinearAxis(23, 10, -1), "positive stroke");
 		throws(() -> new LinearAxis(23, 10, 200, "6001"), "bore does not match the screw diameter");
 		throws(() -> new LinearAxis(23, 50), "No catalog deep groove bearing has a 50 mm bore");
-		throws(() -> new LinearAxis(23, 10, 200, null, 2), "must clear the pillow block screw heads");
+		throws(() -> new LinearAxis(23, 10, 200, null, 2), "must clear the pillow block screw heads and lead nut");
 
 		for (entry in axis.components()) {
 			var part = entry.component.geometry(Envelope);
@@ -668,7 +675,7 @@ class MachineKitSmoke {
 		solid(rail, "linear axis rail");
 		var railBox = rail.shape.bounds();
 		near(railBox.get_min().get_z(), 21, "rail starts at the screw input");
-		near(railBox.get_max().get_z(), 21 + 345, "rail ends at the screw end");
+		near(railBox.get_max().get_z(), 21 + axis.length, "rail ends at the screw end");
 		// Beside the screw, clear of the housings (and their screw heads) and the carriage.
 		var housing = axis.pillowBlockA.housing;
 		check(railBox.get_max().get_y() <= -housing.face / 2 - 1, "rail clears the pillow block housings");
@@ -678,11 +685,11 @@ class MachineKitSmoke {
 		rail.close();
 		var cutList = axis.frame.cutList();
 		check(cutList.length == 1, "linear axis frame cut list");
-		near(cutList[0].totalLength, 345, "linear axis rail length");
+		near(cutList[0].totalLength, axis.length, "linear axis rail length");
 
 		var model = axis.assembly();
 		var definition = model.definition("linear-axis");
-		check(definition.joints.length == 13, "linear axis joint count");
+		check(definition.joints.length == 16, "linear axis joint count");
 		for (joint in definition.joints) if (joint.id == "carriage-slide") {
 			check(joint.limits.lower != null && joint.limits.lower == axis.travelMin, "carriage lower limit");
 			check(joint.limits.upper != null && joint.limits.upper == axis.travelMax, "carriage upper limit");
@@ -691,10 +698,14 @@ class MachineKitSmoke {
 		near(state.worldConnector("coupling", "axis").z, 21, "coupling centred on the motor shaft tip");
 		near(state.worldConnector("screw", "input").z, 21, "screw seats on the motor shaft");
 		near(state.worldConnector("carriage", "bore").z, 21 + axis.travelMin, "carriage starts at its lower travel limit");
+		near(state.worldConnector("guideRodA", "input").x, -axis.guideSpacing, "first guide rod offset");
+		near(state.worldConnector("guideBearingA", "axis").x, -axis.guideSpacing, "first bearing follows guide rod");
+		near(state.worldConnector("leadNut", "mountFace").z, state.worldConnector("carriage", "nutMount").z,
+			"lead nut mounts to the carriage face");
 		near(state.worldConnector("pillowA-bearing", "axis").z, 21 + axis.bearingAPosition, "pillow block A bearing on the screw");
 		near(state.worldConnector("pillowB-bearing", "axis").z, 21 + axis.bearingBPosition, "pillow block B bearing on the screw");
 		near(state.worldConnector("pillowA-bearing", "axis").z, 45, "pillow block A bearing position");
-		near(state.worldConnector("pillowB-bearing", "axis").z, 359, "pillow block B bearing position");
+		near(state.worldConnector("pillowB-bearing", "axis").z, 379, "pillow block B bearing position");
 		// Housing A mounts toward the motor, housing B is turned over to mount toward the far end:
 		// both screw heads face the carriage and their tips point outboard.
 		near(state.worldConnector("pillowA-screw1", "head").z, 21 + axis.bearingAPosition + depth / 2, "pillow A screw heads inboard");
@@ -702,21 +713,31 @@ class MachineKitSmoke {
 		near(state.worldConnector("pillowB-screw1", "head").z, 21 + axis.bearingBPosition - depth / 2, "pillow B screw heads inboard");
 		check(state.worldConnector("pillowB-screw1", "tip").z > 21 + axis.length, "pillow B screw tips outboard");
 
-		state.setJoint("carriage-slide", 100);
-		state.forwardKinematics();
-		near(state.worldConnector("carriage", "bore").z, 121, "carriage travels along the screw");
+		axis.setTravel(state, 100);
+		near(state.joint("coupling"), axis.nut.rotationFor(100), "screw rotation follows nut lead");
+		near(state.worldConnector("carriage", "bore").z, 21 + axis.travelMin + 100, "carriage travels with screw rotation");
+		near(state.worldConnector("guideBearingB", "axis").x, axis.guideSpacing, "bearing stays on second guide");
+		axis.setTravel(state, 0);
+		var unturned = state.worldPose("carriage");
+		axis.setTravel(state, 2);
+		near(state.joint("coupling"), 2 * Math.PI, "one screw turn advances by lead");
+		near(state.worldPose("carriage").qz, unturned.qz, "carriage does not rotate with screw");
+		throws(() -> axis.setTravel(state, axis.stroke + 1), "outside its stroke");
 		state.setJoint("carriage-slide", axis.travelMax);
 		state.forwardKinematics();
 		var carriageEnd = state.worldConnector("carriage", "bore").z + axis.carriage.length / 2;
-		near(state.worldConnector("pillowB-bearing", "axis").z - depth / 2 - carriageEnd, 20,
+		near(state.worldConnector("pillowB-bearing", "axis").z - depth / 2 - carriageEnd, 30,
 			"carriage stops a margin short of pillow block B");
 
 		var bom = axis.bom();
 		var lines = bom.lines();
-		check(lines.length == 8, "linear axis BOM line count");
+		check(lines.length == 11, "linear axis BOM line count");
 		check(bom.quantity(axis.bearing.designation) == 2, "linear axis bearing quantity");
 		check(bom.quantity(axis.coupling.designation) == 1, "linear axis coupling in the BOM");
-		check(bom.quantity("RECT-20x15x2-L345") == 1, "linear axis rail in the BOM");
+		check(bom.quantity(axis.nut.designation) == 1, "linear axis lead nut in the BOM");
+		check(bom.quantity(axis.guideRodA.designation) == 2, "linear axis guide rods in the BOM");
+		check(bom.quantity(axis.guideBearingA.designation) == 2, "linear axis guide bearings in the BOM");
+		check(bom.quantity("RECT-20x15x2-L365") == 1, "linear axis rail in the BOM");
 		check(bom.quantity(axis.pillowBlockA.screw.designation) == 8, "linear axis pillow block screws");
 	}
 
