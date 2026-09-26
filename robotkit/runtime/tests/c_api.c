@@ -60,6 +60,7 @@ int main(void) {
     assert(rk_robot_runtime_capabilities(runtime, &capabilities) == RK_OK);
     assert(capabilities.joint_count == 1);
     assert(capabilities.supports_position_targets != 0);
+    assert(capabilities.supports_trajectory_queue != 0);
 
     rk_robot_command trajectory_command = {0};
     trajectory_command.struct_size = sizeof(trajectory_command);

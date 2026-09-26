@@ -73,6 +73,16 @@ class RobotRuntime {
     check(RobotKitRuntime.rk_robot_runtime_stop(owner.borrow()), "runtime.stop");
   }
 
+  /** Reports the endpoint's actual buffered-trajectory capability. */
+  public function supportsTrajectoryQueue():Bool {
+    ensureLive();
+    var value = new rk_robot_capabilities();
+    value.set_struct_size(rk_robot_capabilities.size());
+    check(RobotKitRuntime.rk_robot_runtime_capabilities(owner.borrow(), value).status,
+      "runtime.capabilities");
+    return value.get_supports_trajectory_queue() != 0;
+  }
+
   /** Submits a complete heterogeneous joint-target batch in one native call. */
   public function submitTargets(targets:Array<robotkit.world.JointTarget>, sequence:Int,
       ?timestampNs:haxe.Int64):Void {

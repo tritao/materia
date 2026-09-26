@@ -24,7 +24,7 @@ class RuntimeRobotAdapter implements Robot {
   public function new(id:RobotId, runtime:RobotRuntime, name:String,
       links:Array<String>, joints:Array<String>, ?ownsRuntime:Bool = false,
       ?startRuntime:Bool = false, ?faultMessage:String = "robot runtime fault",
-      ?supportsTrajectoryQueue:Bool = true) {
+      ?supportsTrajectoryQueue:Null<Bool> = null) {
     if (id == null || id.length == 0)
       throw "RuntimeRobotAdapter requires a non-empty logical ID";
     if (runtime == null)
@@ -33,11 +33,15 @@ class RuntimeRobotAdapter implements Robot {
     this.runtime = runtime;
     this.ownsRuntime = ownsRuntime;
     this.faultMessage = faultMessage;
-    this.supportsTrajectoryQueue = supportsTrajectoryQueue;
+    var runtimeSupportsTrajectoryQueue = runtime.supportsTrajectoryQueue();
+    var configuredSupportsTrajectoryQueue = supportsTrajectoryQueue == null
+      ? runtimeSupportsTrajectoryQueue : supportsTrajectoryQueue == true;
+    this.supportsTrajectoryQueue = runtimeSupportsTrajectoryQueue &&
+      configuredSupportsTrajectoryQueue;
     robotDescription = new RobotDescription(id, name, links, joints);
     robotCapabilities = new RobotCapabilities(
       id, joints == null ? 0 : joints.length, true, true, true, false,
-      supportsTrajectoryQueue);
+      this.supportsTrajectoryQueue);
     if (startRuntime) {
       try runtime.start() catch (error:Dynamic) {
         if (ownsRuntime) runtime.dispose();

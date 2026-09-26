@@ -164,14 +164,15 @@ class MotionSystem {
   /** Holds buffered motion and requests a controlled stop without discarding it. */
   public function hold():Void {
     if (held) return;
-    held = true;
     if (activeTrajectory != null) {
       if (usesTrajectoryChunks(activeTrajectory)) {
+        synchronizeElapsedWithRuntime();
         trajectorySubmitted = false;
         trajectoryChunkInitialPositions = null;
       }
       robot.stop(StopMode.Normal);
     }
+    held = true;
   }
 
   /** Resumes a held buffer at its current deterministic trajectory time. */
@@ -545,14 +546,47 @@ class MotionSystem {
   function prepareTrajectoryResume():Void {
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return;
+    var actualPositions = robot.snapshot().positions.toArray();
     var nextIndex = 0;
     while (nextIndex < trajectoryValue.samples.length &&
         trajectoryValue.samples[nextIndex].timeSeconds <= elapsedSeconds + 1e-9)
       nextIndex++;
+    if (nextIndex < trajectoryValue.samples.length) {
+      var reference = trajectoryValue.sample(elapsedSeconds).positions;
+      while (nextIndex < trajectoryValue.samples.length &&
+          resumeSampleIsBehind(actualPositions, reference,
+            trajectoryValue.samples[nextIndex].positions))
+        nextIndex++;
+    }
     trajectoryNextSampleIndex = nextIndex;
     trajectoryChunkStartSeconds = elapsedSeconds;
-    trajectoryChunkInitialPositions = robot.snapshot().positions.toArray();
+    trajectoryChunkInitialPositions = actualPositions;
     trajectoryChunkEndSeconds = elapsedSeconds;
+  }
+
+  static function resumeSampleIsBehind(actual:Array<Float>, reference:Array<Float>,
+      candidate:Array<Float>):Bool {
+    var count = Std.int(Math.min(actual.length, Math.min(reference.length, candidate.length)));
+    for (joint in 0...count) {
+      var direction = candidate[joint] - reference[joint];
+      if (Math.abs(direction) <= 1e-9) continue;
+      if (direction > 0.0 && candidate[joint] < actual[joint] - 1e-9)
+        return true;
+      if (direction < 0.0 && candidate[joint] > actual[joint] + 1e-9)
+        return true;
+    }
+    return false;
+  }
+
+  function synchronizeElapsedWithRuntime():Void {
+    var trajectoryValue = activeTrajectory;
+    if (trajectoryValue == null) return;
+    var observation = robot.snapshot();
+    if (!observation.trajectoryActive) return;
+    var runtimeSeconds = nanosecondsToSeconds(observation.trajectoryTimeNs);
+    if (!Math.isFinite(runtimeSeconds)) return;
+    elapsedSeconds = Math.min(trajectoryValue.durationSeconds,
+      Math.max(0.0, runtimeSeconds));
   }
 
   function shouldRefillTrajectory(dt:Float):Bool {
@@ -593,6 +627,9 @@ class MotionSystem {
       ? Std.int(lowValue - 4294967296.0) : Std.int(lowValue);
     return Int64.make(high, low);
   }
+
+  static function nanosecondsToSeconds(nanoseconds:Int64):Float
+    return Std.parseFloat(Int64.toStr(nanoseconds)) / 1000000000.0;
 
   static function trajectoryEnd(trajectoryValue:JointTrajectory):Array<Float>
     return trajectoryValue.samples[trajectoryValue.samples.length - 1].positions.copy();

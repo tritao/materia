@@ -449,6 +449,10 @@ class MotionKitBootstrapTests {
           "native runtime reports trajectory duration beyond current time");
       }
     }
+    // Let the runtime advance while the host-side clock is stalled. Hold must
+    // resume from the runtime's authoritative trajectory time, not replay
+    // source samples that are already behind the actual machine pose.
+    for (_ in 0...5) simulation.step(Int64.ofInt(tick++));
     var beforeHold = robot.snapshot().positions.get(0);
     machine.hold();
     check(machine.isHolding(), "buffer reports controlled hold");
@@ -469,6 +473,13 @@ class MotionKitBootstrapTests {
 
     machine.resume();
     check(!machine.isHolding(), "buffer resumes from controlled hold");
+    for (_ in 0...2) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+    }
+    var resumedPosition = robot.snapshot().positions.get(0);
+    check(resumedPosition >= heldPosition - 1e-6,
+      "resume does not replay a stale trajectory sample backwards");
     while (machine.isMoving()) {
       machine.update();
       simulation.step(Int64.ofInt(tick++));
