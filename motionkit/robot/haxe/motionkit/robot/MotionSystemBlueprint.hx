@@ -1,4 +1,6 @@
-package motionkit.axis;
+package motionkit.robot;
+
+import motionkit.axis.MotionAxisBlueprint;
 
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntimeBlueprint;

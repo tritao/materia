@@ -17,6 +17,11 @@ RobotKit execution. The bootstrap package currently provides:
   RobotKit runtime advertises queue support, including bounded streaming for
   trajectories longer than one native chunk.
 
+The pure `motionkit` package contains paths, planners, trajectories and logical
+axes. `motionkit-robot` provides `motionkit.robot.MotionSystem`,
+`motionkit.robot.MotionSystemBlueprint` and
+`motionkit.robot.MachineKitRobotCompiler` for RobotKit integration.
+
 MachineKit dimensions are authored in millimetres. The compiler converts them
 to RobotKit metres, places the logical zero at the axis's lower travel limit,
 and retains the motor and lead-screw identity on the compiled actuator.
@@ -24,6 +29,9 @@ and retains the motor and lead-screw identity on the compiled actuator.
 The first end-to-end path is intentionally small:
 
 ```haxe
+import motionkit.robot.MachineKitRobotCompiler;
+import motionkit.robot.MotionSystem;
+
 var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x");
 var runtime = simulation.addRobot(blueprint.runtime);
 var robot = new SimulatedRobot("gantry-x", runtime, blueprint.model.name,

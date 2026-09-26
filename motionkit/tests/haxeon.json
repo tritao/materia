@@ -5,7 +5,7 @@
   "sourceRoots": ["src"],
   "dependencies": {
     "machinekit": { "path": "../../machinekit" },
-    "motionkit": { "path": ".." },
+    "motionkit-robot": { "path": "../robot" },
     "nativekit": { "path": "../../nativekit" },
     "robotkit": { "path": "../../robotkit" }
   },

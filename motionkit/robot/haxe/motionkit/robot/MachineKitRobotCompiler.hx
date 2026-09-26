@@ -1,8 +1,7 @@
-package motionkit;
+package motionkit.robot;
 
 import machinekit.assembly.LinearAxis;
 import motionkit.axis.MotionAxisBlueprint;
-import motionkit.axis.MotionSystemBlueprint;
 import robotkit.model.Actuator;
 import robotkit.model.Joint;
 import robotkit.model.JointType;

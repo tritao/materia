@@ -1,9 +1,10 @@
-package motionkit;
+package motionkit.robot;
 
 import haxe.Int64;
+import motionkit.AxisTarget;
 import motionkit.Feed;
+import motionkit.MotionOptions;
 import motionkit.axis.MotionAxis;
-import motionkit.axis.MotionSystemBlueprint;
 import motionkit.path.PathPoint;
 import motionkit.path.GeometricPath;
 import motionkit.planner.JogProfile;
