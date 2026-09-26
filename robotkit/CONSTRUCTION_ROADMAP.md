@@ -1097,15 +1097,15 @@ are genuinely coupled, not just adjacent); one for the
 `DigTrench`/`GradeRegion`/`DumpAt` skills, their scenario tests, and the rest
 of the documentation built on top of it. One incidental finding while
 preparing the first commit: `robotkit/haxe/robotkit/skill/DigTrench.hx`'s own
-private `DigTrenchStage` enum fails to compile with "must be registered
-before use" if the file is merely *present* on disk (haxeon's source scan
-picks up every `.hx` file under the project, not just ones reachable from the
-entry point) while nothing anywhere still constructs a `DigTrench` -- so the
-first commit's intermediate, verified-green state genuinely excludes
-`DigTrench.hx`/`GradeRegion.hx`/`DumpAt.hx` from the working tree entirely
-(not just from git's stage), rather than merely leaving them unimported; a
-real compiler quirk worth a future "diagnose before workaround" look, but not
-this milestone's to fix. `robotkit/tests/haxeon.json`: 770 assertions (737 M11
+private `DigTrenchStage` enum failed to compile with "must be registered
+before use" once nothing constructed a `DigTrench` any more, so the first
+commit's intermediate state excludes `DigTrench.hx`/`GradeRegion.hx`/
+`DumpAt.hx` from the working tree. (Later diagnosis: this was not about the
+file being present on disk. It was a haxeon incremental-build bug in which a
+module that stops being reachable leaves stale declarations behind, triggered
+here by rebuilding with an existing build cache after removing the last
+reference. Fixed in haxeon commit 46079e57; deleting the project's `build/`
+directory was the workaround.) `robotkit/tests/haxeon.json`: 770 assertions (737 M11
 baseline + 33 new `ExcavatorTests`); native `ctest --test-dir robotkit/build`:
 9/9. End-of-milestone full-suite confirmation: `robotkit/tests/mujoco` (M9's
 MuJoCo scenario, unaffected by M11/M12): 22 assertions, coverage 99.27%;
