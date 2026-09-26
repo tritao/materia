@@ -1365,6 +1365,34 @@ class MachineKitSmoke {
 		pedestalPreview.close();
 		near(pedestal.connector("top").frame.z, 300, "pedestal top connector");
 		near(AssemblyFrames.transformVector(pedestal.connector("top").frame, 0, 1, 0).z, -1, "pedestal top points into the pedestal");
+		var detailedPedestal = new Pedestal(flange, 300, 70, 4,
+			{baseThickness: 18, anchorCircleDiameter: 120, gussetHeight: 80, gussetThickness: 6,
+				gussetCount: 4, levelingFootDiameter: 24, levelingFootHeight: 6, cablePathDiameter: 20});
+		check(detailedPedestal.designation == "PEDESTAL-50-D70x300-B18-A120-G80x6x4-F24-C20",
+			"detailed pedestal designation");
+		near(detailedPedestal.baseThickness, 18, "detailed pedestal base thickness");
+		near(detailedPedestal.floorBoltCircleDiameter, 120, "detailed pedestal anchor circle");
+		near(detailedPedestal.anchorHoleDiameter, 11, "detailed pedestal anchor hole");
+		near(detailedPedestal.gussetHeight, 80, "detailed pedestal gusset height");
+		near(detailedPedestal.levelingFootHeight, 6, "detailed pedestal foot height");
+		near(detailedPedestal.cablePathDiameter, 20, "detailed pedestal cable path");
+		var detailedEnvelope = detailedPedestal.geometry(Envelope);
+		var detailedPreview = detailedPedestal.geometry();
+		solid(detailedEnvelope, "detailed pedestal envelope");
+		solid(detailedPreview, "detailed pedestal preview");
+		near(bounds(detailedEnvelope).minZ, -6, "detailed pedestal feet extend below floor");
+		check(detailedPreview.volume() < detailedEnvelope.volume(), "detailed pedestal machining features");
+		check(detailedPedestal.connector("cablePath") != null, "detailed pedestal cable connector");
+		check(detailedPedestal.connector("anchor1").role == Mount, "detailed pedestal anchor connector");
+		near(detailedPedestal.connector("floor").frame.z, -6, "detailed pedestal floor connector");
+		detailedPreview.close();
+		detailedEnvelope.close();
+		var pedestalBom = detailedPedestal.billOfMaterials(40);
+		check(pedestalBom.quantity(detailedPedestal.designation) == 1, "pedestal BOM body");
+		check(pedestalBom.quantity(detailedPedestal.floorMountScrewPart(40).designation) == 4, "pedestal anchor BOM");
+		throws(() -> new Pedestal(flange, 300, 70, 4, {baseThickness: 300}), "below its height");
+		throws(() -> new Pedestal(flange, 300, 70, 4, {anchorCircleDiameter: 80}), "clear the column");
+		throws(() -> new Pedestal(flange, 300, 70, 4, {cablePathDiameter: 70}), "smaller than the column");
 
 		// Pedestal -> flange: the flange turns over onto the top face, its boss in the top recess.
 		var pedestalModel = new AssemblyModel();

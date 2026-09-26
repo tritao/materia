@@ -187,10 +187,11 @@ files by path, not CadKit geometry, so the bridge is at the level of a shared
 - `EndEffectorPlate` adapts a `RobotFlange`'s bolt pattern to a tool bolt
   circle outside the flange's bolts, the same cut-and-expose-a-new-pattern
   shape as `MotorPlate` in `MotorShaftBearings.hx`.
-- `Pedestal` is a column stand with a floor bolt pattern at its base and a
-  `RobotFlange`-matching mount at its top; its `top` connector points down into
-  the column, so a flange mated there sits face-down with its pilot in the
-  recess.
+- `Pedestal` is a column stand with a configurable anchor circle, optional
+  base gussets, leveling feet, and a central cable path, plus a
+  `RobotFlange`-matching mount at its top. Its `top` connector points down
+  into the column, so a flange mated there sits face-down with its pilot in
+  the recess. `billOfMaterials()` adds one floor anchor screw per hole.
 
 Run the smoke tests after building CadKit's native library:
 
