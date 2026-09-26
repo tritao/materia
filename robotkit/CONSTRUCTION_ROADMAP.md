@@ -496,3 +496,24 @@ explicit `timestampNs:Int64` argument rather than reading a wall clock, so
 `ToolpathExecutor` (M4) can drive tool on/off state at trajectory-sample
 time without a hidden clock dependency. No haxeon compile issues in this
 milestone.
+
+**M4**: added `robotkit/haxe/robotkit/process/` (`ToolpathPoint`, `Toolpath`
++ `ToolpathSegments`, `CartesianTrajectory` + `CartesianTrajectorySample`,
+`ToolpathExecutor` + `ToolpathExecutionStep`/`Result`/`Failure`) and
+`robotkit/tests/src/tests/ProcessTests.hx`, called from
+`RobotWorldTests.main()`. Each consecutive toolpath-point pair gets its own
+symmetric trapezoidal/triangular velocity profile toward the arriving
+point's feed rate, capped by a max acceleration; position lerps and
+rotation slerps along the same arc-length fraction. `ToolpathExecutor`
+seeds `Manipulator.solveIkForTcp` from the previous sample and reports
+unreachable points or joint discontinuities as explicit result values, per
+the plan and the existing `InverseKinematics` non-throwing convention. No
+plan deviations and no haxeon issues in this milestone; the one thing worth
+noting for later milestones is that `CartesianTrajectory.build` samples
+every segment at `sampleInterval` regardless of distance, so a toolpath
+point placed far outside the reachable workspace with a tight
+`sampleInterval` would generate a very large number of samples before
+`ToolpathExecutor` ever reaches the unreachable point — `ProcessTests`
+documents the workaround (a coarse `sampleInterval` collapses a segment to
+its single final sample) rather than changing the sampler, since M5's
+raster-generated toolpaths keep points close together by construction.

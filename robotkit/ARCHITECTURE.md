@@ -555,6 +555,45 @@ equivalent flange target (`target.compose(flangeTTcp.inverse())`) before
 delegating to `InverseKinematics.solve`, so callers can work entirely in
 tool-center-point coordinates without re-deriving the flange offset.
 
+## Toolpaths and Cartesian trajectories
+
+`robotkit.process` sits above `robotkit.tool`; it does not touch `Robot`,
+`RobotRuntime`, or the native runtime. A `ToolpathPoint` is one TCP
+waypoint (`work_T_tcp`, feed rate, `processOn`, and optional normal/standoff
+a generator may attach) expressed in a named frame that a `Toolpath` (an
+ordered list of points plus that `frameId`) carries as a whole.
+`Toolpath.length()`/`processOnLength()` sum consecutive point distances; a
+move's process state is its *departing* point's `processOn`, the same
+convention `CartesianTrajectory` samples use.
+`Toolpath.segmentByProcess()` splits into a leading `approach` run
+(`processOn == false`), a `process` run from the first to the last
+`processOn == true` point inclusive, and a trailing `retract` run.
+
+`CartesianTrajectory.build(toolpath, maxAcceleration, sampleInterval)` gives
+each consecutive pair of points its own independent symmetric trapezoidal
+(or triangular, when the distance is too short to reach cruise speed)
+velocity profile toward the *arriving* point's feed rate. Position is
+linearly interpolated along the straight line between the two points, and
+rotation is slerped using the same normalized arc-length fraction the
+velocity profile produces, so translation and rotation always reach a
+waypoint together. Every segment's final sample lands exactly at that
+segment's closed-form duration; `duration()` is the last sample's time.
+
+`ToolpathExecutor.execute(manipulator, trajectory, base_T_work, seed, ...)`
+samples the trajectory and solves `Manipulator.solveIkForTcp` for each
+sample, seeded by the previous sample's solution (`base_T_work` brings the
+trajectory's own frame into the chain's base frame; callers resolve that
+transform, e.g. via `FrameTree3.lookup`, before calling). It rejects a
+joint-space jump above `maxJointStep` between consecutive samples. Failure
+is always an explicit `ToolpathExecutionResult` value
+(`ToolpathExecutionFailure.Unreachable`/`Discontinuity`, carrying the
+failing sample index), never an exception — matching `InverseKinematics`'s
+own non-throwing convention. A successful result's `steps` pair each
+sample's `JointTarget`s with its `processOn` flag; turning the physical
+tool on/off from that flag is the caller's job (e.g. a future skill calling
+`SurfaceTool.enable`/`disable`), keeping `robotkit.process` independent of
+which capability interface a given tool implements.
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A
