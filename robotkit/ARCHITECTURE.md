@@ -396,19 +396,64 @@ A regression surfaced while validating this fix: `robotkit_mujoco_tests`
 (confirmed by stashing these changes and re-running it) — a single-hinge
 model's IMU gyro and its joint's reported velocity disagree by a large,
 non-shrinking margin from the very first tick. That model's root link is
-`NKSIM_MOTION_KINEMATIC`, which MuJoCo represents as an ordinary mass-bearing
-free joint pinned back to the scene node only once per outer `step()` (via
-`refresh_kinematic_bodies`), not once per physics substep; the root can pick
-up spurious free-joint velocity within a step's substeps that leaks into a
-child's world angular velocity without appearing in the child's own hinge
-`qvel`. This is a real bug, but it is a kinematic-root/substep-timing issue
-independent of F1-F4's root causes (rest poses, actuator gains,
-self-collision, and the default backend's kinematic placement); fixing it
-would mean restructuring the MuJoCo step loop's kinematic re-pinning, which
-is out of this milestone's scope. Left unfixed and reported here rather than
-silently expanding scope; `robotkit_mujoco_backend` (the lower-level SimKit
-MuJoCo suite) and every other regression suite listed in this milestone are
-green.
+`NKSIM_MOTION_KINEMATIC`, which MuJoCo represented as an ordinary
+mass-bearing free joint pinned back to the scene node only once per outer
+`step()` (via `refresh_kinematic_bodies`), not once per physics substep; the
+root could pick up spurious free-joint velocity within a step's substeps
+that leaked into a child's world angular velocity without appearing in the
+child's own hinge `qvel`. This was a real bug, but a kinematic-root/substep-
+timing issue independent of F1-F4's root causes (rest poses, actuator gains,
+self-collision, and the default backend's kinematic placement); left unfixed
+and reported here in M8.5 rather than silently expanding that milestone's
+scope, and fixed ahead of M9 (below) since M9's holonomic base is exactly
+this "kinematic root" case.
+
+### MuJoCo kinematic-root velocity leak (pre-M9 fix)
+
+`MujocoBackend::configure_body` gave every non-`STATIC` root body — both
+`KINEMATIC` and `DYNAMIC` — a mass-bearing MuJoCo free joint. A `KINEMATIC`
+body (a robot's own root/base link, or any body driven purely by
+`World::refresh_kinematic_bodies` from its scene node) is never meant to be
+an independent dynamical variable: it is externally scripted, exactly like a
+`STATIC` body, just repositioned over time instead of fixed forever. Giving
+it a free joint let real MuJoCo dynamics act on it between the once-per-outer-
+step re-pin, so a driven child's reaction torque (through the shared mass
+matrix — ordinary momentum coupling, not a separate bug) gave the
+"kinematic" root real, nonzero velocity within a step's substeps, which then
+leaked into a child's world-frame velocity reading (what an IMU measures)
+without ever showing up in that child's own joint `qvel`. The fix treats
+`KINEMATIC` exactly like `STATIC` in `configure_body`: no mass/inertia, no
+free joint. A `KINEMATIC` body already had no dof-bearing joint's-worth of
+special handling needed in `body_set_state` — the existing "no incoming
+joint, no free joint" branch (previously reached only by `STATIC` bodies)
+already sets `body_pos`/`body_quat` directly from the given state before
+`mj_forward`, which is exactly the right zero-dof, externally-driven
+placement for a `KINEMATIC` root too, so no other code path changed.
+`kinematic_root_child_velocity_matches_joint_across_substeps`
+(`simkit/sim_mujoco/tests/mujoco.cpp`) reproduces the leak directly (an
+effort-mode torque on a hinge child of a `KINEMATIC` root, so the
+reproduction is independent of the actuator's own mass-matrix addressing —
+see below) and confirms the fix; `robotkit_mujoco_tests`'
+IMU-vs-joint-velocity assertion now passes along with the rest of that
+regression suite (12/12).
+
+A second, previously undocumented native bug surfaced while writing this
+fix's test with a position-mode target instead of effort mode: `data->M`
+stores MuJoCo's mass matrix in a *sparse, per-dof-row* format where
+`dof_Madr[dof]` is the address of the **start** of dof `dof`'s row (that
+dof's own ancestor chain, then finally its own diagonal as the row's *last*
+entry — see `mj_mulM`'s use of `dof_Madr[j+1] - dof_Madr[j]` as a row length
+in `engine_derivative.c`), not the diagonal entry itself. F2's controller
+(`m_ii = data->M[model->dof_Madr[dof]]`) is therefore only correct for a dof
+with *no* ancestor dofs (row length 1) — true for every F2 test fixture
+(a single joint directly on a `STATIC` base) but false for any joint with a
+movable ancestor: a `KINEMATIC` base (M9's holonomic drive) or the second and
+later joints of any multi-joint arm. With an ancestor present, F2's `m_ii`
+silently reads an off-diagonal coupling term instead — often a tiny or zero
+value — so the position/velocity controller could apply near-zero torque and
+never move the joint at all. This is fixed together with F2's other known
+limitation (no cross-joint compensation) by replacing the per-dof diagonal
+lookup with full computed-torque control; see below.
 
 ### MuJoCo joint actuation (M8.5, F2)
 

@@ -691,25 +691,40 @@ private:
     static nksim_result configure_body(mjsBody &body,
                                        const nksim::BackendBodyDesc &desc,
                                        const JointRecord *incoming) {
-        body.mass = desc.mass;
-        if (desc.motion_type != NKSIM_MOTION_STATIC && desc.mass > 0.0) {
-            body.explicitinertial = 1;
-            if (desc.has_inertial_properties) {
-                std::copy(desc.center_of_mass.begin(), desc.center_of_mass.end(), body.ipos);
-                const auto &m = desc.inertia_tensor;
-                body.fullinertia[0] = m[0];
-                body.fullinertia[1] = m[4];
-                body.fullinertia[2] = m[8];
-                body.fullinertia[3] = m[1];
-                body.fullinertia[4] = m[2];
-                body.fullinertia[5] = m[5];
-            } else {
-                body.inertia[0] = body.inertia[1] = body.inertia[2] = 1.0;
+        // A KINEMATIC body (e.g. a robot's own root/base link) is externally
+        // scripted from its owning World's scene node every outer step
+        // (World::refresh_kinematic_bodies), never integrated by physics —
+        // exactly like a STATIC body, just repositioned over time instead of
+        // fixed forever. Only a genuinely DYNAMIC body needs mass/inertia and
+        // a free joint here; giving a KINEMATIC root a mass-bearing MuJoCo
+        // free joint (the pre-fix behavior) let real physics act on it, and
+        // World::refresh_kinematic_bodies only re-pins that free joint's
+        // qpos/qvel once per OUTER step, not per physics substep, so
+        // constraint forces from a driven child (e.g. an actuated hinge)
+        // could give the "kinematic" root spurious velocity within a step
+        // that then leaked into a child's world-frame velocity reading
+        // without appearing in that child's own joint qvel.
+        if (desc.motion_type == NKSIM_MOTION_DYNAMIC) {
+            body.mass = desc.mass;
+            if (desc.mass > 0.0) {
+                body.explicitinertial = 1;
+                if (desc.has_inertial_properties) {
+                    std::copy(desc.center_of_mass.begin(), desc.center_of_mass.end(), body.ipos);
+                    const auto &m = desc.inertia_tensor;
+                    body.fullinertia[0] = m[0];
+                    body.fullinertia[1] = m[4];
+                    body.fullinertia[2] = m[8];
+                    body.fullinertia[3] = m[1];
+                    body.fullinertia[4] = m[2];
+                    body.fullinertia[5] = m[5];
+                } else {
+                    body.inertia[0] = body.inertia[1] = body.inertia[2] = 1.0;
+                }
             }
         }
 
         if (!incoming) {
-            if (desc.motion_type != NKSIM_MOTION_STATIC && !mjs_addFreeJoint(&body))
+            if (desc.motion_type == NKSIM_MOTION_DYNAMIC && !mjs_addFreeJoint(&body))
                 return NKSIM_ERROR_OUT_OF_MEMORY;
         } else if (incoming->desc.type != NKSIM_JOINT_FIXED) {
             auto *joint = mjs_addJoint(&body, nullptr);

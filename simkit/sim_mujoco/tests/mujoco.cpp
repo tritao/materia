@@ -586,6 +586,85 @@ void effort_target_respects_max_force_clamp() {
     assert(std::abs(clamped) > 1e-6); // The clamp still lets it move.
 }
 
+void kinematic_root_child_velocity_matches_joint_across_substeps() {
+    // Pre-existing bug (documented in robotkit/ARCHITECTURE.md under "Link
+    // rest poses (M8.5, F1)"): a KINEMATIC body currently gets a free joint
+    // and real mass in MuJoCo, just like a DYNAMIC one. World::step() only
+    // re-pins that free joint's qpos/qvel to the scene node's authoritative
+    // pose once per OUTER step (World::refresh_kinematic_bodies), not once
+    // per physics substep. With more than one substep, the reaction torque
+    // the child's hinge actuator exerts on its finite-inertia "kinematic"
+    // parent (ordinary momentum coupling through the shared mass matrix)
+    // gives the parent real, non-zero angular velocity partway through the
+    // step; the child's own hinge qvel never reflects that parent motion,
+    // but the child's world-frame angular velocity (what an IMU would read)
+    // does, so the two disagree — exactly robotkit_mujoco_tests' failing
+    // "MuJoCo's hinge velocity and the mounted gyroscope agree" assertion,
+    // reproduced here at the sim_mujoco level without an IMU sensor.
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto base_node = make_node(scene, 0.0);
+    const auto arm_node = make_node(scene, 0.0);
+
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.005;
+    world_desc.physics_substeps = 4; // >1: the bug only appears within a step's substeps.
+    world_desc.gravity[2] = 0.0;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+
+    // A "kinematic root" the way a robot base is: driven by the scene node,
+    // but currently backed by a mass-bearing MuJoCo free joint.
+    const auto base = make_body(world, base_node, NKSIM_MOTION_KINEMATIC, 1.0);
+    const auto shape = make_box(world);
+    const auto arm = make_body(world, arm_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = base;
+    joint_desc.body_b = arm;
+    joint_desc.axis_a[2] = 1.0;
+    joint_desc.max_force = 100.0;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+
+    // Effort mode applies torque directly (no mass-matrix lookup), so this
+    // exercises only the kinematic-root leak, independent of the actuator's
+    // own per-DOF mass-matrix addressing.
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = joint;
+    target.mode = NKSIM_JOINT_TARGET_EFFORT;
+    target.target = 5.0;
+    target.max_force = 0.0;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+    step_world(world, 5);
+
+    nksim_joint_state joint_state{};
+    joint_state.struct_size = sizeof(joint_state);
+    assert(nksim_joint_get_state(world, joint, &joint_state) == NKSIM_OK);
+
+    nksim_body_state arm_state{};
+    arm_state.struct_size = sizeof(arm_state);
+    assert(nksim_body_get_state(world, arm, &arm_state) == NKSIM_OK);
+
+    // The base never actually moves (its scene node pose is never changed),
+    // so the arm's world angular velocity about Z should be exactly its own
+    // hinge qvel; any gap is spurious velocity leaked from the "kinematic"
+    // base's free joint within the step's substeps.
+    assert(std::abs(arm_state.angular_velocity[2] - joint_state.velocity) < 1e-8);
+
+    nksim_joint_destroy(world, joint);
+    nksim_body_destroy(world, arm);
+    nksim_body_destroy(world, base);
+    nksim_shape_destroy(world, shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 void non_adjacent_links_do_not_self_collide() {
     // F3: only parent/child joint pairs were excluded from contact, but
     // after F1's rest-pose fix every link sits at its real offset, so two
@@ -897,5 +976,6 @@ int main() {
     effort_target_respects_max_force_clamp();
     non_adjacent_links_do_not_self_collide();
     cross_backend_link_poses_agree_with_fk();
+    kinematic_root_child_velocity_matches_joint_across_substeps();
     return 0;
 }
