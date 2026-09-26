@@ -128,6 +128,10 @@ class MotionKitBootstrapTests {
     check(report.hasFailure(), "chord speed above claimed limit fails validation");
     near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].value, 1.0,
       "validation records chord speed");
+    near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].margin, -0.2,
+      "validation reports signed limit margin");
+    near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].tolerance, 0.8e-9,
+      "validation reports comparison tolerance", 1e-12);
     check(report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
       MotionKitNativeConstants.MK_CHECK_UNCHECKED, "unclaimed jerk is unchecked");
     check(report.unresolvedAssumptions.length > 0 &&

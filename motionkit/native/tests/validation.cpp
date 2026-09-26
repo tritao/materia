@@ -140,10 +140,72 @@ void quintic_quartic_critical_point() {
     mk_trajectory_destroy(trajectory);
 }
 
+void explicit_quantization_tolerance() {
+    mk_trajectory_handle trajectory{};
+    assert(mk_trajectory_create(1, &trajectory) == MK_OK);
+    mk_segment segment{};
+    segment.struct_size = sizeof(segment);
+    segment.duration_ns = 1;
+    segment.degree = 3;
+    segment.joint_count = 1;
+    segment.coefficients[0].value[2] = (2.0 + 1.8e-9) / 2.0;
+    segment.coefficients[0].value[3] = -5.0 / 6.0;
+    assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+    mk_limits limits{};
+    limits.struct_size = sizeof(limits);
+    limits.joint_count = 1;
+    limits.max_acceleration[0] = 2.0;
+    limits.max_jerk[0] = 5.0;
+    mk_validation_report report{};
+    report.struct_size = sizeof(report);
+    assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+    const auto &check = report.checks[MK_CHECK_ACCELERATION];
+    assert(check.status == MK_CHECK_PASSED);
+    near(check.value, 2.0 + 1.8e-9);
+    near(check.margin, -1.8e-9);
+    near(check.tolerance, 2.5e-9);
+    mk_plan_spec spec{};
+    spec.struct_size = sizeof(spec);
+    spec.plan_id = 71;
+    spec.planning_authority = MK_AUTHORITY_MATERIA;
+    spec.start_state.struct_size = sizeof(spec.start_state);
+    spec.start_state.joint_count = 1;
+    mk_plan_handle plan{};
+    assert(mk_plan_create(trajectory, &spec, &limits, &plan, &report) == MK_OK);
+    assert(plan.id != 0);
+    mk_plan_destroy(plan);
+    limits.max_acceleration[0] = 2.0 - 1e-7;
+    assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+    assert(report.checks[MK_CHECK_ACCELERATION].status == MK_CHECK_FAILED);
+    mk_trajectory_destroy(trajectory);
+}
+
+void nonfinite_extrema_rejected() {
+    mk_trajectory_handle trajectory{};
+    assert(mk_trajectory_create(1, &trajectory) == MK_OK);
+    mk_segment segment{};
+    segment.struct_size = sizeof(segment);
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 2;
+    segment.joint_count = 1;
+    segment.coefficients[0].value[2] = 1e308;
+    assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+    mk_limits limits{};
+    limits.struct_size = sizeof(limits);
+    limits.joint_count = 1;
+    limits.max_acceleration[0] = 1.0;
+    mk_validation_report report{};
+    report.struct_size = sizeof(report);
+    assert(mk_validate(trajectory, &limits, &report) == MK_ERROR_INVALID_ARGUMENT);
+    mk_trajectory_destroy(trajectory);
+}
+
 } // namespace
 
 int main() {
     velocity_extremum_and_plan_rejection();
     position_extremum_between_samples();
     quintic_quartic_critical_point();
+    explicit_quantization_tolerance();
+    nonfinite_extrema_rejected();
 }

@@ -96,6 +96,8 @@ private:
 
 mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                    mk_validation_report &report);
+mk_result generate(const mk_state_to_state_request &request, Trajectory &trajectory,
+                   int32_t &ruckig_result);
 
 } // namespace motionkit
 

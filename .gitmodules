@@ -29,3 +29,6 @@
 [submodule "simkit/vendor/mujoco"]
 	path = simkit/vendor/mujoco
 	url = https://github.com/tritao/mujoco.git
+[submodule "motionkit/native/vendor/ruckig"]
+	path = motionkit/native/vendor/ruckig
+	url = https://github.com/pantor/ruckig.git

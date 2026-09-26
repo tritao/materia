@@ -33,7 +33,7 @@ class ValidationReport {
       var check = native.get_checks(index);
       checks.push(new ValidationCheck(check.get_status(), check.get_joint(),
         check.get_derivative_order(), check.get_value(), check.get_time_seconds(),
-        check.get_limit()));
+        check.get_limit(), check.get_margin(), check.get_tolerance()));
     }
   }
 
@@ -51,14 +51,18 @@ class ValidationCheck {
   public final value:Float;
   public final timeSeconds:Float;
   public final limit:Float;
+  public final margin:Float;
+  public final tolerance:Float;
 
   public function new(status:Int, joint:Int, derivativeOrder:Int, value:Float,
-      timeSeconds:Float, limit:Float) {
+      timeSeconds:Float, limit:Float, margin:Float, tolerance:Float) {
     this.status = status;
     this.joint = joint;
     this.derivativeOrder = derivativeOrder;
     this.value = value;
     this.timeSeconds = timeSeconds;
     this.limit = limit;
+    this.margin = margin;
+    this.tolerance = tolerance;
   }
 }

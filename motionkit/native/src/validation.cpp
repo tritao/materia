@@ -174,7 +174,8 @@ bool valid_limits(const Trajectory &trajectory, const mk_limits &limits) {
 
 void observe(mk_validation_report &report, std::array<long double, MK_CHECK_COUNT> &scores,
              uint32_t kind, uint32_t joint, uint32_t derivative_order,
-             double value, double time_seconds, double limit, long double score,
+             double value, double time_seconds, double limit, double margin,
+             double tolerance, long double score,
              bool failed) {
     auto &check = report.checks[kind];
     if (score > scores[kind]) {
@@ -184,8 +185,45 @@ void observe(mk_validation_report &report, std::array<long double, MK_CHECK_COUN
         check.value = value;
         check.time_seconds = time_seconds;
         check.limit = limit;
+        check.margin = margin;
+        check.tolerance = tolerance;
     }
     if (failed) check.status = MK_CHECK_FAILED;
+}
+
+using DerivativeMaxima = std::array<std::array<double, 5>, MK_MAX_JOINTS>;
+
+DerivativeMaxima derivative_maxima(const Trajectory &trajectory) {
+    DerivativeMaxima maxima{};
+    for (uint32_t index = 0; index < trajectory.segment_count(); ++index) {
+        const auto &segment = trajectory.segment(index);
+        const long double duration = static_cast<long double>(segment.duration_ns) / 1e9L;
+        for (uint32_t joint = 0; joint < trajectory.joint_count(); ++joint) {
+            Polynomial polynomial{};
+            for (uint32_t coefficient = 0; coefficient <= segment.degree; ++coefficient)
+                polynomial[coefficient] = segment.coefficients[joint].value[coefficient];
+            int degree = static_cast<int>(segment.degree);
+            for (uint32_t order = 1; order <= 4; ++order) {
+                polynomial = derivative(polynomial, degree);
+                degree = std::max(0, degree - 1);
+                std::vector<long double> times{0.0L, duration};
+                const auto critical = roots_inside(derivative(polynomial, degree),
+                    std::max(0, degree - 1), duration);
+                times.insert(times.end(), critical.begin(), critical.end());
+                for (const long double time : times)
+                    maxima[joint][order] = std::max(maxima[joint][order],
+                        static_cast<double>(std::abs(evaluate(polynomial, degree, time))));
+            }
+        }
+    }
+    return maxima;
+}
+
+double comparison_tolerance(double limit, double next_derivative_maximum,
+                            double boundary_rounding_seconds = 0.5e-9) {
+    constexpr double relative_epsilon = 1e-9;
+    return std::max(relative_epsilon * std::abs(limit),
+        next_derivative_maximum * boundary_rounding_seconds);
 }
 
 } // namespace
@@ -198,6 +236,10 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
     report.model_revision = limits.model_revision;
     report.calibration_revision = limits.calibration_revision;
     report.trajectory_revision = trajectory.revision();
+    const auto maxima = derivative_maxima(trajectory);
+    for (uint32_t joint = 0; joint < trajectory.joint_count(); ++joint)
+        for (uint32_t order = 1; order <= 4; ++order)
+            if (!std::isfinite(maxima[joint][order])) return MK_ERROR_INVALID_ARGUMENT;
     std::array<long double, MK_CHECK_COUNT> scores;
     scores.fill(-std::numeric_limits<long double>::infinity());
     std::array<bool, MK_CHECK_COUNT> unchecked{};
@@ -247,6 +289,7 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                     times.insert(times.end(), critical.begin(), critical.end());
                     for (long double local_time : times) {
                         const double value = static_cast<double>(evaluate(polynomial, degree, local_time));
+                        if (!std::isfinite(value)) return MK_ERROR_INVALID_ARGUMENT;
                         const double time_seconds = static_cast<double>(segment.t0_ns) * 1e-9 +
                             static_cast<double>(local_time);
                         if (order == 0) {
@@ -255,16 +298,25 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                             const bool upper_side = value - upper >= lower - value;
                             const double limit = upper_side ? upper : lower;
                             const long double excess = upper_side ? value - upper : lower - value;
-                            const long double score = excess /
+                            const double tolerance = comparison_tolerance(limit, maxima[joint][1]);
+                            const double margin = -static_cast<double>(excess);
+                            const long double score = (excess - tolerance) /
                                 std::max(1.0, upper - lower);
                             observe(report, scores, MK_CHECK_POSITION, joint, 0, value,
-                                time_seconds, limit, score, excess > 0.0L);
+                                time_seconds, limit, margin, tolerance, score,
+                                margin < -tolerance);
                         } else {
                             const double limit = order == 1 ? limits.max_velocity[joint] :
                                 order == 2 ? limits.max_acceleration[joint] : limits.max_jerk[joint];
                             const double magnitude = std::abs(value);
+                            const double tolerance = comparison_tolerance(limit,
+                                maxima[joint][order + 1]);
+                            const double margin = limit - magnitude;
+                            const double scale = std::max({limit, tolerance, 1e-30});
                             observe(report, scores, order, joint, order, magnitude,
-                                time_seconds, limit, magnitude / limit, magnitude > limit);
+                                time_seconds, limit, margin, tolerance,
+                                (magnitude - limit - tolerance) / scale,
+                                margin < -tolerance);
                         }
                     }
                 }
@@ -287,11 +339,20 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                 std::abs(left.velocity[joint] - right.velocity[joint]),
                 std::abs(left.acceleration[joint] - right.acceleration[joint])
             };
+            for (double jump : jumps)
+                if (!std::isfinite(jump)) return MK_ERROR_INVALID_ARGUMENT;
             for (uint32_t order = 0; order < 3; ++order) {
                 const double limit = limits.max_continuity_jump[order];
-                if (limit > 0.0)
+                if (limit > 0.0) {
+                    const double tolerance = comparison_tolerance(limit,
+                        maxima[joint][order + 1], 1e-9);
+                    const double margin = limit - jumps[order];
+                    const double scale = std::max({limit, tolerance, 1e-30});
                     observe(report, scores, MK_CHECK_CONTINUITY, joint, order,
-                        jumps[order], time, limit, jumps[order] / limit, jumps[order] > limit);
+                        jumps[order], time, limit, margin, tolerance,
+                        (jumps[order] - limit - tolerance) / scale,
+                        margin < -tolerance);
+                }
             }
         }
     }

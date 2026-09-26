@@ -306,6 +306,12 @@ Do:
   It also records the model revision, calibration revision and trajectory
   revision it was computed for, plus a list of unresolved assumptions
   (strings).
+- Limit comparisons use an explicit tolerance, not zero slack. For derivative
+  order *n*, use `max(1e-9 × abs(limit), max_abs_derivative(n+1) × 0.5 ns)`;
+  continuity compares two rounded sides, so its quantization bound uses 1 ns.
+  Store the signed limit margin and tolerance alongside each worst value in
+  `ValidationReport`. Analytic extrema and genuinely out-of-limit moves still
+  fail. This is the user-approved P5 nanosecond-boundary correction.
 - `ExecutionPlan` (native object, Haxe wrapper) contains:
   - `planId` (u64);
   - `modelRevision` and `calibrationRevision`;
@@ -352,8 +358,10 @@ Do:
   an out-parameter.
 
 Tests (native), each also run through `mk_validate` with all limits claimed:
-- The converted trajectory matches Ruckig's own `at_time` at 1 kHz within
-  1e-9 for position, velocity and acceleration.
+- The converted trajectory matches unmodified Ruckig's own `at_time` at 1 kHz
+  within 1e-9 for position, velocity and acceleration. Within ±1 ns of a
+  rounded phase boundary, use the corresponding derivative quantization
+  bound for that component.
 - Nonzero initial velocity.
 - Nonzero initial acceleration.
 - Reversal (initial velocity away from the target).
@@ -681,3 +689,45 @@ limits, their numeric values cannot double as an unclaimed sentinel. Commit:
 the commit containing this entry. MotionKit Haxe and native tests, RobotKit
 Haxe and native tests, both FFI audits, and TCP integration in default,
 session, and lease-timeout modes passed.
+
+### P5 paused — Nanosecond phase-boundary conflict
+
+The first Ruckig conversion test exposed a conflict between exact limit
+validation and the required 1e-9 acceleration match. In a nonzero-initial-
+velocity case, a saturated acceleration reversal occurs at
+1.2402138573773835 s. The native trajectory can place its segment boundary
+only at an integer nanosecond. Placing it at 1.240213857 s and preserving
+Ruckig's cubic on either side gives an analytic acceleration magnitude of
+2.0000000018869173 against a limit of 2.0. Moving or clamping the boundary
+state enough to pass exact validation creates more than 1e-9 acceleration
+error just after the boundary. This is a representation constraint, not a
+root-finding error. P5 is paused with partial work uncommitted. Proposed
+correction, pending approval: keep strict validation and generate with a small
+documented inward guard band on Ruckig's velocity/acceleration limits, then
+compare conversion against that guarded Ruckig reference with a stated
+nanosecond-quantization tolerance. Do not silently weaken `mk_validate` for
+arbitrary trajectories.
+
+The user approved a different correction: preserve Ruckig's output, round
+phase boundaries to nanoseconds, and make the validator's comparison
+tolerance explicit and reportable. The P4 and P5 sections above now state
+that contract. P5 implementation resumed; the guard-band proposal was not
+used.
+
+### P5 — Add the Ruckig state-to-state generator
+
+Pinned Ruckig Community `v0.19.4` as a submodule, linked only its offline
+calculator sources, and recorded the MIT license and source audit in
+`motionkit/native/THIRD_PARTY.md`. Added a native API for time-synchronized
+position moves and velocity-control stops. It converts the union of each
+joint's brake and seven phase boundaries to degree-3 segments, dropping
+sub-nanosecond phases deterministically. A zero-duration unchanged state is
+represented by one 1 ns constant segment. Ruckig result codes are returned
+alongside MotionKit errors. The user-approved correction keeps the generated
+curve unchanged and reports an explicit derivative-based comparison tolerance
+and signed margin for every validation check. Native tests cover 1 kHz
+comparison to Ruckig, rounded boundaries, multi-axis timing, moving starts,
+reversals, retargeting, stopping, over-limit braking, travel overshoot, and
+error mapping. Commit: the commit containing this entry. MotionKit and
+RobotKit Haxe/native suites, FFI audit, and TCP integration in default,
+session and lease-timeout modes passed.

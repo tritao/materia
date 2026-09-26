@@ -37,7 +37,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 2, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 3, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
 enum {
@@ -46,7 +46,8 @@ enum {
     MK_ERROR_INVALID_HANDLE = -2,
     MK_ERROR_OUT_OF_MEMORY = -3,
     MK_ERROR_LIMIT = -4,
-    MK_ERROR_UNSUPPORTED = -5
+    MK_ERROR_UNSUPPORTED = -5,
+    MK_ERROR_GENERATION = -6
 };
 
 /** Opaque registry identity; only MotionKit may interpret id. */
@@ -75,6 +76,26 @@ typedef struct mk_sample {
     uint32_t joint_count;
     double position[MK_MAX_JOINTS];
 } mk_sample;
+
+enum { MK_SYNCHRONIZATION_TIME = 0 };
+enum { MK_CONTROL_POSITION = 0, MK_CONTROL_VELOCITY_STOP = 1 };
+
+/** Offline Ruckig request. Velocity-stop ignores target position and velocity limits. */
+typedef struct mk_state_to_state_request {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint32_t synchronization; /**< Only MK_SYNCHRONIZATION_TIME is supported. */
+    uint32_t control_mode; /**< Position target or velocity-control stop. */
+    double current_position[MK_MAX_JOINTS];
+    double current_velocity[MK_MAX_JOINTS];
+    double current_acceleration[MK_MAX_JOINTS];
+    double target_position[MK_MAX_JOINTS];
+    double target_velocity[MK_MAX_JOINTS];
+    double target_acceleration[MK_MAX_JOINTS];
+    double max_velocity[MK_MAX_JOINTS];
+    double max_acceleration[MK_MAX_JOINTS];
+    double max_jerk[MK_MAX_JOINTS];
+} mk_state_to_state_request;
 
 typedef struct mk_trajectory_state {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -126,6 +147,8 @@ typedef struct mk_validation_check {
     double value; /**< Signed position or absolute derivative/jump value. */
     double time_seconds; /**< Time from trajectory clock epoch, including t0. */
     double limit; /**< Boundary or absolute maximum corresponding to value. */
+    double margin; /**< Signed room to limit: negative means measured value exceeds it. */
+    double tolerance; /**< Explicit permitted comparison excess, in check units. */
 } mk_validation_check;
 
 typedef struct mk_assumption {
@@ -197,6 +220,9 @@ MK_API mk_result MK_CALL mk_trajectory_boundary_continuity(mk_trajectory_handle 
 MK_API mk_result MK_CALL mk_trajectory_from_samples(uint32_t joint_count,
     const mk_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/** Converts Ruckig Community's offline phases to degree-3 native segments. */
+MK_API mk_result MK_CALL mk_generate_state_to_state(const mk_state_to_state_request *request,
+    mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED, int32_t *out_ruckig_result MK_OUT);
 /** Reports exact polynomial extrema; failed checks return MK_OK with failed status. */
 MK_API mk_result MK_CALL mk_validate(mk_trajectory_handle trajectory,
     const mk_limits *limits, mk_validation_report *out_report);
