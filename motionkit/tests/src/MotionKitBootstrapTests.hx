@@ -18,6 +18,7 @@ import motionkit.planner.TrapezoidalPlanner;
 import motionkit.trajectory.JointTrajectory;
 import motionkit.trajectory.JointTrajectorySample;
 import motionkit.trajectory.MotionLimits;
+import motionkit.trajectory.Trajectory;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
@@ -46,6 +47,7 @@ class MotionKitBootstrapTests {
 
   public static function main():Void {
     testGeometricPathPrimitives();
+    testNativeTrajectoryRoundTrip();
     testPlannerIsDeterministicAndBounded();
     testLineLookaheadPlanner();
     testLinearAxisCompilesToRobotModel();
@@ -84,6 +86,29 @@ class MotionKitBootstrapTests {
     near(arc.end.y, 0.1, "arc ends on its authored circle");
     near(arc.tangentAt(0.0)[0], 1.0, "arc tangent follows increasing distance");
     near(arc.tangentAt(arc.length())[1], 1.0, "arc tangent rotates with the circle");
+  }
+
+  static function testNativeTrajectoryRoundTrip():Void {
+    var source = new JointTrajectory([
+      new JointTrajectorySample(0.0, [0.0], [9.0], [7.0]),
+      new JointTrajectorySample(1.0, [2.0], [8.0], [6.0]),
+      new JointTrajectorySample(2.0, [5.0], [7.0], [5.0])
+    ]);
+    var native = Trajectory.fromJointTrajectory(source);
+    near(native.durationSeconds(), 2.0, "native trajectory duration");
+    check(native.jointCount() == 1, "native trajectory joint count");
+    for (tick in 0...2001) {
+      var time = tick * 0.001;
+      near(native.evaluate(time).positions[0], source.sample(time).positions[0],
+        "native degree-1 positions match Haxe interpolation", 1e-12);
+    }
+    near(native.evaluate(0.5).velocities[0], 2.0,
+      "native velocity is the chord slope, not authored sample velocity");
+    near(native.evaluate(1.0).velocities[0], 3.0,
+      "native velocity is right-continuous at a knot");
+    near(native.evaluate(0.5).accelerations[0], 0.0,
+      "native degree-1 acceleration is zero");
+    native.dispose();
   }
 
   static function testPlannerIsDeterministicAndBounded():Void {

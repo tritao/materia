@@ -19,6 +19,9 @@
         "../../robotkit/runtime/CMakeLists.txt",
         "../../robotkit/runtime/include/robotkit_runtime.h",
         "../../robotkit/runtime/include/robotkit_simkit.h",
+        "../../motionkit/native/CMakeLists.txt",
+        "../../motionkit/native/include/motionkit.h",
+        "../../motionkit/native/src/trajectory.cpp",
         "../../nativekit/CMakeLists.txt",
         "../../simkit/CMakeLists.txt"
       ]

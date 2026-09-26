@@ -6,6 +6,8 @@ RobotKit execution. The bootstrap package currently provides:
 - reusable Cartesian path points, line and planar-arc primitives, and ordered
   geometric paths;
 - immutable timed joint trajectory samples;
+- a native polynomial trajectory evaluator with degree 0–5 segments,
+  analytic derivatives and a Haxe wrapper;
 - deterministic synchronized velocity/acceleration planning with jerk in the
   public limits API, plus tangent-aware line/arc lookahead with exact-stop and
   blend modes;
@@ -77,6 +79,12 @@ tag and time and speeds back up along the path within the same limits
 (`TimeScaling`). The runtime rejects chunks that would move a joint faster than
 its velocity limit, including a jump away from the end of the queued path, and
 bounds the total queued points.
+
+`motionkit.trajectory.Trajectory.fromJointTrajectory` converts sampled
+positions to degree-1 native segments. It preserves position interpolation;
+native velocity is each segment's chord slope, while acceleration and jerk
+are zero within that segment. The sampled Haxe type retains its separately
+authored velocity and acceleration arrays for existing planners.
 
 Every change of speed obeys the joint limits. An immediate move, jog, or normal
 abort issued while the machine is moving first slows to rest along the current

@@ -488,12 +488,27 @@ Do (in `motionkit/robot/…/MotionSystem.hx`):
   for queue backends.
 - `moveAxes`, `queueAxes` and `home` plan with Ruckig (P5), starting from
   the runtime-reported current state.
-- An immediate move or jog while moving now **retargets from the moving
-  state** with `replace_after = committed_until`. It no longer stops first,
-  so `moveAxes`, `moveLinear`, `jog` and `home` return a plan instead of
-  null in that case. Update the README's description of this behaviour.
+- An immediate axis move, jog or home while executing degree ≥ 2 segments
+  **retargets from the moving state** with
+  `replace_after = committed_until`. `moveAxes`, `jog` and `home` return a
+  plan instead of null in that case. Update the README's description of this
+  behaviour. `moveLinear` and path moves keep stop-first behaviour until
+  native path timing exists.
 - `movePath` and `queuePath` keep `LineLookaheadPlanner` (converted to
   degree-1 segments) until native path timing exists.
+- **Derivative sources.** Never derive a retarget start state or hold lead
+  from a degree-1 trajectory's analytic derivatives.
+  - Axis moves, jogs and homing use Ruckig (degree 3), whose derivatives are
+    exact.
+  - `LineLookaheadPlanner` output stays degree 1 until native path timing
+    exists. Line phases could be emitted as exact degree-2 segments, but arcs
+    cannot.
+  - For those trajectories, retargeting while moving keeps today's stop-first
+    behaviour. The hold lead uses the planner's authored velocities, kept
+    alongside the native trajectory, or a conservative bound from the chord
+    velocity.
+  - Retargeting from a moving state applies only when the active segments
+    are degree ≥ 2.
 - Fallback for backends without queue or plan support (serial device
   today):
   - keep position-target streaming;
@@ -512,6 +527,8 @@ Tests:
 - New tests:
   - retarget mid-move stays within jerk limits (validation report);
   - direction reversal while jogging;
+  - a degree-1 path move keeps stop-first replacement and has enough hold
+    lead to stop within joint acceleration limits;
   - a dual-motor axis stays in proportion under retargeting.
 
 Commits: at least three — switch execution; switch planning; delete the
@@ -628,3 +645,24 @@ polynomial cannot match all three values as P3's original test required. The
 smallest correction above limits the equivalence claim to position and states
 the native analytic derivative semantics. No P3 implementation or tests have
 been started. Commit: the commit containing this entry.
+
+### P3 resumed — Derivative-source rule for P9
+
+The user confirmed the P3 degree-1 correction and directed work to proceed.
+P9 now states which trajectories provide exact derivatives for retargeting,
+and preserves stop-first behaviour for `moveLinear` and path moves until
+native path timing exists.
+
+### P3 — Add native polynomial trajectories
+
+Added the standalone `motionkit_core` C++17 library, C ABI with versioned
+structs and owned handles, a shared polynomial evaluator, segment continuity
+reports, degree-1 sample conversion, generated Haxeon bindings and the Haxe
+`Trajectory` wrapper. Robotd builds and loads the library. The wrapper calls
+`mk_trajectory_from_samples` directly; its 1 kHz position round trip passed
+at 1e-12 while native velocity, acceleration and jerk use analytic degree-1
+semantics. Commit: the commit containing this entry. The native MotionKit test,
+MotionKit Haxe suite, RobotKit Haxe and native suites, FFI audit, and TCP
+integration in default, session and lease-timeout modes passed. The Haxeon FFI
+exposes arrays of small coefficient structs, so the C ABI represents each
+joint's six coefficients as one struct inside the segment.

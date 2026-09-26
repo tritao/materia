@@ -4,5 +4,8 @@
   "sourceRoots": ["haxe"],
   "scopeSourceRoots": false,
   "dependencies": {},
+  "ffi": {
+    "interfaces": ["native/bindings/motionkit.hxi"]
+  },
   "target": "host"
 }
