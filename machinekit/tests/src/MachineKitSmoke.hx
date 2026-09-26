@@ -967,7 +967,7 @@ class MachineKitSmoke {
 
 	static function robotics():Void {
 		var flange = new RobotFlange(50);
-		check(flange.designation == "ISO9409-PATTERN-50-4-M6", "robot flange designation");
+		check(flange.designation == "ISO9409-STYLE-50-4-M6", "robot flange designation");
 		check(flange.boltCount == 4, "robot flange ISO bolt count");
 		check(flange.mountScrew == "M6", "robot flange mount screw size");
 		near(flange.boltCircleDiameter, 50, "robot flange pitch circle");
@@ -977,7 +977,7 @@ class MachineKitSmoke {
 		near(flange.thickness, 9, "robot flange thickness");
 		near(flange.pilotHeight, 3, "robot flange pilot height");
 		var small = new RobotFlange(31.5);
-		check(small.designation == "ISO9409-PATTERN-31.5-4-M5", "smallest ISO flange designation");
+		check(small.designation == "ISO9409-STYLE-31.5-4-M5", "smallest ISO flange designation");
 		near(small.pilotDiameter, 20, "31.5 flange pilot");
 		near(small.pinDiameter, 5, "31.5 flange pin");
 		var large = new RobotFlange(80);
@@ -1135,7 +1135,7 @@ class MachineKitSmoke {
 		check(ParallelKey.catalog().metadata("2x2").standard == "DIN 6885-1", "key standard metadata");
 		check(RetainingRing.catalog().metadata("8").dimensionKind == Nominal, "ring dimension metadata");
 		check(RobotFlange.catalog().metadata("50").conformance == GenericApproximation,
-			"raised-pilot flange is a generic approximation");
+			"raised-pilot ISO-style flange is a generic approximation");
 		check(NemaStepper.catalog().metadata("17").dimensionKind == Mixed,
 			"NEMA frame dimensions carry manufacturer drawing provenance");
 		metadataComplete(DeepGrooveBearing.catalog());

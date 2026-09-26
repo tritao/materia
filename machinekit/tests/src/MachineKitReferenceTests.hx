@@ -1,5 +1,8 @@
 import machinekit.catalog.CatalogMetadata.DimensionKind;
+import machinekit.catalog.CatalogMetadata.Conformance;
+import machinekit.motion.LinearBearing;
 import machinekit.motion.NemaStepper;
+import machinekit.robotics.RobotFlange;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.FlatWasher;
 import machinekit.standard.HexBolt;
@@ -17,16 +20,64 @@ class MachineKitReferenceTests {
 	}
 
 	public static function run():Void {
-		// NTN 608 and 6000 product tables: d, D, B and minimum rs, in mm.
-		for (reference in [{name: "608", bore: 8.0, outside: 22.0, width: 7.0, rs: 0.3},
-				{name: "6000", bore: 10.0, outside: 26.0, width: 8.0, rs: 0.3}]) {
+		// SKF bearing catalog: ISO 15 boundary dimensions and minimum rs, in mm.
+		for (reference in [
+				{name: "625", bore: 5.0, outside: 16.0, width: 5.0, rs: 0.3},
+				{name: "626", bore: 6.0, outside: 19.0, width: 6.0, rs: 0.3},
+				{name: "608", bore: 8.0, outside: 22.0, width: 7.0, rs: 0.3},
+				{name: "6000", bore: 10.0, outside: 26.0, width: 8.0, rs: 0.3},
+				{name: "6001", bore: 12.0, outside: 28.0, width: 8.0, rs: 0.3},
+				{name: "6002", bore: 15.0, outside: 32.0, width: 9.0, rs: 0.3},
+				{name: "6003", bore: 17.0, outside: 35.0, width: 10.0, rs: 0.3},
+				{name: "6004", bore: 20.0, outside: 42.0, width: 12.0, rs: 0.6},
+				{name: "6200", bore: 10.0, outside: 30.0, width: 9.0, rs: 0.6},
+				{name: "6201", bore: 12.0, outside: 32.0, width: 10.0, rs: 0.6},
+				{name: "6202", bore: 15.0, outside: 35.0, width: 11.0, rs: 0.6},
+				{name: "6203", bore: 17.0, outside: 40.0, width: 12.0, rs: 0.6},
+				{name: "6204", bore: 20.0, outside: 47.0, width: 14.0, rs: 1.0},
+				{name: "6205", bore: 25.0, outside: 52.0, width: 15.0, rs: 1.0}]) {
 			var row = DeepGrooveBearing.catalog().get(reference.name);
 			equal(row.bore, reference.bore, reference.name + " bore");
 			equal(row.outside, reference.outside, reference.name + " outside");
 			equal(row.width, reference.width, reference.name + " width");
 			equal(row.chamfer, reference.rs, reference.name + " minimum rs");
-			if (DeepGrooveBearing.catalog().metadata(reference.name).dimensionKind != Mixed)
+			var bearingMetadata = DeepGrooveBearing.catalog().metadata(reference.name);
+			if (bearingMetadata.standard != "ISO 15" || bearingMetadata.standardEdition != "2017" ||
+				bearingMetadata.dimensionKind != Nominal || bearingMetadata.verifiedFields == null)
 				throw reference.name + " reference metadata";
+		}
+		// Tuli LM/LME catalog: nominal d, D and L dimensions, in mm.
+		for (reference in [{name: "LM8UU", bore: 8.0, outside: 15.0, length: 24.0},
+				{name: "LM10UU", bore: 10.0, outside: 19.0, length: 29.0},
+				{name: "LM12UU", bore: 12.0, outside: 21.0, length: 30.0},
+				{name: "LM16UU", bore: 16.0, outside: 28.0, length: 37.0},
+				{name: "LM20UU", bore: 20.0, outside: 32.0, length: 42.0}]) {
+			var linear = LinearBearing.catalog().get(reference.name);
+			equal(linear.boreDiameter, reference.bore, reference.name + " bore");
+			equal(linear.outerDiameter, reference.outside, reference.name + " outside");
+			equal(linear.length, reference.length, reference.name + " length");
+			var linearMetadata = LinearBearing.catalog().metadata(reference.name);
+			if (linearMetadata.dimensionKind != Nominal || linearMetadata.verifiedFields == null)
+				throw reference.name + " reference metadata";
+		}
+		// ISO 9409-1:2004 Table 1 pattern values; geometry remains a raised-pilot preview.
+		for (reference in [{name: "31.5", count: 4, screw: "M5", pilot: 20.0, pin: 5.0},
+				{name: "40", count: 4, screw: "M6", pilot: 25.0, pin: 6.0},
+				{name: "50", count: 4, screw: "M6", pilot: 31.5, pin: 6.0},
+				{name: "63", count: 4, screw: "M6", pilot: 40.0, pin: 6.0},
+				{name: "80", count: 6, screw: "M8", pilot: 50.0, pin: 8.0},
+				{name: "100", count: 6, screw: "M8", pilot: 63.0, pin: 8.0},
+				{name: "125", count: 6, screw: "M10", pilot: 80.0, pin: 10.0},
+				{name: "160", count: 6, screw: "M10", pilot: 100.0, pin: 10.0}]) {
+			var flange = RobotFlange.catalog().get(reference.name);
+			if (flange.boltCount != reference.count || flange.screw != reference.screw)
+				throw reference.name + " ISO flange pattern";
+			equal(flange.pilotDiameter, reference.pilot, reference.name + " pilot");
+			equal(flange.pinDiameter, reference.pin, reference.name + " pin");
+			var flangeMetadata = RobotFlange.catalog().metadata(reference.name);
+			if (flangeMetadata.standard != "ISO 9409-1" || flangeMetadata.standardEdition != "2004" ||
+				flangeMetadata.dimensionKind != Nominal || flangeMetadata.conformance != GenericApproximation)
+				throw reference.name + " ISO flange metadata";
 		}
 		// Accu ISO 4762 M5 product sheet: these fields have been cross-checked.
 		var m5 = SocketHeadCapScrew.catalog().get("M5");

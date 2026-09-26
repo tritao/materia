@@ -22,7 +22,7 @@ kind, and conformance level.
 `verifiedFields` lists any fields already checked in an otherwise unverified row;
 `GenericApproximation` means the generated part does not claim a complete standard
 interface. The ISO 9409 bolt-pattern flange remains marked this way; NEMA motor
-variants use a nominal manufacturer envelope. The 608 and 6000 bearing boundary rows have independent NTN
+variants use a nominal manufacturer envelope. The deep-groove bearing table has independent SKF boundary-dimension
 checks; the M5 screw row has independent Accu and Norelem checks for its listed
 fields. NEMA frame rows use manufacturer drawing envelopes and retain `Mixed`
 dimension metadata because drawing limits and nominal interface values differ.
@@ -143,13 +143,13 @@ its tooling, not a link to `robotkit`'s runtime model (which references mesh
 files by path, not CadKit geometry, so the bridge is at the level of a shared
 `AssemblyModel`/BOM workflow, not a shared type):
 
-- `RobotFlange` uses an ISO 9409-1 bolt pattern sized by pitch-circle diameter
+- `RobotFlange` uses an ISO 9409-1-style bolt pattern sized by pitch-circle diameter
   from the standard's table (bolt count and size, pilot diameter, pin), with
   proportional outer diameter and thickness. Its mounting face is z=0 with the
   pilot boss standing proud of it; `mountingCutout()` cuts the matching blind
   pilot recess, bolt and pin holes. The raised pilot swaps the ISO interface
-  roles, so its designation says pattern. Overriding the bolt count drops that
-  pattern designation.
+  roles, so its designation says style. Overriding the bolt count drops that
+  style designation.
 - `EndEffectorPlate` adapts a `RobotFlange`'s bolt pattern to a tool bolt
   circle outside the flange's bolts, the same cut-and-expose-a-new-pattern
   shape as `MotorPlate` in `MotorShaftBearings.hx`.

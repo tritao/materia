@@ -29,7 +29,8 @@ typedef RobotFlangeSpec = {
  * standard's table; the outer diameter (pitch circle plus two screw-head diameters), plate
  * thickness (1.5 screw diameters), and pilot height (half a screw diameter) are proportional. The
  * pilot is modelled as a raised boss that engages a recess in the mating part (ISO specifies the
- * robot side's d2 as an H7 recess; the boss/recess roles are swapped here for a simpler mate).
+ * robot side's d2/d3 centring feature as a recess; this preview intentionally uses a raised pilot
+ * for a simpler mate, so its designation says ISO style rather than exact ISO interface.
  * Passing a `boltCount` that differs from the table gives a non-standard pattern whose
  * designation drops the ISO pattern prefix.
  *
@@ -68,8 +69,10 @@ class RobotFlange extends MachineComponent {
 	/** ISO 9409-1 sizes keyed by pitch circle diameter text ("31.5", "50", ...). */
 	public static function catalog():Catalog<RobotFlangeSpec> {
 		if (table == null)
-			table = new Catalog("ISO 9409-1 flange size", spec -> Dimension.format(spec.pitchCircle), rows(), _ -> ({source: "MachineKit ISO 9409-1 pattern table; source verification pending", standard: "ISO 9409-1",
-				standardEdition: null, dimensionKind: Unverified, conformance: GenericApproximation}));
+			table = new Catalog("ISO 9409-1 flange size", spec -> Dimension.format(spec.pitchCircle), rows(), _ -> ({
+				source: "https://www.iso.org/standard/36578.html", standard: "ISO 9409-1", standardEdition: "2004",
+				dimensionKind: Nominal, conformance: GenericApproximation,
+				verifiedFields: ["pitchCircle", "boltCount", "screw", "pilotDiameter", "pinDiameter"]}));
 		return table;
 	}
 
@@ -90,7 +93,7 @@ class RobotFlange extends MachineComponent {
 			throw 'Robot flange ${Dimension.format(spec.pitchCircle)} has too many bolts for its pitch circle';
 		var size = '${Dimension.format(spec.pitchCircle)}-$count-${spec.screw}';
 		var standardPattern = count == spec.boltCount;
-		super(standardPattern ? 'ISO9409-PATTERN-$size' : 'FLANGE-$size',
+		super(standardPattern ? 'ISO9409-STYLE-$size' : 'FLANGE-$size',
 			standardPattern ? 'Robot flange with ISO 9409-1-$size bolt pattern and raised pilot' : 'Robot flange $size (non-standard ISO 9409-1 bolt count)',
 			"steel");
 		this.spec = spec;

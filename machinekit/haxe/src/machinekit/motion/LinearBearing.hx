@@ -37,8 +37,10 @@ class LinearBearing extends MachineComponent {
 
 	public static function catalog():Catalog<LinearBearingSpec> {
 		if (table == null)
-			table = new Catalog("linear bearing", spec -> spec.designation, rows(), _ -> ({source: "MachineKit embedded LMUU nominal table; source verification pending", standard: null,
-				standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
+			table = new Catalog("linear bearing", spec -> spec.designation, rows(), _ -> ({
+				source: "https://www.tuli.si/media/custom/upload/Linear_bushings_LM_LME.pdf",
+				standard: null, standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope,
+				verifiedFields: ["boreDiameter", "outerDiameter", "length"]}));
 		return table;
 	}
 
