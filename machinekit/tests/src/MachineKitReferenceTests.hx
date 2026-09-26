@@ -1,6 +1,7 @@
 import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.motion.LinearBearing;
+import machinekit.motion.LinearRailSystem;
 import machinekit.motion.NemaStepper;
 import machinekit.robotics.RobotFlange;
 import machinekit.standard.DeepGrooveBearing;
@@ -97,6 +98,22 @@ class MachineKitReferenceTests {
 				profileMetadata.verifiedFields == null)
 				throw reference.name + " profile metadata";
 		}
+		// HIWIN linear guideway catalog: MGN12C rail and block dimensions, in mm.
+		var rail = LinearRailSystem.catalog().get("MGN12C");
+		equal(rail.railWidth, 12, "MGN12C rail width");
+		equal(rail.railHeight, 8, "MGN12C rail height");
+		equal(rail.blockWidth, 27, "MGN12C block width");
+		equal(rail.blockHeight, 13, "MGN12C block height");
+		equal(rail.blockLength, 34.7, "MGN12C block length");
+		equal(rail.blockHoleSpacing, 21.7, "MGN12C block hole spacing");
+		if (rail.blockMountScrew != "M3x8" || rail.railMountScrew != "M3x8")
+			throw "MGN12C mounting screw size";
+		equal(rail.railHolePitch, 25, "MGN12C rail hole pitch");
+		equal(rail.railEndMargin, 10, "MGN12C rail end margin");
+	var railMetadata = LinearRailSystem.catalog().metadata("MGN12C");
+		if (railMetadata.dimensionKind != Nominal || railMetadata.conformance != NominalEnvelope ||
+			railMetadata.verifiedFields == null)
+			throw "MGN12C reference metadata";
 		// Accu ISO 4762 M5 product sheet: these fields have been cross-checked.
 		var m5 = SocketHeadCapScrew.catalog().get("M5");
 		equal(m5.diameter, 5, "M5 diameter");

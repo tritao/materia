@@ -10,6 +10,10 @@ import machinekit.standard.BearingFit.BearingShaftFit;
  * two rods and mate the two bearings through their own assembly model.
  */
 class LinearGuideSystem {
+	/** Construct a profile-rail guide as an alternative to the paired round-rod system. */
+	public static function forRailProfile(designation:String, railLength:Float, blockCount:Int = 1):LinearRailSystem
+		return LinearRailSystem.forProfile(designation, railLength, blockCount);
+
 	public final bearingA:LinearBearing;
 	public final bearingB:LinearBearing;
 	public final rodA:SteppedShaft;

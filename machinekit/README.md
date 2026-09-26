@@ -137,6 +137,13 @@ library classes rather than one-off scripts:
   default axis uses a right-hand Tr10 × 2 single-start thread; other screw
   diameters need an explicit `LeadScrewThread`. Thread flanks are not modelled,
   and a family label does not assert a verified standard size.
+- `LinearGuideSystem.forRailProfile()` provides a catalog-backed profile-rail
+  alternative alongside the round-rod guide. The current `HIWIN` `MGN12C`
+  row carries rail and block envelopes, mounting-hole pitch, block spacing, and
+  explicit end margins. `LinearRailSystem.assembly()` exposes one prismatic
+  joint per block, and its BOM contains the cut rail and matching blocks. The
+  generated solids are nominal envelopes; catalog provenance and connector
+  frames carry the interface dimensions used for layout.
 
 ## Robotics
 

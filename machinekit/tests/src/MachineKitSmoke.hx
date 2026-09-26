@@ -16,6 +16,8 @@ import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import machinekit.motion.LeadScrewThread.LeadScrewHand;
 import machinekit.motion.LinearBearing;
+import machinekit.motion.LinearGuideSystem;
+import machinekit.motion.LinearRailSystem;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.PillowBlockHousing;
 import machinekit.motion.ShaftCoupling;
@@ -841,6 +843,64 @@ class MachineKitSmoke {
 		check(bom.quantity(axis.pillowBlockA.screw.designation) == 8, "linear axis pillow block screws");
 	}
 
+	static function linearRailGuide():Void {
+		var guide = LinearGuideSystem.forRailProfile("MGN12C", 300);
+		check(guide.spec.family == "HIWIN", "profile rail family");
+		check(guide.spec.designation == "MGN12C", "profile rail designation");
+		check(guide.blockCount == 1, "profile rail default block count");
+		near(guide.spec.railWidth, 12, "MGN12 rail width");
+		near(guide.spec.railHeight, 8, "MGN12 rail height");
+		near(guide.spec.blockWidth, 27, "MGN12 block width");
+		near(guide.spec.blockLength, 34.7, "MGN12 block length");
+		near(guide.spec.blockHoleSpacing, 21.7, "MGN12 block hole spacing");
+		near(guide.travelMin, 27.35, "profile rail lower travel");
+		near(guide.travelMax, 272.65, "profile rail upper travel");
+		near(guide.stroke, 245.3, "profile rail stroke");
+		check(guide.rail.holePositions.length == 12, "profile rail mounting-hole count");
+		near(guide.rail.holePositions[0], 10, "profile rail first mounting hole");
+		near(guide.rail.holePositions[guide.rail.holePositions.length - 1], 285, "profile rail last mounting hole");
+		near(guide.rail.connector("mount1").frame.z, 10, "profile rail mount connector");
+		near(guide.blocks[0].connector("mount1").frame.z, -10.85, "profile block first mount connector");
+
+		var railPart = guide.rail.geometry(Envelope);
+		solid(railPart, "profile rail envelope");
+		var railBounds = bounds(railPart);
+		near(railBounds.minX, -6, "profile rail minimum x");
+		near(railBounds.maxX, 6, "profile rail maximum x");
+		near(railBounds.minZ, 0, "profile rail start");
+		near(railBounds.maxZ, 300, "profile rail end");
+		railPart.close();
+		var blockPart = guide.blocks[0].geometry(Preview);
+		solid(blockPart, "profile block envelope");
+		var blockBounds = bounds(blockPart);
+		near(blockBounds.minX, -13.5, "profile block minimum x");
+		near(blockBounds.maxX, 13.5, "profile block maximum x");
+		near(blockBounds.minZ, -17.35, "profile block minimum z");
+		near(blockBounds.maxZ, 17.35, "profile block maximum z");
+		blockPart.close();
+
+		var model = guide.assembly();
+		var definition = model.definition("linear-rail");
+		check(definition.joints.length == 1, "profile rail joint count");
+		var state = model.initialState("linear-rail");
+		near(state.worldConnector("block1", "rail").z, guide.travelMin, "profile block starts at lower travel");
+		near(state.worldConnector("block1", "mount1").z, guide.travelMin - guide.spec.blockHoleSpacing / 2,
+			"profile block mounting pattern at lower travel");
+		guide.setTravel(state, guide.travelMax);
+		near(state.worldConnector("block1", "rail").z, guide.travelMax, "profile block reaches upper travel");
+		guide.setTravel(state, guide.travelMin);
+		throws(() -> guide.setTravel(state, guide.travelMax + 1), "outside its limits");
+		throws(() -> LinearGuideSystem.forRailProfile("MGN12C", 50), "leave room for a block");
+		throws(() -> LinearGuideSystem.forRailProfile("MGN12C", 300, 20), "too short");
+		throws(() -> LinearGuideSystem.forRailProfile("MGN12C", 300, 0), "at least one block");
+		throws(() -> LinearGuideSystem.forRailProfile("MGN99C", 300), 'Unknown linear rail profile "MGN99C"');
+
+		var bom = guide.bom();
+		check(bom.quantity(guide.rail.designation) == 1, "profile rail in BOM");
+		check(bom.quantity(guide.blocks[0].designation) == 1, "profile block in BOM");
+		check(guide.components().length == 2, "profile rail component list");
+	}
+
 	static function catalogExtras():Void {
 		var bushing = new Bushing(8);
 		check(bushing.designation == "BUSHING-8x11x12", "bushing designation");
@@ -1171,6 +1231,7 @@ class MachineKitSmoke {
 		check(TSlotExtrusion.catalog().metadata("HFS5-2020").conformance == NominalEnvelope,
 			"HFS5 profile carries nominal-envelope metadata");
 		metadataComplete(TSlotExtrusion.catalog());
+		metadataComplete(LinearRailSystem.catalog());
 	}
 
 	static function metadataComplete<T>(catalog:Catalog<T>):Void {
@@ -1198,6 +1259,7 @@ class MachineKitSmoke {
 		gears();
 		pillowBlock();
 		linearAxis();
+		linearRailGuide();
 		catalogExtras();
 		robotics();
 		assembly();
