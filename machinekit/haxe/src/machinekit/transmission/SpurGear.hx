@@ -5,13 +5,14 @@ import cadkit.modeling.Vector;
 import machinekit.component.Dimension;
 import machinekit.component.Solids;
 
-/** External involute spur gear, standard full-depth teeth (addendum = module, dedendum = 1.25
- * module, no profile shift or backlash), extruded along local +Z from z=0 to z=faceWidth.
+/** External involute spur gear, full-depth teeth (addendum and dedendum are adjusted by the
+ * profile-shift coefficient), extruded along local +Z from z=0 to z=faceWidth. Backlash is a
+ * tangential allowance at the pitch circle and reduces the generated tooth thickness.
  *
  * Tooth flanks are sampled points along the true involute-of-a-circle curve, not exact curves;
  * that is enough fidelity to mesh visually while keeping the outline a single closed polygon.
  * Below the base circle the flank drops to the root circle on a straight radial step rather
- * than a fillet. Tooth counts that require undercut in an unshifted gear are rejected.
+ * than a fillet. Tooth counts whose selected profile shift still requires undercut are rejected.
  */
 class SpurGear {
 	public static inline var STANDARD_PRESSURE_ANGLE:Float = 0.3490658503988659; // 20 degrees
@@ -28,31 +29,46 @@ class SpurGear {
 	public final teeth:Int;
 	public final pressureAngle:Float;
 	public final faceWidth:Float;
+	/** Profile-shift coefficient x, in module units. */
+	public final profileShift:Float;
+	/** Tangential backlash allowance at the pitch circle, in millimetres. */
+	public final backlash:Float;
 
 	public final pitchDiameter:Float;
 	public final baseDiameter:Float;
 	public final outsideDiameter:Float;
 	public final rootDiameter:Float;
 
-	public function new(moduleSize:Float, teeth:Int, faceWidth:Float, pressureAngle:Float = STANDARD_PRESSURE_ANGLE) {
+	public function new(moduleSize:Float, teeth:Int, faceWidth:Float, pressureAngle:Float = STANDARD_PRESSURE_ANGLE,
+			profileShift:Float = 0, backlash:Float = 0) {
 		if (!(moduleSize > 0)) throw "Spur gear needs a positive module";
 		if (teeth < 6) throw "Spur gear needs at least 6 teeth";
 		if (!(faceWidth > 0)) throw "Spur gear needs a positive face width";
 		if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
-		if (teeth < minimumUnshiftedTeeth(pressureAngle))
-			throw "Unshifted spur gear would require undercut; use more teeth or a profile-shifted generator";
+		if (!Math.isFinite(profileShift) || profileShift <= -1 || profileShift >= 1.25)
+			throw "Spur gear profile shift must be finite and between -1 and 1.25";
+		if (!Math.isFinite(backlash) || backlash < 0) throw "Spur gear backlash must be finite and non-negative";
+		if (profileShift < minimumProfileShift(teeth, pressureAngle) - 1e-10)
+			throw profileShift == 0 ? "Unshifted spur gear would require undercut; use a positive profile shift or more teeth" :
+				"Spur gear profile shift is insufficient to avoid undercut";
 		this.moduleSize = moduleSize;
 		this.teeth = teeth;
 		this.pressureAngle = pressureAngle;
 		this.faceWidth = faceWidth;
+		this.profileShift = profileShift;
+		this.backlash = backlash;
 		pitchDiameter = moduleSize * teeth;
 		baseDiameter = pitchDiameter * Math.cos(pressureAngle);
-		outsideDiameter = pitchDiameter + 2 * moduleSize;
-		rootDiameter = pitchDiameter - 2.5 * moduleSize;
+		outsideDiameter = pitchDiameter + 2 * moduleSize * (1 + profileShift);
+		rootDiameter = pitchDiameter - 2 * moduleSize * (1.25 - profileShift);
 		if (!(rootDiameter > 0)) throw "Spur gear root diameter must be positive; use a larger module or more teeth";
+		var toothThickness = pitchToothThickness();
+		if (!(toothThickness > 0)) throw "Spur gear backlash leaves no tooth thickness";
 		var moduleText = Dimension.format(moduleSize);
-		designation = 'SPUR-M$moduleText-${teeth}T';
-		description = 'Spur gear module $moduleText, ${teeth} teeth';
+		var shiftSuffix = profileShift == 0 ? "" : '-X${Dimension.format(profileShift)}';
+		var backlashSuffix = backlash == 0 ? "" : '-B${Dimension.format(backlash)}';
+		designation = 'SPUR-M$moduleText-${teeth}T$shiftSuffix$backlashSuffix';
+		description = 'Spur gear module $moduleText, ${teeth} teeth${profileShift == 0 ? "" : ", profile shift ${Dimension.format(profileShift)}"}${backlash == 0 ? "" : ", backlash ${Dimension.format(backlash)} mm"}';
 	}
 
 	/** Conservative no-undercut full-depth limit: ceil(2 / sin(pressureAngle)^2). */
@@ -62,19 +78,31 @@ class SpurGear {
 		return Math.ceil(2 / (sine * sine));
 	}
 
+	/** Conservative minimum profile shift coefficient for a full-depth gear with this tooth count. */
+	public static function minimumProfileShift(teeth:Int, pressureAngle:Float = STANDARD_PRESSURE_ANGLE):Float {
+		if (teeth < 1) throw "Spur gear needs a positive tooth count";
+		if (!validPressureAngle(pressureAngle)) throw "Spur gear pressure angle must be between 14.5 and 25 degrees";
+		return 1 - teeth * Math.pow(Math.sin(pressureAngle), 2) / 2;
+	}
+
 	/** True for pressure angles within `MIN_PRESSURE_ANGLE`..`MAX_PRESSURE_ANGLE` (radians). */
 	public static function validPressureAngle(angle:Float):Bool
 		return angle >= MIN_PRESSURE_ANGLE - 1e-12 && angle <= MAX_PRESSURE_ANGLE + 1e-12;
 
-	/** Centre distance to mesh with `other` at the standard (no profile shift) pitch. Both gears
-	 * must share a module and pressure angle.
+	/** Centre distance to mesh with `other`, including the sum of both profile shifts. Both gears
+	 * must share a module and pressure angle. Backlash changes tooth thickness, not centre distance.
 	 */
 	public function centerDistance(other:SpurGear):Float {
 		if (moduleSize != other.moduleSize) throw "Meshing gears must share a module";
 		if (Math.abs(pressureAngle - other.pressureAngle) > 1e-10)
 			throw "Meshing gears must share a pressure angle";
-		return (pitchDiameter + other.pitchDiameter) / 2;
+		return (pitchDiameter + other.pitchDiameter) / 2 +
+			moduleSize * (profileShift + other.profileShift) / Math.sin(pressureAngle);
 	}
+
+	/** Tooth thickness measured along the pitch circle after profile shift and backlash. */
+	public function pitchToothThickness():Float
+		return Math.PI * moduleSize / 2 + 2 * moduleSize * profileShift * Math.tan(pressureAngle) - backlash;
 
 	public function geometry():Part
 		return Solids.prism(profile(), 0, faceWidth);
@@ -83,7 +111,7 @@ class SpurGear {
 	function profile():Array<Vector> {
 		var rb = baseDiameter / 2, rp = pitchDiameter / 2, ra = outsideDiameter / 2, rf = rootDiameter / 2;
 		var rStart = Math.max(rb, rf);
-		var toothThickness = Math.PI * moduleSize / 2;
+		var toothThickness = pitchToothThickness();
 		var halfToothAngle = toothThickness / (2 * rp);
 		var tPitch = Math.sqrt(Math.pow(rp / rb, 2) - 1);
 		var involuteAnglePitch = tPitch - Math.atan2(tPitch, 1);

@@ -598,10 +598,22 @@ class MachineKitSmoke {
 		near(gear.baseDiameter, 40 * Math.cos(SpurGear.STANDARD_PRESSURE_ANGLE), "spur gear base diameter");
 		near(gear.outsideDiameter, 44, "spur gear outside diameter");
 		near(gear.rootDiameter, 35, "spur gear root diameter");
+		near(gear.pitchToothThickness(), Math.PI, "spur gear pitch tooth thickness");
 		throws(() -> new SpurGear(-1, 20, 12), "positive module");
 		throws(() -> new SpurGear(2, 5, 12), "at least 6 teeth");
 		check(SpurGear.minimumUnshiftedTeeth(SpurGear.STANDARD_PRESSURE_ANGLE) == 18, "20 degree undercut limit");
 		throws(() -> new SpurGear(2, 17, 12), "would require undercut");
+		var shifted = new SpurGear(2, 17, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0.1, 0.2);
+		check(shifted.designation == "SPUR-M2-17T-X0.1-B0.2", "profile-shifted gear designation");
+		near(shifted.outsideDiameter, 38.4, "profile-shifted gear outside diameter");
+		near(shifted.rootDiameter, 29.4, "profile-shifted gear root diameter");
+		near(shifted.pitchToothThickness(), Math.PI + 0.4 * Math.tan(SpurGear.STANDARD_PRESSURE_ANGLE) - 0.2,
+			"profile-shifted gear tooth thickness");
+		near(SpurGear.minimumProfileShift(17), 1 - 17 * Math.pow(Math.sin(SpurGear.STANDARD_PRESSURE_ANGLE), 2) / 2,
+			"profile-shift minimum");
+		throws(() -> new SpurGear(2, 20, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -1), "between -1 and 1.25");
+		throws(() -> new SpurGear(2, 20, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0, -0.1), "non-negative");
+		throws(() -> new SpurGear(2, 20, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0, 4), "leaves no tooth thickness");
 		throws(() -> new SpurGear(2, 20, -1), "positive face width");
 
 		var part = gear.geometry();
@@ -616,8 +628,42 @@ class MachineKitSmoke {
 		throws(() -> GearPair.mesh(pinion, new SpurGear(2, 20, 12, 25 * Math.PI / 180)), "share a pressure angle");
 		var pair = GearPair.mesh(pinion, gear);
 		near(pair.centerDistance, (pinion.pitchDiameter + gear.pitchDiameter) / 2, "gear pair centre distance");
+		near(pair.operatingPressureAngle, SpurGear.STANDARD_PRESSURE_ANGLE, "gear pair operating pressure angle");
 		near(pair.ratio(), gear.teeth / pinion.teeth, "gear pair ratio");
 		near(pair.pose().x, pair.centerDistance, "gear pair pose offset");
+		var shiftedPair = GearPair.mesh(new SpurGear(2, 17, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0.1, 0.1),
+			new SpurGear(2, 20, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0.2, 0.05));
+		near(shiftedPair.profileShiftSum, 0.3, "shifted gear pair profile shift");
+		near(shiftedPair.backlash, 0.15, "shifted gear pair backlash");
+		near(shiftedPair.centerDistance, (17 + 20) + 2 * 0.3 / Math.sin(SpurGear.STANDARD_PRESSURE_ANGLE),
+			"shifted gear pair centre distance");
+		near(shiftedPair.operatingPressureAngle,
+			Math.acos((17 + 20) * Math.cos(SpurGear.STANDARD_PRESSURE_ANGLE) / shiftedPair.centerDistance),
+			"shifted gear pair operating pressure angle");
+		near(shiftedPair.pose().x, shiftedPair.centerDistance, "shifted gear pair pose offset");
+		throws(() -> GearPair.mesh(
+			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.5),
+			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.5)),
+			"invalid operating pressure angle");
+		var shiftedASolid = shiftedPair.a.geometry(), shiftedBSolid = shiftedPair.b.geometry();
+		var shiftedMaxPenetration = 0.0;
+		for (sample in 0...9) {
+			var aAngle = 2 * Math.PI * sample / (shiftedPair.a.teeth * 8);
+			var bAngle = shiftedPair.bRotation - aAngle * shiftedPair.a.teeth / shiftedPair.b.teeth;
+			var aPlaced = shiftedASolid.placed(new Location(new Plane(new Vector(0, 0, 0),
+				new Vector(Math.cos(aAngle), Math.sin(aAngle), 0), Vector.Z())));
+			var bPlaced = shiftedBSolid.placed(new Location(new Plane(new Vector(shiftedPair.centerDistance, 0, 0),
+				new Vector(Math.cos(bAngle), Math.sin(bAngle), 0), Vector.Z())));
+			var overlap = aPlaced.intersect(bPlaced);
+			shiftedMaxPenetration = Math.max(shiftedMaxPenetration, overlap.volume());
+			overlap.close();
+			aPlaced.close();
+			bPlaced.close();
+		}
+		shiftedASolid.close();
+		shiftedBSolid.close();
+		check(shiftedMaxPenetration <= 0.05,
+			'shifted gear mesh penetrates by $shiftedMaxPenetration mm^3 over one tooth pitch');
 		var aSolid = pinion.geometry(), bSolid = gear.geometry();
 		var maxPenetration = 0.0;
 		for (sample in 0...17) {

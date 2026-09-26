@@ -2,14 +2,20 @@ package machinekit.transmission;
 
 import materia.project.AssemblyRecord.AssemblyFrame;
 
-/** Two spur gears meshed at the standard (no profile shift) centre distance, both rotating about
- * parallel +Z axes. `a` sits at the origin; `pose` places `b` along `a`'s local +X, turned about
- * its own axis so the teeth interleave.
+/** Two spur gears meshed at their profile-shifted centre distance, both rotating about parallel
+ * +Z axes. `a` sits at the origin; `pose` places `b` along `a`'s local +X, turned about its own
+ * axis so the teeth interleave.
  */
 class GearPair {
 	public final a:SpurGear;
 	public final b:SpurGear;
 	public final centerDistance:Float;
+	/** Derived operating pressure angle after the profile-shift centre-distance change. */
+	public final operatingPressureAngle:Float;
+	/** Sum of the two gears' tangential backlash allowances. */
+	public final backlash:Float;
+	/** Sum of the two gears' profile-shift coefficients. */
+	public final profileShiftSum:Float;
 	/** Rotation of `b` about its +Z axis, radians, in `0 <= angle < 2*pi/b.teeth`. */
 	public final bRotation:Float;
 
@@ -19,7 +25,14 @@ class GearPair {
 	function new(a:SpurGear, b:SpurGear) {
 		this.a = a;
 		this.b = b;
-		centerDistance = a.centerDistance(b);
+		var distance = a.centerDistance(b);
+		var baseRadiusSum = (a.baseDiameter + b.baseDiameter) / 2;
+		if (!(distance > baseRadiusSum + 1e-10))
+			throw "Meshing gear profile shifts produce an invalid operating pressure angle";
+		centerDistance = distance;
+		operatingPressureAngle = Math.acos(baseRadiusSum / distance);
+		backlash = a.backlash + b.backlash;
+		profileShiftSum = a.profileShift + b.profileShift;
 		// `SpurGear` centres a tooth on local angle 0, so `a` has a tooth pointing at the mesh
 		// point (+X). `b` sees the mesh point at its local angle pi and must present a tooth
 		// space there; spaces sit half a pitch from teeth, so the turn t satisfies

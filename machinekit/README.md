@@ -103,14 +103,19 @@ notch sized from the profile envelope.
 
 ## Transmission
 
-`machinekit.transmission` has `SpurGear` (standard full-depth involute teeth,
-sampled as a polyline profile, extruded along +Z) and `Rack` (its straight-flank,
+`machinekit.transmission` has `SpurGear` (full-depth involute teeth with explicit
+profile shift and pitch-circle backlash, sampled as a polyline profile, extruded along +Z) and `Rack` (its straight-flank,
 infinite-radius limit, extruded along +X with teeth along +Z). `GearPair.mesh(a, b)`
-computes the standard centre distance and ratio for two gears with matching module and pressure angle and a
+computes the profile-shifted centre distance and ratio for two gears with matching module and pressure angle and a
 placement pose for `b` relative to `a`, rotated so a tooth space of `b` meets
-`a`'s tooth at the mesh point. Pressure angles are limited to 14.5°–25°.
-Unshifted full-depth gears below `ceil(2 / sin²(pressureAngle))` teeth are
-rejected because this generator does not model undercut or profile shift.
+`a`'s tooth at the mesh point. Pressure angle inputs are limited to 14.5°–25°;
+`GearPair` also derives the operating pressure angle after profile shifting and
+rejects combinations whose base circles cannot produce a real involute mesh.
+Gears reject tooth counts whose selected profile shift is insufficient to avoid
+undercut. A zero-shift gear therefore keeps the usual `ceil(2 /
+sin²(pressureAngle))` limit, while a positive shift can model a small pinion.
+Backlash reduces pitch-circle tooth thickness and is reported in the gear
+designation and pair properties; it does not change centre distance.
 
 `Sprocket` (roller chain) and `TimingPulley` (belt) use a coarser simplified
 tooth outline than `SpurGear` — straight flanks between two radii rather than
