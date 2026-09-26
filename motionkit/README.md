@@ -57,11 +57,12 @@ machine.movePath(GeometricPath.lines([
 ```
 
 The runtime interpolates timestamped trajectory chunks on its owner clock and
-publishes queue depth and timestamp progress through `RobotSnapshot`. MotionKit
-refills long trajectories before the native window drains, and performs a
-short controlled deceleration for a normal hold. It retains a deterministic
-position-target fallback when a backend does not support buffered chunks. CNC
-semantics and G-code remain outside MotionKit.
+publishes queue depth and tagged timestamp progress through `RobotSnapshot`.
+MotionKit refills long trajectories before the native window drains. A normal
+hold slows the trajectory clock along the planned path using the configured
+acceleration limits; resume starts from the runtime-reported stop tag and time.
+MotionKit retains a deterministic position-target fallback when a backend does
+not support buffered chunks. CNC semantics and G-code remain outside MotionKit.
 
 Run the focused native-backed test with:
 

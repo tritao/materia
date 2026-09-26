@@ -87,7 +87,7 @@ class RobotSnapshot {
       if (sample.get_sequence() == Int64.ofInt(0)) continue;
       var config = layout[i];
       frames.push(new SensorFrame(config.id, config.kind, config.frameId,
-      sample.get_sequence(), sample.get_source_timestamp_ns(),
+        sample.get_sequence(), sample.get_source_timestamp_ns(),
         [for (j in 0...sample.get_value_count()) sample.get_values(j)], sample.get_received_timestamp_ns(),
         config.linkId, config.position.toArray(), config.rotation.toArray()));
     }
