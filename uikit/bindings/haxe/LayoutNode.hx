@@ -51,6 +51,10 @@ class LayoutNode {
 		return child;
 	}
 
+	public function remove(child:LayoutNode):Bool {
+		return child != null && children.remove(child);
+	}
+
 	public static function box(id:Int, ?style:LayoutStyle):LayoutNode
 		return new LayoutNode(id, LayoutVisualKind.Box, style);
 

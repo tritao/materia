@@ -37,6 +37,7 @@ import nativekit.ui.widgets.docking.DockTabDropTarget;
 import nativekit.ui.widgets.docking.DockWorkspaceInteraction;
 import nativekit.ui.widgets.controls.TabsOptions;
 import nativekit.ui.theme.TextRole;
+import nativekit.ui.style.StyleState;
 
 /** Renders a DockWorkspaceModel using split panes, tab groups, and lazy panels. */
 class DockWorkspace implements View {
@@ -79,37 +80,42 @@ class DockWorkspace implements View {
 		interaction.beginFrame();
 		var labelWidths:DockTextWidthCache = context.state(
 			context.id("tab-label-width-cache"), new DockTextWidthCache()).value;
+		var panelCache:DockPanelCache = context.state(
+			context.id("panel-tree-cache:" + key), new DockPanelCache()).value;
+		panelCache.retain(context);
 		var content = buildNode(model.root, context, [], "layout",
 			context.viewportWidth, availableHeight == null ? context.viewportHeight : availableHeight,
-			labelWidths);
+			labelWidths, panelCache);
 		var layout = new SizedBox("layout", content, LayoutAxis.grow(), LayoutAxis.grow());
 		return new Column(key, [new KeyedView("content", layout)], style).build(context);
 	}
 
 	function buildNode(node:DockNode, context:BuildContext, path:Array<Int>, nodeKey:String,
-		availableWidth:Float, availableHeight:Float, labelWidths:DockTextWidthCache):View {
+		availableWidth:Float, availableHeight:Float, labelWidths:DockTextWidthCache,
+		panelCache:DockPanelCache):View {
 		if (node == null)
 			return new Text("No dock layout");
 		switch (node) {
 			case DockNode.Empty: return new Text("No panels");
 			case DockNode.Panel(panelId):
 				return targetView(panelId, buildTabs([panelId], panelId, context, nodeKey,
-					availableWidth, labelWidths));
+					availableWidth, labelWidths, panelCache));
 			case DockNode.Tabs(panelIds, activePanelId):
 				var targetPanelId = activePanelId == null && panelIds != null && panelIds.length > 0
 					? panelIds[0] : activePanelId;
 				return targetPanelId == null ? buildTabs(panelIds, activePanelId, context, nodeKey,
-					availableWidth, labelWidths) : targetView(targetPanelId,
-					buildTabs(panelIds, activePanelId, context, nodeKey, availableWidth, labelWidths));
+					availableWidth, labelWidths, panelCache) : targetView(targetPanelId,
+					buildTabs(panelIds, activePanelId, context, nodeKey, availableWidth, labelWidths,
+						panelCache));
 			case DockNode.Split(axis, ratio, first, second):
 				return buildSplit(axis, ratio, first, second, context, path, nodeKey,
-					availableWidth, availableHeight, labelWidths);
+					availableWidth, availableHeight, labelWidths, panelCache);
 		}
 	}
 
 	function buildTabs(panelIds:Array<String>, activePanelId:String,
 		context:BuildContext, nodeKey:String, availableWidth:Float,
-		labelWidths:DockTextWidthCache):View {
+		labelWidths:DockTextWidthCache, panelCache:DockPanelCache):View {
 		var items:Array<TabItem> = [];
 		var visiblePanels:Array<DockPanelDescriptor> = [];
 		if (panelIds != null)
@@ -132,7 +138,8 @@ class DockWorkspace implements View {
 		var showAllLabels = visiblePanels.length <= 1 || allWidth <= availableWidth;
 		var showSelectedLabel = showAllLabels || selectedWidth <= availableWidth;
 		for (descriptor in visiblePanels)
-			items.push(new TabItem(descriptor.id, descriptor.title, panelView(descriptor.id, availableWidth),
+			items.push(new TabItem(descriptor.id, descriptor.title,
+				panelView(descriptor.id, availableWidth, panelCache),
 				descriptor.enabled, descriptor.icon,
 				!showAllLabels && descriptor.icon != null &&
 					(descriptor.id != selectedId || !showSelectedLabel) ? "" : null));
@@ -194,7 +201,8 @@ class DockWorkspace implements View {
 
 	function buildSplit(axis:DockSplitAxis, ratio:Float, first:DockNode, second:DockNode,
 		context:BuildContext, path:Array<Int>, nodeKey:String,
-		availableWidth:Float, availableHeight:Float, labelWidths:DockTextWidthCache):View {
+		availableWidth:Float, availableHeight:Float, labelWidths:DockTextWidthCache,
+		panelCache:DockPanelCache):View {
 		var firstPath = path.copy();
 		firstPath.push(0);
 		var secondPath = path.copy();
@@ -225,17 +233,19 @@ class DockWorkspace implements View {
 		var secondWidth = horizontal ? remaining : availableWidth;
 		var secondHeight = horizontal ? availableHeight : remaining;
 		return new SplitView(nodeKey,
-			buildNode(first, context, firstPath, nodeKey + ":first", firstWidth, firstHeight, labelWidths),
-			buildNode(second, context, secondPath, nodeKey + ":second", secondWidth, secondHeight, labelWidths),
+			buildNode(first, context, firstPath, nodeKey + ":first", firstWidth, firstHeight,
+				labelWidths, panelCache),
+			buildNode(second, context, secondPath, nodeKey + ":second", secondWidth, secondHeight,
+				labelWidths, panelCache),
 			options);
 	}
 
-	function panelView(panelId:String, availableWidth:Float):View {
+	function panelView(panelId:String, availableWidth:Float, panelCache:DockPanelCache):View {
 		var descriptor = model.get(panelId);
 		var content = panelContents.get(panelId);
 		return descriptor == null ? new Text("Missing panel: " + panelId) : content == null ?
 			new Text("Missing panel content: " + panelId) :
-			new DockPanelView(descriptor, content, availableWidth);
+			new DockPanelView(descriptor, content, availableWidth, panelCache);
 	}
 
 	function targetView(targetPanelId:String, child:View):View
@@ -300,17 +310,34 @@ private class DockPanelView implements View {
 	final descriptor:DockPanelDescriptor;
 	final content:DockPanelContent;
 	final availableWidth:Float;
+	final panelCache:DockPanelCache;
 
 	public function new(descriptor:DockPanelDescriptor, content:DockPanelContent,
-			availableWidth:Float) {
+			availableWidth:Float, panelCache:DockPanelCache) {
 		this.descriptor = descriptor;
 		this.content = content;
 		this.availableWidth = availableWidth;
+		this.panelCache = panelCache;
 	}
 
 	public function build(context:BuildContext):RenderNode {
+		var cacheKeyBuilder:Null<DockPanelCacheKeyBuilder> = content.cacheKey;
+		var cacheKey = cacheKeyBuilder == null ? null :
+			cacheKeyBuilder() + "|style=" + context.styleRevision +
+			"|viewport=" + context.viewportWidth + "x" + context.viewportHeight +
+			"|width=" + availableWidth;
+		var cached = cacheKey == null ? null : panelCache.entry(descriptor.id);
+		if (cached != null && cached.key == cacheKey && cached.statesMatch(context)) {
+			context.retainStateIds(cached.stateIds);
+			context.claimRetainedTree(cached.root);
+			cached.root.detach();
+			return cached.root;
+		}
+		if (cached != null)
+			cached.root.detach();
 		var observed = context.buildProbe != null;
 		var preparationStarted = observed ? Sys.time() : 0.0;
+		var stateMarker = context.stateUsageMarker();
 		var widthBuilder = content.buildWithWidth;
 		var view = widthBuilder == null ? content.build(context) :
 			widthBuilder(context, availableWidth);
@@ -323,7 +350,53 @@ private class DockPanelView implements View {
 		if (observed)
 			context.reportBuild("panel:" + descriptor.id, buildStarted - preparationStarted,
 				Sys.time() - buildStarted, root);
+		if (cacheKey != null)
+			panelCache.put(descriptor.id, cacheKey, root, context.stateIdsUsedSince(stateMarker));
 		return root;
+	}
+}
+
+private class DockPanelCache {
+	final entries:Map<String, DockPanelCacheEntry>;
+
+	public function new()
+		entries = new Map();
+
+	public function entry(panelId:String):Null<DockPanelCacheEntry>
+		return entries.get(panelId);
+
+	public function put(panelId:String, key:String, root:RenderNode, stateIds:Array<Int>):Void {
+		var previous = entries.get(panelId);
+		if (previous != null && previous.root != root)
+			previous.root.detach();
+		entries.set(panelId, new DockPanelCacheEntry(key, root, stateIds));
+	}
+
+	public function retain(context:BuildContext):Void {
+		for (entry in entries)
+			context.retainStateIds(entry.stateIds);
+	}
+}
+
+private class DockPanelCacheEntry {
+	public final key:String;
+	public final root:RenderNode;
+	public final stateIds:Array<Int>;
+
+	public function new(key:String, root:RenderNode, stateIds:Array<Int>) {
+		this.key = key;
+		this.root = root;
+		this.stateIds = stateIds == null ? [] : stateIds.copy();
+	}
+
+	public function statesMatch(context:BuildContext):Bool {
+		var mask = StyleState.Hovered | StyleState.Pressed | StyleState.Focused;
+		var result = true;
+		root.walk(function(node) {
+			if ((node.states & mask) != (context.interactionStates.get(node.id) & mask))
+				result = false;
+		});
+		return result;
 	}
 }
 

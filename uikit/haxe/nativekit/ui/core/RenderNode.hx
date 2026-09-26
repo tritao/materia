@@ -134,6 +134,17 @@ class RenderNode {
 		return child;
 	}
 
+	/** Detaches this node from its current parent so a retained subtree can move. */
+	public function detach():RenderNode {
+		if (parent == null)
+			return this;
+		var previous = parent;
+		previous.children.remove(this);
+		previous.layout.remove(layout);
+		parent = null;
+		return this;
+	}
+
 	/** Converts a point in this node's local space into viewport/global space. */
 	public function localToGlobal(point:Point):Point
 		return requireResolved().localToViewport(point);

@@ -7,6 +7,7 @@ class StateStore {
 	final paths:Map<Int, String>;
 	final managed:Map<Int, Bool>;
 	final frameUsed:Map<Int, Bool>;
+	final frameUseOrder:Array<Int>;
 	var frameActive:Bool;
 	public var revision(default, null):Int;
 
@@ -16,6 +17,7 @@ class StateStore {
 		paths = new Map();
 		managed = new Map();
 		frameUsed = new Map();
+		frameUseOrder = [];
 		frameActive = false;
 		revision = 0;
 	}
@@ -38,7 +40,37 @@ class StateStore {
 	/** Starts liveness tracking for resource-backed widget state. */
 	public function beginFrame():Void {
 		frameUsed.clear();
+		frameUseOrder.resize(0);
 		frameActive = true;
+	}
+
+	/** Returns a marker for state usage captured during the current frame. */
+	public function usageMarker():Int
+		return frameUseOrder.length;
+
+	/** Returns state IDs first touched after a usage marker. */
+	public function usedIdsSince(marker:Int):Array<Int> {
+		var start = marker < 0 ? 0 : marker > frameUseOrder.length ? frameUseOrder.length : marker;
+		var result:Array<Int> = [];
+		var seen:Map<Int, Bool> = new Map();
+		for (index in start...frameUseOrder.length) {
+			var id = frameUseOrder[index];
+			if (!seen.exists(id)) {
+				seen.set(id, true);
+				result.push(id);
+			}
+		}
+		return result;
+	}
+
+	/** Keeps state-backed resources for a retained, temporarily detached subtree. */
+	public function retain(ids:Array<Int>):Void {
+		if (ids == null)
+			return;
+		for (id in ids)
+			if (values.exists(id))
+				if (frameActive)
+					frameUsed.set(id, true);
 	}
 
 	/** Marks an initialized state as used by the current render tree. */
@@ -71,6 +103,7 @@ class StateStore {
 			values.remove(id);
 		}
 		frameUsed.clear();
+		frameUseOrder.resize(0);
 		frameActive = false;
 		if (stale.length > 0)
 			revision++;
@@ -151,7 +184,9 @@ class StateStore {
 	}
 
 	function markUsed(id:WidgetId):Void {
-		if (frameActive)
+		if (frameActive) {
 			frameUsed.set(id.value, true);
+			frameUseOrder.push(id.value);
+		}
 	}
 }

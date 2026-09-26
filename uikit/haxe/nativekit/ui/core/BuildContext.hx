@@ -273,6 +273,29 @@ class BuildContext {
 		return new State<T>(stateStore, id);
 	}
 
+	/** Captures state usage so a retained subtree can keep its resources mounted. */
+	public function stateUsageMarker():Int
+		return stateStore.usageMarker();
+
+	/** Returns state IDs touched after a retained subtree build marker. */
+	public function stateIdsUsedSince(marker:Int):Array<Int>
+		return stateStore.usedIdsSince(marker);
+
+	/** Keeps state-backed resources alive for a retained subtree this frame. */
+	public function retainStateIds(ids:Array<Int>):Void
+		stateStore.retain(ids);
+
+	/** Claims IDs belonging to a retained render subtree without rebuilding it. */
+	public function claimRetainedTree(root:RenderNode):Void {
+		if (root == null)
+			throw "A retained render subtree is required";
+		root.walk(function(node) {
+			if (claimed.exists(node.id.value))
+				throw 'Duplicate retained widget ID ${node.id.value}';
+			claimed.set(node.id.value, stateStore.describe(node.id));
+		});
+	}
+
 	/** Opens an already initialized value without supplying an unused placeholder. */
 	public function existingState<T>(id:WidgetId):State<T> {
 		if (!stateStore.contains(id))

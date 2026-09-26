@@ -848,12 +848,19 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("telemetry", "Telemetry", true, true, IconName.Activity));
 
     workspacePanelContents = [
-      new DockPanelContent("hierarchy", function(_) return hierarchyPanel()),
+      new DockPanelContent("hierarchy", function(_) return hierarchyPanel(), null,
+        function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
+          ":filter=" + hierarchySearch),
       new DockPanelContent("bim", function(_) return bimEditor),
       new DockPanelContent("perspective", function(_) return perspectivePanel(),
         function(_, width) return perspectivePanel(width)),
-      new DockPanelContent("inspector", function(_) return inspectorPanel()),
-      new DockPanelContent("sensors", function(_) return sensorPanel()),
+      new DockPanelContent("inspector", function(_) return inspectorPanel(), null,
+        function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
+          ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive()),
+      new DockPanelContent("sensors", function(_) return sensorPanel(), null,
+        function() return "sensors=" + sensors.revision() + ":robot=" + sensors.robotId +
+          ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +
+          ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()),
       new DockPanelContent("console", function(_) return consolePanel()),
       new DockPanelContent("telemetry", function(_) return telemetryPanel())
     ];
