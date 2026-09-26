@@ -8,6 +8,9 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.standard.BearingFit;
+import machinekit.standard.BearingFit.BearingHousingFit;
+import machinekit.standard.BearingFit.BearingShaftFit;
 
 /** LM-series linear ball bearing, for a round rail. Unlike `Bushing`, sizes come from a fixed
  * catalog rather than a proportional formula.
@@ -55,6 +58,21 @@ class LinearBearing extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.cut(Solids.cylinder(outerDiameter / 2, 0, length),
 			[Solids.cylinder(boreDiameter / 2, -0.1, length + 0.1)]);
+
+	/** Diameter of the round guide rod for a named shaft fit. The allowance is diametral. */
+	public function guideRodDiameter(fit:BearingShaftFit = Slip):Float
+		return boreDiameter + BearingFit.shaftAllowance(fit, boreDiameter);
+
+	/** Diameter of the carriage seat for a named housing fit. The allowance is diametral. */
+	public function housingSeatDiameter(fit:BearingHousingFit = Slip):Float
+		return outerDiameter + BearingFit.housingAllowance(fit, outerDiameter);
+
+	/** Cylindrical carriage seat tool for this bearing and housing fit. */
+	public function housingSeat(?depth:Float, fit:BearingHousingFit = Slip):Part {
+		var seatDepth = depth == null ? length : depth;
+		if (!(seatDepth > 0) || !Math.isFinite(seatDepth)) throw "Linear bearing housing seat depth must be positive";
+		return Solids.cylinder(housingSeatDiameter(fit) / 2, 0, seatDepth);
+	}
 
 	function get_boreDiameter():Float return spec.boreDiameter;
 	function get_outerDiameter():Float return spec.outerDiameter;

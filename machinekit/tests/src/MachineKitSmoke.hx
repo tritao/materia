@@ -696,6 +696,15 @@ class MachineKitSmoke {
 		check(axis.nut.thread.designation == "TR-D10-P2-S1-RH", "axis default thread is explicit");
 		check(axis.screw.thread.designation == axis.nut.thread.designation, "axis screw and nut share thread specification");
 		check(axis.guideBearingA.designation == "LM8UU", "linear axis round guide bearing");
+		check(axis.guideSystem.bearingDesignation == "LM8UU", "linear axis guide catalog row");
+		check(axis.guideSystem.rodFit == BearingShaftFit.Slip, "linear axis guide rod fit");
+		check(axis.guideSystem.housingFit == BearingHousingFit.Slip, "linear axis guide seat fit");
+		near(axis.guideSystem.rodDiameter, 7.99, "linear axis guide rod fit diameter");
+		near(axis.guideSystem.seatDiameter, 15.0375, "linear axis guide seat fit diameter");
+		near(axis.carriage.guideSeatDiameter, axis.guideSystem.seatDiameter, "carriage uses guide seat fit");
+		near(axis.guideSystem.rodLength, axis.length, "guide rods span the axis");
+		check(axis.guideRodA == axis.guideSystem.rodA && axis.guideBearingA == axis.guideSystem.bearingA,
+			"axis exposes guide system components");
 		var carriagePreview = axis.carriage.geometry();
 		solid(carriagePreview, "carriage with nut and guide seats");
 		check(carriagePreview.volume() < axis.carriage.width * axis.carriage.width * axis.carriage.length,
@@ -751,6 +760,10 @@ class MachineKitSmoke {
 		near(state.worldConnector("coupling", "axis").z, 21, "coupling centred on the motor shaft tip");
 		near(state.worldConnector("screw", "input").z, 21, "screw seats on the motor shaft");
 		near(state.worldConnector("carriage", "bore").z, 21 + axis.travelMin, "carriage starts at its lower travel limit");
+		near(state.worldConnector("guideBearingA", "axis").z, state.worldConnector("carriage", "bore").z,
+			"first guide bearing is aligned at the lower stroke end");
+		near(state.worldConnector("guideBearingB", "axis").z, state.worldConnector("carriage", "bore").z,
+			"second guide bearing is aligned at the lower stroke end");
 		near(state.worldConnector("guideRodA", "input").x, -axis.guideSpacing, "first guide rod offset");
 		near(state.worldConnector("guideBearingA", "axis").x, -axis.guideSpacing, "first bearing follows guide rod");
 		near(state.worldConnector("leadNut", "mountFace").z, state.worldConnector("carriage", "nutMount").z,
@@ -790,6 +803,10 @@ class MachineKitSmoke {
 		near(leftState.joint("coupling"), -2 * Math.PI, "left-hand axis reverses rotation");
 		state.setJoint("carriage-slide", axis.travelMax);
 		state.forwardKinematics();
+		near(state.worldConnector("guideBearingA", "axis").z, state.worldConnector("carriage", "bore").z,
+			"first guide bearing is aligned at the upper stroke end");
+		near(state.worldConnector("guideBearingB", "axis").z, state.worldConnector("carriage", "bore").z,
+			"second guide bearing is aligned at the upper stroke end");
 		var carriageEnd = state.worldConnector("carriage", "bore").z + axis.carriage.length / 2;
 		near(state.worldConnector("pillowB-bearing", "axis").z - depth / 2 - carriageEnd, 30,
 			"carriage stops a margin short of pillow block B");
@@ -829,6 +846,11 @@ class MachineKitSmoke {
 
 		var linearBearing = LinearBearing.metric("LM8UU");
 		check(linearBearing.designation == "LM8UU", "linear bearing designation");
+		near(linearBearing.guideRodDiameter(BearingShaftFit.Slip), 7.99, "linear bearing shaft fit diameter");
+		near(linearBearing.housingSeatDiameter(BearingHousingFit.Slip), 15.0375, "linear bearing housing fit diameter");
+		var linearSeat = linearBearing.housingSeat(10, BearingHousingFit.Interference);
+		near(linearSeat.volume(), Math.PI * Math.pow((15 - 0.015) / 2, 2) * 10, "linear bearing housing seat tool");
+		linearSeat.close();
 		throws(() -> LinearBearing.metric("LM9UU"), 'Unknown linear bearing "LM9UU"');
 		var linearBearingPart = linearBearing.geometry();
 		solid(linearBearingPart, "linear bearing");

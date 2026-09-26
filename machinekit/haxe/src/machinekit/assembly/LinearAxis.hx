@@ -17,10 +17,13 @@ import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import machinekit.motion.LeadScrewThread.LeadScrewHand;
 import machinekit.motion.LinearBearing;
+import machinekit.motion.LinearGuideSystem;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
 import machinekit.standard.DeepGrooveBearing;
+import machinekit.standard.BearingFit.BearingHousingFit;
+import machinekit.standard.BearingFit.BearingShaftFit;
 import machinekit.standard.ClearanceFit;
 import machinekit.structural.FrameAssembly;
 import machinekit.structural.RectTube;
@@ -33,9 +36,11 @@ class Carriage extends MachineComponent {
 	public final length:Float;
 	public final guideSpacing:Float;
 	public final guideSeatDiameter:Float;
+	public final guideSeatFit:BearingHousingFit;
 	public final nut:LeadScrewNut;
 
-	public function new(boreDiameter:Float, width:Float, length:Float, guideSpacing:Float, guideSeatDiameter:Float, nut:LeadScrewNut) {
+	public function new(boreDiameter:Float, width:Float, length:Float, guideSpacing:Float, guideSeatDiameter:Float,
+			nut:LeadScrewNut, guideSeatFit:BearingHousingFit = Slip) {
 		var bore = Dimension.format(boreDiameter), widthText = Dimension.format(width), lengthText = Dimension.format(length);
 		super('CARRIAGE-D$bore-${widthText}x$lengthText-G${Dimension.format(guideSpacing)}-${nut.designation}', 'Lead-screw carriage ${widthText}x${widthText}x$lengthText',
 			"aluminium 6061");
@@ -44,6 +49,7 @@ class Carriage extends MachineComponent {
 		this.length = length;
 		this.guideSpacing = guideSpacing;
 		this.guideSeatDiameter = guideSeatDiameter;
+		this.guideSeatFit = guideSeatFit;
 		this.nut = nut;
 		addConnector("bore", Axis, Solids.axial(0, 0, length / 2));
 		addConnector("nutMount", Face, Solids.axial(0, 0, 0));
@@ -73,8 +79,9 @@ class Carriage extends MachineComponent {
  *
  * Layout along the screw: coupling, pillow block A, end margin, carriage travel, end margin,
  * then pillow block B. The margin clears the nut protruding from the carriage. Pillow block
- * housings, guide rods and the frame rail are fixed roots in the assembly. Their real mounting
- * structure and screw bearing closure remain outside this kinematic preview.
+ * housings, guide rods and the frame rail are fixed roots in the assembly. The `LinearGuideSystem`
+ * keeps the guide bearing catalog row and shaft/seat fit intent with those parts. Their real
+ * mounting structure and screw bearing closure remain outside this kinematic preview.
  */
 class LinearAxis {
 	/** Axial gap between the coupling's end and pillow block A's housing. */
@@ -91,6 +98,7 @@ class LinearAxis {
 	public final guideRodB:SteppedShaft;
 	public final guideBearingA:LinearBearing;
 	public final guideBearingB:LinearBearing;
+	public final guideSystem:LinearGuideSystem;
 	public final guideSpacing:Float;
 	public final bearing:DeepGrooveBearing;
 	public final carriage:Carriage;
@@ -133,12 +141,14 @@ class LinearAxis {
 		if (Math.abs(threadSpec.screwDiameter - screwDiameter) > 1e-9)
 			throw "Linear axis thread diameter must match the screw diameter";
 		nut = new LeadScrewNut(threadSpec);
-		guideBearingA = LinearBearing.metric("LM8UU");
-		guideBearingB = LinearBearing.metric("LM8UU");
+		var guideBearingSpec = LinearBearing.metric("LM8UU");
 		guideSpacing = Math.max(25, screwDiameter * 2.5);
-		var carriageWidth = 2 * (guideSpacing + guideBearingA.outerDiameter / 2 + 5);
-		carriage = new Carriage(screwDiameter, carriageWidth, Math.max(screwDiameter * 6, guideBearingA.length + 4),
-			guideSpacing, guideBearingA.outerDiameter, nut);
+		var guideSeatFit = BearingHousingFit.Slip;
+		var guideSeatDiameter = guideBearingSpec.housingSeatDiameter(guideSeatFit);
+		var carriageWidth = 2 * (guideSpacing + guideSeatDiameter / 2 + 5);
+		var carriageLength = Math.max(screwDiameter * 6, guideBearingSpec.length + 4);
+		carriage = new Carriage(screwDiameter, carriageWidth, carriageLength,
+			guideSpacing, guideSeatDiameter, nut, guideSeatFit);
 		pillowBlockA = new PillowBlock(bearing);
 		pillowBlockB = new PillowBlock(bearing);
 		if (!(margin > Math.max(pillowBlockA.screw.spec.headHeight, nut.bodyLength + nut.flangeThickness)))
@@ -152,8 +162,12 @@ class LinearAxis {
 		length = bearingBPosition + depth / 2;
 		screwStart = motor.connector("shaftTip").frame.z;
 		screw = new LeadScrew(threadSpec, length);
-		guideRodA = new SteppedShaft([{diameter: guideBearingA.boreDiameter, length: length}]);
-		guideRodB = new SteppedShaft([{diameter: guideBearingB.boreDiameter, length: length}]);
+		guideSystem = new LinearGuideSystem("LM8UU", guideSpacing, length, BearingShaftFit.Slip, guideSeatFit);
+		guideSystem.validateCarriage(carriage.width, carriage.length);
+		guideRodA = guideSystem.rodA;
+		guideRodB = guideSystem.rodB;
+		guideBearingA = guideSystem.bearingA;
+		guideBearingB = guideSystem.bearingB;
 		rail = new RectTube(Math.max(20, screwDiameter * 2), Math.max(15, screwDiameter * 1.5), 2);
 		var housing = pillowBlockA.housing;
 		var screwHeadReach = housing.boltSpacing / 2 + pillowBlockA.screw.spec.headDiameter / 2;

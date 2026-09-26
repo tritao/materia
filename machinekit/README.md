@@ -125,8 +125,8 @@ library classes rather than one-off scripts:
   `front`/`axis`/`back` connectors stay reachable as `'<id>-bearing'` for
   mating a shaft through it.
 - `LinearAxis` drives a semantic `LeadScrew` through a `ShaftCoupling` and
-  matching `LeadScrewNut`. Its carriage runs on two round guide rods with `LM8UU` linear
-  bearings. `setTravel(state, millimetres)` couples screw rotation to carriage
+  matching `LeadScrewNut`. Its `LinearGuideSystem` keeps two round guide rods, `LM8UU` linear
+  bearings, and their shaft/housing fit intent together. `setTravel(state, millimetres)` couples screw rotation to carriage
   translation through the nut lead (pitch × starts, with handedness) and enforces the stroke. The carriage slide
   is parented to the fixed motor frame, so the carriage stays oriented while
   the screw rotates. Two `PillowBlock`s support the screw near its ends; a
