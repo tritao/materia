@@ -144,6 +144,8 @@ class RobotWorldTests {
     testMotionGuard();
     testGridPlanning();
     testNavigator();
+    testGoToBlockedTimeout();
+    testDifferentialDrivePlantKinematics();
     testForkMechanisms();
     testPerceptionSafetyPower();
     testLoadSafetyPolicy();
@@ -1591,6 +1593,226 @@ class RobotWorldTests {
     simulation.dispose();
   }
 
+  static function testGoToBlockedTimeout():Void {
+    var robot = new FakeRobot("goto-blocked");
+    robot.positions = [0.0, 0.0];
+    var base = new MobileBase(robot, new DifferentialDrive(0, 1, 0.1, 0.5),
+      new MotionLimits(1.0, 1.0));
+    var localization = new FixedLocalization(new LocalizationState(
+      Int64.ofInt(0), new Pose2(0.5, 0.5), "map", "base",
+      PoseCovariance2.zero(), Good, Int64.ofInt(0), Int64.ofInt(0),
+      "blocked-clock", "host-clock"));
+    var navigation = new Navigation(base, localization);
+    var grid = new OccupancyGrid2(1.0, new Pose2(), 7, 1, "map", OccupancyCell.Free);
+    var costmap = new Costmap2(grid, 0.0, false, 0.0, 0.0);
+    var navigator = new Navigator(navigation, new AStarPlanner(costmap), costmap, 0.1);
+    var goal = new NavigationGoal(grid.cellCenter(6, 0), "map");
+    var blocker = new Obstacle(new Detection("goto-blocker", "obstacle",
+      1.0, grid.cellCenter(3, 0), "map", Int64.ofInt(1), Int64.ofInt(1),
+      Int64.ofInt(1), "blocked-clock", "host-clock"), 0.1);
+    var blocked = new PerceptionSnapshot([], [blocker]);
+    var clear = new PerceptionSnapshot();
+    var perception = blocked;
+    var observation = robot.snapshot();
+    function isBlocked():Bool
+      return switch navigator.status { case NavigatorStatus.Blocked(_): true; case _: false; };
+
+    var sustained = new GoTo(navigator, goal, function(_) return perception, 0.35);
+    throws(function() new GoTo(navigator, goal, function(_) return perception, -1.0),
+      "GoTo rejects a negative blocked timeout");
+    sustained.start();
+    for (_ in 0...3) sustained.update(observation, 0.1);
+    check(sustained.status() == SkillStatus.Running && isBlocked() &&
+      navigator.replanCount >= 2,
+      "GoTo keeps running while the Navigator retries within its blocked timeout");
+    sustained.update(observation, 0.1);
+    var sustainedMessage = switch sustained.status() {
+      case Failed(message): message;
+      case _: "";
+    };
+    check(sustainedMessage.indexOf("GoTo remained blocked beyond its timeout") == 0 &&
+      sustainedMessage.length > "GoTo remained blocked beyond its timeout: ".length &&
+      navigator.status == NavigatorStatus.Cancelled &&
+      switch robot.lastStop { case Normal: true; case _: false; },
+      'GoTo fails with the blocked reason and stops the Navigator after sustained blocking ($sustainedMessage)');
+
+    perception = blocked;
+    var recovering = new GoTo(navigator, goal, function(_) return perception, 0.35);
+    recovering.start();
+    recovering.update(observation, 0.1);
+    recovering.update(observation, 0.1);
+    check(recovering.status() == SkillStatus.Running && isBlocked(),
+      "GoTo starts a second blocked interval");
+    perception = clear;
+    recovering.update(observation, 0.1);
+    check(recovering.status() == SkillStatus.Running &&
+      navigator.status == NavigatorStatus.Navigating,
+      "GoTo resumes when the Navigator finds a clear route");
+    perception = blocked;
+    for (_ in 0...3) recovering.update(observation, 0.1);
+    check(recovering.status() == SkillStatus.Running && isBlocked(),
+      "GoTo restarts its blocked timeout after navigation resumes");
+    recovering.cancel();
+    check(recovering.status() == SkillStatus.Cancelled &&
+      navigator.status == NavigatorStatus.Cancelled,
+      "GoTo cancels a blocked navigation cleanly");
+  }
+
+  static function testDifferentialDrivePlantKinematics():Void {
+    var model = new RobotModel("plant-kinematics");
+    var baseLink = model.addLink(new Link("base", "link/base"));
+    var leftLink = model.addLink(new Link("left wheel", "link/left-wheel"));
+    var rightLink = model.addLink(new Link("right wheel", "link/right-wheel"));
+    var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink,
+      "joint/left-wheel");
+    left.limits = new JointLimits(-1000.0, 1000.0, 10.0, 100.0);
+    model.addJoint(left);
+    var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink,
+      "joint/right-wheel");
+    right.limits = new JointLimits(-1000.0, 1000.0, 10.0, 100.0);
+    model.addJoint(right);
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
+        0.1, 0.5), 0.8, 1.5, 100.0, 100.0);
+    var imu = model.addSensor(new Sensor("base imu", "imu", 0.0, "sensor/imu"));
+    imu.frame = model.addFrame(new Frame("imu mount", baseLink, "frame/imu"));
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var simulation = new Simulation(0.02);
+    var robot = new SimulatedRobot("plant-kinematics", simulation.addRobot(blueprint),
+      model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+    var base = MobileBase.fromBlueprint(robot, blueprint);
+    var startYaw = 0.5;
+    simulation.teleportRobot(0, [1.0, 2.0, 0.3],
+      [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
+    var plant = new DifferentialDrivePlant(simulation, 0, base);
+    check(Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9 &&
+      Math.abs(plant.pose.yaw - startYaw) < 1e-9 && Math.abs(plant.baseHeight - 0.3) < 1e-9,
+      "DifferentialDrivePlant starts from the simulated base pose and authored height");
+    var tick = 1;
+    function imuFrame(snapshot:RobotSnapshot):Null<SensorFrame> {
+      for (index in 0...snapshot.sensors.length)
+        if (snapshot.sensors.get(index).sensorId == "sensor/imu")
+          return snapshot.sensors.get(index);
+      return null; // Unpublished while the derivative is priming.
+    }
+    function imuSequence(snapshot:RobotSnapshot):Int64 {
+      var frame = imuFrame(snapshot);
+      return frame == null ? Int64.ofInt(0) : frame.sequence;
+    }
+    function imuValue(snapshot:RobotSnapshot, index:Int):Float {
+      var frame = imuFrame(snapshot);
+      if (frame == null) throw "IMU sample was not published";
+      return frame.values.get(index);
+    }
+    // Straight line: 0.5 m/s is 5 rad/s on each 0.1 m wheel, so ten 0.02 s
+    // ticks roll 0.1 m along the heading.
+    base.command(new Twist2(0.5, 0.0));
+    var firstImu = imuSequence(plant.step(Int64.ofInt(tick++)));
+    var snapshot = plant.step(Int64.ofInt(tick++));
+    for (_ in 0...8) snapshot = plant.step(Int64.ofInt(tick++));
+    check(Math.abs(plant.pose.x - (1.0 + 0.1 * Math.cos(startYaw))) < 1e-9 &&
+      Math.abs(plant.pose.y - (2.0 + 0.1 * Math.sin(startYaw))) < 1e-9 &&
+      Math.abs(plant.pose.yaw - startYaw) < 1e-9,
+      "DifferentialDrivePlant rolls equal wheel rates straight along the heading for v*dt per tick");
+    var physics = simulation.robotPose(0);
+    check(Math.abs(physics.position[0] - plant.pose.x) < 1e-6 &&
+      Math.abs(physics.position[1] - plant.pose.y) < 1e-6 &&
+      Math.abs(physics.position[2] - 0.3) < 1e-6,
+      "DifferentialDrivePlant drives the physics base and preserves its authored height");
+    check(Int64.compare(imuSequence(snapshot), Int64.add(firstImu, Int64.ofInt(9))) == 0,
+      "IMU keeps publishing every tick while the plant drives the base");
+    check(Math.abs(imuValue(snapshot, 2)) < 1e-4 && Math.abs(imuValue(snapshot, 3)) < 1e-2 &&
+      Math.abs(imuValue(snapshot, 4)) < 1e-2 && Math.abs(imuValue(snapshot, 5) - 9.81) < 1e-6,
+      "IMU measures a straight constant-speed run as no rotation and no acceleration");
+
+    // Turn sign: a positive yaw rate spins the right wheel forward and turns
+    // counter-clockwise at (vr - vl) / track.
+    base.command(new Twist2(0.0, 1.0));
+    var turnStart = plant.pose;
+    for (_ in 0...10) snapshot = plant.step(Int64.ofInt(tick++));
+    check(Math.abs(Pose2.wrapAngle(plant.pose.yaw - turnStart.yaw) - 0.2) < 1e-9 &&
+      Math.abs(plant.pose.x - turnStart.x) < 1e-9 && Math.abs(plant.pose.y - turnStart.y) < 1e-9,
+      "DifferentialDrivePlant turns in place counter-clockwise at (vr-vl)/track");
+    check(Math.abs(imuValue(snapshot, 2) - 1.0) < 1e-3 &&
+      Math.abs(imuValue(snapshot, 0)) < 1e-4 && Math.abs(imuValue(snapshot, 1)) < 1e-4 &&
+      Math.abs(imuValue(snapshot, 3)) < 1e-2 && Math.abs(imuValue(snapshot, 4)) < 1e-2,
+      "IMU gyro reads the in-place turn rate with no linear acceleration");
+
+    // An arc at 0.5 m/s and 1 rad/s pulls the IMU 0.5 m/s^2 to the left.
+    base.command(new Twist2(0.5, 1.0));
+    for (_ in 0...5) snapshot = plant.step(Int64.ofInt(tick++));
+    check(Math.abs(imuValue(snapshot, 2) - 1.0) < 1e-3 &&
+      Math.abs(imuValue(snapshot, 3)) < 2e-2 && Math.abs(imuValue(snapshot, 4) - 0.5) < 2e-2,
+      "IMU measures the arc's yaw rate and centripetal acceleration");
+
+    // 0.8 m/s with 1.5 rad/s asks 11.75 rad/s of the right wheel; the runtime
+    // saturates that wheel alone at its 10 rad/s limit and the plant rolls by
+    // the applied rates.
+    base.command(new Twist2(0.8, 1.5));
+    var saturatedStart = plant.pose;
+    plant.step(Int64.ofInt(tick++));
+    var expectedSaturated = saturatedStart.integrateDisplacement(
+      (4.25 + 10.0) * 0.1 * 0.02 * 0.5, (10.0 - 4.25) * 0.1 * 0.02 / 0.5);
+    check(Math.abs(plant.pose.x - expectedSaturated.x) < 1e-9 &&
+      Math.abs(plant.pose.y - expectedSaturated.y) < 1e-9 &&
+      Math.abs(plant.pose.yaw - expectedSaturated.yaw) < 1e-9 &&
+      plant.appliedWheelRates().right == 10.0,
+      "DifferentialDrivePlant rolls by the runtime's rate-limited wheel targets");
+
+    // Wheel targets submitted straight to the robot, bypassing MobileBase,
+    // drive the chassis on the tick they are applied.
+    base.stop();
+    plant.step(Int64.ofInt(tick++));
+    var directStart = plant.pose;
+    robot.submit(RobotCommand.JointTargets([
+      robotkit.world.JointTarget.velocity(0, 3.0),
+      robotkit.world.JointTarget.velocity(1, 3.0)
+    ], null));
+    plant.step(Int64.ofInt(tick++));
+    var directExpected = directStart.integrateDisplacement(3.0 * 0.1 * 0.02, 0.0);
+    check(base.currentCommand().linear == 0.0 &&
+      Math.abs(plant.pose.x - directExpected.x) < 1e-9 &&
+      Math.abs(plant.pose.y - directExpected.y) < 1e-9,
+      "DifferentialDrivePlant moves with wheel targets submitted directly to the robot");
+
+    // A stop issued directly on the robot halts the chassis on the tick the
+    // runtime applies it, even though MobileBase still caches its last command.
+    base.command(new Twist2(0.5, 0.0));
+    plant.step(Int64.ofInt(tick++));
+    robot.stop(StopMode.Emergency);
+    var stopped = plant.pose;
+    for (_ in 0...4) plant.step(Int64.ofInt(tick++));
+    check(base.currentCommand().linear > 0.0 &&
+      Math.abs(plant.pose.x - stopped.x) < 1e-12 && Math.abs(plant.pose.y - stopped.y) < 1e-12,
+      "DifferentialDrivePlant does not move a robot under a direct emergency stop");
+    robot.resetSafety();
+    for (_ in 0...3) plant.step(Int64.ofInt(tick++));
+    check(Math.abs(plant.pose.x - stopped.x) < 1e-12 && Math.abs(plant.pose.y - stopped.y) < 1e-12,
+      "DifferentialDrivePlant ignores the stale cached command after a safety reset");
+    base.command(new Twist2(0.5, 0.0));
+    for (_ in 0...3) plant.step(Int64.ofInt(tick++));
+    check(Math.abs(plant.pose.x - stopped.x) > 1e-3,
+      "DifferentialDrivePlant moves again after a new command");
+    robot.stop(StopMode.Normal);
+    var normalStopped = plant.pose;
+    for (_ in 0...4) snapshot = plant.step(Int64.ofInt(tick++));
+    check(base.currentCommand().linear > 0.0 &&
+      Math.abs(plant.pose.x - normalStopped.x) < 1e-12 &&
+      Math.abs(plant.pose.y - normalStopped.y) < 1e-12 &&
+      snapshot.velocities.get(0) == 0.0 && snapshot.velocities.get(1) == 0.0,
+      "DifferentialDrivePlant and the wheels stop during a direct normal stop");
+
+    // Driving never replaces the reset pose chosen by the editable-scene teleport.
+    simulation.resetRobot(0);
+    simulation.step(Int64.ofInt(tick++));
+    var reset = simulation.robotPose(0);
+    check(Math.abs(reset.position[0] - 1.0) < 1e-6 && Math.abs(reset.position[1] - 2.0) < 1e-6 &&
+      Math.abs(reset.position[2] - 0.3) < 1e-6,
+      "resetRobot restores the authored base pose after the plant drove it");
+    robot.close();
+    simulation.dispose();
+  }
+
   static function testForkMechanisms():Void {
     var robot = new FakeRobot("fork-test");
     robot.jointNames = ["mast-lift", "fork-tilt", "fork-spread"];
@@ -2156,20 +2378,47 @@ class RobotWorldTests {
       skillRunner.activeSkill() == null && skillRunner.result() != null,
       "SkillRunner cancels its active skill and records a terminal result");
 
-    var dockPose = new Pose2(liveEstimateValue.pose.x + 0.02,
-      liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
+    // Every approach below is far outside its goal tolerance, so each skill must
+    // plan and drive the forklift before it can complete.
+    var liveTick = ticks + 1;
+    function nextLiveTimestamp():Int64
+      return Int64.fromFloat((liveTick++) * 10000000.0);
+    function liveApproachReached():Bool return liveNavigator.status == NavigatorStatus.Succeeded;
+    function runLive(initial:SkillStatus, update:RobotSnapshot -> SkillStatus,
+        until:Void -> Bool):SkillStatus {
+      var status = initial;
+      var count = 0;
+      while (status == SkillStatus.Running && !until() && count < 3000) {
+        status = update(simulatedRobot.snapshot());
+        if (status == SkillStatus.Running && !until()) simulation.step(nextLiveTimestamp());
+        count++;
+      }
+      return status;
+    }
+    function livePose():Pose2 {
+      var estimate:robotkit.localization.LocalizationState = cast localization.state();
+      return estimate.pose;
+    }
+    function distance(a:Pose2, b:Pose2):Float
+      return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+
+    var dockStart = livePose();
+    var dockPose = new Pose2(dockStart.x + 0.3, dockStart.y, dockStart.yaw);
     var dockDetection = new Detection("charger-dock", "dock", 0.95, dockPose,
       "odom", liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
       liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
     var dock = new Dock(liveNavigator, new DockingTarget(dockDetection, dockPose),
       observeLive);
-    skillRunner.start(dock);
-    var dockStatus = skillRunner.update(liveSnapshot, 0.01);
-    check(switch dockStatus { case Succeeded: true; case _: false; } &&
-      skillRunner.activeSkill() == null,
-      "SkillRunner runs Dock through the same robot-local lifecycle");
-    var pickPose = new Pose2(liveEstimateValue.pose.x + 0.02,
-      liveEstimateValue.pose.y, liveEstimateValue.pose.yaw);
+    var dockStatus = runLive(skillRunner.start(dock),
+      function(snapshot) return skillRunner.update(snapshot, 0.01), function() return false);
+    var dockEnd = livePose();
+    check(dockStatus == SkillStatus.Succeeded && skillRunner.activeSkill() == null &&
+      distance(dockEnd, dockStart) > 0.2 && distance(dockEnd, dockPose) <= 0.06,
+      'SkillRunner runs Dock and drives the forklift to its approach (status ${Std.string(dockStatus)}, pose ${dockEnd.x},${dockEnd.y})');
+
+    var pickStart = livePose();
+    var pickPose = new Pose2(pickStart.x + 0.3, pickStart.y, pickStart.yaw);
+    liveSnapshot = simulatedRobot.snapshot();
     var palletDetection = new Detection("pallet-17", "pallet", 0.98,
       new Pose2(pickPose.x + 0.5, pickPose.y, pickPose.yaw), "odom",
       liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
@@ -2179,18 +2428,20 @@ class RobotWorldTests {
     var pick = new PickPallet(liveNavigator, observeLive, forks, pallet, payload,
       pickPose, 0.5, 0.1, 0.45, 0.05, 0.1);
     pick.start();
-    var pickStatus = pick.update(liveSnapshot, 0.01);
-    check(switch pickStatus { case Running: true; case _: false; } &&
-      forks.loadState.payload == payload && !forks.loadState.secured,
-      "PickPallet approaches and commands its simulated fork mechanism");
-    simulation.step(Int64.ofInt((ticks + 1) * 10000000));
-    liveSnapshot = simulatedRobot.snapshot();
+    var pickStatus = runLive(pick.status(),
+      function(snapshot) return pick.update(snapshot, 0.01), liveApproachReached);
+    var pickEnd = livePose();
+    check(pickStatus == SkillStatus.Running && forks.loadState.payload == payload &&
+      !forks.loadState.secured && distance(pickEnd, pickStart) > 0.2 &&
+      distance(pickEnd, pickPose) <= 0.06,
+      "PickPallet drives to its approach and then commands its simulated fork mechanism");
+    simulation.step(nextLiveTimestamp());
     var forkObservation = forks.state();
     check(Math.abs(forkObservation.lift.position - 0.5) < 1e-9 &&
       Math.abs(cast(forkObservation.tilt, robotkit.material.ForkAxisState).position - 0.1) < 1e-9,
       "simulated runtime applies the fork position batch");
     forks.setLoadState(LoadState.carried(payload));
-    pickStatus = pick.update(liveSnapshot, 0.01);
+    pickStatus = pick.update(simulatedRobot.snapshot(), 0.01);
     check(switch pickStatus { case Succeeded: true; case _: false; } && pick.result() != null,
       "PickPallet completes only after secured-load confirmation");
 
@@ -2208,32 +2459,33 @@ class RobotWorldTests {
       var observation = simulatedRobot.snapshot();
       travelStatus = travel.update(observation, 0.01);
       if (switch travelStatus { case Running: true; case _: false; })
-        simulation.step(Int64.ofInt((ticks + travelTicks + 2) * 10000000));
+        simulation.step(nextLiveTimestamp());
       travelTicks++;
     }
     check(switch travelStatus { case Succeeded: true; case _: false; } && travelTicks < 300,
       "FollowPath drives the loaded forklift to a second location");
-    liveSnapshot = simulatedRobot.snapshot();
 
-    var placePose = new Pose2(travelPose.x + 0.02, travelPose.y, travelPose.yaw);
+    var placeStart = livePose();
+    var placePose = new Pose2(placeStart.x + 0.3, placeStart.y, placeStart.yaw);
     var place = new PlacePallet(liveNavigator, observeLive, forks, payload,
       placePose, 0.0, 0.0, 0.35);
     place.start();
-    var placeStatus = place.update(liveSnapshot, 0.01);
+    var placeStatus = runLive(place.status(),
+      function(snapshot) return place.update(snapshot, 0.01), liveApproachReached);
+    var placeEnd = livePose();
     check(switch placeStatus { case Running: true; case _: false; } &&
-      forks.loadState.secured && forks.loadState.payload == payload,
-      "PlacePallet commands the forks and waits for release confirmation");
-    simulation.step(Int64.ofInt((ticks + travelTicks + 2) * 10000000));
-    liveSnapshot = simulatedRobot.snapshot();
+      forks.loadState.secured && forks.loadState.payload == payload &&
+      distance(placeEnd, placeStart) > 0.2 && distance(placeEnd, placePose) <= 0.09,
+      "PlacePallet drives to its drop pose, commands the forks, and waits for release");
+    simulation.step(nextLiveTimestamp());
     forks.setLoadState(LoadState.empty());
-    placeStatus = place.update(liveSnapshot, 0.01);
+    placeStatus = place.update(simulatedRobot.snapshot(), 0.01);
     check(switch placeStatus { case Succeeded: true; case _: false; },
       "PlacePallet completes only after empty-load confirmation");
 
-    var chargeEstimate = localization.state();
-    var chargeEstimateValue:robotkit.localization.LocalizationState = cast chargeEstimate;
-    var chargePose = new Pose2(chargeEstimateValue.pose.x + 0.01,
-      chargeEstimateValue.pose.y, chargeEstimateValue.pose.yaw);
+    var chargeStart = livePose();
+    var chargePose = new Pose2(chargeStart.x + 0.3, chargeStart.y, chargeStart.yaw);
+    liveSnapshot = simulatedRobot.snapshot();
     var chargeDetection = new Detection("charger-1", "charger", 0.95, chargePose,
       "odom", liveSnapshot.sourceSequence, liveSnapshot.sourceTimestampNs,
       liveSnapshot.receivedTimestampNs, liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
@@ -2244,9 +2496,14 @@ class RobotWorldTests {
     var charge = new Charge(liveNavigator,
       new DockingTarget(chargeDetection, chargePose), livePower, 0.8, observeLive);
     charge.start();
-    var chargeStatus = charge.update(liveSnapshot, 0.01);
-    check(switch chargeStatus { case Running: true; case _: false; },
-      "Charge docks and waits while the battery is below its target");
+    var chargeStatus = runLive(charge.status(),
+      function(snapshot) return charge.update(snapshot, 0.01), liveApproachReached);
+    var chargeEnd = livePose();
+    check(chargeStatus == SkillStatus.Running &&
+      charge.dock.status() == SkillStatus.Succeeded &&
+      distance(chargeEnd, chargeStart) > 0.2 && distance(chargeEnd, chargePose) <= 0.06,
+      "Charge docks at the charger and then waits while the battery is below its target");
+    liveSnapshot = simulatedRobot.snapshot();
     livePower.battery = new BatteryState("traction-pack", 0.85, 48.0, -4.0, 25.0,
       liveSnapshot.sourceTimestampNs, liveSnapshot.receivedTimestampNs,
       liveSnapshot.sourceClockId, liveSnapshot.receivedClockId);
@@ -2316,25 +2573,42 @@ class RobotWorldTests {
     check(switch replayStatus { case Succeeded: true; case _: false; } &&
       replaySkillRunner.activeSkill() == null && replaySkillRunner.result() != null,
       "SkillRunner completes FollowPath against the recorded ReplayRobot observations");
+    function replayApproachReached():Bool
+      return replayNavigator.status == NavigatorStatus.Succeeded;
+    // Mirrors runLive: one update per distinct recorded observation.
+    function runReplay(initial:SkillStatus, update:RobotSnapshot -> SkillStatus,
+        until:Void -> Bool):SkillStatus {
+      var status = initial;
+      if (status == SkillStatus.Running && !until()) status = update(replay.snapshot());
+      while (status == SkillStatus.Running && !until() && advanceReplaySample(replay))
+        status = update(replay.snapshot());
+      return status;
+    }
+    function replayPose():Pose2 {
+      var estimate:robotkit.localization.LocalizationState = cast replayLocalization.state();
+      return estimate.pose;
+    }
     var replaySnapshot = replay.snapshot();
-    var replayEstimate = replayLocalization.state();
-    var replayEstimateValue:robotkit.localization.LocalizationState = cast replayEstimate;
-    var replayDockPose = new Pose2(replayEstimateValue.pose.x + 0.02,
-      replayEstimateValue.pose.y, replayEstimateValue.pose.yaw);
+    var replayDockStart = replayPose();
+    var replayDockPose = new Pose2(replayDockStart.x + 0.3,
+      replayDockStart.y, replayDockStart.yaw);
     var replayDockDetection = new Detection("charger-dock", "dock", 0.95, replayDockPose,
       "odom", replaySnapshot.sourceSequence, replaySnapshot.sourceTimestampNs,
       replaySnapshot.receivedTimestampNs, replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
     var replayDock = new Dock(replayNavigator,
       new DockingTarget(replayDockDetection, replayDockPose), observeReplay);
-    replaySkillRunner.start(replayDock);
-    check(switch replaySkillRunner.update(replaySnapshot, 0.01) {
-      case Succeeded: true;
-      case _: false;
-    } && replaySkillRunner.activeSkill() == null,
-      "SkillRunner starts another skill after replayed FollowPath completes");
+    var replayDockStatus = runReplay(replaySkillRunner.start(replayDock),
+      function(snapshot) return replaySkillRunner.update(snapshot, 0.01),
+      function() return false);
+    check(replayDockStatus == SkillStatus.Succeeded &&
+      replaySkillRunner.activeSkill() == null &&
+      distance(replayPose(), dockEnd) < 1e-9,
+      "SkillRunner reproduces the recorded Dock approach through ReplayRobot");
     var replayForks = Forks.fromBlueprint(replay, blueprint);
-    var replayPickPose = new Pose2(replayEstimateValue.pose.x + 0.02,
-      replayEstimateValue.pose.y, replayEstimateValue.pose.yaw);
+    var replayPickStart = replayPose();
+    var replayPickPose = new Pose2(replayPickStart.x + 0.3,
+      replayPickStart.y, replayPickStart.yaw);
+    replaySnapshot = replay.snapshot();
     var replayPallet = new Pallet(new Detection("pallet-17", "pallet", 0.98,
       new Pose2(replayPickPose.x + 0.5, replayPickPose.y, replayPickPose.yaw), "odom",
       replaySnapshot.sourceSequence, replaySnapshot.sourceTimestampNs,
@@ -2343,17 +2617,18 @@ class RobotWorldTests {
     var replayPick = new PickPallet(replayNavigator, observeReplay, replayForks,
       replayPallet, payload, replayPickPose, 0.5, 0.1, 0.45, 0.05, 0.1);
     replayPick.start();
-    replayPick.update(replaySnapshot, 0.01);
+    var replayPickStatus = runReplay(replayPick.status(),
+      function(snapshot) return replayPick.update(snapshot, 0.01), replayApproachReached);
+    check(replayPickStatus == SkillStatus.Running &&
+      replayForks.loadState.payload == payload && distance(replayPose(), pickEnd) < 1e-9,
+      "PickPallet reproduces the recorded approach before commanding the forks");
+    check(advanceReplaySample(replay),
+      "replay consumes the recorded fork-actuation tick");
     replayForks.setLoadState(LoadState.carried(payload));
-    check(switch replayPick.update(replaySnapshot, 0.01) {
+    check(switch replayPick.update(replay.snapshot(), 0.01) {
       case Succeeded: true;
       case _: false;
     }, "PickPallet confirms the same load during replay");
-
-    check(replay.advance() && replay.advance() && replay.advance(),
-      "replay consumes the duplicated goal samples and the recorded fork-actuation tick");
-    replaySnapshot = replay.snapshot();
-    replayLocalization.update(replaySnapshot);
 
     var replayTravelStart = replayLocalization.state();
     var replayTravelStartValue:robotkit.localization.LocalizationState = cast replayTravelStart;
@@ -2372,25 +2647,29 @@ class RobotWorldTests {
     }
     check(switch replayTravelStatus { case Succeeded: true; case _: false; },
       "FollowPath reaches the second recorded location through ReplayRobot");
-    replaySnapshot = replay.snapshot();
-    var replayPlacePose = new Pose2(placePose.x, placePose.y, placePose.yaw);
+    var replayPlaceStart = replayPose();
+    var replayPlacePose = new Pose2(replayPlaceStart.x + 0.3,
+      replayPlaceStart.y, replayPlaceStart.yaw);
     var replayPlace = new PlacePallet(replayNavigator, observeReplay, replayForks,
       payload, replayPlacePose, 0.0, 0.0, 0.35);
     replayPlace.start();
-    var replayPlaceStatus = replayPlace.update(replaySnapshot, 0.01);
+    var replayPlaceStatus = runReplay(replayPlace.status(),
+      function(snapshot) return replayPlace.update(snapshot, 0.01), replayApproachReached);
     check(switch replayPlaceStatus { case Running: true; case _: false; } &&
-      replayForks.loadState.secured,
-      "PlacePallet replays the same fork command and awaits release");
+      replayForks.loadState.secured && distance(replayPose(), placeEnd) < 1e-9,
+      "PlacePallet replays the same approach and fork command and awaits release");
+    check(advanceReplaySample(replay),
+      "replay consumes the recorded fork-release tick");
     replayForks.setLoadState(LoadState.empty());
-    check(switch replayPlace.update(replaySnapshot, 0.01) {
+    check(switch replayPlace.update(replay.snapshot(), 0.01) {
       case Succeeded: true;
       case _: false;
     }, "PlacePallet confirms release during replay");
 
-    var replayChargeEstimate = replayLocalization.state();
-    var replayChargeEstimateValue:robotkit.localization.LocalizationState = cast replayChargeEstimate;
-    var replayChargePose = new Pose2(replayChargeEstimateValue.pose.x + 0.01,
-      replayChargeEstimateValue.pose.y, replayChargeEstimateValue.pose.yaw);
+    var replayChargeStart = replayPose();
+    var replayChargePose = new Pose2(replayChargeStart.x + 0.3,
+      replayChargeStart.y, replayChargeStart.yaw);
+    replaySnapshot = replay.snapshot();
     var replayChargeDetection = new Detection("charger-1", "charger", 0.95,
       replayChargePose, "odom", replaySnapshot.sourceSequence,
       replaySnapshot.sourceTimestampNs, replaySnapshot.receivedTimestampNs,
@@ -2403,10 +2682,13 @@ class RobotWorldTests {
       new DockingTarget(replayChargeDetection, replayChargePose), replayPower, 0.8,
       observeReplay);
     replayCharge.start();
-    check(switch replayCharge.update(replaySnapshot, 0.01) {
-      case Running: true;
-      case _: false;
-    }, "Charge waits for recorded robot to reach the battery target");
+    var replayChargeStatus = runReplay(replayCharge.status(),
+      function(snapshot) return replayCharge.update(snapshot, 0.01), replayApproachReached);
+    check(replayChargeStatus == SkillStatus.Running &&
+      replayCharge.dock.status() == SkillStatus.Succeeded &&
+      distance(replayPose(), chargeEnd) < 1e-9,
+      "Charge reproduces the recorded docking and waits for the battery target");
+    replaySnapshot = replay.snapshot();
     replayPower.battery = new BatteryState("traction-pack", 0.85, 48.0, -4.0, 25.0,
       replaySnapshot.sourceTimestampNs, replaySnapshot.receivedTimestampNs,
       replaySnapshot.sourceClockId, replaySnapshot.receivedClockId);
@@ -2415,10 +2697,14 @@ class RobotWorldTests {
       case _: false;
     }, "Charge completes deterministically against ReplayRobot");
     var generated = replay.generatedCommands.commands;
-    check(generated.length >= 3 && switch generated[generated.length - 1] {
-      case JointTargets(targets, _): targets.length == 3 && targets[0].joint == 2;
-      case _: false;
-    }, "ReplayRobot captures pick and place fork commands without altering source history");
+    var generatedForkBatches = 0;
+    for (command in generated) switch command {
+      case JointTargets(targets, _):
+        if (targets.length == 3 && targets[0].joint == 2) generatedForkBatches++;
+      case _:
+    }
+    check(generated.length >= 3 && generatedForkBatches == 2,
+      "ReplayRobot captures pick and place fork commands without altering source history");
     var forkliftCommandsMatch = generated.length == recording.commands.length;
     var firstMismatch = -1;
     for (commandIndex in 0...recording.commands.length) {

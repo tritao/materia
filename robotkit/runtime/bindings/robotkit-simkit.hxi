@@ -25,6 +25,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_capture_presentation(simulation: rk_simulation, out_presentation: ptr<rk_simulation_presentation> @out @owned) -> rk_result;
 	/**
+	 * Removes a robot's differential-drive coupling; its base stays where it is.
+	 */
+	extern fn rk_simulation_clear_differential_drive(simulation: rk_simulation, robot_index: u32) -> rk_result;
+	/**
 	 * Creates one shared simulated universe and its fixed-step clock.
 	 *
 	 * The returned handle owns the SceneKit scene, SimKit world, physics host,
@@ -45,6 +49,23 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_destroy(simulation: rk_simulation) -> void;
 	/**
+	 * Drives one attached robot's kinematic base to a pose for the next tick.
+	 *
+	 * Unlike rk_simulation_teleport_robot(), this is accepted while the shared
+	 * clock is running or stepped externally: it does not stop the owner, reset
+	 * sensors, or change the pose restored by reset. The pose becomes the base
+	 * body's physics state by the end of the next completed tick, and the base's
+	 * velocity over that tick is the motion from its previous pose, so derivative
+	 * sensors such as the IMU measure consecutive drives as continuous motion. Use
+	 * rk_simulation_place_robot_base() for a jump that must not read as motion.
+	 *
+	 * @param simulation Shared simulation owner.
+	 * @param robot_index Index of the robot in attachment order.
+	 * @param pose Target base pose with a unit quaternion rotation.
+	 * @return RK_OK, or an invalid-argument/invalid-state/backend error.
+	 */
+	extern fn rk_simulation_drive_robot_base(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
+	/**
 	 * Reads the shared simulation clock.
 	 *
 	 * The values are synchronized with completed ticks. This function reports
@@ -52,6 +73,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * timestamp supplied by the caller.
 	 */
 	extern fn rk_simulation_get_clock(simulation: rk_simulation, out_clock: ptr<rk_simulation_clock> @inout) -> rk_result;
+	/**
+	 * Reads one robot's differential-drive plant state.
+	 */
+	extern fn rk_simulation_get_differential_drive_state(simulation: rk_simulation, robot_index: u32, out_state: ptr<rk_simulation_differential_drive_state> @inout) -> rk_result;
 	/**
 	 * Reads one robot link pose from the latest physics state.
 	 */
@@ -64,6 +89,22 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Reads one robot base pose from the latest physics state.
 	 */
 	extern fn rk_simulation_get_robot_pose(simulation: rk_simulation, robot_index: u32, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
+	/**
+	 * Jumps one attached robot's base to a pose for the next tick.
+	 *
+	 * Like rk_simulation_drive_robot_base(), this is accepted while the shared
+	 * clock is running or stepped externally, and it does not reset sensors or
+	 * change the pose restored by reset. Unlike a drive, the jump is a teleport:
+	 * the base keeps its body-frame velocity through it instead of the pose change
+	 * reading as motion, so derivative sensors such as the IMU see no spike. A
+	 * differential-drive plant continues from the new pose.
+	 *
+	 * @param simulation Shared simulation owner.
+	 * @param robot_index Index of the robot in attachment order.
+	 * @param pose Target base pose with a unit quaternion rotation.
+	 * @return RK_OK, or an invalid-argument/backend error.
+	 */
+	extern fn rk_simulation_place_robot_base(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
 	/**
 	 * Destroys a captured presentation snapshot.
 	 */
@@ -88,6 +129,24 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Restores one attached robot's bodies and clears its runtime state.
 	 */
 	extern fn rk_simulation_reset_robot(simulation: rk_simulation, robot_index: u32) -> rk_result;
+	/**
+	 * Couples one robot's wheel velocity targets to its kinematic base.
+	 *
+	 * Every tick, after the robot applies its commands and before physics
+	 * advances, the base rolls along a constant-curvature arc by the wheel targets
+	 * the robot applied for that tick (rate-clamped by the runtime, zero after a
+	 * normal or emergency stop). The plant starts from the base's current pose,
+	 * keeps its height, and treats the base as upright. Whatever submits the
+	 * targets, the base follows with no added latency. Replaces any previous
+	 * coupling for the robot; accepted while running.
+	 *
+	 * @param simulation Shared simulation owner.
+	 * @param robot_index Index of the robot in attachment order.
+	 * @param desc Wheel joints and geometry.
+	 * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed or
+	 * missing wheel joint, identical wheels, or non-positive geometry.
+	 */
+	extern fn rk_simulation_set_differential_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_differential_drive_desc>>) -> rk_result;
 	/**
 	 * Adds one environment body from the editable scene while stopped.
 	 */
@@ -159,6 +218,45 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		 */
 		backend: u32 @offset(20);
 		reserved: array<u64, 4> @offset(24);
+	}
+	/**
+	 * Ideal rolling differential-drive coupling for one robot's kinematic base.
+	 *
+	 * The wheel joints are robot joint indices of actuated wheel joints. Lengths
+	 * are metres and must be positive; track_width is the distance between the
+	 * wheel contact points.
+	 */
+	struct rk_simulation_differential_drive_desc @layout(48, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		left_wheel_joint: u32 @offset(4);
+		right_wheel_joint: u32 @offset(8);
+		reserved0: u32 @offset(12);
+		wheel_radius: f64 @offset(16);
+		track_width: f64 @offset(24);
+		reserved: array<u64, 2> @offset(32);
+	}
+	/**
+	 * Differential-drive plant state after the latest completed tick.
+	 *
+	 * x, y, and height are the planar base pose written to the kinematic base in
+	 * metres; yaw is its heading in radians, unwrapped so it stays continuous
+	 * across turns. The wheel rates are the velocity targets, in rad/s, the robot
+	 * applied for that tick after runtime clamping: zero after a stop, a reset, or
+	 * while a wheel is idle or held by a non-velocity target.
+	 */
+	struct rk_simulation_differential_drive_state @layout(72, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < Nonzero while the coupling is active.
+		 */
+		enabled: u32 @offset(4);
+		x: f64 @offset(8);
+		y: f64 @offset(16);
+		yaw: f64 @offset(24);
+		height: f64 @offset(32);
+		left_wheel_rate: f64 @offset(40);
+		right_wheel_rate: f64 @offset(48);
+		reserved: array<u64, 2> @offset(56);
 	}
 	/**
 	 * Editable-scene description for one simulation-owned environment object.

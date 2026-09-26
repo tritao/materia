@@ -364,6 +364,356 @@ void sensor_geometry_and_reset() {
     }
 }
 
+void driving_base_keeps_owner_sensors_and_reset_pose() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    rk_simulation simulation = RK_INVALID_SIMULATION;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    const auto model = blueprint(1);
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    pose.rotation[3] = 1.0;
+    rk_simulation_pose observed{};
+    observed.struct_size = sizeof(observed);
+
+    assert(rk_simulation_step(simulation, 100) == RK_OK);
+    assert(rk_simulation_step(simulation, 200) == RK_OK);
+    assert(snapshot(robot).sensors[1].sequence == 1);
+    // Driving between external steps keeps the derivative history: the IMU
+    // publishes on every tick instead of re-priming after each pose update.
+    // The base moves with the driven motion, 0.1 m per 0.01 s tick = 10 m/s:
+    // the accelerometer sees the 0 -> 10 m/s step once, then only gravity.
+    for (int tick = 1; tick <= 5; ++tick) {
+        pose.position[0] = 0.1 * tick;
+        assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
+        assert(rk_simulation_step(simulation, 200 + 100 * tick) == RK_OK);
+        const auto imu = snapshot(robot).sensors[1];
+        assert(imu.sequence == static_cast<uint64_t>(1 + tick));
+        assert(std::abs(imu.values[3] - (tick == 1 ? 1000.0 : 0.0)) < 1e-2);
+        assert(std::abs(imu.values[4]) < 1e-9 && std::abs(imu.values[5] - 9.81) < 1e-9);
+        for (int axis = 0; axis < 3; ++axis) assert(std::abs(imu.values[axis]) < 1e-9);
+        assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
+        assert(std::abs(observed.position[0] - 0.1 * tick) < 1e-6);
+    }
+    // Turning the driven base 0.01 rad per tick is a 1 rad/s yaw rate.
+    for (int tick = 1; tick <= 3; ++tick) {
+        pose.rotation[2] = std::sin(0.005 * tick);
+        pose.rotation[3] = std::cos(0.005 * tick);
+        assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
+        assert(rk_simulation_step(simulation, 700 + 100 * tick) == RK_OK);
+        const auto imu = snapshot(robot).sensors[1];
+        assert(std::abs(imu.values[2] - 1.0) < 1e-3);
+        assert(std::abs(imu.values[0]) < 1e-6 && std::abs(imu.values[1]) < 1e-6);
+    }
+    pose.rotation[2] = 0.0;
+    pose.rotation[3] = 1.0;
+    rk_simulation_clock clock{};
+    clock.struct_size = sizeof(clock);
+    assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
+    assert(clock.step_index == 10);
+
+    // Driving is also accepted by the realtime owner without stopping it.
+    assert(rk_simulation_start(simulation) == RK_OK);
+    pose.position[0] = 1.5;
+    assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
+    for (int attempt = 0; attempt < 200; ++attempt) {
+        assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
+        if (std::abs(observed.position[0] - 1.5) < 1e-6) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    assert(std::abs(observed.position[0] - 1.5) < 1e-6);
+    assert(rk_simulation_step(simulation, 1000) == RK_ERROR_INVALID_STATE); // Still running.
+    assert(rk_simulation_stop(simulation) == RK_OK);
+
+    // Driving never replaces the reset pose, including the kinematic node.
+    assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
+    assert(rk_simulation_step(simulation, 2000) == RK_OK);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
+    assert(std::abs(observed.position[0]) < 1e-6);
+
+    pose.rotation[3] = 2.0;
+    assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_ERROR_INVALID_ARGUMENT);
+    pose.rotation[3] = 1.0;
+    assert(rk_simulation_drive_robot_base(simulation, 1, &pose) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_drive_robot_base(simulation, 0, nullptr) == RK_ERROR_INVALID_ARGUMENT);
+    rk_simulation_destroy(simulation);
+}
+
+rk_robot_runtime_blueprint wheeled_blueprint() {
+    rk_robot_runtime_blueprint value{};
+    value.struct_size = sizeof(value);
+    value.revision = 7;
+    value.joint_count = 2;
+    value.link_count = 3;
+    value.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    for (uint32_t i = 0; i < value.link_count; ++i) {
+        value.links[i].mass = 1.0;
+        value.links[i].inertia_tensor[0] = value.links[i].inertia_tensor[4] =
+            value.links[i].inertia_tensor[8] = 1.0;
+    }
+    for (uint32_t joint = 0; joint < value.joint_count; ++joint) {
+        value.joints[joint] = {joint, RK_RUNTIME_JOINT_REVOLUTE, 0, joint + 1,
+                               -1000.0, 1000.0, 100.0};
+        value.joints[joint].parent_frame_rotation[3] = 1.0;
+        value.joints[joint].child_frame_rotation[3] = 1.0;
+        value.joints[joint].axis[1] = 1.0;
+    }
+    assert(rk_robot_runtime_blueprint_validate(&value) == RK_OK);
+    return value;
+}
+
+rk_robot_command wheel_targets(double left, double right, uint64_t sequence,
+                               double max_rate = 0.0) {
+    rk_robot_command value{};
+    value.struct_size = sizeof(value);
+    value.sequence = sequence;
+    value.kind = RK_COMMAND_JOINT_TARGETS;
+    value.target_count = 2;
+    value.targets[0] = {0, RK_TARGET_VELOCITY, left, max_rate, 0.0};
+    value.targets[1] = {1, RK_TARGET_VELOCITY, right, max_rate, 0.0};
+    return value;
+}
+
+rk_robot_command lifecycle(rk_command_kind kind, uint64_t sequence) {
+    rk_robot_command value{};
+    value.struct_size = sizeof(value);
+    value.sequence = sequence;
+    value.kind = kind;
+    return value;
+}
+
+rk_simulation make_simulation(double timestep) {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = timestep;
+    desc.physics_substeps = 1;
+    rk_simulation simulation = RK_INVALID_SIMULATION;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    return simulation;
+}
+
+void normal_stop_zeroes_wheel_velocities() {
+    auto simulation = make_simulation(0.01);
+    const auto model = wheeled_blueprint();
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    uint64_t sequence = 0;
+    uint64_t time = 0;
+    auto command = wheel_targets(2.0, 3.0, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    auto state = snapshot(robot);
+    assert(state.velocity[0] == 2.0 && state.velocity[1] == 3.0);
+    assert(std::abs(state.position[0] - 0.04) < 1e-12);
+
+    // A normal stop halts the wheels in the physics backend at once; wheel
+    // odometry (encoder positions) stops changing although nothing latches.
+    command = lifecycle(RK_COMMAND_STOP, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    const auto stopped = snapshot(robot);
+    assert(stopped.mode == RK_ROBOT_MODE_STOPPING && stopped.safety == RK_SAFETY_STOPPING);
+    assert(stopped.velocity[0] == 0.0 && stopped.velocity[1] == 0.0);
+    for (int tick = 0; tick < 5; ++tick) {
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        state = snapshot(robot);
+        assert(state.velocity[0] == 0.0 && state.velocity[1] == 0.0);
+        assert(state.position[0] == stopped.position[0]);
+        assert(state.position[1] == stopped.position[1]);
+        assert(state.sensors[0].values[0] == stopped.position[0]); // Encoder sample.
+    }
+
+    // A new command resumes motion without a safety reset.
+    command = wheel_targets(1.0, 1.0, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    state = snapshot(robot);
+    assert(state.mode == RK_ROBOT_MODE_TRACKING && state.velocity[0] == 1.0);
+    assert(state.position[0] > stopped.position[0]);
+    rk_simulation_destroy(simulation);
+}
+
+rk_simulation_differential_drive_state drive_state(rk_simulation simulation) {
+    rk_simulation_differential_drive_state value{};
+    value.struct_size = sizeof(value);
+    assert(rk_simulation_get_differential_drive_state(simulation, 0, &value) == RK_OK);
+    return value;
+}
+
+void differential_drive_follows_applied_wheel_targets() {
+    constexpr double dt = 0.02;
+    auto simulation = make_simulation(dt);
+    const auto model = wheeled_blueprint();
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    const double start_yaw = 0.5;
+    rk_simulation_pose start{};
+    start.struct_size = sizeof(start);
+    start.position[0] = 1.0;
+    start.position[1] = 2.0;
+    start.position[2] = 0.3;
+    start.rotation[2] = std::sin(start_yaw * 0.5);
+    start.rotation[3] = std::cos(start_yaw * 0.5);
+    assert(rk_simulation_teleport_robot(simulation, 0, &start) == RK_OK);
+
+    rk_simulation_differential_drive_desc drive{};
+    drive.struct_size = sizeof(drive);
+    drive.left_wheel_joint = 0;
+    drive.right_wheel_joint = 1;
+    drive.wheel_radius = 0.1;
+    drive.track_width = 0.5;
+    auto invalid = drive;
+    invalid.right_wheel_joint = 0;
+    assert(rk_simulation_set_differential_drive(simulation, 0, &invalid) == RK_ERROR_INVALID_ARGUMENT);
+    invalid = drive;
+    invalid.right_wheel_joint = 2;
+    assert(rk_simulation_set_differential_drive(simulation, 0, &invalid) == RK_ERROR_INVALID_ARGUMENT);
+    invalid = drive;
+    invalid.wheel_radius = 0.0;
+    assert(rk_simulation_set_differential_drive(simulation, 0, &invalid) == RK_ERROR_INVALID_ARGUMENT);
+    invalid = drive;
+    invalid.struct_size = 0;
+    assert(rk_simulation_set_differential_drive(simulation, 0, &invalid) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_set_differential_drive(simulation, 1, &drive) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_set_differential_drive(simulation, 0, nullptr) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_set_differential_drive(simulation, 0, &drive) == RK_OK);
+    auto plant = drive_state(simulation);
+    assert(plant.enabled == 1 && plant.x == 1.0 && plant.y == 2.0 && plant.height == 0.3);
+    assert(std::abs(plant.yaw - start_yaw) < 1e-12);
+
+    // Targets submitted straight to the robot drive the base on the same tick
+    // they are applied. 5 rad/s on 0.1 m wheels is 0.5 m/s: 0.01 m per tick.
+    uint64_t sequence = 0;
+    uint64_t time = 0;
+    auto command = wheel_targets(5.0, 5.0, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    plant = drive_state(simulation);
+    assert(plant.left_wheel_rate == 5.0 && plant.right_wheel_rate == 5.0);
+    assert(std::abs(plant.x - (1.0 + 0.01 * std::cos(start_yaw))) < 1e-12);
+    assert(std::abs(plant.y - (2.0 + 0.01 * std::sin(start_yaw))) < 1e-12);
+    for (int tick = 1; tick < 10; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    plant = drive_state(simulation);
+    assert(std::abs(plant.x - (1.0 + 0.1 * std::cos(start_yaw))) < 1e-12);
+    assert(std::abs(plant.y - (2.0 + 0.1 * std::sin(start_yaw))) < 1e-12);
+    assert(std::abs(plant.yaw - start_yaw) < 1e-12 && plant.height == 0.3);
+    rk_simulation_pose observed{};
+    observed.struct_size = sizeof(observed);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
+    assert(std::abs(observed.position[0] - plant.x) < 1e-6);
+    assert(std::abs(observed.position[1] - plant.y) < 1e-6);
+    assert(std::abs(observed.position[2] - 0.3) < 1e-6);
+    // Straight at constant speed: no rotation, no acceleration beyond gravity.
+    auto imu = snapshot(robot).sensors[1];
+    assert(imu.sequence > 0);
+    for (int axis = 0; axis < 3; ++axis) assert(std::abs(imu.values[axis]) < 1e-4);
+    assert(std::abs(imu.values[3]) < 1e-2 && std::abs(imu.values[4]) < 1e-2);
+    assert(std::abs(imu.values[5] - 9.81) < 1e-6);
+
+    // Arc at 0.5 m/s and 1 rad/s: wheels 2.5 and 7.5 rad/s. The gyro reads
+    // the yaw rate and the accelerometer the 0.5 m/s^2 centripetal pull to
+    // the left in the body frame.
+    command = wheel_targets(2.5, 7.5, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    const double arc_start_yaw = plant.yaw;
+    for (int tick = 0; tick < 5; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    plant = drive_state(simulation);
+    assert(std::abs(plant.yaw - (arc_start_yaw + 5 * dt)) < 1e-12);
+    imu = snapshot(robot).sensors[1];
+    assert(std::abs(imu.values[2] - 1.0) < 1e-3);
+    assert(std::abs(imu.values[0]) < 1e-4 && std::abs(imu.values[1]) < 1e-4);
+    assert(std::abs(imu.values[3]) < 2e-2);
+    assert(std::abs(imu.values[4] - 0.5) < 2e-2);
+
+    // The runtime clamps each wheel at its max rate; the plant uses the
+    // clamped, applied rate rather than the requested one.
+    command = wheel_targets(4.25, 11.75, ++sequence, 10.0);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    plant = drive_state(simulation);
+    assert(plant.left_wheel_rate == 4.25 && plant.right_wheel_rate == 10.0);
+
+    // A normal stop halts the base on the tick it is applied.
+    command = lifecycle(RK_COMMAND_STOP, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    const auto before_stop = drive_state(simulation);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    plant = drive_state(simulation);
+    assert(plant.left_wheel_rate == 0.0 && plant.right_wheel_rate == 0.0);
+    assert(plant.x == before_stop.x && plant.y == before_stop.y && plant.yaw == before_stop.yaw);
+    for (int tick = 0; tick < 3; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(drive_state(simulation).x == before_stop.x);
+    imu = snapshot(robot).sensors[1];
+    for (int axis = 0; axis < 3; ++axis) assert(std::abs(imu.values[axis]) < 1e-4);
+
+    // An emergency stop halts it too, and a safety reset does not resume the
+    // cleared targets.
+    command = wheel_targets(5.0, 5.0, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    command = lifecycle(RK_COMMAND_EMERGENCY_STOP, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    const auto before_estop = drive_state(simulation);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(drive_state(simulation).x == before_estop.x);
+    command = lifecycle(RK_COMMAND_RESET_SAFETY, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    for (int tick = 0; tick < 3; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(drive_state(simulation).x == before_estop.x);
+
+    // Placing the base mid-motion is a jump, not a velocity: the plant carries
+    // on from the new pose and the accelerometer sees no spike.
+    command = wheel_targets(5.0, 5.0, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    for (int tick = 0; tick < 3; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    const auto moving = drive_state(simulation);
+    rk_simulation_pose placed{};
+    placed.struct_size = sizeof(placed);
+    placed.position[0] = moving.x;
+    placed.position[1] = moving.y + 0.6;
+    placed.position[2] = 0.3;
+    placed.rotation[2] = std::sin(moving.yaw * 0.5);
+    placed.rotation[3] = std::cos(moving.yaw * 0.5);
+    const auto imu_sequence = snapshot(robot).sensors[1].sequence;
+    assert(rk_simulation_place_robot_base(simulation, 0, &placed) == RK_OK);
+    plant = drive_state(simulation);
+    assert(plant.x == moving.x && plant.y == moving.y + 0.6 &&
+           std::abs(plant.yaw - moving.yaw) < 1e-12);
+    for (int tick = 0; tick < 2; ++tick) {
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        imu = snapshot(robot).sensors[1];
+        assert(imu.sequence == imu_sequence + 1 + tick); // Sensors keep running.
+        assert(std::abs(imu.values[3]) < 1e-2 && std::abs(imu.values[4]) < 1e-2);
+    }
+    plant = drive_state(simulation);
+    assert(std::abs(plant.x - (moving.x + 0.02 * std::cos(moving.yaw))) < 1e-12);
+    assert(std::abs(plant.y - (moving.y + 0.6 + 0.02 * std::sin(moving.yaw))) < 1e-12);
+
+    // Resetting the robot puts the plant back at the reset pose, at rest.
+    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
+    plant = drive_state(simulation);
+    assert(plant.x == 1.0 && plant.y == 2.0 && std::abs(plant.yaw - start_yaw) < 1e-12);
+    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(drive_state(simulation).x == 1.0);
+    assert(rk_simulation_clear_differential_drive(simulation, 0) == RK_OK);
+    assert(drive_state(simulation).enabled == 0);
+    assert(rk_simulation_clear_differential_drive(simulation, 1) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_place_robot_base(simulation, 0, nullptr) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_place_robot_base(simulation, 1, &placed) == RK_ERROR_INVALID_ARGUMENT);
+    rk_simulation_destroy(simulation);
+}
+
 } // namespace
 
 int main() {
@@ -372,5 +722,8 @@ int main() {
     failed_command_phase_does_not_advance();
     velocity_targets_advance_joint_coordinates();
     sensor_geometry_and_reset();
+    driving_base_keeps_owner_sensors_and_reset_pose();
+    normal_stop_zeroes_wheel_velocities();
+    differential_drive_follows_applied_wheel_targets();
     return 0;
 }

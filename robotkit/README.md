@@ -54,7 +54,18 @@ Participating runtimes cannot be stepped individually; applications must call
 reset, robot teleport, environment-object spawn/remove/teleport, and one
 shared simulation clock. These edits are accepted while stopped. Once running,
 physics is authoritative and editable-scene changes must go through the
-simulation owner. Each simulated robot publishes transport-neutral joint
+simulation owner.
+Kinematic robot bases are the exception: `Simulation.driveRobotBase` moves a
+base for the next tick while running or stepped externally, without stopping
+the clock, resetting sensor history, or changing the reset pose, and the base
+moves with the velocity implied by that motion, so the IMU measures it.
+`Simulation.placeRobotBase` jumps a base the same way but keeps its velocity
+through the jump. `Simulation.setDifferentialDrive` (wrapped by
+`DifferentialDrivePlant`) rolls a differential-drive chassis natively every
+tick by the wheel velocity targets the robot applied for that tick, whoever
+submitted them; a normal or emergency stop zeroes those targets in the physics
+backend, so wheels, odometry, and chassis all stop on the tick the stop is
+applied. Each simulated robot publishes transport-neutral joint
 encoder, IMU, and LiDAR frames with the same source clock, frame IDs, and
 sequences used by the remote path.
 

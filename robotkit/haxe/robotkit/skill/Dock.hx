@@ -8,20 +8,26 @@ import robotkit.world.RobotSnapshot;
 
 /** Plans and navigates to the approach pose of a detected docking target. */
 class Dock implements Skill {
+  public static inline final DEFAULT_POSITION_TOLERANCE:Float = 0.05;
+  public static inline final DEFAULT_HEADING_TOLERANCE:Float = 0.05;
+
   public final navigator:Navigator;
   public final target:DockingTarget;
   public final observePerception:RobotSnapshot -> PerceptionSnapshot;
   public final minimumConfidence:Float;
   public final positionTolerance:Float;
   public final headingTolerance:Float;
+  /** Forwarded to the approach GoTo; see GoTo.blockedTimeoutSeconds. */
+  public final blockedTimeoutSeconds:Float;
 
   final lifecycle:SkillLifecycle = new SkillLifecycle();
   var approach:Null<GoTo> = null;
 
   public function new(navigator:Navigator, target:DockingTarget,
       observePerception:RobotSnapshot -> PerceptionSnapshot,
-      ?minimumConfidence:Float = 0.5, ?positionTolerance:Float = 0.05,
-      ?headingTolerance:Float = 0.05) {
+      ?minimumConfidence:Float = 0.5, ?positionTolerance:Float = DEFAULT_POSITION_TOLERANCE,
+      ?headingTolerance:Float = DEFAULT_HEADING_TOLERANCE,
+      ?blockedTimeoutSeconds:Float = 10.0) {
     if (navigator == null || target == null || observePerception == null ||
         !Math.isFinite(minimumConfidence) || minimumConfidence < 0.0 ||
         minimumConfidence > 1.0 || !Math.isFinite(positionTolerance) ||
@@ -34,6 +40,7 @@ class Dock implements Skill {
     this.minimumConfidence = minimumConfidence;
     this.positionTolerance = positionTolerance;
     this.headingTolerance = headingTolerance;
+    this.blockedTimeoutSeconds = blockedTimeoutSeconds;
   }
 
   public function start():Void {
@@ -46,7 +53,7 @@ class Dock implements Skill {
       return lifecycle.fail("Docking target and localization frames differ");
     var value = new GoTo(navigator,
       new NavigationGoal(target.approachPose, estimate.referenceFrame,
-        positionTolerance, headingTolerance), observePerception);
+        positionTolerance, headingTolerance), observePerception, blockedTimeoutSeconds);
     approach = value;
     value.start();
     sync(value.status());

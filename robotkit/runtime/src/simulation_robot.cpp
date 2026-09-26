@@ -7,6 +7,25 @@
 
 namespace robotkit {
 
+std::vector<SimulationRobot::JointCommand> &SimulationRobot::staged_commands() {
+    if (!staged_valid_) {
+        commanded_.resize(joints_.size());
+        staged_ = commanded_;
+        staged_valid_ = true;
+    }
+    return staged_;
+}
+
+void SimulationRobot::queue_velocity_hold(std::size_t joint) {
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = joints_[joint];
+    target.mode = NKSIM_JOINT_TARGET_VELOCITY;
+    target.target = 0.0;
+    pending_targets_.push_back(target);
+    staged_commands()[joint] = {NKSIM_JOINT_TARGET_VELOCITY, 0.0};
+}
+
 rk_result SimulationRobot::apply(const rk_robot_command &command) {
     if (command.kind == RK_COMMAND_EMERGENCY_STOP) {
         stopped_ = true;
@@ -14,18 +33,28 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         for (std::size_t index = 0; index < joints_.size(); ++index) {
             if (index >= actuated_joints_.size() || !actuated_joints_[index])
                 continue;
-            nksim_joint_target target{};
-            target.struct_size = sizeof(target);
-            target.joint = joints_[index];
-            target.mode = NKSIM_JOINT_TARGET_VELOCITY;
-            target.target = 0.0;
-            pending_targets_.push_back(target);
+            queue_velocity_hold(index);
         }
         return RK_OK;
     }
     if (command.kind == RK_COMMAND_STOP) {
+        // A normal stop is a controlled stop without a latch. The runtime drops
+        // every active target and has no deceleration limit, so moving joints
+        // are commanded to zero velocity at once; otherwise the backend keeps
+        // its last velocity/effort target and wheels would keep spinning.
+        // Position-held joints keep their current, already rate-limited
+        // reference, which is where they stop; never-commanded joints stay
+        // passive.
         stopped_ = false;
         pending_targets_.clear();
+        const auto staged = staged_commands();
+        for (std::size_t index = 0; index < joints_.size(); ++index) {
+            if (index >= actuated_joints_.size() || !actuated_joints_[index] ||
+                staged[index].mode == 0 ||
+                staged[index].mode == NKSIM_JOINT_TARGET_POSITION)
+                continue;
+            queue_velocity_hold(index);
+        }
         return RK_OK;
     }
     if (command.kind == RK_COMMAND_RESET_SAFETY) {
@@ -39,10 +68,12 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         return RK_OK;
     if (command.kind != RK_COMMAND_JOINT_TARGETS)
         return RK_ERROR_UNSUPPORTED;
+    for (uint32_t index = 0; index < command.target_count; ++index)
+        if (command.targets[index].joint >= joints_.size())
+            return RK_ERROR_INVALID_ARGUMENT;
+    auto &staged = staged_commands();
     for (uint32_t index = 0; index < command.target_count; ++index) {
         const auto &source = command.targets[index];
-        if (source.joint >= joints_.size())
-            return RK_ERROR_INVALID_ARGUMENT;
         nksim_joint_target target{};
         target.struct_size = sizeof(target);
         target.joint = joints_[source.joint];
@@ -50,6 +81,7 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         target.target = source.target;
         target.max_force = source.max_effort;
         pending_targets_.push_back(target);
+        staged[source.joint] = {source.mode, source.target};
     }
     return RK_OK;
 }
@@ -57,6 +89,10 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
 std::vector<nksim_joint_target> SimulationRobot::take_pending_targets() {
     auto result = std::move(pending_targets_);
     pending_targets_.clear();
+    if (staged_valid_) {
+        commanded_ = staged_;
+        staged_valid_ = false;
+    }
     return result;
 }
 

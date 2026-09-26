@@ -1,86 +1,75 @@
 package robotkit.runtime;
 
 import haxe.Int64;
-import robotkit.mobile.DifferentialOdometry;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.Pose2;
-import robotkit.world.JointTargetMode;
 import robotkit.world.RobotSnapshot;
 
 /**
  * Ideal rolling-kinematics plant for a differential-drive robot in SimKit.
- * Wheel target rates drive a planar base pose; articulated joints and sensors
- * still advance through the shared native simulation.
+ *
+ * Couples the robot's wheel joints to its kinematic base through the native
+ * simulation: every tick, after the robot applies its commands and before
+ * physics advances, the base rolls by the wheel velocity targets the robot
+ * actually applied for that tick. Those are the runtime's rate-clamped targets
+ * whether they came from MobileBase or were submitted straight to the robot,
+ * and they are zero after a normal or emergency stop or a safety reset, so the
+ * chassis follows every stop on the tick it takes effect with no added
+ * latency. Articulated joints and sensors still advance through the shared
+ * simulation, and the IMU measures the chassis motion.
  */
 class DifferentialDrivePlant {
   public final simulation:Simulation;
   public final robotIndex:Int;
   public final base:MobileBase;
-  public var pose(default, null):Pose2;
-
-  final odometry:DifferentialOdometry;
+  /** Planar base pose after the latest step or teleport; yaw is unwrapped. */
+  public var pose(get, never):Pose2;
+  /** Base height, preserved while the plant drives the planar pose. */
+  public var baseHeight(get, never):Float;
 
   public function new(simulation:Simulation, robotIndex:Int, base:MobileBase,
       ?initialPose:Pose2) {
     if (simulation == null || robotIndex < 0 || base == null)
       throw "Differential-drive plant requires a simulation, robot index, and mobile base";
-    var configuredOdometry = base.driveModel.createOdometry();
-    if (configuredOdometry == null)
+    var odometry = base.driveModel.createOdometry();
+    if (odometry == null)
       throw "Differential-drive plant requires a differential drive model";
     this.simulation = simulation;
     this.robotIndex = robotIndex;
     this.base = base;
-    odometry = configuredOdometry;
-    pose = initialPose == null
-      ? new Pose2()
-      : new Pose2(initialPose.x, initialPose.y, initialPose.yaw);
+    simulation.setDifferentialDrive(robotIndex, odometry.leftWheelJoint,
+      odometry.rightWheelJoint, odometry.wheelRadius, odometry.trackWidth);
+    if (initialPose != null) teleport(initialPose);
   }
 
-  /** Sets the chassis pose while preserving the current wheel targets. */
+  /**
+   * Jumps the chassis for the next tick while keeping wheel targets, sensor
+   * history, and the chassis velocity; the jump itself does not read as motion.
+   */
   public function teleport(pose:Pose2):Void {
     if (pose == null) throw "Differential-drive plant pose cannot be null";
-    var value = new Pose2(pose.x, pose.y, pose.yaw);
-    applyPose(value);
-    this.pose = value;
+    var halfYaw = pose.yaw * 0.5;
+    simulation.placeRobotBase(robotIndex, [pose.x, pose.y, baseHeight],
+      [0.0, 0.0, Math.sin(halfYaw), Math.cos(halfYaw)]);
   }
 
-  /** Advances one fixed simulation step from the mobile base's wheel targets. */
+  /** Advances one fixed simulation step and returns the robot's snapshot. */
   public function step(timestampNs:Int64):RobotSnapshot {
-    var targetRates = base.driveModel.targets(base.currentCommand());
-    var leftRate = 0.0;
-    var rightRate = 0.0;
-    var hasLeft = false;
-    var hasRight = false;
-    for (target in targetRates) {
-      if (target.joint == odometry.leftWheelJoint) {
-        if (target.mode != JointTargetMode.Velocity)
-          throw "Differential-drive plant requires wheel velocity targets";
-        leftRate = target.target;
-        hasLeft = true;
-      } else if (target.joint == odometry.rightWheelJoint) {
-        if (target.mode != JointTargetMode.Velocity)
-          throw "Differential-drive plant requires wheel velocity targets";
-        rightRate = target.target;
-        hasRight = true;
-      }
-    }
-    if (!hasLeft || !hasRight)
-      throw "Differential-drive plant did not receive both wheel targets";
-
-    var leftDistance = leftRate * odometry.wheelRadius * simulation.fixedTimestepSeconds;
-    var rightDistance = rightRate * odometry.wheelRadius * simulation.fixedTimestepSeconds;
-    var distance = (leftDistance + rightDistance) * 0.5;
-    var headingChange = (rightDistance - leftDistance) / odometry.trackWidth;
-    var nextPose = pose.integrateDisplacement(distance, headingChange);
-    applyPose(nextPose);
-    pose = nextPose;
     simulation.step(timestampNs);
     return base.robot.snapshot();
   }
 
-  function applyPose(value:Pose2):Void {
-    var halfYaw = value.yaw * 0.5;
-    simulation.teleportRobot(robotIndex, [value.x, value.y, 0.0],
-      [0.0, 0.0, Math.sin(halfYaw), Math.cos(halfYaw)]);
+  /** Wheel rates, in rad/s, the robot applied during the latest step. */
+  public function appliedWheelRates():{left:Float, right:Float} {
+    var state = simulation.differentialDriveState(robotIndex);
+    return {left: state.leftWheelRate, right: state.rightWheelRate};
   }
+
+  function get_pose():Pose2 {
+    var state = simulation.differentialDriveState(robotIndex);
+    return new Pose2(state.x, state.y, state.yaw);
+  }
+
+  function get_baseHeight():Float
+    return simulation.differentialDriveState(robotIndex).height;
 }

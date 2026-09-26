@@ -22,13 +22,14 @@ class Charge implements Skill {
   public function new(navigator:Navigator, target:DockingTarget, power:Power,
       targetChargeFraction:Float,
       observePerception:RobotSnapshot -> PerceptionSnapshot,
-      ?minimumConfidence:Float = 0.5) {
+      ?minimumConfidence:Float = 0.5, ?blockedTimeoutSeconds:Float = 10.0) {
     if (navigator == null || target == null || power == null ||
         observePerception == null ||
         !Math.isFinite(targetChargeFraction) || targetChargeFraction <= 0.0 ||
         targetChargeFraction > 1.0)
       throw "Charge requires navigation, docking target, power, and a valid charge fraction";
-    dock = new Dock(navigator, target, observePerception, minimumConfidence);
+    dock = new Dock(navigator, target, observePerception, minimumConfidence,
+      Dock.DEFAULT_POSITION_TOLERANCE, Dock.DEFAULT_HEADING_TOLERANCE, blockedTimeoutSeconds);
     this.power = power;
     this.targetChargeFraction = targetChargeFraction;
   }

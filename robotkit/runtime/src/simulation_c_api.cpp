@@ -141,6 +141,48 @@ rk_result RK_CALL rk_simulation_teleport_robot(rk_simulation simulation, uint32_
                  : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_drive_robot_base(rk_simulation simulation, uint32_t robot_index,
+                                                  const rk_simulation_pose *pose) {
+    if (!pose)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->drive_robot_base(robot_index, *pose)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_place_robot_base(rk_simulation simulation, uint32_t robot_index,
+                                                  const rk_simulation_pose *pose) {
+    if (!pose)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->place_robot_base(robot_index, *pose) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_set_differential_drive(
+    rk_simulation simulation, uint32_t robot_index,
+    const rk_simulation_differential_drive_desc *desc) {
+    if (!desc)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->set_differential_drive(robot_index, *desc) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_clear_differential_drive(rk_simulation simulation,
+                                                          uint32_t robot_index) {
+    const auto value = resolve(simulation);
+    return value ? value->clear_differential_drive(robot_index) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_get_differential_drive_state(
+    rk_simulation simulation, uint32_t robot_index,
+    rk_simulation_differential_drive_state *out_state) {
+    if (!out_state)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->get_differential_drive_state(robot_index, *out_state)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_get_robot_pose(rk_simulation simulation,uint32_t robot_index,
                                                 rk_simulation_pose *out_pose) {
     if(!out_pose)return RK_ERROR_INVALID_ARGUMENT;

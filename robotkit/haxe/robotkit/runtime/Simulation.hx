@@ -85,6 +85,91 @@ class Simulation {
       "simulation.teleportRobot");
   }
 
+  /**
+   * Moves one robot's kinematic base to a pose that takes effect on the next
+   * tick. Unlike teleportRobot, this keeps a realtime clock running, keeps
+   * sensor history, and does not change the pose restored by reset or
+   * resetRobot. The base's velocity over the tick is the motion from its
+   * previous pose, so the IMU measures consecutive drives as continuous
+   * motion. Use it to drive a base every tick; use placeRobotBase for a jump.
+   */
+  public function driveRobotBase(robotIndex:Int, position:Array<Float>,
+      ?rotation:Array<Float>):Void {
+    ensureLive();
+    if (position == null || position.length != 3)
+      throw "Simulation.driveRobotBase requires a three-component position";
+    var pose = makePose(position, rotation);
+    check(RobotKitSimKit.rk_simulation_drive_robot_base(owner.borrow(), robotIndex, pose),
+      "simulation.driveRobotBase");
+  }
+
+  /**
+   * Jumps one robot's base to a pose for the next tick without stopping a
+   * realtime clock, resetting sensors, or changing the reset pose. The base
+   * keeps its body-frame velocity through the jump, so the IMU sees no spike,
+   * and a differential-drive plant continues from the new pose.
+   */
+  public function placeRobotBase(robotIndex:Int, position:Array<Float>,
+      ?rotation:Array<Float>):Void {
+    ensureLive();
+    if (position == null || position.length != 3)
+      throw "Simulation.placeRobotBase requires a three-component position";
+    var pose = makePose(position, rotation);
+    check(RobotKitSimKit.rk_simulation_place_robot_base(owner.borrow(), robotIndex, pose),
+      "simulation.placeRobotBase");
+  }
+
+  /**
+   * Couples one robot's wheel velocity targets to its kinematic base. Each
+   * tick the base rolls by the wheel targets the robot applied for that tick
+   * (after runtime clamping, zero after any stop), before physics advances,
+   * whatever submitted them. Joint indices are robot joint indices; lengths
+   * are metres. The plant starts from the base's current pose.
+   */
+  public function setDifferentialDrive(robotIndex:Int, leftWheelJoint:Int,
+      rightWheelJoint:Int, wheelRadius:Float, trackWidth:Float):Void {
+    ensureLive();
+    if (leftWheelJoint < 0 || rightWheelJoint < 0)
+      throw "Simulation.setDifferentialDrive requires wheel joint indices";
+    var desc = new rk_simulation_differential_drive_desc();
+    desc.set_struct_size(rk_simulation_differential_drive_desc.size());
+    desc.set_left_wheel_joint(leftWheelJoint);
+    desc.set_right_wheel_joint(rightWheelJoint);
+    desc.set_wheel_radius(wheelRadius);
+    desc.set_track_width(trackWidth);
+    check(RobotKitSimKit.rk_simulation_set_differential_drive(owner.borrow(), robotIndex, desc),
+      "simulation.setDifferentialDrive");
+  }
+
+  /** Removes a robot's differential-drive coupling; the base stays in place. */
+  public function clearDifferentialDrive(robotIndex:Int):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_clear_differential_drive(owner.borrow(), robotIndex),
+      "simulation.clearDifferentialDrive");
+  }
+
+  /**
+   * Reads a robot's differential-drive plant after the latest tick: its
+   * planar pose (yaw unwrapped) and the wheel rates the robot applied.
+   */
+  public function differentialDriveState(robotIndex:Int):SimulationDifferentialDriveState {
+    ensureLive();
+    var state = new rk_simulation_differential_drive_state();
+    state.set_struct_size(rk_simulation_differential_drive_state.size());
+    var result = RobotKitSimKit.rk_simulation_get_differential_drive_state(owner.borrow(),
+      robotIndex, state);
+    check(result.status, "simulation.differentialDriveState");
+    return {
+      enabled: state.get_enabled() != 0,
+      x: state.get_x(),
+      y: state.get_y(),
+      yaw: state.get_yaw(),
+      height: state.get_height(),
+      leftWheelRate: state.get_left_wheel_rate(),
+      rightWheelRate: state.get_right_wheel_rate()
+    };
+  }
+
   /** Reads one robot base pose without mutating physics or the editable model. */
   public function robotPose(robotIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
     ensureLive();var pose=new rk_simulation_pose();pose.set_struct_size(rk_simulation_pose.size());
@@ -219,3 +304,14 @@ class Simulation {
     if (status != RobotKitRuntimeConstants.RK_OK) throw '$operation failed with RobotKit status $status';
   }
 }
+
+/** Differential-drive plant state; see Simulation.differentialDriveState. */
+typedef SimulationDifferentialDriveState = {
+  enabled:Bool,
+  x:Float,
+  y:Float,
+  yaw:Float,
+  height:Float,
+  leftWheelRate:Float,
+  rightWheelRate:Float
+};

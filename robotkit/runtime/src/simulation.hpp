@@ -41,6 +41,23 @@ public:
     rk_result reset();
     rk_result reset_robot(uint32_t robot_index);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
+    /**
+     * Moves one kinematic robot base for the next tick without stopping the
+     * owner, resetting sensors, or replacing the reset pose.
+     */
+    rk_result drive_robot_base(uint32_t robot_index, const rk_simulation_pose &pose);
+    /**
+     * Jumps one robot base to a pose for the next tick without stopping the
+     * owner, resetting sensors, or replacing the reset pose. The jump carries
+     * the base's body-frame twist instead of reading as a velocity.
+     */
+    rk_result place_robot_base(uint32_t robot_index, const rk_simulation_pose &pose);
+    /** Couples one robot's applied wheel velocity targets to its base pose. */
+    rk_result set_differential_drive(uint32_t robot_index,
+                                     const rk_simulation_differential_drive_desc &desc);
+    rk_result clear_differential_drive(uint32_t robot_index);
+    rk_result get_differential_drive_state(
+        uint32_t robot_index, rk_simulation_differential_drive_state &out_state) const;
     rk_result get_robot_pose(uint32_t robot_index, rk_simulation_pose &out_pose) const;
     rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
                             rk_simulation_pose &out_pose) const;
@@ -62,7 +79,35 @@ private:
     rk_result ensure_host();
     rk_result advance(uint64_t timestamp_ns);
     rk_result read_body_pose(nksim_body body, rk_simulation_pose &out_pose) const;
+    /**
+     * Writes one robot base's scene node, which its kinematic body follows on
+     * the next tick, and re-seeds any differential-drive plant from it.
+     */
+    rk_result set_robot_base_node_pose(uint32_t robot_index, const rk_simulation_pose &pose);
+    rk_result write_robot_base_node(uint32_t robot_index, const rk_simulation_pose &pose);
+    /** Integrates every enabled drive plant from its robot's applied wheel targets. */
+    rk_result advance_differential_drives();
     void run();
+
+    /**
+     * Ideal rolling differential-drive plant for one robot. Each tick it rolls
+     * the base along a constant-curvature arc from the wheel velocity targets
+     * the robot applied for that tick, before physics advances, so the base
+     * responds with zero latency and follows every stop the robot applies.
+     */
+    struct DifferentialDrive {
+        bool enabled = false;
+        uint32_t left_joint = 0;
+        uint32_t right_joint = 0;
+        double wheel_radius = 0.0;
+        double track_width = 0.0;
+        double x = 0.0;
+        double y = 0.0;
+        double yaw = 0.0; // Unwrapped, continuous across re-seeding.
+        double height = 0.0;
+        double left_rate = 0.0;
+        double right_rate = 0.0;
+    };
 
     nkscene_scene scene_ = 0;
     nksim_world world_ = 0;
@@ -83,6 +128,8 @@ private:
     std::vector<rk_robot_runtime> handles_;
     std::vector<nksim_body> robot_base_bodies_;
     std::vector<rk_simulation_pose> robot_initial_poses_;
+    std::vector<rk_simulation_pose> robot_base_poses_; // Last pose written to each base node.
+    std::vector<DifferentialDrive> drives_;
     struct EnvironmentObject {
         nkscene_node_id node{};
         nksim_shape shape = 0;

@@ -81,6 +81,44 @@ typedef struct rk_simulation_pose {
     double rotation[4];
 } rk_simulation_pose;
 
+/**
+ * Ideal rolling differential-drive coupling for one robot's kinematic base.
+ *
+ * The wheel joints are robot joint indices of actuated wheel joints. Lengths
+ * are metres and must be positive; track_width is the distance between the
+ * wheel contact points.
+ */
+typedef struct rk_simulation_differential_drive_desc {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t left_wheel_joint;
+    uint32_t right_wheel_joint;
+    uint32_t reserved0;
+    double wheel_radius;
+    double track_width;
+    uint64_t reserved[2];
+} rk_simulation_differential_drive_desc;
+
+/**
+ * Differential-drive plant state after the latest completed tick.
+ *
+ * x, y, and height are the planar base pose written to the kinematic base in
+ * metres; yaw is its heading in radians, unwrapped so it stays continuous
+ * across turns. The wheel rates are the velocity targets, in rad/s, the robot
+ * applied for that tick after runtime clamping: zero after a stop, a reset, or
+ * while a wheel is idle or held by a non-velocity target.
+ */
+typedef struct rk_simulation_differential_drive_state {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t enabled; /**< Nonzero while the coupling is active. */
+    double x;
+    double y;
+    double yaw;
+    double height;
+    double left_wheel_rate;
+    double right_wheel_rate;
+    uint64_t reserved[2];
+} rk_simulation_differential_drive_state;
+
 /** Immutable copied presentation snapshot captured under one simulation lock. */
 typedef uint32_t rk_simulation_presentation RK_HANDLE RK_HANDLE_DESTROY(rk_simulation_presentation_destroy);
 #define RK_INVALID_SIMULATION_PRESENTATION ((rk_simulation_presentation)0)
@@ -194,6 +232,70 @@ RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
 RK_API rk_result RK_CALL rk_simulation_teleport_robot(
     rk_simulation simulation, uint32_t robot_index,
     const rk_simulation_pose *pose);
+/**
+ * Drives one attached robot's kinematic base to a pose for the next tick.
+ *
+ * Unlike rk_simulation_teleport_robot(), this is accepted while the shared
+ * clock is running or stepped externally: it does not stop the owner, reset
+ * sensors, or change the pose restored by reset. The pose becomes the base
+ * body's physics state by the end of the next completed tick, and the base's
+ * velocity over that tick is the motion from its previous pose, so derivative
+ * sensors such as the IMU measure consecutive drives as continuous motion. Use
+ * rk_simulation_place_robot_base() for a jump that must not read as motion.
+ *
+ * @param simulation Shared simulation owner.
+ * @param robot_index Index of the robot in attachment order.
+ * @param pose Target base pose with a unit quaternion rotation.
+ * @return RK_OK, or an invalid-argument/invalid-state/backend error.
+ */
+RK_API rk_result RK_CALL rk_simulation_drive_robot_base(
+    rk_simulation simulation, uint32_t robot_index,
+    const rk_simulation_pose *pose);
+/**
+ * Jumps one attached robot's base to a pose for the next tick.
+ *
+ * Like rk_simulation_drive_robot_base(), this is accepted while the shared
+ * clock is running or stepped externally, and it does not reset sensors or
+ * change the pose restored by reset. Unlike a drive, the jump is a teleport:
+ * the base keeps its body-frame velocity through it instead of the pose change
+ * reading as motion, so derivative sensors such as the IMU see no spike. A
+ * differential-drive plant continues from the new pose.
+ *
+ * @param simulation Shared simulation owner.
+ * @param robot_index Index of the robot in attachment order.
+ * @param pose Target base pose with a unit quaternion rotation.
+ * @return RK_OK, or an invalid-argument/backend error.
+ */
+RK_API rk_result RK_CALL rk_simulation_place_robot_base(
+    rk_simulation simulation, uint32_t robot_index,
+    const rk_simulation_pose *pose);
+/**
+ * Couples one robot's wheel velocity targets to its kinematic base.
+ *
+ * Every tick, after the robot applies its commands and before physics
+ * advances, the base rolls along a constant-curvature arc by the wheel targets
+ * the robot applied for that tick (rate-clamped by the runtime, zero after a
+ * normal or emergency stop). The plant starts from the base's current pose,
+ * keeps its height, and treats the base as upright. Whatever submits the
+ * targets, the base follows with no added latency. Replaces any previous
+ * coupling for the robot; accepted while running.
+ *
+ * @param simulation Shared simulation owner.
+ * @param robot_index Index of the robot in attachment order.
+ * @param desc Wheel joints and geometry.
+ * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed or
+ * missing wheel joint, identical wheels, or non-positive geometry.
+ */
+RK_API rk_result RK_CALL rk_simulation_set_differential_drive(
+    rk_simulation simulation, uint32_t robot_index,
+    const rk_simulation_differential_drive_desc *desc);
+/** Removes a robot's differential-drive coupling; its base stays where it is. */
+RK_API rk_result RK_CALL rk_simulation_clear_differential_drive(
+    rk_simulation simulation, uint32_t robot_index);
+/** Reads one robot's differential-drive plant state. */
+RK_API rk_result RK_CALL rk_simulation_get_differential_drive_state(
+    rk_simulation simulation, uint32_t robot_index,
+    rk_simulation_differential_drive_state *out_state RK_INOUT);
 /** Reads one robot base pose from the latest physics state. */
 RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
     rk_simulation simulation, uint32_t robot_index,

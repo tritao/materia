@@ -26,6 +26,8 @@ class PlacePallet implements Skill {
   public final spreadMeters:Null<Float>;
   public final positionTolerance:Float;
   public final headingTolerance:Float;
+  /** Forwarded to the approach GoTo; see GoTo.blockedTimeoutSeconds. */
+  public final blockedTimeoutSeconds:Float;
 
   final lifecycle:SkillLifecycle = new SkillLifecycle();
   var stage:PlaceStage = Approach;
@@ -35,7 +37,8 @@ class PlacePallet implements Skill {
       observePerception:RobotSnapshot -> PerceptionSnapshot,
       forks:Forks, payload:Payload, approachPose:Pose2, liftHeightMeters:Float,
       ?tiltRadians:Float, ?spreadMeters:Float,
-      ?positionTolerance:Float = 0.08, ?headingTolerance:Float = 0.08) {
+      ?positionTolerance:Float = 0.08, ?headingTolerance:Float = 0.08,
+      ?blockedTimeoutSeconds:Float = 10.0) {
     if (navigator == null || observePerception == null || forks == null ||
         payload == null || approachPose == null || !Math.isFinite(liftHeightMeters) ||
         !Math.isFinite(positionTolerance) || positionTolerance <= 0.0 ||
@@ -51,6 +54,7 @@ class PlacePallet implements Skill {
     this.spreadMeters = spreadMeters;
     this.positionTolerance = positionTolerance;
     this.headingTolerance = headingTolerance;
+    this.blockedTimeoutSeconds = blockedTimeoutSeconds;
   }
 
   public function start():Void {
@@ -64,7 +68,7 @@ class PlacePallet implements Skill {
     if (violation != null) return lifecycle.fail(violation);
     var value = new GoTo(navigator,
       new NavigationGoal(approachPose, estimate.referenceFrame,
-        positionTolerance, headingTolerance), observePerception);
+        positionTolerance, headingTolerance), observePerception, blockedTimeoutSeconds);
     approach = value;
     value.start();
     syncApproach(value.status());

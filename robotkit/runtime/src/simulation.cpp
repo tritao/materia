@@ -278,7 +278,11 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         binding->base_body_ = binding->bodies_[root];
         robot_base_bodies_.push_back(binding->base_body_);
         rk_simulation_pose initial_pose{};initial_pose.struct_size=sizeof(initial_pose);
+        // Matches robot_transform(), the authored node pose kinematic bases start from.
+        initial_pose.position[0]=static_cast<double>(robot_index);
         initial_pose.rotation[3]=1.0;robot_initial_poses_.push_back(initial_pose);
+        robot_base_poses_.push_back(initial_pose);
+        drives_.emplace_back();
         for (uint32_t i = 0; i < (blueprint.sensor_count ? blueprint.sensor_count : 3); ++i) {
             SimulationRobot::SensorState sensor;
             if (blueprint.sensor_count) sensor.config = blueprint.sensors[i];
@@ -333,6 +337,12 @@ rk_result Simulation::reset() {
     for (std::size_t index = 0; index < runtimes_.size(); ++index) {
         if(set_body_pose(world_,robot_base_bodies_[index],robot_initial_poses_[index].position,
             robot_initial_poses_[index].rotation)!=RK_OK)return RK_ERROR_BACKEND;
+        // Kinematic bases follow their scene node on every tick, so a pose
+        // driven by drive_robot_base() or a drive plant is restored there too.
+        drives_[index].yaw = drives_[index].left_rate = drives_[index].right_rate = 0.0;
+        if (set_robot_base_node_pose(static_cast<uint32_t>(index),
+                                     robot_initial_poses_[index]) != RK_OK)
+            return RK_ERROR_BACKEND;
         if (auto binding = bindings_[index].lock()) binding->reset();
         runtimes_[index]->reset_state();
     }
@@ -355,6 +365,10 @@ rk_result Simulation::reset_robot(uint32_t robot_index) {
             return RK_ERROR_BACKEND;
     if(set_body_pose(world_,robot_base_bodies_[robot_index],robot_initial_poses_[robot_index].position,
         robot_initial_poses_[robot_index].rotation)!=RK_OK)return RK_ERROR_BACKEND;
+    auto &drive = drives_[robot_index];
+    drive.yaw = drive.left_rate = drive.right_rate = 0.0;
+    if (set_robot_base_node_pose(robot_index, robot_initial_poses_[robot_index]) != RK_OK)
+        return RK_ERROR_BACKEND;
     binding->reset();
     runtimes_[robot_index]->reset_state();
     if (snapshot_ != 0) { nksim_snapshot_destroy(snapshot_); snapshot_ = 0; }
@@ -422,6 +436,185 @@ rk_result set_node_pose(nkscene_scene scene, nkscene_node_id node,
 
 } // namespace
 
+namespace {
+
+double yaw_of(const double rotation[4]) {
+    const double x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
+    return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
+}
+
+bool valid_drive_geometry(double value) {
+    return std::isfinite(value) && value > 0.0;
+}
+
+} // namespace
+
+rk_result Simulation::write_robot_base_node(uint32_t robot_index,
+                                            const rk_simulation_pose &pose) {
+    if (robot_index >= bindings_.size() || robot_index >= robot_base_bodies_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (!valid_pose(pose.position, pose.rotation)) return RK_ERROR_INVALID_ARGUMENT;
+    auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    const auto root = std::find(binding->bodies_.begin(), binding->bodies_.end(),
+                                robot_base_bodies_[robot_index]);
+    if (root == binding->bodies_.end()) return RK_ERROR_INVALID_HANDLE;
+    const auto root_index = static_cast<std::size_t>(root - binding->bodies_.begin());
+    const auto result = set_node_pose(scene_, binding->nodes_[root_index], pose.position,
+                                      pose.rotation);
+    if (result == RK_OK) robot_base_poses_[robot_index] = pose;
+    return result;
+}
+
+rk_result Simulation::set_robot_base_node_pose(uint32_t robot_index,
+                                               const rk_simulation_pose &pose) {
+    const auto result = write_robot_base_node(robot_index, pose);
+    if (result != RK_OK) return result;
+    auto &drive = drives_[robot_index];
+    drive.x = pose.position[0];
+    drive.y = pose.position[1];
+    drive.height = pose.position[2];
+    // Keep the plant heading continuous: choose the turn count nearest to the
+    // previous unwrapped heading so a re-seed at the same pose is a no-op.
+    constexpr double tau = 6.283185307179586;
+    const double yaw = yaw_of(pose.rotation);
+    drive.yaw = yaw + tau * std::round((drive.yaw - yaw) / tau);
+    return RK_OK;
+}
+
+rk_result Simulation::advance_differential_drives() {
+    for (uint32_t index = 0; index < drives_.size(); ++index) {
+        auto &drive = drives_[index];
+        if (!drive.enabled) continue;
+        const auto binding = bindings_[index].lock();
+        if (!binding) return RK_ERROR_INVALID_HANDLE;
+        drive.left_rate = binding->applied_velocity(drive.left_joint);
+        drive.right_rate = binding->applied_velocity(drive.right_joint);
+        const double left = drive.left_rate * drive.wheel_radius * fixed_timestep_;
+        const double right = drive.right_rate * drive.wheel_radius * fixed_timestep_;
+        const double distance = (left + right) * 0.5;
+        const double turn = (right - left) / drive.track_width;
+        if (distance == 0.0 && turn == 0.0) continue;
+        const double next_yaw = drive.yaw + turn;
+        if (std::abs(turn) < 1e-9) {
+            drive.x += distance * std::cos(drive.yaw);
+            drive.y += distance * std::sin(drive.yaw);
+        } else {
+            const double radius = distance / turn;
+            drive.x += radius * (std::sin(next_yaw) - std::sin(drive.yaw));
+            drive.y -= radius * (std::cos(next_yaw) - std::cos(drive.yaw));
+        }
+        drive.yaw = next_yaw;
+        rk_simulation_pose pose{};
+        pose.struct_size = sizeof(pose);
+        pose.position[0] = drive.x;
+        pose.position[1] = drive.y;
+        pose.position[2] = drive.height;
+        pose.rotation[2] = std::sin(drive.yaw * 0.5);
+        pose.rotation[3] = std::cos(drive.yaw * 0.5);
+        const auto result = write_robot_base_node(index, pose);
+        if (result != RK_OK) return result;
+    }
+    return RK_OK;
+}
+
+rk_result Simulation::set_differential_drive(
+    uint32_t robot_index, const rk_simulation_differential_drive_desc &desc) {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (desc.struct_size < sizeof(desc) || robot_index >= drives_.size() ||
+        !valid_drive_geometry(desc.wheel_radius) || !valid_drive_geometry(desc.track_width) ||
+        desc.left_wheel_joint == desc.right_wheel_joint)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    for (const auto joint : {desc.left_wheel_joint, desc.right_wheel_joint})
+        if (joint >= binding->joints_.size() || joint >= binding->actuated_joints_.size() ||
+            !binding->actuated_joints_[joint])
+            return RK_ERROR_INVALID_ARGUMENT;
+    auto &drive = drives_[robot_index];
+    drive.enabled = true;
+    drive.left_joint = desc.left_wheel_joint;
+    drive.right_joint = desc.right_wheel_joint;
+    drive.wheel_radius = desc.wheel_radius;
+    drive.track_width = desc.track_width;
+    drive.left_rate = drive.right_rate = 0.0;
+    return set_robot_base_node_pose(robot_index, robot_base_poses_[robot_index]);
+}
+
+rk_result Simulation::clear_differential_drive(uint32_t robot_index) {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (robot_index >= drives_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    drives_[robot_index].enabled = false;
+    drives_[robot_index].left_rate = drives_[robot_index].right_rate = 0.0;
+    return RK_OK;
+}
+
+rk_result Simulation::get_differential_drive_state(
+    uint32_t robot_index, rk_simulation_differential_drive_state &out_state) const {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (out_state.struct_size < sizeof(out_state) || robot_index >= drives_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto &drive = drives_[robot_index];
+    out_state.enabled = drive.enabled ? 1u : 0u;
+    out_state.x = drive.x;
+    out_state.y = drive.y;
+    out_state.yaw = drive.yaw;
+    out_state.height = drive.height;
+    out_state.left_wheel_rate = drive.left_rate;
+    out_state.right_wheel_rate = drive.right_rate;
+    return RK_OK;
+}
+
+rk_result Simulation::drive_robot_base(uint32_t robot_index, const rk_simulation_pose &pose) {
+    // The tick lock orders this scene edit between completed host steps. The
+    // world refreshes every kinematic body from its scene node at the start of
+    // a step and infers its twist from the motion, so the owner thread, host,
+    // sensors, and reset pose stay intact.
+    std::lock_guard tick_lock(tick_mutex_);
+    if (robot_index >= robot_base_bodies_.size()) return RK_ERROR_INVALID_ARGUMENT;
+    if (pose.struct_size < sizeof(pose)) return RK_ERROR_INVALID_ARGUMENT;
+    return set_robot_base_node_pose(robot_index, pose);
+}
+
+rk_result Simulation::place_robot_base(uint32_t robot_index, const rk_simulation_pose &pose) {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (robot_index >= robot_base_bodies_.size() || pose.struct_size < sizeof(pose) ||
+        !valid_pose(pose.position, pose.rotation))
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto body = robot_base_bodies_[robot_index];
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    bool found = false;
+    if (host_ != 0) {
+        nksim_snapshot latest = 0;
+        if (nksim_host_get_snapshot(host_, &latest) != NKSIM_OK) return RK_ERROR_BACKEND;
+        uint64_t count = 0;
+        if (nksim_snapshot_get_body_count(latest, &count) == NKSIM_OK)
+            for (uint64_t index = 0; index < count && !found; ++index)
+                found = nksim_snapshot_get_body(latest, index, &state) == NKSIM_OK &&
+                    state.body == body;
+        nksim_snapshot_destroy(latest);
+    } else {
+        found = nksim_body_get_state(world_, body, &state) == NKSIM_OK;
+    }
+    if (!found) return RK_ERROR_BACKEND;
+    // Carry the body-frame twist across the jump so the new heading keeps the
+    // motion the base had instead of registering a velocity spike or a stop.
+    double linear[3], angular[3];
+    sensors::rotate(state.rotation, state.linear_velocity, linear, true);
+    sensors::rotate(state.rotation, state.angular_velocity, angular, true);
+    sensors::rotate(pose.rotation, linear, state.linear_velocity);
+    sensors::rotate(pose.rotation, angular, state.angular_velocity);
+    std::copy_n(pose.position, 3, state.position);
+    std::copy_n(pose.rotation, 4, state.rotation);
+    state.sleeping = 0;
+    const auto written = host_ != 0
+        ? nksim_host_submit_body_states(host_, &state, 1)
+        : nksim_body_set_state(world_, body, &state);
+    if (written != NKSIM_OK) return RK_ERROR_BACKEND;
+    return set_robot_base_node_pose(robot_index, pose);
+}
+
 rk_result Simulation::teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose) {
     std::lock_guard tick_lock(tick_mutex_);
     if (running_ || stopping_ || host_ != 0 || robot_index >= robot_base_bodies_.size())
@@ -429,12 +622,7 @@ rk_result Simulation::teleport_robot(uint32_t robot_index, const rk_simulation_p
     if (pose.struct_size < sizeof(pose)) return RK_ERROR_INVALID_ARGUMENT;
     auto binding = bindings_[robot_index].lock();
     if (!binding) return RK_ERROR_INVALID_HANDLE;
-    const auto root = std::find(binding->bodies_.begin(), binding->bodies_.end(),
-                                robot_base_bodies_[robot_index]);
-    if (root == binding->bodies_.end()) return RK_ERROR_INVALID_HANDLE;
-    const auto root_index = static_cast<std::size_t>(root - binding->bodies_.begin());
-    auto result = set_node_pose(scene_, binding->nodes_[root_index],
-                                      pose.position, pose.rotation);
+    auto result = set_robot_base_node_pose(robot_index, pose);
     if (result == RK_OK)
         result = set_body_pose(world_, robot_base_bodies_[robot_index], pose.position, pose.rotation);
     if (result == RK_OK) {
@@ -717,6 +905,10 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
             return RK_ERROR_BACKEND;
         ++it;
     }
+    // Targets taken above are the ones every robot applied for this tick.
+    const auto drive_result = advance_differential_drives();
+    if (drive_result != RK_OK)
+        return drive_result;
     nksim_step_result result{};
     result.struct_size = sizeof(result);
     if (nksim_host_step(host_, &result) != NKSIM_OK)
