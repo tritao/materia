@@ -6,12 +6,13 @@ import nativekit.ui.theme.Theme;
 /** Editor-specific surfaces and control colors shared by both theme variants. */
 class EditorAppearance {
   public final theme:Theme;
+  public final dark:Bool;
   public final canvas:Color;
   public final toolbar:Color;
 
   public function new(?source:Theme) {
     theme = source == null ? Theme.light() : source;
-    var dark = theme.tokens.panelBackground.red < 0.5;
+    dark = theme.tokens.panelBackground.red < 0.5;
     canvas = dark ? rgb(0.075, 0.09, 0.11) : rgb(0.945, 0.955, 0.97);
     toolbar = theme.tokens.surfaceRaised;
 

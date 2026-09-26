@@ -328,7 +328,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   static inline var STATUS_HEIGHT:Float = 28.0;
 
   public final ui:UiContext;
-  final appearance:EditorAppearance;
+  var appearance:EditorAppearance;
   public final commands:CommandRegistry;
   public final workspace:DockWorkspaceModel;
   var workspacePanelContents:Array<DockPanelContent>;
@@ -501,7 +501,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "editor.save-as", "scene.export-step", "editor.undo", "editor.redo",
         "scene.frame-selected", "scene.reset-perspective", "scene.show-perspective",
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
-        "scene.toggle-grid", "editor.command-palette", "workspace.reset"
+        "scene.toggle-grid", "editor.toggle-dark-theme", "editor.command-palette", "workspace.reset"
       ], Math.max(8.0, viewportWidth - 228.0), TOOLBAR_HEIGHT, commands, ui.commandContext,
         function() { toolbarMenuVisible = false; commands.refresh(); },
         function(_) { toolbarMenuVisible = false; commands.refresh(); });
@@ -1617,6 +1617,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
       saveWorkspace();
       log("Workspace saved");
     }));
+    commands.register(new Command("editor.toggle-dark-theme", "Toggle dark theme", function() {
+      appearance = new EditorAppearance(appearance.dark ? Theme.light() : Theme.dark());
+      ui.setTheme(appearance.theme);
+      commands.refresh();
+      if (hostContext != null) hostContext.requestFrame();
+    }, null, null, function() return appearance.dark));
     var openPalette = new Command("editor.command-palette", "Open command palette", function() {
       paletteVisible = true;
       contextMenuVisible = false;
