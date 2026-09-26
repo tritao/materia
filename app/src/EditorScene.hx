@@ -1273,6 +1273,10 @@ class EditorScene {
 
   // Reconcile document records into the runtime scene while preserving stable nodes.
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
+    var previousSelectedId = selectedId;
+    var previousSelectedFeatureKey = selectedFeatureKey;
+    var previousSelected = object(previousSelectedId);
+    var previousSelectedKind:Null<String> = previousSelected == null ? null : previousSelected.kind;
     var existingById:Map<String, EditorSceneObject> = new Map();
     for (item in objects) existingById.set(item.id, item);
     var prepared = new PreparedSceneEdit(scene.beginTransaction(), [],
@@ -1449,7 +1453,11 @@ class EditorScene {
     }
     if(restoredFace<0)try clearSelectedCadFace() catch (_:Dynamic) {}
     prepared.retire();
-    selectionRevision++;
+    var nextSelected = object(selection);
+    var propertySchemaChanged = previousSelectedId != selection || previousSelectedFeatureKey != null ||
+      previousSelectedKind != (nextSelected == null ? null : nextSelected.kind);
+    if (propertySchemaChanged)
+      selectionRevision++;
     nextRevision++;
     revision = nextRevision;
     nextEnvironmentRevision++;
@@ -2106,7 +2114,7 @@ class EditorScene {
     var id = selectedId;
     if (object(id) == null) return [];
     // Capture identity in each binding: undo must still target this object after selection changes.
-    var prefix = id + ":" + selectionRevision + ":";
+    var prefix = id + ":" + (selectedFeatureKey == null ? "object" : selectedFeatureKey) + ":";
     var result:Array<PropertyDescriptor> = [];
     if (!kinematicOccurrences.exists(id))
       for (axis in 0...2) result.push(positionProperty(id, axis, prefix));

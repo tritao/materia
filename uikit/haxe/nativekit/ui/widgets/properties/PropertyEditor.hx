@@ -29,21 +29,29 @@ import nativekit.ui.core.View;
 
 /** Descriptor-driven inspector that routes edits through the active document. */
 class PropertyEditor implements View {
+	static var nextGeneration:Int = 0;
 	public final key:String;
 	public final descriptors:Array<PropertyDescriptor>;
 	public final style:LayoutStyle;
 	public final registry:PropertyEditorRegistry;
+	final generation:Int;
+	public var revision(default, null):Int;
 	public var enabled:Bool;
 	public var labelWidth:Float;
 	/** When false, category headers are supplied by an outer inspector. */
 	public var showCategories:Bool;
 	final drafts:Map<String, String>;
 	final errors:Map<String, String>;
+	var cachedChildren:Null<Array<KeyedView>>;
+	var cachedShowCategories:Null<Bool>;
+	var cachedColumn:Null<Column>;
 
 	public function new(key:String, descriptors:Array<PropertyDescriptor>, ?style:LayoutStyle,
 		?registry:PropertyEditorRegistry) {
 		if (key == null || key.length == 0)
 			throw "Property editors require a stable key";
+		nextGeneration++;
+		generation = nextGeneration;
 		this.key = key;
 		this.descriptors = descriptors == null ? [] : descriptors.copy();
 		var ids:Map<String, Bool> = new Map();
@@ -54,11 +62,15 @@ class PropertyEditor implements View {
 		}
 		this.style = style == null ? defaultStyle() : style.copy();
 		this.registry = registry == null ? new PropertyEditorRegistry() : registry;
+		revision = 0;
 		enabled = true;
 		labelWidth = 140.0;
 		showCategories = true;
 		drafts = new Map();
 		errors = new Map();
+		cachedChildren = null;
+		cachedShowCategories = null;
+		cachedColumn = null;
 	}
 
 	/** Applies a validated property value as one undoable document operation. */
@@ -70,13 +82,19 @@ class PropertyEditor implements View {
 		var result = new PropertyBinding(descriptor, commandContext, registry).apply(next, coalesceKey);
 		switch (result) {
 			case PropertyEditResult.Rejected(message):
+				if (errors.get(descriptor.id) != message)
+					revision++;
 				errors.set(descriptor.id, message);
 				context.commands.refresh();
 				return false;
 			case PropertyEditResult.Unchanged:
+				if (errors.exists(descriptor.id))
+					revision++;
 				errors.remove(descriptor.id);
 				return false;
 			case PropertyEditResult.Applied:
+				if (drafts.exists(descriptor.id) || errors.exists(descriptor.id))
+					revision++;
 				drafts.remove(descriptor.id);
 				errors.remove(descriptor.id);
 				context.commands.refresh();
@@ -85,19 +103,24 @@ class PropertyEditor implements View {
 	}
 
 	public function build(context:BuildContext):RenderNode {
-		var children:Array<KeyedView> = [];
-		var categoryKeys:Map<String, Bool> = new Map();
-		for (descriptor in descriptors) {
-			var category = descriptor.category;
-			if (showCategories && category.length > 0 && !categoryKeys.exists(category)) {
-				categoryKeys.set(category, true);
-				children.push(new KeyedView("category:" + category,
-					new Text(category)));
+		if (cachedColumn == null || cachedShowCategories != showCategories) {
+			var children:Array<KeyedView> = [];
+			var categoryKeys:Map<String, Bool> = new Map();
+			for (descriptor in descriptors) {
+				var category = descriptor.category;
+				if (showCategories && category.length > 0 && !categoryKeys.exists(category)) {
+					categoryKeys.set(category, true);
+					children.push(new KeyedView("category:" + category,
+						new Text(category)));
+				}
+				children.push(new KeyedView("property:" + descriptor.id,
+					new PropertyEditorRow(this, descriptor)));
 			}
-			children.push(new KeyedView("property:" + descriptor.id,
-				new PropertyEditorRow(this, descriptor)));
+			cachedChildren = children;
+			cachedShowCategories = showCategories;
+			cachedColumn = new Column(key, children, style);
 		}
-		return new Column(key, children, style).build(context);
+		return cachedColumn.build(context);
 	}
 
 	function setDraft(descriptor:PropertyDescriptor, value:String):Void
@@ -110,6 +133,8 @@ class PropertyEditor implements View {
 	function commitText(context:BuildContext, descriptor:PropertyDescriptor, text:String):Void {
 		var parsed = registry.parse(descriptor.type, text);
 		if (parsed == null) {
+			if (errors.get(descriptor.id) != "Value is not valid")
+				revision++;
 			errors.set(descriptor.id, "Value is not valid");
 			context.commands.refresh();
 			return;
@@ -127,7 +152,7 @@ class PropertyEditor implements View {
 	 */
 	function rowRevision(descriptor:PropertyDescriptor, value:PropertyValue):String {
 		var result = descriptor.id + ":value=" + valueKey(value) +
-			":enabled=" + enabled + ":labelWidth=" + labelWidth;
+			":enabled=" + enabled + ":labelWidth=" + labelWidth + ":generation=" + generation;
 		if (drafts.exists(descriptor.id))
 			result += ":draft=" + drafts.get(descriptor.id);
 		var error = errors.get(descriptor.id);

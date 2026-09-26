@@ -873,7 +873,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         function(_, width) return perspectivePanel(width)),
       new DockPanelContent("inspector", function(_) return inspectorPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
-          ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive()),
+          ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() +
+          ":content=" + (sceneInspector == null ? 0 : sceneInspector.contentRevision())),
       new DockPanelContent("sensors", function(_) return sensorPanel(), null,
         function() return "sensors=" + sensors.revision() + ":robot=" + sensors.robotId +
           ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +

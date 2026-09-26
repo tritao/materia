@@ -57,11 +57,13 @@ class HeadlessEditorProfile {
   static function main():Int {
     try {
       if (Sys.args().length < 2 || Sys.args().length > 4)
-        throw "Usage: headless-profile OUTPUT_DIR CYCLES [tab-inspector|tab-matrix] [HEAP_DUMP_PATH]";
+        throw "Usage: headless-profile OUTPUT_DIR CYCLES [tab-inspector|inspector-edits|selection-stress|tab-matrix] [HEAP_DUMP_PATH]";
       var output = Sys.args()[0];
       var cycles = Std.parseInt(Sys.args()[1]);
       if (cycles == null || cycles < 1) throw "CYCLES must be positive";
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
+        Sys.args()[2] == "inspector-edits" ||
+        Sys.args()[2] == "selection-stress" ||
         Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture") ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
         throw "Unknown headless scenario: " + Sys.args()[2];
@@ -109,6 +111,10 @@ class HeadlessEditorProfile {
         }
       } else if (scenario == "architecture") {
         runArchitectureScenario(editor, frame, output, cycles, frames, actions);
+      } else if (scenario == "inspector-edits") {
+        runInspectorEditScenario(editor, frame, cycles, frames, actions);
+      } else if (scenario == "selection-stress") {
+        runSelectionStressScenario(editor, frame, cycles, frames, actions);
       } else {
         for (cycle in 0...cycles) {
           click(editor, "sensors");
@@ -121,8 +127,7 @@ class HeadlessEditorProfile {
           action(actions, "hierarchy", cycle);
           if ((cycle + 1) % 20 == 0) retained.push(retainedCounts(editor, cycle + 1));
         }
-        var nameKey = "editor:" + editor.scene.selectedId + ":" +
-          editor.scene.selectionRevision + ":name";
+        var nameKey = propertyEditorKey(editor, "name");
         click(editor, nameKey);
         submit(editor, frame, frames, "inspector-focus");
         action(actions, "inspector-focus", 0);
@@ -153,6 +158,75 @@ class HeadlessEditorProfile {
     }
     editor.dispose();
     fonts.dispose();
+  }
+
+  static function runInspectorEditScenario(editor:ReferenceEditorApp, frame:LayoutFrame,
+      cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+    click(editor, "inspector");
+    submit(editor, frame, frames, "setup:inspector");
+    var initialBox = editor.scene.object("box");
+    if (initialBox == null)
+      throw "Inspector property edit scenario has no box object";
+    var initialVisible = initialBox.visible;
+    var initialX = initialBox.x;
+    for (cycle in 0...cycles) {
+      if (cycle > 0) {
+        var nextSelection = cycle % 2 == 0 ? "box" : "tower";
+        editor.scene.select(nextSelection);
+        editor.commands.refresh();
+        submit(editor, frame, frames, "selection", cycle);
+        action(actions, "selection", cycle);
+      }
+      var visibleKey = propertyEditorKey(editor, "visible");
+      var visibleInput = measuredClick(editor, visibleKey, "property-visible");
+      submit(editor, frame, frames, "property-visible", cycle, visibleInput);
+      action(actions, "property-visible", cycle);
+
+      var positionKey = propertyEditorKey(editor, "position-0");
+      var positionInput = measuredClick(editor, positionKey, "property-position");
+      editor.ui.key(UiEventKind.KeyDown, UiKey.A, UiModifier.Control);
+      editor.ui.text(UiEventKind.TextInput, Std.string(0.1 + cycle * 0.01));
+      editor.ui.key(UiEventKind.KeyDown, UiKey.Enter);
+      submit(editor, frame, frames, "property-position", cycle, positionInput);
+      action(actions, "property-position", cycle);
+      var validMetrics = editor.ui.frameMetrics;
+      if (validMetrics == null)
+        throw "Inspector property edit scenario has no valid frame metrics";
+      var validPositionNodes = validMetrics.nodeCount;
+
+      var invalidInput = measuredClick(editor, positionKey, "property-invalid");
+      editor.ui.key(UiEventKind.KeyDown, UiKey.A, UiModifier.Control);
+      // HashLink's Std.parseFloat accepts a nonnumeric prefix as zero; NaN is
+      // unambiguously rejected by the property parser and still exercises the
+      // validation-row invalidation path.
+      editor.ui.text(UiEventKind.TextInput, "nan");
+      editor.ui.key(UiEventKind.KeyDown, UiKey.Enter);
+      submit(editor, frame, frames, "property-invalid", cycle, invalidInput);
+      action(actions, "property-invalid", cycle);
+      var invalidMetrics = editor.ui.frameMetrics;
+      if (invalidMetrics == null || invalidMetrics.nodeCount <= validPositionNodes)
+        throw "Inspector validation error did not reach the submitted tree";
+    }
+    var box = editor.scene.object("box");
+    var boxVisibleToggles = Std.int((cycles + 1) / 2);
+    var expectedVisible = boxVisibleToggles % 2 == 0 ? initialVisible : !initialVisible;
+    if (box == null || box.x == initialX || box.visible != expectedVisible)
+      throw "Inspector property edit scenario did not apply the expected values";
+  }
+
+  static function propertyEditorKey(editor:ReferenceEditorApp, property:String):String
+    return "editor:" + editor.scene.selectedId + ":object:" + property;
+
+  static function runSelectionStressScenario(editor:ReferenceEditorApp, frame:LayoutFrame,
+      cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+    click(editor, "inspector");
+    submit(editor, frame, frames, "setup:inspector");
+    for (cycle in 0...cycles) {
+      editor.scene.select(cycle % 2 == 0 ? "tower" : "box");
+      editor.commands.refresh();
+      submit(editor, frame, frames, "selection", cycle);
+      action(actions, "selection", cycle);
+    }
   }
 
   /** Exercises the expensive editor boundaries called out in the architecture plan. */

@@ -18,8 +18,11 @@ class RetainedView implements View {
 	}
 
 	public function build(context:BuildContext):RenderNode {
-		var cache:RetainedViewCache = context.state(
-			context.id("retained-view-cache:" + key), new RetainedViewCache()).value;
+		var factory:Void->RetainedViewCache = function() return new RetainedViewCache();
+		var disposer:RetainedViewCache->Void = function(value) value.dispose();
+		var cacheState:State<RetainedViewCache> = context.resourceState(
+			context.id("retained-view-cache:" + key), factory, disposer);
+		var cache = cacheState.value;
 		var revisionBuilder:Null<Void->String> = revision;
 		var cacheKey = revisionBuilder == null ? "" : revisionBuilder();
 		cacheKey += "|style=" + context.styleRevision +
@@ -53,6 +56,12 @@ private class RetainedViewCache {
 		if (entry != null && entry.root != root)
 			entry.root.detach();
 		entry = new RetainedViewEntry(key, root, stateIds);
+	}
+
+	public function dispose():Void {
+		if (entry != null)
+			entry.root.detach();
+		entry = null;
 	}
 }
 

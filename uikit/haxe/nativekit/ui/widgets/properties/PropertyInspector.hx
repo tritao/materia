@@ -108,6 +108,16 @@ class PropertyInspector implements View {
 		return section != null && section.expanded;
 	}
 
+	/** Revision of transient editor state that must invalidate a retained panel. */
+	public function contentRevision():Int {
+		var result = 0;
+		for (section in sections) {
+			var editor = editors.get(section.id);
+			result = result * 31 + (editor == null ? 0 : editor.revision);
+		}
+		return result;
+	}
+
 	/** Applies through the row editor assigned to the descriptor's section. */
 	public function applyValue(context:BuildContext, descriptor:PropertyDescriptor,
 		value:PropertyValue, ?coalesceKey:String):Bool {

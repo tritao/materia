@@ -47,7 +47,8 @@ def main():
     parser.add_argument("--allocation-interval", type=int, help="allocation sampling interval in bytes; 0 disables it")
     parser.add_argument("--heap-dump", action="store_true",
                         help="save a full GC heap dump and its exact bytecode (headless scenario only)")
-    parser.add_argument("--scenario", choices=["tab-inspector", "tab-matrix", "architecture"],
+    parser.add_argument("--scenario", choices=["tab-inspector", "inspector-edits", "selection-stress",
+                                                "tab-matrix", "architecture"],
                         help="replay a headless UI interaction")
     parser.add_argument("--cycles", type=int, default=20, help="headless scenario cycles (default: 20)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the compiled editor; still ensure the Release HashLink runtime")
@@ -214,7 +215,8 @@ def main():
         print(f"frames={len(frames)} median={statistics.median(durations):.1f}ms "
               f"p95={durations[int((len(durations) - 1) * .95)]:.1f}ms max={durations[-1]:.1f}ms")
         if args.scenario is not None:
-            for action in ("sensors", "hierarchy", "inspector-focus", "rename"):
+            for action in ("sensors", "hierarchy", "inspector-focus", "rename", "selection",
+                           "property-visible", "property-position", "property-invalid"):
                 action_frames = [frame for frame in frames if frame.get("action") == action]
                 if not action_frames:
                     continue
@@ -309,6 +311,28 @@ def main():
                     not any(row.get("action") == "rename" for row in actions)):
                 raise ValueError("tab and inspector scenario did not commit the expected rename")
             print(f"scenario=tab-inspector verified cycles={args.cycles}")
+        except (OSError, KeyError, ValueError) as error:
+            print(f"scenario verification failed: {error}", file=sys.stderr)
+            result = 1
+    elif args.scenario == "inspector-edits":
+        try:
+            actions = [json.loads(line) for line in (output / "actions.jsonl").read_text().splitlines()]
+            expected = {"property-visible", "property-position", "property-invalid"}
+            counts = {name: sum(row.get("action") == name for row in actions) for name in expected}
+            selections = sum(row.get("action") == "selection" for row in actions)
+            if any(count != args.cycles for count in counts.values()) or selections != max(0, args.cycles - 1):
+                raise ValueError("inspector edit scenario did not complete every action")
+            print(f"scenario=inspector-edits verified cycles={args.cycles}")
+        except (OSError, KeyError, ValueError) as error:
+            print(f"scenario verification failed: {error}", file=sys.stderr)
+            result = 1
+    elif args.scenario == "selection-stress":
+        try:
+            actions = [json.loads(line) for line in (output / "actions.jsonl").read_text().splitlines()]
+            count = sum(row.get("action") == "selection" for row in actions)
+            if count != args.cycles:
+                raise ValueError("selection stress scenario did not complete every selection")
+            print(f"scenario=selection-stress verified cycles={args.cycles}")
         except (OSError, KeyError, ValueError) as error:
             print(f"scenario verification failed: {error}", file=sys.stderr)
             result = 1
