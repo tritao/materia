@@ -5,6 +5,7 @@ import haxe.Int64;
 import materia.automation.facility.Charger;
 import materia.automation.facility.Facility;
 import materia.automation.facility.FacilityRouter;
+import materia.automation.facility.Intersection;
 import materia.automation.facility.Lane;
 import materia.automation.facility.Rack;
 import materia.automation.facility.Station;
@@ -13,6 +14,7 @@ import materia.automation.fleet.Dispatcher;
 import materia.automation.fleet.Fleet;
 import materia.automation.fleet.FleetAssignment;
 import materia.automation.fleet.TrafficManager;
+import materia.automation.fleet.TrafficSpeedZone;
 import materia.automation.mission.Mission;
 import materia.automation.mission.MissionExecutionStatus;
 import materia.automation.mission.MissionExecutor;
@@ -96,6 +98,8 @@ class AutomationTests {
         new Path([inbound.pose, new Pose2(2.0, 0.0), rack.pose], "map"), 1.5, 1.5));
       facility.addLane(new Lane("rack-outbound", rack.id, outbound.id,
         new Path([rack.pose, new Pose2(3.0, 1.0), outbound.pose], "map"), 1.5, 0.3));
+      facility.addIntersection(new Intersection("crossing", "Main crossing",
+        "main", "map", ["inbound-outbound", "inbound-rack"]));
       var lane:Lane = cast facility.lane("inbound-outbound");
       var storedRack:Rack = cast facility.rack("rack-4");
       equal(facility.stations().length, 4, "facility indexes stations and specialized locations");
@@ -167,6 +171,19 @@ class AutomationTests {
       check(traffic.release("inbound-outbound", robot.id()), "owner releases its lane");
       check(traffic.reserve("inbound-outbound", secondRobot.id()), "waiting robot can reserve the released lane");
       check(traffic.release("inbound-outbound", secondRobot.id()), "second lane owner releases its reservation");
+      check(traffic.reserve("inbound-outbound", robot.id()) &&
+        !traffic.reserve("inbound-rack", secondRobot.id()) &&
+        traffic.conflictRegionOwner("crossing") == robot.id() &&
+        traffic.release("inbound-outbound", robot.id()) &&
+        traffic.reserve("inbound-rack", secondRobot.id()) &&
+        traffic.release("inbound-rack", secondRobot.id()),
+        "intersecting lanes require exclusive passage through their shared region");
+      traffic.setSpeedZone(new TrafficSpeedZone("slow-rack", ["inbound-rack"], 0.1));
+      var slowed = traffic.route(inbound.id, outbound.id);
+      check(slowed.legs().length == 1 &&
+        slowed.legs()[0].lane.id == "inbound-outbound" &&
+        traffic.clearSpeedZone("slow-rack"),
+        "a temporary speed cap changes the fastest route and can be cleared");
       check(traffic.reserve("inbound-outbound", robot.id()) &&
         !traffic.reserveIntersection(rack.id, robot.id()) &&
         traffic.release("inbound-outbound", robot.id()) &&

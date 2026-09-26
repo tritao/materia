@@ -7,6 +7,7 @@ class Facility {
   final zonesById = new Map<String,Zone>();
   final stationsById = new Map<String,Station>();
   final lanesById = new Map<String,Lane>();
+  final intersectionsById = new Map<String,Intersection>();
   final racksById = new Map<String,Rack>();
   final chargersById = new Map<String,Charger>();
 
@@ -47,15 +48,31 @@ class Facility {
     lanesById.set(lane.id, lane);
   }
 
+  public function addIntersection(intersection:Intersection):Void {
+    if (intersection == null || intersectionsById.exists(intersection.id))
+      throw "Facility intersection ID is missing or duplicated";
+    var zone = zonesById.get(intersection.zoneId);
+    if (zone == null || zone.frameId != intersection.frameId)
+      throw "Intersection must reference an existing zone in the same frame";
+    for (laneId in intersection.lanes()) {
+      var lane = lanesById.get(laneId);
+      if (lane == null || lane.centerline.frameId != intersection.frameId)
+        throw 'Intersection references an unknown or mismatched lane "$laneId"';
+    }
+    intersectionsById.set(intersection.id, intersection);
+  }
+
   public function zone(id:String):Null<Zone> return zonesById.get(id);
   public function station(id:String):Null<Station> return stationsById.get(id);
   public function lane(id:String):Null<Lane> return lanesById.get(id);
+  public function intersection(id:String):Null<Intersection> return intersectionsById.get(id);
   public function rack(id:String):Null<Rack> return racksById.get(id);
   public function charger(id:String):Null<Charger> return chargersById.get(id);
 
   public function zones():Array<Zone> return sortedValues(zonesById);
   public function stations():Array<Station> return sortedValues(stationsById);
   public function lanes():Array<Lane> return sortedValues(lanesById);
+  public function intersections():Array<Intersection> return sortedValues(intersectionsById);
 
   function requireStation(station:Station):Void {
     if (station == null || stationsById.exists(station.id))

@@ -3,6 +3,7 @@ package materia.automation.fleet;
 import materia.automation.facility.Facility;
 import materia.automation.facility.FacilityRoute;
 import materia.automation.facility.FacilityRouteLeg;
+import materia.automation.facility.FacilityRouter;
 import StringTools;
 
 /** Priority reservations for facility lanes and route intersections. */
@@ -12,6 +13,7 @@ class TrafficManager {
   final ownerByLane = new Map<String,String>();
   final ownerByIntersection = new Map<String,String>();
   final blockedByLane = new Map<String,String>();
+  final speedZonesById = new Map<String,TrafficSpeedZone>();
   final routeSignatureByRobot = new Map<String,String>();
   final routeResourcesByRobot = new Map<String,Array<String>>();
   final waiters:Array<TrafficWaiter> = [];
@@ -31,6 +33,9 @@ class TrafficManager {
     if (owner == robotId) return true;
     if (blockedByLane.exists(laneId)) return false;
     var resources = [laneKey(laneId)];
+    for (areaId in conflictRegionsForLane(laneId))
+      resources.push(intersectionKey('area:$areaId'));
+    resources.sort(Reflect.compare);
     if (!respectsResourceOrder(resources, robotId)) return false;
     return acquire(resources, robotId, priority, null);
   }
@@ -66,6 +71,9 @@ class TrafficManager {
       var blocked = blockedByLane.get(leg.lane.id);
       if (blocked != null) return false;
       resources.push(laneKey(leg.lane.id));
+      for (areaId in conflictRegionsForLane(leg.lane.id))
+        if (resources.indexOf(intersectionKey('area:$areaId')) < 0)
+          resources.push(intersectionKey('area:$areaId'));
       if (index < legs.length - 1)
         resources.push(intersectionKey(leg.toStationId));
     }
@@ -85,7 +93,52 @@ class TrafficManager {
   public function owner(laneId:String):Null<String> return ownerByLane.get(laneId);
   public function intersectionOwner(stationId:String):Null<String>
     return ownerByIntersection.get(stationId);
+  public function conflictRegionOwner(id:String):Null<String>
+    return ownerByIntersection.get('area:$id');
   public function laneBlockReason(laneId:String):Null<String> return blockedByLane.get(laneId);
+
+  public function setSpeedZone(zone:TrafficSpeedZone):Void {
+    if (zone == null) throw "Traffic speed zone is required";
+    for (laneId in zone.lanes())
+      if (facility.lane(laneId) == null) throw 'Unknown facility lane "$laneId"';
+    speedZonesById.set(zone.id, zone);
+  }
+
+  public function clearSpeedZone(zoneId:String):Bool
+    return speedZonesById.remove(zoneId);
+
+  public function speedZone(zoneId:String):Null<TrafficSpeedZone>
+    return speedZonesById.get(zoneId);
+
+  public function speedZones():Array<TrafficSpeedZone> {
+    var ids = [for (id in speedZonesById.keys()) id];
+    ids.sort(Reflect.compare);
+    return [for (id in ids) speedZonesById.get(id)];
+  }
+
+  /** Plans around closures and other robots' reservations with current speed caps. */
+  public function route(fromStationId:String, toStationId:String,
+      ?robotId:String):FacilityRoute {
+    var unavailable:Array<String> = [];
+    for (laneId in blockedByLane.keys()) unavailable.push(laneId);
+    for (laneId in ownerByLane.keys())
+      if (ownerByLane.get(laneId) != robotId && unavailable.indexOf(laneId) < 0)
+        unavailable.push(laneId);
+    for (intersection in facility.intersections()) {
+      var owner = conflictRegionOwner(intersection.id);
+      if (owner == null || owner == robotId) continue;
+      for (laneId in intersection.lanes())
+        if (unavailable.indexOf(laneId) < 0) unavailable.push(laneId);
+    }
+    var limits = new Map<String,Float>();
+    for (zone in speedZones()) for (laneId in zone.lanes()) {
+      var current = limits.get(laneId);
+      if (current == null || zone.maximumSpeedMetersPerSecond < current)
+        limits.set(laneId, zone.maximumSpeedMetersPerSecond);
+    }
+    return new FacilityRouter(facility).route(fromStationId, toStationId,
+      unavailable, limits);
+  }
 
   /** Prevents new reservations; the current owner may still release the lane. */
   public function blockLane(laneId:String, reason:String):Void {
@@ -106,6 +159,13 @@ class TrafficManager {
     if (current == null || current != robotId ||
         isRouteResource(robotId, laneKey(laneId))) return false;
     ownerByLane.remove(laneId);
+    for (areaId in conflictRegionsForLane(laneId)) {
+      var stillHeld = false;
+      var intersection = facility.intersection(areaId);
+      for (otherLane in intersection.lanes())
+        if (ownerByLane.get(otherLane) == robotId) stillHeld = true;
+      if (!stillHeld) ownerByIntersection.remove('area:$areaId');
+    }
     return true;
   }
 
@@ -215,11 +275,21 @@ class TrafficManager {
     var resources:Array<String> = [];
     for (index in 0...legs.length) {
       resources.push(laneKey(legs[index].lane.id));
+      for (areaId in conflictRegionsForLane(legs[index].lane.id))
+        if (resources.indexOf(intersectionKey('area:$areaId')) < 0)
+          resources.push(intersectionKey('area:$areaId'));
       if (index < legs.length - 1)
         resources.push(intersectionKey(legs[index].toStationId));
     }
     resources.sort(Reflect.compare);
     return resources;
+  }
+
+  function conflictRegionsForLane(laneId:String):Array<String> {
+    var result:Array<String> = [];
+    for (intersection in facility.intersections())
+      if (intersection.lanes().indexOf(laneId) >= 0) result.push(intersection.id);
+    return result;
   }
 
   function ownerFor(resource:String):Null<String> {

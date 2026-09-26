@@ -18,7 +18,8 @@ class FacilityRouter {
   }
 
   /** Returns the least-time route, respecting lane speeds and one-way direction. */
-  public function route(fromStationId:String, toStationId:String):FacilityRoute {
+  public function route(fromStationId:String, toStationId:String,
+      ?unavailableLaneIds:Array<String>, ?laneSpeedLimits:Map<String,Float>):FacilityRoute {
     var start = facility.station(fromStationId);
     var goal = facility.station(toStationId);
     if (start == null || goal == null)
@@ -52,6 +53,8 @@ class FacilityRouter {
       if (currentId == toStationId) break;
 
       for (lane in facility.lanes()) {
+        if (unavailableLaneIds != null && unavailableLaneIds.indexOf(lane.id) >= 0)
+          continue;
         var laneFrom = facility.station(lane.fromStationId);
         var laneTo = facility.station(lane.toStationId);
         if (laneFrom == null || laneTo == null ||
@@ -68,7 +71,7 @@ class FacilityRouter {
         var nextId:String = cast nextStationId;
         if (remaining.indexOf(nextId) < 0) continue;
         var candidateTime = currentTime + lane.centerline.length /
-          lane.maximumSpeedMetersPerSecond;
+          effectiveSpeed(lane, laneSpeedLimits);
         var oldTime = travelTimes.exists(nextId) ? travelTimes.get(nextId) : 1.0e300;
         if (candidateTime + 1e-9 < oldTime) {
           travelTimes.set(nextId, candidateTime);
@@ -106,9 +109,10 @@ class FacilityRouter {
       if (poses.length == 0) poses.push(lanePoses[0]);
       else poses[poses.length - 1] = lanePoses[0];
       for (index in 1...lanePoses.length) poses.push(lanePoses[index]);
+      var speed = effectiveSpeed(leg.lane, laneSpeedLimits);
       legPoseRanges.push(new FacilityRoutePoseRange(startIndex, poses.length - 1,
-        leg.lane.maximumSpeedMetersPerSecond));
-      maximumSpeed = Math.min(maximumSpeed, leg.lane.maximumSpeedMetersPerSecond);
+        speed));
+      maximumSpeed = Math.min(maximumSpeed, speed);
     }
     var routePath = new Path(poses, start.frameId);
     var speedLimits:Array<PathSpeedLimit> = [for (range in legPoseRanges)
@@ -116,6 +120,14 @@ class FacilityRouter {
         routePath.distanceAtWaypoint(range.endIndex), range.maximumSpeed)];
     return new FacilityRoute(facility.id, fromStationId, toStationId, legs,
       routePath, speedLimits, maximumSpeed);
+  }
+
+  static function effectiveSpeed(lane:Lane, limits:Map<String,Float>):Float {
+    var limit = limits == null ? null : limits.get(lane.id);
+    if (limit == null) return lane.maximumSpeedMetersPerSecond;
+    if (!Math.isFinite(limit) || limit <= 0.0)
+      throw 'Lane "${lane.id}" has an invalid route speed limit';
+    return Math.min(lane.maximumSpeedMetersPerSecond, limit);
   }
 
   function requireEndpoint(pathPose:Pose2, stationPose:Pose2, laneId:String):Void {

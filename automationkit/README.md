@@ -26,6 +26,11 @@ allows one fleet member to own a lane or intersection at a time, supports
 priority-ordered waits and blocked lanes, and can reserve a complete route's
 lanes and junctions atomically. Route bundles hold all required resources until
 `releaseRoute`, so a waiting route never holds a partial set of locks.
+Facility `Intersection` regions can group crossing lanes under one exclusive
+reservation. `TrafficSpeedZone` applies a temporary cap to selected lanes;
+`TrafficManager.route()` uses active caps and reservations when choosing a
+route, while the existing per-lane `PathSpeedLimit` intervals carry the
+resulting speeds to navigation.
 
 Task execution is an explicit composition point. `TaskSkillFactory` receives
 the current task, assigned `Robot`, and `Facility`, then returns a configured
