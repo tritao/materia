@@ -105,6 +105,8 @@ import nativekit.ui.widgets.overlays.Dialog;
 	diagnostics lifecycle; this executable only configures the editor.
 */
 class Main {
+  public static inline var DEFAULT_WINDOW_WIDTH:Int = 1600;
+  public static inline var DEFAULT_WINDOW_HEIGHT:Int = 1000;
   static var liveEditor:Null<ReferenceEditorApp>;
 
   public static function liveState():String {
@@ -227,8 +229,8 @@ private class ReferenceEditorLaunchOptions {
     var robotEndpoint:Null<String> = null;
     var setupScript:Null<String> = null;
     var projectPath:Null<String> = null;
-    var windowWidth = 1320;
-    var windowHeight = 900;
+    var windowWidth = Main.DEFAULT_WINDOW_WIDTH;
+    var windowHeight = Main.DEFAULT_WINDOW_HEIGHT;
     for (arg in args) {
       if (arg.indexOf("--capture-dir=") == 0)
         directory = arg.substr(14);
@@ -349,8 +351,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var gridSpacing:Float;
   var paletteVisible:Bool;
   var toolbarMenuVisible:Bool;
-  var viewportWidth:Float = 1320.0;
-  var viewportHeight:Float = 900.0;
+  var viewportWidth:Float = Main.DEFAULT_WINDOW_WIDTH;
+  var viewportHeight:Float = Main.DEFAULT_WINDOW_HEIGHT;
   var toolbarDensity:EditorToolbarDensity = Full;
   var contextMenuVisible:Bool;
   var hierarchyAddVisible:Bool = false;
