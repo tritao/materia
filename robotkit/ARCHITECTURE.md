@@ -236,6 +236,33 @@ target batch: differential drive emits both wheel rates, while Ackermann drive
 emits steering position and drive-wheel rate together. Runtime joint limits and
 safety remain authoritative below this application-level mapping.
 
+`HolonomicDrive` (M9) adds a third `DriveModel`: an omnidirectional ("kiwi")
+base with three wheels at 120-degree intervals, each rolling tangentially.
+`Twist2` (shared with `Navigator`/`GoTo`) carries only forward speed and yaw
+rate, never a lateral term, so `targets()` always encodes a body motion with
+zero lateral component — the mechanism itself is genuinely holonomic (a
+caller driving the three wheels directly could strafe), but no planner in
+this codebase currently issues a lateral command; that is a deliberate scope
+limit, not an oversight, consistent with the plan's "no joint base+arm
+whole-body optimization." `DriveModel.createOdometry()` is typed to return
+`Null<DifferentialOdometry>` specifically (a pre-existing, differential-drive-
+specific signature), so `HolonomicDrive.createOdometry()` returns `null`
+(matching `AckermannDrive`) and `robotkit.mobile.HolonomicOdometry` /
+`robotkit.localization.HolonomicOdometryLocalization` take the three wheel
+joints and geometry directly instead, mirroring `WheelOdometryLocalization`.
+Because the base has one more wheel than `Twist2`'s two degrees of freedom,
+recovering a pose update from wheel encoders is an over-determined
+least-squares fit against the same per-wheel tangential-speed relationship
+`HolonomicDrive.targets()` uses; the three wheel angles being 120 degrees
+apart makes the normal equations decouple exactly (their sines sum to zero),
+so `distance` and `headingChange` are each a plain weighted average over the
+three wheels. `runtime.HolonomicDrivePlant` mirrors `DifferentialDrivePlant`:
+since the wheel-rate encoding of a zero-lateral-component twist is exactly
+invertible, the plant integrates chassis motion directly from the commanded
+twist (not by decoding wheel rates) and only re-derives wheel targets to
+validate that the configured wheel joints are the ones actually present,
+then teleports the chassis as `DifferentialDrivePlant` does.
+
 `Pose2` and `Twist2` describe planar geometry and body velocity. The initial
 wheel odometry utility consumes immutable snapshots and uses source clock IDs
 to avoid integrating across a reboot or clock reset. Its pose is derived state;
@@ -999,6 +1026,108 @@ different one. Each returned `WorkPatch` carries its own sub-`WorkSurface`,
 false if any patch's best candidate fell short of full reachability. Base
 motion between patches is left entirely to the existing `Navigator`/`GoTo`
 against each patch's `basePose`.
+
+## Simulated wall-finishing robot (M9)
+
+`robotkit/tests/src/tests/WallFinishingScenarioTests.hx` is the first
+end-to-end exercise of the full stack (`spatial` -> `manipulation` -> `tool`
+-> `process` -> `work` -> `perception` -> `mobile`/`navigation` ->
+`skill`-adjacent orchestration): a `RobotModel` fixture (an omnidirectional
+base — `HolonomicDrive`, three wheels at 120 degrees — carrying a UR5-style
+6R arm, the same published DH-equivalent offsets `KinematicsTests`/
+`PlacementTests` already use, with a sprayer flange offset and a
+base-mounted lidar-kind "scanner" sensor) drives a design `WorkSurface`
+through scan -> registration -> `WorkPatchPlanner` -> per-patch
+navigate/execute/coverage -> verification, records the run to MCAP via
+`RecordingRobot`, and replays it against a `ReplayRobot`.
+
+The "BIM wall" is a `WorkSurface` built directly in the test, not through
+`robotkit/cadbridge`: `robotkit/tests/haxeon.json` depends only on
+`nativekit`/`robotkit`, and importing `cadbridge` there would pull CadKit
+into the CAD-agnostic core's own test project. Per the plan's own fallback,
+`robotkit/cadbridge/tests` carries a separate end-to-end check instead
+(`testBimWallToPatchPlanEndToEnd`): a `BimSchema.Wall` with a hosted opening,
+through `WallBridge.wallToWorkSurface`, into `WorkPatchPlanner` against a UR5
+fixture built directly in that test project (cadbridge cannot depend on
+`robotkit/tests`' own fixtures) — it does not assert `fullyPlanned` the way
+the hand-built, axis-aligned `PlacementTests` (M8) fixture does, since a real
+`WallBridge`-derived `frame_T_surface` is not tuned to one particular
+standoff search; each patch reaching more than half-reachable is enough to
+demonstrate the BIM-to-patch-plan pipeline without overfitting the test to
+one fixture's search parameters.
+
+The scenario's arm holds its seed configuration (a submitted
+`JointTargets` command) from the very first tick, throughout every patch's
+navigation phase, not only during raster execution. Nothing else commands
+the arm while the base drives between patches, and the default backend's
+purely kinematic joint placement (M8.5 F4) never drifts an uncommanded
+joint away from its rest value — but MuJoCo has real dynamics, so an
+uncommanded joint free-falls under gravity while the base drives, eventually
+exceeding the joint's compiled envelope. Holding a defined pose is also the
+physically correct model for a real robot driving between patches, not a
+workaround.
+
+Coverage is derived from the *observed* TCP pose each tick
+(`Simulation.linkPose` of the wrist-3 link, composed with `linkTFlange` and
+`flangeTTcp`), never from commanded joint targets, per the plan. The same
+observed-pose computation doubles as the required cross-check between
+SimKit and RobotKit's own FK: `wrist3FromSim` (the simulator's own reported
+link pose) must equal `basePoseNow . manipulator.tcpPose(reportedQ)` (base
+pose composed with RobotKit's FK evaluated at the simulator's *own reported*
+joint values) — this is a pure kinematics-consistency check between the
+physics engine's body pose and RobotKit's analytic FK, independent of how
+closely the controller is tracking its *commanded* target, so it holds to
+near machine precision in both backends regardless of controller settling.
+The default backend asserts it to `1e-6` (it applies position targets
+exactly and instantly, per M8.5 F4); the MuJoCo backend, which has finite
+settling time, keeps the same computation but only reports it (a loose
+`2e-2` sanity bound guards against a gross regression, e.g. a stalled or
+diverging joint, without asserting default-backend precision).
+
+`runScenario(backend, physicsTimestep, physicsSubsteps, strictFkCrossCheck,
+minCoverage)` parameterizes the whole scenario so the identical
+scan/register/plan/navigate/execute/coverage/replay logic runs against
+either backend; `testSimulatedWallFinishingScenario` calls it with
+`backend = 0` (default, `strictFkCrossCheck = true`, `minCoverage = 0.99`),
+and `testSimulatedWallFinishingScenarioMuJoCo` with the plan's own
+`new Simulation(0.01, 2, 1)` (`strictFkCrossCheck = false`,
+`minCoverage = 0.97`). A fixed navigation tick budget is scaled by the
+timestep (`40.0 / timestep`) so both backends get the same *simulated-time*
+budget to converge, not the same tick count. MuJoCo's per-joint
+computed-torque controller (a real critically-damped second-order response,
+time constant ~1/omega_n ~ 16ms) needs several time constants to close a
+potentially multi-radian jump between a patch's seed-held arm pose and its
+first reach pose — a jump the default backend closes in one tick since it
+applies targets exactly — so the MuJoCo run gives that initial move 60
+settling ticks (instead of 2) and each subsequent raster sample 6 ticks
+(instead of 2) before reading back joint state; this is the class of
+"controller re-tuned, not masked regression" adjustment M8.5 F2 already
+established precedent for. Observed on this fixture: MuJoCo coverage
+99.27% (default backend 99.23%), FK-consistency tracking error max
+5.4e-8m / RMS 4.7e-8m (both backends, since it is a kinematics-consistency
+check as above, not a controller-tracking metric), and joint-tracking error
+(commanded vs. simulator-observed position) max ~0.9 degrees under MuJoCo
+vs. exact under the default backend.
+
+**Why a separate `robotkit/tests/mujoco` haxeon project.** `robotkit/tests`'
+own native build has `NKSIM_BUILD_MUJOCO` compiled out (`robotd/native`'s own
+`option(... OFF)`, so every ordinary Haxe test project's build time and
+dependency footprint stays small), and haxeon's `NativeCMakeProvider` always
+configures a package's `native.cmake` project with a fixed, hardcoded
+argument list — there is no manifest field to pass an extra `-D` define per
+package. `robotkit/robotd/native-mujoco/CMakeLists.txt` is a thin wrapper
+that pre-seeds `NKSIM_BUILD_MUJOCO=ON` in its *own* isolated CMake cache
+before `add_subdirectory`-including the real `robotd/native` project (CMake's
+`option()` only sets a variable when it is not already cached, so the
+wrapper's forced value wins without touching `robotd/native`'s own default
+for any other consumer). `robotkit/tests/mujoco/haxeon.json` points its
+`native.cmake.source` at that wrapper and its `entry` at the small
+`tests.WallFinishingMuJoCoRunner`, which calls only
+`WallFinishingScenarioTests.runMuJoCo()` — not `RobotWorldTests.main()`,
+which is still the entry for the standard `robotkit/tests` project and must
+never reach a `new Simulation(dt, substeps, 1)` call on a build where MuJoCo
+support is compiled out (`RK_ERROR_UNSUPPORTED`, not a silent fallback, per
+the "One simulation tick" section above).
 
 ## Ownership and shutdown
 

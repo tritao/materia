@@ -1,0 +1,28 @@
+{
+	"version": 1,
+	"package": { "name": "robotkit-world-tests-mujoco" },
+	"entry": "tests.WallFinishingMuJoCoRunner",
+	"sourceRoots": ["../src"],
+	"dependencies": {
+		"nativekit": { "path": "../../../nativekit" },
+		"robotkit": { "path": "../.." }
+	},
+	"native": {
+		"cmake": {
+			"source": "../../robotd/native-mujoco",
+			"target": "robotd_native",
+			"inputs": [
+				"../../robotd/native-mujoco/CMakeLists.txt",
+				"../../robotd/native/CMakeLists.txt",
+				"../../CMakeLists.txt",
+				"../../runtime/CMakeLists.txt",
+				"../../runtime/include/robotkit_runtime.h",
+				"../../runtime/include/robotkit_simkit.h",
+				"../../../nativekit/CMakeLists.txt",
+				"../../../simkit/CMakeLists.txt"
+			]
+		}
+	},
+	"target": "host",
+	"outputDir": "build"
+}

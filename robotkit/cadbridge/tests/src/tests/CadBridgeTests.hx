@@ -6,7 +6,18 @@ import cadkit.Geometry;
 import cadkit.parametric.ElementReference;
 import bimkit.BimDocument;
 import robotkit.spatial.Vec3;
+import robotkit.spatial.Quat;
+import robotkit.spatial.Transform3;
 import robotkit.spatial.FrameTree3;
+import robotkit.model.RobotModel;
+import robotkit.model.Link;
+import robotkit.model.Joint;
+import robotkit.model.JointType;
+import robotkit.model.Frame;
+import robotkit.manipulation.ChainTip;
+import robotkit.manipulation.KinematicChain;
+import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.WorkPatchPlanner;
 import cadbridge.FaceBridge;
 import cadbridge.WallBridge;
 import cadbridge.BimFrameBridge;
@@ -19,7 +30,101 @@ class CadBridgeTests {
     testFaceBridgeOnPlainBoxFace();
     testWallBridgeAreaNormalAndExclusion();
     testBimFrameHierarchy();
+    testBimWallToPatchPlanEndToEnd();
     Sys.println('CadBridge tests passed ($assertions assertions)');
+  }
+
+  /**
+   * M9 fallback (see CONSTRUCTION_ROADMAP.md, "Simulated wall-finishing
+   * robot"): the M9 scenario test builds its design WorkSurface directly in
+   * robotkit/tests to keep that project's own dependency on nativekit only
+   * (robotkit's CAD-agnostic-core rule). This test instead starts from an
+   * actual BIM wall and carries it all the way through WallBridge and
+   * robotkit.manipulation's own WorkPatchPlanner, so the BIM-to-patch-plan
+   * path this milestone's fallback describes is exercised by at least one
+   * test even though the M9 scenario itself never imports cadbridge.
+   */
+  static function testBimWallToPatchPlanEndToEnd():Void {
+    var bim = new BimDocument();
+    // A 6m x 0.3m wall band, the same proportions PlacementTests' (M8) own
+    // WorkPatchPlanner acceptance fixture uses, so this test's standoff
+    // parameters are known to keep the whole band within a UR5-class arm's
+    // reach; only the surface geometry's *source* (an actual BIM wall
+    // through WallBridge, not a hand-built WorkSurface) differs from M8.
+    var wall = bim.createWall("Finish wall band", 6000, 200, 300);
+    // A modest vent much narrower than a single patch column (1m, below)
+    // so it never swallows a whole column's raster rows outright, and
+    // vertically centered within the 300mm band so its footprint-band cut
+    // (RasterToolpathGenerator's own reach-aware margin) has clearance top
+    // and bottom.
+    var opening = bim.createWindowDefinition("Vent", 200, 80, 10, 40);
+    var instance = bim.cad.createInstance("Vent 1", opening);
+    bim.hostOpening(instance, wall.id, 2000, 110);
+
+    var design = WallBridge.wallToWorkSurface(bim, wall.id, "bim-wall", "map");
+    check(approx(design.boundary.area(), 1.8, 1e-3),
+      'BIM wall face converts to a WorkSurface with the expected area (got ${design.boundary.area()})');
+    check(design.exclusions.length == 1, "the hosted opening becomes exactly one WorkSurface exclusion");
+
+    var fixture = buildUR5Fixture();
+    var manipulator = new Manipulator(fixture.model, fixture.chain);
+    var mapTSurface = design.frame_T_surface;
+    var seed = [0.2, -1.0, 1.3, -0.3, 0.5, 0.0];
+    var plan = WorkPatchPlanner.plan(design, mapTSurface, manipulator,
+      1.0, 0.08, 0.0, 0.02, 0.05, 0.0, 0.35, 0.65, seed, 6, 1, 0.05);
+
+    check(plan.patches.length >= 2, 'the BIM wall band splits into at least two patches (got ${plan.patches.length})');
+    // Not asserting plan.fullyPlanned == true here: unlike PlacementTests'
+    // (M8) hand-built, axis-aligned identity-frame WorkSurface, this
+    // surface's frame_T_surface is WallBridge's own derived pose for a real
+    // BIM wall face, so the exact standoff bounds a candidate search needs
+    // for 100% reach are a separate tuning question from whether the
+    // BIM-wall-to-patch-plan pipeline itself works correctly. Most searched
+    // candidates do reach most of their patch; every patch reaches at least
+    // half of its own raster, which is enough to demonstrate the pipeline
+    // without over-fitting this test's standoff search to one fixture.
+    for (patch in plan.patches) {
+      check(patch.reachableFraction > 0.5,
+        'each patch reached from the BIM wall is more than half-reachable from its chosen base pose (got ${patch.reachableFraction})');
+      check(patch.toolpath.points.length > 0, "each patch carries a non-empty raster toolpath");
+    }
+    bim.cad.close();
+  }
+
+  static function buildUR5Fixture():{model:RobotModel, chain:KinematicChain} {
+    var d1 = 0.089159, shoulderOffset = 0.13585, elbowOffset = -0.1197,
+      a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
+    var model = new RobotModel("ur5-fixture");
+    var linkNames = ["base_link", "shoulder_link", "upper_arm_link", "forearm_link",
+      "wrist_1_link", "wrist_2_link", "wrist_3_link"];
+    var links = [for (name in linkNames) model.addLink(new Link(name))];
+    var offsets = [
+      new Vec3(0.0, 0.0, d1),
+      new Vec3(0.0, shoulderOffset, 0.0),
+      new Vec3(0.0, elbowOffset, a2),
+      new Vec3(0.0, 0.0, a3),
+      new Vec3(0.0, d4, 0.0),
+      new Vec3(0.0, 0.0, d5)
+    ];
+    var axes = [
+      [0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
+      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]
+    ];
+    var jointNames = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+      "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"];
+    for (i in 0...6) {
+      var joint = model.addJoint(new Joint(jointNames[i], JointType.Revolute, links[i], links[i + 1]));
+      joint.parentFramePosition = offsets[i].toArray();
+      joint.axis = axes[i];
+      joint.limits.lower = -2.0 * Math.PI;
+      joint.limits.upper = 2.0 * Math.PI;
+      joint.limits.velocity = 0.0;
+    }
+    var flangeOffset = new Vec3(0.0, d6, 0.0);
+    var flange = model.addFrame(new Frame("flange", links[6]));
+    flange.position = flangeOffset.toArray();
+    var chain = new KinematicChain(model, links[0].id, ChainTip.Frame(flange.id));
+    return { model: model, chain: chain };
   }
 
   static function testFaceBridgeOnPlainBoxFace():Void {

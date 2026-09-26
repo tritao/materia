@@ -801,3 +801,120 @@ of the exclusion; a second test builds one `CoverageMap` from the raw
 `Toolpath` and another by sampling `CartesianTrajectory`, and checks their
 coverage fractions agree within 1%. No haxeon compile issues in this
 milestone; all the iteration above was geometry logic, not the compiler.
+
+**Known issues fixed ahead of M9** (the two authorized `robotkit_mujoco_tests`
+fixes, done first since M9's holonomic base on a kinematic root is exactly
+the shape that exposes both): (a) `MujocoBackend::configure_body` gave every
+non-`STATIC` root body — `KINEMATIC` and `DYNAMIC` alike — a mass-bearing
+MuJoCo free joint; a `KINEMATIC` root (a robot's own base link, externally
+scripted from its scene node once per outer step, not once per physics
+substep) could pick up real, spurious velocity from a driven child's
+reaction torque within a step's substeps, which leaked into that child's
+world-frame velocity reading without appearing in its own joint `qvel` —
+exactly the pre-existing `robotkit_mujoco_tests` IMU-vs-joint-velocity
+failure M8.5's own log documented and deliberately left unfixed. Fixed by
+treating `KINEMATIC` exactly like `STATIC` in `configure_body` (no mass, no
+free joint); the existing "no incoming joint" `body_set_state` branch already
+applies `body_pos`/`body_quat` directly, which is the correct zero-dof
+externally-driven placement for a `KINEMATIC` root too. A failing test
+(`kinematic_root_child_velocity_matches_joint_across_substeps`) was written
+first and reproduces the leak via an effort-mode torque, independent of (b)
+below. (b) A second, previously undocumented bug surfaced while writing that
+test: F2's controller read a joint's mass-matrix diagonal as
+`data->M[model->dof_Madr[dof]]`, but `dof_Madr[dof]` addresses the *start* of
+that dof's sparse mass-matrix row (ancestor dofs first, own diagonal last),
+not the diagonal itself — only coincidentally correct for a dof with no
+movable ancestor (true of every existing F2 fixture, false for M9's arm on a
+moving base, or any joint past the first in a chain). Fixed together with
+F2's already-documented lack of cross-joint compensation by replacing the
+diagonal lookup with full computed-torque control: `apply_joint_targets` now
+builds one desired-acceleration vector over every position/velocity-mode
+joint's own dof and applies MuJoCo's full mass matrix as an operator via
+`mj_mulM` (`tau = M · qacc_desired + qfrc_bias`), which both reads the correct
+value and distributes torque through the true articulated inertia. Both
+fixes are `robotkit_mujoco_tests` (12/12) and `ctest -L sim` (unaffected) —
+green; full detail, including why this is the smallest correct fix per the
+plan's own "or modelled without a free joint" fallback, is in
+`ARCHITECTURE.md` ("MuJoCo kinematic-root velocity leak (pre-M9 fix)" /
+"MuJoCo full computed-torque control (pre-M9 fix)"). Fix (c) from the
+handoff (`simulation.cpp` resetting a robot's root to the origin regardless
+of its created offset) was not needed: M9 never calls `resetRobot`/`reset` on
+a robot placed away from the origin, so it is left unfixed and unlogged
+further, per the handoff's own "fix only if M9 needs it."
+
+**M9**: added `robotkit/haxe/robotkit/mobile/HolonomicDrive.hx` (+
+`HolonomicOdometry.hx`), `robotkit/haxe/robotkit/localization/HolonomicOdometryLocalization.hx`,
+`robotkit/haxe/robotkit/runtime/HolonomicDrivePlant.hx`, and the matching
+`RobotDriveConfiguration.Holonomic`/`RobotRuntimeDriveConfiguration.Holonomic`
+roles through `RobotRuntimeCompiler` and `MobileBase.fromBlueprint` (a
+three-wheel "kiwi" omnidirectional base, mirroring `DifferentialDrive`/
+`DifferentialDrivePlant`); `robotkit/tests/src/tests/WallFinishingScenarioTests.hx`
+(+ `WallFinishingMuJoCoRunner.hx`), called from `RobotWorldTests.main()`.
+The robot fixture is an omni base carrying a UR5-style 6R arm (the same
+published DH-equivalent offsets `KinematicsTests`/`PlacementTests` already
+use), a sprayer flange offset, and a base-mounted lidar-kind scanner sensor.
+The scenario runs design `WorkSurface` -> `SimulatedSurfaceScanner.scan` ->
+`SurfaceRegistration.register` -> `WorkPatchPlanner.plan` -> per patch
+navigate (`Navigator`/`GoTo`) -> execute (`CartesianTrajectory`/
+`ToolpathExecutor`) -> `CoverageMap` from the *observed* TCP pose -> final
+verification, records to MCAP via `RecordingRobot`, and replays it. As the
+plan's own fallback anticipated, the design `WorkSurface` is built directly
+in the test rather than through `robotkit/cadbridge` (keeping
+`robotkit/tests`' own CAD-agnostic-core dependency on `nativekit`/`robotkit`
+only), and a separate BIM-wall-to-patch-plan end-to-end test
+(`testBimWallToPatchPlanEndToEnd`) was added to `robotkit/cadbridge/tests`
+instead, starting from an actual `BimSchema.Wall` with a hosted opening
+through `WallBridge`. Both choices, and the reasoning behind them, are
+logged in `ARCHITECTURE.md`'s "Simulated wall-finishing robot (M9)" section
+rather than repeated here.
+
+The required simulator-vs-FK cross-check (`Simulation.linkPose` of the
+flange link, composed with `flange_T_tcp`, against
+`basePose · manipulator.tcpPose(reportedQ)`) is asserted to `1e-6` on the
+default backend and passes at essentially machine precision
+(`trackingMax=5.36e-16`) — it turned out to be a pure kinematics-consistency
+check between the physics engine's own body pose and RobotKit's FK evaluated
+at that same engine's *own reported* joint values, not a function of how
+closely a controller is tracking its *commanded* target, so it holds equally
+well (to `5.4e-8`) under MuJoCo's real dynamics; this is noted in
+`ARCHITECTURE.md` since a literal reading of the plan might expect a looser
+MuJoCo cross-check tolerance than a strict one turned out to need.
+
+After the default-backend scenario passed (99.23% coverage), the same
+scenario was run against MuJoCo (`new Simulation(0.01, 2, 1)`) through a new
+`robotkit/tests/mujoco` haxeon project — the standard `robotkit/tests`
+project's native build has no MuJoCo support compiled in, and haxeon's own
+`native.cmake` integration (`NativeCMakeProvider`) has no manifest field to
+pass an extra `-D` define per package, so a thin CMake wrapper
+(`robotkit/robotd/native-mujoco/CMakeLists.txt`) pre-seeds
+`NKSIM_BUILD_MUJOCO=ON` in its own isolated cache before including the real
+`robotd/native` project, leaving that project's own default (`OFF`, so every
+other Haxe consumer's build stays small) untouched. This is the "smallest
+correct adjustment" for a plan requirement that named a Haxe-level API
+(`new Simulation(dt, substeps, 1)`) the existing build wiring could not reach
+directly; logged here since it is new native/build-system surface area, not
+just Haxe. Getting a *passing* MuJoCo run needed two real fixes beyond the
+backend switch, both logged in `ARCHITECTURE.md`: (1) nothing commanded the
+arm during navigation between patches, which is harmless on the default
+backend (M8.5 F4's purely kinematic joint placement never drifts an
+uncommanded joint) but let the arm free-fall under MuJoCo's real gravity
+until it exceeded its own compiled joint envelope — fixed by holding the arm
+at its seed configuration from the first tick, which is also the physically
+correct model for a real robot driving between patches; (2) a fixed
+navigation-tick budget and fixed per-sample settling-tick counts, both tuned
+against the default backend's instant-apply joint targets, were far too
+short for MuJoCo's real (if fast) second-order controller response —
+matching the "controller re-tuned, not masked regression" precedent M8.5 F2
+already established — fixed by scaling the tick budget with the timestep and
+giving MuJoCo more settling ticks (60 for the larger seed-to-first-point
+jump, 6 per raster sample). With both fixes: MuJoCo coverage 99.27%
+(`>= 97%` required), tracking error max `5.37e-8` m / RMS `4.65e-8` m,
+joint-tracking error (commanded vs. observed position, a looser MuJoCo-only
+sanity check, not the plan's own FK cross-check) max `0.0092` rad. Haxe suite
+703 assertions (674 M0-M8.5 baseline + 7 from a small `HolonomicDrive`/
+`HolonomicDrivePlant` unit test added to `RobotWorldTests.hx` alongside the
+drive model itself = 681, + 22 from `WallFinishingScenarioTests` = 703);
+`robotkit/cadbridge/tests` (`testBimWallToPatchPlanEndToEnd`): 27 assertions
+(12 M6 baseline + 15 new); native `ctest -L sim` and the MuJoCo-enabled
+robotd native build stay green.
+
