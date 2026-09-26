@@ -39,10 +39,14 @@ class UiStyleInvalidationMetrics {
 	}
 
 	/** Compares current nodes against the prior submitted tree without touching layout. */
-	public static function compare(previous:Null<RenderNode>, current:Null<RenderNode>):UiStyleInvalidationMetrics {
-		var previousById = new Map<Int, RenderNode>();
+	public static function compare(previous:Null<RenderNode>, current:Null<RenderNode>,
+			?previousById:Map<Int, RenderNode>, ?currentById:Map<Int, RenderNode>):UiStyleInvalidationMetrics {
+		var previousIndex = previousById == null ? new Map<Int, RenderNode>() : previousById;
+		var currentIndex = currentById == null ? new Map<Int, RenderNode>() : currentById;
+		previousIndex.clear();
+		currentIndex.clear();
 		if (previous != null)
-			previous.walk(function(node) previousById.set(node.id.value, node));
+			previous.walk(function(node) previousIndex.set(node.id.value, node));
 
 		var styleChangedNodes = 0;
 		var styleUnchangedNodes = 0;
@@ -54,11 +58,10 @@ class UiStyleInvalidationMetrics {
 		var semanticsInvalidatedNodes = 0;
 		var hitGeometryInvalidatedNodes = 0;
 		var treeChanged = previous == null && current != null;
-		var currentById = new Map<Int, RenderNode>();
 		if (current != null)
 			current.walk(function(node) {
-				currentById.set(node.id.value, node);
-				var prior = previousById.get(node.id.value);
+				currentIndex.set(node.id.value, node);
+				var prior = previousIndex.get(node.id.value);
 				if (prior == null) {
 					treeChanged = true;
 				} else {
@@ -88,8 +91,8 @@ class UiStyleInvalidationMetrics {
 				if (UiDirtyFlag.contains(flags, UiDirtyFlag.NeedsHitGeometry)) hitGeometryInvalidatedNodes++;
 			});
 		if (previous != null)
-			for (id in previousById.keys())
-				if (!currentById.exists(id))
+			for (id in previousIndex.keys())
+				if (!currentIndex.exists(id))
 					treeChanged = true;
 
 		if (treeChanged)

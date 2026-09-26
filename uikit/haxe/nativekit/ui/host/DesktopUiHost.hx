@@ -41,6 +41,8 @@ class DesktopUiHost {
 		var session:Null<UiHostSession> = null;
 		var eventHistory:Array<String> = [];
 		var frameHistory:Array<Dynamic> = [];
+		var eventCounts:Map<String, Int> = new Map();
+		var frameRequestCounts:Map<String, Int> = new Map();
 		var captureState = {startedAt: -1.0};
 		var result = 0;
 		var step:Void->Bool = function() return false;
@@ -107,10 +109,23 @@ class DesktopUiHost {
 			var active = true;
 			var surfaceAvailable = false;
 			var framePending = false;
-			var frameRequested = true;
-			var scheduleFrame = function() {
-				frameRequested = true;
+			var frameRequested = false;
+			var frameRequestedAt = -1.0;
+			var frameRequestReason = "none";
+			var frameRequestSerial = 0;
+			var incrementCount = function(counts:Map<String, Int>, key:String):Void {
+				var previous = counts.get(key);
+				counts.set(key, previous == null ? 1 : previous + 1);
 			};
+			var scheduleFrameWithReason = function(reason:String):Void {
+				frameRequested = true;
+				frameRequestedAt = Sys.time();
+				frameRequestReason = reason;
+				frameRequestSerial++;
+				incrementCount(frameRequestCounts, reason);
+			};
+			var scheduleFrame = function():Void scheduleFrameWithReason("api");
+			scheduleFrameWithReason("startup");
 			session = new UiHostSession(function() active = false);
 			var hostContext = new DesktopUiHostContext(fonts, pump, window, surface,
 				function() session.stop(), scheduleFrame);
@@ -124,6 +139,8 @@ class DesktopUiHost {
 			nativeSurface = borrowedSurface;
 
 			eventSubscription = pump.listen(function(value) {
+				var eventName = eventKind(value);
+				incrementCount(eventCounts, eventName);
 				if (options.eventHistoryLimit > 0) {
 					eventHistory.push(Std.string(value));
 					while (eventHistory.length > options.eventHistoryLimit) eventHistory.shift();
@@ -131,15 +148,20 @@ class DesktopUiHost {
 				switch (value) {
 					case WindowClose(source) if (source.rawValue() == window.rawValue()):
 						hostContext.requestClose();
-						scheduleFrame();
+						scheduleFrameWithReason("window-close");
 					case WindowResize(source, width, height) if (source.rawValue() == window.rawValue()):
 						if (NativeKit.nk_surface_set_bounds(surface, 0, 0, width, height) != Result.Ok)
 							throw "Surface resize failed";
 						runtime.resize(width, height, runtime.framebufferWidth, runtime.framebufferHeight);
-						scheduleFrame();
+						scheduleFrameWithReason("window-resize");
 					case WindowScaleChanged(source, scale) if (source.rawValue() == window.rawValue()):
 						runtime.setScale(scale);
-						scheduleFrame();
+						scheduleFrameWithReason("window-scale");
+					case WindowMove(source, _, _) if (source.rawValue() == window.rawValue()):
+						// Moving the top-level window does not change the surface contents.
+						// On X11 this event is emitted for every position update while the
+						// window is dragged; redrawing the complete Haxe UI here competes
+						// with the compositor and makes the drag less responsive.
 					case SurfaceReady(source) if (source.rawValue() == surface.rawValue()):
 						surfaceAvailable = true;
 						var size = NativeKit.nk_surface_get_framebuffer_size(surface);
@@ -155,6 +177,9 @@ class DesktopUiHost {
 								try {
 									framePending = false;
 									if (!active || !surfaceAvailable || !frameRequested) return;
+									var requestedAt = frameRequestedAt;
+									var requestReason = frameRequestReason;
+									var requestSerial = frameRequestSerial;
 									frameRequested = false;
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
 									var frameStartedAt = Sys.time();
@@ -166,6 +191,9 @@ class DesktopUiHost {
 										frameHistory.push({
 											frame: runtime.rendered,
 											startedAtSeconds: frameStartedAt,
+											requestReason: requestReason,
+											requestSerial: requestSerial,
+											requestAgeSeconds: requestedAt < 0.0 ? null : frameStartedAt - requestedAt,
 											frameSeconds: Sys.time() - frameStartedAt,
 											submitSeconds: metrics == null ? null : metrics.submitSeconds,
 											styleResolutions: metrics == null ? null : metrics.styleResolutions,
@@ -184,32 +212,40 @@ class DesktopUiHost {
 									}
 									if (session.state == UiHostLifecycle.Failed) active = false;
 									if (options.captureDirectory != null && options.frameLimit > 0 && runtime.rendered >= options.frameLimit) {
-										writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime, eventHistory, frameHistory);
+										writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime,
+											eventHistory, frameHistory, eventCounts, frameRequestCounts);
 										session.stop();
 									}
 									var continueFrames = options.continuousFrames;
+									var needsAnimationFrame = runtime.app().context().needsAnimationFrame;
+									var wantsContinuousFrames = !needsAnimationFrame &&
+										continueFrames != null && continueFrames();
 									if (active && session.state == UiHostLifecycle.Running &&
 										(options.captureDirectory != null && options.frameLimit > 0 ||
-											runtime.app().context().needsAnimationFrame ||
-										(continueFrames != null && continueFrames()))) {
-										scheduleFrame();
+											needsAnimationFrame || wantsContinuousFrames)) {
+										if (options.captureDirectory != null && options.frameLimit > 0)
+											scheduleFrameWithReason("capture");
+										else if (needsAnimationFrame)
+											scheduleFrameWithReason("animation");
+										else
+											scheduleFrameWithReason("continuous");
 									}
 								} catch (error:Dynamic) {
 									runtime.fail("frame-callback", error);
 									active = false;
 								}
 							});
-						scheduleFrame();
+						scheduleFrameWithReason("surface-ready");
 					case SurfaceResize(source, width, height, framebufferWidth, framebufferHeight)
 						if (source.rawValue() == surface.rawValue()):
 						runtime.resize(width, height, framebufferWidth, framebufferHeight);
-						scheduleFrame();
+						scheduleFrameWithReason("surface-resize");
 					case SurfaceLost(source) if (source.rawValue() == surface.rawValue()):
 						surfaceAvailable = false;
 						framePending = false;
 						runtime.setSurfaceReady(false);
 					case _:
-						scheduleFrame();
+						scheduleFrameWithReason("event:" + eventName);
 				}
 			});
 
@@ -221,7 +257,7 @@ class DesktopUiHost {
 				if (active && captureState.startedAt >= 0.0 && options.captureSeconds > 0.0 &&
 					Sys.time() - captureState.startedAt >= options.captureSeconds) {
 					writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime,
-						eventHistory, frameHistory);
+						eventHistory, frameHistory, eventCounts, frameRequestCounts);
 					session.stop();
 				}
 				if (active && surfaceAvailable && frameRequested && !framePending) {
@@ -306,7 +342,8 @@ class DesktopUiHost {
 
 	static function writeDiagnostics(options:DesktopUiHostOptions,
 			application:DesktopUiApplication, renderer:Renderer, state:UiHostRuntime,
-			events:Array<String>, frames:Array<Dynamic>):Void {
+			events:Array<String>, frames:Array<Dynamic>, eventCounts:Map<String, Int>,
+			frameRequestCounts:Map<String, Int>):Void {
 		var directory:String = cast options.captureDirectory;
 		createDirectories(directory);
 		File.saveContent(directory + "/ui-tree.txt", application.context().dumpTree() + "\n");
@@ -337,6 +374,10 @@ class DesktopUiHost {
 				pathCacheMisses: Std.string(stats.pathCacheMisses),
 				rasterCacheHits: Std.string(stats.rasterCacheHits),
 				rasterCacheMisses: Std.string(stats.rasterCacheMisses)
+			},
+			scheduling: {
+				eventCounts: countsObject(eventCounts),
+				frameRequestCounts: countsObject(frameRequestCounts)
 			}
 		};
 		File.saveContent(directory + "/frame-metrics.json",
@@ -352,6 +393,39 @@ class DesktopUiHost {
 				"ImageMagick import could not capture the application window (exit " +
 				screenshotResult + ").\n");
 		Sys.println("diagnostics captured in " + directory);
+	}
+
+	static function countsObject(counts:Map<String, Int>):Dynamic {
+		var result:Dynamic = {};
+		for (key in counts.keys()) {
+			var value = counts.get(key);
+			Reflect.setField(result, key, value == null ? 0 : value);
+		}
+		return result;
+	}
+
+	static function eventKind(value:NativeKitEventValue):String {
+		return switch (value) {
+			case WindowClose(_): "WindowClose";
+			case WindowResize(_, _, _): "WindowResize";
+			case WindowMove(_, _, _): "WindowMove";
+			case WindowFramebufferResize(_, _, _): "WindowFramebufferResize";
+			case WindowScaleChanged(_, _): "WindowScaleChanged";
+			case WindowStateChanged(_, _): "WindowStateChanged";
+			case Key(_, _, _, _, _): "Key";
+			case TextInput(_, _): "TextInput";
+			case TextEdit(_, _): "TextEdit";
+			case PointerMove(_, _, _): "PointerMove";
+			case PointerButton(_, _, _, _, _, _): "PointerButton";
+			case PointerScroll(_, _, _): "PointerScroll";
+			case PointerEnter(_, _): "PointerEnter";
+			case Touch(_, _, _, _, _, _, _, _, _, _): "Touch";
+			case SurfaceReady(_): "SurfaceReady";
+			case SurfaceResize(_, _, _, _, _): "SurfaceResize";
+			case SurfaceLost(_): "SurfaceLost";
+			case None: "None";
+			case _: "other";
+		};
 	}
 
 	static function createDirectories(path:String):Void {

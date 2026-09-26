@@ -377,6 +377,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final hostContext:Null<DesktopUiHostContext>;
   var sceneInspector:Null<PropertyInspector> = null;
   var inspectorSelectionRevision:Int = -1;
+  /** Retained sensor inspector; its editors own drafts and validation state. */
+  var sensorInspector:Null<PropertyInspector> = null;
+  var sensorInspectorSensor:Dynamic = null;
+  var sensorInspectorModel:Dynamic = null;
   var framePresentation:Null<ApplicationPresentationSnapshot> = null;
   public var sensors(get, never):SensorConfiguration;
   function get_sensors():SensorConfiguration return session.sensors;
@@ -989,14 +993,22 @@ class ReferenceEditorApp implements DesktopUiApplication {
         revertSensor.enabled=ownership.overridesEnabled;
         content.push(new KeyedView("sensor-revert",revertSensor));
       }
-      var sensorInspector=new PropertyInspector("sensor-inspector:"+selected.id,
-        sensors.properties(),null,null,null,null,"Sensor configuration");
-      sensorInspector.style.width=LayoutAxis.stretch();
-      sensorInspector.style.height=LayoutAxis.fit();
-      sensorInspector.scrollable=false;
-      sensorInspector.labelWidth=viewportWidth < 820.0 ? 76.0 : 100.0;
-      sensorInspector.enabled=ownership==null;
-      content.push(new KeyedView("properties",sensorInspector));
+      var editable = ownership == null;
+      var inspector = sensorInspector;
+      if (inspector == null || sensorInspectorSensor != selected ||
+          sensorInspectorModel != sensors.model) {
+        inspector = new PropertyInspector("sensor-inspector:" + selected.id,
+          sensors.properties(), null, null, null, null, "Sensor configuration");
+        sensorInspector = inspector;
+        sensorInspectorSensor = selected;
+        sensorInspectorModel = sensors.model;
+      }
+      inspector.style.width = LayoutAxis.stretch();
+      inspector.style.height = LayoutAxis.fit();
+      inspector.scrollable = false;
+      inspector.labelWidth = viewportWidth < 820.0 ? 76.0 : 100.0;
+      inspector.enabled = editable;
+      content.push(new KeyedView("properties", inspector));
     }
     var diagnostics=sensors.diagnostics();
     if(diagnostics.length>0)content.push(new KeyedView("diagnostics",new Text(

@@ -77,6 +77,9 @@ class UiContext {
 	var customCompositeKeys:Map<Int, String>;
 	var customCompositeGeometries:Map<Int, ResolvedLayoutItem>;
 	var customCompositeBound:Map<Int, Bool>;
+	final previousNodesById:Map<Int, RenderNode>;
+	final currentNodesById:Map<Int, RenderNode>;
+	final resolvedById:Map<Int, ResolvedLayoutItem>;
 	var accessibilityBridge:Null<AccessibilityBridge>;
 	var accessibilitySurface:Null<NativeKitSurface>;
 	var decorationWindow:Null<WindowHandle>;
@@ -135,6 +138,9 @@ class UiContext {
 		customCompositeKeys = new Map();
 		customCompositeGeometries = new Map();
 		customCompositeBound = new Map();
+		previousNodesById = new Map();
+		currentNodesById = new Map();
+		resolvedById = new Map();
 		accessibilityBridge = null;
 		accessibilitySurface = null;
 		decorationWindow = null;
@@ -264,14 +270,14 @@ class UiContext {
 		if (next == null || next.parent != null)
 			throw "A view must produce one unparented render tree root";
 		diagnosticStage = 5;
-		var styleInvalidation = UiStyleInvalidationMetrics.compare(root, next);
+		var styleInvalidation = UiStyleInvalidationMetrics.compare(root, next,
+			previousNodesById, currentNodesById);
 		next.walk(function(node) {
 			node.syncHitTestPolicy();
 			node.syncSceneRevisions();
 		});
-		var previousById = new Map<Int, RenderNode>();
-		if (root != null)
-			root.walk(function(node) previousById.set(node.id.value, node));
+		var previousById = previousNodesById;
+		var nodesById = currentNodesById;
 		var nativeLayoutReused = !styleInvalidation.nativeLayoutRequired &&
 			submittedFrameWidth == frame.width && submittedFrameHeight == frame.height;
 		if (nativeLayoutReused)
@@ -293,7 +299,6 @@ class UiContext {
 		} else
 			resolved = session.submit(next.layout, frame);
 		diagnosticStage = 6;
-		var nodesById = new Map<Int, RenderNode>();
 		var resolvedStateRevision = stateStore.revision;
 		var missing = false;
 		var missingNode:Null<RenderNode> = null;
@@ -302,9 +307,9 @@ class UiContext {
 		var resolvedGeometryReusedNodes = 0;
 		var layoutPass = 0;
 		while (true) {
-			var passById = new Map<Int, ResolvedLayoutItem>();
+			resolvedById.clear();
 			for (item in resolved)
-				passById.set(item.id, item);
+				resolvedById.set(item.id, item);
 			missing = false;
 			missingNode = null;
 			nodeCount = 0;
@@ -313,9 +318,8 @@ class UiContext {
 			diagnosticStage = 7;
 			next.walk(function(node) {
 				nodeCount++;
-				nodesById.set(node.id.value, node);
 				// Geometry is keyed by the exact LayoutNode ID serialized to NativeUI.
-				var item = passById.get(node.layout.id);
+				var item = resolvedById.get(node.layout.id);
 				if (item == null) {
 					missing = true;
 					if (missingNode == null) missingNode = node;
@@ -350,7 +354,9 @@ class UiContext {
 			layoutPass++;
 		}
 		var nativeLayoutEndedAt = Sys.time();
-		if (layoutPass > 0) styleInvalidation = UiStyleInvalidationMetrics.compare(root, next);
+		if (layoutPass > 0)
+			styleInvalidation = UiStyleInvalidationMetrics.compare(root, next,
+				previousNodesById, currentNodesById);
 		syncWindowDecorations(next);
 		diagnosticStage = 9;
 		var previousFocus = focus.focusedId;

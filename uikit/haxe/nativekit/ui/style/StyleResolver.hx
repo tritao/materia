@@ -19,14 +19,16 @@ class StyleResolver {
 	final animatedValues:Map<String, Dynamic>;
 	final targets:Map<String, Dynamic>;
 	final activeAnimations:Map<String, StyleTransitionAnimation>;
-	final cache:Map<String, ComputedStyle>;
+	final cache:Map<Int, Array<StyleResolverCacheEntry>>;
 	final localFingerprints:Map<Int, StyleResolverLocalFingerprint>;
+	final stringHashes:Map<String, Int>;
 	var cacheEntryCount:Int;
 	var cacheHitCount:Int;
 	var cacheMissCount:Int;
 	var resolutionCount:Int;
 	var localFingerprintCount:Int;
 	var nextLocalFingerprint:Int;
+	var stringHashCount:Int;
 
 	/** Number of cacheable resolutions served from the computed-style cache. */
 	public var cacheHits(get, never):Int;
@@ -45,12 +47,14 @@ class StyleResolver {
 		activeAnimations = new Map();
 		cache = new Map();
 		localFingerprints = new Map();
+		stringHashes = new Map();
 		cacheEntryCount = 0;
 		cacheHitCount = 0;
 		cacheMissCount = 0;
 		resolutionCount = 0;
 		localFingerprintCount = 0;
 		nextLocalFingerprint = 0;
+		stringHashCount = 0;
 	}
 
 	function get_cacheHits():Int
@@ -79,8 +83,10 @@ class StyleResolver {
 	public function clearCache():Void {
 		cache.clear();
 		localFingerprints.clear();
+		stringHashes.clear();
 		cacheEntryCount = 0;
 		localFingerprintCount = 0;
+		stringHashCount = 0;
 	}
 
 	public function resolve(target:StyleTarget, ?parent:ComputedStyle,
@@ -94,14 +100,37 @@ class StyleResolver {
 		// sheet containing transitions conservatively disables caching for the
 		// whole target, while ordinary styles remain pure and cacheable.
 		var cacheable = !hasTransitions(theme, application);
-		var cacheKey = cacheable ? makeCacheKey(target, parent, theme, application, local, environment) : null;
+		var parentInheritedKey:Null<String> = null;
+		var localStyleKey:Null<String> = null;
+		var themeIdentity = theme == null ? -1 : theme.identity;
+		var themeRevision = theme == null ? -1 : theme.revision;
+		var applicationIdentity = application == null ? -1 : application.identity;
+		var applicationRevision = application == null ? -1 : application.revision;
+		var environmentIdentity = environment == null ? -1 : environment.identity;
+		var environmentRevision = environment == null ? -1 : environment.revision;
+		var cacheFingerprint = 0;
 		if (cacheable) {
-			var cached = cache.get(cacheKey);
-			if (cached != null) {
-				cacheHitCount++;
-				return cached.fork();
-			}
+			parentInheritedKey = parentKey(parent);
+			localStyleKey = localKey(local);
+			cacheFingerprint = cacheHash(target.selectorFingerprint, target.states,
+				parentInheritedKey, themeIdentity, themeRevision, applicationIdentity,
+				applicationRevision, localStyleKey, environmentIdentity, environmentRevision);
+		}
+		if (cacheable) {
+			var bucket = cache.get(cacheFingerprint);
+			if (bucket != null)
+				for (entry in bucket)
+					if (entry.matches(target.selectorFingerprint, target.states, parentInheritedKey,
+						themeIdentity, themeRevision, applicationIdentity, applicationRevision,
+						localStyleKey, environmentIdentity, environmentRevision)) {
+						cacheHitCount++;
+						return entry.style.fork();
+					}
 			cacheMissCount++;
+		}
+		if (cacheable && cacheEntryCount >= MaxCacheEntries) {
+			cache.clear();
+			cacheEntryCount = 0;
 		}
 
 		var result = new ComputedStyle();
@@ -120,11 +149,15 @@ class StyleResolver {
 		applyLocal(result, local);
 		applyTransitions(result, target, theme, application);
 		if (cacheable) {
-			if (cacheEntryCount >= MaxCacheEntries) {
-				cache.clear();
-				cacheEntryCount = 0;
+			var bucket = cache.get(cacheFingerprint);
+			if (bucket == null) {
+				bucket = [];
+				cache.set(cacheFingerprint, bucket);
 			}
-			cache.set(cacheKey, result.fork());
+			bucket.push(new StyleResolverCacheEntry(target.selectorFingerprint, target.states,
+				parentInheritedKey, themeIdentity, themeRevision, applicationIdentity,
+				applicationRevision, localStyleKey, environmentIdentity, environmentRevision,
+				result.fork()));
 			cacheEntryCount++;
 		}
 		return result;
@@ -134,22 +167,41 @@ class StyleResolver {
 		return (theme != null && theme.transitions.length > 0) ||
 			(application != null && application.transitions.length > 0);
 
-	function makeCacheKey(target:StyleTarget, parent:Null<ComputedStyle>,
-			theme:Null<StyleSheet>, application:Null<StyleSheet>, local:Null<LayoutStyle>,
-			environment:Null<StyleEnvironment>):String {
-		return "target=" + targetKey(target) +
-			"|parent=" + parentKey(parent) +
-			"|theme=" + sheetKey(theme) +
-			"|application=" + sheetKey(application) +
-			"|local=" + localKey(local) +
-			"|environment=" + (environment == null ? "none" : environment.identity + ":" + environment.revision);
+	function cacheHash(targetFingerprint:String, states:Int, parentKey:String,
+			themeIdentity:Int, themeRevision:Int, applicationIdentity:Int,
+			applicationRevision:Int, localKey:String, environmentIdentity:Int,
+			environmentRevision:Int):Int {
+		var result = keyHash(targetFingerprint);
+		result = mix(result, states);
+		result = mix(result, keyHash(parentKey));
+		result = mix(result, themeIdentity);
+		result = mix(result, themeRevision);
+		result = mix(result, applicationIdentity);
+		result = mix(result, applicationRevision);
+		result = mix(result, keyHash(localKey));
+		result = mix(result, environmentIdentity);
+		return mix(result, environmentRevision);
 	}
 
-	static function sheetKey(sheet:Null<StyleSheet>):String
-		return sheet == null ? "none" : sheet.identity + ":" + sheet.revision;
+	function keyHash(value:String):Int {
+		var cached = stringHashes.get(value);
+		if (cached != null)
+			return cached;
+		if (stringHashCount >= MaxCacheEntries) {
+			stringHashes.clear();
+			stringHashCount = 0;
+		}
+		var result = stringHash(value);
+		stringHashes.set(value, result);
+		stringHashCount++;
+		return result;
+	}
 
-	static function targetKey(target:StyleTarget):String {
-		return target.selectorFingerprint + "|states=" + target.states;
+	static function stringHash(value:String):Int {
+		var result = 17;
+		for (index in 0...value.length)
+			result = mix(result, value.charCodeAt(index));
+		return result;
 	}
 
 	static function stringKey(value:Null<String>):String
@@ -495,4 +547,48 @@ class StyleResolverLocalFingerprint {
 		this.snapshot = snapshot;
 		this.key = key;
 	}
+}
+
+/** Collision-checked structural key for a cached computed style. */
+class StyleResolverCacheEntry {
+	final targetFingerprint:String;
+	final states:Int;
+	final parentKey:String;
+	final themeIdentity:Int;
+	final themeRevision:Int;
+	final applicationIdentity:Int;
+	final applicationRevision:Int;
+	final localKey:String;
+	final environmentIdentity:Int;
+	final environmentRevision:Int;
+	public final style:ComputedStyle;
+
+	public function new(targetFingerprint:String, states:Int, parentKey:String,
+			themeIdentity:Int, themeRevision:Int, applicationIdentity:Int,
+			applicationRevision:Int, localKey:String, environmentIdentity:Int,
+			environmentRevision:Int, style:ComputedStyle) {
+		this.targetFingerprint = targetFingerprint;
+		this.states = states;
+		this.parentKey = parentKey;
+		this.themeIdentity = themeIdentity;
+		this.themeRevision = themeRevision;
+		this.applicationIdentity = applicationIdentity;
+		this.applicationRevision = applicationRevision;
+		this.localKey = localKey;
+		this.environmentIdentity = environmentIdentity;
+		this.environmentRevision = environmentRevision;
+		this.style = style;
+	}
+
+	public function matches(targetFingerprint:String, states:Int, parentKey:String,
+			themeIdentity:Int, themeRevision:Int, applicationIdentity:Int,
+			applicationRevision:Int, localKey:String, environmentIdentity:Int,
+			environmentRevision:Int):Bool
+		return this.targetFingerprint == targetFingerprint && this.states == states &&
+			this.parentKey == parentKey && this.themeIdentity == themeIdentity &&
+			this.themeRevision == themeRevision &&
+			this.applicationIdentity == applicationIdentity &&
+			this.applicationRevision == applicationRevision && this.localKey == localKey &&
+			this.environmentIdentity == environmentIdentity &&
+			this.environmentRevision == environmentRevision;
 }
