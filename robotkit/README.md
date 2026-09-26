@@ -58,14 +58,18 @@ simulation owner.
 Kinematic robot bases are the exception: `Simulation.driveRobotBase` moves a
 base for the next tick while running or stepped externally, without stopping
 the clock, resetting sensor history, or changing the reset pose, and the base
-moves with the velocity implied by that motion, so the IMU measures it.
+moves with the velocity implied by that motion (differenced in double
+precision from its pose at the previous tick), so the IMU measures it.
 `Simulation.placeRobotBase` jumps a base the same way but keeps its velocity
 through the jump. `Simulation.setDifferentialDrive` (wrapped by
 `DifferentialDrivePlant`) rolls a differential-drive chassis natively every
 tick by the wheel velocity targets the robot applied for that tick, whoever
 submitted them; a normal or emergency stop zeroes those targets in the physics
 backend, so wheels, odometry, and chassis all stop on the tick the stop is
-applied. Each simulated robot publishes transport-neutral joint
+applied. The plant hands SimKit its exact double-precision twist, so the IMU
+reads no scene-rounding noise far from the origin. It models wheels rolling on
+a level floor: the chassis translates in the world XY plane at its height and
+turns about world Z while keeping the roll and pitch it was placed with. Each simulated robot publishes transport-neutral joint
 encoder, IMU, and LiDAR frames with the same source clock, frame IDs, and
 sequences used by the remote path.
 

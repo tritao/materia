@@ -55,9 +55,12 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * clock is running or stepped externally: it does not stop the owner, reset
 	 * sensors, or change the pose restored by reset. The pose becomes the base
 	 * body's physics state by the end of the next completed tick, and the base's
-	 * velocity over that tick is the motion from its previous pose, so derivative
-	 * sensors such as the IMU measure consecutive drives as continuous motion. Use
-	 * rk_simulation_place_robot_base() for a jump that must not read as motion.
+	 * velocity over that tick is the motion from the pose it held at the end of
+	 * the previous tick, differenced in double precision, so derivative sensors
+	 * such as the IMU measure consecutive drives as continuous motion without
+	 * single-precision scene rounding, however far from the origin. A tick with no
+	 * drive holds the base at rest. Use rk_simulation_place_robot_base() for a
+	 * jump that must not read as motion.
 	 *
 	 * @param simulation Shared simulation owner.
 	 * @param robot_index Index of the robot in attachment order.
@@ -135,10 +138,13 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Every tick, after the robot applies its commands and before physics
 	 * advances, the base rolls along a constant-curvature arc by the wheel targets
 	 * the robot applied for that tick (rate-clamped by the runtime, zero after a
-	 * normal or emergency stop). The plant starts from the base's current pose,
-	 * keeps its height, and treats the base as upright. Whatever submits the
-	 * targets, the base follows with no added latency. Replaces any previous
-	 * coupling for the robot; accepted while running.
+	 * normal or emergency stop). The plant starts from the base's current pose.
+	 * The wheels roll on a level floor: the base translates in the world XY plane
+	 * at its current height and turns about world Z, and keeps the roll and pitch
+	 * it had when seeded (they turn with the heading), so a tilted chassis stays
+	 * tilted. The base's velocity is the plant's exact double-precision twist.
+	 * Whatever submits the targets, the base follows with no added latency.
+	 * Replaces any previous coupling for the robot; accepted while running.
 	 *
 	 * @param simulation Shared simulation owner.
 	 * @param robot_index Index of the robot in attachment order.
@@ -238,9 +244,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	/**
 	 * Differential-drive plant state after the latest completed tick.
 	 *
-	 * x, y, and height are the planar base pose written to the kinematic base in
-	 * metres; yaw is its heading in radians, unwrapped so it stays continuous
-	 * across turns. The wheel rates are the velocity targets, in rad/s, the robot
+	 * x, y, and height are the base position written to the kinematic base in
+	 * metres; yaw is its heading in radians (the direction of the base's x axis
+	 * projected on the floor), unwrapped so it stays continuous across turns. The
+	 * base's rotation is the yaw about world Z composed with the roll and pitch it
+	 * had when the plant was seeded. The wheel rates are the velocity targets, in rad/s, the robot
 	 * applied for that tick after runtime clamping: zero after a stop, a reset, or
 	 * while a wheel is idle or held by a non-velocity target.
 	 */

@@ -85,6 +85,17 @@ private:
      */
     rk_result set_robot_base_node_pose(uint32_t robot_index, const rk_simulation_pose &pose);
     rk_result write_robot_base_node(uint32_t robot_index, const rk_simulation_pose &pose);
+    /** Re-seeds a robot's differential-drive plant (pose, heading, tilt). */
+    void seed_differential_drive(uint32_t robot_index, const rk_simulation_pose &pose);
+    /**
+     * Moves a robot base continuously to `pose` over the next tick with the
+     * exact double-precision twist given (world frame), writing its scene node
+     * and driving its kinematic body (nksim_body_drive), so the body's reported
+     * velocity carries no single-precision scene-node rounding.
+     */
+    rk_result drive_robot_base_body(uint32_t robot_index, const rk_simulation_pose &pose,
+                                    const double linear_velocity[3],
+                                    const double angular_velocity[3]);
     /** Integrates every enabled drive plant from its robot's applied wheel targets. */
     rk_result advance_differential_drives();
     void run();
@@ -105,6 +116,13 @@ private:
         double y = 0.0;
         double yaw = 0.0; // Unwrapped, continuous across re-seeding.
         double height = 0.0;
+        /**
+         * The base's authored roll and pitch: its rotation with the heading
+         * removed, Rz(-yaw) * rotation. The base's rotation is Rz(yaw) * tilt,
+         * so the tilt turns with the heading while the base rolls on the
+         * level floor.
+         */
+        double tilt[4] = {0.0, 0.0, 0.0, 1.0};
         double left_rate = 0.0;
         double right_rate = 0.0;
     };
@@ -129,6 +147,10 @@ private:
     std::vector<nksim_body> robot_base_bodies_;
     std::vector<rk_simulation_pose> robot_initial_poses_;
     std::vector<rk_simulation_pose> robot_base_poses_; // Last pose written to each base node.
+    // Base pose each robot held at the end of the latest completed tick
+    // (or after a placement, teleport, or reset); a drive's motion is
+    // measured from it.
+    std::vector<rk_simulation_pose> robot_tick_poses_;
     std::vector<DifferentialDrive> drives_;
     struct EnvironmentObject {
         nkscene_node_id node{};

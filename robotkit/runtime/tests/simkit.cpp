@@ -1,6 +1,7 @@
 #include "robotkit_simkit.h"
 #include "../src/sensor_math.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <chrono>
@@ -714,6 +715,153 @@ void differential_drive_follows_applied_wheel_targets() {
     rk_simulation_destroy(simulation);
 }
 
+// Scene nodes are single precision: 1000 m out a float step is ~6e-5 m, so a
+// velocity differenced from node poses at 50 Hz is off by ~3e-3 m/s and an
+// IMU differencing that reads ~0.15 m/s^2 of noise. The plant and base drives
+// hand SimKit their exact double-precision twist instead.
+void driven_base_far_from_origin_reads_exact_imu() {
+    constexpr double dt = 0.02;
+    auto simulation = make_simulation(dt);
+    const auto model = wheeled_blueprint();
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    const double yaw = 0.7;
+    rk_simulation_pose start{};
+    start.struct_size = sizeof(start);
+    start.position[0] = 1000.0;
+    start.position[1] = -1000.0;
+    start.position[2] = 0.3;
+    start.rotation[2] = std::sin(yaw * 0.5);
+    start.rotation[3] = std::cos(yaw * 0.5);
+    assert(rk_simulation_teleport_robot(simulation, 0, &start) == RK_OK);
+    rk_simulation_differential_drive_desc drive{};
+    drive.struct_size = sizeof(drive);
+    drive.left_wheel_joint = 0;
+    drive.right_wheel_joint = 1;
+    drive.wheel_radius = 0.1;
+    drive.track_width = 0.5;
+    assert(rk_simulation_set_differential_drive(simulation, 0, &drive) == RK_OK);
+
+    // 7 rad/s on 0.1 m wheels: 0.7 m/s straight ahead.
+    uint64_t sequence = 0, time = 0;
+    auto command = wheel_targets(7.0, 7.0, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    for (int tick = 0; tick < 3; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    for (int tick = 0; tick < 100; ++tick) {
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        const auto imu = snapshot(robot).sensors[1];
+        for (int axis = 0; axis < 3; ++axis) assert(std::abs(imu.values[axis]) < 1e-9);
+        assert(std::abs(imu.values[3]) < 1e-6 && std::abs(imu.values[4]) < 1e-6);
+        assert(std::abs(imu.values[5] - 9.81) < 1e-6);
+    }
+    const auto plant = drive_state(simulation);
+    rk_simulation_pose observed{};
+    observed.struct_size = sizeof(observed);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
+    // The body holds the plant's double-precision pose, not the float node.
+    assert(std::abs(observed.position[0] - plant.x) < 1e-9);
+    assert(std::abs(observed.position[1] - plant.y) < 1e-9);
+    assert(std::abs(plant.x - (1000.0 + 0.014 * 103 * std::cos(yaw))) < 1e-9);
+
+    // After a stop the base rests where the plant left it, reading gravity.
+    command = lifecycle(RK_COMMAND_STOP, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    for (int tick = 0; tick < 3; ++tick)
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    auto imu = snapshot(robot).sensors[1];
+    assert(std::abs(imu.values[3]) < 1e-6 && std::abs(imu.values[4]) < 1e-6);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
+    assert(observed.position[0] == drive_state(simulation).x);
+
+    // Poses driven from outside are differenced in double precision too.
+    assert(rk_simulation_clear_differential_drive(simulation, 0) == RK_OK);
+    rk_simulation_pose pose = observed;
+    const double from_x = observed.position[0];
+    for (int tick = 1; tick <= 50; ++tick) {
+        pose.position[0] = from_x + 0.013 * tick;
+        assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        if (tick < 3) continue; // Start-up step, then the IMU's first difference.
+        imu = snapshot(robot).sensors[1];
+        assert(std::abs(imu.values[3]) < 1e-6 && std::abs(imu.values[4]) < 1e-6);
+        assert(std::abs(imu.values[5] - 9.81) < 1e-6);
+    }
+    rk_simulation_destroy(simulation);
+}
+
+// A ground robot rolls on the level floor: the plant keeps the base's authored
+// roll and pitch (turning them with the heading) instead of snapping upright.
+void differential_drive_keeps_authored_tilt() {
+    constexpr double dt = 0.02;
+    auto simulation = make_simulation(dt);
+    const auto model = wheeled_blueprint();
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    const double roll = 0.1, pitch = -0.05, yaw = 0.3;
+    const double qx[4] = {std::sin(roll * 0.5), 0.0, 0.0, std::cos(roll * 0.5)};
+    const double qy[4] = {0.0, std::sin(pitch * 0.5), 0.0, std::cos(pitch * 0.5)};
+    const double qz[4] = {0.0, 0.0, std::sin(yaw * 0.5), std::cos(yaw * 0.5)};
+    double tilt[4], start_rotation[4];
+    robotkit::sensors::multiply(qy, qx, tilt); // Roll and pitch, heading removed.
+    robotkit::sensors::multiply(qz, tilt, start_rotation);
+    rk_simulation_pose start{};
+    start.struct_size = sizeof(start);
+    start.position[0] = 1.0;
+    start.position[1] = 2.0;
+    start.position[2] = 0.3;
+    std::copy_n(start_rotation, 4, start.rotation);
+    assert(rk_simulation_teleport_robot(simulation, 0, &start) == RK_OK);
+    rk_simulation_differential_drive_desc drive{};
+    drive.struct_size = sizeof(drive);
+    drive.left_wheel_joint = 0;
+    drive.right_wheel_joint = 1;
+    drive.wheel_radius = 0.1;
+    drive.track_width = 0.5;
+    assert(rk_simulation_set_differential_drive(simulation, 0, &drive) == RK_OK);
+    auto plant = drive_state(simulation);
+    assert(std::abs(plant.yaw - yaw) < 1e-12 && plant.height == 0.3);
+
+    // Arc at 0.5 m/s and 1 rad/s.
+    uint64_t sequence = 0, time = 0;
+    auto command = wheel_targets(2.5, 7.5, ++sequence);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    rk_simulation_pose observed{};
+    observed.struct_size = sizeof(observed);
+    for (int tick = 1; tick <= 20; ++tick) {
+        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        plant = drive_state(simulation);
+        assert(std::abs(plant.yaw - (yaw + tick * dt)) < 1e-12);
+        assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
+        // Planar motion at the seeded height; the plant reports the same pose.
+        assert(std::abs(observed.position[0] - plant.x) < 1e-12);
+        assert(std::abs(observed.position[1] - plant.y) < 1e-12);
+        assert(observed.position[2] == 0.3 && plant.height == 0.3);
+        // Rotation is the heading about world Z composed with the authored tilt.
+        const double heading[4] = {0.0, 0.0, std::sin(plant.yaw * 0.5),
+                                   std::cos(plant.yaw * 0.5)};
+        double expected[4];
+        robotkit::sensors::multiply(heading, tilt, expected);
+        const double sign = expected[3] * observed.rotation[3] < 0.0 ? -1.0 : 1.0;
+        for (int axis = 0; axis < 4; ++axis)
+            assert(std::abs(observed.rotation[axis] - sign * expected[axis]) < 1e-12);
+        if (tick < 3) continue;
+        // The gyro reads the world-Z turn rate in the tilted body frame.
+        const double world_rate[3] = {0.0, 0.0, 1.0};
+        double body_rate[3];
+        robotkit::sensors::rotate(observed.rotation, world_rate, body_rate, true);
+        const auto imu = snapshot(robot).sensors[1];
+        for (int axis = 0; axis < 3; ++axis)
+            assert(std::abs(imu.values[axis] - body_rate[axis]) < 1e-9);
+    }
+    // Plant x/y still follow the planar arc: 20 ticks at 0.01 m, 0.02 rad each.
+    const double radius = 0.5;
+    const double end_yaw = yaw + 20 * dt;
+    assert(std::abs(plant.x - (1.0 + radius * (std::sin(end_yaw) - std::sin(yaw)))) < 1e-12);
+    assert(std::abs(plant.y - (2.0 - radius * (std::cos(end_yaw) - std::cos(yaw)))) < 1e-12);
+    rk_simulation_destroy(simulation);
+}
+
 } // namespace
 
 int main() {
@@ -725,5 +873,7 @@ int main() {
     driving_base_keeps_owner_sensors_and_reset_pose();
     normal_stop_zeroes_wheel_velocities();
     differential_drive_follows_applied_wheel_targets();
+    driven_base_far_from_origin_reads_exact_imu();
+    differential_drive_keeps_authored_tilt();
     return 0;
 }

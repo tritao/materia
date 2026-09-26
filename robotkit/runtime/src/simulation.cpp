@@ -282,6 +282,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         initial_pose.position[0]=static_cast<double>(robot_index);
         initial_pose.rotation[3]=1.0;robot_initial_poses_.push_back(initial_pose);
         robot_base_poses_.push_back(initial_pose);
+        robot_tick_poses_.push_back(initial_pose);
         drives_.emplace_back();
         for (uint32_t i = 0; i < (blueprint.sensor_count ? blueprint.sensor_count : 3); ++i) {
             SimulationRobot::SensorState sensor;
@@ -438,9 +439,31 @@ rk_result set_node_pose(nkscene_scene scene, nkscene_node_id node,
 
 namespace {
 
+// Heading of the body x axis projected on the floor.
 double yaw_of(const double rotation[4]) {
     const double x = rotation[0], y = rotation[1], z = rotation[2], w = rotation[3];
     return std::atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
+}
+
+void yaw_rotation(double yaw, double out[4]) {
+    out[0] = out[1] = 0.0;
+    out[2] = std::sin(yaw * 0.5);
+    out[3] = std::cos(yaw * 0.5);
+}
+
+// World-frame angular velocity that rotates `from` onto `to` in `dt`, the
+// shorter way around.
+void angular_velocity_between(const double from[4], const double to[4], double dt,
+                              double out[3]) {
+    const double inverse[4] = {-from[0], -from[1], -from[2], from[3]};
+    double relative[4];
+    sensors::multiply(to, inverse, relative);
+    if (relative[3] < 0.0)
+        for (double &component : relative) component = -component;
+    const double sine = std::sqrt(relative[0] * relative[0] + relative[1] * relative[1] +
+                                  relative[2] * relative[2]);
+    const double scale = sine > 1e-12 ? 2.0 * std::atan2(sine, relative[3]) / sine : 2.0;
+    for (int axis = 0; axis < 3; ++axis) out[axis] = relative[axis] * scale / dt;
 }
 
 bool valid_drive_geometry(double value) {
@@ -470,6 +493,12 @@ rk_result Simulation::set_robot_base_node_pose(uint32_t robot_index,
                                                const rk_simulation_pose &pose) {
     const auto result = write_robot_base_node(robot_index, pose);
     if (result != RK_OK) return result;
+    robot_tick_poses_[robot_index] = pose;
+    seed_differential_drive(robot_index, pose);
+    return RK_OK;
+}
+
+void Simulation::seed_differential_drive(uint32_t robot_index, const rk_simulation_pose &pose) {
     auto &drive = drives_[robot_index];
     drive.x = pose.position[0];
     drive.y = pose.position[1];
@@ -479,7 +508,30 @@ rk_result Simulation::set_robot_base_node_pose(uint32_t robot_index,
     constexpr double tau = 6.283185307179586;
     const double yaw = yaw_of(pose.rotation);
     drive.yaw = yaw + tau * std::round((drive.yaw - yaw) / tau);
-    return RK_OK;
+    double unyaw[4];
+    yaw_rotation(-yaw, unyaw);
+    sensors::multiply(unyaw, pose.rotation, drive.tilt);
+    double norm = 0.0;
+    for (const double component : drive.tilt) norm += component * component;
+    norm = std::sqrt(norm);
+    for (double &component : drive.tilt) component /= norm;
+}
+
+rk_result Simulation::drive_robot_base_body(uint32_t robot_index, const rk_simulation_pose &pose,
+                                            const double linear_velocity[3],
+                                            const double angular_velocity[3]) {
+    const auto result = write_robot_base_node(robot_index, pose);
+    if (result != RK_OK) return result;
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    state.body = robot_base_bodies_[robot_index];
+    std::copy_n(pose.position, 3, state.position);
+    std::copy_n(pose.rotation, 4, state.rotation);
+    std::copy_n(linear_velocity, 3, state.linear_velocity);
+    std::copy_n(angular_velocity, 3, state.angular_velocity);
+    const auto driven = host_ != 0 ? nksim_host_submit_body_drives(host_, &state, 1)
+                                   : nksim_body_drive(world_, state.body, &state);
+    return driven == NKSIM_OK ? RK_OK : RK_ERROR_BACKEND;
 }
 
 rk_result Simulation::advance_differential_drives() {
@@ -494,6 +546,7 @@ rk_result Simulation::advance_differential_drives() {
         const double right = drive.right_rate * drive.wheel_radius * fixed_timestep_;
         const double distance = (left + right) * 0.5;
         const double turn = (right - left) / drive.track_width;
+        // A stopped plant sends nothing: the base holds its pose at rest.
         if (distance == 0.0 && turn == 0.0) continue;
         const double next_yaw = drive.yaw + turn;
         if (std::abs(turn) < 1e-9) {
@@ -505,14 +558,23 @@ rk_result Simulation::advance_differential_drives() {
             drive.y -= radius * (std::cos(next_yaw) - std::cos(drive.yaw));
         }
         drive.yaw = next_yaw;
+        // The wheels roll on the level floor, so the base translates in the
+        // world XY plane at its seeded height and turns about world Z; its
+        // authored roll and pitch (the tilt) turn with the heading.
         rk_simulation_pose pose{};
         pose.struct_size = sizeof(pose);
         pose.position[0] = drive.x;
         pose.position[1] = drive.y;
         pose.position[2] = drive.height;
-        pose.rotation[2] = std::sin(drive.yaw * 0.5);
-        pose.rotation[3] = std::cos(drive.yaw * 0.5);
-        const auto result = write_robot_base_node(index, pose);
+        double heading[4];
+        yaw_rotation(drive.yaw, heading);
+        sensors::multiply(heading, drive.tilt, pose.rotation);
+        // Exact twist at the end of the arc: constant speed along the new
+        // heading and a constant turn rate about world Z.
+        const double speed = distance / fixed_timestep_;
+        const double linear[3] = {speed * std::cos(drive.yaw), speed * std::sin(drive.yaw), 0.0};
+        const double angular[3] = {0.0, 0.0, turn / fixed_timestep_};
+        const auto result = drive_robot_base_body(index, pose, linear, angular);
         if (result != RK_OK) return result;
     }
     return RK_OK;
@@ -572,8 +634,18 @@ rk_result Simulation::drive_robot_base(uint32_t robot_index, const rk_simulation
     // sensors, and reset pose stay intact.
     std::lock_guard tick_lock(tick_mutex_);
     if (robot_index >= robot_base_bodies_.size()) return RK_ERROR_INVALID_ARGUMENT;
-    if (pose.struct_size < sizeof(pose)) return RK_ERROR_INVALID_ARGUMENT;
-    return set_robot_base_node_pose(robot_index, pose);
+    if (pose.struct_size < sizeof(pose) || !valid_pose(pose.position, pose.rotation))
+        return RK_ERROR_INVALID_ARGUMENT;
+    // The drive's twist is the motion from the pose the base held at the end
+    // of the previous tick, differenced in double precision.
+    const auto &from = robot_tick_poses_[robot_index];
+    double linear[3], angular[3];
+    for (int axis = 0; axis < 3; ++axis)
+        linear[axis] = (pose.position[axis] - from.position[axis]) / fixed_timestep_;
+    angular_velocity_between(from.rotation, pose.rotation, fixed_timestep_, angular);
+    const auto result = drive_robot_base_body(robot_index, pose, linear, angular);
+    if (result == RK_OK) seed_differential_drive(robot_index, pose);
+    return result;
 }
 
 rk_result Simulation::place_robot_base(uint32_t robot_index, const rk_simulation_pose &pose) {
@@ -913,6 +985,7 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
     result.struct_size = sizeof(result);
     if (nksim_host_step(host_, &result) != NKSIM_OK)
         return RK_ERROR_BACKEND;
+    robot_tick_poses_ = robot_base_poses_;
     if (result.scene_changes != 0)
         nkscene_change_set_destroy(result.scene_changes);
     if (snapshot_ != 0)
