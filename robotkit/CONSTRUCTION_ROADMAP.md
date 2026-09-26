@@ -1158,3 +1158,43 @@ the plan directed. `LayTile` and fill/embankment grading are the two
 concretely-scoped "not yet" items, each with a short note (in `ARCHITECTURE.md`'s
 M10 and M12 sections respectively) on what capability they would need that
 this codebase does not have today.
+
+## Follow-ups
+
+**F9**: added `robotkit/tests/run-all.sh` and documented it in `README.md`.
+The runner executes the Haxe world suite, default native CTest suite, CAD
+bridge suite with CadKit's shared-library directory configured internally, the
+MuJoCo wall-finishing project when the vendored submodule is available, and
+world TCP integration in its default and lease-timeout modes. It builds the
+CadKit core when its shared library is missing and attempts to initialize the
+MuJoCo submodule before issuing a clear skip. The complete run passed locally:
+808 Haxe world assertions, 9 native tests, 27 CAD bridge assertions, 22
+MuJoCo scenario assertions, and both TCP modes.
+
+**F1 review — `85cba1f9`**: the commit correctly makes MuJoCo kinematic roots
+zero-DOF externally-driven bodies, removing the mass-bearing free joint and
+preventing substep reaction torque from moving the root. Its new regression
+test checks the child world angular velocity against the child hinge velocity
+across multiple substeps. The separate cross-backend articulation test also
+teleports the root and asserts both child link positions after the move, so
+the required child-carry behavior is covered. The change matches the M8.5
+follow-up fix and no defect was found.
+
+**F1 review — `64a7ec15`**: the commit replaces the incorrect per-DOF sparse
+mass-matrix lookup with one computed-acceleration pass through `mj_mulM`,
+adds bias compensation, and clamps the resulting torque after the computed
+term. Position and velocity modes use separate formulas, so velocity targets
+do not receive the position gain; effort mode remains direct torque. The
+two-joint kinematic-base test covers an ancestor DOF and the existing clamp
+test covers `max_force`. The implementation passes the relevant MuJoCo tests;
+its full-size `mj_mulM` vectors are populated only from the backend's targeted
+joint records and torque is written only to those joints. No defect was found.
+
+**F1 review — `684b4deb`**: the commit adds the three-wheel holonomic model,
+compiler configuration, runtime plant, and basic wheel-target tests. Its wheel
+map uses the standard tangential convention `(-sin(theta), cos(theta))` with
+positive yaw contribution, which agrees with the plant's forward and rotation
+signs. The commit does not yet provide lateral commands or holonomic odometry,
+and its tests check wheel algebra rather than a drive-forward/rotate/odometry
+round trip; those are precisely the behavior gaps handled by F3. Within the
+M9 scope of the commit, no wheel-sign defect was found.
