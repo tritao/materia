@@ -554,6 +554,19 @@ class SceneEditingTests {
           wheelBase == 1.2 && radius == 0.1 && angle == 0.5;
       case _: false;
     }, "save and reopen retain Ackermann steering roles and dimensions");
+    authored.model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Holonomic(["joint/left", "joint/right", "joint/tilt"], 0.1, 0.3),
+      1.0, 1.5);
+    var reopenedHolonomic = new SensorConfiguration(
+      haxe.Json.parse(haxe.Json.stringify(authored.records())));
+    var holonomicConfig:RobotMobileConfiguration = cast reopenedHolonomic.model.mobileBase;
+    check(switch holonomicConfig.drive {
+      case Holonomic(ids, radius, baseRadius):
+        ids.length == 3 && ids[0] == "joint/left" && ids[1] == "joint/right" &&
+          ids[2] == "joint/tilt" && radius == 0.1 && baseRadius == 0.3;
+      case _: false;
+    }, "save and reopen retain holonomic wheel roles and dimensions");
+    reopenedHolonomic.dispose();
     reopenedAckermann.dispose();
     reopenedAuthored.dispose(); authored.dispose();
 

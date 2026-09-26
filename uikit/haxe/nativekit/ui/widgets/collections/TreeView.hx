@@ -240,7 +240,10 @@ class TreeView implements View {
 						function() { toggleExpanded(nodeKey); },
 						function(event) { handleNodeKey(context, entry, event); },
 						function(id) { itemIds.set(nodeKey, id); },
-						function(event) { if (onItemContextMenu != null) onItemContextMenu(nodeKey, event); });
+						function(event) {
+							var handler = onItemContextMenu;
+							if (handler != null) handler(nodeKey, event);
+						});
 					var slotKey = virtualization.recycleSlots ? 'slot:${index - window.first}' :
 						'item:$nodeKey';
 					rowViews.push(new KeyedView(slotKey, row));
@@ -271,9 +274,10 @@ class TreeView implements View {
 	}
 
 	function handleNodeKey(context:BuildContext, entry:TreeEntry, event:UiEvent):Void {
-		if (event.key == UiKey.F2 && onItemRename != null) {
+		var rename = onItemRename;
+		if (event.key == UiKey.F2 && rename != null) {
 			event.preventDefault();
-			onItemRename(entry.key);
+			rename(entry.key);
 			return;
 		}
 		var nextKey:Null<String> = null;
