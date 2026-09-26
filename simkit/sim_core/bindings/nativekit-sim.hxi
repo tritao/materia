@@ -108,18 +108,30 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		fixed_timestep: f64 @offset(16);
 		step_index: u64 @offset(24);
 	}
-	struct nksim_joint_desc @layout(144, 8) {
+	struct nksim_joint_desc @layout(208, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		type: u32 @offset(4);
 		body_a: nksim_body @offset(8);
 		body_b: nksim_body @offset(12);
 		anchor_a: array<f64, 3> @offset(16);
 		anchor_b: array<f64, 3> @offset(40);
+		/**
+		 * < Unit vector in body_a's own frame.
+		 */
 		axis_a: array<f64, 3> @offset(64);
 		lower_limit: f64 @offset(88);
 		upper_limit: f64 @offset(96);
 		max_force: f64 @offset(104);
-		reserved: array<u64, 4> @offset(112);
+		/**
+		 * Joint-frame orientation relative to body_a/body_b (x, y, z, w),
+		 * appended after the original fields so an old struct prefix remains
+		 * valid. A struct_size smaller than sizeof(nksim_joint_desc) means the
+		 * caller predates these fields; backends must treat them as identity
+		 * rather than reading past the caller's actual struct.
+		 */
+		rotation_a: array<f64, 4> @offset(112);
+		rotation_b: array<f64, 4> @offset(144);
+		reserved: array<u64, 4> @offset(176);
 	}
 	struct nksim_joint_state @layout(56, 8) {
 		struct_size: u32 @offset(0) @struct_size;

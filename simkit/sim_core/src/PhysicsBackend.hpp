@@ -47,6 +47,9 @@ struct BackendJointDesc {
     double lower_limit = 0.0;
     double upper_limit = 0.0;
     double max_force = 0.0;
+    /** Joint-frame orientation relative to body_a/body_b; identity when the caller's ABI struct predates these fields. */
+    std::array<double, 4> rotation_a{0.0, 0.0, 0.0, 1.0};
+    std::array<double, 4> rotation_b{0.0, 0.0, 0.0, 1.0};
 };
 
 struct BackendJointState {

@@ -150,10 +150,19 @@ typedef struct nksim_joint_desc {
     nksim_body body_b;
     double anchor_a[3];
     double anchor_b[3];
-    double axis_a[3];
+    double axis_a[3]; /**< Unit vector in body_a's own frame. */
     double lower_limit;
     double upper_limit;
     double max_force;
+    /**
+     * Joint-frame orientation relative to body_a/body_b (x, y, z, w),
+     * appended after the original fields so an old struct prefix remains
+     * valid. A struct_size smaller than sizeof(nksim_joint_desc) means the
+     * caller predates these fields; backends must treat them as identity
+     * rather than reading past the caller's actual struct.
+     */
+    double rotation_a[4];
+    double rotation_b[4];
     uint64_t reserved[4];
 } nksim_joint_desc;
 

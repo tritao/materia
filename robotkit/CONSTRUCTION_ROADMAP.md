@@ -613,6 +613,53 @@ and placing a `BaseObstacle` at the otherwise-best candidate forces a
 different, still-fully-reachable, pose — matching the plan's acceptance
 criteria directly.
 
+**M8.5 F1** (link rest poses / dropped frame rotations): fixed
+`Simulation::add_robot` (`robotkit/runtime/src/simulation.cpp`) to compute
+each link's actual rest pose by walking the joint tree from the root at
+`q = 0` (the same composition `KinematicChain`'s FK uses), instead of
+placing every link's scene node at the same `robot_transform(robot_index)`
+placeholder. Extended `nksim_joint_desc`/`BackendJointDesc`
+(`simkit/sim_core/include/nativekit_sim.h`, `simkit/sim_core/src/PhysicsBackend.hpp`)
+with `rotation_a`/`rotation_b` (xyzw), appended before `reserved` per the
+struct's own "old prefixes remain valid" convention; `World::create_joint`
+(`simkit/sim_core/src/world.cpp`) only reads them when `struct_size` covers
+the full new struct and otherwise (or when they come through as an
+unnormalizable all-zero value, the common `Type{}` zero-init idiom) defaults
+to identity, so it never reads past a legacy caller's actual allocation.
+`MujocoBackend::configure_body`/`add_body` (`simkit/sim_mujoco/src/mujoco_backend.cpp`)
+now place a non-fixed joint's hinge/slide entirely from the child side
+(`anchor_b`/`rotation_b`) and derive its local axis from `axis_a`/`rotation_a`/
+`rotation_b` directly (undo `rotation_a`, reapply `rotation_b`) rather than
+round-tripping through the two bodies' world rest rotations; a new
+`joint_frame_matches_rest_pose` check rejects (`NKSIM_ERROR_INVALID_STATE`)
+a joint whose `anchor_a`/`rotation_a` side disagrees with the bodies' actual
+rest poses instead of silently ignoring `anchor_a` as before. Regenerated
+`simkit/sim_core/bindings/nativekit-sim.hxi` via `check-hxi.sh` and verified
+with `check-haxeon.sh` (no other `.hxi`/binding needed regeneration — the
+public MuJoCo and RobotKit-runtime ABIs are unchanged). Two low-level
+`simkit/sim_mujoco/tests/mujoco.cpp` fixtures pinned a body 1 unit from its
+joint pivot with all-zero anchors, which used to rotate in place around its
+own center (silently ignoring `anchor_a`, exactly F1's bug); adjusted their
+`anchor_b` to the real -1 offset and, for the revolute case, replaced the
+"position never moves" assertion with the correct swinging-arm relationship
+(`position == (cos(theta), sin(theta))`) — confirmed via `git stash` that
+both fail against pre-fix `HEAD` and pass after the fix. Regression across
+`ctest -L sim`, the Haxe suite (674 assertions, unchanged), and the
+MuJoCo-enabled native robotd build (`/tmp/materia-mujoco`, per
+`robotkit/README.md`) is green **except** `robotkit_mujoco_tests`
+(`robotkit/runtime/tests/mujoco.cpp`), which already fails on pre-M8.5
+`HEAD` (confirmed by stashing and re-running): its single-hinge model's
+kinematic root is represented in MuJoCo as a mass-bearing free joint
+re-pinned to the scene node only once per outer `step()`, not per physics
+substep, so it can pick up spurious free-joint velocity within a step that
+leaks into a child's measured world angular velocity without showing up in
+that child's own hinge `qvel`. That is a real, pre-existing bug, but it's a
+kinematic-root/substep-timing issue independent of F1-F4's root causes;
+documented in `ARCHITECTURE.md` and left unfixed rather than silently
+expanding this milestone's scope. `robotkit_mujoco_backend` (the
+lower-level SimKit suite covering the same MuJoCo backend code F1 touches)
+passes.
+
 **M5**: added `robotkit/haxe/robotkit/work/` (`Point2`, `Polygon2`,
 `WorkSurfaceId`, `SourceKind`, `Provenance`, `WorkSurface`,
 `RasterToolpathGenerator`, `CoverageMap`) and

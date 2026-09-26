@@ -559,10 +559,19 @@ nksim_result World::reset() {
     return NKSIM_OK;
 }
 
+namespace {
+// Bytes a caller must provide for the fields that predate rotation_a/rotation_b;
+// a struct_size at least this large is accepted, but rotation_a/rotation_b are
+// only read (never touched, so never over-read) when struct_size covers the
+// full current struct. This is the "old prefixes remain valid" convention
+// nk_init_options documents.
+constexpr std::size_t joint_desc_legacy_size = offsetof(nksim_joint_desc, rotation_a);
+} // namespace
+
 nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_joint) {
     if (!owns_thread() || !out_joint)
         return !owns_thread() ? NKSIM_ERROR_WRONG_THREAD : NKSIM_ERROR_INVALID_ARGUMENT;
-    if (!valid_struct_size(desc.struct_size, sizeof(desc)) || !valid_joint_type(desc.type))
+    if (!valid_struct_size(desc.struct_size, joint_desc_legacy_size) || !valid_joint_type(desc.type))
         return NKSIM_ERROR_INVALID_ARGUMENT;
     const auto *body_a = bodies.get(desc.body_a);
     const auto *body_b = bodies.get(desc.body_b);
@@ -572,20 +581,53 @@ nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_
     if (!joint)
         return NKSIM_ERROR_OUT_OF_MEMORY;
     joint->handle = handle;
-    joint->desc = desc;
+    joint->desc = {};
+    joint->desc.struct_size = sizeof(joint->desc);
+    joint->desc.type = desc.type;
+    joint->desc.body_a = desc.body_a;
+    joint->desc.body_b = desc.body_b;
+    std::copy(std::begin(desc.anchor_a), std::end(desc.anchor_a), std::begin(joint->desc.anchor_a));
+    std::copy(std::begin(desc.anchor_b), std::end(desc.anchor_b), std::begin(joint->desc.anchor_b));
+    std::copy(std::begin(desc.axis_a), std::end(desc.axis_a), std::begin(joint->desc.axis_a));
+    joint->desc.lower_limit = desc.lower_limit;
+    joint->desc.upper_limit = desc.upper_limit;
+    joint->desc.max_force = desc.max_force;
+    joint->desc.rotation_a[3] = 1.0; // identity default for legacy-sized callers
+    joint->desc.rotation_b[3] = 1.0;
+    if (desc.struct_size >= sizeof(nksim_joint_desc)) {
+        std::copy(std::begin(desc.rotation_a), std::end(desc.rotation_a), std::begin(joint->desc.rotation_a));
+        std::copy(std::begin(desc.rotation_b), std::end(desc.rotation_b), std::begin(joint->desc.rotation_b));
+    }
+    // A zero-initialized struct (a common `Type{}` idiom, e.g. in tests
+    // predating these fields) reads back an unnormalizable rotation, not a
+    // deliberately invalid one; treat that exactly like a legacy-sized
+    // caller and default to identity, matching normalize_quaternion's own
+    // zero-length fallback elsewhere in this file.
+    std::array<double, 4> normalized_rotation_a{
+        joint->desc.rotation_a[0], joint->desc.rotation_a[1],
+        joint->desc.rotation_a[2], joint->desc.rotation_a[3]};
+    std::array<double, 4> normalized_rotation_b{
+        joint->desc.rotation_b[0], joint->desc.rotation_b[1],
+        joint->desc.rotation_b[2], joint->desc.rotation_b[3]};
+    normalize_quaternion(normalized_rotation_a);
+    normalize_quaternion(normalized_rotation_b);
+    std::copy(normalized_rotation_a.begin(), normalized_rotation_a.end(), std::begin(joint->desc.rotation_a));
+    std::copy(normalized_rotation_b.begin(), normalized_rotation_b.end(), std::begin(joint->desc.rotation_b));
     joint->state = {};
     joint->state.struct_size = sizeof(joint->state);
     joint->state.joint = handle;
     BackendJointDesc backend_desc{};
-    backend_desc.type = desc.type;
+    backend_desc.type = joint->desc.type;
     backend_desc.body_a = body_a->backend_body;
     backend_desc.body_b = body_b->backend_body;
-    std::copy(std::begin(desc.anchor_a), std::end(desc.anchor_a), backend_desc.anchor_a.begin());
-    std::copy(std::begin(desc.anchor_b), std::end(desc.anchor_b), backend_desc.anchor_b.begin());
-    std::copy(std::begin(desc.axis_a), std::end(desc.axis_a), backend_desc.axis_a.begin());
-    backend_desc.lower_limit = desc.lower_limit;
-    backend_desc.upper_limit = desc.upper_limit;
-    backend_desc.max_force = desc.max_force;
+    std::copy(std::begin(joint->desc.anchor_a), std::end(joint->desc.anchor_a), backend_desc.anchor_a.begin());
+    std::copy(std::begin(joint->desc.anchor_b), std::end(joint->desc.anchor_b), backend_desc.anchor_b.begin());
+    std::copy(std::begin(joint->desc.axis_a), std::end(joint->desc.axis_a), backend_desc.axis_a.begin());
+    backend_desc.lower_limit = joint->desc.lower_limit;
+    backend_desc.upper_limit = joint->desc.upper_limit;
+    backend_desc.max_force = joint->desc.max_force;
+    std::copy(std::begin(joint->desc.rotation_a), std::end(joint->desc.rotation_a), backend_desc.rotation_a.begin());
+    std::copy(std::begin(joint->desc.rotation_b), std::end(joint->desc.rotation_b), backend_desc.rotation_b.begin());
     std::uint64_t backend_joint = 0;
     const auto result = backend->joint_create(backend_desc, &backend_joint);
     if (result != NKSIM_OK) {

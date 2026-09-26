@@ -372,6 +372,44 @@ Adjacent joint-connected bodies are excluded from
 self contact, including static-root pairs. The robot geometry remains the
 current simple box representation, not an imported CAD collision model.
 
+### Link rest poses (M8.5, F1)
+
+`Simulation::add_robot` walks the compiled joint tree from the root at
+`q = 0` and sets each link's scene node to its actual rest pose
+(`world_T_child = world_T_parent . T(parent_frame_position, parent_frame_rotation)
+. T(child_frame_position, child_frame_rotation)^-1`, the same composition
+`robotkit.manipulation.KinematicChain`'s FK uses at zero joint values) before
+creating that link's native body — not the identity-rotation placeholder
+transform every link previously shared. `nksim_joint_desc`/`BackendJointDesc`
+carry the joint frame's orientation relative to each body,
+`rotation_a`/`rotation_b` (xyzw), appended after the original fields so an
+old struct prefix stays valid (`nk_init_options`'s convention); a struct_size
+or an all-zero (unnormalizable) value defaults to identity. The MuJoCo
+backend places a non-fixed joint entirely from the child side —
+`anchor_b`/`rotation_b` — and independently checks that `anchor_a`/`rotation_a`
+describe the same physical pivot against both bodies' rest poses, refusing
+(`NKSIM_ERROR_INVALID_STATE`) a joint description whose two sides disagree,
+rather than silently trusting one side as before.
+
+A regression surfaced while validating this fix: `robotkit_mujoco_tests`
+(`robotkit/runtime/tests/mujoco.cpp`) already failed on the pre-M8.5 `HEAD`
+(confirmed by stashing these changes and re-running it) — a single-hinge
+model's IMU gyro and its joint's reported velocity disagree by a large,
+non-shrinking margin from the very first tick. That model's root link is
+`NKSIM_MOTION_KINEMATIC`, which MuJoCo represents as an ordinary mass-bearing
+free joint pinned back to the scene node only once per outer `step()` (via
+`refresh_kinematic_bodies`), not once per physics substep; the root can pick
+up spurious free-joint velocity within a step's substeps that leaks into a
+child's world angular velocity without appearing in the child's own hinge
+`qvel`. This is a real bug, but it is a kinematic-root/substep-timing issue
+independent of F1-F4's root causes (rest poses, actuator gains,
+self-collision, and the default backend's kinematic placement); fixing it
+would mean restructuring the MuJoCo step loop's kinematic re-pinning, which
+is out of this milestone's scope. Left unfixed and reported here rather than
+silently expanding scope; `robotkit_mujoco_backend` (the lower-level SimKit
+MuJoCo suite) and every other regression suite listed in this milestone are
+green.
+
 ## Deployment boundary
 
 `robotd` remains one robot. It assigns every connection a unique session ID,

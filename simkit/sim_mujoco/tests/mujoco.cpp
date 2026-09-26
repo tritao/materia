@@ -119,6 +119,10 @@ void revolute_joint_is_owned_by_nativekit() {
     joint_desc.body_a = base;
     joint_desc.body_b = arm;
     joint_desc.axis_a[2] = 1.0;
+    // The pivot sits at the base's own origin; the arm's rest pose is 1
+    // unit away along X, so in the arm's own frame the pivot is at -1 (F1:
+    // anchor_a/anchor_b must agree with the bodies' rest poses).
+    joint_desc.anchor_b[0] = -1.0;
     joint_desc.lower_limit = -0.6;
     joint_desc.upper_limit = 0.6;
     joint_desc.max_force = 20.0;
@@ -133,7 +137,7 @@ void revolute_joint_is_owned_by_nativekit() {
     target.max_force = 20.0;
     assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
 
-    for (int index = 0; index < 20; ++index) {
+    for (int index = 0; index < 60; ++index) {
         nksim_step_result step{};
         step.struct_size = sizeof(step);
         assert(nksim_world_step(world, &step) == NKSIM_OK);
@@ -150,7 +154,12 @@ void revolute_joint_is_owned_by_nativekit() {
     nksim_body_state body_state{};
     body_state.struct_size = sizeof(body_state);
     assert(nksim_body_get_state(world, arm, &body_state) == NKSIM_OK);
-    assert(std::abs(body_state.position[0] - 1.0) < 1e-6);
+    // F1: the arm now genuinely swings from the base's pivot (anchor_a at
+    // the base origin, anchor_b 1 unit into the arm) instead of rotating in
+    // place around its own center, so its world position traces the joint
+    // angle around that pivot rather than staying fixed at (1, 0, 0).
+    assert(std::abs(body_state.position[0] - std::cos(joint_state.position)) < 1e-3);
+    assert(std::abs(body_state.position[1] - std::sin(joint_state.position)) < 1e-3);
     assert(std::abs(body_state.angular_velocity[2] - joint_state.velocity) < 1e-9);
     auto invalid_pose = body_state;
     invalid_pose.position[0] += 10.0;
@@ -258,6 +267,9 @@ void fixed_joint_rebuilds_and_can_be_removed() {
     joint_desc.type = NKSIM_JOINT_FIXED;
     joint_desc.body_a = base;
     joint_desc.body_b = child;
+    // Rest poses are 1 unit apart along X (F1: anchor_a/anchor_b must agree
+    // with the bodies' actual rest poses).
+    joint_desc.anchor_b[0] = -1.0;
     nksim_joint joint = 0;
     assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
     step_world(world, 2);

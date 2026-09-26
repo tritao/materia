@@ -45,6 +45,10 @@ Vec3 subtract(const Vec3 &a, const Vec3 &b) {
     return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
 }
 
+Vec3 add(const Vec3 &a, const Vec3 &b) {
+    return {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
+}
+
 Vec3 normalize(Vec3 value, const Vec3 &fallback = {1.0, 0.0, 0.0}) {
     const auto length = std::sqrt(dot(value, value));
     if (!std::isfinite(length) || length < 1e-12)
@@ -89,6 +93,27 @@ Vec3 rotate(const Quat &rotation, const Vec3 &value) {
     const Quat vector{value[0], value[1], value[2], 0.0};
     const auto rotated = multiply(multiply(rotation, vector), conjugate(rotation));
     return {rotated[0], rotated[1], rotated[2]};
+}
+
+// Both sides of a joint describe the same physical pivot: anchor_a/rotation_a
+// in body_a's own rest frame, anchor_b/rotation_b in body_b's. With rest poses
+// now correct (F1), this must agree; a mismatch means the joint description
+// itself is inconsistent (e.g. hand-built rather than derived from one set
+// of link transforms) and must be diagnosed, not silently resolved by
+// trusting anchor_b alone as the previous implementation did.
+bool joint_frame_matches_rest_pose(const nksim::BackendJointDesc &joint,
+                                   const nksim::BackendBodyDesc &parent,
+                                   const nksim::BackendBodyDesc &child) {
+    const Vec3 parent_position{parent.position[0], parent.position[1], parent.position[2]};
+    const Vec3 child_position{child.position[0], child.position[1], child.position[2]};
+    const auto from_parent = add(parent_position,
+        rotate(normalize(Quat{parent.rotation[0], parent.rotation[1], parent.rotation[2], parent.rotation[3]}),
+               joint.anchor_a));
+    const auto from_child = add(child_position,
+        rotate(normalize(Quat{child.rotation[0], child.rotation[1], child.rotation[2], child.rotation[3]}),
+               joint.anchor_b));
+    const auto delta = subtract(from_parent, from_child);
+    return std::sqrt(dot(delta, delta)) <= 1e-6;
 }
 
 void write_pose(const Vec3 &position, const Quat &rotation, mjsBody &body) {
@@ -606,6 +631,9 @@ private:
 
         const auto *incoming = parent_joint(id);
         const auto *parent_record = incoming ? &bodies.at(incoming->desc.body_a) : nullptr;
+        if (incoming && parent_record &&
+            !joint_frame_matches_rest_pose(incoming->desc, parent_record->desc, found->second.desc))
+            return NKSIM_ERROR_INVALID_STATE;
         // Rebuild articulations from rest transforms. Using the live pose here
         // and then restoring qpos applies joint displacement twice.
         const auto world_position = incoming ? found->second.desc.position : found->second.state.position;
@@ -621,8 +649,7 @@ private:
         }
         write_pose(local_position, local_rotation, *body);
 
-        const auto body_result = configure_body(*body, found->second.desc, incoming,
-                                                parent_record, world_rotation);
+        const auto body_result = configure_body(*body, found->second.desc, incoming);
         if (body_result != NKSIM_OK)
             return body_result;
 
@@ -639,9 +666,7 @@ private:
 
     static nksim_result configure_body(mjsBody &body,
                                        const nksim::BackendBodyDesc &desc,
-                                       const JointRecord *incoming,
-                                       const BodyRecord *parent,
-                                       const Quat &world_rotation) {
+                                       const JointRecord *incoming) {
         body.mass = desc.mass;
         if (desc.motion_type != NKSIM_MOTION_STATIC && desc.mass > 0.0) {
             body.explicitinertial = 1;
@@ -670,13 +695,17 @@ private:
                 return NKSIM_ERROR_BACKEND;
             joint->type = incoming->desc.type == NKSIM_JOINT_REVOLUTE
                 ? mjJNT_HINGE : mjJNT_SLIDE;
+            // Place the joint at the joint frame in body-local (child)
+            // coordinates: anchor_b/rotation_b, per F1. axis_a is the
+            // joint-frame axis rotated into body_a's frame by rotation_a;
+            // undoing rotation_a recovers the raw joint-frame axis, then
+            // rotation_b re-expresses it in body_b's (this body's) frame —
+            // this needs only per-joint local data, not the bodies' world
+            // rest rotations.
             std::copy(incoming->desc.anchor_b.begin(), incoming->desc.anchor_b.end(), joint->pos);
-
-            const auto parent_rotation = parent ? normalize(parent->desc.rotation)
-                                                 : Quat{0.0, 0.0, 0.0, 1.0};
-            const auto axis_world = rotate(parent_rotation,
-                                           normalize(incoming->desc.axis_a));
-            const auto axis_local = normalize(rotate(conjugate(world_rotation), axis_world));
+            const auto axis_joint_frame = rotate(conjugate(normalize(incoming->desc.rotation_a)),
+                                                 normalize(incoming->desc.axis_a));
+            const auto axis_local = normalize(rotate(normalize(incoming->desc.rotation_b), axis_joint_frame));
             std::copy(axis_local.begin(), axis_local.end(), joint->axis);
             if (incoming->desc.lower_limit < incoming->desc.upper_limit) {
                 joint->limited = mjLIMITED_TRUE;

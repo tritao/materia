@@ -11,6 +11,7 @@
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>
+#include <vector>
 
 namespace robotkit {
 namespace {
@@ -25,12 +26,107 @@ void require_scene(nkscene_result result, const char *operation) {
         throw std::runtime_error(operation);
 }
 
-nkscene_transform robot_transform(uint32_t robot_index) {
+// Minimal rigid-transform (translation + xyzw quaternion) helper for
+// evaluating each link's rest pose. Mirrors robotkit.spatial.Transform3's
+// compose/inverse exactly (ARCHITECTURE.md's a_T_b convention), so this is
+// the C++ side of the same math, not a parallel convention.
+struct Xform {
+    double pos[3] = {0.0, 0.0, 0.0};
+    double rot[4] = {0.0, 0.0, 0.0, 1.0};
+};
+
+void quat_rotate(const double q[4], const double v[3], double out[3]) {
+    const double t[3] = {
+        2.0 * (q[1] * v[2] - q[2] * v[1]),
+        2.0 * (q[2] * v[0] - q[0] * v[2]),
+        2.0 * (q[0] * v[1] - q[1] * v[0])
+    };
+    out[0] = v[0] + q[3] * t[0] + q[1] * t[2] - q[2] * t[1];
+    out[1] = v[1] + q[3] * t[1] + q[2] * t[0] - q[0] * t[2];
+    out[2] = v[2] + q[3] * t[2] + q[0] * t[1] - q[1] * t[0];
+}
+
+void quat_multiply(const double a[4], const double b[4], double out[4]) {
+    out[0] = a[3]*b[0] + a[0]*b[3] + a[1]*b[2] - a[2]*b[1];
+    out[1] = a[3]*b[1] - a[0]*b[2] + a[1]*b[3] + a[2]*b[0];
+    out[2] = a[3]*b[2] + a[0]*b[1] - a[1]*b[0] + a[2]*b[3];
+    out[3] = a[3]*b[3] - a[0]*b[0] - a[1]*b[1] - a[2]*b[2];
+}
+
+Xform xform_compose(const Xform &a, const Xform &b) {
+    Xform result;
+    double rotated[3];
+    quat_rotate(a.rot, b.pos, rotated);
+    for (int i = 0; i < 3; ++i) result.pos[i] = a.pos[i] + rotated[i];
+    quat_multiply(a.rot, b.rot, result.rot);
+    return result;
+}
+
+Xform xform_inverse(const Xform &a) {
+    Xform result;
+    result.rot[0] = -a.rot[0]; result.rot[1] = -a.rot[1];
+    result.rot[2] = -a.rot[2]; result.rot[3] = a.rot[3];
+    const double neg[3] = {-a.pos[0], -a.pos[1], -a.pos[2]};
+    quat_rotate(result.rot, neg, result.pos);
+    return result;
+}
+
+Xform xform_from(const double pos[3], const double rot[4]) {
+    Xform x;
+    std::copy_n(pos, 3, x.pos);
+    std::copy_n(rot, 4, x.rot);
+    return x;
+}
+
+nkscene_transform to_scene_transform(const Xform &x) {
     nkscene_transform transform{};
-    transform.matrix[0] = transform.matrix[5] = transform.matrix[10] =
-        transform.matrix[15] = 1.0f;
-    transform.matrix[12] = static_cast<float>(robot_index);
+    for (int column = 0; column < 3; ++column) {
+        double axis[3] = {0.0, 0.0, 0.0};
+        axis[column] = 1.0;
+        double rotated[3];
+        quat_rotate(x.rot, axis, rotated);
+        for (int row = 0; row < 3; ++row)
+            transform.matrix[column * 4 + row] = static_cast<float>(rotated[row]);
+    }
+    transform.matrix[12] = static_cast<float>(x.pos[0]);
+    transform.matrix[13] = static_cast<float>(x.pos[1]);
+    transform.matrix[14] = static_cast<float>(x.pos[2]);
+    transform.matrix[15] = 1.0f;
     return transform;
+}
+
+/**
+ * Rest pose (world_T_link at q = 0) for every link, walking the joint tree
+ * from the root. Per ARCHITECTURE.md's joint-frame convention:
+ * world_T_child = world_T_parent . T(parent_frame_position, parent_frame_rotation)
+ *               . T(child_frame_position, child_frame_rotation)^-1
+ * (joint motion is identity at q = 0). robot_index offsets the whole robot
+ * so multiple robots' links don't start stacked at one point either.
+ */
+std::vector<Xform> link_rest_poses(const rk_robot_runtime_blueprint &blueprint, uint32_t robot_index,
+                                    uint32_t root) {
+    std::vector<Xform> world(blueprint.link_count);
+    std::vector<bool> resolved(blueprint.link_count, false);
+    world[root].pos[0] = static_cast<double>(robot_index);
+    resolved[root] = true;
+    uint32_t remaining = blueprint.link_count > 0 ? blueprint.link_count - 1 : 0;
+    for (uint32_t pass = 0; pass < blueprint.link_count && remaining > 0; ++pass) {
+        for (uint32_t j = 0; j < blueprint.joint_count; ++j) {
+            const auto &joint = blueprint.joints[j];
+            if (resolved[joint.child_link] || !resolved[joint.parent_link])
+                continue;
+            const auto parent_T_jointFrame = xform_from(joint.parent_frame_position, joint.parent_frame_rotation);
+            const auto child_T_jointFrame = xform_from(joint.child_frame_position, joint.child_frame_rotation);
+            world[joint.child_link] = xform_compose(
+                xform_compose(world[joint.parent_link], parent_T_jointFrame),
+                xform_inverse(child_T_jointFrame));
+            resolved[joint.child_link] = true;
+            --remaining;
+        }
+    }
+    if (remaining > 0)
+        throw std::runtime_error("robot topology has unreachable links");
+    return world;
 }
 
 uint64_t monotonic_now_ns() {
@@ -101,6 +197,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 child = child || blueprint.joints[joint].child_link == candidate;
             if (!child) { root = candidate; break; }
         }
+        const auto rest_poses = link_rest_poses(blueprint, robot_index, root);
         nkscene_transaction transaction = 0;
         require_scene(nkscene_transaction_begin(scene_, &transaction),
                       "nkscene_transaction_begin");
@@ -110,7 +207,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 nkscene_transaction_cancel(transaction);
                 throw std::runtime_error("nkscene_tx_create_node");
             }
-            const auto transform = robot_transform(robot_index);
+            const auto transform = to_scene_transform(rest_poses[index]);
             if (nkscene_tx_set_transform(transaction, node, &transform) != NKS_OK) {
                 nkscene_transaction_cancel(transaction);
                 throw std::runtime_error("nkscene_tx_set_transform");
@@ -163,6 +260,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.axis_a[0] = a[0] + q[3]*t[0] + q[1]*t[2] - q[2]*t[1];
             desc.axis_a[1] = a[1] + q[3]*t[1] + q[2]*t[0] - q[0]*t[2];
             desc.axis_a[2] = a[2] + q[3]*t[2] + q[0]*t[1] - q[1]*t[0];
+            std::copy_n(source.parent_frame_rotation, 4, desc.rotation_a);
+            std::copy_n(source.child_frame_rotation, 4, desc.rotation_b);
             desc.lower_limit = source.lower_limit;
             desc.upper_limit = source.upper_limit;
             desc.max_force = source.max_effort;
