@@ -11,6 +11,7 @@ std::vector<SimulationRobot::JointCommand> &SimulationRobot::staged_commands() {
     if (!staged_valid_) {
         commanded_.resize(joints_.size());
         staged_ = commanded_;
+        staged_stopped_ = stopped_;
         staged_valid_ = true;
     }
     return staged_;
@@ -27,6 +28,10 @@ void SimulationRobot::queue_velocity_hold(std::size_t joint) {
 }
 
 rk_result SimulationRobot::apply(const rk_robot_command &command) {
+    // Lifecycle commands such as reset do not necessarily stage a target,
+    // but their safety state must still roll back if another robot rejects the
+    // shared simulation tick.
+    staged_commands();
     if (command.kind == RK_COMMAND_EMERGENCY_STOP) {
         stopped_ = true;
         pending_targets_.clear();

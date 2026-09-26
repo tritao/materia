@@ -72,9 +72,12 @@ class MachineKitRobotCompiler {
     addPrismaticJoint(model, "y", xCarriage, yCarriage, yAxis,
       [-halfSqrt, 0.0, 0.0, halfSqrt],
       [0.0, yAxis.screwStart + yAxis.travelMin, 0.0], maxVelocity);
+    // The inherited Y-carriage frame is R_y(90°) * R_x(-90°). Use its
+    // inverse for Z and express the travel origin along local -X so both the
+    // Z joint axis and its origin land on world +Z.
     addPrismaticJoint(model, "z", yCarriage, zCarriage, zAxis,
-      [0.0, 0.0, 0.0, 1.0],
-      [0.0, 0.0, zAxis.screwStart + zAxis.travelMin], maxVelocity);
+      [0.5, -0.5, -0.5, 0.5],
+      [-(zAxis.screwStart + zAxis.travelMin), 0.0, 0.0], maxVelocity);
 
     return MotionSystemBlueprint.fromRobotModel(model, [
       axisBlueprint("x", xAxis, maxVelocity, maxAcceleration),

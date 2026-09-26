@@ -34,6 +34,9 @@ public:
 
     /**
      * Applies one validated command or per-cycle controller output batch.
+     * A runtime owner phase may apply an intermediate lifecycle command before
+     * its final generated setpoint when a mailbox drain contains an ordered
+     * reset/stop followed by a new motion request.
      *
      * The endpoint should not advance shared time here. A simulation can call
      * discard_pending() if a different robot rejects its command, so staged

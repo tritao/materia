@@ -295,6 +295,74 @@ void same_cycle_target_batches_merge_per_joint(const rk_robot_runtime_blueprint 
     assert(state.velocity[0] == 0.0 && state.velocity[1] == 0.0);
 }
 
+void partial_targets_and_ordered_trajectory_commands(
+    const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    uint64_t timestamp = 0;
+
+    // Partial target batches retain joints that the newer batch does not
+    // name, including across owner cycles.
+    assert(runtime.submit(velocity_batch(1, {{0, 0.2}, {1, -0.3}})) == RK_OK);
+    auto state = apply_cycle(runtime, timestamp);
+    assert(state.velocity[0] == 0.2 && state.velocity[1] == -0.3);
+    assert(runtime.submit(velocity_batch(2, {{0, 0.4}})) == RK_OK);
+    state = apply_cycle(runtime, timestamp);
+    assert(state.velocity[0] == 0.4 && state.velocity[1] == -0.3);
+
+    // Updating another joint must not reset an in-progress position
+    // reference or silently drop its rate-limited motion.
+    auto position_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime position_runtime(blueprint, position_endpoint,
+                                            std::chrono::milliseconds(50));
+    auto position = velocity_batch(1, {{1, 0.2}});
+    position.targets[0] = {0, RK_TARGET_POSITION, 0.8, 1.0, 0.0};
+    assert(position_runtime.submit(position) == RK_OK);
+    uint64_t position_timestamp = 0;
+    state = apply_cycle(position_runtime, position_timestamp);
+    assert(std::abs(state.position[0] - 0.05) < 1e-9);
+    assert(position_runtime.submit(velocity_batch(2, {{1, 0.3}})) == RK_OK);
+    state = apply_cycle(position_runtime, position_timestamp);
+    assert(std::abs(state.position[0] - 0.1) < 1e-9);
+
+    // Multiple chunks in one mailbox drain append in sequence order instead
+    // of the newest chunk replacing the earlier one.
+    assert(runtime.submit(trajectory_batch(3, {{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
+    assert(runtime.submit(trajectory_batch(4, {{0, 0.2}, {100'000'000, 0.4}})) == RK_OK);
+    state = apply_cycle(runtime, timestamp);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 4);
+    assert(state.trajectory_duration_ns == 200'000'000);
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.1) < 1e-9);
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.2) < 1e-9);
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.3) < 1e-9);
+
+    // A stop followed by a replacement chunk clears the old queue before the
+    // new motion is accepted; the final owner output is the new trajectory.
+    assert(runtime.submit(lifecycle_command(5, RK_COMMAND_STOP)) == RK_OK);
+    assert(runtime.submit(trajectory_batch(6, {{0, 0.1}, {100'000'000, 0.3}})) == RK_OK);
+    state = apply_cycle(runtime, timestamp);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
+    assert(std::abs(state.position[0] - 0.1) < 1e-9);
+    assert(state.mode == RK_ROBOT_MODE_TRACKING);
+
+    // Reset and a chunk in one owner cycle are also sequential. The reset is
+    // delivered to the endpoint before the generated trajectory setpoint.
+    auto reset_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime reset_runtime(blueprint, reset_endpoint,
+                                         std::chrono::milliseconds(50));
+    assert(reset_runtime.submit(lifecycle_command(1, RK_COMMAND_EMERGENCY_STOP)) == RK_OK);
+    state = apply_cycle(reset_runtime, timestamp);
+    assert(state.safety == RK_SAFETY_EMERGENCY_STOP);
+    assert(reset_runtime.submit(lifecycle_command(2, RK_COMMAND_RESET_SAFETY)) == RK_OK);
+    assert(reset_runtime.submit(trajectory_batch(3, {{0, 0.0}, {100'000'000, 0.25}})) == RK_OK);
+    state = apply_cycle(reset_runtime, timestamp);
+    assert(state.safety == RK_SAFETY_READY);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
+}
+
 } // namespace
 
 int main() {
@@ -315,6 +383,7 @@ int main() {
         joint.axis[2] = 1.0;
     }
     same_cycle_target_batches_merge_per_joint(blueprint);
+    partial_targets_and_ordered_trajectory_commands(blueprint);
     timestamped_trajectory_interpolates_and_reports_progress(blueprint);
     normal_stop_decelerates_active_trajectory(blueprint);
 

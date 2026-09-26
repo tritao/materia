@@ -149,6 +149,11 @@ class LineLookaheadPlanner {
       maxVelocity:Float, maxAcceleration:Float):Float {
     var dot = incoming[0] * outgoing[0] + incoming[1] * outgoing[1] + incoming[2] * outgoing[2];
     dot = Math.max(-1.0, Math.min(1.0, dot));
+    // The junction-deviation construction uses the interior angle between
+    // the reversed incoming tangent and the outgoing tangent. Using the
+    // travel-direction dot product directly inverts gentle bends and near
+    // reversals: shallow corners nearly stop while sharp ones run through.
+    dot = -dot;
     var sineHalfAngle = Math.sqrt(Math.max(0.0, (1.0 - dot) * 0.5));
     if (sineHalfAngle <= EPSILON) return maxVelocity;
     if (sineHalfAngle >= 1.0 - EPSILON) return 0.0;

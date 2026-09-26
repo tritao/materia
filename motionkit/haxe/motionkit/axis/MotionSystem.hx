@@ -21,10 +21,9 @@ import robotkit.world.TrajectoryPoint;
 /**
  * Semantic machine-axis view over an ordinary RobotKit robot.
  *
- * The view owns planning state, while the Robot still owns snapshots,
- * transport, safety, and lifecycle. The bootstrap submits one position batch
- * per deterministic update; a buffered RobotCommand is a later execution
- * increment behind this same API.
+ * The view owns planning and buffered-execution state, while the Robot still
+ * owns snapshots, transport, safety, and lifecycle. Immediate and queued
+ * motions use the same RobotCommand boundary.
  */
 class MotionSystem {
   public final robot:Robot;
@@ -448,7 +447,22 @@ class MotionSystem {
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(trajectoryValue);
     resetTrajectoryChunkState();
-    if (usesTrajectoryChunks(trajectoryValue)) submitActiveTrajectoryChunk();
+    if (usesTrajectoryChunks(trajectoryValue)) {
+      // A direct move replaces the native runtime's queue as well as this
+      // local buffer. The position batch is an ordered flush marker; the
+      // following chunk then starts from the current observed pose instead of
+      // being appended behind stale motion.
+      replaceRuntimeMotion();
+      submitActiveTrajectoryChunk();
+    }
+  }
+
+  function replaceRuntimeMotion():Void {
+    var positions = robot.snapshot().positions.toArray();
+    var targets:Array<JointTarget> = [];
+    for (joint in 0...positions.length)
+      targets.push(JointTarget.position(joint, positions[joint]));
+    robot.submit(RobotCommand.JointTargets(targets, null));
   }
 
   function enqueueTrajectory(trajectoryValue:JointTrajectory):Void {

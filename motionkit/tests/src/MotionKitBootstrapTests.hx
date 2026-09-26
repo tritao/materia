@@ -21,6 +21,8 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
+import robotkit.manipulation.ChainTip;
+import robotkit.manipulation.KinematicChain;
 import robotkit.runtime.Simulation;
 import robotkit.world.RecordingRobot;
 import robotkit.world.RobotRecording;
@@ -41,6 +43,7 @@ class MotionKitBootstrapTests {
     testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
     testLongBufferedExecution();
+    testImmediateMotionReplacesNativeQueue();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
   }
 
@@ -126,6 +129,30 @@ class MotionKitBootstrapTests {
         "lookahead corner position is deterministic");
     }
 
+    var shallowAngle = Math.PI / 18.0;
+    var nearReversalAngle = Math.PI * 170.0 / 180.0;
+    var shallowPath = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
+      new PathPoint(0.1, 0.0, 0.0),
+      new PathPoint(0.1 + 0.1 * Math.cos(shallowAngle), 0.1 * Math.sin(shallowAngle), 0.0)]);
+    var nearReversalPath = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
+      new PathPoint(0.1, 0.0, 0.0),
+      new PathPoint(0.1 + 0.1 * Math.cos(nearReversalAngle),
+        0.1 * Math.sin(nearReversalAngle), 0.0)]);
+    var shallow = planner.planPath(shallowPath, limits, PathPlanningOptions.blend(0.01));
+    var nearReversal = planner.planPath(nearReversalPath, limits,
+      PathPlanningOptions.blend(0.01));
+    var shallowCorner = findCornerSampleAt(shallow, 0.1, 0.0);
+    var nearReversalCorner = findCornerSampleAt(nearReversal, 0.1, 0.0);
+    var shallowSpeed = Math.sqrt(shallowCorner.velocities[0] * shallowCorner.velocities[0] +
+      shallowCorner.velocities[1] * shallowCorner.velocities[1]);
+    var nearReversalSpeed = Math.sqrt(nearReversalCorner.velocities[0] *
+      nearReversalCorner.velocities[0] + nearReversalCorner.velocities[1] *
+      nearReversalCorner.velocities[1]);
+    check(shallowSpeed > 0.5, "a shallow line bend retains high blend speed");
+    check(nearReversalSpeed < 0.2, "a near-reversal line bend slows for the corner");
+    check(shallowSpeed > nearReversalSpeed * 4.0,
+      "corner blend speed decreases as the interior angle closes");
+
     var arc = new ArcSegment(new PathPoint(0.1, 0.1, 0.0), 0.1,
       -Math.PI * 0.5, Math.PI * 0.5);
     var arcTrajectory = planner.planPath(new GeometricPath([arc]),
@@ -141,8 +168,13 @@ class MotionKitBootstrapTests {
   }
 
   static function findCornerSample(trajectory:motionkit.trajectory.JointTrajectory):motionkit.trajectory.JointTrajectorySample {
+    return findCornerSampleAt(trajectory, 0.1, 0.0);
+  }
+
+  static function findCornerSampleAt(trajectory:motionkit.trajectory.JointTrajectory,
+      x:Float, y:Float):motionkit.trajectory.JointTrajectorySample {
     for (sample in trajectory.samples)
-      if (Math.abs(sample.positions[0] - 0.1) <= 1e-7 && Math.abs(sample.positions[1]) <= 1e-7)
+      if (Math.abs(sample.positions[0] - x) <= 1e-7 && Math.abs(sample.positions[1] - y) <= 1e-7)
         return sample;
     throw "lookahead trajectory did not emit its corner sample";
   }
@@ -251,8 +283,29 @@ class MotionKitBootstrapTests {
       (xAxis.screwStart + xAxis.travelMin) * 0.001, "X carriage frame is compiled in metres");
     near(blueprint.model.joints[1].parentFramePosition[1],
       (yAxis.screwStart + yAxis.travelMin) * 0.001, "Y carriage frame is compiled in metres");
-    near(blueprint.model.joints[2].parentFramePosition[2],
-      (zAxis.screwStart + zAxis.travelMin) * 0.001, "Z carriage frame is compiled in metres");
+    near(blueprint.model.joints[2].parentFramePosition[0],
+      -(zAxis.screwStart + zAxis.travelMin) * 0.001,
+      "Z carriage frame compensates the inherited gantry orientation");
+
+    var chain = new KinematicChain(blueprint.model, "gantry.base",
+      ChainTip.Link("z.carriage"));
+    var tip = chain.forwardKinematics([0.0, 0.0, 0.0]).translation;
+    near(tip.x, (xAxis.screwStart + xAxis.travelMin) * 0.001,
+      "XYZ gantry forward kinematics preserves X origin");
+    near(tip.y, (yAxis.screwStart + yAxis.travelMin) * 0.001,
+      "XYZ gantry forward kinematics preserves Y origin");
+    near(tip.z, (zAxis.screwStart + zAxis.travelMin) * 0.001,
+      "XYZ gantry forward kinematics preserves Z origin");
+    var jacobian = chain.jacobian([0.0, 0.0, 0.0]);
+    near(jacobian[0][0], 1.0, "XYZ gantry X joint moves along world X");
+    near(jacobian[1][1], 1.0, "XYZ gantry Y joint moves along world Y");
+    near(jacobian[2][2], 1.0, "XYZ gantry Z joint moves along world Z");
+    near(jacobian[1][0], 0.0, "XYZ gantry X joint has no world Y component");
+    near(jacobian[2][0], 0.0, "XYZ gantry X joint has no world Z component");
+    near(jacobian[0][1], 0.0, "XYZ gantry Y joint has no world X component");
+    near(jacobian[2][1], 0.0, "XYZ gantry Y joint has no world Z component");
+    near(jacobian[0][2], 0.0, "XYZ gantry Z joint has no world X component");
+    near(jacobian[1][2], 0.0, "XYZ gantry Z joint has no world Y component");
 
     var simulation = new Simulation(0.01);
     var runtime = simulation.addRobot(blueprint.runtime);
@@ -476,6 +529,41 @@ class MotionKitBootstrapTests {
     near(instrumented.snapshot().positions.get(0), 0.05,
       "streamed trajectory reaches its final position", 1e-5);
     near(machine.progress(), 1.0, "streamed trajectory reports completed progress");
+    simulation.dispose();
+  }
+
+  static function testImmediateMotionReplacesNativeQueue():Void {
+    var axis = new LinearAxis(23, 10, 80);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("replace-queue", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var recording = new RobotRecording();
+    var instrumented = new RecordingRobot(robot, recording);
+    var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
+    var options = new MotionOptions(0.05, 0.2);
+
+    machine.moveAxes([new AxisTarget("x", 0.06)], options);
+    machine.moveAxes([new AxisTarget("x", 0.01)], options);
+    check(recording.commands.length == 4,
+      "immediate replacement submits a runtime flush before each trajectory");
+    switch recording.commands[2] {
+      case JointTargets(_, _):
+        check(true, "immediate replacement flush is ordered before its new chunk");
+      case TrajectoryChunk(_):
+        throw "immediate replacement submitted its chunk before the runtime flush";
+    }
+    switch recording.commands[3] {
+      case TrajectoryChunk(_):
+        check(true, "immediate replacement submits the new trajectory after its flush");
+      case JointTargets(_, _):
+        throw "immediate replacement did not submit a trajectory after its flush";
+    }
+    runMotion(machine, simulation);
+    near(robot.snapshot().positions.get(0), 0.01,
+      "immediate motion replaces stale native trajectory motion", 1e-5);
     simulation.dispose();
   }
 

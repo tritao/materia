@@ -1,7 +1,6 @@
 #include "robotkit_runtime.hpp"
 
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <cmath>
 #include <iterator>
@@ -57,57 +56,6 @@ void sample_trajectory(const std::deque<rk_trajectory_point> &trajectory,
         velocities[joint] = seconds <= 0.0 ? 0.0 :
             (after->positions[joint] - before->positions[joint]) / seconds;
     }
-}
-
-/**
- * Reduce one mailbox drain to one owner-cycle intent. Submission accepts only
- * increasing sequences, so the drain is already in sequence order. Emergency
- * stop always wins. A newest stop or safety reset wins alone, so a stale
- * target earlier in the same cycle never runs after it. Otherwise every
- * joint-target batch newer than the latest stop or reset merges per joint, a
- * newer batch replacing an older one's target for the same joint: batches are
- * partial updates, so a caller may command a drive and an arm with separate
- * batches in one cycle without the later batch discarding the earlier one's
- * joints.
- */
-rk_robot_command arbitrate(const std::deque<rk_robot_command> &commands) {
-    const rk_robot_command *emergency = nullptr;
-    for (const auto &command : commands)
-        if (command.kind == RK_COMMAND_EMERGENCY_STOP)
-            emergency = &command;
-    if (emergency)
-        return *emergency;
-    const auto &newest = commands.back();
-    if (lifecycle_kind(newest.kind))
-        return newest;
-    if (newest.kind == RK_COMMAND_TRAJECTORY_CHUNK)
-        return newest;
-
-    std::size_t first = 0;
-    for (std::size_t index = 0; index < commands.size(); ++index)
-        if (lifecycle_kind(commands[index].kind))
-            first = index + 1;
-    rk_robot_command merged = newest;
-    merged.kind = RK_COMMAND_NONE;
-    merged.target_count = 0;
-    std::array<int, RK_MAX_JOINTS> slot;
-    slot.fill(-1);
-    for (std::size_t index = first; index < commands.size(); ++index) {
-        const auto &batch = commands[index];
-        if (batch.kind != RK_COMMAND_JOINT_TARGETS)
-            continue;
-        merged.kind = RK_COMMAND_JOINT_TARGETS;
-        for (uint32_t target = 0; target < batch.target_count; ++target) {
-            const auto &value = batch.targets[target];
-            // Submission validation bounds joints by the blueprint, itself
-            // within RK_MAX_JOINTS.
-            auto &position = slot[value.joint];
-            if (position < 0)
-                position = static_cast<int>(merged.target_count++);
-            merged.targets[position] = value;
-        }
-    }
-    return merged;
 }
 
 } // namespace
@@ -347,93 +295,33 @@ rk_result RobotRuntime::apply_pending_commands() {
     }
 
     const bool has_command = !commands.empty();
-    rk_robot_command command{};
-    if (has_command)
-        command = arbitrate(commands);
-
+    rk_command_kind final_kind = RK_COMMAND_NONE;
+    uint64_t final_timestamp_ns = 0;
     rk_safety_state safety = RK_SAFETY_READY;
+    rk_robot_state current{};
     {
         std::lock_guard state_lock(state_mutex_);
+        current = state_;
         safety = state_.safety;
     }
-    if (has_command &&
-        (safety == RK_SAFETY_EMERGENCY_STOP || safety == RK_SAFETY_FAULT) &&
-        command.kind != RK_COMMAND_RESET_SAFETY &&
-        command.kind != RK_COMMAND_EMERGENCY_STOP) {
-        std::lock_guard state_lock(state_mutex_);
-        state_backup_valid_ = false;
-        return RK_ERROR_SAFETY_STOPPED;
+    // Emergency stop remains the one intentionally non-sequential operation:
+    // it wins over every other command in the drained owner cycle. All other
+    // commands are then applied in mailbox order so a reset/flush/chunk
+    // sequence and multiple trajectory chunks retain their meaning.
+    const rk_robot_command *emergency = nullptr;
+    for (const auto &value : commands) {
+        if (value.kind == RK_COMMAND_EMERGENCY_STOP) {
+            emergency = &value;
+            break;
+        }
     }
 
-    if (has_command && command.kind == RK_COMMAND_JOINT_TARGETS) {
-        control_.trajectory.clear();
-        control_.trajectory_time_ns = 0;
-        control_.trajectory_active = false;
-        control_.stop_ramp_active = false;
-        std::fill_n(control_.active, RK_MAX_JOINTS, false);
-        rk_robot_state current{};
-        {
-            std::lock_guard state_lock(state_mutex_);
-            current = state_;
-        }
-        for (uint32_t index = 0; index < command.target_count; ++index) {
-            const auto &target = command.targets[index];
-            const auto &joint = blueprint_.joints[target.joint];
-            if (target.mode == RK_TARGET_POSITION &&
-                (target.target < joint.lower_limit || target.target > joint.upper_limit)) {
-                latch_fault();
-                return RK_ERROR_LIMIT;
-            }
-            if (target.mode == RK_TARGET_EFFORT && joint.max_effort > 0.0 &&
-                std::abs(target.target) > joint.max_effort) {
-                latch_fault();
-                return RK_ERROR_LIMIT;
-            }
-        }
-        for (uint32_t index = 0; index < command.target_count; ++index) {
-            const auto &target = command.targets[index];
-            const auto joint = target.joint;
-            if (target.mode == RK_TARGET_POSITION &&
-                (!control_.active[joint] || control_.targets[joint].mode != RK_TARGET_POSITION)) {
-                control_.position_reference[joint] = current.position[joint];
-                control_.reference_initialized[joint] = true;
-            }
-            control_.targets[joint] = target;
-            if (target.mode == RK_TARGET_EFFORT && target.max_effort > 0.0 &&
-                std::abs(control_.targets[joint].target) > target.max_effort)
-                control_.targets[joint].target = std::copysign(
-                    target.max_effort, control_.targets[joint].target);
-            control_.active[joint] = true;
-        }
-    } else if (has_command && command.kind == RK_COMMAND_TRAJECTORY_CHUNK) {
-        std::fill_n(control_.active, RK_MAX_JOINTS, false);
-        control_.stop_ramp_active = false;
-        const auto base_time = control_.trajectory.empty()
-            ? uint64_t{0} : control_.trajectory.back().time_from_start_ns;
-        for (uint32_t index = 0; index < command.trajectory_count; ++index) {
-            auto point = command.trajectory[index];
-            if (base_time > std::numeric_limits<uint64_t>::max() - point.time_from_start_ns)
-                return RK_ERROR_INVALID_ARGUMENT;
-            point.time_from_start_ns += base_time;
-            for (uint32_t joint = 0; joint < point.joint_count; ++joint) {
-                const auto &limits = blueprint_.joints[joint];
-                if (point.positions[joint] < limits.lower_limit ||
-                    point.positions[joint] > limits.upper_limit) {
-                    latch_fault();
-                    return RK_ERROR_LIMIT;
-                }
-            }
-            control_.trajectory.push_back(point);
-        }
-        control_.trajectory_active = true;
-    }
-
-    const bool lifecycle_command = has_command && command.kind != RK_COMMAND_NONE &&
-        command.kind != RK_COMMAND_JOINT_TARGETS &&
-        command.kind != RK_COMMAND_TRAJECTORY_CHUNK;
     bool controlled_stop = false;
-    if (has_command && command.kind == RK_COMMAND_STOP && control_.trajectory_active &&
-        !control_.trajectory.empty()) {
+    auto begin_controlled_stop = [&]() {
+        if (!control_.trajectory_active || control_.trajectory.empty()) {
+            control_ = {};
+            return false;
+        }
         double positions[RK_MAX_TRAJECTORY_JOINTS]{};
         double velocities[RK_MAX_TRAJECTORY_JOINTS]{};
         sample_trajectory(control_.trajectory, control_.trajectory_time_ns, positions, velocities);
@@ -449,17 +337,154 @@ rk_result RobotRuntime::apply_pending_commands() {
         control_.trajectory_time_ns = 0;
         control_.trajectory_active = false;
         control_.stop_ramp_active = true;
-        controlled_stop = true;
-    }
-    if (lifecycle_command && !controlled_stop) {
+        return true;
+    };
+
+    auto apply_intermediate_lifecycle = [&](rk_robot_command &value) {
+        // The caller sequence belongs to the runtime mailbox. Lifecycle
+        // commands sent through an endpoint also need the endpoint-local
+        // monotonic sequence, otherwise a few owner cycles with no host
+        // command can make an intermediate stop/reset look stale to a device.
+        value.sequence = ++endpoint_command_sequence_;
+        const auto result = endpoint_->apply(value);
+        if (result != RK_OK)
+            latch_fault();
+        return result;
+    };
+
+    if (emergency != nullptr) {
         control_ = {};
+        final_kind = RK_COMMAND_EMERGENCY_STOP;
+        final_timestamp_ns = emergency->timestamp_ns;
+        safety = RK_SAFETY_EMERGENCY_STOP;
+    } else {
+        for (std::size_t index = 0; index < commands.size(); ++index) {
+            auto &value = commands[index];
+            bool has_later_effective_command = false;
+            for (std::size_t next = index + 1; next < commands.size(); ++next) {
+                if (commands[next].kind != RK_COMMAND_NONE) {
+                    has_later_effective_command = true;
+                    break;
+                }
+            }
+            final_timestamp_ns = value.timestamp_ns;
+
+            if ((safety == RK_SAFETY_EMERGENCY_STOP || safety == RK_SAFETY_FAULT) &&
+                value.kind != RK_COMMAND_RESET_SAFETY) {
+                std::lock_guard state_lock(state_mutex_);
+                state_backup_valid_ = false;
+                return RK_ERROR_SAFETY_STOPPED;
+            }
+
+            if (value.kind == RK_COMMAND_NONE)
+                continue;
+            final_kind = value.kind;
+
+            if (value.kind == RK_COMMAND_RESET_SAFETY) {
+                control_ = {};
+                controlled_stop = false;
+                safety = RK_SAFETY_READY;
+                if (has_later_effective_command) {
+                    const auto result = apply_intermediate_lifecycle(value);
+                    if (result != RK_OK)
+                        return result;
+                }
+                continue;
+            }
+
+            if (value.kind == RK_COMMAND_STOP) {
+                controlled_stop = begin_controlled_stop();
+                safety = RK_SAFETY_READY;
+                if (has_later_effective_command) {
+                    const auto result = apply_intermediate_lifecycle(value);
+                    if (result != RK_OK)
+                        return result;
+                }
+                continue;
+            }
+
+            if (value.kind == RK_COMMAND_JOINT_TARGETS) {
+                // A target batch is a replacement when trajectory execution
+                // is active, but remains a partial update during ordinary
+                // target control. This preserves independent drive/arm
+                // updates without appending a new move behind old motion.
+                const bool replace_active_motion = control_.trajectory_active ||
+                    !control_.trajectory.empty() || control_.stop_ramp_active;
+                if (replace_active_motion) {
+                    control_.trajectory.clear();
+                    control_.trajectory_time_ns = 0;
+                    control_.trajectory_active = false;
+                    control_.stop_ramp_active = false;
+                    std::fill_n(control_.active, RK_MAX_JOINTS, false);
+                    std::fill_n(control_.reference_initialized, RK_MAX_JOINTS, false);
+                }
+                for (uint32_t target_index = 0; target_index < value.target_count; ++target_index) {
+                    const auto &target = value.targets[target_index];
+                    const auto &joint = blueprint_.joints[target.joint];
+                    if (target.mode == RK_TARGET_POSITION &&
+                        (target.target < joint.lower_limit || target.target > joint.upper_limit)) {
+                        latch_fault();
+                        return RK_ERROR_LIMIT;
+                    }
+                    if (target.mode == RK_TARGET_EFFORT && joint.max_effort > 0.0 &&
+                        std::abs(target.target) > joint.max_effort) {
+                        latch_fault();
+                        return RK_ERROR_LIMIT;
+                    }
+                }
+                for (uint32_t target_index = 0; target_index < value.target_count; ++target_index) {
+                    const auto &target = value.targets[target_index];
+                    const auto joint = target.joint;
+                    if (target.mode == RK_TARGET_POSITION &&
+                        (!control_.active[joint] || control_.targets[joint].mode != RK_TARGET_POSITION)) {
+                        control_.position_reference[joint] = current.position[joint];
+                        control_.reference_initialized[joint] = true;
+                    }
+                    control_.targets[joint] = target;
+                    if (target.mode == RK_TARGET_EFFORT && target.max_effort > 0.0 &&
+                        std::abs(control_.targets[joint].target) > target.max_effort)
+                        control_.targets[joint].target = std::copysign(
+                            target.max_effort, control_.targets[joint].target);
+                    control_.active[joint] = true;
+                }
+                controlled_stop = false;
+                continue;
+            }
+
+            if (value.kind == RK_COMMAND_TRAJECTORY_CHUNK) {
+                std::fill_n(control_.active, RK_MAX_JOINTS, false);
+                std::fill_n(control_.reference_initialized, RK_MAX_JOINTS, false);
+                control_.stop_ramp_active = false;
+                const auto base_time = control_.trajectory.empty()
+                    ? uint64_t{0} : control_.trajectory.back().time_from_start_ns;
+                for (uint32_t point_index = 0; point_index < value.trajectory_count; ++point_index) {
+                    auto point = value.trajectory[point_index];
+                    if (base_time > std::numeric_limits<uint64_t>::max() - point.time_from_start_ns)
+                        return RK_ERROR_INVALID_ARGUMENT;
+                    point.time_from_start_ns += base_time;
+                    for (uint32_t joint = 0; joint < point.joint_count; ++joint) {
+                        const auto &limits = blueprint_.joints[joint];
+                        if (point.positions[joint] < limits.lower_limit ||
+                            point.positions[joint] > limits.upper_limit) {
+                            latch_fault();
+                            return RK_ERROR_LIMIT;
+                        }
+                    }
+                    control_.trajectory.push_back(point);
+                }
+                control_.trajectory_active = true;
+                controlled_stop = false;
+            }
+        }
     }
+
+    const bool lifecycle_command = has_command && lifecycle_kind(final_kind);
 
     rk_robot_command output{};
     output.struct_size = sizeof(output);
-    output.timestamp_ns = has_command ? command.timestamp_ns : 0;
+    output.timestamp_ns = has_command ? final_timestamp_ns : 0;
     if (lifecycle_command && !controlled_stop) {
-        output.kind = command.kind;
+        output.kind = final_kind;
         output.target_count = 0;
     } else if (control_.stop_ramp_active) {
         output.kind = RK_COMMAND_JOINT_TARGETS;
@@ -547,7 +572,7 @@ rk_result RobotRuntime::apply_pending_commands() {
             output.targets[active_count++] = target;
         }
         output.target_count = active_count;
-        if (active_count == 0 && has_command && command.kind == RK_COMMAND_NONE)
+        if (active_count == 0 && has_command && final_kind == RK_COMMAND_NONE)
             output.kind = RK_COMMAND_NONE;
         else if (active_count == 0) {
             state_backup_valid_ = false;
@@ -567,20 +592,20 @@ rk_result RobotRuntime::apply_pending_commands() {
     state_.trajectory_time_ns = control_.trajectory_active ? control_.trajectory_time_ns : 0;
     state_.trajectory_duration_ns = control_.trajectory_active && !control_.trajectory.empty()
         ? control_.trajectory.back().time_from_start_ns : 0;
-    if (lifecycle_command && command.kind == RK_COMMAND_EMERGENCY_STOP) {
+    if (lifecycle_command && final_kind == RK_COMMAND_EMERGENCY_STOP) {
         state_.mode = RK_ROBOT_MODE_FAULT;
         state_.safety = RK_SAFETY_EMERGENCY_STOP;
-    } else if (lifecycle_command && command.kind == RK_COMMAND_STOP) {
+    } else if (lifecycle_command && final_kind == RK_COMMAND_STOP) {
         state_.mode = RK_ROBOT_MODE_STOPPING;
         state_.safety = RK_SAFETY_STOPPING;
-    } else if (lifecycle_command && command.kind == RK_COMMAND_RESET_SAFETY) {
+    } else if (lifecycle_command && final_kind == RK_COMMAND_RESET_SAFETY) {
         state_.mode = RK_ROBOT_MODE_IDLE;
         state_.safety = RK_SAFETY_READY;
     } else if (controlled_stop || control_.stop_ramp_active) {
         state_.mode = RK_ROBOT_MODE_STOPPING;
         state_.safety = RK_SAFETY_STOPPING;
-    } else if (has_command && (command.kind == RK_COMMAND_JOINT_TARGETS ||
-                               command.kind == RK_COMMAND_TRAJECTORY_CHUNK)) {
+    } else if (has_command && (final_kind == RK_COMMAND_JOINT_TARGETS ||
+                               final_kind == RK_COMMAND_TRAJECTORY_CHUNK)) {
         state_.mode = RK_ROBOT_MODE_TRACKING;
         state_.safety = RK_SAFETY_READY;
     }

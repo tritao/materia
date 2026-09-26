@@ -19,11 +19,14 @@ public:
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override;
     void discard_pending() noexcept override {
         pending_targets_.clear();
+        if (staged_valid_)
+            stopped_ = staged_stopped_;
         staged_valid_ = false;
     }
     void reset() noexcept {
         pending_targets_.clear();
         staged_valid_ = false;
+        staged_stopped_ = false;
         std::fill(commanded_.begin(), commanded_.end(), JointCommand{});
         stopped_ = false;
         reset_sensors();
@@ -75,6 +78,7 @@ private:
     std::vector<JointCommand> commanded_;
     std::vector<JointCommand> staged_;
     bool staged_valid_ = false;
+    bool staged_stopped_ = false;
     bool stopped_ = false;
     nksim_body base_body_ = 0;
     struct SensorState {
