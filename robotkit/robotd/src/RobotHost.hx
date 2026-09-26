@@ -24,7 +24,7 @@ class RobotHost {
     if (args.indexOf("--help") >= 0) {
       Sys.println("Usage: robotd [--server [--once]] [--port=N] [--listen=IPv4] "
         + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] "
-        + "[--deployment=FILE] [--help]");
+        + "[--deployment=FILE] [--camera-fixture] [--help]");
       return;
     }
     var port = parsePort();
@@ -47,6 +47,9 @@ class RobotHost {
       throw "robotd: --deployment cannot be combined with --in-memory";
     var behavior = parseBehavior();
     var multiJoint = args.indexOf("--multi-joint") >= 0;
+    var cameraFixture = args.indexOf("--camera-fixture") >= 0;
+    if (cameraFixture && deployment != null)
+      throw "robotd: --camera-fixture requires the demo robot";
     var robot = deployment == null ? new RobotModel(multiJoint ? "demo-forklift" : "demo-arm") : deployment.robot;
     if (deployment == null) {
     var base = robot.addLink(new Link("base"));
@@ -88,6 +91,11 @@ class RobotHost {
       var sensor = robot.addSensor(new robotkit.model.Sensor(kind, kind, 0, 'demo/$kind'));
       sensor.frame = mount;
     }
+    if (cameraFixture) {
+      var camera = robot.addSensor(new robotkit.model.Sensor("camera", "camera", 0,
+        "demo/camera"));
+      camera.frame = mount;
+    }
     }
     var blueprint = RobotRuntimeCompiler.compile(robot);
     if (args.indexOf("--server") >= 0) {
@@ -103,6 +111,13 @@ class RobotHost {
         }
         if (serverRuntime == null) throw "robotd: failed to create runtime";
         var hostedRuntime:RobotRuntime = serverRuntime;
+        if (cameraFixture) {
+          var pixels = haxe.io.Bytes.alloc(6);
+          for (index in 0...6) pixels.set(index, index + 1);
+          hostedRuntime.publishCameraFrame("demo/camera",
+            new robotkit.world.CameraImage(2, 1, "rgb8", pixels),
+            haxe.Int64.ofInt(1), haxe.Int64.ofInt(1), "camera.fixture");
+        }
         var server = new RobotServer(robot, blueprint, hostedRuntime, serverSimulation,
           port, robotId, behavior, listenAddress);
         server.run(args.indexOf("--once") >= 0);

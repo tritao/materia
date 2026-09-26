@@ -5,6 +5,7 @@ import nativekit.ffi.NativeKit;
 import NativeKitEvents;
 import haxe.Int64;
 import robotkit.client.RobotClient;
+import robotkit.protocol.CameraFrameData;
 import robotkit.protocol.RobotStateMsg;
 import robotkit.protocol.SensorFrameMsg;
 
@@ -28,6 +29,7 @@ class RemoteRobot implements Robot {
     client.faultListener = onFault;
     client.statusListener = onStatus;
     client.sensorListener = onSensor;
+    client.cameraListener = onCamera;
   }
 
   public function id():RobotId return logicalId;
@@ -147,19 +149,37 @@ class RemoteRobot implements Robot {
     var frame = new SensorFrame(value.sensorId, value.kind, value.frameId,
       value.sequence, value.sourceTimestampNs, value.values,
       NativeKit.nk_time_now_ns(), value.linkId, value.mountPosition, value.mountRotation);
+    updateSensor(frame, value.receivedTimestampNs);
+  }
+
+  @:allow(tests.RobotWorldTests)
+  function onCamera(value:CameraFrameData):Void {
+    var metadata = value.frame;
+    var welcome = client.welcome;
+    if (welcome != null && Int64.compare(metadata.robotId, welcome.robotId) != 0)
+      return;
+    var image = value.image();
+    var frame = new SensorFrame(metadata.sensorId, metadata.kind,
+      metadata.frameId, metadata.sequence, metadata.sourceTimestampNs, [],
+      NativeKit.nk_time_now_ns(), metadata.linkId, metadata.mountPosition,
+      metadata.mountRotation, metadata.sourceClockId, "robotkit.monotonic", image);
+    updateSensor(frame, metadata.receivedTimestampNs);
+  }
+
+  function updateSensor(frame:SensorFrame, sourceReceipt:Int64):Void {
     var replaced = false;
     for (index in 0...currentSensors.length) {
       if (currentSensors[index].sensorId == frame.sensorId) {
         var old = currentSensors[index];
         if (old.sequence == frame.sequence && old.sourceTimestampNs == frame.sourceTimestampNs
-            && sensorSourceReceipts.get(frame.sensorId) == value.receivedTimestampNs) return;
+            && sensorSourceReceipts.get(frame.sensorId) == sourceReceipt) return;
         currentSensors[index] = frame;
         replaced = true;
         break;
       }
     }
     if (!replaced) currentSensors.push(frame);
-    sensorSourceReceipts.set(frame.sensorId, value.receivedTimestampNs);
+    sensorSourceReceipts.set(frame.sensorId, sourceReceipt);
     notifyChanged();
   }
 

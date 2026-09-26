@@ -11,7 +11,8 @@ mkdir -p "$log_dir"
 
 "$repo_dir/haxeon/scripts/haxeon" build --project "$server_project"
 server_mode="--server --once"
-client_mode=""
+client_mode="--camera-fixture"
+server_mode="$server_mode --camera-fixture"
 if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" == "1" ]]; then
   server_mode="--server"
   client_mode="--sessions"

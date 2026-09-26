@@ -19,18 +19,26 @@ class CameraImage {
   final pixelBytes:Bytes;
 
   public function new(width:Int, height:Int, encoding:String, bytes:Bytes) {
-    if (width <= 0 || height <= 0 || encoding == null || bytes == null)
+    if (bytes == null)
       throw "Camera image requires positive dimensions, an encoding, and pixel bytes";
-    var bytesPerPixel = bytesPerPixelFor(encoding);
-    if (bytes.length == 0 || bytes.length > MAX_BYTES)
-      throw "Camera image byte length is outside the supported range";
-    if (bytesPerPixel != 0 && (width > Std.int(MAX_BYTES / bytesPerPixel / height) ||
-        bytes.length != width * height * bytesPerPixel))
-      throw 'Camera image "$encoding" byte length does not match its dimensions';
+    validateBytes(width, height, encoding, bytes.length);
     this.width = width;
     this.height = height;
     this.encoding = encoding;
     pixelBytes = copyOf(bytes);
+  }
+
+  /** Checks image dimensions and byte count without copying pixels. */
+  public static function validateBytes(width:Int, height:Int, encoding:String,
+      byteLength:Int):Void {
+    if (width <= 0 || height <= 0 || encoding == null)
+      throw "Camera image requires positive dimensions, an encoding, and pixel bytes";
+    var bytesPerPixel = bytesPerPixelFor(encoding);
+    if (byteLength == 0 || byteLength > MAX_BYTES)
+      throw "Camera image byte length is outside the supported range";
+    if (bytesPerPixel != 0 && (width > Std.int(MAX_BYTES / bytesPerPixel / height) ||
+        byteLength != width * height * bytesPerPixel))
+      throw 'Camera image "$encoding" byte length does not match its dimensions';
   }
 
   /** Bytes per pixel for a raw encoding, or 0 for a compressed one. */

@@ -15,7 +15,7 @@ class IntegrationMain {
     else if (arguments.indexOf("--sessions") >= 0) RobotSessionIntegration.run(host, port);
     else if (arguments.indexOf("--restart-check") >= 0)
       WorldTcpIntegration.runRestartCheck(host, port);
-    else WorldTcpIntegration.run(host, port);
+    else WorldTcpIntegration.run(host, port, arguments.indexOf("--camera-fixture") >= 0);
   }
 
   static function parseHost(arguments:Array<String>):String {

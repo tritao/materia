@@ -19,6 +19,7 @@ import robotkit.behavior.RobotBehavior;
 import robotkit.behavior.RobotBehaviorRunner;
 import robotkit.protocol.ControlHeartbeat;
 import robotkit.protocol.Fault;
+import robotkit.protocol.CameraFrame;
 import robotkit.protocol.Hello;
 import robotkit.protocol.JointTarget;
 import robotkit.protocol.JointTargetValue;
@@ -29,6 +30,7 @@ import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotFrame.RobotFrameStream;
 import robotkit.protocol.RobotMessageType;
 import robotkit.protocol.RobotProtocol;
+import robotkit.protocol.PixelFormat;
 import robotkit.protocol.RobotStateMsg;
 import robotkit.protocol.SafetyReset;
 import robotkit.protocol.Stop;
@@ -554,12 +556,30 @@ class RobotServer {
       snapshot.mode, snapshot.faultCode, snapshot.receivedTimestampNs, snapshot.safety);
     sendTo(target, targetSession, RobotProtocol.state(message, targetSession, snapshot.sequence,
       snapshot.sourceTimestampNs));
-    for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot))
-      sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
-        snapshot.robotId, sensor.sensorId, sensor.kind, sensor.frameId, sensor.sequence,
-        sensor.sourceTimestampNs, sensor.receivedTimestampNs, sensor.values.toArray(),
-        sensor.linkId, sensor.mountPosition.toArray(), sensor.mountRotation.toArray()),
-        targetSession, sensor.sequence, sensor.sourceTimestampNs));
+    for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot)) {
+      if (sensor.image != null) {
+        var image = sensor.image;
+        var format = switch image.encoding {
+          case "rgb8": PixelFormat.RGB8;
+          case "depth32f": PixelFormat.Depth32F;
+          case "jpeg": PixelFormat.JPEG;
+          case _: throw 'Unsupported camera image encoding "${image.encoding}"';
+        };
+        var camera = new CameraFrame(snapshot.robotId, sensor.sensorId,
+          sensor.kind, sensor.frameId, sensor.sequence, sensor.sourceTimestampNs,
+          sensor.receivedTimestampNs, image.width, image.height, format, null,
+          sensor.linkId, sensor.mountPosition.toArray(), sensor.mountRotation.toArray(),
+          sensor.sourceClockId, sensor.receivedClockId);
+        sendTo(target, targetSession, RobotProtocol.cameraFrame(camera,
+          image.bytes(), targetSession, sensor.sequence, sensor.sourceTimestampNs));
+      } else {
+        sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
+          snapshot.robotId, sensor.sensorId, sensor.kind, sensor.frameId, sensor.sequence,
+          sensor.sourceTimestampNs, sensor.receivedTimestampNs, sensor.values.toArray(),
+          sensor.linkId, sensor.mountPosition.toArray(), sensor.mountRotation.toArray()),
+          targetSession, sensor.sequence, sensor.sourceTimestampNs));
+      }
+    }
   }
 
   function sendFault(code:Int, message:String, fatal:Bool):Void {

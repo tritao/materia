@@ -81,7 +81,7 @@ class WorldTcpIntegration {
     if (failure != null) throw failure;
   }
 
-  public static function run(host:String, port:Int):Void {
+  public static function run(host:String, port:Int, ?cameraFixture:Bool = false):Void {
     var runtime = NativeKitRuntime.start();
     var world = new RobotWorld();
     var remote = new RemoteRobot(LOGICAL_ID);
@@ -121,9 +121,22 @@ class WorldTcpIntegration {
         var sensor = model.addSensor(new robotkit.model.Sensor(kind, kind, 0, 'demo/$kind'));
         sensor.frame = mount;
       }
-      var local = new robotkit.world.SimulatedRobot("local", simulation.addRobot(
-        robotkit.runtime.RobotRuntimeCompiler.compile(model)), model.name,
+      if (cameraFixture) {
+        var camera = model.addSensor(new robotkit.model.Sensor("camera", "camera", 0,
+          "demo/camera"));
+        camera.frame = mount;
+      }
+      var localRuntime = simulation.addRobot(
+        robotkit.runtime.RobotRuntimeCompiler.compile(model));
+      var local = new robotkit.world.SimulatedRobot("local", localRuntime, model.name,
         [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
+      if (cameraFixture) {
+        var pixels = haxe.io.Bytes.alloc(6);
+        for (index in 0...6) pixels.set(index, index + 1);
+        localRuntime.publishCameraFrame("demo/camera",
+          new robotkit.world.CameraImage(2, 1, "rgb8", pixels),
+          Int64.ofInt(1), Int64.ofInt(1), "camera.fixture");
+      }
       world.attach(local);
       simulation.step(Int64.ofInt(1));
       simulation.step(Int64.ofInt(2));
@@ -167,7 +180,7 @@ class WorldTcpIntegration {
 
       var state = world.snapshot().robot(LOGICAL_ID);
       var position = state == null ? 0.0 : state.positions.get(0);
-      if (state == null || state.sensors.length != 3)
+      if (state == null || state.sensors.length != (cameraFixture ? 4 : 3))
         throw "robotd did not transport simulated encoder, IMU, and LiDAR frames";
       for (sensor in state.sensors.toArray()) {
         if (sensor.sensorId != 'demo/${sensor.kind}' || sensor.frameId != "demo/sensor-mount"
@@ -178,6 +191,9 @@ class WorldTcpIntegration {
         if (sensor.kind == "lidar")
           for (range in sensor.values.toArray())
             if (range != 10.0) throw "single-robot LiDAR must exclude self geometry";
+        if (sensor.kind == "camera" && (sensor.image == null ||
+            sensor.image.width != 2 || sensor.image.bytes().get(5) != 6))
+          throw "robotd did not transport the camera fixture pixels";
         if (Int64.compare(sensor.receivedTimestampNs, sensor.sourceTimestampNs) == 0)
           throw "sensor receipt reused simulation source time";
       }

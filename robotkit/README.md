@@ -231,6 +231,9 @@ unprojects `depth32f` images through pinhole calibration and the authored 3D
 camera mount before clustering. Both publish detections in their source or body
 frame; wrap them with `FrameAwarePerception` to use the current robot frame tree
 and localization estimate for map-frame obstacles.
+Camera images travel over robotd as `CameraFrame` messages with pixel bytes in
+a separate attachment. `RemoteRobot` publishes the received image as a normal
+sensor frame, preserving sensor identity, mount, and source clock provenance.
 
 `robotkit.navigation.Navigation` follows a framed `Path` using the latest
 localization state and an application-supplied update duration. `Trajectory`

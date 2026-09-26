@@ -18,4 +18,5 @@ enum abstract RobotMessageType(Int) from Int to Int {
   var JointTargets = 14;
   var SafetyReset = 15;
   var ControlHeartbeat = 16;
+  var CameraFrame = 17;
 }

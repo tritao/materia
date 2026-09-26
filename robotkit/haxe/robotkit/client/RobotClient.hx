@@ -14,6 +14,7 @@ import robotkit.protocol.JointTarget;
 import robotkit.protocol.JointTargetValue;
 import robotkit.protocol.JointTargets;
 import robotkit.protocol.RobotCapabilities;
+import robotkit.protocol.CameraFrameData;
 import robotkit.protocol.RobotDescription;
 import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotFrame.RobotFrameStream;
@@ -42,6 +43,7 @@ class RobotClient {
   public var stateListener:Null<RobotStateMsg->Void> = null;
   public var faultListener:Null<Fault->Void> = null;
   public var sensorListener:Null<SensorFrameMsg->Void> = null;
+  public var cameraListener:Null<CameraFrameData->Void> = null;
   public var statusListener:Null<Void->Void> = null;
 
   var nativeRuntime:Null<NativeKitRuntime> = null;
@@ -377,6 +379,13 @@ class RobotClient {
       var listener = sensorListener;
       if (listener != null)
         listener(sensor);
+    case RobotMessageType.CameraFrame:
+      if (!validSession(frame))
+        return;
+      var camera = RobotProtocol.decodeCameraFrame(frame);
+      var listener = cameraListener;
+      if (listener != null)
+        listener(camera);
     case _:
   }
 

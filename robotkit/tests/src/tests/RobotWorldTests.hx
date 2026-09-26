@@ -46,6 +46,13 @@ import robotkit.world.RobotWorld;
 import robotkit.world.RobotWorldEvent;
 import robotkit.world.SensorFrame;
 import robotkit.world.CameraImage;
+import robotkit.protocol.BufferRef;
+import robotkit.protocol.CameraFrame;
+import robotkit.protocol.PixelFormat;
+import robotkit.protocol.RobotFrame;
+import robotkit.protocol.RobotMessageType;
+import robotkit.protocol.RobotProtocol;
+import haxeon.wire.MessagePack;
 import robotkit.world.ReplayRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.RobotRecordingEvent;
@@ -173,6 +180,7 @@ class RobotWorldTests {
     testSensorAndClockContracts();
     testSensorResetPublication();
     testConfiguredSensors();
+    testCameraFrameProtocol();
     testExternalSensorRuntime();
     testSerialRobotUnavailableDevice();
     assertions += SpatialTests.run();
@@ -3340,6 +3348,86 @@ class RobotWorldTests {
     equal(updated, 2, "the simulated robot observes an image update without a physics step");
     robot.close();
     simulation.dispose();
+  }
+
+  static function testCameraFrameProtocol():Void {
+    var pixels = haxe.io.Bytes.alloc(12);
+    for (index in 0...pixels.length) pixels.set(index, index + 1);
+    var metadata = new CameraFrame(Int64.ofInt(42), "camera/front", "camera",
+      "robot/base/camera", Int64.ofInt(8), Int64.ofInt(100), Int64.ofInt(105),
+      2, 2, PixelFormat.RGB8, null, "base", [0.2, 0.0, 0.8],
+      [0.0, 0.0, 0.0, 1.0], "robot.boot-1", "sensor.monotonic");
+    var outgoing = RobotProtocol.cameraFrame(metadata, pixels, Int64.ofInt(7),
+      Int64.ofInt(8), Int64.ofInt(110));
+    equal(outgoing.attachments.length, 1,
+      "camera frame stores pixels in a separate RobotFrame attachment");
+    equal(metadata.pixels.length, 0,
+      "camera frame encoding does not mutate caller-owned metadata");
+    var decoded = RobotProtocol.decodeCameraFrame(RobotFrame.decode(outgoing.encode()));
+    equal(decoded.frame.robotId, Int64.ofInt(42), "camera protocol preserves robot identity");
+    equal(decoded.frame.sensorId, "camera/front", "camera protocol preserves sensor identity");
+    equal(decoded.frame.frameId, "robot/base/camera", "camera protocol preserves frame identity");
+    equal(decoded.frame.sequence, Int64.ofInt(8), "camera protocol preserves sensor sequence");
+    equal(decoded.frame.sourceClockId, "robot.boot-1", "camera protocol preserves source clock");
+    equal(decoded.frame.receivedClockId, "sensor.monotonic", "camera protocol preserves receipt clock");
+    equal(decoded.frame.mountPosition[0], 0.2, "camera protocol preserves sensor mount");
+    var received = decoded.pixels();
+    equal(received.length, pixels.length, "camera protocol resolves the complete attachment");
+    for (index in 0...pixels.length)
+      equal(received.get(index), index + 1, "camera protocol preserves pixel byte $index");
+    outgoing.attachments[0].set(0, 255);
+    equal(decoded.pixels().get(0), 1,
+      "decoded camera pixels own a copy independent of the frame attachment");
+    var remote = new RemoteRobot("camera-remote");
+    remote.onCamera(decoded);
+    var remoteSensors = remote.sensors();
+    equal(remoteSensors.length, 1, "remote robot publishes received camera as a sensor frame");
+    equal(remoteSensors[0].sensorId, "camera/front", "remote camera keeps sensor identity");
+    equal(remoteSensors[0].values.length, 0, "remote camera does not invent scalar readings");
+    var remoteImage = remoteSensors[0].image;
+    check(remoteImage != null, "remote sensor frame includes the camera image");
+    if (remoteImage != null) {
+      equal(remoteImage.width, 2, "remote camera retains image dimensions");
+      equal(remoteImage.bytes().get(5), 6, "remote camera retains image bytes");
+    }
+    equal(remoteSensors[0].sourceClockId, "robot.boot-1",
+      "remote camera retains the source clock");
+    equal(remoteSensors[0].receivedClockId, "robotkit.monotonic",
+      "remote camera stamps receipt time with the local monotonic clock");
+
+    var padded = haxe.io.Bytes.alloc(16);
+    for (index in 0...12) padded.set(index + 2, index + 21);
+    var offsetMetadata = new CameraFrame(Int64.ofInt(42), "camera/offset", "camera",
+      "camera-frame", Int64.ofInt(1), Int64.ofInt(2), Int64.ofInt(3), 2, 2,
+      PixelFormat.RGB8, new BufferRef(0, 2, 12), "base");
+    var offsetFrame = new RobotFrame(RobotMessageType.CameraFrame,
+      MessagePack.encode(offsetMetadata), 0, [padded]);
+    equal(RobotProtocol.decodeCameraFrame(offsetFrame).pixels().get(0), 21,
+      "camera protocol resolves a valid byte range inside an attachment");
+
+    throws(function() RobotProtocol.cameraFrame(new CameraFrame(Int64.ofInt(42),
+      "camera/bad", "camera", "camera-frame", Int64.ofInt(1), Int64.ofInt(2),
+      Int64.ofInt(3), 2, 2, PixelFormat.RGB8), haxe.io.Bytes.alloc(11)),
+      "camera protocol rejects pixel lengths inconsistent with dimensions");
+    var outside = new CameraFrame(Int64.ofInt(42), "camera/outside", "camera",
+      "camera-frame", Int64.ofInt(1), Int64.ofInt(2), Int64.ofInt(3), 2, 2,
+      PixelFormat.RGB8, new BufferRef(0, 8, 12));
+    throws(function() RobotProtocol.decodeCameraFrame(new RobotFrame(
+      RobotMessageType.CameraFrame, MessagePack.encode(outside), 0, [haxe.io.Bytes.alloc(16)])),
+      "camera protocol rejects buffer ranges outside their attachments");
+    var missing = new CameraFrame(Int64.ofInt(42), "camera/missing", "camera",
+      "camera-frame", Int64.ofInt(1), Int64.ofInt(2), Int64.ofInt(3), 2, 2,
+      PixelFormat.RGB8, new BufferRef(1, 0, 12));
+    throws(function() RobotProtocol.decodeCameraFrame(new RobotFrame(
+      RobotMessageType.CameraFrame, MessagePack.encode(missing), 0, [haxe.io.Bytes.alloc(12)])),
+      "camera protocol rejects references to missing attachments");
+    var wrongLength = new CameraFrame(Int64.ofInt(42), "camera/wrong-size", "camera",
+      "camera-frame", Int64.ofInt(1), Int64.ofInt(2), Int64.ofInt(3), 2, 2,
+      PixelFormat.RGB8, new BufferRef(0, 0, 11));
+    throws(function() RobotProtocol.decodeCameraFrame(new RobotFrame(
+      RobotMessageType.CameraFrame, MessagePack.encode(wrongLength), 0,
+      [haxe.io.Bytes.alloc(11)])),
+      "camera protocol rejects malformed raw image dimensions on receipt");
   }
 
   static function testConfiguredSensors():Void {
