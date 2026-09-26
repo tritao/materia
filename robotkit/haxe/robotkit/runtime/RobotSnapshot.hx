@@ -15,6 +15,8 @@ import robotkit.world.SensorFrame;
  */
 class RobotSnapshot {
   public final robotId:Int64;
+  public final modelRevision:Int64;
+  public final calibrationRevision:Int64;
   public final sequence:Int64;
   public final sourceTimestampNs:Int64;
   public final receivedTimestampNs:Int64;
@@ -42,8 +44,11 @@ class RobotSnapshot {
       ?receivedTimestampNs:Int64, ?sensors:Array<SensorFrame>,
       ?trajectoryQueueDepth:Int, ?trajectoryActive:Bool,
       ?trajectoryTimeNs:Int64, ?trajectoryDurationNs:Int64,
-      ?trajectoryTag:Int64, ?trajectoryTagTimeNs:Int64) {
+      ?trajectoryTag:Int64, ?trajectoryTagTimeNs:Int64,
+      ?modelRevision:Int64, ?calibrationRevision:Int64) {
     this.robotId = robotId;
+    this.modelRevision = modelRevision == null ? Int64.ofInt(0) : modelRevision;
+    this.calibrationRevision = calibrationRevision == null ? Int64.ofInt(0) : calibrationRevision;
     this.sequence = sequence;
     this.sourceTimestampNs = sourceTimestampNs;
     this.receivedTimestampNs = receivedTimestampNs == null
@@ -103,7 +108,8 @@ class RobotSnapshot {
       positions, velocities, efforts, value.get_received_timestamp_ns(), frames,
       value.get_trajectory_queue_depth(), value.get_trajectory_active() != 0,
       value.get_trajectory_time_ns(), value.get_trajectory_duration_ns(),
-      value.get_trajectory_tag(), value.get_trajectory_tag_time_ns());
+      value.get_trajectory_tag(), value.get_trajectory_tag_time_ns(),
+      value.get_revision(), value.get_calibration_revision());
   }
 
   /** Returns an immutable copy associated with a caller-provided robot ID. */
@@ -111,7 +117,7 @@ class RobotSnapshot {
     return new RobotSnapshot(value, sequence, sourceTimestampNs, mode, safety, endpoint, faultCode,
       q.toArray(), dq.toArray(), effort.toArray(), receivedTimestampNs, sensors.toArray(),
       trajectoryQueueDepth, trajectoryActive, trajectoryTimeNs, trajectoryDurationNs,
-      trajectoryTag, trajectoryTagTimeNs);
+      trajectoryTag, trajectoryTagTimeNs, modelRevision, calibrationRevision);
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;
 }

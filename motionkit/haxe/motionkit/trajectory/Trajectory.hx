@@ -4,6 +4,7 @@ import MotionKitNative;
 import haxe.Int64;
 
 /** Owns a native piecewise-polynomial joint trajectory. */
+@:allow(motionkit.trajectory.ExecutionPlan)
 class Trajectory {
   final owner:Ownedmk_trajectory_handle;
   var disposed:Bool = false;
@@ -69,6 +70,16 @@ class Trajectory {
     var result = MotionKitNative.mk_trajectory_joint_count(owner.borrow());
     check(result.status, "trajectory.jointCount");
     return result.out_joint_count;
+  }
+
+  public function validate(limits:ValidationLimits):ValidationReport {
+    ensureLive();
+    if (limits.jointCount != jointCount()) throw "Validation joint count mismatch";
+    var report = new mk_validation_report();
+    report.set_struct_size(mk_validation_report.size());
+    check(MotionKitNative.mk_validate(owner.borrow(), limits.nativeValue(), report),
+      "trajectory.validate");
+    return new ValidationReport(report);
   }
 
   public function dispose():Void {

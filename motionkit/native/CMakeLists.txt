@@ -13,7 +13,7 @@ else()
     set(MK_LIBRARY_TYPE STATIC)
 endif()
 
-add_library(motionkit_core ${MK_LIBRARY_TYPE} src/trajectory.cpp)
+add_library(motionkit_core ${MK_LIBRARY_TYPE} src/trajectory.cpp src/validation.cpp)
 target_compile_features(motionkit_core PUBLIC cxx_std_17)
 target_include_directories(motionkit_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -32,4 +32,7 @@ if(BUILD_TESTING)
     add_executable(motionkit_trajectory_tests tests/trajectory.cpp)
     target_link_libraries(motionkit_trajectory_tests PRIVATE motionkit_core)
     add_test(NAME motionkit_trajectory COMMAND motionkit_trajectory_tests)
+    add_executable(motionkit_validation_tests tests/validation.cpp)
+    target_link_libraries(motionkit_validation_tests PRIVATE motionkit_core)
+    add_test(NAME motionkit_validation COMMAND motionkit_validation_tests)
 endif()

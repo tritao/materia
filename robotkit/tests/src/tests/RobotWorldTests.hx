@@ -3757,7 +3757,15 @@ class RobotWorldTests {
     model.addSensor(new robotkit.model.Sensor("lidar", "lidar", 10, "sensor/lidar"));
     var frame = model.addFrame(new robotkit.model.Frame("base frame", base, "frame/base"));
     model.addFrame(new robotkit.model.Frame("tool frame", tool, "frame/tool"));
-    var original = RobotRuntimeCompiler.compile(model, 1);
+    var original = RobotRuntimeCompiler.compile(model, 1, 9);
+    equal(original.calibrationRevision, 9, "compiler preserves calibration revision");
+    var revisionSimulation = new Simulation();
+    var revisionRuntime = revisionSimulation.addRobot(original);
+    var revisionSnapshot = revisionRuntime.snapshot();
+    equal(revisionSnapshot.modelRevision, Int64.ofInt(1), "snapshot carries model revision");
+    equal(revisionSnapshot.calibrationRevision, Int64.ofInt(9),
+      "snapshot carries calibration revision");
+    revisionSimulation.dispose();
     var originalIds = original.identity;
     check(originalIds != null, "compiler supplies semantic identity mappings");
     if (originalIds == null) throw "missing compiled identity";

@@ -666,3 +666,18 @@ MotionKit Haxe suite, RobotKit Haxe and native suites, FFI audit, and TCP
 integration in default, session and lease-timeout modes passed. The Haxeon FFI
 exposes arrays of small coefficient structs, so the C ABI represents each
 joint's six coefficients as one struct inside the segment.
+
+### P4 — Validate limits and create execution plans
+
+Added analytic position/velocity/acceleration/jerk extrema checks through
+degree five, optional continuity claims, revisioned validation reports, and
+native plans that deep-copy a trajectory and reject failed checks while still
+returning the report. The Haxe wrapper requires callers to provide start-state
+derivatives explicitly, avoiding the degree-1 derivative trap noted for P9.
+Added calibration revision to the RobotKit blueprint, compiler, and snapshot,
+with old C ABI struct prefixes accepted and defaulted to zero. Position limits
+use an explicit claim flag because zero is a valid bound; unlike derivative
+limits, their numeric values cannot double as an unclaimed sentinel. Commit:
+the commit containing this entry. MotionKit Haxe and native tests, RobotKit
+Haxe and native tests, both FFI audits, and TCP integration in default,
+session, and lease-timeout modes passed.

@@ -13,6 +13,14 @@ std::mutex registry_mutex;
 std::unordered_map<uint32_t, std::unique_ptr<motionkit::Trajectory>> trajectories;
 uint32_t next_id = 1;
 
+struct Plan {
+    motionkit::Trajectory trajectory;
+    mk_plan_spec spec;
+    mk_validation_report report;
+};
+std::unordered_map<uint32_t, std::unique_ptr<Plan>> plans;
+uint32_t next_plan_id = 1;
+
 motionkit::Trajectory *get(mk_trajectory_handle handle) {
     const auto found = trajectories.find(handle.id);
     return found == trajectories.end() ? nullptr : found->second.get();
@@ -34,6 +42,36 @@ bool valid_sample(const mk_sample &sample, uint32_t joint_count) {
     for (uint32_t joint = 0; joint < joint_count; ++joint)
         if (!std::isfinite(sample.position[joint])) return false;
     return true;
+}
+
+bool valid_plan_spec(const mk_plan_spec &spec, const mk_limits &limits,
+                     uint32_t joint_count) {
+    if (spec.struct_size < sizeof(mk_plan_spec) ||
+        spec.start_state.struct_size < sizeof(mk_start_state) ||
+        spec.start_state.joint_count != joint_count || spec.plan_id == 0 ||
+        spec.model_revision != limits.model_revision ||
+        spec.calibration_revision != limits.calibration_revision ||
+        (spec.required_capabilities & ~static_cast<uint64_t>(MK_CAP_TIMED_TRAJECTORY)) != 0)
+        return false;
+    const auto &start = spec.start_state;
+    for (uint32_t joint = 0; joint < joint_count; ++joint) {
+        if (!std::isfinite(start.position[joint]) ||
+            !std::isfinite(start.velocity[joint]) ||
+            !std::isfinite(start.acceleration[joint]) ||
+            !std::isfinite(start.position_tolerance[joint]) ||
+            !std::isfinite(start.velocity_tolerance[joint]) ||
+            !std::isfinite(start.acceleration_tolerance[joint]) ||
+            start.position_tolerance[joint] < 0.0 ||
+            start.velocity_tolerance[joint] < 0.0 ||
+            start.acceleration_tolerance[joint] < 0.0)
+            return false;
+    }
+    return true;
+}
+
+Plan *get(mk_plan_handle handle) {
+    const auto found = plans.find(handle.id);
+    return found == plans.end() ? nullptr : found->second.get();
 }
 
 } // namespace
@@ -206,6 +244,133 @@ mk_result MK_CALL mk_trajectory_from_samples(uint32_t joint_count,
         return register_trajectory(std::move(trajectory), out_trajectory);
     } catch (const std::bad_alloc &) {
         return MK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+mk_result MK_CALL mk_validate(mk_trajectory_handle trajectory, const mk_limits *limits,
+                              mk_validation_report *out_report) {
+    if (limits == nullptr || out_report == nullptr ||
+        out_report->struct_size < sizeof(mk_validation_report))
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::lock_guard lock(registry_mutex);
+        const auto *value = get(trajectory);
+        if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
+        return motionkit::validate(*value, *limits, *out_report);
+    } catch (const std::bad_alloc &) {
+        return MK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory, const mk_plan_spec *spec,
+    const mk_limits *limits, mk_plan_handle *out_plan, mk_validation_report *out_report) {
+    if (out_plan == nullptr || out_report == nullptr ||
+        out_report->struct_size < sizeof(mk_validation_report) ||
+        spec == nullptr || limits == nullptr)
+        return MK_ERROR_INVALID_ARGUMENT;
+    out_plan->id = 0;
+    try {
+        std::lock_guard lock(registry_mutex);
+        const auto *value = get(trajectory);
+        if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
+        if (!valid_plan_spec(*spec, *limits, value->joint_count()))
+            return MK_ERROR_INVALID_ARGUMENT;
+        if (spec->planning_authority != MK_AUTHORITY_MATERIA)
+            return spec->planning_authority == MK_AUTHORITY_BACKEND ?
+                MK_ERROR_UNSUPPORTED : MK_ERROR_INVALID_ARGUMENT;
+        const auto result = motionkit::validate(*value, *limits, *out_report);
+        if (result != MK_OK) return result;
+        for (const auto &check : out_report->checks)
+            if (check.status == MK_CHECK_FAILED) return MK_ERROR_LIMIT;
+        if (plans.size() >= UINT32_MAX - 1) return MK_ERROR_OUT_OF_MEMORY;
+        auto plan = std::make_unique<Plan>(Plan{*value, *spec, *out_report});
+        while (next_plan_id == 0 || plans.count(next_plan_id) != 0) ++next_plan_id;
+        const uint32_t id = next_plan_id++;
+        plans.emplace(id, std::move(plan));
+        out_plan->id = id;
+        return MK_OK;
+    } catch (const std::bad_alloc &) {
+        return MK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+void MK_CALL mk_plan_destroy(mk_plan_handle plan) {
+    try {
+        std::lock_guard lock(registry_mutex);
+        plans.erase(plan.id);
+    } catch (...) {
+    }
+}
+
+mk_result MK_CALL mk_plan_get_info(mk_plan_handle plan, mk_plan_info *out_info) {
+    if (out_info == nullptr || out_info->struct_size < sizeof(mk_plan_info))
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::lock_guard lock(registry_mutex);
+        const auto *value = get(plan);
+        if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
+        mk_plan_info info{};
+        info.struct_size = sizeof(info);
+        info.joint_count = value->trajectory.joint_count();
+        info.plan_id = value->spec.plan_id;
+        info.model_revision = value->spec.model_revision;
+        info.calibration_revision = value->spec.calibration_revision;
+        info.trajectory_revision = value->trajectory.revision();
+        info.required_capabilities = value->spec.required_capabilities;
+        info.planning_authority = value->spec.planning_authority;
+        info.duration_ns = value->trajectory.duration_ns();
+        *out_info = info;
+        return MK_OK;
+    } catch (...) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+mk_result MK_CALL mk_plan_get_start_state(mk_plan_handle plan,
+                                           mk_start_state *out_start_state) {
+    if (out_start_state == nullptr || out_start_state->struct_size < sizeof(mk_start_state))
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::lock_guard lock(registry_mutex);
+        const auto *value = get(plan);
+        if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
+        *out_start_state = value->spec.start_state;
+        return MK_OK;
+    } catch (...) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+mk_result MK_CALL mk_plan_get_report(mk_plan_handle plan,
+                                      mk_validation_report *out_report) {
+    if (out_report == nullptr || out_report->struct_size < sizeof(mk_validation_report))
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::lock_guard lock(registry_mutex);
+        const auto *value = get(plan);
+        if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
+        *out_report = value->report;
+        return MK_OK;
+    } catch (...) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+mk_result MK_CALL mk_plan_evaluate(mk_plan_handle plan, int64_t time_ns,
+                                    mk_trajectory_state *out_state) {
+    if (out_state == nullptr || out_state->struct_size < sizeof(mk_trajectory_state))
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::lock_guard lock(registry_mutex);
+        const auto *value = get(plan);
+        if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
+        return value->trajectory.evaluate(time_ns, *out_state) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
     } catch (...) {
         return MK_ERROR_INVALID_ARGUMENT;
     }

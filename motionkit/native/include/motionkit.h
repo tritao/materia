@@ -37,18 +37,23 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 1, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5 };
+enum { MK_API_VERSION = 2, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+    MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
 enum {
     MK_OK = 0,
     MK_ERROR_INVALID_ARGUMENT = -1,
     MK_ERROR_INVALID_HANDLE = -2,
-    MK_ERROR_OUT_OF_MEMORY = -3
+    MK_ERROR_OUT_OF_MEMORY = -3,
+    MK_ERROR_LIMIT = -4,
+    MK_ERROR_UNSUPPORTED = -5
 };
 
 /** Opaque registry identity; only MotionKit may interpret id. */
 typedef struct mk_trajectory_handle { uint32_t id; } mk_trajectory_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_trajectory_destroy);
+typedef struct mk_plan_handle { uint32_t id; } mk_plan_handle
+    MK_HANDLE MK_HANDLE_DESTROY(mk_plan_destroy);
 
 typedef struct mk_joint_coefficients {
     double value[MK_MAX_DEGREE + 1];
@@ -93,6 +98,86 @@ typedef struct mk_continuity {
     uint32_t c2_joint;
 } mk_continuity;
 
+enum { MK_CHECK_POSITION = 0, MK_CHECK_VELOCITY = 1,
+    MK_CHECK_ACCELERATION = 2, MK_CHECK_JERK = 3, MK_CHECK_CONTINUITY = 4,
+    MK_CHECK_COUNT = 5 };
+enum { MK_CHECK_UNCHECKED = 0, MK_CHECK_PASSED = 1, MK_CHECK_FAILED = 2 };
+
+/** Zero motion limits are unclaimed. Position limits use an explicit flag so zero is usable. */
+typedef struct mk_limits {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint64_t model_revision;
+    uint64_t calibration_revision;
+    uint32_t position_claimed[MK_MAX_JOINTS];
+    double position_lower[MK_MAX_JOINTS];
+    double position_upper[MK_MAX_JOINTS];
+    double max_velocity[MK_MAX_JOINTS];
+    double max_acceleration[MK_MAX_JOINTS];
+    double max_jerk[MK_MAX_JOINTS];
+    double max_continuity_jump[3]; /**< Optional C0, C1, C2 jump claims. */
+} mk_limits;
+
+typedef struct mk_validation_check {
+    uint32_t status; /**< MK_CHECK_* status. */
+    uint32_t joint; /**< UINT32_MAX when no limit is claimed. */
+    uint32_t derivative_order; /**< 0 for position, 1..3 for derivatives. */
+    uint32_t reserved0;
+    double value; /**< Signed position or absolute derivative/jump value. */
+    double time_seconds; /**< Time from trajectory clock epoch, including t0. */
+    double limit; /**< Boundary or absolute maximum corresponding to value. */
+} mk_validation_check;
+
+typedef struct mk_assumption {
+    char text[MK_ASSUMPTION_LENGTH];
+} mk_assumption;
+
+typedef struct mk_validation_report {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t assumption_count;
+    uint64_t model_revision;
+    uint64_t calibration_revision;
+    uint64_t trajectory_revision;
+    mk_validation_check checks[MK_CHECK_COUNT];
+    mk_assumption assumptions[MK_MAX_ASSUMPTIONS];
+} mk_validation_report;
+
+typedef struct mk_start_state {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    double position[MK_MAX_JOINTS];
+    double velocity[MK_MAX_JOINTS];
+    double acceleration[MK_MAX_JOINTS];
+    double position_tolerance[MK_MAX_JOINTS];
+    double velocity_tolerance[MK_MAX_JOINTS];
+    double acceleration_tolerance[MK_MAX_JOINTS];
+} mk_start_state;
+
+enum { MK_CAP_TIMED_TRAJECTORY = 1 };
+enum { MK_AUTHORITY_MATERIA = 1, MK_AUTHORITY_BACKEND = 2 };
+
+typedef struct mk_plan_spec {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint64_t plan_id;
+    uint64_t model_revision;
+    uint64_t calibration_revision;
+    uint64_t required_capabilities;
+    uint32_t planning_authority;
+    mk_start_state start_state;
+} mk_plan_spec;
+
+typedef struct mk_plan_info {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint64_t plan_id;
+    uint64_t model_revision;
+    uint64_t calibration_revision;
+    uint64_t trajectory_revision;
+    uint64_t required_capabilities;
+    uint32_t planning_authority;
+    int64_t duration_ns;
+} mk_plan_info;
+
 MK_API mk_result MK_CALL mk_trajectory_create(uint32_t joint_count,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 MK_API void MK_CALL mk_trajectory_destroy(mk_trajectory_handle trajectory);
@@ -112,6 +197,21 @@ MK_API mk_result MK_CALL mk_trajectory_boundary_continuity(mk_trajectory_handle 
 MK_API mk_result MK_CALL mk_trajectory_from_samples(uint32_t joint_count,
     const mk_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+/** Reports exact polynomial extrema; failed checks return MK_OK with failed status. */
+MK_API mk_result MK_CALL mk_validate(mk_trajectory_handle trajectory,
+    const mk_limits *limits, mk_validation_report *out_report);
+/** Deep-copies the trajectory and refuses any failed validation check. */
+MK_API mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory,
+    const mk_plan_spec *spec, const mk_limits *limits,
+    mk_plan_handle *out_plan MK_OUT MK_OWNED, mk_validation_report *out_report);
+MK_API void MK_CALL mk_plan_destroy(mk_plan_handle plan);
+MK_API mk_result MK_CALL mk_plan_get_info(mk_plan_handle plan, mk_plan_info *out_info);
+MK_API mk_result MK_CALL mk_plan_get_start_state(mk_plan_handle plan,
+    mk_start_state *out_start_state);
+MK_API mk_result MK_CALL mk_plan_get_report(mk_plan_handle plan,
+    mk_validation_report *out_report);
+MK_API mk_result MK_CALL mk_plan_evaluate(mk_plan_handle plan, int64_t time_ns,
+    mk_trajectory_state *out_state);
 
 #ifdef __cplusplus
 }

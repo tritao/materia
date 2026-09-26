@@ -81,7 +81,7 @@ enum {
     RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum points queued across all chunks. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 7 /**< Version of the RobotKit C data contract (physical model v2, configured LiDAR coverage, timestamped trajectory execution, queue status, split trajectory payloads, and tagged trajectory progress). */
+    RK_API_VERSION = 8 /**< Adds calibration revision to runtime blueprints and snapshots. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -313,6 +313,7 @@ typedef struct rk_robot_runtime_blueprint {
     rk_robot_runtime_link links[RK_MAX_LINKS];
     uint32_t sensor_count; /**< Zero selects the default base-mounted simulation sensors. */
     rk_sensor_config sensors[RK_MAX_SENSORS];
+    uint64_t calibration_revision; /**< Optional compiled calibration identity; zero is unspecified. */
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
@@ -415,6 +416,7 @@ typedef struct rk_robot_snapshot {
     rk_sensor_sample sensors[RK_MAX_SENSORS];
     uint64_t trajectory_tag; /**< Chunk identity currently running or last stopped. */
     uint64_t trajectory_tag_time_ns; /**< Time within trajectory_tag, in nanoseconds. */
+    uint64_t calibration_revision; /**< Blueprint calibration identity; zero is unspecified. */
 } rk_robot_snapshot;
 
 /** Static control capabilities reported by a RobotRuntime endpoint. */

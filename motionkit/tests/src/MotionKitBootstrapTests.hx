@@ -19,6 +19,9 @@ import motionkit.trajectory.JointTrajectory;
 import motionkit.trajectory.JointTrajectorySample;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
+import motionkit.trajectory.ExecutionPlan;
+import motionkit.trajectory.PlanLimitError;
+import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
@@ -48,6 +51,7 @@ class MotionKitBootstrapTests {
   public static function main():Void {
     testGeometricPathPrimitives();
     testNativeTrajectoryRoundTrip();
+    testNativeValidationAndPlan();
     testPlannerIsDeterministicAndBounded();
     testLineLookaheadPlanner();
     testLinearAxisCompilesToRobotModel();
@@ -109,6 +113,41 @@ class MotionKitBootstrapTests {
     near(native.evaluate(0.5).accelerations[0], 0.0,
       "native degree-1 acceleration is zero");
     native.dispose();
+  }
+
+  static function testNativeValidationAndPlan():Void {
+    var source = new JointTrajectory([
+      new JointTrajectorySample(0.0, [0.0], [0.0], [0.0]),
+      new JointTrajectorySample(1.0, [1.0], [0.0], [0.0])
+    ]);
+    var trajectory = Trajectory.fromJointTrajectory(source);
+    var limits = new ValidationLimits(1, Int64.ofInt(12), Int64.ofInt(3));
+    limits.position(0, 0.0, 1.0);
+    limits.velocity(0, 0.8);
+    var report = trajectory.validate(limits);
+    check(report.hasFailure(), "chord speed above claimed limit fails validation");
+    near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].value, 1.0,
+      "validation records chord speed");
+    check(report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
+      MotionKitNativeConstants.MK_CHECK_UNCHECKED, "unclaimed jerk is unchecked");
+    check(report.unresolvedAssumptions.length > 0 &&
+      report.unresolvedAssumptions[0].length > 0,
+      "unresolved assumptions are available to Haxe callers");
+    try {
+      ExecutionPlan.create(trajectory, limits, Int64.ofInt(44), [0.0], [0.0],
+        [0.0], [0.01], [0.01], [0.01]);
+      throw "expected plan limit rejection";
+    } catch (error:PlanLimitError) {
+      check(error.report.hasFailure(), "plan rejection carries validation report");
+    }
+    limits.velocity(0, 1.1);
+    var plan = ExecutionPlan.create(trajectory, limits, Int64.ofInt(44), [0.0],
+      [0.0], [0.0], [0.01], [0.01], [0.01]);
+    check(!plan.report.hasFailure(), "valid plan has no failed check");
+    near(plan.evaluate(0.5).positions[0], 0.5, "plan owns evaluable trajectory");
+    trajectory.dispose();
+    near(plan.evaluate(0.75).positions[0], 0.75, "plan deep copies trajectory");
+    plan.dispose();
   }
 
   static function testPlannerIsDeterministicAndBounded():Void {

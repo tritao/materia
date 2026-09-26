@@ -42,7 +42,9 @@ template <typename T> bool valid_sensors(const T &value) {
 extern "C" {
 
 rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blueprint *blueprint) {
-    if (!has_full_struct(blueprint) || blueprint->joint_count > RK_MAX_JOINTS ||
+    if (blueprint == nullptr ||
+        blueprint->struct_size < offsetof(rk_robot_runtime_blueprint, calibration_revision) ||
+        blueprint->joint_count > RK_MAX_JOINTS ||
         blueprint->link_count == 0 || blueprint->link_count > RK_MAX_LINKS ||
         blueprint->sensor_count > RK_MAX_SENSORS ||
         blueprint->collision_approximation > RK_COLLISION_APPROXIMATION_BOUNDS_BOX ||
@@ -184,7 +186,9 @@ rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state) {
 }
 
 rk_result RK_CALL rk_robot_snapshot_validate(const rk_robot_snapshot *snapshot) {
-    if (!has_full_struct(snapshot) || snapshot->joint_count > RK_MAX_JOINTS)
+    if (snapshot == nullptr ||
+        snapshot->struct_size < offsetof(rk_robot_snapshot, calibration_revision) ||
+        snapshot->joint_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
     if (snapshot->mode > RK_ROBOT_MODE_FAULT || snapshot->safety > RK_SAFETY_FAULT ||
         snapshot->endpoint > RK_ENDPOINT_FAULT ||

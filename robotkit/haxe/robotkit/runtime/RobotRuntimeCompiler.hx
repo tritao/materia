@@ -16,8 +16,9 @@ class RobotRuntimeCompiler {
    * This is the domain-typing boundary: it checks topology and backend
    * support before assigning deterministic runtime indices.
    */
-  public static function compile(robot:RobotModel, ?revision:Int = 1):RobotRuntimeBlueprint {
-    var diagnostics = validate(robot, revision);
+  public static function compile(robot:RobotModel, ?revision:Int = 1,
+      ?calibrationRevision:Int = 0):RobotRuntimeBlueprint {
+    var diagnostics = validate(robot, revision, calibrationRevision);
     if (diagnostics.length > 0)
       throw new RobotCompileException(robot == null ? "<null>" : robot.name, diagnostics);
     // A robot whose authored sensors are all external still gets the native
@@ -37,7 +38,7 @@ class RobotRuntimeCompiler {
         [for (frame in robot.frames) frame.link.id],
         [for (link in robot.links) link.visualGeometry],
         [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation),
-      compileConfiguration(robot));
+      compileConfiguration(robot), calibrationRevision);
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
       case CollisionApproximation.BoundsBox: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
@@ -97,7 +98,8 @@ class RobotRuntimeCompiler {
   }
 
   /** Returns all semantic diagnostics without attempting native lowering. */
-  public static function validate(robot:RobotModel, ?revision:Int = 1):Array<RobotCompileDiagnostic> {
+  public static function validate(robot:RobotModel, ?revision:Int = 1,
+      ?calibrationRevision:Int = 0):Array<RobotCompileDiagnostic> {
     var diagnostics:Array<RobotCompileDiagnostic> = [];
     if (robot == null) {
       diagnostics.push(new RobotCompileDiagnostic("RK_MODEL_NULL", "robot",
@@ -107,6 +109,9 @@ class RobotRuntimeCompiler {
     if (revision < 0)
       diagnostics.push(new RobotCompileDiagnostic("RK_REVISION", "revision",
         "runtime revision must be non-negative"));
+    if (calibrationRevision < 0)
+      diagnostics.push(new RobotCompileDiagnostic("RK_CALIBRATION_REVISION", "calibrationRevision",
+        "runtime calibration revision must be non-negative"));
     if (robot.name == null || robot.name.length == 0)
       diagnostics.push(new RobotCompileDiagnostic("RK_MODEL_NAME", "robot.name",
         "robot name is empty"));

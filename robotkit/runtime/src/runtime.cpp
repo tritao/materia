@@ -347,6 +347,7 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     out_snapshot = {};
     out_snapshot.struct_size = sizeof(out_snapshot);
     out_snapshot.revision = blueprint_.revision;
+    out_snapshot.calibration_revision = blueprint_.calibration_revision;
     out_snapshot.sequence = state_.sequence;
     out_snapshot.source_timestamp_ns = state_.source_timestamp_ns;
     out_snapshot.mode = state_.mode;

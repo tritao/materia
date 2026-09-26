@@ -40,6 +40,7 @@ public:
 
     uint32_t joint_count() const noexcept { return joint_count_; }
     uint32_t segment_count() const noexcept { return static_cast<uint32_t>(segments_.size()); }
+    uint64_t revision() const noexcept { return revision_; }
     const mk_segment &segment(uint32_t index) const { return segments_.at(index); }
     int64_t duration_ns() const noexcept {
         if (segments_.empty()) return 0;
@@ -64,6 +65,7 @@ public:
             for (uint32_t degree = 0; degree <= segment.degree; ++degree)
                 if (!std::isfinite(segment.coefficients[joint].value[degree])) return false;
         segments_.push_back(segment);
+        ++revision_;
         return true;
     }
 
@@ -89,7 +91,11 @@ public:
 private:
     uint32_t joint_count_;
     std::vector<mk_segment> segments_;
+    uint64_t revision_ = 0;
 };
+
+mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
+                   mk_validation_report &report);
 
 } // namespace motionkit
 

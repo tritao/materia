@@ -2,10 +2,13 @@
 #include "robotkit_runtime.hpp"
 #include "robotkit_device_serial_endpoint.hpp"
 #include "runtime_registry.hpp"
+#include "runtime_abi.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -79,7 +82,8 @@ rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprint *blue
     try {
         std::shared_ptr<robotkit::RobotEndpoint> endpoint =
             std::make_shared<robotkit::InMemoryRobot>(blueprint->joint_count);
-        auto runtime = std::make_shared<robotkit::RobotRuntime>(*blueprint, endpoint);
+        auto runtime = std::make_shared<robotkit::RobotRuntime>(
+            robotkit::internal::copy_blueprint(blueprint), endpoint);
         const auto handle = robotkit::internal::register_runtime(std::move(runtime));
         *out_runtime = handle;
         return RK_OK;
@@ -106,7 +110,8 @@ rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprin
             static_cast<std::uint8_t>(blueprint->joint_count), max_target_error, &session_status);
         if (!endpoint)
             return session_status == 2 ? RK_ERROR_MODEL_MISMATCH : RK_ERROR_BACKEND;
-        auto runtime = std::make_shared<robotkit::RobotRuntime>(*blueprint,
+        auto runtime = std::make_shared<robotkit::RobotRuntime>(
+            robotkit::internal::copy_blueprint(blueprint),
             std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint));
         *out_runtime = robotkit::internal::register_runtime(std::move(runtime));
         return RK_OK;
@@ -156,10 +161,19 @@ rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime, rk_robot_s
 
 rk_result RK_CALL rk_robot_runtime_snapshot_full(rk_robot_runtime runtime,
                                            rk_robot_snapshot *out_snapshot) {
-    if (!out_snapshot || out_snapshot->struct_size < sizeof(*out_snapshot))
+    if (!out_snapshot ||
+        out_snapshot->struct_size < offsetof(rk_robot_snapshot, calibration_revision))
         return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);
-    return value ? value->snapshot_full(*out_snapshot) : RK_ERROR_INVALID_HANDLE;
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    const auto caller_size = out_snapshot->struct_size;
+    rk_robot_snapshot complete{};
+    const auto result = value->snapshot_full(complete);
+    if (result != RK_OK) return result;
+    std::memcpy(out_snapshot, &complete,
+        std::min<std::size_t>(caller_size, sizeof(complete)));
+    out_snapshot->struct_size = caller_size;
+    return RK_OK;
 }
 
 rk_result RK_CALL rk_robot_runtime_capabilities(rk_robot_runtime runtime,

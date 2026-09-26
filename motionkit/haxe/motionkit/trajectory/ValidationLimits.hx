@@ -1,0 +1,68 @@
+package motionkit.trajectory;
+
+import MotionKitNative;
+import haxe.Int64;
+
+/** Explicit claims about one native trajectory. A zero derivative limit is unclaimed. */
+class ValidationLimits {
+  public final jointCount:Int;
+  public final modelRevision:Int64;
+  public final calibrationRevision:Int64;
+  final native:mk_limits;
+
+  public function new(jointCount:Int, modelRevision:Int64, calibrationRevision:Int64) {
+    if (jointCount < 1 || jointCount > MotionKitNativeConstants.MK_MAX_JOINTS)
+      throw "Invalid validation joint count";
+    this.jointCount = jointCount;
+    this.modelRevision = modelRevision;
+    this.calibrationRevision = calibrationRevision;
+    native = new mk_limits();
+    native.set_struct_size(mk_limits.size());
+    native.set_joint_count(jointCount);
+    native.set_model_revision(modelRevision);
+    native.set_calibration_revision(calibrationRevision);
+  }
+
+  public function position(joint:Int, lower:Float, upper:Float):Void {
+    validJoint(joint);
+    if (!Math.isFinite(lower) || !Math.isFinite(upper) || lower > upper)
+      throw "Invalid position bounds";
+    native.set_position_claimed(joint, 1);
+    native.set_position_lower(joint, lower);
+    native.set_position_upper(joint, upper);
+  }
+
+  public function velocity(joint:Int, maximum:Float):Void {
+    validJoint(joint);
+    validMaximum(maximum);
+    native.set_max_velocity(joint, maximum);
+  }
+
+  public function acceleration(joint:Int, maximum:Float):Void {
+    validJoint(joint);
+    validMaximum(maximum);
+    native.set_max_acceleration(joint, maximum);
+  }
+
+  public function jerk(joint:Int, maximum:Float):Void {
+    validJoint(joint);
+    validMaximum(maximum);
+    native.set_max_jerk(joint, maximum);
+  }
+
+  public function continuity(order:Int, maximumJump:Float):Void {
+    if (order < 0 || order > 2) throw "Continuity order must be 0, 1, or 2";
+    validMaximum(maximumJump);
+    native.set_max_continuity_jump(order, maximumJump);
+  }
+
+  public function nativeValue():mk_limits return native;
+
+  function validJoint(joint:Int):Void {
+    if (joint < 0 || joint >= jointCount) throw "Validation joint out of range";
+  }
+
+  static function validMaximum(value:Float):Void {
+    if (!Math.isFinite(value) || value < 0.0) throw "Invalid nonnegative limit";
+  }
+}

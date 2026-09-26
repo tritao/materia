@@ -761,6 +761,7 @@ int main() {
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.revision = 1;
+    blueprint.calibration_revision = 9;
     blueprint.joint_count = 2;
     blueprint.link_count = 3;
     blueprint.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
@@ -798,6 +799,10 @@ int main() {
     assert(clock_runtime.publish_sample(0) == RK_OK);
     rk_robot_state clock_state{};
     assert(clock_runtime.snapshot(clock_state) == RK_OK);
+    rk_robot_snapshot revision_snapshot{};
+    assert(clock_runtime.snapshot_full(revision_snapshot) == RK_OK);
+    assert(revision_snapshot.revision == 1);
+    assert(revision_snapshot.calibration_revision == 9);
     const auto after_receive = std::chrono::steady_clock::now().time_since_epoch();
     assert(clock_state.source_timestamp_ns == 0);
     assert(clock_state.received_timestamp_ns >= static_cast<uint64_t>(

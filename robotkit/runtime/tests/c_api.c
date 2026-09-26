@@ -1,6 +1,7 @@
 #include "robotkit_runtime.h"
 
 #include <assert.h>
+#include <stddef.h>
 #include <time.h>
 
 int main(void) {
@@ -30,6 +31,24 @@ int main(void) {
     rk_robot_runtime runtime = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_robot_runtime_create(&blueprint, &runtime) == RK_OK);
     assert(runtime != RK_INVALID_ROBOT_RUNTIME);
+    rk_robot_snapshot full_snapshot = {0};
+    full_snapshot.struct_size = sizeof(full_snapshot);
+    assert(rk_robot_runtime_snapshot_full(runtime, &full_snapshot) == RK_OK);
+    assert(full_snapshot.calibration_revision == 0);
+    full_snapshot.struct_size = offsetof(rk_robot_snapshot, calibration_revision);
+    full_snapshot.calibration_revision = 0x1234;
+    assert(rk_robot_runtime_snapshot_full(runtime, &full_snapshot) == RK_OK);
+    assert(full_snapshot.calibration_revision == 0x1234);
+
+    rk_robot_runtime_blueprint old_blueprint = blueprint;
+    old_blueprint.struct_size = offsetof(rk_robot_runtime_blueprint, calibration_revision);
+    old_blueprint.calibration_revision = 77;
+    rk_robot_runtime old_runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_robot_runtime_create(&old_blueprint, &old_runtime) == RK_OK);
+    full_snapshot.struct_size = sizeof(full_snapshot);
+    assert(rk_robot_runtime_snapshot_full(old_runtime, &full_snapshot) == RK_OK);
+    assert(full_snapshot.calibration_revision == 0);
+    rk_robot_runtime_destroy(old_runtime);
 
     rk_robot_command command = {0};
     command.struct_size = sizeof(command);
