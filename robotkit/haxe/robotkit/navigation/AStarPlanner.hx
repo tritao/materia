@@ -2,7 +2,17 @@ package robotkit.navigation;
 
 import robotkit.mobile.Pose2;
 
-/** Deterministic 8-connected A* over a Costmap2. */
+/**
+ * Deterministic 8-connected A* over a Costmap2.
+ *
+ * The robot is wherever it is, so the start cell is always accepted. A start
+ * inside a blocked but not lethal cell (the costmap's discretization margin,
+ * where the robot can stand without touching anything) plans an escape: the
+ * route may pass through further blocked, non-lethal cells, at a penalty, only
+ * until it first reaches a traversable cell, and never re-enters blocked cells
+ * after that. A start in a traversable cell plans exactly as if escapes did not
+ * exist.
+ */
 class AStarPlanner implements Planner {
   public final costmap:Costmap2;
 
@@ -24,8 +34,6 @@ class AStarPlanner implements Planner {
     if (goalCell == null) throw "AStarPlanner goal lies outside the costmap";
     var startIndex = index(cast startCell);
     var goalIndex = index(cast goalCell);
-    if (!costmap.isTraversable(startCell.x, startCell.y))
-      throw "AStarPlanner start lies in a blocked cell";
     if (!costmap.isTraversable(goalCell.x, goalCell.y))
       throw "AStarPlanner goal lies in a blocked cell";
 
@@ -38,6 +46,7 @@ class AStarPlanner implements Planner {
     push(open, new OpenNode(startIndex, 0.0,
       heuristic(startCell.x, startCell.y, goalCell.x, goalCell.y)));
 
+    var escapeCost = Math.max(10.0, 2.0 * costmap.inflationCostWeight);
     var found = false;
     while (open.length > 0) {
       var current = pop(open);
@@ -50,19 +59,23 @@ class AStarPlanner implements Planner {
       closed[current.index] = true;
       var currentX = current.index % costmap.grid.width;
       var currentY = Std.int(current.index / costmap.grid.width);
+      // Only a cell still inside the start's blocked margin may step into
+      // other blocked cells, and never into a lethal one.
+      var escaping = !costmap.isTraversable(currentX, currentY);
       for (direction in DIRECTIONS) {
         var nextX = currentX + direction[0];
         var nextY = currentY + direction[1];
-        if (!costmap.isTraversable(nextX, nextY)) continue;
+        if (!enterable(nextX, nextY, escaping)) continue;
         var diagonal = direction[0] != 0 && direction[1] != 0;
-        if (diagonal && (!costmap.isTraversable(currentX + direction[0], currentY) ||
-            !costmap.isTraversable(currentX, currentY + direction[1])))
+        if (diagonal && (!enterable(currentX + direction[0], currentY, escaping) ||
+            !enterable(currentX, currentY + direction[1], escaping)))
           continue;
         var nextIndex = nextY * costmap.grid.width + nextX;
         if (closed[nextIndex]) continue;
         var step = costmap.grid.resolutionMeters * (diagonal ? SQRT_TWO : 1.0);
-        var candidate = scores[current.index] + step *
-          (1.0 + costmap.cellCost(nextX, nextY));
+        var cellCost = costmap.isTraversable(nextX, nextY)
+          ? costmap.cellCost(nextX, nextY) : escapeCost;
+        var candidate = scores[current.index] + step * (1.0 + cellCost);
         if (candidate < scores[nextIndex]) {
           scores[nextIndex] = candidate;
           parents[nextIndex] = current.index;
@@ -77,6 +90,9 @@ class AStarPlanner implements Planner {
   }
 
   function index(cell:GridCell2):Int return cell.y * costmap.grid.width + cell.x;
+
+  function enterable(x:Int, y:Int, escaping:Bool):Bool
+    return costmap.isTraversable(x, y) || (escaping && !costmap.isLethal(x, y));
 
   function heuristic(x:Int, y:Int, goalX:Int, goalY:Int):Float {
     var dx = Math.abs(goalX - x);

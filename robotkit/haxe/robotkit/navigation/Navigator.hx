@@ -23,6 +23,12 @@ class Navigator {
 
   final motionGuard:Null<MotionGuard>;
   var blockedElapsedSeconds:Float = 0.0;
+  /**
+   * Length of the active path's leading escape segment: how far it runs from
+   * a start inside the costmap's blocked margin before reaching traversable
+   * cells. That segment only has to stay clear of lethal cells.
+   */
+  var escapeDistance:Float = 0.0;
 
   public function new(navigation:Navigation, planner:Planner, costmap:Costmap2,
       ?replanRetryIntervalSeconds:Float = 0.5,
@@ -48,6 +54,7 @@ class Navigator {
     stopFollower();
     this.goal = goal;
     activePath = null;
+    escapeDistance = 0.0;
     replanCount = 0;
     blockedElapsedSeconds = 0.0;
     planRoute();
@@ -122,6 +129,7 @@ class Navigator {
         throw "Planner returned a path in the wrong frame";
       navigation.follow(planned, activeGoal);
       activePath = planned;
+      escapeDistance = measureEscape(planned);
       status = Navigating;
       return true;
     } catch (error:Dynamic) {
@@ -146,13 +154,17 @@ class Navigator {
     return status;
   }
 
+  /**
+   * Checks the path ahead of the robot. The robot's own pose is not checked:
+   * the follower may cut into the costmap's blocked margin, where the robot
+   * touches nothing, and a replan from there escapes it; MotionGuard stops
+   * for real contact. A leading escape segment only has to avoid lethal cells.
+   */
   function remainingRouteIsClear(path:Path):Bool {
     var estimate:Null<LocalizationState> = navigation.localization.state();
     if (estimate == null || estimate.quality == LocalizationQuality.Invalid ||
         estimate.referenceFrame != costmap.grid.frameId)
       return false;
-    var state:LocalizationState = cast estimate;
-    if (!poseIsTraversable(state.pose)) return false;
     var startDistance = Math.max(0.0,
       Math.min(path.length, navigation.progressDistance));
     var remaining = path.length - startDistance;
@@ -160,14 +172,32 @@ class Navigator {
     var sampleCount = Std.int(Math.ceil(remaining / sampleSpacing));
     for (index in 0...sampleCount + 1) {
       var distance = Math.min(path.length, startDistance + index * sampleSpacing);
-      if (!poseIsTraversable(path.poseAt(distance))) return false;
+      var pose = path.poseAt(distance);
+      if (!(distance < escapeDistance ? poseIsNotLethal(pose) : poseIsTraversable(pose)))
+        return false;
     }
     return true;
+  }
+
+  /** Distance along a freshly planned path to its first traversable sample. */
+  function measureEscape(path:Path):Float {
+    var sampleSpacing = costmap.grid.resolutionMeters * 0.5;
+    var sampleCount = Std.int(Math.ceil(path.length / sampleSpacing));
+    for (index in 0...sampleCount + 1) {
+      var distance = Math.min(path.length, index * sampleSpacing);
+      if (poseIsTraversable(path.poseAt(distance))) return distance;
+    }
+    return path.length;
   }
 
   function poseIsTraversable(pose:Pose2):Bool {
     var cell = costmap.grid.worldToCell(pose);
     return cell != null && costmap.isTraversable(cell.x, cell.y);
+  }
+
+  function poseIsNotLethal(pose:Pose2):Bool {
+    var cell = costmap.grid.worldToCell(pose);
+    return cell != null && !costmap.isLethal(cell.x, cell.y);
   }
 
   function block(reason:String):Void {

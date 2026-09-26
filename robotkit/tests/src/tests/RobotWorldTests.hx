@@ -1341,6 +1341,35 @@ class RobotWorldTests {
     dynamicCostmap.clearDynamicObstacles();
     check(dynamicCostmap.isTraversable(2, 2) && dynamicCostmap.cellCost(3, 2) == 0.0,
       "costmap clears removed dynamic obstacles");
+
+    // A 0.1 m obstacle and a 0.3 m robot: a cell is lethal within 0.4 m of the
+    // obstacle and blocked within 0.4 m plus half a 0.2 m cell diagonal.
+    var marginGrid = new OccupancyGrid2(0.2, new Pose2(), 25, 25, "map", OccupancyCell.Free);
+    var marginCostmap = new Costmap2(marginGrid, 0.3, false, 0.3, 2.0);
+    marginCostmap.setDynamicObstacles([new Obstacle(new Detection("margin-obstacle",
+      "obstacle", 1.0, new Pose2(2.0, 2.0), "map", Int64.ofInt(1), Int64.ofInt(1),
+      Int64.ofInt(1), "sim-clock", "host-clock"), 0.1)]);
+    check(!marginCostmap.isTraversable(12, 10) && !marginCostmap.isLethal(12, 10) &&
+      marginCostmap.isLethal(10, 10) && marginCostmap.isLethal(-1, 0),
+      "costmap separates lethal cells from its blocked discretization margin");
+    var marginPlanner = new AStarPlanner(marginCostmap);
+    var marginGoal = new Pose2(4.3, 3.9);
+    var escapePath = marginPlanner.plan(new Pose2(2.47, 2.0), marginGoal);
+    var reachedFree = false;
+    var escapeIsClean = true;
+    var escapePoses = escapePath.poses();
+    for (index in 1...escapePoses.length) {
+      var cell:GridCell2 = cast marginGrid.worldToCell(escapePoses[index]);
+      if (marginCostmap.isLethal(cell.x, cell.y)) escapeIsClean = false;
+      if (marginCostmap.isTraversable(cell.x, cell.y)) reachedFree = true;
+      else if (reachedFree) escapeIsClean = false;
+    }
+    check(reachedFree && escapeIsClean,
+      "A* escapes a start in the blocked margin without lethal cells or re-entry");
+    throws(function() marginPlanner.plan(new Pose2(2.1, 2.0), marginGoal),
+      "A* finds no route out of a start surrounded by lethal cells");
+    throws(function() marginPlanner.plan(marginGoal, new Pose2(2.47, 2.0)),
+      "A* still rejects a goal in a blocked cell");
   }
 
   static function requireLocalizationState(localization:Localization):LocalizationState {
@@ -1383,6 +1412,42 @@ class RobotWorldTests {
       recoveryNavigator.replanCount >= 2,
       "Navigator retries and resumes when a blocked route becomes clear");
     recoveryNavigator.cancel();
+
+    // A robot that has cut into an obstacle's blocked margin, touching
+    // nothing, keeps navigating out of it instead of deadlocking on its own
+    // cell; the route ahead of the escape stays checked as usual.
+    var marginRobot = new FakeRobot("navigator-margin");
+    marginRobot.positions = [0.0, 0.0];
+    var marginBase = new MobileBase(marginRobot,
+      new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 1.0));
+    var marginLocalization = new FixedLocalization(new LocalizationState(
+      Int64.ofInt(0), new Pose2(2.47, 1.0), "map", "base",
+      PoseCovariance2.zero(), Good, Int64.ofInt(0), Int64.ofInt(0),
+      "margin-clock", "host-clock"));
+    var marginNavigation = new Navigation(marginBase, marginLocalization);
+    var marginGrid = new OccupancyGrid2(0.2, new Pose2(), 30, 10, "map", OccupancyCell.Free);
+    var marginCostmap = new Costmap2(marginGrid, 0.3, false, 0.0, 0.0);
+    var marginObstacle = new Obstacle(new Detection("margin-obstacle", "obstacle", 1.0,
+      new Pose2(2.0, 1.0), "map", Int64.ofInt(1), Int64.ofInt(1), Int64.ofInt(1),
+      "margin-clock", "host-clock"), 0.1);
+    marginCostmap.setDynamicObstacles([marginObstacle]);
+    var marginNavigator = new Navigator(marginNavigation,
+      new AStarPlanner(marginCostmap), marginCostmap, 0.1);
+    var marginStatus = marginNavigator.navigateTo(
+      new NavigationGoal(new Pose2(5.0, 1.0), "map"));
+    for (_ in 0...5)
+      marginStatus = marginNavigator.update(new PerceptionSnapshot([], [marginObstacle]), 0.1);
+    check(marginStatus == NavigatorStatus.Navigating && marginNavigator.replanCount == 0,
+      'Navigator escapes a blocked margin without deadlocking or replanning ($marginStatus)');
+    var wall = new Obstacle(new Detection("margin-wall", "obstacle", 1.0,
+      new Pose2(4.0, 1.0), "map", Int64.ofInt(1), Int64.ofInt(1), Int64.ofInt(1),
+      "margin-clock", "host-clock"), 0.9);
+    marginStatus = marginNavigator.update(
+      new PerceptionSnapshot([], [marginObstacle, wall]), 0.1);
+    check(switch marginStatus { case NavigatorStatus.Blocked(_): true; case _: false; } &&
+      marginNavigator.replanCount == 1,
+      "Navigator still replans when the route ahead of an escape becomes blocked");
+    marginNavigator.cancel();
 
     var model = new RobotModel("navigator-sim");
     var baseLink = model.addLink(new Link("base", "link/base"));

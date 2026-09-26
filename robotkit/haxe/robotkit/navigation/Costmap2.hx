@@ -6,6 +6,13 @@ import robotkit.perception.Obstacle;
  * Traversability and inflation costs over an OccupancyGrid2. Occupied cells,
  * dynamic obstacle disks, and (by default) unknown cells are inflated by the
  * robot radius. A soft cost falls off beyond the inflated boundary.
+ *
+ * A cell is lethal when a robot centred on it would overlap an obstacle, and
+ * blocked (not traversable) when it is lethal or within half a cell diagonal
+ * of that: the extra margin keeps a route through cell centres clear wherever
+ * in the cell the robot actually is. A robot can therefore stand in a blocked
+ * cell without touching anything, and a planner may escape from one through
+ * cells that are not lethal.
  */
 class Costmap2 {
   public final grid:OccupancyGrid2;
@@ -16,6 +23,7 @@ class Costmap2 {
 
   var dynamicObstacles:Array<Obstacle> = [];
   var blockedValues:Array<Bool>;
+  var lethalValues:Array<Bool>;
   var costs:Array<Float>;
 
   public function new(grid:OccupancyGrid2, footprintRadiusMeters:Float,
@@ -45,6 +53,7 @@ class Costmap2 {
     }
     var count = grid.width * grid.height;
     blockedValues = [for (_ in 0...count) false];
+    lethalValues = [for (_ in 0...count) false];
     costs = [for (_ in 0...count) 0.0];
     var halfCellDiagonal = grid.resolutionMeters * Math.sqrt(2.0) * 0.5;
     for (y in 0...grid.height) for (x in 0...grid.width) {
@@ -86,6 +95,12 @@ class Costmap2 {
     return !blockedValues[index];
   }
 
+  /** True when a robot centred on the cell would overlap an obstacle, or off the grid. */
+  public function isLethal(x:Int, y:Int):Bool {
+    if (!grid.contains(x, y)) return true;
+    return lethalValues[y * grid.width + x];
+  }
+
   /** Returns nonnegative traversal cost, or a large sentinel if blocked. */
   public function cellCost(x:Int, y:Int):Float {
     if (!grid.contains(x, y)) return 1.0e300;
@@ -97,7 +112,8 @@ class Costmap2 {
       obstacleRadiusMeters:Float):Void {
     var resolution = grid.resolutionMeters;
     var cellRadius = resolution * Math.sqrt(2.0) * 0.5;
-    var hardRadius = obstacleRadiusMeters + footprintRadiusMeters + cellRadius;
+    var lethalRadius = obstacleRadiusMeters + footprintRadiusMeters;
+    var hardRadius = lethalRadius + cellRadius;
     var extent = hardRadius + inflationCostDistanceMeters;
     var minX = Std.int(Math.floor((localX - extent) / resolution));
     var maxX = Std.int(Math.floor((localX + extent) / resolution));
@@ -116,6 +132,7 @@ class Costmap2 {
       var index = y * grid.width + x;
       if (distance <= hardRadius) {
         blockedValues[index] = true;
+        if (distance <= lethalRadius) lethalValues[index] = true;
       } else if (inflationCostDistanceMeters > 0.0) {
         var clearance = distance - hardRadius;
         if (clearance < inflationCostDistanceMeters) {

@@ -296,9 +296,14 @@ collision avoidance and does not replace native or hardware safety.
 adds dynamic obstacle disks, conservative unknown handling, circular footprint
 inflation, and a soft proximity cost. `AStarPlanner` applies deterministic
 8-connected A* without diagonal corner cutting and converts its route into a
-`Path` for `Navigation`. `Navigator` owns a framed goal, refreshes dynamic
-obstacles, and checks the remaining path against the costmap before each control
-step. It replans blocked routes and stops/retries if no traversable path exists.
+`Path` for `Navigation`. The costmap separates lethal cells (a robot centred
+there would overlap an obstacle) from its blocked discretization margin, so a
+start inside that margin plans an escape through non-lethal cells instead of
+failing; otherwise a follower that cut a corner into the margin would stop and
+never be able to replan. `Navigator` owns a framed goal, refreshes dynamic
+obstacles, and checks the path ahead of the robot against the costmap before
+each control step (a leading escape segment only against lethal cells). It
+replans blocked routes and stops/retries if no traversable path exists.
 `Navigation.follow(path)` remains the lower-level tracking API.
 
 `robotkit.material.Forks` is another explicit view over `Robot`. Its named axis

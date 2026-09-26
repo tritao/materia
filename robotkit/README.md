@@ -283,9 +283,13 @@ blocked command behavior.
 `OccupancyGrid2` stores free, occupied, and unknown cells in a framed planar
 grid. `Costmap2` conservatively blocks unknown cells by default, inflates map
 and dynamic obstacle cells by a circular robot radius, and adds a soft cost
-around the inflated region. `AStarPlanner` implements deterministic 8-connected
-A* with diagonal corner-cutting disabled and returns a framed `Path` that can
-be passed directly to `Navigation.follow()`.
+around the inflated region. Cells where a robot centred on them would overlap an
+obstacle are lethal; the inflated boundary also blocks up to half a cell
+diagonal beyond them, so a route through cell centres stays clear. `AStarPlanner`
+implements deterministic 8-connected A* with diagonal corner-cutting disabled
+and returns a framed `Path` that can be passed directly to `Navigation.follow()`.
+A robot that has strayed into that blocked margin (where it touches nothing)
+gets a route that escapes it through non-lethal cells rather than no route.
 
 ```haxe
 var costmap = new Costmap2(occupancy, base.footprint.radius);
