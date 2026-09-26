@@ -748,7 +748,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Bounded trajectory payload submitted alongside a trajectory command.
 	 */
-	struct rk_trajectory_chunk @layout(135184, 8) {
+	struct rk_trajectory_chunk @layout(135200, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -762,6 +762,18 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * < Stable caller-selected identity for this chunk.
 		 */
 		tag: u64 @offset(135176);
+		/**
+		 * Non-zero to splice: replace queued motion from a point on the current
+		 * path instead of appending. The point is splice_time_ns into the queued
+		 * chunk tagged splice_tag, and this chunk's first point is placed there.
+		 * A splice point the trajectory clock has already reached, or a tag no
+		 * longer queued, drops the chunk and leaves the current path running.
+		 */
+		splice_tag: u64 @offset(135184);
+		/**
+		 * < Time within splice_tag where this chunk starts.
+		 */
+		splice_time_ns: u64 @offset(135192);
 	}
 	/**
 	 * One timestamped, full-joint position sample in a buffered trajectory.

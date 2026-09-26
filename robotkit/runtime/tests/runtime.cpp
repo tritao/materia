@@ -422,6 +422,51 @@ void stop_beyond_queued_path_ramps_within_limits(
     // Stopping distance from 1 m/s at 1 m/s^2 is 0.5 m.
     assert(positions.back() > 0.5 && positions.back() < 0.6);
     assert(std::abs(positions.back() - positions[positions.size() - 2]) < 1e-12);
+    // With room to stop within the limit, the ramp is not a fault.
+    rk_robot_state state{};
+    state.struct_size = sizeof(state);
+    assert(runtime.snapshot(state) == RK_OK);
+    assert(state.safety != RK_SAFETY_FAULT);
+}
+
+void stop_ramp_stays_within_travel(const rk_robot_runtime_blueprint &blueprint) {
+    // At 1 m/s with 1 m/s^2 the stop needs 0.5 m, but the queued path ends
+    // 0.15 m short of the upper travel limit at 1.0. The ramp must stop at
+    // the limit rather than run into it, then report braking past its limit.
+    constexpr double limit = 1.0;
+    auto limited = blueprint;
+    for (auto &joint : limited.joints)
+        joint.max_acceleration = limit;
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
+    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    uint64_t timestamp = 0;
+    // Joint 1 mirrors joint 0 (see trajectory_batch), so keep both in range.
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        sampled_batch([](double t) { return 0.8 + t; }, 50'000'000, 10'000'000, 1)) == RK_OK);
+    std::vector<double> positions;
+    for (int cycle = 0; cycle < 3; ++cycle)
+        positions.push_back(apply_cycle(runtime, timestamp).position[0]);
+    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
+    rk_result result = RK_OK;
+    for (int cycle = 0; cycle < 100 && result == RK_OK; ++cycle) {
+        result = runtime.apply_pending_commands();
+        if (result == RK_OK)
+            result = runtime.publish_sample(timestamp += 10'000'000);
+        rk_robot_state state{};
+        state.struct_size = sizeof(state);
+        assert(runtime.snapshot(state) == RK_OK);
+        positions.push_back(state.position[0]);
+    }
+    assert(result == RK_ERROR_LIMIT);
+    double furthest = 0.0;
+    for (double position : positions)
+        furthest = std::max(furthest, position);
+    assert(furthest <= 1.0 + 1e-12);
+    assert(positions.back() > 0.95);
+    rk_robot_state state{};
+    state.struct_size = sizeof(state);
+    assert(runtime.snapshot(state) == RK_OK);
+    assert(state.safety == RK_SAFETY_FAULT);
 }
 
 void faulted_batch_skips_commands_before_reset(
@@ -503,6 +548,49 @@ void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &bluepri
         assert(runtime.snapshot(state) == RK_OK);
         assert(state.safety == RK_SAFETY_FAULT && state.trajectory_queue_depth == 0);
     }
+}
+
+void trajectory_splice_replaces_path_ahead(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    uint64_t timestamp = 0;
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {1'000'000'000, 1.0}}, 7)) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    auto state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.1) < 1e-9);
+
+    // Splice 300 ms into chunk 7, where the path is at 0.3, and slow down.
+    auto slower = trajectory_batch({{0, 0.3}, {100'000'000, 0.35}, {200'000'000, 0.4}}, 8);
+    slower.splice_tag = 7;
+    slower.splice_time_ns = 300'000'000;
+    assert(runtime.submit_trajectory(trajectory_command(2), slower) == RK_OK);
+    const double expected[] = {0.2, 0.3, 0.35, 0.4, 0.4};
+    for (double position : expected) {
+        state = apply_cycle(runtime, timestamp);
+        assert(std::abs(state.position[0] - position) < 1e-9);
+    }
+    assert(state.trajectory_active == 0 && state.trajectory_tag == 8);
+}
+
+void late_trajectory_splice_keeps_current_path(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    uint64_t timestamp = 0;
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {500'000'000, 0.5}}, 7)) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    apply_cycle(runtime, timestamp);
+    // The clock is already past 50 ms, so this splice is dropped.
+    auto late = trajectory_batch({{0, 0.05}, {100'000'000, 0.05}}, 8);
+    late.splice_tag = 7;
+    late.splice_time_ns = 50'000'000;
+    assert(runtime.submit_trajectory(trajectory_command(2), late) == RK_OK);
+    rk_robot_state state{};
+    for (int cycle = 0; cycle < 5; ++cycle)
+        state = apply_cycle(runtime, timestamp);
+    assert(state.safety == RK_SAFETY_READY);
+    assert(std::abs(state.position[0] - 0.5) < 1e-9 && state.trajectory_tag == 7);
 }
 
 void trajectory_queue_is_bounded(const rk_robot_runtime_blueprint &blueprint) {
@@ -675,10 +763,13 @@ int main() {
     trajectory_chunk_extends_running_stop(blueprint);
     trajectory_stop_counts_trajectory_braking(blueprint);
     stop_beyond_queued_path_ramps_within_limits(blueprint);
+    stop_ramp_stays_within_travel(blueprint);
     faulted_batch_skips_commands_before_reset(blueprint);
     invalid_trajectory_chunk_is_atomic(blueprint);
     trajectory_chunk_speed_is_limited(blueprint);
     trajectory_queue_is_bounded(blueprint);
+    trajectory_splice_replaces_path_ahead(blueprint);
+    late_trajectory_splice_keeps_current_path(blueprint);
 
     // Zero is a valid source epoch, not a missing-timestamp sentinel.
     auto clock_endpoint = std::make_shared<FaultEndpoint>();

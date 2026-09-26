@@ -29,6 +29,8 @@ class RobotRecordingCodec {
         case TrajectoryChunk(chunk):
           Reflect.setField(root, "payload", {kind:"trajectoryChunk",
             tag:Int64.toStr(chunk.tag),
+            spliceTag:Int64.toStr(chunk.spliceTag),
+            spliceTimeNs:Int64.toStr(chunk.spliceTimeNs),
             points:[for (point in chunk.points) {
               timeFromStartNs:Int64.toStr(point.timeFromStartNs),
               positions:point.positions
@@ -76,7 +78,8 @@ class RobotRecordingCodec {
               points.push(new TrajectoryPoint(wide(item, "timeFromStartNs"),
                 floats(item, "positions")));
             Command(TrajectoryChunk(new TrajectoryChunk(points,
-              nullableWide(payload, "tag"))));
+              nullableWide(payload, "tag"), nullableWide(payload, "spliceTag"),
+              nullableWide(payload, "spliceTimeNs"))));
           case _: throw "Unsupported RobotKit command payload";
         }
       case "snapshot": RobotSnapshot(readSnapshot(payload));

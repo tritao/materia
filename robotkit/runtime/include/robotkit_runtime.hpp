@@ -165,6 +165,9 @@ private:
         bool active[RK_MAX_JOINTS]{};
         bool reference_initialized[RK_MAX_JOINTS]{};
         std::deque<RuntimeTrajectoryPoint> trajectory;
+        /** The last point dropped from the front of the queue, for looking back. */
+        RuntimeTrajectoryPoint trajectory_history{};
+        bool trajectory_history_valid = false;
         uint64_t trajectory_time_ns = 0;
         bool trajectory_active = false;
         uint64_t trajectory_tag = 0;
@@ -179,6 +182,8 @@ private:
         /** Last forward estimate of the queued path's acceleration during a stop. */
         double stop_path_accelerations[RK_MAX_TRAJECTORY_JOINTS]{};
         bool stop_ramp_active = false;
+        /** Set when a ramp had to brake past a joint's limit to stay in travel. */
+        bool stop_ramp_exceeds_limits = false;
     };
 
     struct QueuedCommand {

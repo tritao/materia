@@ -121,6 +121,44 @@ bool trajectory_motion(const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &t
     return true;
 }
 
+/**
+ * Trajectory acceleration over the segment behind time_ns: the change from
+ * the chord a window back (or, once that has left the queue, the chord from
+ * `history` to the front) to the chord being entered now. Returns false when
+ * there is nothing behind to compare with.
+ */
+bool trajectory_acceleration_behind(const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &trajectory,
+                                    const RobotRuntime::RuntimeTrajectoryPoint *history,
+                                    uint64_t time_ns, uint64_t window_ns, double *out) {
+    const auto joint_count = trajectory.front().point.joint_count;
+    double current[RK_MAX_TRAJECTORY_JOINTS]{};
+    double behind[RK_MAX_TRAJECTORY_JOINTS]{};
+    double current_midpoint = 0.0;
+    double behind_midpoint = 0.0;
+    forward_velocity(trajectory, time_ns, current, &current_midpoint);
+    const auto target = time_ns >= window_ns ? time_ns - window_ns : 0;
+    const auto &front = trajectory.front().point;
+    if (target >= front.time_from_start_ns) {
+        forward_velocity(trajectory, target, behind, &behind_midpoint);
+    } else if (history != nullptr &&
+               history->point.time_from_start_ns < front.time_from_start_ns) {
+        const double seconds = static_cast<double>(
+            front.time_from_start_ns - history->point.time_from_start_ns) / 1'000'000'000.0;
+        for (uint32_t joint = 0; joint < joint_count; ++joint)
+            behind[joint] = (front.positions[joint] - history->point.positions[joint]) / seconds;
+        behind_midpoint = 0.5 * (static_cast<double>(history->point.time_from_start_ns) +
+            static_cast<double>(front.time_from_start_ns));
+    } else {
+        return false;
+    }
+    const double spacing = (current_midpoint - behind_midpoint) / 1'000'000'000.0;
+    if (spacing <= 0.0)
+        return false;
+    for (uint32_t joint = 0; joint < joint_count; ++joint)
+        out[joint] = (current[joint] - behind[joint]) / spacing;
+    return true;
+}
+
 } // namespace
 
 InMemoryRobot::InMemoryRobot(uint32_t joint_count)
@@ -429,6 +467,10 @@ rk_result RobotRuntime::apply_pending_commands() {
                 const auto *accelerations = control_.stop_path_accelerations;
                 trajectory_motion(control_.trajectory, static_cast<uint64_t>(time_ns), period_ns,
                     velocities, control_.stop_path_accelerations);
+                double recent[RK_MAX_TRAJECTORY_JOINTS]{};
+                trajectory_acceleration_behind(control_.trajectory,
+                    control_.trajectory_history_valid ? &control_.trajectory_history : nullptr,
+                    static_cast<uint64_t>(time_ns), period_ns, recent);
                 double max_decrease = std::numeric_limits<double>::infinity();
                 for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
                     const double speed = std::abs(velocities[joint]);
@@ -444,7 +486,10 @@ rk_result RobotRuntime::apply_pending_commands() {
                     // credited. A slow-down is budgeted at rate * |a| rather
                     // than the continuous rate^2 * |a|, which covers a period
                     // that catches one whole step while the clock runs slowed.
-                    const double braking = std::max(0.0, -direction * accelerations[joint]);
+                    // A step one period behind can still fall within the
+                    // current period, so the budget covers both sides.
+                    const double braking = std::max(0.0, std::max(
+                        -direction * accelerations[joint], -direction * recent[joint]));
                     max_decrease = std::min(max_decrease,
                         (blueprint_.joints[joint].max_acceleration - rate * braking) / speed);
                 }
@@ -553,23 +598,40 @@ rk_result RobotRuntime::apply_pending_commands() {
     };
     // Straight-line ramp from the given pose and velocity to rest, used when
     // the stop cannot follow the queued path. It lasts at least two periods,
-    // and long enough for every joint with a limit to stay within it.
+    // and long enough for every joint with a limit to stay within it. A ramp
+    // travels half its duration at the starting speed, so when a joint's
+    // travel limit is closer than that, the ramp is shortened to stop at the
+    // limit instead of running into it; if that means braking harder than a
+    // joint allows, the fault is latched once the ramp reaches rest.
     auto start_stop_ramp = [&](const double *positions, const double *velocities) {
         const auto period_count = period_.count();
         const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 1;
         double duration_seconds = 2.0 * static_cast<double>(period_ns) / 1'000'000'000.0;
+        double limited_duration = 0.0;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
             const auto acceleration = blueprint_.joints[joint].max_acceleration;
             if (std::isfinite(acceleration) && acceleration > 0.0)
-                duration_seconds = std::max(duration_seconds,
+                limited_duration = std::max(limited_duration,
                     std::abs(velocities[joint]) / acceleration);
         }
+        duration_seconds = std::max(duration_seconds, limited_duration);
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+            const double speed = std::abs(velocities[joint]);
+            if (speed <= 1e-12)
+                continue;
+            const auto &limits = blueprint_.joints[joint];
+            const double room = std::max(0.0, velocities[joint] > 0.0
+                ? limits.upper_limit - positions[joint] : positions[joint] - limits.lower_limit);
+            duration_seconds = std::min(duration_seconds, 2.0 * room / speed);
+        }
+        control_.stop_ramp_exceeds_limits = duration_seconds < limited_duration * (1.0 - 1e-9);
         control_.stop_ramp_duration_ns =
             static_cast<uint64_t>(std::ceil(duration_seconds * 1'000'000'000.0));
         control_.stop_ramp_time_ns = 0;
         std::copy_n(positions, blueprint_.joint_count, control_.stop_ramp_positions);
         std::copy_n(velocities, blueprint_.joint_count, control_.stop_ramp_velocities);
         control_.trajectory.clear();
+        control_.trajectory_history_valid = false;
         control_.trajectory_time_ns = 0;
         control_.trajectory_active = false;
         control_.trajectory_rate = 1.0;
@@ -692,6 +754,7 @@ rk_result RobotRuntime::apply_pending_commands() {
                     !control_.trajectory.empty() || control_.stop_ramp_active;
                 if (replace_active_motion) {
                     control_.trajectory.clear();
+                    control_.trajectory_history_valid = false;
                     control_.trajectory_time_ns = 0;
                     control_.trajectory_active = false;
                     control_.stop_ramp_active = false;
@@ -736,7 +799,34 @@ rk_result RobotRuntime::apply_pending_commands() {
             if (value.kind == RK_COMMAND_TRAJECTORY_CHUNK) {
                 if (queued.trajectory == nullptr)
                     return RK_ERROR_INVALID_ARGUMENT;
-                const auto base_time = control_.trajectory.empty()
+                // A splice replaces queued motion from a point still ahead of
+                // the trajectory clock. Points before it stay queued; a splice
+                // that arrives too late is dropped so the current path, which
+                // is already within limits, keeps running.
+                const bool splice = queued.trajectory->splice_tag != 0;
+                std::size_t kept_points = control_.trajectory.size();
+                uint64_t splice_time = 0;
+                if (splice) {
+                    const RuntimeTrajectoryPoint *anchor = nullptr;
+                    for (const auto &candidate : control_.trajectory)
+                        if (candidate.tag == queued.trajectory->splice_tag) {
+                            anchor = &candidate;
+                            break;
+                        }
+                    const auto offset = queued.trajectory->splice_time_ns;
+                    if (anchor == nullptr || !control_.trajectory_active || control_.stop_ramp_active ||
+                        offset > std::numeric_limits<uint64_t>::max() - anchor->chunk_base_time_ns)
+                        continue;
+                    splice_time = anchor->chunk_base_time_ns + offset;
+                    if (splice_time <= control_.trajectory_time_ns ||
+                        splice_time > control_.trajectory.back().point.time_from_start_ns)
+                        continue;
+                    kept_points = 0;
+                    while (kept_points < control_.trajectory.size() &&
+                           control_.trajectory[kept_points].point.time_from_start_ns < splice_time)
+                        ++kept_points;
+                }
+                const auto base_time = splice ? splice_time : control_.trajectory.empty()
                     ? uint64_t{0} : control_.trajectory.back().point.time_from_start_ns;
                 for (uint32_t point_index = 0;
                      point_index < queued.trajectory->point_count; ++point_index) {
@@ -761,9 +851,10 @@ rk_result RobotRuntime::apply_pending_commands() {
                 // step from the end of the queued path into this chunk, must
                 // stay within each joint's velocity limit: a jump between
                 // points at the same time is an unbounded speed.
-                const rk_trajectory_point *previous = control_.trajectory.empty()
-                    ? nullptr : &control_.trajectory.back().point;
-                uint64_t previous_time = base_time;
+                const rk_trajectory_point *previous = kept_points == 0
+                    ? nullptr : &control_.trajectory[kept_points - 1].point;
+                uint64_t previous_time = previous == nullptr ? base_time
+                    : previous->time_from_start_ns;
                 for (uint32_t point_index = 0;
                      point_index < queued.trajectory->point_count; ++point_index) {
                     const auto &point = queued.trajectory->points[point_index];
@@ -787,9 +878,10 @@ rk_result RobotRuntime::apply_pending_commands() {
                     previous_time = time;
                 }
                 // Submission already bounds the queue; this guards the owner.
-                if (control_.trajectory.size() + queued.trajectory->point_count >
-                    RK_MAX_TRAJECTORY_QUEUE_POINTS)
+                if (kept_points + queued.trajectory->point_count > RK_MAX_TRAJECTORY_QUEUE_POINTS)
                     return RK_ERROR_QUEUE_FULL;
+                while (control_.trajectory.size() > kept_points)
+                    control_.trajectory.pop_back();
                 // While a path-following stop runs, a chunk only extends the
                 // path the stop may use; the stop keeps its current rate and
                 // still ends at rest. Resuming means waiting for the stop to
@@ -820,6 +912,7 @@ rk_result RobotRuntime::apply_pending_commands() {
 
     // Emits the straight stop ramp's position at its current time and ends
     // the ramp once it reaches rest.
+    bool stop_ramp_finished = false;
     auto write_stop_ramp_targets = [&](rk_robot_command &value) {
         value.kind = RK_COMMAND_JOINT_TARGETS;
         value.target_count = blueprint_.joint_count;
@@ -840,8 +933,10 @@ rk_result RobotRuntime::apply_pending_commands() {
             value.targets[joint].max_rate = 0.0;
             value.targets[joint].max_effort = 0.0;
         }
-        if (control_.stop_ramp_time_ns >= control_.stop_ramp_duration_ns)
+        if (control_.stop_ramp_time_ns >= control_.stop_ramp_duration_ns) {
             control_.stop_ramp_active = false;
+            stop_ramp_finished = true;
+        }
     };
 
     rk_robot_command output{};
@@ -853,8 +948,11 @@ rk_result RobotRuntime::apply_pending_commands() {
     } else if (!control_.trajectory.empty()) {
         auto point = control_.trajectory.front().point;
         while (control_.trajectory.size() > 1 &&
-               control_.trajectory[1].point.time_from_start_ns <= control_.trajectory_time_ns)
+               control_.trajectory[1].point.time_from_start_ns <= control_.trajectory_time_ns) {
+            control_.trajectory_history = control_.trajectory.front();
+            control_.trajectory_history_valid = true;
             control_.trajectory.pop_front();
+        }
         point = control_.trajectory.front().point;
         if (control_.trajectory.size() > 1 &&
             control_.trajectory_time_ns > point.time_from_start_ns) {
@@ -901,6 +999,7 @@ rk_result RobotRuntime::apply_pending_commands() {
                 write_stop_ramp_targets(output);
             } else {
                 control_.trajectory.clear();
+                control_.trajectory_history_valid = false;
                 control_.trajectory_time_ns = 0;
                 control_.trajectory_active = false;
                 control_.stop_ramp_active = false;
@@ -956,6 +1055,12 @@ rk_result RobotRuntime::apply_pending_commands() {
     if (result != RK_OK) {
         latch_fault();
         return result;
+    }
+    if (stop_ramp_finished && control_.stop_ramp_exceeds_limits) {
+        // The ramp stopped at a travel limit only by braking harder than a
+        // joint's acceleration limit allows; now at rest, report it.
+        latch_fault();
+        return RK_ERROR_LIMIT;
     }
     refresh_trajectory_progress();
     std::lock_guard state_lock(state_mutex_);

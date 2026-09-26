@@ -139,6 +139,8 @@ class RobotRuntime {
     payload.set_struct_size(rk_trajectory_chunk.size());
     payload.set_point_count(chunk.points.length);
     payload.set_tag(chunk.tag);
+    payload.set_splice_tag(chunk.spliceTag);
+    payload.set_splice_time_ns(chunk.spliceTimeNs);
     for (index in 0...chunk.points.length) {
       var source = chunk.points[index];
       var point = new rk_trajectory_point();

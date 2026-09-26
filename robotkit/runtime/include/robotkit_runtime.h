@@ -334,6 +334,15 @@ typedef struct rk_trajectory_chunk {
     uint32_t point_count; /**< Number of valid points in points. */
     rk_trajectory_point points[RK_MAX_TRAJECTORY_POINTS];
     uint64_t tag; /**< Stable caller-selected identity for this chunk. */
+    /**
+     * Non-zero to splice: replace queued motion from a point on the current
+     * path instead of appending. The point is splice_time_ns into the queued
+     * chunk tagged splice_tag, and this chunk's first point is placed there.
+     * A splice point the trajectory clock has already reached, or a tag no
+     * longer queued, drops the chunk and leaves the current path running.
+     */
+    uint64_t splice_tag;
+    uint64_t splice_time_ns; /**< Time within splice_tag where this chunk starts. */
 } rk_trajectory_chunk;
 
 /** Command metadata and optional fixed-capacity joint-target payload. */
