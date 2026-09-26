@@ -545,8 +545,10 @@ class MotionSystem {
       ? trajectoryValue.durationSeconds : trajectoryValue.samples[endIndex].timeSeconds;
     trajectoryChunkReferences.set(Int64.toStr(tag),
       new TrajectoryChunkReference(trajectoryValue, startTime));
-    trajectoryFinalTag = tag;
-    trajectoryFinalEndSeconds = trajectoryChunkEndSeconds;
+    if (endIndex >= trajectoryValue.samples.length - 1) {
+      trajectoryFinalTag = tag;
+      trajectoryFinalEndSeconds = trajectoryChunkEndSeconds;
+    }
   }
 
   function prepareTrajectoryResume():Void {
@@ -578,8 +580,11 @@ class MotionSystem {
   }
 
   function trajectoryFinishedInRuntime(observation:RobotSnapshot):Bool {
-    if (activeTrajectory == null || !trajectorySubmitted ||
+    var trajectoryValue = activeTrajectory;
+    if (trajectoryValue == null || !trajectorySubmitted ||
         Int64.compare(trajectoryFinalTag, Int64.ofInt(0)) == 0)
+      return false;
+    if (trajectoryFinalEndSeconds < trajectoryValue.durationSeconds - 1e-9)
       return false;
     if (Int64.compare(observation.trajectoryTag, trajectoryFinalTag) != 0)
       return false;
