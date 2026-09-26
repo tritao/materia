@@ -1361,6 +1361,83 @@ either position or pitch (not a large amount of both) sidesteps it without
 adding any manifold-specific logic to the generic `CartesianTrajectory`/
 `ToolpathExecutor` machinery.
 
+**Skills** (`robotkit.skill`, following `FinishSurface`'s pattern of a
+pure-data `*Spec` typedef plus a `start()`/`update()`/`cancel()` lifecycle):
+`DigTrench(lineFrom, lineTo, width, depth, gradeTolerance, spec, seed)` and
+`GradeRegion(region, spec, seed)` both loop bounded `DigCyclePlanner` cycles
+-- `DigTrench` re-cutting the same line deeper each pass (bounded by
+`spec.maxCutPerPass`) until every one of `spec.progressSamples + 1` points
+along the line reads within `gradeTolerance` of the design elevation from
+`heightMap.bilinearSample`; `GradeRegion` repeatedly targeting
+`region.worstVertex()` (the largest-magnitude non-excluded, out-of-tolerance
+vertex) until it returns null -- both applying `BucketSweep.apply` to the
+height map only *after* a cycle's `Toolpath` executes successfully, so
+progress is always read back from the terrain the way a real machine's only
+feedback is the ground it actually moved, never the commanded cycle alone.
+Both fail explicitly after `spec.maxCycles` (a bounded operation, not an
+open-ended search, per the plan), and `GradeRegion` also fails explicitly if
+its worst vertex needs *fill* rather than cut (out of scope: no soil
+mechanics, no material-addition model). `DumpAt(pose)` is a single bounded
+Cartesian move + release, for a caller that already holds a loaded bucket and
+just needs to relocate a little and open it; unlike `DigTrench`/`GradeRegion`,
+its target `pose` is not required to be `poseAt`-manifold-consistent, so it
+inherits the same lerp/slerp manifold-drift limitation described above for
+large combined moves -- its own test exercises a realistic "release in place"
+move (small relocation, pitch-only change from a seed already at the dump
+position) rather than an arbitrary cross-workspace jump, and this limitation
+is the reason a caller needing a large reposition-and-dump should use
+`DigTrench`/`GradeRegion`'s own built-in dump legs (which stay on the
+manifold throughout) instead of a standalone `DumpAt`.
+
+Both `beginNextCycle` implementations seed every cycle's `ToolpathExecutor`
+call from the skill's own *constructor* seed, not the previous cycle's final
+(dump) joint configuration: a new cycle's entry pose is usually a large
+joint-space jump away from wherever the previous cycle's dump left the arm,
+and warm-starting from that far, ever-drifting configuration hit the same
+cold-start/local-optimum sensitivity M2's and M8's logs already document
+(confirmed directly: the *same* seed-independent residual appeared whether
+seeded from the previous dump or from a fresh warm-started seed, which is
+also how a genuine infeasibility was distinguished from a convergence issue
+while tuning the joint limits above). Re-approaching from a known-good seed
+each cycle also matches how a real operator would reposition the boom/stick/
+bucket before a new pass, rather than trying to make a single autonomous
+controller responsible for tracking every intermediate configuration between
+cycles.
+
+`ExcavatorTests.testDigTrenchScenario` digs a 1.5m trench (`width = 0.8`m,
+`depth = 0.5`m, `gradeTolerance = 0.03`m, `maxCutPerPass = 0.2`m) to grade in
+3 bounded cycles, reporting `remainingDepthError`/`totalRemovedVolume` from
+the height map after every cycle; `testGradeRegionScenario` grades a single
+high spot on a 9x9 pad to `gradeFraction() == 1.0`. Both run on the default
+simulator backend only: unlike M9, the plan's MuJoCo fallback applies here --
+after M9's MuJoCo scenario needed a thin CMake wrapper
+(`robotkit/robotd/native-mujoco`) specifically to reach a
+`NKSIM_BUILD_MUJOCO=ON` native build, standing up a *second* such MuJoCo
+Haxe project just to re-verify an already-generic (M2, unmodified)
+4-DOF `KinematicChain`/`InverseKinematics` path -- whose interesting
+behavior is entirely in Haxe-level planning/skill logic, not in anything
+MuJoCo's own dynamics would newly exercise -- was not judged worth
+duplicating that build-system surface area for; M9's own MuJoCo run already
+covers this codebase's one MuJoCo-specific finding (holding an idle arm's
+seed configuration against gravity), and this milestone adds no new
+joint-actuation or rigid-body code for MuJoCo to stress differently.
+
+**Safety boundary.** `DigTrench`/`GradeRegion`/`DumpAt` are application-level
+autonomy running above `RobotRuntime`, exactly like every other skill in this
+codebase (`ARCHITECTURE.md`'s "Runtime versus simulation" section already
+draws this line for navigation/manipulation skills generally) -- they are
+**not** the safety-rated layer for an excavator. A real machine's
+certified controller, underneath `RobotRuntime` and outside this codebase's
+scope, is what would enforce ISO 17757 (autonomous/semi-autonomous earthmoving
+machinery safety) and ISO 19014 (functional safety for earth-moving
+machinery) -- envelope limits, operator-presence/e-stop interlocks, and
+collision/tip-over avoidance independent of whatever a `DigTrench` or
+`GradeRegion` cycle happens to command. Nothing in this milestone (or any
+earlier one) attempts to satisfy either standard; `robotd`'s existing
+controller-lease/heartbeat/emergency-stop mechanism (M0) is a liveness
+safeguard for the control channel, not a certified functional-safety system.
+
+
 ## Ownership and shutdown
 
 The embedding application owns `Simulation` and creates runtimes from it. A

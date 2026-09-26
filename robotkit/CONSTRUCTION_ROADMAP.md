@@ -1017,3 +1017,94 @@ tolerance, per a short derivation in `ARCHITECTURE.md`. `robotkit/tests/haxeon.j
 737 assertions (718 M10 baseline + 19 new `TerrainTests`); native
 `ctest --test-dir robotkit/build`: 9/9. No plan deviations beyond the two
 haxeon findings above.
+
+**M12**: added `robotkit/haxe/robotkit/work/DigCyclePlanner.hx` (+
+`DigCyclePlan.hx`), `robotkit/haxe/robotkit/skill/DigTrench.hx`,
+`GradeRegion.hx`, `DumpAt.hx`, and `robotkit/tests/src/tests/ExcavatorTests.hx`,
+called from `RobotWorldTests.main()`. The excavator fixture (tracked
+undercarriage as a single fixed link, then `slew` (revolute Z), `boom`,
+`stick`, `bucket` (revolute, parallel `+Y` axes)) is built entirely in the
+test, per the M2 UR5-fixture precedent; `KinematicChain`/`Manipulator`/
+`InverseKinematics` are reused completely unchanged. Kinematics/IK approach
+(the plan's "task-space weighting... or a closed-form planar solver, your
+choice, log it"): because `boom`/`stick`/`bucket` turn about parallel axes,
+hand-tracing `KinematicChain.evaluate`'s own composition shows the chain's
+tip orientation is always exactly `Rz(slew) * Ry(totalPitch)` regardless of
+how the three joints split the pitch; `DigCyclePlanner.poseAt(x, y, z,
+pitch)` builds every waypoint on that exact manifold (`slew =
+atan2(y, x)`, which is also the position's own required slew), so the
+existing generic 6-DOF damped-least-squares `InverseKinematics.solve`
+converges to near-zero position *and* orientation residual with **no code
+changes and no weighting scheme** — simpler than either alternative the plan
+offered, since fixing slew and pitch leaves no free orientation DOF to weight.
+Full detail, including the closed-form 2R sub-solve used to distinguish a
+genuine joint-limit infeasibility from an IK convergence issue while tuning
+the fixture's joint limits, is in `ARCHITECTURE.md`'s "Simulated excavator
+(M12)" section. `DigCyclePlanner.planCycle` builds one dig cycle (entry, cut,
+curl, lift, dense manifold-consistent swing waypoints, descend-still-curled,
+open) as a `Toolpath` plus the `BucketSweep` parameters a caller applies once
+it executes; two points for the final dump (not one combined move) and dense
+swing waypoints (not just two endpoints) both exist for the same reason,
+documented in `ARCHITECTURE.md`: `CartesianTrajectory`'s straight-line
+position lerp / rotation slerp does not itself stay on the reachable
+orientation manifold between two *far apart* manifold-consistent points, so a
+combined jump can go briefly unreachable partway through — the same class of
+finding as M2/M8's cold-start IK sensitivity, resolved here by keeping
+consecutive waypoints close rather than by changing `InverseKinematics`/
+`CartesianTrajectory`. `DigTrench`/`GradeRegion` both seed every cycle's
+`ToolpathExecutor` call from the skill's own constructor seed rather than the
+previous cycle's dump configuration, for the same documented reason (a large,
+ever-drifting jump between cycles hit the same cold-start sensitivity,
+confirmed to be seed-independent — i.e., a real residual, not a convergence
+fluke — before the joint limits above were widened to fix it for real).
+`DigTrench` re-cuts its line deeper each bounded pass until every sampled
+point is within `gradeTolerance` of the design elevation (read back from the
+`HeightMap`, never the commanded cycle); `GradeRegion` repeatedly targets
+`EarthworkRegion.worstVertex()` until it returns null, and fails explicitly
+if the worst vertex needs fill rather than cut (out of scope, no soil
+mechanics); both fail explicitly after a bounded `maxCycles` rather than
+searching indefinitely. `DumpAt(pose)` is a single bounded move + release
+whose target need not be manifold-consistent (unlike `DigTrench`/
+`GradeRegion`'s own internal dump legs), so its own test exercises a
+realistic small "release in place" move rather than an arbitrary
+cross-workspace jump, per the same manifold-drift limitation.
+`ExcavatorTests.testDigTrenchScenario` digs a 1.5 m trench (width 0.8 m,
+depth 0.5 m, grade tolerance 0.03 m, `maxCutPerPass` 0.2 m) to grade in
+**3 bounded cycles**, reporting `remainingDepthError`/`totalRemovedVolume`
+from the height map after every cycle (final depth error `0`, total removed
+volume `0.835 m^3` against a `1.5 x 0.8 x 0.5 = 0.6 m^3` trench footprint —
+plausibly higher given the capsule-shaped sweep footprint and the "no soil
+mechanics" box/Voronoi area approximation `BucketSweep` uses, and checked
+against a `< 3x` footprint sanity bound rather than an exact figure);
+`testGradeRegionScenario` grades a single high spot on a 9x9 pad to
+`gradeFraction() == 1.0`. Both run on the default simulator backend only, per
+the plan's own MuJoCo fallback: this milestone's interesting behavior is
+entirely in Haxe-level planning/skill logic over an M2 kinematics/IK path
+that is completely unmodified, so standing up a second MuJoCo Haxe project
+(mirroring the `robotkit/robotd/native-mujoco` wrapper M9 needed) to
+re-verify a generic, already-MuJoCo-exercised code path was judged not worth
+the build-system surface area — logged in `ARCHITECTURE.md` rather than
+silently skipped. Added the plan's required ARCHITECTURE.md safety note:
+`DigTrench`/`GradeRegion`/`DumpAt` are application-level autonomy above
+`RobotRuntime`, not the safety-rated layer — ISO 17757/ISO 19014 functional
+safety belongs in a certified machine controller underneath `RobotRuntime`,
+which this codebase does not implement or claim to. Split into the plan's
+suggested "model+kinematics, dig planner, skills+scenario" shape as two
+commits rather than three: one for the model fixture, 4-DOF kinematics/IK
+verification, and `DigCyclePlanner` foundation (`poseAt`'s manifold trick is
+exercised directly by the kinematics-verification test, so those two aspects
+are genuinely coupled, not just adjacent); one for the
+`DigTrench`/`GradeRegion`/`DumpAt` skills, their scenario tests, and the rest
+of the documentation built on top of it. One incidental finding while
+preparing the first commit: `robotkit/haxe/robotkit/skill/DigTrench.hx`'s own
+private `DigTrenchStage` enum fails to compile with "must be registered
+before use" if the file is merely *present* on disk (haxeon's source scan
+picks up every `.hx` file under the project, not just ones reachable from the
+entry point) while nothing anywhere still constructs a `DigTrench` -- so the
+first commit's intermediate, verified-green state genuinely excludes
+`DigTrench.hx`/`GradeRegion.hx`/`DumpAt.hx` from the working tree entirely
+(not just from git's stage), rather than merely leaving them unimported; a
+real compiler quirk worth a future "diagnose before workaround" look, but not
+this milestone's to fix. `robotkit/tests/haxeon.json`: 770 assertions (737 M11
+baseline + 33 new `ExcavatorTests`); native `ctest --test-dir robotkit/build`:
+9/9.

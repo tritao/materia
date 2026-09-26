@@ -1,5 +1,6 @@
 package tests;
 
+import haxe.Int64;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
 import robotkit.model.Joint;
@@ -15,14 +16,29 @@ import robotkit.manipulation.JointGroup;
 import robotkit.manipulation.Manipulator;
 import robotkit.tool.Tool;
 import robotkit.tool.ToolCollisionShape;
+import robotkit.process.ToolpathExecutionResult;
+import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.runtime.Simulation;
+import robotkit.skill.Skill;
+import robotkit.skill.SkillRunner;
+import robotkit.skill.SkillStatus;
+import robotkit.skill.DigTrench;
+import robotkit.skill.GradeRegion;
+import robotkit.skill.DumpAt;
+import robotkit.work.HeightMap;
+import robotkit.work.EarthworkRegion;
 import robotkit.work.DigCyclePlanner;
+import robotkit.work.DigCyclePlan;
 import robotkit.work.Point2;
+import robotkit.world.SimulatedRobot;
+import robotkit.world.RobotCommand;
+import robotkit.world.RobotSnapshot;
 
 /**
  * M12 acceptance tests for the simulated excavator: the 4-DOF
- * slew/boom/stick/bucket kinematic chain (reused unchanged from M2) and
- * `DigCyclePlanner`. `DigTrench`/`GradeRegion`/`DumpAt` skill and scenario
- * tests are added in a follow-up commit alongside those skills.
+ * slew/boom/stick/bucket kinematic chain, `DigCyclePlanner`, and the
+ * `DigTrench`/`GradeRegion`/`DumpAt` skills, run through `SkillRunner`
+ * against a `SimulatedRobot` on the default backend.
  */
 class ExcavatorTests {
   static var assertions = 0;
@@ -32,6 +48,9 @@ class ExcavatorTests {
     testZeroPoseFK();
     testFourDofIkRecoversManifoldTargets();
     testDigCyclePlannerStages();
+    testDigTrenchScenario();
+    testGradeRegionScenario();
+    testDumpAtMovesToTarget();
     Sys.println('RobotKit excavator tests passed ($assertions assertions)');
     return assertions;
   }
@@ -106,6 +125,161 @@ class ExcavatorTests {
     check(plan.sweepFrom == entry && plan.sweepTo == exit, "Dig cycle plan carries the sweep endpoints");
     check(approx(plan.sweepHalfWidth, 0.4, 1e-9), "Dig cycle plan carries the sweep half-width");
     check(approx(plan.sweepEdgeHeight, -0.3, 1e-9), "Dig cycle plan carries the cut depth as the sweep edge height");
+  }
+
+  // -- M12 scenario ---------------------------------------------------------
+
+  static function testDigTrenchScenario():Void {
+    var fixture = buildExcavatorFixture();
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var simulation = new Simulation(0.02);
+    var linkNames = [for (link in fixture.model.links) link.name];
+    var jointNames = [for (joint in fixture.model.joints) joint.name];
+    var robot = new SimulatedRobot("excavator", simulation.addRobot(blueprint), fixture.model.name, linkNames, jointNames);
+
+    var groundZ = 0.0;
+    var heightMap = new HeightMap("excavator", 0.0, -2.0, 0.1, 61, 41);
+    for (row in 0...41) for (col in 0...61) heightMap.setElevation(col, row, groundZ);
+
+    var lineFrom = new Point2(2.5, 0.0);
+    var lineTo = new Point2(4.0, 0.0);
+    var width = 0.8;
+    var depth = 0.5;
+    var gradeTolerance = 0.03;
+    var spec:DigTrenchSpec = {
+      clearanceZ: 0.6, dumpX: 2.0, dumpY: 2.5, dumpZ: 0.4,
+      digPitch: -0.4, curlPitch: -1.8, dumpPitch: 0.6,
+      feedRate: 0.4, maxAcceleration: 0.6, sampleInterval: 0.05,
+      maxCutPerPass: 0.2, maxCycles: 10, maxJointStep: 6.5,
+      positionTolerance: 2e-3, orientationTolerance: 5e-3, ikMaxIterations: 300, ikDamping: 0.03,
+      progressSamples: 4
+    };
+    var seed = [0.0, 0.3, -1.0, -1.0];
+    var dig = new DigTrench(fixture.manipulator, robot, heightMap, "excavator",
+      lineFrom, lineTo, width, depth, gradeTolerance, spec, seed);
+
+    var runner = new SkillRunner();
+    var tick = 0;
+    var lastCyclesReported = 0;
+    var status = runner.start(dig);
+    var steps = 0;
+    while (status == SkillStatus.Running && steps < 200000) {
+      simulation.step(Int64.ofInt(tick));
+      tick++;
+      var snapshot = robot.snapshot();
+      status = runner.update(snapshot, 0.02);
+      if (dig.cyclesCompleted != lastCyclesReported) {
+        lastCyclesReported = dig.cyclesCompleted;
+        Sys.println('M12 trench dig cycle $lastCyclesReported: remainingDepthError=${dig.remainingDepthError()} totalRemovedVolume=${dig.totalRemovedVolume}');
+      }
+      steps++;
+    }
+
+    check(switch status { case SkillStatus.Succeeded: true; case _: false; },
+      'DigTrench reaches Succeeded (got $status)');
+    check(dig.cyclesCompleted >= 1 && dig.cyclesCompleted <= spec.maxCycles,
+      'DigTrench completes within the cycle budget (${dig.cyclesCompleted} cycles)');
+    check(dig.remainingDepthError() <= gradeTolerance,
+      'DigTrench reaches the design depth within grade tolerance (remaining=${dig.remainingDepthError()})');
+    var expectedVolume = (lineTo.x - lineFrom.x) * width * depth;
+    check(dig.totalRemovedVolume > 0.0 && dig.totalRemovedVolume < expectedVolume * 3.0,
+      'DigTrench reports a plausible removed volume (${dig.totalRemovedVolume} m^3, trench footprint ~$expectedVolume m^3)');
+    Sys.println('M12 trench scenario: cycles=${dig.cyclesCompleted} finalDepthError=${dig.remainingDepthError()} removedVolume=${dig.totalRemovedVolume}');
+    simulation.dispose();
+  }
+
+  static function testGradeRegionScenario():Void {
+    var fixture = buildExcavatorFixture();
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var simulation = new Simulation(0.02);
+    var linkNames = [for (link in fixture.model.links) link.name];
+    var jointNames = [for (joint in fixture.model.joints) joint.name];
+    var robot = new SimulatedRobot("excavator-grade", simulation.addRobot(blueprint), fixture.model.name, linkNames, jointNames);
+
+    var columns = 9, rows = 9;
+    var cellSize = 0.15;
+    var originX = 2.8, originY = -0.6;
+    var design = new HeightMap("excavator", originX, originY, cellSize, columns, rows);
+    var existingElevation:Array<Float> = [for (_ in 0...(columns * rows)) 0.0];
+    var existing = new HeightMap("excavator", originX, originY, cellSize, columns, rows, existingElevation);
+    // One high spot needs grading down to design (0.0); everything else already at grade.
+    existing.setElevation(4, 4, 0.12);
+    var region = new EarthworkRegion("pad", existing, design, [], 0.01);
+
+    var spec:GradeRegionSpec = {
+      clearanceZ: 0.6, dumpX: 2.0, dumpY: 2.5, dumpZ: 0.4,
+      digPitch: -0.4, curlPitch: -1.8, dumpPitch: 0.6,
+      feedRate: 0.4, maxAcceleration: 0.6, sampleInterval: 0.05,
+      maxCutPerPass: 0.2, maxCycles: 10, maxJointStep: 6.5,
+      positionTolerance: 2e-3, orientationTolerance: 5e-3, ikMaxIterations: 300, ikDamping: 0.03,
+      bucketHalfWidth: 0.3
+    };
+    var seed = [0.0, 0.3, -1.0, -1.0];
+    var grade = new GradeRegion(fixture.manipulator, robot, region, "excavator", spec, seed);
+
+    var runner = new SkillRunner();
+    var tick = 0;
+    var status = runner.start(grade);
+    var steps = 0;
+    while (status == SkillStatus.Running && steps < 200000) {
+      simulation.step(Int64.ofInt(tick));
+      tick++;
+      status = runner.update(robot.snapshot(), 0.02);
+      steps++;
+    }
+
+    check(switch status { case SkillStatus.Succeeded: true; case _: false; },
+      'GradeRegion reaches Succeeded (got $status)');
+    check(approx(region.gradeFraction(), 1.0, 1e-9), "GradeRegion brings every vertex to grade");
+    check(grade.cyclesCompleted >= 1, "GradeRegion runs at least one cycle");
+    simulation.dispose();
+  }
+
+  static function testDumpAtMovesToTarget():Void {
+    var fixture = buildExcavatorFixture();
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var simulation = new Simulation(0.02);
+    var linkNames = [for (link in fixture.model.links) link.name];
+    var jointNames = [for (joint in fixture.model.joints) joint.name];
+    var robot = new SimulatedRobot("excavator-dump", simulation.addRobot(blueprint), fixture.model.name, linkNames, jointNames);
+
+    // Seed already at the dump position, curled (as if just swung in after a
+    // dig); DumpAt only needs to open the bucket in place. A cold seed far
+    // across the workspace would ask CartesianTrajectory's straight-line
+    // position lerp / rotation slerp to track this chain's reachable
+    // orientation manifold (see DigCyclePlanner's own doc comment) over a
+    // large combined swing, which it is not guaranteed to do -- the same
+    // reason DigCyclePlanner densifies its own swing with manifold-consistent
+    // waypoints. DumpAt does not have manifold knowledge for an arbitrary
+    // target pose, so its realistic use (relocate a *little* and release) is
+    // what this test exercises; see ARCHITECTURE.md.
+    var seed = [0.8961, 0.994, -1.609, -1.185];
+    var targetPose = DigCyclePlanner.poseAt(2.0, 2.5, 0.4, 0.6);
+    var dumpAt = new DumpAt(fixture.manipulator, robot, "excavator", targetPose, seed,
+      0.4, 0.6, 0.05, 6.5, 2e-3, 8e-3, 500, 0.03);
+
+    var runner = new SkillRunner();
+    var tick = 0;
+    var status = runner.start(dumpAt);
+    var steps = 0;
+    var lastQ = seed;
+    while (status == SkillStatus.Running && steps < 20000) {
+      simulation.step(Int64.ofInt(tick));
+      tick++;
+      var snapshot = robot.snapshot();
+      lastQ = [for (i in 0...4) snapshot.positions.get(i)];
+      status = runner.update(snapshot, 0.02);
+      steps++;
+    }
+
+    check(switch status { case SkillStatus.Succeeded: true; case _: false; },
+      'DumpAt reaches Succeeded (got $status)');
+    var achieved = fixture.manipulator.tcpPose(lastQ);
+    check(approx(achieved.translation.x, targetPose.translation.x, 5e-3) &&
+      approx(achieved.translation.y, targetPose.translation.y, 5e-3) &&
+      approx(achieved.translation.z, targetPose.translation.z, 5e-3),
+      "DumpAt drives the TCP to the requested position");
+    simulation.dispose();
   }
 
   // -- fixture --------------------------------------------------------
