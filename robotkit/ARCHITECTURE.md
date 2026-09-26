@@ -455,7 +455,33 @@ never move the joint at all. This is fixed together with F2's other known
 limitation (no cross-joint compensation) by replacing the per-dof diagonal
 lookup with full computed-torque control; see below.
 
-### MuJoCo joint actuation (M8.5, F2)
+### MuJoCo full computed-torque control (pre-M9 fix)
+
+`MujocoBackend::apply_joint_targets` now computes `tau = M * qacc_desired +
+qfrc_bias` via `mj_mulM` over the *whole* system's degrees of freedom,
+replacing F2's single-dof diagonal lookup. For every position/velocity-mode
+joint it fills one `qacc_desired` entry at that joint's own dof (the same
+PD/velocity-error formula F2 used, just as a desired acceleration instead of
+a pre-scaled torque) and leaves every other dof's entry zero, then calls
+`mj_mulM(model, data, m_qacc, qacc_desired)` once per substep; each actuated
+joint's torque is `m_qacc[dof] + qfrc_bias[dof]`, clamped to `max_force` as
+before. Effort-mode joints are unchanged (`torque = target` directly, no
+mass matrix involved). `mj_mulM` applies the *full* sparse mass matrix as an
+operator (`M * vec`), so a nonzero desired acceleration at one dof correctly
+distributes torque to every dof coupled to it through the articulated
+system's true inertia — this is what "computed torque control" means, and
+it fixes both known problems with the diagonal-only approach in one change:
+it no longer depends on `dof_Madr[dof]` happening to address a diagonal
+entry (see the kinematic-root section above), and it has real cross-joint
+compensation, so the steady-state coupling error the M8.5 cross-backend
+acceptance test noted (2-4mm at larger lever arms, ~0.6-0.7mm at the test's
+own centimeter scale) is no longer an expected limitation of this
+controller — `cross_backend_link_poses_agree_with_fk` still passes at its
+existing tolerance and centimeter-scale anchors with room to spare. `ωn`,
+`ζ`, and `kv` keep F2's defaults; only how their result reaches `ctrl`
+changed.
+
+### MuJoCo joint actuation (M8.5, F2, superseded above)
 
 Each non-fixed joint has exactly one MuJoCo motor actuator (`mjs_setToMotor`),
 not one each for position/velocity/effort: a MuJoCo position actuator's bias

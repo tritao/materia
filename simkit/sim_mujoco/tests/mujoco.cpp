@@ -665,6 +665,90 @@ void kinematic_root_child_velocity_matches_joint_across_substeps() {
     nkscene_scene_destroy(scene);
 }
 
+void two_joint_arm_on_kinematic_base_holds_position_under_gravity() {
+    // Coverage for the M9-relevant shape (a multi-joint arm mounted on a
+    // KINEMATIC base): joint2 has an ancestor dof (joint1), which is exactly
+    // the row shape where the old data->M[dof_Madr[dof]] diagonal lookup
+    // read the wrong cell (dof_Madr[dof] addresses the START of a dof's
+    // sparse row, not its diagonal — see the ARCHITECTURE.md note on full
+    // computed-torque control). The single-joint reproduction above
+    // (kinematic_root_child_velocity_matches_joint_across_substeps, using
+    // effort mode to bypass the mass matrix entirely) is what isolated and
+    // confirmed that root cause: this test exercises the fixed controller
+    // end to end on the actual multi-joint/kinematic-base shape M9 needs.
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto base_node = make_node(scene, 0.0);
+    const auto link1_node = make_node(scene, 0.0);
+    const auto link2_node = make_node_xyz(scene, 0.5, 0.0, 0.0);
+
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+
+    const auto base = make_body(world, base_node, NKSIM_MOTION_KINEMATIC, 1.0);
+    const auto shape = make_box(world);
+    const auto link1 = make_body(world, link1_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+    const auto link2 = make_body(world, link2_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+
+    nksim_joint_desc joint1_desc{};
+    joint1_desc.struct_size = sizeof(joint1_desc);
+    joint1_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint1_desc.body_a = base;
+    joint1_desc.body_b = link1;
+    joint1_desc.axis_a[1] = 1.0; // Hinge about Y: gravity torques it in the X-Z plane.
+    joint1_desc.max_force = 200.0;
+    nksim_joint joint1 = 0;
+    assert(nksim_joint_create(world, &joint1_desc, &joint1) == NKSIM_OK);
+
+    nksim_joint_desc joint2_desc{};
+    joint2_desc.struct_size = sizeof(joint2_desc);
+    joint2_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint2_desc.body_a = link1;
+    joint2_desc.body_b = link2;
+    joint2_desc.axis_a[1] = 1.0;
+    joint2_desc.anchor_b[0] = -0.5; // link2's rest pose is 0.5m out along its own pivot's local X.
+    joint2_desc.max_force = 200.0;
+    nksim_joint joint2 = 0;
+    assert(nksim_joint_create(world, &joint2_desc, &joint2) == NKSIM_OK);
+
+    std::array<nksim_joint_target, 2> targets{};
+    for (auto &target : targets) {
+        target.struct_size = sizeof(target);
+        target.mode = NKSIM_JOINT_TARGET_POSITION;
+        target.target = 0.0; // Hold both joints horizontal against gravity.
+        target.max_force = 200.0;
+    }
+    targets[0].joint = joint1;
+    targets[1].joint = joint2;
+    assert(nksim_world_set_joint_targets(world, targets.data(),
+        static_cast<uint32_t>(targets.size())) == NKSIM_OK);
+    step_world(world, 300); // 3 s to settle.
+
+    nksim_joint_state state1{}, state2{};
+    state1.struct_size = state2.struct_size = sizeof(state1);
+    assert(nksim_joint_get_state(world, joint1, &state1) == NKSIM_OK);
+    assert(nksim_joint_get_state(world, joint2, &state2) == NKSIM_OK);
+    assert(std::abs(state1.position) < 1e-3);
+    assert(std::abs(state1.velocity) < 1e-2);
+    assert(std::abs(state2.position) < 1e-3);
+    assert(std::abs(state2.velocity) < 1e-2);
+
+    nksim_joint_destroy(world, joint2);
+    nksim_joint_destroy(world, joint1);
+    nksim_body_destroy(world, link2);
+    nksim_body_destroy(world, link1);
+    nksim_body_destroy(world, base);
+    nksim_shape_destroy(world, shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 void non_adjacent_links_do_not_self_collide() {
     // F3: only parent/child joint pairs were excluded from contact, but
     // after F1's rest-pose fix every link sits at its real offset, so two
@@ -977,5 +1061,6 @@ int main() {
     non_adjacent_links_do_not_self_collide();
     cross_backend_link_poses_agree_with_fk();
     kinematic_root_child_velocity_matches_joint_across_substeps();
+    two_joint_arm_on_kinematic_base_holds_position_under_gravity();
     return 0;
 }

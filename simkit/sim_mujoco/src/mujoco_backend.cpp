@@ -844,9 +844,66 @@ private:
         std::copy(local_angular.begin(), local_angular.end(), data->qvel + qvel + 3);
     }
 
+    // Full computed-torque control: tau = M * qacc_desired + qfrc_bias,
+    // via mj_mulM (M applied as an operator over the WHOLE system, never
+    // materialized densely) rather than a single diagonal entry. This
+    // replaces two bugs at once: (1) data->M is a sparse, per-dof-ROW
+    // format where dof_Madr[dof] addresses the *start* of that dof's row
+    // (ancestor dofs first, own diagonal last — see mj_mulM's own row-length
+    // computation via dof_Madr[j+1]-dof_Madr[j] in engine_derivative.c), not
+    // the diagonal itself, so a naive M[dof_Madr[dof]] read is only
+    // coincidentally correct for a dof with no ancestor dofs; (2) even with
+    // the right diagonal, a single-DOF PD gain has no cross-joint
+    // compensation, which showed up as steady-state coupling error on the
+    // cross-backend acceptance test (M8.5). Building one desired-acceleration
+    // vector over every actuated dof and multiplying by the full mass matrix
+    // captures cross-joint coupling for free — mj_mulM(qacc_des) naturally
+    // distributes each dof's desired acceleration through the whole
+    // articulated system's inertia, not just its own row.
     void apply_joint_targets() {
         if (model->nu > 0)
             std::fill(data->ctrl, data->ctrl + model->nu, 0.0);
+        const auto nv = static_cast<std::size_t>(model->nv);
+        if (nv == 0)
+            return;
+        std::vector<mjtNum> qacc_desired(nv, 0.0);
+        std::vector<mjtNum> m_qacc(nv, 0.0);
+
+        // Effort-mode joints need no mass matrix at all; apply directly.
+        // Position/velocity-mode joints contribute a desired acceleration
+        // that mj_mulM below turns into torque through the full inertia.
+        for (const auto joint_id : joint_order) {
+            auto &joint = joints.at(joint_id);
+            if (joint.target_mode != NKSIM_JOINT_TARGET_POSITION &&
+                joint.target_mode != NKSIM_JOINT_TARGET_VELOCITY)
+                continue;
+            const auto model_id = model_joint_id(joint);
+            if (model_id < 0)
+                continue;
+            const auto type = model->jnt_type[model_id];
+            if (type != mjJNT_HINGE && type != mjJNT_SLIDE)
+                continue;
+
+            const auto dof = static_cast<std::size_t>(model->jnt_dofadr[model_id]);
+            const auto q = data->qpos[model->jnt_qposadr[model_id]];
+            const auto qdot = data->qvel[dof];
+
+            switch (joint.target_mode) {
+            case NKSIM_JOINT_TARGET_POSITION: {
+                constexpr double omega_n = 2.0 * 3.14159265358979323846 * 10.0;
+                constexpr double zeta = 1.0;
+                qacc_desired[dof] = omega_n * omega_n * (joint.target - q) - 2.0 * zeta * omega_n * qdot;
+                break;
+            }
+            case NKSIM_JOINT_TARGET_VELOCITY: {
+                constexpr double kv = 50.0;
+                qacc_desired[dof] = kv * (joint.target - qdot);
+                break;
+            }
+            }
+        }
+        mj_mulM(model, data, m_qacc.data(), qacc_desired.data());
+
         for (const auto joint_id : joint_order) {
             auto &joint = joints.at(joint_id);
             if (joint.target_mode == 0)
@@ -861,28 +918,15 @@ private:
             if (actuator < 0)
                 continue;
 
-            const auto dof = model->jnt_dofadr[model_id];
-            // The mass matrix is stored sparse; the diagonal entry for dof i
-            // lives at M[dof_Madr[i]] (the roadmap's "m_ii ... via
-            // dof_Madr", avoiding a dense mj_fullM expansion every substep).
-            const auto m_ii = data->M[model->dof_Madr[dof]];
+            const auto dof = static_cast<std::size_t>(model->jnt_dofadr[model_id]);
             const auto bias = data->qfrc_bias[dof];
-            const auto q = data->qpos[model->jnt_qposadr[model_id]];
-            const auto qdot = data->qvel[dof];
 
             double torque = 0.0;
             switch (joint.target_mode) {
-            case NKSIM_JOINT_TARGET_POSITION: {
-                constexpr double omega_n = 2.0 * 3.14159265358979323846 * 10.0;
-                constexpr double zeta = 1.0;
-                torque = m_ii * (omega_n * omega_n * (joint.target - q) - 2.0 * zeta * omega_n * qdot) + bias;
+            case NKSIM_JOINT_TARGET_POSITION:
+            case NKSIM_JOINT_TARGET_VELOCITY:
+                torque = m_qacc[dof] + bias;
                 break;
-            }
-            case NKSIM_JOINT_TARGET_VELOCITY: {
-                constexpr double kv = 50.0;
-                torque = m_ii * kv * (joint.target - qdot) + bias;
-                break;
-            }
             case NKSIM_JOINT_TARGET_EFFORT:
             default:
                 torque = joint.target;
