@@ -50,6 +50,14 @@ class DeepGrooveBearing extends MachineComponent {
 			{designation: "6203", bore: 17, outside: 40, width: 12, chamfer: 0.6},
 			{designation: "6204", bore: 20, outside: 47, width: 14, chamfer: 1.0},
 			{designation: "6205", bore: 25, outside: 52, width: 15, chamfer: 1.0},
+			{designation: "6206", bore: 30, outside: 62, width: 16, chamfer: 1.0},
+			{designation: "6207", bore: 35, outside: 72, width: 17, chamfer: 1.1},
+			{designation: "6208", bore: 40, outside: 80, width: 18, chamfer: 1.1},
+			{designation: "6209", bore: 45, outside: 85, width: 19, chamfer: 1.1},
+			{designation: "6210", bore: 50, outside: 90, width: 20, chamfer: 1.1},
+			{designation: "6211", bore: 55, outside: 100, width: 21, chamfer: 1.5},
+			{designation: "6212", bore: 60, outside: 110, width: 22, chamfer: 1.5},
+			{designation: "6213", bore: 65, outside: 120, width: 23, chamfer: 1.5},
 		];
 
 	public static function catalog():Catalog<DeepGrooveBearingSpec> {

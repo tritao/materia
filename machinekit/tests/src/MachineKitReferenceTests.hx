@@ -38,7 +38,15 @@ class MachineKitReferenceTests {
 				{name: "6202", bore: 15.0, outside: 35.0, width: 11.0, rs: 0.6},
 				{name: "6203", bore: 17.0, outside: 40.0, width: 12.0, rs: 0.6},
 				{name: "6204", bore: 20.0, outside: 47.0, width: 14.0, rs: 1.0},
-				{name: "6205", bore: 25.0, outside: 52.0, width: 15.0, rs: 1.0}]) {
+				{name: "6205", bore: 25.0, outside: 52.0, width: 15.0, rs: 1.0},
+				{name: "6206", bore: 30.0, outside: 62.0, width: 16.0, rs: 1.0},
+				{name: "6207", bore: 35.0, outside: 72.0, width: 17.0, rs: 1.1},
+				{name: "6208", bore: 40.0, outside: 80.0, width: 18.0, rs: 1.1},
+				{name: "6209", bore: 45.0, outside: 85.0, width: 19.0, rs: 1.1},
+				{name: "6210", bore: 50.0, outside: 90.0, width: 20.0, rs: 1.1},
+				{name: "6211", bore: 55.0, outside: 100.0, width: 21.0, rs: 1.5},
+				{name: "6212", bore: 60.0, outside: 110.0, width: 22.0, rs: 1.5},
+				{name: "6213", bore: 65.0, outside: 120.0, width: 23.0, rs: 1.5}]) {
 			var row = DeepGrooveBearing.catalog().get(reference.name);
 			equal(row.bore, reference.bore, reference.name + " bore");
 			equal(row.outside, reference.outside, reference.name + " outside");
@@ -127,9 +135,31 @@ class MachineKitReferenceTests {
 	if (pillow.mountScrew != "M10" || pillow.bearingDesignation != "6204")
 		throw "UCP204 bearing unit interface";
 	var pillowMetadata = PillowBlock.catalog().metadata("UCP204");
-	if (pillowMetadata.dimensionKind != Nominal || pillowMetadata.conformance != NominalEnvelope ||
-		pillowMetadata.verifiedFields == null)
-		throw "UCP204 reference metadata";
+		if (pillowMetadata.dimensionKind != Nominal || pillowMetadata.conformance != NominalEnvelope ||
+			pillowMetadata.verifiedFields == null)
+			throw "UCP204 reference metadata";
+		for (reference in [
+			{name: "UCP205", bore: 25.0, width: 38.0, length: 140.0, height: 36.5, base: 16.0, overall: 70.0, spacing: 105.0, hole: 13.0, screw: "M10"},
+			{name: "UCP206", bore: 30.0, width: 48.0, length: 165.0, height: 42.9, base: 17.0, overall: 84.0, spacing: 121.0, hole: 17.0, screw: "M14"},
+			{name: "UCP207", bore: 35.0, width: 48.0, length: 167.0, height: 47.6, base: 18.0, overall: 95.0, spacing: 127.0, hole: 17.0, screw: "M14"},
+			{name: "UCP208", bore: 40.0, width: 54.0, length: 184.0, height: 49.2, base: 18.0, overall: 98.0, spacing: 137.0, hole: 17.0, screw: "M14"},
+			{name: "UCP209", bore: 45.0, width: 54.0, length: 190.0, height: 54.0, base: 20.0, overall: 106.0, spacing: 146.0, hole: 17.0, screw: "M14"},
+			{name: "UCP210", bore: 50.0, width: 60.0, length: 206.0, height: 57.2, base: 21.0, overall: 113.0, spacing: 159.0, hole: 20.0, screw: "M16"},
+			{name: "UCP211", bore: 55.0, width: 60.0, length: 219.0, height: 63.5, base: 23.0, overall: 125.0, spacing: 171.0, hole: 20.0, screw: "M16"},
+			{name: "UCP212", bore: 60.0, width: 70.0, length: 241.0, height: 69.8, base: 25.0, overall: 138.0, spacing: 184.0, hole: 20.0, screw: "M16"},
+			{name: "UCP213", bore: 65.0, width: 70.0, length: 265.0, height: 76.2, base: 27.0, overall: 150.0, spacing: 203.0, hole: 25.0, screw: "M20"}]) {
+			var row = PillowBlock.catalog().get(reference.name);
+			equal(row.boreDiameter, reference.bore, reference.name + " bore");
+			equal(row.baseWidth, reference.width, reference.name + " base width");
+			equal(row.length, reference.length, reference.name + " length");
+			equal(row.shaftHeight, reference.height, reference.name + " shaft height");
+			equal(row.baseHeight, reference.base, reference.name + " base height");
+			equal(row.overallHeight, reference.overall, reference.name + " overall height");
+			equal(row.boltSpacing, reference.spacing, reference.name + " bolt spacing");
+			equal(row.mountHoleDiameter, reference.hole, reference.name + " mounting hole");
+			if (row.mountScrew != reference.screw)
+				throw reference.name + " mounting screw";
+		}
 		// Accu ISO 4762 M5 product sheet: these fields have been cross-checked.
 		var m5 = SocketHeadCapScrew.catalog().get("M5");
 		equal(m5.diameter, 5, "M5 diameter");

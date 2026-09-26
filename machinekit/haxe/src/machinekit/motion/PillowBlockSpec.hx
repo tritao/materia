@@ -12,5 +12,6 @@ typedef PillowBlockSpec = {
 	var baseHeight:Float;
 	var overallHeight:Float;
 	var boltSpacing:Float;
+	var mountHoleDiameter:Float;
 	var mountScrew:String;
 }

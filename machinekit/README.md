@@ -44,7 +44,7 @@ Each component also produces the machining it needs:
 | `ShaftCollar` | set-screw type, by bore diameter | — |
 | `SteppedShaft` | — (built from arbitrary sections) | keyway and retaining-ring groove cuts, `diameterAt()` |
 | `FlangeBearingHousing` | — (sized from a `DeepGrooveBearing`) | `mountScrewPart()` |
-| `PillowBlock` | Koyo/JTEKT UCP204 base-mounted unit | `mountScrewPart()` |
+| `PillowBlock` | Koyo/JTEKT UCP204–UCP213 base-mounted units | mounting connectors and hole envelope; `mountScrewPart()` for cataloged screw sizes |
 | `Bushing` | — (proportional to bore diameter) | — |
 | `ShaftCoupling` | — (proportional to the larger bore) | `setScrewPart()` |
 | `LinearBearing` | LM8UU–LM20UU | — |
@@ -127,8 +127,8 @@ library classes rather than one-off scripts:
   on the housing's outer face, long enough to pass through it. The bearing's own
   `front`/`axis`/`back` connectors stay reachable as `'<id>-bearing'` for
   mating a shaft through it.
-- `PillowBlock` is the base-mounted UCP-style unit. Its UCP204 catalog row
-  carries the shaft height, base envelope, two-bolt spacing, and M10 mounting
+- `PillowBlock` is the base-mounted UCP-style unit. Its UCP204–UCP213 catalog
+  rows carry the shaft height, base envelope, two-bolt spacing, and mounting
   interface; its connectors expose the shaft axis, base, and bolt centres.
 - `LinearAxis` drives a semantic `LeadScrew` through a `ShaftCoupling` and
   matching `LeadScrewNut`. Its `LinearGuideSystem` keeps two round guide rods, `LM8UU` linear

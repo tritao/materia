@@ -717,6 +717,7 @@ class MachineKitSmoke {
 		near(block.baseHeight, 16, "UCP pillow block base height");
 		near(block.overallHeight, 64.5, "UCP pillow block overall height");
 		near(block.boltSpacing, 95, "UCP pillow block bolt spacing");
+		near(block.mountHoleDiameter, 13, "UCP pillow block mounting hole diameter");
 		check(block.mountScrew == "M10", "UCP pillow block mounting screw");
 		var envelope = block.geometry(Envelope);
 		solid(envelope, "UCP pillow block envelope");
@@ -745,7 +746,27 @@ class MachineKitSmoke {
 		bom.addComponent(block);
 		check(bom.quantity("UCP204") == 1, "UCP pillow block BOM");
 		check(block.mountScrewPart(20).designation == "ISO4762-M10x20", "UCP mounting screw companion");
-		throws(() -> PillowBlock.metric("UCP205"), 'Unknown pillow block unit "UCP205"');
+		for (reference in [
+			{name: "UCP205", bore: 25, length: 140, height: 36.5, boltSpacing: 105, screw: "M10"},
+			{name: "UCP206", bore: 30, length: 165, height: 42.9, boltSpacing: 121, screw: "M14"},
+			{name: "UCP207", bore: 35, length: 167, height: 47.6, boltSpacing: 127, screw: "M14"},
+			{name: "UCP208", bore: 40, length: 184, height: 49.2, boltSpacing: 137, screw: "M14"},
+			{name: "UCP209", bore: 45, length: 190, height: 54, boltSpacing: 146, screw: "M14"},
+			{name: "UCP210", bore: 50, length: 206, height: 57.2, boltSpacing: 159, screw: "M16"},
+			{name: "UCP211", bore: 55, length: 219, height: 63.5, boltSpacing: 171, screw: "M16"},
+			{name: "UCP212", bore: 60, length: 241, height: 69.8, boltSpacing: 184, screw: "M16"},
+			{name: "UCP213", bore: 65, length: 265, height: 76.2, boltSpacing: 203, screw: "M20"}]) {
+			var candidate = PillowBlock.metric(reference.name);
+			near(candidate.boreDiameter, reference.bore, reference.name + " bore");
+			near(candidate.length, reference.length, reference.name + " length");
+			near(candidate.shaftHeight, reference.height, reference.name + " shaft height");
+			near(candidate.boltSpacing, reference.boltSpacing, reference.name + " bolt spacing");
+			check(candidate.mountScrew == reference.screw, reference.name + " mounting screw");
+			var candidatePart = candidate.geometry(Envelope);
+			solid(candidatePart, reference.name + " envelope");
+			candidatePart.close();
+		}
+		throws(() -> PillowBlock.metric("UCP299"), 'Unknown pillow block unit "UCP299"');
 	}
 
 	static function linearAxis():Void {
@@ -784,7 +805,7 @@ class MachineKitSmoke {
 		near(axis.screw.totalLength, axis.length, "linear axis screw total length");
 		throws(() -> new LinearAxis(23, 10, -1), "positive stroke");
 		throws(() -> new LinearAxis(23, 10, 200, "6001"), "bore does not match the screw diameter");
-		throws(() -> new LinearAxis(23, 50), "No catalog deep groove bearing has a 50 mm bore");
+		throws(() -> new LinearAxis(23, 66), "No catalog deep groove bearing has a 66 mm bore");
 		throws(() -> new LinearAxis(23, 10, 200, null, 2), "must clear the flange housing screw heads and lead nut");
 		throws(() -> new LinearAxis(23, 8), "explicit thread for a nondefault screw diameter");
 		throws(() -> new LinearAxis(23, 8, 200, null, 30, new LeadScrewThread(MetricTrapezoidal, 10, 2)),
