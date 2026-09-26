@@ -65,6 +65,7 @@ import robotkit.behavior.HoldJointBehavior;
 import robotkit.behavior.WorldBehaviorRunner;
 import robotkit.worldd.WorldHost;
 import robotkit.mobile.Pose2;
+import robotkit.mobile.Pose3;
 import robotkit.mobile.Twist2;
 import robotkit.mobile.MotionLimits;
 import robotkit.mobile.Footprint;
@@ -112,6 +113,10 @@ import robotkit.material.LoadState;
 import robotkit.material.Payload;
 import robotkit.perception.Detection;
 import robotkit.perception.DepthCameraObstaclePerception;
+import robotkit.perception.FiducialDetector;
+import robotkit.perception.FiducialMarkerObservation;
+import robotkit.perception.FiducialPerception;
+import robotkit.perception.FiducialTargetConfig;
 import robotkit.perception.Obstacle;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.LidarObstaclePerception;
@@ -157,6 +162,7 @@ class RobotWorldTests {
     testWheelImuLocalization();
     testGnssLocalization();
     testDepthObstaclePerception();
+    testFiducialPerception();
     testNavigation();
     testMotionGuard();
     testGridPlanning();
@@ -845,6 +851,57 @@ class RobotWorldTests {
       Math.abs(fused.pose.y + 1.0) < 1e-3, "GNSS fixes anchor pose fusion in the map frame");
     robot.close();
     simulation.dispose();
+  }
+
+  static function testFiducialPerception():Void {
+    var model = new RobotModel("fiducial robot");
+    var body = model.addLink(new Link("base", "fiducial/base"));
+    var mount = model.addFrame(new Frame("camera mount", body, "fiducial/camera"));
+    mount.position = [0.5, 0.0, 1.0];
+    var sensor = model.addSensor(new Sensor("front camera", "camera", 10.0,
+      "fiducial/front"));
+    sensor.frame = mount;
+    var perception = FiducialPerception.fromRobotModel(model, "fiducial/front",
+      "fiducial/base", "base", "fiducial/base", [
+        new FiducialTargetConfig(11, "pallet", 1.2, 0.8, 0.15),
+        new FiducialTargetConfig(22, "dock", 0.0, 0.0, 0.0,
+          new Pose2(-0.5, 0.0))], 0.8);
+    var detections = new SensorFrame("fiducial/front", "camera_detections",
+      "fiducial/camera", Int64.ofInt(1), Int64.ofInt(100), [
+        11.0, 1.0, 0.0, 0.0, 0.95, 22.0, 2.0, 0.0, 0.0, 0.98,
+        99.0, 3.0, 0.0, 0.0, 0.99
+      ], Int64.ofInt(110), "fiducial/base");
+    var mapped = perception.observe([detections]);
+    check(mapped.pallets().length == 1 && mapped.dockingTargets().length == 1 &&
+      Math.abs(mapped.pallets()[0].detection.pose.x - 1.5) < 1e-8 &&
+      Math.abs(mapped.dockingTargets()[0].approachPose.x - 2.0) < 1e-8 &&
+      mapped.detections()[0].frameId == "fiducial/base",
+      "fiducial IDs map to framed pallet and dock targets");
+    throws(function() perception.observe([new SensorFrame("fiducial/front",
+      "camera_detections", "fiducial/camera", Int64.ofInt(2), Int64.ofInt(120),
+      [11.0, 1.0], Int64.ofInt(130))]),
+      "fiducial records require complete values");
+    var pixels = haxe.io.Bytes.alloc(3);
+    pixels.set(0, 10); pixels.set(1, 20); pixels.set(2, 30);
+    var camera = new SensorFrame("fiducial/front", "camera", "fiducial/camera",
+      Int64.ofInt(3), Int64.ofInt(140), [], Int64.ofInt(150), "fiducial/base",
+      null, null, "camera.clock", "host.clock",
+      new CameraImage(1, 1, "rgb8", pixels));
+    var typed = perception.observeCameraFrames([camera], new PortFiducialDetector([
+      new FiducialMarkerObservation(11, new Pose2(1.0, 0.0), 0.95),
+      new FiducialMarkerObservation(22, new Pose2(2.0, 0.0), 0.98)]));
+    check(typed.pallets().length == 1 && typed.dockingTargets().length == 1,
+      "injected image detectors publish typed fiducial targets");
+    mount.rotation = [Math.sqrt(0.5), 0.0, 0.0, Math.sqrt(0.5)];
+    var tilted = FiducialPerception.fromRobotModel(model, "fiducial/front",
+      "fiducial/base", "base", "fiducial/base", [
+        new FiducialTargetConfig(11, "pallet", 1.2, 0.8, 0.15)]);
+    var tiltedResult = tilted.observeCameraFrames([camera], new PortFiducialDetector([
+      FiducialMarkerObservation.fromPose3(11, new Pose3(1.0, 0.0, 0.0), 0.95)]));
+    check(tiltedResult.pallets().length == 1 &&
+      Math.abs(tiltedResult.pallets()[0].detection.pose.x - 1.5) < 1e-8 &&
+      tiltedResult.pallets()[0].detection.frameId == "fiducial/base",
+      "3D fiducial poses compose through a tilted camera mount");
   }
 
   static function testDepthObstaclePerception():Void {
@@ -4169,4 +4226,15 @@ private class QualityOverrideLocalization implements Localization {
     hasQualityOverride = false;
     source.reset(pose);
   }
+}
+
+private class PortFiducialDetector implements FiducialDetector {
+  final observations:Array<FiducialMarkerObservation>;
+
+  public function new(observations:Array<FiducialMarkerObservation>) {
+    this.observations = observations;
+  }
+
+  public function detect(frame:SensorFrame):Array<FiducialMarkerObservation>
+    return observations.copy();
 }

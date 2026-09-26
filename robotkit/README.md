@@ -234,6 +234,10 @@ and localization estimate for map-frame obstacles.
 Camera images travel over robotd as `CameraFrame` messages with pixel bytes in
 a separate attachment. `RemoteRobot` publishes the received image as a normal
 sensor frame, preserving sensor identity, mount, and source clock provenance.
+`FiducialPerception` maps configured marker IDs to pallet and docking targets.
+It accepts five-value detector records or typed observations from an injected
+image detector. A detector can supply a `Pose3`; the authored camera mount is
+then composed in 3D before the target is projected into the body frame.
 
 `robotkit.navigation.Navigation` follows a framed `Path` using the latest
 localization state and an application-supplied update duration. `Trajectory`
