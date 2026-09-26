@@ -12,11 +12,12 @@ namespace {
 constexpr std::uint32_t default_command_capacity = 256;
 
 struct Command {
-    enum class Kind { Forces, JointTargets };
+    enum class Kind { Forces, JointTargets, BodyStates };
 
     Kind kind = Kind::Forces;
     std::vector<nksim_body_force> forces;
     std::vector<nksim_joint_target> joint_targets;
+    std::vector<nksim_body_state> body_states;
 };
 
 struct StepRequest {
@@ -158,6 +159,20 @@ public:
         return enqueue(std::move(command));
     }
 
+    nksim_result submit_body_states(const nksim_body_state *states, std::uint32_t count) {
+        if (count != 0 && !states)
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        Command command;
+        command.kind = Command::Kind::BodyStates;
+        command.body_states.reserve(count);
+        for (std::uint32_t index = 0; index < count; ++index) {
+            if (!valid_struct_size(states[index].struct_size, sizeof(states[index])))
+                return NKSIM_ERROR_INVALID_ARGUMENT;
+            command.body_states.push_back(states[index]);
+        }
+        return enqueue(std::move(command));
+    }
+
     nksim_result get_snapshot(nksim_snapshot *out_snapshot) {
         if (!out_snapshot)
             return NKSIM_ERROR_INVALID_ARGUMENT;
@@ -213,7 +228,8 @@ public:
 
 private:
     nksim_result enqueue(Command command) {
-        if (command.forces.empty() && command.joint_targets.empty())
+        if (command.forces.empty() && command.joint_targets.empty() &&
+            command.body_states.empty())
             return NKSIM_OK;
         std::lock_guard lock(mutex);
         if (!started || !running || stop_requested)
@@ -250,10 +266,16 @@ private:
             if (command.kind == Command::Kind::Forces) {
                 result = world->apply_forces(command.forces.data(),
                                              static_cast<std::uint32_t>(command.forces.size()));
-            } else {
+            } else if (command.kind == Command::Kind::JointTargets) {
                 result = world->set_joint_targets(
                     command.joint_targets.data(),
                     static_cast<std::uint32_t>(command.joint_targets.size()));
+            } else {
+                for (const auto &state : command.body_states) {
+                    result = world->set_body_state(state.body, state);
+                    if (result != NKSIM_OK)
+                        break;
+                }
             }
             if (result != NKSIM_OK)
                 return result;
@@ -449,6 +471,12 @@ nksim_result NKSIM_HOST_CALL nksim_host_submit_joint_targets(
     nksim_host host, const nksim_joint_target *targets, uint32_t count) {
     const auto value = nksim::resolve_host(host);
     return value ? value->submit_joint_targets(targets, count) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_HOST_CALL nksim_host_submit_body_states(
+    nksim_host host, const nksim_body_state *states, uint32_t count) {
+    const auto value = nksim::resolve_host(host);
+    return value ? value->submit_body_states(states, count) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
 nksim_result NKSIM_HOST_CALL nksim_host_get_snapshot(nksim_host host,

@@ -450,6 +450,137 @@ void joint_child_bodies_follow_their_joint_in_default_backend() {
     nkscene_scene_destroy(scene);
 }
 
+void set_node_pose(nkscene_scene scene, nkscene_node_id node, double x, double y,
+                   double yaw) {
+    nkscene_transaction transaction = 0;
+    assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
+    auto transform = make_transform(x, y, 0.0);
+    transform.matrix[0] = static_cast<float>(std::cos(yaw));
+    transform.matrix[1] = static_cast<float>(std::sin(yaw));
+    transform.matrix[4] = static_cast<float>(-std::sin(yaw));
+    transform.matrix[5] = static_cast<float>(std::cos(yaw));
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
+    nkscene_change_set changes = 0;
+    assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
+    nkscene_change_set_destroy(changes);
+}
+
+nksim_body_state step_and_read(nksim_world world, nksim_body body) {
+    nksim_step_result step{};
+    step.struct_size = sizeof(step);
+    assert(nksim_world_step(world, &step) == NKSIM_OK);
+    nkscene_change_set_destroy(step.scene_changes);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_body_get_state(world, body, &state) == NKSIM_OK);
+    return state;
+}
+
+bool near(double actual, double expected, double tolerance) {
+    return std::abs(actual - expected) <= tolerance;
+}
+
+void kinematic_body_velocity_follows_node_motion() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto node = make_node(scene, 0.0);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    nksim_body_desc body_desc{};
+    body_desc.struct_size = sizeof(body_desc);
+    body_desc.motion_type = NKSIM_MOTION_KINEMATIC;
+    body_desc.mass = 1.0;
+    body_desc.node = node;
+    nksim_body body = 0;
+    assert(nksim_body_create(world, &body_desc, &body) == NKSIM_OK);
+    constexpr double tolerance = 1e-4;
+
+    // The first tick has no motion history, so the body starts at rest.
+    set_node_pose(scene, node, 1.0, 0.0, 0.0);
+    auto state = step_and_read(world, body);
+    assert(near(state.position[0], 1.0, 1e-6));
+    for (int axis = 0; axis < 3; ++axis)
+        assert(state.linear_velocity[axis] == 0.0 && state.angular_velocity[axis] == 0.0);
+
+    // Continuous node motion is the body's twist over the tick; gravity does
+    // not act on kinematic bodies.
+    set_node_pose(scene, node, 1.05, 0.02, 0.03);
+    state = step_and_read(world, body);
+    assert(near(state.position[0], 1.05, 1e-6) && near(state.position[1], 0.02, 1e-6));
+    assert(near(state.position[2], 0.0, 1e-12));
+    assert(near(state.linear_velocity[0], 5.0, tolerance));
+    assert(near(state.linear_velocity[1], 2.0, tolerance));
+    assert(near(state.linear_velocity[2], 0.0, tolerance));
+    assert(near(state.angular_velocity[0], 0.0, tolerance));
+    assert(near(state.angular_velocity[1], 0.0, tolerance));
+    assert(near(state.angular_velocity[2], 3.0, tolerance));
+    nksim_snapshot snapshot = 0;
+    assert(nksim_world_snapshot(world, &snapshot) == NKSIM_OK);
+    nksim_body_state published{};
+    published.struct_size = sizeof(published);
+    assert(nksim_snapshot_get_body(snapshot, 0, &published) == NKSIM_OK);
+    assert(published.linear_velocity[0] == state.linear_velocity[0] &&
+           published.angular_velocity[2] == state.angular_velocity[2]);
+    nksim_snapshot_destroy(snapshot);
+
+    // Holding still is at rest again.
+    state = step_and_read(world, body);
+    for (int axis = 0; axis < 3; ++axis)
+        assert(near(state.linear_velocity[axis], 0.0, tolerance) &&
+               near(state.angular_velocity[axis], 0.0, tolerance));
+
+    // Angular velocity takes the short way across the +/-pi yaw seam.
+    set_node_pose(scene, node, 1.05, 0.02, 3.1);
+    (void)step_and_read(world, body);
+    set_node_pose(scene, node, 1.05, 0.02, -3.1);
+    state = step_and_read(world, body);
+    const double seam_rate = (2.0 * 3.141592653589793 - 6.2) / 0.01;
+    assert(near(state.angular_velocity[2], seam_rate, 1e-2));
+
+    // An explicit state write is a teleport: the next tick carries the written
+    // twist instead of reading the jump as a velocity, then motion resumes.
+    set_node_pose(scene, node, 10.0, 0.0, 0.0);
+    nksim_body_state teleport = state;
+    teleport.position[0] = 10.0;
+    teleport.position[1] = 0.0;
+    teleport.rotation[0] = teleport.rotation[1] = teleport.rotation[2] = 0.0;
+    teleport.rotation[3] = 1.0;
+    teleport.linear_velocity[0] = 1.0;
+    teleport.linear_velocity[1] = teleport.linear_velocity[2] = 0.0;
+    teleport.angular_velocity[0] = teleport.angular_velocity[1] = 0.0;
+    teleport.angular_velocity[2] = 0.0;
+    assert(nksim_body_set_state(world, body, &teleport) == NKSIM_OK);
+    state = step_and_read(world, body);
+    assert(near(state.position[0], 10.0, 1e-6));
+    assert(state.linear_velocity[0] == 1.0 && state.linear_velocity[1] == 0.0);
+    assert(state.angular_velocity[2] == 0.0);
+    set_node_pose(scene, node, 10.01, 0.0, 0.0);
+    state = step_and_read(world, body);
+    assert(near(state.linear_velocity[0], 1.0, 1e-3));
+
+    // Resets are discontinuities too: the body comes back to rest at its node.
+    set_node_pose(scene, node, 2.0, 0.0, 0.0);
+    assert(nksim_world_reset(world) == NKSIM_OK);
+    state = step_and_read(world, body);
+    assert(near(state.position[0], 2.0, 1e-6));
+    for (int axis = 0; axis < 3; ++axis)
+        assert(state.linear_velocity[axis] == 0.0 && state.angular_velocity[axis] == 0.0);
+    set_node_pose(scene, node, 3.0, 0.0, 0.0);
+    assert(nksim_body_reset(world, body) == NKSIM_OK);
+    state = step_and_read(world, body);
+    assert(near(state.position[0], 3.0, 1e-6) && state.linear_velocity[0] == 0.0);
+
+    nksim_body_destroy(world, body);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -458,5 +589,6 @@ int main() {
     repeated_replays_are_identical();
     batched_joint_targets_are_accepted();
     joint_child_bodies_follow_their_joint_in_default_backend();
+    kinematic_body_velocity_follows_node_motion();
     return 0;
 }

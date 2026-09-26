@@ -308,6 +308,33 @@ void kinematic_scene_state_drives_mujoco() {
     state.struct_size = sizeof(state);
     assert(nksim_body_get_state(world, body, &state) == NKSIM_OK);
     assert(std::abs(state.position[0] - 3.0) < 1e-6);
+    assert(state.linear_velocity[0] == 0.0); // First tick has no motion history.
+
+    // MuJoCo pins the body at the node pose; the reported twist is the node's
+    // finite difference over the tick.
+    for (int tick = 1; tick <= 3; ++tick) {
+        set_node_x(scene, node, 3.0 + 0.05 * tick);
+        step_world(world, 1);
+        assert(nksim_body_get_state(world, body, &state) == NKSIM_OK);
+        assert(std::abs(state.position[0] - (3.0 + 0.05 * tick)) < 1e-6);
+        assert(std::abs(state.linear_velocity[0] - 5.0) < 1e-4);
+        assert(std::abs(state.linear_velocity[1]) < 1e-9);
+        assert(std::abs(state.angular_velocity[2]) < 1e-9);
+    }
+    step_world(world, 1);
+    assert(nksim_body_get_state(world, body, &state) == NKSIM_OK);
+    assert(std::abs(state.position[0] - 3.15) < 1e-6);
+    assert(std::abs(state.linear_velocity[0]) < 1e-4);
+
+    // A state write is a teleport, not a 1000 m/s velocity.
+    set_node_x(scene, node, 13.0);
+    state.position[0] = 13.0;
+    state.linear_velocity[0] = 0.0;
+    assert(nksim_body_set_state(world, body, &state) == NKSIM_OK);
+    step_world(world, 1);
+    assert(nksim_body_get_state(world, body, &state) == NKSIM_OK);
+    assert(std::abs(state.position[0] - 13.0) < 1e-6);
+    assert(state.linear_velocity[0] == 0.0);
 
     nksim_body_destroy(world, body);
     nksim_world_destroy(world);

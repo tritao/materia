@@ -29,7 +29,9 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_body_get_state(world: nksim_world, body: nksim_body, out_state: ptr<nksim_body_state> @inout) -> nksim_result;
 	extern fn nksim_body_reset(world: nksim_world, body: nksim_body) -> nksim_result;
 	/**
-	 * Replaces a body's pose and velocities on the world owner thread.
+	 * Replaces a body's pose and velocities on the world owner thread. For a
+	 * kinematic body this is a discontinuity: the next tick keeps the supplied
+	 * velocities instead of inferring them from the scene-node pose change.
 	 */
 	extern fn nksim_body_set_state(world: nksim_world, body: nksim_body, state: ptr<const<nksim_body_state>>) -> nksim_result;
 	extern fn nksim_joint_create(world: nksim_world, desc: ptr<const<nksim_joint_desc>>, out_joint: ptr<nksim_joint> @out) -> nksim_result;

@@ -108,6 +108,29 @@ std::array<double, 4> rotation_from_matrix(const float *matrix) noexcept {
     return result;
 }
 
+// World-frame angular velocity that rotates `from` onto `to` in `dt`, taking
+// the shorter way around. The relative rotation is to * conjugate(from).
+std::array<double, 3> angular_velocity_between(const double *from, const double *to,
+                                               double dt) noexcept {
+    const double ax = -from[0], ay = -from[1], az = -from[2], aw = from[3];
+    const double bx = to[0], by = to[1], bz = to[2], bw = to[3];
+    double x = bw * ax + bx * aw + by * az - bz * ay;
+    double y = bw * ay - bx * az + by * aw + bz * ax;
+    double z = bw * az + bx * ay - by * ax + bz * aw;
+    double w = bw * aw - bx * ax - by * ay - bz * az;
+    if (w < 0.0) {
+        x = -x;
+        y = -y;
+        z = -z;
+        w = -w;
+    }
+    const double sine = std::sqrt(x * x + y * y + z * z);
+    // angle = 2 atan2(|v|, w); the rotation vector is v * angle / |v|, which
+    // tends to 2 v as the relative rotation vanishes.
+    const double scale = sine > 1e-12 ? 2.0 * std::atan2(sine, w) / sine : 2.0;
+    return {x * scale / dt, y * scale / dt, z * scale / dt};
+}
+
 } // namespace
 
 RuntimeRegistry &registry() noexcept {
@@ -222,20 +245,33 @@ void World::initialize_body_state(Body &body, const std::array<double, 3> &posit
 }
 
 nksim_result World::set_backend_body_state(const Body &body) {
-    BackendBodyState state{};
-    state.backend_body = body.backend_body;
-    std::copy(std::begin(body.state.position), std::end(body.state.position), state.position.begin());
-    std::copy(std::begin(body.state.rotation), std::end(body.state.rotation), state.rotation.begin());
-    std::copy(std::begin(body.state.linear_velocity), std::end(body.state.linear_velocity),
-              state.linear_velocity.begin());
-    std::copy(std::begin(body.state.angular_velocity), std::end(body.state.angular_velocity),
-              state.angular_velocity.begin());
-    state.sleeping = body.state.sleeping;
-    return backend->body_set_state(body.backend_body, state);
+    return set_backend_body_state(body.backend_body, body.state);
 }
 
+nksim_result World::set_backend_body_state(std::uint64_t backend_body,
+                                           const nksim_body_state &source) {
+    BackendBodyState state{};
+    state.backend_body = backend_body;
+    std::copy(std::begin(source.position), std::end(source.position), state.position.begin());
+    std::copy(std::begin(source.rotation), std::end(source.rotation), state.rotation.begin());
+    std::copy(std::begin(source.linear_velocity), std::end(source.linear_velocity),
+              state.linear_velocity.begin());
+    std::copy(std::begin(source.angular_velocity), std::end(source.angular_velocity),
+              state.angular_velocity.begin());
+    state.sleeping = source.sleeping;
+    return backend->body_set_state(backend_body, state);
+}
+
+// Kinematic bodies follow their scene node. Backends pin a kinematic body
+// where it is placed (it has no degrees of freedom), so it is placed at the
+// node pose before the step and articulations it carries are posed from there.
+// A node that moved continuously since the previous step gives the body the
+// finite-difference twist over the step. The first step after an explicit
+// state write or reset is discontinuous: the body keeps the twist that write
+// supplied, so a teleport never reads as a velocity.
 nksim_result World::refresh_kinematic_bodies() {
     nksim_result result = NKSIM_OK;
+    const double dt = clock.fixed_timestep;
     bodies.for_each([&](nksim_body, Body &body) {
         if (result != NKSIM_OK || body.desc.motion_type != NKSIM_MOTION_KINEMATIC)
             return;
@@ -244,10 +280,37 @@ nksim_result World::refresh_kinematic_bodies() {
         result = node_pose(body.desc.node, position, rotation);
         if (result != NKSIM_OK)
             return;
-        initialize_body_state(body, position, rotation);
-        result = set_backend_body_state(body);
+        auto target = body.state;
+        target.struct_size = sizeof(target);
+        target.body = body.handle;
+        target.node = body.desc.node;
+        std::copy(position.begin(), position.end(), std::begin(target.position));
+        std::copy(rotation.begin(), rotation.end(), std::begin(target.rotation));
+        target.sleeping = 0;
+        if (body.kinematic_continuous) {
+            for (int axis = 0; axis < 3; ++axis)
+                target.linear_velocity[axis] =
+                    (position[axis] - body.state.position[axis]) / dt;
+            const auto angular = angular_velocity_between(body.state.rotation,
+                                                          target.rotation, dt);
+            std::copy(angular.begin(), angular.end(), std::begin(target.angular_velocity));
+        }
+        body.kinematic_target = target;
+        result = set_backend_body_state(body.backend_body, target);
     });
     return result;
+}
+
+// A kinematic body's authoritative state is the pose it was driven to and the
+// twist that took it there; backends that pin it without degrees of freedom
+// report no velocity for it.
+void World::commit_kinematic_targets() noexcept {
+    bodies.for_each([&](nksim_body, Body &body) {
+        if (body.desc.motion_type != NKSIM_MOTION_KINEMATIC)
+            return;
+        body.state = body.kinematic_target;
+        body.kinematic_continuous = true;
+    });
 }
 
 nksim_result World::read_backend_state() {
@@ -274,11 +337,15 @@ nksim_result World::read_backend_state() {
                       std::begin(body.state.position));
             std::copy(std::begin(state.rotation), std::end(state.rotation),
                       std::begin(body.state.rotation));
+            body.state.sleeping = state.sleeping;
+            // A kinematic body's twist is prescribed, not simulated: keep the
+            // one it was given (backends pinning it report none).
+            if (body.desc.motion_type == NKSIM_MOTION_KINEMATIC)
+                return;
             std::copy(std::begin(state.linear_velocity), std::end(state.linear_velocity),
                       std::begin(body.state.linear_velocity));
             std::copy(std::begin(state.angular_velocity), std::end(state.angular_velocity),
                       std::begin(body.state.angular_velocity));
-            body.state.sleeping = state.sleeping;
         });
     }
 
@@ -326,6 +393,7 @@ nksim_result World::step(nksim_step_result *out_result) {
     result = read_backend_state();
     if (result != NKSIM_OK)
         return result;
+    commit_kinematic_targets();
     nkscene_change_set changes = 0;
     result = synchronize_scene(&changes);
     if (result != NKSIM_OK)
@@ -528,6 +596,7 @@ nksim_result World::set_body_state(nksim_body body, const nksim_body_state &stat
     value->state.node = value->desc.node;
     const auto result = set_backend_body_state(*value);
     if (result != NKSIM_OK) { value->state = previous; return result; }
+    value->kinematic_continuous = false;
     // F4: a root's new pose (or a reset child's zeroed joint) can move other
     // bodies kinematically in the backend; pull every body/joint's resulting
     // state back so an immediate get_body_state/get_joint_state observes it,
@@ -545,6 +614,7 @@ nksim_result World::reset_body(nksim_body body) {
     value->state = value->initial_state;
     const auto result = set_backend_body_state(*value);
     if (result != NKSIM_OK) { value->state = previous; return result; }
+    value->kinematic_continuous = false;
     return read_backend_state();
 }
 
@@ -556,6 +626,7 @@ nksim_result World::reset() {
         if (result != NKSIM_OK)
             return;
         body.state = body.initial_state;
+        body.kinematic_continuous = false;
         result = set_backend_body_state(body);
     });
     if (result != NKSIM_OK)

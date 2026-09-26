@@ -53,6 +53,11 @@ enum {
 
 enum {
     NKSIM_MOTION_STATIC = 0,
+    // Follows its scene node's world pose each tick. The body's velocity is
+    // the node's motion over the tick (finite difference of the previous and
+    // new pose), except on the first tick after nksim_body_set_state(),
+    // nksim_body_reset(), or nksim_world_reset(), which carries the twist
+    // those writes supplied so a teleport does not read as a velocity.
     NKSIM_MOTION_KINEMATIC = 1,
     NKSIM_MOTION_DYNAMIC = 2
 };
@@ -237,7 +242,11 @@ NKSIM_API nksim_result NKSIM_CALL nksim_body_create(
 NKSIM_API void NKSIM_CALL nksim_body_destroy(nksim_world world, nksim_body body);
 NKSIM_API nksim_result NKSIM_CALL nksim_body_get_state(
     nksim_world world, nksim_body body, nksim_body_state *out_state NK_INOUT);
-/** Replaces a body's pose and velocities on the world owner thread. */
+/**
+ * Replaces a body's pose and velocities on the world owner thread. For a
+ * kinematic body this is a discontinuity: the next tick keeps the supplied
+ * velocities instead of inferring them from the scene-node pose change.
+ */
 NKSIM_API nksim_result NKSIM_CALL nksim_body_set_state(
     nksim_world world, nksim_body body, const nksim_body_state *state);
 NKSIM_API nksim_result NKSIM_CALL nksim_body_reset(nksim_world world, nksim_body body);

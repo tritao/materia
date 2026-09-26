@@ -33,7 +33,13 @@ host step.
 Each `nksim_world_step()` performs one fixed tick. The built-in backend is an
 internal gravity-only, no-collision backend used to test the headless boundary.
 It integrates dynamic bodies, accepts kinematic scene poses, and leaves static
-bodies at their scene-initialized pose. After backend state is read, dynamic
+bodies at their scene-initialized pose. A kinematic body moves with the twist
+implied by its scene node's motion over each tick (finite difference of the
+previous and new node pose, angular velocity from the relative rotation); the
+first tick after `nksim_body_set_state`, `nksim_host_submit_body_states`,
+`nksim_body_reset`, or `nksim_world_reset` is a teleport that carries the
+written twist instead. Scene poses are single precision, so the inferred
+velocity carries roughly one float ulp of position per tick of noise. After backend state is read, dynamic
 body poses are committed to the scene in one transaction and the owned
 `nkscene_change_set` is returned in the step result.
 

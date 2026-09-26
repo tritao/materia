@@ -177,10 +177,90 @@ void realtime_host_can_pause_and_resume() {
     nkscene_scene_destroy(scene);
 }
 
+void set_node_x(nkscene_scene scene, nkscene_node_id node, double x) {
+    nkscene_transaction transaction = 0;
+    assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
+    nkscene_transform transform{};
+    transform.matrix[0] = 1.0f;
+    transform.matrix[5] = 1.0f;
+    transform.matrix[10] = 1.0f;
+    transform.matrix[15] = 1.0f;
+    transform.matrix[12] = static_cast<float>(x);
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
+    nkscene_change_set changes = 0;
+    assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
+    nkscene_change_set_destroy(changes);
+}
+
+nksim_body_state host_step_and_read(nksim_host host) {
+    nksim_step_result step{};
+    step.struct_size = sizeof(step);
+    assert(nksim_host_step(host, &step) == NKSIM_OK);
+    if (step.scene_changes) nkscene_change_set_destroy(step.scene_changes);
+    nksim_snapshot snapshot = 0;
+    assert(nksim_host_get_snapshot(host, &snapshot) == NKSIM_OK);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_snapshot_get_body(snapshot, 0, &state) == NKSIM_OK);
+    nksim_snapshot_destroy(snapshot);
+    return state;
+}
+
+void host_body_state_writes_teleport_kinematic_bodies() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto node = make_node(scene, 0.0);
+    const auto world = make_world(scene, 0.01);
+    nksim_body_desc body_desc{};
+    body_desc.struct_size = sizeof(body_desc);
+    body_desc.node = node;
+    body_desc.motion_type = NKSIM_MOTION_KINEMATIC;
+    body_desc.mass = 1.0;
+    nksim_body body = 0;
+    assert(nksim_body_create(world, &body_desc, &body) == NKSIM_OK);
+    nksim_host_desc host_desc{};
+    host_desc.struct_size = sizeof(host_desc);
+    host_desc.world = world;
+    host_desc.mode = NKSIM_HOST_MODE_EXTERNAL;
+    nksim_host host = 0;
+    assert(nksim_host_create(&host_desc, &host) == NKSIM_OK);
+    assert(nksim_host_start(host) == NKSIM_OK);
+
+    (void)host_step_and_read(host);
+    set_node_x(scene, node, 0.02);
+    auto state = host_step_and_read(host);
+    assert(std::abs(state.linear_velocity[0] - 2.0) < 1e-4);
+
+    // A queued state write applies before the next tick on the owner thread
+    // and marks the jump as a teleport that keeps the written twist.
+    set_node_x(scene, node, 5.0);
+    auto teleport = state;
+    teleport.position[0] = 5.0;
+    assert(nksim_host_submit_body_states(host, &teleport, 1) == NKSIM_OK);
+    state = host_step_and_read(host);
+    assert(std::abs(state.position[0] - 5.0) < 1e-6);
+    assert(state.linear_velocity[0] == teleport.linear_velocity[0]);
+    set_node_x(scene, node, 5.02);
+    state = host_step_and_read(host);
+    assert(std::abs(state.linear_velocity[0] - 2.0) < 1e-3);
+
+    nksim_body_state invalid = teleport;
+    invalid.struct_size = 0;
+    assert(nksim_host_submit_body_states(host, &invalid, 1) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_host_submit_body_states(host, nullptr, 1) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_host_submit_body_states(host, nullptr, 0) == NKSIM_OK);
+    assert(nksim_host_stop(host) == NKSIM_OK);
+    nksim_host_destroy(host);
+    nksim_body_destroy(world, body);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
     external_host_owns_world_and_publishes_snapshots();
     realtime_host_can_pause_and_resume();
+    host_body_state_writes_teleport_kinematic_bodies();
     return 0;
 }

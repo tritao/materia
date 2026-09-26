@@ -211,6 +211,20 @@ struct Body {
     std::uint64_t backend_body = 0;
     nksim_body_state state{};
     nksim_body_state initial_state{};
+    /**
+     * Kinematic pose and twist for the step in progress: the scene-node pose
+     * the body reaches at the end of the step and the twist that carries it
+     * there. Committed to state after the backend step.
+     */
+    nksim_body_state kinematic_target{};
+    /**
+     * True when state holds the pose this kinematic body reached on the
+     * previous step, so the next scene-node pose is continuous motion whose
+     * twist is the finite difference over the step. Cleared by explicit state
+     * writes and resets, which are discontinuous: the first step after one
+     * keeps the twist carried by that state instead (zero after a reset).
+     */
+    bool kinematic_continuous = false;
 };
 
 struct Joint {
@@ -265,6 +279,9 @@ private:
                                  std::array<double, 3> &position,
                                  std::array<double, 4> &rotation) const;
     nksim_result set_backend_body_state(const Body &body);
+    nksim_result set_backend_body_state(std::uint64_t backend_body,
+                                        const nksim_body_state &state);
+    void commit_kinematic_targets() noexcept;
     void initialize_body_state(Body &body, const std::array<double, 3> &position,
                                const std::array<double, 4> &rotation) noexcept;
 
