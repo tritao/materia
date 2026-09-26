@@ -850,6 +850,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView("add-lidar",addLidar),new KeyedView("add-imu",addImu),new KeyedView("add-camera",addCamera),
       new KeyedView("remove",removeSensor)
     ],actionRowStyle());
+    var applySimulation = new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild", null,
+      function() {
+        log(simulation.rebuild(sensors,scene) ? "Shared simulation configuration applied" :
+          "Simulation rebuild rejected: " + simulation.error);
+        commands.refresh();
+      }, "sensor-apply");
+    applySimulation.variant = ButtonVariant.Primary;
     var runtimeActions=new Column("sensor-runtime-actions",[
       new KeyedView("configuration",new Row("sensor-configuration-actions",[
       new KeyedView("undo",new Button("Undo",null,function(){
@@ -860,10 +867,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         session.document.redo();
         if(ownership!=null)refreshScriptMaterialization("Override redone");
         commands.refresh();},"sensor-redo")),
-      new KeyedView("apply",new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild",null,function(){
-        log(simulation.rebuild(sensors,scene) ? "Shared simulation configuration applied" : "Simulation rebuild rejected: "+simulation.error);
-        commands.refresh();
-      },"sensor-apply"))],actionRowStyle())),
+      new KeyedView("apply",applySimulation)],actionRowStyle())),
       new KeyedView("playback",new Row("sensor-playback-actions",[
       new KeyedView("run",new Button("Run",null,function(){
         try {simulation.start();log("Simulation running");} catch(error:Dynamic){log("Run rejected: "+Std.string(error));}
@@ -1086,10 +1090,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function renameDialog():View {
     var field = new TextField("rename-name", renameValue, function(value) renameValue = value);
     field.onSubmit = function(_) finishRename();
+    var confirm = new Button("Rename", null, finishRename, "rename-confirm");
+    confirm.variant = ButtonVariant.Primary;
     var content = new Column("rename-content", [
       new KeyedView("name", field),
       new KeyedView("actions", new Row("rename-actions", [
-        new KeyedView("save", new Button("Rename", null, finishRename, "rename-confirm")),
+        new KeyedView("save", confirm),
         new KeyedView("cancel", new Button("Cancel", null, function() renameId = null, "rename-cancel"))
       ]))
     ], actionColumnStyle());
@@ -1782,7 +1788,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       dismiss = documents.dismissError;
       buttons.push(new KeyedView("close", new Button("Close", null, documents.dismissError, "document-error-close")));
     } else {
-      buttons.push(new KeyedView("save", new Button("Save", null, function() documents.resolve("save"), "document-confirm-save")));
+      var save = new Button("Save", null, function() documents.resolve("save"), "document-confirm-save");
+      save.variant = ButtonVariant.Primary;
+      buttons.push(new KeyedView("save", save));
       buttons.push(new KeyedView("discard", new Button("Discard", null, function() documents.resolve("discard"), "document-confirm-discard")));
       buttons.push(new KeyedView("cancel", new Button("Cancel", null, dismiss, "document-confirm-cancel")));
     }

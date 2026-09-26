@@ -19,6 +19,7 @@ class CommandButton implements View {
 	public final registry:Null<CommandRegistry>;
 	public final invocationContext:Null<CommandContext>;
 	public final style:Null<LayoutStyle>;
+	/** Defaults to Secondary; callers mark primary commands explicitly. */
 	public var variant:ButtonVariant;
 	public var displayLabel:Null<String>;
 	public var leadingIcon:Null<IconName>;
@@ -34,7 +35,7 @@ class CommandButton implements View {
 		this.registry = registry;
 		this.invocationContext = invocationContext;
 		this.style = style == null ? null : style.copy();
-		variant = ButtonVariant.Primary;
+		variant = ButtonVariant.Secondary;
 		displayLabel = null;
 		leadingIcon = null;
 		this.onResult = onResult;

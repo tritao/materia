@@ -28,6 +28,7 @@ import nativekit.ui.widgets.layout.Stack;
 import nativekit.ui.widgets.layout.StackChild;
 import nativekit.ui.widgets.text.Text;
 import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.ButtonVariant;
 import nativekit.ui.widgets.WindowChrome;
 
 /** Owns the second native window used by the custom window-chrome showcase. */
@@ -381,7 +382,9 @@ class WindowChromeDemo {
 		style.background = theme.buttonBackground;
 		style.radiusTopLeft = style.radiusTopRight = 4.0;
 		style.radiusBottomLeft = style.radiusBottomRight = 4.0;
-		return new Button(label, style, action, key);
+		var button = new Button(label, style, action, key);
+		button.variant = ButtonVariant.Primary;
+		return button;
 	}
 
 	static function buttonRowStyle(gap:Float):LayoutStyle {

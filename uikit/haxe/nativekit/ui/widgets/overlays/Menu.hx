@@ -1,6 +1,7 @@
 package nativekit.ui.widgets.overlays;
 import nativekit.ui.widgets.KeyedView;
 import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.ButtonVariant;
 import nativekit.ui.widgets.layout.Column;
 
 import LayoutAxis;
@@ -45,6 +46,7 @@ class Menu implements View {
 					onDismiss();
 			}, item.key);
 			button.classes = ["menu-item"];
+			button.variant = ButtonVariant.Navigation;
 			button.enabled = item.enabled;
 			button.semanticRole = AccessibilityRole.MenuItem;
 			button.semanticActions = AccessibilityAction.Select;

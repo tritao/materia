@@ -835,7 +835,11 @@ class FrameworkSmoke {
 		var narrowButtonStyle = new LayoutStyle();
 		narrowButtonStyle.width = LayoutAxis.fixed(88.0);
 		narrowButtonStyle.height = LayoutAxis.fixed(38.0);
-		var narrowButtonRoot = context.submit(new Button("Selected", narrowButtonStyle),
+		var defaultButton = new Button("Selected", narrowButtonStyle);
+		if (defaultButton.variant != ButtonVariant.Secondary ||
+			new CommandButton("default-command", "missing-command").variant != ButtonVariant.Secondary)
+			return 303;
+		var narrowButtonRoot = context.submit(defaultButton,
 			new LayoutFrame(256.0, 192.0));
 		if (narrowButtonRoot.children[0].layout.paragraphStyle.wrap != TextWrap.None)
 			return 102;
@@ -2729,6 +2733,7 @@ class FrameworkSmoke {
 			return 217;
 		var themedClicks = 0;
 		var themedButton = new Button("Themed", null, function() { themedClicks++; }, "theme-key");
+		themedButton.variant = ButtonVariant.Primary;
 		var themedFrame = new LayoutFrame(256.0, 192.0);
 		var themedRoot = context.submit(themedButton, themedFrame);
 		if (!frameMetricsValid(context, false))

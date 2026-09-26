@@ -1,6 +1,7 @@
 package nativekit.ui.widgets.commands;
 import nativekit.ui.widgets.KeyedView;
 import nativekit.ui.widgets.controls.Button;
+import nativekit.ui.widgets.controls.ButtonVariant;
 import nativekit.ui.widgets.controls.SearchField;
 import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.overlays.Popup;
@@ -132,6 +133,7 @@ private class CommandPaletteModel implements ListViewModel {
 		button.enabled = command.isEnabled(context);
 		button.selected = command.isChecked(context);
 		button.classes = ["command-palette-item"];
+		button.variant = ButtonVariant.Navigation;
 		return button;
 	}
 

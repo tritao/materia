@@ -222,6 +222,7 @@ class SelectionPopup {
 			var optionButton = new Button(option.label, optionStyle,
 				function() { onSelect(originalIndex); }, option.key);
 			optionButton.classes = ["selection-option"];
+			optionButton.variant = ButtonVariant.Navigation;
 			optionButton.enabled = isEnabled(originalIndex);
 			optionButton.selected = sameValue(option.value, selectedValue);
 			optionButton.semanticRole = AccessibilityRole.ListItem;

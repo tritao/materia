@@ -212,6 +212,8 @@ class ComponentLab {
   ];
 
   function buttonStates():View {
+    var primary = new Button("Primary", null, function() {}, "primary");
+    primary.variant = ButtonVariant.Primary;
     var secondary = new Button("Navigation", null, function() {}, "navigation");
     secondary.variant = ButtonVariant.Navigation;
     var selected = new Button("Selected", null, function() {}, "selected");
@@ -219,7 +221,7 @@ class ComponentLab {
     var disabled = new Button("Disabled", null, null, "disabled");
     disabled.enabled = false;
     return new Row("button-states", [
-      new KeyedView("primary", new Button("Primary", null, function() {}, "primary")),
+      new KeyedView("primary", primary),
       new KeyedView("navigation", secondary),
       new KeyedView("selected", selected),
       new KeyedView("disabled", disabled)
@@ -297,13 +299,15 @@ class ComponentLab {
     var nav = new Button("Navigation item", null, function() {}, "token-navigation");
     nav.variant = ButtonVariant.Navigation;
     nav.selected = true;
+    var primary = new Button("Primary action", null, function() {}, "token-primary");
+    primary.variant = ButtonVariant.Primary;
     return new Column("design-tokens", [
       new KeyedView("heading", new Text("Typography / Heading")),
       new KeyedView("body", new Text("Body text establishes the default reading rhythm.")),
       new KeyedView("muted", new Text("Muted text supports secondary information.", null,
         Color.rgba(0.62, 0.68, 0.78, 1.0))),
       new KeyedView("actions", new Row("token-actions", [
-        new KeyedView("primary", new Button("Primary action", null, function() {}, "token-primary")),
+        new KeyedView("primary", primary),
         new KeyedView("navigation", nav),
         new KeyedView("disabled", disabled)
       ], rowStyle()))

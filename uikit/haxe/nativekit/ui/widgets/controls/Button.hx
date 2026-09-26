@@ -35,7 +35,7 @@ class Button implements View {
 	public final style:LayoutStyle;
 	/** Typed selector classes used by composite controls and application styles. */
 	public var classes:Array<String>;
-	/** Theme-backed visual treatment, including every interaction state. */
+	/** Theme-backed visual treatment; defaults to Secondary. Request Primary for the main action. */
 	public var variant:ButtonVariant;
 	public var enabled:Bool;
 	public var selected:Bool;
@@ -63,7 +63,7 @@ class Button implements View {
 		if (this.style.childGap == 0.0)
 			this.style.childGap = 8.0;
 		classes = [];
-		variant = ButtonVariant.Primary;
+		variant = ButtonVariant.Secondary;
 		this.onClick = onClick;
 		onClickEvent = null;
 		enabled = true;
