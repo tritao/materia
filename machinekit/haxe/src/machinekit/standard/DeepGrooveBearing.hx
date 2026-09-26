@@ -9,6 +9,8 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.standard.BearingFit.BearingHousingFit;
+import machinekit.standard.BearingFit.BearingShaftFit;
 
 /** ISO 15 boundary dimensions in millimetres; `chamfer` is the minimum corner radius r_s. */
 typedef DeepGrooveBearingSpec = {
@@ -96,16 +98,29 @@ class DeepGrooveBearing extends MachineComponent {
 		]);
 	}
 
-	/** Cutting tool for a housing bore in the bearing's frame, from the front face to `depth`.
-	 * `allowance` is diametral: negative for interference, positive for a slip fit.
-	 */
-	public function housingSeat(?depth:Float, allowance:Float = 0):Part {
+	/** Cutting tool for a housing bore, using a named fit and a diametral allowance. */
+	public function housingSeat(?depth:Float, fit:BearingHousingFit = Slip):Part {
 		var length = depth == null ? width : depth;
+		return housingSeatAllowance(length, BearingFit.housingAllowance(fit, outside));
+	}
+
+	/** Housing seat tool with an explicit diametral allowance for drawing-specific fits. */
+	public function housingSeatAllowance(?depth:Float, allowance:Float):Part {
+		var length = depth == null ? width : depth;
+		if (!(length > 0) || !Math.isFinite(length)) throw "Bearing housing seat depth must be positive";
+		if (!(outside + allowance > bore)) throw "Bearing housing seat allowance leaves no bearing wall";
 		return Solids.cylinder((outside + allowance) / 2, 0, length);
 	}
 
-	/** Shaft journal diameter for a diametral allowance (positive for interference). */
-	public function journalDiameter(allowance:Float = 0):Float return bore + allowance;
+	/** Shaft journal diameter for a named fit; allowance is diametral. */
+	public function journalDiameter(fit:BearingShaftFit = Slip):Float
+		return journalDiameterAllowance(BearingFit.shaftAllowance(fit, bore));
+
+	/** Shaft journal diameter with an explicit diametral allowance. */
+	public function journalDiameterAllowance(allowance:Float):Float {
+		if (!(bore + allowance > 0)) throw "Bearing journal allowance leaves no shaft diameter";
+		return bore + allowance;
+	}
 
 	function get_bore():Float return spec.bore;
 	function get_outside():Float return spec.outside;

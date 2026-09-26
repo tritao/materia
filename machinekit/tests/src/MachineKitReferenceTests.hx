@@ -21,14 +21,17 @@ class MachineKitReferenceTests {
 			if (DeepGrooveBearing.catalog().metadata(reference.name).dimensionKind != Mixed)
 				throw reference.name + " reference metadata";
 		}
-		// Accu ISO 4762 M5 product sheet: only these fields have been cross-checked.
+		// Accu ISO 4762 M5 product sheet: these fields have been cross-checked.
 		var m5 = SocketHeadCapScrew.catalog().get("M5");
 		equal(m5.diameter, 5, "M5 diameter");
 		equal(m5.pitch, 0.8, "M5 pitch");
 		equal(m5.headDiameter, 8.5, "M5 head diameter");
+		equal(m5.headHeight, 5, "M5 head height");
+		equal(m5.socketSize, 4, "M5 socket size");
 		equal(m5.socketDepth, 2.5, "M5 socket depth");
+		equal(m5.threadLength, 22, "M5 thread length");
 		var metadata = SocketHeadCapScrew.catalog().metadata("M5");
-		if (metadata.dimensionKind != Unverified || metadata.verifiedFields == null || metadata.verifiedFields.length != 4)
+		if (metadata.dimensionKind != Unverified || metadata.verifiedFields == null || metadata.verifiedFields.length != 7)
 			throw "M5 partial verification metadata";
 		// StepperOnline model pages: body face/length and shaft diameter/length.
 		for (reference in [{name: "17HS19-1684S1", face: 42.0, length: 48.0, shaft: 5.0, shaftLength: 24.0},

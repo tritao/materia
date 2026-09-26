@@ -21,6 +21,8 @@ import machinekit.motion.PillowBlockHousing;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
 import machinekit.standard.Bushing;
+import machinekit.standard.BearingFit.BearingHousingFit;
+import machinekit.standard.BearingFit.BearingShaftFit;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.FlatWasher;
@@ -104,10 +106,18 @@ class MachineKitSmoke {
 		check(preview.volume() < annulus(47, 20, 14), "preview removes shield recesses");
 		preview.close();
 
-		var seat = bearing.housingSeat(10, -0.02);
-		near(seat.volume(), Math.PI * Math.pow(46.98 / 2, 2) * 10, "housing seat volume");
+		var seat = bearing.housingSeat(10, BearingHousingFit.Interference);
+		near(seat.volume(), Math.PI * Math.pow((47 - 0.03) / 2, 2) * 10, "housing seat fit volume");
+		near(bearing.journalDiameter(BearingShaftFit.Interference), 20.02, "journal interference fit");
+		near(bearing.journalDiameter(BearingShaftFit.Slip), 19.98, "journal slip fit");
+		near(bearing.journalDiameterAllowance(0.01), 20.01, "explicit journal allowance");
+		var slipSeat = bearing.housingSeat(10, BearingHousingFit.Slip);
+		check(slipSeat.volume() > seat.volume(), "housing slip fit is larger than press fit");
+		var explicitSeat = bearing.housingSeatAllowance(10, -0.02);
+		near(explicitSeat.volume(), Math.PI * Math.pow(46.98 / 2, 2) * 10, "explicit housing allowance");
 		seat.close();
-		near(bearing.journalDiameter(0.01), 20.01, "journal diameter");
+		slipSeat.close();
+		explicitSeat.close();
 		near(bearing.connector("axis").frame.z, 7, "bearing axis connector");
 		// Connector +Y is the bearing axis (+Z).
 		var axis = AssemblyFrames.transformVector(bearing.connector("back").frame, 0, 1, 0);
@@ -615,6 +625,7 @@ class MachineKitSmoke {
 	static function pillowBlock():Void {
 		var bearing = DeepGrooveBearing.metric("6204");
 		var block = new PillowBlock(bearing);
+		check(block.housing.fit == BearingHousingFit.Slip, "pillow block uses a named housing fit");
 		check(block.housing.mountScrew == "M6", "pillow block mount screw size");
 		near(block.housing.face, 68.4, "pillow block face leaves 1 mm around the M6 heads");
 		near(block.housing.depth, 23.4, "pillow block depth");
@@ -632,7 +643,8 @@ class MachineKitSmoke {
 		var envelope = block.housing.geometry(Envelope);
 		solid(envelope, "pillow block envelope");
 		var envelopeVolume = envelope.volume();
-		near(envelopeVolume, 68.4 * 68.4 * 23.4 - Math.PI * 23.525 * 23.525 * 23.4, "pillow block envelope volume");
+		near(envelopeVolume, 68.4 * 68.4 * 23.4 - Math.PI * Math.pow((47 + block.housing.allowance) / 2, 2) * 23.4,
+			"pillow block envelope volume");
 		envelope.close();
 		var preview = block.housing.geometry();
 		solid(preview, "pillow block preview");

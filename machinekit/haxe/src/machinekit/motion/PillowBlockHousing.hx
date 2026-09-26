@@ -6,6 +6,8 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.standard.ClearanceFit;
+import machinekit.standard.BearingFit.BearingHousingFit;
+import machinekit.standard.BearingFit;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.SocketHeadCapScrew;
 
@@ -21,9 +23,10 @@ class PillowBlockHousing extends MachineComponent {
 	public final depth:Float;
 	public final boltSpacing:Float;
 	public final mountScrew:String;
+	public final fit:BearingHousingFit;
 	public final allowance:Float;
 
-	public function new(bearing:DeepGrooveBearing, allowance:Float = 0.05) {
+	public function new(bearing:DeepGrooveBearing, fit:BearingHousingFit = Slip) {
 		var wall = Math.max(6, bearing.outside * 0.2);
 		var depth = bearing.width + wall;
 		var mountScrew = bearing.bore <= 12 ? "M5" : bearing.bore <= 20 ? "M6" : "M8";
@@ -37,7 +40,8 @@ class PillowBlockHousing extends MachineComponent {
 		this.depth = depth;
 		this.boltSpacing = boltSpacing;
 		this.mountScrew = mountScrew;
-		this.allowance = allowance;
+		this.fit = fit;
+		this.allowance = BearingFit.housingAllowance(fit, bearing.outside);
 		addConnector("bore", Axis, Solids.axial(0, 0, depth / 2));
 		var i = 1;
 		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));

@@ -29,7 +29,7 @@ Each component also produces the machining it needs:
 
 | Component | Catalog | Companion geometry |
 | --- | --- | --- |
-| `DeepGrooveBearing` | 625–6205, ISO 15 boundary dimensions | `housingSeat()`, `journalDiameter()` |
+| `DeepGrooveBearing` | 625–6205, ISO 15 boundary dimensions | `housingSeat()` / `journalDiameter()` with named fits, plus explicit allowance helpers |
 | `SocketHeadCapScrew` | M3–M12, ISO 4762 heads | `clearanceHole()` (ISO 273), `tapHole()`, `counterboreHole()` (DIN 974-1) |
 | `HexBolt` | M3–M12, ISO 4017 (fully threaded) | `clearanceHole()`, `tapHole()`, `counterboreHole()` |
 | `HexNut` | M3–M12, ISO 4032 | `pocket()` for a trapped-nut recess |
@@ -46,6 +46,11 @@ Each component also produces the machining it needs:
 | `LeadScrewThread` | semantic metric trapezoidal or ACME family, diameter, pitch, starts and hand | `lead = pitch × starts` |
 | `LeadScrew` | nominal cylindrical thread envelope | `input`, `output` connectors |
 | `LeadScrewNut` | flanged preview sized from a `LeadScrewThread` | `travelPerRevolution()`, `rotationFor()`, `mountScrewPart()` |
+
+Bearing `Slip`, `Transition`, and `Interference` fits provide named generic
+layout allowances for journals and housing seats. They make the intended fit
+visible in an assembly and are not ISO 286 production tolerances; use the
+explicit allowance helpers when a drawing supplies its own limits.
 
 `SteppedShaft` stacks coaxial cylindrical sections along +Z, producing square
 shoulders at each diameter change. Keyways are cut on the shaft's local +Y

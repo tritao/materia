@@ -39,9 +39,9 @@ class SocketHeadCapScrew extends MachineComponent {
 	public static function catalog():Catalog<MetricScrewSpec> {
 		if (table == null)
 			table = new Catalog("metric screw size", spec -> spec.size, rows(), spec -> spec.size == "M5"
-				? ({source: "https://www.accu.co.uk/api/product-datasheet?id=706273", standard: "ISO 4762",
+				? ({source: "https://www.accu.co.uk/api/product-datasheet?id=652689", standard: "ISO 4762",
 					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope,
-					verifiedFields: ["diameter", "pitch", "headDiameter", "socketDepth"]})
+					verifiedFields: ["diameter", "pitch", "headDiameter", "headHeight", "socketSize", "socketDepth", "threadLength"]})
 				: ({source: "MachineKit embedded nominal table; source verification pending", standard: "ISO 4762",
 					standardEdition: null, dimensionKind: Unverified, conformance: NominalEnvelope}));
 		return table;
