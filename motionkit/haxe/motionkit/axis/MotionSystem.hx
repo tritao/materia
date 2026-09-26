@@ -281,27 +281,25 @@ class MotionSystem {
     var maxVelocity = options.maxVelocity;
     var maxAcceleration = options.maxAcceleration;
     for (primitive in path.primitives) {
-      var line = primitive;
-      var length = line.length();
+      var length = primitive.length();
       if (length <= 1e-12) continue;
-      var startPoint = line.pointAt(0.0);
-      var endPoint = line.pointAt(length);
-      var deltas = [endPoint.x - startPoint.x, endPoint.y - startPoint.y,
-        endPoint.z - startPoint.z];
-      for (i in 0...3) {
-        var fraction = Math.abs(deltas[i]) / length;
-        if (fraction <= 1e-12) continue;
-        var axisVelocity = directAxes[i].maxVelocity;
-        var axisAcceleration = directAxes[i].maxAcceleration;
-        if (axisVelocity > 0.0) {
-          var projectedVelocity = axisVelocity / fraction;
-          maxVelocity = maxVelocity <= 0.0 ? projectedVelocity : Math.min(maxVelocity,
-            projectedVelocity);
-        }
-        if (axisAcceleration > 0.0) {
-          var projectedAcceleration = axisAcceleration / fraction;
-          maxAcceleration = maxAcceleration <= 0.0 ? projectedAcceleration :
-            Math.min(maxAcceleration, projectedAcceleration);
+      for (sampleIndex in 0...65) {
+        var tangent = primitive.tangentAt(length * sampleIndex / 64.0);
+        for (i in 0...3) {
+          var fraction = Math.min(1.0, Math.abs(tangent[i]) + 1e-6);
+          if (fraction <= 1e-12) continue;
+          var axisVelocity = directAxes[i].maxVelocity;
+          var axisAcceleration = directAxes[i].maxAcceleration;
+          if (axisVelocity > 0.0) {
+            var projectedVelocity = axisVelocity / fraction;
+            maxVelocity = maxVelocity <= 0.0 ? projectedVelocity : Math.min(maxVelocity,
+              projectedVelocity);
+          }
+          if (axisAcceleration > 0.0) {
+            var projectedAcceleration = axisAcceleration / fraction;
+            maxAcceleration = maxAcceleration <= 0.0 ? projectedAcceleration :
+              Math.min(maxAcceleration, projectedAcceleration);
+          }
         }
       }
     }
@@ -310,9 +308,9 @@ class MotionSystem {
 
   function validatePathLimits(path:GeometricPath, directAxes:Array<MotionAxis>):Void {
     for (primitive in path.primitives) {
-      var line = primitive;
-      var points = [line.pointAt(0.0), line.pointAt(line.length())];
-      for (point in points) {
+      var length = primitive.length();
+      for (sampleIndex in 0...65) {
+        var point = primitive.pointAt(length * sampleIndex / 64.0);
         var coordinates = [point.x, point.y, point.z];
         for (i in 0...3) {
           if (coordinates[i] < directAxes[i].lowerLimit ||

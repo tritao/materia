@@ -3,10 +3,12 @@
 MotionKit is the transport-neutral motion layer between mechanical design and
 RobotKit execution. The bootstrap package currently provides:
 
-- reusable Cartesian path points, line primitives, and ordered geometric paths;
+- reusable Cartesian path points, line and planar-arc primitives, and ordered
+  geometric paths;
 - immutable timed joint trajectory samples;
 - deterministic synchronized velocity/acceleration planning with jerk in the
-  public limits API, plus line-path lookahead with exact-stop and blend modes;
+  public limits API, plus tangent-aware line/arc lookahead with exact-stop and
+  blend modes;
 - a semantic `MotionSystem`/`MotionAxis` view over any RobotKit `Robot`;
 - a MachineKit `LinearAxis` compiler that produces a two-link prismatic
   RobotModel and a runtime-ready MotionSystem blueprint.
@@ -46,8 +48,10 @@ machine.movePath(GeometricPath.lines([
 ]), PathPlanningOptions.blend(0.001));
 ```
 
-The runtime uses timestamped trajectory chunks where supported and retains a
-deterministic position-target fallback. CNC semantics and G-code remain
+The runtime interpolates timestamped trajectory chunks on its owner clock,
+reports queue progress, and performs a short controlled deceleration for a
+normal hold. It retains a deterministic position-target fallback when a
+backend does not support buffered chunks. CNC semantics and G-code remain
 outside MotionKit.
 
 Run the focused native-backed test with:

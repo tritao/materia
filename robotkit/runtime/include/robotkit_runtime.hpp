@@ -153,6 +153,13 @@ private:
         bool active[RK_MAX_JOINTS]{};
         bool reference_initialized[RK_MAX_JOINTS]{};
         std::deque<rk_trajectory_point> trajectory;
+        uint64_t trajectory_time_ns = 0;
+        bool trajectory_active = false;
+        uint64_t stop_ramp_time_ns = 0;
+        uint64_t stop_ramp_duration_ns = 0;
+        double stop_ramp_positions[RK_MAX_JOINTS]{};
+        double stop_ramp_velocities[RK_MAX_JOINTS]{};
+        bool stop_ramp_active = false;
     };
 
     void run();

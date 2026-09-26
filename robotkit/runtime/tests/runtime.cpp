@@ -182,6 +182,77 @@ rk_robot_state apply_cycle(robotkit::RobotRuntime &runtime, uint64_t &timestamp)
     return state;
 }
 
+rk_robot_command trajectory_batch(uint64_t sequence,
+                                  std::initializer_list<std::pair<uint64_t, double>> points) {
+    rk_robot_command value{};
+    value.struct_size = sizeof(value);
+    value.sequence = sequence;
+    value.kind = RK_COMMAND_TRAJECTORY_CHUNK;
+    for (const auto &[time, position] : points) {
+        auto &point = value.trajectory[value.trajectory_count++];
+        point.time_from_start_ns = time;
+        point.joint_count = 2;
+        point.positions[0] = position;
+        point.positions[1] = -position;
+    }
+    return value;
+}
+
+void timestamped_trajectory_interpolates_and_reports_progress(
+    const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    uint64_t timestamp = 0;
+    assert(runtime.submit(trajectory_batch(1, {{0, 0.0}, {100'000'000, 0.5},
+                                               {200'000'000, 1.0}})) == RK_OK);
+
+    auto state = apply_cycle(runtime, timestamp);
+    assert(state.position[0] == 0.0);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 3);
+    assert(state.trajectory_time_ns == 0 && state.trajectory_duration_ns == 200'000'000);
+
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.25) < 1e-9);
+    assert(state.trajectory_active == 1 && state.trajectory_time_ns == 50'000'000);
+
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.5) < 1e-9);
+    assert(state.trajectory_queue_depth == 2 && state.trajectory_time_ns == 100'000'000);
+
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.75) < 1e-6);
+    assert(state.trajectory_queue_depth == 2 && state.trajectory_time_ns == 150'000'000);
+
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 1.0) < 1e-9);
+    assert(state.trajectory_active == 0 && state.trajectory_queue_depth == 0);
+    assert(state.trajectory_time_ns == 0 && state.trajectory_duration_ns == 0);
+}
+
+void normal_stop_decelerates_active_trajectory(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
+    uint64_t timestamp = 0;
+    assert(runtime.submit(trajectory_batch(1, {{0, 0.0}, {200'000'000, 1.0}})) == RK_OK);
+    auto state = apply_cycle(runtime, timestamp);
+    assert(state.position[0] == 0.0);
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.25) < 1e-9);
+
+    auto stop = lifecycle_command(2, RK_COMMAND_STOP);
+    assert(runtime.submit(stop) == RK_OK);
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.5) < 1e-9);
+    assert(state.mode == RK_ROBOT_MODE_STOPPING);
+    assert(state.safety == RK_SAFETY_STOPPING);
+
+    state = apply_cycle(runtime, timestamp);
+    assert(state.position[0] > 0.5 && state.position[0] < 1.0);
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.75) < 1e-6);
+    assert(state.mode == RK_ROBOT_MODE_STOPPING);
+}
+
 void same_cycle_target_batches_merge_per_joint(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
@@ -244,6 +315,8 @@ int main() {
         joint.axis[2] = 1.0;
     }
     same_cycle_target_batches_merge_per_joint(blueprint);
+    timestamped_trajectory_interpolates_and_reports_progress(blueprint);
+    normal_stop_decelerates_active_trajectory(blueprint);
 
     // Zero is a valid source epoch, not a missing-timestamp sentinel.
     auto clock_endpoint = std::make_shared<FaultEndpoint>();

@@ -1,14 +1,14 @@
 package motionkit.planner;
 
 import motionkit.path.GeometricPath;
-import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
+import motionkit.path.PathPrimitive;
 import motionkit.trajectory.JointTrajectory;
 import motionkit.trajectory.JointTrajectorySample;
 import motionkit.trajectory.MotionLimits;
 
 /**
- * Deterministic line-path planner with velocity lookahead at junctions.
+ * Deterministic line/arc path planner with velocity lookahead at junctions.
  *
  * The generated samples contain every segment and phase boundary, so linear
  * interpolation between samples stays on the authored polyline. Blend mode
@@ -29,48 +29,57 @@ class LineLookaheadPlanner {
   /** Plans a connected polyline as a three-coordinate Cartesian trajectory. */
   public function planPath(path:GeometricPath, limits:MotionLimits,
       ?options:PathPlanningOptions):JointTrajectory {
-    if (path == null || limits == null) throw "Line-path planning needs a path and limits";
+    if (path == null || limits == null) throw "Path planning needs a path and limits";
     var chosenOptions = options == null ? new PathPlanningOptions() : options;
     if (limits.maxVelocity <= 0.0 || limits.maxAcceleration <= 0.0)
       throw "Line-path planning needs positive velocity and acceleration limits";
 
-    var segments:Array<LineSegment> = [];
-    var firstLine:Null<LineSegment> = null;
+    var segments:Array<PathPrimitive> = [];
+    var firstPrimitive:Null<PathPrimitive> = null;
     var previousEnd:Null<PathPoint> = null;
     for (primitive in path.primitives) {
-      // Haxeon keeps PathPrimitive implementations structural at runtime, so
-      // use the line-specific public fields rather than a nominal type test.
-      if (!Reflect.hasField(primitive, "start") || !Reflect.hasField(primitive, "end"))
-        throw "Line-lookahead planning only supports line segments";
-      var line:LineSegment = cast primitive;
-      if (firstLine == null) firstLine = line;
-      if (previousEnd != null && previousEnd.distanceTo(line.start) > 1e-8)
-        throw "Line path primitives must form a connected path";
-      previousEnd = line.end;
-      if (line.length() > MIN_SEGMENT_LENGTH) segments.push(line);
+      if (firstPrimitive == null) firstPrimitive = primitive;
+      var length = primitive.length();
+      var start = primitive.pointAt(0.0);
+      var end = primitive.pointAt(length);
+      if (previousEnd != null && previousEnd.distanceTo(start) > 1e-8)
+        throw "Path primitives must form a connected path";
+      previousEnd = end;
+      if (length > MIN_SEGMENT_LENGTH) segments.push(primitive);
     }
-    if (firstLine == null) throw "Line-lookahead planning needs at least one line";
+    if (firstPrimitive == null) throw "Path planning needs at least one primitive";
     if (segments.length == 0)
       return new JointTrajectory([new JointTrajectorySample(0.0,
-        [firstLine.start.x, firstLine.start.y, firstLine.start.z])]);
+        [firstPrimitive.pointAt(0.0).x, firstPrimitive.pointAt(0.0).y,
+          firstPrimitive.pointAt(0.0).z])]);
 
     var lengths:Array<Float> = [];
-    var directions:Array<Array<Float>> = [];
+    var startDirections:Array<Array<Float>> = [];
+    var endDirections:Array<Array<Float>> = [];
+    var segmentVelocityLimits:Array<Float> = [];
     for (segment in segments) {
       var length = segment.length();
-      var dx = segment.end.x - segment.start.x;
-      var dy = segment.end.y - segment.start.y;
-      var dz = segment.end.z - segment.start.z;
       lengths.push(length);
-      directions.push([dx / length, dy / length, dz / length]);
+      startDirections.push(normalize(segment.tangentAt(0.0)));
+      endDirections.push(normalize(segment.tangentAt(length)));
+      var segmentMaxVelocity = limits.maxVelocity;
+      for (sampleIndex in 0...65) {
+        var curvature = Math.abs(segment.curvatureAt(length * sampleIndex / 64.0));
+        if (curvature > EPSILON)
+          segmentMaxVelocity = Math.min(segmentMaxVelocity,
+            Math.sqrt(limits.maxAcceleration / curvature));
+      }
+      segmentVelocityLimits.push(segmentMaxVelocity);
     }
 
     var boundarySpeeds:Array<Float> = [for (_ in 0...(segments.length + 1)) 0.0];
     for (i in 1...segments.length) {
       boundarySpeeds[i] = chosenOptions.exactStop || chosenOptions.blendTolerance <= 0.0
         ? 0.0
-        : cornerSpeed(directions[i - 1], directions[i], chosenOptions.blendTolerance,
+        : cornerSpeed(endDirections[i - 1], startDirections[i], chosenOptions.blendTolerance,
           limits.maxVelocity, limits.maxAcceleration);
+      boundarySpeeds[i] = Math.min(boundarySpeeds[i],
+        Math.min(segmentVelocityLimits[i - 1], segmentVelocityLimits[i]));
     }
 
     // Forward and backward passes project the requested corner speeds through
@@ -89,10 +98,10 @@ class LineLookaheadPlanner {
         Math.min(limits.maxVelocity, reachable));
     }
 
-    var profiles:Array<LineProfile> = [];
+    var profiles:Array<PathProfile> = [];
     for (i in 0...segments.length) {
-      profiles.push(new LineProfile(segments[i], directions[i], lengths[i],
-        boundarySpeeds[i], boundarySpeeds[i + 1], limits.maxVelocity,
+      profiles.push(new PathProfile(segments[i], startDirections[i], lengths[i],
+        boundarySpeeds[i], boundarySpeeds[i + 1], segmentVelocityLimits[i],
         limits.maxAcceleration));
     }
 
@@ -128,6 +137,14 @@ class LineLookaheadPlanner {
     return new JointTrajectory(samples);
   }
 
+  static function normalize(vector:Array<Float>):Array<Float> {
+    var length = Math.sqrt(vector[0] * vector[0] + vector[1] * vector[1] +
+      vector[2] * vector[2]);
+    if (!Math.isFinite(length) || length <= MIN_SEGMENT_LENGTH)
+      throw "Path primitive tangent must be finite and non-zero";
+    return [vector[0] / length, vector[1] / length, vector[2] / length];
+  }
+
   static function cornerSpeed(incoming:Array<Float>, outgoing:Array<Float>, tolerance:Float,
       maxVelocity:Float, maxAcceleration:Float):Float {
     var dot = incoming[0] * outgoing[0] + incoming[1] * outgoing[1] + incoming[2] * outgoing[2];
@@ -139,12 +156,13 @@ class LineLookaheadPlanner {
     return Math.min(maxVelocity, Math.sqrt(maxAcceleration * radius));
   }
 
-  static function sampleAt(profiles:Array<LineProfile>, segmentStartTimes:Array<Float>,
+  static function sampleAt(profiles:Array<PathProfile>, segmentStartTimes:Array<Float>,
       totalDuration:Float, time:Float):JointTrajectorySample {
     if (time >= totalDuration - EPSILON) {
       var last = profiles[profiles.length - 1];
       return new JointTrajectorySample(totalDuration,
-        [last.segment.end.x, last.segment.end.y, last.segment.end.z]);
+        [last.primitive.pointAt(last.length).x, last.primitive.pointAt(last.length).y,
+          last.primitive.pointAt(last.length).z]);
     }
 
     var index = 0;
@@ -153,18 +171,24 @@ class LineLookaheadPlanner {
       index++;
     var profile = profiles[index];
     var state = profile.stateAt(Math.max(0.0, time - profile.startTime));
-    var point = profile.segment.pointAt(Math.min(profile.length, state.distance));
-    var velocities = [profile.direction[0] * state.velocity,
-      profile.direction[1] * state.velocity, profile.direction[2] * state.velocity];
-    var accelerations = [profile.direction[0] * state.acceleration,
-      profile.direction[1] * state.acceleration, profile.direction[2] * state.acceleration];
+    var distance = Math.min(profile.length, state.distance);
+    var point = profile.primitive.pointAt(distance);
+    var direction = normalize(profile.primitive.tangentAt(distance));
+    var curvature = profile.primitive.curvatureAt(distance);
+    var velocities = [direction[0] * state.velocity,
+      direction[1] * state.velocity, direction[2] * state.velocity];
+    var normalAcceleration = state.velocity * state.velocity * curvature;
+    var accelerations = [direction[0] * state.acceleration,
+      direction[1] * state.acceleration, direction[2] * state.acceleration];
+    accelerations[0] += -direction[1] * normalAcceleration;
+    accelerations[1] += direction[0] * normalAcceleration;
     return new JointTrajectorySample(time, [point.x, point.y, point.z], velocities,
       accelerations);
   }
 }
 
-private class LineProfile {
-  public final segment:LineSegment;
+private class PathProfile {
+  public final primitive:PathPrimitive;
   public final direction:Array<Float>;
   public final length:Float;
   public final startSpeed:Float;
@@ -177,9 +201,9 @@ private class LineProfile {
   public final duration:Float;
   public var startTime:Float = 0.0;
 
-  public function new(segment:LineSegment, direction:Array<Float>, length:Float,
+  public function new(primitive:PathPrimitive, direction:Array<Float>, length:Float,
       startSpeed:Float, endSpeed:Float, maxVelocity:Float, acceleration:Float) {
-    this.segment = segment;
+    this.primitive = primitive;
     this.direction = direction;
     this.length = length;
     this.startSpeed = startSpeed;
@@ -197,28 +221,28 @@ private class LineProfile {
     duration = accelerationTime + cruiseTime + decelerationTime;
   }
 
-  public function stateAt(time:Float):LineProfileState {
+  public function stateAt(time:Float):PathProfileState {
     var t = Math.max(0.0, Math.min(duration, time));
     if (t <= accelerationTime + LineLookaheadPlanner.EPSILON) {
       var distance = startSpeed * t + 0.5 * acceleration * t * t;
-      return new LineProfileState(distance, startSpeed + acceleration * t, acceleration);
+      return new PathProfileState(distance, startSpeed + acceleration * t, acceleration);
     }
     var accelerationDistance = 0.5 * (startSpeed + peakSpeed) * accelerationTime;
     if (t <= accelerationTime + cruiseTime + LineLookaheadPlanner.EPSILON) {
       var cruiseElapsed = t - accelerationTime;
-      return new LineProfileState(accelerationDistance + peakSpeed * cruiseElapsed,
+      return new PathProfileState(accelerationDistance + peakSpeed * cruiseElapsed,
         peakSpeed, 0.0);
     }
     var decelerationElapsed = t - accelerationTime - cruiseTime;
     var cruiseDistance = peakSpeed * cruiseTime;
     var distance = accelerationDistance + cruiseDistance + peakSpeed * decelerationElapsed -
       0.5 * acceleration * decelerationElapsed * decelerationElapsed;
-    return new LineProfileState(distance, peakSpeed - acceleration * decelerationElapsed,
+    return new PathProfileState(distance, peakSpeed - acceleration * decelerationElapsed,
       -acceleration);
   }
 }
 
-private class LineProfileState {
+private class PathProfileState {
   public final distance:Float;
   public final velocity:Float;
   public final acceleration:Float;

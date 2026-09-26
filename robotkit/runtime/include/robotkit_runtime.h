@@ -80,7 +80,7 @@ enum {
     RK_MAX_TRAJECTORY_JOINTS = 64, /**< Maximum joints represented by one trajectory chunk. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 5 /**< Version of the RobotKit C data contract (physical model v2, configured LiDAR coverage, and trajectory chunks). */
+    RK_API_VERSION = 6 /**< Version of the RobotKit C data contract (physical model v2, configured LiDAR coverage, timestamped trajectory execution, and queue status). */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -350,6 +350,10 @@ typedef struct rk_robot_state {
     double velocity[RK_MAX_JOINTS];
     double effort[RK_MAX_JOINTS];
     uint64_t received_timestamp_ns; /**< Monotonic timestamp when Runtime accepted the sample. */
+    uint32_t trajectory_queue_depth; /**< Pending timestamped samples, including the active sample window. */
+    uint32_t trajectory_active; /**< Non-zero while a timestamped trajectory is executing. */
+    uint64_t trajectory_time_ns; /**< Runtime owner-clock position within the active trajectory. */
+    uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final sample. */
     uint32_t sensor_count;
     rk_sensor_sample sensors[RK_MAX_SENSORS];
 } rk_robot_state;
@@ -375,6 +379,10 @@ typedef struct rk_robot_snapshot {
     uint32_t reserved0;
     uint64_t reserved[2];
     uint64_t received_timestamp_ns; /**< Runtime receive timestamp in nanoseconds. */
+    uint32_t trajectory_queue_depth; /**< Pending timestamped samples, including the active sample window. */
+    uint32_t trajectory_active; /**< Non-zero while a timestamped trajectory is executing. */
+    uint64_t trajectory_time_ns; /**< Runtime owner-clock position within the active trajectory. */
+    uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final sample. */
     uint32_t sensor_count;
     rk_sensor_sample sensors[RK_MAX_SENSORS];
 } rk_robot_snapshot;

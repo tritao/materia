@@ -19,6 +19,13 @@ bool valid_target_mode(rk_joint_target_mode mode) {
     return mode >= RK_TARGET_POSITION && mode <= RK_TARGET_EFFORT;
 }
 
+bool valid_trajectory_status(uint32_t depth, uint32_t active, uint64_t time_ns,
+                             uint64_t duration_ns) {
+    if (depth > RK_MAX_TRAJECTORY_POINTS || active > 1 || time_ns > duration_ns)
+        return false;
+    return active != 0 || (depth == 0 && time_ns == 0 && duration_ns == 0);
+}
+
 template <typename T> bool valid_sensors(const T &value) {
     if (value.sensor_count > RK_MAX_SENSORS) return false;
     for (uint32_t i = 0; i < value.sensor_count; ++i) {
@@ -150,7 +157,9 @@ rk_result RK_CALL rk_robot_command_validate_for_blueprint(
 rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state) {
     if (!has_full_struct(state) || state->joint_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (state->mode > RK_ROBOT_MODE_FAULT || state->safety > RK_SAFETY_FAULT || !valid_sensors(*state))
+    if (state->mode > RK_ROBOT_MODE_FAULT || state->safety > RK_SAFETY_FAULT ||
+        !valid_trajectory_status(state->trajectory_queue_depth, state->trajectory_active,
+            state->trajectory_time_ns, state->trajectory_duration_ns) || !valid_sensors(*state))
         return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t index = 0; index < state->joint_count; ++index) {
         if (!is_finite(state->position[index]) || !is_finite(state->velocity[index]) ||
@@ -164,7 +173,9 @@ rk_result RK_CALL rk_robot_snapshot_validate(const rk_robot_snapshot *snapshot) 
     if (!has_full_struct(snapshot) || snapshot->joint_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
     if (snapshot->mode > RK_ROBOT_MODE_FAULT || snapshot->safety > RK_SAFETY_FAULT ||
-        snapshot->endpoint > RK_ENDPOINT_FAULT)
+        snapshot->endpoint > RK_ENDPOINT_FAULT ||
+        !valid_trajectory_status(snapshot->trajectory_queue_depth, snapshot->trajectory_active,
+            snapshot->trajectory_time_ns, snapshot->trajectory_duration_ns))
         return RK_ERROR_INVALID_ARGUMENT;
     if (snapshot->fault_code < 0 || !valid_sensors(*snapshot))
         return RK_ERROR_INVALID_ARGUMENT;

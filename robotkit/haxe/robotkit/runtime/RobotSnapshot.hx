@@ -26,6 +26,10 @@ class RobotSnapshot {
   public final dq:ImmutableFloatArray;
   public final effort:ImmutableFloatArray;
   public final sensors:ImmutableSensorArray;
+  public final trajectoryQueueDepth:Int;
+  public final trajectoryActive:Bool;
+  public final trajectoryTimeNs:Int64;
+  public final trajectoryDurationNs:Int64;
 
   /** Compatibility alias; source time is the runtime's primary observation clock. */
   public var timestampNs(get, never):Int64;
@@ -33,7 +37,9 @@ class RobotSnapshot {
   public function new(robotId:Int64, sequence:Int64, sourceTimestampNs:Int64,
       mode:Int, safety:Int, endpoint:Int, faultCode:Int,
       q:Array<Float>, dq:Array<Float>, effort:Array<Float>,
-      ?receivedTimestampNs:Int64, ?sensors:Array<SensorFrame>) {
+      ?receivedTimestampNs:Int64, ?sensors:Array<SensorFrame>,
+      ?trajectoryQueueDepth:Int, ?trajectoryActive:Bool,
+      ?trajectoryTimeNs:Int64, ?trajectoryDurationNs:Int64) {
     this.robotId = robotId;
     this.sequence = sequence;
     this.sourceTimestampNs = sourceTimestampNs;
@@ -48,6 +54,11 @@ class RobotSnapshot {
     this.dq = new ImmutableFloatArray(dq);
     this.effort = new ImmutableFloatArray(effort);
     this.sensors = new ImmutableSensorArray(sensors);
+    this.trajectoryQueueDepth = trajectoryQueueDepth == null ? 0 : trajectoryQueueDepth;
+    this.trajectoryActive = trajectoryActive == true;
+    this.trajectoryTimeNs = trajectoryTimeNs == null ? Int64.ofInt(0) : trajectoryTimeNs;
+    this.trajectoryDurationNs = trajectoryDurationNs == null
+      ? Int64.ofInt(0) : trajectoryDurationNs;
   }
 
   /** Converts the native ABI value while leaving the semantic robot ID unset. */
@@ -70,7 +81,7 @@ class RobotSnapshot {
       if (sample.get_sequence() == Int64.ofInt(0)) continue;
       var config = layout[i];
       frames.push(new SensorFrame(config.id, config.kind, config.frameId,
-        sample.get_sequence(), sample.get_source_timestamp_ns(),
+      sample.get_sequence(), sample.get_source_timestamp_ns(),
         [for (j in 0...sample.get_value_count()) sample.get_values(j)], sample.get_received_timestamp_ns(),
         config.linkId, config.position.toArray(), config.rotation.toArray()));
     }
@@ -83,13 +94,16 @@ class RobotSnapshot {
           config.linkId, config.position.toArray(), config.rotation.toArray()));
     return new RobotSnapshot(Int64.ofInt(0), value.get_sequence(), value.get_source_timestamp_ns(),
       value.get_mode(), value.get_safety(), value.get_endpoint(), value.get_fault_code(),
-      positions, velocities, efforts, value.get_received_timestamp_ns(), frames);
+      positions, velocities, efforts, value.get_received_timestamp_ns(), frames,
+      value.get_trajectory_queue_depth(), value.get_trajectory_active() != 0,
+      value.get_trajectory_time_ns(), value.get_trajectory_duration_ns());
   }
 
   /** Returns an immutable copy associated with a caller-provided robot ID. */
   public function withRobotId(value:Int64):RobotSnapshot
     return new RobotSnapshot(value, sequence, sourceTimestampNs, mode, safety, endpoint, faultCode,
-      q.toArray(), dq.toArray(), effort.toArray(), receivedTimestampNs, sensors.toArray());
+      q.toArray(), dq.toArray(), effort.toArray(), receivedTimestampNs, sensors.toArray(),
+      trajectoryQueueDepth, trajectoryActive, trajectoryTimeNs, trajectoryDurationNs);
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;
 }

@@ -4,6 +4,8 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <iterator>
+#include <limits>
 
 namespace robotkit {
 
@@ -18,6 +20,43 @@ uint64_t monotonic_now_ns() {
 bool lifecycle_kind(rk_command_kind kind) {
     return kind != RK_COMMAND_NONE && kind != RK_COMMAND_JOINT_TARGETS &&
         kind != RK_COMMAND_TRAJECTORY_CHUNK;
+}
+
+void sample_trajectory(const std::deque<rk_trajectory_point> &trajectory,
+                       uint64_t time_ns, double *positions, double *velocities) {
+    const auto &first = trajectory.front();
+    const auto &last = trajectory.back();
+    const auto joint_count = first.joint_count;
+    std::fill_n(positions, joint_count, 0.0);
+    std::fill_n(velocities, joint_count, 0.0);
+    if (time_ns <= first.time_from_start_ns) {
+        for (uint32_t joint = 0; joint < joint_count; ++joint)
+            positions[joint] = first.positions[joint];
+        return;
+    }
+    if (time_ns >= last.time_from_start_ns) {
+        for (uint32_t joint = 0; joint < joint_count; ++joint)
+            positions[joint] = last.positions[joint];
+        return;
+    }
+    auto before = trajectory.begin();
+    auto after = std::next(before);
+    while (after != trajectory.end() && after->time_from_start_ns < time_ns) {
+        ++before;
+        ++after;
+    }
+    const auto span = after->time_from_start_ns - before->time_from_start_ns;
+    const auto elapsed = time_ns - before->time_from_start_ns;
+    const double alpha = span == 0 ? 0.0 :
+        static_cast<double>(elapsed) / static_cast<double>(span);
+    const double seconds = span == 0 ? 0.0 :
+        static_cast<double>(span) / 1'000'000'000.0;
+    for (uint32_t joint = 0; joint < joint_count; ++joint) {
+        positions[joint] = before->positions[joint] +
+            (after->positions[joint] - before->positions[joint]) * alpha;
+        velocities[joint] = seconds <= 0.0 ? 0.0 :
+            (after->positions[joint] - before->positions[joint]) / seconds;
+    }
 }
 
 /**
@@ -225,6 +264,10 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     }
     out_snapshot.fault_code = state_.safety == RK_SAFETY_FAULT ? 1 : 0;
     out_snapshot.received_timestamp_ns = state_.received_timestamp_ns;
+    out_snapshot.trajectory_queue_depth = state_.trajectory_queue_depth;
+    out_snapshot.trajectory_active = state_.trajectory_active;
+    out_snapshot.trajectory_time_ns = state_.trajectory_time_ns;
+    out_snapshot.trajectory_duration_ns = state_.trajectory_duration_ns;
     out_snapshot.sensor_count = state_.sensor_count;
     std::copy_n(state_.sensors, state_.sensor_count, out_snapshot.sensors);
     return RK_OK;
@@ -285,6 +328,24 @@ rk_result RobotRuntime::apply_pending_commands() {
     }
     control_backup_ = control_;
 
+    if (control_.trajectory_active && !control_.trajectory.empty()) {
+        const auto period_count = period_.count();
+        const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 0;
+        if (std::numeric_limits<uint64_t>::max() - control_.trajectory_time_ns < period_ns)
+            control_.trajectory_time_ns = std::numeric_limits<uint64_t>::max();
+        else
+            control_.trajectory_time_ns += period_ns;
+    }
+    if (control_.stop_ramp_active) {
+        const auto period_count = period_.count();
+        const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 0;
+        if (std::numeric_limits<uint64_t>::max() - control_.stop_ramp_time_ns < period_ns)
+            control_.stop_ramp_time_ns = control_.stop_ramp_duration_ns;
+        else
+            control_.stop_ramp_time_ns = std::min(control_.stop_ramp_duration_ns,
+                control_.stop_ramp_time_ns + period_ns);
+    }
+
     const bool has_command = !commands.empty();
     rk_robot_command command{};
     if (has_command)
@@ -306,6 +367,9 @@ rk_result RobotRuntime::apply_pending_commands() {
 
     if (has_command && command.kind == RK_COMMAND_JOINT_TARGETS) {
         control_.trajectory.clear();
+        control_.trajectory_time_ns = 0;
+        control_.trajectory_active = false;
+        control_.stop_ramp_active = false;
         std::fill_n(control_.active, RK_MAX_JOINTS, false);
         rk_robot_state current{};
         {
@@ -343,8 +407,14 @@ rk_result RobotRuntime::apply_pending_commands() {
         }
     } else if (has_command && command.kind == RK_COMMAND_TRAJECTORY_CHUNK) {
         std::fill_n(control_.active, RK_MAX_JOINTS, false);
+        control_.stop_ramp_active = false;
+        const auto base_time = control_.trajectory.empty()
+            ? uint64_t{0} : control_.trajectory.back().time_from_start_ns;
         for (uint32_t index = 0; index < command.trajectory_count; ++index) {
-            const auto &point = command.trajectory[index];
+            auto point = command.trajectory[index];
+            if (base_time > std::numeric_limits<uint64_t>::max() - point.time_from_start_ns)
+                return RK_ERROR_INVALID_ARGUMENT;
+            point.time_from_start_ns += base_time;
             for (uint32_t joint = 0; joint < point.joint_count; ++joint) {
                 const auto &limits = blueprint_.joints[joint];
                 if (point.positions[joint] < limits.lower_limit ||
@@ -355,24 +425,81 @@ rk_result RobotRuntime::apply_pending_commands() {
             }
             control_.trajectory.push_back(point);
         }
+        control_.trajectory_active = true;
     }
 
     const bool lifecycle_command = has_command && command.kind != RK_COMMAND_NONE &&
         command.kind != RK_COMMAND_JOINT_TARGETS &&
         command.kind != RK_COMMAND_TRAJECTORY_CHUNK;
-    if (lifecycle_command) {
+    bool controlled_stop = false;
+    if (has_command && command.kind == RK_COMMAND_STOP && control_.trajectory_active &&
+        !control_.trajectory.empty()) {
+        double positions[RK_MAX_TRAJECTORY_JOINTS]{};
+        double velocities[RK_MAX_TRAJECTORY_JOINTS]{};
+        sample_trajectory(control_.trajectory, control_.trajectory_time_ns, positions, velocities);
+        const auto period_count = period_.count();
+        const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 1;
+        const auto requested_duration = period_ns > std::numeric_limits<uint64_t>::max() / 2
+            ? std::numeric_limits<uint64_t>::max() : period_ns * 2;
+        control_.stop_ramp_duration_ns = std::max<uint64_t>(period_ns, requested_duration);
+        control_.stop_ramp_time_ns = 0;
+        std::copy_n(positions, blueprint_.joint_count, control_.stop_ramp_positions);
+        std::copy_n(velocities, blueprint_.joint_count, control_.stop_ramp_velocities);
+        control_.trajectory.clear();
+        control_.trajectory_time_ns = 0;
+        control_.trajectory_active = false;
+        control_.stop_ramp_active = true;
+        controlled_stop = true;
+    }
+    if (lifecycle_command && !controlled_stop) {
         control_ = {};
     }
 
     rk_robot_command output{};
     output.struct_size = sizeof(output);
     output.timestamp_ns = has_command ? command.timestamp_ns : 0;
-    if (lifecycle_command) {
+    if (lifecycle_command && !controlled_stop) {
         output.kind = command.kind;
         output.target_count = 0;
+    } else if (control_.stop_ramp_active) {
+        output.kind = RK_COMMAND_JOINT_TARGETS;
+        output.target_count = blueprint_.joint_count;
+        const double duration = static_cast<double>(control_.stop_ramp_duration_ns) /
+            1'000'000'000.0;
+        const double elapsed = static_cast<double>(control_.stop_ramp_time_ns) /
+            1'000'000'000.0;
+        const double t = std::min(duration, elapsed);
+        const double blend = duration <= 0.0 ? 0.0 : t - 0.5 * t * t / duration;
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+            output.targets[joint].joint = joint;
+            output.targets[joint].mode = RK_TARGET_POSITION;
+            const auto &limits = blueprint_.joints[joint];
+            output.targets[joint].target = std::clamp(
+                control_.stop_ramp_positions[joint] +
+                    control_.stop_ramp_velocities[joint] * blend,
+                limits.lower_limit, limits.upper_limit);
+            output.targets[joint].max_rate = 0.0;
+            output.targets[joint].max_effort = 0.0;
+        }
+        if (control_.stop_ramp_time_ns >= control_.stop_ramp_duration_ns)
+            control_.stop_ramp_active = false;
     } else if (!control_.trajectory.empty()) {
-        const auto point = control_.trajectory.front();
-        control_.trajectory.pop_front();
+        auto point = control_.trajectory.front();
+        while (control_.trajectory.size() > 1 &&
+               control_.trajectory[1].time_from_start_ns <= control_.trajectory_time_ns)
+            control_.trajectory.pop_front();
+        point = control_.trajectory.front();
+        if (control_.trajectory.size() > 1 &&
+            control_.trajectory_time_ns > point.time_from_start_ns) {
+            const auto &after = control_.trajectory[1];
+            const auto span = after.time_from_start_ns - point.time_from_start_ns;
+            const auto elapsed = control_.trajectory_time_ns - point.time_from_start_ns;
+            const double alpha = span == 0 ? 0.0 :
+                static_cast<double>(elapsed) / static_cast<double>(span);
+            for (uint32_t joint = 0; joint < point.joint_count; ++joint)
+                point.positions[joint] +=
+                    (after.positions[joint] - point.positions[joint]) * alpha;
+        }
         output.kind = RK_COMMAND_JOINT_TARGETS;
         output.target_count = point.joint_count;
         for (uint32_t joint = 0; joint < point.joint_count; ++joint) {
@@ -381,6 +508,11 @@ rk_result RobotRuntime::apply_pending_commands() {
             output.targets[joint].target = point.positions[joint];
             output.targets[joint].max_rate = 0.0;
             output.targets[joint].max_effort = 0.0;
+        }
+        if (control_.trajectory_time_ns >= control_.trajectory.back().time_from_start_ns) {
+            control_.trajectory.clear();
+            control_.trajectory_time_ns = 0;
+            control_.trajectory_active = false;
         }
     } else {
         output.kind = RK_COMMAND_JOINT_TARGETS;
@@ -430,6 +562,11 @@ rk_result RobotRuntime::apply_pending_commands() {
         return result;
     }
     std::lock_guard state_lock(state_mutex_);
+    state_.trajectory_queue_depth = static_cast<uint32_t>(control_.trajectory.size());
+    state_.trajectory_active = control_.trajectory_active ? 1u : 0u;
+    state_.trajectory_time_ns = control_.trajectory_active ? control_.trajectory_time_ns : 0;
+    state_.trajectory_duration_ns = control_.trajectory_active && !control_.trajectory.empty()
+        ? control_.trajectory.back().time_from_start_ns : 0;
     if (lifecycle_command && command.kind == RK_COMMAND_EMERGENCY_STOP) {
         state_.mode = RK_ROBOT_MODE_FAULT;
         state_.safety = RK_SAFETY_EMERGENCY_STOP;
@@ -439,6 +576,9 @@ rk_result RobotRuntime::apply_pending_commands() {
     } else if (lifecycle_command && command.kind == RK_COMMAND_RESET_SAFETY) {
         state_.mode = RK_ROBOT_MODE_IDLE;
         state_.safety = RK_SAFETY_READY;
+    } else if (controlled_stop || control_.stop_ramp_active) {
+        state_.mode = RK_ROBOT_MODE_STOPPING;
+        state_.safety = RK_SAFETY_STOPPING;
     } else if (has_command && (command.kind == RK_COMMAND_JOINT_TARGETS ||
                                command.kind == RK_COMMAND_TRAJECTORY_CHUNK)) {
         state_.mode = RK_ROBOT_MODE_TRACKING;
@@ -456,11 +596,19 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     }
     const auto runtime_mode = next.mode;
     const auto runtime_safety = next.safety;
+    const auto trajectory_queue_depth = next.trajectory_queue_depth;
+    const auto trajectory_active = next.trajectory_active;
+    const auto trajectory_time_ns = next.trajectory_time_ns;
+    const auto trajectory_duration_ns = next.trajectory_duration_ns;
     next.source_timestamp_ns = 0;
     next.received_timestamp_ns = 0;
     next.sensor_count = 0;
     const auto result = endpoint_->sample(timestamp_ns, next);
     next.mode = runtime_mode;
+    next.trajectory_queue_depth = trajectory_queue_depth;
+    next.trajectory_active = trajectory_active;
+    next.trajectory_time_ns = trajectory_time_ns;
+    next.trajectory_duration_ns = trajectory_duration_ns;
     if (!endpoint_->reports_safety_state())
         next.safety = runtime_safety;
     else if (next.safety == RK_SAFETY_EMERGENCY_STOP || next.safety == RK_SAFETY_FAULT)

@@ -6,6 +6,7 @@ import motionkit.MachineKitRobotCompiler;
 import motionkit.MotionOptions;
 import motionkit.MotionSystem;
 import motionkit.Pose;
+import motionkit.path.ArcSegment;
 import motionkit.path.GeometricPath;
 import motionkit.path.PathPoint;
 import motionkit.planner.LineLookaheadPlanner;
@@ -38,6 +39,15 @@ class MotionKitBootstrapTests {
     near(path.totalLength, 0.2, "line path accumulates primitive lengths");
     near(path.pointAt(0.05).x, 0.05, "line path samples its first primitive");
     near(path.pointAt(0.15).y, 0.05, "line path samples its second primitive");
+
+    var arc = new ArcSegment(new PathPoint(0.1, 0.1, 0.0), 0.1,
+      -Math.PI * 0.5, Math.PI * 0.5);
+    near(arc.start.x, 0.1, "arc starts at its authored angle");
+    near(arc.start.y, 0.0, "arc starts on its authored circle");
+    near(arc.end.x, 0.2, "arc ends at its swept angle");
+    near(arc.end.y, 0.1, "arc ends on its authored circle");
+    near(arc.tangentAt(0.0)[0], 1.0, "arc tangent follows increasing distance");
+    near(arc.tangentAt(arc.length())[1], 1.0, "arc tangent rotates with the circle");
   }
 
   static function testPlannerIsDeterministicAndBounded():Void {
@@ -104,6 +114,19 @@ class MotionKitBootstrapTests {
       near(repeated.samples[i].positions[1], blend.samples[i].positions[1],
         "lookahead corner position is deterministic");
     }
+
+    var arc = new ArcSegment(new PathPoint(0.1, 0.1, 0.0), 0.1,
+      -Math.PI * 0.5, Math.PI * 0.5);
+    var arcTrajectory = planner.planPath(new GeometricPath([arc]),
+      new MotionLimits(0.5, 1.0), PathPlanningOptions.exactStopMode());
+    for (sample in arcTrajectory.samples) {
+      var dx = sample.positions[0] - 0.1;
+      var dy = sample.positions[1] - 0.1;
+      near(Math.sqrt(dx * dx + dy * dy), 0.1,
+        "arc lookahead source samples stay on the authored circle", 1e-5);
+    }
+    near(arcTrajectory.samples[arcTrajectory.samples.length - 1].positions[0], 0.2,
+      "arc planner reaches its endpoint");
   }
 
   static function findCornerSample(trajectory:motionkit.trajectory.JointTrajectory):motionkit.trajectory.JointTrajectorySample {
@@ -277,9 +300,16 @@ class MotionKitBootstrapTests {
     }
 
     var tick = 0;
-    for (_ in 0...5) {
+    for (iteration in 0...5) {
       check(machine.update(), "buffer remains active while its first move is running");
       simulation.step(Int64.ofInt(tick++));
+      if (iteration == 0) {
+        var nativeProgress = runtime.snapshot();
+        check(nativeProgress.trajectoryActive && nativeProgress.trajectoryQueueDepth > 0,
+          "native runtime reports active trajectory queue progress");
+        check(nativeProgress.trajectoryDurationNs > nativeProgress.trajectoryTimeNs,
+          "native runtime reports trajectory duration beyond current time");
+      }
     }
     var beforeHold = robot.snapshot().positions.get(0);
     machine.hold();
@@ -289,8 +319,15 @@ class MotionKitBootstrapTests {
       check(!machine.update(), "held buffer does not submit motion commands");
       simulation.step(Int64.ofInt(tick++));
     }
-    near(robot.snapshot().positions.get(0), beforeHold,
-      "controlled hold keeps the simulated axis stopped", 1e-5);
+    var heldPosition = robot.snapshot().positions.get(0);
+    check(heldPosition > beforeHold && heldPosition < 0.02,
+      "controlled hold decelerates before coming to rest");
+    for (_ in 0...5) {
+      check(!machine.update(), "held buffer remains paused after deceleration");
+      simulation.step(Int64.ofInt(tick++));
+    }
+    near(robot.snapshot().positions.get(0), heldPosition,
+      "controlled hold remains stopped after deceleration", 1e-5);
 
     machine.resume();
     check(!machine.isHolding(), "buffer resumes from controlled hold");

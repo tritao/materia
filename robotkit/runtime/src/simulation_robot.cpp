@@ -38,10 +38,10 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         return RK_OK;
     }
     if (command.kind == RK_COMMAND_STOP) {
-        // A normal stop is a controlled stop without a latch. The runtime drops
-        // every active target and has no deceleration limit, so moving joints
-        // are commanded to zero velocity at once; otherwise the backend keeps
-        // its last velocity/effort target and wheels would keep spinning.
+        // A normal stop is a non-latching stop. The runtime normally converts
+        // an active buffered trajectory into a short position-target ramp;
+        // this branch handles direct velocity/effort targets that have no
+        // runtime trajectory to ramp.
         // Position-held joints keep their current, already rate-limited
         // reference, which is where they stop; never-commanded joints stay
         // passive.
