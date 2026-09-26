@@ -25,4 +25,11 @@ class MachineKitRobotCompiler {
     return motionkit.bridge.MachineKitRobotCompiler.compileLinearAxisModel(axis, axisId,
       maxVelocity);
   }
+
+  public static function compileXYZGantry(xAxis:LinearAxis, yAxis:LinearAxis, zAxis:LinearAxis,
+      ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
+      ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
+    return motionkit.bridge.MachineKitRobotCompiler.compileXYZGantry(xAxis, yAxis, zAxis,
+      maxVelocity, maxAcceleration);
+  }
 }

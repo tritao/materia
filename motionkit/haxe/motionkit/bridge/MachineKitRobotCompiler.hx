@@ -33,7 +33,7 @@ class MachineKitRobotCompiler {
   /** Compiles only the stable RobotKit model for callers that own the runtime step. */
   public static function compileLinearAxisModel(axis:LinearAxis, axisId:String,
       ?maxVelocity:Float = DEFAULT_MAX_VELOCITY):RobotModel {
-    if (axis == null) throw "MachineKit LinearAxis is required";
+    requireAxis(axis, axisId);
     requireId(axisId);
     if (!Math.isFinite(maxVelocity) || maxVelocity < 0.0)
       throw "Linear-axis maximum velocity must be finite and non-negative";
@@ -41,18 +41,77 @@ class MachineKitRobotCompiler {
     var model = new RobotModel('linear-axis-$axisId');
     var base = model.addLink(new Link('${axisId}.base'));
     var carriage = model.addLink(new Link('${axisId}.carriage'));
-    var joint = model.addJoint(new Joint(axisId, JointType.Prismatic, base, carriage, axisId));
-    // MachineKit's LinearAxis is authored along +Z and reports millimetres;
-    // RobotKit uses metres and a zeroed machine coordinate at travelMin.
-    joint.parentFramePosition = [0.0, 0.0,
-      (axis.screwStart + axis.travelMin) * MILLIMETRES_TO_METRES];
+    addPrismaticJoint(model, axisId, base, carriage, axis,
+      [0.0, 0.0, 0.0, 1.0], [0.0, 0.0, axis.screwStart + axis.travelMin], maxVelocity);
+    return model;
+  }
+
+  /** Compiles three MachineKit axes into one serial XYZ gantry robot. */
+  public static function compileXYZGantry(xAxis:LinearAxis, yAxis:LinearAxis, zAxis:LinearAxis,
+      ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
+      ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
+    requireAxis(xAxis, "x");
+    requireAxis(yAxis, "y");
+    requireAxis(zAxis, "z");
+    if (!Math.isFinite(maxVelocity) || maxVelocity < 0.0)
+      throw "Gantry maximum velocity must be finite and non-negative";
+    if (!Math.isFinite(maxAcceleration) || maxAcceleration < 0.0)
+      throw "Gantry maximum acceleration must be finite and non-negative";
+
+    var model = new RobotModel("xyz-gantry");
+    var base = model.addLink(new Link("gantry.base"));
+    var xCarriage = model.addLink(new Link("x.carriage"));
+    var yCarriage = model.addLink(new Link("y.carriage"));
+    var zCarriage = model.addLink(new Link("z.carriage"));
+    var halfSqrt = Math.sqrt(0.5);
+    // MachineKit LinearAxis is authored along local +Z. Rotate each carriage
+    // frame into the corresponding machine coordinate direction.
+    addPrismaticJoint(model, "x", base, xCarriage, xAxis,
+      [0.0, halfSqrt, 0.0, halfSqrt],
+      [xAxis.screwStart + xAxis.travelMin, 0.0, 0.0], maxVelocity);
+    addPrismaticJoint(model, "y", xCarriage, yCarriage, yAxis,
+      [-halfSqrt, 0.0, 0.0, halfSqrt],
+      [0.0, yAxis.screwStart + yAxis.travelMin, 0.0], maxVelocity);
+    addPrismaticJoint(model, "z", yCarriage, zCarriage, zAxis,
+      [0.0, 0.0, 0.0, 1.0],
+      [0.0, 0.0, zAxis.screwStart + zAxis.travelMin], maxVelocity);
+
+    return MotionSystemBlueprint.fromRobotModel(model, [
+      axisBlueprint("x", xAxis, maxVelocity, maxAcceleration),
+      axisBlueprint("y", yAxis, maxVelocity, maxAcceleration),
+      axisBlueprint("z", zAxis, maxVelocity, maxAcceleration)
+    ]);
+  }
+
+  static function axisBlueprint(id:String, axis:LinearAxis, maxVelocity:Float,
+      maxAcceleration:Float):MotionAxisBlueprint {
+    return new MotionAxisBlueprint(id, [id], 0.0,
+      axis.stroke * MILLIMETRES_TO_METRES, maxVelocity, maxAcceleration);
+  }
+
+  static function addPrismaticJoint(model:RobotModel, id:String, parent:Link, child:Link,
+      axis:LinearAxis, frameRotation:Array<Float>, framePositionMillimetres:Array<Float>,
+      maxVelocity:Float):Joint {
+    var joint = model.addJoint(new Joint(id, JointType.Prismatic, parent, child, id));
+    // MachineKit reports millimetres; RobotKit uses metres and a zeroed
+    // machine coordinate at travelMin.
+    joint.parentFramePosition = [
+      framePositionMillimetres[0] * MILLIMETRES_TO_METRES,
+      framePositionMillimetres[1] * MILLIMETRES_TO_METRES,
+      framePositionMillimetres[2] * MILLIMETRES_TO_METRES
+    ];
+    joint.parentFrameRotation = frameRotation.copy();
     joint.axis = [0.0, 0.0, 1.0];
     joint.limits.lower = 0.0;
     joint.limits.upper = axis.stroke * MILLIMETRES_TO_METRES;
     joint.limits.velocity = maxVelocity;
     joint.drive = new Actuator('${axis.motor.designation} / lead-screw ${axis.transmission.lead} mm/rev',
       0.0, maxVelocity);
-    return model;
+    return joint;
+  }
+
+  static function requireAxis(axis:LinearAxis, id:String):Void {
+    if (axis == null) throw 'MachineKit LinearAxis "$id" is required';
   }
 
   static function requireId(id:String):Void {

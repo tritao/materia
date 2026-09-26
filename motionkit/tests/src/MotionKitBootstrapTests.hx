@@ -1,9 +1,11 @@
 import haxe.Int64;
 import machinekit.assembly.LinearAxis;
 import motionkit.AxisTarget;
+import motionkit.Feed;
 import motionkit.MachineKitRobotCompiler;
 import motionkit.MotionOptions;
 import motionkit.MotionSystem;
+import motionkit.Pose;
 import motionkit.path.GeometricPath;
 import motionkit.path.PathPoint;
 import motionkit.planner.TrapezoidalPlanner;
@@ -19,6 +21,7 @@ class MotionKitBootstrapTests {
     testPlannerIsDeterministicAndBounded();
     testLinearAxisCompilesToRobotModel();
     testCompiledAxisRunsThroughSimulation();
+    testCompiledXYZGantryRunsThroughSimulation();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
   }
 
@@ -101,6 +104,79 @@ class MotionKitBootstrapTests {
     simulation.dispose();
   }
 
+  static function testCompiledXYZGantryRunsThroughSimulation():Void {
+    var xAxis = new LinearAxis(23, 10, 80);
+    var yAxis = new LinearAxis(23, 10, 60);
+    var zAxis = new LinearAxis(23, 10, 40);
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(xAxis, yAxis, zAxis, 0.1, 0.4);
+    check(blueprint.model.links.length == 4, "XYZ gantry compiles one base and three carriages");
+    check(blueprint.model.joints.length == 3, "XYZ gantry compiles three prismatic joints");
+    for (i in 0...3) {
+      var joint = blueprint.model.joints[i];
+      check(joint.id == ["x", "y", "z"][i], "XYZ gantry uses stable joint IDs");
+      check(joint.type == robotkit.model.JointType.Prismatic,
+        "XYZ gantry joints are prismatic");
+      near(joint.limits.velocity, 0.1, "XYZ gantry retains the actuator rate limit");
+    }
+    near(blueprint.model.joints[0].parentFramePosition[0],
+      (xAxis.screwStart + xAxis.travelMin) * 0.001, "X carriage frame is compiled in metres");
+    near(blueprint.model.joints[1].parentFramePosition[1],
+      (yAxis.screwStart + yAxis.travelMin) * 0.001, "Y carriage frame is compiled in metres");
+    near(blueprint.model.joints[2].parentFramePosition[2],
+      (zAxis.screwStart + zAxis.travelMin) * 0.001, "Z carriage frame is compiled in metres");
+
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("xyz-gantry", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    check(machine.axis("x") != null && machine.axis("y") != null && machine.axis("z") != null,
+      "XYZ gantry exposes all logical axes");
+
+    machine.home();
+    runMotion(machine, simulation);
+    var home = robot.snapshot();
+    near(home.positions.get(0), 0.0, "XYZ gantry homes X");
+    near(home.positions.get(1), 0.0, "XYZ gantry homes Y");
+    near(home.positions.get(2), 0.0, "XYZ gantry homes Z");
+    throws(function() machine.moveAxes([new AxisTarget("x", 0.081)]),
+      "XYZ gantry rejects an out-of-range axis target");
+
+    machine.moveAxes([
+      new AxisTarget("x", 0.02), new AxisTarget("y", 0.01), new AxisTarget("z", 0.015)
+    ], new MotionOptions(0.08, 0.4));
+    runMotion(machine, simulation);
+    var firstMove = robot.snapshot();
+    near(firstMove.positions.get(0), 0.02, "XYZ gantry reaches X axis target", 1e-5);
+    near(firstMove.positions.get(1), 0.01, "XYZ gantry reaches Y axis target", 1e-5);
+    near(firstMove.positions.get(2), 0.015, "XYZ gantry reaches Z axis target", 1e-5);
+
+    var linear = machine.moveLinear(Pose.xyz(0.03, 0.02, 0.025), Feed.mmPerSecond(50));
+    var midpoint = linear.sample(linear.durationSeconds * 0.5);
+    var xAlpha = (midpoint.positions[0] - 0.02) / 0.01;
+    var yAlpha = (midpoint.positions[1] - 0.01) / 0.01;
+    var zAlpha = (midpoint.positions[2] - 0.015) / 0.01;
+    near(xAlpha, yAlpha, "Cartesian move preserves the X/Y line", 1e-5);
+    near(xAlpha, zAlpha, "Cartesian move preserves the X/Z line", 1e-5);
+    runMotion(machine, simulation);
+    var linearMove = robot.snapshot();
+    near(linearMove.positions.get(0), 0.03, "Cartesian move reaches X target", 1e-5);
+    near(linearMove.positions.get(1), 0.02, "Cartesian move reaches Y target", 1e-5);
+    near(linearMove.positions.get(2), 0.025, "Cartesian move reaches Z target", 1e-5);
+    simulation.dispose();
+  }
+
+  static function runMotion(machine:MotionSystem, simulation:Simulation):Void {
+    var tick = 0;
+    while (machine.isMoving()) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+      if (tick > 2000) throw "MotionKit trajectory did not complete";
+    }
+    for (_ in 0...4) simulation.step(Int64.ofInt(tick++));
+  }
+
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
     assertions++;
@@ -110,5 +186,11 @@ class MotionKitBootstrapTests {
       tolerance:Float = 1e-6):Void {
     check(Math.abs(actual - expected) <= tolerance * Math.max(1.0, Math.abs(expected)),
       '$message: $actual != $expected');
+  }
+
+  static function throws(action:Void -> Void, message:String):Void {
+    var didThrow = false;
+    try action() catch (_:Dynamic) didThrow = true;
+    check(didThrow, message);
   }
 }

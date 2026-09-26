@@ -1,8 +1,11 @@
 package motionkit.axis;
 
+import motionkit.Feed;
+import motionkit.path.PathPoint;
 import motionkit.planner.TrajectoryPlanner;
 import motionkit.planner.TrapezoidalPlanner;
 import motionkit.trajectory.JointTrajectory;
+import motionkit.trajectory.JointTrajectorySample;
 import motionkit.trajectory.MotionLimits;
 import robotkit.world.JointTarget;
 import robotkit.world.Robot;
@@ -84,6 +87,69 @@ class MotionSystem {
     return activeTrajectory;
   }
 
+  /** Plans a straight Cartesian move for a direct XYZ gantry. */
+  public function moveLinear(target:PathPoint, feed:Feed):JointTrajectory {
+    if (target == null || feed == null) throw "Linear move needs a target and feed";
+    var xAxis = requireAxis("x");
+    var yAxis = requireAxis("y");
+    var zAxis = requireAxis("z");
+    var snapshot = robot.snapshot();
+    var start = snapshot.positions.toArray();
+    var goal = start.copy();
+    var starts = [xAxis.logicalPosition(start), yAxis.logicalPosition(start),
+      zAxis.logicalPosition(start)];
+    var goals = [target.x, target.y, target.z];
+    var axes = [xAxis, yAxis, zAxis];
+    for (i in 0...3) {
+      if (goals[i] < axes[i].lowerLimit || goals[i] > axes[i].upperLimit)
+        throw 'Axis "${axes[i].id}" target ${goals[i]} is outside its limits';
+      axes[i].writeLogicalPosition(goal, goals[i]);
+    }
+
+    var dx = goals[0] - starts[0];
+    var dy = goals[1] - starts[1];
+    var dz = goals[2] - starts[2];
+    var distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (distance <= 0.0) {
+      activeTrajectory = new JointTrajectory([new JointTrajectorySample(0.0, goal)]);
+      elapsedSeconds = 0.0;
+      return activeTrajectory;
+    }
+
+    var scalarFeed = feed.value;
+    var scalarAcceleration = 1.0;
+    for (i in 0...3) {
+      var displacement = Math.abs(goals[i] - starts[i]);
+      if (displacement <= 0.0) continue;
+      if (axes[i].maxVelocity > 0.0)
+        scalarFeed = Math.min(scalarFeed, axes[i].maxVelocity * distance / displacement);
+      if (axes[i].maxAcceleration > 0.0)
+        scalarAcceleration = Math.min(scalarAcceleration,
+          axes[i].maxAcceleration * distance / displacement);
+    }
+
+    var scalarTrajectory = planner.plan([0.0], [distance],
+      new MotionLimits(scalarFeed, scalarAcceleration));
+    var mapped:Array<JointTrajectorySample> = [];
+    for (sample in scalarTrajectory.samples) {
+      var alpha = sample.positions[0] / distance;
+      var positions:Array<Float> = [];
+      var velocities:Array<Float> = [];
+      var accelerations:Array<Float> = [];
+      for (j in 0...start.length) {
+        var delta = goal[j] - start[j];
+        positions.push(start[j] + delta * alpha);
+        velocities.push(delta * sample.velocities[0] / distance);
+        accelerations.push(delta * sample.accelerations[0] / distance);
+      }
+      mapped.push(new JointTrajectorySample(sample.timeSeconds, positions,
+        velocities, accelerations));
+    }
+    activeTrajectory = new JointTrajectory(mapped);
+    elapsedSeconds = 0.0;
+    return activeTrajectory;
+  }
+
   /** Software homing for the bootstrap: move to each authored home coordinate. */
   public function home(?options:MotionOptions):JointTrajectory {
     return moveAxes([for (axisValue in axes) new AxisTarget(axisValue.id, axisValue.homePosition)], options);
@@ -115,6 +181,12 @@ class MotionSystem {
     activeTrajectory = null;
     elapsedSeconds = 0.0;
     robot.stop(mode);
+  }
+
+  function requireAxis(id:String):MotionAxis {
+    var result = axis(id);
+    if (result == null) throw 'Motion system needs a "$id" axis';
+    return cast result;
   }
 
   function resolveLimits(targets:Array<AxisTarget>, options:MotionOptions):MotionLimits {
