@@ -32,6 +32,22 @@ class RobotRuntimeSensorBlueprint {
     this.noiseStddev = noiseStddev; this.noiseSeed = noiseSeed;
   }
 
+  /**
+   * True for authored sensors whose observations come from outside the native
+   * runtime (a camera driver, a GNSS receiver) and are published through
+   * `RobotRuntime.publishSensorFrame` against their authored mount.
+   */
+  public static function isExternalKind(kind:String):Bool
+    return kind == "camera" || kind == "gnss_pose";
+
+  /** True for sensors the native runtime samples itself. */
+  public static function isNativeKind(kind:String):Bool
+    return kind == "joint_encoder" || kind == "imu" || kind == "lidar";
+
+  public var external(get, never):Bool;
+
+  function get_external():Bool return isExternalKind(kind);
+
   public function nativeValue():rk_sensor_config {
     var value = new rk_sensor_config();
     value.set_kind(switch kind { case "joint_encoder": 1; case "imu": 2; case "lidar": 3; default: throw "Unsupported sensor kind"; });

@@ -45,6 +45,7 @@ import robotkit.world.StopMode;
 import robotkit.world.RobotWorld;
 import robotkit.world.RobotWorldEvent;
 import robotkit.world.SensorFrame;
+import robotkit.world.CameraImage;
 import robotkit.world.ReplayRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.RobotRecordingEvent;
@@ -164,6 +165,7 @@ class RobotWorldTests {
     testSensorAndClockContracts();
     testSensorResetPublication();
     testConfiguredSensors();
+    testExternalSensorRuntime();
     testSerialRobotUnavailableDevice();
     assertions += SpatialTests.run();
     assertions += KinematicsTests.run();
@@ -3041,6 +3043,84 @@ class RobotWorldTests {
     Reflect.setField(commandTargets[0], "target", 1e400);
     throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(invalidNumber))),
       "recording rejects non-finite numeric payloads");
+  }
+
+  static function testExternalSensorRuntime():Void {
+    var model = new RobotModel("external-sensor robot");
+    var base = model.addLink(new Link("base", "external/base"));
+    var cameraMount = model.addFrame(new Frame("front camera", base, "external/front-optical"));
+    cameraMount.position = [0.15, 0.02, 0.7];
+    var camera = model.addSensor(new Sensor("front camera", "camera", 30.0, "sensor/front-camera"));
+    camera.frame = cameraMount;
+    var antennaMount = model.addFrame(new Frame("gnss antenna", base, "external/antenna"));
+    antennaMount.position = [-0.2, 0.0, 1.1];
+    var gnss = model.addSensor(new Sensor("gnss", "gnss_pose", 10.0, "sensor/gnss"));
+    gnss.frame = antennaMount;
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    equal(blueprint.externalSensorLayout().length, 2,
+      "model compilation keeps camera and GNSS sensors outside the native runtime");
+    equal(blueprint.nativeSensorLayout().length, 3,
+      "a robot with only external sensors keeps the native runtime's default slots");
+    check(blueprint.sensorById("sensor/gnss") != null && blueprint.sensorById("imu") != null,
+      "compiled identity resolves both default native and authored external sensors");
+
+    var simulation = new Simulation();
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("external-sensors", runtime, model.name, [base.name], []);
+    simulation.step(Int64.ofInt(1));
+    simulation.step(Int64.ofInt(2));
+    var nativeCount = robot.snapshot().sensors.length;
+    var pixels = haxe.io.Bytes.alloc(6);
+    for (index in 0...pixels.length) pixels.set(index, index + 31);
+    runtime.publishCameraFrame("sensor/front-camera", new CameraImage(2, 1, "rgb8", pixels),
+      Int64.ofInt(1), Int64.ofInt(100), "camera.boot-3");
+    pixels.set(0, 255);
+    runtime.publishSensorFrame("sensor/gnss", [48.1, 11.5, 0.3], Int64.ofInt(1),
+      Int64.ofInt(100), "gnss.receiver");
+    var snapshot = robot.snapshot();
+    equal(snapshot.sensors.length, nativeCount + 2,
+      "external frames merge with native sensors without a physics step");
+    var cameraFrame:Null<SensorFrame> = null;
+    var gnssFrame:Null<SensorFrame> = null;
+    for (sensor in snapshot.sensors.toArray()) {
+      if (sensor.sensorId == "sensor/front-camera") cameraFrame = sensor;
+      if (sensor.sensorId == "sensor/gnss") gnssFrame = sensor;
+    }
+    if (cameraFrame == null || gnssFrame == null) throw "external frames are missing";
+    var cameraSample:SensorFrame = cast cameraFrame;
+    var gnssSample:SensorFrame = cast gnssFrame;
+    check(cameraSample.frameId == "external/front-optical" &&
+      cameraSample.linkId == "external/base" && cameraSample.mountPosition.get(2) == 0.7 &&
+      cameraSample.sourceClockId == "camera.boot-3",
+      "the runtime stamps the authored camera mount and keeps the source clock");
+    var image = cameraSample.image;
+    check(image != null && image.width == 2 && image.bytes().get(0) == 31,
+      "a published camera image is owned by the frame");
+    check(gnssSample.frameId == "external/antenna" && gnssSample.values.get(0) == 48.1 &&
+      gnssSample.image == null, "a GNSS fix carries its values at the authored antenna mount");
+    throws(function() runtime.publishCameraFrame("sensor/missing",
+      new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("x")), Int64.ofInt(2),
+      Int64.ofInt(101)), "externally sourced");
+    throws(function() runtime.publishSensorFrame("imu", [0.0, 0.0, 0.0], Int64.ofInt(2),
+      Int64.ofInt(101), "imu"), "externally sourced");
+    throws(function() runtime.publishCameraFrame("sensor/front-camera",
+      new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("x")), Int64.ofInt(1),
+      Int64.ofInt(101)), "stale sequence");
+    throws(function() runtime.publishSensorFrame("sensor/gnss", [48.1, 11.5], Int64.ofInt(2),
+      Int64.ofInt(101), "gnss.receiver"), "latitude, longitude, and yaw");
+    throws(function() runtime.publishSensorFrame("sensor/front-camera", [], Int64.ofInt(2),
+      Int64.ofInt(101), "camera.boot-3"), "requires an image");
+    throws(function() new CameraImage(2, 2, "rgb8", haxe.io.Bytes.alloc(5)),
+      "does not match its dimensions");
+    runtime.publishCameraFrame("sensor/front-camera",
+      new CameraImage(1, 1, "jpeg", haxe.io.Bytes.ofString("y")), Int64.ofInt(2),
+      Int64.ofInt(102), "camera.boot-3");
+    var updated = 0;
+    for (sensor in robot.snapshot().sensors.toArray())
+      if (sensor.sensorId == "sensor/front-camera") updated = Int64.toInt(sensor.sequence);
+    equal(updated, 2, "the simulated robot observes an image update without a physics step");
+    robot.close();
+    simulation.dispose();
   }
 
   static function testConfiguredSensors():Void {

@@ -86,6 +86,16 @@ timestamps use the actual local monotonic clock, not the simulation tick hint.
 Absolute world-command deadlines are rejected until clock negotiation and
 runtime enforcement are available.
 
+Sensors of kind `camera` and `gnss_pose` are authored like any other, with a
+frame and mount, but the native runtime does not sample them: a camera driver
+or GNSS receiver publishes each observation through
+`RobotRuntime.publishSensorFrame(...)` (or `publishCameraFrame(...)` for an
+immutable `CameraImage`), and the runtime stamps the authored frame, link,
+mount, and receive time. Snapshots carry the latest frame of each such sensor
+next to the native ones, and robot views notice an update even without a
+physics step. A robot whose authored sensors are all external keeps the native
+runtime's default encoder, IMU, and LiDAR slots.
+
 MuJoCo is opt-in and tested through the same runtime/sensor implementation:
 
 ```sh

@@ -113,13 +113,29 @@ class RuntimeRobotAdapter implements Robot {
   }
 
   function observe(value:robotkit.runtime.RobotSnapshot):Void {
-    if (value.sequence == observedSequence && value.receivedTimestampNs == observedReceipt)
+    // Externally published sensors (cameras, GNSS) update without a native
+    // state change, so compare the sensor frames as well as the sequence.
+    var sensors = RobotSensorFrames.fromRuntimeSnapshot(value);
+    if (value.sequence == observedSequence && value.receivedTimestampNs == observedReceipt &&
+        sameSensors(currentSensors, sensors))
       return;
     observedSequence = value.sequence;
     observedReceipt = value.receivedTimestampNs;
-    currentSensors = RobotSensorFrames.fromRuntimeSnapshot(value);
+    currentSensors = sensors;
     var listener = changeListener;
     if (listener != null) listener(logicalId);
+  }
+
+  static function sameSensors(left:Array<SensorFrame>, right:Array<SensorFrame>):Bool {
+    if (left == null || left.length != right.length) return false;
+    for (index in 0...left.length) {
+      var a = left[index], b = right[index];
+      if (a.sensorId != b.sensorId || a.sequence != b.sequence ||
+          a.sourceTimestampNs != b.sourceTimestampNs ||
+          a.receivedTimestampNs != b.receivedTimestampNs)
+        return false;
+    }
+    return true;
   }
 
   function ensureOpen():Void {

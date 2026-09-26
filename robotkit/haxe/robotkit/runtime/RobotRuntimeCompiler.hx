@@ -20,11 +20,19 @@ class RobotRuntimeCompiler {
     var diagnostics = validate(robot, revision);
     if (diagnostics.length > 0)
       throw new RobotCompileException(robot == null ? "<null>" : robot.name, diagnostics);
+    // A robot whose authored sensors are all external still gets the native
+    // runtime's default sensor slots, ahead of its authored ones.
+    var authoredNativeSensors = false;
+    for (sensor in robot.sensors)
+      if (!RobotRuntimeSensorBlueprint.isExternalKind(sensor.kind)) authoredNativeSensors = true;
+    var sensorIdentityIds = [for (sensor in robot.sensors) sensor.id];
+    if (!authoredNativeSensors)
+      sensorIdentityIds = ["joint_encoders", "imu", "lidar"].concat(sensorIdentityIds);
     var result = new RobotRuntimeBlueprint(revision, robot.joints.length,
       robot.links.length, robot.frames.length, new RobotRuntimeIdentity(
         [for (link in robot.links) link.id],
         [for (joint in robot.joints) joint.id],
-        robot.sensors.length == 0 ? ["joint_encoders", "imu", "lidar"] : [for (sensor in robot.sensors) sensor.id],
+        sensorIdentityIds,
         [for (frame in robot.frames) frame.id],
         [for (frame in robot.frames) frame.link.id],
         [for (link in robot.links) link.visualGeometry],
@@ -71,10 +79,10 @@ class RobotRuntimeCompiler {
     var children = [for (joint in robot.joints) joint.child];
     var root = robot.links[0];
     for (link in robot.links) if (children.indexOf(link) < 0) { root = link; break; }
-    if (robot.sensors.length == 0) {
+    if (!authoredNativeSensors)
       for (sensor in RobotRuntimeSensorBlueprint.defaults(robot.links.indexOf(root), root.id))
         result.sensors.push(sensor);
-    } else for (sensor in robot.sensors) {
+    for (sensor in robot.sensors) {
       var frame = sensor.frame;
       var link = frame == null ? root : frame.link;
       result.sensors.push(new RobotRuntimeSensorBlueprint(sensor.id, sensor.kind,
@@ -295,7 +303,8 @@ class RobotRuntimeCompiler {
       if (sensor.kind == null || sensor.kind.length == 0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_KIND", '$path.kind',
           "sensor kind is empty"));
-      if (sensor.kind != "imu" && sensor.kind != "lidar" && sensor.kind != "joint_encoder")
+      if (!RobotRuntimeSensorBlueprint.isNativeKind(sensor.kind) &&
+          !RobotRuntimeSensorBlueprint.isExternalKind(sensor.kind))
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_UNSUPPORTED", '$path.kind', "unsupported sensor kind"));
       if (sensor.frame != null && robot.frames.indexOf(sensor.frame) < 0)
         diagnostics.push(new RobotCompileDiagnostic("RK_SENSOR_FRAME", '$path.frame', "sensor frame does not belong to model"));

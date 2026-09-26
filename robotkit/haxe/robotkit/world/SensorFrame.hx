@@ -16,11 +16,14 @@ class SensorFrame {
   public final linkId:String;
   public final mountPosition:ImmutableFloatArray;
   public final mountRotation:ImmutableFloatArray;
+  /** Pixels for camera observations; immutable, so copies share it. */
+  public final image:Null<CameraImage>;
 
   public function new(sensorId:String, kind:String, frameId:String, sequence:Int64,
       sourceTimestampNs:Int64, values:Array<Float>, ?receivedTimestampNs:Int64,
       ?linkId:String = "", ?mountPosition:Array<Float>, ?mountRotation:Array<Float>,
-      ?sourceClockId:String = "unspecified", ?receivedClockId:String = "robotkit.monotonic") {
+      ?sourceClockId:String = "unspecified", ?receivedClockId:String = "robotkit.monotonic",
+      ?image:CameraImage) {
     this.sensorId = sensorId;
     this.kind = kind;
     this.frameId = frameId;
@@ -34,9 +37,10 @@ class SensorFrame {
     this.linkId = linkId;
     this.mountPosition = new ImmutableFloatArray(mountPosition == null ? [0.0, 0.0, 0.0] : mountPosition);
     this.mountRotation = new ImmutableFloatArray(mountRotation == null ? [0.0, 0.0, 0.0, 1.0] : mountRotation);
+    this.image = image;
   }
 
   public function copy():SensorFrame return new SensorFrame(sensorId, kind, frameId, sequence,
     sourceTimestampNs, values.toArray(), receivedTimestampNs, linkId, mountPosition.toArray(),
-    mountRotation.toArray(), sourceClockId, receivedClockId);
+    mountRotation.toArray(), sourceClockId, receivedClockId, image);
 }

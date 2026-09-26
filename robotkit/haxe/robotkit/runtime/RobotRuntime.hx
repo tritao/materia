@@ -1,6 +1,11 @@
 package robotkit.runtime;
 
 import RobotKitRuntime;
+import haxe.Int64;
+import nativekit.ffi.NativeKit;
+import robotkit.world.CameraImage;
+import robotkit.world.SensorFrame;
+import sys.thread.Mutex;
 
 /**
  * Per-robot realtime execution boundary.
@@ -15,6 +20,9 @@ class RobotRuntime {
   final defaultMaxRates:Array<Float>;
   final defaultMaxEfforts:Array<Float>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
+  final externalSensorLayout:Array<RobotRuntimeSensorBlueprint>;
+  final externalMutex = new Mutex();
+  final externalFrames:Map<String, SensorFrame> = new Map();
   var disposed:Bool = false;
 
   @:allow(robotkit.runtime.Simulation)
@@ -22,7 +30,8 @@ class RobotRuntime {
     this.owner = owner;
     defaultMaxRates = [for (joint in blueprint.joints) joint.maxRate];
     defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
-    sensorLayout = blueprint.sensorLayout();
+    sensorLayout = blueprint.nativeSensorLayout();
+    externalSensorLayout = blueprint.externalSensorLayout();
   }
 
   /** Creates a standalone in-memory runtime with its own worker lifecycle. */
@@ -163,13 +172,79 @@ class RobotRuntime {
     value.set_struct_size(rk_robot_snapshot.size());
     check(RobotKitRuntime.rk_robot_runtime_snapshot_full(owner.borrow(), value).status,
       "runtime.snapshot");
-    return RobotSnapshot.fromNative(value, sensorLayout);
+    var native = RobotSnapshot.fromNative(value, sensorLayout);
+    if (externalSensorLayout.length == 0) return native;
+    var frames = native.sensors.toArray();
+    externalMutex.acquire();
+    for (config in externalSensorLayout) {
+      var frame = externalFrames.get(config.id);
+      if (frame != null) frames.push(frame);
+    }
+    externalMutex.release();
+    return new RobotSnapshot(native.robotId, native.sequence, native.sourceTimestampNs,
+      native.mode, native.safety, native.endpoint, native.faultCode, native.q.toArray(),
+      native.dq.toArray(), native.effort.toArray(), native.receivedTimestampNs, frames);
   }
+
+  /**
+   * Publishes one observation of an externally sourced sensor (see
+   * `RobotRuntimeSensorBlueprint.isExternalKind`) against its authored mount.
+   * The runtime stamps the authored frame, link, and mount plus the receive
+   * time; later snapshots carry the latest frame for each such sensor.
+   * A `gnss_pose` frame carries latitude and longitude in degrees and ENU yaw
+   * in radians; a `camera` frame carries an image and no values.
+   */
+  public function publishSensorFrame(sensorId:String, values:Array<Float>, sequence:Int64,
+      sourceTimestampNs:Int64, sourceClockId:String, ?image:CameraImage):Void {
+    ensureLive();
+    if (sensorId == null || sensorId.length == 0 || values == null || sequence == null ||
+        Int64.compare(sequence, Int64.ofInt(0)) <= 0 || sourceTimestampNs == null ||
+        Int64.compare(sourceTimestampNs, Int64.ofInt(0)) < 0 || sourceClockId == null ||
+        sourceClockId.length == 0)
+      throw "Sensor publication requires a sensor ID, values, positive sequence, and source clock";
+    for (value in values) if (!Math.isFinite(value))
+      throw 'Sensor "$sensorId" publication has a non-finite value';
+    var config:Null<RobotRuntimeSensorBlueprint> = null;
+    for (candidate in externalSensorLayout)
+      if (candidate.id == sensorId) { config = candidate; break; }
+    if (config == null)
+      throw 'Robot model has no externally sourced sensor "$sensorId"';
+    var mounted:RobotRuntimeSensorBlueprint = cast config;
+    switch mounted.kind {
+      case "camera":
+        if (image == null || values.length != 0)
+          throw 'Camera "$sensorId" publication requires an image and no values';
+      case "gnss_pose":
+        if (image != null || values.length != 3)
+          throw 'GNSS "$sensorId" publication requires latitude, longitude, and yaw';
+      case _:
+    }
+    var frame = new SensorFrame(mounted.id, mounted.kind, mounted.frameId, sequence,
+      sourceTimestampNs, values, NativeKit.nk_time_now_ns(), mounted.linkId,
+      mounted.position.toArray(), mounted.rotation.toArray(), sourceClockId,
+      "robotkit.monotonic", image);
+    externalMutex.acquire();
+    var previous = externalFrames.get(sensorId);
+    if (previous != null && Int64.compare(sequence, previous.sequence) <= 0) {
+      externalMutex.release();
+      throw 'Sensor "$sensorId" received a stale sequence';
+    }
+    externalFrames.set(sensorId, frame);
+    externalMutex.release();
+  }
+
+  /** Publishes one camera image; see `publishSensorFrame`. */
+  public function publishCameraFrame(sensorId:String, image:CameraImage, sequence:Int64,
+      sourceTimestampNs:Int64, ?sourceClockId:String = "unspecified"):Void
+    publishSensorFrame(sensorId, [], sequence, sourceTimestampNs, sourceClockId, image);
 
   public function dispose():Void {
     if (disposed)
       return;
     stop();
+    externalMutex.acquire();
+    externalFrames.clear();
+    externalMutex.release();
     owner.close();
     disposed = true;
   }

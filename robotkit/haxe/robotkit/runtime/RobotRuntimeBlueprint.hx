@@ -30,6 +30,20 @@ class RobotRuntimeBlueprint {
     return RobotRuntimeSensorBlueprint.defaults(root, "base_link");
   }
 
+  /** Sensors the native runtime samples; a robot with only external sensors keeps the defaults. */
+  public function nativeSensorLayout():Array<RobotRuntimeSensorBlueprint> {
+    var native = [for (sensor in sensorLayout()) if (!sensor.external) sensor];
+    if (native.length > 0) return native;
+    var children = [for (joint in joints) joint.childLink];
+    var root = 0;
+    for (i in 0...linkCount) if (children.indexOf(i) < 0) { root = i; break; }
+    return RobotRuntimeSensorBlueprint.defaults(root, "base_link");
+  }
+
+  /** Authored sensors whose observations are published from outside the native runtime. */
+  public function externalSensorLayout():Array<RobotRuntimeSensorBlueprint>
+    return [for (sensor in sensors) if (sensor.external) sensor];
+
   public function new(revision:Int, jointCount:Int, linkCount:Int,
       ?frameCount:Int = 0, ?identity:RobotRuntimeIdentity,
       ?configuration:RobotRuntimeConfiguration) {
@@ -77,7 +91,7 @@ class RobotRuntimeBlueprint {
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);
     value.set_collision_approximation(collisionApproximation);
-    var layout = sensorLayout();
+    var layout = nativeSensorLayout();
     if (layout.length > RobotKitRuntimeConstants.RK_MAX_SENSORS) throw "Too many sensors";
     value.set_sensor_count(layout.length);
     for (i in 0...layout.length) value.set_sensors(i, layout[i].nativeValue());
