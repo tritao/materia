@@ -12,11 +12,18 @@ class GeometryData {
 	final streams:Array<nkscene_vertex_stream> = [];
 	final strokeSegments:Array<nkscene_stroke_segment> = [];
 	final streamData:Array<Bytes> = [];
+	final streamSemantics:Array<Int> = [];
+	final streamFormats:Array<Int> = [];
+	final streamStrides:Array<Int> = [];
+	final streamCounts:Array<Int> = [];
 	final indexValues:Array<Int> = [];
 	var indices:Bytes = Bytes.alloc(0);
 	var packedIndices:Null<Bytes>;
 	var packedIndexCount:Int = 0;
 	var positionStreamCount:Null<Int>;
+	var boundsValid:Bool = false;
+	var boundsMinimum:Array<Float> = [0.0, 0.0, 0.0];
+	var boundsMaximum:Array<Float> = [0.0, 0.0, 0.0];
 
 	public function new() {
 		value = new nkscene_geometry_data();
@@ -71,6 +78,10 @@ class GeometryData {
 		stream.set_count(count);
 		streams.push(stream);
 		streamData.push(data);
+		streamSemantics.push(semantic);
+		streamFormats.push(format);
+		streamStrides.push(stride);
+		streamCounts.push(count);
 		if (semantic == 1) {
 			if (positionStreamCount != null)
 				throw "Geometry data can contain only one position stream";
@@ -90,6 +101,9 @@ class GeometryData {
 		bounds.set_maximum(2, maxZ);
 		bounds.set_valid(1);
 		value.set_bounds(bounds);
+		boundsValid = true;
+		boundsMinimum = [minX, minY, minZ];
+		boundsMaximum = [maxX, maxY, maxZ];
 		return this;
 	}
 
@@ -127,6 +141,49 @@ class GeometryData {
 
 	public function triangleCount():Int
 		return Std.int((packedIndices == null ? indexValues.length : packedIndexCount) / 3);
+
+	/**
+	 * Builds a renderable geometry containing only one subelement's triangles.
+	 * This is used for face overlays while retaining the source vertex streams.
+	 */
+	public function subelementGeometry(subelement:Int):Null<GeometryData> {
+		if (subelement < 0 || streams.length == 0)
+			return null;
+		var primitiveCount = 0;
+		for (range in subelements)
+			if (range.get_subelement() == subelement)
+				primitiveCount += range.get_primitive_count();
+		if (primitiveCount == 0 || (packedIndices == null && indexValues.length == 0))
+			return null;
+
+		var result = new GeometryData();
+		for (index in 0...streams.length)
+			result.addStream(streamSemantics[index], streamFormats[index], streamData[index],
+				streamCounts[index], streamStrides[index]);
+		if (boundsValid)
+			result.setBounds(boundsMinimum[0], boundsMinimum[1], boundsMinimum[2],
+				boundsMaximum[0], boundsMaximum[1], boundsMaximum[2]);
+
+		var selectedIndices = Bytes.alloc(primitiveCount * 3 * 4);
+		var targetIndex = 0;
+		for (range in subelements) if (range.get_subelement() == subelement) {
+			var firstPrimitive = range.get_first_primitive();
+			var endPrimitive = firstPrimitive + range.get_primitive_count();
+			for (primitive in firstPrimitive...endPrimitive) {
+				for (corner in 0...3) {
+					var sourceIndex = primitive * 3 + corner;
+					var vertexIndex = packedIndices == null
+						? indexValues[sourceIndex]
+						: packedIndices.getInt32(sourceIndex * 4);
+					selectedIndices.setInt32(targetIndex * 4, vertexIndex);
+					targetIndex++;
+				}
+			}
+		}
+		result.setIndexBuffer(selectedIndices, targetIndex);
+		result.addSubelement(0, primitiveCount, subelement);
+		return result;
+	}
 
 	/** Supplies a tightly packed uint32 index stream without per-index Haxe allocations. */
 	public function setIndexBuffer(data:Bytes, count:Int):GeometryData {

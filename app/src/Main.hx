@@ -389,6 +389,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var cachedSubmitEnvironmentRevision:Int = -1;
   var cachedSubmitSensorRevision:Int = -1;
   var cachedSubmitSimulationRevision:Int = -1;
+  var cachedSubmitPerspectiveKey:String = "";
   final externalWorldHasRobots:Bool;
   public var sensors(get, never):SensorConfiguration;
   function get_sensors():SensorConfiguration return session.sensors;
@@ -627,20 +628,31 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var environmentRevision = scene.environmentRevision;
     var sensorRevision = sensors.revision();
     var simulationRevision = simulation.appliedRevision;
+    var perspectiveKey = perspectiveViewport == null ? "" : perspectiveViewport.presentationKey();
     if (cachedSubmitSceneGeneration != sceneGeneration ||
         cachedSubmitSceneRevision != sceneRevision ||
         cachedSubmitEnvironmentRevision != environmentRevision ||
         cachedSubmitSensorRevision != sensorRevision ||
-        cachedSubmitSimulationRevision != simulationRevision) {
+        cachedSubmitSimulationRevision != simulationRevision ||
+        cachedSubmitPerspectiveKey != perspectiveKey) {
       cachedSubmitSceneGeneration = sceneGeneration;
       cachedSubmitSceneRevision = sceneRevision;
       cachedSubmitEnvironmentRevision = environmentRevision;
       cachedSubmitSensorRevision = sensorRevision;
       cachedSubmitSimulationRevision = simulationRevision;
-      cachedSubmitKey = "editor:" + sceneGeneration + ":" + sceneRevision + ":" +
-        environmentRevision + ":" + sensorRevision + ":" + simulationRevision;
+      cachedSubmitPerspectiveKey = perspectiveKey;
+      cachedSubmitKey = buildEditorSubmitKey(sceneGeneration, sceneRevision,
+        environmentRevision, sensorRevision, simulationRevision, perspectiveKey);
     }
     return cachedSubmitKey;
+  }
+
+  static function buildEditorSubmitKey(sceneGeneration:Int, sceneRevision:Int,
+      environmentRevision:Int, sensorRevision:Int, simulationRevision:Int,
+      perspectiveKey:String):String {
+    return "editor:" + sceneGeneration + ":" + sceneRevision + ":" +
+      environmentRevision + ":" + sensorRevision + ":" + simulationRevision +
+      ":perspective:" + perspectiveKey;
   }
 
   public function context():UiContext return ui;

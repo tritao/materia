@@ -83,6 +83,10 @@ class EditorScene {
   var spatial:SpatialIndex;
   var presentationStale:Bool = false;
   var selectionMaterial:Material;
+  var hoverMaterial:Material;
+  final faceHoverNodes:Map<String, NodeId> = new Map();
+  final faceHoverGeometries:Map<String, Geometry> = new Map();
+  final faceHoverIndexes:Map<String, Int> = new Map();
   public var selectedId(default, null):String = "box";
   public var selectedCadFaceIndex(default, null):Int = -1;
   public var selectedCadEdgeIndex(default, null):Int = -1;
@@ -160,6 +164,8 @@ class EditorScene {
       var phaseStarted = profileLoadStart();
       selectionMaterial = scene.createMaterial();
       scene.setMaterialData(selectionMaterial, MaterialData.opaque(1.0, 0.88, 0.35).setRoughness(0.7));
+      hoverMaterial = scene.createMaterial();
+      scene.setMaterialData(hoverMaterial, MaterialData.opaque(0.45, 0.78, 1.0).setRoughness(0.55));
       profileLoadEnd("finalMaterial", phaseStarted);
       phaseStarted = profileLoadStart();
       snapshot = scene.snapshot();
@@ -1138,6 +1144,7 @@ class EditorScene {
   function syncCadSession(id:String):Void {
     var item = requiredObject(id);
     var session = requireCadSession(id);
+    faceHoverIndexes.remove(id);
     scene.setGeometryData(runtimeFor(id).geometry, session.geometry());
     var values = session.model.sceneDimensions();
     // Scene persistence requires strictly positive authored dimensions, while a
@@ -1279,8 +1286,26 @@ class EditorScene {
     var previousSelectedKind:Null<String> = previousSelected == null ? null : previousSelected.kind;
     var existingById:Map<String, EditorSceneObject> = new Map();
     for (item in objects) existingById.set(item.id, item);
+    var staleFaceHoverIds:Array<String> = [];
+    for (id in faceHoverNodes.keys()) {
+      var record:Null<SceneObjectData> = null;
+      for (candidate in data) if (candidate.id == id) {
+        record = candidate;
+        break;
+      }
+      var existing = existingById.get(id);
+      var sourceChanged = record != null && existing != null && record.type == "cad-preview"
+        ? existing.meshSnapshot != record.meshSnapshot : false;
+      if (record == null || existing == null || !isFaceHoverKind(record.type) ||
+          existing.kind != record.type || existing.cadGraph != record.cadGraph || sourceChanged)
+        staleFaceHoverIds.push(id);
+    }
     var prepared = new PreparedSceneEdit(scene.beginTransaction(), [],
       bridge.copyEntries(), bridge.copyNodeEntries(), cadSessions.copy());
+    for (id in staleFaceHoverIds) {
+      var node = faceHoverNodes.get(id);
+      if (node != null) prepared.transaction.destroyNode(node);
+    }
     var previousFace=selectedCadFaceFingerprint;
     var previousFaceShape=selectedCadFace;
     var previousFaceX=selectedCadFaceX,previousFaceY=selectedCadFaceY;
@@ -1433,6 +1458,13 @@ class EditorScene {
     } catch (error:Dynamic) {
       prepared.abort();
       throw error;
+    }
+    for (id in staleFaceHoverIds) {
+      faceHoverNodes.remove(id);
+      faceHoverIndexes.remove(id);
+      var geometry = faceHoverGeometries.get(id);
+      faceHoverGeometries.remove(id);
+      if (geometry != null) geometry.dispose();
     }
     objects = prepared.objects;
     cadSessions = prepared.cadSessions;
@@ -1587,12 +1619,23 @@ class EditorScene {
   }
 
   public function configureRenderView(view:SceneView, viewProjection:Transform,
-      ?poses:Array<SimulationPoseVisual>):SceneView {
+      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1):SceneView {
     view.setViewProjection(viewProjection);
     var selected = object(selectedId);
     var selection = new SelectionSet();
     if (selected != null) selection.add(runtimeFor(selected.id).node);
     view.applySelection(selection, selectionMaterial);
+    var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
+      ? null : faceHoverNodes.get(hoveredId);
+    if (faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex) {
+      // The face node is hidden in the scene and shown only in this presentation view.
+      view.setVisibility(faceHoverNode, true);
+      view.setMaterial(faceHoverNode, hoverMaterial);
+      view.applyHover(null, hoverMaterial);
+    } else {
+      var hovered = hoveredId == null ? null : object(hoveredId);
+      view.applyHover(hovered == null ? null : runtimeFor(hovered.id).node, hoverMaterial);
+    }
     if (poses != null) {
       var poseNodes:Array<NodeId> = [];
       var poseTransforms:Array<Transform> = [];
@@ -1932,6 +1975,81 @@ class EditorScene {
     refreshPresentationIfStale();
     var hit = spatial.pickRay(x, y, 1000001.0, 0.0, 0.0, -1.0);
     return idForHit(hit);
+  }
+
+  /** Pick the object and CAD face used by the viewport hover presentation. */
+  public function hoverHit(x:Float, y:Float):{id:String, faceIndex:Int} {
+    return hoverHitRay(x, y, 1000001.0, 0.0, 0.0, -1.0);
+  }
+
+  /** Perspective variant of hoverHit, using the same presented geometry. */
+  public function hoverHitRay(originX:Float, originY:Float, originZ:Float,
+      directionX:Float, directionY:Float, directionZ:Float):{id:String, faceIndex:Int} {
+    refreshPresentationIfStale();
+    var hit = spatial.pickRay(originX, originY, originZ, directionX, directionY, directionZ);
+    var id = idForHit(hit);
+    var faceIndex = -1;
+    var item = object(id);
+    var subelement = hit.subelement();
+    if (item != null && isFaceHoverKind(item.kind) && (subelement & 0x40000000) == 0 &&
+        subelement >= 0) {
+      faceIndex = subelement;
+      ensureFaceHoverPresentation(id, faceIndex);
+    }
+    return {id: id, faceIndex: faceIndex};
+  }
+
+  /** Ensures a hidden child node contains exactly one CAD or preview face for hover rendering. */
+  function ensureFaceHoverPresentation(id:String, faceIndex:Int):Void {
+    var item = object(id);
+    if (item == null || !isFaceHoverKind(item.kind) || faceIndex < 0) return;
+    if (faceHoverIndexes.get(id) == faceIndex && faceHoverNodes.exists(id)) return;
+
+    var geometryData = faceHoverGeometry(id, item, faceIndex);
+    if (geometryData == null) return;
+    var geometry = faceHoverGeometries.get(id);
+    if (geometry == null) {
+      geometry = scene.createGeometry();
+      scene.setGeometryData(geometry, geometryData);
+      var transaction = scene.beginTransaction();
+      var node = transaction.createNode();
+      transaction.setName(node, "Hover face " + (faceIndex + 1));
+      transaction.setVisibility(node, false);
+      transaction.setParent(node, runtimeFor(id).node);
+      transaction.setGeometry(node, geometry);
+      transaction.setMaterial(node, hoverMaterial);
+      transaction.setTransform(node, Transform.identity());
+      transaction.commit();
+      faceHoverNodes.set(id, node);
+      faceHoverGeometries.set(id, geometry);
+    } else {
+      scene.setGeometryData(geometry, geometryData);
+    }
+    faceHoverIndexes.set(id, faceIndex);
+    publish();
+  }
+
+  /** Common face-hover geometry boundary for live CAD and serialized preview objects. */
+  function faceHoverGeometry(id:String, item:EditorSceneObject,
+      faceIndex:Int):Null<GeometryData> {
+    if (isCadKind(item.kind)) {
+      var session = cadSessions.get(id);
+      if (session == null) return null;
+      var output = session.document.outputFeatureOrNull();
+      if (output == null || output.currentShape() == null) return null;
+      var face:Shape = output.currentShape().subshape(CadKit.ShapeKind.Face, faceIndex);
+      try {
+        var result = session.model.geometryFor(face, true);
+        face.close();
+        return result;
+      } catch (error:Dynamic) {
+        face.close();
+        throw error;
+      }
+    }
+    if (item.kind == "cad-preview" && item.meshSnapshot != null)
+      return previewGeometry(item.meshSnapshot).subelementGeometry(faceIndex);
+    return null;
   }
 
   public function pickRay(originX:Float,originY:Float,originZ:Float,
@@ -2640,6 +2758,9 @@ class EditorScene {
 
   static function isCadKind(kind:String):Bool
     return kind=="cad-plate"||kind=="cad-bracket"||kind=="cad-step"||kind=="cad-part";
+
+  static function isFaceHoverKind(kind:String):Bool
+    return isCadKind(kind) || kind == "cad-preview";
 
   function requireCadSession(id:String):CadDocumentSession {
     var result=cadSessions.get(id);

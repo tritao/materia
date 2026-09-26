@@ -12,6 +12,9 @@ import nativekit.ui.properties.PropertyEditResult;
 import nativekit.ui.core.ViewportCamera;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
+import nativekit.scene.GeometryData;
+import LayoutFrame;
+import NativeKitEvents;
 import app.SceneDocumentSession;
 import app.SceneCodec;
 import app.SensorConfiguration;
@@ -19,6 +22,9 @@ import app.ApplicationSimulation;
 import app.PerspectiveCamera;
 import app.EditorPerspectiveViewport;
 import app.PerspectiveSceneDrag;
+import app.Main.ReferenceEditorApp;
+import nativekit.ui.core.UiContext;
+import nativekit.ui.host.UiHostContext;
 import robotkit.world.RobotWorld;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
@@ -41,6 +47,8 @@ import robotkit.model.RobotForkConfiguration;
 import sys.FileSystem;
 import sys.io.File;
 
+@:access(app.EditorPerspectiveViewport)
+@:access(app.Main.ReferenceEditorApp)
 class SceneEditingTests {
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
@@ -903,10 +911,15 @@ class SceneEditingTests {
       var view = scene.configureRenderView(new SceneView(), Transform.identity());
       check(view.selectionOverrideCount() == 1,
         "perspective view highlights the shared scene selection");
+      view = scene.configureRenderView(new SceneView(), Transform.identity(), null, "tower");
+      check(view.hoverOverrideCount() == 1,
+        "perspective view presents the hovered object");
       scene.select("scene");
       view = scene.configureRenderView(new SceneView(), Transform.identity());
       check(view.selectionOverrideCount() == 0,
         "perspective view clears highlighting with the shared selection");
+      check(view.hoverOverrideCount() == 0,
+        "perspective view clears the hover presentation");
       scene.select("tower");
       scene.setVisible("tower", false);
       check(!scene.info("tower").visible(),
@@ -921,7 +934,125 @@ class SceneEditingTests {
     scene.dispose();
   }
 
+  static function perspectiveHoverInput():Void {
+    var scene = new EditorScene();
+    var frameRequests = 0;
+    var host = new UiHostContext(null, new NativeKitEvents(), function() {}, function() {
+      frameRequests++;
+    });
+    var viewport = new EditorPerspectiveViewport("hover-test", scene, host);
+    var ui = new UiContext();
+    try {
+      viewport.renderedWidth = 800;
+      viewport.renderedHeight = 600;
+      viewport.frameSelected();
+      var beforeKey = viewport.presentationKey();
+      ui.submit(viewport, new LayoutFrame(800.0, 600.0));
+
+      ui.events.pointerMove(400.0, 300.0);
+      check(viewport.hoveredId() == "box",
+        "perspective pointer hover resolves the object under the cursor");
+      check(frameRequests == 1,
+        "perspective pointer hover requests a repaint");
+      check(viewport.presentationKey() != beforeKey,
+        "perspective pointer hover changes the presentation cache key");
+      var beforeSubmitKey = ReferenceEditorApp.buildEditorSubmitKey(1, 2, 3, 4, 5, beforeKey);
+      var afterSubmitKey = ReferenceEditorApp.buildEditorSubmitKey(1, 2, 3, 4, 5,
+        viewport.presentationKey());
+      check(beforeSubmitKey != afterSubmitKey,
+        "perspective pointer hover invalidates the retained editor submission");
+      var hoveredView = scene.configureRenderView(new SceneView(),
+        viewport.camera.viewProjection(800.0 / 600.0), null, viewport.hoveredId());
+      check(hoveredView.hoverOverrideCount() == 1,
+        "perspective pointer hover reaches the scene presentation layer");
+
+      ui.events.pointerMove(0.0, 0.0);
+      check(viewport.hoveredId() == null,
+        "perspective pointer hover clears outside scene geometry");
+      check(frameRequests == 2,
+        "clearing perspective pointer hover requests a repaint");
+      var clearedView = scene.configureRenderView(new SceneView(),
+        viewport.camera.viewProjection(800.0 / 600.0), null, viewport.hoveredId());
+      check(clearedView.hoverOverrideCount() == 0,
+        "cleared perspective pointer hover removes the scene presentation layer");
+    } catch (error:Dynamic) {
+      ui.dispose();
+      scene.dispose();
+      throw error;
+    }
+    ui.dispose();
+    scene.dispose();
+  }
+
+  static function cadFaceHoverPresentation():Void {
+    var scene = new EditorScene();
+    try {
+      check(scene.createMountingPlate(), "CAD plate is available for face hover");
+      var hit = scene.hoverHit(0.03, 0.0);
+      check(hit.id != "scene", "CAD face hover resolves the object under the cursor (" + hit.id + ")");
+      check(hit.faceIndex >= 0, "CAD face hover preserves the picked face identity");
+      var view = scene.configureRenderView(new SceneView(), Transform.identity(), null,
+        hit.id, hit.faceIndex);
+      check(view.visibilityOverrideCount() == 1,
+        "CAD face hover presents a dedicated face overlay node");
+      check(view.hoverOverrideCount() == 0,
+        "CAD face hover does not replace the whole-object presentation");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
+  }
+
+  static function cadPreviewFaceHoverPresentation():Void {
+    var positions = haxe.io.Bytes.alloc(3 * 12);
+    positions.setFloat(0, -0.1); positions.setFloat(4, -0.1); positions.setFloat(8, 0.0);
+    positions.setFloat(12, 0.1); positions.setFloat(16, -0.1); positions.setFloat(20, 0.0);
+    positions.setFloat(24, 0.0); positions.setFloat(28, 0.1); positions.setFloat(32, 0.0);
+    var normals = haxe.io.Bytes.alloc(3 * 12);
+    for (index in 0...3) {
+      normals.setFloat(index * 12, 0.0);
+      normals.setFloat(index * 12 + 4, 0.0);
+      normals.setFloat(index * 12 + 8, 1.0);
+    }
+    var indices = haxe.io.Bytes.alloc(3 * 4);
+    indices.setInt32(0, 0); indices.setInt32(4, 1); indices.setInt32(8, 2);
+    var geometry = new GeometryData();
+    geometry.addStream(1, 2, positions, 3, 12);
+    geometry.addStream(2, 2, normals, 3, 12);
+    geometry.setIndexBuffer(indices, 3);
+    geometry.addSubelement(0, 1, 7);
+    geometry.setBounds(-0.1, -0.1, 0.0, 0.1, 0.1, 0.0);
+    var generated = new Map<String, GeometryData>();
+    generated.set("preview-mesh", geometry);
+    var data:Array<app.SceneObjectData> = [{
+      id: "preview", label: "Preview", type: "cad-preview", x: 0.0, y: 0.0, z: 0.0,
+      width: 0.2, height: 0.2, depth: 0.001, collisionEnabled: false,
+      dynamicBody: false, mass: 1.0, red: 0.4, green: 0.6, blue: 0.8,
+      visible: true, meshSnapshot: "preview-mesh"
+    }];
+    var scene = new EditorScene(data, null, null, generated);
+    try {
+      var hit = scene.hoverHit(0.0, 0.0);
+      check(hit.id == "preview", "CAD preview face hover resolves the preview object");
+      check(hit.faceIndex == 7, "CAD preview face hover preserves the mesh face identity");
+      var view = scene.configureRenderView(new SceneView(), Transform.identity(), null,
+        hit.id, hit.faceIndex);
+      check(view.visibilityOverrideCount() == 1,
+        "CAD preview face hover presents a dedicated face overlay node");
+      check(view.hoverOverrideCount() == 0,
+        "CAD preview face hover does not replace the whole-object presentation");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
+  }
+
   static function main():Int {
+    perspectiveHoverInput();
+    cadFaceHoverPresentation();
+    cadPreviewFaceHoverPresentation();
     var scene = new EditorScene();
     try {
       check(scene.items().length == 2, "two initial objects");

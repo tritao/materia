@@ -22,7 +22,7 @@ import nativekit.ui.core.UiEvent;
 import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.View;
-import nativekit.ui.host.DesktopUiHostContext;
+import nativekit.ui.host.UiHostContext;
 import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.Semantics;
 
@@ -30,7 +30,7 @@ import nativekit.ui.semantics.Semantics;
 class EditorPerspectiveViewport implements View {
   public final key:String;
   final scene:EditorScene;
-  final host:DesktopUiHostContext;
+  final host:UiHostContext;
   var renderer:Null<SceneRenderer> = null;
   final style:LayoutStyle;
   var surface:Null<GraphicsSurface> = null;
@@ -39,6 +39,7 @@ class EditorPerspectiveViewport implements View {
   var renderedHeight:Int = 0;
   var renderedCameraRevision:Int = -1;
   var renderedLightingRevision:Int = -1;
+  var renderedHoverRevision:Int = -1;
   var lightingRevision:Int = 0;
   var lightingPreset:Int = 0;
   var renderCount:Int = 0;
@@ -53,6 +54,9 @@ class EditorPerspectiveViewport implements View {
   var pointerStartX:Float = 0.0;
   var pointerStartY:Float = 0.0;
   var pointerMoved:Bool = false;
+  var hoveredObjectId:Null<String> = null;
+  var hoveredFaceIndex:Int = -1;
+  var hoverRevision:Int = 0;
   var objectDrag:Null<PerspectiveSceneDrag> = null;
   var sketchRectangleDrag:Null<PerspectiveSketchRectangleDrag> = null;
   var gridSnapEnabled:Bool = false;
@@ -63,7 +67,7 @@ class EditorPerspectiveViewport implements View {
   var simulationPoses:Array<SimulationPoseVisual> = [];
   var robotVisuals:Array<SimulationRobotVisual> = [];
 
-  public function new(key:String, scene:EditorScene, host:DesktopUiHostContext, ?style:LayoutStyle) {
+  public function new(key:String, scene:EditorScene, host:UiHostContext, ?style:LayoutStyle) {
     this.key = key;
     this.scene = scene;
     this.host = host;
@@ -71,6 +75,11 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function lightingPresetId():Int return lightingPreset;
+
+  /** Revision key for state that changes the retained viewport presentation. */
+  public function presentationKey():String
+    return camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
+      hoverRevision + ":" + gridVisible + ":" + gridStep;
 
   public function setLightingPreset(preset:Int):Void {
     if (preset < 0 || preset > 2 || preset == lightingPreset) return;
@@ -86,7 +95,8 @@ class EditorPerspectiveViewport implements View {
       node.semantics = new Semantics(AccessibilityRole.Image,
         "Scene perspective GPU view");
       node.onPaint(paint, "perspective:" + scene.revision + ":" + runtimeRevision + ":" +
-        sketchDragRevision + ":" + camera.revision + ":light:" + lightingRevision + ":" +
+        sketchDragRevision + ":hover:" + hoverRevision + ":" + camera.revision +
+        ":light:" + lightingRevision + ":" +
         renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep);
       installNavigation(node);
       return node;
@@ -101,11 +111,12 @@ class EditorPerspectiveViewport implements View {
     if (renderer != null && (surface == null || renderedRevision != displayRevision ||
         renderedCameraRevision != camera.revision ||
         renderedLightingRevision != lightingRevision ||
+        renderedHoverRevision != hoverRevision ||
         width != renderedWidth || height != renderedHeight)) {
       var started = Sys.time();
       fitCameraClipRange();
       var view = scene.configureRenderView(new SceneView(), camera.viewProjection(width / height),
-        simulationActive ? simulationPoses : null);
+        simulationActive ? simulationPoses : null, hoveredObjectId, hoveredFaceIndex);
       view.setCameraViewPose(camera.eyePosition(), camera.viewDirection());
       if (gridVisible && gridStep > 0.0) {
         var scale = Math.tan(PerspectiveCamera.FOV_Y * Math.PI / 360.0);
@@ -151,6 +162,7 @@ class EditorPerspectiveViewport implements View {
       renderedRevision = displayRevision;
       renderedCameraRevision = camera.revision;
       renderedLightingRevision = lightingRevision;
+      renderedHoverRevision = hoverRevision;
       renderedWidth = width;
       renderedHeight = height;
       lastRenderSeconds = Sys.time() - started;
@@ -259,6 +271,34 @@ class EditorPerspectiveViewport implements View {
       simulationActive?simulationPoses:null);
     return scene.pickRayWithView(view,ray.originX,ray.originY,ray.originZ,
       ray.directionX,ray.directionY,ray.directionZ,edgeAngularTolerance(localX,localY));
+  }
+
+  public function hoveredId():Null<String> return hoveredObjectId;
+
+  public function hoveredFace():Int return hoveredFaceIndex;
+
+  function updateHover(localX:Float, localY:Float):Void {
+    fitCameraClipRange();
+    var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth),
+      Math.max(1, renderedHeight));
+    var hit = scene.hoverHitRay(ray.originX, ray.originY, ray.originZ,
+      ray.directionX, ray.directionY, ray.directionZ);
+    var next:Null<String> = hit.id;
+    var nextFace = hit.faceIndex;
+    if (next == "scene") next = null;
+    if (next == hoveredObjectId && nextFace == hoveredFaceIndex) return;
+    hoveredObjectId = next;
+    hoveredFaceIndex = next == null ? -1 : nextFace;
+    hoverRevision++;
+    host.requestFrame();
+  }
+
+  function clearHover():Void {
+    if (hoveredObjectId == null && hoveredFaceIndex < 0) return;
+    hoveredObjectId = null;
+    hoveredFaceIndex = -1;
+    hoverRevision++;
+    host.requestFrame();
   }
 
   function edgeAngularTolerance(localX:Float,localY:Float):Float {
@@ -532,6 +572,7 @@ class EditorPerspectiveViewport implements View {
   function installNavigation(node:RenderNode):Void {
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (event.button != 0 && event.button != 2) return;
+      updateHover(event.localX, event.localY);
       if (event.button == 0 && editingEnabled() && scene.hasActiveSketchEdit()) {
         var point = sketchPlanePoint(event.localX, event.localY);
         if (point == null) return;
@@ -559,7 +600,11 @@ class EditorPerspectiveViewport implements View {
       event.capturePointer(); event.preventDefault(); event.stopPropagation();
     });
     node.on(UiEventKind.PointerMove, function(event:UiEvent) {
-      if (navigationPointer == null || event.pointerId != navigationPointer) return;
+      if (navigationPointer == null) {
+        updateHover(event.localX, event.localY);
+        return;
+      }
+      if (event.pointerId != navigationPointer) return;
       var deltaX = event.x - pointerX, deltaY = event.y - pointerY;
       pointerX = event.x; pointerY = event.y;
       if (Math.abs(event.x - pointerStartX) >= 3.0 || Math.abs(event.y - pointerStartY) >= 3.0)
@@ -579,7 +624,14 @@ class EditorPerspectiveViewport implements View {
           }
         }
       }
+      if (navigationMode != 4) updateHover(event.localX, event.localY);
       event.preventDefault(); event.stopPropagation();
+    });
+    node.on(UiEventKind.HoverEnter, function(event:UiEvent) {
+      if (navigationPointer == null) updateHover(event.localX, event.localY);
+    });
+    node.on(UiEventKind.HoverLeave, function(_) {
+      if (navigationPointer == null) clearHover();
     });
     var finish = function(event:UiEvent) {
       if (navigationPointer == null || event.pointerId != navigationPointer) return;
@@ -602,6 +654,8 @@ class EditorPerspectiveViewport implements View {
       } else if (event.kind == UiEventKind.PointerUp && navigationMode == 1 && !pointerMoved)
         selectAt(event.localX,event.localY);
       navigationPointer = null; navigationMode = 0;
+      if (event.kind == UiEventKind.PointerUp) updateHover(event.localX, event.localY);
+      else clearHover();
       event.releasePointer(); event.preventDefault(); event.stopPropagation();
     };
     node.on(UiEventKind.PointerUp, finish);
