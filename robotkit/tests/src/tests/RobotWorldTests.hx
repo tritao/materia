@@ -186,6 +186,7 @@ class RobotWorldTests {
     testStableModelIdentity();
     testSensorAndClockContracts();
     testSensorResetPublication();
+    testRobotResetPose();
     testConfiguredSensors();
     testCameraFrameProtocol();
     testExternalSensorRuntime();
@@ -2186,13 +2187,13 @@ class RobotWorldTests {
       snapshot.velocities.get(0) == 0.0 && snapshot.velocities.get(1) == 0.0,
       "DifferentialDrivePlant and the wheels stop during a direct normal stop");
 
-    // Driving never replaces the reset pose chosen by the editable-scene teleport.
+    // Driving and teleporting never replace the reset pose chosen at add time.
     simulation.resetRobot(0);
     simulation.step(Int64.ofInt(tick++));
     var reset = simulation.robotPose(0);
-    check(Math.abs(reset.position[0] - 1.0) < 1e-6 && Math.abs(reset.position[1] - 2.0) < 1e-6 &&
-      Math.abs(reset.position[2] - 0.3) < 1e-6,
-      "resetRobot restores the authored base pose after the plant drove it");
+    check(Math.abs(reset.position[0]) < 1e-6 && Math.abs(reset.position[1]) < 1e-6 &&
+      Math.abs(reset.position[2]) < 1e-6,
+      "resetRobot restores the addRobot default pose after driving and teleporting");
     robot.close();
     simulation.dispose();
   }
@@ -3686,6 +3687,32 @@ class RobotWorldTests {
     catch (_:Dynamic) rejected = true;
     check(rejected, "simulation never silently ignores an unsupported deadline");
     robot.close();
+    simulation.dispose();
+  }
+
+  static function testRobotResetPose():Void {
+    var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
+    var simulation = new Simulation();
+    var yaw = Math.PI * 0.5;
+    simulation.addRobot(blueprint, new Pose2(3.0, 2.0, yaw));
+    simulation.teleportRobot(0, [8.0, 9.0, 0.0],
+      [0.0, 0.0, Math.sin(0.2), Math.cos(0.2)]);
+    simulation.resetRobot(0);
+    var reset = simulation.robotPose(0);
+    check(Math.abs(reset.position[0] - 3.0) < 1e-9 &&
+      Math.abs(reset.position[1] - 2.0) < 1e-9 &&
+      Math.abs(reset.position[2]) < 1e-9 &&
+      Math.abs(reset.rotation[2] - Math.sin(yaw * 0.5)) < 1e-9 &&
+      Math.abs(reset.rotation[3] - Math.cos(yaw * 0.5)) < 1e-9,
+      "resetRobot restores the initial pose supplied to addRobot");
+    simulation.teleportRobot(0, [5.0, 6.0, 0.0]);
+    simulation.reset();
+    var resetAll = simulation.robotPose(0);
+    check(Math.abs(resetAll.position[0] - 3.0) < 1e-9 &&
+      Math.abs(resetAll.position[1] - 2.0) < 1e-9 &&
+      Math.abs(resetAll.rotation[2] - Math.sin(yaw * 0.5)) < 1e-9 &&
+      Math.abs(resetAll.rotation[3] - Math.cos(yaw * 0.5)) < 1e-9,
+      "teleportRobot does not replace the stored reset pose");
     simulation.dispose();
   }
 

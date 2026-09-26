@@ -81,6 +81,14 @@ typedef struct rk_simulation_pose {
     double rotation[4];
 } rk_simulation_pose;
 
+/** Optional initial pose for one robot added to a Simulation. */
+typedef struct rk_simulation_robot_desc {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t reserved0;
+    rk_simulation_pose initial_pose;
+    uint64_t reserved[2];
+} rk_simulation_robot_desc;
+
 /**
  * Ideal rolling differential-drive coupling for one robot's kinematic base.
  *
@@ -216,11 +224,14 @@ RK_API void RK_CALL rk_simulation_destroy(rk_simulation simulation);
  *
  * @param simulation Shared simulation owner.
  * @param blueprint Compiled robot topology and joint metadata.
+ * @param robot_desc Optional versioned initial-pose descriptor. A null pointer
+ * uses the existing default pose `(robot_index, 0, 0)` with identity yaw.
  * @param out_runtime Receives an owned runtime handle bound to this simulation.
  * @return RK_OK on success, or an invalid-state/argument/backend error.
  */
 RK_API rk_result RK_CALL rk_simulation_add_robot(
     rk_simulation simulation, const rk_robot_runtime_blueprint *blueprint,
+    const rk_simulation_robot_desc *robot_desc,
     rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
 /**
  * Applies all attached robot commands and advances the world exactly once.
@@ -267,7 +278,8 @@ RK_API rk_result RK_CALL rk_simulation_reset(rk_simulation simulation);
 /** Restores one attached robot's bodies and clears its runtime state. */
 RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
                                                     uint32_t robot_index);
-/** Teleports one attached robot's base while the simulation is stopped. */
+/** Teleports one attached robot's base while the simulation is stopped.
+ * This does not change the pose restored by reset or resetRobot. */
 RK_API rk_result RK_CALL rk_simulation_teleport_robot(
     rk_simulation simulation, uint32_t robot_index,
     const rk_simulation_pose *pose);

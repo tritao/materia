@@ -16,6 +16,8 @@
 namespace robotkit {
 namespace {
 
+bool valid_pose(const double position[3], const double rotation[4]);
+
 void require_sim(nksim_result result, const char *operation) {
     if (result != NKSIM_OK)
         throw std::runtime_error(operation);
@@ -176,7 +178,8 @@ Simulation::~Simulation() {
 }
 
 rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
-                                rk_robot_runtime &out_runtime) {
+                                rk_robot_runtime &out_runtime,
+                                const rk_simulation_pose *initial_pose) {
     std::lock_guard tick_lock(tick_mutex_);
     bool topology_update = false;
     {
@@ -186,6 +189,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     }
     if (topology_frozen_ || rk_robot_runtime_blueprint_validate(&blueprint) != RK_OK ||
         blueprint.link_count == 0)
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (initial_pose && (initial_pose->struct_size < sizeof(*initial_pose) ||
+                         !valid_pose(initial_pose->position, initial_pose->rotation)))
         return RK_ERROR_INVALID_ARGUMENT;
     try {
         auto binding = std::shared_ptr<SimulationRobot>(new SimulationRobot(*this));
@@ -197,7 +203,19 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 child = child || blueprint.joints[joint].child_link == candidate;
             if (!child) { root = candidate; break; }
         }
-        const auto rest_poses = link_rest_poses(blueprint, robot_index, root);
+        auto rest_poses = link_rest_poses(blueprint, robot_index, root);
+        rk_simulation_pose chosen_initial{};
+        chosen_initial.struct_size = sizeof(chosen_initial);
+        chosen_initial.position[0] = static_cast<double>(robot_index);
+        chosen_initial.rotation[3] = 1.0;
+        if (initial_pose) {
+            chosen_initial = *initial_pose;
+            const auto authored_root = xform_from(rest_poses[root].pos, rest_poses[root].rot);
+            const auto requested_root = xform_from(chosen_initial.position, chosen_initial.rotation);
+            const auto root_delta = xform_compose(requested_root, xform_inverse(authored_root));
+            for (auto &rest_pose : rest_poses)
+                rest_pose = xform_compose(root_delta, rest_pose);
+        }
         nkscene_transaction transaction = 0;
         require_scene(nkscene_transaction_begin(scene_, &transaction),
                       "nkscene_transaction_begin");
@@ -281,12 +299,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         bindings_.push_back(binding);
         binding->base_body_ = binding->bodies_[root];
         robot_base_bodies_.push_back(binding->base_body_);
-        rk_simulation_pose initial_pose{};initial_pose.struct_size=sizeof(initial_pose);
-        // Matches robot_transform(), the authored node pose kinematic bases start from.
-        initial_pose.position[0]=static_cast<double>(robot_index);
-        initial_pose.rotation[3]=1.0;robot_initial_poses_.push_back(initial_pose);
-        robot_base_poses_.push_back(initial_pose);
-        robot_tick_poses_.push_back(initial_pose);
+        robot_initial_poses_.push_back(chosen_initial);
+        robot_base_poses_.push_back(chosen_initial);
+        robot_tick_poses_.push_back(chosen_initial);
         drives_.emplace_back();
         for (uint32_t i = 0; i < (blueprint.sensor_count ? blueprint.sensor_count : 3); ++i) {
             SimulationRobot::SensorState sensor;
@@ -799,7 +814,6 @@ rk_result Simulation::teleport_robot(uint32_t robot_index, const rk_simulation_p
         result = set_body_pose(world_, robot_base_bodies_[robot_index], pose.position, pose.rotation);
     if (result == RK_OK) {
         binding->reset_sensors();
-        robot_initial_poses_[robot_index] = pose;
         if (snapshot_ != 0) { nksim_snapshot_destroy(snapshot_); snapshot_ = 0; }
     }
     return result;

@@ -1229,3 +1229,12 @@ default-enabled `selfCollision` flag; disabling it uses a separate collision
 category that retains environment contact. The MuJoCo native suite passed,
 including the folded three-link contact regression, and the Haxe world suite
 passed with 4,327 assertions.
+
+**F5**: `Simulation.addRobot` now accepts an optional, `struct_size`-versioned
+initial-pose descriptor. The native runtime applies that pose to the complete
+authored robot tree, stores it for both reset paths, and leaves it unchanged
+when an editor or caller teleports the robot later. The Haxe wrapper exposes
+the descriptor through an optional `Pose2`, while null preserves the existing
+indexed default pose. Tests cover reset after teleport, full simulation reset,
+and the driven differential-base path; the Haxe world suite passed with 4,329
+assertions.

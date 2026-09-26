@@ -40,7 +40,7 @@ int main() {
     model.sensors[1].ray_count = 16;
     model.sensors[1].max_range = 20.0;
     rk_robot_runtime robot = 0;
-    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
 
     // Falling box crosses and leaves the LiDAR plane. Contact response is
     // checked independently by the sim_mujoco backend's plane-drop fixture.

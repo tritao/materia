@@ -31,7 +31,8 @@ public:
     Simulation &operator=(const Simulation &) = delete;
 
     /** Adds one simulation-owned runtime before the topology is sealed. */
-    rk_result add_robot(const rk_robot_runtime_blueprint &blueprint, rk_robot_runtime &out_runtime);
+    rk_result add_robot(const rk_robot_runtime_blueprint &blueprint, rk_robot_runtime &out_runtime,
+                        const rk_simulation_pose *initial_pose = nullptr);
     /** Starts the shared realtime owner thread after all robots are attached. */
     rk_result start();
     /** Stops the shared realtime owner thread without destroying the universe. */

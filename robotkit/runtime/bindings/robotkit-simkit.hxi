@@ -19,7 +19,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * @param out_runtime Receives an owned runtime handle bound to this simulation.
 	 * @return RK_OK on success, or an invalid-state/argument/backend error.
 	 */
-	extern fn rk_simulation_add_robot(simulation: rk_simulation, blueprint: ptr<const<rk_robot_runtime_blueprint>>, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
+	extern fn rk_simulation_add_robot(simulation: rk_simulation, blueprint: ptr<const<rk_robot_runtime_blueprint>>, robot_desc: ptr<const<rk_simulation_robot_desc>>, out_runtime: ptr<rk_robot_runtime> @out @owned) -> rk_result;
 	/**
 	 * Copies the complete clock and every presentation pose under one simulation lock.
 	 */
@@ -352,6 +352,15 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		reserved0: u32 @offset(4);
 		position: array<f64, 3> @offset(8);
 		rotation: array<f64, 4> @offset(32);
+	}
+	struct rk_simulation_robot_desc @layout(88, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		reserved0: u32 @offset(4);
+		initial_struct_size: u32 @offset(8);
+		initial_reserved0: u32 @offset(12);
+		initial_position: array<f64, 3> @offset(16);
+		initial_rotation: array<f64, 4> @offset(40);
+		reserved: array<u64, 2> @offset(72);
 	}
 	struct rk_simulation_presentation_info @layout(40, 8) {
 		struct_size: u32 @offset(0) @struct_size;

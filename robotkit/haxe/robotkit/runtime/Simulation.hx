@@ -2,6 +2,7 @@ package robotkit.runtime;
 
 import RobotKitSimKit;
 import haxe.Int64;
+import robotkit.mobile.Pose2;
 
 /**
  * Owns one shared simulated universe and its fixed-step clock.
@@ -32,9 +33,19 @@ class Simulation {
   }
 
   /** Adds topology before the first start or step. */
-  public function addRobot(blueprint:RobotRuntimeBlueprint):RobotRuntime {
+  public function addRobot(blueprint:RobotRuntimeBlueprint, ?initialPose:Pose2):RobotRuntime {
     ensureLive();
-    var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue());
+    var robotDesc:Null<rk_simulation_robot_desc> = null;
+    if (initialPose != null) {
+      robotDesc = new rk_simulation_robot_desc();
+      robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      robotDesc.set_initial_struct_size(rk_simulation_pose.size());
+      var pose = makePose([initialPose.x, initialPose.y, 0.0],
+        [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]);
+      for (index in 0...3) robotDesc.set_initial_position(index, pose.get_position(index));
+      for (index in 0...4) robotDesc.set_initial_rotation(index, pose.get_rotation(index));
+    }
+    var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
     var runtime = new RobotRuntime(result.out_runtime, blueprint);
     robots.push(runtime);

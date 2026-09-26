@@ -69,8 +69,8 @@ void shared_world_steps_once() {
     const auto second_model = blueprint(12);
     rk_robot_runtime first = RK_INVALID_ROBOT_RUNTIME;
     rk_robot_runtime second = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &first_model, &first) == RK_OK);
-    assert(rk_simulation_add_robot(simulation, &second_model, &second) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &first_model, nullptr, &first) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &second_model, nullptr, &second) == RK_OK);
 
     const auto first_command = target(0.4, 1);
     const auto second_command = target(-0.3, 1);
@@ -106,7 +106,7 @@ void shared_world_steps_once() {
     assert(std::abs(second_state.position[0] + 0.3) < 1e-12);
 
     rk_robot_runtime late = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &first_model, &late) ==
+    assert(rk_simulation_add_robot(simulation, &first_model, nullptr, &late) ==
            RK_ERROR_INVALID_STATE);
 
     assert(rk_simulation_step(simulation, 2000) == RK_OK);
@@ -201,8 +201,8 @@ void failed_command_phase_does_not_advance() {
     const auto model = blueprint(21);
     rk_robot_runtime first = RK_INVALID_ROBOT_RUNTIME;
     rk_robot_runtime second = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &model, &first) == RK_OK);
-    assert(rk_simulation_add_robot(simulation, &model, &second) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &first) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &second) == RK_OK);
 
     auto first_target = target(0.8, 1);
     first_target.targets[0].max_rate = 2.0;
@@ -249,7 +249,7 @@ void realtime_presentation_keeps_one_revision() {
     assert(rk_simulation_create(&desc, &simulation) == RK_OK);
     const auto model = blueprint(21);
     rk_robot_runtime runtime = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &model, &runtime) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &runtime) == RK_OK);
     assert(rk_simulation_start(simulation) == RK_OK);
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
 
@@ -285,7 +285,7 @@ void velocity_targets_advance_joint_coordinates() {
     assert(rk_simulation_create(&desc, &simulation) == RK_OK);
     const auto model = blueprint(31);
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     const auto command = velocity_target(2.0, 1);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     assert(rk_simulation_step(simulation, 100) == RK_OK);
@@ -310,7 +310,7 @@ void sensor_geometry_and_reset() {
     model.joints[0].parent_link = 1;
     model.joints[0].child_link = 0;
     rk_robot_runtime robot = 0;
-    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     rk_simulation_object_desc box{};
     box.struct_size = sizeof(box);
     box.position[0] = 2.0;
@@ -374,7 +374,7 @@ void driving_base_keeps_owner_sensors_and_reset_pose() {
     assert(rk_simulation_create(&desc, &simulation) == RK_OK);
     const auto model = blueprint(1);
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     rk_simulation_pose pose{};
     pose.struct_size = sizeof(pose);
     pose.rotation[3] = 1.0;
@@ -501,7 +501,7 @@ void normal_stop_zeroes_wheel_velocities() {
     auto simulation = make_simulation(0.01);
     const auto model = wheeled_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     uint64_t sequence = 0;
     uint64_t time = 0;
     auto command = wheel_targets(2.0, 3.0, ++sequence);
@@ -551,7 +551,7 @@ void differential_drive_follows_applied_wheel_targets() {
     auto simulation = make_simulation(dt);
     const auto model = wheeled_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     const double start_yaw = 0.5;
     rk_simulation_pose start{};
     start.struct_size = sizeof(start);
@@ -724,7 +724,7 @@ void driven_base_far_from_origin_reads_exact_imu() {
     auto simulation = make_simulation(dt);
     const auto model = wheeled_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     const double yaw = 0.7;
     rk_simulation_pose start{};
     start.struct_size = sizeof(start);
@@ -797,7 +797,7 @@ void differential_drive_keeps_authored_tilt() {
     auto simulation = make_simulation(dt);
     const auto model = wheeled_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     const double roll = 0.1, pitch = -0.05, yaw = 0.3;
     const double qx[4] = {std::sin(roll * 0.5), 0.0, 0.0, std::cos(roll * 0.5)};
     const double qy[4] = {0.0, std::sin(pitch * 0.5), 0.0, std::cos(pitch * 0.5)};
@@ -907,7 +907,7 @@ void omni_drive_follows_applied_wheel_targets() {
     auto simulation = make_simulation(dt);
     const auto model = omni_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_simulation_add_robot(simulation, &model, &robot) == RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     const double start_yaw = 0.5;
     rk_simulation_pose start{};
     start.struct_size = sizeof(start);
