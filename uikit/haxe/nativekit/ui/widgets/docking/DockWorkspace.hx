@@ -11,12 +11,15 @@ import nativekit.ui.widgets.layout.SplitViewOptions;
 import nativekit.ui.widgets.text.Text;
 
 import Color;
+import FontCollection;
 import LayoutAxis;
 import LayoutPositioning;
 import LayoutStyle;
 import LayoutVisualKind;
+import ParagraphStyle;
 import Rect;
 import TextLayout;
+import TextStyle;
 import TextWrap;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
@@ -74,33 +77,39 @@ class DockWorkspace implements View {
 		mount.invalidate = function() context.commands.refresh();
 		interaction = mount.interaction;
 		interaction.beginFrame();
+		var labelWidths:DockTextWidthCache = context.state(
+			context.id("tab-label-width-cache"), new DockTextWidthCache()).value;
 		var content = buildNode(model.root, context, [], "layout",
-			context.viewportWidth, availableHeight == null ? context.viewportHeight : availableHeight);
+			context.viewportWidth, availableHeight == null ? context.viewportHeight : availableHeight,
+			labelWidths);
 		var layout = new SizedBox("layout", content, LayoutAxis.grow(), LayoutAxis.grow());
 		return new Column(key, [new KeyedView("content", layout)], style).build(context);
 	}
 
 	function buildNode(node:DockNode, context:BuildContext, path:Array<Int>, nodeKey:String,
-		availableWidth:Float, availableHeight:Float):View {
+		availableWidth:Float, availableHeight:Float, labelWidths:DockTextWidthCache):View {
 		if (node == null)
 			return new Text("No dock layout");
 		switch (node) {
 			case DockNode.Empty: return new Text("No panels");
 			case DockNode.Panel(panelId):
-				return targetView(panelId, buildTabs([panelId], panelId, context, nodeKey, availableWidth));
+				return targetView(panelId, buildTabs([panelId], panelId, context, nodeKey,
+					availableWidth, labelWidths));
 			case DockNode.Tabs(panelIds, activePanelId):
 				var targetPanelId = activePanelId == null && panelIds != null && panelIds.length > 0
 					? panelIds[0] : activePanelId;
-				return targetPanelId == null ? buildTabs(panelIds, activePanelId, context, nodeKey, availableWidth) :
-					targetView(targetPanelId, buildTabs(panelIds, activePanelId, context, nodeKey, availableWidth));
+				return targetPanelId == null ? buildTabs(panelIds, activePanelId, context, nodeKey,
+					availableWidth, labelWidths) : targetView(targetPanelId,
+					buildTabs(panelIds, activePanelId, context, nodeKey, availableWidth, labelWidths));
 			case DockNode.Split(axis, ratio, first, second):
 				return buildSplit(axis, ratio, first, second, context, path, nodeKey,
-					availableWidth, availableHeight);
+					availableWidth, availableHeight, labelWidths);
 		}
 	}
 
 	function buildTabs(panelIds:Array<String>, activePanelId:String,
-		context:BuildContext, nodeKey:String, availableWidth:Float):View {
+		context:BuildContext, nodeKey:String, availableWidth:Float,
+		labelWidths:DockTextWidthCache):View {
 		var items:Array<TabItem> = [];
 		var visiblePanels:Array<DockPanelDescriptor> = [];
 		if (panelIds != null)
@@ -114,7 +123,7 @@ class DockWorkspace implements View {
 		var selectedWidth = allWidth;
 		for (descriptor in visiblePanels) {
 			var iconWidth = 20.0 + (descriptor.icon == null ? 0.0 : 14.0);
-			var labelWidth = tabLabelWidth(descriptor.title, context);
+			var labelWidth = tabLabelWidth(descriptor.title, context, labelWidths);
 			var labelledWidth = iconWidth + (descriptor.icon == null ? 0.0 : 8.0) + labelWidth;
 			allWidth += labelledWidth;
 			selectedWidth += descriptor.id == selectedId || descriptor.icon == null
@@ -175,20 +184,17 @@ class DockWorkspace implements View {
 		}, options);
 	}
 
-	function tabLabelWidth(label:String, context:BuildContext):Float {
+	function tabLabelWidth(label:String, context:BuildContext,
+		labelWidths:DockTextWidthCache):Float {
 		if (context.fonts == null) return label.length * 8.0;
 		var style = context.resolveTextRole(TextRole.Button,
 			TextStyleOverride.paragraph(TextWrap.None));
-		var layout = TextLayout.createStyled(context.fonts, label, 100000.0,
-			style.textStyle, style.paragraphStyle);
-		var width = layout.measure().width;
-		layout.dispose();
-		return width;
+		return labelWidths.measure(context.fonts, label, style.textStyle, style.paragraphStyle);
 	}
 
 	function buildSplit(axis:DockSplitAxis, ratio:Float, first:DockNode, second:DockNode,
 		context:BuildContext, path:Array<Int>, nodeKey:String,
-		availableWidth:Float, availableHeight:Float):View {
+		availableWidth:Float, availableHeight:Float, labelWidths:DockTextWidthCache):View {
 		var firstPath = path.copy();
 		firstPath.push(0);
 		var secondPath = path.copy();
@@ -219,8 +225,8 @@ class DockWorkspace implements View {
 		var secondWidth = horizontal ? remaining : availableWidth;
 		var secondHeight = horizontal ? availableHeight : remaining;
 		return new SplitView(nodeKey,
-			buildNode(first, context, firstPath, nodeKey + ":first", firstWidth, firstHeight),
-			buildNode(second, context, secondPath, nodeKey + ":second", secondWidth, secondHeight),
+			buildNode(first, context, firstPath, nodeKey + ":first", firstWidth, firstHeight, labelWidths),
+			buildNode(second, context, secondPath, nodeKey + ":second", secondWidth, secondHeight, labelWidths),
 			options);
 	}
 
@@ -374,5 +380,52 @@ private class DockDropTargetView implements View {
 			case DockDropZone.Top: new Rect(0.0, 0.0, width, height * 0.25);
 			case DockDropZone.Bottom: new Rect(0.0, height * 0.75, width, height * 0.25);
 		};
+	}
+}
+
+/** Bounded measured-width cache for tab labels during repeated workspace builds. */
+private class DockTextWidthCache {
+	static inline var MAX_ENTRIES:Int = 128;
+	var fonts:Null<FontCollection>;
+	final widths:Map<String, Float>;
+	var entryCount:Int;
+
+	public function new() {
+		fonts = null;
+		widths = new Map();
+		entryCount = 0;
+	}
+
+	public function measure(fonts:FontCollection, label:String, textStyle:TextStyle,
+		paragraphStyle:ParagraphStyle):Float {
+		if (this.fonts != fonts) {
+			this.fonts = fonts;
+			widths.clear();
+			entryCount = 0;
+		}
+		var key = cacheKey(label, textStyle, paragraphStyle);
+		var cached:Null<Float> = widths.get(key);
+		if (cached != null)
+			return cached;
+		var layout = TextLayout.createStyled(fonts, label, 100000.0, textStyle, paragraphStyle);
+		var width = layout.measure().width;
+		layout.dispose();
+		if (entryCount >= MAX_ENTRIES) {
+			widths.clear();
+			entryCount = 0;
+		}
+		widths.set(key, width);
+		entryCount++;
+		return width;
+	}
+
+	static function cacheKey(label:String, textStyle:TextStyle,
+		paragraphStyle:ParagraphStyle):String {
+		return label.length + ":" + label + "|font=" + Std.string(textStyle.font) +
+			"|size=" + textStyle.fontSize + "|letter=" + textStyle.letterSpacing +
+			"|wrap=" + Std.string(paragraphStyle.wrap) +
+			"|align=" + Std.string(paragraphStyle.alignment) +
+			"|line=" + (paragraphStyle.lineHeight == null ? "none" : Std.string(paragraphStyle.lineHeight)) +
+			"|direction=" + Std.string(paragraphStyle.direction);
 	}
 }
