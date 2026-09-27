@@ -1,5 +1,8 @@
 package app;
 
+import haxe.Json;
+import sys.io.File;
+
 /** Document workflow shared by commands, native close requests and confirmation UI. */
 class SceneDocumentController {
   public final session:ProjectDocumentSession;
@@ -8,6 +11,8 @@ class SceneDocumentController {
   final commitPendingEdit:Void->Void;
   final cancelPendingEdit:Void->Void;
   var pending:Null<Void->Void> = null;
+  var trustedOpen:Null<String> = null;
+  public var trustReference(default, null):Null<String> = null;
   public var choosing(default, null):Bool = false;
   public var error(default, null):Null<String> = null;
 
@@ -22,7 +27,8 @@ class SceneDocumentController {
   }
 
   public function needsConfirmation():Bool return pending != null;
-  public function blocked():Bool return choosing || pending != null || error != null;
+  public function needsTrustConfirmation():Bool return trustedOpen != null;
+  public function blocked():Bool return choosing || pending != null || trustedOpen != null || error != null;
 
   public function requestNew():Void interrupt(function() {
     try session.newDocument() catch (failure:Dynamic) { fail(failure); return; }
@@ -30,11 +36,36 @@ class SceneDocumentController {
   });
 
   public function requestOpen():Void interrupt(function() {
-    choose(false, function(path) {
-      try session.open(path) catch (failure:Dynamic) { fail(failure); return; }
-      changed();
-    });
+    choose(false, openAccepted);
   });
+
+  function openAccepted(path:String):Void {
+    try {
+      var root:Dynamic = Json.parse(File.getContent(path));
+      var project = SceneCodec.decodeProjectRoot(root);
+      var script = project == null ? SceneCodec.decodeScriptRoot(root) : null;
+      if (project != null || script != null) {
+        trustedOpen = path;
+        trustReference = project != null ? Reflect.field(project, "reference") :
+          Reflect.field(script, "reference");
+        changed();
+        return;
+      }
+      session.open(path);
+    } catch (failure:Dynamic) { fail(failure); return; }
+    changed();
+  }
+
+  public function resolveTrust(allow:Bool):Void {
+    var path = trustedOpen;
+    if (path == null) return;
+    trustedOpen = null;
+    trustReference = null;
+    if (allow) {
+      try session.open(path) catch (failure:Dynamic) { fail(failure); return; }
+    }
+    changed();
+  }
 
   public function requestClose(close:Void->Void):Void interrupt(close);
 

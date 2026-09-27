@@ -57,6 +57,7 @@ class ProjectDocumentSession {
   final assemblyOccurrenceIds:Map<String, Bool> = new Map();
   final assemblyDependentJoints:Map<String, Bool> = new Map();
   var projectBaseline:Null<Array<SceneObjectData>> = null;
+  final demoContent:Bool;
   var staleProjectEdits:Array<String> = [];
   var staleProjectRecord:Null<ProjectSceneRecord> = null;
   public function staleEdits():Array<String> return staleProjectEdits.copy();
@@ -71,10 +72,11 @@ class ProjectDocumentSession {
   /** Application-owned runtime cleanup invoked only after replacement data validates. */
   public var beforeReplace:Null<Void->Void> = null;
 
-  public function new(?initialBim:BimDocument) {
+  public function new(?initialBim:BimDocument, demoContent:Bool = true) {
+    this.demoContent = demoContent;
     document = createDocument();
     edits = new ProjectEditCoordinator(document);
-    scene = new EditorScene(null, document);
+    scene = new EditorScene(demoContent ? null : [], document);
     sensors = new SensorConfiguration(null, document);
     bim = initialBim == null ? new BimDocument() : initialBim;
     bim.cad.clearHistory();
@@ -82,7 +84,7 @@ class ProjectDocumentSession {
 
   public function newDocument():Void {
     var nextDocument = createDocument();
-    replace(new EditorScene(null, nextDocument), new SensorConfiguration(null, nextDocument),
+    replace(new EditorScene(demoContent ? null : [], nextDocument), new SensorConfiguration(null, nextDocument),
       null, null, new BimDocument(), nextDocument);
   }
 
@@ -446,8 +448,16 @@ class ProjectDocumentSession {
   }
   public function refreshScriptOverrides():ScriptMaterialization {
     var ownership=scriptOwnership;if(ownership==null)throw "This document is not script-owned";
-    var materialized=ownership.materialize();replace(materialized.scene,materialized.sensors,path,ownership,bim,document,true);
-    return materialized;
+    var materialized=ownership.materialize();
+    try scene.reconcileRecords(materialized.scene.records()) catch(error:Dynamic) {
+      materialized.scene.dispose(); materialized.sensors.dispose(); throw error;
+    }
+    materialized.scene.dispose();
+    var previousSensors = sensors;
+    sensors = materialized.sensors;
+    previousSensors.dispose();
+    return {scene: scene, sensors: sensors, backend: materialized.backend,
+      timestep: materialized.timestep};
   }
 
   public function save(?file:String):Void {
@@ -520,25 +530,16 @@ class ProjectDocumentSession {
     if(previousBim!=nextBim)previousBim.close();
   }
 
-  /** Applies a BIM mutation and places its CAD undo record in project order. */
-  public function applyBimEdit(label:String, change:Void->Void):Bool {
-    if (label == null || label.length == 0 || change == null) throw "BIM edits require a label and mutation";
-    var firstApplication = true;
-    try {
-      return edits.apply(label, function() {
-        if (firstApplication) {
-          change();
-          firstApplication = false;
-        } else if (!bim.redo()) {
-          throw "BIM redo history is out of sync with project history";
-        }
-      }, function() {
-        if (!bim.undo()) throw "BIM undo history is out of sync with project history";
-      });
-    } catch (error:Dynamic) {
-      if (!firstApplication) bim.undo();
-      throw error;
-    }
+  /** Applies a BIM mutation with an explicit inverse on the shared project history. */
+  public function applyBimEdit(label:String, change:Void->Void, undo:Void->Void):Bool {
+    if (label == null || label.length == 0 || change == null || undo == null)
+      throw "BIM edits require a label, mutation, and inverse";
+    var model = bim;
+    var apply = function(action:Void->Void) {
+      try action() catch (error:Dynamic) { model.cad.clearHistory(); throw error; }
+      model.cad.clearHistory();
+    };
+    return edits.apply(label, function() apply(change), function() apply(undo));
   }
 
   static function checkedPath(value:String):String {

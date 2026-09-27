@@ -92,9 +92,11 @@ class ScriptedSetupTests {
     ownership.setOverride("moving-obstacle", "collisionEnabled", "boolean", false);
     ownership.setOverride(ScriptOwnership.SIMULATION_TARGET, "timestep", "number", 0.02);
     ownership.setOverride(ScriptOwnership.SIMULATION_TARGET, "backend", "integer", ApplicationSimulation.DETERMINISTIC);
-    overridden.scene.dispose();
-    overridden.sensors.dispose();
+    var retainedScene = session.scene;
+    var retainedGeneration = session.generation;
     overridden = session.refreshScriptOverrides();
+    check(session.scene == retainedScene && session.generation == retainedGeneration,
+      "script override refresh retains the scene and editor generation");
     overriddenLidar = overridden.sensors.selected();
     var obstacle = overridden.scene.records()[0];
     var overriddenFrame:robotkit.model.Frame = cast overriddenLidar.frame;

@@ -16,6 +16,7 @@ import nativekit.scene.Material;
 import nativekit.scene.ChangeSet;
 import materia.project.Appearance;
 import materia.project.Appearance.Appearances;
+import materia.project.MaterialLibrary;
 import nativekit.scene.Transaction;
 import nativekit.scene.SceneView;
 import nativekit.scene.SelectionSet;
@@ -54,29 +55,20 @@ import app.CadPlateModel.CadPlateHoleEdit;
 import app.CadBracketModel;
 import app.SketchDraftCodec.SketchDraftRecord;
 import app.editor.SelectionModel;
+import app.editor.SceneModel;
+import app.editor.ScenePresentation;
+import app.editor.ScenePropertyProvider;
+import app.editor.SceneReconciler;
+import app.editor.SketchEditController;
+import app.editor.SceneModel.SceneRecordChange;
 import app.editor.ObjectKindRegistry;
 import haxe.io.Path as FilePath;
-
-private typedef SceneRecordChange = {
-  final id:String;
-  final before:Null<SceneObjectData>;
-  final after:Null<SceneObjectData>;
-  final beforeIndex:Int;
-  final afterIndex:Int;
-}
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 @:allow(tests.SceneAtomicityTests)
 class EditorScene {
-  static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>):MaterialData {
-    var finish = appearance == null ? Appearances.neutral() : appearance;
-    return MaterialData.opaque(red, green, blue).setMetallic(finish.metallic).setRoughness(finish.roughness);
-  }
-
   static function sameFinish(left:Null<Appearance>, right:Null<Appearance>):Bool {
-    var a = left == null ? Appearances.neutral() : left;
-    var b = right == null ? Appearances.neutral() : right;
-    return a.finish == b.finish && a.metallic == b.metallic && a.roughness == b.roughness;
+    return Appearances.same(left, right);
   }
   /** Opt-in constructor phase timings used by the headless architecture profile. */
   var loadProfilePhases:Null<Map<String, Float>>;
@@ -88,9 +80,15 @@ class EditorScene {
   static var nextVisualRevision:Int = 0;
   static var nextEnvironmentRevision:Int = 0;
   public final document:EditorDocument;
-  var bridge:SceneBridge;
+  final presentation:ScenePresentation;
+  var bridge(get, set):SceneBridge;
+  function get_bridge():SceneBridge return presentation.bridge;
+  function set_bridge(value:SceneBridge):SceneBridge return presentation.bridge = value;
   var scene(get, never):Scene;
-  var objects:Array<EditorSceneObject>;
+  final model:SceneModel;
+  var objects(get, set):Array<EditorSceneObject>;
+  function get_objects():Array<EditorSceneObject> return model.objects;
+  function set_objects(value:Array<EditorSceneObject>):Array<EditorSceneObject> return model.objects = value;
   var cadSessions:Map<String, CadDocumentSession>;
   final generatedGeometry:Map<String, GeometryData>;
   final kinematicOccurrences:Map<String, Bool> = new Map();
@@ -98,19 +96,42 @@ class EditorScene {
   var assemblyPropertyProvider:Null<String->Array<PropertyDescriptor>> = null;
   /** Optional editor-owned semantic action sink. */
   public var onSemanticAction:Null<String->Dynamic->Void> = null;
-  var nextObjectId:Int = 1;
-  var snapshot:SceneSnapshot;
-  var spatial:SpatialIndex;
-  var presentationStale:Bool = false;
-  var fullReconciliationCount:Int = 0;
-  var spatialFullRebuildCount:Int = 0;
-  var pendingRenderChanges:Null<ChangeSet> = null;
-  var renderNeedsRefresh:Bool = false;
-  var selectionMaterial:Material;
-  var hoverMaterial:Material;
-  final faceHoverNodes:Map<String, NodeId> = new Map();
-  final faceHoverGeometries:Map<String, Geometry> = new Map();
-  final faceHoverIndexes:Map<String, Int> = new Map();
+  var nextObjectId(get, set):Int;
+  function get_nextObjectId():Int return model.nextObjectId;
+  function set_nextObjectId(value:Int):Int return model.nextObjectId = value;
+  var snapshot(get, set):SceneSnapshot;
+  function get_snapshot():SceneSnapshot return presentation.snapshot;
+  function set_snapshot(value:SceneSnapshot):SceneSnapshot return presentation.snapshot = value;
+  var spatial(get, set):SpatialIndex;
+  function get_spatial():SpatialIndex return presentation.spatial;
+  function set_spatial(value:SpatialIndex):SpatialIndex return presentation.spatial = value;
+  var presentationStale(get, set):Bool;
+  function get_presentationStale():Bool return presentation.presentationStale;
+  function set_presentationStale(value:Bool):Bool return presentation.presentationStale = value;
+  var fullReconciliationCount(get, set):Int;
+  function get_fullReconciliationCount():Int return presentation.fullReconciliationCount;
+  function set_fullReconciliationCount(value:Int):Int return presentation.fullReconciliationCount = value;
+  var spatialFullRebuildCount(get, set):Int;
+  function get_spatialFullRebuildCount():Int return presentation.spatialFullRebuildCount;
+  function set_spatialFullRebuildCount(value:Int):Int return presentation.spatialFullRebuildCount = value;
+  var pendingRenderChanges(get, set):Null<ChangeSet>;
+  function get_pendingRenderChanges():Null<ChangeSet> return presentation.pendingRenderChanges;
+  function set_pendingRenderChanges(value:Null<ChangeSet>):Null<ChangeSet> return presentation.pendingRenderChanges = value;
+  var renderNeedsRefresh(get, set):Bool;
+  function get_renderNeedsRefresh():Bool return presentation.renderNeedsRefresh;
+  function set_renderNeedsRefresh(value:Bool):Bool return presentation.renderNeedsRefresh = value;
+  var selectionMaterial(get, set):Material;
+  function get_selectionMaterial():Material return presentation.selectionMaterial;
+  function set_selectionMaterial(value:Material):Material return presentation.selectionMaterial = value;
+  var hoverMaterial(get, set):Material;
+  function get_hoverMaterial():Material return presentation.hoverMaterial;
+  function set_hoverMaterial(value:Material):Material return presentation.hoverMaterial = value;
+  var faceHoverNodes(get, never):Map<String, NodeId>;
+  function get_faceHoverNodes():Map<String, NodeId> return presentation.faceHoverNodes;
+  var faceHoverGeometries(get, never):Map<String, Geometry>;
+  function get_faceHoverGeometries():Map<String, Geometry> return presentation.faceHoverGeometries;
+  var faceHoverIndexes(get, never):Map<String, Int>;
+  function get_faceHoverIndexes():Map<String, Int> return presentation.faceHoverIndexes;
   final selection = new SelectionModel();
   public var selectedId(get, never):String;
   function get_selectedId():String return selection.selectedId;
@@ -128,12 +149,25 @@ class EditorScene {
   function get_selectedCadFace():Null<Shape> return selection.selectedCadFace;
   var selectedFeatureKey(get, never):Null<String>;
   function get_selectedFeatureKey():Null<String> return selection.selectedFeatureKey;
-  var activeSketchEdit:Null<CadSketchEditSession> = null;
-  var activeSketchObjectId:Null<String> = null;
-  var sketchEditPlaneValue:Null<Plane> = null;
-  var sketchDraftRevision:Int = 0;
-  var savedSketchDraftRevision:Int = 0;
-  var savedSketchDraftPresent:Bool = false;
+  final sketchController:SketchEditController;
+  var activeSketchEdit(get, set):Null<CadSketchEditSession>;
+  function get_activeSketchEdit():Null<CadSketchEditSession> return sketchController.activeSketchEdit;
+  function set_activeSketchEdit(value:Null<CadSketchEditSession>):Null<CadSketchEditSession> return sketchController.activeSketchEdit = value;
+  var activeSketchObjectId(get, set):Null<String>;
+  function get_activeSketchObjectId():Null<String> return sketchController.activeSketchObjectId;
+  function set_activeSketchObjectId(value:Null<String>):Null<String> return sketchController.activeSketchObjectId = value;
+  var sketchEditPlaneValue(get, set):Null<Plane>;
+  function get_sketchEditPlaneValue():Null<Plane> return sketchController.sketchEditPlaneValue;
+  function set_sketchEditPlaneValue(value:Null<Plane>):Null<Plane> return sketchController.sketchEditPlaneValue = value;
+  var sketchDraftRevision(get, set):Int;
+  function get_sketchDraftRevision():Int return sketchController.sketchDraftRevision;
+  function set_sketchDraftRevision(value:Int):Int return sketchController.sketchDraftRevision = value;
+  var savedSketchDraftRevision(get, set):Int;
+  function get_savedSketchDraftRevision():Int return sketchController.savedSketchDraftRevision;
+  function set_savedSketchDraftRevision(value:Int):Int return sketchController.savedSketchDraftRevision = value;
+  var savedSketchDraftPresent(get, set):Bool;
+  function get_savedSketchDraftPresent():Bool return sketchController.savedSketchDraftPresent;
+  function set_savedSketchDraftPresent(value:Bool):Bool return sketchController.savedSketchDraftPresent = value;
   public var revision(default, null):Int;
   public var visualRevision(default, null):Int;
   /** Changes only when simulation-consumed scene content changes, not selection. */
@@ -179,9 +213,11 @@ class EditorScene {
     nextEnvironmentRevision++;
     environmentRevision = nextEnvironmentRevision;
     document = sharedDocument == null ? new EditorDocument("scene") : sharedDocument;
+    model = new SceneModel();
+    presentation = new ScenePresentation();
+    sketchController = new SketchEditController();
     objects = [];
     cadSessions = new Map();
-    bridge = new SceneBridge();
     try {
       if (data == null) {
         addObject("box", "Blue box", -1.5, 0.0, 0.0, 1.6, 1.2, 0.1, 0.22, 0.52, 0.85);
@@ -336,7 +372,7 @@ class EditorScene {
       }
       if (geometryIndex == null) throw 'No geometry resource was prepared for "${item.id}"';
       geometryIndexes.push(geometryIndex);
-      materialData.push(materialFor(item.red, item.green, item.blue, item.appearance));
+      materialData.push(ScenePresentation.materialFor(item.red, item.green, item.blue, item.appearance));
       candidates.push(new EditorSceneObject(item.id, item.label, item.type,
         item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
         item.mass, item.red, item.green, item.blue, storedCadGraph,
@@ -385,44 +421,19 @@ class EditorScene {
 
   public function canCreate():Bool return objects.length < 10000;
 
-  function allocateId(prefix:String="rectangle"):String {
-    var id = prefix + "-" + nextObjectId;
-    nextObjectId++;
-    while (object(id) != null) {
-      id = prefix + "-" + nextObjectId;
-      nextObjectId++;
-    }
-    return id;
-  }
+  function allocateId(prefix:String="rectangle"):String return model.allocateId(this, prefix);
 
-  public function createRectangle():Bool {
-    if (!canCreate()) return false;
-    var data = records();
-    var id = allocateId();
-    data.push(ObjectKindRegistry.require("rectangle").createDefaultRecord(id));
-    return changeObjects("Create rectangle", data, id);
-  }
+  public function createRectangle():Bool
+    return model.createDefault(this, "rectangle", "rectangle", "Create rectangle");
 
-  public function createMountingPlate():Bool {
-    if (!canCreate()) return false;
-    var data = records(), id = allocateId("plate");
-    data.push(ObjectKindRegistry.require("cad-plate").createDefaultRecord(id));
-    return changeObjects("Create mounting plate", data, id);
-  }
+  public function createMountingPlate():Bool
+    return model.createDefault(this, "cad-plate", "plate", "Create mounting plate");
 
-  public function createBracket():Bool {
-    if (!canCreate()) return false;
-    var data=records(),id=allocateId("bracket");
-    data.push(ObjectKindRegistry.require("cad-bracket").createDefaultRecord(id));
-    return changeObjects("Create L bracket",data,id);
-  }
+  public function createBracket():Bool
+    return model.createDefault(this, "cad-bracket", "bracket", "Create L bracket");
 
-  public function createCadPart():Bool {
-    if (!canCreate()) return false;
-    var data = records(), id = allocateId("part");
-    data.push(ObjectKindRegistry.require("cad-part").createDefaultRecord(id));
-    return changeObjects("Create CAD part", data, id);
-  }
+  public function createCadPart():Bool
+    return model.createDefault(this, "cad-part", "part", "Create CAD part");
 
   public function canCreateSketch():Bool {
     var item = object(selectedId);
@@ -441,104 +452,22 @@ class EditorScene {
     sketchEditPlaneValue = plane;
     activeSketchEdit = session.beginNewSketchEdit(plane, "mm");
     activeSketchObjectId = id;
-    sketchDraftRevision++;
+    sketchDraftRevision = sketchDraftRevision + 1;
     refreshSelectionRevision();
     return true;
   }
 
-  public function canAddSketchDraftRectangle():Bool {
-    var draft = activeSketchEdit;
-    if (draft == null)
-      return false;
-    var sketch = draft.sketch.snapshot();
-    return sketch.points().length == 0 && sketch.entities().length == 0 && sketch.constraints().length == 0;
-  }
+  public function canAddSketchDraftRectangle():Bool return sketchController.canAddRectangle();
 
-  /** Add a fully constrained 20 mm starter rectangle to an otherwise empty draft. */
-  public function addSketchDraftRectangle():Bool {
-    if (!canAddSketchDraftRectangle())
-      return false;
-    var template = starterSketch();
-    editSketchDraft(function(sketch) {
-      for (point in template.points()) sketch.addPoint(point);
-      for (entity in template.entities()) sketch.addEntity(entity);
-      for (constraint in template.constraints()) sketch.addConstraint(constraint);
-    });
-    return true;
-  }
+  public function addSketchDraftRectangle():Bool return sketchController.addRectangle(this);
 
-  /** Add a fully constrained rectangle in the current sketch plane. */
   public function addSketchDraftRectangleBetween(startX:Float, startY:Float,
-      endX:Float, endY:Float):Bool {
-    var draft = activeSketchEdit;
-    if (draft == null || !Math.isFinite(startX) || !Math.isFinite(startY) ||
-        !Math.isFinite(endX) || !Math.isFinite(endY))
-      return false;
-    var minX = Math.min(startX, endX), maxX = Math.max(startX, endX);
-    var minY = Math.min(startY, endY), maxY = Math.max(startY, endY);
-    if (maxX - minX < 0.000001 || maxY - minY < 0.000001 ||
-        Math.max(Math.max(Math.abs(minX), Math.abs(maxX)),
-          Math.max(Math.abs(minY), Math.abs(maxY))) > 1000000.0)
-      return false;
-    var sketch = draft.sketch.snapshot();
-    var prefixIndex = 1;
-    var prefix = "rect" + prefixIndex;
-    while (sketchHasPrefix(sketch, prefix)) {
-      prefixIndex++;
-      prefix = "rect" + prefixIndex;
-    }
-    var p0 = prefix + ".p0", p1 = prefix + ".p1", p2 = prefix + ".p2", p3 = prefix + ".p3";
-    editSketchDraft(function(value) {
-      value.addPoint(new SketchPoint(p0, minX, minY));
-      value.addPoint(new SketchPoint(p1, maxX, minY));
-      value.addPoint(new SketchPoint(p2, maxX, maxY));
-      value.addPoint(new SketchPoint(p3, minX, maxY));
-      value.addEntity(SketchEntity.line(prefix + ".bottom", p0, p1));
-      value.addEntity(SketchEntity.line(prefix + ".right", p1, p2));
-      value.addEntity(SketchEntity.line(prefix + ".top", p2, p3));
-      value.addEntity(SketchEntity.line(prefix + ".left", p3, p0));
-      value.addConstraint(SketchConstraint.fixed(prefix + ".anchor", p0));
-      value.addConstraint(SketchConstraint.horizontal(prefix + ".bottom-horizontal", prefix + ".bottom"));
-      value.addConstraint(SketchConstraint.vertical(prefix + ".right-vertical", prefix + ".right"));
-      value.addConstraint(SketchConstraint.horizontal(prefix + ".top-horizontal", prefix + ".top"));
-      value.addConstraint(SketchConstraint.vertical(prefix + ".left-vertical", prefix + ".left"));
-      value.addConstraint(SketchConstraint.distance(prefix + ".width", p0, p1, maxX - minX));
-      value.addConstraint(SketchConstraint.distance(prefix + ".height", p1, p2, maxY - minY));
-    });
-    return true;
-  }
+      endX:Float, endY:Float):Bool
+    return sketchController.addRectangleBetween(this, startX, startY, endX, endY);
 
-  function sketchHasPrefix(sketch:ConstrainedSketch, prefix:String):Bool {
-    var start = prefix + ".";
-    for (point in sketch.points()) if (StringTools.startsWith(point.id, start)) return true;
-    for (entity in sketch.entities()) if (StringTools.startsWith(entity.id, start)) return true;
-    for (constraint in sketch.constraints()) if (StringTools.startsWith(constraint.id, start)) return true;
-    return false;
-  }
+  public function canClearSketchDraft():Bool return sketchController.canClearDraft();
 
-  public function canClearSketchDraft():Bool {
-    var draft = activeSketchEdit;
-    if (draft == null)
-      return false;
-    var sketch = draft.sketch.snapshot();
-    return sketch.points().length > 0 || sketch.entities().length > 0 || sketch.constraints().length > 0;
-  }
-
-  /** Return a draft to the valid empty state so geometry can be redrawn. */
-  public function clearSketchDraft():Bool {
-    if (!canClearSketchDraft())
-      return false;
-    var draft = activeSketchEdit;
-    if (draft == null)
-      return false;
-    var snapshot = draft.sketch.snapshot();
-    editSketchDraft(function(sketch) {
-      for (constraint in snapshot.constraints()) sketch.removeConstraint(constraint.id);
-      for (entity in snapshot.entities()) sketch.removeEntity(entity.id);
-      for (point in snapshot.points()) sketch.removePoint(point.id);
-    });
-    return true;
-  }
+  public function clearSketchDraft():Bool return sketchController.clearDraft(this);
 
   public function canCreateFaceSketch():Bool {
     if (activeSketchEdit != null || selectedCadFace == null || selectedCadFaceIndex < 0)
@@ -995,145 +924,12 @@ class EditorScene {
     });
   }
 
-  public function duplicateSelected():Bool {
-    if (!canCreate() || object(selectedId) == null) return false;
-    var data = records();
-    var source:SceneObjectData = null;
-    for (item in data) if (item.id == selectedId) source = item;
-    var id = allocateId();
-    var cadGraph = isCadKind(source.type) ? currentCadGraph(source.id) : source.cadGraph;
-    data.push({id: id, label: source.label + " copy", type: source.type,
-      x: Math.min(1000000, source.x + 0.25), y: Math.min(1000000, source.y + 0.25), z: source.z,
-      width: source.width, height: source.height, red: source.red, green: source.green,
-      blue: source.blue, appearance: source.appearance, visible: source.visible,depth:source.depth,
-      collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass,
-      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot,rotation:source.rotation});
-    return changeObjects("Duplicate object", data, id);
-  }
+  public function duplicateSelected():Bool return model.duplicateSelected(this);
 
-  public function deleteSelected():Bool {
-    if (object(selectedId) == null) return false;
-    var data = records();
-    var index = 0;
-    while (data[index].id != selectedId) index++;
-    data.splice(index, 1);
-    var next = data.length == 0 ? "scene" : data[index < data.length ? index : data.length - 1].id;
-    return changeObjects("Delete object", data, next);
-  }
+  public function deleteSelected():Bool return model.deleteSelected(this);
 
-  function changeObjects(label:String, after:Array<SceneObjectData>, selection:String):Bool {
-    // This helper is used by structural add/remove/duplicate/import operations.
-    // Keep only the membership delta; common records stay in the live scene.
-    var afterIds:Map<String, Bool> = new Map();
-    var existingIds:Map<String, Bool> = new Map();
-    for (index in 0...after.length) {
-      afterIds.set(after[index].id, true);
-    }
-    for (item in objects) existingIds.set(item.id, true);
-    var changes:Array<SceneRecordChange> = [];
-    for (index in 0...objects.length) {
-      var item = objects[index];
-      if (!afterIds.exists(item.id)) {
-        var previous = recordForObject(item);
-        if (isCadKind(previous.type)) previous.cadGraph = currentCadGraph(previous.id);
-        changes.push({id: previous.id, before: previous, after: null,
-          beforeIndex: index, afterIndex: -1});
-      }
-    }
-    for (index in 0...after.length) {
-      var next = after[index];
-      if (!existingIds.exists(next.id))
-        changes.push({id: next.id, before: null, after: next,
-          beforeIndex: -1, afterIndex: index});
-    }
-    var previousSelection = selectedId;
-    var initialAfter:Null<Array<SceneObjectData>> = after;
-    return document.apply(new EditOperation(label,
-      function() {
-        var initial = initialAfter;
-        initialAfter = null;
-        if (initial != null) replaceObjects(initial, selection);
-        else applyObjectChanges(changes, true, selection);
-      },
-      function() applyObjectChanges(changes, false, previousSelection),
-      null, null, null, estimateSceneChanges(changes)));
-  }
-
-  function applyObjectChanges(changes:Array<SceneRecordChange>, forward:Bool, selection:String):Void {
-    var data = records();
-    var removals:Array<SceneRecordChange> = [];
-    for (change in changes) {
-      var target = forward ? change.after : change.before;
-      if (target == null) removals.push(change);
-    }
-    removals.sort(function(lhs, rhs) {
-      return findRecordIndex(data, rhs.id) - findRecordIndex(data, lhs.id);
-    });
-    for (change in removals) {
-      var index = findRecordIndex(data, change.id);
-      if (index >= 0) data.splice(index, 1);
-    }
-
-    var additions:Array<SceneRecordChange> = [];
-    for (change in changes) {
-      var target = forward ? change.after : change.before;
-      var source = forward ? change.before : change.after;
-      if (target == null) continue;
-      var index = findRecordIndex(data, change.id);
-      if (index >= 0) {
-        data[index] = target;
-      } else if (source == null) {
-        additions.push(change);
-      }
-    }
-    additions.sort(function(lhs, rhs) {
-      var left = forward ? lhs.afterIndex : lhs.beforeIndex;
-      var right = forward ? rhs.afterIndex : rhs.beforeIndex;
-      return left - right;
-    });
-    for (change in additions) {
-      var target = forward ? change.after : change.before;
-      var index = forward ? change.afterIndex : change.beforeIndex;
-      if (index < 0) index = data.length;
-      if (index > data.length) index = data.length;
-      data.insert(index, target);
-    }
-    replaceObjects(data, selection);
-  }
-
-  static function findRecordIndex(data:Array<SceneObjectData>, id:String):Int {
-    for (index in 0...data.length) if (data[index].id == id) return index;
-    return -1;
-  }
-
-  static function recordForObject(item:EditorSceneObject):SceneObjectData {
-    return {id: item.id, label: item.label, type: item.kind,
-      x: item.x, y: item.y, z: item.z,
-      width: item.width, height: item.height, depth: item.depth,
-      collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-      red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
-      visible: item.visible, cadGraph: item.cadGraph,
-      meshSnapshot: item.meshSnapshot, rotation: item.rotation};
-  }
-
-  static function estimateSceneChanges(changes:Array<SceneRecordChange>):Int {
-    var bytes = 96 + changes.length * 48;
-    for (change in changes) {
-      bytes += estimateSceneRecord(change.before);
-      bytes += estimateSceneRecord(change.after);
-    }
-    return bytes;
-  }
-
-  static function estimateSceneRecord(record:Null<SceneObjectData>):Int {
-    if (record == null) return 0;
-    return 384 + estimatedStringBytes(record.id) + estimatedStringBytes(record.label) +
-      estimatedStringBytes(record.type) + estimatedStringBytes(record.cadGraph) +
-      estimatedStringBytes(record.sketchDraft);
-  }
-
-  static function estimatedStringBytes(value:Null<String>):Int
-    return value == null ? 0 : value.length * 2;
+  function changeObjects(label:String, after:Array<SceneObjectData>, selection:String):Bool
+    return model.changeObjects(this, label, after, selection);
 
   function applyCadEdit(id:String, label:String, redo:CadDocumentSession->Void,
       undo:CadDocumentSession->Void):Bool {
@@ -1144,19 +940,8 @@ class EditorScene {
 
   function runCadEdit(id:String, edit:CadDocumentSession->Void,
       rollback:CadDocumentSession->Void):Void {
-    var session = requireCadSession(id);
-    session.perform(edit);
-    try {
-      syncCadSession(id);
-    } catch (error:Dynamic) {
-      try {
-        session.perform(rollback);
-        syncCadSession(id);
-      } catch (_:Dynamic) {}
-      throw error;
-    }
+    sketchController.runCadEdit(requireCadSession(id), function() syncCadSession(id), edit, rollback);
   }
-
   function applyConstrainedSketchSnapshot(session:CadDocumentSession, featureId:Int,
       sketch:ConstrainedSketch):Void {
     var candidate = session.document.featureById(featureId);
@@ -1306,257 +1091,21 @@ class EditorScene {
   }
 
   // Reconcile document records into the runtime scene while preserving stable nodes.
-  function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
-    fullReconciliationCount++;
-    var physicsChanged = physicsRecordsChanged(data);
-    var previousSelectedId = selectedId;
-    var previousSelectedFeatureKey = selectedFeatureKey;
-    var previousSelected = object(previousSelectedId);
-    var previousSelectedKind:Null<String> = previousSelected == null ? null : previousSelected.kind;
-    var existingById:Map<String, EditorSceneObject> = new Map();
-    for (item in objects) existingById.set(item.id, item);
-    var staleFaceHoverIds:Array<String> = [];
-    for (id in faceHoverNodes.keys()) {
-      var record:Null<SceneObjectData> = null;
-      for (candidate in data) if (candidate.id == id) {
-        record = candidate;
-        break;
-      }
-      var existing = existingById.get(id);
-      var sourceChanged = record != null && existing != null && record.type == "cad-preview"
-        ? existing.meshSnapshot != record.meshSnapshot : false;
-      if (record == null || existing == null || !isFaceHoverKind(record.type) ||
-          existing.kind != record.type || existing.cadGraph != record.cadGraph || sourceChanged)
-        staleFaceHoverIds.push(id);
+  public function reconcileRecords(data:Array<SceneObjectData>):Void {
+    var nextSelection = selectedId;
+    if (nextSelection != "scene") {
+      var exists = false;
+      for (record in data) if (record.id == nextSelection) { exists = true; break; }
+      if (!exists) nextSelection = data.length == 0 ? "scene" : data[0].id;
     }
-    var prepared = new PreparedSceneEdit(scene.beginTransaction(), [],
-      bridge.copyEntries(), bridge.copyNodeEntries(), cadSessions.copy());
-    var committedChanges:Null<ChangeSet> = null;
-    for (id in staleFaceHoverIds) {
-      var node = faceHoverNodes.get(id);
-      if (node != null) prepared.transaction.destroyNode(node);
-    }
-    var previousFace=selectedCadFaceFingerprint;
-    var previousFaceShape=selectedCadFace;
-    var previousFaceX=selectedCadFaceX,previousFaceY=selectedCadFaceY;
-    var retained:Map<String, Bool> = new Map();
-    try {
-      for (record in data) {
-        var item = existingById.get(record.id);
-        var session = item == null || !isCadKind(item.kind) || item.kind != record.type || item.cadGraph != record.cadGraph
-          ? null : cadSessions.get(record.id);
-        var storedGraph = record.cadGraph;
-        if (isCadKind(record.type) && session == null) {
-          session = createCadSession(storedGraph, record.width, record.height, record.depth, record.type);
-          prepared.stagedCadSessions.push(session);
-          failIfInjected("prepare.cad-session");
-          storedGraph = session.encode();
-        }
-        if (session != null)
-          prepared.cadSessions.set(record.id, session);
-        else
-          prepared.cadSessions.remove(record.id);
-        if (item == null) {
-          var geometry = record.type == "cad-preview"
-            ? sharedPreviewGeometry(record.meshSnapshot, prepared.bridgeEntries, objects, prepared.objects)
-            : null;
-          if (geometry == null) {
-            geometry = scene.createGeometry();
-            prepared.createdGeometry.push(geometry);
-            var geometryData = session != null
-              ? session.geometry()
-              : (record.type == "cad-preview"
-                ? previewGeometry(record.meshSnapshot)
-                : boxGeometry(record.width, record.height, record.depth));
-            scene.setGeometryData(geometry, geometryData);
-            failIfInjected("prepare.new-geometry");
-          }
-          if (geometry == null) throw 'No geometry resource was prepared for "${record.id}"';
-          var material = scene.createMaterial();
-          prepared.createdMaterials.push(material);
-          scene.setMaterialData(material, materialFor(record.red, record.green, record.blue, record.appearance));
-          failIfInjected("prepare.new-material");
-          var node = prepared.transaction.createNode();
-          prepared.transaction.setName(node, record.label);
-          prepared.transaction.setVisibility(node, record.visible);
-          prepared.transaction.setGeometry(node, geometry);
-          prepared.transaction.setMaterial(node, material);
-          prepared.transaction.setTransform(node, objectTransform(record.x, record.y, record.z, record.rotation));
-          prepared.bridgeEntries.set(record.id, new EditorSceneRuntimeObject(node, geometry, material));
-          prepared.nodeEntries.set(SceneBridge.nodeKey(node), record.id);
-          failIfInjected("prepare.bridge-attach");
-          item = new EditorSceneObject(record.id, record.label, record.type,
-            record.width, record.height, record.depth, record.collisionEnabled,
-            record.dynamicBody, record.mass, record.red, record.green, record.blue,
-            storedGraph,
-            record.x, record.y, record.z, record.visible, record.meshSnapshot, record.rotation);
-          item.appearance = record.appearance;
-          prepared.objects.push(item);
-          failIfInjected("prepare.new-object");
-          prepared.changed = true;
-        } else {
-          var runtime = prepared.bridgeEntries.get(record.id);
-          if (runtime == null) throw "Missing runtime scene node: " + record.id;
-          var candidate = item;
-          var objectChanged = item.label != record.label || item.visible != record.visible ||
-            item.x != record.x || item.y != record.y || item.z != record.z ||
-            item.width != record.width || item.height != record.height || item.depth != record.depth ||
-            item.kind != record.type || item.cadGraph != storedGraph ||
-            item.meshSnapshot != record.meshSnapshot || !sameRotation(item.rotation, record.rotation) ||
-            item.collisionEnabled != record.collisionEnabled || item.dynamicBody != record.dynamicBody ||
-            item.mass != record.mass || item.red != record.red || item.green != record.green ||
-            item.blue != record.blue || !sameFinish(item.appearance, record.appearance);
-          if (objectChanged) candidate = copyEditorSceneObject(item);
-          if (item.label != record.label) prepared.transaction.setName(runtime.node, record.label);
-          if (item.visible != record.visible) prepared.transaction.setVisibility(runtime.node, record.visible);
-          if (item.x != record.x || item.y != record.y || item.z != record.z ||
-              !sameRotation(item.rotation, record.rotation)) {
-            prepared.transaction.setTransform(runtime.node,
-              objectTransform(record.x, record.y, record.z, record.rotation));
-            prepared.changedBounds.push(runtime.node);
-          }
-          if (item.label != record.label || item.visible != record.visible || item.x != record.x ||
-              item.y != record.y || item.z != record.z || !sameRotation(item.rotation, record.rotation)) prepared.changed = true;
-          if (item.width != record.width || item.height != record.height || item.depth != record.depth ||
-              item.kind != record.type || item.cadGraph != storedGraph || item.meshSnapshot != record.meshSnapshot) {
-            var geometry = record.type == "cad-preview"
-              ? sharedPreviewGeometry(record.meshSnapshot, prepared.bridgeEntries, objects,
-                prepared.objects, record.id)
-              : null;
-            if (geometry == null) {
-              geometry = scene.createGeometry();
-              prepared.createdGeometry.push(geometry);
-              var geometryData = session != null
-                ? session.geometry()
-                : (record.type == "cad-preview"
-                  ? previewGeometry(record.meshSnapshot)
-                  : boxGeometry(record.width, record.height, record.depth));
-              scene.setGeometryData(geometry, geometryData);
-            }
-            if (geometry == null) throw 'No geometry resource was prepared for "${record.id}"';
-            prepared.transaction.setGeometry(runtime.node, geometry);
-            prepared.retiredGeometry.push(runtime.geometry);
-            runtime = new EditorSceneRuntimeObject(runtime.node, geometry, runtime.material);
-            prepared.bridgeEntries.set(record.id, runtime);
-            failIfInjected("prepare.existing-geometry");
-            prepared.changed = true;
-          }
-          if (item.red != record.red || item.green != record.green || item.blue != record.blue ||
-              !sameFinish(item.appearance, record.appearance)) {
-            var material = scene.createMaterial();
-            prepared.createdMaterials.push(material);
-            scene.setMaterialData(material, materialFor(record.red, record.green, record.blue, record.appearance));
-            prepared.transaction.setMaterial(runtime.node, material);
-            prepared.retiredMaterials.push(runtime.material);
-            runtime = new EditorSceneRuntimeObject(runtime.node, runtime.geometry, material);
-            prepared.bridgeEntries.set(record.id, runtime);
-            failIfInjected("prepare.existing-material");
-            prepared.changed = true;
-          }
-          if (item.collisionEnabled != record.collisionEnabled || item.dynamicBody != record.dynamicBody ||
-              item.mass != record.mass) prepared.changed = true;
-          candidate.label = record.label; candidate.kind = record.type;
-          candidate.width = record.width; candidate.height = record.height; candidate.depth = record.depth;
-          candidate.collisionEnabled = record.collisionEnabled; candidate.dynamicBody = record.dynamicBody;
-          candidate.mass = record.mass; candidate.red = record.red; candidate.green = record.green; candidate.blue = record.blue; candidate.appearance = record.appearance;
-          candidate.cadGraph = storedGraph; candidate.x = record.x; candidate.y = record.y; candidate.z = record.z;
-          candidate.meshSnapshot = record.meshSnapshot;
-          candidate.rotation = record.rotation;
-          candidate.visible = record.visible;
-          if (objectChanged) prepared.changed = true;
-          prepared.objects.push(candidate);
-          failIfInjected("prepare.existing-object");
-        }
-        retained.set(record.id, true);
-      }
-      for (item in objects) if (!retained.exists(item.id)) {
-        var runtime = bridge.runtime(item.id);
-        if (runtime == null) throw "Missing runtime scene node: " + item.id;
-        prepared.transaction.destroyNode(runtime.node);
-        prepared.bridgeEntries.remove(item.id);
-        prepared.nodeEntries.remove(SceneBridge.nodeKey(runtime.node));
-        prepared.retiredGeometry.push(runtime.geometry);
-        prepared.retiredMaterials.push(runtime.material);
-        prepared.cadSessions.remove(item.id);
-        prepared.changed = true;
-      }
-      for (id in cadSessions.keys()) {
-        var previous = cadSessions.get(id);
-        if (previous != null && prepared.cadSessions.get(id) != previous)
-          prepared.retiredCadSessions.push(previous);
-      }
-      failIfInjected("transaction.before-commit");
-      committedChanges = prepared.transaction.commitWithChanges();
-    } catch (error:Dynamic) {
-      prepared.abort();
-      throw error;
-    }
-    for (id in staleFaceHoverIds) {
-      faceHoverNodes.remove(id);
-      faceHoverIndexes.remove(id);
-      var geometry = faceHoverGeometries.get(id);
-      faceHoverGeometries.remove(id);
-      if (geometry != null) geometry.dispose();
-    }
-    objects = prepared.objects;
-    cadSessions = prepared.cadSessions;
-    bridge.replaceEntries(prepared.bridgeEntries, prepared.nodeEntries);
-    this.selection.selectedId = selection;
-    this.selection.selectedFeatureKey=null;
-    if (prepared.changed) publish(prepared.changedBounds, physicsChanged, committedChanges);
-    else if (committedChanges != null) committedChanges.dispose();
-    var restoredFace = -1;
-    if(previousFace!=null){
-      var selected=object(selection);
-      if(selected!=null&&isCadKind(selected.kind)){
-        var session=cadSessions.get(selected.id);
-        if(session!=null)try {
-          restoredFace=remapSelectedCadFace(session,previousFaceShape,previousFace);
-          if(restoredFace>=0){this.selection.selectedCadFaceX=previousFaceX;this.selection.selectedCadFaceY=previousFaceY;}
-        } catch(error:Dynamic) { restoredFace=-1; }
-      }
-    }
-    if(restoredFace<0)try clearSelectedCadFace() catch (_:Dynamic) {}
-    prepared.retire();
-    var nextSelected = object(selection);
-    var propertySchemaChanged = previousSelectedId != selection || previousSelectedFeatureKey != null ||
-      previousSelectedKind != (nextSelected == null ? null : nextSelected.kind);
-    if (propertySchemaChanged)
-      this.selection.changed(this);
+    replaceObjects(data, nextSelection);
   }
 
-  function physicsRecordsChanged(data:Array<SceneObjectData>):Bool {
-    var previous:Map<String, EditorSceneObject> = new Map();
-    var nextIds:Map<String, Bool> = new Map();
-    for (item in objects) previous.set(item.id, item);
-    for (record in data) {
-      nextIds.set(record.id, true);
-      var old = previous.get(record.id);
-      if (old == null) {
-        if (record.collisionEnabled) return true;
-        continue;
-      }
-      if (old.collisionEnabled != record.collisionEnabled) return true;
-      if (!record.collisionEnabled) continue;
-      if (old.kind != record.type || old.x != record.x || old.y != record.y || old.z != record.z ||
-          old.width != record.width || old.height != record.height || old.depth != record.depth ||
-          !sameRotation(old.rotation, record.rotation) || old.cadGraph != record.cadGraph ||
-          old.meshSnapshot != record.meshSnapshot || old.dynamicBody != record.dynamicBody ||
-          old.mass != record.mass) return true;
-    }
-    for (item in objects) if (item.collisionEnabled && !nextIds.exists(item.id)) return true;
-    return false;
-  }
-
-  static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
-    return new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
-      item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
-      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance);
-  }
+  function replaceObjects(data:Array<SceneObjectData>, selection:String):Void
+    SceneReconciler.replace(this, data, selection);
 
   public function setName(id:String, label:String):Void {
-    if (StringTools.trim(label).length == 0 || SceneCodec.containsNul(label))
-      throw "Name cannot be empty or contain NUL";
+    model.validateLabel(label);
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
     var transaction = scene.beginTransaction();
@@ -1565,7 +1114,7 @@ class EditorScene {
       transaction.setName(runtimeFor(id).node, label);
       changes = transaction.commitWithChanges();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
-    item.label = label;
+    model.rename(item, label);
     publish(null, false, changes);
   }
 
@@ -1669,37 +1218,8 @@ class EditorScene {
   }
 
   public function configureRenderView(view:SceneView, viewProjection:Transform,
-      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1):SceneView {
-    view.setViewProjection(viewProjection);
-    var selected = object(selectedId);
-    var selection = new SelectionSet();
-    if (selected != null) selection.add(runtimeFor(selected.id).node);
-    view.applySelection(selection, selectionMaterial);
-    var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
-      ? null : faceHoverNodes.get(hoveredId);
-    if (faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex) {
-      // The face node is hidden in the scene and shown only in this presentation view.
-      view.setVisibility(faceHoverNode, true);
-      view.setMaterial(faceHoverNode, hoverMaterial);
-      view.applyHover(null, hoverMaterial);
-    } else {
-      var hovered = hoveredId == null ? null : object(hoveredId);
-      view.applyHover(hovered == null ? null : runtimeFor(hovered.id).node, hoverMaterial);
-    }
-    if (poses != null) {
-      var poseNodes:Array<NodeId> = [];
-      var poseTransforms:Array<Transform> = [];
-      for (pose in poses) {
-        var runtime = bridge.runtime(pose.id);
-        if (runtime != null) {
-          poseNodes.push(runtime.node);
-          poseTransforms.push(poseTransform(pose.position, pose.rotation));
-        }
-      }
-      view.replacePoses(poseNodes, poseTransforms);
-    }
-    return view;
-  }
+      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1):SceneView
+    return presentation.configureRenderView(this, view, viewProjection, poses, hoveredId, hoveredFaceIndex);
 
   public function selectRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
       directionX:Float, directionY:Float, directionZ:Float,
@@ -1795,7 +1315,8 @@ class EditorScene {
     var marker = selectedFeatureKey.indexOf(":feature:");
     var index = Std.parseInt(selectedFeatureKey.substr(marker + 9));
     activeSketchEdit = requireCadSession(selectedId).beginSketchEdit(index);
-    var feature:ConstrainedSketchFeature = cast activeSketchEdit.feature;
+    var draft:CadSketchEditSession = cast activeSketchEdit;
+    var feature:ConstrainedSketchFeature = cast draft.feature;
     sketchEditPlaneValue = feature.workplane();
     activeSketchObjectId = selectedId;
     refreshSelectionRevision();
@@ -1849,56 +1370,18 @@ class EditorScene {
     throw "sketch draft feature is no longer in its document";
   }
 
-  public function sketchDraftPlane():Null<Plane>
-    return activeSketchEdit == null ? null : sketchEditPlaneValue;
+  public function sketchDraftPlane():Null<Plane> return sketchController.plane();
 
-  public function sketchDraftSnapshot():Null<ConstrainedSketch> {
-    var draft = activeSketchEdit;
-    return draft == null ? null : draft.sketch.snapshot();
-  }
+  public function sketchDraftSnapshot():Null<ConstrainedSketch> return sketchController.snapshot();
 
-  public function sketchDraftSolution():Null<SolvedSketch> {
-    if (activeSketchEdit == null)
-      return null;
-    var session = activeSketchEdit.sketch;
-    return session.solution == null ? session.lastValidSolution : session.solution;
-  }
+  public function sketchDraftSolution():Null<SolvedSketch> return sketchController.solution();
 
-  public function canApplySelectedSketchEdit():Bool {
-    var draft = activeSketchEdit;
-    if (draft == null || !draft.sketch.isSolved)
-      return false;
-    try {
-      var profile = draft.sketch.buildProfile();
-      profile.close();
-      return true;
-    } catch (_:Dynamic) {
-      return false;
-    }
-  }
+  public function canApplySelectedSketchEdit():Bool return sketchController.canApply();
 
-  public function sketchEditSummary():Null<String> {
-    var draft = activeSketchEdit;
-    if (draft == null)
-      return null;
-    if (draft.sketch.snapshot().entities().length == 0)
-      return "Sketch is empty · drag on the workplane to draw a rectangle";
-    var diagnostic = draft.sketch.diagnostic;
-    if (diagnostic == null)
-      return "Sketch draft has not been solved";
-    return diagnostic.message + " · " + draft.sketch.degreesOfFreedom
-      + " degrees of freedom" + (diagnostic.constraintIds.length == 0
-        ? "" : " · constraints: " + diagnostic.constraintIds.join(", "))
-      + " · drag to add a rectangle";
-  }
+  public function sketchEditSummary():Null<String> return sketchController.summary();
 
   public function cancelSelectedSketchEdit():Bool {
-    if (activeSketchEdit == null)
-      return false;
-    activeSketchEdit.cancel();
-    activeSketchEdit = null;
-    activeSketchObjectId = null;
-    sketchEditPlaneValue = null;
+    if (!sketchController.cancel()) return false;
     refreshSelectionRevision();
     return true;
   }
@@ -2024,58 +1507,8 @@ class EditorScene {
     return {id: id, faceIndex: faceIndex};
   }
 
-  /** Ensures a hidden child node contains exactly one CAD or preview face for hover rendering. */
-  function ensureFaceHoverPresentation(id:String, faceIndex:Int):Void {
-    var item = object(id);
-    if (item == null || !isFaceHoverKind(item.kind) || faceIndex < 0) return;
-    if (faceHoverIndexes.get(id) == faceIndex && faceHoverNodes.exists(id)) return;
-
-    var geometryData = faceHoverGeometry(id, item, faceIndex);
-    if (geometryData == null) return;
-    var geometry = faceHoverGeometries.get(id);
-    if (geometry == null) {
-      geometry = scene.createGeometry();
-      scene.setGeometryData(geometry, geometryData);
-      var transaction = scene.beginTransaction();
-      var node = transaction.createNode();
-      transaction.setName(node, "Hover face " + (faceIndex + 1));
-      transaction.setVisibility(node, false);
-      transaction.setParent(node, runtimeFor(id).node);
-      transaction.setGeometry(node, geometry);
-      transaction.setMaterial(node, hoverMaterial);
-      transaction.setTransform(node, Transform.identity());
-      transaction.commit();
-      faceHoverNodes.set(id, node);
-      faceHoverGeometries.set(id, geometry);
-    } else {
-      scene.setGeometryData(geometry, geometryData);
-    }
-    faceHoverIndexes.set(id, faceIndex);
-    publish();
-  }
-
-  /** Common face-hover geometry boundary for live CAD and serialized preview objects. */
-  function faceHoverGeometry(id:String, item:EditorSceneObject,
-      faceIndex:Int):Null<GeometryData> {
-    if (isCadKind(item.kind)) {
-      var session = cadSessions.get(id);
-      if (session == null) return null;
-      var output = session.document.outputFeatureOrNull();
-      if (output == null || output.currentShape() == null) return null;
-      var face:Shape = output.currentShape().subshape(CadKit.ShapeKind.Face, faceIndex);
-      try {
-        var result = session.model.geometryFor(face, true);
-        face.close();
-        return result;
-      } catch (error:Dynamic) {
-        face.close();
-        throw error;
-      }
-    }
-    if (item.kind == "cad-preview" && item.meshSnapshot != null)
-      return previewGeometry(item.meshSnapshot).subelementGeometry(faceIndex);
-    return null;
-  }
+  function ensureFaceHoverPresentation(id:String, faceIndex:Int):Void
+    presentation.ensureFaceHover(this, id, faceIndex);
 
   public function pickRay(originX:Float,originY:Float,originZ:Float,
       directionX:Float,directionY:Float,directionZ:Float):String {
@@ -2272,7 +1705,7 @@ class EditorScene {
     var changes:Null<ChangeSet> = null;
     try {
       material = scene.createMaterial();
-      scene.setMaterialData(material, materialFor(red, green, blue, finish));
+      scene.setMaterialData(material, ScenePresentation.materialFor(red, green, blue, finish));
       transaction.setMaterial(runtime.node, material);
       failIfInjected("prepare.existing-material");
       changes = transaction.commitWithChanges();
@@ -2300,235 +1733,24 @@ class EditorScene {
     rebuildPresentation(updatedNodes);
   }
 
-  function queueRenderChanges(changes:ChangeSet):Void {
-    if (renderNeedsRefresh) { changes.dispose(); return; }
-    if (pendingRenderChanges != null) {
-      pendingRenderChanges.dispose();
-      pendingRenderChanges = null;
-      changes.dispose();
-      renderNeedsRefresh = true;
-    } else pendingRenderChanges = changes;
-  }
+  function queueRenderChanges(changes:ChangeSet):Void presentation.queueRenderChanges(changes);
 
-  function requireRenderRefresh():Void {
-    if (pendingRenderChanges != null) pendingRenderChanges.dispose();
-    pendingRenderChanges = null;
-    renderNeedsRefresh = true;
-  }
+  function requireRenderRefresh():Void presentation.requireRenderRefresh();
 
-  /** Transfers the one pending change set to the viewport; null requests a refresh. */
-  public function takeRenderChanges():Null<ChangeSet> {
-    if (renderNeedsRefresh) {
-      renderNeedsRefresh = false;
-      return null;
-    }
-    var changes = pendingRenderChanges;
-    pendingRenderChanges = null;
-    return changes;
-  }
+  public function takeRenderChanges():Null<ChangeSet> return presentation.takeRenderChanges();
 
-  /** Derived presentation caches may lag a committed edit and retry on the next access/frame. */
-  function refreshPresentationIfStale():Void {
-    if (presentationStale) rebuildPresentation();
-    if (presentationStale) throw "Scene presentation is unavailable until its derived caches rebuild";
-  }
+  function refreshPresentationIfStale():Void presentation.refreshIfStale(this);
 
-  function rebuildPresentation(?updatedNodes:Array<NodeId>):Void {
-    var next:Null<SceneSnapshot> = null;
-    var nextSpatial:Null<SpatialIndex> = null;
-    try {
-      failIfInjected("publish.snapshot");
-      next = scene.snapshot();
-      failIfInjected("publish.spatial-index");
-      if (!spatial.updateNodes(next, updatedNodes == null ? [] : updatedNodes)) {
-        nextSpatial = SpatialIndex.create(next);
-        spatialFullRebuildCount++;
-      }
-    } catch (_:Dynamic) {
-      if (nextSpatial != null) try nextSpatial.dispose() catch (_:Dynamic) {}
-      if (next != null) try next.dispose() catch (_:Dynamic) {}
-      presentationStale = true;
-      return;
-    }
-    var previousSnapshot = snapshot;
-    var previousSpatial = spatial;
-    snapshot = next;
-    if (nextSpatial != null) spatial = nextSpatial;
-    presentationStale = false;
-    if (nextSpatial != null) try previousSpatial.dispose() catch (_:Dynamic) {}
-    try previousSnapshot.dispose() catch (_:Dynamic) {}
-  }
+  function rebuildPresentation(?updatedNodes:Array<NodeId>):Void
+    presentation.rebuild(this, updatedNodes);
 
   function failIfInjected(point:String):Void {
     var injector = failureInjection;
     if (injector != null) injector(point);
   }
 
-  public function properties():Array<PropertyDescriptor> {
-    var id = selectedId;
-    if (object(id) == null) return [];
-    // Capture identity in each binding: undo must still target this object after selection changes.
-    var prefix = id + ":" + (selectedFeatureKey == null ? "object" : selectedFeatureKey) + ":";
-    var result:Array<PropertyDescriptor> = [];
-    if (!kinematicOccurrences.exists(id))
-      for (axis in 0...2) result.push(positionProperty(id, axis, prefix));
-    var visibility = new PropertyDescriptorOptions();
-    visibility.category = "Rendering";
-    result.push(new PropertyDescriptor(prefix + "visible", "Visible", PropertyType.Bool,
-      function(_) return PropertyValue.Bool(requiredObject(id).visible), function(_, value) {
-        switch (value) {
-          case PropertyValue.Bool(next): setVisible(id, next);
-          default: throw "Visibility requires a boolean";
-        }
-      }, visibility));
-    var name = new PropertyDescriptorOptions();
-    name.category = "Object";
-    name.validator = function(_, value) return switch (value) {
-      case PropertyValue.Text(text):
-        StringTools.trim(text).length == 0 || SceneCodec.containsNul(text)
-          ? "Name cannot be empty or contain NUL" : null;
-      default: "Name requires text";
-    };
-    result.push(new PropertyDescriptor(prefix + "name", "Name", PropertyType.Text,
-      function(_) {
-        var item = object(id);
-        if (item == null) throw "Unknown scene object: " + id;
-        return PropertyValue.Text(item.label);
-      }, function(_, value) {
-        switch (value) {
-          case PropertyValue.Text(text): setName(id, text);
-          default: throw "Name requires text";
-        }
-      }, name));
-    var importedShape = requiredObject(id).kind == "cad-step";
-    var genericPart = requiredObject(id).kind == "cad-part";
-    if (!importedShape && !genericPart) {
-      result.push(dimensionProperty(id, 0, prefix));
-      result.push(dimensionProperty(id, 1, prefix));
-    }
-    var colour = new PropertyDescriptorOptions();
-    colour.category = "Rendering";
-    colour.validator = function(_, value) return switch (value) {
-      case PropertyValue.Text(text): decodeColour(text) == null ? "Colour requires #RRGGBB" : null;
-      default: "Colour requires #RRGGBB";
-    };
-    // Property history stores the displayed text. Retain exact channel snapshots so
-    // undoing a hex edit restores values loaded from a document without quantizing them.
-    var colourSnapshots:Map<String, Array<Float>> = new Map();
-    var initialColour = requiredObject(id);
-    colourSnapshots.set(encodeColour(initialColour.red, initialColour.green, initialColour.blue),
-      [initialColour.red, initialColour.green, initialColour.blue]);
-    result.push(new PropertyDescriptor(prefix + "colour", "Colour", PropertyType.Text,
-      function(_) {
-        var item = requiredObject(id);
-        return PropertyValue.Text(encodeColour(item.red, item.green, item.blue));
-      }, function(_, value) {
-        switch (value) {
-          case PropertyValue.Text(text):
-            var key = text.toUpperCase();
-            var channels = colourSnapshots.get(key);
-            if (channels == null) channels = decodeColour(key);
-            if (channels == null) throw "Colour requires #RRGGBB";
-            var current = requiredObject(id);
-            colourSnapshots.set(encodeColour(current.red, current.green, current.blue),
-              [current.red, current.green, current.blue]);
-            setColour(id, channels[0], channels[1], channels[2]);
-          default: throw "Colour requires #RRGGBB";
-        }
-      }, colour));
-    var finishOptions = new PropertyDescriptorOptions();
-    finishOptions.category = "Rendering";
-    var sourceFinish = componentFinishes.get(id);
-    if (sourceFinish != null) finishOptions.options.push(new PropertyOption("component", "Component finish"));
-    for (preset in [
-      ["neutral", "Neutral"], ["painted", "Painted"], ["machined-steel", "Machined steel"],
-      ["black-oxide", "Black oxide"], ["bearing-steel", "Bearing steel"],
-      ["aluminium", "Aluminium"], ["rubber", "Rubber"]
-    ]) finishOptions.options.push(new PropertyOption(preset[0], preset[1]));
-    var initialFinish = requiredObject(id).appearance;
-    if (initialFinish != null && Appearances.preset(initialFinish.finish) == null)
-      finishOptions.options.push(new PropertyOption(initialFinish.finish, initialFinish.finish));
-    finishOptions.validator = function(_, value) return switch (value) {
-      case PropertyValue.Enum(key):
-        key == "component" && sourceFinish != null || Appearances.preset(key) != null ? null : "Unknown finish";
-      default: "Finish requires a preset";
-    };
-    result.push(new PropertyDescriptor(prefix + "finish", "Finish", PropertyType.Enum,
-      function(_) {
-        var item = requiredObject(id);
-        var appearance = item.appearance;
-        if (sourceFinish != null && sameFinish(appearance, sourceFinish.appearance) &&
-            item.red == sourceFinish.red && item.green == sourceFinish.green && item.blue == sourceFinish.blue)
-          return PropertyValue.Enum("component");
-        return PropertyValue.Enum(appearance == null ? "neutral" : appearance.finish);
-      }, function(_, value) {
-        switch (value) {
-          case PropertyValue.Enum("component") if (sourceFinish != null): resetComponentFinish(id);
-          case PropertyValue.Enum(key):
-            var preset = Appearances.preset(key);
-            if (preset == null) throw "Unknown finish";
-            setFinish(id, preset);
-          default: throw "Finish requires a preset";
-        }
-      }, finishOptions));
-    for (channel in ["metallic", "roughness"]) {
-      var field = channel;
-      var settings = new PropertyDescriptorOptions();
-      settings.category = "Rendering";
-      settings.minimum = 0.0;
-      settings.maximum = 1.0;
-      settings.step = 0.05;
-      settings.validator = function(_, value) {
-        var number:Null<Float> = switch (value) {
-          case PropertyValue.Float(next): next;
-          case PropertyValue.Int(next): next;
-          default: null;
-        };
-        return number == null || !validColour(number) ? "Value must be between 0 and 1" : null;
-      };
-      result.push(new PropertyDescriptor(prefix + field, field == "metallic" ? "Metallic" : "Roughness",
-        PropertyType.Float, function(_) {
-          var current = requiredObject(id).appearance;
-          if (current == null) current = Appearances.neutral();
-          return PropertyValue.Float(field == "metallic" ? current.metallic : current.roughness);
-        }, function(_, value) {
-          var number:Float = switch (value) {
-            case PropertyValue.Float(next): next;
-            case PropertyValue.Int(next): next;
-            default: throw "Finish value requires a number";
-          };
-          var current = requiredObject(id).appearance;
-          if (current == null) current = Appearances.neutral();
-          setFinish(id, {finish: current.finish,
-            metallic: field == "metallic" ? number : current.metallic,
-            roughness: field == "roughness" ? number : current.roughness});
-        }, settings));
-    }
-    if (!importedShape && !genericPart)
-      result.push(dimensionProperty(id, 2, prefix));
-    var kindProvider = ObjectKindRegistry.find(requiredObject(id).kind);
-    if (kindProvider != null)
-      for (property in kindProvider.properties(this, id, prefix)) result.push(property);
-    var selectedFeature = selectedCadFeature(id);
-    if (selectedFeature != null && selectedFeature.active && Std.isOfType(selectedFeature, ExtrudeFeature)) {
-      var extrusion:ExtrudeFeature = cast selectedFeature;
-      if (extrusion.amount != null)
-        result.push(extrusionDepthProperty(id, extrusion.id.toInt(), prefix));
-    }
-    if (selectedFeature != null && selectedFeature.active && Std.isOfType(selectedFeature, FilletFeature))
-      result.push(filletRadiusProperty(id, selectedFeature.id.toInt(), prefix));
-    if (activeSketchEdit != null && activeSketchObjectId == id)
-      appendSketchDraftProperties(result, activeSketchEdit, prefix);
-    if (assemblyPropertyProvider != null)
-      for (property in assemblyPropertyProvider(id)) result.push(property);
-    result.push(boolProperty(id,"collision","Collision",function(item)return item.collisionEnabled,
-      "Physics",prefix));
-    result.push(boolProperty(id,"dynamic","Dynamic body",function(item)return item.dynamicBody,
-      "Physics",prefix));
-    result.push(numberProperty(id,"mass","Mass",function(item)return item.mass,
-      0.000001,1000000.0,"kg","Physics",prefix));
-    return result;
-  }
+  public function properties():Array<PropertyDescriptor>
+    return ScenePropertyProvider.build(this);
 
   function appendSketchDraftProperties(result:Array<PropertyDescriptor>, draft:CadSketchEditSession,
       prefix:String):Void {
@@ -2601,7 +1823,8 @@ class EditorScene {
   function sketchPoint(id:String):SketchPoint {
     if (activeSketchEdit == null)
       throw "Sketch draft is no longer active";
-    for (point in activeSketchEdit.sketch.snapshot().points())
+    var draft:CadSketchEditSession = cast activeSketchEdit;
+    for (point in draft.sketch.snapshot().points())
       if (point.id == id) return point;
     throw "Sketch draft point no longer exists: " + id;
   }
@@ -2609,7 +1832,8 @@ class EditorScene {
   function sketchConstraint(id:String):SketchConstraint {
     if (activeSketchEdit == null)
       throw "Sketch draft is no longer active";
-    for (constraint in activeSketchEdit.sketch.snapshot().constraints())
+    var draft:CadSketchEditSession = cast activeSketchEdit;
+    for (constraint in draft.sketch.snapshot().constraints())
       if (constraint.id == id) return constraint;
     throw "Sketch draft constraint no longer exists: " + id;
   }
@@ -2617,8 +1841,9 @@ class EditorScene {
   function editSketchDraft(change:ConstrainedSketch->Void):Void {
     if (activeSketchEdit == null)
       throw "Sketch draft is no longer active";
-    activeSketchEdit.edit(change);
-    sketchDraftRevision++;
+    var draft:CadSketchEditSession = cast activeSketchEdit;
+    draft.edit(change);
+    sketchDraftRevision = sketchDraftRevision + 1;
     refreshSelectionRevision();
   }
 
@@ -2843,19 +2068,7 @@ class EditorScene {
       }, settings);
   }
 
-  public function records():Array<SceneObjectData> {
-    var result:Array<SceneObjectData> = [];
-    for (item in objects) {
-      result.push({id: item.id, label: item.label, type: item.kind,
-        x: item.x, y: item.y, z: item.z,
-        width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
-        dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
-        appearance:item.appearance,
-        visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
-        rotation:item.rotation});
-    }
-    return result;
-  }
+  public function records():Array<SceneObjectData> return model.records();
 
   /** Save boundary: serialize each live authored CAD document only when requested. */
   public function recordsForSave():Array<SceneObjectData> {
@@ -2998,7 +2211,7 @@ class EditorSceneObject {
 }
 
 /** Runtime-only resources associated with one document object. */
-private class SceneBridge {
+class SceneBridge {
   public final scene:Scene;
   var objects:Map<String, EditorSceneRuntimeObject> = new Map();
   var nodeEntries:Map<String, String> = new Map();
@@ -3053,57 +2266,7 @@ private class SceneBridge {
     scene.dispose();
 }
 
-/** All fallible scene-edit work staged before the native transaction commits. */
-private class PreparedSceneEdit {
-  public final transaction:Transaction;
-  public final objects:Array<EditorSceneObject>;
-  public final bridgeEntries:Map<String, EditorSceneRuntimeObject>;
-  public final nodeEntries:Map<String, String>;
-  public final cadSessions:Map<String, CadDocumentSession>;
-  public final stagedCadSessions:Array<CadDocumentSession> = [];
-  public final changedBounds:Array<NodeId> = [];
-  public final createdGeometry:Array<Geometry> = [];
-  public final createdMaterials:Array<Material> = [];
-  public final retiredCadSessions:Array<CadDocumentSession> = [];
-  public final retiredGeometry:Array<Geometry> = [];
-  public final retiredMaterials:Array<Material> = [];
-  public var changed:Bool = false;
-
-  public function new(transaction:Transaction, objects:Array<EditorSceneObject>,
-      bridgeEntries:Map<String, EditorSceneRuntimeObject>,
-      nodeEntries:Map<String, String>,
-      cadSessions:Map<String, CadDocumentSession>) {
-    this.transaction = transaction;
-    this.objects = objects;
-    this.bridgeEntries = bridgeEntries;
-    this.nodeEntries = nodeEntries;
-    this.cadSessions = cadSessions;
-  }
-
-  public function abort():Void {
-    try transaction.dispose() catch (_:Dynamic) {}
-    for (geometry in createdGeometry) try geometry.dispose() catch (_:Dynamic) {}
-    for (material in createdMaterials) try material.dispose() catch (_:Dynamic) {}
-    for (session in stagedCadSessions) try session.close() catch (_:Dynamic) {}
-  }
-
-  /** Retirement happens only after the native scene no longer references these handles. */
-  public function retire():Void {
-    var activeGeometry:Array<Geometry> = [];
-    for (runtime in bridgeEntries) if (activeGeometry.indexOf(runtime.geometry) < 0)
-      activeGeometry.push(runtime.geometry);
-    var disposedGeometry:Array<Geometry> = [];
-    for (geometry in retiredGeometry) if (activeGeometry.indexOf(geometry) < 0 &&
-        disposedGeometry.indexOf(geometry) < 0) {
-      try geometry.dispose() catch (_:Dynamic) {}
-      disposedGeometry.push(geometry);
-    }
-    for (material in retiredMaterials) try material.dispose() catch (_:Dynamic) {}
-    for (session in retiredCadSessions) try session.close() catch (_:Dynamic) {}
-  }
-}
-
-private class EditorSceneRuntimeObject {
+class EditorSceneRuntimeObject {
   public final node:NodeId;
   public final geometry:Geometry;
   public final material:Material;
