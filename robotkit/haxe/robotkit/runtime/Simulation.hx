@@ -66,6 +66,7 @@ class Simulation {
              virtualDevice.stepsPerUnit.length != blueprint.jointCount))
           throw "Simulation virtual device configuration is invalid";
         robotDesc.set_virtual_device_enabled(1);
+        robotDesc.set_virtual_device_profile(virtualDevice.profile);
         robotDesc.set_virtual_device_tick_hz(virtualDevice.tickHz);
         robotDesc.set_virtual_device_step_tick_hz(virtualDevice.stepTickHz);
         robotDesc.set_virtual_device_offset_ticks(virtualDevice.offsetTicks);

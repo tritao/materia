@@ -21,7 +21,7 @@ public:
         if (scale.size() != count) return;
         device_ = rkd_virtual_create(config.device_tick_hz, config.step_tick_hz,
             config.offset_ticks, config.drift_ppm, count, scale.data(),
-            config.fingerprint.data());
+            config.fingerprint.data(), config.profile);
     }
     ~Link() override { rkd_virtual_destroy(device_); }
     bool valid() const noexcept { return device_ != nullptr; }

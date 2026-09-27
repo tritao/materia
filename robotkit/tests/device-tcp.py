@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise RobotClient -> robotd -> RKD5 against the real Rust device core."""
+"""Exercise RobotClient -> robotd -> RKD6 against the Rust minimal device."""
 
 import fcntl
 import json
@@ -8,6 +8,7 @@ from pathlib import Path
 import pty
 import signal
 import socket
+import struct
 import subprocess
 import tempfile
 import time
@@ -17,8 +18,34 @@ ROOT = Path(__file__).resolve().parents[2]
 HAXEON = ROOT / "haxeon/scripts/haxeon"
 ROBOTD = ROOT / "robotkit/robotd/haxeon.json"
 CLIENT = ROOT / "robotkit/tests/integration/haxeon.json"
-MANIFEST = ROOT / "robotkit/device_protocol/Cargo.toml"
+MANIFEST = ROOT / "robotkit/device_virtual/Cargo.toml"
 TARGET = ROOT / "robotkit/tests/build/device-pty-cargo"
+def effective_fingerprint(base_hex, channels):
+    if not channels:
+        return base_hex
+    mask = (1 << 64) - 1
+    value = 14695981039346656037
+    def mix(number):
+        nonlocal value
+        for byte in number.to_bytes(8, "little"):
+            value = ((value ^ byte) * 1099511628211) & mask
+    for byte in bytes.fromhex(base_hex): mix(byte)
+    mix(0)  # no actuator layout
+    mix(len(channels))
+    for channel in channels:
+        for byte in channel["id"].encode().ljust(48, b"\0"): mix(byte)
+        safe = channel["safeValue"]
+        kind = {"digital": 1, "analog": 2, "process": 3}[safe["kind"]]
+        mix(kind); mix(kind); mix(int(safe.get("digital", False)))
+        mix(struct.unpack("<Q", struct.pack("<d", safe.get("analog", 0.0)))[0])
+        mix(struct.unpack("<Q", struct.pack("<d", safe.get("argument", 0.0)))[0])
+        for byte in safe.get("command", "").encode().ljust(48, b"\0"): mix(byte)
+    output = bytearray()
+    for i in range(16):
+        value ^= value >> 32
+        value = (value * 1099511628211) & mask
+        output.append((value >> ((i % 8) * 8)) & 255)
+    return output.hex()
 def run(*args):
     result = subprocess.run(args, cwd=ROOT, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
@@ -64,10 +91,11 @@ def main():
         fixture_dir = ROOT / "robotkit/tests/fixtures/device-deployment"
         (deployment_dir / "robot.json").write_bytes((fixture_dir / "robot.json").read_bytes())
         (deployment_dir / "layout.json").write_bytes((fixture_dir / "layout.json").read_bytes())
-        (deployment_dir / "device_wire.lock.json").write_bytes(
-            (fixture_dir / "device_wire.lock.json").read_bytes())
+        (deployment_dir / "device_wire6.lock.json").write_bytes(
+            (ROOT / "robotkit/schema/device_wire6.lock.json").read_bytes())
         deployment = json.loads((fixture_dir / "deployment.json").read_text())
         deployment["device"]["path"] = slave_path
+        deployment["device"]["schema_lock"] = "device_wire6.lock.json"
         deployment_path = deployment_dir / "deployment.json"
         deployment_path.write_text(json.dumps(deployment))
         wrong = json.loads(json.dumps(deployment))
@@ -87,7 +115,8 @@ def main():
                 client_log_path.open("w+") as client_log:
             device = subprocess.Popen(
                 [str(TARGET / "debug/robotd_pty_device"), str(master), str(control_read),
-                 deployment["device"]["fingerprint"]],
+                 effective_fingerprint(deployment["device"]["fingerprint"],
+                     deployment.get("channels", []))],
                 cwd=ROOT, pass_fds=(master, control_read), stdout=device_log,
                 stderr=subprocess.STDOUT)
             os.close(control_read)

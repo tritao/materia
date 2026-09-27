@@ -36,6 +36,9 @@ class RobotHost {
     var baud = deployment == null ? 115200 : deployment.baud;
     var fingerprint = deployment == null ? null : deployment.fingerprint;
     var targetError = deployment == null ? 0.0 : deployment.targetError;
+    var stepTickHz = deployment == null ? 40000 : deployment.stepTickHz;
+    var linkLossTimeoutNs = deployment == null ? haxe.Int64.ofInt(500000000) : deployment.linkLossTimeoutNs;
+    var clockSyncBoundNs = deployment == null ? haxe.Int64.ofInt(30000000) : deployment.clockSyncBoundNs;
     if (optionValue("--serial=") != null || optionValue("--fingerprint=") != null ||
         optionValue("--target-error=") != null || optionValue("--baud=") != null)
       throw "robotd: serial settings belong in --deployment";
@@ -112,7 +115,8 @@ class RobotHost {
       try {
         if (serialPath != null)
           serverRuntime = RobotRuntime.createSerial(blueprint, serialPath,
-            fingerprint, targetError, baud);
+            fingerprint, targetError, baud, stepTickHz,
+            linkLossTimeoutNs, clockSyncBoundNs);
         else {
           serverSimulation = new Simulation();
           serverRuntime = serverSimulation.addRobot(blueprint);
@@ -141,7 +145,8 @@ class RobotHost {
     var inMemory = args.indexOf("--in-memory") >= 0;
     var simulation:Null<Simulation> = inMemory || serialPath != null ? null : new Simulation();
     var runtime = serialPath != null
-      ? RobotRuntime.createSerial(blueprint, serialPath, fingerprint, targetError, baud)
+      ? RobotRuntime.createSerial(blueprint, serialPath, fingerprint, targetError, baud,
+          stepTickHz, linkLossTimeoutNs, clockSyncBoundNs)
       : inMemory
         ? RobotRuntime.create(blueprint)
         : simulation.addRobot(blueprint);

@@ -1,4 +1,4 @@
-"""Derive the RKD5 accidental-mismatch fingerprint from a deployment artifact.
+"""Derive the RKD6 accidental-mismatch fingerprint from a deployment artifact.
 
 The layout file is the exact, immutable device configuration distributed to
 both the host deployment and firmware build. This tool deliberately does not
@@ -12,8 +12,8 @@ import hashlib
 import json
 from pathlib import Path
 
-DOMAIN = b"RobotKit RKD5 device layout fingerprint v1\0"
-DEFAULT_LOCK = Path(__file__).resolve().parents[1] / "schema/device_wire.lock.json"
+DOMAIN = b"RobotKit RKD6 device layout fingerprint v1\0"
+DEFAULT_LOCK = Path(__file__).resolve().parents[1] / "schema/device_wire6.lock.json"
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:

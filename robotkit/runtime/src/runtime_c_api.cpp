@@ -1,6 +1,7 @@
 #include "robotkit_runtime.h"
 #include "robotkit_runtime.hpp"
 #include "robotkit_device_serial_endpoint.hpp"
+#include "rkd6_endpoint.hpp"
 #include "runtime_registry.hpp"
 #include "runtime_abi.hpp"
 
@@ -104,32 +105,34 @@ rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprin
                                                     const char *fingerprint_hex,
                                                     double max_target_error,
                                                     rk_robot_runtime *out_runtime) {
+    return rk_robot_runtime_create_serial6(blueprint, device_path, baud, fingerprint_hex,
+        max_target_error, 40'000, 500'000'000, 30'000'000, 100'000, out_runtime);
+}
+
+rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_blueprint *blueprint,
+                                                    const char *device_path, uint32_t baud,
+                                                    const char *fingerprint_hex,
+                                                    double max_target_error,
+                                                    uint32_t step_tick_hz,
+                                                    uint64_t link_loss_timeout_ns,
+                                                    uint64_t clock_bound_ns,
+                                                    uint64_t link_latency_ns,
+                                                    rk_robot_runtime *out_runtime) {
     std::array<std::uint8_t, 16> fingerprint{};
     if (!out_runtime || !blueprint || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
         !device_path || !*device_path || blueprint->joint_count > RK_MAX_SERIAL_JOINTS ||
         !std::isfinite(max_target_error) || max_target_error < 0.0 ||
+        step_tick_hz == 0 || link_loss_timeout_ns == 0 || clock_bound_ns == 0 ||
         !parse_fingerprint(fingerprint_hex, fingerprint))
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     try {
         const auto copied = robotkit::internal::copy_blueprint(blueprint);
         const auto period = owner_period(copied);
-        const auto processing_allowance = std::chrono::nanoseconds(
-            copied.serial_processing_allowance_ns == 0 ? 2'000'000 :
-            static_cast<int64_t>(copied.serial_processing_allowance_ns));
-        const auto timing_error = robotkit::DeviceSerialEndpoint::qualification_error(
-            baud, static_cast<std::uint8_t>(blueprint->joint_count), period,
-            processing_allowance);
-        if (!timing_error.empty()) {
-            std::fprintf(stderr, "%s\n", timing_error.c_str());
-            return RK_ERROR_UNSUPPORTED;
-        }
-        std::uint8_t session_status = 0;
-        auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, fingerprint,
-            static_cast<std::uint8_t>(blueprint->joint_count), max_target_error,
-            &session_status, period, processing_allowance);
-        if (!endpoint)
-            return session_status == 2 ? RK_ERROR_MODEL_MISMATCH : RK_ERROR_BACKEND;
+        auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, copied,
+            fingerprint, max_target_error, step_tick_hz, link_loss_timeout_ns,
+            clock_bound_ns, link_latency_ns);
+        if (!endpoint) return RK_ERROR_BACKEND;
         auto runtime = std::make_shared<robotkit::RobotRuntime>(
             copied, std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint), period);
         *out_runtime = robotkit::internal::register_runtime(std::move(runtime));

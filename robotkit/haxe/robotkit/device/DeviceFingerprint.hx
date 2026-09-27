@@ -4,9 +4,9 @@ import haxe.Json;
 import haxe.crypto.Sha256;
 import haxe.io.Bytes;
 
-/** The RKD5 layout fingerprint, matching tools/device_fingerprint.py. */
+/** The RKD6 layout fingerprint, matching tools/device_fingerprint.py. */
 class DeviceFingerprint {
-  static final DOMAIN = Bytes.ofString("RobotKit RKD5 device layout fingerprint v1");
+  static final DOMAIN = Bytes.ofString("RobotKit RKD6 device layout fingerprint v1");
 
   public static function compute(layout:Bytes, schemaLock:Bytes):String {
     if (layout.length == 0) throw "robotd: deployment layout must not be empty";

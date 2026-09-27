@@ -1,14 +1,17 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "model": "robot.json",
   "device": {
     "path": "/dev/robotkit-mcu",
-    "baud": 460800,
+    "baud": 921600,
     "owner_period_ns": 10000000,
     "processing_allowance_ns": 2000000,
     "layout": "layout.json",
-    "schema_lock": "device_wire.lock.json",
-    "fingerprint": "dd4fff8c84fba2fabc96085ee0587059",
-    "target_error": 1e-06
+    "schema_lock": "../../schema/device_wire6.lock.json",
+    "fingerprint": "7ae50a80886f7c133156f72eedbbe042",
+    "target_error": 1e-06,
+    "step_tick_hz": 40000,
+    "link_loss_timeout_ns": 500000000,
+    "clock_sync_bound_ns": 30000000
   }
 }

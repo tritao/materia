@@ -52,7 +52,8 @@ class RobotRuntime {
   /** Creates a serial runtime using a deployed layout fingerprint and SI-unit error budget. */
   public static function createSerial(blueprint:RobotRuntimeBlueprint,
       devicePath:String, fingerprintHex:String, maxTargetError:Float,
-      ?baud:Int = 115200):RobotRuntime {
+      ?baud:Int = 115200, ?stepTickHz:Int = 40000,
+      ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64):RobotRuntime {
     if (blueprint == null) throw "Serial runtime requires a compiled blueprint";
     if (devicePath == null || StringTools.trim(devicePath).length == 0)
       throw "Serial runtime requires a device path";
@@ -61,9 +62,11 @@ class RobotRuntime {
       throw "Serial runtime requires a nonzero 32-digit fingerprint";
     if (!Math.isFinite(maxTargetError) || maxTargetError < 0.0)
       throw "Serial runtime requires a finite nonnegative target error budget";
-    SerialTiming.requireQualified(blueprint, baud);
-    var result = RobotKitRuntime.rk_robot_runtime_create_serial(
-      blueprint.nativeValue(), devicePath, baud, fingerprintHex, maxTargetError);
+    if (linkLossTimeoutNs == null) linkLossTimeoutNs = haxe.Int64.ofInt(500000000);
+    if (clockSyncBoundNs == null) clockSyncBoundNs = haxe.Int64.ofInt(30000000);
+    var result = RobotKitRuntime.rk_robot_runtime_create_serial6(
+      blueprint.nativeValue(), devicePath, baud, fingerprintHex, maxTargetError,
+      stepTickHz, linkLossTimeoutNs, clockSyncBoundNs, haxe.Int64.ofInt(100000));
     check(result.status, "runtime.createSerial");
     return new RobotRuntime(result.out_runtime, blueprint);
   }

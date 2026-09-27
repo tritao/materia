@@ -10,6 +10,7 @@ namespace robotkit {
 
 /** Deterministic in-process RKD6 link and board configuration. */
 struct VirtualDeviceConfig6 {
+    std::uint8_t profile = 1; // 1 full, 2 minimal
     std::uint64_t device_tick_hz = 1'000'000;
     std::uint32_t step_tick_hz = 40'000;
     std::uint64_t offset_ticks = 50'000;
