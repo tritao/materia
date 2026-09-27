@@ -13,6 +13,7 @@ import nativekit.scene.GeometryData;
 import nativekit.scene.Geometry;
 import nativekit.scene.MaterialData;
 import nativekit.scene.Material;
+import nativekit.scene.ChangeSet;
 import materia.project.Appearance;
 import materia.project.Appearance.Appearances;
 import nativekit.scene.Transaction;
@@ -98,6 +99,10 @@ class EditorScene {
   var snapshot:SceneSnapshot;
   var spatial:SpatialIndex;
   var presentationStale:Bool = false;
+  var fullReconciliationCount:Int = 0;
+  var spatialFullRebuildCount:Int = 0;
+  var pendingRenderChanges:Null<ChangeSet> = null;
+  var renderNeedsRefresh:Bool = false;
   var selectionMaterial:Material;
   var hoverMaterial:Material;
   final faceHoverNodes:Map<String, NodeId> = new Map();
@@ -1309,6 +1314,7 @@ class EditorScene {
 
   // Reconcile document records into the runtime scene while preserving stable nodes.
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
+    fullReconciliationCount++;
     var physicsChanged = physicsRecordsChanged(data);
     var previousSelectedId = selectedId;
     var previousSelectedFeatureKey = selectedFeatureKey;
@@ -1332,6 +1338,7 @@ class EditorScene {
     }
     var prepared = new PreparedSceneEdit(scene.beginTransaction(), [],
       bridge.copyEntries(), bridge.copyNodeEntries(), cadSessions.copy());
+    var committedChanges:Null<ChangeSet> = null;
     for (id in staleFaceHoverIds) {
       var node = faceHoverNodes.get(id);
       if (node != null) prepared.transaction.destroyNode(node);
@@ -1486,7 +1493,7 @@ class EditorScene {
           prepared.retiredCadSessions.push(previous);
       }
       failIfInjected("transaction.before-commit");
-      prepared.transaction.commit();
+      committedChanges = prepared.transaction.commitWithChanges();
     } catch (error:Dynamic) {
       prepared.abort();
       throw error;
@@ -1503,7 +1510,8 @@ class EditorScene {
     bridge.replaceEntries(prepared.bridgeEntries, prepared.nodeEntries);
     this.selection.selectedId = selection;
     this.selection.selectedFeatureKey=null;
-    if (prepared.changed) publish(prepared.changedBounds, physicsChanged);
+    if (prepared.changed) publish(prepared.changedBounds, physicsChanged, committedChanges);
+    else if (committedChanges != null) committedChanges.dispose();
     var restoredFace = -1;
     if(previousFace!=null){
       var selected=object(selection);
@@ -1559,12 +1567,13 @@ class EditorScene {
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
     var transaction = scene.beginTransaction();
+    var changes:Null<ChangeSet> = null;
     try {
       transaction.setName(runtimeFor(id).node, label);
-      transaction.commit();
+      changes = transaction.commitWithChanges();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
     item.label = label;
-    publish(null, false);
+    publish(null, false, changes);
   }
 
   public function items():Array<EditorSceneObject> return objects.copy();
@@ -2099,12 +2108,13 @@ class EditorScene {
     var runtime = runtimeFor(id);
     var current = objectTransform(x, y, item.z, item.rotation);
     var transaction = scene.beginTransaction();
+    var changes:Null<ChangeSet> = null;
     try {
       transaction.setTransform(runtime.node, current);
-      transaction.commit();
+      changes = transaction.commitWithChanges();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
     item.x = x; item.y = y;
-    publish([runtime.node]);
+    publish([runtime.node], item.collisionEnabled, changes);
   }
 
   /** Records a move whose final position has already been applied as a drag preview. */
@@ -2141,12 +2151,13 @@ class EditorScene {
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
     var transaction = scene.beginTransaction();
+    var changes:Null<ChangeSet> = null;
     try {
       transaction.setVisibility(runtimeFor(id).node, visible);
-      transaction.commit();
+      changes = transaction.commitWithChanges();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
     item.visible = visible;
-    publish(null, false);
+    publish(null, false, changes);
   }
 
   public function setDimensions(id:String, width:Float, height:Float,?depth:Float):Void {
@@ -2168,13 +2179,14 @@ class EditorScene {
       var runtime = runtimeFor(id);
       var geometry:Null<Geometry> = null;
       var transaction = scene.beginTransaction();
+      var changes:Null<ChangeSet> = null;
       try {
         geometry = scene.createGeometry();
         scene.setGeometryData(geometry, boxGeometry(width, height, chosenDepth));
         transaction.setGeometry(runtime.node, geometry);
         failIfInjected("prepare.existing-geometry");
         failIfInjected("prepare.existing-object");
-        transaction.commit();
+        changes = transaction.commitWithChanges();
       } catch (error:Dynamic) {
         transaction.dispose();
         if (geometry != null) geometry.dispose();
@@ -2182,7 +2194,7 @@ class EditorScene {
       }
       bridge.attach(id, runtime.node, geometry, runtime.material);
       target.width = width; target.height = height; target.depth = chosenDepth;
-      publish([runtime.node], target.collisionEnabled);
+      publish([runtime.node], target.collisionEnabled, changes);
       runtime.geometry.dispose();
       return;
     }
@@ -2256,12 +2268,13 @@ class EditorScene {
     var runtime = runtimeFor(item.id);
     var material:Null<Material> = null;
     var transaction = scene.beginTransaction();
+    var changes:Null<ChangeSet> = null;
     try {
       material = scene.createMaterial();
       scene.setMaterialData(material, materialFor(red, green, blue, finish));
       transaction.setMaterial(runtime.node, material);
       failIfInjected("prepare.existing-material");
-      transaction.commit();
+      changes = transaction.commitWithChanges();
     } catch (error:Dynamic) {
       transaction.dispose();
       if (material != null) material.dispose();
@@ -2269,11 +2282,13 @@ class EditorScene {
     }
     bridge.attach(item.id, runtime.node, runtime.geometry, material);
     item.red = red; item.green = green; item.blue = blue; item.appearance = finish;
-    publish(null, false);
+    publish(null, false, changes);
     runtime.material.dispose();
   }
 
-  function publish(?updatedNodes:Array<NodeId>, ?physicsChanged:Bool = true):Void {
+  function publish(?updatedNodes:Array<NodeId>, ?physicsChanged:Bool = true,
+      ?changes:Null<ChangeSet>):Void {
+    if (changes == null) requireRenderRefresh(); else queueRenderChanges(changes);
     nextRevision++;
     revision = nextRevision;
     markVisualChanged();
@@ -2282,6 +2297,33 @@ class EditorScene {
       environmentRevision = nextEnvironmentRevision;
     }
     rebuildPresentation(updatedNodes);
+  }
+
+  function queueRenderChanges(changes:ChangeSet):Void {
+    if (renderNeedsRefresh) { changes.dispose(); return; }
+    if (pendingRenderChanges != null) {
+      pendingRenderChanges.dispose();
+      pendingRenderChanges = null;
+      changes.dispose();
+      renderNeedsRefresh = true;
+    } else pendingRenderChanges = changes;
+  }
+
+  function requireRenderRefresh():Void {
+    if (pendingRenderChanges != null) pendingRenderChanges.dispose();
+    pendingRenderChanges = null;
+    renderNeedsRefresh = true;
+  }
+
+  /** Transfers the one pending change set to the viewport; null requests a refresh. */
+  public function takeRenderChanges():Null<ChangeSet> {
+    if (renderNeedsRefresh) {
+      renderNeedsRefresh = false;
+      return null;
+    }
+    var changes = pendingRenderChanges;
+    pendingRenderChanges = null;
+    return changes;
   }
 
   /** Derived presentation caches may lag a committed edit and retry on the next access/frame. */
@@ -2297,8 +2339,10 @@ class EditorScene {
       failIfInjected("publish.snapshot");
       next = scene.snapshot();
       failIfInjected("publish.spatial-index");
-      if (!spatial.updateNodes(next, updatedNodes == null ? [] : updatedNodes))
+      if (!spatial.updateNodes(next, updatedNodes == null ? [] : updatedNodes)) {
         nextSpatial = SpatialIndex.create(next);
+        spatialFullRebuildCount++;
+      }
     } catch (_:Dynamic) {
       if (nextSpatial != null) try nextSpatial.dispose() catch (_:Dynamic) {}
       if (next != null) try next.dispose() catch (_:Dynamic) {}
@@ -2871,6 +2915,8 @@ class EditorScene {
   public function dispose():Void {
     if (disposed) return;
     disposed = true;
+    if (pendingRenderChanges != null) pendingRenderChanges.dispose();
+    pendingRenderChanges = null;
     if (activeSketchEdit != null) {
       try activeSketchEdit.cancel() catch (_:Dynamic) {}
       activeSketchEdit = null;

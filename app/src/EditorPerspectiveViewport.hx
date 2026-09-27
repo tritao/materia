@@ -153,8 +153,15 @@ class EditorPerspectiveViewport implements View {
       view.setStudioLighting(directions, sky, ground);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
-      var rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height,
-        0.0, 0.0, 0.0, 0.0);
+      var changes = scene.takeRenderChanges();
+      var rendered:GraphicsImageRef;
+      try rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height,
+        0.0, 0.0, 0.0, 0.0, changes)
+      catch (error:Dynamic) {
+        if (changes != null) changes.dispose();
+        throw error;
+      }
+      if (changes != null) changes.dispose();
       var next = GraphicsSurface.fromImage(rendered);
       rendered.dispose();
       if (surface != null) surface.dispose();

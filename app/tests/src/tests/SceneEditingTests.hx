@@ -70,6 +70,14 @@ class SceneEditingTests {
       PropertyEditResult.Applied && sensors.revision() > before,
       "sensor acquisition change requires simulation rebuild");
     sensors.dispose();
+
+    var shared = new nativekit.ui.editing.EditorDocument("shared");
+    var sharedSensors = new SensorConfiguration(null, shared);
+    var sharedScene = new EditorScene([], shared);
+    var sensorRevision = sharedSensors.revision();
+    check(sharedScene.createRectangle() && sharedSensors.revision() == sensorRevision,
+      "scene edits in the shared document do not change sensor physics revision");
+    sharedScene.dispose(); sharedSensors.dispose();
   }
 
   static function revisionSeparation():Void {
