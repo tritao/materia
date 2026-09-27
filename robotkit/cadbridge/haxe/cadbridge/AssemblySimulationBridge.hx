@@ -1,24 +1,33 @@
 package cadbridge;
 
-import materia.kinematics.AssemblyDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
-import materia.kinematics.AssemblyDefinition.AssemblyJointType;
-import materia.kinematics.AssemblyDefinition.AssemblyJointCoupling;
-import materia.kinematics.AssemblyDefinition.AssemblyStateRecord;
-import materia.kinematics.AssemblyDefinitionCodec;
-import materia.kinematics.AssemblyFrames;
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyDefinition.AssemblyJointType;
+import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
+import materia.assembly.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
+import robotkit.model.JointCoupling;
 import cadkit.modeling.AssemblyState;
 
 typedef AssemblySimulationModel = {
   var model:RobotModel;
-  var couplings:Array<AssemblyJointCoupling>;
   var closureIds:Array<String>;
+  var closures:Array<AssemblySimulationClosure>;
+}
+
+typedef AssemblySimulationClosure = {
+  var id:String;
+  var parent:String;
+  var child:String;
+  var type:AssemblyJointType;
+  var anchorParent:Array<Float>;
+  var axisParent:Array<Float>;
 }
 
 typedef AssemblyPhysicalPart = {
@@ -28,6 +37,8 @@ typedef AssemblyPhysicalPart = {
   var centerOfMass:Array<Float>;
   var inertia:Array<Float>;
   var density:Float;
+  /** Bounded convex support hull, flattened XYZ triples in CAD units. */
+  @:optional var collisionHull:Array<Float>;
 }
 
 typedef AssemblyPhysicalData = {
@@ -45,7 +56,7 @@ class AssemblySimulationBridge {
     var scale = artifact.metresPerUnit;
     var parts = new Map<String, AssemblyPhysicalPart>();
     for (part in artifact.parts) parts.set(part.id, part);
-    var definitions = new Map<String, materia.kinematics.AssemblyDefinition.AssemblyComponentDefinition>();
+    var definitions = new Map<String, materia.assembly.AssemblyDefinition.AssemblyComponentDefinition>();
     for (component in definition.definitions) definitions.set(component.id, component);
     var model = new RobotModel(definition.id);
     var root = model.addLink(new Link("assembly-root"));
@@ -77,8 +88,19 @@ class AssemblySimulationBridge {
       setFrame(joint, placement.worldPose(occurrence.id), true, scale);
     }
     var closures:Array<String> = [];
+    var closureGeometry:Array<AssemblySimulationClosure> = [];
     for (edge in definition.joints) {
-      if (edge.role == AssemblyJointRole.Closure) { closures.push(edge.id); continue; }
+      if (edge.role == AssemblyJointRole.Closure) {
+        closures.push(edge.id);
+        var frame = connector(definitions.get(occurrenceDefinition(definition, edge.parent)),
+          edge.parentConnector);
+        var endpoint = AssemblyFrames.transformPoint(frame, edge.axis.x, edge.axis.y, edge.axis.z);
+        closureGeometry.push({id: edge.id, parent: edge.parent, child: edge.child,
+          type: edge.type,
+          anchorParent: [frame.x * scale, frame.y * scale, frame.z * scale],
+          axisParent: [endpoint.x - frame.x, endpoint.y - frame.y, endpoint.z - frame.z]});
+        continue;
+      }
       var kind:JointType = switch (edge.type) {
         case AssemblyJointType.Fixed: JointType.Fixed;
         case AssemblyJointType.Revolute: JointType.Revolute;
@@ -99,8 +121,25 @@ class AssemblySimulationBridge {
         edge.limits.velocity == null ? 0 : edge.limits.velocity * factor,
         edge.limits.effort == null ? 0 : edge.limits.effort);
     }
-    return {model: model, couplings: definition.couplings == null ? [] : definition.couplings.copy(),
-      closureIds: closures};
+    if (definition.couplings != null) for (coupling in definition.couplings) {
+      var leader:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+      var follower:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
+      for (edge in definition.joints) {
+        if (edge.id == coupling.source) leader = edge;
+        if (edge.id == coupling.target) follower = edge;
+      }
+      if (leader == null || follower == null || leader.role == AssemblyJointRole.Closure ||
+          follower.role == AssemblyJointRole.Closure)
+        throw 'Assembly coupling "${coupling.id}" requires tree joints';
+      var leaderScale = leader.type == AssemblyJointType.Prismatic ? scale : 1.0;
+      var followerScale = follower.type == AssemblyJointType.Prismatic ? scale : 1.0;
+      var ratio = coupling.ratio * followerScale / leaderScale;
+      var offset = (coupling.ratio * placement.joint(coupling.source) + coupling.offset -
+        placement.joint(coupling.target)) * followerScale;
+      model.addCoupling(new JointCoupling(coupling.id, coupling.source,
+        coupling.target, ratio, offset));
+    }
+    return {model: model, closureIds: closures, closures: closureGeometry};
   }
 
   static function occurrenceDefinition(definition:AssemblyDefinition, id:String):String {
@@ -108,7 +147,7 @@ class AssemblySimulationBridge {
     throw 'Unknown assembly occurrence "$id"';
   }
 
-  static function connector(component:materia.kinematics.AssemblyDefinition.AssemblyComponentDefinition,
+  static function connector(component:materia.assembly.AssemblyDefinition.AssemblyComponentDefinition,
       name:String):AssemblyFrame {
     if (component == null) throw "Missing assembly component definition";
     for (item in component.connectors) if (item.name == name) return item.frame;

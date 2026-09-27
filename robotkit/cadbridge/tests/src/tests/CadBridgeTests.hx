@@ -27,7 +27,7 @@ import cadbridge.BimFrameBridge;
 import cadbridge.AssemblySimulationBridge;
 import robotkit.runtime.RobotRuntimeCompiler;
 import cadkit.modeling.AssemblyModel;
-import materia.kinematics.AssemblyFrames;
+import materia.assembly.AssemblyFrames;
 import haxe.io.Bytes;
 
 /** M6 acceptance tests for robotkit/cadbridge: CadKit Face and BimKit wall -> WorkSurface, and BIM hierarchy -> FrameTree3. */

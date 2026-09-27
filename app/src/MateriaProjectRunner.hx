@@ -9,18 +9,18 @@ import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactPart;
 import materia.project.MaterialLibrary;
 import materia.project.MeshMassProperties;
-import materia.kinematics.AssemblyFrames;
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
-import materia.kinematics.AssemblyRecord.AssemblyConnector;
-import materia.kinematics.AssemblyRecord.AssemblyInstance;
-import materia.kinematics.AssemblyRecord.AssemblyJoint;
-import materia.kinematics.AssemblyRecord;
-import materia.kinematics.AssemblyDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyComponentDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
-import materia.kinematics.AssemblyDefinition.AssemblyStateRecord;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyRecord.AssemblyConnector;
+import materia.assembly.AssemblyRecord.AssemblyInstance;
+import materia.assembly.AssemblyRecord.AssemblyJoint;
+import materia.assembly.AssemblyRecord;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import cadkit.modeling.AssemblyState;
-import materia.kinematics.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyDefinitionCodec;
 import nativekit.scene.GeometryData;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart;
@@ -274,6 +274,7 @@ class MateriaProjectRunner {
       var properties = MeshMassProperties.compute(component.vertices, component.indices);
       var materialId = component.materialId == null ? "neutral" : component.materialId;
       physicalParts.push({id: component.id, materialId: materialId,
+        collisionHull: cadkit.ConvexHullVertices.fromMesh(component.vertices, component.vertexCount),
         volume: component.volume == null ? properties.volume : component.volume,
         centerOfMass: component.centerOfMass == null ? properties.centerOfMass : component.centerOfMass.copy(),
         inertia: component.inertia == null ? properties.inertia : component.inertia.copy(),
