@@ -46,6 +46,10 @@ ensure_mujoco() {
 say "Haxe world tests"
 run "$haxeon" run --project "$robotkit_dir/tests/haxeon.json"
 
+say "Device protocol host and MCU tests"
+run cargo test --manifest-path "$robotkit_dir/device_protocol/Cargo.toml" --features std
+run "$robotkit_dir/device_protocol/tools/check-mcu-build.sh"
+
 say "RobotKit native tests"
 run cmake -S "$robotkit_dir" -B "$robotkit_dir/build" -GNinja \
   -DCMAKE_BUILD_TYPE=Debug
@@ -73,6 +77,7 @@ fi
 
 say "World TCP integration"
 run "$robotkit_dir/tests/world-tcp.sh"
+run env ROBOTKIT_TEST_SESSIONS=1 "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_LEASE_TIMEOUT=1 "$robotkit_dir/tests/world-tcp.sh"
 
 printf '\nAll available RobotKit suites passed.\n'
