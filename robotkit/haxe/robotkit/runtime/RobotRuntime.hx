@@ -209,10 +209,16 @@ class RobotRuntime {
     var positions = plan.startPosition.toArray();
     var velocities = plan.startVelocity.toArray();
     var accelerations = plan.startAcceleration.toArray();
+    var positionTolerances = plan.positionTolerances.toArray();
+    var velocityTolerances = plan.velocityTolerances.toArray();
+    var accelerationTolerances = plan.accelerationTolerances.toArray();
     for (joint in 0...positions.length) {
       native.set_start_position(joint, positions[joint]);
       native.set_start_velocity(joint, velocities[joint]);
       native.set_start_acceleration(joint, accelerations[joint]);
+      native.set_position_tolerance(joint, positionTolerances[joint]);
+      native.set_velocity_tolerance(joint, velocityTolerances[joint]);
+      native.set_acceleration_tolerance(joint, accelerationTolerances[joint]);
     }
     var payload = new rk_trajectory_segment_chunk();
     payload.set_struct_size(rk_trajectory_segment_chunk.size());

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <cmath>
 #include <initializer_list>
@@ -87,6 +88,28 @@ private:
     bool queue_support_ = true;
     double position_[RK_MAX_JOINTS]{};
     bool stopped_ = false;
+};
+
+class OffsetEndpoint final : public robotkit::RobotEndpoint {
+public:
+    explicit OffsetEndpoint(double offset) : offset_(offset) {}
+    rk_result apply(const rk_robot_command &command) override {
+        for (uint32_t index = 0; index < command.target_count; ++index)
+            if (command.targets[index].mode == RK_TARGET_POSITION)
+                commanded_[command.targets[index].joint] = command.targets[index].target;
+        return RK_OK;
+    }
+    rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override {
+        state.struct_size = sizeof(state);
+        state.source_timestamp_ns = timestamp_ns;
+        state.joint_count = 2;
+        state.position[0] = commanded_[0] + offset_;
+        state.position[1] = commanded_[1];
+        return RK_OK;
+    }
+private:
+    double offset_ = 0.0;
+    double commanded_[2]{};
 };
 
 class StaleSampleEndpoint final : public robotkit::RobotEndpoint {
@@ -880,6 +903,119 @@ void moving_degree_one_plan_cannot_retarget(const rk_robot_runtime_blueprint &bl
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
 }
 
+void idle_plan_uses_commanded_anchor_and_following_error(
+    const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    blueprint.following_error_bound[0] = 0.0002;
+    auto accepted_endpoint = std::make_shared<OffsetEndpoint>(0.0001);
+    robotkit::RobotRuntime accepted(blueprint, accepted_endpoint,
+        std::chrono::milliseconds(10));
+    assert(accepted.publish_sample(1) == RK_OK);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 91;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.segments = cubic_plan_chunk(91);
+    const auto initial_plan = plan;
+    assert(accepted.submit_plan(plan) == RK_OK);
+
+    auto held_endpoint = std::make_shared<OffsetEndpoint>(0.0001);
+    robotkit::RobotRuntime held(blueprint, held_endpoint, std::chrono::milliseconds(10));
+    uint64_t timestamp = 0;
+    assert(held.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {1'000'000'000, 0.5}}, 90)) == RK_OK);
+    for (int tick = 0; tick < 101; ++tick) apply_cycle(held, timestamp);
+    rk_robot_state held_state{};
+    assert(held.snapshot(held_state) == RK_OK);
+    assert(held_state.trajectory_queue_depth == 0);
+    assert(std::abs(held_state.position[0] - 0.5001) < 1e-12);
+    assert(held.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
+    apply_cycle(held, timestamp);
+    plan.sequence = 3;
+    plan.start_position[0] = 0.5;
+    plan.start_position[1] = -0.5;
+    plan.segments.segments[0].coefficients[0].value[0] = 0.5;
+    plan.segments.segments[0].coefficients[0].value[3] = 0.2;
+    plan.segments.segments[0].coefficients[1].value[0] = -0.5;
+    plan.segments.segments[0].coefficients[1].value[3] = -0.2;
+    assert(held.submit_plan(plan) == RK_OK);
+
+    auto rejected_endpoint = std::make_shared<OffsetEndpoint>(0.0003);
+    robotkit::RobotRuntime rejected(blueprint, rejected_endpoint,
+        std::chrono::milliseconds(10));
+    assert(rejected.publish_sample(1) == RK_OK);
+    assert(rejected.submit_plan(plan) == RK_ERROR_FOLLOWING_ERROR);
+    rk_robot_snapshot snapshot{};
+    assert(rejected.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.trajectory_queue_depth == 0);
+
+    auto unchecked_blueprint = source;
+    auto unchecked_endpoint = std::make_shared<OffsetEndpoint>(0.0003);
+    robotkit::RobotRuntime unchecked(unchecked_blueprint, unchecked_endpoint,
+        std::chrono::milliseconds(10));
+    assert(unchecked.publish_sample(1) == RK_OK);
+    assert(unchecked.submit_plan(initial_plan) == RK_OK);
+}
+
+void submitted_start_tolerances_control_acceptance(
+    const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 92;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.start_position[0] = 0.00005;
+    plan.start_velocity[0] = 0.00002;
+    plan.start_acceleration[0] = 0.00003;
+    plan.segments = cubic_plan_chunk(92);
+    plan.segments.segments[0].coefficients[0].value[0] = 0.00005;
+    plan.segments.segments[0].coefficients[0].value[1] = 0.00002;
+    plan.segments.segments[0].coefficients[0].value[2] = 0.000015;
+    plan.segments.segments[0].coefficients[0].value[3] = 0.5;
+    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
+    plan.position_tolerance[0] = 0.0001;
+    plan.struct_size = offsetof(rk_plan_submission, position_tolerance);
+    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
+    plan.struct_size = sizeof(plan);
+    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
+    plan.velocity_tolerance[0] = 0.0001;
+    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
+    plan.acceleration_tolerance[0] = 0.0001;
+    assert(runtime.submit_plan(plan) == RK_OK);
+}
+
+void degree_one_append_checks_chord_velocity(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    uint64_t timestamp = 0;
+    assert(runtime.submit_trajectory(trajectory_command(1),
+        trajectory_batch({{0, 0.0}, {1'000'000'000, 0.5}}, 93)) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 2;
+    plan.plan_id = 94;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.segments = linear_segment_chunk(0.5, 0.4, 100'000'000, 94);
+    plan.segments.segments[0].degree = 3;
+    plan.start_position[0] = 0.5;
+    plan.start_position[1] = -0.5;
+    plan.start_velocity[0] = 0.4;
+    plan.start_velocity[1] = -0.4;
+    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
+    plan.start_velocity[0] = 0.5;
+    plan.start_velocity[1] = -0.5;
+    plan.segments.segments[0].coefficients[0].value[1] = 0.5;
+    plan.segments.segments[0].coefficients[1].value[1] = -0.5;
+    assert(runtime.submit_plan(plan) == RK_OK);
+}
+
 void ruckig_segments_match_motionkit_evaluation(
     const rk_robot_runtime_blueprint &blueprint) {
     auto limited = blueprint;
@@ -1219,6 +1355,9 @@ int main() {
     plan_submission_checks_and_replacement(blueprint);
     accepted_plan_keeps_committed_region_identical(blueprint);
     moving_degree_one_plan_cannot_retarget(blueprint);
+    idle_plan_uses_commanded_anchor_and_following_error(blueprint);
+    submitted_start_tolerances_control_acceptance(blueprint);
+    degree_one_append_checks_chord_velocity(blueprint);
     ruckig_segments_match_motionkit_evaluation(blueprint);
     segment_splice_cuts_midsegment(blueprint);
     overacceleration_segment_is_rejected(blueprint);

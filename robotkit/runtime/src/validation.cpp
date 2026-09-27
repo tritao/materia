@@ -50,6 +50,12 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         blueprint->collision_approximation > RK_COLLISION_APPROXIMATION_BOUNDS_BOX ||
         blueprint->self_collision > RK_SELF_COLLISION_DISABLED)
         return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >= sizeof(*blueprint))
+        for (uint32_t joint = 0; joint < blueprint->joint_count &&
+                joint < RK_MAX_TRAJECTORY_JOINTS; ++joint)
+            if (!is_finite(blueprint->following_error_bound[joint]) ||
+                blueprint->following_error_bound[joint] < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t i = 0; i < blueprint->link_count; ++i) {
         const auto &link = blueprint->links[i];
         if (!is_finite(link.mass) || link.mass <= 0.0) return RK_ERROR_INVALID_ARGUMENT;
@@ -209,7 +215,10 @@ rk_result RK_CALL rk_trajectory_segment_chunk_validate_for_blueprint(
 
 rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
     const rk_plan_submission *plan, const rk_robot_runtime_blueprint *blueprint) {
-    if (!has_full_struct(plan) || plan->sequence == 0 || plan->plan_id == 0 ||
+    if (!plan || plan->struct_size < offsetof(rk_plan_submission, position_tolerance) ||
+        (plan->struct_size > offsetof(rk_plan_submission, position_tolerance) &&
+         plan->struct_size < sizeof(*plan)) ||
+        plan->sequence == 0 || plan->plan_id == 0 ||
         rk_trajectory_segment_chunk_validate_for_blueprint(&plan->segments, blueprint) != RK_OK ||
         (plan->replace_after_plan_id == 0 && plan->replace_after_time_ns != 0) ||
         (plan->replace_after_plan_id != 0 && plan->replace_after_time_ns == 0))
@@ -219,6 +228,15 @@ rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
             !is_finite(plan->start_velocity[joint]) ||
             !is_finite(plan->start_acceleration[joint]))
             return RK_ERROR_INVALID_ARGUMENT;
+    if (plan->struct_size >= sizeof(*plan))
+        for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
+            if (!is_finite(plan->position_tolerance[joint]) ||
+                !is_finite(plan->velocity_tolerance[joint]) ||
+                !is_finite(plan->acceleration_tolerance[joint]) ||
+                plan->position_tolerance[joint] < 0.0 ||
+                plan->velocity_tolerance[joint] < 0.0 ||
+                plan->acceleration_tolerance[joint] < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
     return RK_OK;
 }
 

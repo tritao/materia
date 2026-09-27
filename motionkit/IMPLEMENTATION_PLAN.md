@@ -449,9 +449,15 @@ Do:
   - Existing splice semantics stay for the old chunk command. Document the
     difference.
   - Plan submission checks position, velocity and acceleration start-state
-    assumptions within 1e-6 in SI units when the anchor has exact derivatives.
-    Degree-1 anchors do not provide exact derivatives and cannot be replaced
-    while moving; replacement segments must start at degree ≥ 2.
+    assumptions against the submission's per-joint tolerances. A missing or
+    zero tolerance defaults to 1e-6 in SI units under `struct_size` versioning.
+    When the queue is empty, the anchor is the last commanded setpoint with
+    zero velocity and acceleration, not the measured state. A blueprint
+    following-error bound checks measured against commanded position per
+    joint; zero disables it, and excess returns a distinct error. When
+    appending after a degree-1 segment, its chord velocity is checked and
+    acceleration is unchecked. Degree-1 anchors cannot be replaced while
+    moving; replacement segments must start at degree ≥ 2.
 - Session state in the snapshot: `idle | executing | holding | held |
   stopping | faulted`.
 - Haxe: `robotkit.world.ExecutionPlanSubmission` and snapshot fields. Keep
@@ -848,3 +854,19 @@ degree-1 retarget rejection, C ABI submission and MCAP replay progress.
 MotionKit and RobotKit native/Haxe suites, both FFI audits, and TCP default,
 session and lease-timeout integration passed.
 Commit: the commit containing this entry.
+
+### Execution-session start-state follow-up
+
+Idle plans now anchor to the last commanded position with zero derivatives,
+including after a completed trajectory or stop. A per-joint blueprint
+following-error bound (zero disables) compares measurements to that command
+and returns `RK_ERROR_FOLLOWING_ERROR` without queue mutation on excess.
+An already-completed stop may accept a new plan from its held setpoint while
+the legacy snapshot still reports stopping for that owner cycle.
+Plan submissions carry the native plan's per-joint position, velocity and
+acceleration tolerances; zero or an older `struct_size` uses 1e-6. A
+degree-1 append checks chord velocity while leaving acceleration unchecked.
+Tests cover measured offsets, completed-motion setpoints, tolerance fallback,
+and mismatched/matching chord-velocity appends. Commit: the commit containing
+this entry. MotionKit and RobotKit native/Haxe suites, both FFI audits, and
+TCP default, session and lease-timeout integration passed.

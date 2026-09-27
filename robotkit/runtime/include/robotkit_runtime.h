@@ -83,7 +83,7 @@ enum {
     RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued knots (legacy name). */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 10 /**< Adds execution-plan submission and session progress. */
+    RK_API_VERSION = 11 /**< Adds following-error bounds and plan start tolerances. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -101,7 +101,8 @@ enum {
     RK_ERROR_STALE_COMMAND = -9, /**< Command sequence is not newer than the last accepted command. */
     RK_ERROR_LIMIT = -10, /**< Command violates a compiled joint or actuator limit. */
     RK_ERROR_STALE_STATE = -11, /**< The endpoint only supplied an old observation. */
-    RK_ERROR_MODEL_MISMATCH = -12 /**< Device layout fingerprint differs from the host deployment. */
+    RK_ERROR_MODEL_MISMATCH = -12, /**< Device layout fingerprint differs from the host deployment. */
+    RK_ERROR_FOLLOWING_ERROR = -13 /**< Measured state exceeds the configured distance from the commanded setpoint. */
 };
 
 /* ------------------------------------------------------------------------- */
@@ -318,6 +319,7 @@ typedef struct rk_robot_runtime_blueprint {
     rk_sensor_config sensors[RK_MAX_SENSORS];
     uint64_t calibration_revision; /**< Optional compiled calibration identity; zero is unspecified. */
     uint64_t commit_lead_ns; /**< Zero selects two owner periods. */
+    double following_error_bound[RK_MAX_TRAJECTORY_JOINTS]; /**< Per-joint SI-unit bound; zero disables this check. */
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
@@ -400,6 +402,10 @@ typedef struct rk_plan_submission {
     double start_velocity[RK_MAX_TRAJECTORY_JOINTS];
     double start_acceleration[RK_MAX_TRAJECTORY_JOINTS];
     rk_trajectory_segment_chunk segments;
+    /** Per-joint nonnegative start-state tolerances; zero defaults to 1e-6. */
+    double position_tolerance[RK_MAX_TRAJECTORY_JOINTS];
+    double velocity_tolerance[RK_MAX_TRAJECTORY_JOINTS];
+    double acceleration_tolerance[RK_MAX_TRAJECTORY_JOINTS];
 } rk_plan_submission;
 
 typedef uint32_t rk_session_state;

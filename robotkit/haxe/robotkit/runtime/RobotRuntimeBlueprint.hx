@@ -24,6 +24,8 @@ class RobotRuntimeBlueprint {
   public var selfCollision:Bool = true;
   /** Zero uses two owner periods. */
   public var commitLeadNs:haxe.Int64 = haxe.Int64.ofInt(0);
+  /** Per-joint SI-unit following-error bounds; zero leaves the check disabled. */
+  public final followingErrorBounds:Array<Float>;
   /** Compiled user-layer roles; null for manually assembled native blueprints. */
   public final configuration:Null<RobotRuntimeConfiguration>;
 
@@ -60,6 +62,7 @@ class RobotRuntimeBlueprint {
     this.revision = revision;
     this.calibrationRevision = calibrationRevision;
     this.jointCount = jointCount;
+    followingErrorBounds = [for (_ in 0...jointCount) 0.0];
     this.linkCount = linkCount;
     this.frameCount = frameCount;
     for (_ in 0...linkCount)
@@ -96,6 +99,13 @@ class RobotRuntimeBlueprint {
     value.set_revision(haxe.Int64.ofInt(revision));
     value.set_calibration_revision(haxe.Int64.ofInt(calibrationRevision));
     value.set_commit_lead_ns(commitLeadNs);
+    for (joint in 0...jointCount) {
+      var bound = followingErrorBounds[joint];
+      if (!Math.isFinite(bound) || bound < 0.0)
+        throw "Invalid runtime following-error bound";
+      if (joint < RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS)
+        value.set_following_error_bound(joint, bound);
+    }
     value.set_joint_count(jointCount);
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);

@@ -4231,7 +4231,8 @@ class RobotWorldTests {
       Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
       [0.0], [0.0], [0.0],
-      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])]);
+      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])],
+      null, null, [0.0001], [0.0002], [0.0003]);
     recorded.submit(RobotCommand.ExecutionPlan(plan));
     var progress:Array<String> = [];
     for (time in [100, 200, 300]) {
@@ -4247,6 +4248,8 @@ class RobotWorldTests {
     switch loaded.commands[0] {
       case ExecutionPlan(replayedPlan):
         equal(replayedPlan.planId, Int64.ofInt(77), "MCAP preserves plan identity");
+        equal(replayedPlan.positionTolerances.toArray()[0], 0.0001,
+          "MCAP preserves plan start tolerances");
       case _:
         check(false, "MCAP decodes the plan command variant");
     }

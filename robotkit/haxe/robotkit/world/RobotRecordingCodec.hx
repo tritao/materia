@@ -54,6 +54,9 @@ class RobotRecordingCodec {
             startPosition:plan.startPosition.toArray(),
             startVelocity:plan.startVelocity.toArray(),
             startAcceleration:plan.startAcceleration.toArray(),
+            positionTolerances:plan.positionTolerances.toArray(),
+            velocityTolerances:plan.velocityTolerances.toArray(),
+            accelerationTolerances:plan.accelerationTolerances.toArray(),
             replaceAfterPlanId:Int64.toStr(plan.replaceAfterPlanId),
             replaceAfterTimeNs:Int64.toStr(plan.replaceAfterTimeNs),
             segments:[for (segment in plan.segments) {
@@ -132,7 +135,10 @@ class RobotRecordingCodec {
               wide(payload, "calibrationRevision"), fieldInt(payload, "requiredCapabilities"),
               floats(payload, "startPosition"), floats(payload, "startVelocity"),
               floats(payload, "startAcceleration"), segments,
-              wide(payload, "replaceAfterPlanId"), wide(payload, "replaceAfterTimeNs"))));
+              wide(payload, "replaceAfterPlanId"), wide(payload, "replaceAfterTimeNs"),
+              optionalFloats(payload, "positionTolerances"),
+              optionalFloats(payload, "velocityTolerances"),
+              optionalFloats(payload, "accelerationTolerances"))));
           case _: throw "Unsupported RobotKit command payload";
         }
       case "snapshot": RobotSnapshot(readSnapshot(payload));
@@ -254,6 +260,8 @@ class RobotRecordingCodec {
     }
   }
   static function nullableWide(v:Dynamic,n:String):Null<Int64> {var x=Reflect.field(v,n);return x==null?null:wide(v,n);}
+  static function optionalFloats(v:Dynamic,n:String):Null<Array<Float>>
+    return Reflect.field(v,n)==null ? null : floats(v,n);
   static function fieldInt(v:Dynamic,n:String):Int {var x=Reflect.field(v,n);if(!Std.isOfType(x,Int))throw 'Invalid recording field $n';return x;}
   static function optionalFieldInt(v:Dynamic,n:String,defaultValue:Int):Int {var x=Reflect.field(v,n);if(x==null)return defaultValue;if(!Std.isOfType(x,Int))throw 'Invalid recording field $n';return x;}
   static function optionalFieldBool(v:Dynamic,n:String,defaultValue:Bool):Bool {var x=Reflect.field(v,n);if(x==null)return defaultValue;if(!Std.isOfType(x,Bool))throw 'Invalid recording field $n';return x;}

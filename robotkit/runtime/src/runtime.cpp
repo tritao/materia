@@ -386,7 +386,10 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         // applies it. Reject rather than accepting a plan against stale state.
         if (!commands_.empty()) return RK_ERROR_INVALID_STATE;
         std::lock_guard state_lock(state_mutex_);
-        if (state_.safety != RK_SAFETY_READY || control_.stop_ramp_active)
+        const bool stopped_and_held = state_.safety == RK_SAFETY_STOPPING &&
+            !control_.trajectory_active && !control_.stop_ramp_active;
+        if ((state_.safety != RK_SAFETY_READY && !stopped_and_held) ||
+            control_.stop_ramp_active)
             return RK_ERROR_INVALID_STATE;
         auto candidate = control_.trajectory;
         const bool replace = plan.replace_after_plan_id != 0;
@@ -408,10 +411,21 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         double anchor_position[RK_MAX_TRAJECTORY_JOINTS]{};
         double anchor_velocity[RK_MAX_TRAJECTORY_JOINTS]{};
         double anchor_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
-        bool exact_anchor_derivatives = candidate.empty();
+        bool check_anchor_velocity = candidate.empty();
+        bool check_anchor_acceleration = candidate.empty();
         if (candidate.empty()) {
-            std::copy_n(state_.position, blueprint_.joint_count, anchor_position);
-            std::copy_n(state_.velocity, blueprint_.joint_count, anchor_velocity);
+            // A drained path or completed stop holds its last commanded
+            // setpoint. Endpoint samples are observations, not plan anchors.
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                if (control_.active[joint] &&
+                    control_.targets[joint].mode != RK_TARGET_POSITION)
+                    return RK_ERROR_INVALID_STATE;
+                const double bound = blueprint_.following_error_bound[joint];
+                if (bound > 0.0 &&
+                    std::abs(state_.position[joint] - commanded_position_[joint]) > bound)
+                    return RK_ERROR_FOLLOWING_ERROR;
+                anchor_position[joint] = commanded_position_[joint];
+            }
         } else {
             const RuntimeTrajectoryPoint *anchor = &candidate.front();
             if (replace) {
@@ -437,27 +451,35 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
             }
             evaluate_knot(*anchor, base_time, anchor_position, anchor_velocity,
                 anchor_acceleration);
-            exact_anchor_derivatives = anchor->has_segment && anchor->segment.degree >= 2;
-            if (replace && !exact_anchor_derivatives)
+            check_anchor_velocity = anchor->has_segment;
+            check_anchor_acceleration = anchor->has_segment && anchor->segment.degree != 1;
+            if (replace && (!anchor->has_segment || anchor->segment.degree < 2))
                 return RK_ERROR_INVALID_STATE;
         }
         // The assumption is checked against the actual anchor, and the
         // submitted polynomial must start at that same state. Degree-1 paths
         // may only promise chord velocity, never stored sample derivatives.
-        constexpr double position_tolerance = 1e-6;
-        constexpr double derivative_tolerance = 1e-6;
+        constexpr double default_tolerance = 1e-6;
+        const bool has_tolerances = plan.struct_size >= sizeof(rk_plan_submission);
         const auto &first = plan.segments.segments[0];
         if (replace && first.degree < 2)
             return RK_ERROR_INVALID_STATE;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+            const double position_tolerance = has_tolerances && plan.position_tolerance[joint] > 0.0
+                ? plan.position_tolerance[joint] : default_tolerance;
+            const double velocity_tolerance = has_tolerances && plan.velocity_tolerance[joint] > 0.0
+                ? plan.velocity_tolerance[joint] : default_tolerance;
+            const double acceleration_tolerance = has_tolerances && plan.acceleration_tolerance[joint] > 0.0
+                ? plan.acceleration_tolerance[joint] : default_tolerance;
             if (std::abs(plan.start_position[joint] - anchor_position[joint]) > position_tolerance ||
-                (exact_anchor_derivatives &&
-                    (std::abs(plan.start_velocity[joint] - anchor_velocity[joint]) > derivative_tolerance ||
-                     std::abs(plan.start_acceleration[joint] - anchor_acceleration[joint]) > derivative_tolerance)) ||
+                (check_anchor_velocity &&
+                    std::abs(plan.start_velocity[joint] - anchor_velocity[joint]) > velocity_tolerance) ||
+                (check_anchor_acceleration &&
+                    std::abs(plan.start_acceleration[joint] - anchor_acceleration[joint]) > acceleration_tolerance) ||
                 std::abs(first.coefficients[joint].value[0] - plan.start_position[joint]) > position_tolerance ||
                 (first.degree >= 2 &&
-                    (std::abs(first.coefficients[joint].value[1] - plan.start_velocity[joint]) > derivative_tolerance ||
-                     std::abs(2.0 * first.coefficients[joint].value[2] - plan.start_acceleration[joint]) > derivative_tolerance)))
+                    (std::abs(first.coefficients[joint].value[1] - plan.start_velocity[joint]) > velocity_tolerance ||
+                     std::abs(2.0 * first.coefficients[joint].value[2] - plan.start_acceleration[joint]) > acceleration_tolerance)))
                 return RK_ERROR_INVALID_STATE;
         }
         if (replace) {
@@ -519,6 +541,7 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         state_.active_plan_id = control_.active_plan_id;
         state_.session_state = RK_SESSION_EXECUTING;
         state_.mode = RK_ROBOT_MODE_TRACKING;
+        state_.safety = RK_SAFETY_READY;
         last_command_sequence_ = plan.sequence;
         return RK_OK;
     } catch (const std::bad_alloc &) {
@@ -635,6 +658,7 @@ rk_result RobotRuntime::apply_pending_commands() {
         state_backup_valid_ = true;
     }
     control_backup_ = control_;
+    std::copy_n(commanded_position_, RK_MAX_JOINTS, commanded_position_backup_);
 
     bool trajectory_stop_completed = false;
     // Set when a path-following stop reaches the end of the queued path this
@@ -1273,6 +1297,10 @@ rk_result RobotRuntime::apply_pending_commands() {
         latch_fault();
         return result;
     }
+    if (output.kind == RK_COMMAND_JOINT_TARGETS)
+        for (uint32_t index = 0; index < output.target_count; ++index)
+            if (output.targets[index].mode == RK_TARGET_POSITION)
+                commanded_position_[output.targets[index].joint] = output.targets[index].target;
     if (stop_ramp_finished && control_.stop_ramp_exceeds_limits) {
         // The ramp stopped at a travel limit only by braking harder than a
         // joint's acceleration limit allows; now at rest, report it.
@@ -1312,10 +1340,14 @@ rk_result RobotRuntime::apply_pending_commands() {
                                final_kind == RK_COMMAND_TRAJECTORY_SEGMENTS)) {
         state_.mode = RK_ROBOT_MODE_TRACKING;
         state_.safety = RK_SAFETY_READY;
+    } else if (state_.safety == RK_SAFETY_STOPPING && !stop_ramp_finished &&
+               !control_.trajectory_active) {
+        state_.mode = RK_ROBOT_MODE_IDLE;
+        state_.safety = RK_SAFETY_READY;
     }
     state_.session_state = state_.safety == RK_SAFETY_FAULT ||
         state_.safety == RK_SAFETY_EMERGENCY_STOP ? RK_SESSION_FAULTED :
-        control_.stop_ramp_active ? RK_SESSION_STOPPING :
+        state_.safety == RK_SAFETY_STOPPING || control_.stop_ramp_active ? RK_SESSION_STOPPING :
         control_.trajectory_active ? RK_SESSION_EXECUTING : RK_SESSION_IDLE;
 
     return RK_OK;
@@ -1412,6 +1444,7 @@ void RobotRuntime::discard_pending_commands() noexcept {
     if (state_backup_valid_) {
         state_ = state_backup_;
         control_ = control_backup_;
+        std::copy_n(commanded_position_backup_, RK_MAX_JOINTS, commanded_position_);
         state_backup_valid_ = false;
     }
 }
@@ -1431,6 +1464,8 @@ void RobotRuntime::reset_state() noexcept {
     state_.mode = state_.safety == RK_SAFETY_EMERGENCY_STOP ||
         state_.safety == RK_SAFETY_FAULT ? RK_ROBOT_MODE_FAULT : RK_ROBOT_MODE_IDLE;
     control_ = {};
+    std::fill_n(commanded_position_, RK_MAX_JOINTS, 0.0);
+    std::fill_n(commanded_position_backup_, RK_MAX_JOINTS, 0.0);
     control_backup_ = {};
     state_backup_valid_ = false;
 }
