@@ -420,44 +420,19 @@ class EditorScene {
 
   public function canCreate():Bool return objects.length < 10000;
 
-  function allocateId(prefix:String="rectangle"):String {
-    var id = prefix + "-" + nextObjectId;
-    nextObjectId = nextObjectId + 1;
-    while (object(id) != null) {
-      id = prefix + "-" + nextObjectId;
-      nextObjectId = nextObjectId + 1;
-    }
-    return id;
-  }
+  function allocateId(prefix:String="rectangle"):String return model.allocateId(this, prefix);
 
-  public function createRectangle():Bool {
-    if (!canCreate()) return false;
-    var data = records();
-    var id = allocateId();
-    data.push(ObjectKindRegistry.require("rectangle").createDefaultRecord(id));
-    return changeObjects("Create rectangle", data, id);
-  }
+  public function createRectangle():Bool
+    return model.createDefault(this, "rectangle", "rectangle", "Create rectangle");
 
-  public function createMountingPlate():Bool {
-    if (!canCreate()) return false;
-    var data = records(), id = allocateId("plate");
-    data.push(ObjectKindRegistry.require("cad-plate").createDefaultRecord(id));
-    return changeObjects("Create mounting plate", data, id);
-  }
+  public function createMountingPlate():Bool
+    return model.createDefault(this, "cad-plate", "plate", "Create mounting plate");
 
-  public function createBracket():Bool {
-    if (!canCreate()) return false;
-    var data=records(),id=allocateId("bracket");
-    data.push(ObjectKindRegistry.require("cad-bracket").createDefaultRecord(id));
-    return changeObjects("Create L bracket",data,id);
-  }
+  public function createBracket():Bool
+    return model.createDefault(this, "cad-bracket", "bracket", "Create L bracket");
 
-  public function createCadPart():Bool {
-    if (!canCreate()) return false;
-    var data = records(), id = allocateId("part");
-    data.push(ObjectKindRegistry.require("cad-part").createDefaultRecord(id));
-    return changeObjects("Create CAD part", data, id);
-  }
+  public function createCadPart():Bool
+    return model.createDefault(this, "cad-part", "part", "Create CAD part");
 
   public function canCreateSketch():Bool {
     var item = object(selectedId);
@@ -1030,73 +1005,12 @@ class EditorScene {
     });
   }
 
-  public function duplicateSelected():Bool {
-    if (!canCreate() || object(selectedId) == null) return false;
-    var data = records();
-    var source:SceneObjectData = null;
-    for (item in data) if (item.id == selectedId) source = item;
-    var id = allocateId();
-    var cadGraph = isCadKind(source.type) ? currentCadGraph(source.id) : source.cadGraph;
-    data.push({id: id, label: source.label + " copy", type: source.type,
-      x: Math.min(1000000, source.x + 0.25), y: Math.min(1000000, source.y + 0.25), z: source.z,
-      width: source.width, height: source.height, red: source.red, green: source.green,
-      blue: source.blue, appearance: source.appearance, visible: source.visible,depth:source.depth,
-      collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass,
-      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot,rotation:source.rotation});
-    return changeObjects("Duplicate object", data, id);
-  }
+  public function duplicateSelected():Bool return model.duplicateSelected(this);
 
-  public function deleteSelected():Bool {
-    if (object(selectedId) == null) return false;
-    var data = records();
-    var index = 0;
-    while (data[index].id != selectedId) index++;
-    data.splice(index, 1);
-    var next = data.length == 0 ? "scene" : data[index < data.length ? index : data.length - 1].id;
-    return changeObjects("Delete object", data, next);
-  }
+  public function deleteSelected():Bool return model.deleteSelected(this);
 
-  function changeObjects(label:String, after:Array<SceneObjectData>, selection:String):Bool {
-    // This helper is used by structural add/remove/duplicate/import operations.
-    // Keep only the membership delta; common records stay in the live scene.
-    var afterIds:Map<String, Bool> = new Map();
-    var existingIds:Map<String, Bool> = new Map();
-    for (index in 0...after.length) {
-      afterIds.set(after[index].id, true);
-    }
-    for (item in objects) existingIds.set(item.id, true);
-    var changes:Array<SceneRecordChange> = [];
-    for (index in 0...objects.length) {
-      var item = objects[index];
-      if (!afterIds.exists(item.id)) {
-        var previous = SceneModel.recordForObject(item);
-        if (isCadKind(previous.type)) previous.cadGraph = currentCadGraph(previous.id);
-        changes.push({id: previous.id, before: previous, after: null,
-          beforeIndex: index, afterIndex: -1});
-      }
-    }
-    for (index in 0...after.length) {
-      var next = after[index];
-      if (!existingIds.exists(next.id))
-        changes.push({id: next.id, before: null, after: next,
-          beforeIndex: -1, afterIndex: index});
-    }
-    var previousSelection = selectedId;
-    var initialAfter:Null<Array<SceneObjectData>> = after;
-    return document.apply(new EditOperation(label,
-      function() {
-        var initial = initialAfter;
-        initialAfter = null;
-        if (initial != null) replaceObjects(initial, selection);
-        else applyObjectChanges(changes, true, selection);
-      },
-      function() applyObjectChanges(changes, false, previousSelection),
-      null, null, null, SceneModel.estimateSceneChanges(changes)));
-  }
-
-  function applyObjectChanges(changes:Array<SceneRecordChange>, forward:Bool, selection:String):Void {
-    replaceObjects(SceneModel.applyChanges(records(), changes, forward), selection);
-  }
+  function changeObjects(label:String, after:Array<SceneObjectData>, selection:String):Bool
+    return model.changeObjects(this, label, after, selection);
 
   function applyCadEdit(id:String, label:String, redo:CadDocumentSession->Void,
       undo:CadDocumentSession->Void):Bool {
