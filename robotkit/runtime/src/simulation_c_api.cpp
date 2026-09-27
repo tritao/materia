@@ -102,6 +102,14 @@ rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
         robot_desc == nullptr ? nullptr : &robot_desc->initial_pose) : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_set_joint_coupling(rk_simulation simulation,
+        uint32_t robot_index, uint32_t source_joint, uint32_t target_joint,
+        double ratio, double offset) {
+    const auto value = resolve(simulation);
+    return value ? value->set_joint_coupling(robot_index, source_joint, target_joint,
+        ratio, offset) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_step(rk_simulation simulation, uint64_t timestamp_ns) {
     const auto value = resolve(simulation);
     return value ? value->step(timestamp_ns) : RK_ERROR_INVALID_HANDLE;

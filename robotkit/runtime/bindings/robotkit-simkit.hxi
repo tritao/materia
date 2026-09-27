@@ -164,6 +164,13 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_set_differential_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_differential_drive_desc>>) -> rk_result;
 	/**
+	 * Drives a follower joint from the measured source position each tick.
+	 * The offset is in the follower's SI coordinate; both indices belong to one robot.
+	 * This target controller is shared by deterministic and MuJoCo backends and
+	 * can have one physics tick of lag under motion.
+	 */
+	extern fn rk_simulation_set_joint_coupling(simulation: rk_simulation, robot_index: u32, source_joint: u32, target_joint: u32, ratio: f64, offset: f64) -> rk_result;
+	/**
 	 * Couples one robot's three omni-wheel velocity targets to its kinematic base.
 	 *
 	 * Behaves like rk_simulation_set_differential_drive, including its floor,

@@ -177,6 +177,24 @@ Simulation::~Simulation() {
     cleanup();
 }
 
+rk_result Simulation::set_joint_coupling(uint32_t robot_index, uint32_t source_joint,
+                                          uint32_t target_joint, double ratio, double offset) {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (robot_index >= bindings_.size() || !std::isfinite(ratio) || !std::isfinite(offset) ||
+        source_joint == target_joint || ratio == 0.0 || topology_frozen_ || running_)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto binding = bindings_[robot_index].lock();
+    if (!binding || source_joint >= binding->joints_.size() ||
+        target_joint >= binding->joints_.size() ||
+        !binding->actuated_joints_[source_joint] || !binding->actuated_joints_[target_joint])
+        return RK_ERROR_INVALID_ARGUMENT;
+    for (const auto &coupling : joint_couplings_)
+        if (coupling.robot_index == robot_index && coupling.target_joint == target_joint)
+            return RK_ERROR_INVALID_ARGUMENT;
+    joint_couplings_.push_back({robot_index, source_joint, target_joint, ratio, offset});
+    return RK_OK;
+}
+
 rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                                 rk_robot_runtime &out_runtime,
                                 const rk_simulation_pose *initial_pose) {
@@ -1090,6 +1108,39 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
                                     static_cast<uint32_t>(targets.size())) != NKSIM_OK)
             return RK_ERROR_BACKEND;
         ++it;
+    }
+    // One target per follower, evaluated from measured source coordinates.
+    // This is a common target controller for both physics backends; it does
+    // not claim the instantaneous rigidity of a MuJoCo equality constraint.
+    for (const auto &coupling : joint_couplings_) {
+        const auto binding = bindings_[coupling.robot_index].lock();
+        if (!binding) return RK_ERROR_INVALID_STATE;
+        double source_position = 0.0;
+        if (snapshot_ != 0) {
+            uint64_t count = 0;
+            if (nksim_snapshot_get_joint_count(snapshot_, &count) != NKSIM_OK)
+                return RK_ERROR_BACKEND;
+            bool found = false;
+            for (uint64_t index = 0; index < count; ++index) {
+                nksim_joint_state state{};
+                state.struct_size = sizeof(state);
+                if (nksim_snapshot_get_joint(snapshot_, index, &state) != NKSIM_OK)
+                    return RK_ERROR_BACKEND;
+                if (state.joint == binding->joints_[coupling.source_joint]) {
+                    source_position = state.position;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return RK_ERROR_BACKEND;
+        }
+        nksim_joint_target target{};
+        target.struct_size = sizeof(target);
+        target.joint = binding->joints_[coupling.target_joint];
+        target.mode = NKSIM_JOINT_TARGET_POSITION;
+        target.target = coupling.ratio * source_position + coupling.offset;
+        if (nksim_host_submit_joint_targets(host_, &target, 1) != NKSIM_OK)
+            return RK_ERROR_BACKEND;
     }
     // Targets taken above are the ones every robot applied for this tick.
     const auto drive_result = advance_drives();

@@ -233,6 +233,14 @@ RK_API rk_result RK_CALL rk_simulation_add_robot(
     rk_simulation simulation, const rk_robot_runtime_blueprint *blueprint,
     const rk_simulation_robot_desc *robot_desc,
     rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
+/** Drives a follower joint from the measured source position each tick.
+ * The offset is in the follower's SI coordinate; both indices belong to one robot.
+ * This target controller is shared by deterministic and MuJoCo backends and
+ * can have one physics tick of lag under motion.
+ */
+RK_API rk_result RK_CALL rk_simulation_set_joint_coupling(
+    rk_simulation simulation, uint32_t robot_index, uint32_t source_joint,
+    uint32_t target_joint, double ratio, double offset);
 /**
  * Applies all attached robot commands and advances the world exactly once.
  *

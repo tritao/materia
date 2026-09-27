@@ -6,10 +6,19 @@ import app.ApplicationSimulation;
 import robotkit.world.RobotWorld;
 import cadbridge.AssemblySimulationBridge;
 import materia.project.AssemblyDefinition;
+import materia.project.AssemblyDefinition.AssemblyJointRole;
 import nativekit.ui.properties.PropertyBinding;
 import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.properties.PropertyEditResult;
 import haxe.Json;
+import haxe.Int64;
+import robotkit.runtime.Simulation;
+import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.model.RobotModel;
+import robotkit.model.Link;
+import robotkit.model.Joint;
+import robotkit.model.JointType;
+import robotkit.model.JointLimits;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -19,7 +28,29 @@ class ProjectSourceTests {
     if (!value) throw message;
   }
 
+  static function checkCoupling(backend:Int):Void {
+    var model = new RobotModel("coupled assembly probe");
+    var base = model.addLink(new Link("base"));
+    var sourceLink = model.addLink(new Link("source"));
+    var targetLink = model.addLink(new Link("target"));
+    var source = model.addJoint(new Joint("source", JointType.Revolute, base, sourceLink));
+    var target = model.addJoint(new Joint("target", JointType.Revolute, base, targetLink));
+    source.limits = new JointLimits(-2, 2);
+    target.limits = new JointLimits(-2, 2);
+    var simulation = new Simulation(0.01, 1, backend);
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    simulation.setJointCoupling(0, 0, 1, -2.0, 0.0);
+    runtime.submitPosition(0, 0.3, 1);
+    for (index in 0...200) simulation.step(Int64.ofInt(index));
+    var q = runtime.snapshot().q;
+    check(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0)) < 0.08,
+      'joint coupling tracks on backend $backend: ${q.get(0)}, ${q.get(1)}');
+    simulation.dispose();
+  }
+
   public static function main():Int {
+    checkCoupling(0);
+    checkCoupling(1);
     var root = Sys.getCwd();
     while (!FileSystem.exists(root + "/cadkit/examples/modeling/materia.project.json")) {
       var parent = haxe.io.Path.directory(root);
@@ -103,6 +134,16 @@ class ProjectSourceTests {
       check(!machineSimulation.rebuild(machineSession.sensors, machineSession.scene, machineSession) &&
         machineSimulation.appliedRevision == applied && machineSimulation.isRunning(),
         "failed assembly bridge preserves the running simulation");
+      machineScene.physical.parts[0].volume = Math.abs(machineScene.physical.parts[0].volume);
+      var edge = machineDefinition.joints[0];
+      machineDefinition.joints.push({id: "test-closure", type: edge.type,
+        role: AssemblyJointRole.Closure, parent: edge.parent, parentConnector: edge.parentConnector,
+        child: edge.child, childConnector: edge.childConnector, axis: edge.axis,
+        limits: edge.limits, defaultValue: edge.defaultValue});
+      check(!machineSimulation.rebuild(machineSession.sensors, machineSession.scene, machineSession) &&
+        machineSimulation.error != null && machineSimulation.error.indexOf("closures") >= 0 &&
+        machineSimulation.isRunning(), "unsupported closure reports a simulation diagnostic");
+      machineDefinition.joints.pop();
     machineSimulation.dispose(); machineWorld.close(); machineSession.dispose();
     var generatedScene = MateriaProjectRunner.loadProject(manifest);
     var generated = generatedScene.objects;

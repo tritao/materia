@@ -2,6 +2,13 @@ package tests;
 
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.RobotRuntimeCompiler;
+import robotkit.model.RobotModel;
+import robotkit.model.Link;
+import robotkit.model.Joint;
+import robotkit.model.JointType;
+import robotkit.model.JointLimits;
+import haxe.Int64;
 
 class SimulationPoseResetTests {
   public static function run(backend:Int):Void {
@@ -15,6 +22,27 @@ class SimulationPoseResetTests {
     simulation.teleportRobot(0, [7.0, 8.0, 9.0]);
     simulation.reset();
     checkPose(simulation, position, rotation, 'reset on backend $backend');
+    simulation.dispose();
+    coupling(backend);
+  }
+
+  static function coupling(backend:Int):Void {
+    var model = new RobotModel("coupled joints");
+    var base = model.addLink(new Link("base"));
+    var first = model.addLink(new Link("first"));
+    var second = model.addLink(new Link("second"));
+    var source = model.addJoint(new Joint("source", JointType.Revolute, base, first));
+    var follower = model.addJoint(new Joint("follower", JointType.Revolute, base, second));
+    source.limits = new JointLimits(-2, 2);
+    follower.limits = new JointLimits(-2, 2);
+    var simulation = new Simulation(0.01, 1, backend);
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
+    simulation.setJointCoupling(0, 0, 1, -2.0, 0.0);
+    runtime.submitPosition(0, 0.3, 1);
+    for (index in 0...200) simulation.step(Int64.ofInt(index));
+    var q = runtime.snapshot().q;
+    if (!(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0)) < 0.08))
+      throw 'coupling did not follow source on backend $backend: ${q.get(0)}, ${q.get(1)}';
     simulation.dispose();
   }
 

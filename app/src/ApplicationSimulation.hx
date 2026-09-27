@@ -130,14 +130,28 @@ class ApplicationSimulation {
         if (converted.closureIds.length > 0)
           throw "Assembly closures are not supported by this simulation backend: " +
             converted.closureIds.join(", ");
-        if (converted.couplings.length > 0)
-          throw "Assembly joint couplings are not supported by this simulation backend: " +
-            [for (coupling in converted.couplings) coupling.id].join(", ");
         var id = "assembly:" + assembly.id;
         if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
           throw 'Robot "$id" is remote and read-only';
         var blueprint = RobotRuntimeCompiler.compile(converted.model, appliedRevision + 1);
         var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]);
+        var assemblyRobotIndex = candidateRobots.length;
+        for (coupling in converted.couplings) {
+          var source = blueprint.identity.jointIndex(coupling.source);
+          var target = blueprint.identity.jointIndex(coupling.target);
+          if (source < 0 || target < 0)
+            throw 'Assembly coupling "${coupling.id}" references a missing tree joint';
+          var sourceKind = [for (joint in assembly.joints) if (joint.id == coupling.source) joint.type][0];
+          var targetKind = [for (joint in assembly.joints) if (joint.id == coupling.target) joint.type][0];
+          var sourceScale = sourceKind == materia.project.AssemblyDefinition.AssemblyJointType.Prismatic
+            ? physical.metresPerUnit : 1.0;
+          var targetScale = targetKind == materia.project.AssemblyDefinition.AssemblyJointType.Prismatic
+            ? physical.metresPerUnit : 1.0;
+          var ratio = coupling.ratio * targetScale / sourceScale;
+          // The bridge places both joints at their saved coordinates as zero.
+          // The authored absolute offset therefore cancels in runtime deltas.
+          candidate.setJointCoupling(assemblyRobotIndex, source, target, ratio, 0.0);
+        }
         candidateRobots.push(new SimulatedRobot(id, runtime, converted.model.name,
           [for (link in converted.model.links) link.id],
           [for (joint in converted.model.joints) joint.id]));

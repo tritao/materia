@@ -47,6 +47,17 @@ class Simulation {
     return addRobotWithPose(blueprint, makePose(position, rotation));
   }
 
+  /** Couples one follower to the measured source coordinate on every tick. */
+  public function setJointCoupling(robotIndex:Int, sourceJoint:Int, targetJoint:Int,
+      ratio:Float, offset:Float):Void {
+    ensureLive();
+    if (robotIndex < 0 || sourceJoint < 0 || targetJoint < 0 ||
+        !Math.isFinite(ratio) || !Math.isFinite(offset))
+      throw "Simulation.setJointCoupling requires finite joint coordinates";
+    check(RobotKitSimKit.rk_simulation_set_joint_coupling(owner.borrow(), robotIndex,
+      sourceJoint, targetJoint, ratio, offset), "simulation.setJointCoupling");
+  }
+
   function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
       initialPose:Null<rk_simulation_pose>):RobotRuntime {
     ensureLive();
