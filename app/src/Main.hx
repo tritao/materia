@@ -131,14 +131,14 @@ class Main {
     var args = Sys.args();
     for (arg in args)
       if (arg != "--reset-workspace" && arg != "--snapshot" &&
-          arg != "--lab" && arg != "--dark" && arg != "--perspective" &&
+          arg != "--lab" && arg != "--dark" && arg != "--perspective" && arg != "--demo" &&
           arg.indexOf("--story=") != 0 &&
           arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0 &&
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
           arg.indexOf("--capture-seconds=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg != "--record" && arg.indexOf("--record=") != 0) {
-        Sys.println("Usage: materia [--reset-workspace] [--snapshot] " +
+        Sys.println("Usage: materia [--reset-workspace] [--snapshot] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] [--record[=PATH]]");
@@ -146,7 +146,8 @@ class Main {
       }
 
     if (args.indexOf("--snapshot") >= 0) {
-      var editor = new ReferenceEditorApp();
+      var editor = new ReferenceEditorApp(null, null, null, null, null, null, null, null,
+        args.indexOf("--demo") >= 0);
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       Sys.println(editor.workspace.snapshotJson());
       editor.dispose();
@@ -186,7 +187,7 @@ class Main {
         remote.connect(robotHost, diagnostics.robotPort, context.events);
       }
       var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context,
-        diagnostics.setupScript, diagnostics.projectPath, diagnostics.recordPath);
+        diagnostics.setupScript, diagnostics.projectPath, diagnostics.recordPath, diagnostics.demo);
       activeEditor = editor;
       liveEditor = editor;
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
@@ -205,6 +206,7 @@ private class ReferenceEditorLaunchOptions {
   public final componentLab:Bool;
   public final storyId:Null<String>;
   public final darkTheme:Bool;
+  public final demo:Bool;
   public final robotHost:Null<String>;
   public final robotPort:Int;
   public final setupScript:Null<String>;
@@ -212,7 +214,7 @@ private class ReferenceEditorLaunchOptions {
   public final windowWidth:Int;
   public final windowHeight:Int;
   public function new(captureDirectory:Null<String>, recordPath:Null<String>, frameLimit:Int, captureSeconds:Float,
-      componentLab:Bool, storyId:Null<String>, darkTheme:Bool,
+      componentLab:Bool, storyId:Null<String>, darkTheme:Bool, demo:Bool,
       robotHost:Null<String>, robotPort:Int,setupScript:Null<String>,projectPath:Null<String>,
       windowWidth:Int, windowHeight:Int) {
     this.captureDirectory = captureDirectory;
@@ -222,6 +224,7 @@ private class ReferenceEditorLaunchOptions {
     this.componentLab = componentLab;
     this.storyId = storyId;
     this.darkTheme = darkTheme;
+    this.demo = demo;
     this.robotHost = robotHost;
     this.robotPort = robotPort;
     this.setupScript=setupScript;
@@ -332,7 +335,8 @@ private class ReferenceEditorLaunchOptions {
       robotPort = parsedPort;
     }
     return new ReferenceEditorLaunchOptions(directory, recordPath, frames, captureSeconds, lab, story,
-      args.indexOf("--dark") >= 0, robotHost, robotPort,setupScript,projectPath,
+      args.indexOf("--dark") >= 0, args.indexOf("--demo") >= 0,
+      robotHost, robotPort,setupScript,projectPath,
       windowWidth, windowHeight);
   }
 }
@@ -426,7 +430,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
       ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String,?projectPath:String,
-      ?recordPath:String) {
+      ?recordPath:String, demo:Bool = true) {
     this.hostContext = hostContext;
     semanticRecordPath = recordPath;
     appearance = new EditorAppearance(theme);
@@ -440,7 +444,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     this.world = world == null ? new RobotWorld() : world;
     externalWorldHasRobots = this.world.robotIds().length > 0;
     simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
-    session = new ProjectDocumentSession(BimEditorDemo.create());
+    session = new ProjectDocumentSession(demo ? BimEditorDemo.create() : null, demo);
     attachSceneRecorder();
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
@@ -467,8 +471,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
         hostContext);
     }
     telemetry = new TelemetryPanel(appearance.theme.tokens.surface,
-      appearance.theme.tokens.textSecondary);
-    logLines = ["Scene ready: two editable objects", "Select a box; edit position or visibility", "Middle-drag to pan; scroll to zoom"];
+      appearance.theme.tokens.textSecondary, demo);
+    logLines = demo ? ["Demo scene ready", "Select a box; edit position or visibility",
+      "Middle-drag to pan; scroll to zoom"] : ["Scene ready", "Use Add to create an object"];
     gridVisible = true;
     gridSnapEnabled = false;
     gridSpacing = EditorSceneViewport.GRID_STEP;

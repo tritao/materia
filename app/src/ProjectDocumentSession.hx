@@ -57,6 +57,7 @@ class ProjectDocumentSession {
   final assemblyOccurrenceIds:Map<String, Bool> = new Map();
   final assemblyDependentJoints:Map<String, Bool> = new Map();
   var projectBaseline:Null<Array<SceneObjectData>> = null;
+  final demoContent:Bool;
   var staleProjectEdits:Array<String> = [];
   var staleProjectRecord:Null<ProjectSceneRecord> = null;
   public function staleEdits():Array<String> return staleProjectEdits.copy();
@@ -71,10 +72,11 @@ class ProjectDocumentSession {
   /** Application-owned runtime cleanup invoked only after replacement data validates. */
   public var beforeReplace:Null<Void->Void> = null;
 
-  public function new(?initialBim:BimDocument) {
+  public function new(?initialBim:BimDocument, demoContent:Bool = true) {
+    this.demoContent = demoContent;
     document = createDocument();
     edits = new ProjectEditCoordinator(document);
-    scene = new EditorScene(null, document);
+    scene = new EditorScene(demoContent ? null : [], document);
     sensors = new SensorConfiguration(null, document);
     bim = initialBim == null ? new BimDocument() : initialBim;
     bim.cad.clearHistory();
@@ -82,7 +84,7 @@ class ProjectDocumentSession {
 
   public function newDocument():Void {
     var nextDocument = createDocument();
-    replace(new EditorScene(null, nextDocument), new SensorConfiguration(null, nextDocument),
+    replace(new EditorScene(demoContent ? null : [], nextDocument), new SensorConfiguration(null, nextDocument),
       null, null, new BimDocument(), nextDocument);
   }
 

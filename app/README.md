@@ -13,7 +13,8 @@ SceneKit. `src/Main.hx` composes:
 - a file-backed docking snapshot under `build/reference-editor-workspace.json`
   (override it with `REFERENCE_EDITOR_WORKSPACE`).
 
-The editor starts with two extruded SceneKit boxes in a perspective view.
+The editor starts with an empty scene in a perspective view. Use `--demo` to
+load the two starter boxes, the BIM example, and sample telemetry.
 Click an object in the viewport or hierarchy to select it; the yellow outline
 tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
 (`#RRGGBB`), or Visible in the inspector.
@@ -46,7 +47,7 @@ or the Scene root to clear object selection.
 - Perspective clicks use a camera ray against the boxes' 3D bounds. Left-dragging a
   selected box moves it on its current Z plane with snapping and one undo step.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
-- New (`Ctrl+N`) starts a fresh scene with the two starter objects.
+- New (`Ctrl+N`) starts a fresh scene; in demo mode it restores the starter objects.
 - Open (`Ctrl+O`), Save (`Ctrl+S`), and Save As (`Ctrl+Shift+S`) use native file
   dialogs. The toolbar shows the current filename and `*` for unsaved changes.
 - New, Open, and window close ask Save / Discard / Cancel when edits are unsaved.
