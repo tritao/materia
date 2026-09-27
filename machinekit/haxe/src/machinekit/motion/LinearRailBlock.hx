@@ -7,7 +7,7 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.LinearRailProfile.LinearRailProfileSpec;
-import materia.kinematics.AssemblyFrames;
+import materia.assembly.AssemblyFrames;
 
 /** Matching carriage block for a profile rail. Geometry is a nominal exterior envelope; the
  * two mounting locations and rail axis are exact interface data from the profile catalog. CAD

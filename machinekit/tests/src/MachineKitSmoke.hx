@@ -52,8 +52,8 @@ import machinekit.transmission.Sprocket;
 import machinekit.transmission.SpurGear;
 import machinekit.transmission.TimingPulley;
 import machinekit.transmission.TimingBeltProfile;
-import materia.kinematics.AssemblyFrames;
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 class MachineKitSmoke {
 	static function check(value:Bool, message:String):Void {

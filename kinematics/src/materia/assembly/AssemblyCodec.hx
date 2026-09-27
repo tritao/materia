@@ -1,10 +1,10 @@
-package materia.kinematics;
+package materia.assembly;
 
 import haxe.Json;
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
-import materia.kinematics.AssemblyRecord.AssemblyConnector;
-import materia.kinematics.AssemblyRecord.AssemblyInstance;
-import materia.kinematics.AssemblyRecord.AssemblyJoint;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyRecord.AssemblyConnector;
+import materia.assembly.AssemblyRecord.AssemblyInstance;
+import materia.assembly.AssemblyRecord.AssemblyJoint;
 
 /** Bounded, validated metadata for rigid instances and their mating frames. */
 class AssemblyCodec {

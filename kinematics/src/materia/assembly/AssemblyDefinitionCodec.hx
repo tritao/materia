@@ -1,21 +1,21 @@
-package materia.kinematics;
+package materia.assembly;
 
 import haxe.Json;
-import materia.kinematics.AssemblyDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyComponentDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyComponentOccurrence;
-import materia.kinematics.AssemblyDefinition.AssemblyJointCoordinate;
-import materia.kinematics.AssemblyDefinition.AssemblyJointCoupling;
-import materia.kinematics.AssemblyDefinition.AssemblyJointLimits;
-import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
-import materia.kinematics.AssemblyDefinition.AssemblyJointType;
-import materia.kinematics.AssemblyDefinition.AssemblyRootPose;
-import materia.kinematics.AssemblyDefinition.AssemblyStateRecord;
-import materia.kinematics.AssemblyDefinition.AssemblyVector;
-import materia.kinematics.AssemblyDefinition.KinematicJoint;
-import materia.kinematics.AssemblyRecord;
-import materia.kinematics.AssemblyRecord.AssemblyConnector;
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
+import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
+import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
+import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
+import materia.assembly.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyDefinition.AssemblyJointType;
+import materia.assembly.AssemblyDefinition.AssemblyRootPose;
+import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
+import materia.assembly.AssemblyDefinition.AssemblyVector;
+import materia.assembly.AssemblyDefinition.KinematicJoint;
+import materia.assembly.AssemblyRecord;
+import materia.assembly.AssemblyRecord.AssemblyConnector;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */

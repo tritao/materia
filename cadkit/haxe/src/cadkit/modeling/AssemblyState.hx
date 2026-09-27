@@ -1,19 +1,19 @@
 package cadkit.modeling;
 
-import materia.kinematics.AssemblyCodec;
-import materia.kinematics.AssemblyDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyComponentDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyJointCoordinate;
-import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
-import materia.kinematics.AssemblyDefinition.AssemblyJointType;
-import materia.kinematics.AssemblyDefinition.AssemblyRootPose;
-import materia.kinematics.AssemblyDefinition.AssemblyStateRecord;
-import materia.kinematics.AssemblyDefinition.AssemblyComponentOccurrence;
-import materia.kinematics.AssemblyDefinition.KinematicJoint;
-import materia.kinematics.AssemblyDefinitionCodec;
-import materia.kinematics.AssemblyFrames;
-import materia.kinematics.AssemblyRecord.AssemblyConnector;
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyCodec;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
+import materia.assembly.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyDefinition.AssemblyJointType;
+import materia.assembly.AssemblyDefinition.AssemblyRootPose;
+import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
+import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
+import materia.assembly.AssemblyDefinition.KinematicJoint;
+import materia.assembly.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyConnector;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 import cadkit.modeling.AssemblyLoopSolver.AssemblyLoopSolveOptions;
 import cadkit.modeling.AssemblyLoopSolver.AssemblyLoopSolveResult;
 

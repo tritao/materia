@@ -1,6 +1,6 @@
 package machinekit.component;
 
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** A named frame in the component's CAD coordinates. Joints act along its +Y axis. */
 typedef Connector = {

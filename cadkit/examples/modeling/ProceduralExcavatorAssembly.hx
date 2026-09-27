@@ -1,9 +1,9 @@
 import cadkit.modeling.AssemblyModel;
-import materia.kinematics.AssemblyFrames;
-import materia.kinematics.AssemblyRecord;
-import materia.kinematics.AssemblyDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyStateRecord;
-import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
+import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 
 /** A posed excavator mechanism. Coordinates are millimetres in each part's CAD frame. */
 class ProceduralExcavatorAssembly {
@@ -120,7 +120,7 @@ class ProceduralExcavatorAssembly {
 	}
 
 	/** Shared slide frame twist keeps both eye axes parallel to the pin axes. */
-	static function planarSlide(x:Float, z:Float, dx:Float, dz:Float):materia.kinematics.AssemblyRecord.AssemblyFrame {
+	static function planarSlide(x:Float, z:Float, dx:Float, dz:Float):materia.assembly.AssemblyRecord.AssemblyFrame {
 		if (distance(0, 0, dx, dz) < 1e-9) throw "Cylinder slide has zero length";
 		var base = AssemblyFrames.alongY(0, 0, 0, 1, 0, 0);
 		var rotation = AssemblyFrames.compose(AssemblyFrames.turnY(-Math.atan2(dz, dx)), base);

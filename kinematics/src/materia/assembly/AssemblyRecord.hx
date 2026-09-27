@@ -1,4 +1,4 @@
-package materia.kinematics;
+package materia.assembly;
 
 /** Rigid frame in the artifact's length unit; quaternion order is x, y, z, w. */
 typedef AssemblyFrame = {

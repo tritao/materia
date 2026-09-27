@@ -1,6 +1,6 @@
 package machinekit.transmission;
 
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Two spur gears meshed at their profile-shifted centre distance, both rotating about parallel
  * +Z axes. `a` sits at the origin; `pose` places `b` along `a`'s local +X, turned about its own

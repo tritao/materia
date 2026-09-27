@@ -1,8 +1,8 @@
-package materia.kinematics;
+package materia.assembly;
 
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
-import materia.kinematics.AssemblyDefinition.AssemblyJointType;
-import materia.kinematics.AssemblyDefinition.AssemblyVector;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyDefinition.AssemblyJointType;
+import materia.assembly.AssemblyDefinition.AssemblyVector;
 
 /** Rigid-frame arithmetic shared by CAD generators and project consumers. */
 class AssemblyFrames {

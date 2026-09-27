@@ -1,11 +1,11 @@
 package materia.project;
 
 import haxe.io.Bytes;
-import materia.kinematics.AssemblyCodec;
-import materia.kinematics.AssemblyRecord;
-import materia.kinematics.AssemblyDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyStateRecord;
-import materia.kinematics.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyCodec;
+import materia.assembly.AssemblyRecord;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
+import materia.assembly.AssemblyDefinitionCodec;
 import materia.project.Appearance;
 import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;

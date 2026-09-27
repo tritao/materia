@@ -1,18 +1,18 @@
 package cadkit.modeling;
 
-import materia.kinematics.AssemblyRecord;
-import materia.kinematics.AssemblyCodec;
-import materia.kinematics.AssemblyFrames;
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
-import materia.kinematics.AssemblyRecord.AssemblyConnector;
-import materia.kinematics.AssemblyRecord.AssemblyInstance;
-import materia.kinematics.AssemblyRecord.AssemblyJoint;
-import materia.kinematics.AssemblyDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyJointLimits;
-import materia.kinematics.AssemblyDefinition.AssemblyJointCoupling;
-import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
-import materia.kinematics.AssemblyDefinition.AssemblyVector;
-import materia.kinematics.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyRecord;
+import materia.assembly.AssemblyCodec;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyRecord.AssemblyConnector;
+import materia.assembly.AssemblyRecord.AssemblyInstance;
+import materia.assembly.AssemblyRecord.AssemblyJoint;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
+import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
+import materia.assembly.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyDefinition.AssemblyVector;
+import materia.assembly.AssemblyDefinitionCodec;
 import materia.units.LengthUnit;
 
 /** Builds a posed assembly from part instances, connector frames, and tree joints. */

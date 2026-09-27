@@ -2,7 +2,7 @@ package machinekit.component;
 
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
-import materia.kinematics.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.MaterialLibrary;
 
 /** Geometry generator, named connector frames, and a BOM line for one machine part.
