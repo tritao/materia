@@ -1,6 +1,7 @@
 #include "robotkit_runtime.h"
 
 #include <cassert>
+#include <cstddef>
 #include <cmath>
 
 int main() {
@@ -20,6 +21,13 @@ int main() {
         joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
         joint.axis[2] = 1.0;
     }
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.owner_period_ns = static_cast<uint64_t>(INT64_MAX) + 1;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.struct_size = offsetof(rk_robot_runtime_blueprint, owner_period_ns);
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.owner_period_ns = 20'000'000;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
 
     rk_robot_command command{};

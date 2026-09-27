@@ -24,6 +24,8 @@ class RobotRuntimeBlueprint {
   public var selfCollision:Bool = true;
   /** Zero uses two owner periods. */
   public var commitLeadNs:haxe.Int64 = haxe.Int64.ofInt(0);
+  /** Zero uses the runtime's 10 ms owner period. */
+  public var ownerPeriodNs:haxe.Int64 = haxe.Int64.ofInt(0);
   /** Per-joint SI-unit following-error bounds; zero leaves the check disabled. */
   public final followingErrorBounds:Array<Float>;
   /** Compiled user-layer roles; null for manually assembled native blueprints. */
@@ -99,6 +101,9 @@ class RobotRuntimeBlueprint {
     value.set_revision(haxe.Int64.ofInt(revision));
     value.set_calibration_revision(haxe.Int64.ofInt(calibrationRevision));
     value.set_commit_lead_ns(commitLeadNs);
+    if (haxe.Int64.compare(ownerPeriodNs, haxe.Int64.ofInt(0)) < 0)
+      throw "Invalid runtime owner period";
+    value.set_owner_period_ns(ownerPeriodNs);
     for (joint in 0...jointCount) {
       var bound = followingErrorBounds[joint];
       if (!Math.isFinite(bound) || bound < 0.0)

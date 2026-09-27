@@ -1103,3 +1103,15 @@ accepted replacements and late rejection without mutating the queue.
 Point-chunk recordings and old spliced chunks are unsupported, with explicit
 decode rejection tests. Bumped `RK_API_VERSION` to 13 and regenerated the
 binding. Commit: the commit containing this entry.
+
+### P9c — Serial host-runtime queue
+
+`DeviceSerialEndpoint` now offers host-runtime plan execution only when the
+configured owner period covers the exact RKD5 8N1 command frame at the
+configured baud and joint count plus the protocol's 10 ms processing margin.
+The `struct_size`-versioned blueprint owner period defaults to 10 ms; an
+insufficient period logs the required threshold and keeps the non-queue
+fallback. PTY/FakeDevice tests cover a generated Ruckig plan with one target
+per owner cycle, HOLD/RESUME on that path, the watchdog, and both sides of
+the baud/period threshold. `RK_API_VERSION` is 14; the wire protocol is unchanged. Commit: the
+commit containing this entry.

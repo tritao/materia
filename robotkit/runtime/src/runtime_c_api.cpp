@@ -39,6 +39,11 @@ bool parse_fingerprint(const char *hex, std::array<std::uint8_t, 16> &result) {
         !std::all_of(result.begin(), result.end(), [](auto byte) { return byte == 0; });
 }
 
+std::chrono::nanoseconds owner_period(const rk_robot_runtime_blueprint &blueprint) {
+    return std::chrono::nanoseconds(blueprint.owner_period_ns == 0
+        ? 10'000'000 : static_cast<int64_t>(blueprint.owner_period_ns));
+}
+
 } // namespace
 
 namespace robotkit::internal {
@@ -80,10 +85,11 @@ rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprint *blue
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     try {
+        const auto copied = robotkit::internal::copy_blueprint(blueprint);
         std::shared_ptr<robotkit::RobotEndpoint> endpoint =
             std::make_shared<robotkit::InMemoryRobot>(blueprint->joint_count);
         auto runtime = std::make_shared<robotkit::RobotRuntime>(
-            robotkit::internal::copy_blueprint(blueprint), endpoint);
+            copied, endpoint, owner_period(copied));
         const auto handle = robotkit::internal::register_runtime(std::move(runtime));
         *out_runtime = handle;
         return RK_OK;
@@ -105,14 +111,16 @@ rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprin
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     try {
+        const auto copied = robotkit::internal::copy_blueprint(blueprint);
+        const auto period = owner_period(copied);
         std::uint8_t session_status = 0;
         auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, fingerprint,
-            static_cast<std::uint8_t>(blueprint->joint_count), max_target_error, &session_status);
+            static_cast<std::uint8_t>(blueprint->joint_count), max_target_error,
+            &session_status, period);
         if (!endpoint)
             return session_status == 2 ? RK_ERROR_MODEL_MISMATCH : RK_ERROR_BACKEND;
         auto runtime = std::make_shared<robotkit::RobotRuntime>(
-            robotkit::internal::copy_blueprint(blueprint),
-            std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint));
+            copied, std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint), period);
         *out_runtime = robotkit::internal::register_runtime(std::move(runtime));
         return RK_OK;
     } catch (const std::bad_alloc &) {

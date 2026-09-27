@@ -2,21 +2,24 @@
 
 #include <array>
 #include <cmath>
+#include <cstdio>
 
 namespace robotkit {
 
 std::shared_ptr<DeviceSerialEndpoint> DeviceSerialEndpoint::open(const char *path, unsigned baud,
     std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count,
-    double max_target_error, std::uint8_t *session_status) {
+    double max_target_error, std::uint8_t *session_status,
+    std::chrono::nanoseconds owner_period) {
     if (session_status) *session_status = 0;
     if (!std::isfinite(max_target_error) || max_target_error < 0.0 ||
         joint_count > device_wire::MAX_JOINTS) return {};
     return attach(device::HostLink::open(path, baud, fingerprint, joint_count, session_status),
-        joint_count, max_target_error);
+        joint_count, max_target_error, owner_period);
 }
 
 std::shared_ptr<DeviceSerialEndpoint> DeviceSerialEndpoint::attach(
-    std::unique_ptr<device::HostLink> link, std::uint8_t joint_count, double max_target_error) {
+    std::unique_ptr<device::HostLink> link, std::uint8_t joint_count, double max_target_error,
+    std::chrono::nanoseconds owner_period) {
     if (!link || !link->ready() || joint_count > device_wire::MAX_JOINTS ||
         !std::isfinite(max_target_error) || max_target_error < 0.0) return {};
     device::HostState initial{};
@@ -25,13 +28,30 @@ std::shared_ptr<DeviceSerialEndpoint> DeviceSerialEndpoint::attach(
          initial.header.safety != RK_SAFETY_FAULT) ||
         initial.header.joint_count != joint_count) return {};
     return std::shared_ptr<DeviceSerialEndpoint>(new DeviceSerialEndpoint(
-        std::move(link), joint_count, max_target_error, initial));
+        std::move(link), joint_count, max_target_error, initial, owner_period));
 }
 
 DeviceSerialEndpoint::DeviceSerialEndpoint(std::unique_ptr<device::HostLink> link,
-    std::uint8_t joint_count, double max_target_error, device::HostState initial_state)
+    std::uint8_t joint_count, double max_target_error, device::HostState initial_state,
+    std::chrono::nanoseconds owner_period)
     : link_(std::move(link)), joint_count_(joint_count), max_target_error_(max_target_error),
-      initial_state_(initial_state) {}
+      initial_state_(initial_state) {
+    // RKD5 framing is 8 bytes of header and 4 bytes of CRC. Reserve the
+    // protocol's 10 ms processing allowance in addition to 8N1 wire time.
+    const std::uint64_t frame_bytes = 12 + device_wire::CommandHeader_SIZE +
+        static_cast<std::uint64_t>(joint_count_) * device_wire::JointTarget_SIZE;
+    const std::uint64_t wire_ns =
+        (frame_bytes * 10'000'000'000ULL + link_->baud() - 1) / link_->baud();
+    const std::uint64_t required_ns = 10'000'000ULL + wire_ns;
+    queue_supported_ = owner_period.count() > 0 &&
+        static_cast<std::uint64_t>(owner_period.count()) >= required_ns;
+    if (!queue_supported_)
+        std::fprintf(stderr,
+            "DeviceSerialEndpoint: trajectory queue disabled: owner period %lld ns "
+            "is below RKD5 command frame plus processing allowance %llu ns\n",
+            static_cast<long long>(owner_period.count()),
+            static_cast<unsigned long long>(required_ns));
+}
 
 rk_result DeviceSerialEndpoint::apply(const rk_robot_command &command) {
     if (!link_ || !link_->ready()) return RK_ERROR_BACKEND;

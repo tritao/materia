@@ -50,12 +50,18 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
         blueprint->collision_approximation > RK_COLLISION_APPROXIMATION_BOUNDS_BOX ||
         blueprint->self_collision > RK_SELF_COLLISION_DISABLED)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (blueprint->struct_size >= sizeof(*blueprint))
+    if (blueprint->struct_size >=
+        offsetof(rk_robot_runtime_blueprint, following_error_bound) +
+            sizeof(blueprint->following_error_bound))
         for (uint32_t joint = 0; joint < blueprint->joint_count &&
                 joint < RK_MAX_TRAJECTORY_JOINTS; ++joint)
             if (!is_finite(blueprint->following_error_bound[joint]) ||
                 blueprint->following_error_bound[joint] < 0.0)
                 return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >= offsetof(rk_robot_runtime_blueprint, owner_period_ns) +
+            sizeof(blueprint->owner_period_ns) &&
+        blueprint->owner_period_ns > static_cast<uint64_t>(INT64_MAX))
+        return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t i = 0; i < blueprint->link_count; ++i) {
         const auto &link = blueprint->links[i];
         if (!is_finite(link.mass) || link.mass <= 0.0) return RK_ERROR_INVALID_ARGUMENT;
