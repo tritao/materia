@@ -11,6 +11,7 @@ import app.editor.SensorPanel;
 import app.editor.HierarchyPanel;
 import app.editor.InspectorPanel;
 import app.editor.EditorDocumentCommands;
+import app.editor.SceneObjectCommands;
 import Color;
 import LayoutAxis;
 import LayoutAlignmentY;
@@ -1147,109 +1148,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function installCommands():Void {
     DockWorkspaceCommands.install(workspace, commands, "workspace");
-    commands.register(new Command("scene.create", "Add rectangle", function() {
-      scene.createRectangle();
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canCreate()));
-    commands.register(new Command("scene.create-part", "Add empty CAD part", function() {
-      runSceneEdit("Could not add CAD part", function() scene.createCadPart());
-    }, null, function() return canEditObjects() && scene.canCreate()));
-    commands.register(new Command("scene.create-sketch", "Create constrained sketch", function() {
-      runSceneEdit("Could not create sketch", function() scene.createSketch());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreateSketch()));
-    commands.register(new Command("scene.create-extrusion", "Extrude selected sketch", function() {
-      runSceneEdit("Could not create extrusion", function() scene.createExtrusion());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreateExtrusion()));
-    commands.register(new Command("scene.create-face-sketch", "Sketch on selected face", function() {
-      runSceneEdit("Could not create face sketch", function() scene.createFaceSketch());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreateFaceSketch()));
-    commands.register(new Command("scene.create-pocket", "Pocket selected face sketch", function() {
-      runSceneEdit("Could not create pocket", function() scene.createPocket());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreatePocket()));
-    commands.register(new Command("scene.create-vertical-fillet", "Fillet vertical edges", function() {
-      runSceneEdit("Could not fillet vertical edges", function() scene.createVerticalFillet());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreateVerticalFillet()));
-    commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
-      runSceneEdit("Could not add mounting plate", function() scene.createMountingPlate());
-    }, null, function() return canEditObjects() && scene.canCreate()));
-    commands.register(new Command("scene.create-bracket", "Add L bracket", function() {
-      runSceneEdit("Could not add L bracket", function() scene.createBracket());
-    }, null, function() return canEditObjects() && scene.canCreate()));
-    commands.register(new Command("scene.edit-sketch", "Edit selected sketch", function() {
-      try {
-        scene.beginSelectedSketchEdit();
-        inspectorSelectionRevision = -1;
-      } catch (error:Dynamic) log("Could not edit sketch: " + Std.string(error));
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canBeginSelectedSketchEdit()));
-    commands.register(new Command("scene.repair-sketch-support-face", "Repair selected sketch support face", function() {
-      runSceneEdit("Could not repair sketch support face", function() scene.repairSelectedSketchSupportFace());
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canRepairSelectedSketchSupportFace()));
-    commands.register(new Command("scene.apply-sketch", "Apply sketch draft", function() {
-      runSceneEdit("Could not apply sketch draft", function() scene.applySelectedSketchEdit());
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canApplySelectedSketchEdit()));
-    commands.register(new Command("scene.cancel-sketch", "Cancel sketch draft", function() {
-      scene.cancelSelectedSketchEdit();
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return scene.hasActiveSketchEdit()));
-    commands.register(new Command("scene.add-sketch-rectangle", "Add starter rectangle to sketch", function() {
-      runSceneEdit("Could not add sketch rectangle", function() scene.addSketchDraftRectangle());
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canAddSketchDraftRectangle()));
-    commands.register(new Command("scene.clear-sketch-draft", "Clear sketch geometry", function() {
-      runSceneEdit("Could not clear sketch", function() scene.clearSketchDraft());
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canClearSketchDraft()));
-    commands.register(new Command("scene.import-step", "Import STEP part", function() {
-      var chooser=files;
-      if(chooser==null)return;
-      chooser.chooseImport("Import STEP part",function(path,error) {
-        if(error!=null){log(error);return;}
-        if(path==null)return;
-        try {
-          scene.importStep(path);
-          log("Imported STEP part: "+path);
-        } catch(failure:Dynamic) log("STEP import failed: "+Std.string(failure));
-        commands.refresh();
-      });
-    },null,function() return canEditObjects()&&files!=null&&scene.canCreate()));
-    commands.register(new Command("scene.add-face-hole", "Add hole on selected face", function() {
-      runSceneEdit("Could not add hole", function() scene.addHoleOnSelectedFace());
-    },null,function() return canEditObjects()&&scene.canAddHoleOnSelectedFace()));
-    commands.register(new Command("scene.export-step", "Export STEP", function() {
-      var chooser=files;
-      if(chooser==null)return;
-      chooser.chooseExport("Export selected CAD part","CAD part.step",function(path,error) {
-        if(error!=null){log(error);return;}
-        if(path==null)return;
-        try { scene.exportSelectedCad(path); log("Exported STEP: "+path); }
-        catch(failure:Dynamic) log("STEP export failed: "+Std.string(failure));
-        commands.refresh();
-      });
-    },null,function() {
-      var selected=scene.object(scene.selectedId);
-      return !documents.blocked()&&files!=null&&selected!=null&&scene.isCadPart(selected.id);
-    }));
-    commands.register(new Command("scene.duplicate", "Duplicate", function() {
-      runSceneEdit("Could not duplicate object", function() scene.duplicateSelected());
-    }, new Shortcut(68, UiModifier.Control), function() return canEditObjects()
-      && scene.canCreate() && scene.object(scene.selectedId) != null));
-    commands.register(new Command("scene.delete", "Delete", function() {
-      scene.deleteSelected();
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.object(scene.selectedId) != null));
+    SceneObjectCommands.install(this);
     EditorDocumentCommands.install(this);
     commands.register(new Command("workspace.save", "Save workspace", function() {
       saveWorkspace();
