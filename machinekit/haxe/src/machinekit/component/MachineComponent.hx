@@ -44,13 +44,12 @@ class MachineComponent {
 	public function tool(name:String, depth:Float):Part
 		throw 'Unknown tool "$name" for "$designation"';
 
-	function get_type():Null<ComponentType> return MachineKitComponents.forComponent(this);
+	public function componentType():Null<ComponentType> return null;
 
-	public function values():ComponentValues {
-		var recipe = type;
-		if (recipe == null) throw 'Component "$designation" is code-only';
-		return recipe.valuesOf(this);
-	}
+	function get_type():Null<ComponentType> return componentType();
+
+	public function values():ComponentValues
+		throw 'Component "$designation" is code-only';
 
 	public function connectors():Array<Connector>
 		return connectorList.copy();

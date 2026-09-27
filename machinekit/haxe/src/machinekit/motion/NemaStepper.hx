@@ -1,5 +1,12 @@
 package machinekit.motion;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.catalog.Catalog;
@@ -152,4 +159,36 @@ class NemaStepper extends MachineComponent {
 		if (name == "mountingCutout") return mountingCutout(depth > 0 ? depth : 10);
 		return super.tool(name, depth);
 	}
+
+	private static var namedRecipeTypeCache:Null<ComponentType>;
+
+	public static function namedRecipeType():ComponentType {
+		if (namedRecipeTypeCache == null)
+			namedRecipeTypeCache = new ComponentType("machinekit.motion.nema-stepper",
+			[ComponentRecipeSupport.catalog("model", NemaStepper.variantCatalog(), "17HS19-1684S1")],
+			v -> NemaStepper.model(v.token("model")),
+			true);
+		return namedRecipeTypeCache;
+	}
+
+	private static var genericRecipeTypeCache:Null<ComponentType>;
+
+	public static function genericRecipeType():ComponentType {
+		if (genericRecipeTypeCache == null)
+			genericRecipeTypeCache = new ComponentType("machinekit.motion.generic-nema-stepper",
+			[ComponentRecipeSupport.choice("frame", ["17", "23", "34"], "17"), ComponentRecipeSupport.length("bodyLength", 48)],
+			v -> NemaStepper.frame(Std.parseInt(v.token("frame")), v.number("bodyLength")));
+		return genericRecipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType>
+		return variant.designation.indexOf("GENERIC-NEMA") == 0 ? genericRecipeType() : namedRecipeType();
+
+	override public function values():ComponentValues {
+		if (variant.designation.indexOf("GENERIC-NEMA") == 0)
+			return new ComponentValues().setToken("frame", Std.string(this.spec.frame))
+				.setNumber("bodyLength", this.bodyLength);
+		return new ComponentValues().setToken("model", this.variant.designation);
+	}
+
 }

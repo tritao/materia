@@ -1,5 +1,12 @@
 package machinekit.standard;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
@@ -62,4 +69,22 @@ class ShaftCollar extends MachineComponent {
 
 	function get_boreDiameter():Float return spec.boreDiameter;
 	function get_width():Float return spec.width;
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.standard.shaft-collar",
+			[ComponentRecipeSupport.catalog("bore", ShaftCollar.catalog(), "8")],
+			v -> ShaftCollar.forShaft(Std.parseFloat(v.token("bore"))),
+			true);
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues().set("bore", Token(Dimension.format(this.spec.boreDiameter)));
+	}
+
 }

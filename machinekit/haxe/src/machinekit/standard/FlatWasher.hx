@@ -1,5 +1,12 @@
 package machinekit.standard;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
@@ -61,4 +68,22 @@ class FlatWasher extends MachineComponent {
 	function get_innerDiameter():Float return spec.innerDiameter;
 	function get_outerDiameter():Float return spec.outerDiameter;
 	function get_thickness():Float return spec.thickness;
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.standard.flat-washer",
+			[ComponentRecipeSupport.catalog("size", FlatWasher.catalog(), "M5")],
+			v -> FlatWasher.metric(v.token("size")),
+			true);
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues().set("size", Token(this.spec.size));
+	}
+
 }

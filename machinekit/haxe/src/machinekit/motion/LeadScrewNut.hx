@@ -1,5 +1,12 @@
 package machinekit.motion;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
@@ -96,4 +103,21 @@ class LeadScrewNut extends MachineComponent {
 				bodyLength + flangeThickness + 0.1, point.x, point.y));
 		return Solids.cut(solidPart, tools);
 	}
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.motion.lead-screw-nut",
+			ComponentRecipeSupport.threadParameters().concat([ComponentRecipeSupport.count("boltCount", 4)]),
+			v -> new LeadScrewNut(ComponentRecipeSupport.thread(v), v.integer("boltCount")));
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return ComponentRecipeSupport.threadValues(this.thread).setInteger("boltCount", this.boltCount);
+	}
+
 }

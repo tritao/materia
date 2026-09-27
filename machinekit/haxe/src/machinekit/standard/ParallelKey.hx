@@ -1,5 +1,12 @@
 package machinekit.standard;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.catalog.Catalog;
@@ -68,4 +75,24 @@ class ParallelKey extends MachineComponent {
 			new Vector(-spec.width / 2, 0), new Vector(spec.width / 2, 0),
 			new Vector(spec.width / 2, spec.height), new Vector(-spec.width / 2, spec.height),
 		], 0, length);
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.standard.parallel-key",
+			[ComponentRecipeSupport.catalog("size", ParallelKey.catalog(), "2x2"), ComponentRecipeSupport.length("length", 10)],
+			v -> ParallelKey.metric(v.token("size"), v.number("length")),
+			true);
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues()
+				.set("size", Token('${Dimension.format(this.spec.width)}x${Dimension.format(this.spec.height)}'))
+				.set("length", Number(this.length));
+	}
+
 }

@@ -1,5 +1,12 @@
 package machinekit.robotics;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;
@@ -109,4 +116,29 @@ class EndEffectorPlate extends MachineComponent {
 					throw "End effector tool bolt circle must clear the flange's bolt holes";
 		}
 	}
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.robotics.end-effector-plate",
+			[ComponentRecipeSupport.length("flangePitchCircle", 40), ComponentRecipeSupport.count("flangeBoltCount", 4), ComponentRecipeSupport.length("thickness", 12),
+				ComponentRecipeSupport.length("toolBoltCircleDiameter", 65), ComponentRecipeSupport.count("toolBoltCount", 4),
+				ComponentRecipeSupport.catalog("toolMountScrew", SocketHeadCapScrew.catalog(), "M5")],
+			v -> new EndEffectorPlate(new RobotFlange(v.number("flangePitchCircle"), v.integer("flangeBoltCount")),
+				v.number("thickness"), v.number("toolBoltCircleDiameter"), v.integer("toolBoltCount"), v.token("toolMountScrew")));
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues().setNumber("flangePitchCircle", this.flange.spec.pitchCircle)
+				.setInteger("flangeBoltCount", this.flange.boltCount)
+				.setNumber("thickness", this.thickness)
+				.setNumber("toolBoltCircleDiameter", this.toolBoltCircleDiameter)
+				.setInteger("toolBoltCount", this.toolBoltCount)
+				.setToken("toolMountScrew", this.toolMountScrew);
+	}
+
 }

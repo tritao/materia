@@ -1,5 +1,12 @@
 package machinekit.motion;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Align;
 import machinekit.catalog.Catalog;
@@ -134,4 +141,22 @@ class PillowBlock extends MachineComponent {
 		if (includeMountingScrews) result.addComponent(mountScrewPart(screwLength), 2);
 		return result;
 	}
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.motion.pillow-block",
+			[ComponentRecipeSupport.catalog("designation", PillowBlock.catalog(), "UCP204")],
+			v -> PillowBlock.metric(v.token("designation")),
+			true);
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues().setToken("designation", this.spec.designation);
+	}
+
 }

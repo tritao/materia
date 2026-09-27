@@ -1,5 +1,12 @@
 package machinekit.transmission;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
@@ -88,4 +95,53 @@ class TimingPulley extends MachineComponent {
 		}
 		return points;
 	}
+
+	private static var standardRecipeTypeCache:Null<ComponentType>;
+
+	public static function standardRecipeType():ComponentType {
+		if (standardRecipeTypeCache == null)
+			standardRecipeTypeCache = new ComponentType("machinekit.transmission.timing-pulley",
+			[ComponentRecipeSupport.choice("profile", ["GT2", "HTD3M", "HTD5M", "HTD8M", "HTD14M", "T5", "XL"], "GT2"),
+				ComponentRecipeSupport.count("teeth", 20), ComponentRecipeSupport.length("boreDiameter", 5), ComponentRecipeSupport.length("thickness", 6)],
+			v -> new TimingPulley(ComponentRecipeSupport.profile(v.token("profile")),
+				v.integer("teeth"), v.number("boreDiameter"), v.number("thickness")));
+		return standardRecipeTypeCache;
+	}
+
+	private static var customRecipeTypeCache:Null<ComponentType>;
+
+	public static function customRecipeType():ComponentType {
+		if (customRecipeTypeCache == null)
+			customRecipeTypeCache = new ComponentType("machinekit.transmission.custom-timing-pulley",
+			[ComponentRecipeSupport.choice("family", ["CUSTOM"], "CUSTOM"), ComponentRecipeSupport.length("pitch", 2),
+				ComponentRecipeSupport.length("pitchLineDifferential", 0.254), ComponentRecipeSupport.count("teeth", 20),
+				ComponentRecipeSupport.length("boreDiameter", 5), ComponentRecipeSupport.length("thickness", 6)],
+			v -> new TimingPulley(Custom(v.token("family"), v.number("pitch"),
+				v.number("pitchLineDifferential")), v.integer("teeth"),
+				v.number("boreDiameter"), v.number("thickness")));
+		return customRecipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType>
+		return switch beltProfile { case Custom(_, _, _): true; default: false; } ? customRecipeType() : standardRecipeType();
+
+	override public function values():ComponentValues {
+		if (switch beltProfile { case Custom(_, _, _): true; default: false; }) {
+				var pulley:TimingPulley = this;
+				var values = new ComponentValues().setInteger("teeth", pulley.teeth)
+					.setNumber("boreDiameter", pulley.boreDiameter).setNumber("thickness", pulley.thickness);
+				switch pulley.beltProfile {
+					case Custom(family, pitch, differential):
+						values.setToken("family", family).setNumber("pitch", pitch)
+							.setNumber("pitchLineDifferential", differential);
+					default: throw "Expected custom timing pulley";
+				}
+				return values;
+			}
+		return new ComponentValues().setToken("profile", Std.string(this.beltProfile))
+				.setInteger("teeth", this.teeth)
+				.setNumber("boreDiameter", this.boreDiameter)
+				.setNumber("thickness", this.thickness);
+	}
+
 }

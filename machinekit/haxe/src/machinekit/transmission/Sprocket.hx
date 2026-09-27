@@ -1,5 +1,12 @@
 package machinekit.transmission;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.catalog.Catalog;
@@ -104,4 +111,46 @@ class Sprocket extends MachineComponent {
 		}
 		return points;
 	}
+
+	private static var chainRecipeTypeCache:Null<ComponentType>;
+
+	public static function chainRecipeType():ComponentType {
+		if (chainRecipeTypeCache == null)
+			chainRecipeTypeCache = new ComponentType("machinekit.transmission.sprocket",
+			[ComponentRecipeSupport.length("pitch", 6.35), ComponentRecipeSupport.count("teeth", 20), ComponentRecipeSupport.length("boreDiameter", 8),
+				ComponentRecipeSupport.length("thickness", 5), ComponentRecipeSupport.length("rollerDiameter", 3.3), ComponentRecipeSupport.catalog("chain", Sprocket.chainCatalog(), "ANSI25")],
+			v -> new Sprocket(v.number("pitch"), v.integer("teeth"), v.number("boreDiameter"),
+				v.number("thickness"), v.number("rollerDiameter"), v.token("chain")));
+		return chainRecipeTypeCache;
+	}
+
+	private static var genericRecipeTypeCache:Null<ComponentType>;
+
+	public static function genericRecipeType():ComponentType {
+		if (genericRecipeTypeCache == null)
+			genericRecipeTypeCache = new ComponentType("machinekit.transmission.generic-sprocket",
+			[ComponentRecipeSupport.length("pitch", 6.35), ComponentRecipeSupport.count("teeth", 20), ComponentRecipeSupport.length("boreDiameter", 8),
+				ComponentRecipeSupport.length("thickness", 5), ComponentRecipeSupport.length("rollerDiameter", 3.96875)],
+			v -> new Sprocket(v.number("pitch"), v.integer("teeth"), v.number("boreDiameter"),
+				v.number("thickness"), v.number("rollerDiameter")));
+		return genericRecipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType>
+		return chain == null ? genericRecipeType() : chainRecipeType();
+
+	override public function values():ComponentValues {
+		if (chain == null)
+		return new ComponentValues().setNumber("pitch", this.pitch)
+				.setInteger("teeth", this.teeth)
+				.setNumber("boreDiameter", this.boreDiameter)
+				.setNumber("thickness", this.thickness)
+				.setNumber("rollerDiameter", this.rollerDiameter);
+		return new ComponentValues().setNumber("pitch", this.pitch)
+				.setInteger("teeth", this.teeth).setNumber("boreDiameter", this.boreDiameter)
+				.setNumber("thickness", this.thickness)
+				.setNumber("rollerDiameter", this.rollerDiameter)
+				.setToken("chain", this.chain);
+	}
+
 }

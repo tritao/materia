@@ -1,5 +1,12 @@
 package machinekit.standard;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
@@ -125,4 +132,23 @@ class HexBolt extends MachineComponent {
 			default: super.tool(name, depth);
 		};
 	}
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.standard.hex-bolt",
+			[ComponentRecipeSupport.catalog("size", HexBolt.catalog(), "M5"), ComponentRecipeSupport.length("length", 20)],
+			v -> HexBolt.metric(v.token("size"), v.number("length")),
+			true);
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues().set("size", Token(this.spec.size))
+				.set("length", Number(this.length));
+	}
+
 }

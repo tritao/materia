@@ -1,5 +1,12 @@
 package machinekit.motion;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
@@ -36,4 +43,22 @@ class LinearRailBlock extends MachineComponent {
 			new Vector(spec.blockWidth / 2, spec.blockHeight), new Vector(-spec.blockWidth / 2, spec.blockHeight),
 		], -spec.blockLength / 2, spec.blockLength / 2);
 	}
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.motion.linear-rail-block",
+			[ComponentRecipeSupport.catalog("profile", LinearRailSystem.catalog(), "MGN12C")],
+			v -> new LinearRailBlock(LinearRailSystem.catalog().get(v.token("profile"))),
+			true);
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues().setToken("profile", this.spec.designation);
+	}
+
 }

@@ -1,5 +1,12 @@
 package machinekit.standard;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
@@ -139,4 +146,25 @@ class SocketHeadCapScrew extends MachineComponent {
 			clearanceMedium: medium, clearanceCoarse: coarse,
 			counterboreDiameter: counterboreDiameter, counterboreDepth: counterboreDepth};
 	}
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.standard.socket-head-cap-screw",
+			[ComponentRecipeSupport.catalog("size", SocketHeadCapScrew.catalog(), "M5"), ComponentRecipeSupport.length("length", 20),
+				ComponentRecipeSupport.choice("material", MaterialLibrary.specs(), "steel 12.9")],
+			v -> SocketHeadCapScrew.metric(v.token("size"), v.number("length"), v.token("material")),
+			true);
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues().set("size", Token(this.spec.size))
+				.set("length", Number(this.length))
+				.set("material", Token(MaterialLibrary.require(this.materialId).physical.spec));
+	}
+
 }

@@ -1,5 +1,12 @@
 package machinekit.standard;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Part;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
@@ -69,4 +76,22 @@ class RetainingRing extends MachineComponent {
 		return {diameter: spec.grooveDiameter, width: spec.grooveWidth};
 
 	function get_thickness():Float return spec.thickness;
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.standard.retaining-ring",
+			[ComponentRecipeSupport.catalog("shaft", RetainingRing.catalog(), "8")],
+			v -> RetainingRing.forShaft(Std.parseFloat(v.token("shaft"))),
+			true);
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues().set("shaft", Token(Dimension.format(this.spec.shaftDiameter)));
+	}
+
 }

@@ -7,19 +7,15 @@ class ComponentType {
 	public final id:String;
 	final inputs:Array<ComponentParameter>;
 	final build:ComponentValues->MachineComponent;
-	final read:MachineComponent->ComponentValues;
-	final accepts:MachineComponent->Bool;
 	final keepDesignation:Bool;
 
 	public function new(id:String, inputs:Array<ComponentParameter>, build:ComponentValues->MachineComponent,
-			read:MachineComponent->ComponentValues, accepts:MachineComponent->Bool, keepDesignation:Bool = false) {
-		if (id == null || id.length == 0 || inputs == null || build == null || read == null || accepts == null)
+			keepDesignation:Bool = false) {
+		if (id == null || id.length == 0 || inputs == null || build == null)
 			throw "Incomplete component type";
 		this.id = id;
 		this.inputs = inputs.copy();
 		this.build = build;
-		this.read = read;
-		this.accepts = accepts;
 		this.keepDesignation = keepDesignation;
 		var seen:Map<String, Bool> = [];
 		for (input in inputs) {
@@ -29,7 +25,7 @@ class ComponentType {
 	}
 
 	public function parameters():Array<ComponentParameter> return inputs.copy();
-	public function matches(component:MachineComponent):Bool return accepts(component);
+	public function matches(component:MachineComponent):Bool return component.componentType() == this;
 
 	public function defaults():ComponentValues return resolve(null);
 
@@ -52,7 +48,7 @@ class ComponentType {
 
 	public function valuesOf(component:MachineComponent):ComponentValues {
 		if (!matches(component)) throw 'Component is not type "$id"';
-		return read(component);
+		return component.values();
 	}
 
 	public function key(values:ComponentValues):String {

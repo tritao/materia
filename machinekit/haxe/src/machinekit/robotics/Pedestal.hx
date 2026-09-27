@@ -1,5 +1,12 @@
 package machinekit.robotics;
 
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValues;
+import machinekit.component.ComponentValue.*;
+import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.Dimension;
+import materia.project.MaterialLibrary;
+
 import cadkit.modeling.Location;
 import cadkit.modeling.Axis;
 import cadkit.modeling.Part;
@@ -222,4 +229,42 @@ class Pedestal extends MachineComponent {
 		if (detail.cablePathDiameter != null) result += '-C${Dimension.format(detail.cablePathDiameter)}';
 		return result;
 	}
+
+	private static var recipeTypeCache:Null<ComponentType>;
+
+	public static function recipeType():ComponentType {
+		if (recipeTypeCache == null)
+			recipeTypeCache = new ComponentType("machinekit.robotics.pedestal",
+			[ComponentRecipeSupport.length("flangePitchCircle", 40), ComponentRecipeSupport.count("flangeBoltCount", 4), ComponentRecipeSupport.length("height", 150),
+				ComponentRecipeSupport.length("columnDiameter", 60), ComponentRecipeSupport.count("floorBoltCount", 4), ComponentRecipeSupport.length("baseThickness", 12),
+				ComponentRecipeSupport.length("anchorCircleDiameter", 90), ComponentRecipeSupport.length("gussetHeight", 0), ComponentRecipeSupport.length("gussetThickness", 4),
+				ComponentRecipeSupport.count("gussetCount", 4), ComponentRecipeSupport.length("levelingFootDiameter", 0),
+				ComponentRecipeSupport.length("levelingFootHeight", 4), ComponentRecipeSupport.length("cablePathDiameter", 0)],
+			v -> new Pedestal(new RobotFlange(v.number("flangePitchCircle"), v.integer("flangeBoltCount")),
+				v.number("height"), v.number("columnDiameter"), v.integer("floorBoltCount"),
+				{baseThickness: v.number("baseThickness"), anchorCircleDiameter: v.number("anchorCircleDiameter"),
+				gussetHeight: v.number("gussetHeight"), gussetThickness: v.number("gussetThickness"),
+				gussetCount: v.integer("gussetCount"), levelingFootDiameter: v.number("levelingFootDiameter"),
+				levelingFootHeight: v.number("levelingFootHeight"), cablePathDiameter: v.number("cablePathDiameter")}));
+		return recipeTypeCache;
+	}
+
+	override public function componentType():Null<ComponentType> return recipeType();
+
+	override public function values():ComponentValues {
+		return new ComponentValues().setNumber("flangePitchCircle", this.flange.spec.pitchCircle)
+				.setInteger("flangeBoltCount", this.flange.boltCount)
+				.setNumber("height", this.height)
+				.setNumber("columnDiameter", this.columnDiameter)
+				.setInteger("floorBoltCount", this.floorBoltCount)
+				.setNumber("baseThickness", this.baseThickness)
+				.setNumber("anchorCircleDiameter", this.floorBoltCircleDiameter)
+				.setNumber("gussetHeight", this.gussetHeight)
+				.setNumber("gussetThickness", this.gussetThickness)
+				.setInteger("gussetCount", this.gussetCount)
+				.setNumber("levelingFootDiameter", this.levelingFootDiameter)
+				.setNumber("levelingFootHeight", this.levelingFootHeight)
+				.setNumber("cablePathDiameter", this.cablePathDiameter);
+	}
+
 }
