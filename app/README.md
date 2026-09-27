@@ -13,7 +13,8 @@ SceneKit. `src/Main.hx` composes:
 - a file-backed docking snapshot under `build/reference-editor-workspace.json`
   (override it with `REFERENCE_EDITOR_WORKSPACE`).
 
-The editor starts with two extruded SceneKit boxes in a perspective view.
+The editor starts with an empty scene in a perspective view. Use `--demo` to
+load the two starter boxes, the BIM example, and sample telemetry.
 Click an object in the viewport or hierarchy to select it; the yellow outline
 tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
 (`#RRGGBB`), or Visible in the inspector.
@@ -46,7 +47,7 @@ or the Scene root to clear object selection.
 - Perspective clicks use a camera ray against the boxes' 3D bounds. Left-dragging a
   selected box moves it on its current Z plane with snapping and one undo step.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
-- New (`Ctrl+N`) starts a fresh scene with the two starter objects.
+- New (`Ctrl+N`) starts a fresh scene; in demo mode it restores the starter objects.
 - Open (`Ctrl+O`), Save (`Ctrl+S`), and Save As (`Ctrl+Shift+S`) use native file
   dialogs. The toolbar shows the current filename and `*` for unsaved changes.
 - New, Open, and window close ask Save / Discard / Cancel when edits are unsaved.
@@ -54,15 +55,24 @@ or the Scene root to clear object selection.
 - Docking preferences remain separate and save automatically. The command
   palette also exposes Save workspace.
 
-`EditorScene` owns the editable records, SceneKit scene, published snapshot,
-spatial index, and UIKit `EditorDocument` history. `editor/SelectionModel` owns
+`EditorScene` provides the scene API and UIKit `EditorDocument` history.
+`editor/SceneModel` owns authored records and structural changes;
+`editor/SceneReconciler` stages atomic updates across those records, CAD sessions,
+and SceneKit nodes. `editor/ScenePresentation` owns SceneKit state, materials,
+face hover, and publication.
+`editor/ScenePropertyProvider` builds inspector descriptors, with kind-specific
+fields contributed by `editor/ObjectKindRegistry`. `editor/SelectionModel` owns
 object, feature, face, and edge selection with a separate revision.
 `editor/ObjectKindRegistry` supplies creation defaults, CAD sessions, kind-specific
 properties, menu entries, and hover support. `EditorSceneTree` caches child lists
 by content revision. Inspector bindings retain object identity so undo works
 after changing selection. `ProjectDocumentSession` owns the document path and
 atomic file publication; `SceneDocumentController` coordinates file commands
-and unsaved-change prompts. `EditorPerspectiveViewport` composites SceneKit's
+and unsaved-change prompts. Opening a script-owned or generated project file
+asks before running its registered code. Stale generated-project edits appear
+in the console with a discard command. Script override refreshes reconcile
+records into the retained scene, preserving viewport and panel state.
+`EditorPerspectiveViewport` composites SceneKit's
 renderer directly into the GPU surface and passes single-edit change sets to
 its incremental render path. `editor/TelemetryPanel` owns the retained plot.
 `editor/HierarchyPanel`, `editor/InspectorPanel`, and `editor/SensorPanel`

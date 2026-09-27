@@ -31,6 +31,9 @@ class McapRobotRecording implements RobotRecordingSink {
   public function recordFault(value:RobotFault):Void { staging.recordFault(value); flushLast(); }
   public function recordWorld(value:WorldSnapshot):Void { staging.recordWorld(value); flushLast(); }
   public function recordEvent(value:RobotWorldEvent):Void { staging.recordEvent(value); flushLast(); }
+  public function recordProcessEvent(robotId:RobotId, value:FiredProcessEvent):Void {
+    staging.recordProcessEvent(robotId, value); flushLast();
+  }
   public function attach(world:RobotWorld):RobotWorldSubscription return world.subscribe(recordEvent);
 
   public function status():McapRecordingStatus {
@@ -55,7 +58,7 @@ class McapRobotRecording implements RobotRecordingSink {
   function flushLast():Void {
     if (closed) throw "Recording is closed";
     var entry=staging.entries[staging.entries.length-1], bytes=RobotRecordingCodec.encode(entry);
-    var kind = switch entry.event {case Command(_):1;case RobotSnapshot(_):2;case Sensor(_,_):3;case Fault(_):4;case World(_):5;case WorldEvent(_):6;};
+    var kind = switch entry.event {case Command(_):1;case RobotSnapshot(_):2;case Sensor(_,_):3;case Fault(_):4;case World(_):5;case WorldEvent(_):6;case ProcessEvent(_):7;};
     check(RobotKitRuntime.rk_recording_writer_enqueue(owner.borrow(),kind,
       RobotRecordingEntry.VERSION,entry.ordinal,entry.recordingTimestampNs,bytes),
       "enqueue recording event");
@@ -66,6 +69,7 @@ class McapRobotRecording implements RobotRecordingSink {
     staging.snapshots.splice(0, staging.snapshots.length);
     staging.faults.splice(0, staging.faults.length);
     staging.worlds.splice(0, staging.worlds.length);
+    staging.processEvents.splice(0, staging.processEvents.length);
     staging.events.splice(0, staging.events.length);
     staging.entries.splice(0, staging.entries.length);
   }

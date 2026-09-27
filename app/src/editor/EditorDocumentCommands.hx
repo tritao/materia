@@ -27,5 +27,11 @@ class EditorDocumentCommands {
       new Shortcut(UiKey.S, UiModifier.Control), function() return !app.documents.blocked()));
     app.commands.register(new Command("editor.save-as", "Save As", function() app.documents.save(true),
       new Shortcut(UiKey.S, UiModifier.Control | UiModifier.Shift), function() return !app.documents.blocked()));
+    app.commands.register(new Command("editor.discard-stale-edits", "Discard stale edits", function() {
+      if (app.session.discardStaleEdits()) {
+        app.log("Discarded stale project edits");
+        app.commands.refresh();
+      }
+    }, null, function() return !app.documents.blocked() && app.session.staleEdits().length > 0));
   }
 }

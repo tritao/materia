@@ -8,4 +8,5 @@ enum RobotRecordingEvent {
   Fault(value:RobotFault);
   World(value:WorldSnapshot);
   WorldEvent(value:RobotWorldEvent);
+  ProcessEvent(value:FiredProcessEvent);
 }

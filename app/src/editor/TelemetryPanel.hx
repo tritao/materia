@@ -20,14 +20,16 @@ class TelemetryPanel {
   final model:PlotModel;
   final surface:Color;
   final textSecondary:Color;
+  final demo:Bool;
 
-  public function new(surface:Color, textSecondary:Color) {
+  public function new(surface:Color, textSecondary:Color, demo:Bool = false) {
+    this.demo = demo;
     this.surface = surface;
     this.textSecondary = textSecondary;
     model = new PlotModel();
     var frameTime = new PlotSeries("frame-time", "Frame time", Color.rgba(0.28, 0.75, 0.98, 1.0), 2.0);
     var gpuTime = new PlotSeries("gpu-time", "GPU submission", Color.rgba(0.78, 0.45, 0.98, 1.0), 2.0);
-    for (index in 0...64) {
+    if (demo) for (index in 0...64) {
       frameTime.add(new PlotPoint(index, 10.0 + Math.sin(index * 0.24) * 2.2));
       gpuTime.add(new PlotPoint(index, 4.0 + Math.cos(index * 0.19) * 1.2));
     }
@@ -47,7 +49,8 @@ class TelemetryPanel {
     return new Column("telemetry-panel", [
       new KeyedView("heading", new Text("TELEMETRY", null, textSecondary, TextStyleOverride.text(11.0, 0.8))),
       new KeyedView("plot", plot),
-      new KeyedView("caption", new Text("Frame time · GPU submission · layout cost")),
+      new KeyedView("caption", new Text(demo ? "Demo frame time · GPU submission" :
+        "Telemetry is available when a runtime is active")),
       new KeyedView("physics-revision", new Text(physicsStatus))
     ], style);
   }

@@ -54,10 +54,17 @@ class ProjectDocumentTests {
     check(session.scene.nudgeSelected(0.05, 0.0), "BIM ordering fixture scene edit applies");
     session.sensors.add("imu");
     check(session.scene.createMountingPlate(), "BIM ordering fixture CAD edit applies");
-    session.applyBimEdit("Add BIM project", function() { session.bim.createProject("Project"); });
+    var createdProject:Null<cadkit.parametric.Element> = null;
+    session.applyBimEdit("Add BIM project", function() {
+      if (createdProject == null) createdProject = session.bim.createProject("Project");
+      else session.bim.cad.restoreElementInsertion(cast createdProject, 0);
+    }, function() {
+      var project:cadkit.parametric.Element = cast createdProject;
+      session.bim.cad.removeElement(project.id);
+    });
     var bimProject = session.bim.cad.allElements()[0];
     var bimName = BimInspectorDescriptors.forElement(bimProject,
-      function(label, change) session.applyBimEdit(label, change))[2];
+      function(label, change, undo) session.applyBimEdit(label, change, undo))[2];
     bimName.write(new CommandContext(), PropertyValue.Text("Renamed Project"));
     check(session.document.history.undoCount == 5 && session.isDirty(),
       "BIM mutation joins scene, sensor and CAD edits in project history");

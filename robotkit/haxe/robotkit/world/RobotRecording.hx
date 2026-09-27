@@ -8,6 +8,7 @@ class RobotRecording implements RobotRecordingSink {
   public final snapshots:Array<RobotSnapshot> = [];
   public final faults:Array<RobotFault> = [];
   public final worlds:Array<WorldSnapshot> = [];
+  public final processEvents:Array<FiredProcessEvent> = [];
   public final events:Array<RobotRecordingEvent> = [];
   public final entries:Array<RobotRecordingEntry> = [];
   var nextOrdinal:Int64 = Int64.ofInt(0);
@@ -73,6 +74,13 @@ class RobotRecording implements RobotRecordingSink {
     append(RobotRecordingEvent.Sensor(robotId, copy.copy()), robotId);
   }
 
+  public function recordProcessEvent(robotId:RobotId, value:FiredProcessEvent):Void {
+    if (value == null) throw "Process record is required";
+    processEvents.push(value);
+    events.push(RobotRecordingEvent.ProcessEvent(value));
+    append(RobotRecordingEvent.ProcessEvent(value), robotId);
+  }
+
   /** Records one owner-thread world notification in arrival order. */
   public function recordEvent(event:RobotWorldEvent):Void switch event {
     case RobotAttached(id): pushWorldEvent(RobotAttached(id), id);
@@ -109,6 +117,7 @@ class RobotRecording implements RobotRecordingSink {
     switch event {
       case RobotSnapshot(value): sequence = value.sourceSequence; timestamp = value.sourceTimestampNs; clock = value.sourceClockId;
       case Sensor(_, value): sequence = value.sequence; timestamp = value.sourceTimestampNs; clock = value.sourceClockId;
+      case ProcessEvent(value): timestamp = value.appliedOwnerTimeNs; clock = "runtime-owner";
       case _: // Event-specific fields remain zero when the source contract has none.
     }
     entries.push(new RobotRecordingEntry(nextOrdinal, robotId, event, sequence, timestamp, clock));
@@ -125,6 +134,7 @@ class RobotRecording implements RobotRecordingSink {
       case RobotSnapshot(value): snapshots.push(copyRobotSnapshot(value));
       case Fault(value): faults.push(new RobotFault(value.id, value.code, value.message, value.fatal));
       case World(value): worlds.push(value);
+      case ProcessEvent(value): processEvents.push(value);
       case Sensor(_, _), WorldEvent(_):
     }
     if (Int64.compare(entry.ordinal, nextOrdinal) >= 0)

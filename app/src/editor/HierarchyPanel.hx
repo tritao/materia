@@ -22,7 +22,7 @@ class HierarchyPanel {
     addStyle.childGap = 5.0;
     var addButton = new Button("Add", addStyle, function() {
       app.hierarchyAddVisible = true;
-      app.commands.refresh();
+      app.invalidateView();
     }, "hierarchy-add");
     addButton.variant = ButtonVariant.Secondary;
     addButton.leadingIcon = IconName.Plus;
@@ -32,7 +32,7 @@ class HierarchyPanel {
       app.hierarchyAddX = Math.max(8.0, Math.min(app.viewportWidth - 228.0, bounds.x));
       app.hierarchyAddY = Math.max(8.0, Math.min(app.viewportHeight - 560.0, bounds.y + bounds.height));
       app.hierarchyAddVisible = true;
-      app.commands.refresh();
+      app.invalidateView();
     };
     var treeStyle = ReferenceEditorApp.fillStyle();
     treeStyle.padding = new Insets(10.0, 10.0, 10.0, 10.0);
@@ -43,7 +43,7 @@ class HierarchyPanel {
       app.treeModel, treeViewport, null, 420.0, app.scene.treeSelectionKey(), ["scene"], function(id) {
       app.scene.selectTreeKey(id);
       app.log("Selected " + id);
-      app.commands.refresh();
+      app.invalidateView();
     }, function(id) {
       app.scene.selectTreeKey(id);
       app.commands.execute("scene.frame-selected");
@@ -55,7 +55,7 @@ class HierarchyPanel {
       app.hierarchyMenuX = Math.max(8.0, Math.min(app.viewportWidth - 228.0, event.x));
       app.hierarchyMenuY = Math.max(8.0, Math.min(app.viewportHeight - 180.0, event.y));
       app.hierarchyMenuVisible = true;
-      app.commands.refresh();
+      app.invalidateView();
     };
     tree.onItemRename = app.startRename;
     return new Column(
@@ -70,7 +70,7 @@ class HierarchyPanel {
         new KeyedView("search", new SearchField("hierarchy-search", app.hierarchySearch, function(value) {
           app.hierarchySearch = value;
           app.treeModel.setFilter(value);
-          app.commands.refresh();
+          app.invalidateView();
         }, null, "Search objects...")),
         new KeyedView(
           "tree",

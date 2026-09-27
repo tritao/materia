@@ -41,7 +41,7 @@ class RuntimeRobotAdapter implements Robot {
       configuredSupportsTrajectoryQueue;
     this.supportsExecutionPlans = runtime.supportsExecutionPlans() &&
       configuredSupportsTrajectoryQueue;
-    robotDescription = new RobotDescription(id, name, links, joints);
+    robotDescription = new RobotDescription(id, name, links, joints, runtime.channels);
     robotCapabilities = new RobotCapabilities(
       id, joints == null ? 0 : joints.length, true, true, true, false,
       this.supportsTrajectoryQueue, this.supportsExecutionPlans);

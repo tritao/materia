@@ -3,6 +3,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
 
 namespace {
 
@@ -41,6 +42,19 @@ template <typename T> bool valid_sensors(const T &value) {
 
 extern "C" {
 
+static bool valid_event_id(const char *value, size_t capacity) {
+    return value[0] != '\0' && std::memchr(value, '\0', capacity) != nullptr;
+}
+
+static bool valid_event_value(const rk_event_value &value) {
+    if (value.kind == RK_EVENT_DIGITAL) return value.digital <= 1;
+    if (value.kind == RK_EVENT_ANALOG) return is_finite(value.analog);
+    if (value.kind == RK_EVENT_PROCESS)
+        return valid_event_id(value.command, RK_PROCESS_COMMAND_BYTES) &&
+            is_finite(value.argument);
+    return false;
+}
+
 rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blueprint *blueprint) {
     if (blueprint == nullptr ||
         blueprint->struct_size < offsetof(rk_robot_runtime_blueprint, calibration_revision) ||
@@ -66,6 +80,20 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             sizeof(blueprint->serial_processing_allowance_ns) &&
         blueprint->serial_processing_allowance_ns > static_cast<uint64_t>(INT64_MAX))
         return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size > offsetof(rk_robot_runtime_blueprint, channel_count) &&
+        blueprint->struct_size < sizeof(*blueprint)) return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >= sizeof(*blueprint)) {
+        if (blueprint->channel_count > RK_MAX_PROCESS_CHANNELS) return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t i = 0; i < blueprint->channel_count; ++i) {
+            const auto &channel = blueprint->channels[i];
+            if (!valid_event_id(channel.id, sizeof(channel.id)) ||
+                channel.kind != channel.safe_value.kind || !valid_event_value(channel.safe_value))
+                return RK_ERROR_INVALID_ARGUMENT;
+            for (uint32_t j = 0; j < i; ++j)
+                if (std::strcmp(channel.id, blueprint->channels[j].id) == 0)
+                    return RK_ERROR_INVALID_ARGUMENT;
+        }
+    }
     for (uint32_t i = 0; i < blueprint->link_count; ++i) {
         const auto &link = blueprint->links[i];
         if (!is_finite(link.mass) || link.mass <= 0.0) return RK_ERROR_INVALID_ARGUMENT;
@@ -197,10 +225,14 @@ rk_result RK_CALL rk_trajectory_segment_chunk_validate_for_blueprint(
 
 rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
     const rk_plan_submission *plan, const rk_robot_runtime_blueprint *blueprint) {
+    constexpr auto old_full_size = offsetof(rk_plan_submission, event_count) +
+        sizeof(uint32_t);
     if (!plan || plan->struct_size < offsetof(rk_plan_submission, position_tolerance) ||
         (plan->struct_size > offsetof(rk_plan_submission, position_tolerance) &&
          plan->struct_size < offsetof(rk_plan_submission, ends_at_rest)) ||
         (plan->struct_size > offsetof(rk_plan_submission, ends_at_rest) &&
+         plan->struct_size < old_full_size) ||
+        (plan->struct_size > old_full_size &&
          plan->struct_size < sizeof(*plan)) ||
         plan->sequence == 0 || plan->plan_id == 0 ||
         rk_trajectory_segment_chunk_validate_for_blueprint(&plan->segments, blueprint) != RK_OK ||
@@ -221,8 +253,28 @@ rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
                 plan->velocity_tolerance[joint] < 0.0 ||
                 plan->acceleration_tolerance[joint] < 0.0)
                 return RK_ERROR_INVALID_ARGUMENT;
-    if (plan->struct_size >= sizeof(*plan) && plan->ends_at_rest > 1)
+    if (plan->struct_size >= old_full_size && plan->ends_at_rest > 1)
         return RK_ERROR_INVALID_ARGUMENT;
+    if (plan->struct_size >= sizeof(*plan)) {
+        if (plan->event_count > RK_MAX_PLAN_EVENTS) return RK_ERROR_INVALID_ARGUMENT;
+        if (plan->event_count > 0 &&
+            (plan->required_capabilities & RK_PLAN_CAPABILITY_EVENTS) == 0)
+            return RK_ERROR_INVALID_ARGUMENT;
+        uint64_t previous = 0;
+        for (uint32_t i = 0; i < plan->event_count; ++i) {
+            const auto &event = plan->events[i];
+            if (!valid_event_id(event.channel, sizeof(event.channel)) ||
+                !valid_event_value(event.value) || event.hold_policy > RK_EVENT_RESTORE_ON_RESUME ||
+                (i != 0 && event.time_ns < previous)) return RK_ERROR_INVALID_ARGUMENT;
+            previous = event.time_ns;
+            bool declared = false;
+            if (blueprint->struct_size >= sizeof(*blueprint))
+                for (uint32_t j = 0; j < blueprint->channel_count; ++j)
+                    if (std::strcmp(event.channel, blueprint->channels[j].id) == 0 &&
+                        event.value.kind == blueprint->channels[j].kind) declared = true;
+            if (!declared) return RK_ERROR_INVALID_ARGUMENT;
+        }
+    }
     return RK_OK;
 }
 

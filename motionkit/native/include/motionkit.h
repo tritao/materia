@@ -37,7 +37,8 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 8, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 9, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+    MK_MAX_PLAN_EVENTS = 256, MK_EVENT_CHANNEL_BYTES = 48, MK_EVENT_COMMAND_BYTES = 48,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
 enum {
@@ -228,8 +229,27 @@ typedef struct mk_start_state {
     double acceleration_tolerance[MK_MAX_JOINTS];
 } mk_start_state;
 
-enum { MK_CAP_TIMED_TRAJECTORY = 1 };
+enum { MK_CAP_TIMED_TRAJECTORY = 1, MK_CAP_EVENTS = 2 };
 enum { MK_AUTHORITY_MATERIA = 1, MK_AUTHORITY_BACKEND = 2 };
+
+typedef uint32_t mk_event_kind;
+enum { MK_EVENT_DIGITAL = 1, MK_EVENT_ANALOG = 2, MK_EVENT_PROCESS = 3 };
+typedef uint32_t mk_event_hold_policy;
+enum { MK_EVENT_KEEP = 0, MK_EVENT_SAFE_WHILE_HELD = 1,
+    MK_EVENT_RESTORE_ON_RESUME = 2 };
+typedef struct mk_event_value {
+    mk_event_kind kind;
+    uint32_t digital;
+    double analog;
+    char command[MK_EVENT_COMMAND_BYTES];
+    double argument;
+} mk_event_value;
+typedef struct mk_timed_event {
+    uint64_t time_ns;
+    char channel[MK_EVENT_CHANNEL_BYTES];
+    mk_event_value value;
+    mk_event_hold_policy hold_policy;
+} mk_timed_event;
 
 typedef struct mk_plan_spec {
     uint32_t struct_size MK_STRUCT_SIZE;
@@ -239,6 +259,8 @@ typedef struct mk_plan_spec {
     uint64_t required_capabilities;
     uint32_t planning_authority;
     mk_start_state start_state;
+    uint32_t event_count; /**< Versioned: zero when absent. */
+    mk_timed_event events[MK_MAX_PLAN_EVENTS];
 } mk_plan_spec;
 
 typedef struct mk_plan_info {
@@ -251,6 +273,7 @@ typedef struct mk_plan_info {
     uint64_t required_capabilities;
     uint32_t planning_authority;
     int64_t duration_ns;
+    uint32_t event_count;
 } mk_plan_info;
 
 MK_API mk_result MK_CALL mk_trajectory_create(uint32_t joint_count,
@@ -317,6 +340,8 @@ MK_API mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory,
     mk_plan_handle *out_plan MK_OUT MK_OWNED, mk_validation_report *out_report);
 MK_API void MK_CALL mk_plan_destroy(mk_plan_handle plan);
 MK_API mk_result MK_CALL mk_plan_get_info(mk_plan_handle plan, mk_plan_info *out_info);
+MK_API mk_result MK_CALL mk_plan_get_event(mk_plan_handle plan, uint32_t index,
+    mk_timed_event *out_event);
 MK_API mk_result MK_CALL mk_plan_get_start_state(mk_plan_handle plan,
     mk_start_state *out_start_state);
 MK_API mk_result MK_CALL mk_plan_get_report(mk_plan_handle plan,

@@ -1,5 +1,8 @@
 # RobotKit device protocol (RKD5)
 
+The scheduled successor is [RKD6](DEVICE_PROTOCOL6.md); RKD5 remains the
+per-cycle target-streaming protocol.
+
 This is the UART byte-stream protocol between a Linux host and a device MCU.
 The fixed payload records come from `robotkit/schema/device_wire.wire.idl`.
 The hardware-independent Rust `robotkit-device-protocol` crate implements the

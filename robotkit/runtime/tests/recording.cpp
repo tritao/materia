@@ -7,14 +7,14 @@
 int main(){
   const std::string path="robotkit-recording-test.mcap"; rk_recording_writer_handle w{};
   assert(rk_recording_writer_create(path.c_str(),1024,&w)==RK_OK);
-  const char data[]="{\"version\":4,\"ordinal\":\"18446744073709551614\",\"type\":\"sensor\"}";
-  assert(rk_recording_writer_enqueue(w,RK_RECORDING_SENSOR,4,UINT64_MAX-1,123456789,
+  const char data[]="{\"version\":5,\"ordinal\":\"18446744073709551614\",\"type\":\"processEvent\"}";
+  assert(rk_recording_writer_enqueue(w,RK_RECORDING_PROCESS_EVENT,5,UINT64_MAX-1,123456789,
     reinterpret_cast<const uint8_t*>(data),sizeof(data)-1)==RK_OK);
   assert(rk_recording_writer_finish(w)==RK_OK); rk_recording_writer_destroy(w);
   rk_recording_reader_handle r{}; assert(rk_recording_reader_open(path.c_str(),&r)==RK_OK);
   rk_recording_message m{};m.struct_size=sizeof(m);uint8_t output[256];uint32_t size=sizeof(output);
   assert(rk_recording_reader_next(r,&m,output,&size)==RK_OK);assert(m.ordinal==UINT64_MAX-1);
-  assert(m.recording_timestamp_ns==123456789);assert(m.kind==RK_RECORDING_SENSOR);
+  assert(m.recording_timestamp_ns==123456789);assert(m.kind==RK_RECORDING_PROCESS_EVENT);
   assert(size==sizeof(data)-1);assert(std::memcmp(output,data,size)==0);
   assert(rk_recording_reader_next(r,&m,output,&size)==RK_ERROR_STALE_STATE);rk_recording_reader_destroy(r);std::remove(path.c_str());
   const std::string truncated="robotkit-recording-truncated.mcap";

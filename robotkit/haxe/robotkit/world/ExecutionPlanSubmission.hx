@@ -1,6 +1,7 @@
 package robotkit.world;
 
 import haxe.Int64;
+import RobotKitRuntime;
 
 /** Immutable plan metadata and bounded polynomial payload for a runtime session. */
 class ExecutionPlanSubmission {
@@ -16,6 +17,7 @@ class ExecutionPlanSubmission {
   public final accelerationTolerances:ImmutableFloatArray;
   public final endsAtRest:Bool;
   public final segments:Array<TrajectorySegment>;
+  public final events:Array<ProcessTimedEvent>;
   public final replaceAfterPlanId:Int64;
   public final replaceAfterTimeNs:Int64;
 
@@ -24,7 +26,8 @@ class ExecutionPlanSubmission {
       startAcceleration:Array<Float>, segments:Array<TrajectorySegment>,
       ?replaceAfterPlanId:Int64, ?replaceAfterTimeNs:Int64,
       ?positionTolerances:Array<Float>, ?velocityTolerances:Array<Float>,
-      ?accelerationTolerances:Array<Float>, ?endsAtRest:Bool = true) {
+      ?accelerationTolerances:Array<Float>, ?endsAtRest:Bool = true,
+      ?events:Array<ProcessTimedEvent>) {
     if (planId == null || Int64.compare(planId, Int64.ofInt(0)) <= 0 ||
         startPosition == null || startVelocity == null || startAcceleration == null ||
         segments == null || segments.length == 0 ||
@@ -35,7 +38,17 @@ class ExecutionPlanSubmission {
     this.planId = planId;
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
-    this.requiredCapabilities = requiredCapabilities;
+    this.events = events == null ? [] : events.copy();
+    if (this.events.length > RobotKitRuntimeConstants.RK_MAX_PLAN_EVENTS)
+      throw "Too many process events in plan";
+    var previous = Int64.ofInt(0);
+    for (event in this.events) {
+      if (event == null || Int64.compare(event.timeNs, previous) < 0)
+        throw "Plan events must be sorted by path time";
+      previous = event.timeNs;
+    }
+    this.requiredCapabilities = requiredCapabilities |
+      (this.events.length > 0 ? RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_EVENTS : 0);
     this.startPosition = new ImmutableFloatArray(startPosition);
     this.startVelocity = new ImmutableFloatArray(startVelocity);
     this.startAcceleration = new ImmutableFloatArray(startAcceleration);
@@ -64,5 +77,5 @@ class ExecutionPlanSubmission {
       requiredCapabilities, startPosition.toArray(), startVelocity.toArray(),
       startAcceleration.toArray(), segments, replaceAfterPlanId, replaceAfterTimeNs,
       positionTolerances.toArray(), velocityTolerances.toArray(),
-      accelerationTolerances.toArray(), endsAtRest);
+      accelerationTolerances.toArray(), endsAtRest, events);
 }

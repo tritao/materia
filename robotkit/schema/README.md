@@ -1,5 +1,9 @@
 # RobotKit device payload schema (RKD5)
 
+`device_wire6.wire.idl` and `../wire6.json` define the separate RKD6
+scheduled-device records and generate C++ and Rust codecs. The frame and
+timing rules are in [the RKD6 protocol](../runtime/DEVICE_PROTOCOL6.md).
+
 `device_wire.wire.idl` defines fixed binary payload records only. The generated
 C++ and Rust codecs have no MessagePack or transport dependency. `wire.json`
 selects the packed backends; the lock records published field order and sizes.

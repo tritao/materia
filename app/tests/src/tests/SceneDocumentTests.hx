@@ -5,15 +5,21 @@ import app.SceneCodec;
 import app.SceneDocumentSession;
 import app.SceneDocumentController;
 import app.SceneFileDialogs;
-import app.EditorSceneViewport;
+import app.PerspectiveCamera;
+import app.PerspectiveSceneDrag;
 import nativekit.ui.properties.PropertyBinding;
+import nativekit.ui.properties.PropertyDescriptor;
 import nativekit.ui.properties.PropertyValue;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.Json;
-import nativekit.ui.core.ViewportCamera;
 
 class SceneDocumentTests {
+  static function property(properties:Array<PropertyDescriptor>, key:String):PropertyDescriptor {
+    for (candidate in properties)
+      if (StringTools.endsWith(candidate.id, ":" + key)) return candidate;
+    throw "Missing property: " + key;
+  }
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
   }
@@ -26,7 +32,7 @@ class SceneDocumentTests {
   }
   static function edit(session:SceneDocumentSession, value:Float):Void {
     session.scene.select("box");
-    new PropertyBinding(session.scene.properties()[0], session.scene.context()).apply(PropertyValue.Float(value));
+    new PropertyBinding(property(session.scene.properties(), "position-0"), session.scene.context()).apply(PropertyValue.Float(value));
   }
 
   public static function run():Void {
@@ -35,6 +41,7 @@ class SceneDocumentTests {
     var first = directory + "/scene.materia.json";
     var second = directory + "/copy.materia.json";
     var bad = directory + "/invalid.materia.json";
+    var codeOwned = directory + "/code-owned.materia.json";
     var session = new SceneDocumentSession();
     try {
       edit(session, 1.25);
@@ -61,7 +68,7 @@ class SceneDocumentTests {
       check(session.path != originalPath && !session.scene.document.isDirty, "Save As adopts new path");
 
       session.scene.select("tower");
-      new PropertyBinding(session.scene.properties()[2], session.scene.context()).apply(PropertyValue.Bool(false));
+      new PropertyBinding(property(session.scene.properties(), "visible"), session.scene.context()).apply(PropertyValue.Bool(false));
       session.save(second);
       var encoded = SceneCodec.encode(session.scene, session.sensors);
       var oldRevision = session.scene.revision;
@@ -145,29 +152,46 @@ class SceneDocumentTests {
       controller.resolve("discard");
       near(session.scene.info("box").localTransform().element(12), 1.25, "Open loads chosen scene");
       check(!controller.blocked() && !session.scene.document.isDirty, "Open resets workflow and dirty state");
+      File.saveContent(codeOwned, '{"project":{"version":1,"reference":"missing-project.py",' +
+        '"overrides":[],"removed":[],"instances":[]}}');
+      chosen = codeOwned;
+      var beforeTrust = session.scene;
+      controller.requestOpen();
+      check(controller.needsTrustConfirmation() && controller.trustReference == "missing-project.py" &&
+        session.scene == beforeTrust, "project code is not run before trust confirmation");
+      controller.resolveTrust(false);
+      check(!controller.blocked() && session.scene == beforeTrust,
+        "cancelling project code leaves the document open");
+      controller.requestOpen();
+      controller.resolveTrust(true);
+      check(controller.error != null && session.scene == beforeTrust,
+        "trust confirmation reaches project loading without replacing on failure");
+      controller.dismissError();
+      chosen = first;
 
       edit(session, -2.0);
       session.save(first);
       var historyBeforeDrag = session.scene.document.history.undoCount;
-      var viewport = new EditorSceneViewport(session.scene);
-      var camera = new ViewportCamera(1.8, 25, -15);
+      var camera = new PerspectiveCamera();
+      camera.frame(-2.0, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
+      var drag:Null<PerspectiveSceneDrag> = null;
       var commitCount = 0;
       var cancelCount = 0;
       var boundaryController = new SceneDocumentController(session,
         function(_, _, done) done(null, null), function() {}, function() {
-          if (viewport.commitDrag()) commitCount++;
+          if (drag != null && drag.commit()) commitCount++;
+          drag = null;
         }, function() {
-          if (viewport.cancelDrag()) cancelCount++;
+          if (drag != null && drag.cancel()) cancelCount++;
+          drag = null;
         });
-      var start = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 2.0 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y);
-      var finish = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 1.0 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 0.5 * EditorSceneViewport.SCALE);
-      check(viewport.beginDrag(camera, start.x, start.y, false), "document-boundary drag begins");
-      viewport.updateDrag(camera, finish.x, finish.y);
+      drag = PerspectiveSceneDrag.begin(session.scene, camera, "box", 400, 300, 800, 600, false, 0.2);
+      check(drag != null, "document-boundary perspective drag begins");
+      check(drag.update(camera, 500, 300, 800, 600), "document-boundary drag previews movement");
+      var movedX = session.scene.info("box").localTransform().element(12);
       check(!session.scene.document.isDirty, "active drag preview remains outside saved history");
       boundaryController.save();
-      check(commitCount == 1 && !viewport.dragging(), "Save commits the active drag");
+      check(commitCount == 1 && drag == null, "Save commits the active drag");
       check(!session.scene.document.isDirty &&
         session.scene.document.history.undoCount == historyBeforeDrag + 1,
         "Save establishes a savepoint after the committed move");
@@ -176,33 +200,32 @@ class SceneDocumentTests {
         "undo after Save restores the pre-drag position");
       check(session.scene.document.isDirty, "undo before the drag savepoint is dirty");
       session.scene.document.redo();
-      near(session.scene.info("box").localTransform().element(12), -1.0,
+      near(session.scene.info("box").localTransform().element(12), movedX,
         "redo after Save restores the persisted drag");
       check(!session.scene.document.isDirty, "redo returns to the drag savepoint");
 
       edit(session, -2.5);
-      var dirtyStart = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 2.5 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 0.5 * EditorSceneViewport.SCALE);
-      var dirtyFinish = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 1.5 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 1.0 * EditorSceneViewport.SCALE);
-      viewport.beginDrag(camera, dirtyStart.x, dirtyStart.y, false);
-      viewport.updateDrag(camera, dirtyFinish.x, dirtyFinish.y);
+      camera.frame(-2.5, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
+      function beginDirtyDrag():Void {
+        drag = PerspectiveSceneDrag.begin(session.scene, camera, "box", 400, 300, 800, 600, false, 0.2);
+        check(drag != null && drag.update(camera, 500, 300, 800, 600),
+          "dirty perspective drag previews movement");
+      }
+      beginDirtyDrag();
       boundaryController.requestNew();
-      check(cancelCount == 1 && !viewport.dragging() && boundaryController.needsConfirmation(),
+      check(cancelCount == 1 && drag == null && boundaryController.needsConfirmation(),
         "New cancels drag before starting the unsaved-change flow");
       near(session.scene.info("box").localTransform().element(12), -2.5,
         "New interruption restores the pre-drag position");
       boundaryController.resolve("cancel");
 
-      viewport.beginDrag(camera, dirtyStart.x, dirtyStart.y, false);
-      viewport.updateDrag(camera, dirtyFinish.x, dirtyFinish.y);
+      beginDirtyDrag();
       boundaryController.requestOpen();
       check(cancelCount == 2 && boundaryController.needsConfirmation(),
         "Open cancels drag before starting the unsaved-change flow");
       boundaryController.resolve("cancel");
       var boundaryClosed = false;
-      viewport.beginDrag(camera, dirtyStart.x, dirtyStart.y, false);
-      viewport.updateDrag(camera, dirtyFinish.x, dirtyFinish.y);
+      beginDirtyDrag();
       boundaryController.requestClose(function() boundaryClosed = true);
       check(cancelCount == 3 && boundaryController.needsConfirmation() && !boundaryClosed,
         "Close cancels drag before starting the unsaved-change flow");
@@ -217,6 +240,7 @@ class SceneDocumentTests {
       FileSystem.deleteFile(first);
       FileSystem.deleteFile(second);
       FileSystem.deleteFile(bad);
+      FileSystem.deleteFile(codeOwned);
       FileSystem.deleteDirectory(directory);
       Sys.println("Scene document tests passed");
     } catch (error:Dynamic) {

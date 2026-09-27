@@ -104,6 +104,7 @@ class RobotHost {
     if (deployment != null) {
       blueprint.ownerPeriodNs = deployment.ownerPeriodNs;
       blueprint.serialProcessingAllowanceNs = deployment.processingAllowanceNs;
+      for (channel in deployment.channels) blueprint.channels.push(channel);
     }
     if (args.indexOf("--server") >= 0) {
       var serverSimulation:Null<Simulation> = null;

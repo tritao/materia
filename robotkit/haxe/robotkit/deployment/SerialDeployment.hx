@@ -6,6 +6,8 @@ import robotkit.device.DeviceLayout;
 import robotkit.device.DeviceFingerprint;
 import robotkit.model.RobotModel;
 import robotkit.model.RobotModelCodec;
+import robotkit.world.ProcessChannelDeclaration;
+import robotkit.world.ProcessEventValue;
 
 /** A canonical semantic robot model plus its physical device configuration. */
 class SerialDeployment {
@@ -16,6 +18,7 @@ class SerialDeployment {
   public final targetError:Float;
   public final ownerPeriodNs:haxe.Int64;
   public final processingAllowanceNs:haxe.Int64;
+  public final channels:Array<ProcessChannelDeclaration>;
 
   public function new(path:String) {
     var directory = Path.directory(path);
@@ -24,6 +27,40 @@ class SerialDeployment {
     if (version != 2) throw "robotd: unsupported deployment schema version";
     var modelPath = Path.join([directory, requiredString(config, "model")]);
     robot = RobotModelCodec.decode(sys.io.File.getBytes(modelPath));
+    channels = [];
+    var declared:Dynamic = Reflect.field(config, "channels");
+    if (declared != null) {
+      if (!Std.isOfType(declared, Array))
+        throw "robotd: deployment channels must be an array";
+      var channelRows:Array<Dynamic> = cast declared;
+      for (entry in channelRows) {
+        if (entry == null) throw "robotd: deployment channel cannot be null";
+        var id = requiredString(entry, "id");
+        for (existing in channels)
+          if (existing.id == id) throw 'robotd: duplicate channel $id';
+        var safe:Dynamic = Reflect.field(entry, "safeValue");
+        if (safe == null) throw 'robotd: channel $id needs a safe value';
+        var kind = requiredString(safe, "kind");
+        var value:ProcessEventValue = switch kind {
+          case "digital":
+            var digital:Dynamic = Reflect.field(safe, "digital");
+            if (!Std.isOfType(digital, Bool)) throw 'robotd: channel $id safe digital must be a bool';
+            ProcessEventValue.Digital(digital);
+          case "analog":
+            var analog:Dynamic = Reflect.field(safe, "analog");
+            if (!Std.isOfType(analog, Int) && !Std.isOfType(analog, Float))
+              throw 'robotd: channel $id safe analog must be a number';
+            ProcessEventValue.Analog(analog);
+          case "process":
+            var argument:Dynamic = Reflect.field(safe, "argument");
+            if (!Std.isOfType(argument, Int) && !Std.isOfType(argument, Float))
+              throw 'robotd: channel $id safe process argument must be a number';
+            ProcessEventValue.Process(requiredString(safe, "command"), argument);
+          default: throw 'robotd: unsupported channel kind $kind';
+        };
+        channels.push(new ProcessChannelDeclaration(id, value));
+      }
+    }
     var device:Dynamic = Reflect.field(config, "device");
     if (device == null) throw "robotd: deployment requires device";
     serialPath = requiredString(device, "path");

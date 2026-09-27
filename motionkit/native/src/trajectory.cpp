@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -46,13 +48,38 @@ bool valid_sample(const mk_sample &sample, uint32_t joint_count) {
 
 bool valid_plan_spec(const mk_plan_spec &spec, const mk_limits &limits,
                      uint32_t joint_count) {
-    if (spec.struct_size < sizeof(mk_plan_spec) ||
+    if (spec.struct_size < offsetof(mk_plan_spec, event_count) ||
+        (spec.struct_size > offsetof(mk_plan_spec, event_count) &&
+         spec.struct_size < sizeof(mk_plan_spec)) ||
         spec.start_state.struct_size < sizeof(mk_start_state) ||
         spec.start_state.joint_count != joint_count || spec.plan_id == 0 ||
         spec.model_revision != limits.model_revision ||
         spec.calibration_revision != limits.calibration_revision ||
-        (spec.required_capabilities & ~static_cast<uint64_t>(MK_CAP_TIMED_TRAJECTORY)) != 0)
+        (spec.required_capabilities & ~static_cast<uint64_t>(
+            MK_CAP_TIMED_TRAJECTORY | MK_CAP_EVENTS)) != 0)
         return false;
+    if (spec.struct_size >= sizeof(mk_plan_spec)) {
+        if (spec.event_count > MK_MAX_PLAN_EVENTS ||
+            (spec.event_count != 0 && (spec.required_capabilities & MK_CAP_EVENTS) == 0))
+            return false;
+        uint64_t previous = 0;
+        for (uint32_t i = 0; i < spec.event_count; ++i) {
+            const auto &event = spec.events[i];
+            if (event.channel[0] == '\0' ||
+                std::memchr(event.channel, '\0', sizeof(event.channel)) == nullptr ||
+                event.hold_policy > MK_EVENT_RESTORE_ON_RESUME ||
+                (i != 0 && event.time_ns < previous)) return false;
+            const auto &value = event.value;
+            if (value.kind == MK_EVENT_DIGITAL && value.digital > 1) return false;
+            if (value.kind == MK_EVENT_ANALOG && !std::isfinite(value.analog)) return false;
+            if (value.kind == MK_EVENT_PROCESS &&
+                (value.command[0] == '\0' ||
+                 std::memchr(value.command, '\0', sizeof(value.command)) == nullptr ||
+                 !std::isfinite(value.argument))) return false;
+            if (value.kind < MK_EVENT_DIGITAL || value.kind > MK_EVENT_PROCESS) return false;
+            previous = event.time_ns;
+        }
+    }
     const auto &start = spec.start_state;
     for (uint32_t joint = 0; joint < joint_count; ++joint) {
         if (!std::isfinite(start.position[joint]) ||
@@ -362,6 +389,11 @@ mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory, const mk_plan_
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         if (!valid_plan_spec(*spec, *limits, value->joint_count()))
             return MK_ERROR_INVALID_ARGUMENT;
+        const auto event_count = spec->struct_size >= sizeof(mk_plan_spec) ?
+            spec->event_count : 0u;
+        for (uint32_t index = 0; index < event_count; ++index)
+            if (spec->events[index].time_ns > static_cast<uint64_t>(value->duration_ns()))
+                return MK_ERROR_INVALID_ARGUMENT;
         if (spec->planning_authority != MK_AUTHORITY_MATERIA)
             return spec->planning_authority == MK_AUTHORITY_BACKEND ?
                 MK_ERROR_UNSUPPORTED : MK_ERROR_INVALID_ARGUMENT;
@@ -370,7 +402,10 @@ mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory, const mk_plan_
         for (const auto &check : out_report->checks)
             if (check.status == MK_CHECK_FAILED) return MK_ERROR_LIMIT;
         if (plans.size() >= UINT32_MAX - 1) return MK_ERROR_OUT_OF_MEMORY;
-        auto plan = std::make_unique<Plan>(Plan{*value, *spec, *out_report});
+        mk_plan_spec normalized{};
+        std::memcpy(&normalized, spec, std::min<size_t>(spec->struct_size, sizeof(normalized)));
+        normalized.struct_size = sizeof(normalized);
+        auto plan = std::make_unique<Plan>(Plan{*value, normalized, *out_report});
         while (next_plan_id == 0 || plans.count(next_plan_id) != 0) ++next_plan_id;
         const uint32_t id = next_plan_id++;
         plans.emplace(id, std::move(plan));
@@ -392,7 +427,7 @@ void MK_CALL mk_plan_destroy(mk_plan_handle plan) {
 }
 
 mk_result MK_CALL mk_plan_get_info(mk_plan_handle plan, mk_plan_info *out_info) {
-    if (out_info == nullptr || out_info->struct_size < sizeof(mk_plan_info))
+    if (out_info == nullptr || out_info->struct_size < offsetof(mk_plan_info, event_count))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
         std::lock_guard lock(registry_mutex);
@@ -408,7 +443,23 @@ mk_result MK_CALL mk_plan_get_info(mk_plan_handle plan, mk_plan_info *out_info) 
         info.required_capabilities = value->spec.required_capabilities;
         info.planning_authority = value->spec.planning_authority;
         info.duration_ns = value->trajectory.duration_ns();
-        *out_info = info;
+        info.event_count = value->spec.event_count;
+        std::memcpy(out_info, &info, std::min<size_t>(out_info->struct_size, sizeof(info)));
+        return MK_OK;
+    } catch (...) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+mk_result MK_CALL mk_plan_get_event(mk_plan_handle plan, uint32_t index,
+    mk_timed_event *out_event) {
+    if (out_event == nullptr) return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::lock_guard lock(registry_mutex);
+        const auto *value = get(plan);
+        if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
+        if (index >= value->spec.event_count) return MK_ERROR_INVALID_ARGUMENT;
+        *out_event = value->spec.events[index];
         return MK_OK;
     } catch (...) {
         return MK_ERROR_INVALID_ARGUMENT;

@@ -242,9 +242,12 @@ class HeadlessEditorProfile {
     var relationships = editor.bimModel.allRelationships();
     if (relationships.length > 0) {
       var opening = relationships[0];
-      for (cycle in 0...cycles) editor.session.applyBimEdit("Profile opening move", function() {
-        editor.bimModel.moveOpening(opening.openingId, 800 + cycle * 2, 900);
-      });
+      for (cycle in 0...cycles) {
+        var previousAlong = opening.along, previousSill = opening.sill;
+        editor.session.applyBimEdit("Profile opening move", function() {
+          editor.bimModel.moveOpening(opening.openingId, 800 + cycle * 2, 900);
+        }, function() editor.bimModel.moveOpening(opening.openingId, previousAlong, previousSill));
+      }
     }
     action(actions, "bim-opening-edits", 0);
     submit(editor, frame, frames, "architecture:bim-opening-edits", 0);

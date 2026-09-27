@@ -4,7 +4,8 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/runtime_c_api.cpp
     src/recording.cpp
     src/device_host.cpp
-    src/device_serial_endpoint.cpp)
+    src/device_serial_endpoint.cpp
+    src/clock_estimator6.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
@@ -33,6 +34,11 @@ if(RK_BUILD_TESTS)
         set_tests_properties(robotkit_device_wire_codegen PROPERTIES
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
             LABELS "robot;wire;codegen" TIMEOUT 30)
+        add_test(NAME robotkit_device_wire6_codegen
+            COMMAND ${Python3_EXECUTABLE} -B -m tools.wire check --config robotkit/wire6.json)
+        set_tests_properties(robotkit_device_wire6_codegen PROPERTIES
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../..
+            LABELS "robot;wire;codegen" TIMEOUT 30)
     endif()
     find_program(RK_CARGO_EXECUTABLE cargo)
     if(RK_CARGO_EXECUTABLE)
@@ -50,6 +56,26 @@ if(RK_BUILD_TESTS)
     add_test(NAME robotkit_device_wire COMMAND robotkit_device_wire_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/../schema/device_wire_vectors.tsv)
     set_tests_properties(robotkit_device_wire PROPERTIES LABELS "robot;wire;codegen" TIMEOUT 30)
+
+    add_executable(robotkit_device_wire6_tests tests/device_wire6.cpp)
+    target_compile_features(robotkit_device_wire6_tests PRIVATE cxx_std_20)
+    target_include_directories(robotkit_device_wire6_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/generated)
+    add_test(NAME robotkit_device_wire6 COMMAND robotkit_device_wire6_tests
+        ${CMAKE_CURRENT_SOURCE_DIR}/../schema/device_frame6_vectors.tsv)
+    set_tests_properties(robotkit_device_wire6 PROPERTIES LABELS "robot;wire;codegen" TIMEOUT 30)
+
+    add_executable(robotkit_clock_estimator6_tests tests/clock_estimator6.cpp src/clock_estimator6.cpp)
+    target_compile_features(robotkit_clock_estimator6_tests PRIVATE cxx_std_20)
+    target_include_directories(robotkit_clock_estimator6_tests PRIVATE src)
+    add_test(NAME robotkit_clock_estimator6 COMMAND robotkit_clock_estimator6_tests)
+    set_tests_properties(robotkit_clock_estimator6 PROPERTIES LABELS "robot;runtime;clock" TIMEOUT 30)
+
+    add_executable(robotkit_segment_vectors_tests tests/segment_vectors.cpp)
+    target_compile_features(robotkit_segment_vectors_tests PRIVATE cxx_std_20)
+    target_link_libraries(robotkit_segment_vectors_tests PRIVATE motionkit_core)
+    add_test(NAME robotkit_segment_vectors COMMAND robotkit_segment_vectors_tests
+        ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/tests/segment_vectors.tsv)
+    set_tests_properties(robotkit_segment_vectors PROPERTIES LABELS "robot;wire;motion" TIMEOUT 30)
 
     add_executable(robotkit_device_protocol_tests tests/device_protocol.cpp)
     target_compile_features(robotkit_device_protocol_tests PRIVATE cxx_std_20)

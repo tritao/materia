@@ -33,8 +33,9 @@ whenever this plan turns out to be wrong.
 
 - **LA-D1 — The device interpolates, the host doesn't stream.** The device
   receives polynomial segments with commit and replace rules, and evaluates
-  them on its own clock. Host-side per-cycle target streaming (P9c) remains
-  for RKD5 devices only.
+  them on its own clock. Host-side per-cycle setpoint streaming (P9c)
+  remains, but only for *cyclic-control* endpoints (simulation today,
+  EtherCAT-style drives later). It is not a device wire protocol.
 - **LA-D2 — Step generation runs on the device, on a fixed timer tick.**
   - A fixed-rate step tick (default 40 kHz, configurable per board) evaluates
     the segment position, in `f32` with segment-local τ.
@@ -48,11 +49,14 @@ whenever this plan turns out to be wrong.
   C5, the device core plus the virtual board layer runs inside the host
   process under the SimKit clock, through a simulated link, and is fully
   deterministic. The PTY binaries remain for cross-process wire tests.
-- **LA-D4 — RKD6 is a new protocol version, not an edit to RKD5.**
+- **LA-D4 — RKD6 is a new protocol version and becomes the only one.**
   - Sync marker `RKD6`. The device protocol version is negotiated in session
     begin.
-  - RKD5 support stays in the host, because RKD5 devices are still valid
-    (the P9c streaming path).
+  - RKD5 keeps working only until RKD6 is proven end to end (A5–A6). No
+    deployed RKD5 devices exist, only test harnesses and the nucleo stub, so
+    A9 then retires RKD5 completely.
+  - Simple devices use RKD6's minimal profile (A9) instead of a second
+    protocol.
   - The device wire schema lives in `robotkit/schema/` next to
     `device_wire.wire.idl`, generated the same way.
 
@@ -197,7 +201,8 @@ Do:
   - The runtime must not also sample and stream targets for this endpoint.
     Add an endpoint capability "device executes queue" and branch on it in
     the owner loop.
-- **Deployment:** `deployment.json` v3 adds `protocol: "rkd5" | "rkd6"`,
+- **Deployment:** `deployment.json` v3 adds `protocol: "rkd5" | "rkd6"`
+  (A9 later removes `"rkd5"`),
   step tick rate, link-loss timeout and the clock-sync bound. The v2 reader
   is kept.
 - **Serial qualification:** extend the P9c check for RKD6. The link must
@@ -245,6 +250,21 @@ Tests:
     observed in the snapshot;
   - clock drift of 2000 ppm: stays in sync.
 
+**Plan C interaction (editor assembly simulation).** A separate plan
+(Plan C, run from another session) simulates MachineKit assemblies in the
+editor through `AssemblySimulationBridge`. It uses one link per part, and
+joint → joint couplings such as lead screw → carriage live in the
+`RobotModel` as `JointCoupling` (model schema v5). Once that is on `main`:
+- add an A6 test that runs the virtual-device loop on the bridge's physical
+  assembly model as well as on the `MachineKitRobotCompiler` model;
+- the leader joint is driven through the actuator transmission, and the
+  coupled follower joint must track `offset + ratio × leader` within
+  tolerance.
+
+Until then, the compiler model is enough. Don't build a parallel coupling
+mechanism here: couplings belong to the model, and A7's joint → actuator
+conversion stage is where the runtime applies them.
+
 ## A7 — Step generation (LA-D2) and transmissions end to end
 
 Do:
@@ -264,6 +284,15 @@ Do:
     `dual_drive_skew` fault.
   - Update `robotkit/ARCHITECTURE.md`'s P11 design section from "design" to
     "implemented".
+  - **Couplings:** if Plan C's `JointCoupling` (model v5) is on `main` when
+    this item runs, apply couplings at this same conversion stage:
+    - follower joint targets are derived from their leader;
+    - a plan whose follower trajectory violates a coupling is rejected at
+      submit.
+
+    If it isn't on `main` yet, leave a clearly marked extension point and
+    note it in the log. Transmissions (actuator ↔ joint) and couplings
+    (joint ↔ joint) stay distinct concepts.
 
 Tests:
 - For a lead-screw axis at 200 steps/rev × 16 microsteps with an 8 mm lead,
@@ -290,6 +319,66 @@ Tests:
   within one step tick, with and without a HOLD in between;
 - STOP sets the channel to its safe value;
 - a replacement discards later events.
+
+## A9 — Retire RKD5; minimal RKD6 device profile (after A5 and A6 are green)
+
+Problem: two device protocols means two host code paths, two qualification
+rules, two fingerprint schemes and two test suites. Nothing deployed uses
+RKD5: only the PTY harnesses and the nucleo stub, which drives no pins. This
+is the cheapest point to remove it, before any hardware exists.
+
+Do:
+- **Minimal profile.** The `SESSION_ACK6` device capabilities get a profile:
+  - `full`: segment degree up to the device maximum, a device queue, step
+    generation;
+  - `minimal`: maximum degree 1, a small queue (for example 4–8 segments),
+    no step generation, and outputs as position setpoints only.
+
+  The host device compiler lowers plans to degree-1 segments at the owner
+  period for `minimal` devices. A5's re-validation applies at that degree and
+  resolution. Qualification (A5) covers both profiles. An unqualified
+  configuration still fails at construction and names the minimum baud,
+  queue depth or period.
+- **Migrate:**
+  - the bench deployment `robotkit/deployment/bench-nucleo-g474re/` and the
+    fixtures under `robotkit/tests/fixtures/`;
+  - the PTY binaries (`pty_device`, `robotd_pty_device`), the nucleo stub
+    firmware (as a `minimal`-profile device driving its two virtual joints),
+    and every RKD5 test.
+
+  Deployment schema v4 drops `protocol`, since RKD6 is implied. The v3
+  reader accepts only `"rkd6"`. Recompute the fingerprints.
+- **Delete:**
+  - the RKD5 schema (`robotkit/schema/device_wire.wire.idl` and its generated
+    Rust and C++);
+  - `HostLink`'s RKD5 path, and the RKD5 `DeviceProtocol` in the Rust core
+    (the core keeps only RKD6);
+  - the P9c serial-streaming qualification in `DeviceSerialEndpoint`, which
+    becomes an RKD6-only endpoint, or is folded into `Rkd6Endpoint`.
+- **Keep** the runtime's host-side sampling and per-cycle setpoint path for
+  cyclic-control endpoints (the SimKit endpoint, and future EtherCAT). It is
+  no longer reachable from any serial device.
+- **Docs:**
+  - `DEVICE_PROTOCOL6.md` becomes `DEVICE_PROTOCOL.md`; archive the old RKD5
+    document in git history only.
+  - Update `robotkit/README.md`, `robotkit/ARCHITECTURE.md` "Deployment
+    boundary", and `motionkit/IMPLEMENTATION_PLAN.md`'s P9c note to point
+    here.
+- Bump the runtime ABI and the RKD protocol version as needed, then
+  regenerate the bindings and fingerprints.
+
+Tests:
+- A `minimal`-profile virtual device runs a Ruckig plan with HOLD, RESUME and
+  a link-loss stop.
+- A `full`-profile device still passes A4–A7.
+- The migrated nucleo stub builds for `thumbv7em-none-eabihf` (A1's check).
+- The bench deployment loads and qualifies.
+- A deployment declaring `"rkd5"` is rejected with a clear message.
+- `grep -rn "RKD5\|device_wire.wire" robotkit` finds only history notes.
+- `world-tcp.sh` passes in all three modes.
+
+Commits: at least two, first adding the minimal profile and migrating, then
+deleting RKD5.
 
 ## Out of scope for this lane
 
@@ -336,3 +425,62 @@ lease-timeout modes passed. An initial TCP attempt used a port occupied by
 another lane; all modes were rerun on port 17962. The lease-timeout case
 missed its plan-start observation once under concurrent builds, then passed
 unchanged on retry.
+
+### A2 — Define RKD6 wire records and framing
+
+Added the separately versioned RKD6 schema, generated fixed-record Rust and
+C++ codecs, and a checked frame format with the `RKD6` marker, length and
+CRC-32. The schema reserves message id 16 for events and defines session,
+sync, queue, segment, control, status and state records. Shared frame vectors
+round-trip in both languages; malformed lengths and CRCs are rejected. The
+protocol document records the maximum frame and serial timing math. Tests
+were written first and failed before the schema and framing were added.
+Commit: the commit containing this entry.
+
+On the lane tree, Rust tests, the MCU build, 14 native tests, 5,873 MotionKit
+and 4,437 RobotKit Haxe assertions, both FFI audits and all three TCP modes
+passed. The TCP tests used port 17962 to avoid other lanes' test servers.
+
+### A3 — Estimate host to device clock mapping
+
+Added a bounded C++ clock estimator with low-RTT sliding-window least-squares
+fit, request cadence, host-time to device-tick mapping, a measured uncertainty
+bound and commit-horizon margin. It latches `clock_sync_lost` when a reply
+steps outside the deployment bound. Deterministic tests cover 1,000 ppm
+drift, 50 ms offset, asymmetric link jitter, mapped tick error, a 10 ms
+clock step and the fault latch. The test was written first. The RKD6 endpoint
+in A5 will drive its request and reply methods and expose the fault reason in
+the runtime snapshot. Commit: the commit containing this entry.
+
+Rust tests, MCU build, all 16 native tests, 5,875 MotionKit and 4,437
+RobotKit Haxe assertions, both FFI audits and TCP integration in default,
+session and lease-timeout modes passed on the lane tree.
+
+### A4 schema correction — Per-actuator limits in RKD6 session
+
+A2's fixed `SessionBegin6` header has a single acceleration field, but A4
+requires a limit per actuator. The schema compatibility lock correctly
+rejected changing that field in place. Added a trailing `ActuatorLimit6`
+record per actuator to the session frame instead; the fixed header remains
+unchanged. The global field caps those records. Updated both frame decoders,
+the generated codecs, tests and the protocol document in the A4 item.
+
+### A4 — Execute a fixed-capacity device segment queue
+
+Added a heap-free Rust scheduled core with revision and committed-horizon
+replacement, expected start-state checks, committed-only execution and an
+`f32` segment-local Horner evaluator. HOLD/RESUME ramp path-clock rate from
+per-actuator acceleration limits. Declared final knots stop without underflow;
+continuations underflow into a controlled stop. STOP and link loss ramp from
+the last executed velocity with travel-limit clamps, ABORT uses a nearer
+rest-declared end when possible, and emergency stop shuts outputs immediately.
+The link-loss stop latches and cannot resume automatically. Shared segment
+vectors were generated from `motionkit_core` and checked against both its C++
+evaluator and the Rust `f32` evaluator. Tests were written before each behavior
+change. Commit: the commit containing this entry.
+
+The Rust tests, MCU compile, all 17 native tests, 5,875 MotionKit and 4,437
+RobotKit Haxe assertions, both FFI audits, and TCP integration in default,
+session and lease-timeout modes passed on the lane tree. A final Rust test
+then caught an idle completed plan being mistaken for link loss; it was fixed
+without changing the host-side behavior.

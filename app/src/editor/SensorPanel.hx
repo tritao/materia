@@ -47,7 +47,7 @@ class SensorPanel {
     worldIds.sort(Reflect.compare);
     var simulatedIds = simulation.simulatedRobotIds();
     for (id in worldIds) {
-      var robotButton = new Button(id,null,function(){sensors.selectRobot(id);commands.refresh();},"sensor-robot:"+id);
+      var robotButton = new Button(id,null,function(){sensors.selectRobot(id);app.invalidateView();},"sensor-robot:"+id);
       robotButton.selected = id == sensors.robotId;
       robotButton.enabled = simulatedIds.indexOf(id)>=0 || sensors.configuredRobotIds().indexOf(id)>=0;
       robotRows.push(new KeyedView("robot:"+id,robotButton));
@@ -56,7 +56,7 @@ class SensorPanel {
     var rows:Array<KeyedView> = [];
     for(index in 0...sensors.model.sensors.length) {
       var sensor=sensors.model.sensors[index];
-      var button=new Button(sensor.name+" · "+sensor.kind,null,function(){sensors.select(index);commands.refresh();},"sensor:"+sensor.id);
+      var button=new Button(sensor.name+" · "+sensor.kind,null,function(){sensors.select(index);app.invalidateView();},"sensor:"+sensor.id);
       button.selected=index==sensors.selectedIndex;rows.push(new KeyedView("sensor:"+sensor.id,button));
     }
     var ownership=session.scriptOwnership;
