@@ -20,6 +20,7 @@ import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
 import motionkit.robot.MotionSystemBlueprint;
 import motionkit.path.ArcSegment;
+import motionkit.path.CornerBlender;
 import motionkit.path.GeometricPath;
 import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
@@ -124,6 +125,7 @@ class MotionKitBootstrapTests {
     testContinuousJog();
     testLateJogReplacementRejectsLateArrival();
     testPathHoldsStayOnPathWithinLimits();
+    testToleranceBlend();
     testDualMotorAxisChangesStayWithinJointLimits();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
   }
@@ -1831,6 +1833,124 @@ class MotionKitBootstrapTests {
     var alpha = Math.max(0.0, Math.min(1.0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
     var px = ax + alpha * dx - x, py = ay + alpha * dy - y;
     return Math.sqrt(px * px + py * py);
+  }
+
+  static function testToleranceBlend():Void {
+    var mixedCorner = new GeometricPath([
+      new LineSegment(new PathPoint(0.0, 0.0), new PathPoint(0.05, 0.0)),
+      new ArcSegment(new PathPoint(0.07, 0.0), 0.02, Math.PI, -Math.PI * 0.5)
+    ]);
+    var mixedGeometry = CornerBlender.blend(mixedCorner, 0.0004, Math.PI * 5.0 / 6.0);
+    check(mixedGeometry.path.primitives.length == 3 && mixedGeometry.diagnostics.length == 0,
+      "line-to-arc corner receives a tolerance blend");
+    for (index in 0...2) {
+      var a = mixedGeometry.path.primitives[index];
+      var b = mixedGeometry.path.primitives[index + 1];
+      check(a.pointAt(a.length()).distanceTo(b.pointAt(0.0)) < 1e-8,
+        "mixed blend joins at the same point");
+      var ta = a.tangentAt(a.length()), tb = b.tangentAt(0.0);
+      check(ta[0] * tb[0] + ta[1] * tb[1] > 0.999999,
+        "mixed blend has a continuous tangent");
+    }
+    var mixedBlend = mixedGeometry.path.primitives[1];
+    for (index in 0...501) {
+      var point = mixedBlend.pointAt(mixedBlend.length() * index / 500.0);
+      var lineDistance = segmentDistance(point.x, point.y, 0.0, 0.0, 0.05, 0.0);
+      var angle = Math.max(Math.PI * 0.5,
+        Math.min(Math.PI, Math.atan2(point.y, point.x - 0.07)));
+      var arcDistance = point.distanceTo(new PathPoint(0.07 + 0.02 * Math.cos(angle),
+        0.02 * Math.sin(angle)));
+      check(Math.min(lineDistance, arcDistance) <= 0.0004,
+        "mixed blend stays within authored geometry tolerance");
+    }
+    var arcToLine = new GeometricPath([
+      mixedCorner.primitives[1],
+      new LineSegment(new PathPoint(0.07, 0.02), new PathPoint(0.07, 0.07))
+    ]);
+    var arcToArc = new GeometricPath([
+      mixedCorner.primitives[1],
+      new ArcSegment(new PathPoint(0.09, 0.02), 0.02, Math.PI, -Math.PI * 0.5)
+    ]);
+    check(CornerBlender.blend(arcToLine, 0.0004, Math.PI * 5.0 / 6.0)
+      .path.primitives.length == 3, "arc-to-line corner receives a blend");
+    check(CornerBlender.blend(arcToArc, 0.0004, Math.PI * 5.0 / 6.0)
+      .path.primitives.length == 3, "arc-to-arc corner receives a blend");
+    var mixedRig = gantryRig(true);
+    var mixedTimed = mixedRig.machine.movePath(mixedCorner,
+      PathPlanningOptions.blend(0.0005), new MotionOptions(0.08, 0.4));
+    var mixedReport = mixedRig.machine.lastPathValidationReport;
+    if (mixedReport == null) throw "Mixed blend did not record validation";
+    check(mixedTimed.durationSeconds() > 0.0 &&
+      mixedReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+        MotionKitNativeConstants.MK_CHECK_PASSED,
+      "mixed blend times and validates through the runtime plan");
+    runMotion(mixedRig.machine, mixedRig.simulation);
+    near(mixedRig.robot.snapshot().positions.get(0), 0.07,
+      "mixed blend executes to its X endpoint", 1e-5);
+    near(mixedRig.robot.snapshot().positions.get(1), 0.02,
+      "mixed blend executes to its Y endpoint", 1e-5);
+    mixedRig.simulation.dispose();
+    var path = GeometricPath.lines([new PathPoint(0.0, 0.0),
+      new PathPoint(0.05, 0.0), new PathPoint(0.05, 0.05)]);
+    var exactRig = gantryRig(true);
+    var exact = exactRig.machine.movePath(path, PathPlanningOptions.exactStopMode(),
+      new MotionOptions(0.08, 0.4));
+    var blendedRig = gantryRig(true);
+    var blended = blendedRig.machine.movePath(path, PathPlanningOptions.blend(0.0005),
+      new MotionOptions(0.08, 0.4));
+    check(blended.durationSeconds() < exact.durationSeconds(),
+      '0.5 mm fillet ${blended.durationSeconds()} is faster than exact stop ${exact.durationSeconds()}');
+    var closestCorner = 1.0;
+    var cornerSpeed = 0.0;
+    for (index in 0...501) {
+      var state = blended.evaluate(blended.durationSeconds() * index / 500.0);
+      var x = state.positions[0], y = state.positions[1];
+      var deviation = Math.min(segmentDistance(x, y, 0.0, 0.0, 0.05, 0.0),
+        segmentDistance(x, y, 0.05, 0.0, 0.05, 0.05));
+      check(deviation <= 0.0005 + 1e-5,
+        "0.5 mm fillet stays within its authored path tolerance");
+      var cornerDistance = Math.sqrt((x - 0.05) * (x - 0.05) + y * y);
+      if (cornerDistance < closestCorner) {
+        closestCorner = cornerDistance;
+        cornerSpeed = Math.sqrt(state.velocities[0] * state.velocities[0] +
+          state.velocities[1] * state.velocities[1]);
+      }
+    }
+    check(cornerSpeed > 1e-3, "0.5 mm fillet carries speed through the corner");
+    var blendReport = blendedRig.machine.lastPathValidationReport;
+    if (blendReport == null) throw "Blend path did not record validation";
+    var taskCheck = blendReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE];
+    check(taskCheck.status == MotionKitNativeConstants.MK_CHECK_PASSED &&
+      Math.abs(taskCheck.limit - 0.0005) < 1e-12,
+      "blend validation checks the authored 0.5 mm tolerance");
+    runMotion(blendedRig.machine, blendedRig.simulation);
+    near(blendedRig.robot.snapshot().positions.get(0), 0.05,
+      "blended path executes to its X endpoint", 1e-5);
+    near(blendedRig.robot.snapshot().positions.get(1), 0.05,
+      "blended path executes to its Y endpoint", 1e-5);
+    exactRig.simulation.dispose();
+    blendedRig.simulation.dispose();
+
+    var reverse = GeometricPath.lines([new PathPoint(0.0, 0.0),
+      new PathPoint(0.05, 0.0),
+      new PathPoint(0.05 + 0.05 * Math.cos(Math.PI * 170.0 / 180.0),
+        0.05 * Math.sin(Math.PI * 170.0 / 180.0))]);
+    var reverseRig = gantryRig(true);
+    var fallback = reverseRig.machine.movePath(reverse, PathPlanningOptions.blend(0.0005),
+      new MotionOptions(0.08, 0.4));
+    check(reverseRig.machine.lastPathPlanningDiagnostics.length > 0 &&
+      reverseRig.machine.lastPathPlanningDiagnostics[0].indexOf("turn angle") >= 0,
+      "near reversal reports an exact-stop fallback");
+    var stoppedAtCorner = false;
+    for (segment in fallback.segments()) {
+      var state = fallback.evaluate(Int64.toFloat(segment.timeFromStartNs) * 1e-9);
+      if (Math.abs(state.positions[0] - 0.05) < 1e-8 &&
+          Math.abs(state.positions[1]) < 1e-8 &&
+          Math.abs(state.velocities[0]) < 1e-7 && Math.abs(state.velocities[1]) < 1e-7)
+        stoppedAtCorner = true;
+    }
+    check(stoppedAtCorner, "near reversal stops at the authored corner");
+    reverseRig.simulation.dispose();
   }
 
   /**

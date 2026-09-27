@@ -90,6 +90,20 @@ int main() {
     }
     assert(velocity_bound);
     mk_time_law_destroy(law);
+    const double boundary_velocity_limit[1] = {0.2};
+    assert(mk_time_path(path, boundary_velocity_limit, acceleration_limit, 1,
+        nullptr, 0, 0.15, 0.15, &law) == MK_OK);
+    assert(mk_path_lower(path, law, 1e-8, &tight) == MK_OK);
+    mk_trajectory_state moving_boundary{};
+    moving_boundary.struct_size = sizeof(moving_boundary);
+    assert(mk_trajectory_evaluate(tight, 0, &moving_boundary) == MK_OK);
+    assert(std::abs(moving_boundary.velocity[0] - 0.15) < 1e-7);
+    assert(mk_path_distance_to_time(law, 1.0, &time) == MK_OK);
+    assert(mk_trajectory_evaluate(tight,
+        static_cast<int64_t>(std::llround(time * 1e9)), &moving_boundary) == MK_OK);
+    assert(std::abs(moving_boundary.velocity[0] - 0.15) < 1e-7);
+    mk_trajectory_destroy(tight);
+    mk_time_law_destroy(law);
     mk_path_destroy(path);
 
     // A quarter circle is represented by a C2 Hermite span. A quadratic

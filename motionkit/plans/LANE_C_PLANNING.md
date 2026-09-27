@@ -428,3 +428,38 @@ acceleration takes 0.811937932 s with TOPP-RA versus 0.966774462 s with
 the old planner. MotionKit passed 5,410 Haxe assertions, RobotKit passed
 4,437 world assertions, all 13 combined native CTests passed, both FFI audits
 passed, and TCP integration passed in default, session and lease modes.
+
+### C3 planning correction — mixed line and arc corners
+
+The first C3 implementation blends planar line-to-line corners and passes the
+90-degree, cycle-time, near-reversal, and runtime execution cases. It emits an
+exact-stop diagnostic for a non-tangent line-to-arc or arc-to-line corner.
+That is short of C3's requirement to replace **each** eligible corner. Added
+a line-to-arc regression assertion to make this gap explicit. The correct
+adjustment is a tangent-continuous fillet for mixed primitives, with distance
+checked against the authored line and arc. C3 remains uncommitted and is not
+ready to merge. Stopped here under the handoff ground rule rather than treat
+the unsupported corner as a completed C3 item. The Haxeon interface-type fix
+is committed locally in its submodule as `560dd069` and has focused tests.
+
+### C3 — Tolerance blending at corners
+
+Planar line-to-line corners use a circular tangent fillet. Mixed line/arc and
+arc/arc corners use a quintic curve matched to endpoint tangent and curvature.
+The mixed curve is accepted only when sampled deviation plus a half-sample
+travel bound fits within the requested tolerance. Junction speeds account for
+curvature within the whole primitive; TOPP-RA samples the quintic at 32 spans
+before polynomial lowering. The runtime receives the resulting polynomial
+segments with nonzero junction speeds. The authored path is checked in task
+space at 1 ms or better, and the report records the requested tolerance.
+Near-reversal corners keep an exact stop and diagnostic.
+
+The first mixed-corner test exposed both an interface `Std.isOfType` error in
+Haxeon and an invalid moving-boundary speed conversion in native TOPP-RA.
+Haxeon now checks the wrapped concrete object for interface values, with a
+focused test in its own submodule commit. The native timing code squares the
+initial path speed as TOPP-RA expects, and preserves moving boundary speeds
+when exact validation cannot accept a law. Commit: the commit containing this
+entry. MotionKit passed 6,430 Haxe assertions; RobotKit passed 4,485 world
+assertions. MotionKit's four native CTests and RobotKit's 13 native CTests,
+both FFI audits, and TCP default, session and lease modes passed.
