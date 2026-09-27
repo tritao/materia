@@ -22,6 +22,8 @@ class SelectionModel {
   public function changed(scene:EditorScene):Void {
     revision++;
     scene.markVisualChanged();
+    var listener = scene.onSelectionChanged;
+    if (listener != null) listener();
   }
 
   public function select(scene:EditorScene, id:String):Bool {

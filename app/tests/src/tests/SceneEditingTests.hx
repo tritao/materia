@@ -83,11 +83,13 @@ class SceneEditingTests {
   static function revisionSeparation():Void {
     var scene = new EditorScene();
     try {
+      var selectionSignals = 0;
+      scene.onSelectionChanged = function() selectionSignals++;
       var content = scene.revision, visual = scene.visualRevision;
       var environment = scene.environmentRevision, selection = scene.selectionRevision;
       check(scene.select("tower") && scene.revision == content &&
         scene.visualRevision > visual && scene.selectionRevision > selection &&
-        scene.environmentRevision == environment,
+        scene.environmentRevision == environment && selectionSignals == 1,
         "selection changes visual and selection revisions only");
       environment = scene.environmentRevision;
       scene.setName("tower", "Renamed tower");

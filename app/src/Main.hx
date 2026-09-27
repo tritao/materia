@@ -440,6 +440,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     contextMenuX = 0.0;
     contextMenuY = 0.0;
     componentLab = null;
+    scene.onSelectionChanged = updateCommandContext;
     updateCommandContext();
 
     workspace = makeWorkspace();
@@ -1127,11 +1128,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       treeModel, treeViewport, null, 420.0, scene.treeSelectionKey(), ["scene"], function(id) {
       scene.selectTreeKey(id);
       log("Selected " + id);
-      updateCommandContext();
       commands.refresh();
     }, function(id) {
       scene.selectTreeKey(id);
-      updateCommandContext();
       commands.execute("scene.frame-selected");
       log("Framed " + id);
     }, null, null);
@@ -1188,7 +1187,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (id == null) return;
     try {
       scene.setName(id, renameValue);
-      updateCommandContext();
       renameId = null;
       commands.refresh();
     } catch (error:Dynamic) log("Rename failed: " + Std.string(error));
@@ -1515,7 +1513,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function runSceneEdit(label:String, action:Void->Bool):Void {
     try {
       action();
-      updateCommandContext();
     } catch (error:ParametricError) {
       log(label + ": " + error.message);
     }
@@ -1526,7 +1523,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     DockWorkspaceCommands.install(workspace, commands, "workspace");
     commands.register(new Command("scene.create", "Add rectangle", function() {
       scene.createRectangle();
-      updateCommandContext();
       commands.refresh();
     }, null, function() return canEditObjects() && scene.canCreate()));
     commands.register(new Command("scene.create-part", "Add empty CAD part", function() {
@@ -1598,7 +1594,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
         if(path==null)return;
         try {
           scene.importStep(path);
-          updateCommandContext();
           log("Imported STEP part: "+path);
         } catch(failure:Dynamic) log("STEP import failed: "+Std.string(failure));
         commands.refresh();
@@ -1627,7 +1622,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       && scene.canCreate() && scene.object(scene.selectedId) != null));
     commands.register(new Command("scene.delete", "Delete", function() {
       scene.deleteSelected();
-      updateCommandContext();
       commands.refresh();
     }, null, function() return canEditObjects() && scene.object(scene.selectedId) != null));
     commands.register(new Command("editor.undo", "Undo", function() {
@@ -1700,7 +1694,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       UiModifier.Shift, 0.0, -1.0);
     commands.register(new Command("scene.cancel-drag", "Cancel object drag", function() {
       cancelActiveDrag();
-      updateCommandContext();
       commands.refresh();
     }, new Shortcut(UiKey.Escape), function() return
       (perspectiveViewport != null && perspectiveViewport.dragging()) || scene.hasActiveSketchEdit()));
@@ -1728,7 +1721,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       deltaX:Float, deltaY:Float):Void {
     commands.register(new Command(id, label, function() {
       scene.nudgeSelected(deltaX, deltaY);
-      updateCommandContext();
       commands.refresh();
     }, new Shortcut(key, modifiers), function() return canEditObjects() &&
       scene.object(scene.selectedId) != null));
@@ -1748,8 +1740,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new EditorPerspectiveViewport("scene-perspective", scene, hostContext);
       sceneInspector = null;
       inspectorSelectionRevision = -1;
-      updateCommandContext();
     }
+    scene.onSelectionChanged = updateCommandContext;
+    updateCommandContext();
     paletteVisible = false;
     contextMenuVisible = false;
     commands.refresh();
@@ -1776,7 +1769,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       changed = true;
     }
     if (!changed) return;
-    updateCommandContext();
     commands.refresh();
   }
 
@@ -1789,7 +1781,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var pointer = perspectiveViewport.cancelDrag();
       if (pointer != null) ui.pointerCancel(pointer.id, pointer.x, pointer.y);
     }
-    updateCommandContext();
     commands.refresh();
   }
 

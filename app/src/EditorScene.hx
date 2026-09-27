@@ -137,6 +137,7 @@ class EditorScene {
   public var environmentRevision(default, null):Int;
   public var selectionRevision(get, never):Int;
   function get_selectionRevision():Int return selection.revision;
+  public var onSelectionChanged:Null<Void->Void> = null;
   var disposed:Bool = false;
 
   function profileLoadStart():Float
