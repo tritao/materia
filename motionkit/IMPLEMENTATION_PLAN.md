@@ -1080,3 +1080,13 @@ runtime currently defaults to a 10 ms owner period, shorter than the RKD5
 10 ms processing allowance plus any command frame; P9c therefore includes a
 versioned owner-period setting. This is a sequencing correction, not a change
 to path-preserving behavior. Commit: the commit containing this entry.
+
+### Queue-independent conversion cleanup
+
+Removed `Trajectory.fromJointTrajectory`, which was only a transitional
+conversion helper and is not used by the path-preserving fallback. Its
+position-equivalence and validation tests now call `fromPositionSamples`
+directly. The remaining old planner and sampled trajectory classes are all
+reachable from the fallback and stay until P9d. Updated the README to
+distinguish native queue execution from the retained fallback. Commit: the
+commit containing this entry.

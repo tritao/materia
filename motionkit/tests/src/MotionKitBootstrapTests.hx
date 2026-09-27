@@ -102,7 +102,9 @@ class MotionKitBootstrapTests {
       new JointTrajectorySample(1.0, [2.0], [8.0], [6.0]),
       new JointTrajectorySample(2.0, [5.0], [7.0], [5.0])
     ]);
-    var native = Trajectory.fromJointTrajectory(source);
+    var native = Trajectory.fromPositionSamples(
+      [for (sample in source.samples) sample.timeSeconds],
+      [for (sample in source.samples) sample.positions]);
     near(native.durationSeconds(), 2.0, "native trajectory duration");
     check(native.jointCount() == 1, "native trajectory joint count");
     for (tick in 0...2001) {
@@ -155,7 +157,9 @@ class MotionKitBootstrapTests {
       new JointTrajectorySample(0.0, [0.0], [0.0], [0.0]),
       new JointTrajectorySample(1.0, [1.0], [0.0], [0.0])
     ]);
-    var trajectory = Trajectory.fromJointTrajectory(source);
+    var trajectory = Trajectory.fromPositionSamples(
+      [for (sample in source.samples) sample.timeSeconds],
+      [for (sample in source.samples) sample.positions]);
     var limits = new ValidationLimits(1, Int64.ofInt(12), Int64.ofInt(3));
     limits.position(0, 0.0, 1.0);
     limits.velocity(0, 0.8);

@@ -13,14 +13,6 @@ class Trajectory {
     this.owner = owner;
   }
 
-  /** Preserves sample times and positions; native derivatives come from chords. */
-  public static function fromJointTrajectory(source:JointTrajectory):Trajectory {
-    if (source == null || source.samples.length < 2)
-      throw "Native trajectory needs at least two samples";
-    return fromPositionSamples([for (sample in source.samples) sample.timeSeconds],
-      [for (sample in source.samples) sample.positions]);
-  }
-
   /** Builds a degree-1 trajectory directly from authored positions. */
   public static function fromPositionSamples(times:Array<Float>, positions:Array<Array<Float>>):Trajectory {
     if (times == null || positions == null || times.length < 2 ||
