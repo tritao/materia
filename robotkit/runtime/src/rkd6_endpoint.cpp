@@ -49,28 +49,20 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
         return {};
     device_wire6::SessionBegin6 begin{};
     begin.session = session;
-    begin.protocol_version = 6;
+    begin.protocol_version = device_wire6::PROTOCOL_VERSION;
     begin.model_fingerprint = fingerprint;
     begin.actuator_count = static_cast<std::uint8_t>(blueprint.joint_count);
     begin.max_degree = 5;
     begin.step_tick_hz = step_tick_hz;
-    begin.link_loss_ticks = 0;
-    for (std::uint32_t i = 0; i < blueprint.joint_count; ++i)
+    begin.link_loss_timeout_ns = link_loss_timeout_ns;
+    for (std::uint32_t i = 0; i < blueprint.joint_count; ++i) {
+        begin.actuator_max_acceleration[i] = static_cast<float>(blueprint.joints[i].max_acceleration);
         begin.max_acceleration = std::max(begin.max_acceleration,
             static_cast<float>(blueprint.joints[i].max_acceleration));
-    if (begin.max_acceleration <= 0 || !std::isfinite(begin.max_acceleration)) return {};
-    std::vector<std::uint8_t> payload(begin.SIZE +
-        blueprint.joint_count * device_wire6::ActuatorLimit6::SIZE +
-        device_wire6::SessionTiming6::SIZE);
-    if (!device_wire6::encode(begin, std::span(payload).first(begin.SIZE))) return {};
-    for (std::uint32_t i = 0; i < blueprint.joint_count; ++i) {
-        device_wire6::ActuatorLimit6 limit{static_cast<float>(blueprint.joints[i].max_acceleration)};
-        if (limit.max_acceleration <= 0 || !std::isfinite(limit.max_acceleration) ||
-            !device_wire6::encode(limit, std::span(payload).subspan(
-                begin.SIZE + i * limit.SIZE, limit.SIZE))) return {};
     }
-    device_wire6::SessionTiming6 timing{link_loss_timeout_ns};
-    if (!device_wire6::encode(timing, std::span(payload).last(timing.SIZE))) return {};
+    if (begin.max_acceleration <= 0 || !std::isfinite(begin.max_acceleration)) return {};
+    std::vector<std::uint8_t> payload(begin.SIZE);
+    if (!device_wire6::encode(begin, payload)) return {};
     std::vector<std::uint8_t> frame;
     if (!device_frame6::encode(1, payload, frame) || !transport->send(frame)) return {};
     std::vector<std::uint8_t> reply;
@@ -84,7 +76,7 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
             break;
         }
     }
-    if (!acknowledged || ack.session != session || ack.protocol_version != 6 ||
+    if (!acknowledged || ack.session != session || ack.protocol_version != device_wire6::PROTOCOL_VERSION ||
         ack.device_fingerprint != fingerprint || ack.status != 1 ||
         ack.actuator_count != blueprint.joint_count || ack.device_tick_hz == 0 ||
         ack.step_tick_hz == 0 || ack.segment_capacity == 0 || ack.max_degree > 5)

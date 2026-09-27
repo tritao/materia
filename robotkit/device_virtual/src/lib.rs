@@ -78,7 +78,7 @@ impl VirtualDevice {
                 };
                 let mut ack = SessionAck6 {
                     session: begin.session,
-                    protocol_version: 6,
+                    protocol_version: PROTOCOL_VERSION,
                     device_fingerprint: self.fingerprint,
                     status: 0,
                     device_tick_hz: self.board.tick_hz(),
@@ -95,15 +95,9 @@ impl VirtualDevice {
                 {
                     let mut limits = [1.0f32; ACTUATORS];
                     for (i, limit) in limits.iter_mut().enumerate().take(self.count) {
-                        let start = SessionBegin6::SIZE + i * ActuatorLimit6::SIZE;
-                        *limit =
-                            ActuatorLimit6::decode(&payload[start..start + ActuatorLimit6::SIZE])
-                                .unwrap()
-                                .max_acceleration;
+                        *limit = begin.actuator_max_acceleration[i];
                     }
-                    let start = SessionBegin6::SIZE + self.count * ActuatorLimit6::SIZE;
-                    let timing = SessionTiming6::decode(&payload[start..]).unwrap();
-                    let link_loss_ticks = ((timing.link_loss_timeout_ns as u128
+                    let link_loss_ticks = ((begin.link_loss_timeout_ns as u128
                         * self.board.tick_hz() as u128)
                         / 1_000_000_000) as u64;
                     let mut core = ScheduledCore::new(
@@ -487,27 +481,17 @@ mod tests {
             VirtualDevice::new(1_000_000, 40_000, 50_000, 0, 1, scale, fingerprint).unwrap();
         let begin = SessionBegin6 {
             session: 9,
-            protocol_version: 6,
+            protocol_version: PROTOCOL_VERSION,
             model_fingerprint: fingerprint,
             actuator_count: 1,
             max_degree: 5,
             step_tick_hz: 40_000,
-            link_loss_ticks: 0,
             max_acceleration: 10.0,
-        };
-        let mut session =
-            vec![0; SessionBegin6::SIZE + ActuatorLimit6::SIZE + SessionTiming6::SIZE];
-        begin.encode(&mut session[..SessionBegin6::SIZE]).unwrap();
-        ActuatorLimit6 {
-            max_acceleration: 10.0,
-        }
-        .encode(&mut session[SessionBegin6::SIZE..SessionBegin6::SIZE + ActuatorLimit6::SIZE])
-        .unwrap();
-        SessionTiming6 {
+            actuator_max_acceleration: [10.0; 64],
             link_loss_timeout_ns: 2_000_000_000,
-        }
-        .encode(&mut session[SessionBegin6::SIZE + ActuatorLimit6::SIZE..])
-        .unwrap();
+        };
+        let mut session = vec![0; SessionBegin6::SIZE];
+        begin.encode(&mut session).unwrap();
         assert!(send::<SessionBegin6>(&mut device, 1, &session));
         assert_eq!(decode_frame6(device.outbox.front().unwrap()).unwrap().0, 2);
         let queue = QueueBegin6 {

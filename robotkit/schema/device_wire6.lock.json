@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 6
+      "value": 7
     }
   },
   "enums": {
@@ -34,17 +34,6 @@
   },
   "messages": {},
   "packed_structs": {
-    "ActuatorLimit6": {
-      "endian": "little",
-      "fields": [
-        {
-          "length": 1,
-          "name": "max_acceleration",
-          "type": "f32"
-        }
-      ],
-      "size": 4
-    },
     "ActuatorState6": {
       "endian": "little",
       "fields": [
@@ -347,27 +336,21 @@
         },
         {
           "length": 1,
-          "name": "link_loss_ticks",
-          "type": "u64"
-        },
-        {
-          "length": 1,
           "name": "max_acceleration",
           "type": "f32"
-        }
-      ],
-      "size": 43
-    },
-    "SessionTiming6": {
-      "endian": "little",
-      "fields": [
+        },
+        {
+          "length": 64,
+          "name": "actuator_max_acceleration",
+          "type": "f32"
+        },
         {
           "length": 1,
           "name": "link_loss_timeout_ns",
           "type": "u64"
         }
       ],
-      "size": 8
+      "size": 299
     },
     "State6Header": {
       "endian": "little",
