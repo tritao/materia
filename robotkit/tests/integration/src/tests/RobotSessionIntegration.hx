@@ -90,17 +90,27 @@ class RobotSessionIntegration {
 
       // A silent controller must also lose a plan that is still in flight.
       controller.stop("prepare lease plan", false);
-      waitFor(controller, function() return controller.latestState != null &&
-        controller.latestState.safety == RobotKitRuntimeConstants.RK_SAFETY_READY &&
-        Math.abs(controller.latestState.dq[0]) < 1e-3,
+      waitFor(controller, function() {
+        var state = controller.latestState;
+        return state != null &&
+          state.safety == RobotKitRuntimeConstants.RK_SAFETY_READY &&
+          state.sessionState == RobotKitRuntimeConstants.RK_SESSION_IDLE &&
+          Math.abs(state.dq[0]) < 1e-3;
+      },
         "lease test did not settle before plan submission");
       var settled = controller.latestState;
       if (settled == null) throw "lease test has no settled state";
       var anchor = settled.q.copy();
+      var anchorSequence = settled.sequence;
       controller.sendJointTargets([for (joint in 0...anchor.length)
         robotkit.world.JointTarget.position(joint, anchor[joint])]);
-      waitFor(controller, function() return controller.latestState != null &&
-        Math.abs(controller.latestState.q[0] - anchor[0]) < 1e-6,
+      waitFor(controller, function() {
+        var state = controller.latestState;
+        return state != null &&
+          Int64.compare(state.sequence, anchorSequence) > 0 &&
+          state.sessionState == RobotKitRuntimeConstants.RK_SESSION_IDLE &&
+          Math.abs(state.q[0] - anchor[0]) < 1e-6;
+      },
         "lease test did not establish a commanded position anchor");
       // A state frame can precede the runtime's next owner cycle. Permit one
       // cycle of position drift while keeping velocity and acceleration exact.
@@ -304,7 +314,9 @@ class RobotSessionIntegration {
   }
 
   static function waitFor(client:RobotClient, condition:Void->Bool, failure:String):Void {
-    for (_ in 0...500) {
+    var start = NativeKit.nk_time_now_ns();
+    var timeout = Int64.fromFloat(5000000000.0);
+    while (Int64.compare(Int64.sub(NativeKit.nk_time_now_ns(), start), timeout) < 0) {
       var hadEvent = client.poll();
       if (condition()) return;
       if (!hadEvent) client.wait(0.01);
