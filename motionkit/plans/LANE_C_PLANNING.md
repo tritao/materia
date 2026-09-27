@@ -116,8 +116,12 @@ Do:
 
 Tests:
 - A square path in exact-stop mode stops at each corner.
-- A circle's arc speed is limited by centripetal acceleration and matches
-  the analytic `v = √(a·r)` within 1%.
+- A circle's arc speed respects the per-joint centripetal acceleration
+  limits. For equal independent X/Y acceleration limits `a`, its instantaneous
+  bound varies with angle: `v²·|cos θ|/r ≤ a` and
+  `v²·|sin θ|/r ≤ a`. Check each joint's acceleration and compare sampled
+  speed with this angle-dependent bound; `√(a·r)` applies at axis-aligned
+  points, not to the peak speed over the whole circle.
 - Cycle time is within 1% of the old planner on analytically optimal straight
   exact-stop paths. Target no regression on curved paths; record comparative
   numbers in the log.
@@ -303,3 +307,16 @@ no-regression target. Stopped C2 implementation here as required by the
 handoff ground rule when a work item shows the plan is wrong. The uncommitted
 C2 implementation in `materia-lane-c` is incomplete and still needs task-space
 reporting, planner replacement tests, full-suite verification and a commit.
+
+### C2 planning correction — Circle speed under independent joint limits
+
+The original circle acceptance expects the peak speed to match `√(a·r)`
+within 1%. That is a vector centripetal acceleration bound, but TOPP-RA's
+contract uses independent per-joint acceleration limits. On a 0.1 m radius
+circle with 1 m/s² limits on X and Y, the sampled peak is 0.333930896 m/s,
+while `√(a·r)` is 0.316227766 m/s. Each joint's sampled acceleration stays
+within 1 m/s²; the peak occurs away from an axis-aligned point, where the
+normal acceleration is shared by the two joints. Changed the acceptance to
+the per-joint, angle-dependent bound. Stopped C2 implementation here under
+the handoff ground rule. The C2 changes remain uncommitted in the Lane C
+worktree; the new test currently fails on the superseded peak-speed assertion.
