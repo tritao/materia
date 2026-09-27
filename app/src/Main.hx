@@ -10,6 +10,7 @@ import app.editor.TelemetryPanel;
 import app.editor.SensorPanel;
 import app.editor.HierarchyPanel;
 import app.editor.InspectorPanel;
+import app.editor.EditorDocumentCommands;
 import Color;
 import LayoutAxis;
 import LayoutAlignmentY;
@@ -1249,23 +1250,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       scene.deleteSelected();
       commands.refresh();
     }, null, function() return canEditObjects() && scene.object(scene.selectedId) != null));
-    commands.register(new Command("editor.undo", "Undo", function() {
-      if (scene.hasActiveSketchEdit()) scene.cancelSelectedSketchEdit();
-      runSceneEdit("Could not undo", function() session.document.undo());
-      if (session.scriptOwnership != null) refreshScriptMaterialization("Override undone");
-    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return !documents.blocked() && session.document.canUndo));
-    commands.register(new Command("editor.redo", "Redo", function() {
-      runSceneEdit("Could not redo", function() session.document.redo());
-      if (session.scriptOwnership != null) refreshScriptMaterialization("Override redone");
-    }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return !documents.blocked() && session.document.canRedo));
-    commands.register(new Command("editor.new", "New", function() documents.requestNew(),
-      new Shortcut(78, UiModifier.Control), function() return !documents.blocked()));
-    commands.register(new Command("editor.open", "Open", function() documents.requestOpen(),
-      new Shortcut(79, UiModifier.Control), function() return !documents.blocked()));
-    commands.register(new Command("editor.save", "Save", function() documents.save(),
-      new Shortcut(UiKey.S, UiModifier.Control), function() return !documents.blocked()));
-    commands.register(new Command("editor.save-as", "Save As", function() documents.save(true),
-      new Shortcut(UiKey.S, UiModifier.Control | UiModifier.Shift), function() return !documents.blocked()));
+    EditorDocumentCommands.install(this);
     commands.register(new Command("workspace.save", "Save workspace", function() {
       saveWorkspace();
       log("Workspace saved");
