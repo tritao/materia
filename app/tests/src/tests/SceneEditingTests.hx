@@ -1134,7 +1134,7 @@ class SceneEditingTests {
   }
 
   static function main():Int {
-    var emptyApp = new ReferenceEditorApp(null, null, null, null, null, null, null, null, false);
+    var emptyApp = new ReferenceEditorApp();
     check(emptyApp.scene.items().length == 0, "default launch starts with an empty scene");
     var commandRevision = emptyApp.commands.revision;
     var submitKey = emptyApp.editorSubmitKey();

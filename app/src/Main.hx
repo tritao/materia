@@ -439,7 +439,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
       ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String,?projectPath:String,
-      ?recordPath:String, demo:Bool = true) {
+      ?recordPath:String, demo:Bool = false) {
     this.hostContext = hostContext;
     semanticRecordPath = recordPath;
     appearance = new EditorAppearance(theme);
