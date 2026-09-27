@@ -139,6 +139,7 @@ class SceneCodec {
     if (overrideValues.length > 10000 || removedValues.length > 10000 || instanceValues.length > 10000)
       throw "Generated project has too many edits";
     var seen = new Map<String, Bool>();
+    var overrideRecords:Array<app.ProjectSceneRecord.ProjectFieldOverride> = [];
     for (item in overrideValues) {
       var id = stringField(item, "targetId");
       var editKey = id + ":" + stringField(item, "property");
@@ -148,6 +149,8 @@ class SceneCodec {
       if (["number", "boolean", "text", "vector", "appearance"].indexOf(kind) < 0 ||
           !Reflect.hasField(item, "value")) throw "Invalid generated project field edit";
       seen.set(editKey, true);
+      overrideRecords.push({targetId: id, property: stringField(item, "property"),
+        kind: kind, value: Reflect.field(item, "value")});
     }
     var removedIds:Array<String> = [];
     for (item in removedValues) {
@@ -165,10 +168,19 @@ class SceneCodec {
       if (!Std.isOfType(field(item, "overrides"), Array) || seen.exists(id))
         throw "Invalid generated project instance";
       seen.set(id, true);
-      instanceRecords.push({sourceId: sourceId, id: id,
-        overrides: cast field(item, "overrides")});
+      var instanceEdits:Array<app.ProjectSceneRecord.ProjectFieldOverride> = [];
+      var rawEdits:Array<Dynamic> = cast field(item, "overrides");
+      for (edit in rawEdits) {
+        var editKind = stringField(edit, "kind");
+        if (["number", "boolean", "text", "vector", "appearance"].indexOf(editKind) < 0 ||
+            !Reflect.hasField(edit, "value")) throw "Invalid generated project instance edit";
+        instanceEdits.push({targetId: stringField(edit, "targetId"),
+          property: stringField(edit, "property"), kind: editKind,
+          value: Reflect.field(edit, "value")});
+      }
+      instanceRecords.push({sourceId: sourceId, id: id, overrides: instanceEdits});
     }
-    return {version: 1, reference: reference, overrides: cast overrides,
+    return {version: 1, reference: reference, overrides: overrideRecords,
       removed: removedIds, instances: instanceRecords, assemblyState: assemblyState,
       assemblyDependentJoints: assemblyDependentJoints};
   }

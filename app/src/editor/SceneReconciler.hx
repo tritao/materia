@@ -24,6 +24,11 @@ class SceneReconciler {
     var previousSelectedKind:Null<String> = previousSelected == null ? null : previousSelected.kind;
     var existingById:Map<String, EditorSceneObject> = new Map();
     for (item in owner.objects) existingById.set(item.id, item);
+    if (!physicsChanged) for (record in data) if (owner.kinematicOccurrences.exists(record.id)) {
+      var old = existingById.get(record.id);
+      if (old == null || old.mass != record.mass || old.materialId != record.materialId || old.meshSnapshot != record.meshSnapshot ||
+          old.kind != record.type) { physicsChanged = true; break; }
+    }
     var staleFaceHoverIds:Array<String> = [];
     for (id in owner.faceHoverNodes.keys()) {
       var record:Null<SceneObjectData> = null;
@@ -98,8 +103,7 @@ class SceneReconciler {
             record.width, record.height, record.depth, record.collisionEnabled,
             record.dynamicBody, record.mass, record.red, record.green, record.blue,
             storedGraph,
-            record.x, record.y, record.z, record.visible, record.meshSnapshot, record.rotation);
-          item.appearance = record.appearance;
+            record.x, record.y, record.z, record.visible, record.meshSnapshot, record.rotation, record.appearance, record.materialId);
           prepared.objects.push(item);
           owner.failIfInjected("prepare.new-object");
           prepared.changed = true;
@@ -113,7 +117,7 @@ class SceneReconciler {
             item.kind != record.type || item.cadGraph != storedGraph ||
             item.meshSnapshot != record.meshSnapshot || !EditorScene.sameRotation(item.rotation, record.rotation) ||
             item.collisionEnabled != record.collisionEnabled || item.dynamicBody != record.dynamicBody ||
-            item.mass != record.mass || item.red != record.red || item.green != record.green ||
+            item.mass != record.mass || item.materialId != record.materialId || item.red != record.red || item.green != record.green ||
             item.blue != record.blue || !EditorScene.sameFinish(item.appearance, record.appearance);
           if (objectChanged) candidate = SceneModel.copyEditorSceneObject(item);
           if (item.label != record.label) prepared.transaction.setName(runtime.node, record.label);
@@ -167,7 +171,7 @@ class SceneReconciler {
           candidate.label = record.label; candidate.kind = record.type;
           candidate.width = record.width; candidate.height = record.height; candidate.depth = record.depth;
           candidate.collisionEnabled = record.collisionEnabled; candidate.dynamicBody = record.dynamicBody;
-          candidate.mass = record.mass; candidate.red = record.red; candidate.green = record.green; candidate.blue = record.blue; candidate.appearance = record.appearance;
+          candidate.mass = record.mass; candidate.materialId = record.materialId; candidate.red = record.red; candidate.green = record.green; candidate.blue = record.blue; candidate.appearance = record.appearance;
           candidate.cadGraph = storedGraph; candidate.x = record.x; candidate.y = record.y; candidate.z = record.z;
           candidate.meshSnapshot = record.meshSnapshot;
           candidate.rotation = record.rotation;
@@ -284,4 +288,3 @@ private class PreparedSceneEdit {
     for (session in retiredCadSessions) try session.close() catch (_:Dynamic) {}
   }
 }
-

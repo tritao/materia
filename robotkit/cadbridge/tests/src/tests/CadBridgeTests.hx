@@ -52,13 +52,11 @@ class CadBridgeTests {
     assembly.connector("slider", "mount", AssemblyFrames.identity());
     assembly.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
       {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
-    var parts:materia.project.SceneArtifact.SceneArtifactData = {metresPerUnit: 0.001,
-      parts: [for (id in ["base", "slider"]) {id: id, name: id, red: 0.5, green: 0.5,
-        blue: 0.5, materialId: "machined-steel", materialDensity: 7850,
+    var parts:cadbridge.AssemblySimulationBridge.AssemblyPhysicalData = {metresPerUnit: 0.001,
+      parts: [for (id in ["base", "slider"]) {id: id, materialId: "machined-steel",
         volume: 1000000.0, centerOfMass: [0.0, 0.0, 0.0],
         inertia: [10000000000.0, 0, 0, 0, 10000000000.0, 0, 0, 0, 10000000000.0],
-        vertexCount: 0, indexCount: 0, vertices: Bytes.alloc(0), normals: Bytes.alloc(0),
-        indices: Bytes.alloc(0), faceRanges: []}]};
+        density: 7850.0}]};
     var translated = AssemblySimulationBridge.toRobotModel(assembly.definition("bridge-test"), parts);
     check(translated.model.links.length == 3 && translated.model.joints.length == 2,
       "assembly tree translates to robot links and joints");

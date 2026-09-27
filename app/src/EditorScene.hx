@@ -376,7 +376,7 @@ class EditorScene {
       candidates.push(new EditorSceneObject(item.id, item.label, item.type,
         item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
         item.mass, item.red, item.green, item.blue, storedCadGraph,
-        item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance));
+        item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId));
     }
     profileLoadEnd("geometryData", preparationStarted);
 
@@ -2188,6 +2188,7 @@ class EditorSceneObject {
   public var green:Float;
   public var blue:Float;
   public var appearance:Null<Appearance>;
+  public var materialId:Null<String>;
   public var cadGraph:Null<String>;
   public var meshSnapshot:Null<String>;
   public var rotation:Null<Array<Float>>;
@@ -2198,11 +2199,12 @@ class EditorSceneObject {
   public function new(id:String,label:String,kind:String,width:Float,height:Float,depth:Float,
       collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float,
       ?cadGraph:String,x:Float=0,y:Float=0,z:Float=0,visible:Bool=true,?meshSnapshot:String,
-      ?rotation:Array<Float>, ?appearance:Appearance) {
+      ?rotation:Array<Float>, ?appearance:Appearance, ?materialId:String) {
     this.id = id; this.label = label; this.kind = kind;
     this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;
     this.dynamicBody=dynamicBody;this.mass=mass;
     this.red = red; this.green = green; this.blue = blue; this.appearance = appearance;
+    this.materialId = materialId;
     this.cadGraph=cadGraph;
     this.meshSnapshot=meshSnapshot;
     this.rotation=rotation;

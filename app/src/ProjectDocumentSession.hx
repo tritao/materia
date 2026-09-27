@@ -32,6 +32,7 @@ import materia.project.AssemblyDefinitionCodec;
 import materia.project.AssemblyFrames;
 import cadkit.modeling.AssemblyState;
 import nativekit.scene.GeometryData;
+import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 
 /** Owns the current document; unsuccessful I/O leaves it and its history intact. */
 class ProjectDocumentSession {
@@ -50,6 +51,12 @@ class ProjectDocumentSession {
   public var projectAssembly(default,null):Null<AssemblyRecord> = null;
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
+  public var projectPhysical(default,null):Null<AssemblyPhysicalData> = null;
+  public function assemblyPreviewCenter(definitionId:String):Null<Array<Float>> {
+    var centers = assemblyLocalCentersByDefinition;
+    var value = centers == null ? null : centers.get(definitionId);
+    return value == null ? null : value.copy();
+  }
   public var customMaterials(default, null):Array<MaterialDef> = [];
   var assemblyRuntime:Null<AssemblyState> = null;
   var assemblyLocalCentersByDefinition:Null<Map<String, Array<Float>>> = null;
@@ -170,7 +177,8 @@ class ProjectDocumentSession {
   public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
       ?assembly:AssemblyRecord, ?geometryBySnapshot:Map<String, GeometryData>,
       ?assemblyDefinition:AssemblyDefinition, ?assemblyState:AssemblyStateRecord,
-      ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0):Void {
+      ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
+      ?physical:AssemblyPhysicalData):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -180,7 +188,7 @@ class ProjectDocumentSession {
     var nextSensors:SensorConfiguration = null;
     var nextBim:BimDocument = null;
     try {
-      nextSensors = new SensorConfiguration(null, nextDocument);
+      nextSensors = new SensorConfiguration(null, nextDocument, assemblyDefinition != null);
       nextBim = new BimDocument();
     } catch (error:Dynamic) {
       next.dispose();
@@ -201,6 +209,7 @@ class ProjectDocumentSession {
     replace(next, nextSensors, null, null, nextBim, nextDocument);
     projectAssembly = assembly;
     installAssemblyRuntime(assemblyDefinition, runtime, localCentersByDefinition, metresPerUnit);
+    projectPhysical = physical;
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -231,7 +240,8 @@ class ProjectDocumentSession {
     try {
       next = new EditorScene(data, nextDocument, null, generated.geometryBySnapshot);
       next.configureComponentFinishes(baseline);
-      nextSensors = new SensorConfiguration(SceneCodec.decodeSensorsRoot(root), nextDocument);
+      nextSensors = new SensorConfiguration(SceneCodec.decodeSensorsRoot(root), nextDocument,
+        generated.assemblyDefinition != null);
       nextBim = SceneCodec.decodeBimRoot(root);
     } catch (error:Dynamic) {
       if (next != null) next.dispose();
@@ -258,6 +268,7 @@ class ProjectDocumentSession {
     projectAssembly = generated.assembly;
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
       generated.localCentersByDefinition, generated.metresPerUnit, dependentJoints);
+    projectPhysical = generated.physical;
   }
 
   function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
@@ -515,6 +526,7 @@ class ProjectDocumentSession {
     projectAssembly = null;
     projectAssemblyDefinition = null;
     projectAssemblyState = null;
+    projectPhysical = null;
     customMaterials = [];
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
@@ -755,9 +767,35 @@ class ProjectDocumentSession {
 
   static function decodeProjectObject(value:Dynamic, materials:Array<MaterialDef>, ?snapshot:String):SceneObjectData {
     Reflect.setField(value, "meshSnapshot", "_");
+    var rawAppearance:Dynamic = Reflect.field(value, "appearance");
+    var checkedAppearance:materia.project.Appearance = rawAppearance == null ? null : {
+      finish: Reflect.field(rawAppearance, "finish"),
+      metallic: Reflect.field(rawAppearance, "metallic"),
+      roughness: Reflect.field(rawAppearance, "roughness")};
+    var rawRotation:Dynamic = Reflect.field(value, "rotation");
+    var rotation:Null<Array<Float>> = null;
+    if (rawRotation != null) {
+      var components:Array<Dynamic> = cast rawRotation;
+      rotation = [];
+      for (component in components) {
+        var coordinate:Float = component;
+        rotation.push(coordinate);
+      }
+    }
+    var candidate:SceneObjectData = {
+      id: Reflect.field(value, "id"), type: Reflect.field(value, "type"),
+      label: Reflect.field(value, "label"), x: Reflect.field(value, "x"),
+      y: Reflect.field(value, "y"), z: Reflect.field(value, "z"),
+      width: Reflect.field(value, "width"), height: Reflect.field(value, "height"),
+      depth: Reflect.field(value, "depth"), collisionEnabled: Reflect.field(value, "collisionEnabled"),
+      dynamicBody: Reflect.field(value, "dynamicBody"), mass: Reflect.field(value, "mass"),
+      red: Reflect.field(value, "red"), green: Reflect.field(value, "green"),
+      blue: Reflect.field(value, "blue"), visible: Reflect.field(value, "visible"),
+      materialId: Reflect.field(value, "materialId"), appearance: checkedAppearance,
+      rotation: rotation, meshSnapshot: "_"};
     var result = SceneCodec.decode(Json.stringify({format: SceneCodec.FORMAT,
       version: SceneCodec.VERSION, materials: MaterialLibrary.all().concat(materials),
-      objects: [SceneCodec.encodeObject(cast value, materials)]}))[0];
+      objects: [SceneCodec.encodeObject(candidate, materials)]}))[0];
     result.meshSnapshot = snapshot;
     return result;
   }

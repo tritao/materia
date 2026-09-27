@@ -11,6 +11,7 @@
 		"bimkit": { "path": "../bimkit" },
 		"uikit": { "path": "../uikit" },
 		"robotkit": { "path": "../robotkit" },
+		"cadbridge": { "path": "../robotkit/cadbridge" },
 		"scenekit": { "path": "../scenekit" }
 	},
 	"native": {

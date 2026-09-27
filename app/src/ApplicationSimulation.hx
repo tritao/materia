@@ -9,6 +9,9 @@ import robotkit.world.RobotWorld;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.WorldSnapshot;
 import robotkit.world.SensorFrame;
+import robotkit.model.CollisionApproximation;
+import materia.project.MaterialLibrary;
+import cadbridge.AssemblySimulationBridge;
 
 typedef SimulationRobotVisual={
   var id:String;
@@ -36,7 +39,10 @@ class ApplicationSimulation {
   var simulatedIds:Array<String> = [];
   var simulatedLinks:Array<Array<String>> = [];
   var simulatedObjects:Array<{id:String,handle:Int}> = [];
+  var assemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
   var running:Bool = false;
+  var presentAssemblyPhysics:Bool = false;
+  var presentationEpoch:Int = 0;
 
   public function new(world:RobotWorld,?backend:Int=DETERMINISTIC) {
     this.world=world;this.backend=DETERMINISTIC;setBackend(backend);
@@ -58,14 +64,17 @@ class ApplicationSimulation {
       appliedEnvironmentRevision != scene.environmentRevision||appliedBackend!=backend||appliedTimestep!=timestep;
 
   /** Builds the complete candidate before changing any live world adapter. */
-  public function rebuild(configuration:SensorConfiguration, scene:EditorScene):Bool {
+  public function rebuild(configuration:SensorConfiguration, scene:EditorScene,
+      ?session:ProjectDocumentSession):Bool {
     var candidate:Null<Simulation> = null;
     var candidateRobots:Array<SimulatedRobot> = [];
     var candidateLinks:Array<Array<String>> = [];
     var candidateObjects:Array<{id:String,handle:Int}> = [];
+    var candidateAssemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
     try {
       var models = configuration.robotModels();
-      if (models.length == 0) throw "No simulated robot configurations";
+      var assembly = session == null ? null : session.projectAssemblyDefinition;
+      if (models.length == 0 && assembly == null) throw "Nothing to simulate";
       for (configured in models) {
         var id=configured.id;
         var existing = world.robot(id);
@@ -82,7 +91,73 @@ class ApplicationSimulation {
           [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
         candidateLinks.push([for (link in editable.model.links) link.id]);
       }
-      for (object in scene.records()) if (object.collisionEnabled) {
+      if (assembly != null) {
+        var physical = session == null ? null : session.projectPhysical;
+        if (physical == null) throw "Assembly physical properties are unavailable";
+        var converted = AssemblySimulationBridge.toRobotModel(assembly, physical,
+          session == null ? null : session.projectAssemblyState);
+        // Link collision geometry is installed with generated-part hulls in the
+        // collision phase; the runtime's generic 10 cm robot box is not a part shape.
+        converted.model.collisionApproximation = CollisionApproximation.None;
+        var sceneParts = new Map<String, SceneObjectData>();
+        for (record in scene.records()) sceneParts.set(record.id, record);
+        var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
+        for (part in physical.parts) physicalParts.set(part.id, part);
+        for (occurrence in assembly.occurrences) {
+          var record = sceneParts.get("project:" + occurrence.id);
+          var part = physicalParts.get(occurrence.definition);
+          if (record == null || part == null)
+            throw 'Assembly occurrence "${occurrence.id}" is missing its generated part';
+          var link:Null<robotkit.model.Link> = null;
+          for (item in converted.model.links) if (item.id == occurrence.id) { link = item; break; }
+          if (link == null) throw 'Assembly occurrence "${occurrence.id}" has no simulated link';
+          var baseMass = link.mass;
+          var chosenMass = record.mass;
+          if (record.materialId != null && record.materialId != part.materialId &&
+              Math.abs(record.mass - baseMass) <= 1e-9 * Math.max(1.0, baseMass)) {
+            var density:Null<Float> = null;
+            var customMaterials = session == null ? [] : session.customMaterials;
+            for (material in customMaterials)
+              if (material.id == record.materialId) { density = material.physical.density; break; }
+            if (density == null) density = MaterialLibrary.require(record.materialId).physical.density;
+            chosenMass = part.volume * density * Math.pow(physical.metresPerUnit, 3);
+          }
+          if (!Math.isFinite(chosenMass) || chosenMass <= 0)
+            throw 'Assembly occurrence "${occurrence.id}" has an invalid mass';
+          link.inertiaTensor = [for (value in link.inertiaTensor) value * chosenMass / baseMass];
+          link.mass = chosenMass;
+        }
+        if (converted.closureIds.length > 0)
+          throw "Assembly closures are not supported by this simulation backend: " +
+            converted.closureIds.join(", ");
+        if (converted.couplings.length > 0)
+          throw "Assembly joint couplings are not supported by this simulation backend: " +
+            [for (coupling in converted.couplings) coupling.id].join(", ");
+        var id = "assembly:" + assembly.id;
+        if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
+          throw 'Robot "$id" is remote and read-only';
+        var blueprint = RobotRuntimeCompiler.compile(converted.model, appliedRevision + 1);
+        var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]);
+        candidateRobots.push(new SimulatedRobot(id, runtime, converted.model.name,
+          [for (link in converted.model.links) link.id],
+          [for (joint in converted.model.joints) joint.id]));
+        candidateLinks.push([for (link in converted.model.links) link.id]);
+        var robotIndex = candidateRobots.length - 1;
+        for (occurrence in assembly.occurrences) {
+          var center = session == null ? null : session.assemblyPreviewCenter(occurrence.definition);
+          if (center == null) throw 'Assembly part "${occurrence.definition}" has no preview center';
+          var linkIndex = -1;
+          for (index in 0...converted.model.links.length)
+            if (converted.model.links[index].id == occurrence.id) { linkIndex = index; break; }
+          if (linkIndex < 0) throw 'Assembly occurrence "${occurrence.id}" has no simulated link';
+          candidateAssemblyParts.push({id: "project:" + occurrence.id, robotIndex: robotIndex,
+            linkIndex: linkIndex, center: [for (coordinate in center) coordinate *
+              physical.metresPerUnit]});
+        }
+      }
+      var environmentRecords = scene.records();
+      environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
+      for (object in environmentRecords) if (object.collisionEnabled) {
         var centerX=object.x,centerY=object.y,centerZ=object.z;
         var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
         if(scene.isCadPart(object.id)){
@@ -117,12 +192,15 @@ class ApplicationSimulation {
       simulatedIds = [for (robot in candidateRobots) robot.id()];
       simulatedLinks = candidateLinks;
       simulatedObjects = candidateObjects;
+      assemblyParts = candidateAssemblyParts;
       appliedRevision++;
       appliedDocumentRevision = configuration.revision();
       appliedEnvironmentRevision = scene.environmentRevision;
       appliedBackend=backend;
       appliedTimestep=timestep;
       error = null;
+      presentAssemblyPhysics = running;
+      presentationEpoch++;
       if (previousSimulation != null) previousSimulation.dispose();
       for (robot in previousRobots) robot.close();
       return true;
@@ -146,16 +224,21 @@ class ApplicationSimulation {
     if (simulation == null) throw "Apply the pending simulation configuration first";
     if (running) throw "Stop realtime simulation before deterministic stepping";
     simulation.step(timestampNs == null ? Int64.ofInt(0) : timestampNs);
+    presentAssemblyPhysics = true;
     return world.snapshot();
   }
   public function start():Void {
     if (simulation == null) throw "Apply the pending simulation configuration first";
-    if (!running) simulation.start(); running = true;
+    if (!running) { simulation.start(); presentationEpoch++; }
+    running = true; presentAssemblyPhysics = true;
   }
-  public function stop():Void { if (simulation != null) simulation.stop(); running = false; }
+  public function stop():Void { if (simulation != null) simulation.stop(); running = false;
+    if (presentAssemblyPhysics) presentationEpoch++;
+    presentAssemblyPhysics = false; }
   public function reset():Bool {
     if (simulation == null) return false;
-    simulation.reset(); running = false; return true;
+    simulation.reset(); running = false; presentAssemblyPhysics = false;
+    presentationEpoch++; return true;
   }
   public function isRunning():Bool return running;
   /** True in both running and paused simulation modes. */
@@ -202,7 +285,15 @@ class ApplicationSimulation {
       var pose = environment.get(object.id);
       if (pose != null) orderedEnvironment.push(pose);
     }
-    return new ApplicationPresentationSnapshot(publication, physics, robots, orderedEnvironment);
+    if (presentAssemblyPhysics) for (part in assemblyParts) {
+      var link = robots[part.robotIndex].links[part.linkIndex];
+      var offset = rotateOffset(part.center[0], part.center[1], part.center[2], link.rotation);
+      orderedEnvironment.push({id:part.id,
+        position:[link.position[0] + offset[0], link.position[1] + offset[1],
+          link.position[2] + offset[2]], rotation:link.rotation});
+    }
+    return new ApplicationPresentationSnapshot(publication, physics, robots, orderedEnvironment,
+      presentationEpoch);
   }
 
   public function visualRevision():Int {
@@ -226,6 +317,8 @@ class ApplicationSimulation {
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);
+    assemblyParts.resize(0);
+    presentAssemblyPhysics = false;
     if (simulation != null) simulation.dispose(); simulation = null;
     appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;appliedTimestep=-1;
   }

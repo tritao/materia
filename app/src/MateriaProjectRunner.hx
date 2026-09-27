@@ -22,6 +22,8 @@ import materia.project.AssemblyDefinition.AssemblyStateRecord;
 import cadkit.modeling.AssemblyState;
 import materia.project.AssemblyDefinitionCodec;
 import nativekit.scene.GeometryData;
+import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
+import cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart;
 import sys.FileSystem;
 import sys.io.File;
 import sys.io.Process;
@@ -250,6 +252,7 @@ class MateriaProjectRunner {
     var boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}> = new Map();
     var geometryKeyByDefinition:Map<String, String> = new Map();
     var localCentersByDefinition:Map<String, Array<Float>> = new Map();
+    var physicalParts:Array<AssemblyPhysicalPart> = [];
     for (component in artifact.parts) {
       var label = component.name;
       var minimum = [1e300, 1e300, 1e300], maximum = [-1e300, -1e300, -1e300];
@@ -268,6 +271,14 @@ class MateriaProjectRunner {
         (minimum[0] + maximum[0]) * 0.5,
         (minimum[1] + maximum[1]) * 0.5,
         (minimum[2] + maximum[2]) * 0.5]);
+      var properties = MeshMassProperties.compute(component.vertices, component.indices);
+      var materialId = component.materialId == null ? "neutral" : component.materialId;
+      physicalParts.push({id: component.id, materialId: materialId,
+        volume: component.volume == null ? properties.volume : component.volume,
+        centerOfMass: component.centerOfMass == null ? properties.centerOfMass : component.centerOfMass.copy(),
+        inertia: component.inertia == null ? properties.inertia : component.inertia.copy(),
+        density: component.materialDensity == null
+          ? MaterialLibrary.require(materialId).physical.density : component.materialDensity});
     }
 
     if (artifact.assemblyDefinition != null) {
@@ -300,7 +311,7 @@ class MateriaProjectRunner {
       assemblyDefinition: artifact.assemblyDefinition,
       assemblyState: runtimeState == null ? null : runtimeState.record(),
       localCentersByDefinition: localCentersByDefinition,
-      metresPerUnit: scale};
+      metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts}};
   }
 
   /** Re-evaluate generated occurrence placements for a project-owned configuration. */
@@ -337,7 +348,7 @@ class MateriaProjectRunner {
     return {objects: objects, assembly: legacySnapshot(definition, state),
       geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: definition,
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
-      metresPerUnit: generated.metresPerUnit};
+      metresPerUnit: generated.metresPerUnit, physical: generated.physical};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -474,4 +485,5 @@ typedef GeneratedAssemblyScene = {
   var assemblyState:Null<AssemblyStateRecord>;
   var localCentersByDefinition:Map<String, Array<Float>>;
   var metresPerUnit:Float;
+  var physical:AssemblyPhysicalData;
 }

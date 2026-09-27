@@ -30,6 +30,7 @@ class SensorConfiguration {
   public var selectedIndex(default,null):Int = 0;
   public var robotId(default, null):String = "materia/robot";
   var nextId:Int = 1;
+  var empty:Bool = false;
   var configurationRevision:Int = 0;
   var physicsRevision:Int = 1;
   var observedDocumentRevision:Int = -1;
@@ -43,28 +44,37 @@ class SensorConfiguration {
   final rotations:Map<String, Array<Float>> = new Map();
   final readOnlyRobots:Map<String, Bool> = new Map();
 
-  public function new(?data:Dynamic, ?sharedDocument:EditorDocument) {
+  public function new(?data:Dynamic, ?sharedDocument:EditorDocument, empty:Bool = false) {
     document = sharedDocument == null ? new EditorDocument("sensors") : sharedDocument;
     model=new RobotModel("Materia robot");
     var base=model.addLink(new Link("Base","base"));
     model.addFrame(new Frame("Base sensor mount",base,"base/sensors"));
-    if (data == null) {
+    if (data == null && empty) {
+      this.empty = true;
+      selectedIndex = -1;
+    } else if (data == null) {
       addDirect("lidar");
     } else if (Reflect.hasField(data, "robots")) {
-      var selected = requiredString(data, "selectedRobotId");
-      for (record in requiredArray(data, "robots")) {
+      var loaded = requiredArray(data, "robots");
+      if (loaded.length == 0) { this.empty = true; selectedIndex = -1; }
+      for (record in loaded) {
         var id = requiredString(record, "robotId");
         if (configurations.exists(id)) throw "Duplicate robot sensor configuration";
         configurations.set(id, record);
       }
-      var record = configurations.get(selected);
-      if (record == null) throw "Selected robot has no sensor configuration";
-      loadRobot(record);
+      if (!this.empty) {
+        var selected = requiredString(data, "selectedRobotId");
+        var record = configurations.get(selected);
+        if (record == null) throw "Selected robot has no sensor configuration";
+        loadRobot(record);
+      }
     } else {
       loadRobot(data);
     }
-    configurations.set(robotId, singleRecord());
-    liveModels.set(robotId, model); selections.set(robotId, selectedIndex);
+    if (!this.empty) {
+      configurations.set(robotId, singleRecord());
+      liveModels.set(robotId, model); selections.set(robotId, selectedIndex);
+    }
     if (sharedDocument == null) document.markSaved();
   }
 
@@ -75,8 +85,21 @@ class SensorConfiguration {
     selectedIndex=index;return true;
   }
   public function selectRobot(id:String):Bool {
-    if (id == null || StringTools.trim(id).length == 0 || id == robotId) return false;
+    if (id == null || StringTools.trim(id).length == 0 || (id == robotId && !empty)) return false;
     if (readOnlyRobots.exists(id) && !configurations.exists(id) && !liveModels.exists(id)) return false;
+    if (empty) {
+      var previousId = robotId;
+      var previousModel = model, previousSelection = selectedIndex;
+      document.apply(new EditOperation("Add robot configuration", function() {
+        empty = false; createDefault(id); configurationRevision++;
+      }, function() {
+        configurations.remove(id); liveModels.remove(id); selections.remove(id);
+        nextIds.remove(id); positions.remove(id); rotations.remove(id);
+        robotId = previousId; model = previousModel; selectedIndex = previousSelection;
+        empty = true; configurationRevision++;
+      }));
+      return true;
+    }
     captureCurrent();
     var nextRecord = configurations.get(id);
     if (nextRecord == null) {
@@ -101,6 +124,7 @@ class SensorConfiguration {
     return true;
   }
   public function configuredRobotIds():Array<String> {
+    if (empty) return [];
     captureCurrent(); var result=[for(id in configurations.keys()) id];
     for(id in liveModels.keys())if(result.indexOf(id)<0)result.push(id);
     result.sort(Reflect.compare); return result;
@@ -171,10 +195,18 @@ class SensorConfiguration {
     var sensor = createSensor(kind);
     var previous = selectedIndex;
     document.apply(new EditOperation("Add " + kind + " sensor", function() {
+      if (empty) {
+        empty = false;
+        configurations.set(ownerId, singleRecord()); liveModels.set(ownerId, owner);
+      }
       if (owner.sensors.indexOf(sensor) < 0) owner.addSensor(sensor);
       if (robotId == ownerId) selectedIndex = owner.sensors.indexOf(sensor);
     }, function() {
       owner.sensors.remove(sensor);
+      if (owner.sensors.length == 0 && configurations.get(ownerId) != null &&
+          configuredRobotIds().length == 1) {
+        configurations.remove(ownerId); liveModels.remove(ownerId); empty = true;
+      }
       if (robotId == ownerId) selectedIndex = previous;
     }));
     return sensor;
@@ -220,6 +252,7 @@ class SensorConfiguration {
     return [for(id in configuredRobotIds()) configurations.get(id)];
   }
   public function robotModels():Array<{id:String,model:RobotModel,position:Array<Float>,rotation:Array<Float>}> {
+    if (empty) return [];
     captureCurrent(); var selected=robotId;
     var result:Array<{id:String,model:RobotModel,position:Array<Float>,rotation:Array<Float>}> = [];
     for(id in configuredRobotIds()) {
@@ -301,6 +334,7 @@ class SensorConfiguration {
   };
 
   function captureCurrent():Void {
+    if (empty) return;
     configurations.set(robotId, singleRecord()); liveModels.set(robotId,model);
     selections.set(robotId,selectedIndex);nextIds.set(robotId,nextId);
   }

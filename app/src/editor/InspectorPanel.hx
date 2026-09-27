@@ -57,6 +57,8 @@ class InspectorPanel {
     var rows:Array<KeyedView> = [new KeyedView("heading",sectionHeading(selected.label))];
     var assembly = session.projectAssembly;
     if (assembly != null && StringTools.startsWith(selected.id, "project:")) {
+      if (simulation.isActive()) rows.push(new KeyedView("assembly-simulation-hint",
+        new Text("Stop the simulation to edit assembly joints.")));
       var instanceId = selected.id.substr(8);
       var jointLines:Array<String> = [];
       for (joint in assembly.joints) if (joint.parent == instanceId || joint.child == instanceId)

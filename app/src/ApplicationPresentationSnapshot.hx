@@ -12,9 +12,11 @@ class ApplicationPresentationSnapshot {
 	public final environment:Array<SimulationPoseVisual>;
 
 	public function new(world:WorldSnapshot, nativeSnapshot:Null<SimulationPresentationSnapshot>,
-		robots:Array<SimulationRobotVisual>, environment:Array<SimulationPoseVisual>) {
+		robots:Array<SimulationRobotVisual>, environment:Array<SimulationPoseVisual>,
+		presentationEpoch:Int = 0) {
 		this.world = world;
-		this.revision = nativeSnapshot == null ? 0 : haxe.Int64.toInt(nativeSnapshot.stepIndex);
+		this.revision = (nativeSnapshot == null ? 0 : haxe.Int64.toInt(nativeSnapshot.stepIndex)) +
+			presentationEpoch * 1000000;
 		this.simulationTime = nativeSnapshot == null ? 0.0 : nativeSnapshot.simulationTime;
 		this.robots = robots;
 		this.environment = environment;

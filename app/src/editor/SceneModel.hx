@@ -132,7 +132,7 @@ class SceneModel {
           old.width != record.width || old.height != record.height || old.depth != record.depth ||
           !EditorScene.sameRotation(old.rotation, record.rotation) || old.cadGraph != record.cadGraph ||
           old.meshSnapshot != record.meshSnapshot || old.dynamicBody != record.dynamicBody ||
-          old.mass != record.mass) return true;
+          old.mass != record.mass || old.materialId != record.materialId) return true;
     }
     for (item in objects) if (item.collisionEnabled && !nextIds.exists(item.id)) return true;
     return false;
@@ -141,7 +141,7 @@ class SceneModel {
   public static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
     return new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
       item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
-      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance);
+      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId);
   }
 
   public function records():Array<SceneObjectData> {
@@ -151,7 +151,7 @@ class SceneModel {
         x: item.x, y: item.y, z: item.z,
         width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
-        appearance:item.appearance,
+        appearance:item.appearance,materialId:item.materialId,
         visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
         rotation:item.rotation});
     }

@@ -73,7 +73,7 @@ class SensorPanel {
     ],actionRowStyle());
     var applySimulation = new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild", null,
       function() {
-        log(simulation.rebuild(sensors,scene) ? "Shared simulation configuration applied" :
+        log(simulation.rebuild(sensors,scene,session) ? "Shared simulation configuration applied" :
           "Simulation rebuild rejected: " + simulation.error);
         commands.refresh();
       }, "sensor-apply");

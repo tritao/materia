@@ -3,6 +3,7 @@ import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord;
 import materia.project.AssemblyDefinition;
 import materia.project.AssemblyDefinition.AssemblyStateRecord;
+import materia.project.AssemblyDefinition.AssemblyJointRole;
 
 /** A posed excavator mechanism. Coordinates are millimetres in each part's CAD frame. */
 class ProceduralExcavatorAssembly {
@@ -18,11 +19,13 @@ class ProceduralExcavatorAssembly {
 			"boom-cylinder-hinge", "boom-cylinder-slide",
 			"stick-cylinder-hinge", "stick-cylinder-slide",
 			"bucket-cylinder-hinge", "bucket-cylinder-slide"];
+		var treeDependent = [for (id in dependent) for (joint in state.definition.joints)
+			if (joint.id == id && joint.role == AssemblyJointRole.Tree) id];
 		// Start near the authored pose to choose the same linkage branch, then
 		// let the closure solver restore pin coincidence and cylinder lengths.
-		for (joint in dependent)
+		for (joint in treeDependent)
 			state.setJoint(joint, state.joint(joint) + (StringTools.endsWith(joint, "-slide") ? 0.1 : 0.002));
-		var result = state.solveClosures(dependent);
+		var result = state.solveClosures(treeDependent);
 		if (!result.converged)
 			throw 'Excavator closure solve failed: ${result.message} (${result.closureIds.join(", ")})';
 		return state.record();
