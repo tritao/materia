@@ -220,7 +220,7 @@ DerivativeMaxima derivative_maxima(const Trajectory &trajectory) {
     return maxima;
 }
 
-double comparison_tolerance(double limit, double next_derivative_maximum,
+double comparison_tolerance(double magnitude_scale, double next_derivative_maximum,
                             uint64_t resolution_ns) {
     // 1e-9 relative slack covers floating-point comparisons. The 1e-6
     // relative cap matches RobotKit's existing chord-velocity slack and
@@ -230,8 +230,21 @@ double comparison_tolerance(double limit, double next_derivative_maximum,
     const long double quantization = static_cast<long double>(next_derivative_maximum) *
         static_cast<long double>(resolution_ns) * 0.5e-9L;
     return static_cast<double>(std::min(
-        std::max(static_cast<long double>(relative_epsilon * std::abs(limit)), quantization),
-        static_cast<long double>(maximum_relative_tolerance * std::abs(limit))));
+        std::max(static_cast<long double>(relative_epsilon * magnitude_scale), quantization),
+        static_cast<long double>(maximum_relative_tolerance * magnitude_scale)));
+}
+
+double position_comparison_tolerance(double lower, double upper,
+                                     double maximum_velocity, uint64_t resolution_ns) {
+    // Positions are affine: shifting the joint origin must not change its
+    // tolerance. A degenerate range uses a 1e-12 absolute comparison floor
+    // (the same floor as a 1e-3 range under the 1e-9 relative rule).
+    const long double range = static_cast<long double>(upper) - lower;
+    const double scale = range > 0.0L
+        ? static_cast<double>(std::min(range,
+            static_cast<long double>(std::numeric_limits<double>::max())))
+        : 1e-3;
+    return comparison_tolerance(scale, maximum_velocity, resolution_ns);
 }
 
 } // namespace
@@ -310,8 +323,8 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                             const bool upper_side = value - upper >= lower - value;
                             const double limit = upper_side ? upper : lower;
                             const long double excess = upper_side ? value - upper : lower - value;
-                            const double tolerance = comparison_tolerance(limit, maxima[joint][1],
-                                report.executor_time_resolution_ns);
+                            const double tolerance = position_comparison_tolerance(lower, upper,
+                                maxima[joint][1], report.executor_time_resolution_ns);
                             const double margin = -static_cast<double>(excess);
                             const long double score = (excess - tolerance) /
                                 std::max(1.0, upper - lower);
@@ -322,7 +335,7 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                             const double limit = order == 1 ? limits.max_velocity[joint] :
                                 order == 2 ? limits.max_acceleration[joint] : limits.max_jerk[joint];
                             const double magnitude = std::abs(value);
-                            const double tolerance = comparison_tolerance(limit,
+                            const double tolerance = comparison_tolerance(std::abs(limit),
                                 maxima[joint][order + 1], report.executor_time_resolution_ns);
                             const double margin = limit - magnitude;
                             const double scale = std::max({limit, tolerance, 1e-30});
@@ -357,7 +370,7 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
             for (uint32_t order = 0; order < 3; ++order) {
                 const double limit = limits.max_continuity_jump[order];
                 if (limit > 0.0) {
-                    const double tolerance = comparison_tolerance(limit,
+                    const double tolerance = comparison_tolerance(std::abs(limit),
                         maxima[joint][order + 1], report.executor_time_resolution_ns);
                     const double margin = limit - jumps[order];
                     const double scale = std::max({limit, tolerance, 1e-30});

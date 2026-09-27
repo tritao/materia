@@ -138,7 +138,8 @@ typedef struct mk_limits {
     double max_acceleration[MK_MAX_JOINTS];
     double max_jerk[MK_MAX_JOINTS];
     double max_continuity_jump[3]; /**< Optional C0, C1, C2 jump claims. */
-    uint64_t executor_time_resolution_ns; /**< Zero defaults to 1 ns; device compilers supply their tick period. */
+    /** Zero defaults to 1 ns. Round non-integer device tick periods up (e.g. 5.88 ns to 6 ns). */
+    uint64_t executor_time_resolution_ns;
 } mk_limits;
 
 typedef struct mk_validation_check {

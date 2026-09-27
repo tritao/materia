@@ -256,6 +256,34 @@ void unchanged_state_has_one_nanosecond_segment() {
     mk_trajectory_destroy(trajectory);
 }
 
+void zero_origin_travel_limit_is_translation_invariant() {
+    double reference_tolerance = 0.0;
+    for (double offset : {0.0, 1000.0}) {
+        auto request = standard();
+        request.current_position[0] = offset + 1.0;
+        request.target_position[0] = offset;
+        mk_trajectory_handle trajectory{};
+        int32_t result = -999;
+        assert(mk_generate_state_to_state(&request, &trajectory, &result) == MK_OK);
+        mk_limits limits{};
+        limits.struct_size = sizeof(limits);
+        limits.joint_count = 1;
+        limits.position_claimed[0] = 1;
+        limits.position_lower[0] = offset;
+        limits.position_upper[0] = offset + 2.0;
+        mk_validation_report report{};
+        report.struct_size = sizeof(report);
+        assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+        const auto &check = report.checks[MK_CHECK_POSITION];
+        assert(check.status == MK_CHECK_PASSED);
+        near(check.limit, offset);
+        assert(check.tolerance > 0.0);
+        if (offset == 0.0) reference_tolerance = check.tolerance;
+        else near(check.tolerance, reference_tolerance, 1e-15);
+        mk_trajectory_destroy(trajectory);
+    }
+}
+
 } // namespace
 
 int main() {
@@ -265,4 +293,5 @@ int main() {
     brake_and_travel_limit();
     invalid_input_maps_result();
     unchanged_state_has_one_nanosecond_segment();
+    zero_origin_travel_limit_is_translation_invariant();
 }

@@ -767,3 +767,18 @@ legacy point-chunk STOP braking estimates and published queue-depth semantics;
 use analytic velocity/acceleration for native segment chunks, and bound the
 underlying queue by actual segments with conservative reservations for legacy
 submissions. No P6 tests or implementation have been started.
+
+### P4/P5 follow-up — Origin-invariant position tolerance
+
+Position comparisons now scale their 1e-9 relative floor and 1e-6 relative
+cap by the joint's claimed travel range, not the absolute position-limit
+value. This makes validation invariant under a shift of joint origin and
+restores a nonzero nanosecond-quantization allowance at a lower travel limit
+of zero. A zero-width claimed range uses an absolute 1e-12 position floor.
+Velocity, acceleration, jerk, and continuity checks retain their previous
+magnitude scaling. Documented that device compilers round fractional tick
+periods up to whole nanoseconds before setting the executor resolution.
+Native tests cover a Ruckig move ending at zero, the same axis shifted by
+1000, a real zero-limit overshoot, and the zero-width fallback. Commit: the
+commit containing this entry. MotionKit and RobotKit native/Haxe suites, both
+FFI audits, and TCP default, session, and lease-timeout modes passed.

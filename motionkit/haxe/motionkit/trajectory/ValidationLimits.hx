@@ -56,7 +56,7 @@ class ValidationLimits {
     native.set_max_continuity_jump(order, maximumJump);
   }
 
-  /** Executor clock resolution in nanoseconds; zero uses the 1 ns host default. */
+  /** Executor clock resolution in nanoseconds; zero uses 1 ns. Round fractional device ticks up. */
   public function timeResolutionNs(resolution:Int64):Void {
     if (Int64.compare(resolution, Int64.ofInt(0)) < 0)
       throw "Validation time resolution must be nonnegative";

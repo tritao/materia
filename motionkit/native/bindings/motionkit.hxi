@@ -99,7 +99,7 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") {
 		 */
 		max_continuity_jump: array<f64, 3> @offset(2840);
 		/**
-		 * < Zero defaults to 1 ns; device compilers supply their tick period.
+		 * Zero defaults to 1 ns. Round non-integer device tick periods up (e.g. 5.88 ns to 6 ns).
 		 */
 		executor_time_resolution_ns: u64 @offset(2864);
 	}

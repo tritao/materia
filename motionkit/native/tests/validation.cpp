@@ -250,6 +250,34 @@ void executor_resolution_and_tolerance_cap() {
     mk_trajectory_destroy(trajectory);
 }
 
+void zero_origin_real_overshoot_fails() {
+    mk_trajectory_handle trajectory{};
+    assert(mk_trajectory_create(1, &trajectory) == MK_OK);
+    mk_segment segment{};
+    segment.struct_size = sizeof(segment);
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 0;
+    segment.joint_count = 1;
+    segment.coefficients[0].value[0] = -1e-4;
+    assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+    mk_limits limits{};
+    limits.struct_size = sizeof(limits);
+    limits.joint_count = 1;
+    limits.position_claimed[0] = 1;
+    limits.position_lower[0] = 0.0;
+    limits.position_upper[0] = 2.0;
+    mk_validation_report report{};
+    report.struct_size = sizeof(report);
+    assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+    assert(report.checks[MK_CHECK_POSITION].status == MK_CHECK_FAILED);
+    near(report.checks[MK_CHECK_POSITION].tolerance, 2e-9);
+    limits.position_upper[0] = 0.0;
+    assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+    assert(report.checks[MK_CHECK_POSITION].status == MK_CHECK_FAILED);
+    near(report.checks[MK_CHECK_POSITION].tolerance, 1e-12);
+    mk_trajectory_destroy(trajectory);
+}
+
 } // namespace
 
 int main() {
@@ -258,5 +286,6 @@ int main() {
     quintic_quartic_critical_point();
     explicit_quantization_tolerance();
     executor_resolution_and_tolerance_cap();
+    zero_origin_real_overshoot_fails();
     nonfinite_extrema_rejected();
 }
