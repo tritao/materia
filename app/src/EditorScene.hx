@@ -57,6 +57,7 @@ import app.SketchDraftCodec.SketchDraftRecord;
 import app.editor.SelectionModel;
 import app.editor.SceneModel;
 import app.editor.ScenePresentation;
+import app.editor.SketchEditController;
 import app.editor.SceneModel.SceneRecordChange;
 import app.editor.ObjectKindRegistry;
 import haxe.io.Path as FilePath;
@@ -146,12 +147,25 @@ class EditorScene {
   function get_selectedCadFace():Null<Shape> return selection.selectedCadFace;
   var selectedFeatureKey(get, never):Null<String>;
   function get_selectedFeatureKey():Null<String> return selection.selectedFeatureKey;
-  var activeSketchEdit:Null<CadSketchEditSession> = null;
-  var activeSketchObjectId:Null<String> = null;
-  var sketchEditPlaneValue:Null<Plane> = null;
-  var sketchDraftRevision:Int = 0;
-  var savedSketchDraftRevision:Int = 0;
-  var savedSketchDraftPresent:Bool = false;
+  final sketchController:SketchEditController;
+  var activeSketchEdit(get, set):Null<CadSketchEditSession>;
+  function get_activeSketchEdit():Null<CadSketchEditSession> return sketchController.activeSketchEdit;
+  function set_activeSketchEdit(value:Null<CadSketchEditSession>):Null<CadSketchEditSession> return sketchController.activeSketchEdit = value;
+  var activeSketchObjectId(get, set):Null<String>;
+  function get_activeSketchObjectId():Null<String> return sketchController.activeSketchObjectId;
+  function set_activeSketchObjectId(value:Null<String>):Null<String> return sketchController.activeSketchObjectId = value;
+  var sketchEditPlaneValue(get, set):Null<Plane>;
+  function get_sketchEditPlaneValue():Null<Plane> return sketchController.sketchEditPlaneValue;
+  function set_sketchEditPlaneValue(value:Null<Plane>):Null<Plane> return sketchController.sketchEditPlaneValue = value;
+  var sketchDraftRevision(get, set):Int;
+  function get_sketchDraftRevision():Int return sketchController.sketchDraftRevision;
+  function set_sketchDraftRevision(value:Int):Int return sketchController.sketchDraftRevision = value;
+  var savedSketchDraftRevision(get, set):Int;
+  function get_savedSketchDraftRevision():Int return sketchController.savedSketchDraftRevision;
+  function set_savedSketchDraftRevision(value:Int):Int return sketchController.savedSketchDraftRevision = value;
+  var savedSketchDraftPresent(get, set):Bool;
+  function get_savedSketchDraftPresent():Bool return sketchController.savedSketchDraftPresent;
+  function set_savedSketchDraftPresent(value:Bool):Bool return sketchController.savedSketchDraftPresent = value;
   public var revision(default, null):Int;
   public var visualRevision(default, null):Int;
   /** Changes only when simulation-consumed scene content changes, not selection. */
@@ -199,6 +213,7 @@ class EditorScene {
     document = sharedDocument == null ? new EditorDocument("scene") : sharedDocument;
     model = new SceneModel();
     presentation = new ScenePresentation();
+    sketchController = new SketchEditController();
     objects = [];
     cadSessions = new Map();
     try {
@@ -460,13 +475,13 @@ class EditorScene {
     sketchEditPlaneValue = plane;
     activeSketchEdit = session.beginNewSketchEdit(plane, "mm");
     activeSketchObjectId = id;
-    sketchDraftRevision++;
+    sketchDraftRevision = sketchDraftRevision + 1;
     refreshSelectionRevision();
     return true;
   }
 
   public function canAddSketchDraftRectangle():Bool {
-    var draft = activeSketchEdit;
+    var draft:CadSketchEditSession = cast activeSketchEdit;
     if (draft == null)
       return false;
     var sketch = draft.sketch.snapshot();
@@ -1091,19 +1106,8 @@ class EditorScene {
 
   function runCadEdit(id:String, edit:CadDocumentSession->Void,
       rollback:CadDocumentSession->Void):Void {
-    var session = requireCadSession(id);
-    session.perform(edit);
-    try {
-      syncCadSession(id);
-    } catch (error:Dynamic) {
-      try {
-        session.perform(rollback);
-        syncCadSession(id);
-      } catch (_:Dynamic) {}
-      throw error;
-    }
+    sketchController.runCadEdit(requireCadSession(id), function() syncCadSession(id), edit, rollback);
   }
-
   function applyConstrainedSketchSnapshot(session:CadDocumentSession, featureId:Int,
       sketch:ConstrainedSketch):Void {
     var candidate = session.document.featureById(featureId);
@@ -1752,7 +1756,8 @@ class EditorScene {
     var marker = selectedFeatureKey.indexOf(":feature:");
     var index = Std.parseInt(selectedFeatureKey.substr(marker + 9));
     activeSketchEdit = requireCadSession(selectedId).beginSketchEdit(index);
-    var feature:ConstrainedSketchFeature = cast activeSketchEdit.feature;
+    var draft:CadSketchEditSession = cast activeSketchEdit;
+    var feature:ConstrainedSketchFeature = cast draft.feature;
     sketchEditPlaneValue = feature.workplane();
     activeSketchObjectId = selectedId;
     refreshSelectionRevision();
@@ -1806,56 +1811,18 @@ class EditorScene {
     throw "sketch draft feature is no longer in its document";
   }
 
-  public function sketchDraftPlane():Null<Plane>
-    return activeSketchEdit == null ? null : sketchEditPlaneValue;
+  public function sketchDraftPlane():Null<Plane> return sketchController.plane();
 
-  public function sketchDraftSnapshot():Null<ConstrainedSketch> {
-    var draft = activeSketchEdit;
-    return draft == null ? null : draft.sketch.snapshot();
-  }
+  public function sketchDraftSnapshot():Null<ConstrainedSketch> return sketchController.snapshot();
 
-  public function sketchDraftSolution():Null<SolvedSketch> {
-    if (activeSketchEdit == null)
-      return null;
-    var session = activeSketchEdit.sketch;
-    return session.solution == null ? session.lastValidSolution : session.solution;
-  }
+  public function sketchDraftSolution():Null<SolvedSketch> return sketchController.solution();
 
-  public function canApplySelectedSketchEdit():Bool {
-    var draft = activeSketchEdit;
-    if (draft == null || !draft.sketch.isSolved)
-      return false;
-    try {
-      var profile = draft.sketch.buildProfile();
-      profile.close();
-      return true;
-    } catch (_:Dynamic) {
-      return false;
-    }
-  }
+  public function canApplySelectedSketchEdit():Bool return sketchController.canApply();
 
-  public function sketchEditSummary():Null<String> {
-    var draft = activeSketchEdit;
-    if (draft == null)
-      return null;
-    if (draft.sketch.snapshot().entities().length == 0)
-      return "Sketch is empty · drag on the workplane to draw a rectangle";
-    var diagnostic = draft.sketch.diagnostic;
-    if (diagnostic == null)
-      return "Sketch draft has not been solved";
-    return diagnostic.message + " · " + draft.sketch.degreesOfFreedom
-      + " degrees of freedom" + (diagnostic.constraintIds.length == 0
-        ? "" : " · constraints: " + diagnostic.constraintIds.join(", "))
-      + " · drag to add a rectangle";
-  }
+  public function sketchEditSummary():Null<String> return sketchController.summary();
 
   public function cancelSelectedSketchEdit():Bool {
-    if (activeSketchEdit == null)
-      return false;
-    activeSketchEdit.cancel();
-    activeSketchEdit = null;
-    activeSketchObjectId = null;
-    sketchEditPlaneValue = null;
+    if (!sketchController.cancel()) return false;
     refreshSelectionRevision();
     return true;
   }
@@ -2558,7 +2525,8 @@ class EditorScene {
   function sketchPoint(id:String):SketchPoint {
     if (activeSketchEdit == null)
       throw "Sketch draft is no longer active";
-    for (point in activeSketchEdit.sketch.snapshot().points())
+    var draft:CadSketchEditSession = cast activeSketchEdit;
+    for (point in draft.sketch.snapshot().points())
       if (point.id == id) return point;
     throw "Sketch draft point no longer exists: " + id;
   }
@@ -2566,7 +2534,8 @@ class EditorScene {
   function sketchConstraint(id:String):SketchConstraint {
     if (activeSketchEdit == null)
       throw "Sketch draft is no longer active";
-    for (constraint in activeSketchEdit.sketch.snapshot().constraints())
+    var draft:CadSketchEditSession = cast activeSketchEdit;
+    for (constraint in draft.sketch.snapshot().constraints())
       if (constraint.id == id) return constraint;
     throw "Sketch draft constraint no longer exists: " + id;
   }
@@ -2574,8 +2543,9 @@ class EditorScene {
   function editSketchDraft(change:ConstrainedSketch->Void):Void {
     if (activeSketchEdit == null)
       throw "Sketch draft is no longer active";
-    activeSketchEdit.edit(change);
-    sketchDraftRevision++;
+    var draft:CadSketchEditSession = cast activeSketchEdit;
+    draft.edit(change);
+    sketchDraftRevision = sketchDraftRevision + 1;
     refreshSelectionRevision();
   }
 
