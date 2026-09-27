@@ -2,6 +2,7 @@
 #include "motionkit.h"
 #include <cassert>
 #include <cmath>
+#include <cstring>
 #include <cstdio>
 
 using namespace robotkit;
@@ -149,8 +150,89 @@ void dual_drive_layout() {
     assert(missed->diagnostic_code() == RK_FAULT_DUAL_DRIVE_SKEW);
 }
 
+std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.joint_count = 1;
+    blueprint.owner_period_ns = 10'000'000;
+    blueprint.joints[0].lower_limit = -10;
+    blueprint.joints[0].upper_limit = 10;
+    blueprint.joints[0].max_velocity = 1;
+    blueprint.joints[0].max_acceleration = 10;
+    blueprint.channel_count = 1;
+    std::strcpy(blueprint.channels[0].id, "sprayer.flow");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
+    VirtualDeviceConfig6 config;
+    config.fingerprint.fill(8);
+    config.steps_per_unit = {1'000};
+    config.clock_bound_ns = 5'000'000;
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    rk_robot_state state{};
+    endpoint->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.plan_id = 60;
+    plan.sequence = 1;
+    plan.ends_at_rest = 1;
+    plan.segments.segment_count = 1;
+    plan.segments.segments[0].duration_ns = 1'000'000'000;
+    plan.segments.segments[0].degree = 1;
+    plan.segments.segments[0].joint_count = 1;
+    plan.segments.segments[0].coefficients[0].value[1] = 0.5;
+    plan.event_count = 2;
+    plan.events[0].time_ns = 250'000'000;
+    std::strcpy(plan.events[0].channel, "sprayer.flow");
+    plan.events[0].value.kind = RK_EVENT_DIGITAL;
+    plan.events[0].value.digital = 1;
+    plan.events[0].hold_policy = RK_EVENT_RESTORE_ON_RESUME;
+    plan.events[1] = plan.events[0];
+    plan.events[1].time_ns = 750'000'000;
+    plan.events[1].value.digital = 0;
+    assert(endpoint->submit_device_plan(plan, 0, 120'000'000, 20'000'000,
+        blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 500'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    assert(endpoint->event_log().size() == 1);
+    assert(endpoint->channel_values()[0] == 1.0f);
+    if (hold || stop) {
+        rk_robot_command command{};
+        command.kind = hold ? RK_COMMAND_HOLD : RK_COMMAND_STOP;
+        assert(endpoint->apply(command) == RK_OK);
+    }
+    for (std::uint64_t now = 510'000'000; now <= 900'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    if (hold) {
+        assert(endpoint->event_log().size() == 1);
+        assert(endpoint->channel_values()[0] == 0.0f);
+        rk_robot_command resume{};
+        resume.kind = RK_COMMAND_RESUME;
+        assert(endpoint->apply(resume) == RK_OK);
+    }
+    for (std::uint64_t now = 910'000'000; now <= 1'900'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    auto events = endpoint->event_log();
+    assert(events.size() == (stop ? 1u : 2u));
+    assert(endpoint->channel_values()[0] == 0.0f);
+    for (const auto &event : events) {
+        assert(event.plan_id == 60 && event.channel == 0 && event.kind == RK_EVENT_DIGITAL);
+        assert(event.applied_path_ticks >= event.scheduled_path_ticks);
+        assert(event.applied_path_ticks - event.scheduled_path_ticks <= 25);
+    }
+    return events;
+}
+
 int main() {
     dual_drive_layout();
+    const auto ordinary_events = run_event_pair(false, false);
+    const auto held_events = run_event_pair(true, false);
+    run_event_pair(false, true);
+    assert(held_events[1].device_ticks > ordinary_events[1].device_ticks);
     VirtualDeviceConfig6 config;
     config.fingerprint.fill(7);
     config.steps_per_unit = {1'000};

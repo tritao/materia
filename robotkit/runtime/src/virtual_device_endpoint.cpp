@@ -55,6 +55,18 @@ public:
         for (const auto &row : rows) result.push_back({row.ticks, row.actuator, row.forward != 0});
         return result;
     }
+    std::vector<VirtualEventRecord6> events() const {
+        const auto count = rkd_virtual_event_log(device_, nullptr, 0);
+        std::vector<rkd_virtual_event_record> rows(count);
+        if (rkd_virtual_event_log(device_, rows.data(), rows.size()) != count) return {};
+        std::vector<VirtualEventRecord6> result;
+        result.reserve(count);
+        for (const auto &row : rows)
+            result.push_back({row.plan_id, row.scheduled_path_ticks,
+                row.applied_path_ticks, row.device_ticks, row.channel,
+                row.kind, row.digital});
+        return result;
+    }
     bool send(std::span<const std::uint8_t> frame) override {
         if (!device_) return false;
         device_frame6::Frame decoded{};
@@ -173,7 +185,8 @@ std::shared_ptr<VirtualDeviceEndpoint> VirtualDeviceEndpoint::create(
             if (config.actuators[j].id == config.actuators[i].id) return {};
     }
     const auto base_fingerprint = config.fingerprint;
-    config.fingerprint = fingerprint_device_layout6(base_fingerprint, config.actuators);
+    config.fingerprint = fingerprint_device_layout6(base_fingerprint, config.actuators,
+        std::span(blueprint.channels, blueprint.channel_count));
     auto transport = std::make_unique<Link>(config, count);
     if (!transport->valid()) return {};
     auto *link = transport.get();
@@ -223,5 +236,6 @@ std::vector<double> VirtualDeviceEndpoint::joint_positions() const {
 }
 std::vector<float> VirtualDeviceEndpoint::channel_values() const { return link_->channels(); }
 std::vector<VirtualStepRecord6> VirtualDeviceEndpoint::step_log() const { return link_->steps(); }
+std::vector<VirtualEventRecord6> VirtualDeviceEndpoint::event_log() const { return link_->events(); }
 
 } // namespace robotkit

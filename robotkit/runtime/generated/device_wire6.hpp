@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 8;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 9;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -30,7 +30,7 @@ enum class MessageType6 : std::uint8_t {
     event = 16,
 };
 
-inline constexpr std::size_t SessionBegin6_SIZE = 1515;
+inline constexpr std::size_t SessionBegin6_SIZE = 4908;
 struct SessionBegin6 {
     static constexpr std::size_t SIZE = SessionBegin6_SIZE;
     std::uint64_t session{};
@@ -48,6 +48,13 @@ struct SessionBegin6 {
     std::array<float, 64> actuator_ratio{};
     std::array<float, 64> dual_drive_skew_bound{};
     std::uint64_t link_loss_timeout_ns{};
+    std::uint8_t channel_count{};
+    std::array<std::uint8_t, 1536> channel_id{};
+    std::array<std::uint8_t, 32> channel_kind{};
+    std::array<std::uint8_t, 32> safe_digital{};
+    std::array<float, 32> safe_analog{};
+    std::array<float, 32> safe_argument{};
+    std::array<std::uint8_t, 1536> safe_command{};
 };
 
 inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
@@ -135,6 +142,38 @@ inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
     out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 40);
     out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 48);
     out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 56);
+    const std::uint8_t bits_channel_count = static_cast<std::uint8_t>(value.channel_count);
+    out[offset++] = static_cast<std::uint8_t>(bits_channel_count >> 0);
+    for (std::size_t i = 0; i < 1536; ++i) {
+        const std::uint8_t bits_channel_id = static_cast<std::uint8_t>(value.channel_id[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_channel_id >> 0);
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        const std::uint8_t bits_channel_kind = static_cast<std::uint8_t>(value.channel_kind[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_channel_kind >> 0);
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        const std::uint8_t bits_safe_digital = static_cast<std::uint8_t>(value.safe_digital[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_digital >> 0);
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        const std::uint32_t bits_safe_analog = std::bit_cast<std::uint32_t>(value.safe_analog[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_analog >> 0);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_analog >> 8);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_analog >> 16);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_analog >> 24);
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        const std::uint32_t bits_safe_argument = std::bit_cast<std::uint32_t>(value.safe_argument[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_argument >> 0);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_argument >> 8);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_argument >> 16);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_argument >> 24);
+    }
+    for (std::size_t i = 0; i < 1536; ++i) {
+        const std::uint8_t bits_safe_command = static_cast<std::uint8_t>(value.safe_command[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_safe_command >> 0);
+    }
     return true;
 }
 
@@ -238,6 +277,180 @@ inline bool decode(std::span<const std::uint8_t> input, SessionBegin6 &value) {
     bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 48;
     bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 56;
     value.link_loss_timeout_ns = bits_link_loss_timeout_ns;
+    std::uint8_t bits_channel_count = 0;
+    bits_channel_count |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.channel_count = bits_channel_count;
+    for (std::size_t i = 0; i < 1536; ++i) {
+        std::uint8_t bits_channel_id = 0;
+        bits_channel_id |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.channel_id[i] = bits_channel_id;
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        std::uint8_t bits_channel_kind = 0;
+        bits_channel_kind |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.channel_kind[i] = bits_channel_kind;
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        std::uint8_t bits_safe_digital = 0;
+        bits_safe_digital |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.safe_digital[i] = bits_safe_digital;
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        std::uint32_t bits_safe_analog = 0;
+        bits_safe_analog |= static_cast<std::uint32_t>(input[offset++]) << 0;
+        bits_safe_analog |= static_cast<std::uint32_t>(input[offset++]) << 8;
+        bits_safe_analog |= static_cast<std::uint32_t>(input[offset++]) << 16;
+        bits_safe_analog |= static_cast<std::uint32_t>(input[offset++]) << 24;
+        value.safe_analog[i] = std::bit_cast<float>(bits_safe_analog);
+    }
+    for (std::size_t i = 0; i < 32; ++i) {
+        std::uint32_t bits_safe_argument = 0;
+        bits_safe_argument |= static_cast<std::uint32_t>(input[offset++]) << 0;
+        bits_safe_argument |= static_cast<std::uint32_t>(input[offset++]) << 8;
+        bits_safe_argument |= static_cast<std::uint32_t>(input[offset++]) << 16;
+        bits_safe_argument |= static_cast<std::uint32_t>(input[offset++]) << 24;
+        value.safe_argument[i] = std::bit_cast<float>(bits_safe_argument);
+    }
+    for (std::size_t i = 0; i < 1536; ++i) {
+        std::uint8_t bits_safe_command = 0;
+        bits_safe_command |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.safe_command[i] = bits_safe_command;
+    }
+    return true;
+}
+
+inline constexpr std::size_t Event6_SIZE = 84;
+struct Event6 {
+    static constexpr std::size_t SIZE = Event6_SIZE;
+    std::uint64_t queue_revision{};
+    std::uint64_t plan_id{};
+    std::uint64_t path_ticks{};
+    std::uint8_t channel{};
+    std::uint8_t kind{};
+    std::uint8_t hold_policy{};
+    std::uint8_t digital{};
+    float analog{};
+    float argument{};
+    std::array<std::uint8_t, 48> command{};
+};
+
+inline bool encode(const Event6 &value, std::span<std::uint8_t> out) {
+    if (out.size() < Event6_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint64_t bits_queue_revision = static_cast<std::uint64_t>(value.queue_revision);
+    out[offset++] = static_cast<std::uint8_t>(bits_queue_revision >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_queue_revision >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_queue_revision >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_queue_revision >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_queue_revision >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_queue_revision >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_queue_revision >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_queue_revision >> 56);
+    const std::uint64_t bits_plan_id = static_cast<std::uint64_t>(value.plan_id);
+    out[offset++] = static_cast<std::uint8_t>(bits_plan_id >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_plan_id >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_plan_id >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_plan_id >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_plan_id >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_plan_id >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_plan_id >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_plan_id >> 56);
+    const std::uint64_t bits_path_ticks = static_cast<std::uint64_t>(value.path_ticks);
+    out[offset++] = static_cast<std::uint8_t>(bits_path_ticks >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_path_ticks >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_path_ticks >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_path_ticks >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_path_ticks >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_path_ticks >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_path_ticks >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_path_ticks >> 56);
+    const std::uint8_t bits_channel = static_cast<std::uint8_t>(value.channel);
+    out[offset++] = static_cast<std::uint8_t>(bits_channel >> 0);
+    const std::uint8_t bits_kind = static_cast<std::uint8_t>(value.kind);
+    out[offset++] = static_cast<std::uint8_t>(bits_kind >> 0);
+    const std::uint8_t bits_hold_policy = static_cast<std::uint8_t>(value.hold_policy);
+    out[offset++] = static_cast<std::uint8_t>(bits_hold_policy >> 0);
+    const std::uint8_t bits_digital = static_cast<std::uint8_t>(value.digital);
+    out[offset++] = static_cast<std::uint8_t>(bits_digital >> 0);
+    const std::uint32_t bits_analog = std::bit_cast<std::uint32_t>(value.analog);
+    out[offset++] = static_cast<std::uint8_t>(bits_analog >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_analog >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_analog >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_analog >> 24);
+    const std::uint32_t bits_argument = std::bit_cast<std::uint32_t>(value.argument);
+    out[offset++] = static_cast<std::uint8_t>(bits_argument >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_argument >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_argument >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_argument >> 24);
+    for (std::size_t i = 0; i < 48; ++i) {
+        const std::uint8_t bits_command = static_cast<std::uint8_t>(value.command[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_command >> 0);
+    }
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, Event6 &value) {
+    if (input.size() != Event6_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint64_t bits_queue_revision = 0;
+    bits_queue_revision |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_queue_revision |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_queue_revision |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_queue_revision |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_queue_revision |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_queue_revision |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_queue_revision |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_queue_revision |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.queue_revision = bits_queue_revision;
+    std::uint64_t bits_plan_id = 0;
+    bits_plan_id |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_plan_id |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_plan_id |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_plan_id |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_plan_id |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_plan_id |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_plan_id |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_plan_id |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.plan_id = bits_plan_id;
+    std::uint64_t bits_path_ticks = 0;
+    bits_path_ticks |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_path_ticks |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_path_ticks |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_path_ticks |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_path_ticks |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_path_ticks |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_path_ticks |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_path_ticks |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.path_ticks = bits_path_ticks;
+    std::uint8_t bits_channel = 0;
+    bits_channel |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.channel = bits_channel;
+    std::uint8_t bits_kind = 0;
+    bits_kind |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.kind = bits_kind;
+    std::uint8_t bits_hold_policy = 0;
+    bits_hold_policy |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.hold_policy = bits_hold_policy;
+    std::uint8_t bits_digital = 0;
+    bits_digital |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.digital = bits_digital;
+    std::uint32_t bits_analog = 0;
+    bits_analog |= static_cast<std::uint32_t>(input[offset++]) << 0;
+    bits_analog |= static_cast<std::uint32_t>(input[offset++]) << 8;
+    bits_analog |= static_cast<std::uint32_t>(input[offset++]) << 16;
+    bits_analog |= static_cast<std::uint32_t>(input[offset++]) << 24;
+    value.analog = std::bit_cast<float>(bits_analog);
+    std::uint32_t bits_argument = 0;
+    bits_argument |= static_cast<std::uint32_t>(input[offset++]) << 0;
+    bits_argument |= static_cast<std::uint32_t>(input[offset++]) << 8;
+    bits_argument |= static_cast<std::uint32_t>(input[offset++]) << 16;
+    bits_argument |= static_cast<std::uint32_t>(input[offset++]) << 24;
+    value.argument = std::bit_cast<float>(bits_argument);
+    for (std::size_t i = 0; i < 48; ++i) {
+        std::uint8_t bits_command = 0;
+        bits_command |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.command[i] = bits_command;
+    }
     return true;
 }
 

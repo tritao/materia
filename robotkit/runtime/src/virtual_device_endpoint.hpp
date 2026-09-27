@@ -35,6 +35,16 @@ struct VirtualStepRecord6 {
     bool operator==(const VirtualStepRecord6 &) const = default;
 };
 
+struct VirtualEventRecord6 {
+    std::uint64_t plan_id;
+    std::uint64_t scheduled_path_ticks;
+    std::uint64_t applied_path_ticks;
+    std::uint64_t device_ticks;
+    std::uint32_t channel;
+    std::uint8_t kind;
+    std::uint8_t digital;
+};
+
 class RK_API VirtualDeviceEndpoint final : public RobotEndpoint {
 public:
     static std::shared_ptr<VirtualDeviceEndpoint> create(
@@ -55,6 +65,7 @@ public:
     std::vector<double> joint_positions() const;
     std::vector<float> channel_values() const;
     std::vector<VirtualStepRecord6> step_log() const;
+    std::vector<VirtualEventRecord6> event_log() const;
 
 private:
     class Link;
