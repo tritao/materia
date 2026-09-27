@@ -11,13 +11,23 @@
 #include <unordered_map>
 #include <vector>
 
+#include <toppra/algorithm/toppra.hpp>
+#include <toppra/constraint/linear_joint_acceleration.hpp>
+#include <toppra/constraint/linear_joint_velocity.hpp>
+#include <toppra/geometric_path/piecewise_poly_path.hpp>
+#include <toppra/solver/seidel.hpp>
+
 namespace {
 
 using Poly = std::vector<double>; // ascending powers on the unit interval
 
 std::mutex mutex;
 std::unordered_map<uint32_t, std::vector<mk_path_sample>> paths;
-std::unordered_map<uint32_t, std::vector<mk_time_stage>> laws;
+struct Law {
+    std::vector<mk_time_stage> stages;
+    std::vector<mk_timing_binding> bindings;
+};
+std::unordered_map<uint32_t, Law> laws;
 uint32_t next_path = 1;
 uint32_t next_law = 1;
 
@@ -73,15 +83,17 @@ bool valid_law(const mk_time_stage *stages, uint32_t count) {
 }
 
 bool inverse_time(const std::vector<mk_time_stage> &stages, double s, double &seconds) {
-    if (!std::isfinite(s) || s < stages.front().start_s || s > end_s(stages.back()))
+    const double epsilon = 1e-12 * std::max(1.0, std::abs(s));
+    if (!std::isfinite(s) || s < stages.front().start_s - epsilon ||
+        s > end_s(stages.back()) + epsilon)
         return false;
     for (const auto &stage : stages) {
-        if (s == stage.start_s) {
+        if (std::abs(s - stage.start_s) <= epsilon) {
             seconds = static_cast<double>(stage.start_ns) * 1e-9;
             return true;
         }
-        if (s > end_s(stage)) continue;
-        if (s == end_s(stage)) {
+        if (s > end_s(stage) + epsilon) continue;
+        if (std::abs(s - end_s(stage)) <= epsilon) {
             seconds = static_cast<double>(stage.start_ns + stage.duration_ns) * 1e-9;
             return true;
         }
@@ -245,6 +257,103 @@ bool append_interval(const std::vector<mk_path_sample> &path,
     return mk_trajectory_append_segment(trajectory, &segment) == MK_OK;
 }
 
+class VelocityWithCaps final : public toppra::constraint::LinearJointVelocity {
+public:
+    VelocityWithCaps(const toppra::Vector &lower, const toppra::Vector &upper,
+                     std::vector<double> knots, std::vector<double> caps)
+        : LinearJointVelocity(lower, upper), knots_(std::move(knots)),
+          caps_(std::move(caps)) {}
+
+protected:
+    void computeVelocityLimits(double s) override {
+        auto next = std::upper_bound(knots_.begin(), knots_.end(), s);
+        size_t span = std::min(caps_.size() - 1,
+            static_cast<size_t>(std::max<int64_t>(0, next - knots_.begin() - 1)));
+        double cap = caps_[span] > 0.0 ? caps_[span] : 1e8;
+        if (span > 0 && std::abs(s - knots_[span]) < 1e-12 && caps_[span - 1] > 0.0)
+            cap = std::min(cap, caps_[span - 1]);
+        m_lower[m_lower.size() - 1] = -cap;
+        m_upper[m_upper.size() - 1] = cap;
+    }
+
+private:
+    std::vector<double> knots_;
+    std::vector<double> caps_;
+};
+
+bool valid_timing_request(const std::vector<mk_path_sample> &path,
+                          const double *velocity, const double *acceleration,
+                          uint32_t joints, const double *caps, uint32_t cap_count,
+                          double start_speed, double end_speed) {
+    if (!velocity || !acceleration || joints != path.front().joint_count ||
+        (cap_count && (!caps || cap_count != path.size() - 1)) ||
+        (!cap_count && caps) || !std::isfinite(start_speed) || start_speed < 0.0 ||
+        !std::isfinite(end_speed) || end_speed < 0.0) return false;
+    for (uint32_t j = 0; j < joints; ++j)
+        if (!std::isfinite(velocity[j]) || velocity[j] <= 0.0 ||
+            !std::isfinite(acceleration[j]) || acceleration[j] <= 0.0) return false;
+    for (uint32_t i = 0; i < cap_count; ++i)
+        if (!std::isfinite(caps[i]) || caps[i] < 0.0) return false;
+    return true;
+}
+
+mk_timing_binding binding_for_stage(const std::vector<mk_path_sample> &path,
+                                    uint32_t path_span, uint32_t stage_index,
+                                    double s, double speed_squared,
+                                    double path_acceleration,
+                                    const double *velocity,
+                                    const double *acceleration,
+                                    double feed_cap) {
+    mk_timing_binding binding{};
+    binding.struct_size = sizeof(binding);
+    binding.stage_index = stage_index;
+    binding.kind = MK_TIMING_BINDING_FEED_CAP;
+    binding.joint = UINT32_MAX;
+    binding.limit = feed_cap;
+    double ratio = feed_cap > 0.0 ? std::sqrt(speed_squared) / feed_cap : -1.0;
+    for (uint32_t j = 0; j < path.front().joint_count; ++j) {
+        const auto q = path_state(path[path_span], path[path_span + 1], j, s);
+        const double velocity_ratio = std::abs(q.first) *
+            std::sqrt(speed_squared) / velocity[j];
+        if (velocity_ratio > ratio) {
+            ratio = velocity_ratio;
+            binding.kind = MK_TIMING_BINDING_JOINT_VELOCITY;
+            binding.joint = j;
+            binding.limit = velocity[j];
+        }
+        const double acceleration_ratio = std::abs(q.first * path_acceleration +
+            q.second * speed_squared) / acceleration[j];
+        if (acceleration_ratio > ratio) {
+            ratio = acceleration_ratio;
+            binding.kind = MK_TIMING_BINDING_JOINT_ACCELERATION;
+            binding.joint = j;
+            binding.limit = acceleration[j];
+        }
+    }
+    return binding;
+}
+
+bool stretch_stages(std::vector<mk_time_stage> &stages, double factor) {
+    int64_t start_ns = 0;
+    double speed = stages.front().speed / factor;
+    for (auto &stage : stages) {
+        const double distance = end_s(stage) - stage.start_s;
+        const double scaled = std::floor(static_cast<double>(stage.duration_ns) * factor);
+        if (!std::isfinite(scaled) || scaled < 1.0 ||
+            scaled > static_cast<double>(INT64_MAX - start_ns)) return false;
+        const int64_t duration_ns = static_cast<int64_t>(scaled);
+        const double duration = static_cast<double>(duration_ns) * 1e-9;
+        stage.start_ns = start_ns;
+        stage.duration_ns = duration_ns;
+        stage.acceleration = 2.0 * (distance - speed * duration) /
+            (duration * duration);
+        stage.speed = speed;
+        speed += stage.acceleration * duration;
+        start_ns += duration_ns;
+    }
+    return true;
+}
+
 } // namespace
 
 extern "C" {
@@ -276,7 +385,7 @@ mk_result MK_CALL mk_time_law_create(const mk_time_stage *stages, uint32_t stage
         std::lock_guard lock(mutex);
         while (!next_law || laws.count(next_law)) ++next_law;
         const uint32_t id = next_law++;
-        laws.emplace(id, std::vector<mk_time_stage>(stages, stages + stage_count));
+        laws.emplace(id, Law{std::vector<mk_time_stage>(stages, stages + stage_count), {}});
         out_law->id = id;
         return MK_OK;
     } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
@@ -293,7 +402,7 @@ mk_result MK_CALL mk_path_distance_to_time(mk_time_law_handle law, double s,
     std::lock_guard lock(mutex);
     const auto found = laws.find(law.id);
     if (found == laws.end()) return MK_ERROR_INVALID_HANDLE;
-    return inverse_time(found->second, s, *out_seconds) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
+    return inverse_time(found->second.stages, s, *out_seconds) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
 }
 
 mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
@@ -306,19 +415,19 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
         const auto p = paths.find(path.id);
         const auto l = laws.find(law.id);
         if (p == paths.end() || l == laws.end()) return MK_ERROR_INVALID_HANDLE;
-        if (std::abs(p->second.front().s - l->second.front().start_s) > 1e-10 ||
-            std::abs(p->second.back().s - end_s(l->second.back())) > 1e-10)
+        if (std::abs(p->second.front().s - l->second.stages.front().start_s) > 1e-10 ||
+            std::abs(p->second.back().s - end_s(l->second.stages.back())) > 1e-10)
             return MK_ERROR_INVALID_ARGUMENT;
         mk_trajectory_handle trajectory{};
         auto result = mk_trajectory_create(p->second.front().joint_count, &trajectory);
         if (result != MK_OK) return result;
-        for (const auto &stage : l->second) {
+        for (const auto &stage : l->second.stages) {
             std::vector<int64_t> knots{stage.start_ns,
                 stage.start_ns + stage.duration_ns};
             for (const auto &sample : p->second) {
                 if (sample.s <= stage.start_s || sample.s >= end_s(stage)) continue;
                 double seconds = 0.0;
-                if (!inverse_time(l->second, sample.s, seconds)) {
+                if (!inverse_time(l->second.stages, sample.s, seconds)) {
                     mk_trajectory_destroy(trajectory);
                     return MK_ERROR_INVALID_ARGUMENT;
                 }
@@ -337,6 +446,187 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
         *out_trajectory = trajectory;
         return MK_OK;
     } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
+}
+
+mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
+                               const double *max_acceleration, uint32_t joint_count,
+                               const double *speed_caps, uint32_t speed_cap_count,
+                               double start_speed, double end_speed,
+                               mk_time_law_handle *out_law) {
+    if (!out_law) return MK_ERROR_INVALID_ARGUMENT;
+    out_law->id = 0;
+    std::vector<mk_path_sample> samples;
+    {
+        std::lock_guard lock(mutex);
+        const auto found = paths.find(path.id);
+        if (found == paths.end()) return MK_ERROR_INVALID_HANDLE;
+        samples = found->second;
+    }
+    if (!valid_timing_request(samples, max_velocity, max_acceleration, joint_count,
+        speed_caps, speed_cap_count, start_speed, end_speed))
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        const auto dof = static_cast<Eigen::Index>(joint_count + 1);
+        std::vector<double> knots, caps;
+        toppra::Matrices coefficients;
+        knots.reserve(samples.size());
+        caps.reserve(samples.size() - 1);
+        coefficients.reserve(samples.size() - 1);
+        for (const auto &sample : samples) knots.push_back(sample.s);
+        for (size_t i = 0; i + 1 < samples.size(); ++i) {
+            const double ds = samples[i + 1].s - samples[i].s;
+            toppra::Matrix matrix = toppra::Matrix::Zero(6, dof);
+            for (uint32_t j = 0; j < joint_count; ++j) {
+                const Poly p = path_poly(samples[i], samples[i + 1], j);
+                for (size_t k = 0; k < p.size(); ++k)
+                    matrix(5 - static_cast<Eigen::Index>(k), j) =
+                        p[k] / std::pow(ds, static_cast<int>(k));
+            }
+            matrix(4, joint_count) = 1.0;
+            matrix(5, joint_count) = samples[i].s;
+            coefficients.push_back(std::move(matrix));
+            caps.push_back(speed_cap_count ? speed_caps[i] : 0.0);
+        }
+        auto geometric = std::make_shared<toppra::PiecewisePolyPath>(coefficients, knots);
+        toppra::Vector lower_velocity(dof), upper_velocity(dof);
+        toppra::Vector lower_acceleration(dof), upper_acceleration(dof);
+        for (uint32_t j = 0; j < joint_count; ++j) {
+            lower_velocity[j] = -max_velocity[j];
+            upper_velocity[j] = max_velocity[j];
+            lower_acceleration[j] = -max_acceleration[j];
+            upper_acceleration[j] = max_acceleration[j];
+        }
+        lower_velocity[joint_count] = -1e8;
+        upper_velocity[joint_count] = 1e8;
+        lower_acceleration[joint_count] = -1e12;
+        upper_acceleration[joint_count] = 1e12;
+        toppra::LinearConstraintPtrs constraints{
+            std::make_shared<VelocityWithCaps>(lower_velocity, upper_velocity, knots, caps),
+            std::make_shared<toppra::constraint::LinearJointAcceleration>(
+                lower_acceleration, upper_acceleration)};
+        for (auto &constraint : constraints)
+            constraint->discretizationType(toppra::DiscretizationType::Collocation);
+        toppra::algorithm::TOPPRA algorithm(constraints, geometric);
+        algorithm.solver(std::make_shared<toppra::solver::Seidel>());
+        toppra::Vector grid(static_cast<Eigen::Index>(1 + 32 * (samples.size() - 1)));
+        for (size_t span = 0; span + 1 < samples.size(); ++span)
+            for (int step = 0; step < 32; ++step)
+                grid[static_cast<Eigen::Index>(span * 32 + step)] = samples[span].s +
+                    (samples[span + 1].s - samples[span].s) * step / 32.0;
+        grid[grid.size() - 1] = samples.back().s;
+        algorithm.setGridpoints(grid);
+        algorithm.setInitialXBounds(toppra::Bound{0.0, 1e16});
+        if (algorithm.computePathParametrization(start_speed, end_speed) !=
+            toppra::ReturnCode::OK) return MK_ERROR_GENERATION;
+        const auto &data = algorithm.getParameterizationData();
+        std::vector<mk_time_stage> stages;
+        std::vector<mk_timing_binding> bindings;
+        stages.reserve(static_cast<size_t>(grid.size() - 1));
+        bindings.reserve(stages.capacity());
+        int64_t start_ns = 0;
+        double speed = start_speed;
+        for (Eigen::Index i = 0; i + 1 < grid.size(); ++i) {
+            const double ds = grid[i + 1] - grid[i];
+            const double target_speed = std::sqrt(std::max(0.0, data.parametrization[i + 1]));
+            const double duration = 2.0 * ds / (speed + target_speed);
+            if (!std::isfinite(duration) || duration <= 0.0 ||
+                duration > static_cast<double>(INT64_MAX - start_ns) * 1e-9)
+                return MK_ERROR_GENERATION;
+            const int64_t duration_ns = std::max<int64_t>(1,
+                static_cast<int64_t>(std::floor(duration * 1e9)));
+            const double rounded = static_cast<double>(duration_ns) * 1e-9;
+            const double path_acceleration = 2.0 * (ds - speed * rounded) /
+                (rounded * rounded);
+            mk_time_stage stage{};
+            stage.struct_size = sizeof(stage);
+            stage.start_ns = start_ns;
+            stage.duration_ns = duration_ns;
+            stage.start_s = grid[i];
+            stage.speed = speed;
+            stage.acceleration = path_acceleration;
+            stages.push_back(stage);
+            const auto span = static_cast<size_t>(i) / 32;
+            const double mid_s = 0.5 * (grid[i] + grid[i + 1]);
+            const double mid_speed_squared = speed * speed + path_acceleration * ds;
+            bindings.push_back(binding_for_stage(samples, static_cast<uint32_t>(span),
+                static_cast<uint32_t>(i), mid_s, std::max(0.0, mid_speed_squared),
+                path_acceleration, max_velocity, max_acceleration, caps[span]));
+            speed += path_acceleration * rounded;
+            start_ns += duration_ns;
+        }
+        mk_time_law_handle created{};
+        bool accepted = false;
+        for (int attempt = 0; attempt < 8; ++attempt) {
+            const auto result = mk_time_law_create(stages.data(),
+                static_cast<uint32_t>(stages.size()), &created);
+            if (result != MK_OK) return result;
+            mk_trajectory_handle lowered{};
+            const auto lowered_result = mk_path_lower(path, created, 1e-6, &lowered);
+            if (lowered_result != MK_OK) {
+                mk_time_law_destroy(created);
+                return lowered_result;
+            }
+            mk_limits limits{};
+            limits.struct_size = sizeof(limits);
+            limits.joint_count = joint_count;
+            for (uint32_t j = 0; j < joint_count; ++j) {
+                limits.max_velocity[j] = max_velocity[j];
+                limits.max_acceleration[j] = max_acceleration[j];
+            }
+            mk_validation_report report{};
+            report.struct_size = sizeof(report);
+            const auto validation = mk_validate(lowered, &limits, &report);
+            mk_trajectory_destroy(lowered);
+            if (validation != MK_OK) {
+                mk_time_law_destroy(created);
+                return MK_ERROR_GENERATION;
+            }
+            double factor = 1.0;
+            const auto &velocity_check = report.checks[MK_CHECK_VELOCITY];
+            const auto &acceleration_check = report.checks[MK_CHECK_ACCELERATION];
+            if (velocity_check.status == MK_CHECK_FAILED)
+                factor = std::max(factor, velocity_check.value / velocity_check.limit);
+            if (acceleration_check.status == MK_CHECK_FAILED)
+                factor = std::max(factor, std::sqrt(acceleration_check.value /
+                    acceleration_check.limit));
+            if (factor <= 1.0) {
+                accepted = true;
+                break;
+            }
+            mk_time_law_destroy(created);
+            if (!stretch_stages(stages, factor * 1.002)) return MK_ERROR_GENERATION;
+        }
+        if (!accepted) return MK_ERROR_GENERATION;
+        {
+            std::lock_guard lock(mutex);
+            laws.at(created.id).bindings = std::move(bindings);
+        }
+        *out_law = created;
+        return MK_OK;
+    } catch (const std::bad_alloc &) { return MK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return MK_ERROR_GENERATION; }
+}
+
+mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
+                                             uint32_t *out_count) {
+    if (!out_count) return MK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard lock(mutex);
+    const auto found = laws.find(law.id);
+    if (found == laws.end()) return MK_ERROR_INVALID_HANDLE;
+    *out_count = static_cast<uint32_t>(found->second.bindings.size());
+    return MK_OK;
+}
+
+mk_result MK_CALL mk_time_law_get_binding(mk_time_law_handle law,
+                                          uint32_t index, mk_timing_binding *out_binding) {
+    if (!out_binding || out_binding->struct_size < sizeof(*out_binding))
+        return MK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard lock(mutex);
+    const auto found = laws.find(law.id);
+    if (found == laws.end()) return MK_ERROR_INVALID_HANDLE;
+    if (index >= found->second.bindings.size()) return MK_ERROR_INVALID_ARGUMENT;
+    *out_binding = found->second.bindings[index];
+    return MK_OK;
 }
 
 } // extern C

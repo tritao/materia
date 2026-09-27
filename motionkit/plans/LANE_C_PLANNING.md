@@ -155,9 +155,14 @@ Do:
 
 Tests:
 - A square path in exact-stop mode stops at each corner.
-- A circle's arc speed is limited by centripetal acceleration and matches
-  the analytic `v = √(a·r)` within 1%.
-- Cycle time is ≤ the old planner's on the existing path tests; record the
+- A circle's arc speed respects the per-joint centripetal acceleration
+  limits. For equal independent X/Y acceleration limits `a`, its instantaneous
+  bound varies with angle: `v²·|cos θ|/r ≤ a` and
+  `v²·|sin θ|/r ≤ a`. Check each joint's acceleration and compare sampled
+  speed with this angle-dependent bound; `√(a·r)` applies at axis-aligned
+  points, not to the peak speed over the whole circle.
+- Cycle time is within 1% of the old planner on analytically optimal straight
+  exact-stop paths. Target no regression on curved paths; record comparative
   numbers in the log.
 - The binding-constraint report names the right joint on a path that
   saturates one axis.
@@ -376,3 +381,50 @@ subsequent owner cycle could move the position before plan acceptance. The
 lease test now allows 0.02 joint units of start-position difference and keeps
 zero velocity and acceleration tolerances; the unchanged test failed before
 this adjustment and passed after it. Commit: the commit containing this entry.
+
+### C2 planning correction — Exact-stop cycle-time comparison
+
+C2's original strict `new cycle time ≤ old cycle time` test is unattainable
+for a straight exact-stop path where the old trapezoid already reaches the
+analytic minimum. On a two-leg 0.1 m square with 2 m/s² acceleration, the old
+planner takes 0.894427191 s. The native TOPP-RA backend takes 0.896218108 s
+under the same limits (0.20% longer), including the time stretch needed for
+exact validation after nanosecond rounding. Changed only that acceptance bound
+to allow 1% on analytic-optimal straight paths; curved paths retain a
+no-regression target. Stopped C2 implementation here as required by the
+handoff ground rule when a work item shows the plan is wrong. The uncommitted
+C2 implementation in `materia-lane-c` is incomplete and still needs task-space
+reporting, planner replacement tests, full-suite verification and a commit.
+
+### C2 planning correction — Circle speed under independent joint limits
+
+The original circle acceptance expects the peak speed to match `√(a·r)`
+within 1%. That is a vector centripetal acceleration bound, but TOPP-RA's
+contract uses independent per-joint acceleration limits. On a 0.1 m radius
+circle with 1 m/s² limits on X and Y, the sampled peak is 0.333930896 m/s,
+while `√(a·r)` is 0.316227766 m/s. Each joint's sampled acceleration stays
+within 1 m/s²; the peak occurs away from an axis-aligned point, where the
+normal acceleration is shared by the two joints. Changed the acceptance to
+the per-joint, angle-dependent bound. Stopped C2 implementation here under
+the handoff ground rule. The C2 changes remain uncommitted in the Lane C
+worktree; the new test currently fails on the superseded peak-speed assertion.
+
+### C2 — TOPP-RA timing and Cartesian path submission
+
+Vendored the pinned TOPP-RA C++ Seidel solver, added the native reachability
+timing entry point and per-stage binding-constraint report, and exposed it
+through `ToppraPathTiming`. `MotionSystem` now times direct XYZ lines and arcs,
+lowers them to native polynomial segments, checks joint limits exactly, and
+records a sampled task-space deviation report at no worse than 1 ms spacing.
+Path jerk remains unchecked. The old `LineLookaheadPlanner` was removed;
+exact-stop corners, circle joint acceleration, straight-path timing, binding
+joint, long queues, hold/resume and task-space reporting are exercised by the
+MotionKit suite. Commit: the commit containing this entry.
+
+For two 0.1 m straight exact-stop legs at 2 m/s², the old planner takes
+0.894427191 s and TOPP-RA takes 0.896218108 s (0.20% longer). A standalone
+0.1 m radius quarter arc at 0.5 m/s velocity and 1 m/s² per-joint
+acceleration takes 0.811937932 s with TOPP-RA versus 0.966774462 s with
+the old planner. MotionKit passed 5,410 Haxe assertions, RobotKit passed
+4,437 world assertions, all 13 combined native CTests passed, both FFI audits
+passed, and TCP integration passed in default, session and lease modes.
