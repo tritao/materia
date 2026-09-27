@@ -29,6 +29,7 @@ import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.RobotRuntimeError;
+import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
 import robotkit.world.RecordingRobot;
 import robotkit.world.ReplayRobot;
@@ -45,6 +46,8 @@ import robotkit.world.RobotStatus;
 import robotkit.world.RuntimeRobotAdapter;
 import robotkit.world.SensorFrame;
 import robotkit.world.StopMode;
+import robotkit.world.ExecutionPlanSubmission;
+import robotkit.world.TrajectorySegment;
 
 class MotionKitBootstrapTests {
   static var assertions:Int = 0;
@@ -56,6 +59,7 @@ class MotionKitBootstrapTests {
     testPlannerIsDeterministicAndBounded();
     testLineLookaheadPlanner();
     testLinearAxisCompilesToRobotModel();
+    testLeadScrewActuatorRateLimitsPlans();
     testTransmissionDerivedAxisMapping();
     testCompiledAxisRunsThroughSimulation();
     testHomingAndJogging();
@@ -317,6 +321,36 @@ class MotionKitBootstrapTests {
       "transmission-derived single-joint mapping keeps the old scale");
     near(blueprint.axes[0].jointOffsets[0], 0.0,
       "transmission-derived single-joint mapping keeps the old offset");
+  }
+
+  static function testLeadScrewActuatorRateLimitsPlans():Void {
+    var axis = new LinearAxis(23, 10, 80);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
+    var actuator = blueprint.model.actuators[0];
+    var ratio = switch actuator.transmission {
+      case SimpleTransmission(_, value, _): Math.abs(value);
+    };
+    actuator.maxRate = 0.02 * ratio;
+    var limited = RobotRuntimeCompiler.compile(blueprint.model);
+    near(limited.joints[0].maxRate, 0.02,
+      "lead-screw motor rate converts to the tighter joint-space limit");
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(limited);
+    var plan = new ExecutionPlanSubmission(Int64.ofInt(1), Int64.ofInt(limited.revision),
+      Int64.ofInt(limited.calibrationRevision),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      [0.0], [0.0], [0.0],
+      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000), [[0.0, 0.03]])]);
+    var rejectedForLimit = false;
+    try runtime.submitPlan(plan, 1) catch (error:Dynamic) {
+      if (Std.isOfType(error, RobotRuntimeError)) {
+        var nativeError:RobotRuntimeError = cast error;
+        rejectedForLimit = nativeError.status == RobotKitRuntimeConstants.RK_ERROR_LIMIT;
+      }
+    }
+    check(rejectedForLimit,
+      "runtime rejects a plan faster than the converted motor rate limit");
+    simulation.dispose();
   }
 
   static function testTransmissionDerivedAxisMapping():Void {

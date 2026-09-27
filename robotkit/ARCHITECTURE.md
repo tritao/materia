@@ -167,12 +167,18 @@ mapping reference. Additional actuators on that joint do not change the
 logical-axis mapping. Explicit authored axis maps remain a deprecated override.
 `RobotModelCodec` accepts v4 only; older schemas are rejected, not migrated.
 
-The native runtime and RKD5 devices remain joint-space only in this item;
-actuator-unit limits are not inserted into a joint-space runtime blueprint.
+The native runtime and RKD5 devices remain joint-space only in this item. The
+Haxe runtime compiler converts each actuator's rate limit to joint units as
+`maxRate / |ratio|` and its effort limit as `maxEffort * |ratio|`, assuming an
+ideal lossless transmission. For several actuators on one joint, the joint
+rate takes the minimum converted rate and the effort capacities sum. Zero
+means an unset limit; each claimed actuator limit is combined with the
+joint-authored limit by taking the tighter value. The resulting joint-space
+limits are enforced by the existing native runtime.
 Future endpoint transmission support converts commanded joint positions and
 rates to actuator targets with `actuator = ratio * (joint - offset)` and
-`actuator_rate = ratio * joint_rate`, before device encoding. It intersects
-joint-space limits with converted actuator-space position/rate/effort limits;
+`actuator_rate = ratio * joint_rate`, before device encoding. It checks
+actuator-space position/rate/effort limits at the endpoint too;
 neither space may silently override the other. An ideal transmission maps
 effort by `joint_effort = ratio * actuator_effort` (with the corresponding
 linear-force/rotary-torque units).

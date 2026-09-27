@@ -1227,3 +1227,16 @@ layout, fingerprint change and dual-drive skew fault are specified in
 RobotKit's architecture document. Tests cover v4 round trips, rejection of
 older/legacy drive records, two actuators on one joint, lead-screw ratio and
 derived/overridden axis mappings. Commit: the commit containing this entry.
+
+### P11 follow-up — Convert actuator limits into joint-space runtime limits
+
+The Haxe runtime compiler now converts each SimpleTransmission actuator rate
+to `maxRate / |ratio|` and effort to `maxEffort * |ratio|` under an ideal
+lossless transmission. Multiple actuators on a joint contribute the minimum
+nonzero converted rate and the sum of nonzero converted efforts; the blueprint
+takes the tighter nonzero joint-authored and converted limit. This supersedes
+the P11 note above that left actuator limits out of the blueprint. Tests cover
+a lead-screw rate tighter than the joint limit, rejection of an over-rate plan,
+two-actuator aggregation, and identical limits for positive and negative unit
+ratios. Native runtime and device protocol remain unchanged. Commit: the
+commit containing this entry.

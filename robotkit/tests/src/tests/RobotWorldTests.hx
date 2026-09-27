@@ -185,6 +185,7 @@ class RobotWorldTests {
     testForwardingAndLifecycle();
     testMixedSimulatedAndRemoteWorld();
     testRuntimeUsesCompiledJointRate();
+    testMultipleActuatorLimits();
     testWorldHostComposition();
     testCompilerDiagnosticsAndTopology();
     testStableModelIdentity();
@@ -4219,17 +4220,19 @@ class RobotWorldTests {
     model.addActuator(new Actuator("shoulder-motor", 100.0, 1.0,
       Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
     var blueprint = RobotRuntimeCompiler.compile(model);
-    equal(blueprint.joints[0].maxRate, 2.0,
-      "runtime blueprint keeps joint rate until endpoint actuator conversion exists");
+    equal(blueprint.joints[0].maxRate, 0.5,
+      "runtime blueprint converts actuator rate to joint rate");
+    equal(blueprint.joints[0].maxEffort, 200.0,
+      "runtime blueprint converts actuator effort to joint effort");
 
     var simulation = new Simulation(0.1);
     var runtime = simulation.addRobot(blueprint);
     runtime.submitPosition(0, 0.8, 1);
     simulation.step(Int64.ofInt(100));
-    check(Math.abs(runtime.snapshot().q.get(0) - 0.2) < 0.000000001,
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.05) < 0.000000001,
       "runtime applies the compiled rate limit on the first shared tick");
     simulation.step(Int64.ofInt(200));
-    check(Math.abs(runtime.snapshot().q.get(0) - 0.4) < 0.000000001,
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.1) < 0.000000001,
       "runtime keeps advancing the same target on later shared ticks");
     simulation.dispose();
 
@@ -4291,6 +4294,32 @@ class RobotWorldTests {
     planSimulation.dispose();
     sys.FileSystem.deleteFile(planPath);
     sys.FileSystem.deleteFile(planPath + ".incomplete.status");
+  }
+
+  static function testMultipleActuatorLimits():Void {
+    var model = new RobotModel("dual-actuator-limits");
+    var base = model.addLink(new Link("base"));
+    var tool = model.addLink(new Link("tool"));
+    var joint = model.addJoint(new Joint("shoulder", JointType.Revolute, base, tool));
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    joint.limits.velocity = 2.0;
+    var first = model.addActuator(new Actuator("first", 100.0, 1.0,
+      Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
+    var second = model.addActuator(new Actuator("second", 40.0, 0.3,
+      Transmission.SimpleTransmission(joint.id, -1.0, 0.0)));
+    var limits = RobotRuntimeCompiler.compile(model).joints[0];
+    equal(limits.maxRate, 0.3, "multiple actuators use the slowest joint rate");
+    equal(limits.maxEffort, 240.0, "multiple actuators sum joint effort");
+    second.transmission = Transmission.SimpleTransmission(joint.id, 1.0, 0.0);
+    var positive = RobotRuntimeCompiler.compile(model).joints[0];
+    equal(positive.maxRate, limits.maxRate, "negative ratio keeps the same rate limit");
+    equal(positive.maxEffort, limits.maxEffort, "negative ratio keeps the same effort limit");
+    joint.limits.velocity = 0.2;
+    joint.limits.effort = 200.0;
+    var tighter = RobotRuntimeCompiler.compile(model).joints[0];
+    equal(tighter.maxRate, 0.2, "joint rate remains the tighter claim");
+    equal(tighter.maxEffort, 200.0, "joint effort remains the tighter claim");
   }
 
   static function check(value:Bool, message:String):Void {

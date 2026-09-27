@@ -67,8 +67,21 @@ class RobotRuntimeCompiler {
       };
       var maxEffort = joint.limits.effort;
       var maxRate = joint.limits.velocity;
-      // Actuator limits are in actuator units. Until endpoint transmission
-      // support exists, only joint-space limits belong in this blueprint.
+      var actuatorEffort = 0.0;
+      var actuatorRate = 0.0;
+      for (actuator in robot.actuators) switch actuator.transmission {
+        case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
+          var magnitude = Math.abs(ratio);
+          // Ideal lossless transmission: joint rate = actuator rate / |ratio|,
+          // and joint effort = actuator effort * |ratio|.
+          if (actuator.maxRate > 0.0)
+            actuatorRate = tighterLimit(actuatorRate, actuator.maxRate / magnitude);
+          if (actuator.maxEffort > 0.0)
+            actuatorEffort += actuator.maxEffort * magnitude;
+        case _:
+      }
+      maxRate = tighterLimit(maxRate, actuatorRate);
+      maxEffort = tighterLimit(maxEffort, actuatorEffort);
       result.addJoint(new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
         joint.limits.lower, joint.limits.upper, maxEffort, maxRate,
         joint.parentFramePosition, joint.parentFrameRotation,
@@ -92,6 +105,12 @@ class RobotRuntimeCompiler {
         sensor.startAngleRadians, sensor.fieldOfViewRadians));
     }
     return result;
+  }
+
+  static function tighterLimit(first:Float, second:Float):Float {
+    if (first == 0.0) return second;
+    if (second == 0.0) return first;
+    return Math.min(first, second);
   }
 
   /** Returns all semantic diagnostics without attempting native lowering. */
