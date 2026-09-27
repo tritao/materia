@@ -153,6 +153,39 @@ to that artifact and keep `DeviceLayout` as the separate ordered mapping from
 model joint IDs to RKD5 channels. The RKD5 fingerprint covers the exact device
 layout and wire schema lock, not mutable semantic model fields.
 
+### Transmissions (model contract and future execution design)
+
+RobotModel v4 owns actuators independently of joints. Each actuator has a
+stable ID, effort/rate limits in actuator units, and a `SimpleTransmission`
+with `jointId`, `ratio`, and `offset`. Coordinates are SI and obey
+`joint = offset + actuator / ratio`: for a motor driving a linear joint,
+`ratio` is rad/m. Several actuators may name the same joint. A MotionKit
+logical axis using several transmitted joints takes its first joint as the
+logical coordinate and derives the other joint scales and offsets by equating
+actuator coordinates, using the first actuator authored for each joint as its
+mapping reference. Additional actuators on that joint do not change the
+logical-axis mapping. Explicit authored axis maps remain a deprecated override.
+`RobotModelCodec` accepts v4 only; older schemas are rejected, not migrated.
+
+The native runtime and RKD5 devices remain joint-space only in this item;
+actuator-unit limits are not inserted into a joint-space runtime blueprint.
+Future endpoint transmission support converts commanded joint positions and
+rates to actuator targets with `actuator = ratio * (joint - offset)` and
+`actuator_rate = ratio * joint_rate`, before device encoding. It intersects
+joint-space limits with converted actuator-space position/rate/effort limits;
+neither space may silently override the other. An ideal transmission maps
+effort by `joint_effort = ratio * actuator_effort` (with the corresponding
+linear-force/rotary-torque units).
+
+That future device layout must map channels to stable actuator IDs, including
+multiple channels for a dual-driven joint, rather than assuming one channel
+per joint. Its schema and safety fingerprint must change to include the
+actuator/channel assignment and transmission ratio/offset; existing RKD5
+fingerprints are unchanged here. Dual-drive feedback will be converted back
+to joint coordinates and compared for skew, with a latched fault on excessive
+disagreement. The skew threshold and fault behavior belong to that later
+runtime/device item, not to RobotModel v4 compilation.
+
 Compilation has two deliberate entry points. `RobotRuntimeCompiler.validate()`
 returns every `RobotCompileDiagnostic` with a stable code, field path, and
 human-readable message. `compile()` uses that same validation pass and throws a

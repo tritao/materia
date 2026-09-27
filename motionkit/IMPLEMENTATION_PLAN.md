@@ -684,8 +684,7 @@ Do:
     `joint = offset + actuator / ratio` (documented, SI units);
   - allow several actuators on one joint (dual drive, each with its own
     transmission);
-  - bump the `RobotModel` schema to v4, and have `RobotModelCodec` read v3
-    by converting its one-to-one actuators (ratio 1, offset 0).
+  - bump the `RobotModel` schema to v4; only v4 artifacts are supported.
 - `MachineKitRobotCompiler.compileLinearAxis`: emit the lead-screw
   transmission (ratio in rad/m from `LeadScrewNut.travelPerRevolution()`)
   instead of only keeping the motor and screw identity.
@@ -700,11 +699,12 @@ Do:
   - the fingerprint change;
   - dual-drive skew monitoring as a future fault.
 
-  Do not change the runtime, the device layout or the fingerprint in this
-  item.
+  Do not change the native runtime, the device layout or the fingerprint in
+  this item. The Haxe runtime compiler must not misread actuator-unit limits
+  as joint-unit limits before endpoint conversion exists.
 
 Tests:
-- v3 JSON still loads;
+- v3 JSON is rejected;
 - a v4 round trip;
 - the compiled LinearAxis has the lead-screw ratio;
 - the derived axis scales equal the old explicit ones;
@@ -1208,3 +1208,22 @@ and motion-change tests cover its remaining plan-path behavior. The non-queue
 variants of motion-change, continuous-jog, path-hold, and dual-motor tests were
 removed with the fallback; their plan-path variants remain. Commit: the commit
 containing this entry.
+
+### P11 — Model transmissions (v4 only)
+
+RobotModel v4 owns stable-ID actuators and simple joint transmissions as a
+model-level collection, allowing multiple actuators on one joint. The v4
+codec round-trips them and rejects v1–v3 rather than migrating; the checked-in
+deployment artifacts are v4. MachineKit's linear-axis compiler emits the
+signed lead-screw ratio in rad/m and actuator speed in rad/s. MotionSystem
+derives joint scales and offsets from transmissions when no explicit mapping
+was supplied; the old explicit mapping remains a deprecated override.
+
+The Haxe runtime compiler now leaves actuator-unit limits out of its
+joint-space blueprint, preventing a unit mismatch before endpoint conversion
+exists. Native runtime behavior, device layout and fingerprint are unchanged.
+The future endpoint conversion, limits in both spaces, actuator-channel
+layout, fingerprint change and dual-drive skew fault are specified in
+RobotKit's architecture document. Tests cover v4 round trips, rejection of
+older/legacy drive records, two actuators on one joint, lead-screw ratio and
+derived/overridden axis mappings. Commit: the commit containing this entry.

@@ -7,7 +7,6 @@ class Joint {
   public final parent:Link;
   public final child:Link;
   public var limits:JointLimits;
-  public var drive:Null<Actuator>;
   public var parentFramePosition:Array<Float> = [0.0, 0.0, 0.0];
   public var parentFrameRotation:Array<Float> = [0.0, 0.0, 0.0, 1.0];
   public var childFramePosition:Array<Float> = [0.0, 0.0, 0.0];

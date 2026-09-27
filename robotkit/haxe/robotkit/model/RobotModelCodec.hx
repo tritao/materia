@@ -2,6 +2,7 @@ package robotkit.model;
 
 import haxe.Json;
 import haxe.io.Bytes;
+import robotkit.model.Transmission;
 
 /** Canonical, versioned JSON artifact for an editable RobotModel. */
 class RobotModelCodec {
@@ -52,7 +53,12 @@ class RobotModelCodec {
       if (joint.limits.maxAcceleration < 0.0)
         throw "joint limits.maxAcceleration must be non-negative";
       jointTypeName(joint.type);
-      validateActuator(joint.drive);
+    }
+    var actuators = new Map<String, Bool>();
+    for (actuator in model.actuators) {
+      validateActuator(actuator, joints);
+      if (actuators.exists(actuator.id)) throw 'Duplicate robot actuator ${actuator.id}';
+      actuators.set(actuator.id, true);
     }
     var sensors = new Map<String, Bool>();
     for (sensor in model.sensors) {
@@ -88,13 +94,13 @@ class RobotModelCodec {
         limits: {lower: joint.limits.lower, upper: joint.limits.upper,
           velocity: joint.limits.velocity, effort: joint.limits.effort,
           maxAcceleration: joint.limits.maxAcceleration},
-        drive: encodeActuator(joint.drive),
         parentFramePosition: joint.parentFramePosition,
         parentFrameRotation: joint.parentFrameRotation,
         childFramePosition: joint.childFramePosition,
         childFrameRotation: joint.childFrameRotation,
         axis: joint.axis
       }],
+      actuators: [for (actuator in model.actuators) encodeActuator(actuator)],
       frames: [for (frame in model.frames) {
         id: frame.id, name: frame.name, link: frame.link.id,
         position: frame.position, rotation: frame.rotation
@@ -118,17 +124,7 @@ class RobotModelCodec {
     try root = Json.parse(bytes.toString()) catch (_:Dynamic)
       throw "Malformed RobotModel artifact";
     var version = fieldInt(root, "schemaVersion");
-    if (version < 1 || version > VERSION) throw 'Unsupported RobotModel schema version $version';
-    if (version == 1) {
-      migrateV1ToV2(root);
-      version = 2;
-    }
-    if (version == 2) {
-      migrateV2ToV3(root);
-      setDefault(root, "mobileBase", null);
-      setDefault(root, "forkMechanism", null);
-      Reflect.setField(root, "schemaVersion", 3);
-    }
+    if (version != VERSION) throw 'Unsupported RobotModel schema version $version; expected $VERSION';
 
     var model = new RobotModel(text(root, "name"));
     model.collisionApproximation = readCollision(text(root, "collisionApproximation"));
@@ -147,6 +143,8 @@ class RobotModelCodec {
 
     var joints = new Map<String, Bool>();
     for (record in array(root, "joints")) {
+      if (Reflect.hasField(record, "drive"))
+        throw "RobotModel v4 does not accept joint.drive; use root actuators";
       var id = text(record, "id");
       if (joints.exists(id)) throw 'Duplicate robot joint $id';
       joints.set(id, true);
@@ -157,16 +155,27 @@ class RobotModelCodec {
       var joint = model.addJoint(new Joint(text(record, "name"),
         readJointType(text(record, "type")), parent, child, id));
       var limits:Dynamic = required(record, "limits");
-      var maxAcceleration = Reflect.hasField(limits, "maxAcceleration")
-        ? number(limits, "maxAcceleration") : 0.0;
+      var maxAcceleration = number(limits, "maxAcceleration");
       joint.limits = new JointLimits(number(limits, "lower"), number(limits, "upper"),
         number(limits, "velocity"), number(limits, "effort"), maxAcceleration);
-      joint.drive = readActuator(Reflect.field(record, "drive"));
       joint.parentFramePosition = vectorField(record, "parentFramePosition", 3);
       joint.parentFrameRotation = vectorField(record, "parentFrameRotation", 4);
       joint.childFramePosition = vectorField(record, "childFramePosition", 3);
       joint.childFrameRotation = vectorField(record, "childFrameRotation", 4);
       joint.axis = vectorField(record, "axis", 3);
+    }
+
+    var actuatorIds = new Map<String, Bool>();
+    for (record in array(root, "actuators")) {
+      var actuator = readActuator(record);
+      if (actuatorIds.exists(actuator.id)) throw 'Duplicate robot actuator ${actuator.id}';
+      actuatorIds.set(actuator.id, true);
+      switch actuator.transmission {
+        case SimpleTransmission(jointId, _, _):
+          if (!joints.exists(jointId))
+            throw 'Actuator ${actuator.id} references unknown joint $jointId';
+      }
+      model.addActuator(actuator);
     }
 
     var frames = new Map<String, Frame>();
@@ -208,39 +217,29 @@ class RobotModelCodec {
     return model;
   }
 
-  static function migrateV1ToV2(root:Dynamic):Void {
-    setDefault(root, "collisionApproximation", "bounds-box");
-    for (link in array(root, "links")) {
-      setDefault(link, "mass", 1.0);
-      setDefault(link, "centerOfMass", [0.0, 0.0, 0.0]);
-      setDefault(link, "inertiaTensor", [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
-      setDefault(link, "visualGeometry", null);
-      setDefault(link, "collisionGeometry", null);
+  static function encodeActuator(value:Actuator):Dynamic return {
+    id: value.id, maxEffort: value.maxEffort, maxRate: value.maxRate,
+    transmission: switch value.transmission {
+      case SimpleTransmission(jointId, ratio, offset):
+        {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
     }
-    Reflect.setField(root, "schemaVersion", 2);
-  }
-
-  static function migrateV2ToV3(root:Dynamic):Void {
-    for (sensor in array(root, "sensors")) {
-      if (!Reflect.hasField(sensor, "startAngleRadians") ||
-          Reflect.field(sensor, "startAngleRadians") == null)
-        Reflect.setField(sensor, "startAngleRadians", 0.0);
-      if (!Reflect.hasField(sensor, "fieldOfViewRadians") ||
-          Reflect.field(sensor, "fieldOfViewRadians") == null)
-        Reflect.setField(sensor, "fieldOfViewRadians", Math.PI * 2.0);
-    }
-    Reflect.setField(root, "schemaVersion", 3);
-  }
-
-  static function encodeActuator(value:Null<Actuator>):Dynamic return value == null ? null : {
-    name: value.name, maxEffort: value.maxEffort, maxRate: value.maxRate
   };
 
-  static function validateActuator(value:Null<Actuator>):Void {
-    if (value == null) return;
-    requireText(value.name, "actuator name");
+  static function validateActuator(value:Actuator, joints:Map<String, Bool>):Void {
+    if (value == null) throw "Robot actuator is null";
+    requireText(value.id, "actuator ID");
     finite(value.maxEffort, "actuator maxEffort");
     finite(value.maxRate, "actuator maxRate");
+    if (value.maxEffort < 0.0 || value.maxRate < 0.0)
+      throw "Actuator limits must be non-negative";
+    if (value.transmission == null) throw "Actuator transmission is required";
+    switch value.transmission {
+      case SimpleTransmission(jointId, ratio, offset):
+        if (!joints.exists(jointId)) throw 'Actuator ${value.id} references unknown joint $jointId';
+        finite(ratio, "transmission ratio");
+        finite(offset, "transmission offset");
+        if (ratio == 0.0) throw "Transmission ratio must be nonzero";
+    }
   }
 
   static function validateMobile(value:RobotMobileConfiguration,
@@ -282,9 +281,15 @@ class RobotModelCodec {
     if (!joints.exists(id)) throw 'RobotModel $role role references unknown joint $id';
   }
 
-  static function readActuator(value:Dynamic):Null<Actuator> {
-    if (value == null) return null;
-    return new Actuator(text(value, "name"), number(value, "maxEffort"), number(value, "maxRate"));
+  static function readActuator(value:Dynamic):Actuator {
+    var transmission = required(value, "transmission");
+    var parsed:Transmission = switch text(transmission, "kind") {
+      case "simple": SimpleTransmission(text(transmission, "jointId"),
+        number(transmission, "ratio"), number(transmission, "offset"));
+      case kind: throw 'Unsupported transmission kind $kind';
+    };
+    return new Actuator(text(value, "id"), number(value, "maxEffort"),
+      number(value, "maxRate"), parsed);
   }
 
   static function encodeMobile(value:RobotMobileConfiguration):Dynamic return {
@@ -363,10 +368,6 @@ class RobotModelCodec {
     case "floating": JointType.Floating;
     case _: throw 'Unsupported RobotModel joint type $value';
   };
-
-  static function setDefault(value:Dynamic, name:String, fallback:Dynamic):Void {
-    if (!Reflect.hasField(value, name)) Reflect.setField(value, name, fallback);
-  }
 
   static function required(value:Dynamic, name:String):Dynamic {
     if (value == null || !Reflect.hasField(value, name)) throw 'Missing RobotModel field $name';

@@ -19,6 +19,7 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.Actuator;
+import robotkit.model.Transmission;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Frame;
@@ -751,7 +752,10 @@ class RobotWorldTests {
     source.links[0].inertiaTensor = [2.0, 0.1, 0.0, 0.1, 3.0, 0.2, 0.0, 0.2, 4.0];
     source.links[0].visualGeometry = "meshes/base.glb";
     source.links[0].collisionGeometry = "colliders/base.obj";
-    source.joints[0].drive = new Actuator("left-wheel-drive", 90.0, 12.0);
+    source.addActuator(new Actuator("left-wheel-drive", 90.0, 12.0,
+      Transmission.SimpleTransmission(source.joints[0].id, 2.0, 0.1)));
+    source.addActuator(new Actuator("left-wheel-assist", 45.0, 8.0,
+      Transmission.SimpleTransmission(source.joints[0].id, -3.0, 0.1)));
     source.joints[0].parentFramePosition = [0.0, 0.25, 0.1];
     source.joints[0].parentFrameRotation = [0.0, 0.0, 0.1, 0.99498743710662];
     source.joints[0].axis = [0.0, 1.0, 0.0];
@@ -771,8 +775,14 @@ class RobotWorldTests {
       "RobotModel codec preserves geometry references");
     equal(restored.joints[0].parentFramePosition[1], 0.25,
       "RobotModel codec preserves joint frame transforms");
-    var restoredDrive:Actuator = cast restored.joints[0].drive;
-    equal(restoredDrive.maxRate, 12.0, "RobotModel codec preserves actuator settings");
+    equal(restored.actuators.length, 2,
+      "v4 RobotModel accepts two actuators on one joint");
+    equal(restored.actuators[0].maxRate, 12.0,
+      "RobotModel codec preserves actuator-unit limits");
+    check(switch restored.actuators[1].transmission {
+      case SimpleTransmission(jointId, ratio, offset):
+        jointId == source.joints[0].id && ratio == -3.0 && offset == 0.1;
+    }, "v4 RobotModel preserves independent transmission ratios");
     equal(restored.frames[0].link.id, "link/base", "RobotModel codec resolves frame link references");
     check(restored.sensors[0].frame == restored.frames[0],
       "RobotModel codec resolves sensor frame references to shared frame objects");
@@ -805,30 +815,15 @@ class RobotWorldTests {
     throws(function() wrongLayout.validateAgainst(source),
       "device channel mapping rejects order that differs from semantic model joints");
 
-    var legacyV1 = haxe.io.Bytes.ofString('{"schemaVersion":1,"name":"legacy-arm",'
-      + '"links":[{"id":"base","name":"base"}],"joints":[],"frames":[],"sensors":[]}');
-    var migratedV1 = RobotModelCodec.decode(legacyV1);
-    equal(migratedV1.schemaVersion, RobotModel.CURRENT_VERSION,
-      "v1 RobotModel artifact migrates to the current schema");
-    equal(migratedV1.links[0].mass, 1.0, "v1 migration supplies default link mass");
-    equal(migratedV1.links[0].inertiaTensor[8], 1.0,
-      "v1 migration supplies default link inertia");
-    equal(RobotModelCodec.decode(RobotModelCodec.encode(migratedV1)).name, "legacy-arm",
-      "migrated RobotModel can be saved in the current canonical format");
-
-    var legacyV2:Dynamic = haxe.Json.parse(encoded.toString());
-    Reflect.setField(legacyV2, "schemaVersion", 2);
-    Reflect.setField(legacyV2, "mobileBase", null);
-    Reflect.setField(legacyV2, "forkMechanism", null);
-    var legacySensors:Array<Dynamic> = cast Reflect.field(legacyV2, "sensors");
-    Reflect.setField(legacySensors[0], "startAngleRadians", null);
-    Reflect.setField(legacySensors[0], "fieldOfViewRadians", null);
-    var migratedV2 = RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(legacyV2)));
-    equal(migratedV2.sensors[0].startAngleRadians, 0.0,
-      "v2 migration supplies default sensor angle");
-    equal(migratedV2.sensors[0].fieldOfViewRadians, Math.PI * 2.0,
-      "v2 migration supplies full-circle sensor coverage");
-    equal(migratedV2.mobileBase, null, "v2 migration defaults newer semantic roles");
+    var oldVersion:Dynamic = haxe.Json.parse(encoded.toString());
+    Reflect.setField(oldVersion, "schemaVersion", 3);
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(oldVersion))),
+      "v4-only RobotModel codec rejects old schemas");
+    var legacyDrive:Dynamic = haxe.Json.parse(encoded.toString());
+    var legacyJoints:Array<Dynamic> = cast Reflect.field(legacyDrive, "joints");
+    Reflect.setField(legacyJoints[0], "drive", {name: "old-drive"});
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(legacyDrive))),
+      "v4 codec rejects silently ignored joint-drive records");
 
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString('{"schemaVersion":99}')),
       "future RobotModel schema versions are rejected");
@@ -4221,19 +4216,20 @@ class RobotWorldTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     joint.limits.velocity = 2.0;
-    joint.drive = new Actuator("shoulder-motor", 100.0, 1.0);
+    model.addActuator(new Actuator("shoulder-motor", 100.0, 1.0,
+      Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
     var blueprint = RobotRuntimeCompiler.compile(model);
-    equal(blueprint.joints[0].maxRate, 1.0,
-      "runtime compiler combines joint and actuator rate limits");
+    equal(blueprint.joints[0].maxRate, 2.0,
+      "runtime blueprint keeps joint rate until endpoint actuator conversion exists");
 
     var simulation = new Simulation(0.1);
     var runtime = simulation.addRobot(blueprint);
     runtime.submitPosition(0, 0.8, 1);
     simulation.step(Int64.ofInt(100));
-    check(Math.abs(runtime.snapshot().q.get(0) - 0.1) < 0.000000001,
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.2) < 0.000000001,
       "runtime applies the compiled rate limit on the first shared tick");
     simulation.step(Int64.ofInt(200));
-    check(Math.abs(runtime.snapshot().q.get(0) - 0.2) < 0.000000001,
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.4) < 0.000000001,
       "runtime keeps advancing the same target on later shared ticks");
     simulation.dispose();
 

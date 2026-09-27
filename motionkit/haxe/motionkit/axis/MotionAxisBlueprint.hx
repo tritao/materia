@@ -15,6 +15,8 @@ class MotionAxisBlueprint {
   public final homePosition:Float;
   public final jointScales:Array<Float>;
   public final jointOffsets:Array<Float>;
+  /** Explicit task-to-joint maps override model transmissions; deprecated. */
+  public final hasExplicitMapping:Bool;
 
   public function new(id:String, jointIds:Array<String>, lowerLimit:Float,
       upperLimit:Float, ?maxVelocity:Float = 0.0, ?maxAcceleration:Float = 0.0,
@@ -47,6 +49,7 @@ class MotionAxisBlueprint {
     this.homePosition = chosenHome;
     this.jointScales = scales;
     this.jointOffsets = offsets;
+    this.hasExplicitMapping = jointScales != null || jointOffsets != null;
   }
 
   static function requireNonnegative(value:Float, label:String, id:String):Void {

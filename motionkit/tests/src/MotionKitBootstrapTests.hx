@@ -23,6 +23,8 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
+import robotkit.model.Actuator;
+import robotkit.model.Transmission;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.runtime.Simulation;
@@ -54,6 +56,7 @@ class MotionKitBootstrapTests {
     testPlannerIsDeterministicAndBounded();
     testLineLookaheadPlanner();
     testLinearAxisCompilesToRobotModel();
+    testTransmissionDerivedAxisMapping();
     testCompiledAxisRunsThroughSimulation();
     testHomingAndJogging();
     testMoveLinearUsesPlannerLimits();
@@ -301,10 +304,52 @@ class MotionKitBootstrapTests {
       "MachineKit travel origin is converted to metres");
     near(joint.limits.upper, 0.08, "MachineKit stroke becomes the logical upper limit");
     near(joint.limits.velocity, 0.1, "compiled actuator rate is retained");
-    check(joint.drive != null && joint.drive.name.indexOf(axis.motor.designation) >= 0,
+    check(blueprint.model.actuators.length == 1 &&
+      blueprint.model.actuators[0].id.indexOf(axis.motor.designation) >= 0,
       "compiled actuator retains motor identity");
-    check(joint.drive != null && joint.drive.name.indexOf("mm/rev") >= 0,
-      "compiled actuator retains transmission identity");
+    var expectedRatio = 2.0 * Math.PI /
+      (axis.nut.travelPerRevolution() * MachineKitRobotCompiler.MILLIMETRES_TO_METRES);
+    check(switch blueprint.model.actuators[0].transmission {
+      case SimpleTransmission(jointId, ratio, offset):
+        jointId == joint.id && Math.abs(ratio - expectedRatio) < 1e-9 && offset == 0.0;
+    }, "compiled actuator carries the lead-screw rad/m ratio");
+    near(blueprint.axes[0].jointScales[0], 1.0,
+      "transmission-derived single-joint mapping keeps the old scale");
+    near(blueprint.axes[0].jointOffsets[0], 0.0,
+      "transmission-derived single-joint mapping keeps the old offset");
+  }
+
+  static function testTransmissionDerivedAxisMapping():Void {
+    var model = new RobotModel("dual-drive-map");
+    var base = model.addLink(new Link("base"));
+    var left = model.addLink(new Link("left"));
+    var right = model.addLink(new Link("right"));
+    var first = model.addJoint(new Joint("x.left", JointType.Prismatic, base, left));
+    var second = model.addJoint(new Joint("x.right", JointType.Prismatic, left, right));
+    first.limits.lower = 0.0;
+    first.limits.upper = 0.08;
+    second.limits.lower = -0.16;
+    second.limits.upper = 0.01;
+    model.addActuator(new Actuator("left-motor", 0.0, 1.0,
+      Transmission.SimpleTransmission(first.id, 1.0, 0.0)));
+    model.addActuator(new Actuator("right-motor", 0.0, 1.0,
+      Transmission.SimpleTransmission(second.id, -0.5, 0.01)));
+    var authored = new MotionAxisBlueprint("x", [first.id, second.id],
+      0.0, 0.08, 0.08, 0.4);
+    var derived = MotionSystemBlueprint.fromRobotModel(model, [authored]);
+    near(derived.axes[0].jointScales[0], 1.0,
+      "first transmitted joint defines the logical coordinate");
+    near(derived.axes[0].jointScales[1], -2.0,
+      "transmission ratio derives the old dual-motor scale");
+    near(derived.axes[0].jointOffsets[1], 0.01,
+      "transmission offset is retained in joint coordinates");
+    var explicit = new MotionAxisBlueprint("x", [first.id, second.id],
+      0.0, 0.08, 0.08, 0.4, 0.0, [1.0, -3.0], [0.0, 0.02]);
+    var overridden = MotionSystemBlueprint.fromRobotModel(model, [explicit]);
+    near(overridden.axes[0].jointScales[1], -3.0,
+      "deprecated explicit scale still overrides the transmission");
+    near(overridden.axes[0].jointOffsets[1], 0.02,
+      "deprecated explicit offset still overrides the transmission");
   }
 
   static function testCompiledAxisRunsThroughSimulation():Void {
