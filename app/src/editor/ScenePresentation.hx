@@ -2,6 +2,11 @@ package app.editor;
 
 import app.EditorScene.SceneBridge;
 import app.EditorScene;
+import app.EditorScene.EditorSceneObject;
+import CadKit;
+import cadkit.Shape;
+import nativekit.scene.GeometryData;
+import nativekit.scene.Transform;
 import materia.project.Appearance;
 import materia.project.Appearance.Appearances;
 import nativekit.scene.SceneSnapshot;
@@ -88,6 +93,59 @@ class ScenePresentation {
     presentationStale = false;
     if (nextSpatial != null) try previousSpatial.dispose() catch (_:Dynamic) {}
     try previousSnapshot.dispose() catch (_:Dynamic) {}
+  }
+
+  /** Ensures a hidden child node contains exactly one CAD or preview face for hover rendering. */
+  public function ensureFaceHover(owner:EditorScene, id:String, faceIndex:Int):Void {
+    var item = owner.object(id);
+    if (item == null || !EditorScene.isFaceHoverKind(item.kind) || faceIndex < 0) return;
+    if (faceHoverIndexes.get(id) == faceIndex && faceHoverNodes.exists(id)) return;
+
+    var geometryData = faceHoverGeometry(owner, id, item, faceIndex);
+    if (geometryData == null) return;
+    var geometry = faceHoverGeometries.get(id);
+    if (geometry == null) {
+      geometry = owner.scene.createGeometry();
+      owner.scene.setGeometryData(geometry, geometryData);
+      var transaction = owner.scene.beginTransaction();
+      var node = transaction.createNode();
+      transaction.setName(node, "Hover face " + (faceIndex + 1));
+      transaction.setVisibility(node, false);
+      transaction.setParent(node, owner.runtimeFor(id).node);
+      transaction.setGeometry(node, geometry);
+      transaction.setMaterial(node, hoverMaterial);
+      transaction.setTransform(node, Transform.identity());
+      transaction.commit();
+      faceHoverNodes.set(id, node);
+      faceHoverGeometries.set(id, geometry);
+    } else {
+      owner.scene.setGeometryData(geometry, geometryData);
+    }
+    faceHoverIndexes.set(id, faceIndex);
+    owner.publish();
+  }
+
+  /** Common face-hover geometry boundary for live CAD and serialized preview objects. */
+  function faceHoverGeometry(owner:EditorScene, id:String, item:EditorSceneObject,
+      faceIndex:Int):Null<GeometryData> {
+    if (EditorScene.isCadKind(item.kind)) {
+      var session = owner.cadSessions.get(id);
+      if (session == null) return null;
+      var output = session.document.outputFeatureOrNull();
+      if (output == null || output.currentShape() == null) return null;
+      var face:Shape = output.currentShape().subshape(CadKit.ShapeKind.Face, faceIndex);
+      try {
+        var result = session.model.geometryFor(face, true);
+        face.close();
+        return result;
+      } catch (error:Dynamic) {
+        face.close();
+        throw error;
+      }
+    }
+    if (item.kind == "cad-preview" && item.meshSnapshot != null)
+      return owner.previewGeometry(item.meshSnapshot).subelementGeometry(faceIndex);
+    return null;
   }
 
   public static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>):MaterialData {

@@ -1751,58 +1751,8 @@ class EditorScene {
     return {id: id, faceIndex: faceIndex};
   }
 
-  /** Ensures a hidden child node contains exactly one CAD or preview face for hover rendering. */
-  function ensureFaceHoverPresentation(id:String, faceIndex:Int):Void {
-    var item = object(id);
-    if (item == null || !isFaceHoverKind(item.kind) || faceIndex < 0) return;
-    if (faceHoverIndexes.get(id) == faceIndex && faceHoverNodes.exists(id)) return;
-
-    var geometryData = faceHoverGeometry(id, item, faceIndex);
-    if (geometryData == null) return;
-    var geometry = faceHoverGeometries.get(id);
-    if (geometry == null) {
-      geometry = scene.createGeometry();
-      scene.setGeometryData(geometry, geometryData);
-      var transaction = scene.beginTransaction();
-      var node = transaction.createNode();
-      transaction.setName(node, "Hover face " + (faceIndex + 1));
-      transaction.setVisibility(node, false);
-      transaction.setParent(node, runtimeFor(id).node);
-      transaction.setGeometry(node, geometry);
-      transaction.setMaterial(node, hoverMaterial);
-      transaction.setTransform(node, Transform.identity());
-      transaction.commit();
-      faceHoverNodes.set(id, node);
-      faceHoverGeometries.set(id, geometry);
-    } else {
-      scene.setGeometryData(geometry, geometryData);
-    }
-    faceHoverIndexes.set(id, faceIndex);
-    publish();
-  }
-
-  /** Common face-hover geometry boundary for live CAD and serialized preview objects. */
-  function faceHoverGeometry(id:String, item:EditorSceneObject,
-      faceIndex:Int):Null<GeometryData> {
-    if (isCadKind(item.kind)) {
-      var session = cadSessions.get(id);
-      if (session == null) return null;
-      var output = session.document.outputFeatureOrNull();
-      if (output == null || output.currentShape() == null) return null;
-      var face:Shape = output.currentShape().subshape(CadKit.ShapeKind.Face, faceIndex);
-      try {
-        var result = session.model.geometryFor(face, true);
-        face.close();
-        return result;
-      } catch (error:Dynamic) {
-        face.close();
-        throw error;
-      }
-    }
-    if (item.kind == "cad-preview" && item.meshSnapshot != null)
-      return previewGeometry(item.meshSnapshot).subelementGeometry(faceIndex);
-    return null;
-  }
+  function ensureFaceHoverPresentation(id:String, faceIndex:Int):Void
+    presentation.ensureFaceHover(this, id, faceIndex);
 
   public function pickRay(originX:Float,originY:Float,originZ:Float,
       directionX:Float,directionY:Float,directionZ:Float):String {
