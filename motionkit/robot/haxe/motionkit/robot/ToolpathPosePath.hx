@@ -5,6 +5,7 @@ import motionkit.event.PathEvent;
 import motionkit.kinematics.Pose3;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.PoseLine;
+import motionkit.path.PoseMath;
 import motionkit.path.PosePath;
 import motionkit.path.PosePrimitive;
 import motionkit.path.PoseWaypoint;
@@ -28,12 +29,18 @@ class ToolpathPosePath {
         events.push(new PathEvent(distance, channel, EventValue.Digital(current.processOn)));
         wasOn = current.processOn;
       }
-      var segment = new PoseLine(waypoint(current.work_T_tcp, current.positionTolerance,
-        current.orientationTolerance), waypoint(next.work_T_tcp, next.positionTolerance,
-        next.orientationTolerance), OrientationPolicy.Interpolated, rotationWeight, next.feedRate);
+      var start = waypoint(current.work_T_tcp, current.positionTolerance,
+        current.orientationTolerance);
+      var end = waypoint(next.work_T_tcp, next.positionTolerance,
+        next.orientationTolerance);
+      if (PoseMath.distance(start.pose, end.pose) <= 1e-12 &&
+          PoseMath.angle(start.pose, end.pose) <= 1e-12) continue;
+      var segment = new PoseLine(start, end, OrientationPolicy.Interpolated,
+        rotationWeight, next.feedRate);
       primitives.push(segment);
       distance += segment.length();
     }
+    if (primitives.length == 0) throw "Toolpath conversion needs a nonzero path";
     if (wasOn) events.push(new PathEvent(distance, channel, EventValue.Digital(false)));
     return new PosePath(toolpath.frameId, primitives, events);
   }

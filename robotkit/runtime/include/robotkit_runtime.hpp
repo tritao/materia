@@ -257,6 +257,8 @@ private:
     /** Last position sent to the endpoint, retained after a trajectory drains. */
     double commanded_position_[RK_MAX_JOINTS]{};
     double commanded_position_backup_[RK_MAX_JOINTS]{};
+    bool velocity_anchor_pending_[RK_MAX_JOINTS]{};
+    bool velocity_anchor_pending_backup_[RK_MAX_JOINTS]{};
     uint64_t endpoint_command_sequence_ = 0;
     bool state_backup_valid_ = false;
 };

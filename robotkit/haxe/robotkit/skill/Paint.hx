@@ -1,12 +1,12 @@
 package robotkit.skill;
 
-import haxe.Int64;
 import robotkit.manipulation.BaseObstacle;
 import robotkit.manipulation.Manipulator;
 import robotkit.navigation.Navigator;
 import robotkit.perception.PerceptionSnapshot;
 import robotkit.spatial.Transform3;
 import robotkit.tool.Sprayer;
+import robotkit.tool.ChannelToolAdapter;
 import robotkit.work.CoverageMap;
 import robotkit.work.WorkSurface;
 import robotkit.world.Robot;
@@ -23,13 +23,21 @@ class Paint implements Skill {
   public function new(navigator:Navigator, manipulator:Manipulator, robot:Robot,
       map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
       observePerception:RobotSnapshot -> PerceptionSnapshot, sprayer:Sprayer,
-      litersPerMinute:Float, pressureBar:Float, seed:Array<Float>, ?obstacles:Array<BaseObstacle>) {
+      litersPerMinute:Float, pressureBar:Float, seed:Array<Float>,
+      runner:SurfacePlanRunner, ?obstacles:Array<BaseObstacle>) {
     if (sprayer == null) throw "Paint requires a sprayer";
+    var adapter = new ChannelToolAdapter();
+    adapter.bind("surface.process", function(event) {
+      var on = switch event.value {
+        case Digital(value): value;
+        case Analog(value): value > 0.0;
+        case Process(_, _): throw "Paint process channel needs a digital or analog value";
+      };
+      sprayer.setFlow(on ? litersPerMinute : 0.0, event.scheduledTimeNs);
+      sprayer.setPressure(on ? pressureBar : 0.0, event.scheduledTimeNs);
+    });
     finish = new FinishSurface(navigator, manipulator, robot, map_T_surface, surface, spec,
-      observePerception, function(on:Bool, tick:Int64) {
-        sprayer.setFlow(on ? litersPerMinute : 0.0, tick);
-        sprayer.setPressure(on ? pressureBar : 0.0, tick);
-      }, seed, obstacles);
+      observePerception, runner, adapter, "surface.process", seed, obstacles);
   }
 
   public function coverage():Null<CoverageMap> return finish.coverage;
@@ -38,6 +46,8 @@ class Paint implements Skill {
   public function update(snapshot:RobotSnapshot, durationSeconds:Float):SkillStatus
     return finish.update(snapshot, durationSeconds);
   public function cancel():Void finish.cancel();
+  public function hold():Void finish.hold();
+  public function resume():Void finish.resume();
   public function status():SkillStatus return finish.status();
   public function result():Null<SkillResult> return finish.result();
 }

@@ -17,6 +17,7 @@ class ManipulatorMotion {
   final input:String -> Null<EventValue>;
   final eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool};
   final executor:PlanExecutor;
+  public final jointIndices:Array<Int>;
   var compiled:Null<CompiledProgram>;
   var blockIndex:Int = 0;
   var planIndex:Int = 0;
@@ -25,17 +26,28 @@ class ManipulatorMotion {
   var planStarted:Bool = false;
   var nextPlanId:Int64 = Int64.ofInt(1);
   var events:Array<FiredProcessEvent> = [];
+  var lastCommandedQ:Null<Array<Float>> = null;
 
   public function new(robot:Robot, compiler:ProgramCompiler,
       input:String -> Null<EventValue>,
-      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}) {
+      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool},
+      ?jointIndices:Array<Int>) {
     if (robot == null || compiler == null || input == null || eventSource == null)
       throw "ManipulatorMotion needs a robot, compiler, input and event source";
     this.robot = robot; this.compiler = compiler;
     this.input = input; this.eventSource = eventSource;
-    executor = new PlanExecutor(robot);
-    if (robot.description().joints.length != compiler.solver.jointCount())
+    var count = robot.description().joints.length;
+    this.jointIndices = jointIndices == null ? [for (i in 0...count) i] :
+      jointIndices.copy();
+    if (this.jointIndices.length != compiler.solver.jointCount())
       throw "ManipulatorMotion joint count does not match compiler";
+    var seen = new Map<Int, Bool>();
+    for (index in this.jointIndices) {
+      if (index < 0 || index >= count || seen.exists(index))
+        throw "ManipulatorMotion needs distinct robot joint indices";
+      seen.set(index, true);
+    }
+    executor = new PlanExecutor(robot, this.jointIndices);
   }
 
   public function run(program:MotionProgram):Void {
@@ -43,7 +55,10 @@ class ManipulatorMotion {
     release(); completed = false; failure = null; events = [];
     blockIndex = 0; planIndex = 0; barrierElapsed = 0.0; holding = false; planStarted = false;
     try {
-      compiled = compiler.compile(program, robot.snapshot().positions.toArray(), nextPlanId);
+      var positions = robot.snapshot().positions;
+      compiled = compiler.compile(program, lastCommandedQ == null
+        ? [for (index in jointIndices) positions.get(index)]
+        : lastCommandedQ.copy(), nextPlanId);
       for (block in compiled.blocks) nextPlanId = Int64.add(nextPlanId,
         Int64.ofInt(block.plans.length));
       running = true;
@@ -149,7 +164,12 @@ class ManipulatorMotion {
       }
       blockIndex++; planIndex = 0; barrierElapsed = 0.0;
     }
-    if (running) { running = false; completed = true; release(); }
+    if (running) {
+      for (block in source.blocks)
+        for (plan in block.plans)
+          lastCommandedQ = plan.evaluate(plan.durationSeconds).positions;
+      running = false; completed = true; release();
+    }
   }
 
   function hasPlan():Bool {
@@ -162,6 +182,7 @@ class ManipulatorMotion {
       try executor.abort() catch (_:Dynamic) {}
     }
     failure = message; completed = false; running = false;
+    lastCommandedQ = null;
     release();
   }
   function collectEvents():Void {

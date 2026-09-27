@@ -292,6 +292,11 @@ sprayer tests check scheduled timestamps, and native tests cover replacement,
 undeclared channels, ring overflow, and safety transitions. Commit: the
 commit containing this entry.
 
+Reverified on the merged B5 tree: MotionKit Haxe passed 6,459 assertions,
+RobotKit Haxe passed 4,539 assertions, MotionKit native CTest passed 4/4,
+RobotKit native CTest passed 17/17, both FFI audits passed, and TCP integration
+passed in default, session, and lease-timeout modes.
+
 ### B3 — MotionProgram compiler
 
 Changed the C2 `FollowPath` field from `MotionPath` to `PosePath` in the shared
@@ -315,6 +320,11 @@ submodule commit so the MotionKit timing fixture can keep its nested array
 expression. Haxeon regression and full test script passed. Commit: the
 commit containing this entry.
 
+Reverified on the merged B5 tree: MotionKit Haxe passed 6,459 assertions,
+RobotKit Haxe passed 4,539 assertions, MotionKit native CTest passed 4/4,
+RobotKit native CTest passed 17/17, both FFI audits passed, and TCP integration
+passed in default, session, and lease-timeout modes.
+
 ### B4 — ManipulatorMotion facade
 
 Extracted bounded trajectory-plan chunk submission, owner-clock progress
@@ -331,3 +341,27 @@ output after abort. Commit: the commit containing this entry.
 
 MotionKit and RobotKit Haxe, both native suites, both FFI audits, and TCP
 integration in default, session, and lease-timeout modes passed.
+
+### B5 — Wall finishing through plans
+
+`FinishSurface`, `Paint`, and `Sand` now run patch programs through
+`ManipulatorMotion`: `MoveJ` approach, `FollowPath` process with timed channel
+events, and `MoveL` retract. `ChannelToolAdapter` applies fired process records
+to the simulated sprayer, and coverage uses observed joints and FK. The M9
+scenario holds and resumes mid-patch, checks scheduled spray timing against
+the owner clock, and confirms no paint during the hold. The synthetic DH arm
+has only placeholder bounds boxes; its inferred self-contact trapped the slow
+MuJoCo approach, so this fixture disables self collision while retaining
+environment collision. Bounded plan chunks carry the preceding chord velocity
+at linear continuation anchors. Sequential plans retain commanded endpoints,
+and stopped velocity-controlled joints reanchor from observation.
+
+After merging main, MotionKit Haxe passed 6,459 assertions, RobotKit Haxe
+passed 4,537 assertions, and the MuJoCo M9 runner passed 64 assertions.
+Default and MuJoCo coverage were both 99.60%, with zero opening coverage.
+MotionKit native CTest passed 4/4, RobotKit native CTest passed 17/17, both
+FFI audits passed, and TCP integration passed in default, session, and
+lease-timeout modes. Commit: the commit containing this entry.
+
+Lane C's `CornerBlender` can be evaluated for `ToleranceBlend` in B8 after
+the TOPP-RA backend swap. B3's exact-stop fallback remains in place.

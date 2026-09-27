@@ -442,7 +442,9 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
                 (first.degree >= 2 &&
                     (std::abs(first.coefficients[joint].value[1] - plan.start_velocity[joint]) > velocity_tolerance ||
                      std::abs(2.0 * first.coefficients[joint].value[2] - plan.start_acceleration[joint]) > acceleration_tolerance)))
+            {
                 return RK_ERROR_INVALID_STATE;
+            }
         }
         const auto &terminal = plan.segments.segments[plan.segments.segment_count - 1];
         const auto plan_duration_ns = terminal.time_from_start_ns +
@@ -529,6 +531,7 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         control_.trajectory = std::move(candidate);
         control_.events = std::move(candidate_events);
         control_.trajectory_active = true;
+        std::fill_n(velocity_anchor_pending_, blueprint_.joint_count, false);
         control_.plan_just_submitted = was_idle;
         if (was_idle) control_.trajectory_time_ns = 0;
         control_.active_plan_id = replace ? control_.active_plan_id : plan.plan_id;
@@ -666,6 +669,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     }
     control_backup_ = control_;
     std::copy_n(commanded_position_, RK_MAX_JOINTS, commanded_position_backup_);
+    std::copy_n(velocity_anchor_pending_, RK_MAX_JOINTS,
+        velocity_anchor_pending_backup_);
 
     bool trajectory_stop_completed = false;
     // Set when a path-following stop reaches the end of the queued path this
@@ -1179,6 +1184,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                         control_.reference_initialized[joint] = true;
                     }
                     control_.targets[joint] = target;
+                    velocity_anchor_pending_[joint] = target.mode == RK_TARGET_VELOCITY;
                     if (target.mode == RK_TARGET_EFFORT && target.max_effort > 0.0 &&
                         std::abs(control_.targets[joint].target) > target.max_effort)
                         control_.targets[joint].target = std::copysign(
@@ -1598,6 +1604,14 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
         }
         next.struct_size = sizeof(next);
         state_ = next;
+        // After velocity control stops, use its observed resting position as
+        // the next plan anchor. Position-controlled and untouched joints keep
+        // their commanded anchor despite small observation offsets.
+        if (!control_.trajectory_active && control_.trajectory.empty() &&
+            !control_.stop_ramp_active)
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                if (!control_.active[joint] && velocity_anchor_pending_[joint])
+                    commanded_position_[joint] = next.position[joint];
         state_backup_valid_ = false;
     }
     return RK_OK;
@@ -1616,6 +1630,8 @@ void RobotRuntime::discard_pending_commands() noexcept {
         state_ = state_backup_;
         control_ = control_backup_;
         std::copy_n(commanded_position_backup_, RK_MAX_JOINTS, commanded_position_);
+        std::copy_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS,
+            velocity_anchor_pending_);
         state_backup_valid_ = false;
     }
 }
@@ -1638,6 +1654,8 @@ void RobotRuntime::reset_state() noexcept {
     latched_fault_code_ = 1;
     std::fill_n(commanded_position_, RK_MAX_JOINTS, 0.0);
     std::fill_n(commanded_position_backup_, RK_MAX_JOINTS, 0.0);
+    std::fill_n(velocity_anchor_pending_, RK_MAX_JOINTS, false);
+    std::fill_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS, false);
     control_backup_ = {};
     state_backup_valid_ = false;
 }
