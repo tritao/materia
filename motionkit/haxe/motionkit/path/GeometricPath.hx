@@ -1,7 +1,9 @@
 package motionkit.path;
 
+import motionkit.program.MotionPath;
+
 /** Immutable ordered geometric path made from reusable primitives. */
-class GeometricPath {
+class GeometricPath implements MotionPath {
   public final primitives:Array<PathPrimitive>;
   public final totalLength:Float;
   final cumulativeLengths:Array<Float>;
@@ -31,6 +33,8 @@ class GeometricPath {
       segments.push(new LineSegment(points[i], points[i + 1]));
     return new GeometricPath(segments);
   }
+
+  public function length():Float return totalLength;
 
   public function pointAt(distance:Float):PathPoint {
     if (!Math.isFinite(distance) || distance < 0.0 || distance > totalLength)

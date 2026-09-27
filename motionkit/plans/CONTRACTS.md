@@ -385,3 +385,21 @@ Commit: the commit containing this entry.
 MotionKit passed 4,995 assertions, RobotKit passed 4,437 aggregate assertions,
 all 12 native tests passed, and TCP integration passed in default, session and
 lease-timeout modes.
+
+### P0.2 — Add validated motion programs
+
+Added the controller-independent `MotionProgram` and typed operations for
+joint, linear, circular and authored-path motion, dwell, output and input
+barriers. Added joint/pose move targets, exact/tolerance blends, serializable
+input predicates and a small path interface that current and future authored
+paths can implement. Structural validation reports the operation index and
+checks non-empty programs and joint targets, framed poses, positive finite
+feeds/dwell/timeouts, sorted in-range events, typed values and blends only
+between consecutive moves. Tests were written first and now pass. Commit: the
+commit containing this entry.
+
+MotionKit passed 5,004 assertions, RobotKit passed 4,437 aggregate assertions,
+all 12 native tests passed, and TCP integration passed in default, session and
+lease-timeout modes. The session integration's first run missed the latched
+e-stop during reconnect; an immediate unchanged rerun passed, as it did before
+this item.

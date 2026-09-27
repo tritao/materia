@@ -24,6 +24,11 @@ import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
 import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
+import motionkit.program.Blend;
+import motionkit.program.InputPredicate;
+import motionkit.program.MotionOp;
+import motionkit.program.MotionProgram;
+import motionkit.program.MoveTarget;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ExecutionPlan;
@@ -67,6 +72,7 @@ class MotionKitBootstrapTests {
   public static function main():Void {
     testMotionEventContracts();
     testKinematicsContract();
+    testMotionProgramContracts();
     testGeometricPathPrimitives();
     testNativeTrajectoryRoundTrip();
     testNativeValidationAndPlan();
@@ -204,6 +210,55 @@ class MotionKitBootstrapTests {
       "MotionKit twist rejects non-finite components");
     throws(function() new IkTolerance(0.0, 1e-3),
       "IK tolerance rejects a non-positive position tolerance");
+  }
+
+  static function testMotionProgramContracts():Void {
+    var pose = new Pose3(0.2, 0.1, 0.3);
+    var path = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
+      new PathPoint(0.1, 0.0, 0.0)]);
+    var events = [new PathEvent(0.02, "sprayer.enabled", EventValue.Digital(true)),
+      new PathEvent(0.08, "sprayer.enabled", EventValue.Digital(false))];
+    var program = new MotionProgram([
+      MotionOp.MoveJ(MoveTarget.JointTarget([0.1, -0.2]), new MotionOptions(1.0, 2.0),
+        Blend.ExactStop),
+      MotionOp.MoveL(pose, "work", 0.2, Blend.ToleranceBlend(0.002)),
+      MotionOp.MoveC(new Pose3(0.25, 0.15, 0.3), new Pose3(0.3, 0.1, 0.3),
+        "work", 0.15, Blend.ExactStop),
+      MotionOp.FollowPath(path, "work", 0.1, events),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false)),
+      MotionOp.WaitInput("sprayer.ready", InputPredicate.Equals(EventValue.Digital(true)), 2.0)
+    ]);
+    check(program.ops.length == 6, "motion program retains its ordered operations");
+    check(MotionProgram.validate(program.ops) == null,
+      "a structurally valid motion program has no validation error");
+
+    var emptyError = MotionProgram.validate([]);
+    check(emptyError != null && emptyError.indexOf("at least one operation") >= 0,
+      "empty program validation explains the missing operation");
+    var frameError = MotionProgram.validate([
+      MotionOp.MoveL(pose, " ", 0.1, Blend.ExactStop)]);
+    check(frameError != null && frameError.indexOf("op 0") >= 0 &&
+      frameError.indexOf("frame") >= 0,
+      "program validation identifies an operation with a missing frame");
+    var feedError = MotionProgram.validate([
+      MotionOp.MoveL(pose, "work", Math.NaN, Blend.ExactStop)]);
+    check(feedError != null && feedError.indexOf("feed") >= 0,
+      "program validation rejects a non-finite feed");
+    var blendError = MotionProgram.validate([
+      MotionOp.MoveL(pose, "work", 0.1, Blend.ToleranceBlend(0.01)),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false))]);
+    check(blendError != null && blendError.indexOf("consecutive moves") >= 0,
+      "program validation keeps tolerance blends between moves");
+    var timeoutError = MotionProgram.validate([
+      MotionOp.WaitInput("sprayer.ready", InputPredicate.Equals(EventValue.Digital(true)), 0.0)]);
+    check(timeoutError != null && timeoutError.indexOf("timeout") >= 0,
+      "program validation rejects a non-positive wait timeout");
+    var eventOrderError = MotionProgram.validate([
+      MotionOp.FollowPath(path, "work", 0.1, [events[1], events[0]])]);
+    check(eventOrderError != null && eventOrderError.indexOf("sorted") >= 0,
+      "program validation rejects unsorted path events");
+    throws(function() new MotionProgram([]),
+      "motion program construction rejects invalid structure");
   }
 
   static function buildContractArmFixture():{model:RobotModel, chain:KinematicChain} {
