@@ -580,7 +580,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
           var selectedId = id;
           items.push(new MenuItem(id, command.label, function() {
             commands.executeContext(selectedId, ui.commandContext);
-            commands.refresh();
+            invalidateView();
           }, command.isEnabled(ui.commandContext)));
         }
       };
@@ -646,7 +646,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
           invalidateView();
         }, function(_) {
           log("Command executed from palette");
-          commands.refresh();
+          invalidateView();
         });
       palette.centered = true;
       windowLayers.push(new StackChild("command-palette", palette, 0.0, 0.0, 1000,
@@ -793,7 +793,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function resetWorkspace():Void {
     workspace.reset();
     log("Workspace reset");
-    commands.refresh();
+    invalidateView();
   }
 
   function robotDiagnosticState():Dynamic {
@@ -1065,7 +1065,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     options.onClickEvent = function(event) {
       if (viewportOptionsVisible) {
         viewportOptionsVisible = false;
-        commands.refresh();
+        invalidateView();
         return;
       }
       var bounds = menuTriggerBounds(event);
