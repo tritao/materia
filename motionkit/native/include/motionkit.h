@@ -9,6 +9,7 @@
 #define MK_HANDLE __attribute__((annotate("hxi:handle")))
 #define MK_HANDLE_DESTROY(symbol) __attribute__((annotate("hxi:handle_destroy")))
 #define MK_IN_ARRAY(count) __attribute__((annotate("hxi:in_array")))
+#define MK_OUT_ARRAY(count) __attribute__((annotate("hxi:out_array")))
 #define MK_STRUCT_SIZE __attribute__((annotate("hxi:struct_size")))
 #else
 #define MK_OUT
@@ -16,6 +17,7 @@
 #define MK_HANDLE
 #define MK_HANDLE_DESTROY(symbol)
 #define MK_IN_ARRAY(count)
+#define MK_OUT_ARRAY(count)
 #define MK_STRUCT_SIZE
 #endif
 
@@ -37,7 +39,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 9, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 10, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_PLAN_EVENTS = 256, MK_EVENT_CHANNEL_BYTES = 48, MK_EVENT_COMMAND_BYTES = 48,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
@@ -60,6 +62,35 @@ typedef struct mk_path_handle { uint32_t id; } mk_path_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_path_destroy);
 typedef struct mk_time_law_handle { uint32_t id; } mk_time_law_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_time_law_destroy);
+
+/** OPW's seven geometric parameters and manufacturer joint conventions. */
+typedef struct mk_opw_parameters {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double a1, a2, b, c1, c2, c3, c4;
+    double offsets[6];
+    int8_t sign_corrections[6];
+} mk_opw_parameters;
+
+typedef struct mk_opw_pose {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double position[3];
+    double quaternion[4]; /**< x, y, z, w. */
+} mk_opw_pose;
+
+typedef struct mk_opw_solution {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double joints[6];
+    uint8_t valid;
+    uint8_t singular;
+} mk_opw_solution;
+
+/** All eight slots are written, including invalid solutions. */
+MK_API mk_result MK_CALL mk_opw_forward(const mk_opw_parameters *parameters,
+    const double *joints MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_opw_pose *out_pose MK_OUT);
+MK_API mk_result MK_CALL mk_opw_inverse(const mk_opw_parameters *parameters,
+    const mk_opw_pose *pose, mk_opw_solution *out_solutions MK_OUT_ARRAY(solution_count),
+    uint32_t solution_count);
 
 /** Joint path derivatives are with respect to path parameter s. */
 typedef struct mk_path_sample {

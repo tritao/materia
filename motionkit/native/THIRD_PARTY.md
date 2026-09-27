@@ -35,3 +35,17 @@ The audited compiled C++ sources are `constraint.cpp`,
 filter excludes qpOASES, GLPK, Python bindings, Pinocchio, torque and
 Cartesian constraints, and parametrizer implementations. Only the Seidel
 LP solver is constructed by MotionKit.
+
+## opw_kinematics
+
+- Upstream: <https://github.com/Jmeyer1292/opw_kinematics>.
+- Git submodule: `vendor/opw_kinematics`, tag `0.5.5` at
+  `8a32bda8197c50bd0d60dfe1d12ecb4c13111b72`.
+- License: Apache-2.0; full text at `vendor/opw_kinematics/LICENSE`.
+  This release does not ship a separate `NOTICE` file.
+- Dependency: Eigen 3, provided through `Eigen3::Eigen`.
+
+OPW is header-only. The wrapper includes `opw_kinematics.h` and
+`opw_utilities.h`; their audited transitive header set is
+`opw_parameters.h` and `opw_kinematics_impl.h`. MotionKit does not compile
+upstream tests, ROS packaging, or install targets.

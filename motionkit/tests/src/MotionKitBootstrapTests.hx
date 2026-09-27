@@ -19,6 +19,7 @@ import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
+import motionkit.robot.OpwKinematics;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
@@ -101,9 +102,15 @@ class MotionKitBootstrapTests {
   static var assertions:Int = 0;
 
   public static function main():Void {
+    if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
+      testOpwKinematics();
+      Sys.println('C4 focused tests passed ($assertions assertions)');
+      return;
+    }
     testPoseProcessPath();
     testMotionEventContracts();
     testKinematicsContract();
+    testOpwKinematics();
     testMotionProgramContracts();
     testProgramCompiler();
     testManipulatorMotion();
@@ -704,6 +711,105 @@ class MotionKitBootstrapTests {
       "joint path samples require strictly increasing path positions");
     throws(function() new PathTimingLimits([0.0], [1.0]),
       "path timing requires positive joint velocity limits");
+  }
+
+  static function testOpwKinematics():Void {
+    var model = new RobotModel("opw-abb-test");
+    var links = [for (index in 0...7) model.addLink(new Link('opw-link-$index'))];
+    var positions = [[0.0, 0.0, 0.0], [0.1, 0.0, 0.615],
+      [0.0, 0.0, 0.705], [-0.135, 0.0, 0.755],
+      [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0],
+      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    for (index in 0...6) {
+      var joint = model.addJoint(new Joint('opw-joint-$index', JointType.Revolute,
+        links[index], links[index + 1]));
+      joint.parentFramePosition = positions[index];
+      joint.axis = axes[index];
+      joint.limits.lower = -2.0 * Math.PI;
+      joint.limits.upper = 2.0 * Math.PI;
+    }
+    var flange = model.addFrame(new Frame("opw-flange", links[6]));
+    flange.position = [0.0, 0.0, 0.085];
+    var chain = new KinematicChain(model, links[0].id, ChainTip.Frame(flange.id));
+    var manipulator = new Manipulator(model, chain);
+    var solver = new OpwKinematics(model, manipulator);
+    near(solver.parameters.a1, 0.1, "OPW extracts a1", 1e-9);
+    near(solver.parameters.a2, -0.135, "OPW extracts a2", 1e-9);
+    near(solver.parameters.c1, 0.615, "OPW extracts c1", 1e-9);
+    var q = [0.2, -0.3, 0.4, 0.5, -0.6, 0.7];
+    var reference = new ManipulatorKinematics(manipulator).forward(q);
+    var actual = solver.forward(q);
+    near(actual.x, reference.x, "OPW forward agrees with RobotKit X", 1e-9);
+    near(actual.y, reference.y, "OPW forward agrees with RobotKit Y", 1e-9);
+    near(actual.z, reference.z, "OPW forward agrees with RobotKit Z", 1e-9);
+    var candidates = solver.sampleCandidates(reference, 8, new IkTolerance());
+    var found = false;
+    for (candidate in candidates) {
+      var error = 0.0;
+      for (index in 0...6)
+        error += Math.abs(candidate[index] - q[index]);
+      if (error < 1e-8) found = true;
+    }
+    check(found, "OPW analytic candidates include the authored joint pose");
+    function published(name:String, values:Array<Float>, offsets:Array<Float>,
+        signs:Array<Int>):Void {
+      var fixture = new RobotModel(name);
+      var parts = [for (index in 0...7) fixture.addLink(new Link('$name-$index'))];
+      var origins = [[0.0, 0.0, 0.0], [values[0], values[2], values[3]],
+        [0.0, 0.0, values[4]], [values[1], 0.0, values[5]],
+        [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]];
+      for (index in 0...6) {
+        var direction = index == 0 || index == 3 || index == 5
+          ? new Vec3(0.0, 0.0, 1.0) : new Vec3(0.0, 1.0, 0.0);
+        var joint = fixture.addJoint(new Joint('$name-joint-$index',
+          JointType.Revolute, parts[index], parts[index + 1]));
+        joint.parentFramePosition = origins[index];
+        joint.parentFrameRotation = Quat.fromAxisAngle(direction,
+          -offsets[index]).toArray();
+        joint.axis = direction.scale(signs[index]).toArray();
+        joint.limits.lower = -2.0 * Math.PI;
+        joint.limits.upper = 2.0 * Math.PI;
+      }
+      var tool = fixture.addFrame(new Frame('$name-flange', parts[6]));
+      tool.position = [0.0, 0.0, values[6]];
+      var chain = new KinematicChain(fixture, parts[0].id, ChainTip.Frame(tool.id));
+      var robot = new Manipulator(fixture, chain);
+      var analytic = new OpwKinematics(fixture, robot);
+      for (index in 0...7) {
+        var extracted = [analytic.parameters.a1, analytic.parameters.a2,
+          analytic.parameters.b, analytic.parameters.c1, analytic.parameters.c2,
+          analytic.parameters.c3, analytic.parameters.c4][index];
+        near(extracted, values[index], '$name OPW parameter $index', 1e-9);
+      }
+      for (index in 0...6) {
+        near(analytic.parameters.offsets[index], offsets[index],
+          '$name OPW offset $index', 1e-9);
+        check(analytic.parameters.signCorrections[index] == signs[index],
+          '$name OPW sign $index');
+      }
+      var probe = [0.17, -0.24, 0.32, -0.41, 0.53, -0.68];
+      var expected = new ManipulatorKinematics(robot).forward(probe);
+      var actual = analytic.forward(probe);
+      near(actual.x, expected.x, '$name FK X', 1e-9);
+      near(actual.y, expected.y, '$name FK Y', 1e-9);
+      near(actual.z, expected.z, '$name FK Z', 1e-9);
+    }
+    published("ABB IRB2400", [0.1, -0.135, 0.0, 0.615, 0.705, 0.755, 0.085],
+      [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0], [1, 1, 1, 1, 1, 1]);
+    published("KUKA KR6", [0.025, -0.035, 0.0, 0.4, 0.315, 0.365, 0.08],
+      [0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0, 0.0], [-1, 1, 1, -1, 1, -1]);
+    published("Fanuc R2000", [0.72, -0.225, 0.0, 0.6, 1.075, 1.28, 0.235],
+      [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0], [1, 1, 1, 1, 1, 1]);
+    published("Stäubli TX40", [0.0, 0.0, 0.035, 0.32, 0.225, 0.225, 0.065],
+      [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0], [1, 1, 1, 1, 1, 1]);
+    var bad = buildContractArmFixture();
+    var diagnostic = "";
+    try new OpwKinematics(bad.model, new Manipulator(bad.model, bad.chain))
+    catch (error:Dynamic) diagnostic = Std.string(error);
+    check(diagnostic.indexOf("joint-3") >= 0,
+      "non-spherical UR5 wrist names its violating joint");
   }
 
   static function buildContractArmFixture():{model:RobotModel, chain:KinematicChain} {

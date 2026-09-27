@@ -36,3 +36,6 @@
 	path = motionkit/native/vendor/toppra
 	url = https://github.com/hungpham2511/toppra.git
 	branch = develop
+[submodule "motionkit/native/vendor/opw_kinematics"]
+	path = motionkit/native/vendor/opw_kinematics
+	url = https://github.com/Jmeyer1292/opw_kinematics.git
