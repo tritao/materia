@@ -1,11 +1,6 @@
 package robotkit.skill;
 
 import robotkit.manipulation.Manipulator;
-import robotkit.process.CartesianTrajectory;
-import robotkit.process.ToolpathExecutionFailure;
-import robotkit.process.ToolpathExecutionResult;
-import robotkit.process.ToolpathExecutionStep;
-import robotkit.process.ToolpathExecutor;
 import robotkit.spatial.Transform3;
 import robotkit.work.BucketSweep;
 import robotkit.work.DigCyclePlan;
@@ -14,7 +9,6 @@ import robotkit.work.HeightMap;
 import robotkit.work.Polygon2;
 import robotkit.work.Point2;
 import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 
 /**
@@ -31,7 +25,6 @@ typedef DigTrenchSpec = {
   var dumpPitch:Float;
   var feedRate:Float;
   var maxAcceleration:Float;
-  var sampleInterval:Float;
   var maxCutPerPass:Float;
   var maxCycles:Int;
   var maxJointStep:Float;
@@ -53,7 +46,7 @@ private enum DigTrenchStage {
  * with `DigCyclePlanner`, one bounded pass at a time: each cycle samples the
  * *current* terrain from `heightMap`, cuts down by at most
  * `spec.maxCutPerPass` toward the trench's design elevation, executes the
- * cycle's `Toolpath` through `ToolpathExecutor`, and applies the resulting
+ * cycle's `Toolpath` through validated plans, and applies the resulting
  * `BucketSweep` to `heightMap` directly -- so progress is always read back
  * from the height map (`remainingDepthError`), the way a real excavator's
  * only feedback is the ground it has actually moved, never the commanded
@@ -76,6 +69,7 @@ class DigTrench implements Skill {
   public final depth:Float;
   public final gradeTolerance:Float;
   public final spec:DigTrenchSpec;
+  public final planRunner:ToolpathPlanRunner;
   /** Design surface used to clamp every executed cut. */
   public var designMap(default, null):Null<HeightMap>;
   /** Planar trench footprint used to reject sweep vertices outside the work region. */
@@ -91,14 +85,16 @@ class DigTrench implements Skill {
   final initialSeed:Array<Float>;
   var stage:DigTrenchStage = PreparingCycle;
   var originalGroundZ:Float = 0.0;
-  var lastQ:Array<Float>;
-  var currentSteps:Array<ToolpathExecutionStep> = [];
-  var stepIndex:Int = 0;
   var currentSweep:Null<DigCyclePlan> = null;
+  var firstObservedCut:Null<Transform3> = null;
+  var lastObservedCut:Null<Transform3> = null;
+  var minObservedCutZ:Float = Math.POSITIVE_INFINITY;
+  final jointIndices:Array<Int>;
 
   public function new(manipulator:Manipulator, robot:Robot, heightMap:HeightMap, frameId:String,
       lineFrom:Point2, lineTo:Point2, width:Float, depth:Float, gradeTolerance:Float,
-      spec:DigTrenchSpec, seed:Array<Float>, ?designMap:HeightMap, ?footprint:Polygon2,
+      spec:DigTrenchSpec, seed:Array<Float>, planRunner:ToolpathPlanRunner,
+      ?designMap:HeightMap, ?footprint:Polygon2,
       ?footprintTolerance:Float = -1.0) {
     if (manipulator == null || robot == null || heightMap == null || frameId == null || frameId.length == 0 ||
         lineFrom == null || lineTo == null || spec == null || seed == null)
@@ -116,8 +112,10 @@ class DigTrench implements Skill {
     this.depth = depth;
     this.gradeTolerance = gradeTolerance;
     this.spec = spec;
+    if (planRunner == null) throw "DigTrench needs a toolpath plan runner";
+    this.planRunner = planRunner;
     this.initialSeed = seed.copy();
-    this.lastQ = seed.copy();
+    this.jointIndices = [for (target in manipulator.toJointTargets(seed)) target.joint];
     if (designMap != null) HeightMap.ensureSameGrid(heightMap, designMap);
     if (!Math.isFinite(footprintTolerance) || footprintTolerance < -1.0)
       throw "DigTrench footprint tolerance must be finite and non-negative";
@@ -151,14 +149,14 @@ class DigTrench implements Skill {
       case PreparingCycle:
         lifecycle.fail("DigTrench reached update() before a cycle was staged");
       case ExecutingCycle:
-        advanceExecution();
+        advanceExecution(snapshot, durationSeconds);
     }
     return lifecycle.status();
   }
 
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
-    try robot.stop(robotkit.world.StopMode.Normal) catch (_:Dynamic) {}
+    try planRunner.abort() catch (_:Dynamic) {}
     lifecycle.cancel();
   }
 
@@ -200,54 +198,52 @@ class DigTrench implements Skill {
       var plan = DigCyclePlanner.planCycle(frameId, lineFrom, lineTo, currentZ, cut,
         spec.clearanceZ, new Point2(spec.dumpX, spec.dumpY), spec.dumpZ, width * 0.5,
         spec.digPitch, spec.curlPitch, spec.dumpPitch, spec.feedRate);
-      var trajectory = CartesianTrajectory.build(plan.toolpath, spec.maxAcceleration, spec.sampleInterval);
-      // Seed every cycle's IK from the constructor's own initial seed, not the
-      // previous cycle's final (dump) configuration: a dig cycle's entry pose is
-      // usually a large joint-space jump away from where the previous cycle left
-      // off (swung out to dump), and warm-starting from that far, ever-drifting
-      // configuration is the same cold-start/local-optimum sensitivity M2/M8's
-      // logs already document, not a new bug -- so each cycle instead
-      // "re-approaches" from the same known-good configuration, matching how a
-      // real operator would reposition the boom/stick/bucket before a new pass.
-      var execution:ToolpathExecutionResult = ToolpathExecutor.execute(manipulator, trajectory, Transform3.identity(),
-        initialSeed, spec.maxJointStep, spec.positionTolerance, spec.orientationTolerance, spec.ikMaxIterations, spec.ikDamping);
-      if (!execution.success) {
-        lifecycle.fail('dig cycle $cyclesCompleted toolpath execution failed: ${describeFailure(execution.failure)}');
+      planRunner.run(plan.toolpath, initialSeed);
+      if (!planRunner.running()) {
+        lifecycle.fail('dig cycle $cyclesCompleted plan failed: ${planRunner.failure()}');
         return;
       }
-      currentSteps = execution.steps;
-      stepIndex = 0;
       currentSweep = plan;
+      firstObservedCut = null;
+      lastObservedCut = null;
+      minObservedCutZ = Math.POSITIVE_INFINITY;
       stage = ExecutingCycle;
     } catch (error:Dynamic) {
       lifecycle.fail(Std.string(error));
     }
   }
 
-  function advanceExecution():Void {
-    if (stepIndex >= currentSteps.length) {
+  function advanceExecution(snapshot:RobotSnapshot, durationSeconds:Float):Void {
+    try planRunner.update(durationSeconds) catch (error:Dynamic) {
+      lifecycle.fail(Std.string(error));
+      return;
+    }
+    if (planRunner.cuttingMoveActive()) {
+      var q = [for (joint in jointIndices) snapshot.positions.get(joint)];
+      var observed = manipulator.tcpPose(q);
+      if (firstObservedCut == null) firstObservedCut = observed;
+      lastObservedCut = observed;
+      minObservedCutZ = Math.min(minObservedCutZ, observed.translation.z);
+    }
+    if (!planRunner.running()) {
+      if (!planRunner.completed()) {
+        lifecycle.fail('dig cycle $cyclesCompleted plan failed: ${planRunner.failure()}');
+        return;
+      }
       var sweep = currentSweep;
-      if (sweep != null)
-        totalRemovedVolume += BucketSweep.apply(heightMap, sweep.sweepFrom, sweep.sweepTo,
-          sweep.sweepHalfWidth, sweep.sweepEdgeHeight, designMap, footprint,
-          footprintTolerance).removedVolume;
+      var from = firstObservedCut, to = lastObservedCut;
+      if (sweep == null || from == null || to == null) {
+        lifecycle.fail("DigTrench completed without an observed cut");
+        return;
+      }
+      totalRemovedVolume += BucketSweep.apply(heightMap,
+        new Point2(from.translation.x, from.translation.y),
+        new Point2(to.translation.x, to.translation.y), sweep.sweepHalfWidth + 0.001,
+        minObservedCutZ, designMap, footprint, footprintTolerance).removedVolume;
       cyclesCompleted++;
       stage = PreparingCycle;
       beginNextCycle();
-      return;
     }
-    var step = currentSteps[stepIndex];
-    robot.submit(RobotCommand.JointTargets(step.targets, null));
-    lastQ = step.q;
-    stepIndex++;
-  }
-
-  static function describeFailure(failure:Null<ToolpathExecutionFailure>):String {
-    return switch failure {
-      case Unreachable(index, ik): 'unreachable at sample $index (positionError=${ik.positionError}, orientationError=${ik.orientationError}, iterations=${ik.iterations})';
-      case Discontinuity(index, joint, delta): 'discontinuity at sample $index joint $joint (delta=$delta)';
-      case null: "unknown failure";
-    };
   }
 
   function makeDesignMap():HeightMap {

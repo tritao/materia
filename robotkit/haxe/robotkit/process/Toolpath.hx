@@ -28,7 +28,7 @@ class Toolpath {
   /**
    * Sum of straight-line distances for moves whose *departing* point has
    * `processOn == true` (the point's process state governs the move to the
-   * next point, matching `CartesianTrajectory`'s per-segment sampling).
+   * next point).
    */
   public function processOnLength():Float {
     var total = 0.0;

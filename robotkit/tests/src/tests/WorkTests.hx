@@ -7,7 +7,8 @@ import robotkit.work.Polygon2;
 import robotkit.work.WorkSurface;
 import robotkit.work.RasterToolpathGenerator;
 import robotkit.work.CoverageMap;
-import robotkit.process.CartesianTrajectory;
+import motionkit.event.EventValue;
+import motionkit.robot.ToolpathPosePath;
 
 /** M5 acceptance tests for robotkit.work: WorkSurface, RasterToolpathGenerator, CoverageMap. */
 class WorkTests {
@@ -73,20 +74,25 @@ class WorkTests {
     sweepProcessMoves(planned, toolpath, toolWidth * 0.5, 0.005);
 
     var simulated = new CoverageMap(surface, 0.01);
-    var trajectory = CartesianTrajectory.build(toolpath, 0.5, 0.05);
-    var i = 0;
-    while (i < trajectory.samples.length - 1) {
-      var sample = trajectory.samples[i];
-      var next = trajectory.samples[i + 1];
-      // Only sweep within one segment's own samples: a segment-boundary pair
-      // carries the departing segment's processOn flag but the arriving
-      // segment's (possibly very different) position.
-      if (sample.processOn && sample.segmentIndex == next.segmentIndex) {
-        var from = new Point2(sample.work_T_tcp.translation.x, sample.work_T_tcp.translation.y);
-        var to = new Point2(next.work_T_tcp.translation.x, next.work_T_tcp.translation.y);
-        simulated.markSweep(from, to, toolWidth * 0.5, 0.005);
+    var path = ToolpathPosePath.convert(toolpath, "surface.process");
+    var eventIndex = 0, processOn = false;
+    var steps = Std.int(Math.ceil(path.length() / 0.005));
+    for (step in 0...steps) {
+      var fromDistance = path.length() * step / steps;
+      var toDistance = path.length() * (step + 1) / steps;
+      while (eventIndex < path.events.length &&
+          path.events[eventIndex].distance <= fromDistance + 1e-9) {
+        processOn = switch path.events[eventIndex].value {
+          case EventValue.Digital(on): on;
+          case _: false;
+        };
+        eventIndex++;
       }
-      i++;
+      if (!processOn) continue;
+      var fromPose = path.waypointAt(fromDistance).pose;
+      var toPose = path.waypointAt(toDistance).pose;
+      simulated.markSweep(new Point2(fromPose.x, fromPose.y),
+        new Point2(toPose.x, toPose.y), toolWidth * 0.5, 0.005);
     }
 
     check(planned.coverageFraction() >= 0.99, 'Planned coverage over the small surface is at least 99% (got ${planned.coverageFraction()})');
