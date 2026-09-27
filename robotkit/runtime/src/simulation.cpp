@@ -309,7 +309,6 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 ? robot_desc->collision_hull_count[index] : 0;
             if (hull_count != 0 && (hull_count < 4 || hull_count > 64))
                 throw std::invalid_argument("invalid link collision hull vertex count");
-            double extents[3]{};
             if (hull_count > 0) {
                 nksim_shape link_shape = 0;
                 const auto *vertices = robot_desc->collision_hull_vertices + index * 64 * 3;
@@ -319,16 +318,17 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 desc.shape = link_shape;
                 has_link_shape = true;
             } else if (has_link_shape) {
+                double extents[3]{};
                 for (int axis = 0; axis < 3; ++axis)
                     extents[axis] = robot_desc->collision_half_extents[index * 3 + axis];
                 has_link_shape = extents[0] > 0.0 && extents[1] > 0.0 && extents[2] > 0.0;
-            }
-            if (has_link_shape) {
-                nksim_shape link_shape = 0;
-                require_sim(nksim_shape_create_box(world_, extents, &link_shape),
-                            "nksim_shape_create_box(link)");
-                link_shapes_.push_back(link_shape);
-                desc.shape = link_shape;
+                if (has_link_shape) {
+                    nksim_shape link_shape = 0;
+                    require_sim(nksim_shape_create_box(world_, extents, &link_shape),
+                                "nksim_shape_create_box(link)");
+                    link_shapes_.push_back(link_shape);
+                    desc.shape = link_shape;
+                }
             }
             // Layer 2 is an opt-out category for a robot's own links. It
             // still collides with ordinary layer-1 environment geometry,

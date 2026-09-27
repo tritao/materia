@@ -10,7 +10,47 @@ static rk_robot_state state(rk_robot_runtime robot) {
     return value;
 }
 
+static void convex_link_and_box_link_build() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.005;
+    desc.physics_substeps = 1;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 2;
+    model.joint_count = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    for (auto &link : model.links) {
+        link.mass = 1.0;
+        link.inertia_tensor[0] = link.inertia_tensor[4] = link.inertia_tensor[8] = 1.0;
+    }
+    model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
+    model.joints[0].axis[2] = 1.0;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    robot_desc.collision_hull_count[0] = 8;
+    for (int index = 0; index < 8; ++index) {
+        robot_desc.collision_hull_vertices[index * 3] = (index & 1) ? 0.5 : -0.5;
+        robot_desc.collision_hull_vertices[index * 3 + 1] = (index & 2) ? 0.5 : -0.5;
+        robot_desc.collision_hull_vertices[index * 3 + 2] = (index & 4) ? 0.5 : -0.5;
+    }
+    robot_desc.collision_half_extents[3] = 0.2;
+    robot_desc.collision_half_extents[4] = 0.3;
+    robot_desc.collision_half_extents[5] = 0.4;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    rk_simulation_destroy(simulation);
+}
+
 int main() {
+    convex_link_and_box_link_build();
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.fixed_timestep = 0.005;

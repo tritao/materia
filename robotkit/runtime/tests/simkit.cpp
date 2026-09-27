@@ -57,6 +57,33 @@ rk_robot_state snapshot(rk_robot_runtime runtime) {
     return value;
 }
 
+void convex_link_and_box_link_build() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    auto model = blueprint(101);
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    robot_desc.collision_hull_count[0] = 8;
+    for (int index = 0; index < 8; ++index) {
+        robot_desc.collision_hull_vertices[index * 3] = (index & 1) ? 0.5 : -0.5;
+        robot_desc.collision_hull_vertices[index * 3 + 1] = (index & 2) ? 0.5 : -0.5;
+        robot_desc.collision_hull_vertices[index * 3 + 2] = (index & 4) ? 0.5 : -0.5;
+    }
+    robot_desc.collision_half_extents[3] = 0.2;
+    robot_desc.collision_half_extents[4] = 0.3;
+    robot_desc.collision_half_extents[5] = 0.4;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    rk_simulation_destroy(simulation);
+}
+
 void shared_world_steps_once() {
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
@@ -1009,6 +1036,7 @@ void omni_drive_follows_applied_wheel_targets() {
 } // namespace
 
 int main() {
+    convex_link_and_box_link_build();
     shared_world_steps_once();
     realtime_presentation_keeps_one_revision();
     failed_command_phase_does_not_advance();
