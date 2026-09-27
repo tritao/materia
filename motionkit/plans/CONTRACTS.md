@@ -433,3 +433,13 @@ entry.
 MotionKit passed 5,864 assertions, RobotKit passed 4,437 aggregate assertions,
 all 12 native tests passed, both FFI audits passed, and TCP integration passed
 in default, session and lease-timeout modes.
+
+### P0.5 — Verify main after replay
+
+Replayed the phase-zero contract plan and implementation commits onto `main`
+after the sheet-workflow commits. On main source commit `b35edef6`, MotionKit
+passed 5,864 Haxe assertions, RobotKit passed 4,437 aggregate Haxe
+assertions, and all 12 native CTest tests passed. TCP integration passed in
+default, session and lease-timeout modes. Both FFI audits passed, and the pure
+MotionKit packages have no RobotKit or MachineKit imports. Commit: the commit
+containing this entry.
