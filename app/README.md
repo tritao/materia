@@ -65,6 +65,10 @@ atomic file publication; `SceneDocumentController` coordinates file commands
 and unsaved-change prompts. `EditorPerspectiveViewport` composites SceneKit's
 renderer directly into the GPU surface and passes single-edit change sets to
 its incremental render path. `editor/TelemetryPanel` owns the retained plot.
+`editor/HierarchyPanel`, `editor/InspectorPanel`, and `editor/SensorPanel`
+build the dock content; `editor/SceneObjectCommands`,
+`editor/SceneViewCommands`, and `editor/EditorDocumentCommands` register the
+corresponding actions. `Main` composes these modules and the desktop host.
 The orbit camera lives in `editorkit`; `app/PerspectiveCamera` retains the
 existing import names for callers.
 
