@@ -5,6 +5,7 @@ import nativekit.ui.widgets.controls.Toggle;
 
 
 import app.EditorToolbarLayout.EditorToolbarDensity;
+import app.editor.ObjectKindRegistry;
 import Color;
 import LayoutAxis;
 import LayoutAlignmentY;
@@ -532,12 +533,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
           }, command.isEnabled(ui.commandContext)));
         }
       };
-      addSection("Primitive", ["scene.create"]);
-      addSection("CAD", ["scene.create-part", "scene.create-plate", "scene.create-bracket"]);
+      addSection("Primitive", ObjectKindRegistry.addMenuCommands("Primitive"));
+      addSection("CAD", ObjectKindRegistry.addMenuCommands("CAD"));
       addSection("Feature", ["scene.create-sketch", "scene.create-face-sketch",
         "scene.create-extrusion", "scene.add-face-hole", "scene.create-pocket",
         "scene.create-vertical-fillet"]);
-      addSection("Import", ["scene.import-step"]);
+      addSection("Import", ObjectKindRegistry.addMenuCommands("Import"));
       var addMenu = new Menu("hierarchy-add-menu", items, hierarchyAddX, hierarchyAddY,
         function() { hierarchyAddVisible = false; commands.refresh(); });
       windowLayers.push(new StackChild("hierarchy-add-menu", addMenu, 0.0, 0.0, 25));
@@ -1412,21 +1413,22 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if(selected.kind=="cad-preview"&&scene.selectedCadEdgeIndex>=0)
       rows.push(new KeyedView("edge-selection",
         new Text("Selected edge "+(scene.selectedCadEdgeIndex+1))));
-    if (scene.canCreateSketch())
-      rows.push(new KeyedView("create-sketch",
-        sceneAction("create-constrained-sketch", "scene.create-sketch", "Create sketch", IconName.Plus)));
-    if (scene.canCreateFaceSketch())
-      rows.push(new KeyedView("create-face-sketch",
-        sceneAction("create-face-sketch", "scene.create-face-sketch", "Sketch on face", IconName.Plus)));
-    if (scene.canCreateExtrusion())
-      rows.push(new KeyedView("create-extrusion",
-        sceneAction("create-extrusion", "scene.create-extrusion", "Extrude", IconName.Plus)));
-    if (scene.canCreatePocket())
-      rows.push(new KeyedView("create-pocket",
-        sceneAction("create-pocket", "scene.create-pocket", "Pocket", IconName.Plus)));
-    if (scene.canCreateVerticalFillet())
-      rows.push(new KeyedView("create-vertical-fillet",
-        sceneAction("create-vertical-fillet", "scene.create-vertical-fillet", "Fillet vertical edges", IconName.Plus)));
+    var kindProvider = ObjectKindRegistry.find(selected.kind);
+    if (kindProvider != null) for (commandId in kindProvider.commands(scene, selected.id)) {
+      switch (commandId) {
+        case "scene.create-sketch": rows.push(new KeyedView("create-sketch",
+          sceneAction("create-constrained-sketch", commandId, "Create sketch", IconName.Plus)));
+        case "scene.create-face-sketch": rows.push(new KeyedView("create-face-sketch",
+          sceneAction("create-face-sketch", commandId, "Sketch on face", IconName.Plus)));
+        case "scene.create-extrusion": rows.push(new KeyedView("create-extrusion",
+          sceneAction("create-extrusion", commandId, "Extrude", IconName.Plus)));
+        case "scene.create-pocket": rows.push(new KeyedView("create-pocket",
+          sceneAction("create-pocket", commandId, "Pocket", IconName.Plus)));
+        case "scene.create-vertical-fillet": rows.push(new KeyedView("create-vertical-fillet",
+          sceneAction("create-vertical-fillet", commandId, "Fillet vertical edges", IconName.Plus)));
+        default:
+      }
+    }
     if(ownership!=null) {
       rows.push(new KeyedView("origin",textLines("script-object-origins",
         ["Script-owned"].concat(ownership.propertyOrigins(selected.id,["position","dimensions",

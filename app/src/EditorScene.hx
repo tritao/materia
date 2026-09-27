@@ -54,6 +54,7 @@ import app.CadPlateModel.CadPlateHoleEdit;
 import app.CadBracketModel;
 import app.SketchDraftCodec.SketchDraftRecord;
 import app.editor.SelectionModel;
+import app.editor.ObjectKindRegistry;
 import haxe.io.Path as FilePath;
 
 private typedef SceneRecordChange = {
@@ -396,39 +397,28 @@ class EditorScene {
     if (!canCreate()) return false;
     var data = records();
     var id = allocateId();
-    data.push({id: id, label: "Rectangle", type: "rectangle", x: 0.0, y: 0.0, z: 0.0,
-      width: 1.6, height: 1.2, depth:0.1,collisionEnabled:true,dynamicBody:false,mass:1.0,
-      red: 0.22, green: 0.52, blue: 0.85, visible: true});
+    data.push(ObjectKindRegistry.require("rectangle").createDefaultRecord(id));
     return changeObjects("Create rectangle", data, id);
   }
 
   public function createMountingPlate():Bool {
     if (!canCreate()) return false;
     var data = records(), id = allocateId("plate");
-    var model = CadPlateModel.create(0.08, 0.05, 0.006, 0.012);
-    var graph = model.encode();
-    model.close();
-    data.push({id:id, label:"Mounting plate", type:"cad-plate", x:0.0, y:0.0, z:0.0,
-      width:0.08, height:0.05, depth:0.006, collisionEnabled:false, dynamicBody:false, mass:1.0,
-      red:0.34, green:0.62, blue:0.78, visible:true, cadGraph:graph});
+    data.push(ObjectKindRegistry.require("cad-plate").createDefaultRecord(id));
     return changeObjects("Create mounting plate", data, id);
   }
 
   public function createBracket():Bool {
     if (!canCreate()) return false;
     var data=records(),id=allocateId("bracket");
-    data.push({id:id,label:"L bracket",type:"cad-bracket",x:0.0,y:0.0,z:0.0,
-      width:0.06,height:0.04,depth:0.03,collisionEnabled:false,dynamicBody:false,mass:1.0,
-      red:0.64,green:0.66,blue:0.70,visible:true});
+    data.push(ObjectKindRegistry.require("cad-bracket").createDefaultRecord(id));
     return changeObjects("Create L bracket",data,id);
   }
 
   public function createCadPart():Bool {
     if (!canCreate()) return false;
     var data = records(), id = allocateId("part");
-    data.push({id:id, label:"Part", type:"cad-part", x:0.0, y:0.0, z:0.0,
-      width:0.05, height:0.05, depth:0.01, collisionEnabled:false, dynamicBody:false, mass:1.0,
-      red:0.66, green:0.68, blue:0.72, visible:true});
+    data.push(ObjectKindRegistry.require("cad-part").createDefaultRecord(id));
     return changeObjects("Create CAD part", data, id);
   }
 
@@ -2506,16 +2496,9 @@ class EditorScene {
     }
     if (!importedShape && !genericPart)
       result.push(dimensionProperty(id, 2, prefix));
-    if (requiredObject(id).kind == "cad-plate") {
-      result.push(cadProperty(id,CadPlateModel.HOLE_DIAMETER,"Hole diameter",false,prefix));
-      result.push(cadProperty(id,CadPlateModel.HOLE_X,"Hole X",true,prefix));
-      result.push(cadProperty(id,CadPlateModel.HOLE_Y,"Hole Y",true,prefix));
-    } else if (requiredObject(id).kind == "cad-bracket") {
-      result.push(bracketProperty(id,"wall","Wall thickness",function(model)return model.wallThickness(),
-        function(value)setBracketWallThickness(id,value),prefix));
-      result.push(bracketProperty(id,"hole-radius","Hole radius",function(model)return model.holeRadius(),
-        function(value)setBracketHoleRadius(id,value),prefix));
-    }
+    var kindProvider = ObjectKindRegistry.find(requiredObject(id).kind);
+    if (kindProvider != null)
+      for (property in kindProvider.properties(this, id, prefix)) result.push(property);
     var selectedFeature = selectedCadFeature(id);
     if (selectedFeature != null && selectedFeature.active && Std.isOfType(selectedFeature, ExtrudeFeature)) {
       var extrusion:ExtrudeFeature = cast selectedFeature;
@@ -2939,22 +2922,9 @@ class EditorScene {
 
   function createCadSession(graph:Null<String>,width:Float,height:Float,depth:Float,
       kind:String="cad-plate"):CadDocumentSession {
-    var model:CadSessionModel;
-    if(kind=="cad-step") {
-      if (graph == null) throw "Imported STEP object has no persisted source graph";
-      model = CadImportedModel.decode(graph);
-    } else if (kind == "cad-part") {
-      model = graph == null ? CadPartModel.createEmpty() : CadPartModel.decode(graph);
-    } else if(kind=="cad-bracket") {
-      model=graph==null?CadBracketModel.create(width,height,depth):CadBracketModel.decode(graph);
-    } else {
-      model=graph==null?CadPlateModel.create(width,height,depth,
-        Math.min(0.012,Math.min(width,height)*0.5)):CadPlateModel.decode(graph);
-    }
-    try {
-      return new CadDocumentSession(model);
-    }
-    catch(error:Dynamic){model.close();throw error;}
+    var result = ObjectKindRegistry.require(kind).createCadSession(graph, width, height, depth);
+    if (result == null) throw "Object kind has no CAD session: " + kind;
+    return result;
   }
 
   function cadPlateModel(id:String):CadPlateModel
@@ -2963,11 +2933,15 @@ class EditorScene {
   function cadBracketModel(id:String):CadBracketModel
     return cast requireCadSession(id).model;
 
-  static function isCadKind(kind:String):Bool
-    return kind=="cad-plate"||kind=="cad-bracket"||kind=="cad-step"||kind=="cad-part";
+  static function isCadKind(kind:String):Bool {
+    var provider = ObjectKindRegistry.find(kind);
+    return provider != null && provider.isCad();
+  }
 
-  static function isFaceHoverKind(kind:String):Bool
-    return isCadKind(kind) || kind == "cad-preview";
+  static function isFaceHoverKind(kind:String):Bool {
+    var provider = ObjectKindRegistry.find(kind);
+    return provider != null && provider.supportsFaceHover();
+  }
 
   function requireCadSession(id:String):CadDocumentSession {
     var result=cadSessions.get(id);
