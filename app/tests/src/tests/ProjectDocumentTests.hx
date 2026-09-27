@@ -22,7 +22,7 @@ class ProjectDocumentTests {
     check(Math.abs(actual - expected) < 0.000001, message);
 
   public static function run():Void {
-    testSceneVersionMigration();
+    testCurrentSceneFixture();
     testProjectEditCoordinator();
     var session = new ProjectDocumentSession();
     check(session.scene.document == session.document && session.sensors.document == session.document,
@@ -96,27 +96,21 @@ class ProjectDocumentTests {
     session.dispose();
   }
 
-  static function testSceneVersionMigration():Void {
-    var oldProject = SceneCodec.decodeProject(File.getContent("app/tests/fixtures/project-v1.json"));
-    check(oldProject != null && oldProject.version == 1 && oldProject.overrides.length == 1,
-      "legacy full-object project edits remain available for baseline rebasing");
-    for (version in [1, 2]) {
-      var path = "app/tests/fixtures/scene-v" + version + ".json";
-      var objects = SceneCodec.decode(File.getContent(path));
-      check(objects.length == 1 && objects[0].appearance != null,
-        "scene fixture migrates appearance to current format");
-      var scene = new EditorScene(objects);
-      try {
-        var encoded = SceneCodec.encode(scene);
-        var root:Dynamic = Json.parse(encoded);
-        check(Reflect.field(root, "version") == SceneCodec.VERSION &&
-          SceneCodec.decode(encoded).length == 1, "scene fixture re-encodes at current version");
-      } catch (error:Dynamic) {
-        scene.dispose();
-        throw error;
-      }
+  static function testCurrentSceneFixture():Void {
+    var objects = SceneCodec.decode(File.getContent("app/tests/fixtures/scene-current.json"));
+    check(objects.length == 1 && objects[0].appearance != null,
+      "scene fixture has current appearance data");
+    var scene = new EditorScene(objects);
+    try {
+      var encoded = SceneCodec.encode(scene);
+      var root:Dynamic = Json.parse(encoded);
+      check(Reflect.field(root, "version") == SceneCodec.VERSION &&
+        SceneCodec.decode(encoded).length == 1, "scene fixture re-encodes in current format");
+    } catch (error:Dynamic) {
       scene.dispose();
+      throw error;
     }
+    scene.dispose();
   }
 
   static function testProjectEditCoordinator():Void {

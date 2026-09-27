@@ -1,4 +1,0 @@
-{
-  "format":"materia.scene","version":1,"objects":[],
-  "project":{"version":1,"reference":"legacy.project.json","overrides":[{"id":"project:part","label":"Renamed","x":0,"y":0,"z":0,"width":1,"height":1,"depth":1,"red":0.5,"green":0.5,"blue":0.5,"visible":true}],"removed":[],"instances":[]}
-}

@@ -17,7 +17,6 @@ typedef ProjectSceneInstance = {
   var sourceId:String;
   var id:String;
   var overrides:Array<ProjectFieldOverride>;
-  @:optional var object:Dynamic;
 }
 
 typedef ProjectFieldOverride = {

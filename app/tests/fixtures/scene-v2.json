@@ -1,7 +1,0 @@
-{
-  "format": "materia.scene",
-  "version": 2,
-  "objects": [
-    {"id":"current-box","label":"Current box","type":"rectangle","x":0,"y":0,"z":0,"width":1,"height":1,"depth":0.1,"red":0.4,"green":0.5,"blue":0.6,"appearance":{"finish":"neutral","metallic":0,"roughness":0.65},"visible":true}
-  ]
-}

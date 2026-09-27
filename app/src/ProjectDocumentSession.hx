@@ -569,14 +569,12 @@ class ProjectDocumentSession {
     var stale = staleProjectRecord;
     if (stale != null) {
       for (id in stale.removed) if (!sources.exists(id)) removed.push(id);
-      if (stale.version == 2) {
-        for (edit in stale.overrides) if (!sources.exists(edit.targetId)) overrides.push(edit);
-        for (instance in stale.instances) if (!sources.exists(instance.sourceId)) instances.push(instance);
-      }
+      for (edit in stale.overrides) if (!sources.exists(edit.targetId)) overrides.push(edit);
+      for (instance in stale.instances) if (!sources.exists(instance.sourceId)) instances.push(instance);
     }
     var savedAssemblyState = projectAssemblyDefinition == null || assemblyRuntime == null ? null
       : AssemblyDefinitionCodec.encodeState(projectAssemblyDefinition, assemblyRuntime.record());
-    return {record: {version: 2, reference: relativeReference(destination, reference),
+    return {record: {version: 1, reference: relativeReference(destination, reference),
       overrides: overrides, removed: removed, instances: instances,
       assemblyState: savedAssemblyState,
       assemblyDependentJoints: projectAssemblyDefinition == null ? null : assemblyDependentJointIds()},
@@ -666,13 +664,11 @@ class ProjectDocumentSession {
     }
     var overrides = new Map<String, Array<ProjectFieldOverride>>();
     for (edit in project.overrides) {
-      var id:String = project.version == 1 ? Reflect.field(edit, "id") : edit.targetId;
+      var id = edit.targetId;
       if (!sources.exists(id)) { diagnostics.push("override:" + id); continue; }
       var list = overrides.get(id);
       if (list == null) { list = []; overrides.set(id, list); }
-      if (project.version == 1) {
-        addLegacyDeltas(list, id, cast edit, sources.get(id));
-      } else list.push(edit);
+      list.push(edit);
     }
     var data:Array<SceneObjectData> = [];
     var ids = new Map<String, Bool>();
@@ -686,12 +682,7 @@ class ProjectDocumentSession {
       if (source == null) { diagnostics.push("instance:" + instance.id); continue; }
       if (ids.exists(instance.id)) throw 'Duplicate project object ID: ${instance.id}';
       ids.set(instance.id, true);
-      var edits = instance.overrides;
-      if (project.version == 1) {
-        edits = [];
-        addLegacyDeltas(edits, instance.id, instance.object, source);
-      }
-      data.push(applyDeltas(source, instance.id, edits, diagnostics));
+      data.push(applyDeltas(source, instance.id, instance.overrides, diagnostics));
     }
     for (item in authored) {
       if (item.type == "cad-preview") throw "Project-owned previews must reference a generated part";
@@ -701,15 +692,6 @@ class ProjectDocumentSession {
     }
     if (data.length > 10000) throw "Scene documents support at most 10000 objects";
     return data;
-  }
-
-  static function addLegacyDeltas(result:Array<ProjectFieldOverride>, id:String, legacy:Dynamic,
-      source:SceneObjectData):Void {
-    for (property in EDITABLE_FIELDS) if (Reflect.hasField(legacy, property)) {
-      var value = Reflect.field(legacy, property);
-      if (!sameValue(property, value, Reflect.field(source, property)))
-        result.push({targetId: id, property: property, kind: "legacy", value: value});
-    }
   }
 
   static function applyDeltas(source:SceneObjectData, id:String, edits:Null<Array<ProjectFieldOverride>>,

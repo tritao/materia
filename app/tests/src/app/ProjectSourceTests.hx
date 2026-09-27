@@ -81,7 +81,7 @@ class ProjectSourceTests {
       check(saved.indexOf(base.meshSnapshot) < 0,
         "saved project excludes generated mesh buffers");
       var savedEdits:Array<Dynamic> = cast Reflect.field(project, "overrides");
-      check(Reflect.field(project, "version") == 2 && savedEdits.length > 0,
+      check(Reflect.field(project, "version") == 1 && savedEdits.length > 0,
         "project saves typed sparse edits");
       for (edit in savedEdits) check(Reflect.field(edit, "property") != "width" &&
         Reflect.field(edit, "property") != "height" && Reflect.field(edit, "property") != "depth",
