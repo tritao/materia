@@ -557,23 +557,20 @@ Do (in `motionkit/robot/…/MotionSystem.hx`):
     (chord finite differences at degree 1); no host-side hold lead remains.
   - Retargeting from a moving state applies only when the active segments
     are degree ≥ 2.
-- Fallback for backends without queue or plan support (serial device
-  today):
-  - keep position-target streaming;
-  - evaluate the native trajectory each fixed step;
-  - hold and resume become "stop and replan with Ruckig" there. Document
-    this as the degraded mode.
-- Once every `MotionSystem` path submits plans, delete `JointTrajectory`,
-  `JointTrajectorySample`, `TrajectoryPlanner`, `TrapezoidalPlanner`,
-  `JogProfile`, `TimeScaling` and `TimeScaledTrajectory`. Keep `MotionLimits`.
-  Re-express each deleted class's behavior tests on `MotionSystem` or native
-  `Trajectory` instead of dropping coverage.
+- Leave the existing non-queue position-target fallback untouched for now.
+  Its HOLD/RESUME behavior must remain path-preserving, including arcs, and
+  its existing tests stay in place. Remove only planner/sample code no longer
+  reachable from that fallback; do not delete `TimeScaling`,
+  `TimeScaledTrajectory` or their dependencies here.
+- Migrate the queue-backed public motion path fully to native `Trajectory`.
+  Remove old planner/sample dependencies from that branch while retaining
+  every type still reachable from the non-queue fallback. Keep `MotionLimits`.
 - For queue backends, delete `MotionSystem`'s host-side hold and splice
   machinery: `holdStopLeadSeconds`, `refillTrajectoryForHold`, `PendingSplice`
   and the late-splice fallback. Native HOLD and RESUME replace them. Keep
   chunked refill for long plans, setting `ends_at_rest = false` on every
   non-final chunk. Keep position streaming for backends without queue support
-  (the serial device until RKD6).
+  until P9c enables the serial host-runtime queue.
 
 Tests:
 - The existing MotionSystem suite passes, with assertions updated only
@@ -586,8 +583,8 @@ Tests:
     within joint acceleration limits;
   - a dual-motor axis stays in proportion under retargeting.
 
-Commits: at least three — switch execution; switch planning; delete the
-old planners.
+Commits: at least three — switch execution; switch planning; remove queue-side
+dependencies on the old planners. Final fallback deletion is P9d.
 
 ## P9b — Remove the legacy point-chunk path
 
@@ -607,6 +604,28 @@ Do this as a separate commit after the `MotionSystem` migration:
 Acceptance: every MotionKit and RobotKit native/Haxe suite, both FFI audits,
 and TCP default, session and lease-timeout integration stay green. Log the
 deletions and test replacements in the Progress log.
+
+## P9c — Enable the host-runtime queue for DeviceSerialEndpoint
+
+Do this after P9b and before P10. The host runtime already samples its queue
+each owner cycle and sends position targets through `apply()`; RKD5 and the
+device firmware protocol do not change.
+
+- Report `supports_trajectory_queue()` true only when the configured owner
+  period is at least the RKD5 command-frame transmission time for the
+  configured baud and joint count plus the processing margin specified in
+  `robotkit/runtime/DEVICE_PROTOCOL.md`. Otherwise report false and log the
+  reason. The current serial C constructor uses the runtime's 10 ms default;
+  expose a versioned owner-period setting so a deployment can choose a period
+  that passes the test. Keep the non-queue fallback available when it fails.
+- Exercise the existing PTY/FakeDevice harness: a Ruckig plan runs over
+  serial with one target frame per owner cycle; HOLD and RESUME stay on the
+  path; the device watchdog still stops on a host stall; insufficient baud
+  reports no queue support.
+
+Acceptance: every MotionKit and RobotKit native/Haxe suite, both FFI audits,
+and TCP default, session and lease-timeout integration stay green. Log the
+capability rule and tests in the Progress log.
 
 ## P10 — Trajectories and plans over robotd
 
@@ -635,6 +654,24 @@ Tests:
 - Lease expiry mid-plan still triggers the emergency stop.
 - Every suite and the three TCP integration modes stay green; log the
   replacement in the Progress log.
+
+## P9d — Delete the non-queue MotionSystem fallback
+
+Do this only after P9c and P10, in a separate commit.
+
+- Audit every in-repo backend's advertised queue and plan capabilities. If
+  any still reports no queue support, stop and report it rather than deleting
+  its execution path.
+- Delete position-target streaming, host-side HOLD/RESUME timing,
+  `TimeScaling`, `TimeScaledTrajectory`, and the remaining old Haxe planners
+  and sampled trajectory types. Re-express their behavior tests on the native
+  trajectory and plan APIs; do not drop coverage.
+- Require plan support in the `MotionSystem` constructor and throw a clear
+  error for a backend without it.
+
+Acceptance: every MotionKit and RobotKit native/Haxe suite, both FFI audits,
+and TCP default, session and lease-timeout integration stay green. Log the
+backend audit and deletions in the Progress log.
 
 ## P11 — Transmissions in the RobotKit model (D2, model and compiler only)
 
@@ -1030,3 +1067,16 @@ tests also require serial-style path holds to stay on lines and arcs. Direct
 joint-space Ruckig stop/replan cannot promise that, so the remaining work
 needs an explicit path-preserving timing strategy or an approved change to
 that degraded-mode behavior. Commit: the commit containing this entry.
+
+### Fallback preservation and migration order correction
+
+The existing non-queue position stream and path-preserving HOLD/RESUME are
+retained unchanged. Only queue-side planner/sample dependencies are removed
+in P9. P9b removes legacy point chunks, P9c qualifies and enables the host
+queue over RKD5 serial without changing the wire protocol, and P10 carries
+plans through robotd. Only after those items does P9d audit all in-repo
+backends and delete the fallback and its remaining old Haxe types. The serial
+runtime currently defaults to a 10 ms owner period, shorter than the RKD5
+10 ms processing allowance plus any command frame; P9c therefore includes a
+versioned owner-period setting. This is a sequencing correction, not a change
+to path-preserving behavior. Commit: the commit containing this entry.
