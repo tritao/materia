@@ -13,9 +13,11 @@ import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
 import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
+import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
+import motionkit.robot.ProgramCompiler;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
 import motionkit.robot.MotionSystemBlueprint;
@@ -93,6 +95,7 @@ class MotionKitBootstrapTests {
     testMotionEventContracts();
     testKinematicsContract();
     testMotionProgramContracts();
+    testProgramCompiler();
     testSimplePathTimingContract();
     testNativePathLowering();
     testGeometricPathPrimitives();
@@ -208,6 +211,141 @@ class MotionKitBootstrapTests {
       EventValue.Digital(false)), "channel declaration rejects a mismatched safe value");
   }
 
+  static function testProgramCompiler():Void {
+    var fixture = buildContractArmFixture();
+    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
+    var velocity = [for (_ in 0...6) 2.0];
+    var acceleration = [for (_ in 0...6) 4.0];
+    var jerk = [for (_ in 0...6) 20.0];
+    var compiler = new ProgramCompiler(solver, limits, "work", velocity,
+      acceleration, jerk);
+    var start = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
+    var goal = start.copy(); goal[0] += 0.05;
+    var program = new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
+    var compiled = compiler.compile(program, start, Int64.ofInt(100));
+    check(compiled.blocks.length == 1 && compiled.blocks[0].plans.length == 1,
+      "program compiler lowers a joint move to one plan");
+    near(compiled.blocks[0].plans[0].evaluate(
+      compiled.blocks[0].plans[0].durationSeconds).positions[0], goal[0],
+      "program compiler reaches the MoveJ target", 1e-6);
+    compiled.dispose();
+
+    var startPose = solver.forward(start);
+    var endQ = start.copy(); endQ[0] += 0.025;
+    var endPose = solver.forward(endQ);
+    var path = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(startPose, 0.005, 0.02),
+      new PoseWaypoint(endPose, 0.005, 0.02),
+      OrientationPolicy.Interpolated, 0.1, 0.1)]);
+    var pathProgram = new MotionProgram([
+      MotionOp.FollowPath(path, "work", 0.1,
+        [new PathEvent(path.length() * 0.5, "sprayer.enabled",
+          EventValue.Digital(true))]),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false)),
+      MotionOp.WaitInput("sprayer.ready", InputPredicate.Equals(
+        EventValue.Digital(true)), 2.0),
+      MotionOp.MoveJ(MoveTarget.JointTarget(start), new MotionOptions(),
+        Blend.ExactStop),
+      MotionOp.Dwell(0.1)
+    ]);
+    var lowered = compiler.compile(pathProgram, start, Int64.ofInt(200));
+    check(lowered.blocks.length == 2 && lowered.blocks[0].plans.length == 1 &&
+      lowered.blocks[1].plans.length == 1,
+      "WaitInput splits a path and a return move into separate blocks");
+    var pathPlan = lowered.blocks[0].plans[0];
+    check(pathPlan.events.length == 2, "path event and SetOutput reach the plan");
+    check(Int64.compare(pathPlan.events[0].timeNs, Int64.ofInt(0)) > 0 &&
+      Int64.toFloat(pathPlan.events[0].timeNs) <
+        pathPlan.durationSeconds * 1e9,
+      "path event is placed inside the timed path");
+    near(Int64.toFloat(pathPlan.events[1].timeNs) * 1e-9,
+      pathPlan.durationSeconds, "SetOutput fires at the prior move end", 1e-9);
+    check(pathPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED,
+      "sampled task-space validation is recorded in the plan");
+    lowered.dispose();
+
+    var line = compiler.compile(new MotionProgram([MotionOp.MoveL(endPose,
+      "work", 0.1, Blend.ExactStop)]), start, Int64.ofInt(300));
+    check(line.blocks[0].plans[0].report.checks[
+      MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED,
+      "MoveL meets the sampled Cartesian tolerance");
+    line.dispose();
+    var poseMove = compiler.compile(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.PoseTarget(solver.forward([for (_ in 0...6) 0.0]), "work", null),
+      new MotionOptions(), Blend.ExactStop)]), start, Int64.ofInt(301));
+    check(poseMove.blocks[0].plans.length == 1,
+      "MoveJ resolves a reachable 6R pose through candidate IK");
+    poseMove.dispose();
+
+    var branchSolver = new WristBranchSolver();
+    var branchCompiler = new ProgramCompiler(branchSolver, limits, "work", velocity,
+      acceleration, jerk, null, 0.05, 0.5);
+    var branchPath = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
+      new PoseWaypoint(new Pose3(1.0), 0.005, 0.02),
+      OrientationPolicy.Fixed, 0.1, 0.1)]);
+    var branchError = "";
+    try branchCompiler.compile(new MotionProgram([MotionOp.FollowPath(branchPath,
+      "work", 0.1, [])]), [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(400))
+    catch (error:Dynamic) branchError = Std.string(error);
+    check(branchError.indexOf("op 0 IK discontinuity at path distance") >= 0,
+      "a wrist-branch jump is rejected with its op and path distance");
+
+    var linearSolver = new WristBranchSolver(false);
+    var linearCompiler = new ProgramCompiler(linearSolver, limits, "work", velocity,
+      acceleration, jerk, null, 0.05);
+    var linearPath = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
+      new PoseWaypoint(new Pose3(0.1), 0.005, 0.02),
+      OrientationPolicy.Fixed, 0.1, 0.1)]);
+    var linearProgram = new MotionProgram([MotionOp.FollowPath(linearPath,
+      "work", 0.1, [new PathEvent(0.05, "sprayer.enabled",
+        EventValue.Digital(true), 0.02)])]);
+    var linearPlan = linearCompiler.compile(linearProgram,
+      [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(500));
+    var reference = new SimplePathTiming().time(new JointPathSamples(
+      [0.0, 0.05, 0.1],
+      [[0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
+       [0.05, 0.0, 0.0, 0.0, 0.1, 0.0],
+       [0.1, 0.0, 0.0, 0.0, 0.1, 0.0]],
+      [for (_ in 0...3) [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
+      [for (_ in 0...3) [for (_ in 0...6) 0.0]]),
+      new PathTimingLimits(velocity, acceleration, [0.1, 0.1]));
+    check(Int64.compare(linearPlan.blocks[0].plans[0].events[0].timeNs,
+      Trajectory.nanoseconds(reference.distanceToTime(0.05) - 0.02)) == 0,
+      "FollowPath event follows the lowered distance-to-time law and lead");
+    reference.trajectory.dispose();
+    linearPlan.dispose();
+    var bounded = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
+    bounded.position(0, -0.1, 0.05);
+    var boundedCompiler = new ProgramCompiler(linearSolver, bounded, "work", velocity,
+      acceleration, jerk, null, 0.05);
+    var limitError = "";
+    try boundedCompiler.compile(linearProgram,
+      [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(501))
+    catch (error:Dynamic) limitError = Std.string(error);
+    check(limitError.indexOf("op 0 joint limit 0 at path distance") >= 0,
+      "path joint-limit diagnostics identify the op, joint, and distance");
+    var yaw = new Pose3(0.0, 0.0, 0.0, 0.0, 0.0,
+      Math.sin(Math.PI / 4.0), Math.cos(Math.PI / 4.0));
+    var freePath = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(new Pose3(), 0.005, 0.02),
+      new PoseWaypoint(yaw, 0.005, 0.02),
+      OrientationPolicy.FreeAboutTool, 0.1, 0.1)]);
+    var freePlan = linearCompiler.compile(new MotionProgram([MotionOp.FollowPath(
+      freePath, "work", 0.1, [])]), [0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
+      Int64.ofInt(502));
+    check(freePlan.blocks[0].plans[0].report.checks[
+      MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED,
+      "FreeAboutTool accepts a free twist about the tool axis");
+    freePlan.dispose();
+  }
+
   static function testKinematicsContract():Void {
     var fixture = buildContractArmFixture();
     var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
@@ -281,8 +419,10 @@ class MotionKitBootstrapTests {
 
   static function testMotionProgramContracts():Void {
     var pose = new Pose3(0.2, 0.1, 0.3);
-    var path = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
-      new PathPoint(0.1, 0.0, 0.0)]);
+    var path = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(new Pose3(0.0, 0.0, 0.0), 0.005, 0.02),
+      new PoseWaypoint(new Pose3(0.1, 0.0, 0.0), 0.005, 0.02),
+      OrientationPolicy.Fixed, 0.1, 0.1)]);
     var events = [new PathEvent(0.02, "sprayer.enabled", EventValue.Digital(true)),
       new PathEvent(0.08, "sprayer.enabled", EventValue.Digital(false))];
     var program = new MotionProgram([
@@ -2037,6 +2177,26 @@ class MotionKitBootstrapTests {
     try action() catch (_:Dynamic) didThrow = true;
     check(didThrow, message);
   }
+}
+
+/** Deterministic IK branch switch at a synthetic wrist singularity. */
+private class WristBranchSolver implements KinematicsSolver {
+  final jump:Bool;
+  public function new(?jump:Bool = true) this.jump = jump;
+  public function jointCount():Int return 6;
+  public function forward(q:Array<Float>):Pose3 return new Pose3(q[0]);
+  public function solvePose(target:Pose3, seed:Array<Float>,
+      tolerance:IkTolerance):Null<Array<Float>> {
+    var q = seed.copy();
+    q[0] = target.x;
+    q[4] = !jump || target.x < 0.5 ? 0.1 : -2.0;
+    return q;
+  }
+  public function sampleCandidates(target:Pose3, maxCount:Int,
+      tolerance:IkTolerance):Array<Array<Float>>
+    return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
+  public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
+    return [for (_ in 0...6) 0.0];
 }
 
 /** Robot wrapper that can hold submitted commands back, to simulate transport delay. */

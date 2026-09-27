@@ -291,3 +291,26 @@ recording, while earlier recording versions remain readable. Simulated
 sprayer tests check scheduled timestamps, and native tests cover replacement,
 undeclared channels, ring overflow, and safety transitions. Commit: the
 commit containing this entry.
+
+### B3 — MotionProgram compiler
+
+Changed the C2 `FollowPath` field from `MotionPath` to `PosePath` in the shared
+contract. `MotionPath` exposed only `length()` and also admitted geometric
+paths without poses, so the arm compiler had to cast at runtime to obtain
+framed pose samples. `PosePath` is the required typed input for arm path IK;
+new line, arc, and spline primitives can implement its `PosePrimitive` API.
+
+Added `ProgramCompiler` with exact-stop plan blocks and host-side dwell/input
+barriers. Joint moves use Ruckig and pose candidates are ranked by joint
+velocity-weighted distance. Cartesian moves are sampled, solved with seeded
+IK, timed through `PathTimingBackend`, checked against joint bounds and the
+authored task-space tolerance, and lowered to plans carrying timed process
+events. A branch jump is rejected with the operation and path distance.
+Tests cover a 6R pose target, Cartesian line, path events with lead time,
+barrier splitting, joint bounds, a synthetic wrist branch jump, and a free
+tool-axis rotation. `ToleranceBlend` records its exact-stop fallback.
+
+Fixed Haxeon's nested array comprehension typing and lowering in its own
+submodule commit so the MotionKit timing fixture can keep its nested array
+expression. Haxeon regression and full test script passed. Commit: the
+commit containing this entry.
