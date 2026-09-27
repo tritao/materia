@@ -145,6 +145,15 @@ class ProjectSourceTests {
       }
   }
 
+  static function rotateVector(x:Float, y:Float, z:Float, q:Array<Float>):Array<Float> {
+    var tx = 2 * (q[1] * z - q[2] * y);
+    var ty = 2 * (q[2] * x - q[0] * z);
+    var tz = 2 * (q[0] * y - q[1] * x);
+    return [x + q[3] * tx + q[1] * tz - q[2] * ty,
+      y + q[3] * ty + q[2] * tx - q[0] * tz,
+      z + q[3] * tz + q[0] * ty - q[1] * tx];
+  }
+
   public static function main():Int {
     var flat = Bytes.alloc(4 * 24);
     for (index in 0...4) {
@@ -273,7 +282,8 @@ class ProjectSourceTests {
       var restBefore = [for (pose in machineSimulation.capturePresentationSnapshot().environment)
         if (pose.id == machineScene.objects[0].id) pose][0];
       for (index in 0...100) machineSimulation.step();
-      var restAfter = [for (pose in machineSimulation.capturePresentationSnapshot().environment)
+      var restFrame = machineSimulation.capturePresentationSnapshot();
+      var restAfter = [for (pose in restFrame.environment)
         if (pose.id == machineScene.objects[0].id) pose][0];
       var restShift = 0.0;
       for (axis in 0...3) restShift += Math.pow(restAfter.position[axis] - restBefore.position[axis], 2);
@@ -284,6 +294,61 @@ class ProjectSourceTests {
         "MachineKit assembly starts without a Simulation panel error");
       machineSimulation.capturePresentationSnapshot();
       machineSimulation.stop();
+      var target = machineScene.objects[0];
+      var dropX = 0.0, dropY = 0.0, dropTop = Math.NEGATIVE_INFINITY;
+      for (occurrence in machineDefinition.occurrences) {
+        var physical = [for (part in machineScene.physical.parts)
+          if (part.id == occurrence.definition) part][0];
+        var linkPose = [for (link in restFrame.robots[0].links)
+          if (link.id == occurrence.id) link][0];
+        var hull = physical.collisionHull;
+        if (hull == null) continue;
+        var centroidX = 0.0, centroidY = 0.0;
+        var top = Math.NEGATIVE_INFINITY;
+        var count = Std.int(hull.length / 3);
+        for (index in 0...count) {
+          var point = rotateVector(hull[index * 3] * machineScene.physical.metresPerUnit,
+            hull[index * 3 + 1] * machineScene.physical.metresPerUnit,
+            hull[index * 3 + 2] * machineScene.physical.metresPerUnit, linkPose.rotation);
+          centroidX += point[0]; centroidY += point[1];
+          top = Math.max(top, linkPose.position[2] + point[2]);
+        }
+        if (top > dropTop) {
+          target = [for (part in machineScene.objects)
+            if (part.id == "project:" + occurrence.id) part][0];
+          dropX = linkPose.position[0] + centroidX / count;
+          dropY = linkPose.position[1] + centroidY / count;
+          dropTop = top;
+        }
+      }
+      check(machineSession.scene.createRectangle(), "create a falling box above a MachineKit part");
+      var probeId = machineSession.scene.selectedId;
+      var probe = machineSession.scene.object(probeId);
+      check(probe != null, "falling box was added to the generated scene");
+      machineSession.scene.setDimensions(probeId, 0.05, 0.05, 0.05);
+      machineSession.scene.setPositionXY(probeId, dropX, dropY);
+      probe.z = dropTop + 0.5;
+      probe.dynamicBody = true;
+      check(machineSimulation.rebuild(machineSession.sensors, machineSession.scene, machineSession),
+        "MachineKit assembly rebuilds with a falling box: " + machineSimulation.error);
+      for (index in 0...200) machineSimulation.step();
+      var onPose = [for (pose in machineSimulation.capturePresentationSnapshot().environment)
+        if (pose.id == probeId) pose][0];
+      var targetObject = machineSession.scene.object(target.id);
+      check(targetObject != null, "target MachineKit part remains in the scene");
+      targetObject.collisionEnabled = false;
+      check(machineSimulation.rebuild(machineSession.sensors, machineSession.scene, machineSession),
+        "MachineKit assembly rebuilds with one part collision disabled: " + machineSimulation.error);
+      for (index in 0...200) machineSimulation.step();
+      var offPose = [for (pose in machineSimulation.capturePresentationSnapshot().environment)
+        if (pose.id == probeId) pose][0];
+      check(onPose.position[2] > offPose.position[2] + 0.001,
+        'falling box passes through disabled MachineKit part: on=${onPose.position[2]}, off=${offPose.position[2]}');
+      for (part in machineScene.objects) if (part.id != target.id) {
+        var unchanged = machineSession.scene.object(part.id);
+        check(unchanged != null && unchanged.collisionEnabled,
+          'disabling ${target.id} preserves ${part.id} collision');
+      }
     machineSimulation.dispose(); machineWorld.close(); machineSession.dispose();
     var generatedScene = MateriaProjectRunner.loadProject(manifest);
     var generated = generatedScene.objects;
