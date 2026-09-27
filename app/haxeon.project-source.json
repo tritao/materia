@@ -21,6 +21,9 @@
     "cadkit": {
       "path": "../cadkit"
     },
+    "machinekit": {
+      "path": "../machinekit"
+    },
     "bimkit": {
       "path": "../bimkit"
     },
@@ -29,6 +32,9 @@
     },
     "robotkit": {
       "path": "../robotkit"
+    },
+    "cadbridge": {
+      "path": "../robotkit/cadbridge"
     },
     "scenekit": {
       "path": "../scenekit"
