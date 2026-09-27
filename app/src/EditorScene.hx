@@ -1721,8 +1721,6 @@ class EditorScene {
     selectedId = id;
     selectedFeatureKey=null;
     selectionRevision++;
-    nextRevision++;
-    revision = nextRevision;
     return true;
   }
 
@@ -1739,7 +1737,7 @@ class EditorScene {
     if(selectedId==id&&selectedFeatureKey==key)return false;
     clearSelectedCadFace();
     selectedId=id;selectedFeatureKey=key;
-    selectionRevision++;nextRevision++;revision=nextRevision;
+    selectionRevision++;
     return true;
   }
 
@@ -1972,7 +1970,7 @@ class EditorScene {
       } catch(error:Dynamic){clearSelectedCadFace();}
     }
     if(previousFace!=selectedCadFaceIndex||previousEdge!=selectedCadEdgeIndex)
-      {selectionRevision++;nextRevision++;revision=nextRevision;}
+      selectionRevision++;
     return id;
   }
 

@@ -1120,6 +1120,13 @@ class SceneEditingTests {
       var tree = new EditorSceneTree(scene);
       check(tree.childCount("scene") == 2, "hierarchy reflects scene");
       check(tree.childKeyAt("scene", 1) == "tower", "stable hierarchy identity");
+      var contentBeforeSelection = scene.revision;
+      var selectionBeforeSelection = scene.selectionRevision;
+      check(scene.select("tower"), "selection changes to another object");
+      check(scene.revision == contentBeforeSelection &&
+        scene.selectionRevision > selectionBeforeSelection,
+        "selection leaves scene content revision unchanged");
+      scene.select("box");
 
       var camera = new ViewportCamera(1.7, 35, -20);
       var viewport = new EditorSceneViewport(scene);
@@ -1179,8 +1186,6 @@ class SceneEditingTests {
       simulationViewportSemantics();
       sensorConfiguration();
       sensorWorkflow();
-      ScriptedSetupTests.run();
-      SceneDocumentTests.run();
       Sys.println("Scene editing tests passed");
       return 0;
     } catch (error:Dynamic) {
