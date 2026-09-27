@@ -81,11 +81,6 @@ class MotionSystem {
   var afterStop:Array<Void -> Void> = [];
   /** Logical axis of the active jog, which a further jog can change without stopping. */
   var activeJogAxis:Null<String> = null;
-  /** Splice point for the next submitted chunk; a zero tag appends. */
-  var nextChunkSpliceTag:Int64 = Int64.ofInt(0);
-  var nextChunkSpliceTimeNs:Int64 = Int64.ofInt(0);
-  /** A jog splice the runtime has not yet taken over, with how to recover if dropped. */
-  var pendingSplice:Null<PendingSplice> = null;
   /** Per-joint acceleration limits from the logical axes; zero is unconstrained. */
   final jointAccelerationLimits:Array<Float>;
   final modelRevision:Int64;
@@ -577,17 +572,15 @@ class MotionSystem {
   }
 
   /**
-   * Changes a running jog on the same axis without stopping: plans from the
-   * jog's position and velocity a few periods ahead and splices the new
-   * profile in there, so speed and direction change within the acceleration
-   * limit. Returns null when the jog cannot be continued this way.
+   * Changes a running jog on the same axis without stopping. Native queues
+   * replace at the committed state; position-streaming backends continue from
+   * the current host sample. Returns null if continuation is unavailable.
    */
   function continueJog(axisValue:MotionAxis, velocity:Float, durationSeconds:Float,
       acceleration:Float):Null<JointTrajectory> {
     var executing = activeTrajectory;
     if (executing == null || activeJogAxis != axisValue.id || held || stoppingForReplacement ||
-        hostStopping || afterStop.length > 0 || queuedTrajectories.length > 0 ||
-        pendingSplice != null)
+        hostStopping || afterStop.length > 0 || queuedTrajectories.length > 0)
       return null;
     var smooth = nativeFor(executing);
     if (smooth != null && usesTrajectoryChunks(executing)) {
@@ -617,29 +610,13 @@ class MotionSystem {
           acceleration));
       return submitSmoothReplacement(planned, state, observation, axisValue.id);
     }
-    var buffered = usesTrajectoryChunks(executing);
-    var spliceSeconds = elapsedSeconds;
-    var spliceTag = Int64.ofInt(0);
-    var spliceTimeNs = Int64.ofInt(0);
-    if (buffered) {
-      var observation = syncFromRuntime();
-      if (!observation.trajectoryActive) return null;
-      var reference = trajectoryChunkReferences.get(Int64.toStr(observation.trajectoryTag));
-      if (reference == null || reference.trajectory != executing) return null;
-      // Leave a few periods for the command to reach the runtime before the
-      // splice point; a splice that still arrives late is dropped safely.
-      var tagSeconds = Std.parseFloat(Int64.toStr(observation.trajectoryTagTimeNs)) / 1000000000.0 +
-        3.0 * fixedTimestepSeconds;
-      spliceSeconds = reference.startSeconds + tagSeconds;
-      if (spliceSeconds >= trajectoryChunkEndSeconds) return null;
-      spliceTag = observation.trajectoryTag;
-      spliceTimeNs = secondsToNanoseconds(tagSeconds);
-    }
-    if (spliceSeconds >= executing.durationSeconds - fixedTimestepSeconds) return null;
+    if (usesTrajectoryChunks(executing)) return null;
+    var sampleSeconds = elapsedSeconds;
+    if (sampleSeconds >= executing.durationSeconds - fixedTimestepSeconds) return null;
 
-    var start = executing.sample(spliceSeconds).positions;
+    var start = executing.sample(sampleSeconds).positions;
     var startLogical = axisValue.logicalPosition(start);
-    var startVelocity = logicalVelocityAt(executing, axisValue, spliceSeconds);
+    var startVelocity = logicalVelocityAt(executing, axisValue, sampleSeconds);
     var requestedEnd = Math.max(axisValue.lowerLimit,
       Math.min(axisValue.upperLimit, startLogical + velocity * durationSeconds));
     var profile = new JogProfile(startLogical, startVelocity, requestedEnd, Math.abs(velocity),
@@ -667,15 +644,6 @@ class MotionSystem {
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(trajectoryValue);
     activeJogAxis = axisValue.id;
-    if (buffered) {
-      nextChunkSpliceTag = spliceTag;
-      nextChunkSpliceTimeNs = spliceTimeNs;
-      fillNativeWindow();
-      pendingSplice = new PendingSplice(spliceTag, spliceTimeNs, () -> {
-        activeJogAxis = null;
-        jog(axisValue.id, velocity, durationSeconds, acceleration);
-      });
-    }
     return trajectoryValue;
   }
 
@@ -784,33 +752,6 @@ class MotionSystem {
   }
 
   /**
-   * Confirms a pending jog splice once the runtime runs the new profile, or
-   * recovers when the runtime dropped it for arriving late: the old jog is
-   * still running, so stop along it and start the requested jog from rest.
-   */
-  function checkPendingSplice(observation:RobotSnapshot):Void {
-    var pending = pendingSplice;
-    if (pending == null) return;
-    if (trajectoryChunkReferences.exists(Int64.toStr(observation.trajectoryTag))) {
-      pendingSplice = null;
-      return;
-    }
-    var passed = Int64.compare(observation.trajectoryTag, pending.oldTag) == 0 &&
-      Int64.compare(observation.trajectoryTagTimeNs, pending.spliceTimeNs) >= 0;
-    if (!passed && observation.trajectoryActive) return;
-    pendingSplice = null;
-    queuedTrajectories = [];
-    afterStop = [() -> {
-      clearBufferedMotion();
-      pending.retry();
-    }];
-    held = false;
-    resumeRequested = false;
-    stoppingForReplacement = true;
-    robot.stop(StopMode.Normal);
-  }
-
-  /**
    * Advances the local deterministic clock and submits one complete position
    * batch. Pass no duration to use the compiled fixed timestep.
    */
@@ -852,7 +793,6 @@ class MotionSystem {
     }
     if (usesTrajectoryChunks(trajectory)) {
       var observation = syncFromRuntime();
-      checkPendingSplice(observation);
       if (stoppingForReplacement) return true;
       if (trajectoryFinishedInRuntime(observation)) {
         completeActiveTrajectory();
@@ -1088,7 +1028,6 @@ class MotionSystem {
     held = false;
     stoppingForReplacement = false;
     afterStop = [];
-    pendingSplice = null;
     activeJogAxis = null;
     bufferedTotalSeconds = 0.0;
     bufferedCompletedSeconds = 0.0;
@@ -1169,8 +1108,6 @@ class MotionSystem {
         + 'start=${positions[0]}, end=${positions[positions.length - 1]}, '
         + 'segments=${segments.length}, firstT=${segments[0].timeFromStartNs}, '
         + 'lastT=${segments[segments.length - 1].timeFromStartNs}: $error';
-    nextChunkSpliceTag = Int64.ofInt(0);
-    nextChunkSpliceTimeNs = Int64.ofInt(0);
     trajectorySubmitted = true;
     trajectoryNextSampleIndex = endIndex;
     trajectoryChunkStartSeconds = startTime;
@@ -1280,48 +1217,6 @@ class MotionSystem {
     return !observation.trajectoryActive || observation.trajectoryQueueDepth == 0;
   }
 
-  /**
-   * Keeps enough source trajectory queued for the runtime's path-following
-   * stop. Used at the hold boundary, where the ordinary two-tick streaming
-   * lead may be shorter than v/a.
-   */
-  function refillTrajectoryForHold():Void {
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || !usesTrajectoryChunks(trajectoryValue)) return;
-    var requiredLead = holdStopLeadSeconds();
-    var attempts = 0;
-    while (trajectoryNextSampleIndex < trajectoryValue.samples.length - 1 &&
-        trajectoryChunkEndSeconds - elapsedSeconds < requiredLead - 1e-9 &&
-        attempts < 8) {
-      var previousEnd = trajectoryChunkEndSeconds;
-      submitActiveTrajectoryChunk();
-      attempts += 1;
-      if (trajectoryChunkEndSeconds <= previousEnd + 1e-9) break;
-    }
-  }
-
-  function holdStopLeadSeconds():Float {
-    var result = fixedTimestepSeconds * 2.0;
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null) return result;
-    var current = trajectoryValue.sample(elapsedSeconds);
-    var nextTime = Math.min(trajectoryValue.durationSeconds,
-      elapsedSeconds + Math.max(fixedTimestepSeconds, 1e-6));
-    var next = trajectoryValue.sample(nextTime);
-    for (joint in 0...jointAccelerationLimits.length) {
-      var limit = jointAccelerationLimits[joint];
-      if (limit <= 0.0 || joint >= current.positions.length) continue;
-      var sampledVelocity = Math.abs(current.velocities[joint]);
-      var finiteDifference = nextTime > elapsedSeconds
-        ? Math.abs(next.positions[joint] - current.positions[joint]) /
-          (nextTime - elapsedSeconds) : 0.0;
-      result = Math.max(result, Math.max(sampledVelocity, finiteDifference) / limit);
-    }
-    // Leave two owner periods of margin for mailbox and simulation phase
-    // ordering. The runtime itself enforces the acceleration bound.
-    return result + fixedTimestepSeconds * 2.0;
-  }
-
   function resetTrajectoryChunkState():Void {
     trajectoryNextSampleIndex = 0;
     trajectoryChunkEndSeconds = 0.0;
@@ -1357,18 +1252,6 @@ class MotionSystem {
         maxAcceleration = maxAcceleration <= 0.0 ? axisAcceleration : Math.min(maxAcceleration, axisAcceleration);
     }
     return new MotionLimits(maxVelocity, maxAcceleration, maxJerk);
-  }
-}
-
-private class PendingSplice {
-  public final oldTag:Int64;
-  public final spliceTimeNs:Int64;
-  public final retry:Void -> Void;
-
-  public function new(oldTag:Int64, spliceTimeNs:Int64, retry:Void -> Void) {
-    this.oldTag = oldTag;
-    this.spliceTimeNs = spliceTimeNs;
-    this.retry = retry;
   }
 }
 

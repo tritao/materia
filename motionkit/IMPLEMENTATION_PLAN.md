@@ -984,3 +984,15 @@ The old Haxe planners and host-side hold/splice machinery are still present
 and scheduled for removal, so this checkpoint does not complete the item.
 MotionKit Haxe (21,962 assertions), RobotKit Haxe, all 12 native CTest
 targets, and both FFI audits passed. Commit: the commit containing this entry.
+
+### Native queue hold and splice cleanup
+
+Removed the unused host hold lead, hold refill, pending splice and silent
+late-splice recovery from `MotionSystem`. Smooth jog changes use native plan
+replacement at the committed horizon; late replacements are rejected
+explicitly, leaving the original plan intact. Degree-1 plans keep stop-first
+replacement. The position-target fallback still uses its host-side stop path
+until it is replanned with Ruckig. MotionKit Haxe (21,962 assertions),
+RobotKit Haxe, all 12 native CTest targets, both FFI audits, and TCP default,
+session and lease-timeout integration passed. Commit: the commit containing
+this entry.
