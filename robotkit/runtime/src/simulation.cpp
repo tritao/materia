@@ -1279,6 +1279,14 @@ rk_result Simulation::ensure_host() {
         host_ = 0;
         return RK_ERROR_BACKEND;
     }
+    // The host now owns the physics thread. Presentation must read its initial
+    // snapshot even before the first tick; direct body reads use the wrong thread.
+    if (snapshot_ == 0 && nksim_host_get_snapshot(host_, &snapshot_) != NKSIM_OK) {
+        nksim_host_stop(host_);
+        nksim_host_destroy(host_);
+        host_ = 0;
+        return RK_ERROR_BACKEND;
+    }
     topology_frozen_ = true;
     return RK_OK;
 }

@@ -45,6 +45,11 @@ static void convex_link_and_box_link_build() {
     robot_desc.collision_half_extents[5] = 0.4;
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    assert(rk_simulation_start(simulation) == RK_OK);
+    rk_simulation_presentation presentation = 0;
+    assert(rk_simulation_capture_presentation(simulation, &presentation) == RK_OK);
+    rk_simulation_presentation_destroy(presentation);
+    assert(rk_simulation_stop(simulation) == RK_OK);
     assert(rk_simulation_step(simulation, 0) == RK_OK);
     rk_simulation_destroy(simulation);
 }

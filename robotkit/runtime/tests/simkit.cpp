@@ -80,6 +80,11 @@ void convex_link_and_box_link_build() {
     robot_desc.collision_half_extents[5] = 0.4;
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    assert(rk_simulation_start(simulation) == RK_OK);
+    rk_simulation_presentation presentation = 0;
+    assert(rk_simulation_capture_presentation(simulation, &presentation) == RK_OK);
+    rk_simulation_presentation_destroy(presentation);
+    assert(rk_simulation_stop(simulation) == RK_OK);
     assert(rk_simulation_step(simulation, 0) == RK_OK);
     rk_simulation_destroy(simulation);
 }
@@ -727,13 +732,14 @@ void differential_drive_follows_applied_wheel_targets() {
     assert(std::abs(plant.x - (moving.x + 0.02 * std::cos(moving.yaw))) < 1e-12);
     assert(std::abs(plant.y - (moving.y + 0.6 + 0.02 * std::sin(moving.yaw))) < 1e-12);
 
-    // Resetting the robot puts the plant back at the reset pose, at rest.
+    // Teleport does not change the authored reset pose. Reset returns the
+    // plant to the original zero pose, at rest.
     assert(rk_simulation_stop(simulation) == RK_OK);
     assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
     plant = drive_state(simulation);
-    assert(plant.x == 1.0 && plant.y == 2.0 && std::abs(plant.yaw - start_yaw) < 1e-12);
+    assert(plant.x == 0.0 && plant.y == 0.0 && std::abs(plant.yaw) < 1e-12);
     assert(rk_simulation_step(simulation, time += 100) == RK_OK);
-    assert(drive_state(simulation).x == 1.0);
+    assert(drive_state(simulation).x == 0.0);
     assert(rk_simulation_clear_differential_drive(simulation, 0) == RK_OK);
     assert(drive_state(simulation).enabled == 0);
     assert(rk_simulation_clear_differential_drive(simulation, 1) == RK_ERROR_INVALID_ARGUMENT);
