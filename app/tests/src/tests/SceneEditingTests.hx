@@ -48,10 +48,44 @@ import sys.io.File;
 import haxe.io.Bytes;
 import materia.project.SceneArtifact;
 import materia.project.Appearance.Appearances;
+import materia.project.MaterialLibrary;
 
 @:access(app.EditorPerspectiveViewport)
 @:access(app.Main.ReferenceEditorApp)
 class SceneEditingTests {
+  static function finishLibrarySelection():Void {
+    var scene = new EditorScene([]);
+    try {
+      check(scene.createRectangle(), "finish test creates a rectangle");
+      var finish:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+      var metallic:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+      for (property in scene.properties()) {
+        if (StringTools.endsWith(property.id, "finish")) finish = property;
+        if (StringTools.endsWith(property.id, "metallic")) metallic = property;
+      }
+      check(finish != null && metallic != null, "finish properties are identified by id");
+      var finishProperty:nativekit.ui.properties.PropertyDescriptor = cast finish;
+      var metallicProperty:nativekit.ui.properties.PropertyDescriptor = cast metallic;
+      var bronzeChoice = false;
+      for (option in finishProperty.options) if (option.key == "bronze") bronzeChoice = true;
+      check(bronzeChoice, "finish choices include the shared material library");
+      var binding = new PropertyBinding(finishProperty, scene.context());
+      check(binding.apply(PropertyValue.Enum("bronze")) == PropertyEditResult.Applied,
+        "library finish can be selected");
+      var selected = scene.object(scene.selectedId);
+      check(selected != null && Appearances.same(selected.appearance, MaterialLibrary.appearance("bronze")),
+        "library finish supplies its visual values");
+      check(new PropertyBinding(metallicProperty, scene.context()).apply(PropertyValue.Float(0.2)) ==
+        PropertyEditResult.Applied, "metallic edit succeeds");
+      check(binding.read() == PropertyValue.Enum("custom"),
+        "edited library finish is shown as Custom");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
+  }
+
   static function sensorRevisionSeparation():Void {
     var sensors = new SensorConfiguration();
     var name:Null<nativekit.ui.properties.PropertyDescriptor> = null;
@@ -1198,6 +1232,7 @@ class SceneEditingTests {
   }
 
   static function main():Int {
+    finishLibrarySelection();
     sensorRevisionSeparation();
     revisionSeparation();
     appearanceArtifactRoundTrip();

@@ -16,6 +16,7 @@ import nativekit.scene.Material;
 import nativekit.scene.ChangeSet;
 import materia.project.Appearance;
 import materia.project.Appearance.Appearances;
+import materia.project.MaterialLibrary;
 import nativekit.scene.Transaction;
 import nativekit.scene.SceneView;
 import nativekit.scene.SelectionSet;
@@ -74,9 +75,7 @@ class EditorScene {
   }
 
   static function sameFinish(left:Null<Appearance>, right:Null<Appearance>):Bool {
-    var a = left == null ? Appearances.neutral() : left;
-    var b = right == null ? Appearances.neutral() : right;
-    return a.finish == b.finish && a.metallic == b.metallic && a.roughness == b.roughness;
+    return Appearances.same(left, right);
   }
   /** Opt-in constructor phase timings used by the headless architecture profile. */
   var loadProfilePhases:Null<Map<String, Float>>;
@@ -2440,17 +2439,13 @@ class EditorScene {
     finishOptions.category = "Rendering";
     var sourceFinish = componentFinishes.get(id);
     if (sourceFinish != null) finishOptions.options.push(new PropertyOption("component", "Component finish"));
-    for (preset in [
-      ["neutral", "Neutral"], ["painted", "Painted"], ["machined-steel", "Machined steel"],
-      ["black-oxide", "Black oxide"], ["bearing-steel", "Bearing steel"],
-      ["aluminium", "Aluminium"], ["rubber", "Rubber"]
-    ]) finishOptions.options.push(new PropertyOption(preset[0], preset[1]));
-    var initialFinish = requiredObject(id).appearance;
-    if (initialFinish != null && Appearances.preset(initialFinish.finish) == null)
-      finishOptions.options.push(new PropertyOption(initialFinish.finish, initialFinish.finish));
+    for (material in MaterialLibrary.all())
+      finishOptions.options.push(new PropertyOption(material.id, material.name));
+    finishOptions.options.push(new PropertyOption("custom", "Custom"));
     finishOptions.validator = function(_, value) return switch (value) {
       case PropertyValue.Enum(key):
-        key == "component" && sourceFinish != null || Appearances.preset(key) != null ? null : "Unknown finish";
+        key == "component" && sourceFinish != null || key == "custom" ||
+          MaterialLibrary.get(key) != null ? null : "Unknown finish";
       default: "Finish requires a preset";
     };
     result.push(new PropertyDescriptor(prefix + "finish", "Finish", PropertyType.Enum,
@@ -2460,14 +2455,18 @@ class EditorScene {
         if (sourceFinish != null && sameFinish(appearance, sourceFinish.appearance) &&
             item.red == sourceFinish.red && item.green == sourceFinish.green && item.blue == sourceFinish.blue)
           return PropertyValue.Enum("component");
-        return PropertyValue.Enum(appearance == null ? "neutral" : appearance.finish);
+        if (appearance == null) return PropertyValue.Enum("neutral");
+        var preset = MaterialLibrary.get(appearance.finish);
+        return PropertyValue.Enum(preset != null && Appearances.same(appearance,
+          MaterialLibrary.appearance(preset.id)) ? preset.id : "custom");
       }, function(_, value) {
         switch (value) {
           case PropertyValue.Enum("component") if (sourceFinish != null): resetComponentFinish(id);
+          case PropertyValue.Enum("custom"): return;
           case PropertyValue.Enum(key):
-            var preset = Appearances.preset(key);
+            var preset = MaterialLibrary.get(key);
             if (preset == null) throw "Unknown finish";
-            setFinish(id, preset);
+            setFinish(id, MaterialLibrary.appearance(key));
           default: throw "Finish requires a preset";
         }
       }, finishOptions));
