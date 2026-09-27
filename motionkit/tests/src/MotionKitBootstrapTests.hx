@@ -228,6 +228,21 @@ class MotionKitBootstrapTests {
     var limits = new MotionLimits(1.0, 2.0, 0.0);
     var exact = planner.planPath(path, limits, PathPlanningOptions.exactStopMode());
     var blend = planner.planPath(path, limits, PathPlanningOptions.blend(0.01));
+    var nativeBlend = planner.planNativePath(path, limits, PathPlanningOptions.blend(0.01));
+    near(nativeBlend.durationSeconds(), blend.durationSeconds,
+      "native lookahead preserves authored duration", 1e-8);
+    for (segment in nativeBlend.segments())
+      check(segment.coefficients[0].length == 2,
+        "native lookahead emits degree-1 segments");
+    for (index in 0...101) {
+      var time = blend.durationSeconds * index / 100.0;
+      var authored = blend.sample(time);
+      var evaluated = nativeBlend.evaluate(time);
+      for (joint in 0...3)
+        near(evaluated.positions[joint], authored.positions[joint],
+          "native lookahead preserves piecewise-linear positions", 1e-8);
+    }
+    nativeBlend.dispose();
     check(exact.durationSeconds > blend.durationSeconds,
       "blending shortens a cornered path without changing its endpoints");
 
@@ -290,6 +305,17 @@ class MotionKitBootstrapTests {
       -Math.PI * 0.5, Math.PI * 0.5);
     var arcTrajectory = planner.planPath(new GeometricPath([arc]),
       new MotionLimits(0.5, 1.0), PathPlanningOptions.exactStopMode());
+    var nativeArc = planner.planNativePath(new GeometricPath([arc]),
+      new MotionLimits(0.5, 1.0), PathPlanningOptions.exactStopMode());
+    for (index in 0...101) {
+      var time = arcTrajectory.durationSeconds * index / 100.0;
+      var authored = arcTrajectory.sample(time);
+      var evaluated = nativeArc.evaluate(time);
+      for (joint in 0...3)
+        near(evaluated.positions[joint], authored.positions[joint],
+          "native arc preserves piecewise-linear contour", 1e-8);
+    }
+    nativeArc.dispose();
     for (sample in arcTrajectory.samples) {
       var dx = sample.positions[0] - 0.1;
       var dy = sample.positions[1] - 0.1;

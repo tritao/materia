@@ -455,14 +455,18 @@ class MotionSystem {
       motionOptions == null ? new MotionOptions() : motionOptions);
     validatePathLimits(path, [xAxis, yAxis, zAxis]);
     var cartesian = linePlanner.planPath(path, limits, pathOptions);
+    var nativeCartesian = robot.capabilities().supportsExecutionPlans
+      ? linePlanner.planNativePath(path, limits, pathOptions) : null;
     var mapped:Array<JointTrajectorySample> = [];
     for (sample in cartesian.samples) {
       var positions = start.copy();
       var velocities = [for (_ in start) 0.0];
       var accelerations = [for (_ in start) 0.0];
-      xAxis.writeLogicalPosition(positions, sample.positions[0]);
-      yAxis.writeLogicalPosition(positions, sample.positions[1]);
-      zAxis.writeLogicalPosition(positions, sample.positions[2]);
+      var cartesianPosition = nativeCartesian == null ? sample.positions
+        : nativeCartesian.evaluate(sample.timeSeconds).positions;
+      xAxis.writeLogicalPosition(positions, cartesianPosition[0]);
+      yAxis.writeLogicalPosition(positions, cartesianPosition[1]);
+      zAxis.writeLogicalPosition(positions, cartesianPosition[2]);
       writeLogicalVector(xAxis, velocities, sample.velocities[0]);
       writeLogicalVector(yAxis, velocities, sample.velocities[1]);
       writeLogicalVector(zAxis, velocities, sample.velocities[2]);
@@ -472,7 +476,15 @@ class MotionSystem {
       mapped.push(new JointTrajectorySample(sample.timeSeconds, positions, velocities,
         accelerations));
     }
-    return new JointTrajectory(mapped);
+    if (nativeCartesian != null) nativeCartesian.dispose();
+    var result = new JointTrajectory(mapped);
+    if (robot.capabilities().supportsExecutionPlans && mapped.length > 1) {
+      var native = Trajectory.fromPositionSamples(
+        [for (sample in mapped) sample.timeSeconds],
+        [for (sample in mapped) sample.positions]);
+      nativeTrajectories.push({trajectory: result, native: native});
+    }
+    return result;
   }
 
   function resolvePathLimits(path:GeometricPath, directAxes:Array<MotionAxis>,
@@ -655,7 +667,7 @@ class MotionSystem {
         !usesTrajectoryChunks(executing))
       return null;
     var smooth = nativeFor(executing);
-    if (smooth == null) return null;
+    if (smooth == null || smooth.segments()[0].coefficients[0].length < 3) return null;
     return trySmoothReplacement(executing, null, state -> {
       var target = state.positions.copy();
       var seen = new Map<String, Bool>();
@@ -1066,11 +1078,13 @@ class MotionSystem {
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return;
     var smooth = nativeFor(trajectoryValue);
-    if (smooth != null) {
+    var nativeSegments = smooth == null ? null : smooth.segments();
+    if (nativeSegments != null && nativeSegments.length > 0 &&
+        nativeSegments[0].coefficients[0].length >= 3) {
       if (trajectorySubmitted) return;
       var tag = nextTrajectoryTag;
       nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
-      var segments = [for (segment in smooth.segments())
+      var segments = [for (segment in nativeSegments)
         new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
           segment.coefficients)];
       if (segments.length > 128) throw "Smooth plan exceeds one runtime submission";
@@ -1106,11 +1120,23 @@ class MotionSystem {
       trajectoryValue.samples[index].timeSeconds - startTime];
     var positions = [for (index in startIndex...(endIndex + 1))
       trajectoryValue.samples[index].positions];
-    var native = Trajectory.fromPositionSamples(times, positions);
-    var segments = [for (segment in native.segments())
-      new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
-        segment.coefficients)];
-    native.dispose();
+    var segments:Array<TrajectorySegment> = [];
+    if (nativeSegments != null &&
+        nativeSegments.length == trajectoryValue.samples.length - 1) {
+      var nativeStartNs = nativeSegments[startIndex].timeFromStartNs;
+      for (index in startIndex...endIndex) {
+        var segment = nativeSegments[index];
+        segments.push(new TrajectorySegment(
+          Int64.sub(segment.timeFromStartNs, nativeStartNs),
+          segment.durationNs, segment.coefficients));
+      }
+    } else {
+      var native = Trajectory.fromPositionSamples(times, positions);
+      for (segment in native.segments())
+        segments.push(new TrajectorySegment(segment.timeFromStartNs,
+          segment.durationNs, segment.coefficients));
+      native.dispose();
+    }
     var startVelocity = [for (_ in positions[0]) 0.0];
     if (startIndex > 0) {
       var before = trajectoryValue.samples[startIndex - 1];

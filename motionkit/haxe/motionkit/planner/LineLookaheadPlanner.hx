@@ -6,6 +6,7 @@ import motionkit.path.PathPrimitive;
 import motionkit.trajectory.JointTrajectory;
 import motionkit.trajectory.JointTrajectorySample;
 import motionkit.trajectory.MotionLimits;
+import motionkit.trajectory.Trajectory;
 
 /**
  * Deterministic line/arc path planner with velocity lookahead at junctions.
@@ -29,6 +30,27 @@ class LineLookaheadPlanner {
   /** Plans a connected polyline as a three-coordinate Cartesian trajectory. */
   public function planPath(path:GeometricPath, limits:MotionLimits,
       ?options:PathPlanningOptions):JointTrajectory {
+    return new JointTrajectory([for (sample in plannedSamples(path, limits, options))
+      new JointTrajectorySample(sample.timeSeconds, sample.positions,
+        sample.velocities, sample.accelerations)]);
+  }
+
+  /** Emits degree-1 native segments from the planner's authored knots. */
+  public function planNativePath(path:GeometricPath, limits:MotionLimits,
+      ?options:PathPlanningOptions):Trajectory {
+    var samples = plannedSamples(path, limits, options);
+    if (samples.length == 1) {
+      var position = samples[0].positions;
+      return Trajectory.fromPositionSamples([0.0, samplePeriodSeconds],
+        [position, position]);
+    }
+    return Trajectory.fromPositionSamples(
+      [for (sample in samples) sample.timeSeconds],
+      [for (sample in samples) sample.positions]);
+  }
+
+  function plannedSamples(path:GeometricPath, limits:MotionLimits,
+      options:Null<PathPlanningOptions>):Array<LookaheadSample> {
     if (path == null || limits == null) throw "Path planning needs a path and limits";
     var chosenOptions = options == null ? new PathPlanningOptions() : options;
     if (limits.maxVelocity <= 0.0 || limits.maxAcceleration <= 0.0)
@@ -49,9 +71,10 @@ class LineLookaheadPlanner {
     }
     if (firstPrimitive == null) throw "Path planning needs at least one primitive";
     if (segments.length == 0)
-      return new JointTrajectory([new JointTrajectorySample(0.0,
+      return [{timeSeconds: 0.0, positions:
         [firstPrimitive.pointAt(0.0).x, firstPrimitive.pointAt(0.0).y,
-          firstPrimitive.pointAt(0.0).z])]);
+          firstPrimitive.pointAt(0.0).z], velocities: [0.0, 0.0, 0.0],
+        accelerations: [0.0, 0.0, 0.0]}];
 
     var lengths:Array<Float> = [];
     var startDirections:Array<Array<Float>> = [];
@@ -138,10 +161,10 @@ class LineLookaheadPlanner {
         uniqueTimes.push(time);
     }
 
-    var samples:Array<JointTrajectorySample> = [];
+    var samples:Array<LookaheadSample> = [];
     for (time in uniqueTimes)
       samples.push(sampleAt(profiles, segmentStartTimes, totalDuration, time));
-    return new JointTrajectory(samples);
+    return samples;
   }
 
   static function normalize(vector:Array<Float>):Array<Float> {
@@ -169,12 +192,14 @@ class LineLookaheadPlanner {
   }
 
   static function sampleAt(profiles:Array<PathProfile>, segmentStartTimes:Array<Float>,
-      totalDuration:Float, time:Float):JointTrajectorySample {
+      totalDuration:Float, time:Float):LookaheadSample {
     if (time >= totalDuration - EPSILON) {
       var last = profiles[profiles.length - 1];
-      return new JointTrajectorySample(totalDuration,
-        [last.primitive.pointAt(last.length).x, last.primitive.pointAt(last.length).y,
-          last.primitive.pointAt(last.length).z]);
+      return {timeSeconds: totalDuration,
+        positions: [last.primitive.pointAt(last.length).x,
+          last.primitive.pointAt(last.length).y,
+          last.primitive.pointAt(last.length).z],
+        velocities: [0.0, 0.0, 0.0], accelerations: [0.0, 0.0, 0.0]};
     }
 
     var index = 0;
@@ -194,9 +219,16 @@ class LineLookaheadPlanner {
       direction[1] * state.acceleration, direction[2] * state.acceleration];
     accelerations[0] += -direction[1] * normalAcceleration;
     accelerations[1] += direction[0] * normalAcceleration;
-    return new JointTrajectorySample(time, [point.x, point.y, point.z], velocities,
-      accelerations);
+    return {timeSeconds: time, positions: [point.x, point.y, point.z],
+      velocities: velocities, accelerations: accelerations};
   }
+}
+
+private typedef LookaheadSample = {
+  var timeSeconds:Float;
+  var positions:Array<Float>;
+  var velocities:Array<Float>;
+  var accelerations:Array<Float>;
 }
 
 private class PathProfile {

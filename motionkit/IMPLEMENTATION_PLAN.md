@@ -1010,3 +1010,23 @@ repeated jog changes with the free-running owner thread. Haxeon gained
 it for nanosecond-to-second conversions. MotionKit and RobotKit Haxe suites,
 all 12 native CTest targets, and Wasm32/Wasm-GC Int64 checks passed. Commit:
 the commit containing this entry.
+
+### Native lookahead checkpoint; non-queue stop boundary
+
+`LineLookaheadPlanner` now emits degree-1 native trajectories directly from
+its authored knots. Queue-backed `MotionSystem` path planning maps those
+native positions to joints and submits the native segments in bounded plan
+chunks, retaining authored derivatives only in the transitional public
+sample wrapper. Moving retargeting remains restricted to degree ≥ 2.
+Native-versus-authored position equivalence is tested for lines and arcs;
+MotionKit Haxe, RobotKit Haxe and all 12 native CTest targets passed.
+
+The non-queue fallback and old Haxe classes are not deleted yet. A trial that
+changed fallback axis generation to Ruckig while retaining the old host
+`TimeScaling` stop produced `RK_ERROR_LIMIT` in the existing position-target
+replacement sweep (event tick 4, owner tick 22); it was reverted. The
+fallback generator and stop/resume timing must change together. Existing
+tests also require serial-style path holds to stay on lines and arcs. Direct
+joint-space Ruckig stop/replan cannot promise that, so the remaining work
+needs an explicit path-preserving timing strategy or an approved change to
+that degraded-mode behavior. Commit: the commit containing this entry.
