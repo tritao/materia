@@ -21,17 +21,76 @@ nkscene_transform make_transform(double x, double y, double z) {
     return transform;
 }
 
-nkscene_node_id make_node(nkscene_scene scene, double z) {
+nkscene_node_id make_node_at(nkscene_scene scene, double x, double y, double z) {
     nkscene_transaction transaction = 0;
     assert(nkscene_transaction_begin(scene, &transaction) == NKS_OK);
     nkscene_node_id node{};
     assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
-    const auto transform = make_transform(0.0, 0.0, z);
+    const auto transform = make_transform(x, y, z);
     assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
     nkscene_change_set changes = 0;
     assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
     nkscene_change_set_destroy(changes);
     return node;
+}
+
+nkscene_node_id make_node(nkscene_scene scene, double z) {
+    return make_node_at(scene, 0.0, 0.0, z);
+}
+
+void offset_convex_fallback_uses_its_bounds_center() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto obstacle_node = make_node(scene, 0.0);
+    const auto hit_node = make_node_at(scene, 10.0, 0.0, 2.0);
+    const auto miss_node = make_node_at(scene, 0.0, 0.0, 2.0);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 1;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    const double vertices[] = {9.5,-0.5,-0.5, 10.5,-0.5,-0.5,
+        9.5,0.5,-0.5, 10.5,0.5,-0.5, 9.5,-0.5,0.5,
+        10.5,-0.5,0.5, 9.5,0.5,0.5, 10.5,0.5,0.5};
+    nksim_shape hull = 0;
+    assert(nksim_shape_create_convex(world, vertices, 24, &hull) == NKSIM_OK);
+    const double half[] = {0.1, 0.1, 0.1};
+    nksim_shape box = 0;
+    assert(nksim_shape_create_box(world, half, &box) == NKSIM_OK);
+    nksim_body_desc body_desc{};
+    body_desc.struct_size = sizeof(body_desc);
+    body_desc.node = obstacle_node;
+    body_desc.shape = hull;
+    body_desc.motion_type = NKSIM_MOTION_STATIC;
+    body_desc.collision_layer = body_desc.collision_mask = 1;
+    nksim_body obstacle = 0;
+    assert(nksim_body_create(world, &body_desc, &obstacle) == NKSIM_OK);
+    body_desc.shape = box;
+    body_desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    body_desc.mass = 1.0;
+    body_desc.node = hit_node;
+    nksim_body hit = 0;
+    assert(nksim_body_create(world, &body_desc, &hit) == NKSIM_OK);
+    body_desc.node = miss_node;
+    nksim_body miss = 0;
+    assert(nksim_body_create(world, &body_desc, &miss) == NKSIM_OK);
+    for (int tick = 0; tick < 200; ++tick) {
+        nksim_step_result step{};
+        step.struct_size = sizeof(step);
+        assert(nksim_world_step(world, &step) == NKSIM_OK);
+        if (step.scene_changes) nkscene_change_set_destroy(step.scene_changes);
+    }
+    nksim_body_state hit_state{}, miss_state{};
+    hit_state.struct_size = miss_state.struct_size = sizeof(hit_state);
+    assert(nksim_body_get_state(world, hit, &hit_state) == NKSIM_OK);
+    assert(nksim_body_get_state(world, miss, &miss_state) == NKSIM_OK);
+    assert(hit_state.position[2] > 0.55 && hit_state.position[2] < 0.7);
+    assert(miss_state.position[2] < -1.0);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
 }
 
 struct NestedNodes {
@@ -777,6 +836,7 @@ void kinematic_root_twist_carries_to_its_links() {
 } // namespace
 
 int main() {
+    offset_convex_fallback_uses_its_bounds_center();
     falling_body_updates_scene_and_snapshot();
     nested_dynamic_body_updates_local_transform();
     repeated_replays_are_identical();

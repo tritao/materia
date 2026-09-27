@@ -591,7 +591,7 @@ nksim_result World::create_convex_shape(const double *vertices, std::uint32_t co
     desc.struct_size = sizeof(desc);
     desc.type = NKSIM_SHAPE_BOX;
     for (int axis = 0; axis < 3; ++axis)
-        desc.parameters[axis] = std::max(std::abs(minimum[axis]), std::abs(maximum[axis]));
+        desc.parameters[axis] = (maximum[axis] - minimum[axis]) * 0.5;
     nksim_shape shape = 0;
     const auto result = create_shape(desc, &shape);
     if (result != NKSIM_OK) return result;

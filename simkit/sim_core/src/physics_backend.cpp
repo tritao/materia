@@ -294,6 +294,24 @@ public:
                 }
                 return half;
             };
+            auto collision_center = [](const TestBody &body) {
+                Vec3 center = body.state.position;
+                if (body.desc.shape_type != NKSIM_SHAPE_CONVEX ||
+                    body.desc.shape_vertices.empty()) return center;
+                Vec3 minimum{INFINITY, INFINITY, INFINITY};
+                Vec3 maximum{-INFINITY, -INFINITY, -INFINITY};
+                for (std::size_t i = 0; i < body.desc.shape_vertices.size(); ++i) {
+                    const auto axis = i % 3;
+                    minimum[axis] = std::min(minimum[axis],
+                                             static_cast<double>(body.desc.shape_vertices[i]));
+                    maximum[axis] = std::max(maximum[axis],
+                                             static_cast<double>(body.desc.shape_vertices[i]));
+                }
+                return add(center, rotate(body.state.rotation,
+                    {(minimum[0] + maximum[0]) * 0.5,
+                     (minimum[1] + maximum[1]) * 0.5,
+                     (minimum[2] + maximum[2]) * 0.5}));
+            };
             for (auto &moving : bodies) {
                 if (moving.desc.motion_type != NKSIM_MOTION_DYNAMIC ||
                     parent_joint(moving.id) != nullptr ||
@@ -301,6 +319,7 @@ public:
                      moving.desc.shape_type != NKSIM_SHAPE_CONVEX))
                     continue;
                 const auto moving_half = bounds(moving);
+                const auto moving_center = collision_center(moving);
                 for (const auto &obstacle : bodies) {
                     if (obstacle.id == moving.id ||
                         (obstacle.desc.motion_type == NKSIM_MOTION_DYNAMIC &&
@@ -311,11 +330,12 @@ public:
                         (obstacle.desc.collision_mask & moving.desc.collision_layer) == 0)
                         continue;
                     const auto obstacle_half = bounds(obstacle);
+                    const auto obstacle_center = collision_center(obstacle);
                     int axis = -1;
                     double least_penetration = std::numeric_limits<double>::infinity();
                     for (int candidate = 0; candidate < 3; ++candidate) {
                         const double penetration = moving_half[candidate] + obstacle_half[candidate] -
-                            std::abs(moving.state.position[candidate] - obstacle.state.position[candidate]);
+                            std::abs(moving_center[candidate] - obstacle_center[candidate]);
                         if (penetration <= 0.0) { axis = -1; break; }
                         if (penetration < least_penetration) {
                             least_penetration = penetration;
@@ -323,7 +343,7 @@ public:
                         }
                     }
                     if (axis >= 0) {
-                        const double direction = moving.state.position[axis] >= obstacle.state.position[axis] ? 1.0 : -1.0;
+                        const double direction = moving_center[axis] >= obstacle_center[axis] ? 1.0 : -1.0;
                         moving.state.position[axis] += direction * least_penetration;
                         if (moving.state.linear_velocity[axis] * direction < 0.0)
                             moving.state.linear_velocity[axis] = 0.0;
