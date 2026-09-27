@@ -5,6 +5,7 @@
 /robotkit/robotd/build/
 /robotkit/tests/build/
 /robotkit/tests/mujoco/build/
+/robotkit/tests/excavator/build/
 /robotkit/build/
 /robotkit/device_protocol/target/
 /robotkit/device_virtual/target/
@@ -12,6 +13,7 @@
 /robotkit/worldd/build/
 /automationkit/tests/build/
 /motionkit/tests/build/
+/processkit/tests/build/
 
 /cadkit/examples/modeling/build/
 /simkit/.cache/

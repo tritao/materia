@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "package": { "name": "processkit" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "motionkit": { "path": "../motionkit" },
+    "motionkit-robot": { "path": "../motionkit/robot" },
+    "robotkit": { "path": "../robotkit" }
+  },
+  "target": "host"
+}

@@ -22,10 +22,6 @@ import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.WorkPatchPlanner;
 import robotkit.tool.SimulatedSprayer;
-import robotkit.process.CartesianTrajectory;
-import robotkit.process.ToolpathExecutor;
-import robotkit.process.ToolpathExecutionResult;
-import robotkit.process.ToolpathExecutionFailure;
 import robotkit.work.WorkSurface;
 import robotkit.work.Polygon2;
 import robotkit.work.Point2;
@@ -434,15 +430,6 @@ class WallFinishingScenarioTests {
     if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);
     if (sys.FileSystem.exists(recordingPath + ".incomplete.status"))
       sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
-  }
-
-  static function describeFailure(result:ToolpathExecutionResult):String {
-    if (result.success) return "none";
-    return switch result.failure {
-      case Unreachable(index, ik): 'unreachable at sample $index (positionError=${ik.positionError})';
-      case Discontinuity(index, joint, delta): 'discontinuity at sample $index joint $joint (delta=$delta)';
-      case null: "unknown failure";
-    };
   }
 
   // Link order fixed by buildWallFinishingRobotModel's addLink calls:

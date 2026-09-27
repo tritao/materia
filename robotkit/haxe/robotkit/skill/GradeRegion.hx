@@ -1,11 +1,6 @@
 package robotkit.skill;
 
 import robotkit.manipulation.Manipulator;
-import robotkit.process.CartesianTrajectory;
-import robotkit.process.ToolpathExecutionFailure;
-import robotkit.process.ToolpathExecutionResult;
-import robotkit.process.ToolpathExecutionStep;
-import robotkit.process.ToolpathExecutor;
 import robotkit.spatial.Transform3;
 import robotkit.work.BucketSweep;
 import robotkit.work.DigCyclePlan;
@@ -13,7 +8,6 @@ import robotkit.work.DigCyclePlanner;
 import robotkit.work.EarthworkRegion;
 import robotkit.work.Point2;
 import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 
 /**
@@ -30,7 +24,6 @@ typedef GradeRegionSpec = {
   var dumpPitch:Float;
   var feedRate:Float;
   var maxAcceleration:Float;
-  var sampleInterval:Float;
   var maxCutPerPass:Float;
   var maxCycles:Int;
   var maxJointStep:Float;
@@ -67,6 +60,7 @@ class GradeRegion implements Skill {
   public final region:EarthworkRegion;
   public final frameId:String;
   public final spec:GradeRegionSpec;
+  public final planRunner:ToolpathPlanRunner;
 
   public var cyclesCompleted(default, null):Int = 0;
   public var totalRemovedVolume(default, null):Float = 0.0;
@@ -74,13 +68,14 @@ class GradeRegion implements Skill {
   final lifecycle:SkillLifecycle = new SkillLifecycle();
   final initialSeed:Array<Float>;
   var stage:GradeRegionStage = PreparingCycle;
-  var lastQ:Array<Float>;
-  var currentSteps:Array<ToolpathExecutionStep> = [];
-  var stepIndex:Int = 0;
   var currentSweep:Null<DigCyclePlan> = null;
+  var firstObservedCut:Null<Transform3> = null;
+  var lastObservedCut:Null<Transform3> = null;
+  var minObservedCutZ:Float = Math.POSITIVE_INFINITY;
+  final jointIndices:Array<Int>;
 
   public function new(manipulator:Manipulator, robot:Robot, region:EarthworkRegion, frameId:String,
-      spec:GradeRegionSpec, seed:Array<Float>) {
+      spec:GradeRegionSpec, seed:Array<Float>, planRunner:ToolpathPlanRunner) {
     if (manipulator == null || robot == null || region == null || frameId == null || frameId.length == 0 ||
         spec == null || seed == null)
       throw "GradeRegion requires a manipulator, robot, region, frame id, spec, and seed";
@@ -89,8 +84,10 @@ class GradeRegion implements Skill {
     this.region = region;
     this.frameId = frameId;
     this.spec = spec;
+    if (planRunner == null) throw "GradeRegion needs a toolpath plan runner";
+    this.planRunner = planRunner;
     this.initialSeed = seed.copy();
-    this.lastQ = seed.copy();
+    this.jointIndices = [for (target in manipulator.toJointTargets(seed)) target.joint];
   }
 
   public function start():Void {
@@ -111,14 +108,14 @@ class GradeRegion implements Skill {
       case PreparingCycle:
         lifecycle.fail("GradeRegion reached update() before a cycle was staged");
       case ExecutingCycle:
-        advanceExecution();
+        advanceExecution(snapshot, durationSeconds);
     }
     return lifecycle.status();
   }
 
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
-    try robot.stop(robotkit.world.StopMode.Normal) catch (_:Dynamic) {}
+    try planRunner.abort() catch (_:Dynamic) {}
     lifecycle.cancel();
   }
 
@@ -149,45 +146,51 @@ class GradeRegion implements Skill {
       var plan = DigCyclePlanner.planCycle(frameId, point, point, currentZ, cut,
         spec.clearanceZ, new Point2(spec.dumpX, spec.dumpY), spec.dumpZ, spec.bucketHalfWidth,
         spec.digPitch, spec.curlPitch, spec.dumpPitch, spec.feedRate);
-      var trajectory = CartesianTrajectory.build(plan.toolpath, spec.maxAcceleration, spec.sampleInterval);
-      // Seed from the constructor's own initial seed each cycle, not the previous
-      // cycle's dump configuration -- see DigTrench's identical choice/rationale.
-      var execution:ToolpathExecutionResult = ToolpathExecutor.execute(manipulator, trajectory, Transform3.identity(),
-        initialSeed, spec.maxJointStep, spec.positionTolerance, spec.orientationTolerance, spec.ikMaxIterations, spec.ikDamping);
-      if (!execution.success) {
-        lifecycle.fail('grade cycle $cyclesCompleted toolpath execution failed: ${describeFailure(execution.failure)}');
+      planRunner.run(plan.toolpath, initialSeed);
+      if (!planRunner.running()) {
+        lifecycle.fail('grade cycle $cyclesCompleted plan failed: ${planRunner.failure()}');
         return;
       }
-      currentSteps = execution.steps;
-      stepIndex = 0;
       currentSweep = plan;
+      firstObservedCut = null;
+      lastObservedCut = null;
+      minObservedCutZ = Math.POSITIVE_INFINITY;
       stage = ExecutingCycle;
     } catch (error:Dynamic) {
       lifecycle.fail(Std.string(error));
     }
   }
 
-  function advanceExecution():Void {
-    if (stepIndex >= currentSteps.length) {
+  function advanceExecution(snapshot:RobotSnapshot, durationSeconds:Float):Void {
+    try planRunner.update(durationSeconds) catch (error:Dynamic) {
+      lifecycle.fail(Std.string(error));
+      return;
+    }
+    if (planRunner.cuttingMoveActive()) {
+      var q = [for (joint in jointIndices) snapshot.positions.get(joint)];
+      var observed = manipulator.tcpPose(q);
+      if (firstObservedCut == null) firstObservedCut = observed;
+      lastObservedCut = observed;
+      minObservedCutZ = Math.min(minObservedCutZ, observed.translation.z);
+    }
+    if (!planRunner.running()) {
+      if (!planRunner.completed()) {
+        lifecycle.fail('grade cycle $cyclesCompleted plan failed: ${planRunner.failure()}');
+        return;
+      }
       var sweep = currentSweep;
-      if (sweep != null)
-        totalRemovedVolume += BucketSweep.apply(region.existing, sweep.sweepFrom, sweep.sweepTo, sweep.sweepHalfWidth, sweep.sweepEdgeHeight).removedVolume;
+      var from = firstObservedCut, to = lastObservedCut;
+      if (sweep == null || from == null || to == null) {
+        lifecycle.fail("GradeRegion completed without an observed cut");
+        return;
+      }
+      totalRemovedVolume += BucketSweep.apply(region.existing,
+        new Point2(from.translation.x, from.translation.y),
+        new Point2(to.translation.x, to.translation.y), sweep.sweepHalfWidth,
+        minObservedCutZ).removedVolume;
       cyclesCompleted++;
       stage = PreparingCycle;
       beginNextCycle();
-      return;
     }
-    var step = currentSteps[stepIndex];
-    robot.submit(RobotCommand.JointTargets(step.targets, null));
-    lastQ = step.q;
-    stepIndex++;
-  }
-
-  static function describeFailure(failure:Null<ToolpathExecutionFailure>):String {
-    return switch failure {
-      case Unreachable(index, ik): 'unreachable at sample $index (positionError=${ik.positionError}, orientationError=${ik.orientationError}, iterations=${ik.iterations})';
-      case Discontinuity(index, joint, delta): 'discontinuity at sample $index joint $joint (delta=$delta)';
-      case null: "unknown failure";
-    };
   }
 }

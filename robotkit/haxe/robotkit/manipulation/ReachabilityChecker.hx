@@ -26,12 +26,10 @@ class ReachabilityResult {
 
 /**
  * For one candidate base placement (folded into `base_T_work`, the
- * manipulator chain's base frame to the toolpath's own frame — the same
- * convention `ToolpathExecutor` uses for `base_T_work`), solves IK for
+ * manipulator chain's base frame to the toolpath's own frame), solves IK for
  * every point of a `Toolpath` segment, seeded by continuation from the
  * previous point, and reports the reachable fraction rather than aborting
- * at the first failure (unlike `ToolpathExecutor`, which is used once a
- * placement has already been chosen).
+ * at the first failure.
  */
 class ReachabilityChecker {
   public static function check(manipulator:Manipulator, toolpath:Toolpath, base_T_work:Transform3,

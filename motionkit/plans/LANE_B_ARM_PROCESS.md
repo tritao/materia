@@ -365,3 +365,44 @@ lease-timeout modes. Commit: the commit containing this entry.
 
 Lane C's `CornerBlender` can be evaluated for `ToleranceBlend` in B8 after
 the TOPP-RA backend swap. B3's exact-stop fallback remains in place.
+
+### B6 — Excavator toolpaths through plans
+
+`DigTrench`, `GradeRegion`, and `DumpAt` now use a shared
+`ToolpathPlanRunner` boundary backed by `ManipulatorMotion`. The four-joint
+excavator follows validated joint moves through its authored TCP waypoints.
+Its orientation manifold has an IK branch change across some straight TCP
+segments, so a continuous Cartesian `FollowPath` cannot meet the authored
+2 mm tolerance there. The cutting move is tracked by program operation;
+`BucketSweep` reads observed joints and FK for the executed cut endpoints
+and depth, with a 1 mm edge allowance for owner-cycle sampling. The trench
+reaches grade in three cycles and removes 0.56 m³ within its existing 10%
+volume bound. `DumpAt` and `GradeRegion` pass their existing acceptance.
+The per-tick `ToolpathExecutor` API, its step/result/failure types, and
+`CartesianTrajectory` were removed. Process and work tests now exercise
+B1 path conversion and distance-based events.
+
+MotionKit Haxe passed 6,459 assertions, RobotKit Haxe passed 4,522
+assertions, and MuJoCo M9 passed 64 assertions with 99.60% coverage and zero
+opening coverage. MotionKit native CTest passed 4/4, RobotKit native CTest
+passed 17/17, both FFI audits passed, and TCP integration passed in default,
+session, and lease-timeout modes. Commit: the commit containing this entry.
+
+### B7 — ProcessKit v1: painting and dispensing
+
+Added a ProcessKit Haxe package with recipes, simulated process devices, and
+logged preparation, ready, active, interruption, recovery, and completion
+transitions. Runs compile an approach and a remaining process path to
+`MotionProgram`; they do not submit plans. A fault makes the channel safe, and
+recovery slices the authored pose path at the interruption distance minus the
+recipe backoff, regenerating process events from that position. Feed changes
+use explicit Adapt, Pause, or Reject policies. Adapt scales analog flow with
+path speed to preserve quantity per distance. Tests cover paint interruption
+and bounded overlap, simulated sprayer output, dispense feed adaptation within
+2%, and Pause and Reject behavior.
+
+ProcessKit Haxe passed 19 assertions, MotionKit Haxe passed 6,459, RobotKit
+Haxe passed 4,522, and MuJoCo M9 passed 64 with 99.60% coverage and zero
+opening coverage. MotionKit native CTest passed 4/4, RobotKit native CTest
+passed 17/17, both FFI audits passed, and TCP integration passed in default,
+session, and lease-timeout modes. Commit: the commit containing this entry.

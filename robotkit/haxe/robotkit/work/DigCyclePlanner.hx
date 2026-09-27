@@ -16,7 +16,7 @@ import robotkit.process.ToolpathPoint;
  * `KinematicChain.evaluate`'s own composition order). Every waypoint this
  * planner emits sets its orientation from `poseAt`, so it always lies
  * exactly on that manifold; the existing generic (undamped-least-squares)
- * `InverseKinematics`/`ToolpathExecutor` then converges to near-zero
+ * `InverseKinematics` then converges to near-zero
  * position *and* orientation error with no weighting or closed-form solver
  * of its own, since a target already on the manifold leaves the "extra" two
  * 6-DOF error components at zero by construction.
@@ -34,8 +34,7 @@ class DigCyclePlanner {
    * and end of the cut; `groundZ` the terrain elevation there before this
    * cycle; `depth` how far below `groundZ` to cut. The bucket lifts clear at
    * `clearanceZ`, swings through `swingSteps` intermediate waypoints (each
-   * built from `poseAt`, so the swing stays on the reachable manifold rather
-   * than relying on `CartesianTrajectory`'s slerp across a wide arc) to
+   * built from `poseAt`, so the swing stays on the reachable manifold) to
    * `dump` at `dumpZ`, then opens to `dumpPitch`. Returns both the
    * `Toolpath` and the full swept-segment parameters
    * (`BucketSweep.apply(heightMap, sweepFrom, sweepTo, sweepHalfWidth,

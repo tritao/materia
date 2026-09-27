@@ -1,6 +1,7 @@
 package tests;
 
 import haxe.Int64;
+import motionkit.robot.ToolpathPlanRunner;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
 import robotkit.model.Joint;
@@ -16,7 +17,6 @@ import robotkit.manipulation.JointGroup;
 import robotkit.manipulation.Manipulator;
 import robotkit.tool.Tool;
 import robotkit.tool.ToolCollisionShape;
-import robotkit.process.ToolpathExecutionResult;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.skill.Skill;
@@ -153,14 +153,18 @@ class ExcavatorTests {
     var spec:DigTrenchSpec = {
       clearanceZ: 0.6, dumpX: 2.0, dumpY: 2.5, dumpZ: 0.4,
       digPitch: -0.4, curlPitch: -1.8, dumpPitch: 0.6,
-      feedRate: 0.4, maxAcceleration: 0.6, sampleInterval: 0.05,
+      feedRate: 0.4, maxAcceleration: 0.6,
       maxCutPerPass: 0.2, maxCycles: 10, maxJointStep: 6.5,
       positionTolerance: 2e-3, orientationTolerance: 5e-3, ikMaxIterations: 300, ikDamping: 0.03,
       progressSamples: 4
     };
     var seed = [0.0, 0.3, -1.0, -1.0];
+    var digMotion = ToolpathPlanRunner.create(robot, fixture.manipulator,
+      "excavator", spec.maxAcceleration, spec.maxJointStep,
+      spec.positionTolerance, spec.orientationTolerance,
+      spec.ikMaxIterations, spec.ikDamping);
     var dig = new DigTrench(fixture.manipulator, robot, heightMap, "excavator",
-      lineFrom, lineTo, width, depth, gradeTolerance, spec, seed);
+      lineFrom, lineTo, width, depth, gradeTolerance, spec, seed, digMotion);
 
     var runner = new SkillRunner();
     var tick = 0;
@@ -227,13 +231,18 @@ class ExcavatorTests {
     var spec:GradeRegionSpec = {
       clearanceZ: 0.6, dumpX: 2.0, dumpY: 2.5, dumpZ: 0.4,
       digPitch: -0.4, curlPitch: -1.8, dumpPitch: 0.6,
-      feedRate: 0.4, maxAcceleration: 0.6, sampleInterval: 0.05,
+      feedRate: 0.4, maxAcceleration: 0.6,
       maxCutPerPass: 0.2, maxCycles: 10, maxJointStep: 6.5,
       positionTolerance: 2e-3, orientationTolerance: 5e-3, ikMaxIterations: 300, ikDamping: 0.03,
       bucketHalfWidth: 0.3
     };
     var seed = [0.0, 0.3, -1.0, -1.0];
-    var grade = new GradeRegion(fixture.manipulator, robot, region, "excavator", spec, seed);
+    var gradeMotion = ToolpathPlanRunner.create(robot, fixture.manipulator,
+      "excavator", spec.maxAcceleration, spec.maxJointStep,
+      spec.positionTolerance, spec.orientationTolerance,
+      spec.ikMaxIterations, spec.ikDamping);
+    var grade = new GradeRegion(fixture.manipulator, robot, region, "excavator",
+      spec, seed, gradeMotion);
 
     var runner = new SkillRunner();
     var tick = 0;
@@ -262,19 +271,14 @@ class ExcavatorTests {
     var robot = new SimulatedRobot("excavator-dump", simulation.addRobot(blueprint), fixture.model.name, linkNames, jointNames);
 
     // Seed already at the dump position, curled (as if just swung in after a
-    // dig); DumpAt only needs to open the bucket in place. A cold seed far
-    // across the workspace would ask CartesianTrajectory's straight-line
-    // position lerp / rotation slerp to track this chain's reachable
-    // orientation manifold (see DigCyclePlanner's own doc comment) over a
-    // large combined swing, which it is not guaranteed to do -- the same
-    // reason DigCyclePlanner densifies its own swing with manifold-consistent
-    // waypoints. DumpAt does not have manifold knowledge for an arbitrary
-    // target pose, so its realistic use (relocate a *little* and release) is
-    // what this test exercises; see ARCHITECTURE.md.
+    // dig); DumpAt only needs to open the bucket in place. The target remains
+    // on this four-joint chain's reachable orientation manifold.
     var seed = [0.8961, 0.994, -1.609, -1.185];
     var targetPose = DigCyclePlanner.poseAt(2.0, 2.5, 0.4, 0.6);
+    var dumpMotion = ToolpathPlanRunner.create(robot, fixture.manipulator,
+      "excavator", 0.6, 6.5, 2e-3, 8e-3, 500, 0.03);
     var dumpAt = new DumpAt(fixture.manipulator, robot, "excavator", targetPose, seed,
-      0.4, 0.6, 0.05, 6.5, 2e-3, 8e-3, 500, 0.03);
+      0.4, 0.6, 6.5, 2e-3, 8e-3, 500, 0.03, dumpMotion);
 
     var runner = new SkillRunner();
     var tick = 0;
