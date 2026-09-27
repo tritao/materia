@@ -42,13 +42,14 @@ class ProgramCompiler {
   public final positionTolerance:Float;
   public final orientationTolerance:Float;
   public final ikTolerance:IkTolerance;
+  public final configurationSelector:Null<PathConfigurationSelector>;
 
   public function new(solver:KinematicsSolver, limits:ValidationLimits,
       frameId:String, maxVelocity:Array<Float>, maxAcceleration:Array<Float>,
       maxJerk:Array<Float>, ?timing:PathTimingBackend,
       ?cartesianResolution:Float = 0.01, ?maxJointJump:Float = 0.5,
       ?positionTolerance:Float = 0.005, ?orientationTolerance:Float = 0.02,
-      ?ikTolerance:IkTolerance) {
+      ?ikTolerance:IkTolerance, ?configurationSelector:PathConfigurationSelector) {
     if (solver == null || limits == null || solver.jointCount() != limits.jointCount)
       throw "Program compiler needs matching kinematics and validation limits";
     if (frameId == null || StringTools.trim(frameId).length == 0)
@@ -77,6 +78,23 @@ class ProgramCompiler {
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.ikTolerance = ikTolerance == null ? new IkTolerance() : ikTolerance;
+    if (configurationSelector != null && configurationSelector.solver != solver)
+      throw "Program compiler selector must use its kinematics solver";
+    if (configurationSelector != null) {
+      this.configurationSelector = configurationSelector;
+    } else if (Std.isOfType(solver, OpwKinematics)) {
+      var arm:OpwKinematics = cast solver;
+      var lower:Array<Float> = [], upper:Array<Float> = [];
+      for (joint in 0...count) {
+        var bounds = arm.manipulator.group.limitsOf(joint);
+        lower.push(bounds.lower < bounds.upper ? bounds.lower : -1e6);
+        upper.push(bounds.lower < bounds.upper ? bounds.upper : 1e6);
+      }
+      this.configurationSelector = new PathConfigurationSelector(solver,
+        lower, upper, [for (_ in 0...count) maxJointJump], maxVelocity);
+    } else {
+      this.configurationSelector = null;
+    }
   }
 
   public function compile(program:MotionProgram, initialQ:Array<Float>,
@@ -333,10 +351,19 @@ class ProgramCompiler {
     var positions:Array<Array<Float>> = [];
     var caps:Array<Float> = [];
     var previous = startQ.copy();
+    var pathPoses:Array<Pose3> = [];
     for (sample in 0...(count + 1)) {
       var distance = path.length() * sample / count;
-      var desired = path.waypointAt(distance).pose;
-      var solved = sample == 0 ? startQ.copy() : solver.solvePose(desired, previous, ikTolerance);
+      distances.push(distance);
+      pathPoses.push(path.waypointAt(distance).pose);
+    }
+    var selected = configurationSelector == null ? null :
+      configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance);
+    for (sample in 0...(count + 1)) {
+      var distance = distances[sample];
+      var desired = pathPoses[sample];
+      var solved = selected != null ? selected[sample] :
+        (sample == 0 ? startQ.copy() : solver.solvePose(desired, previous, ikTolerance));
       if (solved == null || solved.length != startQ.length)
         throw 'Motion program op $index unreachable pose at path distance $distance';
       checkJointPosition(solved, index, distance);
@@ -349,7 +376,6 @@ class ProgramCompiler {
         caps.push(Math.min(feed, primitiveSpeedAt(path,
           (distance + distances[sample-1]) * 0.5)));
       }
-      distances.push(distance);
       positions.push(solved.copy());
       previous = solved;
     }

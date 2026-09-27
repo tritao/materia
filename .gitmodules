@@ -39,3 +39,6 @@
 [submodule "motionkit/native/vendor/opw_kinematics"]
 	path = motionkit/native/vendor/opw_kinematics
 	url = https://github.com/Jmeyer1292/opw_kinematics.git
+[submodule "motionkit/native/vendor/descartes_light"]
+	path = motionkit/native/vendor/descartes_light
+	url = https://github.com/swri-robotics/descartes_light.git

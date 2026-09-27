@@ -177,12 +177,35 @@ class OpwKinematics implements KinematicsSolver {
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
     return differential.solveDifferential(q, twist);
 
+  public function nativeParameters():mk_opw_parameters return native;
+
+  /** Transform a requested TCP pose to the OPW flange frame for bulk IK. */
+  public function nativePathSample(distance:Float, target:Pose3):mk_opw_path_sample {
+    if (target == null || !Math.isFinite(distance))
+      throw "OPW path sample needs a finite distance and pose";
+    var local = localFlangePose(target);
+    var result = new mk_opw_path_sample();
+    result.set_struct_size(mk_opw_path_sample.size());
+    result.set_distance(distance);
+    var position = local.translation.toArray();
+    for (index in 0...3) result.set_position(index, position[index]);
+    var quaternion = [local.rotation.x, local.rotation.y, local.rotation.z, local.rotation.w];
+    for (index in 0...4) result.set_quaternion(index, quaternion[index]);
+    return result;
+  }
+
+  function localFlangePose(target:Pose3):Transform3 {
+    var requested = new Transform3(new Vec3(target.x, target.y, target.z),
+      new Quat(target.qx, target.qy, target.qz, target.qw));
+    return base.inverse().compose(requested).compose(flangeTTcp.inverse());
+  }
+
   function candidates(target:Pose3, tolerance:IkTolerance,
       seed:Null<Array<Float>>):Array<Array<Float>> {
     if (target == null || tolerance == null) throw "OPW candidate sampling needs pose and tolerance";
     var requested = new Transform3(new Vec3(target.x, target.y, target.z),
       new Quat(target.qx, target.qy, target.qz, target.qw));
-    var local = base.inverse().compose(requested).compose(flangeTTcp.inverse());
+    var local = localFlangePose(target);
     var nativePose = new mk_opw_pose();
     nativePose.set_struct_size(mk_opw_pose.size());
     for (index in 0...3) nativePose.set_position(index, local.translation.toArray()[index]);

@@ -49,3 +49,21 @@ OPW is header-only. The wrapper includes `opw_kinematics.h` and
 `opw_utilities.h`; their audited transitive header set is
 `opw_parameters.h` and `opw_kinematics_impl.h`. MotionKit does not compile
 upstream tests, ROS packaging, or install targets.
+
+## Descartes Light core
+
+- Upstream: <https://github.com/swri-robotics/descartes_light>.
+- Git submodule: `vendor/descartes_light` at
+  `49e2ee3305b5d7ba5018f28cf706e0dc71ecf6cf`.
+- License: Apache-2.0; full text at `vendor/descartes_light/LICENSE.Apache-2.0`.
+  This commit does not ship a separate `NOTICE` file.
+- Dependency: Eigen 3. OpenMP is optional.
+
+The build never enters upstream CMake, ROS packaging, tests, or the BGL/Boost
+component. `src/descartes_instantiations.cpp` includes the three core ladder
+graph implementation headers (`ladder_graph.hpp`, `ladder_graph_dag_search.hpp`,
+`ladder_graph_solver.hpp`) and instantiates only their `double` classes. No
+upstream `.cpp` files are compiled. The local `vendor/shims/console_bridge/console.h`
+captures core diagnostics, and `vendor/shims/no_openmp/omp.h` satisfies its
+header include when OpenMP is absent. The pinned core uses OpenMP pragmas but
+calls no `omp_*` functions.

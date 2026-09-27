@@ -59,9 +59,27 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/opw_kinematics/include/opw_kin
     message(FATAL_ERROR "Initialize motionkit/native/vendor/opw_kinematics submodule")
 endif()
 
-add_library(motionkit_core ${MK_LIBRARY_TYPE} src/trajectory.cpp src/validation.cpp src/generator.cpp src/path.cpp src/opw.cpp)
+set(MK_DESCARTES_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/vendor/descartes_light/descartes_light/core/include")
+if(NOT EXISTS "${MK_DESCARTES_INCLUDE}/descartes_light/solvers/ladder_graph/ladder_graph_solver.h")
+    message(FATAL_ERROR "Initialize motionkit/native/vendor/descartes_light submodule")
+endif()
+find_package(OpenMP QUIET COMPONENTS CXX)
+add_library(motionkit_descartes_core STATIC src/descartes_instantiations.cpp)
+set_target_properties(motionkit_descartes_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(motionkit_descartes_core PUBLIC cxx_std_17)
+target_include_directories(motionkit_descartes_core PUBLIC "${MK_DESCARTES_INCLUDE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/vendor/shims")
+target_link_libraries(motionkit_descartes_core PUBLIC Eigen3::Eigen)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(motionkit_descartes_core PUBLIC OpenMP::OpenMP_CXX)
+else()
+    target_include_directories(motionkit_descartes_core PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/vendor/shims/no_openmp")
+endif()
+
+add_library(motionkit_core ${MK_LIBRARY_TYPE} src/trajectory.cpp src/validation.cpp src/generator.cpp src/path.cpp src/opw.cpp src/configuration.cpp)
 target_compile_features(motionkit_core PUBLIC cxx_std_17)
-target_link_libraries(motionkit_core PRIVATE ruckig::ruckig toppra Eigen3::Eigen)
+target_link_libraries(motionkit_core PRIVATE ruckig::ruckig toppra Eigen3::Eigen motionkit_descartes_core)
 target_include_directories(motionkit_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
@@ -93,4 +111,7 @@ if(BUILD_TESTING)
     add_executable(motionkit_opw_tests tests/opw.cpp)
     target_link_libraries(motionkit_opw_tests PRIVATE motionkit_core)
     add_test(NAME motionkit_opw COMMAND motionkit_opw_tests)
+    add_executable(motionkit_configuration_tests tests/configuration.cpp)
+    target_link_libraries(motionkit_configuration_tests PRIVATE motionkit_core)
+    add_test(NAME motionkit_configuration COMMAND motionkit_configuration_tests)
 endif()

@@ -39,7 +39,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 10, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 11, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_PLAN_EVENTS = 256, MK_EVENT_CHANNEL_BYTES = 48, MK_EVENT_COMMAND_BYTES = 48,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
@@ -91,6 +91,60 @@ MK_API mk_result MK_CALL mk_opw_forward(const mk_opw_parameters *parameters,
 MK_API mk_result MK_CALL mk_opw_inverse(const mk_opw_parameters *parameters,
     const mk_opw_pose *pose, mk_opw_solution *out_solutions MK_OUT_ARRAY(solution_count),
     uint32_t solution_count);
+
+/** Candidate sets for one Descartes ladder-graph selection call. */
+typedef struct mk_configuration_request {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint32_t threads; /**< 1 by default; multiple threads need OpenMP. */
+    uint8_t has_preferred;
+    double lower[MK_MAX_JOINTS];
+    double upper[MK_MAX_JOINTS];
+    double max_jump[MK_MAX_JOINTS];
+    double weights[MK_MAX_JOINTS];
+    double preferred[MK_MAX_JOINTS];
+} mk_configuration_request;
+
+typedef struct mk_configuration_sample {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double distance;
+    uint32_t first_candidate;
+    uint32_t candidate_count;
+} mk_configuration_sample;
+
+typedef struct mk_opw_path_sample {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double distance;
+    double position[3];
+    double quaternion[4]; /**< OPW flange pose in the solver's local frame. */
+} mk_opw_path_sample;
+
+typedef struct mk_configuration_candidate {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double joints[MK_MAX_JOINTS];
+} mk_configuration_candidate;
+
+typedef struct mk_configuration_solution {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double joints[MK_MAX_JOINTS];
+    uint32_t failed_sample; /**< Only slot zero: UINT32_MAX on success. */
+    double failed_distance;
+    double cost;
+    int8_t diagnostic[256];
+} mk_configuration_solution;
+
+/** Returns MK_ERROR_GENERATION with a sample-distance diagnostic if disconnected. */
+MK_API mk_result MK_CALL mk_select_configurations(const mk_configuration_request *request,
+    const mk_configuration_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
+    const mk_configuration_candidate *candidates MK_IN_ARRAY(candidate_count), uint32_t candidate_count,
+    mk_configuration_solution *out_sequence MK_OUT_ARRAY(sample_count));
+
+/** Samples OPW's eight IK branches natively before the same Descartes search. */
+MK_API mk_result MK_CALL mk_select_opw_configurations(
+    const mk_configuration_request *request, const mk_opw_parameters *parameters,
+    const mk_opw_path_sample *samples MK_IN_ARRAY(sample_count), uint32_t sample_count,
+    const double *start_joints MK_IN_ARRAY(joint_count), uint32_t joint_count,
+    mk_configuration_solution *out_sequence MK_OUT_ARRAY(sample_count));
 
 /** Joint path derivatives are with respect to path parameter s. */
 typedef struct mk_path_sample {
