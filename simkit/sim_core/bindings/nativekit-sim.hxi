@@ -57,9 +57,9 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_shape_create_box(world: nksim_world, half_extents: ptr<const<f64>>, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_capsule(world: nksim_world, radius: f64, height: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	/**
-	 * Copies 4..64 XYZ vertices; MuJoCo compiles their convex polytope.
+	 * Copies 12..192 XYZ coordinates (4..64 vertices); MuJoCo compiles their convex polytope.
 	 */
-	extern fn nksim_shape_create_convex(world: nksim_world, vertices: ptr<const<f64>> @in_array("vertex_count"), vertex_count: u32, out_shape: ptr<nksim_shape> @out) -> nksim_result;
+	extern fn nksim_shape_create_convex(world: nksim_world, vertices: ptr<const<f64>> @in_array("coordinate_count"), coordinate_count: u32, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_plane(world: nksim_world, normal: ptr<const<f64>>, offset: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_sphere(world: nksim_world, radius: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_destroy(world: nksim_world, shape: nksim_shape) -> void;

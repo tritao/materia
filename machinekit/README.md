@@ -86,11 +86,12 @@ The Sensor panel can rebuild and run this generated assembly without adding a
 separate robot. The saved joint placement becomes the simulation start pose,
 and simulated part poses are shown while stepping or running. Stop or Reset
 restores the editable assembly pose. Joint controls are disabled during
-simulation. Couplings follow through a per-tick target controller on both
-backends, with possible one-tick lag. Loop closures currently stop Rebuild
-with a diagnostic. Generated parts default to collision enabled and use
-conservative link-attached boxes; loose parts use scene bodies. Convex mesh
-hulls are not available yet.
+simulation. Joint couplings belong to the RobotModel: MuJoCo enforces them
+with joint equality constraints, and the deterministic backend enforces them
+exactly. MuJoCo also supports assembly loop closures; other backends report
+a clear diagnostic. Generated parts default to collision enabled and carry
+bounded convex hulls from the CAD physical-part view. The deterministic
+backend uses boxes as its documented collision fallback.
 Component dimensions are currently authored in `MotorShaftBearings.hx`; editing
 that source and reopening the project regenerates the preview.
 
