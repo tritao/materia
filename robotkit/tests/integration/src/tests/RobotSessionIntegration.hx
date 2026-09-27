@@ -102,13 +102,16 @@ class RobotSessionIntegration {
       waitFor(controller, function() return controller.latestState != null &&
         Math.abs(controller.latestState.q[0] - anchor[0]) < 1e-6,
         "lease test did not establish a commanded position anchor");
+      // A state frame can precede the runtime's next owner cycle. Permit one
+      // cycle of position drift while keeping velocity and acceleration exact.
       controller.submitPlan(new robotkit.world.ExecutionPlanSubmission(
         Int64.ofInt(801), Int64.ofInt(1), Int64.ofInt(0), 0,
         anchor, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
         [for (index in 0...4) new robotkit.world.TrajectorySegment(
           Int64.fromFloat(index * 2000000000.0), Int64.ofInt(2000000000),
           [[anchor[0] + index * 0.02, 0.01], [anchor[1], 0.0],
-            [anchor[2], 0.0]])], null, null, null, null, null, false));
+            [anchor[2], 0.0]])], null, null,
+        [for (_ in 0...anchor.length) 0.02], null, null, false));
       waitFor(controller, function() return controller.latestState != null &&
         Int64.compare(controller.latestState.activePlanId, Int64.ofInt(801)) == 0,
         'lease test plan did not start: fault=${controller.lastFault} id=${controller.latestState == null ? "null" : Std.string(controller.latestState.activePlanId)} safety=${controller.latestState == null ? -1 : controller.latestState.safety} q=${controller.latestState == null ? -1.0 : controller.latestState.q[0]}');

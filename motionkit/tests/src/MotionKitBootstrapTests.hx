@@ -22,6 +22,9 @@ import motionkit.path.ArcSegment;
 import motionkit.path.GeometricPath;
 import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
+import motionkit.path.NativeJointPath;
+import motionkit.path.PathTimeLaw;
+import motionkit.path.PathTimeLaw.PathTimeStage;
 import motionkit.path.PosePath;
 import motionkit.path.PoseLine;
 import motionkit.path.PoseArc;
@@ -90,6 +93,7 @@ class MotionKitBootstrapTests {
     testKinematicsContract();
     testMotionProgramContracts();
     testSimplePathTimingContract();
+    testNativePathLowering();
     testGeometricPathPrimitives();
     testNativeTrajectoryRoundTrip();
     testNativeValidationAndPlan();
@@ -118,6 +122,25 @@ class MotionKitBootstrapTests {
     testPathHoldsStayOnPathWithinLimits();
     testDualMotorAxisChangesStayWithinJointLimits();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
+  }
+
+  static function testNativePathLowering():Void {
+    var samples = new JointPathSamples([0.0, 1.0, 2.0],
+      [[0.0], [1.0], [4.0]], [[0.0], [2.0], [4.0]], [[2.0], [2.0], [2.0]]);
+    var path = new NativeJointPath(samples);
+    var law = new PathTimeLaw([
+      new PathTimeStage(Trajectory.nanoseconds(0.0), Trajectory.nanoseconds(1.0),
+        0.0, 1.0, 0.0),
+      new PathTimeStage(Trajectory.nanoseconds(1.0), Trajectory.nanoseconds(1.0),
+        1.0, 1.0, 0.0)
+    ]);
+    near(law.distanceToTime(1.0), 1.0, "native path time law preserves knots");
+    var trajectory = path.lower(law, 1e-6);
+    near(trajectory.evaluate(1.5).positions[0], 2.25,
+      "native path lowering follows quadratic path");
+    trajectory.dispose();
+    law.dispose();
+    path.dispose();
   }
 
   static function testPoseProcessPath():Void {
