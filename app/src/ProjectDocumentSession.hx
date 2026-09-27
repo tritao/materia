@@ -530,25 +530,16 @@ class ProjectDocumentSession {
     if(previousBim!=nextBim)previousBim.close();
   }
 
-  /** Applies a BIM mutation and places its CAD undo record in project order. */
-  public function applyBimEdit(label:String, change:Void->Void):Bool {
-    if (label == null || label.length == 0 || change == null) throw "BIM edits require a label and mutation";
-    var firstApplication = true;
-    try {
-      return edits.apply(label, function() {
-        if (firstApplication) {
-          change();
-          firstApplication = false;
-        } else if (!bim.redo()) {
-          throw "BIM redo history is out of sync with project history";
-        }
-      }, function() {
-        if (!bim.undo()) throw "BIM undo history is out of sync with project history";
-      });
-    } catch (error:Dynamic) {
-      if (!firstApplication) bim.undo();
-      throw error;
-    }
+  /** Applies a BIM mutation with an explicit inverse on the shared project history. */
+  public function applyBimEdit(label:String, change:Void->Void, undo:Void->Void):Bool {
+    if (label == null || label.length == 0 || change == null || undo == null)
+      throw "BIM edits require a label, mutation, and inverse";
+    var model = bim;
+    var apply = function(action:Void->Void) {
+      try action() catch (error:Dynamic) { model.cad.clearHistory(); throw error; }
+      model.cad.clearHistory();
+    };
+    return edits.apply(label, function() apply(change), function() apply(undo));
   }
 
   static function checkedPath(value:String):String {

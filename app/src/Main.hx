@@ -1261,7 +1261,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function makeBimEditor():BimModelEditor return new BimModelEditor("bim-model-editor", session.bim,
-    session.document, function(label, change) session.applyBimEdit(label, change));
+    session.document, function(label, change, undo) session.applyBimEdit(label, change, undo));
 
   function refreshScriptMaterialization(message:String):Void {
     try {var result=session.refreshScriptOverrides();simulation.setBackend(result.backend);

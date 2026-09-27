@@ -45,10 +45,18 @@ class BimInspectorDescriptors {
 		return new PropertyDescriptor("definition:" + definition.id.value + ":input:" + input.name, input.name, PropertyType.Float,
 			function(_) return PropertyValue.Float(UnitConversion.fromCanonical(definition.input(input.name).defaultValue,
 				input.kind, input.unit)), function(_, value) switch (value) {
-				case PropertyValue.Float(next): apply(edit, "Set " + input.name, function() definition.setDefault(input.name, next, input.unit));
-				case PropertyValue.Int(next): apply(edit, "Set " + input.name, function() definition.setDefault(input.name, next, input.unit));
+				case PropertyValue.Float(next): setInput(edit, definition, input, next);
+				case PropertyValue.Int(next): setInput(edit, definition, input, next);
 				default: throw "Definition input requires a number";
 			}, options);
+	}
+
+	private static function setInput(edit:Null<BimProjectEdit>, definition:Definition,
+			input:DefinitionInput, next:Float):Void {
+		var before = UnitConversion.fromCanonical(definition.input(input.name).defaultValue,
+			input.kind, input.unit);
+		apply(edit, "Set " + input.name, function() definition.setDefault(input.name, next, input.unit),
+			function() definition.setDefault(input.name, before, input.unit));
 	}
 
 	private static function nameDescriptor(element:Element, ?edit:BimProjectEdit):PropertyDescriptor {
@@ -57,23 +65,34 @@ class BimInspectorDescriptors {
 		options.recordHistory = false;
 		return new PropertyDescriptor("element:" + element.id.value + ":name", "Name", PropertyType.Text,
 			function(_) return PropertyValue.Text(element.name), function(_, value) switch (value) {
-				case PropertyValue.Text(next): apply(edit, "Rename " + element.name, function() element.rename(next));
+				case PropertyValue.Text(next):
+					var before = element.name;
+					apply(edit, "Rename " + before, function() element.rename(next), function() element.rename(before));
 				default: throw "Element name requires text";
 			}, options);
 	}
 
 	private static function elementProperty(element:Element, property:TypedProperty, ?edit:BimProjectEdit):PropertyDescriptor {
 		return propertyDescriptor("element:" + element.id.value, property,
-			function(next) apply(edit, "Set " + property.name, function() element.setProperty(next)));
+			function(next) {
+				var before = element.property(property.name);
+				apply(edit, "Set " + property.name, function() element.setProperty(next),
+					function() element.setProperty(before));
+			});
 	}
 
 	private static function definitionProperty(definition:Definition, property:TypedProperty, ?edit:BimProjectEdit):PropertyDescriptor {
 		return propertyDescriptor("definition:" + definition.id.value, property,
-			function(next) apply(edit, "Set " + property.name, function() definition.setProperty(next)));
+			function(next) {
+				var before = definition.property(property.name);
+				apply(edit, "Set " + property.name, function() definition.setProperty(next),
+					function() definition.setProperty(before));
+			});
 	}
 
-	static function apply(edit:Null<BimProjectEdit>, label:String, change:Void->Void):Void {
-		if (edit == null) change(); else edit(label, change);
+	static function apply(edit:Null<BimProjectEdit>, label:String, change:Void->Void,
+			undo:Void->Void):Void {
+		if (edit == null) change(); else edit(label, change, undo);
 	}
 
 	private static function propertyDescriptor(prefix:String, schema:TypedProperty, write:TypedProperty->Void):PropertyDescriptor {
