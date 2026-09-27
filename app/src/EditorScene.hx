@@ -1102,7 +1102,7 @@ class EditorScene {
 
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
     fullReconciliationCount = fullReconciliationCount + 1;
-    var physicsChanged = physicsRecordsChanged(data);
+    var physicsChanged = model.physicsRecordsChanged(data);
     var previousSelectedId = selectedId;
     var previousSelectedFeatureKey = selectedFeatureKey;
     var previousSelected = object(previousSelectedId);
@@ -1200,7 +1200,7 @@ class EditorScene {
             item.collisionEnabled != record.collisionEnabled || item.dynamicBody != record.dynamicBody ||
             item.mass != record.mass || item.red != record.red || item.green != record.green ||
             item.blue != record.blue || !sameFinish(item.appearance, record.appearance);
-          if (objectChanged) candidate = copyEditorSceneObject(item);
+          if (objectChanged) candidate = SceneModel.copyEditorSceneObject(item);
           if (item.label != record.label) prepared.transaction.setName(runtime.node, record.label);
           if (item.visible != record.visible) prepared.transaction.setVisibility(runtime.node, record.visible);
           if (item.x != record.x || item.y != record.y || item.z != record.z ||
@@ -1317,35 +1317,6 @@ class EditorScene {
       previousSelectedKind != (nextSelected == null ? null : nextSelected.kind);
     if (propertySchemaChanged)
       this.selection.changed(this);
-  }
-
-  function physicsRecordsChanged(data:Array<SceneObjectData>):Bool {
-    var previous:Map<String, EditorSceneObject> = new Map();
-    var nextIds:Map<String, Bool> = new Map();
-    for (item in objects) previous.set(item.id, item);
-    for (record in data) {
-      nextIds.set(record.id, true);
-      var old = previous.get(record.id);
-      if (old == null) {
-        if (record.collisionEnabled) return true;
-        continue;
-      }
-      if (old.collisionEnabled != record.collisionEnabled) return true;
-      if (!record.collisionEnabled) continue;
-      if (old.kind != record.type || old.x != record.x || old.y != record.y || old.z != record.z ||
-          old.width != record.width || old.height != record.height || old.depth != record.depth ||
-          !sameRotation(old.rotation, record.rotation) || old.cadGraph != record.cadGraph ||
-          old.meshSnapshot != record.meshSnapshot || old.dynamicBody != record.dynamicBody ||
-          old.mass != record.mass) return true;
-    }
-    for (item in objects) if (item.collisionEnabled && !nextIds.exists(item.id)) return true;
-    return false;
-  }
-
-  static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
-    return new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
-      item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
-      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance);
   }
 
   public function setName(id:String, label:String):Void {

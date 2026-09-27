@@ -106,6 +106,35 @@ class SceneModel {
     owner.replaceObjects(SceneModel.applyChanges(records(), changes, forward), selection);
   }
 
+  public function physicsRecordsChanged(data:Array<SceneObjectData>):Bool {
+    var previous:Map<String, EditorSceneObject> = new Map();
+    var nextIds:Map<String, Bool> = new Map();
+    for (item in objects) previous.set(item.id, item);
+    for (record in data) {
+      nextIds.set(record.id, true);
+      var old = previous.get(record.id);
+      if (old == null) {
+        if (record.collisionEnabled) return true;
+        continue;
+      }
+      if (old.collisionEnabled != record.collisionEnabled) return true;
+      if (!record.collisionEnabled) continue;
+      if (old.kind != record.type || old.x != record.x || old.y != record.y || old.z != record.z ||
+          old.width != record.width || old.height != record.height || old.depth != record.depth ||
+          !EditorScene.sameRotation(old.rotation, record.rotation) || old.cadGraph != record.cadGraph ||
+          old.meshSnapshot != record.meshSnapshot || old.dynamicBody != record.dynamicBody ||
+          old.mass != record.mass) return true;
+    }
+    for (item in objects) if (item.collisionEnabled && !nextIds.exists(item.id)) return true;
+    return false;
+  }
+
+  public static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
+    return new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
+      item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
+      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance);
+  }
+
   public function records():Array<SceneObjectData> {
     var result:Array<SceneObjectData> = [];
     for (item in objects) {
