@@ -11,8 +11,8 @@ ClockEstimator6::ClockEstimator6(std::uint64_t device_tick_hz,
       rate_(nominal_rate_), bound_ns_(uncertainty_bound_ns) {}
 
 bool ClockEstimator6::sync_due(std::uint64_t host_now_ns, std::uint64_t period_ns) const {
-    return !sync_lost_ && (!sent_ || host_now_ns < last_send_ns_ ||
-                           host_now_ns - last_send_ns_ >= period_ns);
+    return !sent_ || host_now_ns < last_send_ns_ ||
+           host_now_ns - last_send_ns_ >= period_ns;
 }
 
 void ClockEstimator6::note_sync_request(std::uint64_t host_send_ns) {
@@ -24,23 +24,29 @@ void ClockEstimator6::observe(std::uint64_t host_send_ns, std::uint64_t host_rec
                               std::uint64_t device_receive_ticks,
                               std::uint64_t device_send_ticks) {
     if (!nominal_rate_ || host_receive_ns <= host_send_ns ||
-        device_send_ticks < device_receive_ticks) { sync_lost_ = true; return; }
+        device_send_ticks < device_receive_ticks) return;
     const auto processing_ns = (device_send_ticks - device_receive_ticks) / nominal_rate_;
     const auto rtt = static_cast<double>(host_receive_ns - host_send_ns) - processing_ns;
-    if (rtt < 0) { sync_lost_ = true; return; }
+    if (rtt < 0 || rtt > 2.0 * static_cast<double>(bound_ns_)) return;
     const Sample sample{(static_cast<double>(host_send_ns) + host_receive_ns) * .5,
                         (static_cast<double>(device_receive_ticks) + device_send_ticks) * .5,
                         rtt};
     if (ready_ && std::abs((sample.device_ticks - (offset_ + rate_ * sample.host_ns)) / rate_) >
                       static_cast<double>(bound_ns_)) {
-        sync_lost_ = true;
+        if (++bad_samples_ >= 3) {
+            sync_lost_ = true;
+            ready_ = false;
+            count_ = next_ = 0;
+            bad_samples_ = 0;
+        }
         return;
     }
+    bad_samples_ = 0;
     samples_[next_] = sample;
     next_ = (next_ + 1) % samples_.size();
     count_ = std::min(count_ + 1, samples_.size());
     fit();
-    if (uncertainty_ns_ > bound_ns_) sync_lost_ = true;
+    if (ready_) sync_lost_ = uncertainty_ns_ > bound_ns_;
 }
 
 void ClockEstimator6::fit() {
@@ -64,7 +70,7 @@ void ClockEstimator6::fit() {
     }
     if (variance <= 0) return;
     const auto fitted_rate = covariance / variance;
-    if (!std::isfinite(fitted_rate) || fitted_rate <= 0) { sync_lost_ = true; return; }
+    if (!std::isfinite(fitted_rate) || fitted_rate <= 0) return;
     // Two early serial samples can differ by a full device update tick. Keep
     // that quantization from turning into an implausible clock-rate estimate.
     rate_ = std::clamp(fitted_rate, nominal_rate_ * 0.995, nominal_rate_ * 1.005);

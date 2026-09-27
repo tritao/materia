@@ -34,10 +34,22 @@ int main() {
     assert(clock.uncertainty_ns() <= 500'000);
     assert(clock.committed_horizon_extra_ns(200'000) ==
            200'000 + 2 * clock.uncertainty_ns());
+    // A late serial reply is an RTT outlier, not evidence that the clocks moved.
+    clock.observe(3'100'000'000ULL, 3'150'000'000ULL,
+                  3'153'100, 3'153'100);
+    assert(clock.may_commit());
     sample(clock, 4'100'000'000ULL, 60'000, 1'000.0, 100'000);
+    assert(clock.may_commit());
+    sample(clock, 4'200'000'000ULL, 60'000, 1'000.0, 100'000);
+    sample(clock, 4'300'000'000ULL, 60'000, 1'000.0, 100'000);
     assert(!clock.may_commit());
     assert(clock.clock_sync_lost());
     assert(std::string(clock.fault_reason()) == "clock_sync_lost");
+    assert(clock.sync_due(4'400'000'000ULL, 100'000'000ULL));
+    for (int i = 0; i < 8; ++i)
+        sample(clock, 4'400'000'000ULL + i * 100'000'000ULL,
+               50'000, 1'000.0, 100'000);
+    assert(clock.may_commit());
 
     ClockEstimator6 jittered(1'000'000, 500'000);
     for (int i = 0; i < 20; ++i) {
