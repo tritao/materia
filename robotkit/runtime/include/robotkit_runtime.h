@@ -82,7 +82,12 @@ enum {
     RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued segment-start knots. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 16 /**< Adds the RKD6 clock-sync diagnostic code. */
+    RK_MAX_PROCESS_CHANNELS = 32,
+    RK_MAX_PLAN_EVENTS = 256,
+    RK_MAX_EVENT_RECORDS = 64,
+    RK_PROCESS_CHANNEL_ID_BYTES = 48,
+    RK_PROCESS_COMMAND_BYTES = 48,
+    RK_API_VERSION = 17 /**< Adds events, channels and RKD6 clock-sync diagnostic. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -116,7 +121,8 @@ enum {
     RK_RECORDING_SENSOR = 3,
     RK_RECORDING_FAULT = 4,
     RK_RECORDING_WORLD = 5,
-    RK_RECORDING_WORLD_EVENT = 6
+    RK_RECORDING_WORLD_EVENT = 6,
+    RK_RECORDING_PROCESS_EVENT = 7
 };
 
 typedef uint32_t rk_recording_state;
@@ -297,6 +303,52 @@ typedef struct rk_sensor_sample {
     double values[RK_MAX_SENSOR_VALUES];
 } rk_sensor_sample;
 
+typedef uint32_t rk_event_kind;
+enum { RK_EVENT_DIGITAL = 1, RK_EVENT_ANALOG = 2, RK_EVENT_PROCESS = 3 };
+typedef uint32_t rk_event_hold_policy;
+enum { RK_EVENT_KEEP = 0, RK_EVENT_SAFE_WHILE_HELD = 1,
+    RK_EVENT_RESTORE_ON_RESUME = 2 };
+
+/** One typed output value; digital is 0 or 1, analog and process arguments use SI units. */
+typedef struct rk_event_value {
+    rk_event_kind kind;
+    uint32_t digital;
+    double analog;
+    char command[RK_PROCESS_COMMAND_BYTES];
+    double argument;
+} rk_event_value;
+
+typedef struct rk_channel_declaration {
+    char id[RK_PROCESS_CHANNEL_ID_BYTES];
+    rk_event_kind kind;
+    rk_event_value safe_value;
+} rk_channel_declaration;
+
+typedef struct rk_timed_event {
+    uint64_t time_ns; /**< Plan-relative trajectory time. */
+    char channel[RK_PROCESS_CHANNEL_ID_BYTES];
+    rk_event_value value;
+    rk_event_hold_policy hold_policy;
+} rk_timed_event;
+
+typedef uint32_t rk_event_cause;
+enum { RK_EVENT_SCHEDULED = 1, RK_EVENT_HOLD_SAFE = 2,
+    RK_EVENT_RESUME_RESTORE = 3, RK_EVENT_STOP_SAFE = 4 };
+typedef struct rk_event_record {
+    uint64_t plan_id;
+    uint64_t scheduled_time_ns;
+    uint64_t applied_owner_time_ns;
+    char channel[RK_PROCESS_CHANNEL_ID_BYTES];
+    rk_event_value value;
+    rk_event_cause cause;
+} rk_event_record;
+typedef struct rk_event_record_batch {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t count;
+    uint32_t overflow;
+    rk_event_record records[RK_MAX_EVENT_RECORDS];
+} rk_event_record_batch;
+
 /**
  * Bulk compiled robot description consumed when a RobotRuntime is created.
  *
@@ -323,6 +375,8 @@ typedef struct rk_robot_runtime_blueprint {
     double following_error_bound[RK_MAX_TRAJECTORY_JOINTS]; /**< Per-joint SI-unit bound; zero disables this check. */
     uint64_t owner_period_ns; /**< Zero selects the 10 ms default; versioned by struct_size. */
     uint64_t serial_processing_allowance_ns; /**< Zero selects 2 ms; one-way target-streaming budget. */
+    uint32_t channel_count; /**< Versioned: absent means no process channels. */
+    rk_channel_declaration channels[RK_MAX_PROCESS_CHANNELS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
@@ -363,7 +417,7 @@ typedef struct rk_trajectory_segment_chunk {
 /** Capabilities required by a plan; unknown or reserved bits are unsupported. */
 enum {
     RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE = 1u,
-    /** Reserved for path-time process events; see motionkit/plans/CONTRACTS.md C1. */
+    /** Path-time process events; see motionkit/plans/CONTRACTS.md C1. */
     RK_PLAN_CAPABILITY_EVENTS = 2u
 };
 
@@ -390,6 +444,8 @@ typedef struct rk_plan_submission {
      * Full-size C callers must set this explicitly; Haxe defaults to final.
      */
     uint32_t ends_at_rest;
+    uint32_t event_count; /**< Versioned: absent means no events. */
+    rk_timed_event events[RK_MAX_PLAN_EVENTS];
 } rk_plan_submission;
 
 /** Non-latched runtime diagnostic; safety remains READY. */
@@ -601,6 +657,9 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(
  */
 RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(
     rk_robot_runtime runtime, const rk_plan_submission *plan);
+/** Drains process-output changes. An overflow flag means earlier records were lost. */
+RK_API rk_result RK_CALL rk_robot_runtime_poll_events(
+    rk_robot_runtime runtime, rk_event_record_batch *out_batch);
 
 /**
  * Copies the latest state into the caller-provided value.

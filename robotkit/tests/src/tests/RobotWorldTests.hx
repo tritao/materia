@@ -65,6 +65,15 @@ import robotkit.world.McapRecordingReader;
 import robotkit.world.McapRecordingStatus;
 import robotkit.world.RobotRecordingCodec;
 import robotkit.world.RobotRecordingEntry;
+import robotkit.world.FiredProcessEvent;
+import robotkit.world.ProcessEventValue;
+import robotkit.world.ProcessChannelDeclaration;
+import robotkit.world.ProcessTimedEvent;
+import robotkit.world.ExecutionPlanSubmission;
+import robotkit.world.ProcessHoldPolicy;
+import robotkit.tool.ChannelToolAdapter;
+import robotkit.tool.SimulatedSprayer;
+import robotkit.deployment.SerialDeployment;
 import robotkit.behavior.HoldJointBehavior;
 import robotkit.behavior.WorldBehaviorRunner;
 import robotkit.worldd.WorldHost;
@@ -199,6 +208,8 @@ class RobotWorldTests {
     testExternalSensorRuntime();
     testSerialRobotUnavailableDevice();
     testSerialDeploymentVersions();
+    testProcessChannelDeployment();
+    testRuntimeProcessEvents();
     assertions += SpatialTests.run();
     assertions += KinematicsTests.run();
     assertions += ToolTests.run();
@@ -295,7 +306,7 @@ class RobotWorldTests {
     var opened=RobotKitRuntime.rk_recording_writer_create(mismatchPath,Int64.ofInt(4096));
     equal(opened.status,RobotKitRuntimeConstants.RK_OK,"schema mismatch fixture opens");
     var payload=RobotRecordingCodec.encode(mismatchEntry);
-    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,4,
+    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,5,
       mismatchEntry.ordinal,mismatchEntry.recordingTimestampNs,payload),RobotKitRuntimeConstants.RK_OK,
       "schema mismatch fixture writes payload to wrong channel");
     equal(RobotKitRuntime.rk_recording_writer_finish(opened.out_writer.borrow()),RobotKitRuntimeConstants.RK_OK,
@@ -3381,10 +3392,16 @@ class RobotWorldTests {
     var robots = new Map<RobotId,RobotSnapshot>(); robots.set(first.id,first); robots.set(second.id,second);
     writer.recordWorld(new robotkit.world.WorldSnapshot(7,2,Int64.ofInt(0),robots,Int64.ofInt(50)));
     writer.recordEvent(RobotWorldEvent.RobotChanged("robot-a"));
+    writer.recordProcessEvent("robot-a", new FiredProcessEvent(Int64.ofInt(91),
+      "sprayer.flow", ProcessEventValue.Analog(1.25), Int64.ofInt(300),
+      Int64.ofInt(310), RobotKitRuntimeConstants.RK_EVENT_SCHEDULED));
     writer.close();
 
     var loaded = McapRecordingReader.load(path);
-    equal(loaded.entries.length, 6, "MCAP reload preserves every event type");
+    equal(loaded.entries.length, 7, "MCAP reload preserves every event type");
+    equal(loaded.processEvents.length, 1, "MCAP reload preserves process records");
+    equal(loaded.processEvents[0].scheduledTimeNs, Int64.ofInt(300),
+      "MCAP preserves scheduled trajectory time");
     switch loaded.commands[0] {
       case JointTargets(targets, expiry):
         equal(targets.length, 3, "MCAP preserves batched target count");
@@ -3723,6 +3740,68 @@ class RobotWorldTests {
       timingMessage.indexOf("processing_allowance_ns=2000000") >= 0 &&
       timingMessage.indexOf("minimum_owner_period_ns=") >= 0,
       "under-period SerialRobot construction names its qualification minimum");
+  }
+
+  static function testProcessChannelDeployment():Void {
+    var deployment = new SerialDeployment(
+      "fixtures/device-deployment/deployment.json");
+    equal(deployment.channels.length, 1, "deployment declares one process channel");
+    equal(deployment.channels[0].id, "sprayer.flow", "deployment keeps channel ID");
+    var blueprint = RobotRuntimeCompiler.compile(deployment.robot);
+    for (channel in deployment.channels) blueprint.channels.push(channel);
+    var simulation = new Simulation();
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("process-channel", runtime, "process-channel",
+      [for (link in deployment.robot.links) link.id],
+      [for (joint in deployment.robot.joints) joint.id]);
+    equal(robot.description().channels.length, 1,
+      "simulation description exposes its declared process channels");
+    simulation.dispose();
+  }
+
+  static function testRuntimeProcessEvents():Void {
+    var model = new RobotModel("process-events");
+    var base = model.addLink(new Link("base"));
+    var tool = model.addLink(new Link("tool"));
+    var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    blueprint.channels.push(new ProcessChannelDeclaration("sprayer.flow",
+      ProcessEventValue.Digital(false)));
+    var simulation = new Simulation();
+    var runtime = simulation.addRobot(blueprint);
+    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(500000000),
+      [[0.0, 0.0]]);
+    var plan = new ExecutionPlanSubmission(Int64.ofInt(700),
+      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      [0.0], [0.0], [0.0], [segment], null, null, null, null, null, true,
+      [new ProcessTimedEvent(Int64.ofInt(100000000), "sprayer.flow",
+        ProcessEventValue.Digital(true), ProcessHoldPolicy.RestoreOnResume),
+       new ProcessTimedEvent(Int64.ofInt(300000000), "sprayer.flow",
+        ProcessEventValue.Digital(false))]);
+    runtime.submitPlan(plan, 1);
+    var sprayer = new SimulatedSprayer();
+    var adapter = new ChannelToolAdapter();
+    adapter.bindSprayerFlow("sprayer.flow", sprayer, 1.5);
+    var recorded = new RobotRecording();
+    for (tick in 1...36) {
+      simulation.step(Int64.ofInt(tick * 10000000));
+      var batch = runtime.pollEvents();
+      check(!batch.overflow, "runtime event polling stays within capacity");
+      for (event in batch.events) {
+        adapter.apply(event);
+        recorded.recordProcessEvent("process-events", event);
+      }
+    }
+    equal(sprayer.history.length, 2, "runtime fires each process event once");
+    equal(sprayer.history[0].timestampNs, Int64.ofInt(100000000),
+      "sprayer receives the scheduled trajectory time");
+    equal(sprayer.history[1].timestampNs, Int64.ofInt(300000000),
+      "sprayer receives the later scheduled trajectory time");
+    equal(recorded.processEvents.length, 2, "recording captures fired runtime events");
+    simulation.dispose();
   }
 
   static function testSensorResetPublication():Void {

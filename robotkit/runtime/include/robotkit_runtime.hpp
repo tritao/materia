@@ -147,6 +147,7 @@ public:
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
     rk_result snapshot_full(rk_robot_snapshot &out_snapshot) const;
+    rk_result poll_events(rk_event_record_batch &out_batch);
     /** Reports whether the endpoint accepts buffered trajectory chunks. */
     bool supports_trajectory_queue() const noexcept {
         return endpoint_ != nullptr && endpoint_->supports_trajectory_queue();
@@ -169,19 +170,29 @@ public:
     };
 
     /** Internal phases used by Simulation to coordinate multiple runtimes. */
-    rk_result apply_pending_commands();
+    rk_result apply_pending_commands(uint64_t owner_time_ns = 0);
     rk_result publish_sample(uint64_t timestamp_ns);
     void discard_pending_commands() noexcept;
     void reset_state() noexcept;
     void set_externally_driven(bool value) noexcept;
 
 private:
+    struct QueuedEvent {
+        uint64_t time_ns = 0;
+        uint64_t plan_id = 0;
+        rk_timed_event event{};
+    };
     struct ControlState {
         rk_joint_target targets[RK_MAX_JOINTS]{};
         double position_reference[RK_MAX_JOINTS]{};
         bool active[RK_MAX_JOINTS]{};
         bool reference_initialized[RK_MAX_JOINTS]{};
         std::deque<RuntimeTrajectoryPoint> trajectory;
+        std::deque<QueuedEvent> events;
+        rk_event_value channel_values[RK_MAX_PROCESS_CHANNELS]{};
+        rk_event_value last_fired_values[RK_MAX_PROCESS_CHANNELS]{};
+        rk_event_hold_policy channel_hold_policies[RK_MAX_PROCESS_CHANNELS]{};
+        bool channel_has_fired[RK_MAX_PROCESS_CHANNELS]{};
         /** The last point dropped from the front of the queue, for looking back. */
         RuntimeTrajectoryPoint trajectory_history{};
         bool trajectory_history_valid = false;
@@ -235,6 +246,12 @@ private:
     uint64_t last_command_sequence_ = 0;
     rk_robot_state state_backup_{};
     ControlState control_{};
+    std::deque<rk_event_record> event_records_;
+    bool event_records_overflow_ = false;
+    uint64_t current_owner_time_ns_ = 0;
+    void record_event(uint32_t channel_index, const rk_event_value &value,
+        uint64_t plan_id, uint64_t scheduled_ns, uint64_t owner_ns, rk_event_cause cause);
+    void safe_channels(uint64_t owner_ns, rk_event_cause cause, bool hold_only = false);
     int32_t latched_fault_code_ = 1;
     ControlState control_backup_{};
     /** Last position sent to the endpoint, retained after a trajectory drains. */

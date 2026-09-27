@@ -2,6 +2,9 @@ package motionkit.trajectory;
 
 import MotionKitNative;
 import haxe.Int64;
+import motionkit.event.TimedEvent;
+import motionkit.event.EventValue;
+import motionkit.event.HoldPolicy;
 
 /** Validated, immutable native trajectory with explicit start-state assumptions. */
 class ExecutionPlan {
@@ -15,6 +18,7 @@ class ExecutionPlan {
   public final requiredCapabilities:Int64;
   public final planningAuthority:Int;
   public final durationSeconds:Float;
+  public final events:Array<TimedEvent>;
 
   private function new(owner:Ownedmk_plan_handle, report:ValidationReport) {
     this.owner = owner;
@@ -29,13 +33,47 @@ class ExecutionPlan {
     requiredCapabilities = info.get_required_capabilities();
     planningAuthority = info.get_planning_authority();
     durationSeconds = Int64.toFloat(info.get_duration_ns()) * 1e-9;
+    events = [];
+    for (index in 0...info.get_event_count()) {
+      var nativeEvent = new mk_timed_event();
+      check(MotionKitNative.mk_plan_get_event(owner.borrow(), index, nativeEvent),
+        "plan.event");
+      var channel = new StringBuf();
+      for (i in 0...MotionKitNativeConstants.MK_EVENT_CHANNEL_BYTES) {
+        var code = nativeEvent.get_channel(i);
+        if (code == 0) break;
+        channel.addChar(code);
+      }
+      var nativeValue = nativeEvent.get_value();
+      var value = switch nativeValue.get_kind() {
+        case MotionKitNativeConstants.MK_EVENT_DIGITAL:
+          EventValue.Digital(nativeValue.get_digital() != 0);
+        case MotionKitNativeConstants.MK_EVENT_ANALOG:
+          EventValue.Analog(nativeValue.get_analog());
+        case MotionKitNativeConstants.MK_EVENT_PROCESS:
+          var command = new StringBuf();
+          for (i in 0...MotionKitNativeConstants.MK_EVENT_COMMAND_BYTES) {
+            var code = nativeValue.get_command(i);
+            if (code == 0) break;
+            command.addChar(code);
+          }
+          EventValue.Process(command.toString(), nativeValue.get_argument());
+        default: throw "Unknown native event value";
+      };
+      var hold = switch nativeEvent.get_hold_policy() {
+        case MotionKitNativeConstants.MK_EVENT_SAFE_WHILE_HELD: HoldPolicy.SafeWhileHeld;
+        case MotionKitNativeConstants.MK_EVENT_RESTORE_ON_RESUME: HoldPolicy.RestoreOnResume;
+        default: HoldPolicy.Keep;
+      };
+      events.push(new TimedEvent(nativeEvent.get_time_ns(), channel.toString(), value, hold));
+    }
   }
 
   /** Does not infer derivatives from degree-1 chords; callers supply the authored state. */
   public static function create(trajectory:Trajectory, limits:ValidationLimits, planId:Int64,
       positions:Array<Float>, velocities:Array<Float>, accelerations:Array<Float>,
       positionTolerances:Array<Float>, velocityTolerances:Array<Float>,
-      accelerationTolerances:Array<Float>):ExecutionPlan {
+      accelerationTolerances:Array<Float>, ?events:Array<TimedEvent>):ExecutionPlan {
     var count = trajectory.jointCount();
     if (count != limits.jointCount || positions.length != count || velocities.length != count ||
         accelerations.length != count || positionTolerances.length != count ||
@@ -58,6 +96,45 @@ class ExecutionPlan {
     spec.set_model_revision(limits.modelRevision);
     spec.set_calibration_revision(limits.calibrationRevision);
     spec.set_required_capabilities(Int64.ofInt(MotionKitNativeConstants.MK_CAP_TIMED_TRAJECTORY));
+    var authored = events == null ? [] : events;
+    if (authored.length > MotionKitNativeConstants.MK_MAX_PLAN_EVENTS)
+      throw "Too many timed events in plan";
+    if (authored.length > 0)
+      spec.set_required_capabilities(Int64.ofInt(
+        MotionKitNativeConstants.MK_CAP_TIMED_TRAJECTORY | MotionKitNativeConstants.MK_CAP_EVENTS));
+    spec.set_event_count(authored.length);
+    var previous = Int64.ofInt(0);
+    for (index in 0...authored.length) {
+      var event = authored[index];
+      if (event == null || Int64.compare(event.timeNs, previous) < 0)
+        throw "Timed events must be sorted";
+      previous = event.timeNs;
+      var nativeEvent = new mk_timed_event();
+      writeAscii(event.channel, MotionKitNativeConstants.MK_EVENT_CHANNEL_BYTES,
+        function(i, code) nativeEvent.set_channel(i, code));
+      nativeEvent.set_time_ns(event.timeNs);
+      nativeEvent.set_hold_policy(switch event.holdPolicy {
+        case Keep: MotionKitNativeConstants.MK_EVENT_KEEP;
+        case SafeWhileHeld: MotionKitNativeConstants.MK_EVENT_SAFE_WHILE_HELD;
+        case RestoreOnResume: MotionKitNativeConstants.MK_EVENT_RESTORE_ON_RESUME;
+      });
+      var nativeValue = new mk_event_value();
+      switch event.value {
+        case Digital(enabled):
+          nativeValue.set_kind(MotionKitNativeConstants.MK_EVENT_DIGITAL);
+          nativeValue.set_digital(enabled ? 1 : 0);
+        case Analog(number):
+          nativeValue.set_kind(MotionKitNativeConstants.MK_EVENT_ANALOG);
+          nativeValue.set_analog(number);
+        case Process(command, argument):
+          nativeValue.set_kind(MotionKitNativeConstants.MK_EVENT_PROCESS);
+          writeAscii(command, MotionKitNativeConstants.MK_EVENT_COMMAND_BYTES,
+            function(i, code) nativeValue.set_command(i, code));
+          nativeValue.set_argument(argument);
+      }
+      nativeEvent.set_value(nativeValue);
+      spec.set_events(index, nativeEvent);
+    }
     spec.set_planning_authority(MotionKitNativeConstants.MK_AUTHORITY_MATERIA);
     spec.set_start_state(start);
     var nativeReport = new mk_validation_report();
@@ -98,5 +175,15 @@ class ExecutionPlan {
   static function check(status:Int, operation:String):Void {
     if (status != MotionKitNativeConstants.MK_OK)
       throw '$operation failed with MotionKit error $status';
+  }
+
+  static function writeAscii(value:String, capacity:Int, write:Int -> Int -> Void):Void {
+    if (value == null || value.length == 0 || value.length >= capacity)
+      throw "Event text does not fit native ABI";
+    for (i in 0...value.length) {
+      var code = value.charCodeAt(i);
+      if (code <= ' '.code || code > '~'.code) throw "Native events need printable ASCII text";
+      write(i, code);
+    }
   }
 }

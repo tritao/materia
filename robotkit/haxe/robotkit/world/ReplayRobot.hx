@@ -100,7 +100,7 @@ class ReplayRobot implements Robot {
           if (current.faultCode == 0) currentFault = null;
           source.push(new ReplayObservation(current, currentFault));
         }
-      case Command(_), WorldEvent(_), RobotSnapshot(_), Sensor(_, _), Fault(_):
+      case Command(_), WorldEvent(_), RobotSnapshot(_), Sensor(_, _), Fault(_), ProcessEvent(_):
     }
   }
 

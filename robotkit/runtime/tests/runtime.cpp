@@ -784,6 +784,9 @@ void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &so
     plan.segments = first;
     plan.start_position[0] = 0.0;
     plan.start_position[1] = 0.0;
+    plan.struct_size = offsetof(rk_plan_submission, event_count) + sizeof(uint32_t);
+    assert(rk_plan_submission_validate_for_blueprint(&plan, &blueprint) == RK_OK);
+    plan.struct_size = sizeof(plan);
     plan.model_revision = 41;
     assert(runtime.submit_plan(plan) == RK_ERROR_MODEL_MISMATCH);
     rk_robot_snapshot rejected_snapshot{};
@@ -796,7 +799,14 @@ void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &so
     plan.required_capabilities = 0x80000000u;
     assert(runtime.submit_plan(plan) == RK_ERROR_UNSUPPORTED);
     plan.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
-    assert(runtime.submit_plan(plan) == RK_ERROR_UNSUPPORTED);
+    // An event-capable plan still needs a declared output channel.
+    plan.event_count = 1;
+    plan.events[0].time_ns = 0;
+    std::strcpy(plan.events[0].channel, "sprayer.flow");
+    plan.events[0].value.kind = RK_EVENT_DIGITAL;
+    plan.events[0].value.digital = 1;
+    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
+    plan.event_count = 0;
     plan.required_capabilities = 0;
     plan.start_position[0] = 0.1;
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
@@ -862,8 +872,101 @@ void device_queue_endpoint_does_not_receive_sampled_targets(
     assert(snapshot.active_plan_id == 99 && snapshot.committed_until_ns == 250'000'000);
 }
 
+void plan_events_follow_path_clock(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint)
+        blueprint.joints[joint].max_acceleration = 100.0;
+    blueprint.channel_count = 1;
+    std::strcpy(blueprint.channels[0].id, "sprayer.flow");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].safe_value.digital = 0;
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 100;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
+    plan.segments = cubic_plan_chunk(100);
+    plan.event_count = 2;
+    std::strcpy(plan.events[0].channel, "sprayer.flow");
+    plan.events[0].time_ns = 0;
+    plan.events[0].value.kind = RK_EVENT_DIGITAL;
+    plan.events[0].value.digital = 1;
+    plan.events[0].hold_policy = RK_EVENT_RESTORE_ON_RESUME;
+    plan.events[1] = plan.events[0];
+    plan.events[1].time_ns = 200'000'000;
+    plan.events[1].value.digital = 0;
+    assert(runtime.submit_plan(plan) == RK_OK);
+    uint64_t timestamp = 0;
+    apply_cycle(runtime, timestamp);
+    rk_event_record_batch records{};
+    records.struct_size = sizeof(records);
+    assert(runtime.poll_events(records) == RK_OK);
+    assert(records.count == 1 && records.records[0].cause == RK_EVENT_SCHEDULED);
+    assert(records.records[0].scheduled_time_ns == 0);
+    for (int cycle = 0; cycle < 10; ++cycle) apply_cycle(runtime, timestamp);
+    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_HOLD)) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    assert(runtime.poll_events(records) == RK_OK);
+    assert(records.count == 1 && records.records[0].cause == RK_EVENT_HOLD_SAFE);
+    for (int cycle = 0; cycle < 40; ++cycle) apply_cycle(runtime, timestamp);
+    assert(runtime.poll_events(records) == RK_OK);
+    assert(records.count == 0);
+    assert(runtime.submit(lifecycle_command(3, RK_COMMAND_RESUME)) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    assert(runtime.poll_events(records) == RK_OK);
+    assert(records.count == 1 && records.records[0].cause == RK_EVENT_RESUME_RESTORE);
+    for (int cycle = 0; cycle < 40; ++cycle) apply_cycle(runtime, timestamp);
+    assert(runtime.poll_events(records) == RK_OK);
+    assert(records.count == 1 && records.records[0].scheduled_time_ns == 200'000'000);
+    assert(records.records[0].applied_owner_time_ns >= records.records[0].scheduled_time_ns);
+}
+
+void plan_event_records_report_overflow(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    blueprint.channel_count = 1;
+    std::strcpy(blueprint.channels[0].id, "sprayer.flow");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 101;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
+    plan.segments = cubic_plan_chunk(101);
+    plan.event_count = RK_MAX_EVENT_RECORDS + 6;
+    for (uint32_t index = 0; index < plan.event_count; ++index) {
+        std::strcpy(plan.events[index].channel, "sprayer.flow");
+        plan.events[index].value.kind = RK_EVENT_DIGITAL;
+        plan.events[index].value.digital = index % 2;
+    }
+    assert(runtime.submit_plan(plan) == RK_OK);
+    uint64_t timestamp = 0;
+    apply_cycle(runtime, timestamp);
+    rk_event_record_batch records{};
+    records.struct_size = sizeof(records);
+    assert(runtime.poll_events(records) == RK_OK);
+    assert(records.count == RK_MAX_EVENT_RECORDS && records.overflow == 1);
+    assert(records.records[0].value.digital == 0);
+    assert(runtime.poll_events(records) == RK_OK);
+    assert(records.count == 0 && records.overflow == 0);
+}
+
 void accepted_plan_keeps_committed_region_identical(
-    const rk_robot_runtime_blueprint &blueprint) {
+    const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    blueprint.channel_count = 1;
+    std::strcpy(blueprint.channels[0].id, "sprayer.flow");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
     auto reference_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     auto replacement_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime reference(blueprint, reference_endpoint,
@@ -877,6 +980,12 @@ void accepted_plan_keeps_committed_region_identical(
     first.model_revision = blueprint.revision;
     first.calibration_revision = blueprint.calibration_revision;
     first.segments = cubic_plan_chunk(71);
+    first.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
+    first.event_count = 1;
+    first.events[0].time_ns = 700'000'000;
+    std::strcpy(first.events[0].channel, "sprayer.flow");
+    first.events[0].value.kind = RK_EVENT_DIGITAL;
+    first.events[0].value.digital = 1;
     assert(reference.submit_plan(first) == RK_OK);
     assert(replacement.submit_plan(first) == RK_OK);
     uint64_t ref_time = 0, replacement_time = 0;
@@ -896,6 +1005,8 @@ void accepted_plan_keeps_committed_region_identical(
     next.start_acceleration[0] = 3.0;
     next.start_acceleration[1] = -3.0;
     next.segments = replacement_plan_chunk(72);
+    next.events[0].time_ns = 200'000'000;
+    next.events[0].value.digital = 0;
     assert(replacement.submit_plan(next) == RK_OK);
     // One sample per millisecond across the entire committed part, not just
     // the replacement junction. The two queues must produce identical bytes.
@@ -906,6 +1017,17 @@ void accepted_plan_keeps_committed_region_identical(
             assert(std::memcmp(&before.position[joint], &after.position[joint],
                 sizeof(double)) == 0);
     }
+    for (int tick = 500; tick < 800; ++tick) {
+        apply_cycle(reference, ref_time);
+        apply_cycle(replacement, replacement_time);
+    }
+    rk_event_record_batch records{};
+    records.struct_size = sizeof(records);
+    assert(reference.poll_events(records) == RK_OK);
+    assert(records.count == 1 && records.records[0].value.digital == 1);
+    assert(replacement.poll_events(records) == RK_OK);
+    assert(records.count == 1 && records.records[0].plan_id == 72 &&
+        records.records[0].value.digital == 0);
 }
 
 void moving_degree_one_plan_cannot_retarget(const rk_robot_runtime_blueprint &blueprint) {
@@ -1677,6 +1799,8 @@ int main() {
     mixed_queue_depth_counts_knots(blueprint);
     plan_submission_checks_and_replacement(blueprint);
     device_queue_endpoint_does_not_receive_sampled_targets(blueprint);
+    plan_events_follow_path_clock(blueprint);
+    plan_event_records_report_overflow(blueprint);
     accepted_plan_keeps_committed_region_identical(blueprint);
     moving_degree_one_plan_cannot_retarget(blueprint);
     idle_plan_uses_commanded_anchor_and_following_error(blueprint);

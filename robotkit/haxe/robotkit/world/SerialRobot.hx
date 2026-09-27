@@ -12,11 +12,14 @@ class SerialRobot implements Robot {
 
   public function new(id:RobotId, model:RobotModel, devicePath:String,
       fingerprintHex:String, maxTargetError:Float, ?baud:Int = 115200,
-      ?ownerPeriodNs:haxe.Int64, ?processingAllowanceNs:haxe.Int64) {
+      ?ownerPeriodNs:haxe.Int64, ?processingAllowanceNs:haxe.Int64,
+      ?channels:Array<ProcessChannelDeclaration>) {
     if (id == null || id.length == 0)
       throw "SerialRobot requires a non-empty logical ID";
     if (model == null) throw "SerialRobot requires a robot model";
     var blueprint:RobotRuntimeBlueprint = RobotRuntimeCompiler.compile(model);
+    if (channels != null)
+      for (channel in channels) blueprint.channels.push(channel);
     if (ownerPeriodNs != null) blueprint.ownerPeriodNs = ownerPeriodNs;
     if (processingAllowanceNs != null)
       blueprint.serialProcessingAllowanceNs = processingAllowanceNs;
@@ -34,7 +37,7 @@ class SerialRobot implements Robot {
       throw "SerialRobot: RKD6 deployment requires a scheduled-device endpoint";
     return new SerialRobot(id, deployment.robot, deployment.serialPath,
       deployment.fingerprint, deployment.targetError, deployment.baud,
-      deployment.ownerPeriodNs, deployment.processingAllowanceNs);
+      deployment.ownerPeriodNs, deployment.processingAllowanceNs, deployment.channels);
   }
 
   public function id():RobotId return adapter.id();

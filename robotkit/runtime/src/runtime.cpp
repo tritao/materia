@@ -3,11 +3,51 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <new>
 #include <utility>
 
 namespace robotkit {
+
+rk_result RobotRuntime::poll_events(rk_event_record_batch &out_batch) {
+    if (out_batch.struct_size < sizeof(out_batch)) return RK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard owner_lock(owner_mutex_);
+    out_batch.count = 0;
+    out_batch.overflow = event_records_overflow_ ? 1u : 0u;
+    event_records_overflow_ = false;
+    while (!event_records_.empty() && out_batch.count < RK_MAX_EVENT_RECORDS) {
+        out_batch.records[out_batch.count++] = event_records_.front();
+        event_records_.pop_front();
+    }
+    return RK_OK;
+}
+
+void RobotRuntime::record_event(uint32_t channel_index, const rk_event_value &value,
+    uint64_t plan_id, uint64_t scheduled_ns, uint64_t owner_ns, rk_event_cause cause) {
+    control_.channel_values[channel_index] = value;
+    rk_event_record record{};
+    record.plan_id = plan_id;
+    record.scheduled_time_ns = scheduled_ns;
+    record.applied_owner_time_ns = owner_ns;
+    std::memcpy(record.channel, blueprint_.channels[channel_index].id, sizeof(record.channel));
+    record.value = value;
+    record.cause = cause;
+    if (event_records_.size() == RK_MAX_EVENT_RECORDS) {
+        event_records_.pop_front();
+        event_records_overflow_ = true;
+    }
+    event_records_.push_back(record);
+}
+
+void RobotRuntime::safe_channels(uint64_t owner_ns, rk_event_cause cause, bool hold_only) {
+    for (uint32_t i = 0; i < blueprint_.channel_count; ++i) {
+        if (hold_only && control_.channel_hold_policies[i] == RK_EVENT_KEEP) continue;
+        record_event(i, blueprint_.channels[i].safe_value, control_.active_plan_id,
+            control_.trajectory_time_ns, owner_ns, cause);
+    }
+    if (!hold_only) control_.events.clear();
+}
 
 namespace {
 
@@ -291,10 +331,12 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
     if (plan.model_revision != blueprint_.revision ||
         plan.calibration_revision != blueprint_.calibration_revision)
         return RK_ERROR_MODEL_MISMATCH;
-    if ((plan.required_capabilities & ~RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE) != 0 ||
+    if ((plan.required_capabilities & ~(RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE |
+            RK_PLAN_CAPABILITY_EVENTS)) != 0 ||
         !supports_trajectory_queue())
         return RK_ERROR_UNSUPPORTED;
-    const bool ends_at_rest = plan.struct_size < sizeof(rk_plan_submission) ||
+    const bool ends_at_rest = plan.struct_size <
+        offsetof(rk_plan_submission, event_count) + sizeof(plan.ends_at_rest) ||
         plan.ends_at_rest != 0;
     try {
         std::lock_guard owner_lock(owner_mutex_);
@@ -310,6 +352,7 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
             control_.stop_ramp_active)
             return RK_ERROR_INVALID_STATE;
         auto candidate = control_.trajectory;
+        auto candidate_events = control_.events;
         const bool replace = plan.replace_after_plan_id != 0;
         uint64_t base_time = 0;
         const uint64_t lead = blueprint_.commit_lead_ns != 0 ? blueprint_.commit_lead_ns :
@@ -402,6 +445,12 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
                 return RK_ERROR_INVALID_STATE;
         }
         const auto &terminal = plan.segments.segments[plan.segments.segment_count - 1];
+        const auto plan_duration_ns = terminal.time_from_start_ns +
+            static_cast<uint64_t>(terminal.duration_ns);
+        const auto event_count = plan.struct_size >= sizeof(plan) ? plan.event_count : 0u;
+        for (uint32_t index = 0; index < event_count; ++index)
+            if (plan.events[index].time_ns > plan_duration_ns)
+                return RK_ERROR_INVALID_ARGUMENT;
         if (ends_at_rest && terminal.degree >= 2) {
             mk_segment segment = native_segment(terminal, 0);
             mk_trajectory_state endpoint{};
@@ -413,6 +462,8 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
                     return RK_ERROR_INVALID_ARGUMENT;
         }
         if (replace) {
+            while (!candidate_events.empty() && candidate_events.back().time_ns >= base_time)
+                candidate_events.pop_back();
             while (!candidate.empty() && candidate.back().point.time_from_start_ns >= base_time)
                 candidate.pop_back();
             if (!candidate.empty() && candidate.back().has_segment) {
@@ -425,6 +476,17 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         } else if (!candidate.empty() && !candidate.back().has_segment) {
             candidate.pop_back();
         }
+        for (uint32_t index = 0; index < event_count; ++index) {
+            if (plan.events[index].time_ns > UINT64_MAX - base_time)
+                return RK_ERROR_INVALID_ARGUMENT;
+            QueuedEvent queued{};
+            queued.time_ns = base_time + plan.events[index].time_ns;
+            queued.plan_id = plan.plan_id;
+            queued.event = plan.events[index];
+            candidate_events.push_back(queued);
+        }
+        if (candidate_events.size() > RK_MAX_TRAJECTORY_QUEUE_POINTS)
+            return RK_ERROR_QUEUE_FULL;
         for (uint32_t index = 0; index < plan.segments.segment_count; ++index) {
             const auto &source = plan.segments.segments[index];
             if (source.time_from_start_ns > static_cast<uint64_t>(INT64_MAX) - base_time ||
@@ -465,6 +527,7 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         }
         const bool was_idle = !control_.trajectory_active;
         control_.trajectory = std::move(candidate);
+        control_.events = std::move(candidate_events);
         control_.trajectory_active = true;
         control_.plan_just_submitted = was_idle;
         if (was_idle) control_.trajectory_time_ns = 0;
@@ -555,13 +618,14 @@ void RobotRuntime::run() {
 }
 
 rk_result RobotRuntime::step_owner(uint64_t timestamp_ns) {
-    const auto apply_result = apply_pending_commands();
+    const auto apply_result = apply_pending_commands(timestamp_ns);
     if (apply_result != RK_OK)
         return apply_result;
     return publish_sample(timestamp_ns);
 }
 
 void RobotRuntime::latch_fault(bool clear_control, int32_t fault_code) {
+    safe_channels(current_owner_time_ns_, RK_EVENT_STOP_SAFE);
     rk_robot_command emergency_stop{};
     emergency_stop.struct_size = sizeof(emergency_stop);
     emergency_stop.sequence = ++endpoint_command_sequence_;
@@ -588,7 +652,7 @@ void RobotRuntime::latch_fault(bool clear_control, int32_t fault_code) {
     state_backup_valid_ = false;
 }
 
-rk_result RobotRuntime::apply_pending_commands() {
+rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     std::lock_guard owner_lock(owner_mutex_);
     std::deque<QueuedCommand> commands;
     {
@@ -771,6 +835,10 @@ rk_result RobotRuntime::apply_pending_commands() {
         current = state_;
         safety = state_.safety;
     }
+    if (owner_time_ns == 0)
+        owner_time_ns = current.source_timestamp_ns +
+            static_cast<uint64_t>(std::max<int64_t>(0, period_.count()));
+    current_owner_time_ns_ = owner_time_ns;
     // Emergency stop remains the one intentionally non-sequential operation:
     // it wins over every other command in the drained owner cycle. All other
     // commands are then applied in mailbox order so a reset/flush/chunk
@@ -920,6 +988,7 @@ rk_result RobotRuntime::apply_pending_commands() {
     };
 
     if (emergency != nullptr) {
+        safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE);
         control_ = {};
         final_kind = RK_COMMAND_EMERGENCY_STOP;
         final_timestamp_ns = emergency->timestamp_ns;
@@ -971,6 +1040,7 @@ rk_result RobotRuntime::apply_pending_commands() {
             }
 
             if (value.kind == RK_COMMAND_STOP) {
+                safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE);
                 controlled_stop = begin_controlled_stop();
                 safety = RK_SAFETY_READY;
                 if (has_later_effective_command) {
@@ -982,6 +1052,7 @@ rk_result RobotRuntime::apply_pending_commands() {
             }
 
             if (value.kind == RK_COMMAND_ABORT) {
+                safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE);
                 if (control_.trajectory_active && !control_.trajectory.empty()) {
                     refresh_trajectory_progress();
                     double positions[RK_MAX_TRAJECTORY_JOINTS]{};
@@ -1046,6 +1117,7 @@ rk_result RobotRuntime::apply_pending_commands() {
                 for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                     if (blueprint_.joints[joint].max_acceleration <= 0.0)
                         return RK_ERROR_UNSUPPORTED;
+                safe_channels(owner_time_ns, RK_EVENT_HOLD_SAFE, true);
                 control_.hold_requested = true;
                 control_.resume_requested = false;
                 continue;
@@ -1055,6 +1127,12 @@ rk_result RobotRuntime::apply_pending_commands() {
                 if (!control_.trajectory_active || control_.trajectory.empty() ||
                     !control_.hold_requested || control_.stop_ramp_active)
                     return RK_ERROR_INVALID_STATE;
+                for (uint32_t channel = 0; channel < blueprint_.channel_count; ++channel)
+                    if (control_.channel_has_fired[channel] &&
+                        control_.channel_hold_policies[channel] == RK_EVENT_RESTORE_ON_RESUME)
+                        record_event(channel, control_.last_fired_values[channel],
+                            control_.active_plan_id, control_.trajectory_time_ns,
+                            owner_time_ns, RK_EVENT_RESUME_RESTORE);
                 control_.hold_requested = false;
                 control_.resume_requested = true;
                 continue;
@@ -1174,6 +1252,24 @@ rk_result RobotRuntime::apply_pending_commands() {
                 }
                 control_.trajectory_active = true;
             }
+        }
+    }
+
+    if (control_.trajectory_active && !control_.stop_ramp_active &&
+        !control_.hold_requested) {
+        while (!control_.events.empty() &&
+               control_.events.front().time_ns <= control_.trajectory_time_ns) {
+            const auto queued = control_.events.front();
+            control_.events.pop_front();
+            for (uint32_t channel = 0; channel < blueprint_.channel_count; ++channel)
+                if (std::strcmp(queued.event.channel, blueprint_.channels[channel].id) == 0) {
+                    record_event(channel, queued.event.value, queued.plan_id, queued.time_ns,
+                        owner_time_ns, RK_EVENT_SCHEDULED);
+                    control_.last_fired_values[channel] = queued.event.value;
+                    control_.channel_hold_policies[channel] = queued.event.hold_policy;
+                    control_.channel_has_fired[channel] = true;
+                    break;
+                }
         }
     }
 

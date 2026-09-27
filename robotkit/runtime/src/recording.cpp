@@ -21,11 +21,12 @@
 #include <vector>
 
 namespace {
-constexpr const char* Names[] = {"", "command", "snapshot", "sensor", "fault", "world", "world_event"};
+constexpr const char* Names[] = {"", "command", "snapshot", "sensor", "fault", "world", "world_event", "process_event"};
 constexpr const char* SchemaV1 = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload v1","type":"object","additionalProperties":true,"required":["version","ordinal","recordingTimestampNs","robotId","sourceSequence","sourceTimestampNs","sourceClockId","type","payload"],"properties":{"version":{"const":1},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"recordingTimestampNs":{"type":"string","pattern":"^[0-9]+$"},"robotId":{"type":"string"},"sourceSequence":{"type":"string"},"sourceTimestampNs":{"type":"string"},"sourceClockId":{"type":"string"},"type":{"type":"string"},"payload":{"type":"object"}}})";
 constexpr const char* SchemaV2 = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload v2","type":"object","additionalProperties":true,"required":["version","ordinal","recordingTimestampNs","robotId","sourceSequence","sourceTimestampNs","sourceClockId","type","payload"],"properties":{"version":{"const":2},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"recordingTimestampNs":{"type":"string","pattern":"^[0-9]+$"},"robotId":{"type":"string"},"sourceSequence":{"type":"string"},"sourceTimestampNs":{"type":"string"},"sourceClockId":{"type":"string"},"type":{"type":"string"},"payload":{"type":"object"}}})";
 constexpr const char* SchemaV3 = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload v3","type":"object","additionalProperties":true,"required":["version","ordinal","recordingTimestampNs","robotId","sourceSequence","sourceTimestampNs","sourceClockId","type","payload"],"properties":{"version":{"const":3},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"recordingTimestampNs":{"type":"string","pattern":"^[0-9]+$"},"robotId":{"type":"string"},"sourceSequence":{"type":"string"},"sourceTimestampNs":{"type":"string"},"sourceClockId":{"type":"string"},"type":{"type":"string"},"payload":{"type":"object"}}})";
 constexpr const char* SchemaV4 = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload v4","type":"object","additionalProperties":true,"required":["version","ordinal","recordingTimestampNs","robotId","sourceSequence","sourceTimestampNs","sourceClockId","type","payload"],"properties":{"version":{"const":4},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"recordingTimestampNs":{"type":"string","pattern":"^[0-9]+$"},"robotId":{"type":"string"},"sourceSequence":{"type":"string"},"sourceTimestampNs":{"type":"string"},"sourceClockId":{"type":"string"},"type":{"type":"string"},"payload":{"type":"object"}}})";
+constexpr const char* SchemaV5 = R"({"$schema":"https://json-schema.org/draft/2020-12/schema","title":"RobotKit recording payload v5","type":"object","additionalProperties":true,"required":["version","ordinal","recordingTimestampNs","robotId","sourceSequence","sourceTimestampNs","sourceClockId","type","payload"],"properties":{"version":{"const":5},"ordinal":{"type":"string","pattern":"^[0-9]+$"},"recordingTimestampNs":{"type":"string","pattern":"^[0-9]+$"},"robotId":{"type":"string"},"sourceSequence":{"type":"string"},"sourceTimestampNs":{"type":"string"},"sourceClockId":{"type":"string"},"type":{"type":"string"},"payload":{"type":"object"}}})";
 
 struct Item {
   uint32_t kind = 0;
@@ -65,7 +66,7 @@ template<class T> std::shared_ptr<T> lookup(std::unordered_map<uint32_t,std::sha
   auto found = values.find(id);
   return found == values.end() ? nullptr : found->second;
 }
-bool validKind(uint32_t kind) { return kind >= RK_RECORDING_COMMAND && kind <= RK_RECORDING_WORLD_EVENT; }
+bool validKind(uint32_t kind) { return kind >= RK_RECORDING_COMMAND && kind <= RK_RECORDING_PROCESS_EVENT; }
 bool validSchemaData(const mcap::ByteArray& data, const char* schema) {
   const auto size = std::strlen(schema);
   return data.size() == size && std::memcmp(data.data(), schema, size) == 0;
@@ -106,12 +107,12 @@ void writerMain(const std::shared_ptr<Writer>& writer, const std::string& path) 
   options.compression = mcap::Compression::None;
   auto result = output.open(path, options);
   if (!result.ok()) { fail(writer, result.message); writeStatus(writer); return; }
-  std::array<mcap::ChannelId, 7> channels{};
-  for (uint32_t kind = 1; kind <= 6; ++kind) {
-    mcap::Schema schema(std::string("robotkit.") + Names[kind] + ".v4", "jsonschema", SchemaV4);
+  std::array<mcap::ChannelId, 8> channels{};
+  for (uint32_t kind = 1; kind <= 7; ++kind) {
+    mcap::Schema schema(std::string("robotkit.") + Names[kind] + ".v5", "jsonschema", SchemaV5);
     output.addSchema(schema);
     mcap::Channel channel(std::string("robotkit/") + Names[kind], "json", schema.id);
-    channel.metadata["robotkit.schema_version"] = "4";
+    channel.metadata["robotkit.schema_version"] = "5";
     output.addChannel(channel);
     channels[kind] = channel.id;
   }
@@ -151,7 +152,7 @@ rk_result validateAndCache(const std::shared_ptr<Reader>& reader) {
   const auto& view = **reader->iterator;
   const auto& topic = view.channel->topic;
   uint32_t kind = 0;
-  for (uint32_t index = 1; index <= 6; ++index)
+  for (uint32_t index = 1; index <= 7; ++index)
     if (topic == std::string("robotkit/") + Names[index]) kind = index;
   auto version = view.channel->metadata.find("robotkit.schema_version");
   if (!kind || !view.schema || view.schema->encoding != "jsonschema" ||
@@ -161,6 +162,7 @@ rk_result validateAndCache(const std::shared_ptr<Reader>& reader) {
   const auto expected_v2 = std::string("robotkit.") + Names[kind] + ".v2";
   const auto expected_v3 = std::string("robotkit.") + Names[kind] + ".v3";
   const auto expected_v4 = std::string("robotkit.") + Names[kind] + ".v4";
+  const auto expected_v5 = std::string("robotkit.") + Names[kind] + ".v5";
   const bool schema_v1 = version->second == "1" && view.schema->name == expected_v1 &&
       validSchemaData(view.schema->data, SchemaV1);
   const bool schema_v2 = version->second == "2" && view.schema->name == expected_v2 &&
@@ -169,10 +171,13 @@ rk_result validateAndCache(const std::shared_ptr<Reader>& reader) {
       validSchemaData(view.schema->data, SchemaV3);
   const bool schema_v4 = version->second == "4" && view.schema->name == expected_v4 &&
       validSchemaData(view.schema->data, SchemaV4);
-  if (!schema_v1 && !schema_v2 && !schema_v3 && !schema_v4) return RK_ERROR_UNSUPPORTED;
+  const bool schema_v5 = version->second == "5" && view.schema->name == expected_v5 &&
+      validSchemaData(view.schema->data, SchemaV5);
+  if (!schema_v1 && !schema_v2 && !schema_v3 && !schema_v4 && !schema_v5)
+    return RK_ERROR_UNSUPPORTED;
   Item item;
   item.kind = kind;
-  item.version = schema_v1 ? 1 : schema_v2 ? 2 : schema_v3 ? 3 : 4;
+  item.version = schema_v1 ? 1 : schema_v2 ? 2 : schema_v3 ? 3 : schema_v4 ? 4 : 5;
   if (!payloadOrdinal(view.message.data, view.message.dataSize, item.ordinal))
     return RK_ERROR_INVALID_ARGUMENT;
   item.timestamp = view.message.logTime;
@@ -199,7 +204,7 @@ rk_result rk_recording_writer_enqueue(rk_recording_writer_handle handle, rk_reco
     uint32_t version, uint64_t ordinal, uint64_t timestamp, const uint8_t* payload, uint32_t size) {
   auto writer = lookup(Writers, handle.id);
   if (!writer) return RK_ERROR_INVALID_HANDLE;
-  if (!validKind(kind) || version != 4 || (!payload && size)) return RK_ERROR_INVALID_ARGUMENT;
+  if (!validKind(kind) || version != 5 || (!payload && size)) return RK_ERROR_INVALID_ARGUMENT;
   std::lock_guard lock(writer->mutex);
   if (writer->state != RK_RECORDING_OPEN) return RK_ERROR_INVALID_STATE;
   if (size > writer->capacityBytes || writer->queuedBytes > writer->capacityBytes - size) {

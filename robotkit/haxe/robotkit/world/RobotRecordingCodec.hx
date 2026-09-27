@@ -6,7 +6,7 @@ import haxe.io.Bytes;
 
 /** Stable JSON payload contract stored inside MCAP messages. Wide integers are strings. */
 class RobotRecordingCodec {
-  public static inline final VERSION:Int = 4;
+  public static inline final VERSION:Int = 5;
 
   public static function encode(entry:RobotRecordingEntry):Bytes {
     var root:Dynamic = {
@@ -49,6 +49,10 @@ class RobotRecordingCodec {
             endsAtRest:plan.endsAtRest,
             replaceAfterPlanId:Int64.toStr(plan.replaceAfterPlanId),
             replaceAfterTimeNs:Int64.toStr(plan.replaceAfterTimeNs),
+            events:[for (event in plan.events) {
+              timeNs:Int64.toStr(event.timeNs), channel:event.channel,
+              value:eventValue(event.value), holdPolicy:holdPolicy(event.holdPolicy)
+            }],
             segments:[for (segment in plan.segments) {
               timeFromStartNs:Int64.toStr(segment.timeFromStartNs),
               durationNs:Int64.toStr(segment.durationNs),
@@ -72,6 +76,13 @@ class RobotRecordingCodec {
       case WorldEvent(value):
         Reflect.setField(root, "type", "worldEvent");
         Reflect.setField(root, "payload", switch value {case RobotAttached(id):{kind:"attached",robotId:id};case RobotDetached(id):{kind:"detached",robotId:id};case RobotChanged(id):{kind:"changed",robotId:id};});
+      case ProcessEvent(value):
+        Reflect.setField(root, "type", "processEvent");
+        Reflect.setField(root, "payload", {
+          planId:Int64.toStr(value.planId), channel:value.channel,
+          value:eventValue(value.value), scheduledTimeNs:Int64.toStr(value.scheduledTimeNs),
+          appliedOwnerTimeNs:Int64.toStr(value.appliedOwnerTimeNs), cause:value.cause
+        });
     }
     return Bytes.ofString(Json.stringify(root));
   }
@@ -129,7 +140,11 @@ class RobotRecordingCodec {
               optionalFloats(payload, "positionTolerances"),
               optionalFloats(payload, "velocityTolerances"),
               optionalFloats(payload, "accelerationTolerances"),
-              optionalFieldBool(payload, "endsAtRest", true))));
+              optionalFieldBool(payload, "endsAtRest", true),
+              version >= 5 ? [for (item in array(payload,"events"))
+                new ProcessTimedEvent(wide(item,"timeNs"), string(item,"channel"),
+                  readEventValue(Reflect.field(item,"value")),
+                  readHoldPolicy(string(item,"holdPolicy")))] : [])));
           case "hold" if (version >= 4): Command(Hold);
           case "resume" if (version >= 4): Command(Resume);
           case "abort" if (version >= 4): Command(Abort);
@@ -145,11 +160,39 @@ class RobotRecordingCodec {
       case "worldEvent":
         var id=string(payload,"robotId");
         WorldEvent(switch string(payload,"kind") {case "attached":RobotAttached(id);case "detached":RobotDetached(id);case "changed":RobotChanged(id);case _:throw "Unsupported RobotKit world event";});
+      case "processEvent" if (version >= 5):
+        ProcessEvent(new FiredProcessEvent(wide(payload,"planId"),
+          string(payload,"channel"), readEventValue(Reflect.field(payload,"value")),
+          wide(payload,"scheduledTimeNs"), wide(payload,"appliedOwnerTimeNs"),
+          fieldInt(payload,"cause")));
       case _: throw "Unsupported RobotKit recording event type";
     };
     return new RobotRecordingEntry(ordinal, robotId, event, sequence, timestamp, clock,
       wide(root, "recordingTimestampNs"), version);
   }
+
+  static function eventValue(value:ProcessEventValue):Dynamic return switch value {
+    case Digital(enabled): {kind:"digital", digital:enabled};
+    case Analog(number): {kind:"analog", analog:number};
+    case Process(command, argument): {kind:"process", command:command, argument:argument};
+  };
+  static function readEventValue(value:Dynamic):ProcessEventValue return switch string(value,"kind") {
+    case "digital": ProcessEventValue.Digital(fieldBool(value,"digital"));
+    case "analog": ProcessEventValue.Analog(fieldFloat(value,"analog"));
+    case "process": ProcessEventValue.Process(string(value,"command"),fieldFloat(value,"argument"));
+    case _: throw "Unsupported process event value";
+  };
+  static function holdPolicy(value:ProcessHoldPolicy):String return switch value {
+    case Keep: "keep";
+    case SafeWhileHeld: "safeWhileHeld";
+    case RestoreOnResume: "restoreOnResume";
+  };
+  static function readHoldPolicy(value:String):ProcessHoldPolicy return switch value {
+    case "keep": ProcessHoldPolicy.Keep;
+    case "safeWhileHeld": ProcessHoldPolicy.SafeWhileHeld;
+    case "restoreOnResume": ProcessHoldPolicy.RestoreOnResume;
+    case _: throw "Unsupported process hold policy";
+  };
 
   static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,safety:v.safety,trajectoryQueueDepth:v.trajectoryQueueDepth,trajectoryActive:v.trajectoryActive,trajectoryTimeNs:Int64.toStr(v.trajectoryTimeNs),trajectoryDurationNs:Int64.toStr(v.trajectoryDurationNs),trajectoryTag:Int64.toStr(v.trajectoryTag),trajectoryTagTimeNs:Int64.toStr(v.trajectoryTagTimeNs),sessionState:v.sessionState,activePlanId:Int64.toStr(v.activePlanId),committedUntilNs:Int64.toStr(v.committedUntilNs),queueEndTimeNs:Int64.toStr(v.queueEndTimeNs),sensors:[for(s in v.sensors.toArray()) sensor(s)]};
   static function sensor(v:SensorFrame):Dynamic return {sensorId:v.sensorId,kind:v.kind,frameId:v.frameId,sequence:Int64.toStr(v.sequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,values:v.values.toArray(),linkId:v.linkId,mountPosition:v.mountPosition.toArray(),mountRotation:v.mountRotation.toArray(),image:v.image==null?null:cameraImage(v.image)};

@@ -33,8 +33,9 @@ whenever this plan turns out to be wrong.
 
 - **LA-D1 — The device interpolates, the host doesn't stream.** The device
   receives polynomial segments with commit and replace rules, and evaluates
-  them on its own clock. Host-side per-cycle target streaming (P9c) remains
-  for RKD5 devices only.
+  them on its own clock. Host-side per-cycle setpoint streaming (P9c)
+  remains, but only for *cyclic-control* endpoints (simulation today,
+  EtherCAT-style drives later). It is not a device wire protocol.
 - **LA-D2 — Step generation runs on the device, on a fixed timer tick.**
   - A fixed-rate step tick (default 40 kHz, configurable per board) evaluates
     the segment position, in `f32` with segment-local τ.
@@ -48,11 +49,14 @@ whenever this plan turns out to be wrong.
   C5, the device core plus the virtual board layer runs inside the host
   process under the SimKit clock, through a simulated link, and is fully
   deterministic. The PTY binaries remain for cross-process wire tests.
-- **LA-D4 — RKD6 is a new protocol version, not an edit to RKD5.**
+- **LA-D4 — RKD6 is a new protocol version and becomes the only one.**
   - Sync marker `RKD6`. The device protocol version is negotiated in session
     begin.
-  - RKD5 support stays in the host, because RKD5 devices are still valid
-    (the P9c streaming path).
+  - RKD5 keeps working only until RKD6 is proven end to end (A5–A6). No
+    deployed RKD5 devices exist, only test harnesses and the nucleo stub, so
+    A9 then retires RKD5 completely.
+  - Simple devices use RKD6's minimal profile (A9) instead of a second
+    protocol.
   - The device wire schema lives in `robotkit/schema/` next to
     `device_wire.wire.idl`, generated the same way.
 
@@ -197,7 +201,8 @@ Do:
   - The runtime must not also sample and stream targets for this endpoint.
     Add an endpoint capability "device executes queue" and branch on it in
     the owner loop.
-- **Deployment:** `deployment.json` v3 adds `protocol: "rkd5" | "rkd6"`,
+- **Deployment:** `deployment.json` v3 adds `protocol: "rkd5" | "rkd6"`
+  (A9 later removes `"rkd5"`),
   step tick rate, link-loss timeout and the clock-sync bound. The v2 reader
   is kept.
 - **Serial qualification:** extend the P9c check for RKD6. The link must
@@ -245,6 +250,21 @@ Tests:
     observed in the snapshot;
   - clock drift of 2000 ppm: stays in sync.
 
+**Plan C interaction (editor assembly simulation).** A separate plan
+(Plan C, run from another session) simulates MachineKit assemblies in the
+editor through `AssemblySimulationBridge`. It uses one link per part, and
+joint → joint couplings such as lead screw → carriage live in the
+`RobotModel` as `JointCoupling` (model schema v5). Once that is on `main`:
+- add an A6 test that runs the virtual-device loop on the bridge's physical
+  assembly model as well as on the `MachineKitRobotCompiler` model;
+- the leader joint is driven through the actuator transmission, and the
+  coupled follower joint must track `offset + ratio × leader` within
+  tolerance.
+
+Until then, the compiler model is enough. Don't build a parallel coupling
+mechanism here: couplings belong to the model, and A7's joint → actuator
+conversion stage is where the runtime applies them.
+
 ## A7 — Step generation (LA-D2) and transmissions end to end
 
 Do:
@@ -264,6 +284,15 @@ Do:
     `dual_drive_skew` fault.
   - Update `robotkit/ARCHITECTURE.md`'s P11 design section from "design" to
     "implemented".
+  - **Couplings:** if Plan C's `JointCoupling` (model v5) is on `main` when
+    this item runs, apply couplings at this same conversion stage:
+    - follower joint targets are derived from their leader;
+    - a plan whose follower trajectory violates a coupling is rejected at
+      submit.
+
+    If it isn't on `main` yet, leave a clearly marked extension point and
+    note it in the log. Transmissions (actuator ↔ joint) and couplings
+    (joint ↔ joint) stay distinct concepts.
 
 Tests:
 - For a lead-screw axis at 200 steps/rev × 16 microsteps with an 8 mm lead,
@@ -290,6 +319,66 @@ Tests:
   within one step tick, with and without a HOLD in between;
 - STOP sets the channel to its safe value;
 - a replacement discards later events.
+
+## A9 — Retire RKD5; minimal RKD6 device profile (after A5 and A6 are green)
+
+Problem: two device protocols means two host code paths, two qualification
+rules, two fingerprint schemes and two test suites. Nothing deployed uses
+RKD5: only the PTY harnesses and the nucleo stub, which drives no pins. This
+is the cheapest point to remove it, before any hardware exists.
+
+Do:
+- **Minimal profile.** The `SESSION_ACK6` device capabilities get a profile:
+  - `full`: segment degree up to the device maximum, a device queue, step
+    generation;
+  - `minimal`: maximum degree 1, a small queue (for example 4–8 segments),
+    no step generation, and outputs as position setpoints only.
+
+  The host device compiler lowers plans to degree-1 segments at the owner
+  period for `minimal` devices. A5's re-validation applies at that degree and
+  resolution. Qualification (A5) covers both profiles. An unqualified
+  configuration still fails at construction and names the minimum baud,
+  queue depth or period.
+- **Migrate:**
+  - the bench deployment `robotkit/deployment/bench-nucleo-g474re/` and the
+    fixtures under `robotkit/tests/fixtures/`;
+  - the PTY binaries (`pty_device`, `robotd_pty_device`), the nucleo stub
+    firmware (as a `minimal`-profile device driving its two virtual joints),
+    and every RKD5 test.
+
+  Deployment schema v4 drops `protocol`, since RKD6 is implied. The v3
+  reader accepts only `"rkd6"`. Recompute the fingerprints.
+- **Delete:**
+  - the RKD5 schema (`robotkit/schema/device_wire.wire.idl` and its generated
+    Rust and C++);
+  - `HostLink`'s RKD5 path, and the RKD5 `DeviceProtocol` in the Rust core
+    (the core keeps only RKD6);
+  - the P9c serial-streaming qualification in `DeviceSerialEndpoint`, which
+    becomes an RKD6-only endpoint, or is folded into `Rkd6Endpoint`.
+- **Keep** the runtime's host-side sampling and per-cycle setpoint path for
+  cyclic-control endpoints (the SimKit endpoint, and future EtherCAT). It is
+  no longer reachable from any serial device.
+- **Docs:**
+  - `DEVICE_PROTOCOL6.md` becomes `DEVICE_PROTOCOL.md`; archive the old RKD5
+    document in git history only.
+  - Update `robotkit/README.md`, `robotkit/ARCHITECTURE.md` "Deployment
+    boundary", and `motionkit/IMPLEMENTATION_PLAN.md`'s P9c note to point
+    here.
+- Bump the runtime ABI and the RKD protocol version as needed, then
+  regenerate the bindings and fingerprints.
+
+Tests:
+- A `minimal`-profile virtual device runs a Ruckig plan with HOLD, RESUME and
+  a link-loss stop.
+- A `full`-profile device still passes A4–A7.
+- The migrated nucleo stub builds for `thumbv7em-none-eabihf` (A1's check).
+- The bench deployment loads and qualifies.
+- A deployment declaring `"rkd5"` is rejected with a clear message.
+- `grep -rn "RKD5\|device_wire.wire" robotkit` finds only history notes.
+- `world-tcp.sh` passes in all three modes.
+
+Commits: at least two, first adding the minimal profile and migrating, then
+deleting RKD5.
 
 ## Out of scope for this lane
 

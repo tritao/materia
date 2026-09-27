@@ -1065,7 +1065,7 @@ rk_result Simulation::step(uint64_t timestamp_ns) {
         sealed_ = true;
     }
     for (const auto &runtime : runtimes_) {
-        const auto result = runtime->apply_pending_commands();
+        const auto result = runtime->apply_pending_commands(timestamp_ns);
         if (result != RK_OK) {
             for (const auto &participant : runtimes_)
                 participant->discard_pending_commands();
@@ -1180,8 +1180,9 @@ void Simulation::run() {
         {
             std::lock_guard tick_lock(tick_mutex_);
             bool commands_valid = true;
+            const auto owner_time_ns = monotonic_now_ns();
             for (const auto &runtime : runtimes_) {
-                if (runtime->apply_pending_commands() != RK_OK) {
+                if (runtime->apply_pending_commands(owner_time_ns) != RK_OK) {
                     commands_valid = false;
                     break;
                 }
@@ -1189,7 +1190,7 @@ void Simulation::run() {
             if (!commands_valid) {
                 for (const auto &runtime : runtimes_)
                     runtime->discard_pending_commands();
-            } else if (advance(monotonic_now_ns()) != RK_OK) {
+            } else if (advance(owner_time_ns) != RK_OK) {
                 // The owner thread remains alive; the published runtime state
                 // records the endpoint fault and callers can stop the session.
                 break;

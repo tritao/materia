@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstring>
 
 namespace {
 
@@ -84,6 +85,20 @@ void velocity_extremum_and_plan_rejection() {
     stored_report.struct_size = sizeof(stored_report);
     assert(mk_plan_get_report(plan, &stored_report) == MK_OK);
     assert(stored_report.checks[MK_CHECK_VELOCITY].status == MK_CHECK_PASSED);
+    mk_plan_destroy(plan);
+    spec.required_capabilities |= MK_CAP_EVENTS;
+    spec.event_count = 1;
+    spec.events[0].time_ns = 0;
+    std::strcpy(spec.events[0].channel, "sprayer.flow");
+    spec.events[0].value.kind = MK_EVENT_DIGITAL;
+    spec.events[0].value.digital = 1;
+    spec.events[0].hold_policy = MK_EVENT_RESTORE_ON_RESUME;
+    assert(mk_plan_create(trajectory, &spec, &limits, &plan, &report) == MK_OK);
+    assert(mk_plan_get_info(plan, &info) == MK_OK && info.event_count == 1);
+    mk_timed_event stored_event{};
+    assert(mk_plan_get_event(plan, 0, &stored_event) == MK_OK);
+    assert(stored_event.value.digital == 1 && stored_event.time_ns == 0);
+    assert(mk_plan_get_event(plan, 1, &stored_event) == MK_ERROR_INVALID_ARGUMENT);
     mk_plan_destroy(plan);
     mk_trajectory_destroy(trajectory);
 }
