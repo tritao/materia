@@ -11,7 +11,8 @@
 		"viewport": {
 			"kind": "cad-preview",
 			"module": "MotorShaftBearingsPreview",
-			"function": "preview"
+			"function": "preview",
+			"cache": {"inputs": ["MotorShaftBearings.hx", "MotorShaftBearingsPreview.hx"]}
 		}
 	}
 }

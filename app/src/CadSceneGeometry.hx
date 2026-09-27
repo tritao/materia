@@ -2,8 +2,6 @@ package app;
 
 import cadkit.Mesh;
 import cadkit.Shape;
-import CadKit;
-import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 
 /** Converts CadKit's millimetre mesh convention into SceneKit metres. */
@@ -24,73 +22,35 @@ class CadSceneGeometry {
   }
 
   public static function fromMesh(mesh:Mesh, ?source:Shape):GeometryData {
-    var vertexBytes:Bytes = mesh.vertices;
-    var normalBytes:Bytes = mesh.normals;
-    var indexBytes:Bytes = mesh.indices;
-    if (vertexBytes.length != mesh.vertexCount * 24 || normalBytes.length != mesh.vertexCount * 24 ||
-        indexBytes.length != mesh.indexCount * 4 || mesh.indexCount % 3 != 0)
+    var minimum = [1e300, 1e300, 1e300], maximum = [-1e300, -1e300, -1e300];
+    if (mesh.vertexCount <= 0 || mesh.vertices.length != mesh.vertexCount * 24)
       throw "CadKit returned an inconsistent tessellation";
-    var geometry = new GeometryData();
-    var positions = Bytes.alloc(mesh.vertexCount * 12);
-    var normals = Bytes.alloc(mesh.vertexCount * 12);
-    var minX = 1e300, minY = 1e300, minZ = 1e300;
-    var maxX = -1e300, maxY = -1e300, maxZ = -1e300;
-    for (index in 0...mesh.vertexCount) {
-      var offset = index * 24;
-      var x = vertexBytes.getDouble(offset) * METRES_PER_MILLIMETRE;
-      var y = vertexBytes.getDouble(offset + 8) * METRES_PER_MILLIMETRE;
-      var z = vertexBytes.getDouble(offset + 16) * METRES_PER_MILLIMETRE;
-      geometry.addVertex(x, y, z);
-      positions.setFloat(index * 12, x);
-      positions.setFloat(index * 12 + 4, y);
-      positions.setFloat(index * 12 + 8, z);
-      normals.setFloat(index * 12, normalBytes.getDouble(offset));
-      normals.setFloat(index * 12 + 4, normalBytes.getDouble(offset + 8));
-      normals.setFloat(index * 12 + 8, normalBytes.getDouble(offset + 16));
-      minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z);
-      maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
+    for (index in 0...mesh.vertexCount) for (axis in 0...3) {
+      var value = mesh.vertices.getDouble(index * 24 + axis * 8);
+      if (!Math.isFinite(value)) throw "CadKit returned a non-finite vertex";
+      minimum[axis] = Math.min(minimum[axis], value);
+      maximum[axis] = Math.max(maximum[axis], value);
     }
-    for (triangle in 0...Std.int(mesh.indexCount / 3)) {
-      var offset = triangle * 12;
-      geometry.addTriangle(indexBytes.getInt32(offset), indexBytes.getInt32(offset + 4),
-        indexBytes.getInt32(offset + 8));
-    }
-    // SceneKit format/semantic values are stable C ABI constants: float3 and normal.
-    geometry.addStream(1, 2, positions, mesh.vertexCount, 12);
-    geometry.addStream(2, 2, normals, mesh.vertexCount, 12);
-    for (range in mesh.faceRanges)
-      geometry.addSubelement(Std.int(range.firstIndex / 3), Std.int(range.indexCount / 3), range.faceIndex);
-    appendMeshEdges(geometry, mesh);
     if (source != null) {
-      var kernelBounds = source.bounds();
-      var minimum = kernelBounds.get_min();
-      var maximum = kernelBounds.get_max();
-      minX = Math.min(minX, minimum.get_x() * METRES_PER_MILLIMETRE);
-      minY = Math.min(minY, minimum.get_y() * METRES_PER_MILLIMETRE);
-      minZ = Math.min(minZ, minimum.get_z() * METRES_PER_MILLIMETRE);
-      maxX = Math.max(maxX, maximum.get_x() * METRES_PER_MILLIMETRE);
-      maxY = Math.max(maxY, maximum.get_y() * METRES_PER_MILLIMETRE);
-      maxZ = Math.max(maxZ, maximum.get_z() * METRES_PER_MILLIMETRE);
+      var bounds = source.bounds(), low = bounds.get_min(), high = bounds.get_max();
+      var sourceMinimum = [low.get_x(), low.get_y(), low.get_z()];
+      var sourceMaximum = [high.get_x(), high.get_y(), high.get_z()];
+      for (axis in 0...3) {
+        minimum[axis] = Math.min(minimum[axis], sourceMinimum[axis]);
+        maximum[axis] = Math.max(maximum[axis], sourceMaximum[axis]);
+      }
     }
-    geometry.setBounds(minX, minY, minZ, maxX, maxY, maxZ);
-    return geometry;
+    var part:materia.project.SceneArtifact.SceneArtifactPart = {
+      id: "cad", name: "cad", red: 0.7, green: 0.7, blue: 0.7,
+      vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
+      vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
+      edgeSegments: mesh.edgeSegments, edgeIds: mesh.edgeIds,
+      faceRanges: [for (range in mesh.faceRanges) {
+        faceIndex: range.faceIndex, firstIndex: range.firstIndex, indexCount: range.indexCount
+      }]
+    };
+    return CadPreviewGeometry.fromArtifact(part, minimum, maximum,
+      METRES_PER_MILLIMETRE, false, true);
   }
 
-  static function appendMeshEdges(geometry:GeometryData, mesh:Mesh):Void {
-    var segments = mesh.edgeSegments;
-    var edgeIds = mesh.edgeIds;
-    if (segments.length % 48 != 0 || edgeIds.length != Std.int(segments.length / 48) * 4)
-      throw "CadKit returned an inconsistent edge segment stream";
-    for (index in 0...Std.int(segments.length / 48)) {
-      var offset = index * 48;
-      geometry.addStrokeSegment(
-        segments.getDouble(offset) * METRES_PER_MILLIMETRE,
-        segments.getDouble(offset + 8) * METRES_PER_MILLIMETRE,
-        segments.getDouble(offset + 16) * METRES_PER_MILLIMETRE,
-        segments.getDouble(offset + 24) * METRES_PER_MILLIMETRE,
-        segments.getDouble(offset + 32) * METRES_PER_MILLIMETRE,
-        segments.getDouble(offset + 40) * METRES_PER_MILLIMETRE,
-        edgeIds.getInt32(index * 4));
-    }
-  }
 }

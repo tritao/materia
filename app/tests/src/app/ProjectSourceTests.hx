@@ -21,6 +21,20 @@ class ProjectSourceTests {
     }
     Sys.setCwd(root);
     var manifest = root + "/cadkit/examples/modeling/materia.project.json";
+    var machineManifest = root + "/machinekit/examples/materia.project.json";
+    var requirement = MateriaProjectRunner.executionRequirement(machineManifest);
+    check(requirement.kind == "requires-project-code" &&
+      requirement.projectPath == machineManifest && requirement.module.length > 0,
+      "project inspection identifies executable generator code without running it");
+    var machineScene = MateriaProjectRunner.loadProject(machineManifest);
+    var hasAluminium = false, hasSteel = false;
+    for (part in machineScene.objects) {
+      check(part.mass > 0.000001 && Math.abs(part.mass - 1.0) > 0.000001,
+        "generated part mass comes from volume and material density");
+      if (part.materialId == "aluminium") hasAluminium = true;
+      if (part.materialId == "steel-c45") hasSteel = true;
+    }
+    check(hasAluminium && hasSteel, "machine preview carries distinct physical materials");
     var generatedScene = MateriaProjectRunner.loadProject(manifest);
     var generated = generatedScene.objects;
     check(generated.length == 13, "project generates all excavator parts");
@@ -33,7 +47,9 @@ class ProjectSourceTests {
     var stage = "open generated scene";
     try {
       session.openGeneratedScene(generated, manifest, generatedScene.assembly,
-        generatedScene.geometryBySnapshot);
+        generatedScene.geometryBySnapshot, generatedScene.assemblyDefinition,
+        generatedScene.assemblyState, generatedScene.localCentersByDefinition,
+        generatedScene.metresPerUnit);
       session.scene.select(base.id);
       check(session.scene.nudgeSelected(0.1, 0.0), "generated part can be moved");
       check(session.scene.duplicateSelected(), "generated part can be instanced");
@@ -78,6 +94,12 @@ class ProjectSourceTests {
         "saved scene keeps its project reference");
       check(saved.indexOf(base.meshSnapshot) < 0,
         "saved project excludes generated mesh buffers");
+      var savedEdits:Array<Dynamic> = cast Reflect.field(project, "overrides");
+      check(Reflect.field(project, "version") == 1 && savedEdits.length > 0,
+        "project saves typed sparse edits");
+      for (edit in savedEdits) check(Reflect.field(edit, "property") != "width" &&
+        Reflect.field(edit, "property") != "height" && Reflect.field(edit, "property") != "depth",
+        "generated bounds are never saved as overrides");
       var authored:Array<Dynamic> = cast Reflect.field(document, "objects");
       check(authored.length == 1, "saved scene keeps authored objects separately");
       stage = "reopen scene";
@@ -90,6 +112,19 @@ class ProjectSourceTests {
       check(Math.abs(session.scene.info(base.id).localTransform().element(12) - (base.x + 0.1)) < 0.000001,
         "reopen restores the generated part's authored position");
       check(!session.isDirty(), "reopened project starts clean");
+      session.save(output);
+      check(File.getContent(output) == saved, "open-save-open-save is byte identical");
+      var stale:Dynamic = Json.parse(saved);
+      var staleProject:Dynamic = Reflect.field(stale, "project");
+      var staleRemoved:Array<Dynamic> = cast Reflect.field(staleProject, "removed");
+      staleRemoved.push("project:removed-in-generator");
+      File.saveContent(output, Json.stringify(stale));
+      session.open(output);
+      check(session.staleEdits().length == 1, "missing removed part is diagnostic");
+      check(session.discardStaleEdits() && session.staleEdits().length == 0,
+        "stale edit can be discarded through history");
+      check(session.document.undo() && session.staleEdits().length == 1,
+        "discarding stale edits is undoable");
     } catch (error:Dynamic) {
       session.dispose();
       if (FileSystem.exists(output)) FileSystem.deleteFile(output);

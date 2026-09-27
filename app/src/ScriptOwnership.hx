@@ -27,6 +27,7 @@ class ScriptOwnership {
   public var overridesEnabled(default, null):Bool;
   public var diagnostics(default, null):Array<String> = [];
   public var staleOverrides(default, null):Array<String> = [];
+  public var identityMismatch(default, null):Null<String> = null;
   var baseline:ScriptedSetup;
   final overrides:Map<String, ScriptOverrideRecord> = new Map();
 
@@ -253,7 +254,7 @@ class ScriptOwnership {
       || record.packageVersion != packageIdentity.packageVersion
       || record.sourceSha256 != packageIdentity.sourceSha256
       || record.configurationSha256 != configurationSha256)
-      throw 'Setup script identity mismatch: $reference';
+      identityMismatch = 'Setup script identity mismatch: $reference';
   }
   function applyOverrides(sensors:SensorConfiguration, objects:Array<SceneObjectData>, settings:ScriptSettings):Void {
     var found = new Map<String, Bool>();
@@ -282,6 +283,7 @@ class ScriptOwnership {
       if (applied) found.set(k, true);
     }
     diagnostics = [];
+    if (identityMismatch != null) diagnostics.push(identityMismatch);
     staleOverrides = [];
     if (savedVersion > 0 && savedVersion != configurationVersion) diagnostics
       .push('Configuration version changed from $savedVersion to $configurationVersion; stable-ID overrides were revalidated');
@@ -332,11 +334,12 @@ class ScriptOwnership {
     var issues = RobotRuntimeCompiler.validate(robot.model);
     if (issues.length > 0) throw issues[0].code + ": " + issues[0].message;
   }
-  function cloneObjects():Array<SceneObjectData> return SceneCodec.decode(Json.stringify({
-    format: SceneCodec.FORMAT,
-    version: SceneCodec.VERSION,
-    objects: baseline.objects
-  }));
+  function cloneObjects():Array<SceneObjectData> {
+    var objects:Array<Dynamic> = [];
+    for (object in baseline.objects) objects.push(SceneCodec.encodeObject(object));
+    return SceneCodec.decode(Json.stringify({format: SceneCodec.FORMAT,
+      version: SceneCodec.VERSION, objects: objects}));
+  }
   static function validateSetup(value:ScriptedSetup, expectedReference:String):Void {
     if (value.reference != expectedReference || StringTools.trim(value.reference).length == 0
       || value.version < 1 || value.sensors == null || value.objects == null

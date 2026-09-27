@@ -7,6 +7,8 @@ import haxe.io.Path as ProjectPath;
 import sys.io.AtomicFile;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactPart;
+import materia.project.MaterialLibrary;
+import materia.project.MeshMassProperties;
 import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord.AssemblyFrame;
 import materia.project.AssemblyRecord.AssemblyConnector;
@@ -29,7 +31,26 @@ import sys.thread.Thread;
 /** Resolves a Materia project entrypoint and materializes its generated viewport geometry. */
 class MateriaProjectRunner {
   static final MAX_OUTPUT_BYTES:Int = 150000000;
-  static var temporarySequence:Int = 0;
+
+  /** Inspect a project without compiling or executing its entrypoint. */
+  public static function executionRequirement(projectPath:String):ProjectExecutionRequirement {
+    var manifestPath = FileSystem.fullPath(projectPath);
+    if (!FileSystem.exists(manifestPath) || FileSystem.isDirectory(manifestPath))
+      throw 'Materia project file not found: $manifestPath';
+    var root:Dynamic = Json.parse(File.getContent(manifestPath));
+    if (fieldText(root, "format") != "materia.project" || fieldInt(root, "version") != 1)
+      throw "Unsupported Materia project format";
+    var build = field(root, "build");
+    if (fieldText(build, "system") != "haxeon") throw "Materia project requires the Haxeon build system";
+    var entries = field(root, "entrypoints");
+    var entryId = fieldText(root, "defaultEntrypoint");
+    var entry = Reflect.field(entries, entryId);
+    if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
+    if (fieldText(entry, "kind") != "cad-preview")
+      throw "Unsupported Materia viewport entrypoint kind";
+    return {kind: "requires-project-code", projectPath: manifestPath,
+      entrypoint: entryId, module: fieldText(entry, "module")};
+  }
 
   public static function load(projectPath:String):Array<SceneObjectData> return loadProject(projectPath).objects;
 
@@ -54,9 +75,8 @@ class MateriaProjectRunner {
     var kind = fieldText(entry, "kind");
     if (kind != "cad-preview") throw 'Unsupported Materia viewport entrypoint kind: $kind';
 
-    var home = Sys.getEnv("HAXEON_HOME");
-    if (home == null || home.length == 0) throw "HAXEON_HOME is not set; launch Materia through Haxeon";
-    home = FileSystem.fullPath(home);
+    var installation = installationRoot();
+    var home = ProjectPath.join([installation, "haxeon"]);
     var haxe = ProjectPath.join([home, ".tools", "haxe", "haxe"]);
     if (!FileSystem.exists(haxe)) throw 'Pinned Haxe compiler was not found at $haxe';
     var tools = projectToolsDirectory();
@@ -74,9 +94,9 @@ class MateriaProjectRunner {
       }
     }
     var tempRootValue = Sys.getEnv("TMPDIR");
-    temporarySequence++;
     var temporaryRoot = ProjectPath.join([tempRootValue == null ? "/tmp" : tempRootValue,
-      "materia-project-" + Sys.getPid() + "-" + temporarySequence]);
+      "materia-project-" + Sys.getPid() + "-" + Std.string(Sys.time())
+        + "-" + Std.random(1000000000)]);
     FileSystem.createDirectory(temporaryRoot);
     var outputPrefix = ProjectPath.join([temporaryRoot, "preview"]);
     var records:GeneratedAssemblyScene;
@@ -134,7 +154,7 @@ class MateriaProjectRunner {
     var cacheDirectory = ProjectPath.join([cacheRoot, "materia", "generated-artifacts"]);
     if (!ensureCacheDirectory(cacheDirectory)) return null;
     var arguments = ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools,
-      "--run", "MateriaProjectFingerprint", haxeonManifest, module, functionName, tools].concat(inputs);
+      "--run", "MateriaProjectFingerprint", haxeonManifest, module, functionName, tools, home].concat(inputs);
     var fingerprint = StringTools.trim(runCommand(haxe, arguments,
       "Could not fingerprint Materia project entrypoint"));
     if (!~/^[0-9a-f]{64}$/.match(fingerprint)) throw "Project fingerprint has an invalid result";
@@ -160,7 +180,7 @@ class MateriaProjectRunner {
   static function buildModule(haxe:String, home:String, tools:String, manifest:String,
       module:String, functionName:String, outputPrefix:String):Void {
     var arguments = ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools,
-      "--run", "MateriaProjectModuleBuild", manifest, module, functionName, outputPrefix];
+      "--run", "MateriaProjectModuleBuild", manifest, module, functionName, outputPrefix, home];
     runCommand(haxe, arguments, "Could not compile Materia project entrypoint");
   }
 
@@ -296,7 +316,7 @@ class MateriaProjectRunner {
         x: source.x, y: source.y, z: source.z, width: source.width, height: source.height,
         depth: source.depth, collisionEnabled: source.collisionEnabled, dynamicBody: source.dynamicBody,
         mass: source.mass, red: source.red, green: source.green, blue: source.blue,
-        appearance: source.appearance,
+        appearance: source.appearance, materialId: source.materialId,
         visible: source.visible, rotation: source.rotation == null ? null : source.rotation.copy(),
         cadGraph: source.cadGraph, meshSnapshot: source.meshSnapshot, sketchDraft: source.sketchDraft};
       objects.push(copy);
@@ -333,14 +353,21 @@ class MateriaProjectRunner {
     var center = pose == null ? {x: centerX, y: centerY, z: centerZ}
       : AssemblyFrames.transformPoint(pose, centerX, centerY, centerZ);
     var label = useCount != null && useCount > 1 ? component.name + " · " + occurrenceId : component.name;
+    var volume = component.volume == null
+      ? MeshMassProperties.compute(component.vertices, component.indices).volume : component.volume;
+    var materialId = component.materialId == null ? "neutral" : component.materialId;
+    var density = component.materialDensity == null
+      ? MaterialLibrary.require(materialId).physical.density : component.materialDensity;
+    var mass = volume * scale * scale * scale * density;
+    if (!Math.isFinite(mass) || mass <= 0) throw 'Invalid mass for generated part "$occurrenceId"';
     records.push({id: "project:" + occurrenceId, label: label, type: "cad-preview",
       x: center.x * scale, y: center.y * scale, z: center.z * scale,
       width: Math.max(0.000001, (maximum[0] - minimum[0]) * scale),
       height: Math.max(0.000001, (maximum[1] - minimum[1]) * scale),
       depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
-      collisionEnabled: false, dynamicBody: false, mass: 1.0,
+      collisionEnabled: false, dynamicBody: false, mass: mass,
       red: component.red, green: component.green, blue: component.blue,
-      appearance: component.appearance, visible: true,
+      appearance: component.appearance, materialId: component.materialId, visible: true,
       meshSnapshot: geometryKeyByDefinition.get(definitionId),
       rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]});
   }
@@ -370,12 +397,23 @@ class MateriaProjectRunner {
   }
 
   static function projectToolsDirectory():String {
-    var current = Sys.getCwd();
-    var candidate = ProjectPath.join([current, "tools", "MateriaProjectModuleBuild.hx"]);
-    if (FileSystem.exists(candidate)) return ProjectPath.join([current, "tools"]);
-    candidate = ProjectPath.join([current, "app", "tools", "MateriaProjectModuleBuild.hx"]);
-    if (FileSystem.exists(candidate)) return ProjectPath.join([current, "app", "tools"]);
-    throw "Could not locate MateriaProjectModuleBuild.hx next to the app source tree";
+    return ProjectPath.join([installationRoot(), "app", "tools"]);
+  }
+
+  static function installationRoot():String {
+    var configured = Sys.getEnv("MATERIA_INSTALL_ROOT");
+    var current = configured == null || configured.length == 0
+      ? ProjectPath.directory(FileSystem.fullPath(Sys.executablePath()))
+      : FileSystem.fullPath(configured);
+    while (true) {
+      var tools = ProjectPath.join([current, "app", "tools", "MateriaProjectModuleBuild.hx"]);
+      var compiler = ProjectPath.join([current, "haxeon", ".tools", "haxe", "haxe"]);
+      if (FileSystem.exists(tools) && FileSystem.exists(compiler)) return current;
+      var parent = ProjectPath.directory(current);
+      if (parent == current || parent.length == 0) break;
+      current = parent;
+    }
+    throw "Materia installation is missing app/tools or the pinned Haxeon toolchain";
   }
 
   static function digestHex(bytes:Bytes):String {
@@ -419,6 +457,13 @@ class MateriaProjectRunner {
     return number;
   }
 
+}
+
+typedef ProjectExecutionRequirement = {
+  var kind:String;
+  var projectPath:String;
+  var entrypoint:String;
+  var module:String;
 }
 
 typedef GeneratedAssemblyScene = {

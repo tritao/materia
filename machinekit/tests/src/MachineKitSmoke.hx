@@ -992,6 +992,9 @@ class MachineKitSmoke {
 		leftAxis.setTravel(leftState, 8);
 		near(leftState.joint("coupling"), -2 * Math.PI, "left-hand axis reverses rotation");
 		state.setJoint("carriage-slide", axis.travelMax);
+		near(state.joint("coupling"), axis.nut.rotationFor(axis.stroke),
+			"assembly coupling drives screw rotation from carriage travel");
+		throws(() -> state.setJoint("coupling", 0), "driven by coupled joint");
 		state.forwardKinematics();
 		near(state.worldConnector("guideBearingA", "axis").z, state.worldConnector("carriage", "bore").z,
 			"first guide bearing is aligned at the upper stroke end");

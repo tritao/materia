@@ -3,19 +3,23 @@ package machinekit.component;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
 import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.project.MaterialLibrary;
 
 /** Geometry generator, named connector frames, and a BOM line for one machine part.
  * `geometry()` returns a new owned Part in the component's CAD frame; the caller closes it.
  */
 class MachineComponent {
 	public final designation:String;
+	public final materialId:String;
 	public final bom:BomItem;
 	final connectorList:Array<Connector> = [];
 
 	function new(designation:String, description:String, ?material:String) {
 		if (designation == null || designation.length == 0) throw "Machine component needs a designation";
 		this.designation = designation;
-		bom = {partNumber: designation, description: description, quantity: 1, material: material};
+		materialId = MaterialLibrary.fromSpec(material);
+		bom = {partNumber: designation, description: description, quantity: 1,
+			material: MaterialLibrary.require(materialId).physical.spec};
 	}
 
 	public function geometry(detail:ComponentDetail = Preview):Part

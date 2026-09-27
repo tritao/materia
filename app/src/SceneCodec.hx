@@ -4,6 +4,9 @@ import haxe.Json;
 import bimkit.BimCodec;
 import bimkit.BimDocument;
 import materia.project.Appearance;
+import materia.project.Appearance.Appearances;
+import materia.project.MaterialDef;
+import materia.project.MaterialLibrary;
 
 class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
@@ -11,24 +14,111 @@ class SceneCodec {
 
   public static function encode(scene:EditorScene,
     ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument,
-    ?project:ProjectSceneRecord, ?authoredObjects:Array<SceneObjectData>):String return Json.stringify(
-      {
-    format: FORMAT,
-    version: VERSION,
-    objects: script == null ? (authoredObjects == null ? scene.recordsForSave() : authoredObjects) :[],
-    sensors : script == null && sensors != null ? sensors.records() : null,
-    script : script,
-    project: project,
-    bim : bim == null ? null : Json.parse(BimCodec.encode(bim))
-  },
-    null,
-    "  "
-  ) + "\n";
+    ?project:ProjectSceneRecord, ?authoredObjects:Array<SceneObjectData>,
+    ?customMaterials:Array<MaterialDef>):String {
+    var custom = customMaterials == null ? [] : customMaterials;
+    MaterialLibrary.validateCustom(custom);
+    var objects = script == null ? (authoredObjects == null ? scene.recordsForSave() : authoredObjects) : [];
+    var encodedObjects:Array<Dynamic> = [];
+    for (object in objects) encodedObjects.push(encodeObject(object, custom));
+    return Json.stringify({format: FORMAT, version: VERSION, objects: encodedObjects,
+      sensors: script == null && sensors != null ? sensors.records() : null,
+      script: script, project: project, materials: MaterialLibrary.all().concat(custom),
+      bim: bim == null ? null : Json.parse(BimCodec.encode(bim))}, null, "  ") + "\n";
+  }
 
-  public static function decodeProject(text:String):Null<ProjectSceneRecord> {
+  /** Serialize editor color fields as sparse material visuals. */
+  public static function encodeObject(object:SceneObjectData, ?customMaterials:Array<MaterialDef>):Dynamic {
+    var custom = customMaterials == null ? [] : customMaterials;
+    var finish = object.appearance == null ? "neutral" : object.appearance.finish;
+    var id = object.materialId == null ?
+      (hasMaterial(finish, custom) ? finish : "neutral") : object.materialId;
+    var material = resolveMaterial(id, custom);
+    var result:Dynamic = {};
+    for (name in Reflect.fields(object)) if (["red", "green", "blue", "appearance", "materialId"].indexOf(name) < 0)
+      Reflect.setField(result, name, Reflect.field(object, name));
+    Reflect.setField(result, "materialId", id);
+    var visual:Dynamic = {};
+    var color = material.visual.baseColor;
+    if (Math.abs(object.red - color[0]) > 1e-6 || Math.abs(object.green - color[1]) > 1e-6 ||
+        Math.abs(object.blue - color[2]) > 1e-6)
+      Reflect.setField(visual, "baseColor", [object.red, object.green, object.blue]);
+    var appearance = object.appearance == null ? Appearances.neutral() : object.appearance;
+    if (appearance.finish != id) Reflect.setField(visual, "finish", appearance.finish);
+    if (Math.abs(appearance.metallic - material.visual.metallic) > 1e-6)
+      Reflect.setField(visual, "metallic", appearance.metallic);
+    if (Math.abs(appearance.roughness - material.visual.roughness) > 1e-6)
+      Reflect.setField(visual, "roughness", appearance.roughness);
+    if (Reflect.fields(visual).length > 0) Reflect.setField(result, "visualOverrides", visual);
+    return result;
+  }
+
+  static function resolveMaterial(id:String, custom:Array<MaterialDef>):MaterialDef {
+    var builtIn = MaterialLibrary.get(id);
+    if (builtIn != null) return builtIn;
+    for (item in custom) if (item.id == id) return item;
+    throw 'Unknown scene material "$id"';
+  }
+
+  static function hasMaterial(id:String, custom:Array<MaterialDef>):Bool {
+    if (MaterialLibrary.get(id) != null) return true;
+    for (item in custom) if (item.id == id) return true;
+    return false;
+  }
+
+  /** Parse once before decoding independently validated sections. */
+  public static function parse(text:String):Dynamic {
     var root:Dynamic = Json.parse(text);
     if (stringField(root, "format") != FORMAT || numberField(root, "version") != VERSION)
       throw "Unsupported scene document";
+    return root;
+  }
+
+  public static function decodeProject(text:String):Null<ProjectSceneRecord> return decodeProjectRoot(parse(text));
+
+  public static function decodeCustomMaterialsRoot(root:Dynamic):Array<MaterialDef> {
+    if (!Reflect.hasField(root, "materials") || Reflect.field(root, "materials") == null) return [];
+    var raw:Dynamic = Reflect.field(root, "materials");
+    if (!Std.isOfType(raw, Array)) throw "Scene materials must be an array";
+    var custom:Array<MaterialDef> = [];
+    var seen = new Map<String, Bool>();
+    var materials:Array<Dynamic> = cast raw;
+    for (material in materials) {
+      var id = stringField(material, "id");
+      if (seen.exists(id)) throw "Duplicate scene material";
+      seen.set(id, true);
+      if (MaterialLibrary.get(id) != null) continue;
+      var visual = field(material, "visual"), physical = field(material, "physical");
+      var parsed:MaterialDef = {
+        id: id, name: stringField(material, "name"),
+        visual: {baseColor: materialColor(field(visual, "baseColor")),
+          metallic: numberField(visual, "metallic"), roughness: numberField(visual, "roughness")},
+        physical: {density: numberField(physical, "density"), spec: stringField(physical, "spec")}
+      };
+      if (Reflect.hasField(visual, "emissive") && Reflect.field(visual, "emissive") != null)
+        parsed.visual.emissive = materialColor(Reflect.field(visual, "emissive"));
+      if (Reflect.hasField(visual, "alpha") && Reflect.field(visual, "alpha") != null)
+        parsed.visual.alpha = numberField(visual, "alpha");
+      custom.push(parsed);
+    }
+    MaterialLibrary.validateCustom(custom);
+    return custom;
+  }
+
+  static function materialColor(raw:Dynamic):Array<Float> {
+    if (!Std.isOfType(raw, Array)) throw "Scene material color must be an array";
+    var values:Array<Dynamic> = cast raw;
+    if (values.length != 3) throw "Scene material color must have three channels";
+    var color:Array<Float> = [];
+    for (value in values) {
+      if ((!Std.isOfType(value, Float) && !Std.isOfType(value, Int)) || !Math.isFinite(cast value))
+        throw "Scene material color must be finite";
+      color.push(cast value);
+    }
+    return color;
+  }
+
+  public static function decodeProjectRoot(root:Dynamic):Null<ProjectSceneRecord> {
     var value:Dynamic = Reflect.field(root, "project");
     if (value == null) return null;
     if (Reflect.field(root, "script") != null) throw "A scene cannot have both script and project owners";
@@ -50,10 +140,14 @@ class SceneCodec {
       throw "Generated project has too many edits";
     var seen = new Map<String, Bool>();
     for (item in overrideValues) {
-      var id = stringField(item, "id");
-      if (seen.exists(id) || Reflect.hasField(item, "meshSnapshot") || Reflect.hasField(item, "cadGraph"))
+      var id = stringField(item, "targetId");
+      var editKey = id + ":" + stringField(item, "property");
+      if (seen.exists(editKey) || Reflect.hasField(item, "meshSnapshot") || Reflect.hasField(item, "cadGraph"))
         throw "Invalid generated project override";
-      seen.set(id, true);
+      var kind = stringField(item, "kind");
+      if (["number", "boolean", "text", "vector", "appearance"].indexOf(kind) < 0 ||
+          !Reflect.hasField(item, "value")) throw "Invalid generated project field edit";
+      seen.set(editKey, true);
     }
     var removedIds:Array<String> = [];
     for (item in removedValues) {
@@ -67,22 +161,21 @@ class SceneCodec {
     var instanceRecords:Array<app.ProjectSceneRecord.ProjectSceneInstance> = [];
     for (item in instanceValues) {
       var sourceId = stringField(item, "sourceId");
-      var object = field(item, "object");
-      var id = stringField(object, "id");
-      if (seen.exists(id) || Reflect.hasField(object, "meshSnapshot") || Reflect.hasField(object, "cadGraph"))
+      var id = stringField(item, "id");
+      if (!Std.isOfType(field(item, "overrides"), Array) || seen.exists(id))
         throw "Invalid generated project instance";
       seen.set(id, true);
-      instanceRecords.push({sourceId: sourceId, object: object});
+      instanceRecords.push({sourceId: sourceId, id: id,
+        overrides: cast field(item, "overrides")});
     }
     return {version: 1, reference: reference, overrides: cast overrides,
       removed: removedIds, instances: instanceRecords, assemblyState: assemblyState,
       assemblyDependentJoints: assemblyDependentJoints};
   }
 
-  public static function decodeScript(text:String):Null < ScriptOwnershipRecord > {
-    var root:Dynamic = Json.parse(text);
-    if (stringField(root,
-      "format") != FORMAT || numberField(root, "version") != VERSION) throw "Unsupported scene document";
+  public static function decodeScript(text:String):Null<ScriptOwnershipRecord> return decodeScriptRoot(parse(text));
+
+  public static function decodeScriptRoot(root:Dynamic):Null<ScriptOwnershipRecord> {
     var value:Dynamic = Reflect.field(root, "script");
     if (value == null) return null;
     var reference = stringField(value, "reference"), version = Std.int(numberField(value, "version"));
@@ -148,10 +241,9 @@ class SceneCodec {
   }
 
   /** Optional versioned BimKit section; absent sections migrate to an empty BIM model. */
-  public static function decodeBim(text:String):BimDocument {
-    var root:Dynamic = Json.parse(text);
-    if (stringField(root, "format") != FORMAT || numberField(root, "version") != VERSION)
-      throw "Unsupported scene document";
+  public static function decodeBim(text:String):BimDocument return decodeBimRoot(parse(text));
+
+  public static function decodeBimRoot(root:Dynamic):BimDocument {
     var value:Dynamic = Reflect.field(root, "bim");
     return value == null ? new BimDocument() : BimCodec.decode(Json.stringify(value));
   }
@@ -176,18 +268,16 @@ class SceneCodec {
       throw "Unsupported script override type";
   }
 
-  public static function decodeSensors(text:String):Null < Dynamic > {
-    var root:Dynamic = Json.parse(text);
-    if (stringField(root,
-      "format") != FORMAT || numberField(root, "version") != VERSION) throw "Unsupported scene document";
+  public static function decodeSensors(text:String):Null<Dynamic> return decodeSensorsRoot(parse(text));
+
+  public static function decodeSensorsRoot(root:Dynamic):Null<Dynamic> {
     return Reflect.hasField(root, "sensors") ? Reflect.field(root, "sensors") : null;
   }
 
   /** Validate the entire file before allocating native scene resources. */
-  public static function decode(text:String):Array < SceneObjectData > {
-    var root:Dynamic = Json.parse(text);
-    if (stringField(root, "format") != FORMAT) throw "This is not a Materia scene document";
-    if (numberField(root, "version") != VERSION) throw "Unsupported scene document version";
+  public static function decode(text:String):Array<SceneObjectData> return decodeRoot(parse(text));
+
+  public static function decodeRoot(root:Dynamic):Array<SceneObjectData> {
     var raw:Dynamic = field(root, "objects");
     if (!Std.isOfType(raw, Array)) throw "Scene objects must be an array";
     var values:Array<Dynamic> = cast raw;
@@ -195,6 +285,7 @@ class SceneCodec {
     var result:Array<SceneObjectData> = [];
     var ids:Map<String, Bool> = new Map();
     var sketchDraftCount = 0;
+    var custom = decodeCustomMaterialsRoot(root);
     for (value in values) {
       var id = stringField(value, "id");
       if (id == "scene" || ids.exists(id)) throw "Duplicate or reserved object ID: " + id;
@@ -203,6 +294,22 @@ class SceneCodec {
       if (kind != "rectangle" && kind != "cad-plate" && kind != "cad-bracket" && kind != "cad-step" &&
           kind != "cad-part" && kind != "cad-preview")
         throw "Unsupported scene object type: " + kind;
+      var materialId = stringField(value, "materialId");
+      var material = resolveMaterial(materialId, custom);
+      var visual:Dynamic = Reflect.field(value, "visualOverrides");
+      var color = material.visual.baseColor;
+      if (visual != null && Reflect.hasField(visual, "baseColor")) {
+        var rawColor:Dynamic = Reflect.field(visual, "baseColor");
+        if (!Std.isOfType(rawColor, Array)) throw "Invalid scene material color";
+        color = cast rawColor;
+        if (color.length != 3) throw "Invalid scene material color";
+        for (channel in color) if (!Math.isFinite(channel) || channel < 0 || channel > 1)
+          throw "Invalid scene material color";
+      }
+      var appearance:Appearance = {finish: visual == null || !Reflect.hasField(visual, "finish")
+        ? materialId : stringField(visual, "finish"),
+        metallic: visual == null ? material.visual.metallic : optionalBounded(visual, "metallic", 0, 1, material.visual.metallic),
+        roughness: visual == null ? material.visual.roughness : optionalBounded(visual, "roughness", 0, 1, material.visual.roughness)};
       var visible:Dynamic = field(value, "visible");
       if (!Std.isOfType(visible, Bool)) throw "Object visibility must be a boolean";
       var visibleValue:Bool = visible;
@@ -272,25 +379,11 @@ class SceneCodec {
           1000000,
           1.0
         ),
-        red: bounded(
-          value,
-          "red",
-          0,
-          1
-        ),
-        green: bounded(
-          value,
-          "green",
-          0,
-          1
-        ),
-        blue: bounded(
-          value,
-          "blue",
-          0,
-          1
-        ),
-        appearance: optionalAppearance(value),
+        red: color[0],
+        green: color[1],
+        blue: color[2],
+        appearance: appearance,
+        materialId: materialId,
         visible: visibleValue,
         rotation: optionalRotation(value),
         cadGraph: cadGraph,
@@ -305,17 +398,6 @@ class SceneCodec {
   static function field(value:Dynamic, name:String):Dynamic {
     if (value == null || !Reflect.hasField(value, name)) throw "Missing scene field: " + name;
     return Reflect.field(value, name);
-  }
-  static function optionalAppearance(value:Dynamic):Null<Appearance> {
-    if (!Reflect.hasField(value, "appearance") || Reflect.field(value, "appearance") == null) return null;
-    var data:Dynamic = Reflect.field(value, "appearance");
-    var finish = stringField(data, "finish");
-    if (finish.length > 4096) throw "Scene appearance finish is too long";
-    return {
-      finish: finish,
-      metallic: bounded(data, "metallic", 0, 1),
-      roughness: bounded(data, "roughness", 0, 1)
-    };
   }
   static function stringField(value:Dynamic, name:String):String {
     var data = field(value, name);

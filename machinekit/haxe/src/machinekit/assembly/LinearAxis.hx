@@ -237,6 +237,9 @@ class LinearAxis {
 		carriage.addTo(model, "carriage");
 		model.mateOnAxis("carriage-slide", "prismatic", "motor", "shaftTip", "carriage", "bore",
 			{x: 0, y: 1, z: 0}, travelMin, {lower: travelMin, upper: travelMax, velocity: null, effort: null});
+		var ratio = 2 * Math.PI / (transmission.lead * transmission.direction);
+		model.couple("lead-screw", "carriage-slide", "coupling", ratio,
+			-transmission.linearOffset * ratio);
 		nut.addTo(model, "leadNut");
 		model.mate("nut-carriage", "fixed", "carriage", "nutMount", "leadNut", "mountFace");
 		if (railGuide == null) {

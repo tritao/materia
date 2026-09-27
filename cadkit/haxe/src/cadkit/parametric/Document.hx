@@ -35,6 +35,7 @@ import cadkit.parametric.ElementChanges.ElementPropertyChange;
 import cadkit.parametric.DatumChanges.LevelElevationChange;
 import cadkit.parametric.DatumChanges.ReferencePlaneChange;
 import cadkit.modeling.Plane;
+import materia.units.LengthUnit;
 import cadkit.parametric.Placement;
 import cadkit.parametric.PlacementChange;
 import cadkit.parametric.Definition;
@@ -61,6 +62,8 @@ class Document {
 	private var nextId:Int;
 
 	public final id:DocumentId;
+	public final lengthUnit:String;
+	public final metresPerUnit:Float;
 
 	private final elements:Array<Element>;
 	private var elementsById:Map<String, Element>;
@@ -107,8 +110,10 @@ class Document {
 	/** Checked between feature evaluations and by cooperative sketch solving. */
 	public var evaluationCancellationCheck:Null<Void->Bool>;
 
-	public function new(?id:DocumentId, implicitOutputEnabled:Bool = true) {
+	public function new(?id:DocumentId, implicitOutputEnabled:Bool = true, lengthUnit:String = "mm") {
 		this.id = id == null ? new DocumentId() : id;
+		this.lengthUnit = lengthUnit;
+		this.metresPerUnit = LengthUnit.metresPerUnit(lengthUnit);
 		this.implicitOutputEnabled = implicitOutputEnabled;
 		token = nextToken;
 		nextToken++;

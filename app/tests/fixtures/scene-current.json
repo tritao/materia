@@ -1,0 +1,26 @@
+{
+  "format": "materia.scene",
+  "version": 1,
+  "objects": [
+    {
+      "id": "current-box",
+      "label": "Current box",
+      "type": "rectangle",
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "width": 1,
+      "height": 1,
+      "depth": 0.1,
+      "visible": true,
+      "materialId": "neutral",
+      "visualOverrides": {
+        "baseColor": [
+          0.4,
+          0.5,
+          0.6
+        ]
+      }
+    }
+  ]
+}

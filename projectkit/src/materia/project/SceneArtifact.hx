@@ -8,6 +8,9 @@ import materia.project.AssemblyDefinition.AssemblyStateRecord;
 import materia.project.AssemblyDefinitionCodec;
 import materia.project.Appearance;
 import materia.project.Appearance.Appearances;
+import materia.project.MaterialLibrary;
+import materia.project.MeshMassProperties;
+import materia.units.LengthUnit;
 
 typedef SceneArtifactFaceRange = {
 	var faceIndex:Int;
@@ -22,6 +25,12 @@ typedef SceneArtifactPart = {
 	var green:Float;
 	var blue:Float;
 	@:optional var appearance:Appearance;
+	@:optional var materialId:String;
+	@:optional var materialDensity:Float;
+	@:optional var materialSpec:String;
+	@:optional var volume:Float;
+	@:optional var centerOfMass:Array<Float>;
+	@:optional var inertia:Array<Float>;
 	var vertexCount:Int;
 	var indexCount:Int;
 	var vertices:Bytes;
@@ -33,6 +42,7 @@ typedef SceneArtifactPart = {
 }
 
 typedef SceneArtifactData = {
+	@:optional var lengthUnit:String;
 	/** Metres represented by one coordinate in every mesh stream. */
 	var metresPerUnit:Float;
 	var parts:Array<SceneArtifactPart>;
@@ -44,7 +54,7 @@ typedef SceneArtifactData = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 7;
+	public static inline var VERSION:Int = 8;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -52,7 +62,10 @@ class SceneArtifact {
 
 	public static function encode(data:SceneArtifactData):Bytes {
 		validateHeader(data);
-		var names:Array<{id:Bytes, name:Bytes, finish:Bytes}> = [];
+		var unit = data.lengthUnit == null ? LengthUnit.fromScale(data.metresPerUnit) : data.lengthUnit;
+		var unitText = Bytes.ofString(unit);
+		var names:Array<{id:Bytes, name:Bytes, finish:Bytes, materialId:Bytes, materialSpec:Bytes,
+			density:Float, volume:Float, center:Array<Float>, inertia:Array<Float>}> = [];
 		var assembly = data.assembly == null ? Bytes.alloc(0) : Bytes.ofString(AssemblyCodec.encode(data.assembly));
 		var assemblyDefinition = data.assemblyDefinition == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
@@ -60,15 +73,25 @@ class SceneArtifact {
 			: Bytes.ofString(AssemblyDefinitionCodec.encodeState(data.assemblyDefinition, data.assemblyState));
 		if (assembly.length > 2000000 || assemblyDefinition.length > 2000000 || assemblyState.length > 2000000)
 			throw "Scene artifact assembly metadata is too large";
-		var length = 32 + assembly.length + assemblyDefinition.length + assemblyState.length;
+		var length = 36 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
 			if (id.length == 0 || id.length > 4096 || name.length == 0 || name.length > 4096)
 				throw "Scene artifact has an invalid part ID or name";
 			var finish = Bytes.ofString(part.appearance == null ? "neutral" : part.appearance.finish);
-			names.push({id: id, name: name, finish: finish});
-			length += 48 + finish.length + id.length + name.length + part.vertices.length + part.normals.length
+			var idValue = part.materialId == null ? "neutral" : part.materialId;
+			var materialId = Bytes.ofString(idValue);
+			var spec = part.materialSpec == null ? MaterialLibrary.require(idValue).physical.spec : part.materialSpec;
+			var materialSpec = Bytes.ofString(spec);
+			var density = part.materialDensity == null ? MaterialLibrary.require(idValue).physical.density : part.materialDensity;
+			var meshProperties = MeshMassProperties.compute(part.vertices, part.indices);
+			names.push({id: id, name: name, finish: finish, materialId: materialId,
+				materialSpec: materialSpec, density: density,
+				volume: part.volume == null ? meshProperties.volume : part.volume,
+				center: part.centerOfMass == null ? meshProperties.centerOfMass : part.centerOfMass,
+				inertia: part.inertia == null ? meshProperties.inertia : part.inertia});
+			length += 168 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
 				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
 				+ (part.edgeIds == null ? 0 : part.edgeIds.length)
 				+ part.faceRanges.length * 12;
@@ -78,6 +101,8 @@ class SceneArtifact {
 		for (byte in [77, 84, 82, 71]) result.set(offset++, byte); // MTRG.
 		offset = putInt(result, offset, VERSION);
 		result.setDouble(offset, data.metresPerUnit); offset += 8;
+		offset = putInt(result, offset, unitText.length);
+		result.blit(offset, unitText, 0, unitText.length); offset += unitText.length;
 		offset = putInt(result, offset, data.parts.length);
 		for (index in 0...data.parts.length) {
 			var part = data.parts[index], text = names[index];
@@ -93,6 +118,14 @@ class SceneArtifact {
 			var appearance = part.appearance == null ? Appearances.neutral() : part.appearance;
 			result.setFloat(offset, appearance.metallic); offset += 4;
 			result.setFloat(offset, appearance.roughness); offset += 4;
+			offset = putInt(result, offset, text.materialId.length);
+			result.blit(offset, text.materialId, 0, text.materialId.length); offset += text.materialId.length;
+			result.setDouble(offset, text.density); offset += 8;
+			offset = putInt(result, offset, text.materialSpec.length);
+			result.blit(offset, text.materialSpec, 0, text.materialSpec.length); offset += text.materialSpec.length;
+			result.setDouble(offset, text.volume); offset += 8;
+			for (coordinate in text.center) { result.setDouble(offset, coordinate); offset += 8; }
+			for (component in text.inertia) { result.setDouble(offset, component); offset += 8; }
 			offset = putInt(result, offset, part.vertexCount);
 			offset = putInt(result, offset, part.indexCount);
 			offset = putInt(result, offset, part.faceRanges.length);
@@ -133,6 +166,9 @@ class SceneArtifact {
 		if (data == null || !finite(data.metresPerUnit) || data.metresPerUnit <= 0.0 ||
 			data.parts == null || data.parts.length == 0 || data.parts.length > 1000)
 			throw "Scene artifact has invalid units or part count";
+		if (data.lengthUnit != null &&
+			Math.abs(LengthUnit.metresPerUnit(data.lengthUnit) - data.metresPerUnit) > 1e-12)
+			throw "Scene artifact length unit and scale disagree";
 		var ids = new Map<String, Bool>();
 		for (part in data.parts) {
 			if (part.id == null || StringTools.trim(part.id).length == 0 || ids.exists(part.id))
@@ -142,9 +178,9 @@ class SceneArtifact {
 		var assembly = data.assembly;
 		if (assembly != null) {
 			AssemblyCodec.validate(assembly);
-			if (assembly.instances.length != data.parts.length)
+			if (data.assemblyDefinition == null && assembly.instances.length != data.parts.length)
 				throw "Assembly must place every scene artifact part";
-			for (instance in assembly.instances) if (!ids.exists(instance.id))
+			for (instance in assembly.instances) if (data.assemblyDefinition == null && !ids.exists(instance.id))
 				throw 'Assembly instance "${instance.id}" has no geometry part';
 		}
 		if (data.assemblyState != null && data.assemblyDefinition == null)
@@ -152,6 +188,8 @@ class SceneArtifact {
 		var assemblyDefinition = data.assemblyDefinition;
 		if (assemblyDefinition != null) {
 			AssemblyDefinitionCodec.validate(assemblyDefinition);
+			if (assembly != null && assembly.instances.length != assemblyDefinition.occurrences.length)
+				throw "Assembly snapshot does not match its occurrences";
 			for (definition in assemblyDefinition.definitions) if (!ids.exists(definition.id))
 				throw 'Assembly component definition "${definition.id}" has no geometry part';
 			if (data.assemblyState != null)
@@ -183,6 +221,25 @@ class SceneArtifact {
 			if (!finite(color) || color < 0.0 || color > 1.0)
 				throw 'Scene artifact part "${part.id}" has an invalid color';
 		var appearance = part.appearance;
+		if (part.materialId != null && MaterialLibrary.get(part.materialId) == null &&
+			(part.materialDensity == null || part.materialSpec == null))
+			throw 'Scene artifact part "${part.id}" needs resolved custom material properties';
+		if (part.materialId != null && (StringTools.trim(part.materialId).length == 0 ||
+			Bytes.ofString(part.materialId).length > 4096))
+			throw 'Scene artifact part "${part.id}" has an invalid material ID';
+		if (part.materialDensity != null && (!finite(part.materialDensity) || part.materialDensity <= 0))
+			throw 'Scene artifact part "${part.id}" has an invalid density';
+		if (part.materialSpec != null && (StringTools.trim(part.materialSpec).length == 0 ||
+			Bytes.ofString(part.materialSpec).length > 4096))
+			throw 'Scene artifact part "${part.id}" has an invalid material specification';
+		if (part.volume != null && (!finite(part.volume) || part.volume <= 0) ||
+			part.centerOfMass != null && part.centerOfMass.length != 3 ||
+			part.inertia != null && part.inertia.length != 9)
+			throw 'Scene artifact part "${part.id}" has invalid mass properties';
+		if (part.centerOfMass != null) for (coordinate in part.centerOfMass)
+			if (!finite(coordinate)) throw 'Scene artifact part "${part.id}" has invalid centre of mass';
+		if (part.inertia != null) for (component in part.inertia)
+			if (!finite(component)) throw 'Scene artifact part "${part.id}" has invalid inertia';
 		if (appearance != null && (appearance.finish == null ||
 			StringTools.trim(appearance.finish).length == 0 ||
 			Bytes.ofString(appearance.finish).length > 4096 ||
@@ -224,9 +281,10 @@ private class SceneArtifactReader {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != SceneArtifact.VERSION)
+		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 && version != SceneArtifact.VERSION)
 			throw "Unsupported scene artifact version";
 		var metresPerUnit = readDouble();
+		var lengthUnit = version >= 8 ? readText() : null;
 		var count = readInt();
 		if (!Math.isFinite(metresPerUnit) || metresPerUnit <= 0.0 || count <= 0 || count > 1000)
 			throw "Scene artifact has invalid units or part count";
@@ -239,6 +297,13 @@ private class SceneArtifactReader {
 			var appearance:Appearance = version >= 7
 				? {finish: readText(), metallic: readFloat(), roughness: readFloat()}
 				: Appearances.neutral();
+			var materialId = version >= 8 ? readText() :
+				(MaterialLibrary.get(appearance.finish) == null ? "neutral" : appearance.finish);
+			var density = version >= 8 ? readDouble() : null;
+			var materialSpec = version >= 8 ? readText() : null;
+			var volume = version >= 8 ? readDouble() : null;
+			var center = version >= 8 ? [for (_ in 0...3) readDouble()] : null;
+			var inertia = version >= 8 ? [for (_ in 0...9) readDouble()] : null;
 			var vertexCount = readInt(), indexCount = readInt(), rangeCount = readInt();
 			var edgeByteCount = version >= 4 ? readInt() : 0;
 			if (vertexCount <= 0 || vertexCount > 2000000 || indexCount <= 0 ||
@@ -252,7 +317,8 @@ private class SceneArtifactReader {
 			for (_ in 0...rangeCount)
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
 			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
-				appearance: appearance,
+				appearance: appearance, materialId: materialId, materialDensity: density, materialSpec: materialSpec,
+				volume: volume, centerOfMass: center, inertia: inertia,
 				vertexCount: vertexCount, indexCount: indexCount, vertices: vertices, normals: normals,
 				indices: indices, edgeSegments: edgeSegments, edgeIds: edgeIds,
 				faceRanges: faceRanges};
@@ -282,7 +348,8 @@ private class SceneArtifactReader {
 			}
 		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
-		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, parts: parts, assembly: assembly,
+		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
+			parts: parts, assembly: assembly,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;

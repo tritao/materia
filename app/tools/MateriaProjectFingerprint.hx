@@ -10,12 +10,11 @@ import sys.io.File;
 class MateriaProjectFingerprint {
 	static function main():Void {
 		var args = Sys.args();
-		if (args.length < 4)
-			throw "usage: MateriaProjectFingerprint <manifest> <module> <function> <tools-dir> [input-file ...]";
+		if (args.length < 5)
+			throw "usage: MateriaProjectFingerprint <manifest> <module> <function> <tools-dir> <haxeon-root> [input-file ...]";
 		var manifest = FileSystem.fullPath(args[0]);
 		var project = new PackageResolver(new PathSourceAcquirer()).resolve(manifest, null, false, Target.parse("host"));
-		var home = Sys.getEnv("HAXEON_HOME");
-		if (home == null || home.length == 0) throw "HAXEON_HOME is not set";
+		var home = FileSystem.fullPath(args[4]);
 		var paths = new Map<String, Bool>();
 		add(paths, manifest);
 		for (item in project.packages.packages) {
@@ -32,7 +31,7 @@ class MateriaProjectFingerprint {
 			addHaxeSources(paths, root);
 		for (name in ["MateriaProjectModuleBuild.hx", "MateriaProjectFingerprint.hx"])
 			add(paths, Path.join([args[3], name]));
-		for (index in 4...args.length) add(paths, args[index]);
+		for (index in 5...args.length) add(paths, args[index]);
 		var ordered = [for (path in paths.keys()) path];
 		ordered.sort(Reflect.compare);
 		var fields = new StringBuf();

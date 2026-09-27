@@ -54,11 +54,13 @@ import materia.project.Appearance.Appearances;
 @:access(app.Main.ReferenceEditorApp)
 class SceneEditingTests {
   static function appearanceArtifactRoundTrip():Void {
-    var vertices = Bytes.alloc(72), normals = Bytes.alloc(72), indices = Bytes.alloc(12);
-    indices.setInt32(0, 0); indices.setInt32(4, 1); indices.setInt32(8, 2);
+    var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
+    vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
+    var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+    for (index in 0...corners.length) indices.setInt32(index * 4, corners[index]);
     var encoded = SceneArtifact.encode({metresPerUnit: 0.001, parts: [{
       id: "shaft", name: "Shaft", red: 0.6, green: 0.62, blue: 0.65,
-      appearance: Appearances.machinedSteel(), vertexCount: 3, indexCount: 3,
+      appearance: Appearances.machinedSteel(), vertexCount: 4, indexCount: 12,
       vertices: vertices, normals: normals, indices: indices, faceRanges: []
     }]});
     var part = SceneArtifact.decode(encoded).parts[0];
@@ -1228,6 +1230,7 @@ class SceneEditingTests {
     } catch (error:Dynamic) {
       scene.dispose();
       Sys.println("Scene editing tests failed: " + Std.string(error));
+      Sys.println(haxe.CallStack.toString(haxe.CallStack.exceptionStack()));
       return 1;
     }
   }

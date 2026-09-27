@@ -8,6 +8,14 @@ typedef Appearance = {
 }
 
 class Appearances {
+	public static function same(a:Null<Appearance>, b:Null<Appearance>):Bool {
+		var left = a == null ? neutral() : a;
+		var right = b == null ? neutral() : b;
+		return left.finish == right.finish && Math.abs(left.metallic - right.metallic) < 1e-6
+			&& Math.abs(left.roughness - right.roughness) < 1e-6;
+	}
+	public static function presets():Array<Appearance> return [neutral(), painted(), machinedSteel(),
+		blackOxide(), bearingSteel(), aluminium(), rubber()];
 	public static function preset(id:String):Null<Appearance> return switch (id) {
 		case "neutral": neutral();
 		case "painted": painted();

@@ -5,6 +5,7 @@ import materia.project.AssemblyDefinition;
 import materia.project.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.project.AssemblyDefinition.AssemblyComponentOccurrence;
 import materia.project.AssemblyDefinition.AssemblyJointCoordinate;
+import materia.project.AssemblyDefinition.AssemblyJointCoupling;
 import materia.project.AssemblyDefinition.AssemblyJointLimits;
 import materia.project.AssemblyDefinition.AssemblyJointRole;
 import materia.project.AssemblyDefinition.AssemblyJointType;
@@ -15,6 +16,7 @@ import materia.project.AssemblyDefinition.KinematicJoint;
 import materia.project.AssemblyRecord;
 import materia.project.AssemblyRecord.AssemblyConnector;
 import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
@@ -52,6 +54,14 @@ class AssemblyDefinitionCodec {
 		}
 		var result:AssemblyDefinition = {schemaVersion: integerField(raw, "schemaVersion"),
 			id: textField(raw, "id"), definitions: definitions, occurrences: occurrences, joints: joints};
+		result.lengthUnit = Reflect.hasField(raw, "lengthUnit") ? textField(raw, "lengthUnit") : "mm";
+		if (Reflect.hasField(raw, "couplings") && Reflect.field(raw, "couplings") != null) {
+			var couplings:Array<AssemblyJointCoupling> = [];
+			for (item in arrayField(raw, "couplings")) couplings.push({id: textField(item, "id"),
+				source: textField(item, "source"), target: textField(item, "target"),
+				ratio: numberField(item, "ratio"), offset: numberField(item, "offset")});
+			result.couplings = couplings;
+		}
 		validate(result);
 		return result;
 	}
@@ -82,6 +92,7 @@ class AssemblyDefinitionCodec {
 			definition.occurrences.length == 0 || definition.occurrences.length > 1000 ||
 			definition.joints == null || definition.joints.length > 4000)
 			throw "Assembly definition has an invalid version, ID, or item count";
+		LengthUnit.metresPerUnit(definition.lengthUnit == null ? "mm" : definition.lengthUnit);
 
 		var definitions = new Map<String, AssemblyComponentDefinition>();
 		for (component in definition.definitions) {
@@ -108,6 +119,7 @@ class AssemblyDefinitionCodec {
 		}
 
 		var joints = new Map<String, Bool>(), incoming = new Map<String, String>();
+		var movable = new Map<String, KinematicJoint>();
 		for (joint in definition.joints) {
 			if (joint == null || !validText(joint.id) || joints.exists(joint.id) ||
 				!validJointType(joint.type) || (joint.role != AssemblyJointRole.Tree &&
@@ -117,6 +129,7 @@ class AssemblyDefinitionCodec {
 				!validLimits(joint.limits, joint.defaultValue))
 				throw "Assembly definition has an invalid joint";
 			joints.set(joint.id, true);
+			if (joint.role == AssemblyJointRole.Tree && hasCoordinate(joint.type)) movable.set(joint.id, joint);
 			var parent = occurrences.get(joint.parent), child = occurrences.get(joint.child);
 			if (parent == null || child == null ||
 				!hasConnector(definitions.get(parent.definition), joint.parentConnector) ||
@@ -129,6 +142,31 @@ class AssemblyDefinitionCodec {
 			}
 		}
 		validateTree(occurrences, incoming);
+		var couplings = definition.couplings == null ? [] : definition.couplings;
+		if (couplings.length > 4000) throw "Assembly has too many coupled joints";
+		var targets = new Map<String, Bool>(), names = new Map<String, Bool>();
+		var sourceByTarget = new Map<String, String>();
+		for (coupling in couplings) {
+			if (coupling == null || !validText(coupling.id) || names.exists(coupling.id) ||
+				coupling.source == coupling.target || movable.get(coupling.source) == null ||
+				movable.get(coupling.target) == null || targets.exists(coupling.target) ||
+				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset))
+				throw "Assembly has an invalid coupled joint";
+			names.set(coupling.id, true);
+			targets.set(coupling.target, true);
+			sourceByTarget.set(coupling.target, coupling.source);
+		}
+		for (coupling in couplings) {
+			var seen = new Map<String, Bool>();
+			var current = coupling.target;
+			while (true) {
+				if (seen.exists(current)) throw "Assembly coupled joints contain a cycle";
+				seen.set(current, true);
+				var next = sourceByTarget.get(current);
+				if (next == null) break;
+				current = next;
+			}
+		}
 	}
 
 	public static function validateState(definition:AssemblyDefinition, state:AssemblyStateRecord):Void {
@@ -143,12 +181,24 @@ class AssemblyDefinitionCodec {
 		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree && hasCoordinate(joint.type))
 			joints.set(joint.id, joint);
 		var values = new Map<String, Bool>();
+		var coordinateValues = new Map<String, Float>();
 		for (coordinate in state.jointCoordinates) {
 			var joint = coordinate == null ? null : joints.get(coordinate.joint);
 			if (joint == null || values.exists(coordinate.joint) || !Math.isFinite(coordinate.value) ||
 				!withinLimits(joint.limits, coordinate.value))
 				throw "Assembly state has an invalid joint coordinate";
 			values.set(coordinate.joint, true);
+			coordinateValues.set(coordinate.joint, coordinate.value);
+		}
+		if (definition.couplings != null) for (coupling in definition.couplings) {
+			var source = coordinateValues.get(coupling.source);
+			var target = coordinateValues.get(coupling.target);
+			var sourceJoint = joints.get(coupling.source), targetJoint = joints.get(coupling.target);
+			if (sourceJoint == null || targetJoint == null) throw "Assembly coupling has a missing joint";
+			if (source == null) source = sourceJoint.defaultValue;
+			if (target == null) target = targetJoint.defaultValue;
+			if (Math.abs(target - (source * coupling.ratio + coupling.offset)) > 1e-7)
+				throw 'Assembly coupling "${coupling.id}" has inconsistent state';
 		}
 
 		var roots = rootOccurrences(definition);

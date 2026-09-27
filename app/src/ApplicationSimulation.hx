@@ -88,11 +88,12 @@ class ApplicationSimulation {
         if(scene.isCadPart(object.id)){
           var bounds=scene.cadSession(object.id).collisionBounds;
           if(bounds==null)throw "CAD collision bounds are unavailable for: "+object.id;
-          centerX+=bounds.center.x;centerY+=bounds.center.y;centerZ+=bounds.center.z;
+          var offset = rotateOffset(bounds.center.x, bounds.center.y, bounds.center.z, object.rotation);
+          centerX+=offset[0];centerY+=offset[1];centerZ+=offset[2];
           halfX=bounds.halfExtents.x;halfY=bounds.halfExtents.y;halfZ=bounds.halfExtents.z;
         }
         var handle=candidate.spawnBox([centerX,centerY,centerZ],
-          [halfX,halfY,halfZ],object.dynamicBody,object.mass);
+          [halfX,halfY,halfZ],object.dynamicBody,object.mass,object.rotation);
         candidateObjects.push({id:object.id,handle:handle});
       }
       if (running) candidate.start();
@@ -130,6 +131,15 @@ class ApplicationSimulation {
       if (candidate != null && candidate != simulation) candidate.dispose();
       return false;
     }
+  }
+
+  static function rotateOffset(x:Float, y:Float, z:Float, rotation:Null<Array<Float>>):Array<Float> {
+    if (rotation == null) return [x, y, z];
+    var qx = rotation[0], qy = rotation[1], qz = rotation[2], qw = rotation[3];
+    var tx = 2 * (qy * z - qz * y), ty = 2 * (qz * x - qx * z), tz = 2 * (qx * y - qy * x);
+    return [x + qw * tx + qy * tz - qz * ty,
+      y + qw * ty + qz * tx - qx * tz,
+      z + qw * tz + qx * ty - qy * tx];
   }
 
   public function step(?timestampNs:Int64):WorldSnapshot {

@@ -406,6 +406,10 @@ class HaxeonSmoke {
 		if (serialized.length == 0)
 			return 37;
 		var loaded = DocumentCodec.decode(serialized);
+		var centimetreDocument = DocumentCodec.decode(DocumentCodec.encode(new Document(null, true, "cm")));
+		if (centimetreDocument.lengthUnit != "cm" ||
+			Math.abs(centimetreDocument.metresPerUnit - 0.01) > 1e-12)
+			return 101;
 		if (loaded.featureCount() != 4)
 			return 38;
 		var loadedBase:BoxFeature = cast loaded.featureAt(0);

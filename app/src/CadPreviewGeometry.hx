@@ -12,31 +12,59 @@ class CadPreviewGeometry {
 
   /** Build generated geometry directly from the validated binary artifact. */
   public static function fromArtifact(part:SceneArtifactPart, minimum:Array<Float>,
-      maximum:Array<Float>, scale:Float):GeometryData {
+      maximum:Array<Float>, scale:Float, centered:Bool = true,
+      includeTopology:Bool = false):GeometryData {
+    if (!finite(scale) || scale <= 0 || part.vertexCount <= 0 || part.indexCount <= 0 ||
+        part.indexCount % 3 != 0 || part.vertices.length != part.vertexCount * 24 ||
+        part.normals.length != part.vertexCount * 24 || part.indices.length != part.indexCount * 4)
+      throw "CAD mesh has inconsistent streams";
     var geometry = new GeometryData();
     var positions = Bytes.alloc(part.vertexCount * 12);
     var normals = Bytes.alloc(part.vertexCount * 12);
-    var centerX = (minimum[0] + maximum[0]) * 0.5;
-    var centerY = (minimum[1] + maximum[1]) * 0.5;
-    var centerZ = (minimum[2] + maximum[2]) * 0.5;
+    var centerX = centered ? (minimum[0] + maximum[0]) * 0.5 : 0.0;
+    var centerY = centered ? (minimum[1] + maximum[1]) * 0.5 : 0.0;
+    var centerZ = centered ? (minimum[2] + maximum[2]) * 0.5 : 0.0;
     for (index in 0...part.vertexCount) {
       var source = index * 24, target = index * 12;
-      positions.setFloat(target, (part.vertices.getDouble(source) - centerX) * scale);
-      positions.setFloat(target + 4, (part.vertices.getDouble(source + 8) - centerY) * scale);
-      positions.setFloat(target + 8, (part.vertices.getDouble(source + 16) - centerZ) * scale);
-      normals.setFloat(target, part.normals.getDouble(source));
-      normals.setFloat(target + 4, part.normals.getDouble(source + 8));
-      normals.setFloat(target + 8, part.normals.getDouble(source + 16));
+      var x = (part.vertices.getDouble(source) - centerX) * scale;
+      var y = (part.vertices.getDouble(source + 8) - centerY) * scale;
+      var z = (part.vertices.getDouble(source + 16) - centerZ) * scale;
+      var nx = part.normals.getDouble(source), ny = part.normals.getDouble(source + 8),
+        nz = part.normals.getDouble(source + 16);
+      if (!finite(x) || !finite(y) || !finite(z) || !finite(nx) || !finite(ny) || !finite(nz))
+        throw "CAD mesh contains a non-finite vertex or normal";
+      if (includeTopology) geometry.addVertex(x, y, z);
+      positions.setFloat(target, x); positions.setFloat(target + 4, y); positions.setFloat(target + 8, z);
+      normals.setFloat(target, nx); normals.setFloat(target + 4, ny); normals.setFloat(target + 8, nz);
+    }
+    for (triangle in 0...Std.int(part.indexCount / 3)) {
+      var offset = triangle * 12;
+      var first = part.indices.getInt32(offset), second = part.indices.getInt32(offset + 4),
+        third = part.indices.getInt32(offset + 8);
+      if (first < 0 || second < 0 || third < 0 || first >= part.vertexCount ||
+          second >= part.vertexCount || third >= part.vertexCount)
+        throw "CAD mesh has an out-of-range triangle index";
+      if (includeTopology) geometry.addTriangle(first, second, third);
     }
     geometry.addStream(1, 2, positions, part.vertexCount, 12);
     geometry.addStream(2, 2, normals, part.vertexCount, 12);
-    geometry.setIndexBuffer(part.indices, part.indexCount);
-    for (range in part.faceRanges)
+    if (!includeTopology) geometry.setIndexBuffer(part.indices, part.indexCount);
+    for (range in part.faceRanges) {
+      if (range.firstIndex < 0 || range.indexCount < 0 || range.firstIndex % 3 != 0 ||
+          range.indexCount % 3 != 0 || range.firstIndex + range.indexCount > part.indexCount)
+        throw "CAD mesh has an invalid face range";
       geometry.addSubelement(Std.int(range.firstIndex / 3), Std.int(range.indexCount / 3), range.faceIndex);
+    }
     var edges = part.edgeSegments;
     var edgeIds = part.edgeIds;
+    if (edges != null && edges.length % 48 != 0) throw "CAD mesh has invalid edges";
+    if (edgeIds != null && edgeIds.length != 0 &&
+        (edges == null || edgeIds.length != Std.int(edges.length / 48) * 4))
+      throw "CAD mesh has invalid edge IDs";
     if (edges != null) for (index in 0...Std.int(edges.length / 48)) {
       var offset = index * 48;
+      for (axis in 0...6) if (!finite(edges.getDouble(offset + axis * 8)))
+        throw "CAD mesh has a non-finite edge endpoint";
       geometry.addStrokeSegment(
         (edges.getDouble(offset) - centerX) * scale,
         (edges.getDouble(offset + 8) - centerY) * scale,
@@ -81,51 +109,25 @@ class CadPreviewGeometry {
     var minimum = numberTriple(fields[3 + shift]), maximum = numberTriple(fields[4 + shift]);
     for (axis in 0...3) if (minimum[axis] > maximum[axis])
       throw "CAD preview snapshot has invalid bounds";
-    var centerX = (minimum[0] + maximum[0]) / 2.0;
-    var centerY = (minimum[1] + maximum[1]) / 2.0;
-    var centerZ = (minimum[2] + maximum[2]) / 2.0;
-    var geometry = new GeometryData();
-    var positionStream = Bytes.alloc(vertexCount * 12);
-    var normalStream = Bytes.alloc(vertexCount * 12);
     var actualMinimum = [1e300, 1e300, 1e300], actualMaximum = [-1e300, -1e300, -1e300];
-    for (index in 0...vertexCount) {
-      var offset = index * 24;
-      var rawX = vertices.getDouble(offset), rawY = vertices.getDouble(offset + 8), rawZ = vertices.getDouble(offset + 16);
-      if (!finite(rawX) || !finite(rawY) || !finite(rawZ))
-        throw "CAD preview snapshot contains a non-finite vertex";
-      actualMinimum[0] = Math.min(actualMinimum[0], rawX);
-      actualMinimum[1] = Math.min(actualMinimum[1], rawY);
-      actualMinimum[2] = Math.min(actualMinimum[2], rawZ);
-      actualMaximum[0] = Math.max(actualMaximum[0], rawX);
-      actualMaximum[1] = Math.max(actualMaximum[1], rawY);
-      actualMaximum[2] = Math.max(actualMaximum[2], rawZ);
-      var x = (rawX - centerX) * scale;
-      var y = (rawY - centerY) * scale;
-      var z = (rawZ - centerZ) * scale;
-      var nx = normals.getDouble(offset), ny = normals.getDouble(offset + 8), nz = normals.getDouble(offset + 16);
-      if (!finite(x) || !finite(y) || !finite(z) || !finite(nx) || !finite(ny) || !finite(nz))
+    for (index in 0...vertexCount) for (axis in 0...3) {
+      var value = vertices.getDouble(index * 24 + axis * 8);
+      if (!finite(value) || !finite(normals.getDouble(index * 24 + axis * 8)))
         throw "CAD preview snapshot contains a non-finite vertex or normal";
-      positionStream.setFloat(index * 12, x);
-      positionStream.setFloat(index * 12 + 4, y);
-      positionStream.setFloat(index * 12 + 8, z);
-      normalStream.setFloat(index * 12, nx);
-      normalStream.setFloat(index * 12 + 4, ny);
-      normalStream.setFloat(index * 12 + 8, nz);
+      actualMinimum[axis] = Math.min(actualMinimum[axis], value);
+      actualMaximum[axis] = Math.max(actualMaximum[axis], value);
     }
     for (axis in 0...3) if (Math.abs(actualMinimum[axis] - minimum[axis]) > 1e-6 ||
         Math.abs(actualMaximum[axis] - maximum[axis]) > 1e-6)
       throw "CAD preview snapshot bounds do not match its vertices";
-    for (triangle in 0...triangleCount) {
-      var offset = triangle * 12;
-      var first = indices.getInt32(offset), second = indices.getInt32(offset + 4), third = indices.getInt32(offset + 8);
-      if (first < 0 || second < 0 || third < 0 || first >= vertexCount || second >= vertexCount || third >= vertexCount)
+    for (triangle in 0...triangleCount) for (corner in 0...3) {
+      var vertex = indices.getInt32(triangle * 12 + corner * 4);
+      if (vertex < 0 || vertex >= vertexCount)
         throw "CAD preview snapshot has an out-of-range triangle index";
     }
-    geometry.addStream(1, 2, positionStream, vertexCount, 12);
-    geometry.addStream(2, 2, normalStream, vertexCount, 12);
-    geometry.setIndexBuffer(indices, totalIndexCount);
     var faceRanges:Array<String> = fields[5 + shift].length == 0 ? [] : fields[5 + shift].split(";");
     if (faceRanges.length > 100000) throw "CAD preview snapshot has invalid face ranges";
+    var ranges:Array<materia.project.SceneArtifact.SceneArtifactFaceRange> = [];
     for (range in faceRanges) {
       var values = range.split(",");
       if (values.length != 3) throw "CAD preview snapshot has invalid face ranges";
@@ -133,24 +135,16 @@ class CadPreviewGeometry {
       if (faceIndex < 0 || firstIndex < 0 || indexCount < 0 || firstIndex % 3 != 0 || indexCount % 3 != 0 ||
           firstIndex + indexCount > totalIndexCount)
         throw "CAD preview snapshot has an invalid face range";
-      geometry.addSubelement(Std.int(firstIndex / 3), Std.int(indexCount / 3), faceIndex);
+      ranges.push({faceIndex: faceIndex, firstIndex: firstIndex, indexCount: indexCount});
     }
-    for (index in 0...Std.int(edges.length / 48)) {
-      var offset = index * 48;
-      var x0 = edges.getDouble(offset), y0 = edges.getDouble(offset + 8), z0 = edges.getDouble(offset + 16);
-      var x1 = edges.getDouble(offset + 24), y1 = edges.getDouble(offset + 32), z1 = edges.getDouble(offset + 40);
-      if (!finite(x0) || !finite(y0) || !finite(z0) || !finite(x1) || !finite(y1) || !finite(z1))
+    for (index in 0...Std.int(edges.length / 8))
+      if (!finite(edges.getDouble(index * 8)))
         throw "CAD preview snapshot contains a non-finite edge endpoint";
-      geometry.addStrokeSegment((x0 - centerX) * scale, (y0 - centerY) * scale, (z0 - centerZ) * scale,
-        (x1 - centerX) * scale, (y1 - centerY) * scale, (z1 - centerZ) * scale);
-    }
-    geometry.setBounds((minimum[0] - centerX) * scale,
-      (minimum[1] - centerY) * scale,
-      (minimum[2] - centerZ) * scale,
-      (maximum[0] - centerX) * scale,
-      (maximum[1] - centerY) * scale,
-      (maximum[2] - centerZ) * scale);
-    return geometry;
+    var part:SceneArtifactPart = {id: "snapshot", name: "snapshot", red: 0.7, green: 0.7, blue: 0.7,
+      vertexCount: vertexCount, indexCount: totalIndexCount, vertices: vertices,
+      normals: normals, indices: indices, edgeSegments: edges, edgeIds: Bytes.alloc(0),
+      faceRanges: ranges};
+    return fromArtifact(part, minimum, maximum, scale);
   }
 
   static function parseInt(value:String):Int {
