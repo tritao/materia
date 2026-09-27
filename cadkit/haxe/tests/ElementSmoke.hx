@@ -9,6 +9,7 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.Placement;
 import cadkit.parametric.Definition;
 import cadkit.parametric.DefinitionEvaluator;
+import cadkit.parametric.DefinitionConnectorEvaluator;
 import cadkit.parametric.DefinitionEvaluatorRegistry;
 import cadkit.parametric.DefinitionInput;
 import cadkit.parametric.DefinitionOutput;
@@ -62,6 +63,20 @@ private class TestBoxDefinitionEvaluator implements DefinitionEvaluator {
 	}
 }
 
+private class TypedConnectorEvaluator implements DefinitionEvaluator implements DefinitionConnectorEvaluator {
+	public function new() {}
+
+	public function evaluate(definition:Definition, instance:cadkit.parametric.InstanceElement, output:String):Shape {
+		if (output != "body") throw new ParametricError("unexpected geometry output");
+		return Shape.box(instance.resolved("width"), 2, 3);
+	}
+
+	public function connector(definition:Definition, instance:cadkit.parametric.InstanceElement, output:String):Placement {
+		if (output != "mount") throw new ParametricError("unexpected connector output");
+		return new Placement(new Plane(new Vector(0, 0, instance.resolved("width")), Vector.X(), Vector.Z()));
+	}
+}
+
 class ElementSmoke {
 	static function check(value:Bool, message:String):Void {
 		if (!value)
@@ -72,6 +87,7 @@ class ElementSmoke {
 		check(Math.abs(value - expected) < 1e-6 * Math.max(1, Math.abs(expected)), 'expected $expected, got $value');
 
 	public static function run():Void {
+		typedDefinitions();
 		var emptyDocument = new Document();
 		var emptyReload = DocumentCodec.decode(DocumentCodec.encode(emptyDocument));
 		check(emptyReload.featureCount() == 0 && emptyReload.elementCount() == 0
@@ -505,5 +521,69 @@ class ElementSmoke {
 		definitionTransaction.cancel();
 		check(definitionTransactionDocument.allDefinitions().length == 0, "definition creation is transactional");
 		definitionTransactionDocument.close();
+	}
+
+	static function typedDefinitions():Void {
+		var evaluator = new TypedConnectorEvaluator();
+		DefinitionEvaluatorRegistry.register("cadkit.test.typed-connector", evaluator, evaluator);
+		DefinitionEvaluatorRegistry.register("cadkit.test.typed-connector", evaluator, evaluator);
+		check(DefinitionEvaluatorRegistry.isRegistered("cadkit.test.typed-connector"), "recipe registry reports registration");
+		var rejected = false;
+		try DefinitionEvaluatorRegistry.register("cadkit.test.typed-connector", new TypedConnectorEvaluator())
+		catch (_:Dynamic) rejected = true;
+		check(rejected, "different evaluator under the same recipe is rejected");
+		var doc = new Document();
+		var definition = doc.createDefinition("Typed", "cadkit.test.typed-connector", [
+			new DefinitionInput("width", ParameterKind.Length, "mm", 10),
+			DefinitionInput.boolean("enabled", true),
+			DefinitionInput.integer("count", 2),
+			DefinitionInput.token("detail", "preview", ["preview", "envelope"])
+		], [new DefinitionOutput("body", DefinitionOutput.Geometry),
+			new DefinitionOutput("mount", DefinitionOutput.Connector)]);
+		var instance = doc.createInstance("Part", definition);
+		check(instance.resolvedBoolean("enabled") && instance.resolvedInteger("count") == 2 &&
+			instance.resolvedToken("detail") == "preview", "typed defaults resolve");
+		var transaction = doc.beginTransaction();
+		instance.setTypedOverride("detail", "envelope");
+		var invalid = false;
+		try instance.setTypedOverride("detail", "high") catch (_:Dynamic) invalid = true;
+		check(invalid && instance.resolvedToken("detail") == "envelope", "invalid token rejected inside transaction");
+		transaction.commit();
+		check(doc.undo() && instance.resolvedToken("detail") == "preview", "token override undo");
+		check(doc.redo() && instance.resolvedToken("detail") == "envelope", "token override redo");
+		instance.setTypedOverride("enabled", false);
+		instance.setTypedOverride("count", 3);
+		check(!instance.resolvedBoolean("enabled") && instance.resolvedInteger("count") == 3,
+			"typed overrides resolve");
+		definition.setTypedDefault("detail", "envelope");
+		var parent = doc.createObject("Parent");
+		parent.setPlacement(new Placement(new Plane(new Vector(20, 0, 0), Vector.X(), Vector.Z())));
+		instance.setPlacement(new Placement(new Plane(new Vector(2, 0, 0), Vector.X(), Vector.Z())));
+		instance.reparent(new ElementReference(doc.id, parent.id), false);
+		var origin = instance.connector("mount").location.plane.origin;
+		check(origin.x == 22 && origin.z == 10, "connector follows placement and reparenting");
+		var saved = DocumentCodec.encode(doc);
+		check(Reflect.field(Json.parse(saved), "version") == DocumentCodec.VERSION, "typed format version is current");
+		var loaded = DocumentCodec.decode(saved);
+		var loadedInstance:cadkit.parametric.InstanceElement = cast loaded.element(instance.id);
+		check(loadedInstance.resolvedToken("detail") == "envelope" && !loadedInstance.resolvedBoolean("enabled")
+			&& loadedInstance.resolvedInteger("count") == 3, "typed values round-trip");
+		var loadedOrigin = loadedInstance.connector("mount").location.plane.origin;
+		check(loadedOrigin.x == 22 && loadedOrigin.z == 10, "connector frame survives reload");
+		loaded.close();
+		doc.close();
+
+		var legacy = new Document();
+		legacy.createDefinition("Legacy", "cadkit.test.box", [new DefinitionInput("width", ParameterKind.Length, "mm", 10),
+			new DefinitionInput("height", ParameterKind.Length, "mm", 20),
+			new DefinitionInput("depth", ParameterKind.Length, "mm", 30)],
+			[new DefinitionOutput("body", DefinitionOutput.Geometry)]);
+		var legacyRecord:Dynamic = Json.parse(DocumentCodec.encode(legacy));
+		Reflect.setField(legacyRecord, "version", 2);
+		var legacyLoaded = DocumentCodec.decode(Json.stringify(legacyRecord));
+		check(legacyLoaded.allDefinitions().length == 1 && legacyLoaded.allDefinitions()[0].input("width").defaultValue == 10,
+			"version 2 numeric definitions remain readable");
+		legacyLoaded.close();
+		legacy.close();
 	}
 }
