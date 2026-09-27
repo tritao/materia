@@ -19,32 +19,11 @@ uint64_t monotonic_now_ns() {
 
 bool lifecycle_kind(rk_command_kind kind) {
     return kind != RK_COMMAND_NONE && kind != RK_COMMAND_JOINT_TARGETS &&
-        kind != RK_COMMAND_TRAJECTORY_CHUNK && kind != RK_COMMAND_TRAJECTORY_SEGMENTS;
+        kind != RK_COMMAND_TRAJECTORY_SEGMENTS;
 }
 
 uint32_t queued_knot_count(const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &trajectory) {
-    uint32_t count = 0;
-    for (const auto &knot : trajectory)
-        count += knot.counted_knot ? 1u : 0u;
-    return count;
-}
-
-mk_segment chord_segment(const rk_trajectory_point &before,
-                         const rk_trajectory_point &after) {
-    mk_segment segment{};
-    segment.struct_size = sizeof(segment);
-    segment.t0_ns = static_cast<int64_t>(before.time_from_start_ns);
-    segment.duration_ns = static_cast<int64_t>(
-        after.time_from_start_ns - before.time_from_start_ns);
-    segment.degree = 1;
-    segment.joint_count = before.joint_count;
-    const double seconds = static_cast<double>(segment.duration_ns) * 1e-9;
-    for (uint32_t joint = 0; joint < segment.joint_count; ++joint) {
-        segment.coefficients[joint].value[0] = before.positions[joint];
-        segment.coefficients[joint].value[1] =
-            (after.positions[joint] - before.positions[joint]) / seconds;
-    }
-    return segment;
+    return trajectory.empty() ? 0u : static_cast<uint32_t>(trajectory.size() - 1);
 }
 
 mk_segment native_segment(const rk_trajectory_segment &input, uint64_t base_time) {
@@ -83,24 +62,6 @@ rk_result validate_queued_path(
     const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &trajectory,
     const rk_robot_runtime_blueprint &blueprint) {
     if (trajectory.empty()) return RK_OK;
-    for (const auto &knot : trajectory) {
-        if (!knot.legacy_point) continue;
-        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
-            const auto &limit = blueprint.joints[joint];
-            if (knot.point.positions[joint] < limit.lower_limit ||
-                knot.point.positions[joint] > limit.upper_limit)
-                return RK_ERROR_LIMIT;
-        }
-    }
-    for (std::size_t index = 1; index < trajectory.size(); ++index) {
-        if (trajectory[index - 1].point.time_from_start_ns ==
-            trajectory[index].point.time_from_start_ns) {
-            for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint)
-                if (std::abs(trajectory[index - 1].point.positions[joint] -
-                        trajectory[index].point.positions[joint]) > 1e-9)
-                    return RK_ERROR_LIMIT;
-        }
-    }
     mk_trajectory_handle handle{};
     if (mk_trajectory_create(blueprint.joint_count, &handle) != MK_OK)
         return RK_ERROR_OUT_OF_MEMORY;
@@ -267,8 +228,7 @@ rk_result RobotRuntime::stop() {
 }
 
 rk_result RobotRuntime::submit(const rk_robot_command &command) {
-    if (command.kind == RK_COMMAND_TRAJECTORY_CHUNK ||
-        command.kind == RK_COMMAND_TRAJECTORY_SEGMENTS)
+    if (command.kind == RK_COMMAND_TRAJECTORY_SEGMENTS)
         return RK_ERROR_INVALID_ARGUMENT;
     if (rk_robot_command_validate_for_blueprint(&command, &blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -281,48 +241,6 @@ rk_result RobotRuntime::submit(const rk_robot_command &command) {
         last_command_sequence_ = command.sequence;
         QueuedCommand queued;
         queued.command = command;
-        commands_.push_back(std::move(queued));
-        queue_condition_.notify_all();
-        return RK_OK;
-    } catch (const std::bad_alloc &) {
-        return RK_ERROR_OUT_OF_MEMORY;
-    }
-}
-
-rk_result RobotRuntime::submit_trajectory(const rk_robot_command &command,
-                                          const rk_trajectory_chunk &chunk) {
-    if (command.kind != RK_COMMAND_TRAJECTORY_CHUNK ||
-        rk_robot_command_validate_for_blueprint(&command, &blueprint_) != RK_OK ||
-        rk_trajectory_chunk_validate_for_blueprint(&chunk, &blueprint_) != RK_OK)
-        return RK_ERROR_INVALID_ARGUMENT;
-    if (!supports_trajectory_queue())
-        return RK_ERROR_UNSUPPORTED;
-    // The published depth may lag the owner, which only ever shrinks the
-    // queue between cycles, so this bound is conservative.
-    uint32_t queued_points = 0;
-    {
-        std::lock_guard state_lock(state_mutex_);
-        queued_points = state_.trajectory_queue_depth;
-    }
-    try {
-        std::lock_guard lock(queue_mutex_);
-        if (command.sequence == 0 || command.sequence <= last_command_sequence_)
-            return RK_ERROR_STALE_COMMAND;
-        if (commands_.size() >= 128)
-            return RK_ERROR_QUEUE_FULL;
-        uint64_t pending_points = queued_points;
-        for (const auto &pending : commands_)
-            if (pending.trajectory != nullptr)
-                pending_points += pending.trajectory->point_count;
-            else if (pending.segments != nullptr)
-                pending_points += pending.segments->segment_count;
-        if (pending_points + chunk.point_count > RK_MAX_TRAJECTORY_QUEUE_POINTS)
-            return RK_ERROR_QUEUE_FULL;
-        auto payload = std::make_shared<rk_trajectory_chunk>(chunk);
-        last_command_sequence_ = command.sequence;
-        QueuedCommand queued;
-        queued.command = command;
-        queued.trajectory = std::move(payload);
         commands_.push_back(std::move(queued));
         queue_condition_.notify_all();
         return RK_OK;
@@ -350,9 +268,7 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command,
         if (commands_.size() >= 128) return RK_ERROR_QUEUE_FULL;
         uint64_t pending_knots = queued_knots;
         for (const auto &pending : commands_)
-            if (pending.trajectory != nullptr)
-                pending_knots += pending.trajectory->point_count;
-            else if (pending.segments != nullptr)
+            if (pending.segments != nullptr)
                 pending_knots += pending.segments->segment_count;
         if (pending_knots + chunk.segment_count > RK_MAX_TRAJECTORY_QUEUE_POINTS)
             return RK_ERROR_QUEUE_FULL;
@@ -384,8 +300,8 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         std::lock_guard owner_lock(owner_mutex_);
         std::lock_guard queue_lock(queue_mutex_);
         if (plan.sequence <= last_command_sequence_) return RK_ERROR_STALE_COMMAND;
-        // A pending legacy command could change the anchor before the owner
-        // applies it. Reject rather than accepting a plan against stale state.
+        // A pending command could change the anchor before the owner applies
+        // it. Reject rather than accepting a plan against stale state.
         if (!commands_.empty()) return RK_ERROR_INVALID_STATE;
         std::lock_guard state_lock(state_mutex_);
         const bool stopped_and_held = state_.safety == RK_SAFETY_STOPPING &&
@@ -506,6 +422,8 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
                     candidate.back().segment.duration_ns = static_cast<int64_t>(
                         base_time - candidate.back().point.time_from_start_ns);
             }
+        } else if (!candidate.empty() && !candidate.back().has_segment) {
+            candidate.pop_back();
         }
         for (uint32_t index = 0; index < plan.segments.segment_count; ++index) {
             const auto &source = plan.segments.segments[index];
@@ -515,7 +433,6 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
             RuntimeTrajectoryPoint knot{};
             knot.segment = native_segment(source, base_time);
             knot.has_segment = true;
-            knot.legacy_point = false;
             knot.point.time_from_start_ns = static_cast<uint64_t>(knot.segment.t0_ns);
             knot.point.joint_count = source.joint_count;
             for (uint32_t joint = 0; joint < source.joint_count; ++joint)
@@ -531,8 +448,6 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         end.point.time_from_start_ns = static_cast<uint64_t>(last.segment.t0_ns + last.segment.duration_ns);
         end.point.joint_count = blueprint_.joint_count;
         evaluate_knot(last, end.point.time_from_start_ns, end.point.positions);
-        end.counted_knot = false;
-        end.legacy_point = false;
         end.chunk_base_time_ns = base_time;
         end.tag = plan.segments.tag;
         end.plan_id = plan.plan_id;
@@ -1190,98 +1105,43 @@ rk_result RobotRuntime::apply_pending_commands() {
                 continue;
             }
 
-            if (value.kind == RK_COMMAND_TRAJECTORY_CHUNK ||
-                value.kind == RK_COMMAND_TRAJECTORY_SEGMENTS) {
-                const bool sampled = value.kind == RK_COMMAND_TRAJECTORY_CHUNK;
-                if (sampled ? queued.trajectory == nullptr : queued.segments == nullptr)
+            if (value.kind == RK_COMMAND_TRAJECTORY_SEGMENTS) {
+                if (queued.segments == nullptr)
                     return RK_ERROR_INVALID_ARGUMENT;
                 if (!supports_trajectory_queue())
                     return RK_ERROR_UNSUPPORTED;
-                const uint64_t tag = sampled ? queued.trajectory->tag : queued.segments->tag;
-                const uint64_t splice_tag = sampled ? queued.trajectory->splice_tag
-                    : queued.segments->splice_tag;
-                const uint64_t splice_offset = sampled ? queued.trajectory->splice_time_ns
-                    : queued.segments->splice_time_ns;
-                const bool splice = splice_tag != 0;
+                const uint64_t tag = queued.segments->tag;
                 auto candidate = control_.trajectory;
-                uint64_t splice_time = 0;
-                if (splice) {
-                    const RuntimeTrajectoryPoint *anchor = nullptr;
-                    for (const auto &knot : control_.trajectory)
-                        if (knot.tag == splice_tag) {
-                            anchor = &knot;
-                            break;
-                        }
-                    if (anchor == nullptr || !control_.trajectory_active || control_.stop_ramp_active ||
-                        splice_offset > std::numeric_limits<uint64_t>::max() - anchor->chunk_base_time_ns)
-                        continue;
-                    splice_time = anchor->chunk_base_time_ns + splice_offset;
-                    if (splice_time <= control_.trajectory_time_ns ||
-                        splice_time > control_.trajectory.back().point.time_from_start_ns)
-                        continue;
-                    while (!candidate.empty() &&
-                           candidate.back().point.time_from_start_ns >= splice_time)
-                        candidate.pop_back();
-                    if (!candidate.empty() && candidate.back().has_segment) {
-                        const auto &last = candidate.back();
-                        const auto end = last.point.time_from_start_ns +
-                            static_cast<uint64_t>(last.segment.duration_ns);
-                        if (end > splice_time)
-                            candidate.back().segment.duration_ns = static_cast<int64_t>(
-                                splice_time - last.point.time_from_start_ns);
-                    }
-                }
-                const auto base_time = splice ? splice_time : candidate.empty()
+                const auto base_time = candidate.empty()
                     ? uint64_t{0} : candidate.back().point.time_from_start_ns;
-                if (sampled) {
-                    for (uint32_t index = 0; index < queued.trajectory->point_count; ++index) {
-                        auto point = queued.trajectory->points[index];
-                        if (point.time_from_start_ns >
-                            static_cast<uint64_t>(INT64_MAX) - base_time)
-                            return RK_ERROR_INVALID_ARGUMENT;
-                        point.time_from_start_ns += base_time;
-                        if (!candidate.empty() && !candidate.back().has_segment &&
-                            candidate.back().point.time_from_start_ns < point.time_from_start_ns) {
-                            candidate.back().segment = chord_segment(candidate.back().point, point);
-                            candidate.back().has_segment = true;
-                        }
-                        RuntimeTrajectoryPoint knot{};
-                        knot.point = point;
-                        knot.chunk_base_time_ns = base_time;
-                        knot.tag = tag;
-                        candidate.push_back(std::move(knot));
-                    }
-                } else {
-                    for (uint32_t index = 0; index < queued.segments->segment_count; ++index) {
-                        const auto &source = queued.segments->segments[index];
-                        if (source.time_from_start_ns > static_cast<uint64_t>(INT64_MAX) - base_time ||
-                            source.duration_ns > static_cast<uint64_t>(INT64_MAX) - base_time -
-                                source.time_from_start_ns)
-                            return RK_ERROR_INVALID_ARGUMENT;
-                        RuntimeTrajectoryPoint knot{};
-                        knot.segment = native_segment(source, base_time);
-                        knot.has_segment = true;
-                        knot.legacy_point = false;
-                        knot.point.time_from_start_ns = static_cast<uint64_t>(knot.segment.t0_ns);
-                        knot.point.joint_count = source.joint_count;
-                        for (uint32_t joint = 0; joint < source.joint_count; ++joint)
-                            knot.point.positions[joint] = source.coefficients[joint].value[0];
-                        knot.chunk_base_time_ns = base_time;
-                        knot.tag = tag;
-                        candidate.push_back(std::move(knot));
-                    }
-                    RuntimeTrajectoryPoint end{};
-                    const auto &last = candidate.back();
-                    end.point.time_from_start_ns = static_cast<uint64_t>(
-                        last.segment.t0_ns + last.segment.duration_ns);
-                    end.point.joint_count = blueprint_.joint_count;
-                    evaluate_knot(last, end.point.time_from_start_ns, end.point.positions);
-                    end.counted_knot = false;
-                    end.legacy_point = false;
-                    end.chunk_base_time_ns = base_time;
-                    end.tag = tag;
-                    candidate.push_back(std::move(end));
+                if (!candidate.empty() && !candidate.back().has_segment)
+                    candidate.pop_back();
+                for (uint32_t index = 0; index < queued.segments->segment_count; ++index) {
+                    const auto &source = queued.segments->segments[index];
+                    if (source.time_from_start_ns > static_cast<uint64_t>(INT64_MAX) - base_time ||
+                        source.duration_ns > static_cast<uint64_t>(INT64_MAX) - base_time -
+                            source.time_from_start_ns)
+                        return RK_ERROR_INVALID_ARGUMENT;
+                    RuntimeTrajectoryPoint knot{};
+                    knot.segment = native_segment(source, base_time);
+                    knot.has_segment = true;
+                    knot.point.time_from_start_ns = static_cast<uint64_t>(knot.segment.t0_ns);
+                    knot.point.joint_count = source.joint_count;
+                    for (uint32_t joint = 0; joint < source.joint_count; ++joint)
+                        knot.point.positions[joint] = source.coefficients[joint].value[0];
+                    knot.chunk_base_time_ns = base_time;
+                    knot.tag = tag;
+                    candidate.push_back(std::move(knot));
                 }
+                RuntimeTrajectoryPoint end{};
+                const auto &last = candidate.back();
+                end.point.time_from_start_ns = static_cast<uint64_t>(
+                    last.segment.t0_ns + last.segment.duration_ns);
+                end.point.joint_count = blueprint_.joint_count;
+                evaluate_knot(last, end.point.time_from_start_ns, end.point.positions);
+                end.chunk_base_time_ns = base_time;
+                end.tag = tag;
+                candidate.push_back(std::move(end));
                 if (queued_knot_count(candidate) > RK_MAX_TRAJECTORY_QUEUE_POINTS)
                     return RK_ERROR_QUEUE_FULL;
                 const auto checked = validate_queued_path(candidate, blueprint_);
@@ -1379,9 +1239,7 @@ rk_result RobotRuntime::apply_pending_commands() {
                 !control_.trajectory.back().ends_at_rest &&
                 control_.trajectory.back().plan_id != 0;
             const bool ramp_at_end = queue_exhausted && !trajectory_stop_completed &&
-                (declared_continuation ||
-                 (control_.trajectory.back().plan_id == 0 &&
-                  (control_.stop_ramp_active || control_.hold_requested)));
+                declared_continuation;
             if (ramp_at_end) {
                 // The stop ran out of queued path before reaching rest. Finish
                 // with a straight ramp, still within the acceleration limits,
@@ -1538,7 +1396,6 @@ rk_result RobotRuntime::apply_pending_commands() {
         state_.mode = RK_ROBOT_MODE_STOPPING;
         state_.safety = RK_SAFETY_STOPPING;
     } else if (has_command && (final_kind == RK_COMMAND_JOINT_TARGETS ||
-                               final_kind == RK_COMMAND_TRAJECTORY_CHUNK ||
                                final_kind == RK_COMMAND_TRAJECTORY_SEGMENTS)) {
         state_.mode = RK_ROBOT_MODE_TRACKING;
         state_.safety = RK_SAFETY_READY;

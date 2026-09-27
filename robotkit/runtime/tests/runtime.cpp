@@ -216,7 +216,7 @@ rk_robot_command trajectory_command(uint64_t sequence) {
     rk_robot_command value{};
     value.struct_size = sizeof(value);
     value.sequence = sequence;
-    value.kind = RK_COMMAND_TRAJECTORY_CHUNK;
+    value.kind = RK_COMMAND_TRAJECTORY_SEGMENTS;
     return value;
 }
 
@@ -262,17 +262,25 @@ rk_trajectory_segment_chunk replacement_plan_chunk(uint64_t tag) {
     return chunk;
 }
 
-rk_trajectory_chunk trajectory_batch(
+rk_trajectory_segment_chunk trajectory_batch(
     std::initializer_list<std::pair<uint64_t, double>> points, uint64_t tag = 0) {
-    rk_trajectory_chunk value{};
+    rk_trajectory_segment_chunk value{};
     value.struct_size = sizeof(value);
     value.tag = tag;
-    for (const auto &[time, position] : points) {
-        auto &point = value.points[value.point_count++];
-        point.time_from_start_ns = time;
-        point.joint_count = 2;
-        point.positions[0] = position;
-        point.positions[1] = -position;
+    auto previous = points.begin();
+    assert(previous != points.end());
+    for (auto next = previous + 1; next != points.end(); ++next, ++previous) {
+        auto &segment = value.segments[value.segment_count++];
+        segment.time_from_start_ns = previous->first;
+        segment.duration_ns = next->first - previous->first;
+        segment.degree = 1;
+        segment.joint_count = 2;
+        const double slope = (next->second - previous->second) /
+            (static_cast<double>(segment.duration_ns) * 1e-9);
+        segment.coefficients[0].value[0] = previous->second;
+        segment.coefficients[0].value[1] = slope;
+        segment.coefficients[1].value[0] = -previous->second;
+        segment.coefficients[1].value[1] = -slope;
     }
     return value;
 }
@@ -281,7 +289,7 @@ void unsupported_trajectory_queue_is_rejected(const rk_robot_runtime_blueprint &
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count, false);
     robotkit::RobotRuntime runtime(blueprint, endpoint);
     assert(!runtime.supports_trajectory_queue());
-    assert(runtime.submit_trajectory(trajectory_command(1),
+    assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.1}})) == RK_ERROR_UNSUPPORTED);
     assert(runtime.apply_pending_commands() == RK_OK);
     rk_robot_state state{};
@@ -297,13 +305,13 @@ void timestamped_trajectory_interpolates_and_reports_progress(
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
     uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
+    assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.5},
                           {200'000'000, 1.0}})) == RK_OK);
 
     auto state = apply_cycle(runtime, timestamp);
     assert(state.position[0] == 0.0);
-    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 3);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
     assert(state.trajectory_time_ns == 0 && state.trajectory_duration_ns == 200'000'000);
 
     state = apply_cycle(runtime, timestamp);
@@ -312,11 +320,11 @@ void timestamped_trajectory_interpolates_and_reports_progress(
 
     state = apply_cycle(runtime, timestamp);
     assert(std::abs(state.position[0] - 0.5) < 1e-9);
-    assert(state.trajectory_queue_depth == 2 && state.trajectory_time_ns == 100'000'000);
+    assert(state.trajectory_queue_depth == 1 && state.trajectory_time_ns == 100'000'000);
 
     state = apply_cycle(runtime, timestamp);
     assert(std::abs(state.position[0] - 0.75) < 1e-6);
-    assert(state.trajectory_queue_depth == 2 && state.trajectory_time_ns == 150'000'000);
+    assert(state.trajectory_queue_depth == 1 && state.trajectory_time_ns == 150'000'000);
 
     state = apply_cycle(runtime, timestamp);
     assert(std::abs(state.position[0] - 1.0) < 1e-9);
@@ -328,7 +336,7 @@ void normal_stop_decelerates_active_trajectory(const rk_robot_runtime_blueprint 
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
     uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
+    assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {200'000'000, 1.0}})) == RK_OK);
     auto state = apply_cycle(runtime, timestamp);
     assert(state.position[0] == 0.0);
@@ -357,7 +365,7 @@ void trajectory_stop_follows_path_and_reports_tag(
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(slow_blueprint.joint_count);
     robotkit::RobotRuntime runtime(slow_blueprint, endpoint, std::chrono::milliseconds(100));
     uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
+    assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 1.0}}, 42)) == RK_OK);
     auto state = apply_cycle(runtime, timestamp);
     assert(state.trajectory_active == 1 && state.trajectory_tag == 42);
@@ -388,42 +396,30 @@ void trajectory_stop_follows_path_and_reports_tag(
 
 /** Samples position(t) every step_ns over [0, duration_ns] into one chunk. */
 template <typename Position>
-rk_trajectory_chunk sampled_batch(Position position, uint64_t duration_ns, uint64_t step_ns,
+rk_trajectory_segment_chunk sampled_batch(Position position, uint64_t duration_ns, uint64_t step_ns,
                                   uint64_t tag) {
-    rk_trajectory_chunk value{};
+    rk_trajectory_segment_chunk value{};
     value.struct_size = sizeof(value);
     value.tag = tag;
-    for (uint64_t time = 0; time <= duration_ns; time += step_ns) {
-        auto &point = value.points[value.point_count++];
-        point.time_from_start_ns = time;
-        point.joint_count = 2;
-        point.positions[0] = position(static_cast<double>(time) / 1'000'000'000.0);
-        point.positions[1] = -point.positions[0];
+    for (uint64_t time = 0; time < duration_ns; time += step_ns) {
+        auto &segment = value.segments[value.segment_count++];
+        segment.time_from_start_ns = time;
+        segment.duration_ns = std::min(step_ns, duration_ns - time);
+        segment.degree = 1;
+        segment.joint_count = 2;
+        const double before = position(static_cast<double>(time) * 1e-9);
+        const double after = position(static_cast<double>(time + segment.duration_ns) * 1e-9);
+        const double slope = (after - before) / (static_cast<double>(segment.duration_ns) * 1e-9);
+        segment.coefficients[0].value[0] = before;
+        segment.coefficients[0].value[1] = slope;
+        segment.coefficients[1].value[0] = -before;
+        segment.coefficients[1].value[1] = -slope;
     }
     return value;
 }
 
-rk_trajectory_segment_chunk segments_from_samples(const rk_trajectory_chunk &samples) {
-    rk_trajectory_segment_chunk chunk{};
-    chunk.struct_size = sizeof(chunk);
-    chunk.tag = samples.tag;
-    assert(samples.point_count > 1 && samples.point_count - 1 <= RK_MAX_TRAJECTORY_SEGMENTS);
-    for (uint32_t index = 1; index < samples.point_count; ++index) {
-        const auto &before = samples.points[index - 1];
-        const auto &after = samples.points[index];
-        auto &segment = chunk.segments[chunk.segment_count++];
-        segment.time_from_start_ns = before.time_from_start_ns;
-        segment.duration_ns = after.time_from_start_ns - before.time_from_start_ns;
-        segment.degree = 1;
-        segment.joint_count = before.joint_count;
-        const double seconds = static_cast<double>(segment.duration_ns) * 1e-9;
-        for (uint32_t joint = 0; joint < segment.joint_count; ++joint) {
-            segment.coefficients[joint].value[0] = before.positions[joint];
-            segment.coefficients[joint].value[1] =
-                (after.positions[joint] - before.positions[joint]) / seconds;
-        }
-    }
-    return chunk;
+rk_trajectory_segment_chunk segments_from_samples(const rk_trajectory_segment_chunk &samples) {
+    return samples;
 }
 
 rk_trajectory_segment_chunk segments_from_native(mk_trajectory_handle trajectory) {
@@ -466,7 +462,7 @@ void trajectory_chunk_extends_running_stop(
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(slow_blueprint.joint_count);
     robotkit::RobotRuntime runtime(slow_blueprint, endpoint, std::chrono::milliseconds(100));
     uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
+    assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 1.0}}, 7)) == RK_OK);
     apply_cycle(runtime, timestamp);
     auto state = apply_cycle(runtime, timestamp);
@@ -478,7 +474,7 @@ void trajectory_chunk_extends_running_stop(
         if (cycle == 2) {
             // More path arriving mid-stop, which would turn back towards 0,
             // must extend the stop without resuming full speed.
-            assert(runtime.submit_trajectory(trajectory_command(sequence++),
+            assert(runtime.submit_segments(trajectory_command(sequence++),
                 trajectory_batch({{0, 1.0}, {1'000'000'000, 0.0}}, 8)) == RK_OK);
         }
         if (cycle == 4) {
@@ -517,7 +513,7 @@ void trajectory_stop_counts_trajectory_braking(
         return 0.1 + 0.5 * braking - 0.5 * braking * braking;
     };
     const double end = profile(0.7);
-    assert(runtime.submit_trajectory(trajectory_command(1),
+    assert(runtime.submit_segments(trajectory_command(1),
         sampled_batch(profile, 700'000'000, 10'000'000, 1)) == RK_OK);
     std::vector<double> positions;
     for (int cycle = 0; cycle < 22; ++cycle)
@@ -541,8 +537,15 @@ void stop_beyond_queued_path_ramps_within_limits(
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
     robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
     uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
-        sampled_batch([](double t) { return t; }, 100'000'000, 10'000'000, 1)) == RK_OK);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 1;
+    plan.model_revision = limited.revision;
+    plan.calibration_revision = limited.calibration_revision;
+    plan.ends_at_rest = 0;
+    plan.segments = sampled_batch([](double t) { return t; }, 100'000'000, 10'000'000, 1);
+    assert(runtime.submit_plan(plan) == RK_OK);
     std::vector<double> positions;
     for (int cycle = 0; cycle < 6; ++cycle)
         positions.push_back(apply_cycle(runtime, timestamp).position[0]);
@@ -571,13 +574,28 @@ void stop_ramp_stays_within_travel(const rk_robot_runtime_blueprint &blueprint) 
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
     robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
     uint64_t timestamp = 0;
-    // Joint 1 mirrors joint 0 (see trajectory_batch), so keep both in range.
-    assert(runtime.submit_trajectory(trajectory_command(1),
-        sampled_batch([](double t) { return 0.8 + t; }, 50'000'000, 10'000'000, 1)) == RK_OK);
+    auto initial = velocity_batch(1, {{0, 0.0}, {1, 0.0}});
+    initial.targets[0].mode = RK_TARGET_POSITION;
+    initial.targets[0].target = 0.8;
+    initial.targets[1].mode = RK_TARGET_POSITION;
+    initial.targets[1].target = -0.8;
+    assert(runtime.submit(initial) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 2;
+    plan.plan_id = 1;
+    plan.model_revision = limited.revision;
+    plan.calibration_revision = limited.calibration_revision;
+    plan.start_position[0] = 0.8;
+    plan.start_position[1] = -0.8;
+    plan.ends_at_rest = 0;
+    plan.segments = sampled_batch([](double t) { return 0.8 + t; }, 50'000'000, 10'000'000, 1);
+    assert(runtime.submit_plan(plan) == RK_OK);
     std::vector<double> positions;
     for (int cycle = 0; cycle < 3; ++cycle)
         positions.push_back(apply_cycle(runtime, timestamp).position[0]);
-    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_STOP)) == RK_OK);
+    assert(runtime.submit(lifecycle_command(3, RK_COMMAND_STOP)) == RK_OK);
     rk_result result = RK_OK;
     for (int cycle = 0; cycle < 100 && result == RK_OK; ++cycle) {
         result = runtime.apply_pending_commands();
@@ -629,13 +647,13 @@ void invalid_trajectory_chunk_is_atomic(
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
     uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
+    assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
     auto state = apply_cycle(runtime, timestamp);
-    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 1);
 
     auto invalid = trajectory_batch({{0, 0.2}, {100'000'000, 2.0}});
-    assert(runtime.submit_trajectory(trajectory_command(2), invalid) == RK_OK);
+    assert(runtime.submit_segments(trajectory_command(2), invalid) == RK_OK);
     assert(runtime.apply_pending_commands() == RK_ERROR_LIMIT);
     assert(runtime.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
@@ -652,17 +670,17 @@ void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &bluepri
         auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
         robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(50));
         uint64_t timestamp = 0;
-        assert(runtime.submit_trajectory(trajectory_command(1),
+        assert(runtime.submit_segments(trajectory_command(1),
             trajectory_batch({{0, 0.0}, {100'000'000, 0.1}})) == RK_OK);
         auto state = apply_cycle(runtime, timestamp);
         assert(state.safety == RK_SAFETY_READY && state.trajectory_active == 1);
 
         // Continuing from where the queue ends is accepted; jumping away is not.
-        assert(runtime.submit_trajectory(trajectory_command(2),
+        assert(runtime.submit_segments(trajectory_command(2),
             trajectory_batch({{0, 0.1}, {100'000'000, 0.2}})) == RK_OK);
         state = apply_cycle(runtime, timestamp);
         assert(state.safety == RK_SAFETY_READY && state.trajectory_queue_depth > 0);
-        assert(runtime.submit_trajectory(trajectory_command(3),
+        assert(runtime.submit_segments(trajectory_command(3),
             trajectory_batch({{0, 0.5}, {100'000'000, 0.5}})) == RK_OK);
         assert(runtime.apply_pending_commands() == RK_ERROR_LIMIT);
         assert(runtime.snapshot(state) == RK_OK);
@@ -674,7 +692,7 @@ void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &bluepri
         // 0.2 m in 100 ms is 2 m/s: twice the limit.
         auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
         robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(50));
-        assert(runtime.submit_trajectory(trajectory_command(1),
+        assert(runtime.submit_segments(trajectory_command(1),
             trajectory_batch({{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
         assert(runtime.apply_pending_commands() == RK_ERROR_LIMIT);
         rk_robot_state state{};
@@ -684,84 +702,43 @@ void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &bluepri
     }
 }
 
-void trajectory_splice_replaces_path_ahead(const rk_robot_runtime_blueprint &blueprint) {
-    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
-    uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
-        trajectory_batch({{0, 0.0}, {1'000'000'000, 1.0}}, 7)) == RK_OK);
-    apply_cycle(runtime, timestamp);
-    auto state = apply_cycle(runtime, timestamp);
-    assert(std::abs(state.position[0] - 0.1) < 1e-9);
-
-    // Splice 300 ms into chunk 7, where the path is at 0.3, and slow down.
-    auto slower = trajectory_batch({{0, 0.3}, {100'000'000, 0.35}, {200'000'000, 0.4}}, 8);
-    slower.splice_tag = 7;
-    slower.splice_time_ns = 300'000'000;
-    assert(runtime.submit_trajectory(trajectory_command(2), slower) == RK_OK);
-    const double expected[] = {0.2, 0.3, 0.35, 0.4, 0.4};
-    for (double position : expected) {
-        state = apply_cycle(runtime, timestamp);
-        assert(std::abs(state.position[0] - position) < 1e-9);
-    }
-    assert(state.trajectory_active == 0 && state.trajectory_tag == 8);
-}
-
-void late_trajectory_splice_keeps_current_path(const rk_robot_runtime_blueprint &blueprint) {
-    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
-    uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
-        trajectory_batch({{0, 0.0}, {500'000'000, 0.5}}, 7)) == RK_OK);
-    apply_cycle(runtime, timestamp);
-    apply_cycle(runtime, timestamp);
-    // The clock is already past 50 ms, so this splice is dropped.
-    auto late = trajectory_batch({{0, 0.05}, {100'000'000, 0.05}}, 8);
-    late.splice_tag = 7;
-    late.splice_time_ns = 50'000'000;
-    assert(runtime.submit_trajectory(trajectory_command(2), late) == RK_OK);
-    rk_robot_state state{};
-    for (int cycle = 0; cycle < 5; ++cycle)
-        state = apply_cycle(runtime, timestamp);
-    assert(state.safety == RK_SAFETY_READY);
-    assert(std::abs(state.position[0] - 0.5) < 1e-9 && state.trajectory_tag == 7);
-}
-
 void trajectory_queue_is_bounded(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
-    rk_trajectory_chunk full{};
+    rk_trajectory_segment_chunk full{};
     full.struct_size = sizeof(full);
-    for (uint32_t index = 0; index < RK_MAX_TRAJECTORY_POINTS; ++index) {
-        auto &point = full.points[full.point_count++];
-        point.time_from_start_ns = static_cast<uint64_t>(index) * 1'000'000;
-        point.joint_count = 2;
+    for (uint32_t index = 0; index < RK_MAX_TRAJECTORY_SEGMENTS; ++index) {
+        auto &segment = full.segments[full.segment_count++];
+        segment.time_from_start_ns = static_cast<uint64_t>(index) * 1'000'000;
+        segment.duration_ns = 1'000'000;
+        segment.degree = 1;
+        segment.joint_count = 2;
     }
-    const uint32_t chunks = RK_MAX_TRAJECTORY_QUEUE_POINTS / RK_MAX_TRAJECTORY_POINTS;
+    const uint32_t chunks = RK_MAX_TRAJECTORY_QUEUE_POINTS / RK_MAX_TRAJECTORY_SEGMENTS;
     uint64_t sequence = 1;
     for (uint32_t index = 0; index < chunks; ++index)
-        assert(runtime.submit_trajectory(trajectory_command(sequence++), full) == RK_OK);
+        assert(runtime.submit_segments(trajectory_command(sequence++), full) == RK_OK);
     // Pending mailbox chunks count towards the bound before the owner runs.
-    assert(runtime.submit_trajectory(trajectory_command(sequence++), full) == RK_ERROR_QUEUE_FULL);
+    assert(runtime.submit_segments(trajectory_command(sequence++), full) == RK_ERROR_QUEUE_FULL);
     assert(runtime.apply_pending_commands() == RK_OK);
     rk_robot_state state{};
     state.struct_size = sizeof(state);
     assert(runtime.snapshot(state) == RK_OK);
     assert(state.trajectory_queue_depth <= RK_MAX_TRAJECTORY_QUEUE_POINTS);
     // Once queued, the published depth keeps the bound.
-    assert(runtime.submit_trajectory(trajectory_command(sequence++), full) == RK_ERROR_QUEUE_FULL);
+    assert(runtime.submit_segments(trajectory_command(sequence++), full) == RK_ERROR_QUEUE_FULL);
 }
 
 void mixed_queue_depth_counts_knots(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
     uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
+    assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.1}})) == RK_OK);
     assert(runtime.submit_segments(segment_command(2),
         linear_segment_chunk(0.1, 1.0, 100'000'000)) == RK_OK);
     auto state = apply_cycle(runtime, timestamp);
-    assert(state.trajectory_queue_depth == 3);
+    assert(state.trajectory_queue_depth == 2);
     state = apply_cycle(runtime, timestamp);
     assert(state.trajectory_queue_depth == 1);
 }
@@ -927,7 +904,7 @@ void idle_plan_uses_commanded_anchor_and_following_error(
     auto held_endpoint = std::make_shared<OffsetEndpoint>(0.0001);
     robotkit::RobotRuntime held(blueprint, held_endpoint, std::chrono::milliseconds(10));
     uint64_t timestamp = 0;
-    assert(held.submit_trajectory(trajectory_command(1),
+    assert(held.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 0.5}}, 90)) == RK_OK);
     for (int tick = 0; tick < 101; ++tick) apply_cycle(held, timestamp);
     rk_robot_state held_state{};
@@ -996,7 +973,7 @@ void degree_one_append_checks_chord_velocity(const rk_robot_runtime_blueprint &b
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
     uint64_t timestamp = 0;
-    assert(runtime.submit_trajectory(trajectory_command(1),
+    assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 0.5}}, 93)) == RK_OK);
     apply_cycle(runtime, timestamp);
     rk_plan_submission plan{};
@@ -1055,25 +1032,6 @@ void ruckig_segments_match_motionkit_evaluation(
             assert(std::abs(state.position[joint] - reference.position[joint]) < 1e-12);
     }
     mk_trajectory_destroy(trajectory);
-}
-
-void segment_splice_cuts_midsegment(const rk_robot_runtime_blueprint &blueprint) {
-    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
-    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
-    uint64_t timestamp = 0;
-    auto original = linear_segment_chunk(0.0, 1.0, 1'000'000'000, 7);
-    assert(runtime.submit_segments(segment_command(1), original) == RK_OK);
-    apply_cycle(runtime, timestamp);
-    apply_cycle(runtime, timestamp);
-    auto replacement = linear_segment_chunk(0.3, 0.5, 200'000'000, 8);
-    replacement.splice_tag = 7;
-    replacement.splice_time_ns = 300'000'000;
-    assert(runtime.submit_segments(segment_command(2), replacement) == RK_OK);
-    const double expected[] = {0.2, 0.3, 0.35, 0.4};
-    for (double position : expected) {
-        const auto state = apply_cycle(runtime, timestamp);
-        assert(std::abs(state.position[0] - position) < 1e-12);
-    }
 }
 
 void overacceleration_segment_is_rejected(const rk_robot_runtime_blueprint &blueprint) {
@@ -1276,12 +1234,12 @@ void partial_targets_and_ordered_trajectory_commands(
 
     // Multiple chunks in one mailbox drain append in sequence order instead
     // of the newest chunk replacing the earlier one.
-    assert(runtime.submit_trajectory(trajectory_command(3),
+    assert(runtime.submit_segments(trajectory_command(3),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.2}})) == RK_OK);
-    assert(runtime.submit_trajectory(trajectory_command(4),
+    assert(runtime.submit_segments(trajectory_command(4),
         trajectory_batch({{0, 0.2}, {100'000'000, 0.4}})) == RK_OK);
     state = apply_cycle(runtime, timestamp);
-    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 4);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
     assert(state.trajectory_duration_ns == 200'000'000);
     state = apply_cycle(runtime, timestamp);
     assert(std::abs(state.position[0] - 0.1) < 1e-9);
@@ -1293,10 +1251,10 @@ void partial_targets_and_ordered_trajectory_commands(
     // A stop followed by a replacement chunk clears the old queue before the
     // new motion is accepted; the final owner output is the new trajectory.
     assert(runtime.submit(lifecycle_command(5, RK_COMMAND_STOP)) == RK_OK);
-    assert(runtime.submit_trajectory(trajectory_command(6),
+    assert(runtime.submit_segments(trajectory_command(6),
         trajectory_batch({{0, 0.1}, {100'000'000, 0.3}})) == RK_OK);
     state = apply_cycle(runtime, timestamp);
-    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 1);
     assert(std::abs(state.position[0] - 0.1) < 1e-9);
     assert(state.mode == RK_ROBOT_MODE_TRACKING);
 
@@ -1309,11 +1267,11 @@ void partial_targets_and_ordered_trajectory_commands(
     state = apply_cycle(reset_runtime, timestamp);
     assert(state.safety == RK_SAFETY_EMERGENCY_STOP);
     assert(reset_runtime.submit(lifecycle_command(2, RK_COMMAND_RESET_SAFETY)) == RK_OK);
-    assert(reset_runtime.submit_trajectory(trajectory_command(3),
+    assert(reset_runtime.submit_segments(trajectory_command(3),
         trajectory_batch({{0, 0.0}, {100'000'000, 0.25}})) == RK_OK);
     state = apply_cycle(reset_runtime, timestamp);
     assert(state.safety == RK_SAFETY_READY);
-    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 2);
+    assert(state.trajectory_active == 1 && state.trajectory_queue_depth == 1);
 }
 
 } // namespace
@@ -1635,8 +1593,8 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
 int main() {
     static_assert(sizeof(rk_robot_command) < 20'000,
         "trajectory payload must not be embedded in the command mailbox value");
-    static_assert(sizeof(rk_trajectory_chunk) > 130'000,
-        "trajectory payload remains explicitly bounded and independently allocated");
+    static_assert(sizeof(rk_trajectory_segment_chunk) > 300'000,
+        "segment payload remains explicitly bounded and independently allocated");
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.revision = 1;
@@ -1676,7 +1634,6 @@ int main() {
     submitted_start_tolerances_control_acceptance(blueprint);
     degree_one_append_checks_chord_velocity(blueprint);
     ruckig_segments_match_motionkit_evaluation(blueprint);
-    segment_splice_cuts_midsegment(blueprint);
     overacceleration_segment_is_rejected(blueprint);
     segment_junction_jump_is_rejected(blueprint);
     stop_braking_uses_segment_degree(blueprint);
@@ -1685,8 +1642,6 @@ int main() {
     plan_end_braking_stays_on_path(blueprint);
     smooth_path_hold_respects_acceleration(blueprint);
     ruckig_segment_stop_uses_analytic_braking(blueprint);
-    trajectory_splice_replaces_path_ahead(blueprint);
-    late_trajectory_splice_keeps_current_path(blueprint);
 
     // Zero is a valid source epoch, not a missing-timestamp sentinel.
     auto clock_endpoint = std::make_shared<FaultEndpoint>();

@@ -25,7 +25,6 @@ import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.StopMode;
 import robotkit.world.TrajectoryChunk;
-import robotkit.world.TrajectoryPoint;
 import robotkit.world.ExecutionPlanSubmission;
 import robotkit.world.TrajectorySegment;
 import robotkit.runtime.RobotRuntimeError;
@@ -1071,7 +1070,7 @@ class MotionSystem {
   function usesTrajectoryChunks(trajectoryValue:JointTrajectory):Bool {
     if (trajectoryValue == null) return false;
     return robot.capabilities().supportsExecutionPlans &&
-      trajectoryValue.jointCount <= TrajectoryPoint.MAX_JOINTS;
+      trajectoryValue.jointCount <= RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS;
   }
 
   function submitActiveTrajectoryChunk():Void {

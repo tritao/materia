@@ -595,8 +595,9 @@ Do this as a separate commit after the `MotionSystem` migration:
   compatibility special cases. Segment and plan queues use one knot model.
 - Update Haxe `TrajectoryChunk` and `RobotCommand` so no new point chunks can
   be submitted. Bump `RK_API_VERSION` and regenerate the `.hxi`.
-- MCAP stops writing point chunks, while v1–v4 readers continue loading old
-  recordings.
+- MCAP drops point-chunk writing and reading. Old point- and splice-chunk
+  recordings are intentionally unsupported; there is no compatibility reader
+  or replay path for those commands.
 - Re-express the legacy runtime tests on plans: queue depth, STOP braking on
   degree-1 segments, and splice replacement as plan replacement. Do not
   remove the behavior coverage.
@@ -1090,3 +1091,15 @@ directly. The remaining old planner and sampled trajectory classes are all
 reachable from the fallback and stay until P9d. Updated the README to
 distinguish native queue execution from the retained fallback. Commit: the
 commit containing this entry.
+
+### P9b — Remove legacy point chunks
+
+Removed the point-chunk C command, payload, validators, and submission entry
+point; Haxe trajectory chunks now contain only polynomial segments. Removed
+splice metadata and its silent late-drop path. Queue depth counts remaining
+segment-start knots. Native queue-depth and degree-1 STOP tests now use
+segments or declared-continuation plans; the plan-replacement tests cover
+accepted replacements and late rejection without mutating the queue.
+Point-chunk recordings and old spliced chunks are unsupported, with explicit
+decode rejection tests. Bumped `RK_API_VERSION` to 13 and regenerated the
+binding. Commit: the commit containing this entry.

@@ -132,9 +132,6 @@ public:
     rk_result stop();
     /** Queues command metadata and joint-target payload for the next owner-thread phase. */
     rk_result submit(const rk_robot_command &command);
-    /** Queues trajectory metadata and its separately allocated payload. */
-    rk_result submit_trajectory(const rk_robot_command &command,
-                                const rk_trajectory_chunk &chunk);
     rk_result submit_segments(const rk_robot_command &command,
                               const rk_trajectory_segment_chunk &chunk);
     rk_result submit_plan(const rk_plan_submission &plan);
@@ -150,11 +147,13 @@ public:
     bool running() const;
 
     struct RuntimeTrajectoryPoint {
-        rk_trajectory_point point{};
+        struct {
+            uint64_t time_from_start_ns = 0;
+            uint32_t joint_count = 0;
+            double positions[RK_MAX_TRAJECTORY_JOINTS]{};
+        } point{};
         mk_segment segment{}; /**< Valid when has_segment; starts at point time. */
         bool has_segment = false;
-        bool counted_knot = true; /**< False only for a segment chunk's end marker. */
-        bool legacy_point = true; /**< Retains strict stored-sample position checks. */
         uint64_t chunk_base_time_ns = 0;
         uint64_t tag = 0;
         uint64_t plan_id = 0;
@@ -203,7 +202,6 @@ private:
 
     struct QueuedCommand {
         rk_robot_command command{};
-        std::shared_ptr<rk_trajectory_chunk> trajectory;
         std::shared_ptr<rk_trajectory_segment_chunk> segments;
     };
 

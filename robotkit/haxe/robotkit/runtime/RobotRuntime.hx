@@ -129,7 +129,7 @@ class RobotRuntime {
       "runtime.submitTargets");
   }
 
-  /** Appends a timestamped position chunk to the native runtime queue. */
+  /** Appends a bounded polynomial segment chunk to the native runtime queue. */
   public function submitTrajectory(chunk:TrajectoryChunk, sequence:Int,
       ?timestampNs:haxe.Int64):Void {
     submitTrajectory64(chunk, haxe.Int64.ofInt(sequence), timestampNs);
@@ -143,54 +143,29 @@ class RobotRuntime {
     command.set_struct_size(rk_robot_command.size());
     command.set_sequence(sequence);
     command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
-    command.set_kind(chunk.segments.length == 0
-      ? RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_CHUNK
-      : RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_SEGMENTS);
+    command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_SEGMENTS);
     command.set_target_count(0);
-    if (chunk.segments.length > 0) {
-      var payload = new rk_trajectory_segment_chunk();
-      payload.set_struct_size(rk_trajectory_segment_chunk.size());
-      payload.set_segment_count(chunk.segments.length);
-      payload.set_tag(chunk.tag);
-      payload.set_splice_tag(chunk.spliceTag);
-      payload.set_splice_time_ns(chunk.spliceTimeNs);
-      for (index in 0...chunk.segments.length) {
-        var source = chunk.segments[index];
-        var segment = new rk_trajectory_segment();
-        segment.set_time_from_start_ns(source.timeFromStartNs);
-        segment.set_duration_ns(source.durationNs);
-        segment.set_degree(source.degree);
-        segment.set_joint_count(source.jointCount);
-        for (joint in 0...source.jointCount) {
-          var coefficients = new rk_trajectory_coefficients();
-          for (degree in 0...source.degree + 1)
-            coefficients.set_value(degree, source.coefficients[joint][degree]);
-          segment.set_coefficients(joint, coefficients);
-        }
-        payload.set_segments(index, segment);
-      }
-      check(RobotKitRuntime.rk_robot_runtime_submit_segments(owner.borrow(), command, payload),
-        "runtime.submitTrajectorySegments");
-      return;
-    }
-    var payload = new rk_trajectory_chunk();
-    payload.set_struct_size(rk_trajectory_chunk.size());
-    payload.set_point_count(chunk.points.length);
+    var payload = new rk_trajectory_segment_chunk();
+    payload.set_struct_size(rk_trajectory_segment_chunk.size());
+    payload.set_segment_count(chunk.segments.length);
     payload.set_tag(chunk.tag);
-    payload.set_splice_tag(chunk.spliceTag);
-    payload.set_splice_time_ns(chunk.spliceTimeNs);
-    for (index in 0...chunk.points.length) {
-      var source = chunk.points[index];
-      var point = new rk_trajectory_point();
-      point.set_time_from_start_ns(source.timeFromStartNs);
-      point.set_joint_count(source.positions.length);
-      point.set_reserved0(0);
-      for (joint in 0...source.positions.length)
-        point.set_positions(joint, source.positions[joint]);
-      payload.set_points(index, point);
+    for (index in 0...chunk.segments.length) {
+      var source = chunk.segments[index];
+      var segment = new rk_trajectory_segment();
+      segment.set_time_from_start_ns(source.timeFromStartNs);
+      segment.set_duration_ns(source.durationNs);
+      segment.set_degree(source.degree);
+      segment.set_joint_count(source.jointCount);
+      for (joint in 0...source.jointCount) {
+        var coefficients = new rk_trajectory_coefficients();
+        for (degree in 0...source.degree + 1)
+          coefficients.set_value(degree, source.coefficients[joint][degree]);
+        segment.set_coefficients(joint, coefficients);
+      }
+      payload.set_segments(index, segment);
     }
-    check(RobotKitRuntime.rk_robot_runtime_submit_trajectory(owner.borrow(), command, payload),
-      "runtime.submitTrajectory");
+    check(RobotKitRuntime.rk_robot_runtime_submit_segments(owner.borrow(), command, payload),
+      "runtime.submitTrajectorySegments");
   }
 
   /** Accepts a plan atomically, including its revision and horizon checks. */

@@ -212,7 +212,7 @@ class RobotWorldTests {
     var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000),
       [[0.0, 1.0], [0.0, -1.0]]);
     var chunk = TrajectoryChunk.fromSegments([segment], Int64.ofInt(7));
-    check(chunk.points.length == 0 && chunk.segments.length == 1,
+    check(chunk.segments.length == 1,
       "polynomial chunk uses segment payload");
     check(chunk.copy().segments[0].coefficients[1][1] == -1.0,
       "polynomial chunk copy keeps coefficients");
@@ -226,6 +226,17 @@ class RobotWorldTests {
           "polynomial chunk survives recording round trip");
       case _: throw "Expected recorded polynomial chunk";
     }
+    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
+      '{"version":4,"ordinal":"0","recordingTimestampNs":"0","robotId":"r",'
+      + '"sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock",'
+      + '"type":"command","payload":{"kind":"trajectoryChunk","points":[]}}')),
+      "legacy point-chunk recordings are unsupported");
+    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
+      '{"version":4,"ordinal":"0","recordingTimestampNs":"0","robotId":"r",'
+      + '"sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock",'
+      + '"type":"command","payload":{"kind":"trajectorySegmentChunk",'
+      + '"spliceTag":"7","segments":[]}}')),
+      "legacy spliced recordings are unsupported");
   }
 
   static function testMcapRobustness():Void {
@@ -3405,7 +3416,7 @@ class RobotWorldTests {
     replay.close();
     if (Sys.getEnv("ROBOTKIT_KEEP_MCAP") == null) sys.FileSystem.deleteFile(path);
     else Sys.println('RobotKit MCAP fixture: $path');
-    var unsupported = haxe.io.Bytes.ofString('{"version":4,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
+    var unsupported = haxe.io.Bytes.ofString('{"version":5,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
     var legacyV2 = RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
       '{"version":2,"ordinal":"0","recordingTimestampNs":"1","robotId":"x","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}'));
     equal(legacyV2.schemaVersion, 2, "recording reader accepts schema v2");
@@ -4276,7 +4287,7 @@ class RobotWorldTests {
   static function commandSummary(command:RobotCommand):String return switch command {
     case JointTargets(targets, _): [for (target in targets)
       '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
-    case TrajectoryChunk(chunk): 'trajectory:${chunk.points.length}';
+    case TrajectoryChunk(chunk): 'trajectory:${chunk.segments.length}';
     case ExecutionPlan(plan): 'plan:${Int64.toStr(plan.planId)}';
     case Hold: 'hold';
     case Resume: 'resume';

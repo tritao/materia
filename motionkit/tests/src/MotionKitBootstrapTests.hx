@@ -1565,9 +1565,11 @@ class MotionKitBootstrapTests {
                   for (target in targets) byJoint[target.joint] = target.target;
                   worstSkew = Math.max(worstSkew, Math.abs(byJoint[1] + 2.0 * byJoint[0]));
                 case TrajectoryChunk(chunk):
-                  for (point in chunk.points)
-                    worstSkew = Math.max(worstSkew,
-                      Math.abs(point.positions[1] + 2.0 * point.positions[0]));
+                  for (segment in chunk.segments)
+                    for (degree in 0...(segment.degree + 1))
+                      worstSkew = Math.max(worstSkew,
+                        Math.abs(segment.coefficients[1][degree] +
+                          2.0 * segment.coefficients[0][degree]));
                 case ExecutionPlan(plan):
                   worstSkew = Math.max(worstSkew,
                     Math.abs(plan.startPosition.get(1) + 2.0 * plan.startPosition.get(0)));

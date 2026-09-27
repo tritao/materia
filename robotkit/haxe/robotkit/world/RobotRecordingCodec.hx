@@ -27,24 +27,13 @@ class RobotRecordingCodec {
               mode:jointTargetMode(target.mode), target:target.target}],
             expiryNs:expiryNs == null ? null : Int64.toStr(expiryNs)});
         case TrajectoryChunk(chunk):
-          Reflect.setField(root, "payload", chunk.segments.length > 0
-            ? {kind:"trajectorySegmentChunk",
+          Reflect.setField(root, "payload", {kind:"trajectorySegmentChunk",
               tag:Int64.toStr(chunk.tag),
-              spliceTag:Int64.toStr(chunk.spliceTag),
-              spliceTimeNs:Int64.toStr(chunk.spliceTimeNs),
               segments:[for (segment in chunk.segments) {
                 timeFromStartNs:Int64.toStr(segment.timeFromStartNs),
                 durationNs:Int64.toStr(segment.durationNs),
                 coefficients:segment.coefficients
-              }]}
-            : {kind:"trajectoryChunk",
-            tag:Int64.toStr(chunk.tag),
-            spliceTag:Int64.toStr(chunk.spliceTag),
-            spliceTimeNs:Int64.toStr(chunk.spliceTimeNs),
-            points:[for (point in chunk.points) {
-              timeFromStartNs:Int64.toStr(point.timeFromStartNs),
-              positions:point.positions
-            }]});
+              }]});
         case ExecutionPlan(plan):
           Reflect.setField(root, "payload", {kind:"executionPlan",
             planId:Int64.toStr(plan.planId),
@@ -108,15 +97,10 @@ class RobotRecordingCodec {
               targets.push(new JointTarget(fieldInt(item, "joint"),
                 readJointTargetMode(string(item, "mode")), fieldFloat(item, "target")));
             Command(JointTargets(JointTarget.copyBatch(targets), expiry));
-          case "trajectoryChunk" if (version >= 2):
-            var points:Array<TrajectoryPoint> = [];
-            for (item in array(payload, "points"))
-              points.push(new TrajectoryPoint(wide(item, "timeFromStartNs"),
-                floats(item, "positions")));
-            Command(TrajectoryChunk(new TrajectoryChunk(points,
-              nullableWide(payload, "tag"), nullableWide(payload, "spliceTag"),
-              nullableWide(payload, "spliceTimeNs"))));
           case "trajectorySegmentChunk" if (version >= 3):
+            var spliceTag = nullableWide(payload, "spliceTag");
+            if (spliceTag != null && Int64.compare(spliceTag, Int64.ofInt(0)) != 0)
+              throw "Spliced trajectory recordings are unsupported";
             var segments:Array<TrajectorySegment> = [];
             for (item in array(payload, "segments")) {
               var coefficients:Array<Array<Float>> = [];
@@ -126,8 +110,7 @@ class RobotRecordingCodec {
                 wide(item, "durationNs"), coefficients));
             }
             Command(TrajectoryChunk(TrajectoryChunk.fromSegments(segments,
-              nullableWide(payload, "tag"), nullableWide(payload, "spliceTag"),
-              nullableWide(payload, "spliceTimeNs"))));
+              nullableWide(payload, "tag"))));
           case "executionPlan" if (version >= 4):
             var segments:Array<TrajectorySegment> = [];
             for (item in array(payload, "segments")) {
