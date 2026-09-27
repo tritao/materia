@@ -501,8 +501,11 @@ Do:
   from the velocity actually executed (analytic for degree >= 2, chord speed
   for degree 1), and report non-latched `trajectory_underflow`. Legacy point
   chunks retain their current completion behavior.
-- A hold that runs out of queued path finishes on the ramp, as STOP does
-  today.
+- A hold that reaches a declared final endpoint completes at that knot; it
+  must not ramp beyond an authored stop, including a degree-1 final chord.
+  A hold that exhausts a declared continuation finishes on the limited ramp.
+  Legacy point chunks retain their existing STOP/hold queue-end behavior until
+  the point-chunk path is removed.
 
 Tests:
 - Hold mid-move: the path is preserved (positions stay on the planned
@@ -931,3 +934,17 @@ normal completion, both stream derivative types, timely refill, hold during
 acceleration and deceleration, resume limits, and abort. MotionKit and RobotKit
 native/Haxe suites, both FFI audits, and TCP default, session and lease-timeout
 integration passed. Commit: the commit containing this entry.
+
+### Native hold at a declared final endpoint — correction before migration
+
+During the plan-backed `MotionSystem` migration, the hold sweep failed near
+the end of a degree-1 move: HOLD reached a plan declared `ends_at_rest = true`
+with a nonzero final chord, then the runtime started a straight ramp and
+commanded motion past the final knot. That violates the declared-completion
+rule and can cross a travel limit. The smallest correction is to complete a
+declared final plan at its endpoint; ramp only when a plan declared that more
+motion follows, while preserving the legacy point-chunk STOP fallback until
+its removal. Add a native regression for HOLD near a final degree-1 endpoint
+and retain the existing legacy queue-end STOP regression. Implementation work
+is paused at this decision boundary; the migration changes remain uncommitted
+and its MotionKit suite is not yet green.
