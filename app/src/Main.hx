@@ -1281,7 +1281,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function makeDocumentDialog():Null<View> {
-    if (!documents.needsConfirmation() && documents.error == null) return null;
+    if (!documents.needsConfirmation() && !documents.needsTrustConfirmation() &&
+        documents.error == null) return null;
     var style = new LayoutStyle();
     style.width = LayoutAxis.grow();
     style.childGap = 12.0;
@@ -1290,7 +1291,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var title = "Unsaved changes";
     var message = "Save changes to " + session.label() + " before continuing?";
     var dismiss = function() documents.resolve("cancel");
-    if (documents.error != null) {
+    if (documents.needsTrustConfirmation()) {
+      title = "Run project code?";
+      message = "Opening this file runs registered code: " + documents.trustReference;
+      dismiss = function() documents.resolveTrust(false);
+      var run = new Button("Run code and open", null, function() documents.resolveTrust(true),
+        "document-trust-run");
+      run.variant = ButtonVariant.Primary;
+      buttons.push(new KeyedView("run", run));
+      buttons.push(new KeyedView("cancel", new Button("Cancel", null, dismiss, "document-trust-cancel")));
+    } else if (documents.error != null) {
       title = "Scene document error";
       message = documents.error;
       dismiss = documents.dismissError;

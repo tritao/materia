@@ -35,6 +35,7 @@ class SceneDocumentTests {
     var first = directory + "/scene.materia.json";
     var second = directory + "/copy.materia.json";
     var bad = directory + "/invalid.materia.json";
+    var codeOwned = directory + "/code-owned.materia.json";
     var session = new SceneDocumentSession();
     try {
       edit(session, 1.25);
@@ -145,6 +146,22 @@ class SceneDocumentTests {
       controller.resolve("discard");
       near(session.scene.info("box").localTransform().element(12), 1.25, "Open loads chosen scene");
       check(!controller.blocked() && !session.scene.document.isDirty, "Open resets workflow and dirty state");
+      File.saveContent(codeOwned, '{"project":{"version":1,"reference":"missing-project.py",' +
+        '"overrides":[],"removed":[],"instances":[]}}');
+      chosen = codeOwned;
+      var beforeTrust = session.scene;
+      controller.requestOpen();
+      check(controller.needsTrustConfirmation() && controller.trustReference == "missing-project.py" &&
+        session.scene == beforeTrust, "project code is not run before trust confirmation");
+      controller.resolveTrust(false);
+      check(!controller.blocked() && session.scene == beforeTrust,
+        "cancelling project code leaves the document open");
+      controller.requestOpen();
+      controller.resolveTrust(true);
+      check(controller.error != null && session.scene == beforeTrust,
+        "trust confirmation reaches project loading without replacing on failure");
+      controller.dismissError();
+      chosen = first;
 
       edit(session, -2.0);
       session.save(first);
@@ -217,6 +234,7 @@ class SceneDocumentTests {
       FileSystem.deleteFile(first);
       FileSystem.deleteFile(second);
       FileSystem.deleteFile(bad);
+      FileSystem.deleteFile(codeOwned);
       FileSystem.deleteDirectory(directory);
       Sys.println("Scene document tests passed");
     } catch (error:Dynamic) {
