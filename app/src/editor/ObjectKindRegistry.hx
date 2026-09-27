@@ -118,7 +118,7 @@ private class BuiltinObjectKind implements ObjectKindProvider {
           function(value) scene.setBracketHoleRadius(id, value), prefix));
       default:
     }
-    return result;
+    return ScenePropertyProvider.common(scene, id, prefix, result);
   }
 
   public function commands(scene:EditorScene, id:String):Array<String> {

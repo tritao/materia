@@ -20,6 +20,13 @@ class ScenePropertyProvider {
     if (scene.object(id) == null) return [];
     // Capture identity in each binding: undo must still target this object after selection changes.
     var prefix = id + ":" + (scene.selectedFeatureKey == null ? "object" : scene.selectedFeatureKey) + ":";
+    var provider = ObjectKindRegistry.find(scene.requiredObject(id).kind);
+    return provider == null ? common(scene, id, prefix, []) : provider.properties(scene, id, prefix);
+  }
+
+  /** Shared fields stay ordered around the kind-specific fields supplied by each provider. */
+  public static function common(scene:EditorScene, id:String, prefix:String,
+      kindProperties:Array<PropertyDescriptor>):Array<PropertyDescriptor> {
     var result:Array<PropertyDescriptor> = [];
     if (!scene.kinematicOccurrences.exists(id))
       for (axis in 0...2) result.push(scene.positionProperty(id, axis, prefix));
@@ -157,9 +164,7 @@ class ScenePropertyProvider {
     }
     if (!importedShape && !genericPart)
       result.push(scene.dimensionProperty(id, 2, prefix));
-    var kindProvider = ObjectKindRegistry.find(scene.requiredObject(id).kind);
-    if (kindProvider != null)
-      for (property in kindProvider.properties(scene, id, prefix)) result.push(property);
+    for (property in kindProperties) result.push(property);
     var selectedFeature = scene.selectedCadFeature(id);
     if (selectedFeature != null && selectedFeature.active && Std.isOfType(selectedFeature, ExtrudeFeature)) {
       var extrusion:ExtrudeFeature = cast selectedFeature;
