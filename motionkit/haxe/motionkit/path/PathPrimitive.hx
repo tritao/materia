@@ -2,6 +2,7 @@ package motionkit.path;
 
 /** Geometric path primitive parameterized by travelled arc length. */
 interface PathPrimitive {
+  function kind():PathPrimitiveKind;
   function length():Float;
   function pointAt(distance:Float):PathPoint;
   /** Unit tangent in increasing path-distance direction. */

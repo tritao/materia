@@ -2,6 +2,7 @@ package motionkit.path;
 
 /** Straight Cartesian path primitive. */
 class LineSegment implements PathPrimitive {
+  public function kind():PathPrimitiveKind return PathPrimitiveKind.Line;
   public final start:PathPoint;
   public final end:PathPoint;
   final segmentLength:Float;

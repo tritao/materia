@@ -2,6 +2,7 @@ package motionkit.path;
 
 /** Planar quintic Hermite blend, parameterized numerically by arc length. */
 class QuinticBlend implements PathPrimitive {
+  public function kind():PathPrimitiveKind return PathPrimitiveKind.Blend;
   final controls:Array<PathPoint>;
   final distances:Array<Float>;
   final blendLength:Float;

@@ -10,6 +10,7 @@ import motionkit.path.GeometricPath;
 import motionkit.path.ArcSegment;
 import motionkit.path.CornerBlender;
 import motionkit.path.LineSegment;
+import motionkit.path.PathPrimitiveKind;
 import motionkit.path.QuinticBlend;
 import motionkit.planner.JointPathSamples;
 import motionkit.planner.PathTimingLimits;
@@ -447,8 +448,8 @@ class MotionSystem {
           }
         }
       }
-      speed = Math.min(speed * 0.9,
-        0.8 * Math.sqrt(2.0 * pathAcceleration *
+      speed = Math.min(speed * 0.75,
+        0.75 * Math.sqrt(2.0 * pathAcceleration *
           Math.min(before.length(), after.length())));
       junctionSpeeds[index] = speed;
     }
@@ -465,11 +466,11 @@ class MotionSystem {
       previousEnd = primitive.pointAt(length);
       if (length <= 1e-12) continue;
       var count = 1;
-      if (Std.isOfType(primitive, ArcSegment)) {
+      if (primitive.kind() == PathPrimitiveKind.Arc) {
         var arc:ArcSegment = cast primitive;
         count = Std.int(Math.ceil(Math.abs(arc.sweepAngle) * 16.0));
       }
-      if (Std.isOfType(primitive, QuinticBlend)) count = 32;
+      if (primitive.kind() == PathPrimitiveKind.Blend) count = 32;
       var distances:Array<Float> = [];
       var positions:Array<Array<Float>> = [];
       var first:Array<Array<Float>> = [];
@@ -577,7 +578,7 @@ class MotionSystem {
   function distanceToAuthoredPath(point:PathPoint, path:GeometricPath):Float {
     var closest = Math.POSITIVE_INFINITY;
     for (primitive in path.primitives) {
-      if (Std.isOfType(primitive, LineSegment)) {
+      if (primitive.kind() == PathPrimitiveKind.Line) {
         var line:LineSegment = cast primitive;
         var length = line.length();
         if (length <= 0.0) {
@@ -590,7 +591,7 @@ class MotionSystem {
           (point.z - line.start.z) * direction[2];
         closest = Math.min(closest, point.distanceTo(
           line.pointAt(Math.max(0.0, Math.min(length, projection)))));
-      } else if (Std.isOfType(primitive, ArcSegment)) {
+      } else if (primitive.kind() == PathPrimitiveKind.Arc) {
         var arc:ArcSegment = cast primitive;
         var angle = Math.atan2(point.y - arc.center.y, point.x - arc.center.x);
         var baseShift = Math.round((arc.startAngle - angle) / (2.0 * Math.PI));

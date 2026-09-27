@@ -2,6 +2,7 @@ package motionkit.path;
 
 /** Planar circular arc in the XY plane with a constant Z coordinate. */
 class ArcSegment implements PathPrimitive {
+  public function kind():PathPrimitiveKind return PathPrimitiveKind.Arc;
   public final center:PathPoint;
   public final radius:Float;
   public final startAngle:Float;

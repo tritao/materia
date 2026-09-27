@@ -17,9 +17,9 @@ class CornerBlender {
     if (tolerance > 0.0) for (i in 0...(count - 1)) {
       var before = path.primitives[i];
       var after = path.primitives[i + 1];
-      if (!Std.isOfType(before, LineSegment) || !Std.isOfType(after, LineSegment)) {
-        if ((Std.isOfType(before, LineSegment) || Std.isOfType(before, ArcSegment)) &&
-            (Std.isOfType(after, LineSegment) || Std.isOfType(after, ArcSegment))) {
+      if (before.kind() != PathPrimitiveKind.Line || after.kind() != PathPrimitiveKind.Line) {
+        if ((before.kind() == PathPrimitiveKind.Line || before.kind() == PathPrimitiveKind.Arc) &&
+            (after.kind() == PathPrimitiveKind.Line || after.kind() == PathPrimitiveKind.Arc)) {
           var corner = before.pointAt(before.length());
           if (corner.distanceTo(after.pointAt(0.0)) > 1e-8)
             throw 'Corner ${i + 1} is disconnected';
@@ -119,11 +119,11 @@ class CornerBlender {
     var primitives:Array<PathPrimitive> = [];
     for (i in 0...count) {
       var primitive = path.primitives[i];
-      if (Std.isOfType(primitive, LineSegment)) {
+      if (primitive.kind() == PathPrimitiveKind.Line) {
         var line:LineSegment = cast primitive;
         primitives.push(new LineSegment(line.pointAt(startCuts[i]),
           line.pointAt(line.length() - endCuts[i])));
-      } else if (Std.isOfType(primitive, ArcSegment)) {
+      } else if (primitive.kind() == PathPrimitiveKind.Arc) {
         var arc:ArcSegment = cast primitive;
         var direction = arc.sweepAngle < 0.0 ? -1.0 : 1.0;
         primitives.push(new ArcSegment(arc.center, arc.radius,
@@ -137,7 +137,7 @@ class CornerBlender {
   }
 
   static function distanceToPrimitive(point:PathPoint, primitive:PathPrimitive):Float {
-    if (Std.isOfType(primitive, LineSegment)) {
+    if (primitive.kind() == PathPrimitiveKind.Line) {
       var line:LineSegment = cast primitive;
       var tangent = line.tangentAt(0.0);
       var projection = (point.x - line.start.x) * tangent[0] +

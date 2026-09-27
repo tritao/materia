@@ -488,6 +488,19 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             caps.push_back(speed_cap_count ? speed_caps[i] : 0.0);
         }
         auto geometric = std::make_shared<toppra::PiecewisePolyPath>(coefficients, knots);
+        bool nonlinear = false;
+        for (size_t span = 0; span + 1 < samples.size() && !nonlinear; ++span)
+            for (uint32_t joint = 0; joint < joint_count; ++joint)
+                if (std::abs(samples[span].second[joint]) > 1e-10 ||
+                    std::abs(samples[span + 1].second[joint]) > 1e-10 ||
+                    std::abs(samples[span].first[joint] - samples[span + 1].first[joint]) > 1e-10) {
+                    nonlinear = true;
+                    break;
+                }
+        // Collocation can miss acceleration peaks between samples on a curved
+        // path. Reserve room for those peaks; final validation still uses the
+        // caller's exact acceleration limit.
+        const double interpolation_margin = nonlinear ? 0.8 : 1.0;
         toppra::Vector lower_velocity(dof), upper_velocity(dof);
         toppra::Vector lower_acceleration(dof), upper_acceleration(dof);
         const double moving_boundary_margin = (start_speed > 0.0 || end_speed > 0.0)
@@ -495,8 +508,8 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         for (uint32_t j = 0; j < joint_count; ++j) {
             lower_velocity[j] = -max_velocity[j] * moving_boundary_margin;
             upper_velocity[j] = max_velocity[j] * moving_boundary_margin;
-            lower_acceleration[j] = -max_acceleration[j] * moving_boundary_margin;
-            upper_acceleration[j] = max_acceleration[j] * moving_boundary_margin;
+            lower_acceleration[j] = -max_acceleration[j] * moving_boundary_margin * interpolation_margin;
+            upper_acceleration[j] = max_acceleration[j] * moving_boundary_margin * interpolation_margin;
         }
         lower_velocity[joint_count] = -1e8;
         upper_velocity[joint_count] = 1e8;
