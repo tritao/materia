@@ -88,6 +88,15 @@ class RobotRuntimeCompiler {
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
         joint.limits.maxAcceleration));
     }
+    for (coupling in robot.couplings) {
+      var leader = -1, follower = -1;
+      for (index in 0...robot.joints.length) {
+        if (robot.joints[index].id == coupling.leader) leader = index;
+        if (robot.joints[index].id == coupling.follower) follower = index;
+      }
+      result.couplings.push(new RobotRuntimeJointCouplingBlueprint(
+        leader, follower, coupling.ratio, coupling.offset));
+    }
     var children = [for (joint in robot.joints) joint.child];
     var root = robot.links[0];
     for (link in robot.links) if (children.indexOf(link) < 0) { root = link; break; }
@@ -260,6 +269,33 @@ class RobotRuntimeCompiler {
     }
 
     var actuatorIds = new Map<String, Bool>();
+    if (robot.couplings.length > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS)
+      diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_LIMIT", "couplings", "too many joint couplings"));
+    var couplingIds = new Map<String, Bool>();
+    var followers = new Map<String, Bool>();
+    for (index in 0...robot.couplings.length) {
+      var coupling = robot.couplings[index];
+      var path = 'couplings[$index]';
+      if (coupling == null) {
+        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_NULL", path, "joint coupling is null"));
+        continue;
+      }
+      if (couplingIds.exists(coupling.id))
+        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_ID", path, "duplicate joint coupling ID"));
+      couplingIds.set(coupling.id, true);
+      if (followers.exists(coupling.follower))
+        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_FOLLOWER", path, "joint has multiple leaders"));
+      followers.set(coupling.follower, true);
+      if (!jointIds.exists(coupling.leader) || !jointIds.exists(coupling.follower))
+        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_JOINT", path, "coupling references an unknown joint"));
+      for (joint in robot.joints) if (joint != null &&
+          (joint.id == coupling.leader || joint.id == coupling.follower) &&
+          joint.type == JointType.Fixed)
+        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_FIXED", path,
+          "joint coupling requires movable joints"));
+      if (!Math.isFinite(coupling.ratio) || coupling.ratio == 0.0 || !Math.isFinite(coupling.offset))
+        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_VALUE", path, "invalid coupling ratio or offset"));
+    }
     for (index in 0...robot.actuators.length) {
       var actuator = robot.actuators[index];
       var path = 'actuators[$index]';

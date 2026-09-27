@@ -48,6 +48,7 @@ class MotionSystemBlueprint {
       }
       var ratios:Array<Float> = [];
       var offsets:Array<Float> = [];
+      var transmitted:Array<Bool> = [];
       var found = 0;
       for (jointId in axis.jointIds) {
         var selected:Null<robotkit.model.Actuator> = null;
@@ -65,25 +66,49 @@ class MotionSystemBlueprint {
         if (selected == null) {
           ratios.push(1.0);
           offsets.push(0.0);
+          transmitted.push(false);
         } else switch selected.transmission {
           case SimpleTransmission(_, ratio, offset):
             ratios.push(ratio);
             offsets.push(offset);
+            transmitted.push(true);
             found++;
         }
       }
-      if (found == 0) {
+      var scales = [for (_ in axis.jointIds) 1.0];
+      var jointOffsets = [for (_ in axis.jointIds) 0.0];
+      var resolved = [for (index in 0...axis.jointIds.length) index == 0];
+      if (found > 0 && transmitted[0]) {
+        var referenceRatio = ratios[0], referenceOffset = offsets[0];
+        // Equating actuator coordinates gives q_i = o_i + (r_0/r_i)*(q_0-o_0).
+        for (index in 0...ratios.length) if (transmitted[index]) {
+          scales[index] = referenceRatio / ratios[index];
+          jointOffsets[index] = offsets[index] - scales[index] * referenceOffset;
+          resolved[index] = true;
+        }
+      }
+      var coupled = false;
+      for (_ in 0...axis.jointIds.length) for (coupling in model.couplings) {
+          var leader = axis.jointIds.indexOf(coupling.leader);
+          var follower = axis.jointIds.indexOf(coupling.follower);
+          if (leader < 0 || follower < 0) continue;
+          coupled = true;
+          if (resolved[leader]) {
+            scales[follower] = coupling.ratio * scales[leader];
+            jointOffsets[follower] = coupling.ratio * jointOffsets[leader] + coupling.offset;
+            resolved[follower] = true;
+          } else if (resolved[follower]) {
+            scales[leader] = scales[follower] / coupling.ratio;
+            jointOffsets[leader] = (jointOffsets[follower] - coupling.offset) / coupling.ratio;
+            resolved[leader] = true;
+          }
+      }
+      if (found == 0 && !coupled) {
         mapped.push(axis);
         continue;
       }
-      if (found != axis.jointIds.length)
-        throw 'Motion axis "${axis.id}" has transmissions for only some joints';
-      var referenceRatio = ratios[0], referenceOffset = offsets[0];
-      // Logical coordinate is the first joint coordinate. Equating actuator
-      // coordinates gives q_i = o_i + (r_0/r_i) * (q_0 - o_0).
-      var scales = [for (ratio in ratios) referenceRatio / ratio];
-      var jointOffsets = [for (index in 0...offsets.length)
-        offsets[index] - scales[index] * referenceOffset];
+      for (index in 0...resolved.length) if (!resolved[index])
+        throw 'Motion axis "${axis.id}" has an unmapped joint "${axis.jointIds[index]}"';
       mapped.push(new MotionAxisBlueprint(axis.id, axis.jointIds,
         axis.lowerLimit, axis.upperLimit, axis.maxVelocity,
         axis.maxAcceleration, axis.homePosition, scales, jointOffsets));

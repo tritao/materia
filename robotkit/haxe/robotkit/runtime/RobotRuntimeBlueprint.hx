@@ -19,6 +19,7 @@ class RobotRuntimeBlueprint {
   public final linkCount:Int;
   public final frameCount:Int;
   public final joints:Array<RobotRuntimeJointBlueprint> = [];
+  public final couplings:Array<RobotRuntimeJointCouplingBlueprint> = [];
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
   public final channels:Array<ProcessChannelDeclaration> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
@@ -135,6 +136,11 @@ class RobotRuntimeBlueprint {
         value.set_following_error_bound(joint, bound);
     }
     value.set_joint_count(jointCount);
+    if (couplings.length > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS)
+      throw "Too many runtime joint couplings";
+    value.set_coupling_count(couplings.length);
+    for (index in 0...couplings.length)
+      value.set_couplings(index, couplings[index].nativeValue());
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);
     value.set_collision_approximation(collisionApproximation);

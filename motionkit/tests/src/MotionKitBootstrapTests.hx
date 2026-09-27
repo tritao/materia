@@ -65,6 +65,7 @@ import robotkit.model.Frame;
 import robotkit.model.RobotModel;
 import robotkit.model.Actuator;
 import robotkit.model.Transmission;
+import robotkit.model.JointCoupling;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
@@ -1038,6 +1039,18 @@ class MotionKitBootstrapTests {
       "deprecated explicit scale still overrides the transmission");
     near(overridden.axes[0].jointOffsets[1], 0.02,
       "deprecated explicit offset still overrides the transmission");
+    model.addCoupling(new JointCoupling("gantry-gears", first.id, second.id, -1.5, 0.02));
+    var coupled = MotionSystemBlueprint.fromRobotModel(model, [authored]);
+    near(coupled.axes[0].jointScales[1], -1.5,
+      "model joint coupling derives the axis follower scale");
+    near(coupled.axes[0].jointOffsets[1], 0.02,
+      "model joint coupling derives the axis follower offset");
+    check(coupled.runtime.couplings.length == 1,
+      "runtime blueprint retains the model joint coupling");
+    model.actuators.pop();
+    var leaderDriven = MotionSystemBlueprint.fromRobotModel(model, [authored]);
+    near(leaderDriven.axes[0].jointScales[1], -1.5,
+      "one transmitted leader drives a coupled follower axis");
   }
 
   static function testCompiledAxisRunsThroughSimulation():Void {
