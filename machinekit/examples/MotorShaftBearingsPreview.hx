@@ -6,24 +6,77 @@ import materia.units.LengthUnit;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Solids;
 import cadkit.modeling.Part;
+import cadkit.modeling.AssemblyModel;
+import cadkit.parametric.Document;
+import cadkit.parametric.DocumentCodec;
+import cadkit.parametric.InstanceElement;
+import machinekit.document.MachineKitDocuments;
+import machinekit.document.MachineKitRecipes;
+import machinekit.document.MachineKitDocumentAssembly;
 
 /** Materia project entrypoint for the MachineKit motor/shaft/bearing assembly. */
 class MotorShaftBearingsPreview {
-	public static function preview():Bytes {
+	/** Editable document for every registered part occurrence in the example. */
+	public static function document():Document {
+		var result = new Document();
 		var example = new MotorShaftBearings();
-		var model = example.assembly();
+		var definitions = new Map<String, cadkit.parametric.Definition>();
+		for (entry in example.components()) {
+			var recipe = entry.component.type;
+			if (recipe == null) continue;
+			var identity = recipe.key(entry.component.values());
+			var definition = definitions.get(identity);
+			if (definition == null) {
+				definition = MachineKitDocuments.define(result, recipe, entry.component.values());
+				definitions.set(identity, definition);
+			}
+			result.createInstance(entry.id, definition);
+		}
+		return result;
+	}
+
+	/** A saved document can be edited and passed back to rebuild the viewport. */
+	public static function preview(?savedDocument:String):Bytes {
+		MachineKitRecipes.register();
+		var editable = savedDocument == null ? document() : DocumentCodec.decode(savedDocument);
+		try {
+			var result = previewDocument(editable);
+			editable.close();
+			return result;
+		} catch (error:Dynamic) {
+			editable.close();
+			throw error;
+		}
+	}
+
+	static function previewDocument(editable:Document):Bytes {
+		var example = new MotorShaftBearings();
+		var instances = new Map<String, InstanceElement>();
+		for (element in editable.allElements()) if (element.kind == "instance") {
+			var instance:InstanceElement = cast element;
+			instances.set(instance.name, instance);
+		}
+		var model = assembly(example, instances);
 		var parts:Array<SceneArtifactPart> = [];
 		var definitionByOccurrence = new Map<String, String>();
 		var definitionByIdentity = new Map<String, String>();
 		for (entry in example.components()) {
-			var recipe = entry.component.type;
-			var identity = recipe == null ? entry.component.designation : recipe.key(entry.component.values());
+			var instance = instances.get(entry.id);
+			var identity = instance == null ? entry.component.designation :
+				instance.definitionId.value + ":" + MachineKitRecipes.component(instance).type.key(
+					MachineKitRecipes.component(instance).values());
 			var definitionId = definitionByIdentity.get(identity);
 			if (definitionId == null) {
 				definitionId = entry.id;
 				definitionByIdentity.set(identity, definitionId);
-				var part = entry.component.geometry(ComponentDetail.Preview);
-				addPart(parts, definitionId, entry.component.designation, part, entry.component.materialId);
+				if (instance == null) {
+					addPart(parts, definitionId, entry.component.designation,
+						entry.component.geometry(ComponentDetail.Preview), entry.component.materialId);
+				} else {
+					var component = MachineKitRecipes.component(instance);
+					addPart(parts, definitionId, component.designation,
+						new Part(editable.definitionOutput(instance, "body").cloneShape()), component.materialId);
+				}
 			}
 			definitionByOccurrence.set(entry.id, definitionId);
 		}
@@ -42,11 +95,40 @@ class MotorShaftBearingsPreview {
 			if (definitionByOccurrence.get(component.id) == component.id) component];
 		for (occurrence in definition.occurrences)
 			occurrence.definition = definitionByOccurrence.get(occurrence.id);
-
 		return SceneArtifact.encode({lengthUnit: "mm",
 			metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
 			assembly: model.record(), assemblyDefinition: definition,
-			assemblyState: state});
+			assemblyState: state, recipeDocument: DocumentCodec.encode(editable)});
+	}
+
+	static function assembly(example:MotorShaftBearings, instances:Map<String, InstanceElement>):AssemblyModel {
+		var model = new AssemblyModel();
+		add(model, "motor", example.motor, instances);
+		add(model, "plate", example.plate, instances);
+		model.mate("plate-mount", "fixed", "motor", "mountFace", "plate", "motor");
+		for (i in 1...5) {
+			var id = 'screw$i';
+			add(model, id, example.screw, instances);
+			model.mate('$id-seat', "fixed", "plate", 'bolt$i', id, "head");
+		}
+		add(model, "shaft", example.shaft, instances);
+		model.mate("coupling", "continuous", "motor", "shaftTip", "shaft", "input");
+		for (seat in ["bearingA", "bearingB"]) {
+			add(model, seat, example.bearing, instances);
+			model.mate('$seat-seat', "fixed", "shaft", seat, seat, "front");
+		}
+		add(model, "key", example.key, instances);
+		model.mate("key-seat", "fixed", "shaft", "outputKey", "key", "seat");
+		add(model, "ring", example.ring, instances);
+		model.mate("ring-seat", "fixed", "shaft", "bearingBRing", "ring", "seat");
+		return model;
+	}
+
+	static function add(model:AssemblyModel, id:String, component:machinekit.component.MachineComponent,
+			instances:Map<String, InstanceElement>):Void {
+		var instance = instances.get(id);
+		if (instance == null) component.addTo(model, id);
+		else MachineKitDocumentAssembly.add(model, id, instance);
 	}
 
 	static function addPart(parts:Array<SceneArtifactPart>, id:String, name:String, part:Part,

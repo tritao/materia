@@ -5,6 +5,7 @@ import nativekit.ui.widgets.text.Text;
 
 import cadkit.parametric.Definition;
 import cadkit.parametric.Element;
+import cadkit.parametric.InstanceElement;
 import cadkit.parametric.DefinitionInput;
 import cadkit.parametric.QuantityKind;
 import cadkit.parametric.TypedProperty;
@@ -13,6 +14,7 @@ import nativekit.ui.properties.PropertyDescriptor;
 import nativekit.ui.properties.PropertyDescriptorOptions;
 import nativekit.ui.properties.PropertyType;
 import nativekit.ui.properties.PropertyValue;
+import nativekit.ui.properties.PropertyOption;
 
 /** Adapts persistent CadKit values into the shared typed property inspector. */
 class BimInspectorDescriptors {
@@ -37,26 +39,96 @@ class BimInspectorDescriptors {
 		return result;
 	}
 
-	private static function inputDescriptor(definition:Definition, input:DefinitionInput, ?edit:BimProjectEdit):PropertyDescriptor {
-		var options = new PropertyDescriptorOptions();
-		options.category = "Type Inputs";
-		options.unit = input.unit;
-		options.recordHistory = false;
-		return new PropertyDescriptor("definition:" + definition.id.value + ":input:" + input.name, input.name, PropertyType.Float,
-			function(_) return PropertyValue.Float(UnitConversion.fromCanonical(definition.input(input.name).defaultValue,
-				input.kind, input.unit)), function(_, value) switch (value) {
-				case PropertyValue.Float(next): setInput(edit, definition, input, next);
-				case PropertyValue.Int(next): setInput(edit, definition, input, next);
-				default: throw "Definition input requires a number";
-			}, options);
+	/** The same controls edit resolved values on an individual definition instance. */
+	public static function forInstanceInputs(instance:InstanceElement, ?edit:BimProjectEdit):Array<PropertyDescriptor> {
+		var result:Array<PropertyDescriptor> = [];
+		for (input in instance.document.definition(instance.definitionId).inputs())
+			result.push(instanceInputDescriptor(instance, input, edit));
+		return result;
 	}
 
-	private static function setInput(edit:Null<BimProjectEdit>, definition:Definition,
-			input:DefinitionInput, next:Float):Void {
-		var before = UnitConversion.fromCanonical(definition.input(input.name).defaultValue,
-			input.kind, input.unit);
-		apply(edit, "Set " + input.name, function() definition.setDefault(input.name, next, input.unit),
-			function() definition.setDefault(input.name, before, input.unit));
+	private static function instanceInputDescriptor(instance:InstanceElement, input:DefinitionInput,
+			?edit:BimProjectEdit):PropertyDescriptor {
+		var options = inputOptions(input, "Instance Inputs");
+		return new PropertyDescriptor("instance:" + instance.id.value + ":input:" + input.name,
+			input.name, inputType(input), function(_) return switch input.kind {
+				case TypedProperty.TypeBoolean: PropertyValue.Bool(instance.resolvedBoolean(input.name));
+				case TypedProperty.TypeInteger: PropertyValue.Int(instance.resolvedInteger(input.name));
+				case TypedProperty.TypeToken: PropertyValue.Enum(instance.resolvedToken(input.name));
+				default: PropertyValue.Float(UnitConversion.fromCanonical(instance.resolved(input.name), input.kind, input.unit));
+			}, function(_, value) setInstanceInput(edit, instance, input, value), options);
+	}
+
+	private static function inputOptions(input:DefinitionInput, category:String):PropertyDescriptorOptions {
+		var options = new PropertyDescriptorOptions();
+		options.category = category;
+		options.unit = input.isNumeric() ? input.unit : null;
+		options.recordHistory = false;
+		if (input.allowedValues != null)
+			for (allowed in input.allowedValues) options.options.push(new PropertyOption(allowed, allowed));
+		return options;
+	}
+
+	private static function inputType(input:DefinitionInput):PropertyType return switch input.kind {
+		case TypedProperty.TypeBoolean: PropertyType.Bool;
+		case TypedProperty.TypeInteger: PropertyType.Int;
+		case TypedProperty.TypeToken: PropertyType.Enum;
+		default: PropertyType.Float;
+	};
+
+	private static function inputDescriptor(definition:Definition, input:DefinitionInput, ?edit:BimProjectEdit):PropertyDescriptor {
+		var options = inputOptions(input, "Type Inputs");
+		return new PropertyDescriptor("definition:" + definition.id.value + ":input:" + input.name, input.name, inputType(input),
+			function(_) return switch input.kind {
+				case TypedProperty.TypeBoolean: PropertyValue.Bool(cast definition.input(input.name).defaultValue);
+				case TypedProperty.TypeInteger: PropertyValue.Int(cast definition.input(input.name).defaultValue);
+				case TypedProperty.TypeToken: PropertyValue.Enum(cast definition.input(input.name).defaultValue);
+				default: PropertyValue.Float(UnitConversion.fromCanonical(definition.input(input.name).defaultValue,
+					input.kind, input.unit));
+			}, function(_, value) setDefinitionInput(edit, definition, input, value), options);
+	}
+
+	private static function setInstanceInput(edit:Null<BimProjectEdit>, instance:InstanceElement,
+			input:DefinitionInput, value:PropertyValue):Void {
+		var before = instance.typedOverrideValue(input.name);
+		apply(edit, "Set " + input.name, function() writeInstanceInput(instance, input, value), function() {
+			if (before == null) instance.removeOverride(input.name);
+			else if (input.isNumeric()) instance.setOverride(input.name,
+				UnitConversion.fromCanonical(before, input.kind, input.unit), input.unit);
+			else instance.setTypedOverride(input.name, before);
+		});
+	}
+
+	private static function writeInstanceInput(instance:InstanceElement, input:DefinitionInput,
+			value:PropertyValue):Void switch value {
+		case PropertyValue.Bool(next): instance.setTypedOverride(input.name, next);
+		case PropertyValue.Enum(next): instance.setTypedOverride(input.name, next);
+		case PropertyValue.Int(next):
+			if (input.kind == TypedProperty.TypeInteger) instance.setTypedOverride(input.name, next);
+			else instance.setOverride(input.name, next, input.unit);
+		case PropertyValue.Float(next): instance.setOverride(input.name, next, input.unit);
+		default: throw "Definition input value has the wrong type";
+	}
+
+	private static function setDefinitionInput(edit:Null<BimProjectEdit>, definition:Definition,
+			input:DefinitionInput, value:PropertyValue):Void {
+		var before = definition.input(input.name).defaultValue;
+		apply(edit, "Set " + input.name, function() writeDefinitionInput(definition, input, value), function() {
+			if (input.isNumeric()) definition.setDefault(input.name,
+				UnitConversion.fromCanonical(before, input.kind, input.unit), input.unit);
+			else definition.setTypedDefault(input.name, before);
+		});
+	}
+
+	private static function writeDefinitionInput(definition:Definition, input:DefinitionInput,
+			value:PropertyValue):Void switch value {
+		case PropertyValue.Bool(next): definition.setTypedDefault(input.name, next);
+		case PropertyValue.Enum(next): definition.setTypedDefault(input.name, next);
+		case PropertyValue.Int(next):
+			if (input.kind == TypedProperty.TypeInteger) definition.setTypedDefault(input.name, next);
+			else definition.setDefault(input.name, next, input.unit);
+		case PropertyValue.Float(next): definition.setDefault(input.name, next, input.unit);
+		default: throw "Definition input value has the wrong type";
 	}
 
 	private static function nameDescriptor(element:Element, ?edit:BimProjectEdit):PropertyDescriptor {

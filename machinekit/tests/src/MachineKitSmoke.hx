@@ -15,10 +15,13 @@ import machinekit.component.MachineKitComponents;
 import machinekit.component.ComponentValues;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
+import machinekit.document.MachineKitDocumentAssembly;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
+import cadkit.parametric.Placement;
 import cadkit.parametric.DefinitionEvaluatorRegistry;
 import cadkit.parametric.DefinitionOutput;
+import materia.project.SceneArtifact;
 import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
@@ -131,11 +134,20 @@ class MachineKitSmoke {
 		first.removeOverride("detail");
 		check(document.definitionOutput(first, "bearingSeat").volume() > 0, "bearing seat tool output");
 		var firstBack = first.connector("back").location.plane.origin.z;
+		document.setElementPlacement(first, new Placement(new Plane(
+			new Vector(10, 20, 30), Vector.X(), Vector.Z())));
+		var assembly = new AssemblyModel();
+		MachineKitDocumentAssembly.add(assembly, "bearingA", first);
+		MachineKitDocumentAssembly.add(assembly, "bearingB", second);
+		assembly.mate("bearing-seat", "fixed", "bearingA", "back", "bearingB", "front");
+		near(assembly.worldPoint("bearingB", "front").x, 10, "document assembly placement x");
+		near(assembly.worldPoint("bearingB", "front").y, 20, "document assembly placement y");
+		near(assembly.worldPoint("bearingB", "front").z, firstBack + 30, "document connectors mate by name");
 		second.setTypedOverride("designation", "6000");
-		check(second.shape().volume() != firstVolume && first.shape().volume() == firstVolume,
-			"bearing override updates one instance");
+		check(second.shape().volume() != firstVolume, "bearing override updates one instance");
+		near(first.shape().volume(), firstVolume, "other bearing retains its volume");
 		check(second.connector("back").location.plane.origin.z != firstBack &&
-			first.connector("back").location.plane.origin.z == firstBack,
+			first.connector("back").location.plane.origin.z == firstBack + 30,
 			"bearing override updates one connector set");
 		var bom = MachineKitDocuments.bom(document);
 		check(bom.quantity("608-2Z") == 1 && bom.quantity("6000-2Z") == 1,
@@ -164,6 +176,20 @@ class MachineKitSmoke {
 		var motor = tools.createInstance("Motor", MachineKitDocuments.define(tools, motorType));
 		check(tools.definitionOutput(motor, "mountingCutout").volume() > 0, "motor cutout output");
 		tools.close();
+	}
+
+	static function documentPreview():Void {
+		var editable = MotorShaftBearingsPreview.document();
+		var saved = DocumentCodec.encode(editable);
+		var baseline = SceneArtifact.decode(MotorShaftBearingsPreview.preview(saved));
+		check(baseline.parts.length == 8, "document preview retains shared part geometry");
+		var changed:Null<cadkit.parametric.InstanceElement> = null;
+		for (element in editable.allElements()) if (element.name == "bearingB") changed = cast element;
+		check(changed != null, "document preview exposes bearing instance");
+		changed.setTypedOverride("designation", "6000");
+		var edited = SceneArtifact.decode(MotorShaftBearingsPreview.preview(DocumentCodec.encode(editable)));
+		check(edited.parts.length == 9, "saved bearing dimensions rebuild one preview definition");
+		editable.close();
 	}
 	static function check(value:Bool, message:String):Void {
 		if (!value) throw message;
@@ -1617,6 +1643,7 @@ class MachineKitSmoke {
 	static function main():Void {
 		componentRecipes();
 		documentRecipes();
+		documentPreview();
 		MachineKitReferenceTests.run();
 		dimensions();
 		catalogMetadata();

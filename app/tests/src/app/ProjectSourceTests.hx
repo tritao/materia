@@ -24,7 +24,7 @@ class ProjectSourceTests {
     var machineManifest = root + "/machinekit/examples/materia.project.json";
     var requirement = MateriaProjectRunner.executionRequirement(machineManifest);
     check(requirement.kind == "requires-project-code" &&
-      requirement.projectPath == machineManifest && requirement.module.length > 0,
+      requirement.projectPath == FileSystem.fullPath(machineManifest) && requirement.module.length > 0,
       "project inspection identifies executable generator code without running it");
     var machineScene = MateriaProjectRunner.loadProject(machineManifest);
     var hasAluminium = false, hasSteel = false;

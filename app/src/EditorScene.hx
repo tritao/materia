@@ -1091,6 +1091,11 @@ class EditorScene {
   }
 
   // Reconcile document records into the runtime scene while preserving stable nodes.
+  public function refreshGenerated(data:Array<SceneObjectData>, geometry:Map<String, GeometryData>):Void {
+    for (key in geometry.keys()) generatedGeometry.set(key, geometry.get(key));
+    reconcileRecords(data);
+  }
+
   public function reconcileRecords(data:Array<SceneObjectData>):Void {
     var nextSelection = selectedId;
     if (nextSelection != "scene") {
