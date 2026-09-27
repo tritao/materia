@@ -315,7 +315,13 @@ class RobotRuntime {
     externalMutex.release();
     return new RobotSnapshot(native.robotId, native.sequence, native.sourceTimestampNs,
       native.mode, native.safety, native.endpoint, native.faultCode, native.q.toArray(),
-      native.dq.toArray(), native.effort.toArray(), native.receivedTimestampNs, frames);
+      native.dq.toArray(), native.effort.toArray(), native.receivedTimestampNs, frames,
+      native.trajectoryQueueDepth, native.trajectoryActive,
+      native.trajectoryTimeNs, native.trajectoryDurationNs,
+      native.trajectoryTag, native.trajectoryTagTimeNs,
+      native.modelRevision, native.calibrationRevision,
+      native.sessionState, native.activePlanId,
+      native.committedUntilNs, native.queueEndTimeNs);
   }
 
   /**

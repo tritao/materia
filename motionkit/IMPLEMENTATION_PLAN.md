@@ -1115,3 +1115,17 @@ fallback. PTY/FakeDevice tests cover a generated Ruckig plan with one target
 per owner cycle, HOLD/RESUME on that path, the watchdog, and both sides of
 the baud/period threshold. `RK_API_VERSION` is 14; the wire protocol is unchanged. Commit: the
 commit containing this entry.
+
+### P10 — Plans over robotd
+
+Message type 9 now carries a bounded polynomial execution plan instead of the
+unhandled `TrajectoryRequest`. The network advertises queue/plan capabilities,
+accepts plan submission and HOLD/RESUME/ABORT only from the lease owner, and
+returns native rejection status codes as faults. Network snapshots carry the
+trajectory and session fields. Fixed the runtime Haxe snapshot copy with
+external sensors, which previously discarded those fields. The TCP scenario
+submits a Ruckig plan, holds, resumes, and completes; session coverage checks
+observer rejection and a native error code; lease expiry now occurs mid-plan.
+MotionKit Haxe (22,688 assertions), RobotKit Haxe (4,432 assertions), MotionKit
+and RobotKit native CTest (3 and 12 targets), both FFI audits, and TCP default,
+session, and lease-timeout modes passed. Commit: the commit containing this entry.

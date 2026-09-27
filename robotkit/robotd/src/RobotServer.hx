@@ -34,6 +34,9 @@ import robotkit.protocol.PixelFormat;
 import robotkit.protocol.RobotStateMsg;
 import robotkit.protocol.SafetyReset;
 import robotkit.protocol.Stop;
+import robotkit.protocol.PlanSubmission;
+import robotkit.protocol.PathControl;
+import robotkit.runtime.RobotRuntimeError;
 import robotkit.protocol.SensorFrameMsg;
 import robotkit.transport.NativeTransport;
 import robotkit.world.RobotSensorFrames;
@@ -262,6 +265,12 @@ class RobotServer {
       handleLegacyJointTarget(frame, RobotProtocol.decodeJointTarget(frame));
     case RobotMessageType.JointTargets:
       handleJointTargets(frame, RobotProtocol.decodeJointTargets(frame));
+    case RobotMessageType.PlanSubmission:
+      try handlePlanSubmission(frame, RobotProtocol.decodePlanSubmission(frame))
+      catch (error:Dynamic) sendFault(422, 'invalid plan payload: $error', false);
+    case RobotMessageType.PathControl:
+      try handlePathControl(frame, RobotProtocol.decodePathControl(frame))
+      catch (error:Dynamic) sendFault(422, 'invalid path control payload: $error', false);
     case RobotMessageType.Stop:
       var value:Stop = RobotProtocol.decodeStop(frame);
       if (!remoteOwnsControl() || !sameRobot(value.robotId) || !validSession(frame)
@@ -316,7 +325,8 @@ class RobotServer {
       Int64.ofInt(robotId), robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), observerSession));
     sendTo(transport, observerSession, RobotProtocol.capabilities(new RobotCapabilities(
-      Int64.ofInt(robotId), blueprint.jointCount, true, true, true, false), observerSession));
+      Int64.ofInt(robotId), blueprint.jointCount, true, true, true, false,
+      runtime.supportsTrajectoryQueue(), runtime.supportsExecutionPlans()), observerSession));
     observerHello.set(transport.rawValue(), true);
     var latest = runtime.snapshot().withRobotId(Int64.ofInt(robotId));
     sendStateTo(transport, observerSession, latest);
@@ -345,7 +355,8 @@ class RobotServer {
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
     send(RobotProtocol.capabilities(new RobotCapabilities(Int64.ofInt(robotId),
-      blueprint.jointCount, true, true, true, false), sessionId));
+      blueprint.jointCount, true, true, true, false,
+      runtime.supportsTrajectoryQueue(), runtime.supportsExecutionPlans()), sessionId));
     helloComplete = true;
     publishSnapshot(true);
     if (!controllerGranted)
@@ -439,6 +450,68 @@ class RobotServer {
       return;
     }
     lastLeaseRenewalNs = NativeKit.nk_time_now_ns();
+  }
+
+  function handlePlanSubmission(frame:RobotFrame, value:PlanSubmission):Void {
+    if (!controllerGranted || !remoteOwnsControl()) {
+      sendFault(403, "control lease not granted", false);
+      return;
+    }
+    if (!validSession(frame) || !sameRobot(value.robotId) ||
+        !validCommandSequence(frame.sequence)) {
+      sendFault(400, "invalid plan session, robot, or sequence", false);
+      return;
+    }
+    if (!runtime.supportsExecutionPlans()) {
+      sendFault(422, "runtime does not support execution plans", false);
+      return;
+    }
+    try {
+      var plan = value.toWorld();
+      if (plan.startPosition.length != blueprint.jointCount)
+        throw "plan joint count does not match robot";
+      runtime.submitPlan(plan, nextRuntimeSequenceInt());
+      lastRequestSequence = frame.sequence;
+      servedState = true;
+    } catch (error:RobotRuntimeError) {
+      sendFault(error.status, error.toString(), false);
+    } catch (error:Dynamic) {
+      sendFault(422, 'plan rejected: $error', false);
+    }
+  }
+
+  function handlePathControl(frame:RobotFrame, value:PathControl):Void {
+    if (!controllerGranted || !remoteOwnsControl()) {
+      sendFault(403, "control lease not granted", false);
+      return;
+    }
+    if (!validSession(frame) || !sameRobot(value.robotId) ||
+        !validCommandSequence(frame.sequence)) {
+      sendFault(400, "invalid path control session, robot, or sequence", false);
+      return;
+    }
+    try {
+      var sequence = nextRuntimeSequenceInt();
+      switch value.action {
+        case 1: runtime.submitHold(sequence);
+        case 2: runtime.submitResume(sequence);
+        case 3: runtime.submitAbort(sequence);
+        case _: throw "invalid path control action";
+      }
+      lastRequestSequence = frame.sequence;
+      servedState = true;
+    } catch (error:RobotRuntimeError) {
+      sendFault(error.status, error.toString(), false);
+    } catch (error:Dynamic) {
+      sendFault(422, 'path control rejected: $error', false);
+    }
+  }
+
+  function nextRuntimeSequenceInt():Int {
+    var sequence = nextRuntimeSequence();
+    if (Int64.compare(sequence, Int64.ofInt(0x7fffffff)) > 0)
+      throw "runtime command sequence exhausted";
+    return Int64.toInt(sequence);
   }
 
   function checkControlLeaseTimeout():Void {
@@ -553,7 +626,12 @@ class RobotServer {
     if (target == null) return;
     var message = new RobotStateMsg(snapshot.robotId, snapshot.sequence,
       snapshot.sourceTimestampNs, snapshot.q.toArray(), snapshot.dq.toArray(), snapshot.effort.toArray(),
-      snapshot.mode, snapshot.faultCode, snapshot.receivedTimestampNs, snapshot.safety);
+      snapshot.mode, snapshot.faultCode, snapshot.receivedTimestampNs, snapshot.safety,
+      snapshot.trajectoryQueueDepth, snapshot.trajectoryActive,
+      snapshot.trajectoryTimeNs, snapshot.trajectoryDurationNs,
+      snapshot.trajectoryTag, snapshot.trajectoryTagTimeNs,
+      snapshot.sessionState, snapshot.activePlanId,
+      snapshot.committedUntilNs, snapshot.queueEndTimeNs);
     sendTo(target, targetSession, RobotProtocol.state(message, targetSession, snapshot.sequence,
       snapshot.sourceTimestampNs));
     for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot)) {

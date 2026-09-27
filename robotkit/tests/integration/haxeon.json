@@ -6,6 +6,7 @@
 	"dependencies": {
 		"nativekit": { "path": "../../../nativekit" },
 		"robotkit": { "path": "../.." },
+		"motionkit": { "path": "../../../motionkit" },
 		"materia-automation": { "path": "../../../automationkit" }
 	},
 	"native": {

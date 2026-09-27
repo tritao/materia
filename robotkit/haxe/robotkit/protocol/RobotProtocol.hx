@@ -36,6 +36,16 @@ class RobotProtocol {
     return message(RobotMessageType.JointTargets, MessagePack.encode(value), sessionId,
       sequence, timestampNs);
 
+  public static function planSubmission(value:PlanSubmission, ?sessionId:haxe.Int64 = null,
+      ?sequence:haxe.Int64 = null, ?timestampNs:haxe.Int64 = null):RobotFrame
+    return message(RobotMessageType.PlanSubmission, MessagePack.encode(value), sessionId,
+      sequence, timestampNs);
+
+  public static function pathControl(value:PathControl, ?sessionId:haxe.Int64 = null,
+      ?sequence:haxe.Int64 = null, ?timestampNs:haxe.Int64 = null):RobotFrame
+    return message(RobotMessageType.PathControl, MessagePack.encode(value), sessionId,
+      sequence, timestampNs);
+
   public static function stop(value:Stop, ?sessionId:haxe.Int64 = null,
       ?sequence:haxe.Int64 = null, ?timestampNs:haxe.Int64 = null):RobotFrame
     return message(RobotMessageType.Stop, MessagePack.encode(value), sessionId,
@@ -89,6 +99,16 @@ class RobotProtocol {
 
   public static function decodeJointTargets(frame:RobotFrame):JointTargets
     return decodeJointTargetsPayload(frame);
+
+  public static function decodePlanSubmission(frame:RobotFrame):PlanSubmission {
+    expect(frame, RobotMessageType.PlanSubmission);
+    return MessagePack.decode(frame.payload);
+  }
+
+  public static function decodePathControl(frame:RobotFrame):PathControl {
+    expect(frame, RobotMessageType.PathControl);
+    return MessagePack.decode(frame.payload);
+  }
 
   public static function decodeStop(frame:RobotFrame):Stop
     return decodeStopPayload(frame);

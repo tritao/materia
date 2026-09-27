@@ -88,6 +88,31 @@ class RobotSessionIntegration {
       if (!controller.hasControlLease() || velocityOf(controller) != 1.0)
         throw "active RobotClient did not keep its control lease renewed";
 
+      // A silent controller must also lose a plan that is still in flight.
+      controller.stop("prepare lease plan", false);
+      waitFor(controller, function() return controller.latestState != null &&
+        controller.latestState.safety == RobotKitRuntimeConstants.RK_SAFETY_READY &&
+        Math.abs(controller.latestState.dq[0]) < 1e-3,
+        "lease test did not settle before plan submission");
+      var settled = controller.latestState;
+      if (settled == null) throw "lease test has no settled state";
+      var anchor = settled.q.copy();
+      controller.sendJointTargets([for (joint in 0...anchor.length)
+        robotkit.world.JointTarget.position(joint, anchor[joint])]);
+      waitFor(controller, function() return controller.latestState != null &&
+        Math.abs(controller.latestState.q[0] - anchor[0]) < 1e-6,
+        "lease test did not establish a commanded position anchor");
+      controller.submitPlan(new robotkit.world.ExecutionPlanSubmission(
+        Int64.ofInt(801), Int64.ofInt(1), Int64.ofInt(0), 0,
+        anchor, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+        [for (index in 0...4) new robotkit.world.TrajectorySegment(
+          Int64.fromFloat(index * 2000000000.0), Int64.ofInt(2000000000),
+          [[anchor[0] + index * 0.02, 0.01], [anchor[1], 0.0],
+            [anchor[2], 0.0]])], null, null, null, null, null, false));
+      waitFor(controller, function() return controller.latestState != null &&
+        Int64.compare(controller.latestState.activePlanId, Int64.ofInt(801)) == 0,
+        'lease test plan did not start: fault=${controller.lastFault} id=${controller.latestState == null ? "null" : Std.string(controller.latestState.activePlanId)} safety=${controller.latestState == null ? -1 : controller.latestState.safety} q=${controller.latestState == null ? -1.0 : controller.latestState.q[0]}');
+
       // Do not poll, wait, or send anything during the silent interval. The
       // controller socket stays open locally while robotd's monotonic timer
       // expires the lease and applies emergency stop.
@@ -201,6 +226,15 @@ class RobotSessionIntegration {
       }
       if (!observerCommandRejected)
         throw "observer command was not rejected by the client lease boundary";
+      var observerPlanRejected = false;
+      try observer.submitPlan(new robotkit.world.ExecutionPlanSubmission(
+        Int64.ofInt(800), Int64.ofInt(1), Int64.ofInt(0), 0,
+        [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+        [new robotkit.world.TrajectorySegment(Int64.ofInt(0),
+          Int64.ofInt(100000000), [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])]))
+      catch (_:Dynamic) observerPlanRejected = true;
+      if (!observerPlanRejected)
+        throw "observer plan was not rejected by the client lease boundary";
 
       stage = "controller command";
       controller.sendJointTarget(0, 1, 0.5);
@@ -209,6 +243,16 @@ class RobotSessionIntegration {
         "controller command did not reach the runtime");
       waitFor(observer, function() return observerState,
         "observer did not receive read-only state fanout");
+      controller.submitPlan(new robotkit.world.ExecutionPlanSubmission(
+        Int64.ofInt(802), Int64.ofInt(1), Int64.ofInt(0), 0,
+        [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+        [new robotkit.world.TrajectorySegment(Int64.ofInt(0),
+          Int64.ofInt(100000000), [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]])]));
+      waitFor(controller, function() return controller.lastFault != null,
+        "rejected plan did not return a fault");
+      var planFault = controller.lastFault;
+      if (planFault == null || planFault.code != RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE)
+        throw "rejected plan lost its native error code";
 
       var oldSession = sessionOf(controller);
       stage = "controller disconnect";

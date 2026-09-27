@@ -3,6 +3,9 @@ package tests;
 import RobotKitRuntime;
 import NativeKitRuntime;
 import haxe.Int64;
+import motionkit.trajectory.Trajectory;
+import robotkit.world.ExecutionPlanSubmission;
+import robotkit.world.TrajectorySegment;
 import materia.automation.facility.Facility;
 import materia.automation.facility.FacilityRouter;
 import materia.automation.facility.Lane;
@@ -156,6 +159,34 @@ class WorldTcpIntegration {
         var state = world.snapshot().robot(LOGICAL_ID);
         return state != null && state.positions.length > 0;
       }, "remote robot did not publish its initial state");
+      if (!remote.capabilities().supportsTrajectoryQueue ||
+          !remote.capabilities().supportsExecutionPlans)
+        throw "robotd did not advertise its native plan queue";
+      var initial = remote.snapshot().positions.toArray();
+      var target = initial.copy();
+      target[0] += 0.1;
+      var generated = Trajectory.generateStateToState(initial, [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0], target, [0.5, 0.5, 0.5],
+        [0.5, 0.5, 0.5], [1.0, 1.0, 1.0]);
+      var planSegments:Array<TrajectorySegment> = [for (segment in generated.segments())
+        new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
+          segment.coefficients)];
+      generated.dispose();
+      remote.submit(robotkit.world.RobotCommand.ExecutionPlan(
+        new ExecutionPlanSubmission(Int64.ofInt(1001), Int64.ofInt(1),
+          Int64.ofInt(0), 0, initial, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+          planSegments)));
+      waitUntil(runtime, function() return Int64.compare(
+        remote.snapshot().activePlanId, Int64.ofInt(1001)) == 0,
+        'remote Ruckig plan was not accepted: fault=${remote.fault()} state=${remote.snapshot().sessionState} id=${remote.snapshot().activePlanId} depth=${remote.snapshot().trajectoryQueueDepth} q=${remote.snapshot().positions.get(0)} safety=${remote.snapshot().safety} code=${remote.snapshot().faultCode} seq=${remote.snapshot().sourceSequence} status=${remote.status()}');
+      remote.submit(robotkit.world.RobotCommand.Hold);
+      waitUntil(runtime, function() return remote.snapshot().sessionState ==
+        RobotKitRuntimeConstants.RK_SESSION_HELD,
+        'remote HOLD did not pause the native plan: state=${remote.snapshot().sessionState} q=${remote.snapshot().positions.get(0)} fault=${remote.fault()}');
+      remote.submit(robotkit.world.RobotCommand.Resume);
+      waitUntil(runtime, function() return Math.abs(remote.snapshot().positions.get(0) -
+        target[0]) < 1e-4 && !remote.snapshot().trajectoryActive,
+        "remote Ruckig plan did not resume and complete");
       remote.stop(robotkit.world.StopMode.Emergency);
       waitUntil(runtime, function() return remote.snapshot().safety ==
           RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP,
