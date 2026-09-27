@@ -46,10 +46,26 @@ import robotkit.model.RobotMobileConfiguration;
 import robotkit.model.RobotForkConfiguration;
 import sys.FileSystem;
 import sys.io.File;
+import haxe.io.Bytes;
+import materia.project.SceneArtifact;
+import materia.project.Appearance.Appearances;
 
 @:access(app.EditorPerspectiveViewport)
 @:access(app.Main.ReferenceEditorApp)
 class SceneEditingTests {
+  static function appearanceArtifactRoundTrip():Void {
+    var vertices = Bytes.alloc(72), normals = Bytes.alloc(72), indices = Bytes.alloc(12);
+    indices.setInt32(0, 0); indices.setInt32(4, 1); indices.setInt32(8, 2);
+    var encoded = SceneArtifact.encode({metresPerUnit: 0.001, parts: [{
+      id: "shaft", name: "Shaft", red: 0.6, green: 0.62, blue: 0.65,
+      appearance: Appearances.machinedSteel(), vertexCount: 3, indexCount: 3,
+      vertices: vertices, normals: normals, indices: indices, faceRanges: []
+    }]});
+    var part = SceneArtifact.decode(encoded).parts[0];
+    check(part.appearance != null && part.appearance.finish == "machined-steel" &&
+      nearValue(part.appearance.metallic, 0.8) && nearValue(part.appearance.roughness, 0.34),
+      "generated artifact retains surface finish");
+  }
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
   }
@@ -269,7 +285,7 @@ class SceneEditingTests {
     check(viewport.revision() > revision && viewport.pick(camera,
       EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y) == originalId,
       "viewport observes created geometry");
-    check(empty.properties().length == 11, "inspector exposes rendering and collision properties");
+    check(empty.properties().length == 14, "inspector exposes finish and collision properties");
 
     var name = new PropertyBinding(empty.properties()[3], empty.context());
     check(name.apply(PropertyValue.Text("Hidden panel")) == PropertyEditResult.Applied,
@@ -282,11 +298,15 @@ class SceneEditingTests {
       == PropertyEditResult.Applied, "height edit succeeds");
     check(new PropertyBinding(empty.properties()[6], empty.context()).apply(PropertyValue.Text("#336699"))
       == PropertyEditResult.Applied, "colour edit succeeds");
-    check(new PropertyBinding(empty.properties()[7], empty.context()).apply(PropertyValue.Float(0.6))
+    check(new PropertyBinding(empty.properties()[7], empty.context()).apply(PropertyValue.Text("machined-steel"))
+      == PropertyEditResult.Applied, "finish preset edit succeeds");
+    check(new PropertyBinding(empty.properties()[8], empty.context()).apply(PropertyValue.Float(0.7))
+      == PropertyEditResult.Applied, "metallic edit succeeds");
+    check(new PropertyBinding(empty.properties()[10], empty.context()).apply(PropertyValue.Float(0.6))
       == PropertyEditResult.Applied, "collision depth edit succeeds");
-    check(new PropertyBinding(empty.properties()[9], empty.context()).apply(PropertyValue.Bool(true))
+    check(new PropertyBinding(empty.properties()[12], empty.context()).apply(PropertyValue.Bool(true))
       == PropertyEditResult.Applied, "dynamic collision mode edit succeeds");
-    check(new PropertyBinding(empty.properties()[10], empty.context()).apply(PropertyValue.Float(4.0))
+    check(new PropertyBinding(empty.properties()[13], empty.context()).apply(PropertyValue.Float(4.0))
       == PropertyEditResult.Applied, "collision mass edit succeeds");
     var visible = new PropertyBinding(empty.properties()[2], empty.context());
     check(visible.apply(PropertyValue.Bool(false)) == PropertyEditResult.Applied,
@@ -304,7 +324,9 @@ class SceneEditingTests {
       && tree.childKeyAt("scene", 1) == duplicateId, "hidden state and hierarchy order duplicate together");
     check(duplicateState.width == 2.4 && duplicateState.height == 0.8 && duplicateState.depth == 0.6 &&
       duplicateState.dynamicBody && duplicateState.mass == 4.0 && duplicateState.collisionEnabled &&
-      nearValue(duplicateState.red, 0.2), "rendering and collision settings duplicate together");
+      nearValue(duplicateState.red, 0.2) && duplicateState.appearance != null &&
+      nearValue(duplicateState.appearance.metallic, 0.7),
+      "rendering and collision settings duplicate together");
     check(empty.deleteSelected(), "duplicate deletes");
     check(empty.object(duplicateId) == null && empty.selectedId == originalId,
       "delete removes selection and selects its neighbour");
@@ -332,8 +354,10 @@ class SceneEditingTests {
         "reopen preserves rename and hidden state");
       var reopened = session.scene.items()[0];
       check(reopened.width == 2.4 && reopened.height == 0.8 && reopened.depth == 0.6 &&
-        reopened.dynamicBody && reopened.mass == 4.0 && reopened.collisionEnabled && nearValue(reopened.blue, 0.6),
-        "reopen preserves dimensions, colour, and collision settings");
+        reopened.dynamicBody && reopened.mass == 4.0 && reopened.collisionEnabled && nearValue(reopened.blue, 0.6) &&
+        reopened.appearance != null && reopened.appearance.finish == "machined-steel" &&
+        nearValue(reopened.appearance.metallic, 0.7),
+        "reopen preserves dimensions, finish, colour, and collision settings");
       check(!session.scene.document.isDirty && !session.scene.document.canUndo,
         "reopened document starts clean with fresh history");
     } catch (error:Dynamic) {
@@ -842,7 +866,7 @@ class SceneEditingTests {
 
     session.scene.setPositionXY("tower",1.0,3.0);
     session.scene.select("tower");
-    check(new PropertyBinding(session.scene.properties()[9],session.scene.context())
+    check(new PropertyBinding(session.scene.properties()[12],session.scene.context())
       .apply(PropertyValue.Bool(true))==PropertyEditResult.Applied,
       "physics regression makes the observed obstacle dynamic");
 
@@ -1090,6 +1114,7 @@ class SceneEditingTests {
       near(scene.info("box").localTransform().element(12), -1.5, "undo targets original selection");
       check(!scene.document.isDirty, "undo restores initial document state");
       scene.document.redo();
+    appearanceArtifactRoundTrip();
       near(scene.info("box").localTransform().element(12), -2.5, "redo original object");
 
       var visibility = new PropertyBinding(scene.properties()[2], scene.context());

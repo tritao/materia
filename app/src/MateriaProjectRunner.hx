@@ -296,6 +296,7 @@ class MateriaProjectRunner {
         x: source.x, y: source.y, z: source.z, width: source.width, height: source.height,
         depth: source.depth, collisionEnabled: source.collisionEnabled, dynamicBody: source.dynamicBody,
         mass: source.mass, red: source.red, green: source.green, blue: source.blue,
+        appearance: source.appearance,
         visible: source.visible, rotation: source.rotation == null ? null : source.rotation.copy(),
         cadGraph: source.cadGraph, meshSnapshot: source.meshSnapshot, sketchDraft: source.sketchDraft};
       objects.push(copy);
@@ -338,7 +339,8 @@ class MateriaProjectRunner {
       height: Math.max(0.000001, (maximum[1] - minimum[1]) * scale),
       depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
       collisionEnabled: false, dynamicBody: false, mass: 1.0,
-      red: component.red, green: component.green, blue: component.blue, visible: true,
+      red: component.red, green: component.green, blue: component.blue,
+      appearance: component.appearance, visible: true,
       meshSnapshot: geometryKeyByDefinition.get(definitionId),
       rotation: pose == null ? null : [pose.qx, pose.qy, pose.qz, pose.qw]});
   }

@@ -1,5 +1,7 @@
 package app;
 
+import materia.project.Appearance;
+
 /** Portable scene data. Native node handles are deliberately not persisted. */
 typedef SceneObjectData = {
   var id:String;
@@ -17,6 +19,7 @@ typedef SceneObjectData = {
   var red:Float;
   var green:Float;
   var blue:Float;
+  @:optional var appearance:Appearance;
   var visible:Bool;
   @:optional var rotation:Array<Float>;
   @:optional var cadGraph:String;

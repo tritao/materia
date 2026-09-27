@@ -1,0 +1,17 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "MachineKit motor, shaft and bearings",
+	"defaultEntrypoint": "viewport",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"viewport": {
+			"kind": "cad-preview",
+			"module": "MotorShaftBearingsPreview",
+			"function": "preview"
+		}
+	}
+}

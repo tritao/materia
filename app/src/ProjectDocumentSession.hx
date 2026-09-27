@@ -649,11 +649,11 @@ class ProjectDocumentSession {
     var value:Dynamic = withoutMesh(source);
     Reflect.setField(value, "id", id);
     for (field in ["label", "x", "y", "z", "width", "height", "depth",
-        "collisionEnabled", "dynamicBody", "mass", "red", "green", "blue", "visible", "rotation"])
+        "collisionEnabled", "dynamicBody", "mass", "red", "green", "blue", "appearance", "visible", "rotation"])
       if (Reflect.hasField(edit, field)) Reflect.setField(value, field, Reflect.field(edit, field));
     for (field in Reflect.fields(edit)) if (field != "id" && field != "type" &&
         ["label", "x", "y", "z", "width", "height", "depth", "collisionEnabled",
-          "dynamicBody", "mass", "red", "green", "blue", "visible", "rotation"].indexOf(field) < 0)
+          "dynamicBody", "mass", "red", "green", "blue", "appearance", "visible", "rotation"].indexOf(field) < 0)
       throw 'Project part "$id" has an unsupported edit';
     // Validate authored fields without serializing generated mesh data.
     Reflect.setField(value, "meshSnapshot", "_");
@@ -667,7 +667,8 @@ class ProjectDocumentSession {
     var result:Dynamic = {id: item.id, type: item.type, label: item.label,
       width: item.width, height: item.height, depth: item.depth,
       collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-      red: item.red, green: item.green, blue: item.blue, visible: item.visible};
+      red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
+      visible: item.visible};
     if (includePose) {
       Reflect.setField(result, "x", item.x);
       Reflect.setField(result, "y", item.y);
@@ -682,13 +683,21 @@ class ProjectDocumentSession {
       left.width == right.width && left.height == right.height && left.depth == right.depth &&
       left.collisionEnabled == right.collisionEnabled && left.dynamicBody == right.dynamicBody &&
       left.mass == right.mass && left.red == right.red && left.green == right.green &&
-      left.blue == right.blue && left.visible == right.visible && sameRotation(left.rotation, right.rotation);
+      left.blue == right.blue && sameAppearanceFinish(left, right) &&
+      left.visible == right.visible && sameRotation(left.rotation, right.rotation);
 
   static function sameAppearanceWithoutPose(left:SceneObjectData, right:SceneObjectData):Bool
     return left.label == right.label && left.width == right.width && left.height == right.height &&
       left.depth == right.depth && left.collisionEnabled == right.collisionEnabled &&
       left.dynamicBody == right.dynamicBody && left.mass == right.mass && left.red == right.red &&
-      left.green == right.green && left.blue == right.blue && left.visible == right.visible;
+      left.green == right.green && left.blue == right.blue && sameAppearanceFinish(left, right) &&
+      left.visible == right.visible;
+
+  static function sameAppearanceFinish(left:SceneObjectData, right:SceneObjectData):Bool {
+    var a = left.appearance, b = right.appearance;
+    if (a == null || b == null) return a == null && b == null;
+    return a.finish == b.finish && a.metallic == b.metallic && a.roughness == b.roughness;
+  }
 
   static function sameRotation(left:Null<Array<Float>>, right:Null<Array<Float>>):Bool {
     if (left == null || right == null) return left == right;

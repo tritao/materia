@@ -6,6 +6,8 @@ import materia.project.AssemblyRecord;
 import materia.project.AssemblyDefinition;
 import materia.project.AssemblyDefinition.AssemblyStateRecord;
 import materia.project.AssemblyDefinitionCodec;
+import materia.project.Appearance;
+import materia.project.Appearance.Appearances;
 
 typedef SceneArtifactFaceRange = {
 	var faceIndex:Int;
@@ -19,6 +21,7 @@ typedef SceneArtifactPart = {
 	var red:Float;
 	var green:Float;
 	var blue:Float;
+	@:optional var appearance:Appearance;
 	var vertexCount:Int;
 	var indexCount:Int;
 	var vertices:Bytes;
@@ -41,7 +44,7 @@ typedef SceneArtifactData = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 6;
+	public static inline var VERSION:Int = 7;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -49,7 +52,7 @@ class SceneArtifact {
 
 	public static function encode(data:SceneArtifactData):Bytes {
 		validateHeader(data);
-		var names:Array<{id:Bytes, name:Bytes}> = [];
+		var names:Array<{id:Bytes, name:Bytes, finish:Bytes}> = [];
 		var assembly = data.assembly == null ? Bytes.alloc(0) : Bytes.ofString(AssemblyCodec.encode(data.assembly));
 		var assemblyDefinition = data.assemblyDefinition == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
@@ -63,8 +66,9 @@ class SceneArtifact {
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
 			if (id.length == 0 || id.length > 4096 || name.length == 0 || name.length > 4096)
 				throw "Scene artifact has an invalid part ID or name";
-			names.push({id: id, name: name});
-			length += 36 + id.length + name.length + part.vertices.length + part.normals.length
+			var finish = Bytes.ofString(part.appearance == null ? "neutral" : part.appearance.finish);
+			names.push({id: id, name: name, finish: finish});
+			length += 48 + finish.length + id.length + name.length + part.vertices.length + part.normals.length
 				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
 				+ (part.edgeIds == null ? 0 : part.edgeIds.length)
 				+ part.faceRanges.length * 12;
@@ -84,6 +88,11 @@ class SceneArtifact {
 			for (color in [part.red, part.green, part.blue]) {
 				result.setFloat(offset, color); offset += 4;
 			}
+			offset = putInt(result, offset, text.finish.length);
+			result.blit(offset, text.finish, 0, text.finish.length); offset += text.finish.length;
+			var appearance = part.appearance == null ? Appearances.neutral() : part.appearance;
+			result.setFloat(offset, appearance.metallic); offset += 4;
+			result.setFloat(offset, appearance.roughness); offset += 4;
 			offset = putInt(result, offset, part.vertexCount);
 			offset = putInt(result, offset, part.indexCount);
 			offset = putInt(result, offset, part.faceRanges.length);
@@ -173,6 +182,13 @@ class SceneArtifact {
 		for (color in [part.red, part.green, part.blue])
 			if (!finite(color) || color < 0.0 || color > 1.0)
 				throw 'Scene artifact part "${part.id}" has an invalid color';
+		var appearance = part.appearance;
+		if (appearance != null && (appearance.finish == null ||
+			StringTools.trim(appearance.finish).length == 0 ||
+			Bytes.ofString(appearance.finish).length > 4096 ||
+			!finite(appearance.metallic) || appearance.metallic < 0 || appearance.metallic > 1 ||
+			!finite(appearance.roughness) || appearance.roughness < 0 || appearance.roughness > 1))
+			throw 'Scene artifact part "${part.id}" has an invalid appearance';
 		for (range in part.faceRanges)
 			if (range.faceIndex < 0 || range.firstIndex < 0 || range.indexCount < 0 ||
 				range.firstIndex % 3 != 0 || range.indexCount % 3 != 0 ||
@@ -208,7 +224,7 @@ private class SceneArtifactReader {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != 2 && version != 3 && version != 4 && version != 5 && version != SceneArtifact.VERSION)
+		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != SceneArtifact.VERSION)
 			throw "Unsupported scene artifact version";
 		var metresPerUnit = readDouble();
 		var count = readInt();
@@ -220,6 +236,9 @@ private class SceneArtifactReader {
 			if (ids.exists(id)) throw 'Scene artifact has duplicate part ID "$id"';
 			ids.set(id, true);
 			var red = readFloat(), green = readFloat(), blue = readFloat();
+			var appearance:Appearance = version >= 7
+				? {finish: readText(), metallic: readFloat(), roughness: readFloat()}
+				: Appearances.neutral();
 			var vertexCount = readInt(), indexCount = readInt(), rangeCount = readInt();
 			var edgeByteCount = version >= 4 ? readInt() : 0;
 			if (vertexCount <= 0 || vertexCount > 2000000 || indexCount <= 0 ||
@@ -233,6 +252,7 @@ private class SceneArtifactReader {
 			for (_ in 0...rangeCount)
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
 			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
+				appearance: appearance,
 				vertexCount: vertexCount, indexCount: indexCount, vertices: vertices, normals: normals,
 				indices: indices, edgeSegments: edgeSegments, edgeIds: edgeIds,
 				faceRanges: faceRanges};

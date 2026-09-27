@@ -13,6 +13,8 @@ import nativekit.scene.GeometryData;
 import nativekit.scene.Geometry;
 import nativekit.scene.MaterialData;
 import nativekit.scene.Material;
+import materia.project.Appearance;
+import materia.project.Appearance.Appearances;
 import nativekit.scene.Transaction;
 import nativekit.scene.SceneView;
 import nativekit.scene.SelectionSet;
@@ -62,6 +64,16 @@ private typedef SceneRecordChange = {
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 @:allow(tests.SceneAtomicityTests)
 class EditorScene {
+  static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>):MaterialData {
+    var finish = appearance == null ? Appearances.neutral() : appearance;
+    return MaterialData.opaque(red, green, blue).setMetallic(finish.metallic).setRoughness(finish.roughness);
+  }
+
+  static function sameFinish(left:Null<Appearance>, right:Null<Appearance>):Bool {
+    var a = left == null ? Appearances.neutral() : left;
+    var b = right == null ? Appearances.neutral() : right;
+    return a.finish == b.finish && a.metallic == b.metallic && a.roughness == b.roughness;
+  }
   /** Opt-in constructor phase timings used by the headless architecture profile. */
   var loadProfilePhases:Null<Map<String, Float>>;
   /** Test-only synchronous fault injection for scene edit publication boundaries. */
@@ -299,11 +311,11 @@ class EditorScene {
       }
       if (geometryIndex == null) throw 'No geometry resource was prepared for "${item.id}"';
       geometryIndexes.push(geometryIndex);
-      materialData.push(MaterialData.opaque(item.red, item.green, item.blue).setRoughness(0.65));
+      materialData.push(materialFor(item.red, item.green, item.blue, item.appearance));
       candidates.push(new EditorSceneObject(item.id, item.label, item.type,
         item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
         item.mass, item.red, item.green, item.blue, storedCadGraph,
-        item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation));
+        item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance));
     }
     profileLoadEnd("geometryData", preparationStarted);
 
@@ -979,7 +991,7 @@ class EditorScene {
     data.push({id: id, label: source.label + " copy", type: source.type,
       x: Math.min(1000000, source.x + 0.25), y: Math.min(1000000, source.y + 0.25), z: source.z,
       width: source.width, height: source.height, red: source.red, green: source.green,
-      blue: source.blue, visible: source.visible,depth:source.depth,
+      blue: source.blue, appearance: source.appearance, visible: source.visible,depth:source.depth,
       collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass,
       cadGraph:cadGraph,meshSnapshot:source.meshSnapshot,rotation:source.rotation});
     return changeObjects("Duplicate object", data, id);
@@ -1085,7 +1097,7 @@ class EditorScene {
       x: item.x, y: item.y, z: item.z,
       width: item.width, height: item.height, depth: item.depth,
       collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-      red: item.red, green: item.green, blue: item.blue,
+      red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
       visible: item.visible, cadGraph: item.cadGraph,
       meshSnapshot: item.meshSnapshot, rotation: item.rotation};
   }
@@ -1344,7 +1356,7 @@ class EditorScene {
           if (geometry == null) throw 'No geometry resource was prepared for "${record.id}"';
           var material = scene.createMaterial();
           prepared.createdMaterials.push(material);
-          scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue).setRoughness(0.65));
+          scene.setMaterialData(material, materialFor(record.red, record.green, record.blue, record.appearance));
           failIfInjected("prepare.new-material");
           var node = prepared.transaction.createNode();
           prepared.transaction.setName(node, record.label);
@@ -1362,6 +1374,7 @@ class EditorScene {
             record.x, record.y, record.z, record.visible, record.meshSnapshot, record.rotation);
           prepared.objects.push(item);
           failIfInjected("prepare.new-object");
+          item.appearance = record.appearance;
           prepared.changed = true;
         } else {
           var runtime = prepared.bridgeEntries.get(record.id);
@@ -1374,7 +1387,7 @@ class EditorScene {
             item.meshSnapshot != record.meshSnapshot || !sameRotation(item.rotation, record.rotation) ||
             item.collisionEnabled != record.collisionEnabled || item.dynamicBody != record.dynamicBody ||
             item.mass != record.mass || item.red != record.red || item.green != record.green ||
-            item.blue != record.blue;
+            item.blue != record.blue || !sameFinish(item.appearance, record.appearance);
           if (objectChanged) candidate = copyEditorSceneObject(item);
           if (item.label != record.label) prepared.transaction.setName(runtime.node, record.label);
           if (item.visible != record.visible) prepared.transaction.setVisibility(runtime.node, record.visible);
@@ -1410,10 +1423,11 @@ class EditorScene {
             failIfInjected("prepare.existing-geometry");
             prepared.changed = true;
           }
-          if (item.red != record.red || item.green != record.green || item.blue != record.blue) {
+          if (item.red != record.red || item.green != record.green || item.blue != record.blue ||
+              !sameFinish(item.appearance, record.appearance)) {
             var material = scene.createMaterial();
             prepared.createdMaterials.push(material);
-            scene.setMaterialData(material, MaterialData.opaque(record.red, record.green, record.blue).setRoughness(0.65));
+            scene.setMaterialData(material, materialFor(record.red, record.green, record.blue, record.appearance));
             prepared.transaction.setMaterial(runtime.node, material);
             prepared.retiredMaterials.push(runtime.material);
             runtime = new EditorSceneRuntimeObject(runtime.node, runtime.geometry, material);
@@ -1426,7 +1440,7 @@ class EditorScene {
           candidate.label = record.label; candidate.kind = record.type;
           candidate.width = record.width; candidate.height = record.height; candidate.depth = record.depth;
           candidate.collisionEnabled = record.collisionEnabled; candidate.dynamicBody = record.dynamicBody;
-          candidate.mass = record.mass; candidate.red = record.red; candidate.green = record.green; candidate.blue = record.blue;
+          candidate.mass = record.mass; candidate.red = record.red; candidate.green = record.green; candidate.blue = record.blue; candidate.appearance = record.appearance;
           candidate.cadGraph = storedGraph; candidate.x = record.x; candidate.y = record.y; candidate.z = record.z;
           candidate.meshSnapshot = record.meshSnapshot;
           candidate.rotation = record.rotation;
@@ -1499,7 +1513,7 @@ class EditorScene {
   static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
     return new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
       item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
-      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation);
+      item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance);
   }
 
   public function setName(id:String, label:String):Void {
@@ -2195,6 +2209,16 @@ class EditorScene {
 
   /** Derived presentation caches may lag a committed edit and retry on the next access/frame. */
   function refreshPresentationIfStale():Void {
+  public function setFinish(id:String, finish:Appearance):Void {
+    if (finish == null || finish.finish == null || StringTools.trim(finish.finish).length == 0 ||
+        !validColour(finish.metallic) || !validColour(finish.roughness))
+      throw "Invalid surface finish";
+    if (object(id) == null) throw "Unknown scene object: " + id;
+    var data = records();
+    for (item in data) if (item.id == id) item.appearance = finish;
+    replaceObjects(data, selectedId);
+  }
+
     if (presentationStale) rebuildPresentation();
     if (presentationStale) throw "Scene presentation is unavailable until its derived caches rebuild";
   }
@@ -2310,6 +2334,58 @@ class EditorScene {
       result.push(bracketProperty(id,"wall","Wall thickness",function(model)return model.wallThickness(),
         function(value)setBracketWallThickness(id,value),prefix));
       result.push(bracketProperty(id,"hole-radius","Hole radius",function(model)return model.holeRadius(),
+    var finishOptions = new PropertyDescriptorOptions();
+    finishOptions.category = "Rendering";
+    finishOptions.validator = function(_, value) return switch (value) {
+      case PropertyValue.Text(text): Appearances.preset(text) == null ? "Unknown finish" : null;
+      default: "Finish requires a preset name";
+    };
+    result.push(new PropertyDescriptor(prefix + "finish", "Finish", PropertyType.Text,
+      function(_) {
+        var appearance = requiredObject(id).appearance;
+        return PropertyValue.Text(appearance == null ? "neutral" : appearance.finish);
+      }, function(_, value) {
+        switch (value) {
+          case PropertyValue.Text(text):
+            var preset = Appearances.preset(text);
+            if (preset == null) throw "Unknown finish";
+            setFinish(id, preset);
+          default: throw "Finish requires a preset name";
+        }
+      }, finishOptions));
+    for (channel in ["metallic", "roughness"]) {
+      var field = channel;
+      var settings = new PropertyDescriptorOptions();
+      settings.category = "Rendering";
+      settings.minimum = 0.0;
+      settings.maximum = 1.0;
+      settings.step = 0.05;
+      settings.validator = function(_, value) {
+        var number:Null<Float> = switch (value) {
+          case PropertyValue.Float(next): next;
+          case PropertyValue.Int(next): next;
+          default: null;
+        };
+        return number == null || !validColour(number) ? "Value must be between 0 and 1" : null;
+      };
+      result.push(new PropertyDescriptor(prefix + field, field == "metallic" ? "Metallic" : "Roughness",
+        PropertyType.Float, function(_) {
+          var current = requiredObject(id).appearance;
+          if (current == null) current = Appearances.neutral();
+          return PropertyValue.Float(field == "metallic" ? current.metallic : current.roughness);
+        }, function(_, value) {
+          var number:Float = switch (value) {
+            case PropertyValue.Float(next): next;
+            case PropertyValue.Int(next): next;
+            default: throw "Finish value requires a number";
+          };
+          var current = requiredObject(id).appearance;
+          if (current == null) current = Appearances.neutral();
+          setFinish(id, {finish: current.finish,
+            metallic: field == "metallic" ? number : current.metallic,
+            roughness: field == "roughness" ? number : current.roughness});
+        }, settings));
+    }
         function(value)setBracketHoleRadius(id,value),prefix));
     }
     var selectedFeature = selectedCadFeature(id);
@@ -2663,6 +2739,7 @@ class EditorScene {
   public function recordsForSave():Array<SceneObjectData> {
     var result=records();
     for(record in result)if(isCadKind(record.type))
+        appearance:item.appearance,
       record.cadGraph=currentCadGraph(record.id);
     var draft = activeSketchEdit;
     if (draft != null) {
@@ -2793,11 +2870,12 @@ class EditorSceneObject {
   public function new(id:String,label:String,kind:String,width:Float,height:Float,depth:Float,
       collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float,
       ?cadGraph:String,x:Float=0,y:Float=0,z:Float=0,visible:Bool=true,?meshSnapshot:String,
-      ?rotation:Array<Float>) {
+  public var appearance:Null<Appearance>;
+      ?rotation:Array<Float>, ?appearance:Appearance) {
     this.id = id; this.label = label; this.kind = kind;
     this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;
     this.dynamicBody=dynamicBody;this.mass=mass;
-    this.red = red; this.green = green; this.blue = blue;
+    this.red = red; this.green = green; this.blue = blue; this.appearance = appearance;
     this.cadGraph=cadGraph;
     this.meshSnapshot=meshSnapshot;
     this.rotation=rotation;

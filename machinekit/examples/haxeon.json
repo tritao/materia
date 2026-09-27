@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-motor-shaft-example" },
+	"entry": "MotorShaftBearingsPreview",
+	"sources": ["MotorShaftBearings.hx", "MotorShaftBearingsPreview.hx"],
+	"sourceRoots": ["."],
+	"dependencies": {
+		"projectkit": { "path": "../../projectkit" },
+		"cadkit": { "path": "../../cadkit" },
+		"machinekit": { "path": ".." }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

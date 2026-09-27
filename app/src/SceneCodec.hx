@@ -3,6 +3,7 @@ package app;
 import haxe.Json;
 import bimkit.BimCodec;
 import bimkit.BimDocument;
+import materia.project.Appearance;
 
 class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
@@ -289,6 +290,7 @@ class SceneCodec {
           0,
           1
         ),
+        appearance: optionalAppearance(value),
         visible: visibleValue,
         rotation: optionalRotation(value),
         cadGraph: cadGraph,
@@ -303,6 +305,17 @@ class SceneCodec {
   static function field(value:Dynamic, name:String):Dynamic {
     if (value == null || !Reflect.hasField(value, name)) throw "Missing scene field: " + name;
     return Reflect.field(value, name);
+  }
+  static function optionalAppearance(value:Dynamic):Null<Appearance> {
+    if (!Reflect.hasField(value, "appearance") || Reflect.field(value, "appearance") == null) return null;
+    var data:Dynamic = Reflect.field(value, "appearance");
+    var finish = stringField(data, "finish");
+    if (finish.length > 4096) throw "Scene appearance finish is too long";
+    return {
+      finish: finish,
+      metallic: bounded(data, "metallic", 0, 1),
+      roughness: bounded(data, "roughness", 0, 1)
+    };
   }
   static function stringField(value:Dynamic, name:String):String {
     var data = field(value, name);
