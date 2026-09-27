@@ -63,7 +63,11 @@ properties, menu entries, and hover support. `EditorSceneTree` caches child list
 by content revision. Inspector bindings retain object identity so undo works
 after changing selection. `ProjectDocumentSession` owns the document path and
 atomic file publication; `SceneDocumentController` coordinates file commands
-and unsaved-change prompts. `EditorPerspectiveViewport` composites SceneKit's
+and unsaved-change prompts. Opening a script-owned or generated project file
+asks before running its registered code. Stale generated-project edits appear
+in the console with a discard command. Script override refreshes reconcile
+records into the retained scene, preserving viewport and panel state.
+`EditorPerspectiveViewport` composites SceneKit's
 renderer directly into the GPU surface and passes single-edit change sets to
 its incremental render path. `editor/TelemetryPanel` owns the retained plot.
 `editor/HierarchyPanel`, `editor/InspectorPanel`, and `editor/SensorPanel`
