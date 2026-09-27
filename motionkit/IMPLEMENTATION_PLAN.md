@@ -660,7 +660,7 @@ Tests:
 
 Do this only after P9c and P10, in a separate commit.
 
-- Audit every in-repo backend's advertised queue and plan capabilities. If
+- Audit every in-repo execution backend's advertised queue and plan capabilities. If
   any still reports no queue support, stop and report it rather than deleting
   its execution path.
 - Delete position-target streaming, host-side HOLD/RESUME timing,
@@ -1184,3 +1184,27 @@ replays observations without executing them. Therefore the literal condition
 that every in-repo backend supports plans is not met. Per P9d, deletion of the
 non-queue MotionSystem path and its dependent classes stopped here; no fallback
 tests were removed or re-expressed. Commit: the commit containing this entry.
+
+### P9d — Execution-backend audit and fallback deletion
+
+The audit condition applies to execution backends. In-memory, SimKit, qualified
+serial, and robotd-backed execution all support queue plans; RecordingRobot
+delegates to its execution backend. ReplayRobot is observation-only: it
+executes no command and keeps its default capabilities unchanged. Its class
+documentation now requires callers replaying a plan-based controller to pass
+queue and plan capabilities explicitly; a MotionSystem-over-ReplayRobot test
+checks that generated plan submissions are recorded.
+
+MotionSystem now requires queue and plan support at construction and returns
+native Trajectory values. It maps Cartesian lookahead directly to native
+degree-1 segments, chunks long paths by native segment index, and uses native
+HOLD/RESUME and plan STOP without host position streaming or retiming. Removed
+TimeScaling, TimeScaledTrajectory, JointTrajectory, JointTrajectorySample,
+TrajectoryPlanner, TrapezoidalPlanner, and JogProfile. The trapezoid planner
+test is re-expressed on Ruckig; lookahead, round-trip, long-queue, and
+moveLinear limit tests use native trajectories and executed chord derivatives.
+The JogProfile-only unit test was removed because continuous-jog, homing/jog,
+and motion-change tests cover its remaining plan-path behavior. The non-queue
+variants of motion-change, continuous-jog, path-hold, and dual-motor tests were
+removed with the fallback; their plan-path variants remain. Commit: the commit
+containing this entry.

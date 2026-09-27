@@ -1,6 +1,13 @@
 package robotkit.world;
 
-/** Robot adapter that deterministically replays one recorded robot. */
+/**
+ * Robot adapter that deterministically replays one recorded robot.
+ *
+ * ReplayRobot observes commands but does not execute them. Its default
+ * capabilities intentionally do not claim queue or plan support. A caller
+ * replaying a plan-based controller must pass capabilities with both
+ * supportsTrajectoryQueue and supportsExecutionPlans enabled.
+ */
 class ReplayRobot implements Robot {
   public final logicalId:RobotId;
   /** Commands produced while replaying; never written into the source recording. */

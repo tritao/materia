@@ -13,6 +13,46 @@ class Trajectory {
     this.owner = owner;
   }
 
+  /** Builds a native trajectory from already-timed polynomial segments. */
+  public static function fromSegments(segments:Array<{timeFromStartNs:Int64,
+      durationNs:Int64, coefficients:Array<Array<Float>>}>):Trajectory {
+    if (segments == null || segments.length == 0 || segments[0].coefficients == null)
+      throw "Native trajectory needs segments";
+    var count = segments[0].coefficients.length;
+    var created = MotionKitNative.mk_trajectory_create(count);
+    check(created.status, "trajectory.create");
+    var result = new Trajectory(created.out_trajectory);
+    try {
+      for (segment in segments) {
+        if (segment.coefficients == null || segment.coefficients.length != count)
+          throw "Native trajectory joint count changed";
+        var degree = segment.coefficients[0].length - 1;
+        if (degree < 0 || degree > MotionKitNativeConstants.MK_MAX_DEGREE)
+          throw "Native trajectory degree is out of range";
+        var value = new mk_segment();
+        value.set_struct_size(mk_segment.size());
+        value.set_t0_ns(segment.timeFromStartNs);
+        value.set_duration_ns(segment.durationNs);
+        value.set_joint_count(count);
+        value.set_degree(degree);
+        for (joint in 0...count) {
+          if (segment.coefficients[joint].length != degree + 1)
+            throw "Native trajectory degree changed within a segment";
+          var coefficients = new mk_joint_coefficients();
+          for (index in 0...(degree + 1))
+            coefficients.set_value(index, segment.coefficients[joint][index]);
+          value.set_coefficients(joint, coefficients);
+        }
+        check(MotionKitNative.mk_trajectory_append_segment(result.owner.borrow(), value),
+          "trajectory.appendSegment");
+      }
+      return result;
+    } catch (error:Dynamic) {
+      result.dispose();
+      throw error;
+    }
+  }
+
   /** Builds a degree-1 trajectory directly from authored positions. */
   public static function fromPositionSamples(times:Array<Float>, positions:Array<Array<Float>>):Trajectory {
     if (times == null || positions == null || times.length < 2 ||

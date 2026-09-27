@@ -7,24 +7,15 @@ import motionkit.MotionOptions;
 import motionkit.axis.MotionAxis;
 import motionkit.path.PathPoint;
 import motionkit.path.GeometricPath;
-import motionkit.planner.JogProfile;
 import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
-import motionkit.planner.TrajectoryPlanner;
-import motionkit.planner.TrapezoidalPlanner;
-import motionkit.trajectory.JointTrajectory;
-import motionkit.trajectory.JointTrajectorySample;
 import motionkit.trajectory.MotionLimits;
-import motionkit.trajectory.TimeScaledTrajectory;
-import motionkit.trajectory.TimeScaling;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.TrajectoryState;
-import robotkit.world.JointTarget;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.StopMode;
-import robotkit.world.TrajectoryChunk;
 import robotkit.world.ExecutionPlanSubmission;
 import robotkit.world.TrajectorySegment;
 import robotkit.runtime.RobotRuntimeError;
@@ -48,17 +39,13 @@ class MotionSystem {
   public final fixedTimestepSeconds:Float;
   public final replacementMarginOwnerPeriods:Int;
   public final replacementOwnerPeriodSeconds:Float;
-  public final planner:TrajectoryPlanner;
   public final linePlanner:LineLookaheadPlanner;
-  /** Trajectory being executed; a re-timed copy of activeSource after a hold or resume. */
-  var activeTrajectory:Null<JointTrajectory> = null;
-  /** The planned trajectory behind activeTrajectory. */
-  var activeSource:Null<JointTrajectory> = null;
-  /** Maps activeTrajectory time back to activeSource time when it was re-timed. */
-  var activeTiming:Null<TimeScaledTrajectory> = null;
-  var queuedTrajectories:Array<JointTrajectory> = [];
-  /** Native polynomials backing smooth axis moves until the public API migrates. */
-  var nativeTrajectories:Array<{trajectory:JointTrajectory, native:Trajectory}> = [];
+  /** Native trajectory currently submitted to the runtime queue. */
+  var activeTrajectory:Null<Trajectory> = null;
+  var queuedTrajectories:Array<Trajectory> = [];
+  var activeSegments:Array<{timeFromStartNs:Int64, durationNs:Int64,
+    coefficients:Array<Array<Float>>}> = [];
+  var activeStationary:Bool = false;
   var elapsedSeconds:Float = 0.0;
   var held:Bool = false;
   /** A native lifecycle command must reach the owner before another plan. */
@@ -67,37 +54,36 @@ class MotionSystem {
   var bufferedCompletedSeconds:Float = 0.0;
   var plannedEndPositions:Null<Array<Float>> = null;
   var trajectorySubmitted:Bool = false;
-  /** Source-sample index used as the boundary of the next native chunk. */
-  var trajectoryNextSampleIndex:Int = 0;
+  /** Native segment index used as the boundary of the next plan chunk. */
+  var trajectoryNextSegmentIndex:Int = 0;
   var trajectoryChunkEndSeconds:Float = 0.0;
   var trajectoryChunkStartSeconds:Float = 0.0;
   var nextTrajectoryTag:Int64 = Int64.ofInt(1);
-  var trajectoryChunkReferences:Map<String, TrajectoryChunkReference> = new Map();
+  var trajectoryChunkReferences:Map<String, PlanChunkReference> = new Map();
   var trajectoryFinalTag:Int64 = Int64.ofInt(0);
   var trajectoryFinalEndSeconds:Float = 0.0;
-  var resumeRequested:Bool = false;
-  /** True while the position-target path plays a host-side stop. */
-  var hostStopping:Bool = false;
   /** True while stopping so that deferred work can start from rest. */
   var stoppingForReplacement:Bool = false;
   /** Work deferred until a replacement stop reaches rest, in order. */
   var afterStop:Array<Void -> Void> = [];
   /** Logical axis of the active jog, which a further jog can change without stopping. */
   var activeJogAxis:Null<String> = null;
-  /** Per-joint acceleration limits from the logical axes; zero is unconstrained. */
-  final jointAccelerationLimits:Array<Float>;
   final modelRevision:Int64;
   final calibrationRevision:Int64;
 
   public static function fromBlueprint(robot:Robot, blueprint:MotionSystemBlueprint):MotionSystem
     return new MotionSystem(robot, blueprint);
 
-  public function new(robot:Robot, blueprint:MotionSystemBlueprint,
-      ?planner:TrajectoryPlanner) {
+  public function new(robot:Robot, blueprint:MotionSystemBlueprint) {
     if (robot == null || blueprint == null) throw "Motion system needs a robot and blueprint";
+    if (!robot.capabilities().supportsTrajectoryQueue ||
+        !robot.capabilities().supportsExecutionPlans)
+      throw "MotionSystem requires a robot with trajectory queue and execution plan support";
     var description = robot.description();
     if (description == null || description.joints.length != blueprint.model.joints.length)
       throw "Robot description does not match the motion-system model";
+    if (description.joints.length > RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS)
+      throw "MotionSystem robot exceeds the execution plan joint limit";
     for (i in 0...blueprint.model.joints.length) {
       if (description.joints[i] != blueprint.model.joints[i].name)
         throw 'Robot joint $i does not match motion-system joint "${blueprint.model.joints[i].name}"';
@@ -113,7 +99,6 @@ class MotionSystem {
       throw "Smooth replacement owner period must be finite and positive";
     this.replacementMarginOwnerPeriods = blueprint.replacementMarginOwnerPeriods;
     this.replacementOwnerPeriodSeconds = blueprint.replacementOwnerPeriodSeconds;
-    this.planner = planner == null ? new TrapezoidalPlanner(fixedTimestepSeconds) : planner;
     this.linePlanner = new LineLookaheadPlanner(fixedTimestepSeconds);
     this.axes = [];
     var axisIds = new Map<String, Bool>();
@@ -122,17 +107,6 @@ class MotionSystem {
       if (axisIds.exists(axis.id)) throw 'Duplicate motion axis "${axis.id}"';
       axisIds.set(axis.id, true);
       this.axes.push(axis);
-    }
-    this.jointAccelerationLimits = [for (_ in description.joints) 0.0];
-    for (axisValue in axes) {
-      if (axisValue.maxAcceleration <= 0.0) continue;
-      var scales = [for (_ in description.joints) 0.0];
-      axisValue.writeLogicalDelta(scales, 1.0);
-      for (joint in axisValue.jointIndices) {
-        var limit = axisValue.maxAcceleration * Math.abs(scales[joint]);
-        var current = jointAccelerationLimits[joint];
-        jointAccelerationLimits[joint] = current <= 0.0 ? limit : Math.min(current, limit);
-      }
     }
   }
 
@@ -144,7 +118,7 @@ class MotionSystem {
   /** True while a trajectory is active, held, or waiting to start after a stop. */
   public function isMoving():Bool return activeTrajectory != null || afterStop.length > 0;
 
-  public function trajectory():Null<JointTrajectory> return activeTrajectory;
+  public function trajectory():Null<Trajectory> return activeTrajectory;
 
   /** Number of active and waiting trajectories currently owned by the system. */
   public function queueDepth():Int
@@ -153,19 +127,18 @@ class MotionSystem {
   /** Remaining duration across the active trajectory and all queued trajectories. */
   public function queuedDurationSeconds():Float {
     var result = activeTrajectory == null ? 0.0 :
-      Math.max(0.0, activeTrajectory.durationSeconds - elapsedSeconds);
-    for (trajectoryValue in queuedTrajectories) result += trajectoryValue.durationSeconds;
+      Math.max(0.0, activeTrajectory.durationSeconds() - elapsedSeconds);
+    for (trajectoryValue in queuedTrajectories) result += trajectoryValue.durationSeconds();
     return result;
   }
 
   /** Completion fraction of the currently buffered motion, in the range [0, 1]. */
   public function progress():Float {
-    if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory))
-      syncFromRuntime();
+    if (activeTrajectory != null) syncFromRuntime();
     if (bufferedTotalSeconds <= 0.0) return 1.0;
-    var source = activeSource;
+    var source = activeTrajectory;
     var completed = bufferedCompletedSeconds + (source == null ? 0.0
-      : Math.min(source.durationSeconds, activeSourceSeconds()));
+      : Math.min(source.durationSeconds(), elapsedSeconds));
     return Math.min(1.0, Math.max(0.0, completed / bufferedTotalSeconds));
   }
 
@@ -177,7 +150,7 @@ class MotionSystem {
    * first stops along its current path; the move is then planned from where
    * it came to rest and null is returned, as the plan does not exist yet.
    */
-  public function moveAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<JointTrajectory> {
+  public function moveAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<Trajectory> {
     var retargeted = retargetNativeAxes(targets, options);
     if (retargeted != null) return retargeted;
     var planned = planAxesFrom(robot.snapshot().positions.toArray(), targets, options);
@@ -186,7 +159,7 @@ class MotionSystem {
   }
 
   /** Adds a coordinated axis move behind all motion already in the buffer. */
-  public function queueAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<JointTrajectory> {
+  public function queueAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<Trajectory> {
     if (afterStop.length > 0) {
       afterStop.push(() -> queueAxes(targets, options));
       return null;
@@ -197,11 +170,11 @@ class MotionSystem {
   }
 
   /** Adds an already planned joint trajectory to the execution buffer. */
-  public function queueTrajectory(trajectoryValue:JointTrajectory):Void {
+  public function queueTrajectory(trajectoryValue:Trajectory):Void {
     if (trajectoryValue == null) throw "Queued trajectory is required";
     var jointCount = robot.description().joints.length;
-    if (trajectoryValue.jointCount != jointCount)
-      throw 'Queued trajectory has ${trajectoryValue.jointCount} joints; robot has $jointCount';
+    if (trajectoryValue.jointCount() != jointCount)
+      throw 'Queued trajectory has ${trajectoryValue.jointCount()} joints; robot has $jointCount';
     if (afterStop.length > 0) {
       afterStop.push(() -> queueTrajectory(trajectoryValue));
       return;
@@ -214,7 +187,7 @@ class MotionSystem {
    * it first stops along the current path when the machine is moving.
    */
   public function moveLinear(target:PathPoint, feed:Feed,
-      ?options:MotionOptions):Null<JointTrajectory> {
+      ?options:MotionOptions):Null<Trajectory> {
     var planned = planLinearPathFrom(robot.snapshot().positions.toArray(), target, feed, options);
     return replaceMotion(planned,
       () -> planLinearPathFrom(robot.snapshot().positions.toArray(), target, feed, options));
@@ -222,7 +195,7 @@ class MotionSystem {
 
   /** Adds a straight Cartesian move behind all motion already in the buffer. */
   public function queueLinear(target:PathPoint, feed:Feed,
-      ?options:MotionOptions):Null<JointTrajectory> {
+      ?options:MotionOptions):Null<Trajectory> {
     if (afterStop.length > 0) {
       afterStop.push(() -> queueLinear(target, feed, options));
       return null;
@@ -238,7 +211,7 @@ class MotionSystem {
    * hold and wait for rest first.
    */
   public function movePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
-      ?motionOptions:MotionOptions):JointTrajectory {
+      ?motionOptions:MotionOptions):Trajectory {
     if (isMotionInProgress())
       throw "A path must start where the machine is at rest; hold and wait before replacing motion with a path";
     var trajectoryValue = planPathFrom(robot.snapshot().positions.toArray(), path,
@@ -250,7 +223,7 @@ class MotionSystem {
 
   /** Adds a connected Cartesian polyline behind motion already in the buffer. */
   public function queuePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
-      ?motionOptions:MotionOptions):Null<JointTrajectory> {
+      ?motionOptions:MotionOptions):Null<Trajectory> {
     if (afterStop.length > 0) {
       afterStop.push(() -> queuePath(path, pathOptions, motionOptions));
       return null;
@@ -265,12 +238,7 @@ class MotionSystem {
   public function hold():Void {
     if (held) return;
     held = true;
-    resumeRequested = false;
-    if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory)) {
-      robot.submit(RobotCommand.Hold);
-      return;
-    }
-    beginStop();
+    if (activeTrajectory != null) robot.submit(RobotCommand.Hold);
   }
 
   /**
@@ -279,20 +247,20 @@ class MotionSystem {
    */
   public function resume():Void {
     if (!held) return;
-    if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory)) {
+    if (activeTrajectory != null) {
       if (trajectoryFinishedInRuntime(syncFromRuntime())) {
         completeActiveTrajectory();
-        resumeFromRest();
+        held = false;
+        activateNextTrajectory();
         return;
       }
       robot.submit(RobotCommand.Resume);
       nativeRefillDeferred = true;
       held = false;
-      resumeRequested = false;
       return;
     }
-    resumeRequested = true;
-    advanceStop();
+    held = false;
+    activateNextTrajectory();
   }
 
   /**
@@ -301,17 +269,8 @@ class MotionSystem {
    */
   public function abort(?mode:StopMode = StopMode.Normal):Void {
     if (mode == StopMode.Normal && isMotionInProgress()) {
-      if (activeTrajectory != null && usesTrajectoryChunks(activeTrajectory)) {
-        robot.submit(RobotCommand.Abort);
-        clearBufferedMotion();
-        return;
-      }
-      queuedTrajectories = [];
-      afterStop = [() -> clearBufferedMotion()];
-      held = false;
-      resumeRequested = false;
-      stoppingForReplacement = true;
-      beginStop();
+      robot.submit(RobotCommand.Abort);
+      clearBufferedMotion();
       return;
     }
     clearBufferedMotion();
@@ -322,8 +281,8 @@ class MotionSystem {
    * Starts `planned` now when the machine is at rest. Otherwise stops along
    * the current path and starts a fresh `replan` from where it came to rest.
    */
-  function replaceMotion(planned:JointTrajectory, replan:Void -> JointTrajectory,
-      ?jogAxis:String):Null<JointTrajectory> {
+  function replaceMotion(planned:Trajectory, replan:Void -> Trajectory,
+      ?jogAxis:String):Null<Trajectory> {
     if (!isMotionInProgress()) {
       clearBufferedMotion();
       beginImmediate(planned);
@@ -331,7 +290,6 @@ class MotionSystem {
       return planned;
     }
     discardNativeTrajectory(planned);
-    for (queued in queuedTrajectories) discardNativeTrajectory(queued);
     queuedTrajectories = [];
     afterStop = [() -> {
       clearBufferedMotion();
@@ -339,7 +297,6 @@ class MotionSystem {
       activeJogAxis = jogAxis;
     }];
     held = false;
-    resumeRequested = false;
     stoppingForReplacement = true;
     beginStop();
     return null;
@@ -350,77 +307,43 @@ class MotionSystem {
    * started and not finished, or a stop still slowing down.
    */
   function isMotionInProgress():Bool {
-    if (hostStopping || stoppingForReplacement) return true;
+    if (stoppingForReplacement) return true;
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return false;
-    if (usesTrajectoryChunks(trajectoryValue) && syncFromRuntime().trajectoryActive) return true;
-    return elapsedSeconds > 1e-9 && elapsedSeconds < trajectoryValue.durationSeconds - 1e-9 &&
+    if (syncFromRuntime().trajectoryActive) return true;
+    return elapsedSeconds > 1e-9 && elapsedSeconds < trajectoryValue.durationSeconds() - 1e-9 &&
       !(held && stopSettled());
   }
 
   /** Slows the active trajectory to rest along its path. */
   function beginStop():Void {
-    var trajectoryValue = activeTrajectory, source = activeSource;
-    if (trajectoryValue == null || source == null) return;
-    if (usesTrajectoryChunks(trajectoryValue)) {
+    if (activeTrajectory != null) {
       syncFromRuntime();
       robot.stop(StopMode.Normal);
-      return;
     }
-    if (hostStopping) return;
-    // Without a runtime queue, play the same path-following stop host-side.
-    var sourceTime = activeSourceSeconds();
-    if (elapsedSeconds <= 1e-9 || sourceTime >= source.durationSeconds - 1e-9) return;
-    retimeActive(TimeScaling.stop(source, sourceTime, activeRate(),
-      jointAccelerationLimits, fixedTimestepSeconds));
-    hostStopping = true;
   }
 
   /** True once a requested stop has reached rest. */
   function stopSettled():Bool {
-    if (hostStopping) return false;
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || !usesTrajectoryChunks(trajectoryValue)) return true;
+    if (activeTrajectory == null) return true;
     return !syncFromRuntime().trajectoryActive;
   }
 
   /** Runs deferred work or a pending resume once a stop has reached rest. */
   function advanceStop():Void {
     if (!stopSettled()) return;
-    if (stoppingForReplacement && (!held || resumeRequested)) {
+    if (stoppingForReplacement && !held) {
       stoppingForReplacement = false;
       held = false;
-      resumeRequested = false;
       var actions = afterStop;
       afterStop = [];
       for (action in actions) action();
       return;
     }
-    if (held && resumeRequested) resumeFromRest();
-  }
-
-  /** Speeds the active trajectory back up from rest along its path. */
-  function resumeFromRest():Void {
-    held = false;
-    resumeRequested = false;
-    var source = activeSource;
-    if (activeTrajectory == null || source == null) {
-      activateNextTrajectory();
-      return;
-    }
-    var sourceTime = activeSourceSeconds();
-    if (sourceTime >= source.durationSeconds - 1e-9) {
-      completeActiveTrajectory();
-      return;
-    }
-    var timing = TimeScaling.start(source, sourceTime, jointAccelerationLimits,
-      fixedTimestepSeconds);
-    retimeActive(timing);
-    if (usesTrajectoryChunks(timing.trajectory)) submitActiveTrajectoryChunk();
   }
 
   function planLinearPathFrom(start:Array<Float>, target:PathPoint, feed:Feed,
-      options:Null<MotionOptions>):JointTrajectory {
+      options:Null<MotionOptions>):Trajectory {
     if (target == null || feed == null) throw "Linear move needs a target and feed";
     var xAxis = requireAxis("x");
     var yAxis = requireAxis("y");
@@ -436,7 +359,7 @@ class MotionSystem {
   }
 
   function planPathFrom(start:Array<Float>, path:GeometricPath,
-      pathOptions:Null<PathPlanningOptions>, motionOptions:Null<MotionOptions>):JointTrajectory {
+      pathOptions:Null<PathPlanningOptions>, motionOptions:Null<MotionOptions>):Trajectory {
     if (path == null) throw "Cartesian path is required";
     var xAxis = requireAxis("x");
     var yAxis = requireAxis("y");
@@ -453,37 +376,26 @@ class MotionSystem {
     var limits = resolvePathLimits(path, [xAxis, yAxis, zAxis],
       motionOptions == null ? new MotionOptions() : motionOptions);
     validatePathLimits(path, [xAxis, yAxis, zAxis]);
-    var cartesian = linePlanner.planPath(path, limits, pathOptions);
-    var nativeCartesian = robot.capabilities().supportsExecutionPlans
-      ? linePlanner.planNativePath(path, limits, pathOptions) : null;
-    var mapped:Array<JointTrajectorySample> = [];
-    for (sample in cartesian.samples) {
-      var positions = start.copy();
-      var velocities = [for (_ in start) 0.0];
-      var accelerations = [for (_ in start) 0.0];
-      var cartesianPosition = nativeCartesian == null ? sample.positions
-        : nativeCartesian.evaluate(sample.timeSeconds).positions;
-      xAxis.writeLogicalPosition(positions, cartesianPosition[0]);
-      yAxis.writeLogicalPosition(positions, cartesianPosition[1]);
-      zAxis.writeLogicalPosition(positions, cartesianPosition[2]);
-      writeLogicalVector(xAxis, velocities, sample.velocities[0]);
-      writeLogicalVector(yAxis, velocities, sample.velocities[1]);
-      writeLogicalVector(zAxis, velocities, sample.velocities[2]);
-      writeLogicalVector(xAxis, accelerations, sample.accelerations[0]);
-      writeLogicalVector(yAxis, accelerations, sample.accelerations[1]);
-      writeLogicalVector(zAxis, accelerations, sample.accelerations[2]);
-      mapped.push(new JointTrajectorySample(sample.timeSeconds, positions, velocities,
-        accelerations));
+    var nativeCartesian = linePlanner.planNativePath(path, limits, pathOptions);
+    var mapped = [];
+    for (segment in nativeCartesian.segments()) {
+      var coefficients = [for (joint in start) [joint, 0.0]];
+      for (entry in [{axis: xAxis, source: 0}, {axis: yAxis, source: 1},
+          {axis: zAxis, source: 2}]) {
+        var positions = start.copy();
+        entry.axis.writeLogicalPosition(positions,
+          segment.coefficients[entry.source][0]);
+        var velocities = [for (_ in start) 0.0];
+        entry.axis.writeLogicalDelta(velocities,
+          segment.coefficients[entry.source][1]);
+        for (joint in entry.axis.jointIndices)
+          coefficients[joint] = [positions[joint], velocities[joint]];
+      }
+      mapped.push({timeFromStartNs: segment.timeFromStartNs,
+        durationNs: segment.durationNs, coefficients: coefficients});
     }
-    if (nativeCartesian != null) nativeCartesian.dispose();
-    var result = new JointTrajectory(mapped);
-    if (robot.capabilities().supportsExecutionPlans && mapped.length > 1) {
-      var native = Trajectory.fromPositionSamples(
-        [for (sample in mapped) sample.timeSeconds],
-        [for (sample in mapped) sample.positions]);
-      nativeTrajectories.push({trajectory: result, native: native});
-    }
-    return result;
+    nativeCartesian.dispose();
+    return Trajectory.fromSegments(mapped);
   }
 
   function resolvePathLimits(path:GeometricPath, directAxes:Array<MotionAxis>,
@@ -551,12 +463,8 @@ class MotionSystem {
     }
   }
 
-  static function writeLogicalVector(axis:MotionAxis, joints:Array<Float>, value:Float):Void {
-    axis.writeLogicalDelta(joints, value);
-  }
-
   /** Software homing for the bootstrap: move to each authored home coordinate. */
-  public function home(?options:MotionOptions):Null<JointTrajectory> {
+  public function home(?options:MotionOptions):Null<Trajectory> {
     return moveAxes([for (axisValue in axes) new AxisTarget(axisValue.id, axisValue.homePosition)], options);
   }
 
@@ -566,7 +474,7 @@ class MotionSystem {
    * group receive the same logical displacement and scaled velocity.
    */
   public function jog(axisId:String, velocity:Float, durationSeconds:Float,
-      ?maxAcceleration:Float):Null<JointTrajectory> {
+      ?maxAcceleration:Float):Null<Trajectory> {
     var axisValue = axis(axisId);
     if (axisValue == null) throw 'Unknown motion axis "$axisId"';
     if (!Math.isFinite(velocity) || velocity == 0.0)
@@ -581,7 +489,7 @@ class MotionSystem {
 
     var continued = continueJog(axisValue, velocity, durationSeconds, acceleration);
     if (continued != null) return continued;
-    function planJog():JointTrajectory {
+    function planJog():Trajectory {
       var start = robot.snapshot().positions.toArray();
       var startLogical = axisValue.logicalPosition(start);
       var requestedEnd = startLogical + velocity * durationSeconds;
@@ -594,18 +502,16 @@ class MotionSystem {
   }
 
   /**
-   * Changes a running jog on the same axis without stopping. Native queues
-   * replace at the committed state; position-streaming backends continue from
-   * the current host sample. Returns null if continuation is unavailable.
+   * Changes a running jog on the same axis at the committed plan state.
    */
   function continueJog(axisValue:MotionAxis, velocity:Float, durationSeconds:Float,
-      acceleration:Float):Null<JointTrajectory> {
+      acceleration:Float):Null<Trajectory> {
     var executing = activeTrajectory;
     if (executing == null || activeJogAxis != axisValue.id || held || stoppingForReplacement ||
-        hostStopping || afterStop.length > 0 || queuedTrajectories.length > 0)
+        afterStop.length > 0 || queuedTrajectories.length > 0)
       return null;
-    var smooth = nativeFor(executing);
-    if (smooth != null && usesTrajectoryChunks(executing)) {
+    var smooth = executing;
+    if (smooth != null) {
       return trySmoothReplacement(executing, axisValue.id, state -> {
         var target = state.positions.copy();
         var logical = axisValue.logicalPosition(target);
@@ -621,51 +527,16 @@ class MotionSystem {
             acceleration));
       });
     }
-    if (usesTrajectoryChunks(executing)) return null;
-    var sampleSeconds = elapsedSeconds;
-    if (sampleSeconds >= executing.durationSeconds - fixedTimestepSeconds) return null;
-
-    var start = executing.sample(sampleSeconds).positions;
-    var startLogical = axisValue.logicalPosition(start);
-    var startVelocity = logicalVelocityAt(executing, axisValue, sampleSeconds);
-    var requestedEnd = Math.max(axisValue.lowerLimit,
-      Math.min(axisValue.upperLimit, startLogical + velocity * durationSeconds));
-    var profile = new JogProfile(startLogical, startVelocity, requestedEnd, Math.abs(velocity),
-      acceleration);
-    // Braking from the current speed may not fit before a travel limit.
-    if (profile.endPosition < axisValue.lowerLimit - 1e-12 ||
-        profile.endPosition > axisValue.upperLimit + 1e-12)
-      return null;
-    var samples:Array<JointTrajectorySample> = [];
-    var count = Std.int(Math.max(1.0, Math.ceil(profile.durationSeconds / fixedTimestepSeconds)));
-    for (index in 0...(count + 1)) {
-      var time = index == count ? profile.durationSeconds : index * fixedTimestepSeconds;
-      var positions = start.copy();
-      var logical = Math.max(axisValue.lowerLimit,
-        Math.min(axisValue.upperLimit, profile.positionAt(time)));
-      axisValue.writeLogicalPosition(positions, logical);
-      var velocities = [for (_ in start) 0.0];
-      axisValue.writeLogicalDelta(velocities, profile.velocityAt(time));
-      samples.push(new JointTrajectorySample(time, positions, velocities));
-    }
-    var trajectoryValue = new JointTrajectory(samples);
-
-    setActive(trajectoryValue);
-    bufferedTotalSeconds = trajectoryValue.durationSeconds;
-    bufferedCompletedSeconds = 0.0;
-    plannedEndPositions = trajectoryEnd(trajectoryValue);
-    activeJogAxis = axisValue.id;
-    return trajectoryValue;
+    return null;
   }
 
   function retargetNativeAxes(targets:Array<AxisTarget>,
-      options:Null<MotionOptions>):Null<JointTrajectory> {
+      options:Null<MotionOptions>):Null<Trajectory> {
     var executing = activeTrajectory;
-    if (executing == null || held || stoppingForReplacement || hostStopping ||
-        afterStop.length > 0 || queuedTrajectories.length > 0 ||
-        !usesTrajectoryChunks(executing))
+    if (executing == null || held || stoppingForReplacement ||
+        afterStop.length > 0 || queuedTrajectories.length > 0)
       return null;
-    var smooth = nativeFor(executing);
+    var smooth = executing;
     if (smooth == null || smooth.segments()[0].coefficients[0].length < 3) return null;
     return trySmoothReplacement(executing, null, state -> {
       var target = state.positions.copy();
@@ -688,9 +559,9 @@ class MotionSystem {
     });
   }
 
-  function trySmoothReplacement(executing:JointTrajectory, jogAxis:Null<String>,
-      planFromState:TrajectoryState -> JointTrajectory):Null<JointTrajectory> {
-    var smooth = nativeFor(executing);
+  function trySmoothReplacement(executing:Trajectory, jogAxis:Null<String>,
+      planFromState:TrajectoryState -> Trajectory):Null<Trajectory> {
+    var smooth = executing;
     if (smooth == null) return null;
     for (_ in 0...2) {
       var observation = syncFromRuntime();
@@ -723,9 +594,9 @@ class MotionSystem {
     return null;
   }
 
-  function submitSmoothReplacement(planned:JointTrajectory, state:TrajectoryState,
-      observation:RobotSnapshot, anchorNs:Int64, jogAxis:Null<String>):JointTrajectory {
-    var replacement = nativeFor(planned);
+  function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
+      observation:RobotSnapshot, anchorNs:Int64, jogAxis:Null<String>):Trajectory {
+    var replacement = planned;
     var tag = nextTrajectoryTag;
     var segments = [for (segment in replacement.segments())
       new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
@@ -738,47 +609,18 @@ class MotionSystem {
     nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
     setActive(planned);
     activeJogAxis = jogAxis;
-    bufferedTotalSeconds = planned.durationSeconds;
+    bufferedTotalSeconds = planned.durationSeconds();
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(planned);
     trajectorySubmitted = true;
-    trajectoryNextSampleIndex = planned.samples.length - 1;
+    trajectoryNextSegmentIndex = planned.segments().length;
     trajectoryChunkStartSeconds = 0.0;
-    trajectoryChunkEndSeconds = planned.durationSeconds;
+    trajectoryChunkEndSeconds = planned.durationSeconds();
     trajectoryFinalTag = tag;
-    trajectoryFinalEndSeconds = planned.durationSeconds;
+    trajectoryFinalEndSeconds = planned.durationSeconds();
     trajectoryChunkReferences.set(Int64.toStr(tag),
-      new TrajectoryChunkReference(planned, 0.0));
+      new PlanChunkReference(planned, 0.0));
     return planned;
-  }
-
-  /**
-   * Logical velocity of `trajectoryValue` at `timeSeconds`. A segment's chord
-   * velocity is exact at its midpoint, so this interpolates between the
-   * chords of the neighbouring segments rather than taking the chord ahead,
-   * which would be half a sample late while the trajectory accelerates.
-   */
-  static function logicalVelocityAt(trajectoryValue:JointTrajectory, axisValue:MotionAxis,
-      timeSeconds:Float):Float {
-    var samples = trajectoryValue.samples;
-    var midpoints:Array<Float> = [];
-    var chords:Array<Float> = [];
-    for (index in 0...(samples.length - 1)) {
-      var before = samples[index];
-      var after = samples[index + 1];
-      if (after.timeSeconds <= before.timeSeconds) continue;
-      midpoints.push(0.5 * (before.timeSeconds + after.timeSeconds));
-      chords.push((axisValue.logicalPosition(after.positions) -
-        axisValue.logicalPosition(before.positions)) / (after.timeSeconds - before.timeSeconds));
-    }
-    if (chords.length == 0) return 0.0;
-    if (chords.length == 1 || timeSeconds <= midpoints[0]) return chords[0];
-    var last = chords.length - 1;
-    if (timeSeconds >= midpoints[last]) return chords[last];
-    var index = 0;
-    while (index + 1 < last && midpoints[index + 1] <= timeSeconds) index++;
-    var alpha = (timeSeconds - midpoints[index]) / (midpoints[index + 1] - midpoints[index]);
-    return chords[index] + (chords[index + 1] - chords[index]) * alpha;
   }
 
   /**
@@ -793,52 +635,26 @@ class MotionSystem {
       // the whole stop, and a late chunk could otherwise land after the stop
       // finished and be taken as a resume.
       var stopping = activeTrajectory;
-      if (stopping != null) {
-        if (usesTrajectoryChunks(stopping)) {
-          if (trajectoryFinishedInRuntime(syncFromRuntime()))
-            completeActiveTrajectory();
-        } else if (hostStopping) {
-          // The final stop sample is applied by the step after it is sent, so
-          // the stop only counts as settled one update later; planning from
-          // rest before then would start from a stale pose.
-          if (elapsedSeconds > stopping.durationSeconds) {
-            hostStopping = false;
-          } else {
-            submitPositionSample(stopping.sample(elapsedSeconds));
-            elapsedSeconds = elapsedSeconds >= stopping.durationSeconds
-              ? stopping.durationSeconds + dt
-              : Math.min(stopping.durationSeconds, elapsedSeconds + dt);
-          }
-        }
-      }
+      if (stopping != null && trajectoryFinishedInRuntime(syncFromRuntime()))
+        completeActiveTrajectory();
       advanceStop();
-      if (held || stoppingForReplacement) return hostStopping;
+      if (held || stoppingForReplacement) return false;
     }
     if (activeTrajectory == null) activateNextTrajectory();
     if (activeTrajectory == null) return false;
     var trajectory = activeTrajectory;
-    if (trajectory.durationSeconds <= 0.0) {
+    if (trajectory.durationSeconds() <= 0.0 || activeStationary) {
       completeActiveTrajectory();
       return activeTrajectory != null;
     }
-    if (usesTrajectoryChunks(trajectory)) {
-      var observation = syncFromRuntime();
-      if (stoppingForReplacement) return true;
-      if (trajectoryFinishedInRuntime(observation)) {
-        completeActiveTrajectory();
-        return activeTrajectory != null;
-      }
-      if (nativeRefillDeferred) nativeRefillDeferred = false;
-      else if (!trajectorySubmitted || shouldRefillTrajectory(dt)) fillNativeWindow();
-    } else {
-      submitPositionSample(trajectory.sample(elapsedSeconds));
-    }
-    if (!usesTrajectoryChunks(trajectory) && elapsedSeconds >= trajectory.durationSeconds) {
+    var observation = syncFromRuntime();
+    if (stoppingForReplacement) return true;
+    if (trajectoryFinishedInRuntime(observation)) {
       completeActiveTrajectory();
       return activeTrajectory != null;
     }
-    if (!usesTrajectoryChunks(trajectory))
-      elapsedSeconds = Math.min(trajectory.durationSeconds, elapsedSeconds + dt);
+    if (nativeRefillDeferred) nativeRefillDeferred = false;
+    else if (!trajectorySubmitted || shouldRefillTrajectory(dt)) fillNativeWindow();
     return true;
   }
 
@@ -846,47 +662,18 @@ class MotionSystem {
     abort(mode);
   }
 
-  function submitPositionSample(sample:JointTrajectorySample):Void {
-    var targets:Array<JointTarget> = [];
-    for (i in 0...sample.positions.length)
-      targets.push(JointTarget.position(i, sample.positions[i]));
-    robot.submit(RobotCommand.JointTargets(targets, null));
-  }
-
-  /** Time along the planned trajectory reached by the executed one. */
-  function activeSourceSeconds():Float {
-    var timing = activeTiming;
-    return timing == null ? elapsedSeconds : timing.sourceTimeAt(elapsedSeconds);
-  }
-
-  /** Clock rate of the executed trajectory relative to its plan. */
-  function activeRate():Float {
-    var timing = activeTiming;
-    return timing == null ? 1.0 : timing.rateAt(elapsedSeconds);
-  }
-
   /** Starts executing `trajectoryValue` as a fresh, un-retimed plan. */
-  function setActive(trajectoryValue:JointTrajectory):Void {
-    if (activeTrajectory != null && activeTrajectory != trajectoryValue)
-      discardNativeTrajectory(activeTrajectory);
+  function setActive(trajectoryValue:Trajectory):Void {
     activeTrajectory = trajectoryValue;
-    activeSource = trajectoryValue;
-    activeTiming = null;
+    activeSegments = trajectoryValue.segments();
+    activeStationary = stationarySegments(activeSegments);
     activeJogAxis = null;
-    resetExecutionState();
-  }
-
-  /** Swaps in a re-timed execution of the current plan. */
-  function retimeActive(timing:TimeScaledTrajectory):Void {
-    activeTrajectory = timing.trajectory;
-    activeTiming = timing;
     resetExecutionState();
   }
 
   function resetExecutionState():Void {
     elapsedSeconds = 0.0;
     trajectorySubmitted = false;
-    hostStopping = false;
     resetTrajectoryChunkState();
     trajectoryChunkReferences = new Map();
     trajectoryFinalTag = Int64.ofInt(0);
@@ -894,7 +681,7 @@ class MotionSystem {
   }
 
   function planAxesFrom(start:Array<Float>, targets:Array<AxisTarget>,
-      options:Null<MotionOptions>):JointTrajectory {
+      options:Null<MotionOptions>):Trajectory {
     if (targets == null || targets.length == 0) throw "Axis move needs at least one target";
     var movedAxes:Array<MotionAxis> = [];
     var logicalGoal:Array<Float> = [];
@@ -915,48 +702,27 @@ class MotionSystem {
   }
 
   /**
-   * Plans in logical axis units and maps each sample onto the joints. The
+   * Plans in logical axis units and maps the native polynomial onto joints. The
    * limits are the axes' authored units, and every joint of an axis follows
    * that axis's one profile, so the motors of a geared or dual-motor axis stay
    * in proportion throughout the move. Joints of other axes keep `start`.
    */
   function planLogical(start:Array<Float>, movedAxes:Array<MotionAxis>, logicalGoal:Array<Float>,
-      limits:MotionLimits):JointTrajectory {
-    if (robot.capabilities().supportsExecutionPlans) {
-      var target = start.copy();
-      for (index in 0...movedAxes.length)
-        movedAxes[index].writeLogicalPosition(target, logicalGoal[index]);
-      var stationary = true;
-      for (joint in 0...start.length)
-        if (Math.abs(target[joint] - start[joint]) > 1e-12) stationary = false;
-      if (stationary)
-        return new JointTrajectory([new JointTrajectorySample(0.0, start,
-          [for (_ in start) 0.0])]);
-      return nativeLogicalPlan(start, [for (_ in start) 0.0],
-        [for (_ in start) 0.0], target, limits);
-    }
-    var logicalStart = [for (axisValue in movedAxes) axisValue.logicalPosition(start)];
-    var logical = planner.plan(logicalStart, logicalGoal, limits);
-    var samples:Array<JointTrajectorySample> = [];
-    for (sample in logical.samples) {
-      var positions = start.copy();
-      var velocities = [for (_ in start) 0.0];
-      var accelerations = [for (_ in start) 0.0];
-      for (index in 0...movedAxes.length) {
-        var axisValue = movedAxes[index];
-        axisValue.writeLogicalPosition(positions, Math.max(axisValue.lowerLimit,
-          Math.min(axisValue.upperLimit, sample.positions[index])));
-        axisValue.writeLogicalDelta(velocities, sample.velocities[index]);
-        axisValue.writeLogicalDelta(accelerations, sample.accelerations[index]);
-      }
-      samples.push(new JointTrajectorySample(sample.timeSeconds, positions, velocities,
-        accelerations));
-    }
-    return new JointTrajectory(samples);
+      limits:MotionLimits):Trajectory {
+    var target = start.copy();
+    for (index in 0...movedAxes.length)
+      movedAxes[index].writeLogicalPosition(target, logicalGoal[index]);
+    var stationary = true;
+    for (joint in 0...start.length)
+      if (Math.abs(target[joint] - start[joint]) > 1e-12) stationary = false;
+    if (stationary)
+      return Trajectory.fromPositionSamples([0.0, fixedTimestepSeconds], [start, start]);
+    return nativeLogicalPlan(start, [for (_ in start) 0.0],
+      [for (_ in start) 0.0], target, limits);
   }
 
   function nativeLogicalPlan(start:Array<Float>, velocity:Array<Float>,
-      acceleration:Array<Float>, target:Array<Float>, limits:MotionLimits):JointTrajectory {
+      acceleration:Array<Float>, target:Array<Float>, limits:MotionLimits):Trajectory {
     var maxVelocity = [for (_ in start) 0.0];
     var maxAcceleration = [for (_ in start) 0.0];
     var maxJerk = [for (_ in start) 0.0];
@@ -987,18 +753,7 @@ class MotionSystem {
         throw 'Joint $joint needs positive velocity, acceleration and jerk limits';
     var native = Trajectory.generateStateToState(start, velocity, acceleration, target,
       maxVelocity, maxAcceleration, maxJerk);
-    var samples:Array<JointTrajectorySample> = [];
-    var duration = native.durationSeconds();
-    var count = Std.int(Math.max(1.0, Math.ceil(duration / fixedTimestepSeconds)));
-    for (index in 0...(count + 1)) {
-      var time = index == count ? duration : index * fixedTimestepSeconds;
-      var state = native.evaluate(time);
-      samples.push(new JointTrajectorySample(time, state.positions,
-        state.velocities, state.accelerations));
-    }
-    var result = new JointTrajectory(samples);
-    nativeTrajectories.push({trajectory: result, native: native});
-    return result;
+    return native;
   }
 
   function planningStartPositions():Array<Float> {
@@ -1006,29 +761,21 @@ class MotionSystem {
     return robot.snapshot().positions.toArray();
   }
 
-  function beginImmediate(trajectoryValue:JointTrajectory):Void {
+  function beginImmediate(trajectoryValue:Trajectory):Void {
     setActive(trajectoryValue);
-    bufferedTotalSeconds = trajectoryValue.durationSeconds;
+    bufferedTotalSeconds = trajectoryValue.durationSeconds();
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(trajectoryValue);
-    resumeRequested = false;
-    if (trajectoryValue.durationSeconds <= 0.0) {
-      if (usesTrajectoryChunks(trajectoryValue))
-        submitStationaryPlan(trajectoryValue.samples[0].positions);
-      return;
-    }
-    if (usesTrajectoryChunks(trajectoryValue)) {
-      fillNativeWindow();
-    }
+    fillNativeWindow();
   }
 
-  function enqueueTrajectory(trajectoryValue:JointTrajectory):Void {
+  function enqueueTrajectory(trajectoryValue:Trajectory):Void {
     if (activeTrajectory == null && queuedTrajectories.length == 0) {
       bufferedTotalSeconds = 0.0;
       bufferedCompletedSeconds = 0.0;
     }
     queuedTrajectories.push(trajectoryValue);
-    bufferedTotalSeconds += trajectoryValue.durationSeconds;
+    bufferedTotalSeconds += trajectoryValue.durationSeconds();
     plannedEndPositions = trajectoryEnd(trajectoryValue);
     activateNextTrajectory();
   }
@@ -1037,23 +784,15 @@ class MotionSystem {
     if (held || stoppingForReplacement || activeTrajectory != null ||
         queuedTrajectories.length == 0)
       return;
-    var next:JointTrajectory = queuedTrajectories.shift();
+    var next:Trajectory = queuedTrajectories.shift();
     setActive(next);
-    resumeRequested = false;
-    if (next.durationSeconds <= 0.0) {
-      if (usesTrajectoryChunks(next))
-        submitStationaryPlan(next.samples[0].positions);
-      return;
-    }
-    if (usesTrajectoryChunks(activeTrajectory)) fillNativeWindow();
+    fillNativeWindow();
   }
 
   function clearBufferedMotion():Void {
-    if (activeTrajectory != null) discardNativeTrajectory(activeTrajectory);
-    for (queued in queuedTrajectories) discardNativeTrajectory(queued);
     activeTrajectory = null;
-    activeSource = null;
-    activeTiming = null;
+    activeSegments = [];
+    activeStationary = false;
     queuedTrajectories = [];
     held = false;
     stoppingForReplacement = false;
@@ -1062,24 +801,16 @@ class MotionSystem {
     bufferedTotalSeconds = 0.0;
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = null;
-    resumeRequested = false;
     nativeRefillDeferred = false;
     resetExecutionState();
-  }
-
-  function usesTrajectoryChunks(trajectoryValue:JointTrajectory):Bool {
-    if (trajectoryValue == null) return false;
-    return robot.capabilities().supportsExecutionPlans &&
-      trajectoryValue.jointCount <= RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS;
   }
 
   function submitActiveTrajectoryChunk():Void {
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return;
-    var smooth = nativeFor(trajectoryValue);
-    var nativeSegments = smooth == null ? null : smooth.segments();
-    if (nativeSegments != null && nativeSegments.length > 0 &&
-        nativeSegments[0].coefficients[0].length >= 3) {
+    var nativeSegments = activeSegments;
+    if (nativeSegments.length == 0) return;
+    if (nativeSegments[0].coefficients[0].length >= 3) {
       if (trajectorySubmitted) return;
       var tag = nextTrajectoryTag;
       nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
@@ -1087,78 +818,58 @@ class MotionSystem {
         new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
           segment.coefficients)];
       if (segments.length > 128) throw "Smooth plan exceeds one runtime submission";
-      var start = smooth.evaluate(0.0);
+      var start = trajectoryValue.evaluate(0.0);
       robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
         modelRevision, calibrationRevision, 1, start.positions, start.velocities,
         start.accelerations, segments)));
       trajectorySubmitted = true;
-      trajectoryNextSampleIndex = trajectoryValue.samples.length - 1;
+      trajectoryNextSegmentIndex = nativeSegments.length;
       trajectoryChunkStartSeconds = 0.0;
-      trajectoryChunkEndSeconds = trajectoryValue.durationSeconds;
+      trajectoryChunkEndSeconds = trajectoryValue.durationSeconds();
       trajectoryFinalTag = tag;
-      trajectoryFinalEndSeconds = trajectoryValue.durationSeconds;
+      trajectoryFinalEndSeconds = trajectoryValue.durationSeconds();
       trajectoryChunkReferences.set(Int64.toStr(tag),
-        new TrajectoryChunkReference(trajectoryValue, 0.0));
+        new PlanChunkReference(trajectoryValue, 0.0));
       return;
     }
-    var startIndex = trajectoryNextSampleIndex;
-    var startTime = trajectoryValue.samples[startIndex].timeSeconds;
+    var startIndex = trajectoryNextSegmentIndex;
+    if (startIndex >= nativeSegments.length) return;
+    var startTimeNs = nativeSegments[startIndex].timeFromStartNs;
+    var startTime = Int64.toFloat(startTimeNs) * 1e-9;
     var availableSegments = 4096 - robot.snapshot().trajectoryQueueDepth;
-    var pointLimit = Std.int(Math.min(129, availableSegments + 1));
-    if (pointLimit < 2) return;
-    var endIndex = startIndex;
-    var maximumEnd:Int = Std.int(Math.min(trajectoryValue.samples.length - 1,
-      startIndex + pointLimit - 1));
-    for (index in (startIndex + 1)...(maximumEnd + 1)) {
-      var sample = trajectoryValue.samples[index];
-      endIndex = index;
-    }
+    var segmentLimit = Std.int(Math.min(128, availableSegments));
+    if (segmentLimit < 1) return;
+    var endIndex = Std.int(Math.min(nativeSegments.length, startIndex + segmentLimit));
     var tag = nextTrajectoryTag;
     nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
-    var times = [for (index in startIndex...(endIndex + 1))
-      trajectoryValue.samples[index].timeSeconds - startTime];
-    var positions = [for (index in startIndex...(endIndex + 1))
-      trajectoryValue.samples[index].positions];
     var segments:Array<TrajectorySegment> = [];
-    if (nativeSegments != null &&
-        nativeSegments.length == trajectoryValue.samples.length - 1) {
-      var nativeStartNs = nativeSegments[startIndex].timeFromStartNs;
-      for (index in startIndex...endIndex) {
-        var segment = nativeSegments[index];
-        segments.push(new TrajectorySegment(
-          Int64.sub(segment.timeFromStartNs, nativeStartNs),
-          segment.durationNs, segment.coefficients));
-      }
-    } else {
-      var native = Trajectory.fromPositionSamples(times, positions);
-      for (segment in native.segments())
-        segments.push(new TrajectorySegment(segment.timeFromStartNs,
-          segment.durationNs, segment.coefficients));
-      native.dispose();
+    for (index in startIndex...endIndex) {
+      var segment = nativeSegments[index];
+      segments.push(new TrajectorySegment(
+        Int64.sub(segment.timeFromStartNs, startTimeNs),
+        segment.durationNs, segment.coefficients));
     }
-    var startVelocity = [for (_ in positions[0]) 0.0];
+    var startPosition = trajectoryValue.evaluate(startTime).positions;
+    var startVelocity = [for (_ in startPosition) 0.0];
     if (startIndex > 0) {
-      var before = trajectoryValue.samples[startIndex - 1];
-      var after = trajectoryValue.samples[startIndex];
-      var seconds = after.timeSeconds - before.timeSeconds;
+      var before = nativeSegments[startIndex - 1];
       for (joint in 0...startVelocity.length)
-        startVelocity[joint] = (after.positions[joint] - before.positions[joint]) / seconds;
+        startVelocity[joint] = before.coefficients[joint][1];
     }
     try robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
-      modelRevision, calibrationRevision, 1, positions[0], startVelocity,
-      [for (_ in positions[0]) 0.0], segments, null, null, null, null, null,
-      endIndex >= trajectoryValue.samples.length - 1))) catch (error:Dynamic)
-      throw 'plan chunk [$startIndex,$endIndex] of ${trajectoryValue.samples.length}, '
-        + 'start=${positions[0]}, end=${positions[positions.length - 1]}, '
-        + 'segments=${segments.length}, firstT=${segments[0].timeFromStartNs}, '
-        + 'lastT=${segments[segments.length - 1].timeFromStartNs}: $error';
+      modelRevision, calibrationRevision, 1, startPosition, startVelocity,
+      [for (_ in startPosition) 0.0], segments, null, null, null, null, null,
+      endIndex >= nativeSegments.length))) catch (error:Dynamic)
+      throw 'plan chunk [$startIndex,$endIndex] of ${nativeSegments.length}: $error';
     trajectorySubmitted = true;
-    trajectoryNextSampleIndex = endIndex;
+    trajectoryNextSegmentIndex = endIndex;
     trajectoryChunkStartSeconds = startTime;
-    trajectoryChunkEndSeconds = trajectoryValue.samples[endIndex].timeSeconds;
+    var finalSegment = nativeSegments[endIndex - 1];
+    trajectoryChunkEndSeconds = Int64.toFloat(Int64.add(finalSegment.timeFromStartNs,
+      finalSegment.durationNs)) * 1e-9;
     trajectoryChunkReferences.set(Int64.toStr(tag),
-      new TrajectoryChunkReference(trajectoryValue, startTime));
-    if (endIndex >= trajectoryValue.samples.length - 1) {
+      new PlanChunkReference(trajectoryValue, startTime));
+    if (endIndex >= nativeSegments.length) {
       trajectoryFinalTag = tag;
       trajectoryFinalEndSeconds = trajectoryChunkEndSeconds;
     }
@@ -1167,35 +878,25 @@ class MotionSystem {
   /** Keep a fixed execution window queued so native HOLD never needs a host lead estimate. */
   function fillNativeWindow():Void {
     var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || !usesTrajectoryChunks(trajectoryValue)) return;
-    while (trajectoryNextSampleIndex < trajectoryValue.samples.length - 1 &&
+    if (trajectoryValue == null) return;
+    while (trajectoryNextSegmentIndex < activeSegments.length &&
         trajectoryChunkEndSeconds - elapsedSeconds < 2.0) {
-      var before = trajectoryNextSampleIndex;
+      var before = trajectoryNextSegmentIndex;
       submitActiveTrajectoryChunk();
-      if (trajectoryNextSampleIndex == before) break;
+      if (trajectoryNextSegmentIndex == before) break;
     }
-  }
-
-  function submitStationaryPlan(positions:Array<Float>):Void {
-    var tag = nextTrajectoryTag;
-    nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
-    var zeros = [for (_ in positions) 0.0];
-    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
-      modelRevision, calibrationRevision, 1, positions, zeros, zeros,
-      [new TrajectorySegment(Int64.ofInt(0),
-        secondsToNanoseconds(fixedTimestepSeconds), [for (value in positions) [value]])])));
   }
 
   function syncFromRuntime():RobotSnapshot {
     var observation = robot.snapshot();
     var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || !usesTrajectoryChunks(trajectoryValue)) return observation;
+    if (trajectoryValue == null) return observation;
     var reference = trajectoryChunkReferences.get(Int64.toStr(observation.trajectoryTag));
     if (reference != null && reference.trajectory == trajectoryValue) {
       var runtimeSeconds = Int64.toFloat(observation.trajectoryTagTimeNs) /
         1000000000.0;
       if (Math.isFinite(runtimeSeconds))
-        elapsedSeconds = Math.min(trajectoryValue.durationSeconds,
+        elapsedSeconds = Math.min(trajectoryValue.durationSeconds(),
           Math.max(0.0, reference.startSeconds + runtimeSeconds));
     }
     return observation;
@@ -1206,7 +907,7 @@ class MotionSystem {
     if (trajectoryValue == null || !trajectorySubmitted ||
         Int64.compare(trajectoryFinalTag, Int64.ofInt(0)) == 0)
       return false;
-    if (trajectoryFinalEndSeconds < trajectoryValue.durationSeconds - 1e-9)
+    if (trajectoryFinalEndSeconds < trajectoryValue.durationSeconds() - 1e-9)
       return false;
     if (Int64.compare(observation.trajectoryTag, trajectoryFinalTag) != 0)
       return false;
@@ -1219,35 +920,22 @@ class MotionSystem {
   }
 
   function completeActiveTrajectory():Void {
-    var source = activeSource;
-    if (activeTrajectory == null || source == null) return;
-    discardNativeTrajectory(activeTrajectory);
-    bufferedCompletedSeconds += source.durationSeconds;
+    if (activeTrajectory == null) return;
+    bufferedCompletedSeconds += activeTrajectory.durationSeconds();
     activeTrajectory = null;
-    activeSource = null;
-    activeTiming = null;
+    activeSegments = [];
+    activeStationary = false;
     resetExecutionState();
     activateNextTrajectory();
   }
 
-  function discardNativeTrajectory(value:JointTrajectory):Void {
-    for (index in 0...nativeTrajectories.length)
-      if (nativeTrajectories[index].trajectory == value) {
-        nativeTrajectories[index].native.dispose();
-        nativeTrajectories.splice(index, 1);
-        return;
-      }
-  }
-
-  function nativeFor(value:JointTrajectory):Null<Trajectory> {
-    for (entry in nativeTrajectories)
-      if (entry.trajectory == value) return entry.native;
-    return null;
+  function discardNativeTrajectory(value:Trajectory):Void {
+    value.dispose();
   }
 
   function shouldRefillTrajectory(dt:Float):Bool {
     var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || trajectoryNextSampleIndex >= trajectoryValue.samples.length - 1)
+    if (trajectoryValue == null || trajectoryNextSegmentIndex >= activeSegments.length)
       return false;
     var lead = Math.max(2.0, Math.max(fixedTimestepSeconds, dt) * 2.0);
     if (trajectoryChunkEndSeconds - elapsedSeconds <= lead + 1e-9) return true;
@@ -1262,17 +950,22 @@ class MotionSystem {
   }
 
   function resetTrajectoryChunkState():Void {
-    trajectoryNextSampleIndex = 0;
+    trajectoryNextSegmentIndex = 0;
     trajectoryChunkEndSeconds = 0.0;
     trajectoryChunkStartSeconds = 0.0;
   }
 
-  static function secondsToNanoseconds(seconds:Float):Int64 {
-    return Trajectory.nanoseconds(seconds);
-  }
+  static function trajectoryEnd(trajectoryValue:Trajectory):Array<Float>
+    return trajectoryValue.evaluate(trajectoryValue.durationSeconds()).positions.copy();
 
-  static function trajectoryEnd(trajectoryValue:JointTrajectory):Array<Float>
-    return trajectoryValue.samples[trajectoryValue.samples.length - 1].positions.copy();
+  static function stationarySegments(segments:Array<{timeFromStartNs:Int64,
+      durationNs:Int64, coefficients:Array<Array<Float>>}>):Bool {
+    for (segment in segments)
+      for (coefficients in segment.coefficients)
+        for (index in 1...coefficients.length)
+          if (Math.abs(coefficients[index]) > 1e-15) return false;
+    return true;
+  }
 
   function requireAxis(id:String):MotionAxis {
     var result = axis(id);
@@ -1299,11 +992,11 @@ class MotionSystem {
   }
 }
 
-private class TrajectoryChunkReference {
-  public final trajectory:JointTrajectory;
+private class PlanChunkReference {
+  public final trajectory:Trajectory;
   public final startSeconds:Float;
 
-  public function new(trajectory:JointTrajectory, startSeconds:Float) {
+  public function new(trajectory:Trajectory, startSeconds:Float) {
     this.trajectory = trajectory;
     this.startSeconds = startSeconds;
   }

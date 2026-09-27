@@ -3,8 +3,6 @@ package motionkit.planner;
 import motionkit.path.GeometricPath;
 import motionkit.path.PathPoint;
 import motionkit.path.PathPrimitive;
-import motionkit.trajectory.JointTrajectory;
-import motionkit.trajectory.JointTrajectorySample;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 
@@ -25,14 +23,6 @@ class LineLookaheadPlanner {
     if (!Math.isFinite(samplePeriodSeconds) || samplePeriodSeconds <= 0.0)
       throw "Line-lookahead sample period must be finite and positive";
     this.samplePeriodSeconds = samplePeriodSeconds;
-  }
-
-  /** Plans a connected polyline as a three-coordinate Cartesian trajectory. */
-  public function planPath(path:GeometricPath, limits:MotionLimits,
-      ?options:PathPlanningOptions):JointTrajectory {
-    return new JointTrajectory([for (sample in plannedSamples(path, limits, options))
-      new JointTrajectorySample(sample.timeSeconds, sample.positions,
-        sample.velocities, sample.accelerations)]);
   }
 
   /** Emits degree-1 native segments from the planner's authored knots. */
