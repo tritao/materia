@@ -175,7 +175,7 @@ class Main {
     var activeEditor:Null<ReferenceEditorApp> = null;
     host.continuousFrames = function() return activeEditor != null &&
       (activeEditor.simulation.isRunning() || diagnostics.robotHost != null);
-    return DesktopUiHost.open(host, function(context) {
+    var hosted = DesktopUiHost.open(host, function(context) {
       var activeTheme = Theme.light();
       if (diagnostics.darkTheme) activeTheme = Theme.dark();
       var world:Null<RobotWorld> = null;
@@ -195,6 +195,11 @@ class Main {
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
       return editor;
     });
+    return new DesktopUiHostSession(function() {
+      var active = hosted.tick();
+      if (activeEditor != null) activeEditor.tick();
+      return active;
+    }, function() return hosted.close());
   }
 }
 
@@ -413,6 +418,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var sheetPieceSelection:String = "";
   var sheetOperationsExpanded:Bool = false;
   var framePresentation:Null<ApplicationPresentationSnapshot> = null;
+  var refinementFrameSubmitted:Bool = false;
   var cachedSubmitKey:String = "";
   var cachedSubmitSceneGeneration:Int = -1;
   var cachedSubmitSceneRevision:Int = -1;
@@ -659,12 +665,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     viewportHeight = frame.height;
     toolbarDensity = EditorToolbarLayout.forWidth(toolbarDensity, frame.width);
     updateReadOnlyRobots();
-    if (scene.advanceCadMeshRefinement()) {
-      if (hostContext != null)
-        hostContext.requestFrame();
-      else
-        scene.advanceCadMeshRefinement();
-    }
+    refinementFrameSubmitted = true;
     // A stable editor frame does not need to reconstruct its declarative tree.
     // Keep live simulation, component stories, and externally populated worlds
     // on the normal path because their presentation can change independently
@@ -672,6 +673,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (componentLab != null || simulation.isActive() || externalWorldHasRobots)
       return ui.submit(view(), frame);
     return ui.submitCached(function() return view(), frame, editorSubmitKey());
+  }
+
+  /** Advance CAD preview refinement after a rendered frame. */
+  public function tick():Void {
+    if (!refinementFrameSubmitted) return;
+    refinementFrameSubmitted = false;
+    var before = scene.visualRevision;
+    var needsFrame = scene.advanceCadMeshRefinement();
+    if ((needsFrame || scene.visualRevision != before) && hostContext != null)
+      hostContext.requestFrame();
   }
 
   function editorSubmitKey():String {
