@@ -3,6 +3,7 @@
 
 in vec4 vertex_pick_color;
 in vec3 world_position;
+flat in float vertex_face_id;
 uniform vec4 clip_planes[32];
 uniform vec4 clip_plane_count;
 out vec4 fragment_color;
@@ -16,7 +17,7 @@ void main() {
         if (dot(clip_planes[index].xyz, world_position) + clip_planes[index].w < 0.0)
             discard;
     }
-    uint id = uint(gl_PrimitiveID) + 1u;
+    uint id = uint(vertex_face_id);
     fragment_color = vertex_pick_color;
     fragment_subelement = vec4(float(id & 0xffu) / 255.0,
                                float((id >> 8u) & 0xffu) / 255.0,

@@ -10,7 +10,7 @@ layout(location=5) in vec4 transform2;
 layout(location=6) in vec4 transform3;
 uniform mat4 view_projection;
 uniform vec4 stroke_view;
-out vec2 line_coordinate;
+out vec3 line_coordinate_homogeneous;
 out float line_length;
 out float line_half_width;
 out vec3 world_position;
@@ -23,7 +23,7 @@ void main() {
     vec4 b = view_projection * vec4(world_b, 1.0);
     if (a.w <= 1e-5 && b.w <= 1e-5) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-        line_coordinate = vec2(0.0);
+        line_coordinate_homogeneous = vec3(0.0, 0.0, 1.0);
         line_length = 0.0;
         line_half_width = stroke_view.z;
         world_position = world_a;
@@ -51,7 +51,10 @@ void main() {
     vec2 pixel_offset = normal * (stroke_coordinate.y * extent) + tangent * cap_extension;
     clip.xy += pixel_offset * (2.0 / stroke_view.xy) * clip.w;
     gl_Position = clip;
-    line_coordinate = vec2(along * length_px + cap_extension, stroke_coordinate.y * extent);
+    // Recover screen-linear pixel coordinates after perspective interpolation.
+    line_coordinate_homogeneous = vec3(
+        vec2(along * length_px + cap_extension, stroke_coordinate.y * extent) * clip.w,
+        clip.w);
     line_length = length_px;
     line_half_width = half_width;
 }

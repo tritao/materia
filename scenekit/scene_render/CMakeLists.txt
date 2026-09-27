@@ -3,47 +3,19 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(NKSCENE_RENDER_SHADER_INPUTS
     shaders/scene_vertex.glsl
     shaders/scene_fragment.glsl
-    shaders/scene_vertex.hlsl
-    shaders/scene_fragment.hlsl
-    shaders/scene_vertex.metal
-    shaders/scene_fragment.metal
     shaders/pick_vertex.glsl
     shaders/pick_fragment.glsl
-    shaders/pick_vertex.hlsl
-    shaders/pick_fragment.hlsl
-    shaders/pick_vertex.metal
-    shaders/pick_fragment.metal
     shaders/postprocess_vertex.glsl
     shaders/postprocess_fragment.glsl
     shaders/stroke_vertex.glsl
     shaders/stroke_fragment.glsl
-    shaders/stroke_vertex.hlsl
-    shaders/stroke_fragment.hlsl
-    shaders/stroke_vertex.metal
-    shaders/stroke_fragment.metal
     shaders/workplane_vertex.glsl
     shaders/workplane_fragment.glsl
-    shaders/workplane_vertex.hlsl
-    shaders/workplane_fragment.hlsl
-    shaders/workplane_vertex.metal
-    shaders/workplane_fragment.metal
     tools/generate-shaders.py)
-set(NKSCENE_RENDER_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
-set(NKSCENE_RENDER_SHADER_HEADER
-    "${NKSCENE_RENDER_GENERATED_DIR}/scene_shader_sources.h")
-add_custom_command(
-    OUTPUT "${NKSCENE_RENDER_SHADER_HEADER}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${NKSCENE_RENDER_GENERATED_DIR}"
-    COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate-shaders.py"
-        --output "${NKSCENE_RENDER_SHADER_HEADER}"
-    DEPENDS ${NKSCENE_RENDER_SHADER_INPUTS}
-    VERBATIM)
-add_custom_target(nativekit_scene_render_shaders
-    DEPENDS "${NKSCENE_RENDER_SHADER_HEADER}")
 add_custom_target(nativekit_scene_render_shaders_check
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate-shaders.py"
-        --check --output "${NKSCENE_RENDER_SHADER_HEADER}"
-    DEPENDS nativekit_scene_render_shaders
+        --check
+    DEPENDS ${NKSCENE_RENDER_SHADER_INPUTS}
     VERBATIM)
 
 add_library(nativekit_scene_render ${NK_LIBRARY_TYPE}
@@ -57,7 +29,6 @@ add_library(nativekit_scene_render ${NK_LIBRARY_TYPE}
     src/resource_cache.cpp
     src/spatial_index.cpp)
 add_library(NativeKit::scene_render ALIAS nativekit_scene_render)
-add_dependencies(nativekit_scene_render nativekit_scene_render_shaders)
 target_compile_features(nativekit_scene_render PRIVATE cxx_std_20)
 target_compile_definitions(nativekit_scene_render PRIVATE NKSRENDER_BUILDING_LIBRARY)
 target_include_directories(nativekit_scene_render
@@ -66,7 +37,6 @@ target_include_directories(nativekit_scene_render
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../scene/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
-        "${NKSCENE_RENDER_GENERATED_DIR}"
         src
         "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")
 target_link_libraries(nativekit_scene_render PUBLIC NativeKit::scene NativeKit::gpu)
@@ -98,7 +68,7 @@ if(NK_BUILD_TESTS)
     add_executable(nativekit_scene_render_tests tests/compiler.cpp)
     target_compile_features(nativekit_scene_render_tests PRIVATE cxx_std_20)
     target_include_directories(nativekit_scene_render_tests PRIVATE
-        src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src" "${NKSCENE_RENDER_GENERATED_DIR}")
+        src "${CMAKE_CURRENT_SOURCE_DIR}/../scene/src")
     target_link_libraries(nativekit_scene_render_tests PRIVATE NativeKit::scene_render
         NativeKit::scene)
     add_test(NAME scene_render_compiler COMMAND nativekit_scene_render_tests)

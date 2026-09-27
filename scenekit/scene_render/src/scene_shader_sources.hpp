@@ -31,12 +31,12 @@ inline SceneShaderSources scene_shader_sources(nkgpu_backend backend, bool picki
                                             shader_source::scene_fragment_gles,
                                             NKGPU_SHADERLANGUAGE_GLSL};
     case NKGPU_BACKEND_D3D11:
-        return picking ? SceneShaderSources{shader_source::scene_pick_vertex_hlsl, shader_source::scene_pick_fragment_hlsl,
+        return picking ? SceneShaderSources{shader_source::pick_vertex_hlsl, shader_source::pick_fragment_hlsl,
                                             NKGPU_SHADERLANGUAGE_HLSL5}
                        : SceneShaderSources{shader_source::scene_vertex_hlsl, shader_source::scene_fragment_hlsl,
                                             NKGPU_SHADERLANGUAGE_HLSL5};
     case NKGPU_BACKEND_METAL:
-        return picking ? SceneShaderSources{shader_source::scene_pick_vertex_metal, shader_source::scene_pick_fragment_metal,
+        return picking ? SceneShaderSources{shader_source::pick_vertex_metal, shader_source::pick_fragment_metal,
                                             NKGPU_SHADERLANGUAGE_MSL}
                        : SceneShaderSources{shader_source::scene_vertex_metal, shader_source::scene_fragment_metal,
                                             NKGPU_SHADERLANGUAGE_MSL};
@@ -72,6 +72,12 @@ inline PostProcessShaderSources post_process_shader_sources(nkgpu_backend backen
     case NKGPU_BACKEND_GLES3:
         return {shader_source::postprocess_vertex_gles, shader_source::postprocess_fragment_gles,
                 NKGPU_SHADERLANGUAGE_GLSL};
+    case NKGPU_BACKEND_D3D11:
+        return {shader_source::postprocess_vertex_hlsl, shader_source::postprocess_fragment_hlsl,
+                NKGPU_SHADERLANGUAGE_HLSL5};
+    case NKGPU_BACKEND_METAL:
+        return {shader_source::postprocess_vertex_metal, shader_source::postprocess_fragment_metal,
+                NKGPU_SHADERLANGUAGE_MSL};
     default:
         return {};
     }

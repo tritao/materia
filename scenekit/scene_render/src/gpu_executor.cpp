@@ -25,6 +25,11 @@ struct SceneVertex {
     std::array<float, 4> color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
+struct PickVertex {
+    std::array<float, 3> position{};
+    float face_id = 0.0f;
+};
+
 struct StrokeVertex {
     std::array<float, 3> start{};
     std::array<float, 3> end{};
@@ -32,12 +37,14 @@ struct StrokeVertex {
 };
 
 constexpr std::uint32_t vertex_stride = sizeof(SceneVertex);
+constexpr std::uint32_t pick_vertex_stride = sizeof(PickVertex);
 constexpr std::uint32_t stroke_vertex_stride = sizeof(StrokeVertex);
 constexpr std::uint32_t instance_stride = sizeof(float) * 20;
 constexpr std::uint32_t default_viewport_width = 1024;
 constexpr std::uint32_t default_viewport_height = 768;
 
 static_assert(sizeof(SceneVertex) == sizeof(float) * 12);
+static_assert(sizeof(PickVertex) == sizeof(float) * 4);
 static_assert(sizeof(StrokeVertex) == sizeof(float) * 8);
 
 struct StrokeUniformData {
@@ -319,12 +326,14 @@ struct NativeKitGpuExecutor::State {
     struct GeometryGpu {
         nkgpu_buffer buffer{};
         nkgpu_buffer index_buffer{};
+        nkgpu_buffer pick_buffer{};
         nkgpu_buffer stroke_buffer{};
         std::uint64_t revision = 0;
         std::uint32_t byte_size = 0;
         std::uint32_t index_byte_size = 0;
         std::uint32_t vertex_count = 0;
         std::uint32_t index_count = 0;
+        std::uint32_t pick_vertex_count = 0;
         std::uint32_t stroke_vertex_count = 0;
         bool indexed = false;
     };
@@ -363,7 +372,6 @@ struct NativeKitGpuExecutor::State {
     nkgpu_pipeline stroke_pipeline{};
     nkgpu_shader pick_shader{};
     nkgpu_pipeline pick_pipeline{};
-    nkgpu_pipeline pick_indexed_pipeline{};
     nkgpu_shader postprocess_shader{};
     nkgpu_pipeline postprocess_pipeline{};
     nkgpu_buffer postprocess_vertex_buffer{};
@@ -411,6 +419,8 @@ struct NativeKitGpuExecutor::State {
                 (void)nkgpu_buffer_destroy(renderer, resource.buffer);
             if (renderer.id && resource.index_buffer.id)
                 (void)nkgpu_buffer_destroy(renderer, resource.index_buffer);
+            if (renderer.id && resource.pick_buffer.id)
+                (void)nkgpu_buffer_destroy(renderer, resource.pick_buffer);
             if (renderer.id && resource.stroke_buffer.id)
                 (void)nkgpu_buffer_destroy(renderer, resource.stroke_buffer);
         }
@@ -460,8 +470,6 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_shader_destroy(renderer, shader);
         if (renderer.id && pick_pipeline.id)
             (void)nkgpu_pipeline_destroy(renderer, pick_pipeline);
-        if (renderer.id && pick_indexed_pipeline.id)
-            (void)nkgpu_pipeline_destroy(renderer, pick_indexed_pipeline);
         if (renderer.id && pick_shader.id)
             (void)nkgpu_shader_destroy(renderer, pick_shader);
         if (renderer.id && postprocess_sampler.id)
@@ -492,7 +500,6 @@ struct NativeKitGpuExecutor::State {
         stroke_shader = {};
         shader = {};
         pick_pipeline = {};
-        pick_indexed_pipeline = {};
         pick_shader = {};
         postprocess_pipeline = {};
         postprocess_shader = {};
@@ -609,7 +616,7 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
         const auto attribute = [&](std::uint32_t location, const char *name, const char *semantic) {
             return nkgpu_shader_attribute(shader_builder, location, name, semantic, location);
         };
-        if ((result = attribute(0, "position", "POSITION")) != NKGPU_OK ||
+        if ((result = attribute(0, "position", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(1, "transform0", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(2, "transform1", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(3, "transform2", "TEXCOORD")) != NKGPU_OK ||
@@ -619,55 +626,31 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
             (result = attribute(7, "color0", "TEXCOORD")) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 1, NKGPU_SHADERSTAGE_VERTEX,
                                                  sizeof(float) * 16)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_projection",
-                                           NKGPU_UNIFORMTYPE_MAT4, 1)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(MaterialUniformData))) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "base_color",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 1, "material_params",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 2, "emissive",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 3, "texture_flags",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "material_uniforms",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(LightingUniformData))) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 3, 0, "light_position_type",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 32)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 3, 1, "light_direction_range",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 32)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 3, 2, "light_color_intensity",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 32)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 3, 3, "light_cones",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 32)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 3, 4, "ambient_sky",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 3, 5, "ambient_ground",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 3, 6, "lighting_mode",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 3, 7, "camera_position",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 3, 8, "camera_view_direction",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 0, "lighting_uniforms",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 133)) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                           "base_color_texture")) != NKGPU_OK ||
+                                           "base_color_texture_image_scene_sampler")) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 1, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                           "metallic_roughness_texture")) != NKGPU_OK ||
+                                           "metallic_roughness_texture_image_scene_sampler")) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 2, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                           "normal_texture")) != NKGPU_OK ||
+                                           "normal_texture_image_scene_sampler")) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 3, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                           "occlusion_texture")) != NKGPU_OK ||
+                                           "occlusion_texture_image_scene_sampler")) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 4, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                           "emissive_texture")) != NKGPU_OK ||
+                                           "emissive_texture_image_scene_sampler")) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 2, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(ClipUniformData))) != NKGPU_OK ||
-            (result =
-                 nkgpu_shader_uniform(shader_builder, 2, 0, "clip_planes", NKGPU_UNIFORMTYPE_FLOAT4,
-                                      RenderPlan::max_clip_planes)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 2, 1, "clip_plane_count",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 2, 0, "clip_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4,
+                                           RenderPlan::max_clip_planes + 1)) != NKGPU_OK ||
             (result = nkgpu_shader_end(shader_builder, &state.shader)) != NKGPU_OK)
             return set_failure(state, stats, result);
     }
@@ -722,7 +705,7 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats) {
     const auto attribute = [&](std::uint32_t location, const char *name) {
         return nkgpu_shader_attribute(shader_builder, location, name, "TEXCOORD", location);
     };
-    if ((result = nkgpu_shader_attribute(shader_builder, 0, "start_position", "POSITION", 0)) != NKGPU_OK ||
+    if ((result = nkgpu_shader_attribute(shader_builder, 0, "start_position", "TEXCOORD", 0)) != NKGPU_OK ||
         (result = nkgpu_shader_attribute(shader_builder, 1, "end_position", "TEXCOORD", 1)) != NKGPU_OK ||
         (result = nkgpu_shader_attribute(shader_builder, 2, "stroke_coordinate", "TEXCOORD", 2)) != NKGPU_OK ||
         (result = attribute(3, "transform0")) != NKGPU_OK ||
@@ -731,23 +714,21 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats) {
         (result = attribute(6, "transform3")) != NKGPU_OK ||
         (result = nkgpu_shader_uniform_block(shader_builder, 1, NKGPU_SHADERSTAGE_VERTEX,
                                              sizeof(float) * 16)) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_projection",
-                                       NKGPU_UNIFORMTYPE_MAT4, 1)) != NKGPU_OK ||
+        (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_params",
+                                       NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK ||
         (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_VERTEX,
                                              sizeof(StrokeUniformData))) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform(shader_builder, 3, 0, "stroke_view",
+        (result = nkgpu_shader_uniform(shader_builder, 3, 0, "stroke_view_params",
                                        NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
         (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                              sizeof(float) * 4)) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform(shader_builder, 0, 0, "stroke_color",
+        (result = nkgpu_shader_uniform(shader_builder, 0, 0, "stroke_color_params",
                                        NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
         (result = nkgpu_shader_uniform_block(shader_builder, 2, NKGPU_SHADERSTAGE_FRAGMENT,
                                              sizeof(ClipUniformData))) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform(shader_builder, 2, 0, "clip_planes",
+        (result = nkgpu_shader_uniform(shader_builder, 2, 0, "clip_params",
                                        NKGPU_UNIFORMTYPE_FLOAT4,
-                                       RenderPlan::max_clip_planes)) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform(shader_builder, 2, 1, "clip_plane_count",
-                                       NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+                                       RenderPlan::max_clip_planes + 1)) != NKGPU_OK ||
         (result = nkgpu_shader_end(shader_builder, &state.stroke_shader)) != NKGPU_OK)
         return set_failure(state, stats, result);
 
@@ -855,9 +836,8 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, GpuExecutionStat
 }
 
 template <class StateT>
-bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
-    auto &pipeline = indexed ? state.pick_indexed_pipeline : state.pick_pipeline;
-    if (pipeline.id)
+bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats) {
+    if (state.pick_pipeline.id)
         return true;
 
     const auto sources =
@@ -875,33 +855,34 @@ bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed)
         const auto attribute = [&](std::uint32_t location, const char *name, const char *semantic) {
             return nkgpu_shader_attribute(shader_builder, location, name, semantic, location);
         };
-        if ((result = attribute(0, "position", "POSITION")) != NKGPU_OK ||
+        if ((result = attribute(0, "position", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(1, "transform0", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(2, "transform1", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(3, "transform2", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(4, "transform3", "TEXCOORD")) != NKGPU_OK ||
             (result = attribute(5, "pick_color", "TEXCOORD")) != NKGPU_OK ||
+            (result = attribute(6, "face_id", "TEXCOORD")) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 1, NKGPU_SHADERSTAGE_VERTEX,
                                                  sizeof(float) * 16)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_projection",
-                                           NKGPU_UNIFORMTYPE_MAT4, 1)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK ||
             (result = nkgpu_shader_uniform_block(shader_builder, 2, NKGPU_SHADERSTAGE_FRAGMENT,
                                                  sizeof(ClipUniformData))) != NKGPU_OK ||
-            (result =
-                 nkgpu_shader_uniform(shader_builder, 2, 0, "clip_planes", NKGPU_UNIFORMTYPE_FLOAT4,
-                                      RenderPlan::max_clip_planes)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 2, 1, "clip_plane_count",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 2, 0, "clip_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4,
+                                           RenderPlan::max_clip_planes + 1)) != NKGPU_OK ||
             (result = nkgpu_shader_end(shader_builder, &state.pick_shader)) != NKGPU_OK)
             return set_failure(state, stats, result);
     }
 
     nkgpu_pipeline_builder pipeline_builder{};
-    if ((result = nkgpu_pipeline_begin(state.renderer, state.pick_shader, vertex_stride,
+    if ((result = nkgpu_pipeline_begin(state.renderer, state.pick_shader, pick_vertex_stride,
                                        &pipeline_builder)) != NKGPU_OK)
         return set_failure(state, stats, result);
     if ((result = nkgpu_pipeline_attribute(pipeline_builder, 0, 0, 0, NKGPU_VERTEXFORMAT_FLOAT3)) !=
             NKGPU_OK ||
+        (result = nkgpu_pipeline_attribute(pipeline_builder, 6, 0, sizeof(float) * 3,
+                                           NKGPU_VERTEXFORMAT_FLOAT)) != NKGPU_OK ||
         (result = nkgpu_pipeline_attribute(pipeline_builder, 1, 1, 0, NKGPU_VERTEXFORMAT_FLOAT4)) !=
             NKGPU_OK ||
         (result = nkgpu_pipeline_attribute(pipeline_builder, 2, 1, sizeof(float) * 4,
@@ -912,14 +893,12 @@ bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed)
                                            NKGPU_VERTEXFORMAT_FLOAT4)) != NKGPU_OK ||
         (result = nkgpu_pipeline_attribute(pipeline_builder, 5, 1, sizeof(float) * 16,
                                            NKGPU_VERTEXFORMAT_FLOAT4)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 0, vertex_stride,
+        (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 0, pick_vertex_stride,
                                                NKGPU_VERTEXSTEP_PER_VERTEX, 1)) != NKGPU_OK ||
         (result = nkgpu_pipeline_vertex_buffer(pipeline_builder, 1, instance_stride,
                                                NKGPU_VERTEXSTEP_PER_INSTANCE, 1)) != NKGPU_OK ||
         (result = nkgpu_pipeline_primitive_type(pipeline_builder, NKGPU_PRIMITIVETYPE_TRIANGLES)) !=
             NKGPU_OK ||
-        (indexed && (result = nkgpu_pipeline_index_type(pipeline_builder,
-                                                        NKGPU_INDEXTYPE_UINT32)) != NKGPU_OK) ||
         (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK ||
         (result = nkgpu_pipeline_color_target(pipeline_builder, 0, NKGPU_IMAGEFORMAT_RGBA8,
                                               NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
@@ -927,7 +906,7 @@ bool ensure_pick_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed)
                                               NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
         (result = nkgpu_pipeline_color_target(pipeline_builder, 2, NKGPU_IMAGEFORMAT_R32F,
                                               NKGPU_COLORMASK_R, nullptr)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
+        (result = nkgpu_pipeline_end(pipeline_builder, &state.pick_pipeline)) != NKGPU_OK)
         return set_failure(state, stats, result);
     return true;
 }
@@ -1133,17 +1112,20 @@ bool ensure_postprocess_pipeline(StateT &state, GpuExecutionStats &stats) {
                                     sources.fragment, &shader_builder);
         if (result != NKGPU_OK)
             return fail_setup(result);
-        if ((result = nkgpu_shader_uniform_block(
+        if ((result = nkgpu_shader_attribute(shader_builder, 0, "position", "TEXCOORD", 0)) !=
+                NKGPU_OK ||
+            (result = nkgpu_shader_uniform_block(
                  shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                 sizeof(PostProcessUniformData))) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "color_params",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 1, "distortion_params",
-                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-            (result = nkgpu_shader_uniform(shader_builder, 0, 2, "random_params",
+                 sizeof(float) * 8)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "postprocess_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 2)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform_block(
+                 shader_builder, 1, NKGPU_SHADERSTAGE_FRAGMENT,
+                 sizeof(std::int32_t) * 4)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 1, 0, "postprocess_random",
                                            NKGPU_UNIFORMTYPE_INT4, 0)) != NKGPU_OK ||
             (result = nkgpu_shader_texture(shader_builder, 0, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                           "source_image")) != NKGPU_OK ||
+                                           "source_image_image_postprocess_sampler")) != NKGPU_OK ||
             (result = nkgpu_shader_end(shader_builder, &state.postprocess_shader)) != NKGPU_OK)
             return fail_setup(result);
     }
@@ -1192,16 +1174,15 @@ bool ensure_workplane_pipeline(StateT &state, GpuExecutionStats &stats) {
     if ((result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex,
                                     sources.fragment, &shader_builder)) != NKGPU_OK)
         return set_failure(state, stats, result);
+    if ((result = nkgpu_shader_attribute(shader_builder, 0, "position", "TEXCOORD", 0)) !=
+        NKGPU_OK)
+        return set_failure(state, stats, result);
     if ((result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
                                             sizeof(WorkplaneUniformData))) != NKGPU_OK)
         return set_failure(state, stats, result);
-    for (std::uint32_t index = 0; index < 4; ++index) {
-        constexpr const char *names[] = {"grid_eye_spacing", "grid_forward",
-                                         "grid_right", "grid_up"};
-        if ((result = nkgpu_shader_uniform(shader_builder, 0, index, names[index],
-                                            NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK)
-            return set_failure(state, stats, result);
-    }
+    if ((result = nkgpu_shader_uniform(shader_builder, 0, 0, "grid_params",
+                                       NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK)
+        return set_failure(state, stats, result);
     if ((result = nkgpu_shader_end(shader_builder, &state.workplane_shader)) != NKGPU_OK)
         return set_failure(state, stats, result);
     nkgpu_pipeline_builder pipeline_builder{};
@@ -1278,6 +1259,18 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
     auto &cached = found->second;
     const auto byte_size = packed_vertices.size() * sizeof(SceneVertex);
     const auto index_byte_size = index_count * sizeof(std::uint32_t);
+    const auto pick_vertex_count = index_count ? index_count : vertex_count;
+    if (pick_vertex_count > std::numeric_limits<std::uint32_t>::max() / sizeof(PickVertex) ||
+        pick_vertex_count / 3 > 0x00ffffffu)
+        return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
+    std::vector<PickVertex> pick_vertices;
+    pick_vertices.reserve(pick_vertex_count);
+    for (std::size_t index = 0; index < pick_vertex_count; ++index) {
+        const auto source = index_count ? resource.payload->indices[index] : index;
+        pick_vertices.push_back({packed_vertices[source].position,
+                                 static_cast<float>(index / 3 + 1)});
+    }
+    const auto pick_byte_size = pick_vertices.size() * sizeof(PickVertex);
     if (resource.payload->stroke_segments.size() >
         std::numeric_limits<std::uint32_t>::max() / (6 * sizeof(StrokeVertex)))
         return set_failure(state, stats, NKGPU_ERROR_INVALID_ARGUMENT);
@@ -1351,6 +1344,34 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
         if (result != NKGPU_OK)
             return set_failure(state, stats, result);
     }
+    if (cached.pick_buffer.id) {
+        if (cached.pick_vertex_count * sizeof(PickVertex) == pick_byte_size &&
+            pick_byte_size != 0) {
+            const auto result = nkgpu_buffer_update(
+                state.renderer, cached.pick_buffer, 0,
+                reinterpret_cast<const std::uint8_t *>(pick_vertices.data()),
+                static_cast<std::uint32_t>(pick_byte_size));
+            if (result != NKGPU_OK)
+                return set_failure(state, stats, result);
+        } else {
+            (void)nkgpu_buffer_destroy(state.renderer, cached.pick_buffer);
+            cached.pick_buffer = {};
+            cached.pick_vertex_count = 0;
+        }
+    }
+    if (pick_byte_size != 0 && !cached.pick_buffer.id) {
+        nkgpu_buffer_desc descriptor{};
+        descriptor.struct_size = sizeof(descriptor);
+        descriptor.size = static_cast<std::uint32_t>(pick_byte_size);
+        descriptor.usage = NKGPU_BUFFER_VERTEX;
+        descriptor.data = reinterpret_cast<const std::uint8_t *>(pick_vertices.data());
+        descriptor.data_size = descriptor.size;
+        descriptor.dynamic_update = 1;
+        const auto result = nkgpu_buffer_create_desc(state.renderer, &descriptor,
+                                                     &cached.pick_buffer);
+        if (result != NKGPU_OK)
+            return set_failure(state, stats, result);
+    }
     if (cached.stroke_buffer.id) {
         if (cached.stroke_vertex_count * sizeof(StrokeVertex) == stroke_byte_size &&
             stroke_byte_size != 0) {
@@ -1384,6 +1405,7 @@ bool ensure_geometry(StateT &state, const GeometryResource &resource, GpuExecuti
     cached.index_byte_size = static_cast<std::uint32_t>(index_byte_size);
     cached.vertex_count = static_cast<std::uint32_t>(vertex_count);
     cached.index_count = static_cast<std::uint32_t>(index_count);
+    cached.pick_vertex_count = static_cast<std::uint32_t>(pick_vertex_count);
     cached.stroke_vertex_count = static_cast<std::uint32_t>(stroke_vertices.size());
     cached.indexed = !resource.payload->indices.empty();
     if (inserted)
@@ -1773,6 +1795,8 @@ template <class StateT> void remove_geometry_resource(StateT &state, GeometryId 
         (void)nkgpu_buffer_destroy(state.renderer, found->second.buffer);
     if (state.renderer.id && found->second.index_buffer.id)
         (void)nkgpu_buffer_destroy(state.renderer, found->second.index_buffer);
+    if (state.renderer.id && found->second.pick_buffer.id)
+        (void)nkgpu_buffer_destroy(state.renderer, found->second.pick_buffer);
     if (state.renderer.id && found->second.stroke_buffer.id)
         (void)nkgpu_buffer_destroy(state.renderer, found->second.stroke_buffer);
     state.geometry_resources.erase(found);
@@ -1891,6 +1915,8 @@ bool prepare_resources(StateT &state, const RenderPlan &plan, const SceneSnapsho
             (void)nkgpu_buffer_destroy(state.renderer, found->second.buffer);
         if (state.renderer.id && found->second.index_buffer.id)
             (void)nkgpu_buffer_destroy(state.renderer, found->second.index_buffer);
+        if (state.renderer.id && found->second.pick_buffer.id)
+            (void)nkgpu_buffer_destroy(state.renderer, found->second.pick_buffer);
         if (state.renderer.id && found->second.stroke_buffer.id)
             (void)nkgpu_buffer_destroy(state.renderer, found->second.stroke_buffer);
         found = state.geometry_resources.erase(found);
@@ -2513,7 +2539,11 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
             static_cast<std::int32_t>(static_cast<std::uint32_t>(post_process.sequence >> 32))};
         if ((result = nkgpu_apply_uniform_data(
                  state_->renderer, 0, reinterpret_cast<const std::uint8_t *>(&post_data),
-                 sizeof(post_data))) != NKGPU_OK ||
+                 sizeof(float) * 8)) != NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(
+                 state_->renderer, 1,
+                 reinterpret_cast<const std::uint8_t *>(post_data.random_params.data()),
+                 sizeof(std::int32_t) * 4)) != NKGPU_OK ||
             (result = nkgpu_draw(state_->renderer, 0, 3, 1)) != NKGPU_OK)
             return fail_frame(result);
 
@@ -2599,11 +2629,10 @@ nkgpu_result NativeKitGpuExecutor::capture_depth(const RenderPlan &plan,
         return state_->last_result;
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+        if (geometry == state_->geometry_resources.end() || !geometry->second.pick_buffer.id)
             continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
-        if (element_count && !ensure_pick_pipeline(*state_, stats, geometry->second.indexed))
+        const auto element_count = geometry->second.pick_vertex_count;
+        if (element_count && !ensure_pick_pipeline(*state_, stats))
             return state_->last_result;
     }
 
@@ -2652,24 +2681,18 @@ nkgpu_result NativeKitGpuExecutor::capture_depth(const RenderPlan &plan,
     const auto clip_data = clip_uniform_data(plan);
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+        if (geometry == state_->geometry_resources.end() || !geometry->second.pick_buffer.id)
             continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
+        const auto element_count = geometry->second.pick_vertex_count;
         if (!element_count)
             continue;
-        const auto &pipeline =
-            geometry->second.indexed ? state_->pick_indexed_pipeline : state_->pick_pipeline;
-        if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
+        if ((result = nkgpu_apply_pipeline(state_->renderer, state_->pick_pipeline)) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(
                  state_->renderer, 1,
                  reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
                  sizeof(float) * 16)) != NKGPU_OK ||
-            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, geometry->second.buffer, 0)) !=
+            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, geometry->second.pick_buffer, 0)) !=
                 NKGPU_OK ||
-            (geometry->second.indexed &&
-             (result = nkgpu_apply_index_buffer(state_->renderer, geometry->second.index_buffer,
-                                                0)) != NKGPU_OK) ||
             (result = nkgpu_apply_vertex_buffer(state_->renderer, 1, batch.buffer, 0)) !=
                 NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(state_->renderer, 2,
@@ -2753,11 +2776,10 @@ nkgpu_result NativeKitGpuExecutor::capture_pick_ids(const RenderPlan &plan,
         return state_->last_result;
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+        if (geometry == state_->geometry_resources.end() || !geometry->second.pick_buffer.id)
             continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
-        if (element_count && !ensure_pick_pipeline(*state_, stats, geometry->second.indexed))
+        const auto element_count = geometry->second.pick_vertex_count;
+        if (element_count && !ensure_pick_pipeline(*state_, stats))
             return state_->last_result;
     }
 
@@ -2806,24 +2828,18 @@ nkgpu_result NativeKitGpuExecutor::capture_pick_ids(const RenderPlan &plan,
     const auto clip_data = clip_uniform_data(plan);
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+        if (geometry == state_->geometry_resources.end() || !geometry->second.pick_buffer.id)
             continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
+        const auto element_count = geometry->second.pick_vertex_count;
         if (!element_count)
             continue;
-        const auto &pipeline =
-            geometry->second.indexed ? state_->pick_indexed_pipeline : state_->pick_pipeline;
-        if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
+        if ((result = nkgpu_apply_pipeline(state_->renderer, state_->pick_pipeline)) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(
                  state_->renderer, 1,
                  reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
                  sizeof(float) * 16)) != NKGPU_OK ||
-            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, geometry->second.buffer, 0)) !=
+            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, geometry->second.pick_buffer, 0)) !=
                 NKGPU_OK ||
-            (geometry->second.indexed &&
-             (result = nkgpu_apply_index_buffer(state_->renderer, geometry->second.index_buffer,
-                                                0)) != NKGPU_OK) ||
             (result = nkgpu_apply_vertex_buffer(state_->renderer, 1, batch.buffer, 0)) !=
                 NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(state_->renderer, 2,
@@ -3076,11 +3092,10 @@ nkgpu_result NativeKitGpuExecutor::begin_pick_pixel(const RenderPlan &plan,
         return state_->last_result;
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+        if (geometry == state_->geometry_resources.end() || !geometry->second.pick_buffer.id)
             continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
-        if (element_count && !ensure_pick_pipeline(*state_, stats, geometry->second.indexed))
+        const auto element_count = geometry->second.pick_vertex_count;
+        if (element_count && !ensure_pick_pipeline(*state_, stats))
             return state_->last_result;
     }
 
@@ -3126,24 +3141,18 @@ nkgpu_result NativeKitGpuExecutor::begin_pick_pixel(const RenderPlan &plan,
 
     for (const auto &batch : state_->batches) {
         const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
+        if (geometry == state_->geometry_resources.end() || !geometry->second.pick_buffer.id)
             continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
+        const auto element_count = geometry->second.pick_vertex_count;
         if (!element_count)
             continue;
-        const auto &pipeline =
-            geometry->second.indexed ? state_->pick_indexed_pipeline : state_->pick_pipeline;
-        if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
+        if ((result = nkgpu_apply_pipeline(state_->renderer, state_->pick_pipeline)) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(
                  state_->renderer, 1,
                  reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
                  sizeof(float) * 16)) != NKGPU_OK ||
-            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, geometry->second.buffer, 0)) !=
+            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, geometry->second.pick_buffer, 0)) !=
                 NKGPU_OK ||
-            (geometry->second.indexed &&
-             (result = nkgpu_apply_index_buffer(state_->renderer, geometry->second.index_buffer,
-                                                0)) != NKGPU_OK) ||
             (result = nkgpu_apply_vertex_buffer(state_->renderer, 1, batch.buffer, 0)) !=
                 NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(state_->renderer, 2,
