@@ -2,13 +2,11 @@ package cadkit;
 
 import haxe.io.Bytes;
 
-typedef HullPlane = {x:Float, y:Float, z:Float, support:Float};
-typedef CollisionHullResult = {vertices:Array<Float>, warning:Null<String>};
+typedef CollisionHullResult = {vertices:Array<Float>, warning:Null<String>, errorRatio:Float};
 
-/** Conservative convex outer hull of a tessellated part, in CAD units. */
+/** Bounded support-point hull of a tessellated part, in CAD units. */
 class ConvexHullVertices {
-  // The 26 support planes yield at most 2 * 26 - 4 = 48 vertices.
-  public static inline final MAX_VERTICES:Int = 48;
+  public static inline final MAX_VERTICES:Int = 64;
 
   /** Keeps a thin or degenerate part loadable with a minimum-thickness box. */
   public static function safeFromMesh(vertices:Bytes, count:Int,
@@ -59,7 +57,9 @@ class ConvexHullVertices {
     }
     if (!flat) {
       try {
-        return {vertices: fromMesh(vertices, count), warning: null};
+        var hull = fromMesh(vertices, count);
+        return {vertices: hull, warning: null,
+          errorRatio: supportErrorRatio(vertices, count, hull, diagonal)};
       } catch (_:Dynamic) {}
     }
     for (axis in 0...3) if (maximum[axis] - minimum[axis] < minimumThickness) {
@@ -70,71 +70,68 @@ class ConvexHullVertices {
     var box:Array<Float> = [];
     for (index in 0...8) for (axis in 0...3)
       box.push((index & (1 << axis)) == 0 ? minimum[axis] : maximum[axis]);
-    return {vertices: box, warning: flat ?
+    return {vertices: box, errorRatio: supportErrorRatio(vertices, count, box, diagonal), warning: flat ?
       "Flat collision mesh uses a thickened box" :
       "Collision hull could not be sampled; using a bounding box"};
+  }
+
+  /** Maximum sampled support excess of the enclosing hull, relative to mesh diagonal. */
+  static function supportErrorRatio(mesh:Bytes, count:Int, hull:Array<Float>, diagonal:Float):Float {
+    if (diagonal <= 0) return 0.0;
+    var maximum = 0.0;
+    for (sample in 0...128) {
+      var z = 1.0 - 2.0 * (sample + 0.5) / 128.0;
+      var radius = Math.sqrt(Math.max(0.0, 1.0 - z * z));
+      var angle = sample * Math.PI * (3.0 - Math.sqrt(5.0));
+      var x = radius * Math.cos(angle), y = radius * Math.sin(angle);
+      var meshSupport = Math.NEGATIVE_INFINITY, hullSupport = Math.NEGATIVE_INFINITY;
+      for (index in 0...count) {
+        var at = index * 24;
+        meshSupport = Math.max(meshSupport, x * mesh.getDouble(at) +
+          y * mesh.getDouble(at + 8) + z * mesh.getDouble(at + 16));
+      }
+      for (index in 0...Std.int(hull.length / 3)) {
+        var at = index * 3;
+        hullSupport = Math.max(hullSupport, x * hull[at] + y * hull[at + 1] + z * hull[at + 2]);
+      }
+      maximum = Math.max(maximum, meshSupport - hullSupport);
+    }
+    return maximum / diagonal;
   }
 
   public static function fromMesh(vertices:Bytes, count:Int):Array<Float> {
     if (vertices == null || count < 4 || vertices.length < count * 24)
       throw "Convex hull needs at least four 3D mesh vertices";
-    var planes:Array<HullPlane> = [];
-    var scale = 1.0;
-    for (ix in 0...3) for (iy in 0...3) for (iz in 0...3) {
-      var nx = ix - 1, ny = iy - 1, nz = iz - 1;
-      if (nx == 0 && ny == 0 && nz == 0) continue;
-      var support = Math.NEGATIVE_INFINITY;
-      for (vertex in 0...count) {
-        var at = vertex * 24;
-        var x = vertices.getDouble(at), y = vertices.getDouble(at + 8),
-          z = vertices.getDouble(at + 16);
-        if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z))
-          throw "Convex hull mesh has a non-finite vertex";
-        scale = Math.max(scale, Math.max(Math.abs(x), Math.max(Math.abs(y), Math.abs(z))));
-        support = Math.max(support, nx * x + ny * y + nz * z);
-      }
-      planes.push({x: nx, y: ny, z: nz, support: support});
-    }
     var result:Array<Float> = [];
-    var tolerance = scale * 1e-8;
-    for (i in 0...planes.length) for (j in i + 1...planes.length)
-      for (k in j + 1...planes.length) {
-        var a = planes[i], b = planes[j], c = planes[k];
-        var bcX = b.y * c.z - b.z * c.y;
-        var bcY = b.z * c.x - b.x * c.z;
-        var bcZ = b.x * c.y - b.y * c.x;
-        var caX = c.y * a.z - c.z * a.y;
-        var caY = c.z * a.x - c.x * a.z;
-        var caZ = c.x * a.y - c.y * a.x;
-        var abX = a.y * b.z - a.z * b.y;
-        var abY = a.z * b.x - a.x * b.z;
-        var abZ = a.x * b.y - a.y * b.x;
-        var determinant = a.x * bcX + a.y * bcY + a.z * bcZ;
-        if (Math.abs(determinant) < 1e-12) continue;
-        var x = (a.support * bcX + b.support * caX + c.support * abX) / determinant;
-        var y = (a.support * bcY + b.support * caY + c.support * abY) / determinant;
-        var z = (a.support * bcZ + b.support * caZ + c.support * abZ) / determinant;
-        var inside = true;
-        for (plane in planes)
-          if (plane.x * x + plane.y * y + plane.z * z > plane.support + tolerance) {
-            inside = false;
-            break;
-          }
-        if (!inside) continue;
-        var duplicate = false;
-        for (existing in 0...Std.int(result.length / 3)) {
-          var at = existing * 3;
-          if (Math.abs(result[at] - x) <= tolerance &&
-              Math.abs(result[at + 1] - y) <= tolerance &&
-              Math.abs(result[at + 2] - z) <= tolerance) {
-            duplicate = true;
-            break;
-          }
-        }
-        if (!duplicate) { result.push(x); result.push(y); result.push(z); }
+    var selected = new Map<Int, Bool>();
+    for (sample in 0...MAX_VERTICES) {
+      var x:Float, y:Float, z:Float;
+      if (sample < 6) {
+        x = sample == 0 ? 1.0 : sample == 1 ? -1.0 : 0.0;
+        y = sample == 2 ? 1.0 : sample == 3 ? -1.0 : 0.0;
+        z = sample == 4 ? 1.0 : sample == 5 ? -1.0 : 0.0;
+      } else {
+        var step = sample - 6;
+        z = 1.0 - 2.0 * (step + 0.5) / (MAX_VERTICES - 6);
+        var radius = Math.sqrt(Math.max(0.0, 1.0 - z * z));
+        var angle = step * Math.PI * (3.0 - Math.sqrt(5.0));
+        x = radius * Math.cos(angle);
+        y = radius * Math.sin(angle);
       }
-    if (result.length < 12 || result.length > MAX_VERTICES * 3)
-      throw "Convex hull is degenerate or exceeds its vertex cap";
+      var best = -1, score = Math.NEGATIVE_INFINITY;
+      for (index in 0...count) {
+        var at = index * 24;
+        var projected = x * vertices.getDouble(at) +
+          y * vertices.getDouble(at + 8) + z * vertices.getDouble(at + 16);
+        if (projected > score) { score = projected; best = index; }
+      }
+      if (!selected.exists(best)) {
+        selected.set(best, true);
+        var at = best * 24;
+        for (axis in 0...3) result.push(vertices.getDouble(at + axis * 8));
+      }
+    }
+    if (result.length < 12) throw "Convex hull vertices are degenerate";
     return result;
   }
 }

@@ -283,6 +283,7 @@ class MateriaProjectRunner {
         component.vertexCount, 0.0005 / scale);
       physicalParts.push({id: component.id, materialId: materialId,
         collisionHull: collision.vertices, collisionWarning: collision.warning,
+        collisionErrorRatio: collision.errorRatio,
         volume: component.volume == null ? properties.volume : component.volume,
         centerOfMass: component.centerOfMass == null ? properties.centerOfMass : component.centerOfMass.copy(),
         inertia: component.inertia == null ? properties.inertia : component.inertia.copy(),

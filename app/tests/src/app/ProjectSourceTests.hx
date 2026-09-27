@@ -66,6 +66,27 @@ class ProjectSourceTests {
     simulation.dispose();
   }
 
+  static function checkHullCollision(backend:Int, enabled:Bool):Void {
+    var model = new RobotModel("convex link collision probe");
+    model.addLink(new Link("part"));
+    model.collisionApproximation = robotkit.model.CollisionApproximation.None;
+    var vertices:Array<Float> = [];
+    for (index in 0...8) {
+      vertices.push((index & 1) == 0 ? -0.5 : 0.5);
+      vertices.push((index & 2) == 0 ? -0.5 : 0.5);
+      vertices.push((index & 4) == 0 ? -0.5 : 0.5);
+    }
+    var simulation = new Simulation(0.01, 1, backend);
+    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? vertices : null]);
+    var box = simulation.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
+    for (index in 0...200) simulation.step(Int64.ofInt(index));
+    var height = simulation.objectPose(box).position[2];
+    check(enabled ? height > 0.5 : (backend == 1 ? height < 0.25 : height < -1.0),
+      'hull link collision ${enabled ? "on" : "off"} on backend $backend: $height');
+    simulation.dispose();
+  }
+
   public static function main():Int {
     var flat = Bytes.alloc(4 * 24);
     for (index in 0...4) {
@@ -83,6 +104,10 @@ class ProjectSourceTests {
     checkLinkCollision(0, false);
     checkLinkCollision(1, true);
     checkLinkCollision(1, false);
+    checkHullCollision(0, true);
+    checkHullCollision(0, false);
+    checkHullCollision(1, true);
+    checkHullCollision(1, false);
     var root = Sys.getCwd();
     while (!FileSystem.exists(root + "/cadkit/examples/modeling/materia.project.json")) {
       var parent = haxe.io.Path.directory(root);
@@ -107,6 +132,9 @@ class ProjectSourceTests {
     check(hasAluminium && hasSteel, "machine preview carries distinct physical materials");
     check(machineScene.physical.parts.length > 0 && machineScene.assemblyDefinition != null,
       "machine preview keeps assembly mass properties without retaining mesh streams");
+    for (part in machineScene.physical.parts)
+      check(part.collisionErrorRatio != null && part.collisionErrorRatio <= 0.02,
+        'part ${part.id} hull support error exceeds 2% of its diagonal: ${part.collisionErrorRatio}');
     var machineDefinition:AssemblyDefinition = cast(machineScene.assemblyDefinition, AssemblyDefinition);
     if (machineDefinition != null) {
       var translated = AssemblySimulationBridge.toRobotModel(machineDefinition,
