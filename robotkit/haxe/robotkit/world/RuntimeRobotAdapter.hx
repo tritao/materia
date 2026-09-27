@@ -85,6 +85,8 @@ class RuntimeRobotAdapter implements Robot {
     var value = runtime.snapshot();
     if (value.faultCode == 0 && value.safety != RobotKitRuntimeConstants.RK_SAFETY_FAULT)
       return null;
+    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_TRAJECTORY_UNDERFLOW)
+      return new RobotFault(logicalId, value.faultCode, "trajectory_underflow", false);
     return new RobotFault(logicalId, value.faultCode, faultMessage, true);
   }
 

@@ -83,7 +83,7 @@ enum {
     RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued knots (legacy name). */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 11 /**< Adds following-error bounds and plan start tolerances. */
+    RK_API_VERSION = 12 /**< Adds declared plan completion and native hold controls. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -216,7 +216,10 @@ enum {
     RK_COMMAND_EMERGENCY_STOP = 3, /**< Request an emergency stop. */
     RK_COMMAND_RESET_SAFETY = 4, /**< Clear a latched stop after application acknowledgement. */
     RK_COMMAND_TRAJECTORY_CHUNK = 5, /**< Append timestamped position samples to the runtime queue. */
-    RK_COMMAND_TRAJECTORY_SEGMENTS = 6 /**< Append polynomial trajectory segments. */
+    RK_COMMAND_TRAJECTORY_SEGMENTS = 6, /**< Append polynomial trajectory segments. */
+    RK_COMMAND_HOLD = 7, /**< Decelerate the path clock to zero, retaining the queue. */
+    RK_COMMAND_RESUME = 8, /**< Accelerate a held path clock back to normal rate. */
+    RK_COMMAND_ABORT = 9 /**< Straight-line controlled stop, clearing the queue. */
 };
 
 /** Control interpretation of one joint target value. */
@@ -406,7 +409,14 @@ typedef struct rk_plan_submission {
     double position_tolerance[RK_MAX_TRAJECTORY_JOINTS];
     double velocity_tolerance[RK_MAX_TRAJECTORY_JOINTS];
     double acceleration_tolerance[RK_MAX_TRAJECTORY_JOINTS];
+    /** One for a final plan, zero if more motion is expected. Absent means one.
+     * Full-size C callers must set this explicitly; Haxe defaults to final.
+     */
+    uint32_t ends_at_rest;
 } rk_plan_submission;
+
+/** Non-latched runtime diagnostic; safety remains READY. */
+enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2 };
 
 typedef uint32_t rk_session_state;
 enum {

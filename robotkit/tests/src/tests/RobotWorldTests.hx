@@ -4250,6 +4250,7 @@ class RobotWorldTests {
         equal(replayedPlan.planId, Int64.ofInt(77), "MCAP preserves plan identity");
         equal(replayedPlan.positionTolerances.toArray()[0], 0.0001,
           "MCAP preserves plan start tolerances");
+        check(replayedPlan.endsAtRest, "MCAP preserves declared plan completion");
       case _:
         check(false, "MCAP decodes the plan command variant");
     }

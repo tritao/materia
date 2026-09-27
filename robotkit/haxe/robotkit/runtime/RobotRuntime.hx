@@ -204,6 +204,7 @@ class RobotRuntime {
     native.set_model_revision(plan.modelRevision);
     native.set_calibration_revision(plan.calibrationRevision);
     native.set_required_capabilities(plan.requiredCapabilities);
+    native.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
     native.set_replace_after_plan_id(plan.replaceAfterPlanId);
     native.set_replace_after_time_ns(plan.replaceAfterTimeNs);
     var positions = plan.startPosition.toArray();
@@ -282,6 +283,26 @@ class RobotRuntime {
     command.set_target_count(0);
     check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
       "runtime.submitStop");
+  }
+
+  /** Pauses, resumes, or aborts a native execution path. */
+  public function submitHold(sequence:Int):Void
+    submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_HOLD);
+
+  public function submitResume(sequence:Int):Void
+    submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_RESUME);
+
+  public function submitAbort(sequence:Int):Void
+    submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_ABORT);
+
+  function submitLifecycle(sequence:Int, kind:Int):Void {
+    ensureLive();
+    var command = new rk_robot_command();
+    command.set_struct_size(rk_robot_command.size());
+    command.set_sequence(haxe.Int64.ofInt(sequence));
+    command.set_kind(kind);
+    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+      "runtime.submitLifecycle");
   }
 
   /** Clears a latched safety stop only after the application has acknowledged it. */

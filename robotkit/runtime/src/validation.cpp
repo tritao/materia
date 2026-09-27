@@ -111,11 +111,13 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
 rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command) {
     if (!has_full_struct(command) || command->target_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (command->kind > RK_COMMAND_TRAJECTORY_SEGMENTS)
+    if (command->kind > RK_COMMAND_ABORT)
         return RK_ERROR_INVALID_ARGUMENT;
     if ((command->kind == RK_COMMAND_NONE || command->kind == RK_COMMAND_STOP ||
          command->kind == RK_COMMAND_EMERGENCY_STOP ||
-         command->kind == RK_COMMAND_RESET_SAFETY) &&
+         command->kind == RK_COMMAND_RESET_SAFETY ||
+         command->kind == RK_COMMAND_HOLD || command->kind == RK_COMMAND_RESUME ||
+         command->kind == RK_COMMAND_ABORT) &&
         command->target_count != 0)
         return RK_ERROR_INVALID_ARGUMENT;
     if ((command->kind == RK_COMMAND_TRAJECTORY_CHUNK ||
@@ -217,6 +219,8 @@ rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
     const rk_plan_submission *plan, const rk_robot_runtime_blueprint *blueprint) {
     if (!plan || plan->struct_size < offsetof(rk_plan_submission, position_tolerance) ||
         (plan->struct_size > offsetof(rk_plan_submission, position_tolerance) &&
+         plan->struct_size < offsetof(rk_plan_submission, ends_at_rest)) ||
+        (plan->struct_size > offsetof(rk_plan_submission, ends_at_rest) &&
          plan->struct_size < sizeof(*plan)) ||
         plan->sequence == 0 || plan->plan_id == 0 ||
         rk_trajectory_segment_chunk_validate_for_blueprint(&plan->segments, blueprint) != RK_OK ||
@@ -228,7 +232,7 @@ rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
             !is_finite(plan->start_velocity[joint]) ||
             !is_finite(plan->start_acceleration[joint]))
             return RK_ERROR_INVALID_ARGUMENT;
-    if (plan->struct_size >= sizeof(*plan))
+    if (plan->struct_size >= offsetof(rk_plan_submission, ends_at_rest))
         for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
             if (!is_finite(plan->position_tolerance[joint]) ||
                 !is_finite(plan->velocity_tolerance[joint]) ||
@@ -237,6 +241,8 @@ rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
                 plan->velocity_tolerance[joint] < 0.0 ||
                 plan->acceleration_tolerance[joint] < 0.0)
                 return RK_ERROR_INVALID_ARGUMENT;
+    if (plan->struct_size >= sizeof(*plan) && plan->ends_at_rest > 1)
+        return RK_ERROR_INVALID_ARGUMENT;
     return RK_OK;
 }
 

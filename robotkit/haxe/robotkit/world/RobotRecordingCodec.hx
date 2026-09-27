@@ -57,6 +57,7 @@ class RobotRecordingCodec {
             positionTolerances:plan.positionTolerances.toArray(),
             velocityTolerances:plan.velocityTolerances.toArray(),
             accelerationTolerances:plan.accelerationTolerances.toArray(),
+            endsAtRest:plan.endsAtRest,
             replaceAfterPlanId:Int64.toStr(plan.replaceAfterPlanId),
             replaceAfterTimeNs:Int64.toStr(plan.replaceAfterTimeNs),
             segments:[for (segment in plan.segments) {
@@ -138,7 +139,8 @@ class RobotRecordingCodec {
               wide(payload, "replaceAfterPlanId"), wide(payload, "replaceAfterTimeNs"),
               optionalFloats(payload, "positionTolerances"),
               optionalFloats(payload, "velocityTolerances"),
-              optionalFloats(payload, "accelerationTolerances"))));
+              optionalFloats(payload, "accelerationTolerances"),
+              optionalFieldBool(payload, "endsAtRest", true))));
           case _: throw "Unsupported RobotKit command payload";
         }
       case "snapshot": RobotSnapshot(readSnapshot(payload));

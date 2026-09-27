@@ -378,6 +378,8 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
     if ((plan.required_capabilities & ~RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE) != 0 ||
         !supports_trajectory_queue())
         return RK_ERROR_UNSUPPORTED;
+    const bool ends_at_rest = plan.struct_size < sizeof(rk_plan_submission) ||
+        plan.ends_at_rest != 0;
     try {
         std::lock_guard owner_lock(owner_mutex_);
         std::lock_guard queue_lock(queue_mutex_);
@@ -460,7 +462,8 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         // submitted polynomial must start at that same state. Degree-1 paths
         // may only promise chord velocity, never stored sample derivatives.
         constexpr double default_tolerance = 1e-6;
-        const bool has_tolerances = plan.struct_size >= sizeof(rk_plan_submission);
+        const bool has_tolerances = plan.struct_size >=
+            offsetof(rk_plan_submission, ends_at_rest);
         const auto &first = plan.segments.segments[0];
         if (replace && first.degree < 2)
             return RK_ERROR_INVALID_STATE;
@@ -481,6 +484,17 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
                     (std::abs(first.coefficients[joint].value[1] - plan.start_velocity[joint]) > velocity_tolerance ||
                      std::abs(2.0 * first.coefficients[joint].value[2] - plan.start_acceleration[joint]) > acceleration_tolerance)))
                 return RK_ERROR_INVALID_STATE;
+        }
+        const auto &terminal = plan.segments.segments[plan.segments.segment_count - 1];
+        if (ends_at_rest && terminal.degree >= 2) {
+            mk_segment segment = native_segment(terminal, 0);
+            mk_trajectory_state endpoint{};
+            motionkit::evaluate_segment(segment,
+                static_cast<double>(terminal.duration_ns) * 1e-9, endpoint);
+            for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                if (std::abs(endpoint.velocity[joint]) > 1e-6 ||
+                    std::abs(endpoint.acceleration[joint]) > 1e-6)
+                    return RK_ERROR_INVALID_ARGUMENT;
         }
         if (replace) {
             while (!candidate.empty() && candidate.back().point.time_from_start_ns >= base_time)
@@ -509,6 +523,7 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
             knot.chunk_base_time_ns = base_time;
             knot.tag = plan.segments.tag;
             knot.plan_id = plan.plan_id;
+            knot.ends_at_rest = ends_at_rest;
             candidate.push_back(std::move(knot));
         }
         RuntimeTrajectoryPoint end{};
@@ -521,6 +536,7 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         end.chunk_base_time_ns = base_time;
         end.tag = plan.segments.tag;
         end.plan_id = plan.plan_id;
+        end.ends_at_rest = ends_at_rest;
         candidate.push_back(std::move(end));
         if (queued_knot_count(candidate) > RK_MAX_TRAJECTORY_QUEUE_POINTS)
             return RK_ERROR_QUEUE_FULL;
@@ -532,6 +548,7 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         control_.plan_just_submitted = was_idle;
         if (was_idle) control_.trajectory_time_ns = 0;
         control_.active_plan_id = replace ? control_.active_plan_id : plan.plan_id;
+        control_.diagnostic_code = 0;
         state_.trajectory_active = 1;
         state_.trajectory_queue_depth = queued_knot_count(control_.trajectory);
         state_.trajectory_time_ns = control_.trajectory_time_ns;
@@ -556,6 +573,9 @@ rk_result RobotRuntime::snapshot(rk_robot_state &out_state) const {
 }
 
 rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
+    // The diagnostic lives with owner-controlled execution state. Serialize
+    // with the owner before reading it alongside the published sample.
+    std::lock_guard owner_lock(owner_mutex_);
     std::lock_guard lock(state_mutex_);
     out_snapshot = {};
     out_snapshot.struct_size = sizeof(out_snapshot);
@@ -573,7 +593,8 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
         out_snapshot.velocity[index] = state_.velocity[index];
         out_snapshot.effort[index] = state_.effort[index];
     }
-    out_snapshot.fault_code = state_.safety == RK_SAFETY_FAULT ? 1 : 0;
+    out_snapshot.fault_code = state_.safety == RK_SAFETY_FAULT ? 1 :
+        control_.diagnostic_code;
     out_snapshot.received_timestamp_ns = state_.received_timestamp_ns;
     out_snapshot.trajectory_queue_depth = state_.trajectory_queue_depth;
     out_snapshot.trajectory_active = state_.trajectory_active;
@@ -676,9 +697,10 @@ rk_result RobotRuntime::apply_pending_commands() {
             control_.trajectory_time_remainder_ns;
         if (control_.plan_just_submitted) {
             control_.plan_just_submitted = false;
-        } else if (!control_.stop_ramp_active) {
+        } else if (!control_.stop_ramp_active && !control_.hold_requested &&
+                   !control_.resume_requested) {
             time_ns += static_cast<double>(period_ns);
-        } else {
+        } else if (control_.stop_ramp_active || control_.hold_requested) {
             // Path-following stop. A joint moves at rate * v and accelerates
             // at rate' * v + rate^2 * a, where v and a belong to the queued
             // trajectory itself. Lower the rate as fast as every joint's limit
@@ -761,7 +783,41 @@ rk_result RobotRuntime::apply_pending_commands() {
                 rate = next_rate;
             }
             control_.trajectory_rate = rate;
-            trajectory_stop_completed = rate <= 0.0 && !stop_crossed_queue_end;
+            trajectory_stop_completed = control_.stop_ramp_active && rate <= 0.0 &&
+                !stop_crossed_queue_end;
+        } else {
+            // Resume uses the same joint acceleration budget as hold. The
+            // path's own acceleration is charged before increasing its rate.
+            constexpr int substeps = 16;
+            const double step_seconds = period_seconds / substeps;
+            const auto region = path_region(control_.trajectory,
+                control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
+            double rate = control_.trajectory_rate;
+            for (int step = 0; step < substeps; ++step) {
+                if (rate >= 1.0) {
+                    time_ns += step_seconds * 1'000'000'000.0;
+                    continue;
+                }
+                mk_path_derivative_estimate estimate{};
+                motionkit::estimate_path_derivatives(region, static_cast<int64_t>(time_ns),
+                    period_ns, estimate);
+                double max_increase = std::numeric_limits<double>::infinity();
+                for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                    const double speed = std::abs(estimate.velocity[joint]);
+                    if (speed <= 1e-12) continue;
+                    const double path_acceleration = std::max(std::abs(estimate.acceleration[joint]),
+                        std::abs(estimate.recent_acceleration[joint]));
+                    max_increase = std::min(max_increase,
+                        std::max(0.0, blueprint_.joints[joint].max_acceleration -
+                            rate * path_acceleration) / speed);
+                }
+                const double next_rate = !std::isfinite(max_increase) ? 1.0 :
+                    std::clamp(rate + max_increase * step_seconds, rate, 1.0);
+                time_ns += 0.5 * (rate + next_rate) * step_seconds * 1'000'000'000.0;
+                rate = next_rate;
+            }
+            if (rate >= 1.0) control_.resume_requested = false;
+            control_.trajectory_rate = rate;
         }
         const double max_time = static_cast<double>(std::numeric_limits<uint64_t>::max());
         if (time_ns >= max_time) {
@@ -870,6 +926,8 @@ rk_result RobotRuntime::apply_pending_commands() {
         control_.trajectory_rate = 1.0;
         control_.trajectory_time_remainder_ns = 0.0;
         control_.stop_ramp_active = true;
+        control_.hold_requested = false;
+        control_.resume_requested = false;
     };
     auto begin_controlled_stop = [&]() {
         // A stop that is already running keeps its progress; restarting it
@@ -890,10 +948,19 @@ rk_result RobotRuntime::apply_pending_commands() {
             }
         }
         if (has_acceleration_limits) {
-            control_.trajectory_rate = 1.0;
+            if (control_.trajectory_rate <= 0.0) {
+                control_.trajectory.clear();
+                control_.trajectory_history_valid = false;
+                control_.trajectory_active = false;
+                control_.hold_requested = false;
+                control_.resume_requested = false;
+                return false;
+            }
             control_.trajectory_time_remainder_ns = 0.0;
             std::fill_n(control_.stop_path_accelerations, RK_MAX_TRAJECTORY_JOINTS, 0.0);
             control_.stop_ramp_active = true;
+            control_.hold_requested = false;
+            control_.resume_requested = false;
         } else {
             double positions[RK_MAX_TRAJECTORY_JOINTS]{};
             double velocities[RK_MAX_TRAJECTORY_JOINTS]{};
@@ -984,6 +1051,56 @@ rk_result RobotRuntime::apply_pending_commands() {
                     if (result != RK_OK)
                         return result;
                 }
+                continue;
+            }
+
+            if (value.kind == RK_COMMAND_ABORT) {
+                if (control_.trajectory_active && !control_.trajectory.empty()) {
+                    refresh_trajectory_progress();
+                    double positions[RK_MAX_TRAJECTORY_JOINTS]{};
+                    double velocities[RK_MAX_TRAJECTORY_JOINTS]{};
+                    const auto region = path_region(control_.trajectory,
+                        control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
+                    const RuntimeTrajectoryPoint *active = &control_.trajectory.front();
+                    for (const auto &knot : control_.trajectory) {
+                        if (knot.point.time_from_start_ns > control_.trajectory_time_ns) break;
+                        active = &knot;
+                    }
+                    evaluate_knot(*active, control_.trajectory_time_ns, positions);
+                    mk_path_derivative_estimate estimate{};
+                    if (motionkit::estimate_path_derivatives(region,
+                            static_cast<int64_t>(control_.trajectory_time_ns), 0, estimate))
+                        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                            velocities[joint] = control_.trajectory_rate * estimate.velocity[joint];
+                    start_stop_ramp(positions, velocities);
+                    controlled_stop = true;
+                } else if (control_.stop_ramp_active) {
+                    controlled_stop = true;
+                } else {
+                    control_ = {};
+                }
+                safety = RK_SAFETY_READY;
+                continue;
+            }
+
+            if (value.kind == RK_COMMAND_HOLD) {
+                if (!control_.trajectory_active || control_.trajectory.empty() ||
+                    control_.stop_ramp_active)
+                    return RK_ERROR_INVALID_STATE;
+                for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
+                    if (blueprint_.joints[joint].max_acceleration <= 0.0)
+                        return RK_ERROR_UNSUPPORTED;
+                control_.hold_requested = true;
+                control_.resume_requested = false;
+                continue;
+            }
+
+            if (value.kind == RK_COMMAND_RESUME) {
+                if (!control_.trajectory_active || control_.trajectory.empty() ||
+                    !control_.hold_requested || control_.stop_ramp_active)
+                    return RK_ERROR_INVALID_STATE;
+                control_.hold_requested = false;
+                control_.resume_requested = true;
                 continue;
             }
 
@@ -1143,8 +1260,9 @@ rk_result RobotRuntime::apply_pending_commands() {
                 // path the stop may use; the stop keeps its current rate and
                 // still ends at rest. Resuming means waiting for the stop to
                 // finish, or flushing with a target batch first.
-                const bool stopping_along_path =
-                    control_.stop_ramp_active && control_.trajectory_active;
+                const bool stopping_along_path = control_.trajectory_active &&
+                    (control_.stop_ramp_active || control_.hold_requested ||
+                     control_.resume_requested);
                 if (!stopping_along_path) {
                     std::fill_n(control_.active, RK_MAX_JOINTS, false);
                     std::fill_n(control_.reference_initialized, RK_MAX_JOINTS, false);
@@ -1192,8 +1310,9 @@ rk_result RobotRuntime::apply_pending_commands() {
     rk_robot_command output{};
     output.struct_size = sizeof(output);
     output.timestamp_ns = has_command ? final_timestamp_ns : 0;
-    if (lifecycle_command && !controlled_stop) {
-        output.kind = final_kind;
+    if (lifecycle_command && !controlled_stop && final_kind != RK_COMMAND_HOLD &&
+        final_kind != RK_COMMAND_RESUME) {
+        output.kind = final_kind == RK_COMMAND_ABORT ? RK_COMMAND_STOP : final_kind;
         output.target_count = 0;
     } else if (!control_.trajectory.empty()) {
         auto point = control_.trajectory.front().point;
@@ -1221,9 +1340,12 @@ rk_result RobotRuntime::apply_pending_commands() {
             // Report the chunk and time where motion actually ended; a stop
             // can finish inside an earlier chunk than the last one queued.
             refresh_trajectory_progress();
-            const bool stop_still_moving = queue_exhausted && !trajectory_stop_completed &&
-                control_.stop_ramp_active;
-            if (stop_still_moving) {
+            const bool declared_continuation = queue_exhausted &&
+                !control_.trajectory.back().ends_at_rest &&
+                control_.trajectory.back().plan_id != 0;
+            const bool ramp_at_end = queue_exhausted && !trajectory_stop_completed &&
+                (control_.stop_ramp_active || control_.hold_requested || declared_continuation);
+            if (ramp_at_end) {
                 // The stop ran out of queued path before reaching rest. Finish
                 // with a straight ramp, still within the acceleration limits,
                 // instead of stopping dead. The ramp starts where the clock
@@ -1232,9 +1354,34 @@ rk_result RobotRuntime::apply_pending_commands() {
                 double velocities[RK_MAX_JOINTS]{};
                 const double crossing_rate = stop_crossed_queue_end
                     ? stop_crossing_rate : control_.trajectory_rate;
+                if (!stop_crossed_queue_end) {
+                    // At normal clock rate the end marker is already current.
+                    // Its preceding segment supplies the executed terminal
+                    // velocity: analytic for smooth plans, chord for linear.
+                    const RuntimeTrajectoryPoint *terminal_segment = nullptr;
+                    for (auto it = control_.trajectory.rbegin();
+                         it != control_.trajectory.rend(); ++it)
+                        if (it->has_segment) {
+                            terminal_segment = &*it;
+                            break;
+                        }
+                    if (terminal_segment == nullptr && control_.trajectory_history_valid &&
+                        control_.trajectory_history.has_segment)
+                        terminal_segment = &control_.trajectory_history;
+                    if (terminal_segment != nullptr) {
+                        mk_trajectory_state endpoint{};
+                        motionkit::evaluate_segment(terminal_segment->segment,
+                            static_cast<double>(terminal_segment->segment.duration_ns) * 1e-9,
+                            endpoint);
+                        std::copy_n(endpoint.velocity, blueprint_.joint_count,
+                            stop_path_velocities);
+                    }
+                }
                 for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                     velocities[joint] = crossing_rate * stop_path_velocities[joint];
                 start_stop_ramp(point.positions, velocities);
+                if (declared_continuation)
+                    control_.diagnostic_code = RK_FAULT_TRAJECTORY_UNDERFLOW;
                 control_.stop_ramp_time_ns = std::min(control_.stop_ramp_duration_ns,
                     static_cast<uint64_t>(stop_after_crossing_seconds * 1'000'000'000.0));
                 write_stop_ramp_targets(output);
@@ -1246,6 +1393,8 @@ rk_result RobotRuntime::apply_pending_commands() {
                 control_.stop_ramp_active = false;
                 control_.trajectory_rate = 1.0;
                 control_.trajectory_time_remainder_ns = 0.0;
+                control_.hold_requested = false;
+                control_.resume_requested = false;
             }
         }
     } else if (control_.stop_ramp_active) {
@@ -1286,6 +1435,15 @@ rk_result RobotRuntime::apply_pending_commands() {
         if (active_count == 0 && has_command && final_kind == RK_COMMAND_NONE)
             output.kind = RK_COMMAND_NONE;
         else if (active_count == 0) {
+            if (!stop_ramp_finished && !control_.trajectory_active &&
+                !control_.stop_ramp_active) {
+                std::lock_guard state_lock(state_mutex_);
+                if (state_.safety == RK_SAFETY_STOPPING) {
+                    state_.mode = RK_ROBOT_MODE_IDLE;
+                    state_.safety = RK_SAFETY_READY;
+                    state_.session_state = RK_SESSION_IDLE;
+                }
+            }
             state_backup_valid_ = false;
             return RK_OK;
         }
@@ -1326,11 +1484,18 @@ rk_result RobotRuntime::apply_pending_commands() {
     if (lifecycle_command && final_kind == RK_COMMAND_EMERGENCY_STOP) {
         state_.mode = RK_ROBOT_MODE_FAULT;
         state_.safety = RK_SAFETY_EMERGENCY_STOP;
-    } else if (lifecycle_command && final_kind == RK_COMMAND_STOP) {
+    } else if (lifecycle_command && (final_kind == RK_COMMAND_STOP ||
+               final_kind == RK_COMMAND_ABORT)) {
         state_.mode = RK_ROBOT_MODE_STOPPING;
         state_.safety = RK_SAFETY_STOPPING;
     } else if (lifecycle_command && final_kind == RK_COMMAND_RESET_SAFETY) {
         state_.mode = RK_ROBOT_MODE_IDLE;
+        state_.safety = RK_SAFETY_READY;
+    } else if (control_.hold_requested) {
+        state_.mode = control_.trajectory_rate <= 0.0 ? RK_ROBOT_MODE_IDLE : RK_ROBOT_MODE_TRACKING;
+        state_.safety = RK_SAFETY_READY;
+    } else if (control_.resume_requested) {
+        state_.mode = RK_ROBOT_MODE_TRACKING;
         state_.safety = RK_SAFETY_READY;
     } else if (controlled_stop || control_.stop_ramp_active) {
         state_.mode = RK_ROBOT_MODE_STOPPING;
@@ -1348,6 +1513,8 @@ rk_result RobotRuntime::apply_pending_commands() {
     state_.session_state = state_.safety == RK_SAFETY_FAULT ||
         state_.safety == RK_SAFETY_EMERGENCY_STOP ? RK_SESSION_FAULTED :
         state_.safety == RK_SAFETY_STOPPING || control_.stop_ramp_active ? RK_SESSION_STOPPING :
+        control_.hold_requested ? (control_.trajectory_rate <= 0.0 ? RK_SESSION_HELD :
+            RK_SESSION_HOLDING) :
         control_.trajectory_active ? RK_SESSION_EXECUTING : RK_SESSION_IDLE;
 
     return RK_OK;

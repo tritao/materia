@@ -493,10 +493,14 @@ Do:
   via the straight ramp, then the queue is cleared, with no safety latch.
   Otherwise document why STOP already covers it. Decide by reading the
   current STOP fallback, and record the decision.
-- Underflow: when the queue ends while the path is still moving (nonzero
-  velocity at the last segment end), finish with the acceleration-limited
-  straight ramp instead of holding the last point. Record a fault reason
-  `trajectory_underflow`, which is not latched.
+- Plans declare `ends_at_rest` (true by default; absent in an older C struct
+  means true). If true, a degree >= 2 plan must end with near-zero velocity
+  and acceleration; a degree-1 plan stops at its last knot as authored.
+- Underflow is a queue ending on a plan that declared `ends_at_rest = false`:
+  more motion was expected. Finish with an acceleration-limited straight ramp
+  from the velocity actually executed (analytic for degree >= 2, chord speed
+  for degree 1), and report non-latched `trajectory_underflow`. Legacy point
+  chunks retain their current completion behavior.
 - A hold that runs out of queued path finishes on the ramp, as STOP does
   today.
 
@@ -507,6 +511,9 @@ Tests:
 - A hold during acceleration or deceleration phases stays within limits
   (mirror the existing MotionKit hold tests).
 - Underflow at speed is ramped and flagged.
+- A normal degree-1 plan never overshoots its endpoint; a smooth plan that
+  declares rest but ends at speed is rejected. Late refills on both degree-1
+  and smooth streamed plans brake and flag underflow.
 - The existing MotionKit hold and resume tests pass once P9 switches over.
 
 ## P9 — MotionSystem on sessions and Ruckig; delete the replaced Haxe planners
@@ -525,6 +532,9 @@ Do (in `motionkit/robot/…/MotionSystem.hx`):
   native path timing exists.
 - `movePath` and `queuePath` keep `LineLookaheadPlanner` (converted to
   degree-1 segments) until native path timing exists.
+- Set `ends_at_rest = false` on each non-final streamed plan of a longer path;
+  only the final plan declares rest. This lets a late refill trigger native
+  underflow braking from the executed chord speed.
 - **Derivative sources.** Never derive a retarget start state or hold lead
   from a degree-1 trajectory's analytic derivatives.
   - Axis moves, jogs and homing use Ruckig (degree 3), whose derivatives are
@@ -870,3 +880,25 @@ Tests cover measured offsets, completed-motion setpoints, tolerance fallback,
 and mismatched/matching chord-velocity appends. Commit: the commit containing
 this entry. MotionKit and RobotKit native/Haxe suites, both FFI audits, and
 TCP default, session and lease-timeout integration passed.
+
+### Native path lifecycle and declared completion
+
+Added native HOLD, RESUME and ABORT commands. HOLD and RESUME rate-limit the
+path clock against the joint acceleration budget while retaining the queue;
+ABORT uses a controlled straight ramp and clears it. STOP retains its
+path-following semantics. A plan now declares whether it ends at rest.
+Normal degree-1 completion still stops at the final knot, while a queue that
+exhausts a declared continuation brakes from its executed terminal velocity
+(chord for degree 1, analytic otherwise) and reports non-latched
+`trajectory_underflow`. Smooth plans declaring rest are rejected if their
+terminal velocity or acceleration exceeds 1e-6 SI units. Older C plan structs
+default to final; full-size C callers set the field explicitly, and the Haxe
+wrapper defaults to final. Recorded plans round-trip the declaration.
+
+The end segment can move into queue history before underflow handling; the
+ramp now reads that history. Resume also integrates the remainder of a cycle
+after reaching full rate, avoiding a setpoint acceleration jump. Tests cover
+normal completion, both stream derivative types, timely refill, hold during
+acceleration and deceleration, resume limits, and abort. MotionKit and RobotKit
+native/Haxe suites, both FFI audits, and TCP default, session and lease-timeout
+integration passed. Commit: the commit containing this entry.

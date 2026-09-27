@@ -1315,6 +1315,209 @@ void partial_targets_and_ordered_trajectory_commands(
 
 } // namespace
 
+void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+        blueprint.joints[joint].max_acceleration = 1.0;
+        blueprint.joints[joint].max_velocity = 1.0;
+    }
+    auto make_plan = [&](uint64_t id, bool ends_at_rest, bool smooth) {
+        rk_plan_submission plan{};
+        plan.struct_size = sizeof(plan);
+        plan.sequence = 1;
+        plan.plan_id = id;
+        plan.model_revision = blueprint.revision;
+        plan.calibration_revision = blueprint.calibration_revision;
+        plan.ends_at_rest = ends_at_rest ? 1u : 0u;
+        plan.segments = linear_segment_chunk(0.0, 0.2, 1'000'000'000, id);
+        if (smooth) {
+            plan.segments.segments[0].degree = 4;
+            for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+                const double sign = joint == 0 ? 1.0 : -1.0;
+                plan.segments.segments[0].coefficients[joint].value[1] = 0.0;
+                plan.segments.segments[0].coefficients[joint].value[2] = 0.0;
+                plan.segments.segments[0].coefficients[joint].value[3] = sign * 0.2;
+                plan.segments.segments[0].coefficients[joint].value[4] = sign * -0.1;
+            }
+        }
+        return plan;
+    };
+    {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto plan = make_plan(201, true, false);
+        assert(runtime.submit_plan(plan) == RK_OK);
+        uint64_t timestamp = 0;
+        for (int step = 0; step < 14; ++step) apply_cycle(runtime, timestamp);
+        rk_robot_snapshot snapshot{};
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(snapshot.trajectory_active == 0 && snapshot.fault_code == 0);
+        assert(std::abs(snapshot.position[0] - 0.2) < 1e-9);
+    }
+    {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto plan = make_plan(202, true, true);
+        assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
+        plan.struct_size = offsetof(rk_plan_submission, ends_at_rest);
+        plan.ends_at_rest = 0;
+        assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
+    }
+    for (bool smooth : {false, true}) {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto plan = make_plan(smooth ? 204 : 203, false, smooth);
+        assert(runtime.submit_plan(plan) == RK_OK);
+        uint64_t timestamp = 0;
+        std::vector<double> positions;
+        for (int step = 0; step < 16; ++step)
+            positions.push_back(apply_cycle(runtime, timestamp).position[0]);
+        rk_robot_snapshot snapshot{};
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(snapshot.fault_code == RK_FAULT_TRAJECTORY_UNDERFLOW);
+        assert(snapshot.safety == RK_SAFETY_READY);
+        assert(positions.back() > positions[11]);
+        for (std::size_t step = 2; step < positions.size(); ++step)
+            assert(std::abs(positions[step] - 2 * positions[step - 1] +
+                positions[step - 2]) <= 0.010001);
+    }
+    {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto first = make_plan(205, false, false);
+        assert(runtime.submit_plan(first) == RK_OK);
+        uint64_t timestamp = 0;
+        for (int step = 0; step < 4; ++step) apply_cycle(runtime, timestamp);
+        auto refill = make_plan(206, true, false);
+        refill.sequence = 2;
+        refill.start_position[0] = 0.2;
+        refill.start_position[1] = -0.2;
+        refill.start_velocity[0] = 0.2;
+        refill.start_velocity[1] = -0.2;
+        refill.segments = linear_segment_chunk(0.2, 0.2, 1'000'000'000, 206);
+        assert(runtime.submit_plan(refill) == RK_OK);
+        for (int step = 0; step < 23; ++step) apply_cycle(runtime, timestamp);
+        rk_robot_snapshot snapshot{};
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(snapshot.fault_code == 0 && snapshot.trajectory_active == 0);
+        assert(std::abs(snapshot.position[0] - 0.4) < 1e-9);
+    }
+}
+
+void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+        blueprint.joints[joint].max_acceleration = 1.0;
+        blueprint.joints[joint].max_velocity = 1.0;
+    }
+    auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 210;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.ends_at_rest = 1;
+    plan.segments = linear_segment_chunk(0.0, 0.2, 2'000'000'000, 210);
+    assert(runtime.submit_plan(plan) == RK_OK);
+    uint64_t timestamp = 0;
+    for (int step = 0; step < 3; ++step) apply_cycle(runtime, timestamp);
+    assert(runtime.submit(lifecycle_command(2, RK_COMMAND_HOLD)) == RK_OK);
+    for (int step = 0; step < 7; ++step) apply_cycle(runtime, timestamp);
+    rk_robot_snapshot snapshot{};
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.session_state == RK_SESSION_HELD);
+    assert(snapshot.trajectory_queue_depth > 0);
+    const double held_position = snapshot.position[0];
+    for (int step = 0; step < 3; ++step) apply_cycle(runtime, timestamp);
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(std::abs(snapshot.position[0] - held_position) < 1e-9);
+    assert(runtime.submit(lifecycle_command(3, RK_COMMAND_RESUME)) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.session_state == RK_SESSION_EXECUTING);
+    assert(snapshot.mode == RK_ROBOT_MODE_TRACKING);
+    for (int step = 0; step < 30; ++step) apply_cycle(runtime, timestamp);
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.session_state == RK_SESSION_IDLE);
+    assert(std::abs(snapshot.position[0] - 0.4) < 1e-9);
+
+    auto abort_endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+    robotkit::RobotRuntime abort_runtime(blueprint, abort_endpoint, std::chrono::milliseconds(100));
+    plan.sequence = 1;
+    plan.plan_id = 211;
+    assert(abort_runtime.submit_plan(plan) == RK_OK);
+    for (int step = 0; step < 4; ++step) apply_cycle(abort_runtime, timestamp);
+    assert(abort_runtime.submit(lifecycle_command(2, RK_COMMAND_ABORT)) == RK_OK);
+    std::vector<double> aborted_positions;
+    for (int step = 0; step < 8; ++step)
+        aborted_positions.push_back(apply_cycle(abort_runtime, timestamp).position[0]);
+    for (std::size_t step = 2; step < aborted_positions.size(); ++step)
+        assert(std::abs(aborted_positions[step] - 2 * aborted_positions[step - 1] +
+            aborted_positions[step - 2]) <= 0.010001);
+    assert(abort_runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.trajectory_queue_depth == 0);
+    assert(snapshot.safety != RK_SAFETY_FAULT && snapshot.fault_code == 0);
+}
+
+void smooth_path_hold_respects_acceleration(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+        blueprint.joints[joint].max_acceleration = 1.0;
+        blueprint.joints[joint].max_velocity = 1.0;
+    }
+    for (int hold_after : {3, 14}) {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        rk_plan_submission plan{};
+        plan.struct_size = sizeof(plan);
+        plan.sequence = 1;
+        plan.plan_id = 220 + hold_after;
+        plan.model_revision = blueprint.revision;
+        plan.calibration_revision = blueprint.calibration_revision;
+        plan.ends_at_rest = 1;
+        plan.segments = linear_segment_chunk(0.0, 0.0, 2'000'000'000, plan.plan_id);
+        auto &segment = plan.segments.segments[0];
+        segment.degree = 5;
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            const double sign = joint == 0 ? 1.0 : -1.0;
+            segment.coefficients[joint].value[3] = sign * 0.5;
+            segment.coefficients[joint].value[4] = sign * -0.375;
+            segment.coefficients[joint].value[5] = sign * 0.075;
+        }
+        assert(runtime.submit_plan(plan) == RK_OK);
+        uint64_t timestamp = 0;
+        std::vector<double> positions;
+        for (int step = 0; step < hold_after; ++step)
+            positions.push_back(apply_cycle(runtime, timestamp).position[0]);
+        assert(runtime.submit(lifecycle_command(2, RK_COMMAND_HOLD)) == RK_OK);
+        for (int step = 0; step < 15; ++step)
+            positions.push_back(apply_cycle(runtime, timestamp).position[0]);
+        rk_robot_snapshot snapshot{};
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(snapshot.session_state == RK_SESSION_HELD);
+        for (std::size_t step = 2; step < positions.size(); ++step)
+            assert(std::abs(positions[step] - 2 * positions[step - 1] +
+                positions[step - 2]) <= 0.010001);
+        const double held = snapshot.position[0];
+        apply_cycle(runtime, timestamp);
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(std::abs(snapshot.position[0] - held) < 1e-9);
+        assert(runtime.submit(lifecycle_command(3, RK_COMMAND_RESUME)) == RK_OK);
+        positions.clear();
+        positions.push_back(held);
+        for (int step = 0; step < 35; ++step)
+            positions.push_back(apply_cycle(runtime, timestamp).position[0]);
+        for (std::size_t step = 2; step < positions.size(); ++step)
+            assert(std::abs(positions[step] - 2 * positions[step - 1] +
+                positions[step - 2]) <= 0.010001);
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(snapshot.session_state == RK_SESSION_IDLE);
+        assert(std::abs(snapshot.position[0] - 0.4) < 1e-8);
+    }
+}
+
 int main() {
     static_assert(sizeof(rk_robot_command) < 20'000,
         "trajectory payload must not be embedded in the command mailbox value");
@@ -1363,6 +1566,9 @@ int main() {
     overacceleration_segment_is_rejected(blueprint);
     segment_junction_jump_is_rejected(blueprint);
     stop_braking_uses_segment_degree(blueprint);
+    declared_plan_completion_and_underflow(blueprint);
+    native_hold_resume_and_abort(blueprint);
+    smooth_path_hold_respects_acceleration(blueprint);
     ruckig_segment_stop_uses_analytic_braking(blueprint);
     trajectory_splice_replaces_path_ahead(blueprint);
     late_trajectory_splice_keeps_current_path(blueprint);

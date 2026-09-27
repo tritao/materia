@@ -158,6 +158,7 @@ public:
         uint64_t chunk_base_time_ns = 0;
         uint64_t tag = 0;
         uint64_t plan_id = 0;
+        bool ends_at_rest = true;
     };
 
     /** Internal phases used by Simulation to coordinate multiple runtimes. */
@@ -193,6 +194,9 @@ private:
         /** Last forward estimate of the queued path's acceleration during a stop. */
         double stop_path_accelerations[RK_MAX_TRAJECTORY_JOINTS]{};
         bool stop_ramp_active = false;
+        bool hold_requested = false;
+        bool resume_requested = false;
+        int32_t diagnostic_code = 0;
         /** Set when a ramp had to brake past a joint's limit to stay in travel. */
         bool stop_ramp_exceeds_limits = false;
     };
