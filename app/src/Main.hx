@@ -878,6 +878,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var selected = scene.object(scene.selectedId);
     var left = simulation.error != null ? "Simulation error: " + simulation.error :
       selected == null ? "Ready" : selected.label + " selected";
+    var staleCount = session.staleEdits().length;
+    if (staleCount > 0) left = staleCount + " stale project edit" + (staleCount == 1 ? "" : "s");
     var mode = simulation.isRunning() ? "Running" : simulation.isActive() ? "Paused" : "Design";
     if (simulation.isActive() && simulation.pending(sensors, scene)) mode += " · Rebuild pending";
     var worldLabel = switch (world.status()) {
@@ -1143,6 +1145,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
     style.background = appearance.theme.tokens.surface;
     var rows:Array<KeyedView> = [];
+    var stale = session.staleEdits();
+    if (stale.length > 0) {
+      rows.push(new KeyedView("stale-heading", new Text("Stale project edits: " + stale.length)));
+      for (index in 0...stale.length)
+        rows.push(new KeyedView("stale:" + index, new Text(stale[index])));
+      rows.push(new KeyedView("stale-discard", sceneAction("stale-discard-command",
+        "editor.discard-stale-edits", "Discard stale edits", IconName.Trash)));
+    }
     for (index in 0...logLines.length) rows.push(new KeyedView(
       "log:" + index,
       new Text(
