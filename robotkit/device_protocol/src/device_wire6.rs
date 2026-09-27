@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 6;
+pub const PROTOCOL_VERSION: u8 = 7;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -35,12 +35,13 @@ pub struct SessionBegin6 {
     pub actuator_count: u8,
     pub max_degree: u8,
     pub step_tick_hz: u32,
-    pub link_loss_ticks: u64,
     pub max_acceleration: f32,
+    pub actuator_max_acceleration: [f32; 64],
+    pub link_loss_timeout_ns: u64,
 }
 
 impl SessionBegin6 {
-    pub const SIZE: usize = 43;
+    pub const SIZE: usize = 299;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -59,10 +60,14 @@ impl SessionBegin6 {
         offset += 1;
         out[offset..offset + 4].copy_from_slice(&self.step_tick_hz.to_le_bytes());
         offset += 4;
-        out[offset..offset + 8].copy_from_slice(&self.link_loss_ticks.to_le_bytes());
-        offset += 8;
         out[offset..offset + 4].copy_from_slice(&self.max_acceleration.to_le_bytes());
         offset += 4;
+        for value in self.actuator_max_acceleration {
+            out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            offset += 4;
+        }
+        out[offset..offset + 8].copy_from_slice(&self.link_loss_timeout_ns.to_le_bytes());
+        offset += 8;
         Ok(offset)
     }
 
@@ -96,72 +101,23 @@ impl SessionBegin6 {
         bytes.copy_from_slice(&input[offset..offset + 4]);
         let step_tick_hz = u32::from_le_bytes(bytes);
         offset += 4;
-        let mut bytes = [0u8; 8];
-        bytes.copy_from_slice(&input[offset..offset + 8]);
-        let link_loss_ticks = u64::from_le_bytes(bytes);
-        offset += 8;
         let mut bytes = [0u8; 4];
         bytes.copy_from_slice(&input[offset..offset + 4]);
         let max_acceleration = f32::from_le_bytes(bytes);
         offset += 4;
-        let _ = offset;
-        Ok(Self { session, protocol_version, model_fingerprint, actuator_count, max_degree, step_tick_hz, link_loss_ticks, max_acceleration })
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ActuatorLimit6 {
-    pub max_acceleration: f32,
-}
-
-impl ActuatorLimit6 {
-    pub const SIZE: usize = 4;
-
-    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
-        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
-        let mut offset = 0usize;
-        out[offset..offset + 4].copy_from_slice(&self.max_acceleration.to_le_bytes());
-        offset += 4;
-        Ok(offset)
-    }
-
-    pub fn decode(input: &[u8]) -> Result<Self, Error> {
-        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
-        let mut offset = 0usize;
-        let mut bytes = [0u8; 4];
-        bytes.copy_from_slice(&input[offset..offset + 4]);
-        let max_acceleration = f32::from_le_bytes(bytes);
-        offset += 4;
-        let _ = offset;
-        Ok(Self { max_acceleration })
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SessionTiming6 {
-    pub link_loss_timeout_ns: u64,
-}
-
-impl SessionTiming6 {
-    pub const SIZE: usize = 8;
-
-    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
-        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
-        let mut offset = 0usize;
-        out[offset..offset + 8].copy_from_slice(&self.link_loss_timeout_ns.to_le_bytes());
-        offset += 8;
-        Ok(offset)
-    }
-
-    pub fn decode(input: &[u8]) -> Result<Self, Error> {
-        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
-        let mut offset = 0usize;
+        let mut actuator_max_acceleration = [0 as f32; 64];
+        for item in &mut actuator_max_acceleration {
+            let mut bytes = [0u8; 4];
+            bytes.copy_from_slice(&input[offset..offset + 4]);
+            *item = f32::from_le_bytes(bytes);
+            offset += 4;
+        }
         let mut bytes = [0u8; 8];
         bytes.copy_from_slice(&input[offset..offset + 8]);
         let link_loss_timeout_ns = u64::from_le_bytes(bytes);
         offset += 8;
         let _ = offset;
-        Ok(Self { link_loss_timeout_ns })
+        Ok(Self { session, protocol_version, model_fingerprint, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, link_loss_timeout_ns })
     }
 }
 

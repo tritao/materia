@@ -16,16 +16,16 @@ with degree at most five. Segment start and duration are device ticks. One
 one `ActuatorState6` record per actuator. Queue control and safety command
 frames carry the fixed records specified by the schema. The session ACK
 reports the tick rate, step tick rate, degree limit and queue capacities.
-`SESSION_BEGIN6` carries a fixed header followed by one `ActuatorLimit6`
-record per actuator. The header's acceleration is the global cap; each
-actuator limit must be positive and no greater than that cap. This trailing
-record keeps the published fixed header compatible while supplying A4's
-per-actuator HOLD and stop limits.
-One `SessionTiming6` record follows the actuator limits. It carries the
-link-loss timeout in nanoseconds because the host learns the device tick rate
-only in `SESSION_ACK6`. The device converts it using its own clock. The older
-fixed header's `link_loss_ticks` field is zero when this trailing record is
-present.
+`SESSION_BEGIN6` is one fixed record. Its 64-slot acceleration array carries
+the active actuator limits, each positive and no greater than the global cap.
+It also carries the link-loss timeout in nanoseconds. The device converts that
+timeout using its own clock after the session begins.
+
+No RKD6 hardware has shipped. Before the first hardware release, an in-place
+schema revision is permitted with a `PROTOCOL_VERSION` bump and regenerated
+Rust and C++ codecs, lock, and shared vectors. The schema freezes at the first
+hardware release; subsequent changes must preserve that released wire format
+or negotiate a new version.
 
 | Quantity | RKD6 bound | Source |
 | --- | ---: | --- |
