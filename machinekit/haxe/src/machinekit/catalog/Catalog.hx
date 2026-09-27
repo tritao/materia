@@ -1,7 +1,7 @@
 package machinekit.catalog;
 
 /** Designation-keyed table of standard sizes, kept separate from geometry code. */
-class Catalog<T> {
+class Catalog<T> implements CatalogIndex {
 	public final kind:String;
 	final entries:Map<String, T> = [];
 	final metadataEntries:Map<String, CatalogMetadata> = [];

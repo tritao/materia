@@ -13,19 +13,6 @@ import machinekit.component.ComponentParameterType;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValue;
 import machinekit.component.ComponentValues;
-import machinekit.motion.LinearBearing;
-import machinekit.motion.LinearRailSystem;
-import machinekit.motion.NemaStepper;
-import machinekit.motion.PillowBlock;
-import machinekit.standard.DeepGrooveBearing;
-import machinekit.standard.FlatWasher;
-import machinekit.standard.HexBolt;
-import machinekit.standard.HexNut;
-import machinekit.standard.ParallelKey;
-import machinekit.standard.RetainingRing;
-import machinekit.standard.ShaftCollar;
-import machinekit.standard.SocketHeadCapScrew;
-import machinekit.transmission.Sprocket;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
@@ -44,8 +31,8 @@ class MachineKitDocuments {
 				case Count: DefinitionInput.integer(parameter.name, integer(value));
 				case Bool: DefinitionInput.boolean(parameter.name, boolean(value));
 				case Choice(options): DefinitionInput.token(parameter.name, token(value), options);
-				case CatalogDesignation(catalog):
-					DefinitionInput.token(parameter.name, token(value), catalogOptions(catalog, token(value)));
+				case CatalogDesignation(index):
+					DefinitionInput.token(parameter.name, token(value), index.designations());
 			};
 			inputs.push(input);
 		}
@@ -58,9 +45,9 @@ class MachineKitDocuments {
 		definition.restoreProperty("machinekit.partNumber", TypedProperty.text("machinekit.partNumber", component.bom.partNumber));
 		definition.restoreProperty("machinekit.material", TypedProperty.text("machinekit.material", component.materialId));
 		for (parameter in type.parameters()) switch parameter.type {
-			case CatalogDesignation(catalog):
+			case CatalogDesignation(index):
 				var designation = resolved.token(parameter.name);
-				var source = catalogSource(catalog, designation);
+				var source = index.metadata(designation).source;
 				if (source != null) {
 					definition.restoreProperty("machinekit.catalog.source",
 						TypedProperty.text("machinekit.catalog.source", source));
@@ -108,43 +95,4 @@ class MachineKitDocuments {
 		default: throw "Expected token component input";
 	};
 
-	static function catalogOptions(catalog:String, fallback:String):Array<String> {
-		var options = switch catalog {
-			case "deep-groove-bearing": DeepGrooveBearing.catalog().designations();
-			case "metric-screw": SocketHeadCapScrew.catalog().designations();
-			case "hex-bolt": HexBolt.catalog().designations();
-			case "hex-nut": HexNut.catalog().designations();
-			case "flat-washer": FlatWasher.catalog().designations();
-			case "parallel-key": ParallelKey.catalog().designations();
-			case "retaining-ring": RetainingRing.catalog().designations();
-			case "shaft-collar": ShaftCollar.catalog().designations();
-			case "linear-bearing": LinearBearing.catalog().designations();
-			case "pillow-block": PillowBlock.catalog().designations();
-			case "linear-rail-profile": LinearRailSystem.catalog().designations();
-			case "stepper-motor-variant": NemaStepper.variantCatalog().designations();
-			case "roller-chain": Sprocket.chainCatalog().designations();
-			default: [fallback];
-		};
-		if (options.indexOf(fallback) < 0) options.push(fallback);
-		return options;
-	}
-
-	static function catalogSource(catalog:String, designation:String):Null<String> {
-		return switch catalog {
-			case "deep-groove-bearing": DeepGrooveBearing.catalog().metadata(designation).source;
-			case "metric-screw": SocketHeadCapScrew.catalog().metadata(designation).source;
-			case "hex-bolt": HexBolt.catalog().metadata(designation).source;
-			case "hex-nut": HexNut.catalog().metadata(designation).source;
-			case "flat-washer": FlatWasher.catalog().metadata(designation).source;
-			case "parallel-key": ParallelKey.catalog().metadata(designation).source;
-			case "retaining-ring": RetainingRing.catalog().metadata(designation).source;
-			case "shaft-collar": ShaftCollar.catalog().metadata(designation).source;
-			case "linear-bearing": LinearBearing.catalog().metadata(designation).source;
-			case "pillow-block": PillowBlock.catalog().metadata(designation).source;
-			case "linear-rail-profile": LinearRailSystem.catalog().metadata(designation).source;
-			case "stepper-motor-variant": NemaStepper.variantCatalog().metadata(designation).source;
-			case "roller-chain": Sprocket.chainCatalog().metadata(designation).source;
-			default: null;
-		};
-	}
 }

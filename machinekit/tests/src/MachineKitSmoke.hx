@@ -94,7 +94,7 @@ class MachineKitSmoke {
 		}
 		var bearing = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
 		throws(() -> bearing.create(new ComponentValues().setToken("designation", "NO-BEARING")),
-			"Unknown");
+			"Unknown catalog designation");
 		var pulley = MachineKitComponents.byId("machinekit.transmission.timing-pulley");
 		throws(() -> pulley.create(new ComponentValues().setToken("profile", "UNKNOWN")), "Invalid choice");
 		var conflicted = new Bom();

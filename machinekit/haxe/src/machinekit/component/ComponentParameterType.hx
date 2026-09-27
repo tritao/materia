@@ -1,5 +1,7 @@
 package machinekit.component;
 
+import machinekit.catalog.CatalogIndex;
+
 /** Supported editable inputs for a single machine part. */
 enum ComponentParameterType {
 	Length;
@@ -7,5 +9,5 @@ enum ComponentParameterType {
 	Count;
 	Bool;
 	Choice(options:Array<String>);
-	CatalogDesignation(catalog:String);
+	CatalogDesignation(index:CatalogIndex);
 }

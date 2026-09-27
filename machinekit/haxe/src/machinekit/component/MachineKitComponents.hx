@@ -2,6 +2,7 @@ package machinekit.component;
 
 import machinekit.component.ComponentParameterType.*;
 import machinekit.component.ComponentValue.*;
+import machinekit.catalog.CatalogIndex;
 
 import machinekit.standard.Bushing;
 import machinekit.standard.DeepGrooveBearing;
@@ -59,13 +60,13 @@ class MachineKitComponents {
 	static function build():Array<ComponentType> {
 		var result:Array<ComponentType> = [];
 		result.push(new ComponentType("machinekit.standard.deep-groove-bearing",
-			[catalog("designation", "deep-groove-bearing", "608"), flag("shielded", true)],
+			[catalog("designation", DeepGrooveBearing.catalog(), "608"), flag("shielded", true)],
 			v -> DeepGrooveBearing.metric(v.token("designation"), v.boolean("shielded")),
 			c -> new ComponentValues().set("designation", Token(cast(c, DeepGrooveBearing).spec.designation))
 				.set("shielded", Boolean(cast(c, DeepGrooveBearing).shielded)),
 			c -> Std.isOfType(c, DeepGrooveBearing), true));
 		result.push(new ComponentType("machinekit.standard.socket-head-cap-screw",
-			[catalog("size", "metric-screw", "M5"), length("length", 20),
+			[catalog("size", SocketHeadCapScrew.catalog(), "M5"), length("length", 20),
 				choice("material", ["steel 12.9", "steel", "stainless steel"], "steel 12.9")],
 			v -> SocketHeadCapScrew.metric(v.token("size"), v.number("length"), v.token("material")),
 			c -> new ComponentValues().set("size", Token(cast(c, SocketHeadCapScrew).spec.size))
@@ -73,35 +74,35 @@ class MachineKitComponents {
 				.set("material", Token(MaterialLibrary.require(c.materialId).physical.spec)),
 			c -> Std.isOfType(c, SocketHeadCapScrew), true));
 		result.push(new ComponentType("machinekit.standard.hex-bolt",
-			[catalog("size", "hex-bolt", "M5"), length("length", 20)],
+			[catalog("size", HexBolt.catalog(), "M5"), length("length", 20)],
 			v -> HexBolt.metric(v.token("size"), v.number("length")),
 			c -> new ComponentValues().set("size", Token(cast(c, HexBolt).spec.size))
 				.set("length", Number(cast(c, HexBolt).length)),
 			c -> Std.isOfType(c, HexBolt), true));
 		result.push(new ComponentType("machinekit.standard.hex-nut",
-			[catalog("size", "hex-nut", "M5")],
+			[catalog("size", HexNut.catalog(), "M5")],
 			v -> HexNut.metric(v.token("size")),
 			c -> new ComponentValues().set("size", Token(cast(c, HexNut).spec.size)),
 			c -> Std.isOfType(c, HexNut), true));
 		result.push(new ComponentType("machinekit.standard.flat-washer",
-			[catalog("size", "flat-washer", "M5")],
+			[catalog("size", FlatWasher.catalog(), "M5")],
 			v -> FlatWasher.metric(v.token("size")),
 			c -> new ComponentValues().set("size", Token(cast(c, FlatWasher).spec.size)),
 			c -> Std.isOfType(c, FlatWasher), true));
 		result.push(new ComponentType("machinekit.standard.parallel-key",
-			[catalog("size", "parallel-key", "2x2"), length("length", 10)],
+			[catalog("size", ParallelKey.catalog(), "2x2"), length("length", 10)],
 			v -> ParallelKey.metric(v.token("size"), v.number("length")),
 			c -> new ComponentValues()
 				.set("size", Token('${Dimension.format(cast(c, ParallelKey).spec.width)}x${Dimension.format(cast(c, ParallelKey).spec.height)}'))
 				.set("length", Number(cast(c, ParallelKey).length)),
 			c -> Std.isOfType(c, ParallelKey), true));
 		result.push(new ComponentType("machinekit.standard.retaining-ring",
-			[catalog("shaft", "retaining-ring", "8")],
+			[catalog("shaft", RetainingRing.catalog(), "8")],
 			v -> RetainingRing.forShaft(Std.parseFloat(v.token("shaft"))),
 			c -> new ComponentValues().set("shaft", Token(Dimension.format(cast(c, RetainingRing).spec.shaftDiameter))),
 			c -> Std.isOfType(c, RetainingRing), true));
 		result.push(new ComponentType("machinekit.standard.shaft-collar",
-			[catalog("bore", "shaft-collar", "8")],
+			[catalog("bore", ShaftCollar.catalog(), "8")],
 			v -> ShaftCollar.forShaft(Std.parseFloat(v.token("bore"))),
 			c -> new ComponentValues().set("bore", Token(Dimension.format(cast(c, ShaftCollar).spec.boreDiameter))),
 			c -> Std.isOfType(c, ShaftCollar), true));
@@ -112,28 +113,28 @@ class MachineKitComponents {
 				.set("outerDiameter", Number(cast(c, Bushing).outerDiameter)).set("length", Number(cast(c, Bushing).length)),
 			c -> Std.isOfType(c, Bushing)));
 		result.push(new ComponentType("machinekit.motion.linear-bearing",
-			[catalog("designation", "linear-bearing", "LM8UU")],
+			[catalog("designation", LinearBearing.catalog(), "LM8UU")],
 			v -> LinearBearing.metric(v.token("designation")),
 			c -> new ComponentValues().setToken("designation", cast(c, LinearBearing).spec.designation),
 			c -> Std.isOfType(c, LinearBearing), true));
 		result.push(new ComponentType("machinekit.motion.pillow-block",
-			[catalog("designation", "pillow-block", "UCP204")],
+			[catalog("designation", PillowBlock.catalog(), "UCP204")],
 			v -> PillowBlock.metric(v.token("designation")),
 			c -> new ComponentValues().setToken("designation", cast(c, PillowBlock).spec.designation),
 			c -> Std.isOfType(c, PillowBlock), true));
 		result.push(new ComponentType("machinekit.motion.linear-rail",
-			[catalog("profile", "linear-rail-profile", "MGN12C"), length("length", 100)],
+			[catalog("profile", LinearRailSystem.catalog(), "MGN12C"), length("length", 100)],
 			v -> new LinearRail(LinearRailSystem.catalog().get(v.token("profile")), v.number("length")),
 			c -> new ComponentValues().setToken("profile", cast(c, LinearRail).spec.designation)
 				.setNumber("length", cast(c, LinearRail).length),
 			c -> Std.isOfType(c, LinearRail)));
 		result.push(new ComponentType("machinekit.motion.linear-rail-block",
-			[catalog("profile", "linear-rail-profile", "MGN12C")],
+			[catalog("profile", LinearRailSystem.catalog(), "MGN12C")],
 			v -> new LinearRailBlock(LinearRailSystem.catalog().get(v.token("profile"))),
 			c -> new ComponentValues().setToken("profile", cast(c, LinearRailBlock).spec.designation),
 			c -> Std.isOfType(c, LinearRailBlock), true));
 		result.push(new ComponentType("machinekit.motion.nema-stepper",
-			[catalog("model", "stepper-motor-variant", "17HS19-1684S1")],
+			[catalog("model", NemaStepper.variantCatalog(), "17HS19-1684S1")],
 			v -> NemaStepper.model(v.token("model")),
 			c -> new ComponentValues().setToken("model", cast(c, NemaStepper).variant.designation),
 			c -> Std.isOfType(c, NemaStepper) &&
@@ -146,7 +147,7 @@ class MachineKitComponents {
 			c -> Std.isOfType(c, NemaStepper) &&
 				cast(c, NemaStepper).variant.designation.indexOf("GENERIC-NEMA") == 0));
 		result.push(new ComponentType("machinekit.motion.flange-bearing-housing",
-			[catalog("bearing", "deep-groove-bearing", "608"), flag("shielded", true),
+			[catalog("bearing", DeepGrooveBearing.catalog(), "608"), flag("shielded", true),
 				choice("fit", ["Slip", "Transition", "Interference"], "Slip")],
 			v -> new FlangeBearingHousing(DeepGrooveBearing.metric(v.token("bearing"), v.boolean("shielded")),
 				fit(v.token("fit"))),
@@ -173,7 +174,7 @@ class MachineKitComponents {
 		result.push(new ComponentType("machinekit.robotics.end-effector-plate",
 			[length("flangePitchCircle", 40), count("flangeBoltCount", 4), length("thickness", 12),
 				length("toolBoltCircleDiameter", 65), count("toolBoltCount", 4),
-				catalog("toolMountScrew", "metric-screw", "M5")],
+				catalog("toolMountScrew", SocketHeadCapScrew.catalog(), "M5")],
 			v -> new EndEffectorPlate(new RobotFlange(v.number("flangePitchCircle"), v.integer("flangeBoltCount")),
 				v.number("thickness"), v.number("toolBoltCircleDiameter"), v.integer("toolBoltCount"), v.token("toolMountScrew")),
 			c -> new ComponentValues().setNumber("flangePitchCircle", cast(c, EndEffectorPlate).flange.spec.pitchCircle)
@@ -211,7 +212,7 @@ class MachineKitComponents {
 			c -> Std.isOfType(c, Pedestal)));
 		result.push(new ComponentType("machinekit.transmission.sprocket",
 			[length("pitch", 6.35), count("teeth", 20), length("boreDiameter", 8),
-				length("thickness", 5), length("rollerDiameter", 3.3), catalog("chain", "roller-chain", "ANSI25")],
+				length("thickness", 5), length("rollerDiameter", 3.3), catalog("chain", Sprocket.chainCatalog(), "ANSI25")],
 			v -> new Sprocket(v.number("pitch"), v.integer("teeth"), v.number("boreDiameter"),
 				v.number("thickness"), v.number("rollerDiameter"), v.token("chain")),
 			c -> new ComponentValues().setNumber("pitch", cast(c, Sprocket).pitch)
@@ -245,7 +246,7 @@ class MachineKitComponents {
 				default: true;
 			}));
 		result.push(new ComponentType("machinekit.transmission.custom-timing-pulley",
-			[catalog("family", "timing-belt-family", "CUSTOM"), length("pitch", 2),
+			[choice("family", ["CUSTOM"], "CUSTOM"), length("pitch", 2),
 				length("pitchLineDifferential", 0.254), count("teeth", 20),
 				length("boreDiameter", 5), length("thickness", 6)],
 			v -> new TimingPulley(Custom(v.token("family"), v.number("pitch"),
@@ -322,6 +323,6 @@ class MachineKitComponents {
 	static function choice(name:String, options:Array<String>, value:String):ComponentParameter
 		return new ComponentParameter(name, Choice(options), Token(value));
 
-	static function catalog(name:String, catalogName:String, value:String):ComponentParameter
-		return new ComponentParameter(name, CatalogDesignation(catalogName), Token(value));
+	static function catalog(name:String, index:CatalogIndex, value:String):ComponentParameter
+		return new ComponentParameter(name, CatalogDesignation(index), Token(value));
 }

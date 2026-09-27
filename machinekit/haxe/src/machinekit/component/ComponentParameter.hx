@@ -47,9 +47,9 @@ class ComponentParameter {
 					case Token(v): if (options.indexOf(v) < 0) throw 'Invalid choice "$v" for component parameter "$name"';
 					default: wrongType();
 				}
-			case CatalogDesignation(_):
+			case CatalogDesignation(index):
 				switch value {
-					case Token(v): if (v == null || v.length == 0) throw 'Empty catalog designation for component parameter "$name"';
+					case Token(v): if (v == null || index.designations().indexOf(v) < 0) throw 'Unknown catalog designation "$v" for component parameter "$name"';
 					default: wrongType();
 				}
 		}
