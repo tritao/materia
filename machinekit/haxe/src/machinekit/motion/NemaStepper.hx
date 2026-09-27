@@ -116,21 +116,21 @@ class NemaStepper extends MachineComponent {
 		var half = variant.bodyFace / 2;
 		var parts:Array<Part> = [];
 		if (detail == Envelope) {
-			parts.push(Solids.prism([new Vector(-half, -half), new Vector(half, -half),
+			parts.push(Part.prism([new Vector(-half, -half), new Vector(half, -half),
 				new Vector(half, half), new Vector(-half, half)], -bodyLength, 0));
 		} else {
 			var c = 0.08 * variant.bodyFace;
-			var body = Solids.prism([new Vector(-half + c, -half), new Vector(half - c, -half),
+			var body = Part.prism([new Vector(-half + c, -half), new Vector(half - c, -half),
 				new Vector(half, -half + c), new Vector(half, half - c), new Vector(half - c, half),
 				new Vector(-half + c, half), new Vector(-half, half - c), new Vector(-half, -half + c)],
 				-bodyLength, 0);
 			var screw = mountScrew(10);
 			var holeDiameter = variant.tappedMount ? screw.spec.tapDrill : screw.clearanceDiameter(Medium);
 			parts.push(Solids.cut(body, [for (point in boltPattern())
-				Solids.cylinder(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y)]));
+				Part.cylinder(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y)]));
 		}
-		parts.push(Solids.cylinder(spec.pilotDiameter / 2, 0, variant.pilotHeight));
-		parts.push(Solids.cylinder(variant.shaftDiameter / 2, 0, variant.shaftLength));
+		parts.push(Part.cylinder(spec.pilotDiameter / 2, 0, variant.pilotHeight));
+		parts.push(Part.cylinder(variant.shaftDiameter / 2, 0, variant.shaftLength));
 		return Solids.union(parts);
 	}
 
@@ -141,8 +141,8 @@ class NemaStepper extends MachineComponent {
 	public function mountingCutout(thickness:Float, pilotClearance:Float = 0.2, fit:ClearanceFit = Medium):Part {
 		if (!(thickness > 0)) throw "Motor mounting plate needs a positive thickness";
 		var radius = mountScrew(10).clearanceDiameter(fit) / 2;
-		var tools = [Solids.cylinder((spec.pilotDiameter + pilotClearance) / 2, 0, thickness)];
-		for (point in boltPattern()) tools.push(Solids.cylinder(radius, 0, thickness, point.x, point.y));
+		var tools = [Part.cylinder((spec.pilotDiameter + pilotClearance) / 2, 0, thickness)];
+		for (point in boltPattern()) tools.push(Part.cylinder(radius, 0, thickness, point.x, point.y));
 		return Solids.union(tools);
 	}
 }

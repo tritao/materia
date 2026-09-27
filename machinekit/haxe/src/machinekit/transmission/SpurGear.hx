@@ -105,7 +105,7 @@ class SpurGear {
 		return Math.PI * moduleSize / 2 + 2 * moduleSize * profileShift * Math.tan(pressureAngle) - backlash;
 
 	public function geometry():Part
-		return Solids.prism(profile(), 0, faceWidth);
+		return Part.prism(profile(), 0, faceWidth);
 
 	/** Full-gear outline as one closed loop, one tooth centred on each multiple of 2*pi/teeth. */
 	function profile():Array<Vector> {

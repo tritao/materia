@@ -91,12 +91,12 @@ class DeepGrooveBearing extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var ri = bore / 2, ro = outside / 2, b = width;
 		if (detail == Envelope)
-			return Solids.revolve([{r: ri, z: 0}, {r: ro, z: 0}, {r: ro, z: b}, {r: ri, z: b}]);
+			return Part.revolve([{r: ri, z: 0}, {r: ro, z: 0}, {r: ro, z: b}, {r: ri, z: b}]);
 		// Ring shoulders at 30% of the section height; the recess shows the shield or ball gap.
 		var c = spec.chamfer, section = ro - ri;
 		var a = ri + 0.3 * section, o = ro - 0.3 * section;
 		var e = shielded ? Math.min(0.5, 0.06 * b) : 0.2 * b;
-		return Solids.revolve([
+		return Part.revolve([
 			{r: ri + c, z: 0}, {r: a, z: 0}, {r: a, z: e}, {r: o, z: e}, {r: o, z: 0},
 			{r: ro - c, z: 0}, {r: ro, z: c}, {r: ro, z: b - c}, {r: ro - c, z: b},
 			{r: o, z: b}, {r: o, z: b - e}, {r: a, z: b - e}, {r: a, z: b},
@@ -113,11 +113,11 @@ class DeepGrooveBearing extends MachineComponent {
 		var inner = bore / 2 + 0.3 * section;
 		var outer = outside / 2 - 0.3 * section;
 		var recess = Math.min(0.5, 0.06 * width);
-		var front = Solids.revolve([
+		var front = Part.revolve([
 			{r: inner, z: recess * 0.25}, {r: outer, z: recess * 0.25},
 			{r: outer, z: recess * 0.7}, {r: inner, z: recess * 0.7}
 		]);
-		var back = Solids.revolve([
+		var back = Part.revolve([
 			{r: inner, z: width - recess * 0.7}, {r: outer, z: width - recess * 0.7},
 			{r: outer, z: width - recess * 0.25}, {r: inner, z: width - recess * 0.25}
 		]);
@@ -135,7 +135,7 @@ class DeepGrooveBearing extends MachineComponent {
 		var length = depth == null ? width : depth;
 		if (!(length > 0) || !Math.isFinite(length)) throw "Bearing housing seat depth must be positive";
 		if (!(outside + allowance > bore)) throw "Bearing housing seat allowance leaves no bearing wall";
-		return Solids.cylinder((outside + allowance) / 2, 0, length);
+		return Part.cylinder((outside + allowance) / 2, 0, length);
 	}
 
 	/** Shaft journal diameter for a named fit; allowance is diametral. */

@@ -25,7 +25,7 @@ class FlatBar implements StructuralProfile {
 
 	public function geometry(length:Float):Part {
 		if (!(length > 0)) throw "Flat bar needs a positive length";
-		return Solids.prism([
+		return Part.prism([
 			new Vector(-width / 2, -thickness / 2), new Vector(width / 2, -thickness / 2),
 			new Vector(width / 2, thickness / 2), new Vector(-width / 2, thickness / 2),
 		], 0, length);

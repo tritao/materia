@@ -86,8 +86,8 @@ class Sprocket extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Solids.prism(profile(), 0, thickness);
-		return Solids.cut(body, [Solids.cylinder(boreDiameter / 2, -0.1, thickness + 0.1)]);
+		var body = Part.prism(profile(), 0, thickness);
+		return Solids.cut(body, [Part.cylinder(boreDiameter / 2, -0.1, thickness + 0.1)]);
 	}
 
 	function profile():Array<Vector> {

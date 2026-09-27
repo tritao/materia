@@ -64,7 +64,7 @@ class ParallelKey extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.prism([
+		return Part.prism([
 			new Vector(-spec.width / 2, 0), new Vector(spec.width / 2, 0),
 			new Vector(spec.width / 2, spec.height), new Vector(-spec.width / 2, spec.height),
 		], 0, length);

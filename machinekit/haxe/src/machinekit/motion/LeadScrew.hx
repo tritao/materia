@@ -26,5 +26,5 @@ class LeadScrew extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.cylinder(thread.screwDiameter / 2, 0, totalLength);
+		return Part.cylinder(thread.screwDiameter / 2, 0, totalLength);
 }

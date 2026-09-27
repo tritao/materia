@@ -28,7 +28,7 @@ class Angle implements StructuralProfile {
 
 	public function geometry(length:Float):Part {
 		if (!(length > 0)) throw "Angle needs a positive length";
-		return Solids.prism([
+		return Part.prism([
 			new Vector(0, 0), new Vector(legA, 0), new Vector(legA, thickness),
 			new Vector(thickness, thickness), new Vector(thickness, legB), new Vector(0, legB),
 		], 0, length);
