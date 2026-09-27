@@ -104,6 +104,26 @@ class DeepGrooveBearing extends MachineComponent {
 		]);
 	}
 
+	/** Two thin annular shields seated inside the front and back ring recesses.
+	 * Kept separate so preview renderers can assign a different surface finish.
+	 */
+	public function shieldGeometry():Part {
+		if (!shielded) throw "Open bearings have no shields";
+		var section = (outside - bore) / 2;
+		var inner = bore / 2 + 0.3 * section;
+		var outer = outside / 2 - 0.3 * section;
+		var recess = Math.min(0.5, 0.06 * width);
+		var front = Solids.revolve([
+			{r: inner, z: recess * 0.25}, {r: outer, z: recess * 0.25},
+			{r: outer, z: recess * 0.7}, {r: inner, z: recess * 0.7}
+		]);
+		var back = Solids.revolve([
+			{r: inner, z: width - recess * 0.7}, {r: outer, z: width - recess * 0.7},
+			{r: outer, z: width - recess * 0.25}, {r: inner, z: width - recess * 0.25}
+		]);
+		return Solids.union([front, back]);
+	}
+
 	/** Cutting tool for a housing bore, using a named fit and a diametral allowance. */
 	public function housingSeat(?depth:Float, fit:BearingHousingFit = Slip):Part {
 		var length = depth == null ? width : depth;

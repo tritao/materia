@@ -24,6 +24,7 @@ import nativekit.ui.editing.EditOperation;
 import nativekit.ui.core.CommandContext;
 import nativekit.ui.properties.PropertyDescriptor;
 import nativekit.ui.properties.PropertyDescriptorOptions;
+import nativekit.ui.properties.PropertyOption;
 import nativekit.ui.properties.PropertyType;
 import nativekit.ui.properties.PropertyValue;
 import nativekit.scene.PickResult;
@@ -89,6 +90,7 @@ class EditorScene {
   var cadSessions:Map<String, CadDocumentSession>;
   final generatedGeometry:Map<String, GeometryData>;
   final kinematicOccurrences:Map<String, Bool> = new Map();
+  final componentFinishes:Map<String, SceneObjectData> = new Map();
   var assemblyPropertyProvider:Null<String->Array<PropertyDescriptor>> = null;
   var nextObjectId:Int = 1;
   var snapshot:SceneSnapshot;
@@ -1372,9 +1374,9 @@ class EditorScene {
             record.dynamicBody, record.mass, record.red, record.green, record.blue,
             storedGraph,
             record.x, record.y, record.z, record.visible, record.meshSnapshot, record.rotation);
+          item.appearance = record.appearance;
           prepared.objects.push(item);
           failIfInjected("prepare.new-object");
-          item.appearance = record.appearance;
           prepared.changed = true;
         } else {
           var runtime = prepared.bridgeEntries.get(record.id);
@@ -2199,16 +2201,6 @@ class EditorScene {
     replaceObjects(data, selectedId);
   }
 
-  function publish(?updatedNodes:Array<NodeId>):Void {
-    nextRevision++;
-    revision = nextRevision;
-    nextEnvironmentRevision++;
-    environmentRevision = nextEnvironmentRevision;
-    rebuildPresentation(updatedNodes);
-  }
-
-  /** Derived presentation caches may lag a committed edit and retry on the next access/frame. */
-  function refreshPresentationIfStale():Void {
   public function setFinish(id:String, finish:Appearance):Void {
     if (finish == null || finish.finish == null || StringTools.trim(finish.finish).length == 0 ||
         !validColour(finish.metallic) || !validColour(finish.roughness))
@@ -2219,6 +2211,34 @@ class EditorScene {
     replaceObjects(data, selectedId);
   }
 
+  /** Generated source appearance for a project occurrence; remains stable across authored edits. */
+  public function configureComponentFinishes(baseline:Array<SceneObjectData>):Void {
+    componentFinishes.clear();
+    for (item in baseline) componentFinishes.set(item.id, item);
+    selectionRevision++;
+  }
+
+  public function resetComponentFinish(id:String):Void {
+    var source = componentFinishes.get(id);
+    if (source == null) throw "Object has no component finish: " + id;
+    var data = records();
+    for (item in data) if (item.id == id) {
+      item.red = source.red; item.green = source.green; item.blue = source.blue;
+      item.appearance = source.appearance;
+    }
+    replaceObjects(data, selectedId);
+  }
+
+  function publish(?updatedNodes:Array<NodeId>):Void {
+    nextRevision++;
+    revision = nextRevision;
+    nextEnvironmentRevision++;
+    environmentRevision = nextEnvironmentRevision;
+    rebuildPresentation(updatedNodes);
+  }
+
+  /** Derived presentation caches may lag a committed edit and retry on the next access/frame. */
+  function refreshPresentationIfStale():Void {
     if (presentationStale) rebuildPresentation();
     if (presentationStale) throw "Scene presentation is unavailable until its derived caches rebuild";
   }
@@ -2324,33 +2344,39 @@ class EditorScene {
           default: throw "Colour requires #RRGGBB";
         }
       }, colour));
-    if (!importedShape && !genericPart)
-      result.push(dimensionProperty(id, 2, prefix));
-    if (requiredObject(id).kind == "cad-plate") {
-      result.push(cadProperty(id,CadPlateModel.HOLE_DIAMETER,"Hole diameter",false,prefix));
-      result.push(cadProperty(id,CadPlateModel.HOLE_X,"Hole X",true,prefix));
-      result.push(cadProperty(id,CadPlateModel.HOLE_Y,"Hole Y",true,prefix));
-    } else if (requiredObject(id).kind == "cad-bracket") {
-      result.push(bracketProperty(id,"wall","Wall thickness",function(model)return model.wallThickness(),
-        function(value)setBracketWallThickness(id,value),prefix));
-      result.push(bracketProperty(id,"hole-radius","Hole radius",function(model)return model.holeRadius(),
     var finishOptions = new PropertyDescriptorOptions();
     finishOptions.category = "Rendering";
+    var sourceFinish = componentFinishes.get(id);
+    if (sourceFinish != null) finishOptions.options.push(new PropertyOption("component", "Component finish"));
+    for (preset in [
+      ["neutral", "Neutral"], ["painted", "Painted"], ["machined-steel", "Machined steel"],
+      ["black-oxide", "Black oxide"], ["bearing-steel", "Bearing steel"],
+      ["aluminium", "Aluminium"], ["rubber", "Rubber"]
+    ]) finishOptions.options.push(new PropertyOption(preset[0], preset[1]));
+    var initialFinish = requiredObject(id).appearance;
+    if (initialFinish != null && Appearances.preset(initialFinish.finish) == null)
+      finishOptions.options.push(new PropertyOption(initialFinish.finish, initialFinish.finish));
     finishOptions.validator = function(_, value) return switch (value) {
-      case PropertyValue.Text(text): Appearances.preset(text) == null ? "Unknown finish" : null;
-      default: "Finish requires a preset name";
+      case PropertyValue.Enum(key):
+        key == "component" && sourceFinish != null || Appearances.preset(key) != null ? null : "Unknown finish";
+      default: "Finish requires a preset";
     };
-    result.push(new PropertyDescriptor(prefix + "finish", "Finish", PropertyType.Text,
+    result.push(new PropertyDescriptor(prefix + "finish", "Finish", PropertyType.Enum,
       function(_) {
-        var appearance = requiredObject(id).appearance;
-        return PropertyValue.Text(appearance == null ? "neutral" : appearance.finish);
+        var item = requiredObject(id);
+        var appearance = item.appearance;
+        if (sourceFinish != null && sameFinish(appearance, sourceFinish.appearance) &&
+            item.red == sourceFinish.red && item.green == sourceFinish.green && item.blue == sourceFinish.blue)
+          return PropertyValue.Enum("component");
+        return PropertyValue.Enum(appearance == null ? "neutral" : appearance.finish);
       }, function(_, value) {
         switch (value) {
-          case PropertyValue.Text(text):
-            var preset = Appearances.preset(text);
+          case PropertyValue.Enum("component") if (sourceFinish != null): resetComponentFinish(id);
+          case PropertyValue.Enum(key):
+            var preset = Appearances.preset(key);
             if (preset == null) throw "Unknown finish";
             setFinish(id, preset);
-          default: throw "Finish requires a preset name";
+          default: throw "Finish requires a preset";
         }
       }, finishOptions));
     for (channel in ["metallic", "roughness"]) {
@@ -2386,6 +2412,16 @@ class EditorScene {
             roughness: field == "roughness" ? number : current.roughness});
         }, settings));
     }
+    if (!importedShape && !genericPart)
+      result.push(dimensionProperty(id, 2, prefix));
+    if (requiredObject(id).kind == "cad-plate") {
+      result.push(cadProperty(id,CadPlateModel.HOLE_DIAMETER,"Hole diameter",false,prefix));
+      result.push(cadProperty(id,CadPlateModel.HOLE_X,"Hole X",true,prefix));
+      result.push(cadProperty(id,CadPlateModel.HOLE_Y,"Hole Y",true,prefix));
+    } else if (requiredObject(id).kind == "cad-bracket") {
+      result.push(bracketProperty(id,"wall","Wall thickness",function(model)return model.wallThickness(),
+        function(value)setBracketWallThickness(id,value),prefix));
+      result.push(bracketProperty(id,"hole-radius","Hole radius",function(model)return model.holeRadius(),
         function(value)setBracketHoleRadius(id,value),prefix));
     }
     var selectedFeature = selectedCadFeature(id);
@@ -2729,6 +2765,7 @@ class EditorScene {
         x: item.x, y: item.y, z: item.z,
         width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
+        appearance:item.appearance,
         visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
         rotation:item.rotation});
     }
@@ -2739,7 +2776,6 @@ class EditorScene {
   public function recordsForSave():Array<SceneObjectData> {
     var result=records();
     for(record in result)if(isCadKind(record.type))
-        appearance:item.appearance,
       record.cadGraph=currentCadGraph(record.id);
     var draft = activeSketchEdit;
     if (draft != null) {
@@ -2860,6 +2896,7 @@ class EditorSceneObject {
   public var red:Float;
   public var green:Float;
   public var blue:Float;
+  public var appearance:Null<Appearance>;
   public var cadGraph:Null<String>;
   public var meshSnapshot:Null<String>;
   public var rotation:Null<Array<Float>>;
@@ -2870,7 +2907,6 @@ class EditorSceneObject {
   public function new(id:String,label:String,kind:String,width:Float,height:Float,depth:Float,
       collisionEnabled:Bool,dynamicBody:Bool,mass:Float,red:Float,green:Float,blue:Float,
       ?cadGraph:String,x:Float=0,y:Float=0,z:Float=0,visible:Bool=true,?meshSnapshot:String,
-  public var appearance:Null<Appearance>;
       ?rotation:Array<Float>, ?appearance:Appearance) {
     this.id = id; this.label = label; this.kind = kind;
     this.width=width;this.height=height;this.depth=depth;this.collisionEnabled=collisionEnabled;

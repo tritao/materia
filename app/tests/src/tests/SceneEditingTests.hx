@@ -66,6 +66,25 @@ class SceneEditingTests {
       nearValue(part.appearance.metallic, 0.8) && nearValue(part.appearance.roughness, 0.34),
       "generated artifact retains surface finish");
   }
+  static function componentFinishReset():Void {
+    var source:app.SceneObjectData = {id:"project:bearing", label:"Bearing", type:"rectangle",
+      x:0, y:0, z:0, width:1, height:1, depth:1, collisionEnabled:false,
+      dynamicBody:false, mass:1, red:0.6, green:0.62, blue:0.64,
+      appearance: Appearances.bearingSteel(), visible:true};
+    var scene = new EditorScene([source]);
+    scene.configureComponentFinishes([source]);
+    scene.select(source.id);
+    scene.setColour(source.id, 0.2, 0.25, 0.3);
+    scene.setFinish(source.id, Appearances.blackOxide());
+    var finish = new PropertyBinding(scene.properties()[7], scene.context());
+    check(finish.apply(PropertyValue.Enum("component")) == PropertyEditResult.Applied,
+      "component finish reset is available in picker");
+    var restored = scene.records()[0];
+    check(restored.appearance != null && restored.appearance.finish == "bearing-steel" &&
+      nearValue(restored.red, 0.6) && nearValue(restored.green, 0.62),
+      "component finish reset restores source finish and color");
+    scene.dispose();
+  }
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
   }
@@ -298,7 +317,7 @@ class SceneEditingTests {
       == PropertyEditResult.Applied, "height edit succeeds");
     check(new PropertyBinding(empty.properties()[6], empty.context()).apply(PropertyValue.Text("#336699"))
       == PropertyEditResult.Applied, "colour edit succeeds");
-    check(new PropertyBinding(empty.properties()[7], empty.context()).apply(PropertyValue.Text("machined-steel"))
+    check(new PropertyBinding(empty.properties()[7], empty.context()).apply(PropertyValue.Enum("machined-steel"))
       == PropertyEditResult.Applied, "finish preset edit succeeds");
     check(new PropertyBinding(empty.properties()[8], empty.context()).apply(PropertyValue.Float(0.7))
       == PropertyEditResult.Applied, "metallic edit succeeds");
@@ -1074,6 +1093,8 @@ class SceneEditingTests {
   }
 
   static function main():Int {
+    appearanceArtifactRoundTrip();
+    componentFinishReset();
     perspectiveHoverInput();
     cadFaceHoverPresentation();
     cadPreviewFaceHoverPresentation();
@@ -1114,7 +1135,6 @@ class SceneEditingTests {
       near(scene.info("box").localTransform().element(12), -1.5, "undo targets original selection");
       check(!scene.document.isDirty, "undo restores initial document state");
       scene.document.redo();
-    appearanceArtifactRoundTrip();
       near(scene.info("box").localTransform().element(12), -2.5, "redo original object");
 
       var visibility = new PropertyBinding(scene.properties()[2], scene.context());

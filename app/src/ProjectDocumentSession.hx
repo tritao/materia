@@ -151,6 +151,7 @@ class ProjectDocumentSession {
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
     var nextDocument = createDocument();
     var next = new EditorScene(data, nextDocument, null, geometryBySnapshot);
+    if (reference != null) next.configureComponentFinishes(data);
     var nextSensors:SensorConfiguration = null;
     var nextBim:BimDocument = null;
     try {
@@ -202,6 +203,7 @@ class ProjectDocumentSession {
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
     try {
       next = new EditorScene(data, nextDocument, null, generated.geometryBySnapshot);
+      next.configureComponentFinishes(baseline);
       nextSensors = new SensorConfiguration(SceneCodec.decodeSensors(text), nextDocument);
       nextBim = SceneCodec.decodeBim(text);
     } catch (error:Dynamic) {
