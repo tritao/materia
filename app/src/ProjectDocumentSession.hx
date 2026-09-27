@@ -17,6 +17,7 @@ import bimkit.BimDocument;
 import app.ProjectSceneRecord.ProjectSceneInstance;
 import app.ProjectSceneRecord.ProjectFieldOverride;
 import materia.project.Appearance.Appearances;
+import materia.project.MaterialDef;
 import materia.project.AssemblyRecord;
 import materia.project.AssemblyDefinition;
 import materia.project.AssemblyDefinition.AssemblyComponentOccurrence;
@@ -47,6 +48,7 @@ class ProjectDocumentSession {
   public var projectAssembly(default,null):Null<AssemblyRecord> = null;
   public var projectAssemblyDefinition(default,null):Null<AssemblyDefinition> = null;
   public var projectAssemblyState(default,null):Null<AssemblyStateRecord> = null;
+  public var customMaterials(default, null):Array<MaterialDef> = [];
   var assemblyRuntime:Null<AssemblyState> = null;
   var assemblyLocalCentersByDefinition:Null<Map<String, Array<Float>>> = null;
   var assemblyMetresPerUnit:Float = 1.0;
@@ -97,7 +99,7 @@ class ProjectDocumentSession {
       content: SceneCodec.encode(scene, sensors,
         scriptOwnership == null ? null : scriptOwnership.record(), bim,
         project == null ? null : project.record,
-        project == null ? null : project.authored),
+        project == null ? null : project.authored, customMaterials),
       dirty: isDirty()});
   }
 
@@ -113,9 +115,11 @@ class ProjectDocumentSession {
 
   function openContent(absolute:String, text:String):Void {
     var root = SceneCodec.parse(text);
+    var loadedMaterials = SceneCodec.decodeCustomMaterialsRoot(root);
     var project = SceneCodec.decodeProjectRoot(root);
     if (project != null) {
       openProjectDocument(absolute, root, project);
+      customMaterials = loadedMaterials;
       return;
     }
     var script=SceneCodec.decodeScriptRoot(root);
@@ -132,7 +136,9 @@ class ProjectDocumentSession {
         nextBim.close();
         throw error;
       }
-      replace(materialized.scene,materialized.sensors,absolute,ownership,nextBim,nextDocument);return;
+      replace(materialized.scene,materialized.sensors,absolute,ownership,nextBim,nextDocument);
+      customMaterials = loadedMaterials;
+      return;
     }
     var data = SceneCodec.decodeRoot(root);
     var nextDocument = createDocument();
@@ -145,6 +151,7 @@ class ProjectDocumentSession {
     }
     catch (error:Dynamic) { next.dispose(); if (nextSensors != null) nextSensors.dispose(); throw error; }
     replace(next, nextSensors, absolute, null, nextBim, nextDocument);
+    customMaterials = loadedMaterials;
   }
 
   public function openScript(reference:String):ScriptMaterialization {
@@ -448,7 +455,7 @@ class ProjectDocumentSession {
     AtomicFile.write(absolute, SceneCodec.encode(scene, sensors,
       scriptOwnership==null?null:scriptOwnership.record(), bim,
       project == null ? null : project.record,
-      project == null ? null : project.authored));
+      project == null ? null : project.authored, customMaterials));
     // Do not move the savepoint or change the document path until publication succeeds.
     path = absolute;
     document.markSaved();
@@ -495,6 +502,7 @@ class ProjectDocumentSession {
     projectAssembly = null;
     projectAssemblyDefinition = null;
     projectAssemblyState = null;
+    customMaterials = [];
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;
@@ -628,10 +636,11 @@ class ProjectDocumentSession {
     return Json.stringify(first) == Json.stringify(second);
 
   static var EDITABLE_FIELDS:Array<String> = ["label", "x", "y", "z", "rotation",
-    "collisionEnabled", "dynamicBody", "mass", "red", "green", "blue", "appearance", "visible"];
+    "collisionEnabled", "dynamicBody", "mass", "materialId", "visible"];
+  static var VISUAL_FIELDS:Array<String> = ["visual.baseColor", "visual.finish",
+    "visual.metallic", "visual.roughness"];
 
   static function sameValue(property:String, a:Dynamic, b:Dynamic):Bool {
-    if (property == "appearance") return Appearances.same(cast a, cast b);
     if (property == "rotation") return sameRotation(cast a, cast b);
     if (Std.isOfType(a, Float) || Std.isOfType(b, Float)) {
       var first:Float = a, second:Float = b;
@@ -645,12 +654,25 @@ class ProjectDocumentSession {
     for (property in EDITABLE_FIELDS) {
       if (!includePose && ["x", "y", "z", "rotation"].indexOf(property) >= 0) continue;
       var value = Reflect.field(item, property);
+      if (property == "materialId" && value == null) continue;
       if (sameValue(property, value, Reflect.field(source, property))) continue;
       result.push({targetId: id, property: property,
-        kind: property == "rotation" ? "vector" : property == "appearance" ? "appearance" :
+        kind: property == "rotation" ? "vector" :
           Std.isOfType(value, Bool) ? "boolean" : Std.isOfType(value, String) ? "text" : "number",
         value: value});
     }
+    if (Math.abs(item.red - source.red) >= 1e-6 || Math.abs(item.green - source.green) >= 1e-6 ||
+        Math.abs(item.blue - source.blue) >= 1e-6)
+      result.push({targetId: id, property: "visual.baseColor", kind: "vector",
+        value: [item.red, item.green, item.blue]});
+    var appearance = item.appearance == null ? Appearances.neutral() : item.appearance;
+    var baselineAppearance = source.appearance == null ? Appearances.neutral() : source.appearance;
+    if (appearance.finish != baselineAppearance.finish)
+      result.push({targetId: id, property: "visual.finish", kind: "text", value: appearance.finish});
+    if (Math.abs(appearance.metallic - baselineAppearance.metallic) >= 1e-6)
+      result.push({targetId: id, property: "visual.metallic", kind: "number", value: appearance.metallic});
+    if (Math.abs(appearance.roughness - baselineAppearance.roughness) >= 1e-6)
+      result.push({targetId: id, property: "visual.roughness", kind: "number", value: appearance.roughness});
   }
 
   static function materializeProject(baseline:Array<SceneObjectData>, project:ProjectSceneRecord,
@@ -699,14 +721,27 @@ class ProjectDocumentSession {
     var value:Dynamic = withoutMesh(source);
     Reflect.setField(value, "id", id);
     if (edits != null) for (edit in edits) {
-      if (EDITABLE_FIELDS.indexOf(edit.property) < 0 || edit.targetId != id) {
+      if ((EDITABLE_FIELDS.indexOf(edit.property) < 0 && VISUAL_FIELDS.indexOf(edit.property) < 0)
+          || edit.targetId != id) {
         diagnostics.push("override:" + id + ":" + edit.property);
         continue;
       }
-      var previous = Reflect.field(value, edit.property);
-      Reflect.setField(value, edit.property, edit.value);
+      var previous:Dynamic = Json.parse(Json.stringify(value));
+      switch (edit.property) {
+        case "visual.baseColor":
+          var color:Array<Dynamic> = cast edit.value;
+          if (color != null && color.length == 3) {
+            Reflect.setField(value, "red", color[0]);
+            Reflect.setField(value, "green", color[1]);
+            Reflect.setField(value, "blue", color[2]);
+          } else Reflect.setField(value, "red", null);
+        case "visual.finish", "visual.metallic", "visual.roughness":
+          var appearance:Dynamic = Reflect.field(value, "appearance");
+          Reflect.setField(appearance, edit.property.substr(7), edit.value);
+        default: Reflect.setField(value, edit.property, edit.value);
+      }
       try decodeProjectObject(value) catch (_:Dynamic) {
-        Reflect.setField(value, edit.property, previous);
+        value = previous;
         diagnostics.push("override:" + id + ":" + edit.property);
       }
     }
@@ -716,7 +751,7 @@ class ProjectDocumentSession {
   static function decodeProjectObject(value:Dynamic, ?snapshot:String):SceneObjectData {
     Reflect.setField(value, "meshSnapshot", "_");
     var result = SceneCodec.decode(Json.stringify({format: SceneCodec.FORMAT,
-      version: SceneCodec.VERSION, objects: [value]}))[0];
+      version: SceneCodec.VERSION, objects: [SceneCodec.encodeObject(cast value)]}))[0];
     result.meshSnapshot = snapshot;
     return result;
   }
@@ -725,7 +760,8 @@ class ProjectDocumentSession {
     id: item.id, type: item.type, label: item.label, x: item.x, y: item.y, z: item.z,
     width: item.width, height: item.height, depth: item.depth,
     collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-    red: item.red, green: item.green, blue: item.blue, appearance: item.appearance == null ? Appearances.neutral() : item.appearance,
+    red: item.red, green: item.green, blue: item.blue, appearance: item.appearance == null ? Appearances.neutral() : Json.parse(Json.stringify(item.appearance)),
+    materialId: item.materialId,
     visible: item.visible, rotation: item.rotation
   };
 

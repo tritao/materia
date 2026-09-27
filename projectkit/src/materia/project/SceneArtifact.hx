@@ -8,6 +8,7 @@ import materia.project.AssemblyDefinition.AssemblyStateRecord;
 import materia.project.AssemblyDefinitionCodec;
 import materia.project.Appearance;
 import materia.project.Appearance.Appearances;
+import materia.project.MaterialLibrary;
 
 typedef SceneArtifactFaceRange = {
 	var faceIndex:Int;
@@ -22,6 +23,9 @@ typedef SceneArtifactPart = {
 	var green:Float;
 	var blue:Float;
 	@:optional var appearance:Appearance;
+	@:optional var materialId:String;
+	@:optional var materialDensity:Float;
+	@:optional var materialSpec:String;
 	var vertexCount:Int;
 	var indexCount:Int;
 	var vertices:Bytes;
@@ -44,7 +48,7 @@ typedef SceneArtifactData = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 7;
+	public static inline var VERSION:Int = 8;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -52,7 +56,7 @@ class SceneArtifact {
 
 	public static function encode(data:SceneArtifactData):Bytes {
 		validateHeader(data);
-		var names:Array<{id:Bytes, name:Bytes, finish:Bytes}> = [];
+		var names:Array<{id:Bytes, name:Bytes, finish:Bytes, materialId:Bytes, materialSpec:Bytes, density:Float}> = [];
 		var assembly = data.assembly == null ? Bytes.alloc(0) : Bytes.ofString(AssemblyCodec.encode(data.assembly));
 		var assemblyDefinition = data.assemblyDefinition == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
@@ -67,8 +71,14 @@ class SceneArtifact {
 			if (id.length == 0 || id.length > 4096 || name.length == 0 || name.length > 4096)
 				throw "Scene artifact has an invalid part ID or name";
 			var finish = Bytes.ofString(part.appearance == null ? "neutral" : part.appearance.finish);
-			names.push({id: id, name: name, finish: finish});
-			length += 48 + finish.length + id.length + name.length + part.vertices.length + part.normals.length
+			var idValue = part.materialId == null ? "neutral" : part.materialId;
+			var material = MaterialLibrary.get(idValue);
+			var materialId = Bytes.ofString(idValue);
+			var materialSpec = Bytes.ofString(part.materialSpec == null ? material.physical.spec : part.materialSpec);
+			var density = part.materialDensity == null ? material.physical.density : part.materialDensity;
+			names.push({id: id, name: name, finish: finish, materialId: materialId,
+				materialSpec: materialSpec, density: density});
+			length += 64 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
 				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
 				+ (part.edgeIds == null ? 0 : part.edgeIds.length)
 				+ part.faceRanges.length * 12;
@@ -93,6 +103,11 @@ class SceneArtifact {
 			var appearance = part.appearance == null ? Appearances.neutral() : part.appearance;
 			result.setFloat(offset, appearance.metallic); offset += 4;
 			result.setFloat(offset, appearance.roughness); offset += 4;
+			offset = putInt(result, offset, text.materialId.length);
+			result.blit(offset, text.materialId, 0, text.materialId.length); offset += text.materialId.length;
+			result.setDouble(offset, text.density); offset += 8;
+			offset = putInt(result, offset, text.materialSpec.length);
+			result.blit(offset, text.materialSpec, 0, text.materialSpec.length); offset += text.materialSpec.length;
 			offset = putInt(result, offset, part.vertexCount);
 			offset = putInt(result, offset, part.indexCount);
 			offset = putInt(result, offset, part.faceRanges.length);
@@ -183,6 +198,17 @@ class SceneArtifact {
 			if (!finite(color) || color < 0.0 || color > 1.0)
 				throw 'Scene artifact part "${part.id}" has an invalid color';
 		var appearance = part.appearance;
+		if (part.materialId != null && MaterialLibrary.get(part.materialId) == null &&
+			(part.materialDensity == null || part.materialSpec == null))
+			throw 'Scene artifact part "${part.id}" needs resolved custom material properties';
+		if (part.materialId != null && (StringTools.trim(part.materialId).length == 0 ||
+			Bytes.ofString(part.materialId).length > 4096))
+			throw 'Scene artifact part "${part.id}" has an invalid material ID';
+		if (part.materialDensity != null && (!finite(part.materialDensity) || part.materialDensity <= 0))
+			throw 'Scene artifact part "${part.id}" has an invalid density';
+		if (part.materialSpec != null && (StringTools.trim(part.materialSpec).length == 0 ||
+			Bytes.ofString(part.materialSpec).length > 4096))
+			throw 'Scene artifact part "${part.id}" has an invalid material specification';
 		if (appearance != null && (appearance.finish == null ||
 			StringTools.trim(appearance.finish).length == 0 ||
 			Bytes.ofString(appearance.finish).length > 4096 ||
@@ -224,7 +250,7 @@ private class SceneArtifactReader {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != SceneArtifact.VERSION)
+		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 && version != SceneArtifact.VERSION)
 			throw "Unsupported scene artifact version";
 		var metresPerUnit = readDouble();
 		var count = readInt();
@@ -239,6 +265,10 @@ private class SceneArtifactReader {
 			var appearance:Appearance = version >= 7
 				? {finish: readText(), metallic: readFloat(), roughness: readFloat()}
 				: Appearances.neutral();
+			var materialId = version >= 8 ? readText() :
+				(MaterialLibrary.get(appearance.finish) == null ? "neutral" : appearance.finish);
+			var density = version >= 8 ? readDouble() : null;
+			var materialSpec = version >= 8 ? readText() : null;
 			var vertexCount = readInt(), indexCount = readInt(), rangeCount = readInt();
 			var edgeByteCount = version >= 4 ? readInt() : 0;
 			if (vertexCount <= 0 || vertexCount > 2000000 || indexCount <= 0 ||
@@ -252,7 +282,7 @@ private class SceneArtifactReader {
 			for (_ in 0...rangeCount)
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
 			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
-				appearance: appearance,
+				appearance: appearance, materialId: materialId, materialDensity: density, materialSpec: materialSpec,
 				vertexCount: vertexCount, indexCount: indexCount, vertices: vertices, normals: normals,
 				indices: indices, edgeSegments: edgeSegments, edgeIds: edgeIds,
 				faceRanges: faceRanges};

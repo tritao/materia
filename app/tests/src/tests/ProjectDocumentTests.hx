@@ -106,6 +106,15 @@ class ProjectDocumentTests {
       var root:Dynamic = Json.parse(encoded);
       check(Reflect.field(root, "version") == SceneCodec.VERSION &&
         SceneCodec.decode(encoded).length == 1, "scene fixture re-encodes in current format");
+      check(encoded.indexOf('"materialId"') >= 0 && encoded.indexOf('"visualOverrides"') >= 0 &&
+        encoded.indexOf('"red"') < 0 && encoded.indexOf('"appearance"') < 0,
+        "saved scene uses material references and sparse visual values");
+      var custom:materia.project.MaterialDef = {id: "user-copper", name: "Copper",
+        visual: {baseColor: [0.7, 0.35, 0.2], metallic: 0.9, roughness: 0.3},
+        physical: {density: 8960, spec: "C110"}};
+      var withCustom = SceneCodec.encode(scene, null, null, null, null, null, [custom]);
+      check(SceneCodec.decodeCustomMaterialsRoot(SceneCodec.parse(withCustom)).length == 1,
+        "project material library preserves custom materials");
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
