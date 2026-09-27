@@ -13,7 +13,10 @@ class VirtualDeviceEndpoint::Link final : public Rkd6Transport {
 public:
     Link(const VirtualDeviceConfig6 &config, std::uint32_t count)
         : config_(config), random_(config.seed), count_(count) {
-        std::vector<double> scale = config.steps_per_unit;
+        std::vector<double> scale;
+        if (!config.actuators.empty()) {
+            for (const auto &actuator : config.actuators) scale.push_back(actuator.steps_per_unit);
+        }
         if (scale.empty()) scale.assign(count, 1'000.0);
         if (scale.size() != count) return;
         device_ = rkd_virtual_create(config.device_tick_hz, config.step_tick_hz,
@@ -22,6 +25,9 @@ public:
     }
     ~Link() override { rkd_virtual_destroy(device_); }
     bool valid() const noexcept { return device_ != nullptr; }
+    bool miss_next_steps(std::uint32_t actuator, std::uint32_t count) {
+        return rkd_virtual_miss_next_steps(device_, actuator, count) != 0;
+    }
     unsigned baud() const noexcept override { return config_.baud; }
     std::uint64_t received_at_ns() const noexcept override { return received_at_ns_; }
     void cut(bool value) {
@@ -147,18 +153,36 @@ private:
 
 std::shared_ptr<VirtualDeviceEndpoint> VirtualDeviceEndpoint::create(
     const rk_robot_runtime_blueprint &blueprint, VirtualDeviceConfig6 config) {
-    if (blueprint.joint_count == 0 || blueprint.joint_count > device_wire6::MAX_ACTUATORS ||
+    if (config.actuators.empty()) {
+        for (std::uint32_t i = 0; i < blueprint.joint_count; ++i) {
+            DeviceActuator6 actuator{static_cast<std::uint8_t>(i)};
+            actuator.id = "joint." + std::to_string(i);
+            if (i < config.steps_per_unit.size())
+                actuator.steps_per_unit = config.steps_per_unit[i];
+            config.actuators.push_back(actuator);
+        }
+    }
+    const auto count = config.actuators.empty() ? blueprint.joint_count : config.actuators.size();
+    if (blueprint.joint_count == 0 || count > device_wire6::MAX_ACTUATORS ||
         config.baud == 0 || config.frame_drop_rate < 0 || config.corruption_rate < 0 ||
         config.frame_drop_rate + config.corruption_rate >= 1 ||
         config.clock_bound_ns == 0 || config.step_tick_hz == 0) return {};
-    auto transport = std::make_unique<Link>(config, blueprint.joint_count);
+    for (std::size_t i = 0; i < config.actuators.size(); ++i) {
+        if (config.actuators[i].id.empty()) return {};
+        for (std::size_t j = 0; j < i; ++j)
+            if (config.actuators[j].id == config.actuators[i].id) return {};
+    }
+    const auto base_fingerprint = config.fingerprint;
+    config.fingerprint = fingerprint_device_layout6(base_fingerprint, config.actuators);
+    auto transport = std::make_unique<Link>(config, count);
     if (!transport->valid()) return {};
     auto *link = transport.get();
-    auto inner = Rkd6Endpoint::attach(std::move(transport), blueprint, config.fingerprint,
+    auto inner = Rkd6Endpoint::attach(std::move(transport), blueprint, base_fingerprint,
         config.seed ? config.seed : 1, config.target_error, config.clock_bound_ns,
-        config.latency_ns, config.step_tick_hz, config.link_loss_timeout_ns);
+        config.latency_ns, config.step_tick_hz, config.link_loss_timeout_ns, config.actuators);
     if (!inner) return {};
-    return std::shared_ptr<VirtualDeviceEndpoint>(new VirtualDeviceEndpoint(std::move(inner), link));
+    return std::shared_ptr<VirtualDeviceEndpoint>(new VirtualDeviceEndpoint(std::move(inner), link,
+        std::move(config.actuators), blueprint.joint_count, config.fingerprint));
 }
 
 rk_result VirtualDeviceEndpoint::apply(const rk_robot_command &command) {
@@ -182,7 +206,21 @@ rk_result VirtualDeviceEndpoint::submit_device_plan(const rk_plan_submission &pl
 }
 
 void VirtualDeviceEndpoint::cut_link(bool cut) { link_->cut(cut); }
+bool VirtualDeviceEndpoint::miss_next_steps(std::uint32_t actuator, std::uint32_t count) {
+    return link_->miss_next_steps(actuator, count);
+}
 std::vector<double> VirtualDeviceEndpoint::actuator_positions() const { return link_->positions(); }
+std::vector<double> VirtualDeviceEndpoint::joint_positions() const {
+    auto positions = link_->positions();
+    if (actuators_.empty()) return positions;
+    std::vector<double> joints(joint_count_);
+    for (std::size_t i = 0; i < positions.size(); ++i) {
+        const auto &mapping = actuators_[i];
+        if (mapping.joint < joints.size())
+            joints[mapping.joint] = positions[i] / mapping.ratio + mapping.offset;
+    }
+    return joints;
+}
 std::vector<float> VirtualDeviceEndpoint::channel_values() const { return link_->channels(); }
 std::vector<VirtualStepRecord6> VirtualDeviceEndpoint::step_log() const { return link_->steps(); }
 

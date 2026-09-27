@@ -4,7 +4,7 @@ use crate::Board;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QueueError { StaleRevision, Committed, BadBoundary, BadExpectedState, Full, InvalidSegment, InvalidCommit }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StopReason { Underflow, LinkLost, Abort, Stop, EmergencyStop }
+pub enum StopReason { Underflow, LinkLost, Abort, Stop, EmergencyStop, DualDriveSkew }
 
 #[derive(Clone, Copy, Debug)]
 pub struct ScheduledSegment<const A: usize> {
@@ -330,6 +330,10 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
                 self.position = position;
                 self.velocity.fill(0.0);
                 for a in 0..A { board.position_target(a, position[a]); board.velocity_target(a, 0.0); }
+                if committed_len == self.len {
+                    self.segments.fill(None);
+                    self.len = 0;
+                }
                 if self.abort_at_end {
                     self.stop(StopReason::Abort);
                     board.stop_all();

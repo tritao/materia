@@ -2,7 +2,7 @@
 use robotkit_device_protocol::device_wire6::*;
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, MAX_FRAME_SIZE};
 use robotkit_device_protocol::{
-    Board, Output, ScheduledCore, ScheduledSegment, StopReason, VirtualBoard,
+    Board, Output, ScheduledCore, ScheduledSegment, SkewGroup, StepGenerator, StopReason, VirtualBoard,
 };
 use std::collections::VecDeque;
 
@@ -13,6 +13,7 @@ const CAPACITY: usize = 128;
 pub struct VirtualDevice {
     board: VirtualBoard<ACTUATORS, CHANNELS>,
     core: Option<ScheduledCore<ACTUATORS, CAPACITY>>,
+    steps: StepGenerator<ACTUATORS>,
     fingerprint: [u8; 16],
     count: usize,
     session: u64,
@@ -41,6 +42,8 @@ impl VirtualDevice {
             return None;
         }
         Some(Self {
+            steps: StepGenerator::new(steps_per_unit, [0; ACTUATORS],
+                [0.0; ACTUATORS], tick_hz)?,
             board: VirtualBoard::new(tick_hz, offset_ticks, drift_ppm, steps_per_unit),
             core: None,
             fingerprint,
@@ -92,10 +95,41 @@ impl VirtualDevice {
                     && begin.actuator_count as usize == self.count
                     && begin.step_tick_hz == self.step_tick_hz
                     && begin.session != 0
+                    && (0..self.count).all(|i| {
+                        let physical = self.board.steps_per_unit()[i];
+                        ((begin.steps_per_unit[i] as f64 - physical) / physical).abs() < 1e-6
+                    })
                 {
                     let mut limits = [1.0f32; ACTUATORS];
                     for (i, limit) in limits.iter_mut().enumerate().take(self.count) {
                         *limit = begin.actuator_max_acceleration[i];
+                    }
+                    let mut steps_per_unit = [1.0; ACTUATORS];
+                    let mut max_rate = [0.0; ACTUATORS];
+                    let mut setup = [0; ACTUATORS];
+                    for i in 0..self.count {
+                        steps_per_unit[i] = begin.steps_per_unit[i] as f64;
+                        max_rate[i] = begin.max_rate[i] as f64;
+                        setup[i] = begin.direction_setup_ticks[i] as u64;
+                    }
+                    let Some(mut generator) = StepGenerator::new(
+                        steps_per_unit, setup, max_rate, self.board.tick_hz()) else {
+                        return false;
+                    };
+                    for i in 0..self.count {
+                        for j in i + 1..self.count {
+                            if begin.actuator_joint[i] == begin.actuator_joint[j] {
+                                let bound = begin.dual_drive_skew_bound[i]
+                                    .max(begin.dual_drive_skew_bound[j]) as f64;
+                                if bound > 0.0 {
+                                    if !generator.set_skew_group(SkewGroup { first: i, second: j,
+                                        first_ratio: begin.actuator_ratio[i] as f64,
+                                        second_ratio: begin.actuator_ratio[j] as f64, bound }) {
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
                     }
                     let link_loss_ticks = ((begin.link_loss_timeout_ns as u128
                         * self.board.tick_hz() as u128)
@@ -108,6 +142,7 @@ impl VirtualDevice {
                         link_loss_ticks.max(1),
                     );
                     core.initialize_clock(self.board.now_ticks());
+                    self.steps = generator;
                     self.core = Some(core);
                     self.session = begin.session;
                     ack.status = 1;
@@ -232,16 +267,9 @@ impl VirtualDevice {
             self.board.advance_host_ns(self.host_ns);
             if let Some(core) = self.core.as_mut() {
                 core.tick(&mut self.board);
-                // A6 needs discrete virtual positions for its plant. A7 adds
-                // setup-time and rate-limit qualification to this crossing loop.
                 let targets = self.board.position_targets();
-                let counts = self.board.step_counts();
-                let scale = self.board.steps_per_unit();
-                for i in 0..self.count {
-                    let desired = (targets[i] as f64 * scale[i]).floor() as i64;
-                    if desired != counts[i] {
-                        self.board.step_pulse(i, desired > counts[i]);
-                    }
+                if self.steps.tick(&mut self.board, targets).is_err() {
+                    core.stop(StopReason::DualDriveSkew);
                 }
             }
         }
@@ -253,6 +281,13 @@ impl VirtualDevice {
         let Some(core) = self.core.as_ref() else {
             return;
         };
+        let fault = match core.stop_reason() {
+            None => 0,
+            Some(StopReason::Underflow) => 2,
+            Some(StopReason::LinkLost) => 3,
+            Some(StopReason::DualDriveSkew) => 4,
+            Some(_) => 1,
+        };
         let status = QueueStatus6 {
             queue_revision: core.revision(),
             committed_until_ticks: core.committed_until(),
@@ -263,7 +298,7 @@ impl VirtualDevice {
             remaining_segments: core.remaining_capacity() as u16,
             remaining_events: 0,
             underflow: core.underflow() as u8,
-            fault: core.stop_reason().is_some() as u8,
+            fault,
         };
         let mut bytes = [0; QueueStatus6::SIZE];
         status.encode(&mut bytes).unwrap();
@@ -274,7 +309,7 @@ impl VirtualDevice {
             timestamp_ticks: self.board.now_ticks(),
             accepted_sequence: 0,
             safety: if core.stop_reason().is_some() { 3 } else { 0 },
-            fault: core.stop_reason().is_some() as u8,
+            fault,
             actuator_count: self.count as u8,
             reserved: 0,
             path_clock_ticks: core.path_clock(),
@@ -345,6 +380,13 @@ pub unsafe extern "C" fn rkd_virtual_step(device: *mut VirtualDevice, host_ns: u
     } else {
         0
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rkd_virtual_miss_next_steps(
+    device: *mut VirtualDevice, actuator: u32, count: u32,
+) -> i32 {
+    device.as_mut().is_some_and(|v| v.board.miss_next_steps(actuator as usize, count)) as i32
 }
 
 #[no_mangle]
@@ -488,6 +530,9 @@ mod tests {
             step_tick_hz: 40_000,
             max_acceleration: 10.0,
             actuator_max_acceleration: [10.0; 64],
+            steps_per_unit: [1_000.0; 64], max_rate: [0.0; 64],
+            direction_setup_ticks: [0; 64], actuator_joint: [0; 64],
+            actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64],
             link_loss_timeout_ns: 2_000_000_000,
         };
         let mut session = vec![0; SessionBegin6::SIZE];

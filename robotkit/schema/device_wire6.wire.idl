@@ -1,5 +1,5 @@
 # RKD6 scheduled device payload records. Outer frame uses RKD6, length and CRC32.
-const PROTOCOL_VERSION : u8 = 7;
+const PROTOCOL_VERSION : u8 = 8;
 const MAX_ACTUATORS : u8 = 64;
 
 enum MessageType6 : u8 {
@@ -30,6 +30,12 @@ packed SessionBegin6 endian little {
     step_tick_hz : u32
     max_acceleration : f32
     actuator_max_acceleration : f32[64]
+    steps_per_unit : f32[64]
+    max_rate : f32[64]
+    direction_setup_ticks : u16[64]
+    actuator_joint : u8[64]
+    actuator_ratio : f32[64]
+    dual_drive_skew_bound : f32[64]
     link_loss_timeout_ns : u64
 }
 

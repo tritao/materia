@@ -15,6 +15,7 @@ class VirtualDeviceOptions {
   public var corruptionRate:Float = 0.0;
   public var seed:Int64 = Int64.ofInt(1);
   public var stepsPerUnit:Array<Float> = [];
+  public var actuators:Array<VirtualActuatorOptions> = [];
   public var fingerprint:String = "00000000000000000000000000000000";
   public var targetError:Float = 0.00001;
   public var clockBoundNs:Int64 = Int64.ofInt(5000000);

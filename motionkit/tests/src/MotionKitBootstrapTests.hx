@@ -1,5 +1,7 @@
 import haxe.Int64;
 import machinekit.assembly.LinearAxis;
+import machinekit.motion.LeadScrewThread;
+import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import motionkit.AxisTarget;
 import motionkit.Feed;
 import motionkit.MotionOptions;
@@ -69,6 +71,8 @@ import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.VirtualDeviceOptions;
+import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
 import RobotKitRuntime;
@@ -118,6 +122,7 @@ class MotionKitBootstrapTests {
     testHomingAndJogging();
     testMoveLinearUsesPlannerLimits();
     testCompiledXYZGantryRunsThroughSimulation();
+    testMachineKitLeadScrewThroughVirtualDevice();
     testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
     testPlanCapableReplayRecordsMotionPlan();
@@ -1268,6 +1273,35 @@ class MotionKitBootstrapTests {
     var snapshot = robot.snapshot();
     near(snapshot.positions.get(0), 0.035, "dual-motor axis reaches its logical target on motor one", 1e-5);
     near(snapshot.positions.get(1), 0.035, "dual-motor axis reaches its logical target on motor two", 1e-5);
+    simulation.dispose();
+  }
+
+  static function testMachineKitLeadScrewThroughVirtualDevice():Void {
+    var screw = new LeadScrewThread(MetricTrapezoidal, 10, 2, 4);
+    var axis = new LinearAxis(23, 10, 80, null, 30, screw);
+    near(axis.nut.travelPerRevolution(), 8.0, "four-start screw has an 8 mm lead");
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.01, 0.04);
+    var ratio = 2.0 * Math.PI / 0.008;
+    var options = new VirtualDeviceOptions();
+    options.actuators = [new VirtualActuatorOptions(blueprint.model.actuators[0].id, 0, ratio, 0.0,
+      3200.0 / (2.0 * Math.PI), 0.01 * ratio, 2)];
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime, null, options);
+    for (tick in 1...21) simulation.step(Int64.ofInt(tick));
+    var robot = new SimulatedRobot("lead-screw-virtual", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var before = simulation.linkPose(0, 1);
+    machine.moveAxes([new AxisTarget("x", 0.02)], new MotionOptions(0.01, 0.04));
+    runMotion(machine, simulation);
+    for (tick in 0...20) simulation.step(Int64.ofInt(tick));
+    var finalJoint = robot.snapshot().positions.get(0);
+    check(Math.abs(finalJoint - 0.02) <= 1.0 / 400000.0 + 1e-6,
+      "MachineKit lead screw follows the virtual RKD6 step position");
+    var after = simulation.linkPose(0, 1);
+    check(Math.abs(after.position[2] - before.position[2] - 0.02) <=
+      1.0 / 400000.0 + 1e-6, "lead screw step position moves the SimKit carriage");
     simulation.dispose();
   }
 
