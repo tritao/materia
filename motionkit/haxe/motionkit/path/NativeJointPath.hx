@@ -2,6 +2,7 @@ package motionkit.path;
 
 import MotionKitNative;
 import motionkit.planner.JointPathSamples;
+import motionkit.planner.PathTimingLimits;
 import motionkit.trajectory.Trajectory;
 
 /** Native C2 joint path. Owns the path handle and lowers against a time law. */
@@ -36,6 +37,15 @@ class NativeJointPath {
     var created = MotionKitNative.mk_path_lower(owner.borrow(), law.borrow(), tolerance);
     check(created.status, "path.lower");
     return new Trajectory(created.out_trajectory);
+  }
+
+  public function time(limits:PathTimingLimits):PathTimeLaw {
+    if (disposed) throw "Native joint path has been disposed";
+    var created = MotionKitNative.mk_time_path(owner.borrow(), limits.maxVelocity,
+      limits.maxAcceleration, limits.speedCaps, limits.startPathSpeed,
+      limits.endPathSpeed);
+    check(created.status, "path.time");
+    return new PathTimeLaw([], created.out_law);
   }
 
   public function dispose():Void {

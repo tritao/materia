@@ -2,6 +2,8 @@ package motionkit.path;
 
 import MotionKitNative;
 import haxe.Int64;
+import motionkit.planner.BindingConstraint;
+import motionkit.planner.BindingConstraint.BindingConstraintKind;
 
 /** One constant-acceleration span of a path-distance time law. */
 class PathTimeStage {
@@ -26,7 +28,11 @@ class PathTimeLaw {
   final owner:Ownedmk_time_law_handle;
   var disposed:Bool = false;
 
-  public function new(stages:Array<PathTimeStage>) {
+  public function new(stages:Array<PathTimeStage>, ?nativeOwner:Ownedmk_time_law_handle) {
+    if (nativeOwner != null) {
+      owner = nativeOwner;
+      return;
+    }
     if (stages == null || stages.length == 0) throw "Time law needs stages";
     var native:Array<mk_time_stage> = [];
     for (stage in stages) {
@@ -43,6 +49,31 @@ class PathTimeLaw {
     if (created.status != MotionKitNativeConstants.MK_OK)
       throw 'timeLaw.create failed with MotionKit error ${created.status}';
     owner = created.out_law;
+  }
+
+  public function bindingConstraints():Array<BindingConstraint> {
+    var result = MotionKitNative.mk_time_law_binding_count(borrow());
+    if (result.status != MotionKitNativeConstants.MK_OK)
+      throw 'timeLaw.bindingCount failed with MotionKit error ${result.status}';
+    var bindings:Array<BindingConstraint> = [];
+    for (index in 0...result.out_count) {
+      var native = new mk_timing_binding();
+      native.set_struct_size(mk_timing_binding.size());
+      var status = MotionKitNative.mk_time_law_get_binding(borrow(), index, native);
+      if (status != MotionKitNativeConstants.MK_OK)
+        throw 'timeLaw.binding failed with MotionKit error $status';
+      var kind = switch native.get_kind() {
+        case MotionKitNativeConstants.MK_TIMING_BINDING_JOINT_VELOCITY:
+          BindingConstraintKind.JointVelocity;
+        case MotionKitNativeConstants.MK_TIMING_BINDING_JOINT_ACCELERATION:
+          BindingConstraintKind.JointAcceleration;
+        case _: BindingConstraintKind.SpeedCap;
+      };
+      bindings.push(new BindingConstraint(native.get_stage_index(),
+        native.get_kind() == MotionKitNativeConstants.MK_TIMING_BINDING_FEED_CAP
+          ? -1 : native.get_joint(), kind, native.get_limit()));
+    }
+    return bindings;
   }
 
   public function distanceToTime(distance:Float):Float {

@@ -39,12 +39,13 @@ import robotkit.process.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
-import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
 import motionkit.planner.JointPathSamples;
 import motionkit.planner.PathTimingBackend;
 import motionkit.planner.PathTimingLimits;
 import motionkit.planner.SimplePathTiming;
+import motionkit.planner.ToppraPathTiming;
+import motionkit.planner.BindingConstraint.BindingConstraintKind;
 import motionkit.program.Blend;
 import motionkit.program.InputPredicate;
 import motionkit.program.MotionOp;
@@ -98,11 +99,13 @@ class MotionKitBootstrapTests {
     testProgramCompiler();
     testSimplePathTimingContract();
     testNativePathLowering();
+    testToppraPathTiming();
     testGeometricPathPrimitives();
     testNativeTrajectoryRoundTrip();
     testNativeValidationAndPlan();
     testPlannerIsDeterministicAndBounded();
-    testLineLookaheadPlanner();
+    testToppraExactStopsAndBindings();
+    testToppraCircleAcceleration();
     testLinearAxisCompilesToRobotModel();
     testLeadScrewActuatorRateLimitsPlans();
     testTransmissionDerivedAxisMapping();
@@ -145,6 +148,21 @@ class MotionKitBootstrapTests {
     trajectory.dispose();
     law.dispose();
     path.dispose();
+  }
+
+  static function testToppraPathTiming():Void {
+    var path = new JointPathSamples([0.0, 1.0], [[0.0], [1.0]],
+      [[1.0], [1.0]], [[0.0], [0.0]]);
+    var timed = new ToppraPathTiming(1e-8).time(path,
+      new PathTimingLimits([0.4], [1.0]));
+    check(timed.trajectory.durationSeconds() > 2.8 &&
+      timed.trajectory.durationSeconds() < 3.1, "TOPP-RA respects velocity limit");
+    near(timed.distanceToTime(1.0), timed.trajectory.durationSeconds(),
+      "TOPP-RA end distance maps to end time", 1e-6);
+    check(timed.bindingConstraints.length > 0,
+      "TOPP-RA reports binding constraints");
+    timed.releaseDistanceMap();
+    timed.trajectory.dispose();
   }
 
   static function testPoseProcessPath():Void {
@@ -708,130 +726,80 @@ class MotionKitBootstrapTests {
     second.dispose();
   }
 
-  static function testLineLookaheadPlanner():Void {
-    var path = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
-      new PathPoint(0.1, 0.0, 0.0), new PathPoint(0.1, 0.1, 0.0)]);
-    var planner = new LineLookaheadPlanner(0.01);
-    var limits = new MotionLimits(1.0, 2.0, 0.0);
-    var exact = planner.planNativePath(path, limits, PathPlanningOptions.exactStopMode());
-    var blend = planner.planNativePath(path, limits, PathPlanningOptions.blend(0.01));
-    check(exact.durationSeconds() > blend.durationSeconds(),
-      "blending shortens a cornered path without changing its endpoints");
-    for (segment in blend.segments())
-      check(segment.coefficients[0].length == 2,
-        "native lookahead emits degree-1 segments");
-    for (trajectory in [exact, blend]) {
-      for (i in 0...101) {
-        var point = trajectory.evaluate(trajectory.durationSeconds() * i / 100.0).positions;
-        var onFirst = Math.abs(point[1]) <= 1e-7 &&
-          point[0] >= -1e-7 && point[0] <= 0.1000001;
-        var onSecond = Math.abs(point[0] - 0.1) <= 1e-7 &&
-          point[1] >= -1e-7 && point[1] <= 0.1000001;
-        check(onFirst || onSecond, "lookahead stays on the authored polyline");
-      }
-    }
-    // Degree-1 chords around a stop can only be as fast as one sample period
-    // of braking, so an exact-stop corner stays under that bound on both
-    // sides while a blended corner carries clearly more speed through.
-    var stopChordBound = limits.maxAcceleration * planner.samplePeriodSeconds + 1e-9;
-    var exactCorner = cornerChordSpeeds(exact, 0.1, 0.0);
-    check(exactCorner[0] <= stopChordBound && exactCorner[1] <= stopChordBound,
-      "exact-stop corner comes to rest");
-    var blendCorner = cornerChordSpeeds(blend, 0.1, 0.0);
-    check(blendCorner[0] > 2.0 * stopChordBound && blendCorner[1] > 2.0 * stopChordBound,
-      "blend corner retains continuous path speed");
-
-    var repeated = planner.planNativePath(path, limits, PathPlanningOptions.blend(0.01));
-    near(repeated.durationSeconds(), blend.durationSeconds(),
-      "lookahead duration is deterministic");
-    for (i in 0...101) {
-      var time = blend.durationSeconds() * i / 100.0;
-      for (joint in 0...3)
-        near(repeated.evaluate(time).positions[joint], blend.evaluate(time).positions[joint],
-          "lookahead position is deterministic");
-    }
-
-    var shallowAngle = Math.PI / 18.0;
-    var nearReversalAngle = Math.PI * 170.0 / 180.0;
-    function cornerPath(angle:Float):GeometricPath return GeometricPath.lines([
-      new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.1, 0.0, 0.0),
-      new PathPoint(0.1 + 0.1 * Math.cos(angle), 0.1 * Math.sin(angle), 0.0)]);
-    var shallow = planner.planNativePath(cornerPath(shallowAngle), limits,
-      PathPlanningOptions.blend(0.01));
-    var reversal = planner.planNativePath(cornerPath(nearReversalAngle), limits,
-      PathPlanningOptions.blend(0.01));
-    var shallowSpeed = cornerChordSpeed(shallow, 0.1, 0.0);
-    var reversalSpeed = cornerChordSpeed(reversal, 0.1, 0.0);
-    check(shallowSpeed > 0.5, "shallow bend retains high blend speed");
-    check(reversalSpeed < 0.2, "near-reversal bend slows for the corner");
-    check(shallowSpeed > reversalSpeed * 4.0,
-      "corner speed decreases as the interior angle closes");
-
-    var arc = new ArcSegment(new PathPoint(0.1, 0.1, 0.0), 0.1,
-      -Math.PI * 0.5, Math.PI * 0.5);
-    var arcTrajectory = planner.planNativePath(new GeometricPath([arc]),
-      new MotionLimits(0.5, 1.0), PathPlanningOptions.exactStopMode());
-    for (segment in arcTrajectory.segments()) {
-      var point = segment.coefficients;
-      var dx = point[0][0] - 0.1;
-      var dy = point[1][0] - 0.1;
-      near(Math.sqrt(dx * dx + dy * dy), 0.1,
-        "arc knots stay on the authored circle", 1e-5);
-    }
-    // Tangential and centripetal acceleration share one budget; the chord
-    // estimate turns the circle's rotation into its centripetal term.
-    check(peakChordAccelerationNorm(arcTrajectory) <= 1.0 * 1.02,
-      "arc acceleration stays within the combined acceleration budget");
-    near(arcTrajectory.evaluate(arcTrajectory.durationSeconds()).positions[0], 0.2,
-      "arc planner reaches its endpoint");
-    for (trajectory in [exact, blend, repeated, shallow, reversal, arcTrajectory])
-      trajectory.dispose();
+  static function testToppraExactStopsAndBindings():Void {
+    var path = new JointPathSamples([0.0, 0.05, 0.1], [[0.0], [0.05], [0.1]],
+      [[1.0], [1.0], [1.0]], [[0.0], [0.0], [0.0]]);
+    var timed = new ToppraPathTiming(1e-8).time(path,
+      new PathTimingLimits([0.2], [1.0]));
+    near(timed.trajectory.evaluate(0.0).velocities[0], 0.0,
+      "TOPP-RA exact stop begins at rest", 1e-8);
+    near(timed.trajectory.evaluate(timed.trajectory.durationSeconds()).velocities[0], 0.0,
+      "TOPP-RA exact stop ends at rest", 1e-8);
+    check(timed.bindingConstraints.length > 0,
+      "TOPP-RA records a binding joint constraint");
+    check(Lambda.exists(timed.bindingConstraints, binding ->
+      binding.jointIndex == 0 && binding.kind == BindingConstraintKind.JointVelocity),
+      "TOPP-RA names the saturated joint and velocity limit");
+    timed.releaseDistanceMap();
+    timed.trajectory.dispose();
+    var sprint = new ToppraPathTiming(1e-8).time(path,
+      new PathTimingLimits([10.0], [2.0]));
+    var analyticTwoLegs = 4.0 * Math.sqrt(0.1 / 2.0);
+    var sprintDuration = sprint.trajectory.durationSeconds();
+    check(2.0 * sprintDuration <= analyticTwoLegs * 1.01,
+      "TOPP-RA straight exact stops stay within 1% of analytic minimum");
+    sprint.releaseDistanceMap();
+    sprint.trajectory.dispose();
+    var capped = new ToppraPathTiming(1e-8).time(path,
+      new PathTimingLimits([10.0], [2.0], [0.2, 0.2]));
+    check(capped.trajectory.durationSeconds() > sprintDuration,
+      "TOPP-RA feed cap lengthens a straight move");
+    check(Lambda.exists(capped.bindingConstraints, binding ->
+      binding.kind == BindingConstraintKind.SpeedCap && binding.jointIndex == -1),
+      "TOPP-RA identifies an authored feed cap");
+    capped.releaseDistanceMap();
+    capped.trajectory.dispose();
   }
 
-  static function cornerChordSpeed(trajectory:Trajectory, x:Float, y:Float):Float {
-    for (segment in trajectory.segments())
-      if (Math.abs(segment.coefficients[0][0] - x) <= 1e-7 &&
-          Math.abs(segment.coefficients[1][0] - y) <= 1e-7)
-        return Math.sqrt(segment.coefficients[0][1] * segment.coefficients[0][1] +
-          segment.coefficients[1][1] * segment.coefficients[1][1]);
-    throw "lookahead trajectory did not emit its corner knot";
-  }
-
-  /** Chord speeds of the segments arriving at and leaving the knot at (x, y). */
-  static function cornerChordSpeeds(trajectory:Trajectory, x:Float, y:Float):Array<Float> {
-    var segments = trajectory.segments();
-    for (index in 1...segments.length) {
-      var segment = segments[index];
-      if (Math.abs(segment.coefficients[0][0] - x) <= 1e-7 &&
-          Math.abs(segment.coefficients[1][0] - y) <= 1e-7) {
-        var before = segments[index - 1].coefficients;
-        var after = segment.coefficients;
-        return [Math.sqrt(before[0][1] * before[0][1] + before[1][1] * before[1][1]),
-          Math.sqrt(after[0][1] * after[0][1] + after[1][1] * after[1][1])];
-      }
+  static function testToppraCircleAcceleration():Void {
+    var radius = 0.1;
+    var total = 2.0 * Math.PI * radius;
+    var distances:Array<Float> = [];
+    var positions:Array<Array<Float>> = [];
+    var first:Array<Array<Float>> = [];
+    var second:Array<Array<Float>> = [];
+    for (index in 0...17) {
+      var angle = 2.0 * Math.PI * index / 16.0;
+      distances.push(total * index / 16.0);
+      positions.push([radius * Math.cos(angle), radius * Math.sin(angle)]);
+      first.push([-Math.sin(angle), Math.cos(angle)]);
+      second.push([-Math.cos(angle) / radius, -Math.sin(angle) / radius]);
     }
-    throw "lookahead trajectory did not emit its corner knot";
-  }
-
-  /** Peak Cartesian acceleration norm estimated from consecutive chord velocities. */
-  static function peakChordAccelerationNorm(value:Trajectory):Float {
-    var segments = value.segments();
+    var timed = new ToppraPathTiming().time(
+      new JointPathSamples(distances, positions, first, second),
+      new PathTimingLimits([2.0, 2.0], [1.0, 1.0]));
     var peak = 0.0;
-    for (index in 1...segments.length) {
-      var before = segments[index - 1];
-      var after = segments[index];
-      var seconds = 0.5 * (Int64.toFloat(before.durationNs) +
-        Int64.toFloat(after.durationNs)) * 1e-9;
-      if (seconds <= 0.0) continue;
-      var sum = 0.0;
-      for (joint in 0...after.coefficients.length) {
-        var change = after.coefficients[joint][1] - before.coefficients[joint][1];
-        sum += change * change;
+    var peakAngle = 0.0;
+    for (index in 0...201) {
+      var state = timed.trajectory.evaluate(timed.trajectory.durationSeconds() * index / 200.0);
+      var speed = Math.sqrt(state.velocities[0] * state.velocities[0] +
+        state.velocities[1] * state.velocities[1]);
+      if (speed > peak) {
+        peak = speed;
+        peakAngle = Math.atan2(state.positions[1], state.positions[0]);
       }
-      peak = Math.max(peak, Math.sqrt(sum) / seconds);
+      check(Math.abs(state.accelerations[0]) <= 1.001 &&
+        Math.abs(state.accelerations[1]) <= 1.001,
+        "TOPP-RA circle respects both joint acceleration budgets");
     }
-    return peak;
+    var peakBound = Math.sqrt(radius /
+      Math.max(Math.abs(Math.cos(peakAngle)), Math.abs(Math.sin(peakAngle))));
+    check(peak <= peakBound * 1.01,
+      'TOPP-RA circle peak speed $peak respects per-joint bound $peakBound');
+    timed.releaseDistanceMap();
+    timed.trajectory.dispose();
   }
+
   static function testLinearAxisCompilesToRobotModel():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
@@ -1108,7 +1076,7 @@ class MotionKitBootstrapTests {
 
     var cornerPath = GeometricPath.lines([new PathPoint(0.03, 0.02, 0.025),
       new PathPoint(0.04, 0.02, 0.025), new PathPoint(0.04, 0.03, 0.025)]);
-    var cornerMove = machine.movePath(cornerPath, PathPlanningOptions.blend(0.001),
+    var cornerMove = machine.movePath(cornerPath, PathPlanningOptions.exactStopMode(),
       new MotionOptions(0.05, 0.2));
     check(cornerMove.segments().length > 1, "MotionSystem exposes buffered line-path planning");
     runMotion(machine, simulation);
@@ -1472,11 +1440,32 @@ class MotionKitBootstrapTests {
       squareBlueprint.model.name, [for (link in squareBlueprint.model.links) link.name],
       [for (joint in squareBlueprint.model.joints) joint.name]);
     var squareMachine = MotionSystem.fromBlueprint(squareRobot, squareBlueprint);
-    squareMachine.movePath(GeometricPath.lines([
+    var squarePath = squareMachine.movePath(GeometricPath.lines([
       new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.02, 0.0, 0.0),
       new PathPoint(0.02, 0.02, 0.0), new PathPoint(0.0, 0.02, 0.0),
       new PathPoint(0.0, 0.0, 0.0)
     ]), PathPlanningOptions.exactStopMode(), new MotionOptions(0.04, 0.2));
+    var cornerStops = 0;
+    for (segment in squarePath.segments()) {
+      var state = squarePath.evaluate(Int64.toFloat(segment.timeFromStartNs) * 1e-9);
+      for (corner in [new PathPoint(0.02, 0.0), new PathPoint(0.02, 0.02),
+          new PathPoint(0.0, 0.02)])
+        if (Math.abs(state.positions[0] - corner.x) < 1e-8 &&
+            Math.abs(state.positions[1] - corner.y) < 1e-8 &&
+            Math.abs(state.velocities[0]) < 1e-7 && Math.abs(state.velocities[1]) < 1e-7)
+          cornerStops++;
+    }
+    check(cornerStops >= 3, "TOPP-RA square stops at every authored corner");
+    var squareReport = squareMachine.lastPathValidationReport;
+    if (squareReport == null) throw "TOPP-RA path did not record validation";
+    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED &&
+      squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].method ==
+      MotionKitNativeConstants.MK_CHECK_METHOD_SAMPLED,
+      "TOPP-RA task-space check reports sampled path tolerance");
+    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
+      MotionKitNativeConstants.MK_CHECK_UNCHECKED,
+      "TOPP-RA reports jerk as unchecked");
     tick = 0;
     var reachedThirdLeg = false;
     while (squareMachine.isMoving()) {
@@ -2010,9 +1999,9 @@ class MotionKitBootstrapTests {
     var cases:Array<{label:String, begin:MotionSystem -> Void, distance:(Float, Float) -> Float}> = [
       {label: "arc path", distance: arcDistance, begin: machine -> machine.movePath(arcPath(),
         PathPlanningOptions.exactStopMode(), new MotionOptions(0.05, limit))},
-      {label: "blended corner", distance: cornerDistance, begin: machine -> machine.movePath(
+      {label: "exact-stop corner", distance: cornerDistance, begin: machine -> machine.movePath(
         GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.05, 0.0, 0.0),
-          new PathPoint(0.05, 0.05, 0.0)]), PathPlanningOptions.blend(0.001),
+          new PathPoint(0.05, 0.05, 0.0)]), PathPlanningOptions.exactStopMode(),
         new MotionOptions(0.05, limit))}
     ];
     for (queueSupport in [true]) {
@@ -2147,17 +2136,10 @@ class MotionKitBootstrapTests {
   }
 
   static function peakChordAcceleration(value:Trajectory, joint:Int):Float {
-    var segments = value.segments();
     var peak = 0.0;
-    for (index in 1...segments.length) {
-      var before = segments[index - 1];
-      var after = segments[index];
-      var seconds = 0.5 * (Int64.toFloat(before.durationNs) +
-        Int64.toFloat(after.durationNs)) * 1e-9;
-      if (seconds > 0.0)
-        peak = Math.max(peak, Math.abs(after.coefficients[joint][1] -
-          before.coefficients[joint][1]) / seconds);
-    }
+    for (index in 0...501)
+      peak = Math.max(peak, Math.abs(value.evaluate(
+        value.durationSeconds() * index / 500.0).accelerations[joint]));
     return peak;
   }
 

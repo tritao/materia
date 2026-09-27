@@ -31,13 +31,16 @@ int main(int argc, char **argv) {
     begin.step_tick_hz = 40'000;
     begin.link_loss_ticks = 500'000;
     begin.max_acceleration = 4.0f;
-    std::vector<std::uint8_t> session(begin.SIZE + 2 * ActuatorLimit6::SIZE);
+    std::vector<std::uint8_t> session(begin.SIZE + 2 * ActuatorLimit6::SIZE + SessionTiming6::SIZE);
     assert(encode(begin, std::span<std::uint8_t>(session.data(), begin.SIZE)));
     assert(encode(ActuatorLimit6{2.0f},
                   std::span<std::uint8_t>(session.data() + begin.SIZE, ActuatorLimit6::SIZE)));
     assert(encode(ActuatorLimit6{4.0f},
                   std::span<std::uint8_t>(session.data() + begin.SIZE + ActuatorLimit6::SIZE,
                                           ActuatorLimit6::SIZE)));
+    assert(encode(SessionTiming6{500'000'000},
+                  std::span<std::uint8_t>(session.data() + begin.SIZE +
+                      2 * ActuatorLimit6::SIZE, SessionTiming6::SIZE)));
     std::vector<std::uint8_t> session_frame;
     assert(robotkit::device_frame6::encode(1, session, session_frame));
     robotkit::device_frame6::Frame decoded_session{};

@@ -62,6 +62,36 @@ int main() {
     mk_time_law_destroy(law);
     mk_path_destroy(path);
 
+    mk_path_sample straight[2]{};
+    for (int i = 0; i < 2; ++i) {
+        straight[i].struct_size = sizeof(straight[i]);
+        straight[i].joint_count = 1;
+        straight[i].s = static_cast<double>(i);
+        straight[i].position[0] = straight[i].s;
+        straight[i].first[0] = 1.0;
+    }
+    assert(mk_path_create(straight, 2, &path) == MK_OK);
+    const double velocity_limit[1] = {0.4};
+    const double acceleration_limit[1] = {1.0};
+    assert(mk_time_path(path, velocity_limit, acceleration_limit, 1,
+        nullptr, 0, 0.0, 0.0, &law) == MK_OK);
+    assert(mk_path_distance_to_time(law, 1.0, &time) == MK_OK);
+    assert(time > 2.8 && time < 3.1); // 0.4 m/s cruise, 1 m/s² ramps.
+    uint32_t binding_count = 0;
+    assert(mk_time_law_binding_count(law, &binding_count) == MK_OK);
+    assert(binding_count > 0);
+    bool velocity_bound = false;
+    for (uint32_t i = 0; i < binding_count; ++i) {
+        mk_timing_binding binding{};
+        binding.struct_size = sizeof(binding);
+        assert(mk_time_law_get_binding(law, i, &binding) == MK_OK);
+        if (binding.kind == MK_TIMING_BINDING_JOINT_VELOCITY && binding.joint == 0)
+            velocity_bound = true;
+    }
+    assert(velocity_bound);
+    mk_time_law_destroy(law);
+    mk_path_destroy(path);
+
     // A quarter circle is represented by a C2 Hermite span. A quadratic
     // time law raises its degree above five, exercising adaptive lowering.
     mk_path_sample circle[2]{};
