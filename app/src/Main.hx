@@ -132,7 +132,7 @@ class Main {
   public static function main():Int {
     var args = Sys.args();
     for (arg in args)
-      if (arg != "--reset-workspace" && arg != "--snapshot" &&
+      if (arg != "--reset-workspace" && arg != "--snapshot" && arg != "--simulate" &&
           arg != "--lab" && arg != "--dark" && arg != "--perspective" && arg != "--demo" &&
           arg.indexOf("--story=") != 0 &&
           arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0 &&
@@ -141,7 +141,7 @@ class Main {
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
           arg != "--record" && arg.indexOf("--record=") != 0) {
-        Sys.println("Usage: materia [--reset-workspace] [--snapshot] [--demo] " +
+        Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] " +
@@ -150,10 +150,28 @@ class Main {
       }
 
     if (args.indexOf("--snapshot") >= 0) {
-      var editor = new ReferenceEditorApp(null, null, null, null, null, null, null, null,
-        args.indexOf("--demo") >= 0);
+      var projectPath:String = "";
+      for (arg in args) if (arg.indexOf("--project=") == 0) projectPath = arg.substr(10);
+      var editor = args.indexOf("--demo") >= 0 ?
+        new ReferenceEditorApp(null, null, null, null, null, null, null, null, true) :
+        new ReferenceEditorApp();
+      if (projectPath.length > 0) {
+        var generated = MateriaProjectRunner.loadProject(projectPath);
+        editor.session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
+          generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+          generated.localCentersByDefinition, generated.metresPerUnit,
+          generated.physical, generated.recipeDocument);
+      }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
-      Sys.println(editor.workspace.snapshotJson());
+      if (args.indexOf("--simulate") >= 0) {
+        if (!editor.simulation.rebuild(editor.sensors, editor.scene, editor.session))
+          throw "Snapshot simulation rebuild failed: " + editor.simulation.error;
+        editor.simulation.start();
+        var frame = editor.simulation.capturePresentationSnapshot();
+        Sys.println(haxe.Json.stringify({workspace: haxe.Json.parse(editor.workspace.snapshotJson()),
+          simulation: {running: editor.simulation.isRunning(), error: editor.simulation.error,
+            generatedParts: frame.environment.length}}));
+      } else Sys.println(editor.workspace.snapshotJson());
       editor.dispose();
       return 0;
     }

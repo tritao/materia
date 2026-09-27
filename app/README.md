@@ -243,6 +243,9 @@ Run the editor with:
 
 Use `--snapshot` after `--` for the headless workspace JSON path, or
 `--reset-workspace` to discard the persisted panel arrangement before startup.
+Add `--project=/absolute/path/to/materia.project.json --simulate` to a snapshot
+run to load a generated assembly, rebuild and start MuJoCo, and print its
+running state and generated-part count alongside the workspace snapshot.
 Use `--perspective` to activate the GPU viewport tab at launch, including for
 deterministic frame captures.
 
