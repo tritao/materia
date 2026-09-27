@@ -106,6 +106,26 @@ limits, optional actuator, frames, sensors, and explicit world pose. Pending
 state covers robot physics edits and collision-environment changes. Names,
 colour, visibility, and selection do not require a physics rebuild.
 
+Generated projects with an assembly add its occurrence links to the same
+simulation, even when the document has no configured sensor robot. Link mass
+and inertia come from each part's generated volume and material density. A
+rebuild starts from the saved assembly joint coordinates; simulated part poses
+appear in the viewport after stepping or while running, and Stop or Reset
+returns to the editor pose. Joint editing in the Inspector is disabled while
+simulation is active. Coupled joints use a shared per-tick target controller on
+both backends, so a moving follower can lag its source by one physics tick.
+Loop closures report a Simulation panel diagnostic and prevent Rebuild on both
+backends; they are not enforced as MuJoCo equality constraints yet.
+
+Generated parts default to collision enabled. Assembly-owned parts attach
+collision boxes to their links, and loose parts use scene bodies. Their boxes
+conservatively enclose the generated bounds around the link origin; they are
+not mesh convex hulls. The Test backend resolves free dynamic box contacts
+against static, kinematic, and linked boxes using world-axis bounds. MuJoCo
+uses its box contact solver. Turning collision off on one part removes that
+part's link contact on Rebuild. Collision and mass overrides remain sparse
+project field edits; the saved file schema is unchanged.
+
 Scene rectangles persist an extrusion depth plus independent collision-enabled,
 dynamic-body, and mass settings. Visibility affects rendering only. Application
 runs default to the bundled MuJoCo backend, while the sensor panel can select

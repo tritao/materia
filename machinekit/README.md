@@ -82,6 +82,15 @@ To inspect this assembly in Materia, build the app and open the bundled project:
 The project entrypoint generates a CAD preview for every component and preserves
 the assembly's connectors and joints. Select a part in the hierarchy to inspect
 it; the continuous coupling joint is available through the assembly inspector.
+The Sensor panel can rebuild and run this generated assembly without adding a
+separate robot. The saved joint placement becomes the simulation start pose,
+and simulated part poses are shown while stepping or running. Stop or Reset
+restores the editable assembly pose. Joint controls are disabled during
+simulation. Couplings follow through a per-tick target controller on both
+backends, with possible one-tick lag. Loop closures currently stop Rebuild
+with a diagnostic. Generated parts default to collision enabled and use
+conservative link-attached boxes; loose parts use scene bodies. Convex mesh
+hulls are not available yet.
 Component dimensions are currently authored in `MotorShaftBearings.hx`; editing
 that source and reopening the project regenerates the preview.
 

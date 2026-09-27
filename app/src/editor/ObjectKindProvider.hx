@@ -19,4 +19,7 @@ interface ObjectKindProvider {
   public function isCad():Bool;
   public function supportsFaceHover():Bool;
   public function supportsEdgeHover():Bool;
+  public function hasGeneratedGeometry():Bool;
+  public function supportsSketchEdit():Bool;
+  public function isPrimitive():Bool;
 }

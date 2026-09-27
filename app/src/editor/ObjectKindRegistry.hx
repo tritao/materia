@@ -64,6 +64,9 @@ private class BuiltinObjectKind implements ObjectKindProvider {
   public function isCad():Bool return cad;
   public function supportsFaceHover():Bool return faceHover;
   public function supportsEdgeHover():Bool return faceHover;
+  public function hasGeneratedGeometry():Bool return kind == "cad-preview";
+  public function supportsSketchEdit():Bool return kind == "cad-part";
+  public function isPrimitive():Bool return kind == "rectangle";
 
   public function createDefaultRecord(id:String):SceneObjectData {
     switch (kind) {

@@ -267,7 +267,7 @@ class EditorScene {
       first:Array<EditorSceneObject>, second:Array<EditorSceneObject>, ?excludeId:String):Null<Geometry> {
     if (snapshot == null) return null;
     for (candidate in first.concat(second)) {
-      if (candidate.id == excludeId || candidate.kind != "cad-preview" || candidate.meshSnapshot != snapshot)
+      if (candidate.id == excludeId || !ObjectKindRegistry.require(candidate.kind).hasGeneratedGeometry() || candidate.meshSnapshot != snapshot)
         continue;
       var runtime = entries.get(candidate.id);
       if (runtime != null && !runtime.geometry.isDisposed()) return runtime.geometry;
@@ -291,7 +291,7 @@ class EditorScene {
       if (storedCadGraph == null)
         storedCadGraph = session.encode();
       geometryData = session.geometry();
-    } else if (kind == "cad-preview") {
+    } else if (ObjectKindRegistry.require(kind).hasGeneratedGeometry()) {
       if (meshSnapshot == null) throw "CAD preview object has no mesh snapshot";
       geometryData = previewGeometry(meshSnapshot);
     } else {
@@ -352,7 +352,7 @@ class EditorScene {
       var session:Null<CadDocumentSession> = null;
       var storedCadGraph = item.cadGraph;
       var geometryIndex:Null<Int> = null;
-      if (item.type == "cad-preview" && item.meshSnapshot != null)
+      if (ObjectKindRegistry.require(item.type).hasGeneratedGeometry() && item.meshSnapshot != null)
         geometryIndex = previewGeometryIndexes.get(item.meshSnapshot);
       if (geometryIndex == null && isCadKind(item.type)) {
         session = createCadSession(storedCadGraph, item.width, item.height, item.depth, item.type);
@@ -361,7 +361,7 @@ class EditorScene {
         geometryIndex = geometryData.length;
         geometryData.push(session.geometry());
         cadSessions.set(item.id, session);
-      } else if (geometryIndex == null && item.type == "cad-preview") {
+      } else if (geometryIndex == null && ObjectKindRegistry.require(item.type).hasGeneratedGeometry()) {
         if (item.meshSnapshot == null) throw "CAD preview object has no mesh snapshot";
         geometryIndex = geometryData.length;
         geometryData.push(previewGeometry(item.meshSnapshot));
@@ -437,7 +437,7 @@ class EditorScene {
 
   public function canCreateSketch():Bool {
     var item = object(selectedId);
-    return item != null && item.kind == "cad-part" && activeSketchEdit == null;
+    return item != null && ObjectKindRegistry.require(item.kind).supportsSketchEdit() && activeSketchEdit == null;
   }
 
   /** Start a blank sketch draft without adding an unevaluated feature to the document. */
@@ -473,7 +473,7 @@ class EditorScene {
     if (activeSketchEdit != null || selectedCadFace == null || selectedCadFaceIndex < 0)
       return false;
     var item = object(selectedId);
-    if (item == null || item.kind != "cad-part")
+    if (item == null || !ObjectKindRegistry.require(item.kind).supportsSketchEdit())
       return false;
     var output = requireCadSession(selectedId).document.outputFeatureOrNull();
     var shape = output == null ? null : output.currentShape();
@@ -523,7 +523,7 @@ class EditorScene {
     if (activeSketchEdit != null)
       return false;
     var item = object(selectedId);
-    if (item == null || item.kind != "cad-part")
+    if (item == null || !ObjectKindRegistry.require(item.kind).supportsSketchEdit())
       return false;
     var feature = selectedCadFeature(selectedId);
     return feature != null && feature.active && feature.currentShape() != null &&
@@ -576,7 +576,7 @@ class EditorScene {
     if (activeSketchEdit != null)
       return false;
     var item = object(selectedId);
-    if (item == null || item.kind != "cad-part")
+    if (item == null || !ObjectKindRegistry.require(item.kind).supportsSketchEdit())
       return false;
     var feature = selectedCadFeature(selectedId);
     return feature != null && feature.active && Std.isOfType(feature, ConstrainedSketchFeature) &&
@@ -679,7 +679,7 @@ class EditorScene {
     if (activeSketchEdit != null)
       return false;
     var item = object(selectedId);
-    if (item == null || item.kind != "cad-part")
+    if (item == null || !ObjectKindRegistry.require(item.kind).supportsSketchEdit())
       return false;
     var output = requireCadSession(selectedId).document.outputFeatureOrNull();
     var shape = output == null ? null : output.currentShape();
@@ -1333,7 +1333,7 @@ class EditorScene {
     var restored:SketchDraftRecord = SketchDraftCodec.decode(encoded);
     var session = requireCadSession(owner.id);
     if (restored.featureIndex < 0) {
-      if (owner.type != "cad-part")
+      if (!ObjectKindRegistry.require(owner.type).supportsSketchEdit())
         throw "new sketch drafts require a generic CAD part";
       activeSketchEdit = session.beginNewSketchEdit(restored.sketch.plane,
         restored.sketch.units, restored.sketch);
@@ -1450,7 +1450,7 @@ class EditorScene {
     clearSelectedCadFace();
     var item=object(id);
     var subelement=hit.subelement();
-    if(item!=null&&(isCadKind(item.kind)||item.kind=="cad-preview")&&
+    if(item!=null&&(isCadKind(item.kind)||ObjectKindRegistry.require(item.kind).hasGeneratedGeometry())&&
         (subelement & 0x40000000)!=0) {
       selection.selectedCadEdgeIndex = (subelement & 0x3fffffff)-1;
     } else if(item!=null&&isCadKind(item.kind)&&subelement>=0){
@@ -1608,7 +1608,7 @@ class EditorScene {
         function(session)session.model.setSceneDimensions(before.width,before.height,before.depth));
       return;
     }
-    if (target.kind == "rectangle") {
+    if (ObjectKindRegistry.require(target.kind).isPrimitive()) {
       if (target.width == width && target.height == height && target.depth == chosenDepth) return;
       var runtime = runtimeFor(id);
       var geometry:Null<Geometry> = null;
