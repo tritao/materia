@@ -1,5 +1,8 @@
 # Motion architecture plan: gap map against the current code
 
+Historical snapshot from before RobotKit Lane A. Current device behavior is
+documented in [the RKD6 protocol](runtime/DEVICE_PROTOCOL.md).
+
 This compares the proposed "Materia Motion / Machine Control Architecture —
 Updated Plan" (not checked in; section numbers below are the plan's) with what
 exists on `main` as of 2026-09-26. For each concept it records whether the code
@@ -312,8 +315,8 @@ Backend classes that exist today:
 
 ## 9. Native execution and RKD (§19–23)
 
-**RKD scheduled protocol — Missing.** RKD5 (`robotkit/runtime/DEVICE_PROTOCOL.md`,
-`schema/device_wire.wire.idl`) already provides:
+**RKD scheduled protocol — Missing at this snapshot.** The former RKD5
+protocol (available in git history) provided:
 
 - sessions, a model fingerprint and sequence numbers;
 - a device watchdog (500 ms on the bench board) and latched safety;

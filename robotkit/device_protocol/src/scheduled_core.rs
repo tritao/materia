@@ -295,6 +295,15 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         let whole = advance as u64;
         self.path_fraction = advance - whole as f32;
         self.path_clock = self.path_clock.saturating_add(whole);
+        // Retire completed committed segments so a small device queue can stream
+        // plans longer than its physical capacity. Keep the final segment until
+        // its at-rest or underflow decision has been made below.
+        while self.committed_len() > 1 && self.segments[0].unwrap().end_ticks() < self.path_clock &&
+            self.segments[0].unwrap().end_ticks() <= self.committed_until {
+            self.segments.copy_within(1..self.len, 0);
+            self.len -= 1;
+            self.segments[self.len] = None;
+        }
         let mut current = None;
         let committed_len = self.committed_len();
         for segment in self.segments[..committed_len].iter().flatten() {

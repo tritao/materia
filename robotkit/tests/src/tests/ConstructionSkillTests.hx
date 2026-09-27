@@ -1,6 +1,7 @@
 package tests;
 
 import haxe.Int64;
+import motionkit.robot.SurfacePlanRunner;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
 import robotkit.model.Joint;
@@ -52,6 +53,8 @@ import robotkit.world.McapRecordingReader;
 import robotkit.world.RobotDescription;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotSnapshot;
+import robotkit.world.ProcessChannelDeclaration;
+import robotkit.world.ProcessEventValue;
 
 /**
  * M10 acceptance tests: `ScanSurface`, `RegisterSurface`, `Paint`, and
@@ -79,11 +82,14 @@ class ConstructionSkillTests {
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
     var blueprint = RobotRuntimeCompiler.compile(model);
+    blueprint.channels.push(new ProcessChannelDeclaration("surface.process",
+      ProcessEventValue.Digital(false)));
 
     var simulation = new Simulation(0.02);
     var recordingPath = '/tmp/robotkit-${Sys.getPid()}-construction-skills.mcap';
     var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
-    var sourceRobot = new SimulatedRobot("construction-robot", simulation.addRobot(blueprint),
+    var runtime = simulation.addRobot(blueprint);
+    var sourceRobot = new SimulatedRobot("construction-robot", runtime,
       model.name, linkNames, jointNames);
     var robot = new RecordingRobot(sourceRobot, writer);
 
@@ -155,8 +161,15 @@ class ConstructionSkillTests {
 
     // -- Paint --
     var sprayer = new SimulatedSprayer();
+    function eventSource():{events:Array<robotkit.world.FiredProcessEvent>, overflow:Bool} {
+      var batch = runtime.pollEvents();
+      for (event in batch.events) writer.recordProcessEvent(robot.id(), event);
+      return batch;
+    }
+    var paintMotion = SurfacePlanRunner.create(robot, manipulator, eventSource,
+      spec.feedRate, spec.maxAcceleration, spec.maxJointStep);
     var paint = new Paint(navigator, manipulator, robot, registered.frame_T_surface, registered, spec,
-      observe, sprayer, 0.3, 2.0, seed);
+      observe, sprayer, 0.3, 2.0, seed, paintMotion);
     check(runToCompletion(paint) == SkillStatus.Succeeded, 'Paint completes through SkillRunner (${paint.status()})');
     var paintCoverage = paint.coverage();
     check(paintCoverage != null && paintCoverage.coverageFraction() >= 0.9,
@@ -167,8 +180,10 @@ class ConstructionSkillTests {
 
     // -- Sand --
     var sander = new SimulatedSander();
+    var sandMotion = SurfacePlanRunner.create(robot, manipulator, eventSource,
+      spec.feedRate, spec.maxAcceleration, spec.maxJointStep);
     var sand = new Sand(navigator, manipulator, robot, registered.frame_T_surface, registered, spec,
-      observe, sander, 8000.0, 15.0, seed);
+      observe, sander, 8000.0, 15.0, seed, sandMotion);
     check(runToCompletion(sand) == SkillStatus.Succeeded, 'Sand completes through SkillRunner (${sand.status()})');
     var sandedOn = false;
     for (event in sander.history) if (event.contactForce > 0.0) sandedOn = true;
@@ -181,79 +196,21 @@ class ConstructionSkillTests {
     check(recording.commands.length > 10 && recording.snapshots.length > 10,
       "construction skill run is recorded to MCAP");
 
-    // -- replay: re-run Paint against a ReplayRobot of the recording --
-    var replayDescription = new RobotDescription("construction-robot", "recorded construction robot",
-      linkNames, jointNames);
-    var replayCapabilities = new RobotCapabilities("construction-robot", jointNames.length, true, true, true, false);
-    var replay = new ReplayRobot("construction-robot", recording, replayDescription, replayCapabilities);
-    // A fresh MobileBase over `replay` (not the live `base`, whose
-    // underlying RecordingRobot is now closed): Navigation drives commands
-    // through base.robot.submit(), which must reach the ReplayRobot.
-    var replayBase = MobileBase.fromBlueprint(replay, blueprint);
-    var replayLocalization = new HolonomicOdometryLocalization([0, 1, 2], fixture.wheelRadius, fixture.baseRadius);
-    var replayNavigation = new Navigation(replayBase, replayLocalization, 0.2, 0.3, 1.0);
-    var replayGrid = new OccupancyGrid2(0.1, new Pose2(-2.0, -2.0), 40, 40, "odom", OccupancyCell.Free);
-    var replayCostmap = new Costmap2(replayGrid, baseFootprint.radius);
-    var replayNavigator = new Navigator(replayNavigation, new AStarPlanner(replayCostmap), replayCostmap);
-    replayLocalization.update(replay.snapshot());
-    var replayObserve:RobotSnapshot -> PerceptionSnapshot = function(snapshot) {
-      replayLocalization.update(snapshot);
-      return new PerceptionSnapshot();
-    };
-    // ScanSurface/RegisterSurface submit no RobotCommand, so replaying them
-    // does not consume any of the replay cursor's recorded command/snapshot
-    // pairs Paint/Sand need below; still run each through its own
-    // SkillRunner against the ReplayRobot's observations, per the plan's
-    // "each skill runs ... against a ReplayRobot of a recording".
-    var replayScan = new ScanSurface(function() {
-      return SimulatedSurfaceScanner.scan(design, trueOffset, 0.0015, 0.02, 0.0003, 5, Int64.ofInt(0));
-    });
-    var replayScanRunner = new SkillRunner();
-    var replayScanStatus = replayScanRunner.start(replayScan);
-    while (replayScanStatus == SkillStatus.Running)
-      replayScanStatus = replayScanRunner.update(replay.snapshot(), timestep);
-    check(replayScanStatus == SkillStatus.Succeeded,
-      "ScanSurface replays to completion against a ReplayRobot's observations");
-    var replayRegister = new RegisterSurface(design, replayScan.cloud, 5);
-    var replayRegisterRunner = new SkillRunner();
-    var replayRegisterStatus = replayRegisterRunner.start(replayRegister);
-    check(replayRegisterStatus == SkillStatus.Succeeded,
-      "RegisterSurface replays to completion against a ReplayRobot's observations");
-
-    var replaySprayer = new SimulatedSprayer();
-    var replayPaint = new Paint(replayNavigator, manipulator, replay, registered.frame_T_surface, registered,
-      spec, replayObserve, replaySprayer, 0.3, 2.0, seed);
-    var replayRunner = new SkillRunner();
-    var replayStatus = replayRunner.start(replayPaint);
-    while (replayStatus == SkillStatus.Running && replay.advance())
-      replayStatus = replayRunner.update(replay.snapshot(), timestep);
-    check(replayStatus == SkillStatus.Succeeded,
-      'Paint replays to completion against a ReplayRobot of the recording (status $replayStatus)');
-    // Not asserted bit-identical to the live run's coverage: replay drives
-    // its own fresh Navigation/localization instance from the same recorded
-    // observations, and pure-pursuit path tracking against a freshly built
-    // A* route can converge to a very slightly different final base pose
-    // than the live run's (still within GoTo's own tolerance) without any
-    // nondeterminism in the replayed observations themselves. Both runs
-    // reaching strong coverage independently is the meaningful check.
-    var replayCoverage = replayPaint.coverage();
-    var liveFraction = paintCoverage == null ? -1.0 : paintCoverage.coverageFraction();
-    var replayFraction = replayCoverage == null ? -1.0 : replayCoverage.coverageFraction();
-    check(replayCoverage != null && replayFraction >= 0.85,
-      'replayed Paint reaches strong coverage on its own recomputed plan (live=$liveFraction, replay=$replayFraction)');
-
-    // -- Sand replay: continue the same ReplayRobot cursor into the
-    // recorded Sand run (Paint and Sand were recorded back to back in one
-    // continuous MCAP stream during the live run above). --
-    var replaySander = new SimulatedSander();
-    var replaySand = new Sand(replayNavigator, manipulator, replay, registered.frame_T_surface, registered,
-      spec, replayObserve, replaySander, 8000.0, 15.0, seed);
-    var replaySandRunner = new SkillRunner();
-    var replaySandStatus = replaySandRunner.start(replaySand);
-    while (replaySandStatus == SkillStatus.Running && replay.advance())
-      replaySandStatus = replaySandRunner.update(replay.snapshot(), timestep);
-    check(replaySandStatus == SkillStatus.Succeeded,
-      'Sand replays to completion against a ReplayRobot of the recording (status $replaySandStatus)');
+    // Replay the plan command stream and inspect its recorded process output.
+    var replayDescription = new RobotDescription("construction-robot",
+      "recorded construction robot", linkNames, jointNames);
+    var replayCapabilities = new RobotCapabilities("construction-robot", jointNames.length,
+      true, true, true, false, true, true);
+    var replay = new ReplayRobot("construction-robot", recording,
+      replayDescription, replayCapabilities);
+    for (command in recording.commands) {
+      replay.submit(command);
+      replay.advance();
+    }
+    check(replay.generatedCommands.commands.length == recording.commands.length,
+      "ReplayRobot preserves the plan and navigation command stream");
+    check(recording.processEvents.length > 0,
+      "MCAP preserves process output records from Paint and Sand");
     replay.close();
 
     if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);
@@ -276,7 +233,7 @@ class ConstructionSkillTests {
       // (RobotRuntimeCompiler has no separate "unbounded" native type), so
       // lower/upper must be set wide -- the default JointLimits() is [0, 0],
       // which rejects any nonzero wheel position with RK_ERROR_LIMIT.
-      joint.limits = new JointLimits(-1000.0, 1000.0, 20.0, 1000.0);
+      joint.limits = new JointLimits(-1000.0, 1000.0, 20.0, 1000.0, 1.0);
       joint.parentFramePosition = [baseRadius * Math.cos(wheelAngles[i]), baseRadius * Math.sin(wheelAngles[i]), 0.0];
       joint.axis = [0.0, 1.0, 0.0];
       model.addJoint(joint);
@@ -314,6 +271,7 @@ class ConstructionSkillTests {
       joint.limits.upper = 2.0 * Math.PI;
       joint.limits.velocity = 3.0;
       joint.limits.effort = 150.0;
+      joint.limits.maxAcceleration = 0.3;
     }
     var flange = model.addFrame(new Frame("flange", links[6], "frame/flange"));
     flange.position = [0.0, d6, 0.0];

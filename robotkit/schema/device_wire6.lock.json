@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 9
+      "value": 10
     }
   },
   "enums": {
@@ -353,9 +353,14 @@
           "length": 1,
           "name": "actuator_count",
           "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "profile",
+          "type": "u8"
         }
       ],
-      "size": 44
+      "size": 45
     },
     "SessionBegin6": {
       "endian": "little",

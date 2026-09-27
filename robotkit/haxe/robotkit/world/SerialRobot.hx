@@ -13,7 +13,8 @@ class SerialRobot implements Robot {
   public function new(id:RobotId, model:RobotModel, devicePath:String,
       fingerprintHex:String, maxTargetError:Float, ?baud:Int = 115200,
       ?ownerPeriodNs:haxe.Int64, ?processingAllowanceNs:haxe.Int64,
-      ?channels:Array<ProcessChannelDeclaration>) {
+      ?channels:Array<ProcessChannelDeclaration>, ?stepTickHz:Int = 40000,
+      ?linkLossTimeoutNs:haxe.Int64, ?clockSyncBoundNs:haxe.Int64) {
     if (id == null || id.length == 0)
       throw "SerialRobot requires a non-empty logical ID";
     if (model == null) throw "SerialRobot requires a robot model";
@@ -24,7 +25,7 @@ class SerialRobot implements Robot {
     if (processingAllowanceNs != null)
       blueprint.serialProcessingAllowanceNs = processingAllowanceNs;
     var runtime = RobotRuntime.createSerial(blueprint, devicePath, fingerprintHex,
-      maxTargetError, baud);
+      maxTargetError, baud, stepTickHz, linkLossTimeoutNs, clockSyncBoundNs);
     adapter = new RuntimeRobotAdapter(id, runtime, model.name,
       [for (link in model.links) link.id], [for (joint in model.joints) joint.id],
       true, true, "serial endpoint fault");
@@ -33,11 +34,10 @@ class SerialRobot implements Robot {
   /** Opens a serial robot from the same versioned deployment as robotd. */
   public static function fromDeployment(id:RobotId, path:String):SerialRobot {
     var deployment = new SerialDeployment(path);
-    if (deployment.protocol != "rkd5")
-      throw "SerialRobot: RKD6 deployment requires a scheduled-device endpoint";
     return new SerialRobot(id, deployment.robot, deployment.serialPath,
       deployment.fingerprint, deployment.targetError, deployment.baud,
-      deployment.ownerPeriodNs, deployment.processingAllowanceNs, deployment.channels);
+      deployment.ownerPeriodNs, deployment.processingAllowanceNs, deployment.channels,
+      deployment.stepTickHz, deployment.linkLossTimeoutNs, deployment.clockSyncBoundNs);
   }
 
   public function id():RobotId return adapter.id();

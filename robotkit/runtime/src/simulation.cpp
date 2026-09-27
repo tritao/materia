@@ -216,6 +216,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         config.target_error = robot_desc->virtual_device_target_error;
         config.clock_bound_ns = robot_desc->virtual_device_clock_bound_ns;
         config.link_loss_timeout_ns = robot_desc->virtual_device_link_loss_timeout_ns;
+        if (robot_desc->struct_size >= sizeof(*robot_desc) && robot_desc->virtual_device_profile)
+            config.profile = robot_desc->virtual_device_profile;
         if (robot_desc->struct_size >=
             offsetof(rk_simulation_robot_desc, collision_half_extents) &&
             robot_desc->virtual_device_actuator_count > 0) {
@@ -380,7 +382,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             coupling.offset = source.offset;
             require_sim(nksim_joint_couple(world_, &coupling), "nksim_joint_couple");
         }
-        const auto closure_count = robot_desc && robot_desc->struct_size >= sizeof(*robot_desc)
+        const auto closure_count = robot_desc && robot_desc->struct_size >=
+            offsetof(rk_simulation_robot_desc, virtual_device_profile)
             ? robot_desc->closure_count : 0;
         if (closure_count > 64) throw std::invalid_argument("too many assembly closures");
         for (uint32_t index = 0; index < closure_count; ++index) {

@@ -88,7 +88,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 18 /**< Adds compiled joint-to-joint couplings. */
+    RK_API_VERSION = 19 /**< Adds joint couplings and configured RKD6 serial construction. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -617,6 +617,13 @@ RK_API rk_result RK_CALL rk_robot_runtime_create_serial(
     const rk_robot_runtime_blueprint *blueprint, const char *device_path RK_UTF8,
     uint32_t baud, const char *fingerprint_hex RK_UTF8,
     double max_target_error, rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
+/** RKD6 serial constructor with deployment timing and capability inputs. */
+RK_API rk_result RK_CALL rk_robot_runtime_create_serial6(
+    const rk_robot_runtime_blueprint *blueprint, const char *device_path RK_UTF8,
+    uint32_t baud, const char *fingerprint_hex RK_UTF8,
+    double max_target_error, uint32_t step_tick_hz,
+    uint64_t link_loss_timeout_ns, uint64_t clock_bound_ns,
+    uint64_t link_latency_ns, rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
 /**
  * Stops and releases a standalone runtime handle.
  *

@@ -92,6 +92,44 @@ CompiledDevicePlan6 compile_device_segments6(
             !std::isfinite(actuator.steps_per_unit) || actuator.steps_per_unit <= 0 ||
             !std::isfinite(actuator.max_rate) || actuator.max_rate < 0)
             return failure("invalid actuator layout");
+    const auto original_segments = segments;
+    std::vector<rk_trajectory_segment> lowered;
+    std::vector<std::size_t> original_index;
+    std::vector<std::uint64_t> original_offset;
+    if (max_degree == 1) {
+        const auto period = blueprint.owner_period_ns ? blueprint.owner_period_ns : 10'000'000ULL;
+        std::uint64_t expected = 0;
+        for (std::size_t i = 0; i < original_segments.size(); ++i) {
+            const auto &source = original_segments[i];
+            if (source.joint_count != blueprint.joint_count || source.degree > 5 ||
+                source.duration_ns == 0 || source.time_from_start_ns != expected ||
+                source.duration_ns > UINT64_MAX - expected)
+                return failure("invalid source segment");
+            for (std::uint64_t offset = 0; offset < source.duration_ns;) {
+                if (lowered.size() >= 100'000) return failure("minimal profile segment limit");
+                const auto duration = std::min<std::uint64_t>(period, source.duration_ns - offset);
+                auto piece = source;
+                piece.time_from_start_ns = expected + offset;
+                piece.duration_ns = duration;
+                piece.degree = 1;
+                for (std::uint32_t joint = 0; joint < source.joint_count; ++joint) {
+                    const auto t0 = static_cast<double>(offset) / 1e9;
+                    const auto t1 = static_cast<double>(offset + duration) / 1e9;
+                    const auto q0 = evaluate_f64(source.coefficients[joint], source.degree, t0);
+                    const auto q1 = evaluate_f64(source.coefficients[joint], source.degree, t1);
+                    piece.coefficients[joint].value[0] = q0;
+                    piece.coefficients[joint].value[1] = (q1 - q0) / (static_cast<double>(duration) / 1e9);
+                    for (int k = 2; k < 6; ++k) piece.coefficients[joint].value[k] = 0;
+                }
+                lowered.push_back(piece);
+                original_index.push_back(i);
+                original_offset.push_back(offset);
+                offset += duration;
+            }
+            expected += source.duration_ns;
+        }
+        segments = lowered;
+    }
     const auto resolution_ns = (1'000'000'000ULL + step_tick_hz - 1) / step_tick_hz;
     const auto base_ticks = clock.map_host_ns(host_plan_start_ns);
     CompiledDevicePlan6 result;
@@ -201,7 +239,10 @@ CompiledDevicePlan6 compile_device_segments6(
                 const auto offset = layout.empty() ? 0.0 : layout[actuator].offset;
                 const auto actual = static_cast<double>(evaluate_f32(wire.coefficients[actuator],
                     wire.header.degree, static_cast<float>(device_elapsed_seconds)));
-                const auto exact = evaluate_f64(source.coefficients[joint], wire.header.degree, host_tau);
+                const auto &reference = max_degree == 1 ? original_segments[original_index[i]] : source;
+                const auto reference_tau = host_tau +
+                    (max_degree == 1 ? static_cast<double>(original_offset[i]) / 1e9 : 0.0);
+                const auto exact = evaluate_f64(reference.coefficients[joint], reference.degree, reference_tau);
                 const auto error = std::abs(actual / ratio + offset - exact);
                 result.worst_position_error = std::max(result.worst_position_error, error);
                 if (error > target_error) return reject("converted trajectory exceeds target_error");

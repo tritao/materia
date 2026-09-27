@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 9;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 10;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -454,7 +454,7 @@ inline bool decode(std::span<const std::uint8_t> input, Event6 &value) {
     return true;
 }
 
-inline constexpr std::size_t SessionAck6_SIZE = 44;
+inline constexpr std::size_t SessionAck6_SIZE = 45;
 struct SessionAck6 {
     static constexpr std::size_t SIZE = SessionAck6_SIZE;
     std::uint64_t session{};
@@ -467,6 +467,7 @@ struct SessionAck6 {
     std::uint32_t step_tick_hz{};
     std::uint8_t max_degree{};
     std::uint8_t actuator_count{};
+    std::uint8_t profile{};
 };
 
 inline bool encode(const SessionAck6 &value, std::span<std::uint8_t> out) {
@@ -513,6 +514,8 @@ inline bool encode(const SessionAck6 &value, std::span<std::uint8_t> out) {
     out[offset++] = static_cast<std::uint8_t>(bits_max_degree >> 0);
     const std::uint8_t bits_actuator_count = static_cast<std::uint8_t>(value.actuator_count);
     out[offset++] = static_cast<std::uint8_t>(bits_actuator_count >> 0);
+    const std::uint8_t bits_profile = static_cast<std::uint8_t>(value.profile);
+    out[offset++] = static_cast<std::uint8_t>(bits_profile >> 0);
     return true;
 }
 
@@ -570,6 +573,9 @@ inline bool decode(std::span<const std::uint8_t> input, SessionAck6 &value) {
     std::uint8_t bits_actuator_count = 0;
     bits_actuator_count |= static_cast<std::uint8_t>(input[offset++]) << 0;
     value.actuator_count = bits_actuator_count;
+    std::uint8_t bits_profile = 0;
+    bits_profile |= static_cast<std::uint8_t>(input[offset++]) << 0;
+    value.profile = bits_profile;
     return true;
 }
 

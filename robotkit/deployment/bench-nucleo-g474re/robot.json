@@ -83,9 +83,9 @@
       "limits": {
         "lower": -100,
         "upper": 100,
-        "velocity": 0,
+        "velocity": 2,
         "effort": 100,
-        "maxAcceleration": 0
+        "maxAcceleration": 10
       },
       "parentFramePosition": [
         0,
@@ -124,9 +124,9 @@
       "limits": {
         "lower": -100,
         "upper": 100,
-        "velocity": 0,
+        "velocity": 2,
         "effort": 100,
-        "maxAcceleration": 0
+        "maxAcceleration": 10
       },
       "parentFramePosition": [
         0,

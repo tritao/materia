@@ -128,17 +128,16 @@ disabling contacts between that robot's own links.
 `Robot` interface used by `RemoteRobot`. `robotkit.world.SerialRobot` compiles
 an authored `RobotModel`, opens a POSIX serial device, and owns its standalone
 runtime. Both can be attached to `RobotWorld` and used through the same command
-and snapshot interfaces. The serial protocol carries indexed target batches and
-joint positions/velocities/efforts in compiled model slot
-order. `robotd --server --serial=DEVICE` hosts that same endpoint behind the
-existing remote protocol; see [the device protocol](runtime/DEVICE_PROTOCOL.md)
-before implementing device firmware.
+and snapshot interfaces. The serial endpoint executes RKD6 scheduled plans. It receives queue status and
+actuator state from the device. `robotd --server --deployment=FILE` hosts that
+endpoint behind the existing remote protocol; see
+[the device protocol](runtime/DEVICE_PROTOCOL.md).
 
 Use `new SerialRobot(id, model, devicePath, fingerprintHex, maxTargetError)`
-or `RobotRuntime.createSerial(...)`. The fingerprint comes
-from `robotkit/tools/device_fingerprint.py`; the error budget is the largest
-allowed `double` to `f32` target rounding error in the target's SI units.
-RKD5 state packets contain joint/control state only, with no bulk sensors.
+or `RobotRuntime.createSerial(...)`. The fingerprint comes from
+`robotkit/tools/device_fingerprint.py`; the error budget bounds the converted
+trajectory's position error in the joint's SI units. Serial devices do not
+carry bulk sensors.
 
 The complete ownership and tick model is documented in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).

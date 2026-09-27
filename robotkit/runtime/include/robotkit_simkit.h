@@ -131,6 +131,7 @@ typedef struct rk_simulation_robot_desc {
     double collision_hull_vertices[RK_MAX_LINKS * 64 * 3];
     uint32_t closure_count;
     rk_simulation_closure_desc closures[64];
+    uint32_t virtual_device_profile; /**< 1 full, 2 minimal; zero defaults to full. */
 } rk_simulation_robot_desc;
 
 /**

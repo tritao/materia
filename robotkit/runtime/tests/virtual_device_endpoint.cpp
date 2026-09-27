@@ -13,7 +13,8 @@ struct RunResult {
     std::vector<VirtualStepRecord6> steps;
 };
 
-RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = false) {
+RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = false,
+    bool hold = false) {
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.joint_count = 1;
@@ -65,9 +66,14 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
         assert(endpoint->submit_device_plan(next, 1'000'000'000, 120'000'000,
             1'020'000'000, blueprint) == RK_OK);
     }
-    const auto end_ns = replace ? 2'220'000'000ULL : 1'220'000'000ULL;
+    const auto end_ns = replace ? 2'220'000'000ULL : hold ? 1'420'000'000ULL : 1'220'000'000ULL;
     for (std::uint64_t now = 130'000'000; now <= end_ns; now += 10'000'000) {
         if (cut && now == 330'000'000) endpoint->cut_link(true);
+        if (hold && (now == 330'000'000 || now == 530'000'000)) {
+            rk_robot_command command{};
+            command.kind = now == 330'000'000 ? RK_COMMAND_HOLD : RK_COMMAND_RESUME;
+            assert(endpoint->apply(command) == RK_OK);
+        }
         assert(endpoint->sample(now, state) == RK_OK);
     }
     const auto positions = endpoint->actuator_positions();
@@ -242,6 +248,15 @@ int main() {
     assert(baseline.state.safety == RK_SAFETY_READY);
     assert(!baseline.steps.empty());
     assert(baseline.steps == run(config).steps);
+    auto minimal = config;
+    minimal.profile = 2;
+    const auto setpoint_run = run(minimal);
+    assert(std::abs(setpoint_run.position - 0.5) <= 1e-5);
+    assert(setpoint_run.steps.empty());
+    const auto held_setpoints = run(minimal, false, false, true);
+    assert(std::abs(held_setpoints.position - 0.5) <= 1e-5);
+    const auto lost_link = run(minimal, true);
+    assert(lost_link.position < 0.5 && lost_link.state.safety == RK_SAFETY_FAULT);
     const auto replaced = run(config, false, true);
     assert(std::abs(replaced.position - 1.0) <= 0.00101);
     assert(replaced.state.safety == RK_SAFETY_READY);
@@ -286,46 +301,55 @@ int main() {
     blueprint.joints[0].upper_limit = 10;
     blueprint.joints[0].max_velocity = 10;
     blueprint.joints[0].max_acceleration = 10;
-    auto ruckig_device = VirtualDeviceEndpoint::create(blueprint, config);
-    assert(ruckig_device);
-    rk_robot_state state{};
-    assert(ruckig_device->sample(0, state) == RK_ERROR_STALE_STATE);
-    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
-        assert(ruckig_device->sample(now, state) == RK_OK);
-    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
-        assert(ruckig_device->sample(now, state) == RK_OK);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
-    plan.plan_id = 40;
-    plan.sequence = 1;
-    plan.ends_at_rest = 1;
-    plan.segments.segment_count = count;
-    for (std::uint32_t i = 0; i < count; ++i) {
-        mk_segment segment{};
-        segment.struct_size = sizeof(segment);
-        assert(mk_trajectory_get_segment(trajectory, i, &segment) == MK_OK);
-        auto &target = plan.segments.segments[i];
-        target.time_from_start_ns = segment.t0_ns;
-        target.duration_ns = segment.duration_ns;
-        target.degree = segment.degree;
-        target.joint_count = 1;
-        for (std::uint32_t d = 0; d <= segment.degree; ++d)
-            target.coefficients[0].value[d] = segment.coefficients[0].value[d];
-    }
-    assert(ruckig_device->submit_device_plan(plan, 0, 120'000'000, 20'000'000,
-        blueprint) == RK_OK);
-    for (std::uint64_t now = 130'000'000;
-         now <= 120'000'000 + static_cast<std::uint64_t>(duration_ns) + 100'000'000;
-         now += 10'000'000) {
-        assert(ruckig_device->sample(now, state) == RK_OK);
-        if (state.trajectory_active && state.trajectory_time_ns <= static_cast<std::uint64_t>(duration_ns)) {
-            mk_trajectory_state reference{};
-            reference.struct_size = sizeof(reference);
-            assert(mk_trajectory_evaluate(trajectory, state.trajectory_time_ns, &reference) == MK_OK);
-            assert(std::abs(state.position[0] - reference.position[0]) <= 0.002);
+    for (const auto profile : {1, 2}) {
+        config.profile = profile;
+        config.target_error = profile == 2 ? 0.002 : 1e-5;
+        auto ruckig_device = VirtualDeviceEndpoint::create(blueprint, config);
+        assert(ruckig_device);
+        rk_robot_state state{};
+        assert(ruckig_device->sample(0, state) == RK_ERROR_STALE_STATE);
+        for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+            assert(ruckig_device->sample(now, state) == RK_OK);
+        for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+            assert(ruckig_device->sample(now, state) == RK_OK);
+        rk_plan_submission plan{};
+        plan.struct_size = sizeof(plan);
+        plan.plan_id = 40;
+        plan.sequence = 1;
+        plan.ends_at_rest = 1;
+        plan.segments.segment_count = count;
+        for (std::uint32_t i = 0; i < count; ++i) {
+            mk_segment segment{};
+            segment.struct_size = sizeof(segment);
+            assert(mk_trajectory_get_segment(trajectory, i, &segment) == MK_OK);
+            auto &target = plan.segments.segments[i];
+            target.time_from_start_ns = segment.t0_ns;
+            target.duration_ns = segment.duration_ns;
+            target.degree = segment.degree;
+            target.joint_count = 1;
+            for (std::uint32_t d = 0; d <= segment.degree; ++d)
+                target.coefficients[0].value[d] = segment.coefficients[0].value[d];
         }
+        assert(ruckig_device->submit_device_plan(plan, 0, 120'000'000, 20'000'000,
+            blueprint) == RK_OK);
+        for (std::uint64_t now = 130'000'000;
+             now <= 120'000'000 + static_cast<std::uint64_t>(duration_ns) + 100'000'000;
+             now += 10'000'000) {
+            assert(ruckig_device->sample(now, state) == RK_OK);
+            if (state.trajectory_active && state.trajectory_time_ns <= static_cast<std::uint64_t>(duration_ns)) {
+                mk_trajectory_state reference{};
+                reference.struct_size = sizeof(reference);
+                assert(mk_trajectory_evaluate(trajectory, state.trajectory_time_ns, &reference) == MK_OK);
+                if (std::abs(state.position[0] - reference.position[0]) > 0.002)
+                    std::fprintf(stderr, "profile=%d t=%llu actual=%f expected=%f safety=%d\n", profile,
+                        static_cast<unsigned long long>(state.trajectory_time_ns), state.position[0],
+                        reference.position[0], state.safety);
+                assert(std::abs(state.position[0] - reference.position[0]) <= 0.002);
+            }
+        }
+        assert(std::abs(ruckig_device->actuator_positions()[0] - 0.5) <= 0.00101);
+        assert(state.safety == RK_SAFETY_READY);
+        if (profile == 2) assert(ruckig_device->step_log().empty());
     }
-    assert(std::abs(ruckig_device->actuator_positions()[0] - 0.5) <= 0.00101);
-    assert(state.safety == RK_SAFETY_READY);
     mk_trajectory_destroy(trajectory);
 }

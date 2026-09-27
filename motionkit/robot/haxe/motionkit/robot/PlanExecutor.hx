@@ -20,12 +20,14 @@ import robotkit.world.TrajectorySegment;
 class PlanExecutor {
   static var nextTag:Int64 = Int64.ofInt(1000000);
   public final robot:Robot;
+  public final jointIndices:Array<Int>;
   public var elapsedSeconds(default, null):Float = 0.0;
   public var completed(default, null):Bool = false;
   var plan:Null<ExecutionPlan>;
   var planSegments:Array<{timeFromStartNs:Int64, durationNs:Int64,
     coefficients:Array<Array<Float>>}> = [];
   var planEvents:Array<TimedEvent> = [];
+  var fixedPositions:Array<Float> = [];
   var nextSegment:Int = 0;
   var finalTag:Int64 = Int64.ofInt(0);
   var finalDurationNs:Int64 = Int64.ofInt(0);
@@ -34,11 +36,13 @@ class PlanExecutor {
   var endsAtRest:Bool = true;
   var deferredRefill:Bool = false;
 
-  public function new(robot:Robot) {
+  public function new(robot:Robot, ?jointIndices:Array<Int>) {
     if (robot == null || !robot.capabilities().supportsExecutionPlans ||
         !robot.capabilities().supportsTrajectoryQueue)
       throw "PlanExecutor requires execution plan and trajectory queue support";
     this.robot = robot;
+    this.jointIndices = jointIndices == null ?
+      [for (i in 0...robot.description().joints.length) i] : jointIndices.copy();
   }
 
   public function start(plan:ExecutionPlan, ?endsAtRest:Bool = true):Void {
@@ -46,6 +50,9 @@ class PlanExecutor {
     this.plan = plan;
     planSegments = plan.segments();
     planEvents = plan.events;
+    fixedPositions = robot.snapshot().positions.toArray();
+    if (plan.evaluate(0.0).positions.length != jointIndices.length)
+      throw "PlanExecutor plan and robot joint map disagree";
     this.endsAtRest = endsAtRest;
     elapsedSeconds = 0.0; completed = false; nextSegment = 0;
     finalTag = Int64.ofInt(0); chunkEndSeconds = 0.0;
@@ -107,7 +114,12 @@ class PlanExecutor {
       modelRevision:Int64, calibrationRevision:Int64):Null<{last:Int,
         startSeconds:Float, endSeconds:Float}> {
     var available = 4096 - robot.snapshot().trajectoryQueueDepth;
-    var count = Std.int(Math.min(128, Math.min(available, nativeSegments.length - first)));
+    // Native chunks also cap the total scalar coefficients. Reserve six per
+    // joint so mixed polynomial degrees remain below that bound.
+    var coefficientLimit = Std.int(Math.floor(4096.0 /
+      (robot.snapshot().positions.length * 6.0)));
+    var count = Std.int(Math.min(coefficientLimit,
+      Math.min(128, Math.min(available, nativeSegments.length - first))));
     if (count < 1) return null;
     var last = first + count;
     var startNs = nativeSegments[first].timeFromStartNs;
@@ -191,8 +203,10 @@ class PlanExecutor {
     while (nextSegment < planSegments.length &&
         chunkEndSeconds - elapsedSeconds < 2.0) {
       var available = 4096 - robot.snapshot().trajectoryQueueDepth - stagedSegments;
-      var count = Std.int(Math.min(128, Math.min(available,
-        planSegments.length - nextSegment)));
+      var coefficientLimit = Std.int(Math.floor(4096.0 /
+        (fixedPositions.length * 6.0)));
+      var count = Std.int(Math.min(coefficientLimit, Math.min(128,
+        Math.min(available, planSegments.length - nextSegment))));
       if (count < 1) return;
       var first = nextSegment;
       var last = first + count;
@@ -202,8 +216,13 @@ class PlanExecutor {
       var segments:Array<TrajectorySegment> = [];
       for (index in first...last) {
         var segment = planSegments[index];
+        var degree = segment.coefficients[0].length;
+        var coefficients = [for (joint in 0...fixedPositions.length)
+          [for (power in 0...degree) power == 0 ? fixedPositions[joint] : 0.0]];
+        for (joint in 0...jointIndices.length)
+          coefficients[jointIndices[joint]] = segment.coefficients[joint].copy();
         segments.push(new TrajectorySegment(Int64.sub(segment.timeFromStartNs, startNs),
-          segment.durationNs, segment.coefficients));
+          segment.durationNs, coefficients));
       }
       var events:Array<ProcessTimedEvent> = [];
       var endNs = Int64.add(planSegments[last - 1].timeFromStartNs,
@@ -225,20 +244,41 @@ class PlanExecutor {
           events.push(new ProcessTimedEvent(Int64.sub(event.timeNs, startNs),
             event.channel, value, hold));
         }
-      var startVelocity = first == 0 ? active.copyStartVelocities() : state.velocities;
-      var startAcceleration = first == 0 ? active.copyStartAccelerations() : state.accelerations;
-      var pTol = first == 0 ? active.copyPositionTolerances() :
-        [for (_ in state.positions) 0.02];
-      var vTol = first == 0 ? active.copyVelocityTolerances() :
-        [for (_ in state.positions) 0.02];
-      var aTol = first == 0 ? active.copyAccelerationTolerances() :
-        [for (_ in state.positions) 0.02];
+      var positions = expanded(state.positions, fixedPositions);
+      var zero = [for (_ in fixedPositions) 0.0];
+      var startVelocity = expanded(first == 0 ? active.copyStartVelocities() :
+        state.velocities, zero);
+      var startAcceleration = expanded(first == 0 ? active.copyStartAccelerations() :
+        state.accelerations, zero);
+      // Linear chunks promise the preceding chord at a continuation anchor.
+      // The path's derivative at this sample can differ across a corner.
+      if (planSegments[first].coefficients[0].length == 2) {
+        startVelocity = zero.copy();
+        startAcceleration = zero.copy();
+        if (first > 0)
+          for (joint in 0...jointIndices.length)
+            startVelocity[jointIndices[joint]] =
+              planSegments[first - 1].coefficients[joint][1];
+      }
+      var tolerance = [for (_ in fixedPositions) 0.02];
+      var pTol = expanded(first == 0 ? active.copyPositionTolerances() :
+        [for (_ in state.positions) 0.02], tolerance);
+      var vTol = expanded(first == 0 ? active.copyVelocityTolerances() :
+        [for (_ in state.positions) 0.02], tolerance);
+      var aTol = expanded(first == 0 ? active.copyAccelerationTolerances() :
+        [for (_ in state.positions) 0.02], tolerance);
       var tag = nextTag;
       nextTag = Int64.add(nextTag, Int64.ofInt(1));
-      robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
-        active.modelRevision, active.calibrationRevision, 1, state.positions,
+      try robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
+        active.modelRevision, active.calibrationRevision, 1, positions,
         startVelocity, startAcceleration, segments, null, null, pTol, vTol, aTol,
-        last == planSegments.length && endsAtRest, events)));
+        last == planSegments.length && endsAtRest, events))) catch (error:Dynamic)
+      {
+        var snapshot = robot.snapshot();
+        throw 'plan chunk [$first,$last] of ${planSegments.length}, '
+          + 'events=${events.length}, safety=${snapshot.safety}, '
+          + 'active=${snapshot.trajectoryActive}, queue=${snapshot.trajectoryQueueDepth}: $error';
+      }
       references.set(Int64.toStr(tag), startSeconds);
       nextSegment = last;
       stagedSegments += count;
@@ -248,5 +288,12 @@ class PlanExecutor {
         finalDurationNs = Int64.sub(endNs, startNs);
       }
     }
+  }
+
+  function expanded(values:Array<Float>, baseline:Array<Float>):Array<Float> {
+    var result = baseline.copy();
+    for (joint in 0...jointIndices.length)
+      result[jointIndices[joint]] = values[joint];
+    return result;
   }
 }

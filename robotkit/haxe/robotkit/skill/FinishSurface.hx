@@ -1,6 +1,5 @@
 package robotkit.skill;
 
-import haxe.Int64;
 import robotkit.localization.LocalizationState;
 import robotkit.manipulation.BaseObstacle;
 import robotkit.manipulation.Manipulator;
@@ -9,16 +8,12 @@ import robotkit.manipulation.WorkPatchPlanner;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Navigator;
 import robotkit.perception.PerceptionSnapshot;
-import robotkit.process.CartesianTrajectory;
-import robotkit.process.ToolpathExecutionResult;
-import robotkit.process.ToolpathExecutionFailure;
-import robotkit.process.ToolpathExecutor;
 import robotkit.spatial.Transform3;
+import robotkit.tool.ChannelToolAdapter;
 import robotkit.work.CoverageMap;
 import robotkit.work.Point2;
 import robotkit.work.WorkSurface;
 import robotkit.world.Robot;
-import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 
 /**
@@ -26,7 +21,7 @@ import robotkit.world.RobotSnapshot;
  * (`toolWidth`/`overlap`/`standoff`/`feedRate`/`leadInOut`, the same
  * `RasterToolpathGenerator` inputs `WorkPatchPlanner` forwards per patch),
  * `maxPatchWidth`/standoff-search band for `WorkPatchPlanner`, and the
- * Cartesian/IK tolerances `CartesianTrajectory`/`ToolpathExecutor` use. A
+ * Cartesian/IK tolerances used while compiling each patch plan. A
  * pure-data anonymous typedef, per haxeon's structural-typing rules.
  */
 typedef FinishSpec = {
@@ -42,7 +37,7 @@ typedef FinishSpec = {
   var coverageCellSize:Float;
   var footprintRadius:Float;
   /**
-   * Largest allowed joint-space step `ToolpathExecutor` accepts between
+   * Largest allowed joint-space step accepted between
    * consecutive samples, *including* the initial move from the seed
    * configuration to a patch's first point — a real repositioning move
    * before a continuous raster starts, not a discontinuity in the raster
@@ -56,22 +51,14 @@ typedef FinishSpec = {
 private enum FinishStage {
   Planning;
   NavigatingToPatch;
+  AwaitingBaseStop;
   ExecutingPatch;
 }
 
 /**
- * Drives M8's `WorkPatchPlanner` through M4's `ToolpathExecutor`: split the
- * surface into patches, navigate the base to each patch's chosen pose
- * (`Navigator`/`GoTo`, unchanged per the plan's base-motion boundary), plan
- * and execute that patch's raster, and toggle the process on/off around
- * each step's `processOn` flag via a caller-supplied `setProcessOn`
- * callback — `Paint`/`Sand` bind this to `Sprayer`/`Sander` commands, so
- * `FinishSurface` itself never depends on which capability interface the
- * mounted tool implements. Coverage is tracked from the *planned* TCP pose
- * (`Manipulator.tcpPose` at each executed step's joint solution): unlike the
- * M9 scenario test, a skill has no `Simulation` to cross-check against and
- * must work identically over a `RemoteRobot`, `SimulatedRobot`, or
- * `ReplayRobot`.
+ * Splits the surface into patches, navigates the base, and runs each patch
+ * through a motion plan. Process events drive the tool adapter. Coverage is
+ * measured from observed joint positions and the current base localization.
  */
 class FinishSurface implements Skill {
   public final navigator:Navigator;
@@ -81,7 +68,9 @@ class FinishSurface implements Skill {
   public final surface:WorkSurface;
   public final spec:FinishSpec;
   public final observePerception:RobotSnapshot -> PerceptionSnapshot;
-  public final setProcessOn:(Bool, Int64) -> Void;
+  public final runner:SurfacePlanRunner;
+  public final toolAdapter:ChannelToolAdapter;
+  public final processChannel:String;
   public final seed:Array<Float>;
   public final obstacles:Array<BaseObstacle>;
 
@@ -93,17 +82,17 @@ class FinishSurface implements Skill {
   var patchIndex:Int = 0;
   var stage:FinishStage = Planning;
   var currentGoTo:Null<GoTo> = null;
-  var currentSteps:Array<robotkit.process.ToolpathExecutionStep> = [];
-  var stepIndex:Int = 0;
+  var eventIndex:Int = 0;
   var toolOn:Bool = false;
-  var lastQ:Array<Float>;
 
   public function new(navigator:Navigator, manipulator:Manipulator, robot:Robot,
       map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
       observePerception:RobotSnapshot -> PerceptionSnapshot,
-      setProcessOn:(Bool, Int64) -> Void, seed:Array<Float>, ?obstacles:Array<BaseObstacle>) {
+      runner:SurfacePlanRunner, toolAdapter:ChannelToolAdapter, processChannel:String,
+      seed:Array<Float>, ?obstacles:Array<BaseObstacle>) {
     if (navigator == null || manipulator == null || robot == null || map_T_surface == null ||
-        surface == null || spec == null || observePerception == null || setProcessOn == null || seed == null)
+        surface == null || spec == null || observePerception == null || runner == null ||
+        toolAdapter == null || processChannel == null || seed == null)
       throw "FinishSurface requires navigation, a manipulator, a robot, a surface, a spec, and a seed";
     this.navigator = navigator;
     this.manipulator = manipulator;
@@ -112,10 +101,11 @@ class FinishSurface implements Skill {
     this.surface = surface;
     this.spec = spec;
     this.observePerception = observePerception;
-    this.setProcessOn = setProcessOn;
+    this.runner = runner;
+    this.toolAdapter = toolAdapter;
+    this.processChannel = processChannel;
     this.seed = seed.copy();
     this.obstacles = obstacles == null ? [] : obstacles;
-    lastQ = seed.copy();
   }
 
   public function start():Void {
@@ -156,13 +146,17 @@ class FinishSurface implements Skill {
         var navStatus = goTo.update(snapshot, durationSeconds);
         switch navStatus {
           case SkillStatus.Running:
-          case SkillStatus.Succeeded: beginExecution();
+          case SkillStatus.Succeeded: awaitBaseStop();
           case SkillStatus.Cancelled: lifecycle.cancel();
           case SkillStatus.Failed(message): lifecycle.fail(message);
           case SkillStatus.Idle: lifecycle.fail("navigation returned to idle");
         }
       case ExecutingPatch:
-        advanceExecution();
+        try advanceExecution(snapshot, durationSeconds)
+        catch (error:Dynamic) lifecycle.fail(Std.string(error));
+      case AwaitingBaseStop:
+        if (snapshot.safety == RobotKitRuntimeConstants.RK_SAFETY_READY)
+          beginExecution();
     }
     return lifecycle.status();
   }
@@ -170,20 +164,15 @@ class FinishSurface implements Skill {
   public function cancel():Void {
     if (!lifecycle.isRunning()) return;
     if (currentGoTo != null) currentGoTo.cancel();
-    try robot.stop(robotkit.world.StopMode.Normal) catch (_:Dynamic) {}
+    try runner.abort() catch (_:Dynamic) {}
     lifecycle.cancel();
   }
 
+  public function hold():Void if (stage == ExecutingPatch) runner.hold();
+  public function resume():Void if (stage == ExecutingPatch) runner.resume();
+
   public function status():SkillStatus return lifecycle.status();
   public function result():Null<SkillResult> return lifecycle.result();
-
-  static function describeFailure(failure:Null<ToolpathExecutionFailure>):String {
-    return switch failure {
-      case Unreachable(index, ik): 'unreachable at sample $index (positionError=${ik.positionError}, orientationError=${ik.orientationError}, iterations=${ik.iterations})';
-      case Discontinuity(index, joint, delta): 'discontinuity at sample $index joint $joint (delta=$delta)';
-      case null: "unknown failure";
-    };
-  }
 
   function beginPatch(index:Int):Void {
     var patch = patches[index];
@@ -193,11 +182,15 @@ class FinishSurface implements Skill {
     stage = NavigatingToPatch;
     goTo.start();
     switch goTo.status() {
-      case SkillStatus.Succeeded: beginExecution();
+      case SkillStatus.Succeeded: awaitBaseStop();
       case SkillStatus.Failed(message): lifecycle.fail(message);
       case SkillStatus.Cancelled: lifecycle.cancel();
       case _:
     }
+  }
+
+  function awaitBaseStop():Void {
+    stage = AwaitingBaseStop;
   }
 
   function beginExecution():Void {
@@ -208,21 +201,9 @@ class FinishSurface implements Skill {
       var state:LocalizationState = cast estimate;
       var baseWorld = Transform3.fromPose2(state.pose, 0.0);
       var base_T_work = baseWorld.inverse().compose(map_T_surface);
-      var trajectory = CartesianTrajectory.build(patch.toolpath, spec.maxAcceleration, 0.05);
-      // 2mm/5mrad matches the M9 scenario test's own proven-converging IK
-      // tolerances (and WorkSurface's own default 2mm `tolerance` field): a
-      // tighter 1mm tolerance left this call within a hairline's width of a
-      // damped-least-squares non-convergence at a near-limit raster pose
-      // (observed as a rebuild-sensitive flake), matching the documented
-      // cold-start/near-limit IK sensitivity in ARCHITECTURE.md.
-      var execution:ToolpathExecutionResult = ToolpathExecutor.execute(manipulator, trajectory,
-        base_T_work, lastQ, spec.maxJointStep, 2e-3, 5e-3, 300, 0.03);
-      if (!execution.success) {
-        lifecycle.fail('toolpath execution failed for patch $patchIndex: ${describeFailure(execution.failure)}');
-        return;
-      }
-      currentSteps = execution.steps;
-      stepIndex = 0;
+      runner.runPatch(patch, base_T_work, seed);
+      if (runner.failure() != null) throw runner.failure();
+      eventIndex = 0;
       toolOn = false;
       stage = ExecutingPatch;
     } catch (error:Dynamic) {
@@ -230,9 +211,36 @@ class FinishSurface implements Skill {
     }
   }
 
-  function advanceExecution():Void {
-    if (stepIndex >= currentSteps.length) {
-      if (toolOn) { setProcessOn(false, Int64.ofInt(0)); toolOn = false; }
+  function advanceExecution(snapshot:RobotSnapshot, dtSeconds:Float):Void {
+    runner.update(dtSeconds);
+    var fired = runner.firedEvents();
+    while (eventIndex < fired.length) {
+      var event = fired[eventIndex++];
+      toolAdapter.apply(event);
+      if (event.channel == processChannel) toolOn = switch event.value {
+        case Digital(enabled): enabled;
+        case Analog(value): value > 0.0;
+        case Process(_, _): false;
+      };
+    }
+    if (runner.failure() != null) {
+      lifecycle.fail(runner.failure());
+      return;
+    }
+    if (toolOn) {
+      var indices = runner.jointIndices();
+      var q = [for (index in indices) snapshot.positions.get(index)];
+      var estimate = navigator.navigation.localization.state();
+      if (estimate != null) {
+        var state:LocalizationState = cast estimate;
+        var baseWorld = Transform3.fromPose2(state.pose, 0.0);
+        var tcpWorld = baseWorld.compose(manipulator.tcpPose(q));
+        var local = map_T_surface.inverse().transformPoint(tcpWorld.translation);
+        if (coverage != null)
+          coverage.markFootprint(new Point2(local.x, local.y), spec.footprintRadius);
+      }
+    }
+    if (runner.completed()) {
       patchIndex++;
       if (patchIndex >= patches.length) {
         lifecycle.succeed('finished ${patches.length} patch(es)');
@@ -241,24 +249,5 @@ class FinishSurface implements Skill {
       beginPatch(patchIndex);
       return;
     }
-    var step = currentSteps[stepIndex];
-    if (step.processOn != toolOn) {
-      toolOn = step.processOn;
-      setProcessOn(toolOn, Int64.ofInt(stepIndex));
-    }
-    robot.submit(RobotCommand.JointTargets(step.targets, null));
-    lastQ = step.q;
-    if (step.processOn) {
-      var patch = patches[patchIndex];
-      var estimate = navigator.navigation.localization.state();
-      if (estimate != null) {
-        var state:LocalizationState = cast estimate;
-        var baseWorld = Transform3.fromPose2(state.pose, 0.0);
-        var tcpWorld = baseWorld.compose(manipulator.tcpPose(step.q));
-        var local = map_T_surface.inverse().transformPoint(tcpWorld.translation);
-        if (coverage != null) coverage.markFootprint(new Point2(local.x, local.y), spec.footprintRadius);
-      }
-    }
-    stepIndex++;
   }
 }

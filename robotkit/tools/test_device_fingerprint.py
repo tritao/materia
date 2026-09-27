@@ -16,7 +16,7 @@ class FingerprintTests(unittest.TestCase):
         layout = b"ordered-joints: left-wheel,right-wheel; channels: 0,1\n"
         value = module.fingerprint(layout, lock)
         self.assertEqual(len(value), 16)
-        self.assertEqual(value.hex(), "179b3f58ee7869463d1ffe5d0b8eb143")
+        self.assertEqual(value.hex(), "f2fcdb78edcd4a2c6d2c9d29b9ca8c48")
         self.assertNotEqual(value, module.fingerprint(layout + b"calibration=2\n", lock))
         edited = json.loads(lock)
         edited["fingerprint_test_extension"] = 1
@@ -31,10 +31,10 @@ class FingerprintTests(unittest.TestCase):
     def test_g474_bench_artifacts_match(self):
         root = MODULE_PATH.parents[1]
         deployment = root / "deployment/bench-nucleo-g474re"
-        robot = json.loads((deployment / "robot.json").read_text())
+        config = json.loads((deployment / "deployment.json").read_text())
         value = module.fingerprint((deployment / "layout.json").read_bytes(),
-                                   (deployment / "device_wire.lock.json").read_bytes())
-        self.assertEqual(robot["device"]["fingerprint"], value.hex())
+                                   module.DEFAULT_LOCK.read_bytes())
+        self.assertEqual(config["device"]["fingerprint"], value.hex())
         self.assertEqual((root / "device_protocol/boards/nucleo-g474re/src/fingerprint.rs")
                          .read_text(), module.rust_constant(value))
 

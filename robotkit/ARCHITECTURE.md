@@ -150,8 +150,9 @@ directly.
 `RobotModelCodec` stores the complete semantic robot definition as a versioned
 JSON artifact shared by editor, simulation, and `robotd`. Deployment files refer
 to that artifact and keep `DeviceLayout` as the separate ordered mapping from
-model joint IDs to RKD5 channels. The RKD5 fingerprint covers the exact device
-layout and wire schema lock, not mutable semantic model fields.
+model joint IDs to ordered RKD6 actuator channels. The RKD6 base fingerprint
+covers exact device layout bytes and the RKD6 schema lock. The endpoint also
+hashes ordered actuator transmissions and process-channel declarations.
 
 ### Transmissions (model contract and RKD6 implementation)
 
@@ -180,7 +181,7 @@ by the motion stack. MachineKit motor parts will attach actuators to its joints;
 `MachineKitRobotCompiler` will then only derive those actuators and their
 transmissions, rather than build a second robot topology.
 
-The native runtime and RKD5 devices remain joint-space. The
+The native runtime remains joint-space. The
 Haxe runtime compiler converts each actuator's rate limit to joint units as
 `maxRate / |ratio|` and its effort limit as `maxEffort * |ratio|`, assuming an
 ideal lossless transmission. For several actuators on one joint, the joint
@@ -202,7 +203,7 @@ maps it to a joint through transmission
 ratio and offset, including multiple channels for a dual-driven joint. The
 session carries the step scale, rate bound, direction setup time and skew
 bound. The RKD6 endpoint fingerprint covers channel order and all layout
-fields; RKD5 fingerprints are unchanged. The no_std step generator compares
+fields. The no_std step generator compares
 dual-drive feedback in joint units and latches `dual_drive_skew` when the
 deployment bound is exceeded.
 

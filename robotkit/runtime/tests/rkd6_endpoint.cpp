@@ -12,6 +12,7 @@ public:
     int commit_frames = 0;
     int queue_begin_frames = 0;
     std::array<std::uint8_t, 16> fingerprint{};
+    bool minimal = false;
     std::deque<std::vector<std::uint8_t>> incoming;
     std::vector<std::uint8_t> delayed;
     bool delay_once = false;
@@ -37,10 +38,11 @@ public:
             ack.status = 1;
             ack.device_tick_hz = 1'000'000;
             ack.step_tick_hz = 40'000;
-            ack.segment_capacity = 4;
+            ack.segment_capacity = minimal ? 8 : 4;
             ack.event_capacity = 4;
-            ack.max_degree = 5;
+            ack.max_degree = minimal ? 1 : 5;
             ack.actuator_count = begin.actuator_count;
+            ack.profile = minimal ? 2 : 1;
             push(2, ack);
             device_wire6::State6Header state{};
             state.session = begin.session;
@@ -90,6 +92,9 @@ int main() {
     assert(Rkd6Endpoint::minimum_baud(64, 10'000'000, 2'000'000) > 921'600);
     assert(Rkd6Endpoint::minimum_queue_depth(921'600, 1, 10'000'000,
         100'000, 500'000) <= 4);
+    assert(Rkd6Endpoint::minimum_baud(2, 10'000'000, 2'000'000) <= 921'600);
+    assert(Rkd6Endpoint::minimum_queue_depth(921'600, 2, 10'000'000,
+        100'000, 30'000'000) <= 8);
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.joint_count = 1;
@@ -98,6 +103,19 @@ int main() {
     blueprint.joints[0].upper_limit = 10;
     blueprint.joints[0].max_velocity = 10;
     blueprint.joints[0].max_acceleration = 10;
+    {
+        auto bench = blueprint;
+        bench.joint_count = 2;
+        bench.joints[1] = bench.joints[0];
+        auto minimal_link = std::make_unique<MockLink>();
+        minimal_link->minimal = true;
+        minimal_link->fingerprint.fill(9);
+        auto qualified = Rkd6Endpoint::attach(std::move(minimal_link), bench,
+            std::array<std::uint8_t, 16>{9, 9, 9, 9, 9, 9, 9, 9,
+                9, 9, 9, 9, 9, 9, 9, 9},
+            78, 1e-5, 30'000'000, 100'000);
+        assert(qualified);
+    }
     auto link = std::make_unique<MockLink>();
     auto *observed = link.get();
     observed->fingerprint.fill(7);
