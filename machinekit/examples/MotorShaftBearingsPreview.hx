@@ -14,12 +14,14 @@ class MotorShaftBearingsPreview {
 		var model = example.assembly();
 		var parts:Array<SceneArtifactPart> = [];
 		var definitionByOccurrence = new Map<String, String>();
-		var definitionByDesignation = new Map<String, String>();
+		var definitionByIdentity = new Map<String, String>();
 		for (entry in example.components()) {
-			var definitionId = definitionByDesignation.get(entry.component.designation);
+			var recipe = entry.component.type;
+			var identity = recipe == null ? entry.component.designation : recipe.key(entry.component.values());
+			var definitionId = definitionByIdentity.get(identity);
 			if (definitionId == null) {
 				definitionId = entry.id;
-				definitionByDesignation.set(entry.component.designation, definitionId);
+				definitionByIdentity.set(identity, definitionId);
 				var part = entry.component.geometry(ComponentDetail.Preview);
 				addPart(parts, definitionId, entry.component.designation, part, entry.component.materialId);
 			}

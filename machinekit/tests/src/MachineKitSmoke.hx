@@ -11,6 +11,8 @@ import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
+import machinekit.component.MachineKitComponents;
+import machinekit.component.ComponentValues;
 import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
@@ -56,6 +58,42 @@ import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord.AssemblyFrame;
 
 class MachineKitSmoke {
+	static function componentRecipes():Void {
+		for (recipe in MachineKitComponents.all()) {
+			var original = recipe.create();
+			check(original.type == recipe, 'recipe type mismatch ${recipe.id}');
+			var values = original.values();
+			var restored = recipe.create(values);
+			check(recipe.key(values) == recipe.key(restored.values()), 'recipe values mismatch ${recipe.id}');
+			check(original.designation == restored.designation, 'recipe designation mismatch ${recipe.id}');
+			var a = original.connectors(), b = restored.connectors();
+			check(a.length == b.length, 'recipe connector count mismatch ${recipe.id}');
+			for (i in 0...a.length) {
+				check(a[i].name == b[i].name && a[i].role == b[i].role,
+					'recipe connector mismatch ${recipe.id}');
+				check(a[i].frame.x == b[i].frame.x && a[i].frame.y == b[i].frame.y &&
+					a[i].frame.z == b[i].frame.z && a[i].frame.qx == b[i].frame.qx &&
+					a[i].frame.qy == b[i].frame.qy && a[i].frame.qz == b[i].frame.qz &&
+					a[i].frame.qw == b[i].frame.qw, 'recipe connector frame mismatch ${recipe.id}');
+			}
+			var first = original.geometry(), second = restored.geometry();
+			near(first.massProperties().volume, second.massProperties().volume,
+				'recipe volume mismatch ${recipe.id}');
+			check(first.solidCount() == second.solidCount(), 'recipe solids mismatch ${recipe.id}');
+			first.close();
+			second.close();
+		}
+		var bearing = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
+		throws(() -> bearing.create(new ComponentValues().setToken("designation", "NO-BEARING")),
+			"Unknown");
+		var pulley = MachineKitComponents.byId("machinekit.transmission.timing-pulley");
+		throws(() -> pulley.create(new ComponentValues().setToken("profile", "UNKNOWN")), "Invalid choice");
+		var conflicted = new Bom();
+		conflicted.add({partNumber: "X", description: "same", quantity: 1, material: "steel",
+			typeId: "test", valuesKey: "a"});
+		throws(() -> conflicted.add({partNumber: "X", description: "same", quantity: 1,
+			material: "steel", typeId: "test", valuesKey: "b"}), "conflicting");
+	}
 	static function check(value:Bool, message:String):Void {
 		if (!value) throw message;
 	}
@@ -1009,8 +1047,8 @@ class MachineKitSmoke {
 		check(lines.length == 11, "linear axis BOM line count");
 		check(bom.quantity(axis.bearing.designation) == 2, "linear axis bearing quantity");
 		check(bom.quantity(axis.coupling.designation) == 1, "linear axis coupling in the BOM");
-		check(bom.quantity(axis.nut.designation) == 1, "linear axis lead nut in the BOM");
-		check(bom.quantity(axis.screw.designation) == 1, "thread-specific lead screw in the BOM");
+		check(bom.quantity(axis.nut.bom.partNumber) == 1, "linear axis lead nut in the BOM");
+		check(bom.quantity(axis.screw.bom.partNumber) == 1, "thread-specific lead screw in the BOM");
 		check(bom.quantity(axis.guideRodA.designation) == 2, "linear axis guide rods in the BOM");
 		check(bom.quantity(axis.guideBearingA.designation) == 2, "linear axis guide bearings in the BOM");
 		check(bom.quantity("RECT-20x15x2-L365") == 1, "linear axis rail in the BOM");
@@ -1043,8 +1081,8 @@ class MachineKitSmoke {
 		near(railState.worldConnector("profileRail", "axis").z + railGuide.travelMax,
 			21 + railAxis.travelMax, "profile rail upper limit aligns with axis");
 		var railBom = railAxis.bom();
-		check(railBom.quantity(railGuide.rail.designation) == 1, "profile rail axis rail in BOM");
-		check(railBom.quantity(railGuide.blocks[0].designation) == 1, "profile rail axis block in BOM");
+		check(railBom.quantity(railGuide.rail.bom.partNumber) == 1, "profile rail axis rail in BOM");
+		check(railBom.quantity(railGuide.blocks[0].bom.partNumber) == 1, "profile rail axis block in BOM");
 		throws(() -> LinearAxis.forRailProfile("MGN99C"), 'Unknown linear rail profile "MGN99C"');
 	}
 
@@ -1101,8 +1139,8 @@ class MachineKitSmoke {
 		throws(() -> LinearGuideSystem.forRailProfile("MGN99C", 300), 'Unknown linear rail profile "MGN99C"');
 
 		var bom = guide.bom();
-		check(bom.quantity(guide.rail.designation) == 1, "profile rail in BOM");
-		check(bom.quantity(guide.blocks[0].designation) == 1, "profile block in BOM");
+		check(bom.quantity(guide.rail.bom.partNumber) == 1, "profile rail in BOM");
+		check(bom.quantity(guide.blocks[0].bom.partNumber) == 1, "profile block in BOM");
 		check(guide.components().length == 2, "profile rail component list");
 	}
 
@@ -1391,7 +1429,7 @@ class MachineKitSmoke {
 		detailedPreview.close();
 		detailedEnvelope.close();
 		var pedestalBom = detailedPedestal.billOfMaterials(40);
-		check(pedestalBom.quantity(detailedPedestal.designation) == 1, "pedestal BOM body");
+		check(pedestalBom.quantity(detailedPedestal.bom.partNumber) == 1, "pedestal BOM body");
 		check(pedestalBom.quantity(detailedPedestal.floorMountScrewPart(40).designation) == 4, "pedestal anchor BOM");
 		throws(() -> new Pedestal(flange, 300, 70, 4, {baseThickness: 300}), "below its height");
 		throws(() -> new Pedestal(flange, 300, 70, 4, {anchorCircleDiameter: 80}), "clear the column");
@@ -1506,6 +1544,7 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		componentRecipes();
 		MachineKitReferenceTests.run();
 		dimensions();
 		catalogMetadata();
