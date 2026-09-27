@@ -336,3 +336,18 @@ lease-timeout modes passed. An initial TCP attempt used a port occupied by
 another lane; all modes were rerun on port 17962. The lease-timeout case
 missed its plan-start observation once under concurrent builds, then passed
 unchanged on retry.
+
+### A2 — Define RKD6 wire records and framing
+
+Added the separately versioned RKD6 schema, generated fixed-record Rust and
+C++ codecs, and a checked frame format with the `RKD6` marker, length and
+CRC-32. The schema reserves message id 16 for events and defines session,
+sync, queue, segment, control, status and state records. Shared frame vectors
+round-trip in both languages; malformed lengths and CRCs are rejected. The
+protocol document records the maximum frame and serial timing math. Tests
+were written first and failed before the schema and framing were added.
+Commit: the commit containing this entry.
+
+On the lane tree, Rust tests, the MCU build, 14 native tests, 5,873 MotionKit
+and 4,437 RobotKit Haxe assertions, both FFI audits and all three TCP modes
+passed. The TCP tests used port 17962 to avoid other lanes' test servers.

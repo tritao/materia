@@ -1,0 +1,120 @@
+# RKD6 scheduled device payload records. Outer frame uses RKD6, length and CRC32.
+const PROTOCOL_VERSION : u8 = 6;
+const MAX_ACTUATORS : u8 = 64;
+
+enum MessageType6 : u8 {
+    session_begin6 = 1
+    session_ack6 = 2
+    time_sync_request = 3
+    time_sync_reply = 4
+    queue_begin = 5
+    segment = 6
+    commit = 7
+    hold = 8
+    resume = 9
+    abort = 10
+    stop = 11
+    emergency_stop = 12
+    reset_safety = 13
+    queue_status = 14
+    state6 = 15
+    event = 16
+}
+
+packed SessionBegin6 endian little {
+    session : u64
+    protocol_version : u8
+    model_fingerprint : u8[16]
+    actuator_count : u8
+    max_degree : u8
+    step_tick_hz : u32
+    link_loss_ticks : u64
+    max_acceleration : f32
+}
+
+packed SessionAck6 endian little {
+    session : u64
+    protocol_version : u8
+    device_fingerprint : u8[16]
+    status : u8
+    device_tick_hz : u64
+    segment_capacity : u16
+    event_capacity : u16
+    step_tick_hz : u32
+    max_degree : u8
+    actuator_count : u8
+}
+
+packed TimeSyncRequest endian little {
+    host_send_ns : u64
+}
+
+packed TimeSyncReply endian little {
+    host_send_ns : u64
+    device_rx_ticks : u64
+    device_tx_ticks : u64
+}
+
+packed QueueBegin6 endian little {
+    queue_revision : u64
+    replace_after_ticks : u64
+    expected_position : f32[64]
+    expected_velocity : f32[64]
+    actuator_count : u8
+}
+
+packed Segment6Header endian little {
+    queue_revision : u64
+    plan_id : u64
+    t0_ticks : u64
+    duration_ticks : u64
+    degree : u8
+    actuator_count : u8
+    ends_at_rest : u8
+    reserved : u8
+}
+
+packed Segment6Coefficients endian little {
+    actuator : u8
+    c0 : f32
+    c1 : f32
+    c2 : f32
+    c3 : f32
+    c4 : f32
+    c5 : f32
+}
+
+packed Commit6 endian little {
+    through_ticks : u64
+}
+
+packed QueueStatus6 endian little {
+    queue_revision : u64
+    committed_until_ticks : u64
+    executing_plan_id : u64
+    executing_segment : u16
+    path_clock_ticks : u64
+    rate : f32
+    remaining_segments : u16
+    remaining_events : u16
+    underflow : u8
+    fault : u8
+}
+
+packed State6Header endian little {
+    session : u64
+    timestamp_ticks : u64
+    accepted_sequence : u64
+    safety : u8
+    fault : u8
+    actuator_count : u8
+    reserved : u8
+    path_clock_ticks : u64
+}
+
+packed ActuatorState6 endian little {
+    position : f32
+    velocity : f32
+    effort : f32
+    step_count : i64
+}

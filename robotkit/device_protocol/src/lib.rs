@@ -4,6 +4,8 @@
 extern crate std;
 
 mod device_wire;
+pub mod device_wire6;
+pub mod frame6;
 mod runtime;
 mod board;
 #[cfg(feature = "std")]
