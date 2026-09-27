@@ -1136,6 +1136,11 @@ class SceneEditingTests {
   static function main():Int {
     var emptyApp = new ReferenceEditorApp(null, null, null, null, null, null, null, null, false);
     check(emptyApp.scene.items().length == 0, "default launch starts with an empty scene");
+    var commandRevision = emptyApp.commands.revision;
+    var submitKey = emptyApp.editorSubmitKey();
+    emptyApp.invalidateView();
+    check(emptyApp.editorSubmitKey() != submitKey && emptyApp.commands.revision == commandRevision,
+      "view-local invalidation leaves command availability revision unchanged");
     emptyApp.dispose();
     finishLibrarySelection();
     sensorRevisionSeparation();

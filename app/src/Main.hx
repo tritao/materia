@@ -421,6 +421,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var framePresentation:Null<ApplicationPresentationSnapshot> = null;
   var refinementFrameSubmitted:Bool = false;
   var cachedSubmitKey:String = "";
+  var viewRevision:Int = 0;
+  var cachedSubmitViewRevision:Int = -1;
   var cachedSubmitSceneGeneration:Int = -1;
   var cachedSubmitSceneRevision:Int = -1;
   var cachedSubmitSelectionRevision:Int = -1;
@@ -539,7 +541,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "workspace.reset"
       ], contextMenuX, contextMenuY, commands, ui.commandContext, function() {
         contextMenuVisible = false;
-        commands.refresh();
+        invalidateView();
       }
       );
       layers.push(new StackChild("context-menu", menu, 0.0, 0.0, 20));
@@ -564,8 +566,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
         "scene.toggle-grid", "editor.toggle-dark-theme", "editor.command-palette", "workspace.reset"
       ], Math.max(8.0, viewportWidth - 228.0), TOOLBAR_HEIGHT, commands, ui.commandContext,
-        function() { toolbarMenuVisible = false; commands.refresh(); },
-        function(_) { toolbarMenuVisible = false; commands.refresh(); });
+        function() { toolbarMenuVisible = false; invalidateView(); },
+        function(_) { toolbarMenuVisible = false; invalidateView(); });
       windowLayers.push(new StackChild("editor-more-menu", toolbarMenu, 0.0, 0.0, 25));
     }
     if (hierarchyAddVisible && documentDialog == null) {
@@ -589,7 +591,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.create-vertical-fillet"]);
       addSection("Import", ObjectKindRegistry.addMenuCommands("Import"));
       var addMenu = new Menu("hierarchy-add-menu", items, hierarchyAddX, hierarchyAddY,
-        function() { hierarchyAddVisible = false; commands.refresh(); });
+        function() { hierarchyAddVisible = false; invalidateView(); });
       windowLayers.push(new StackChild("hierarchy-add-menu", addMenu, 0.0, 0.0, 25));
     }
     if (hierarchyMenuVisible && documentDialog == null) {
@@ -600,7 +602,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         new MenuItem("delete", "Delete", function() commands.execute("scene.delete"),
           commands.get("scene.delete").isEnabled(ui.commandContext)),
         new MenuItem("frame", "Frame selected", function() commands.execute("scene.frame-selected"))
-      ], hierarchyMenuX, hierarchyMenuY, function() { hierarchyMenuVisible = false; commands.refresh(); });
+      ], hierarchyMenuX, hierarchyMenuY, function() { hierarchyMenuVisible = false; invalidateView(); });
       windowLayers.push(new StackChild("hierarchy-object-menu", objectMenu, 0.0, 0.0, 26));
     }
     if (renameId != null && documentDialog == null) {
@@ -613,8 +615,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast"]);
       var options = new CommandMenu("viewport-options-menu", optionIds,
         viewportOptionsX, viewportOptionsY, commands, ui.commandContext,
-        function() { viewportOptionsVisible = false; commands.refresh(); },
-        function(_) { viewportOptionsVisible = false; commands.refresh(); });
+        function() { viewportOptionsVisible = false; invalidateView(); },
+        function(_) { viewportOptionsVisible = false; invalidateView(); });
       windowLayers.push(new StackChild("viewport-options-menu", options, 0.0, 0.0, 25));
     }
     if (viewAngleMenuVisible && documentDialog == null) {
@@ -633,7 +635,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         })
       ], viewAngleMenuX, viewAngleMenuY, function() {
         viewAngleMenuVisible = false;
-        commands.refresh();
+        invalidateView();
       });
       windowLayers.push(new StackChild("view-angle-menu", angleMenu, 0.0, 0.0, 25));
     }
@@ -641,7 +643,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var palette = new CommandPalette("reference-command-palette",
         commands, ui.commandContext, 0.0, 0.0, "", function() {
           paletteVisible = false;
-          commands.refresh();
+          invalidateView();
         }, function(_) {
           log("Command executed from palette");
           commands.refresh();
@@ -686,6 +688,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
       hostContext.requestFrame();
   }
 
+  function invalidateView():Void {
+    viewRevision++;
+    if (hostContext != null) hostContext.requestFrame();
+  }
+
   function editorSubmitKey():String {
     var sceneRevision = scene.revision;
     var selectionRevision = scene.selectionRevision;
@@ -693,13 +700,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var sensorRevision = session.document.revision;
     var simulationRevision = simulation.appliedRevision;
     var perspectiveKey = perspectiveViewport == null ? "" : perspectiveViewport.presentationKey();
-    if (cachedSubmitSceneGeneration != sceneGeneration ||
+    if (cachedSubmitViewRevision != viewRevision ||
+        cachedSubmitSceneGeneration != sceneGeneration ||
         cachedSubmitSceneRevision != sceneRevision ||
         cachedSubmitSelectionRevision != selectionRevision ||
         cachedSubmitEnvironmentRevision != environmentRevision ||
         cachedSubmitSensorRevision != sensorRevision ||
         cachedSubmitSimulationRevision != simulationRevision ||
         cachedSubmitPerspectiveKey != perspectiveKey) {
+      cachedSubmitViewRevision = viewRevision;
       cachedSubmitSceneGeneration = sceneGeneration;
       cachedSubmitSceneRevision = sceneRevision;
       cachedSubmitSelectionRevision = selectionRevision;
@@ -709,7 +718,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       cachedSubmitPerspectiveKey = perspectiveKey;
       cachedSubmitKey = buildEditorSubmitKey(sceneGeneration, sceneRevision,
         environmentRevision, sensorRevision, simulationRevision, perspectiveKey,
-        selectionRevision);
+        selectionRevision) + ":view:" + viewRevision;
     }
     return cachedSubmitKey;
   }
@@ -755,7 +764,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   public function enableComponentLab(?storyId:String):Void {
     componentLab = new ComponentLab(storyId);
-    commands.refresh();
+    invalidateView();
   }
 
   /** Machine-readable application state paired with diagnostic frame captures. */
@@ -860,7 +869,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       TextStyleOverride.text(12.0))));
     var more = new Button(compact ? "" : "More", null, function() {
       toolbarMenuVisible = !toolbarMenuVisible;
-      commands.refresh();
+      invalidateView();
     }, "toolbar-more");
     more.variant = ButtonVariant.Secondary;
     more.leadingIcon = IconName.ChevronDown;
@@ -879,7 +888,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision +
       ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled +
       ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
-      ":viewport=" + viewportWidth + "x" + viewportHeight;
+      ":viewport=" + viewportWidth + "x" + viewportHeight + ":view=" + viewRevision;
   }
 
   function statusBar():View {
@@ -993,7 +1002,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     renameId = id;
     renameValue = item.label;
     hierarchyMenuVisible = false;
-    commands.refresh();
+    invalidateView();
   }
 
   function finishRename():Void {
@@ -1002,7 +1011,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     try {
       scene.setName(id, renameValue);
       renameId = null;
-      commands.refresh();
+      invalidateView();
     } catch (error:Dynamic) log("Rename failed: " + Std.string(error));
   }
 
@@ -1063,7 +1072,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       viewportOptionsX = Math.max(8.0, Math.min(viewportWidth - 228.0, bounds.x));
       viewportOptionsY = Math.max(8.0, Math.min(viewportHeight - 245.0, bounds.y + bounds.height));
       viewportOptionsVisible = true;
-      commands.refresh();
+      invalidateView();
     };
     var controls:Array<KeyedView> = [new KeyedView("frame",
       viewportToolbarAction("viewport-frame", "scene.frame-selected", "Frame", IconName.Inspect, compact))];
@@ -1106,7 +1115,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         viewAngleMenuY = Math.max(8.0, Math.min(viewportHeight - 155.0, bounds.y + bounds.height));
         viewAngleMenuVisible = true;
       }
-      commands.refresh();
+      invalidateView();
     };
     var canvas:View = new Stack("perspective-canvas-overlay", [
       new StackChild("scene", content, 0.0, 0.0, 0,
@@ -1230,7 +1239,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var openPalette = new Command("editor.command-palette", "Open command palette", function() {
       paletteVisible = true;
       contextMenuVisible = false;
-      commands.refresh();
+      invalidateView();
     }, new Shortcut(UiKey.K, UiModifier.Control), function() return !documents.blocked());
     openPalette.addShortcut(new Shortcut(UiKey.P, UiModifier.Control));
     commands.register(openPalette);
