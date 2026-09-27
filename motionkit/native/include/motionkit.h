@@ -37,7 +37,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 5, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 6, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
 enum {
@@ -135,6 +135,7 @@ enum { MK_CHECK_POSITION = 0, MK_CHECK_VELOCITY = 1,
     MK_CHECK_TASK_SPACE = 5, /**< Reserved for Cartesian and tool-path tolerance. */
     MK_CHECK_COUNT = 6 };
 enum { MK_CHECK_UNCHECKED = 0, MK_CHECK_PASSED = 1, MK_CHECK_FAILED = 2 };
+enum { MK_CHECK_METHOD_EXACT = 0, MK_CHECK_METHOD_SAMPLED = 1 };
 
 /** Zero motion limits are unclaimed. Position limits use an explicit flag so zero is usable. */
 typedef struct mk_limits {
@@ -157,12 +158,13 @@ typedef struct mk_validation_check {
     uint32_t status; /**< MK_CHECK_* status. */
     uint32_t joint; /**< UINT32_MAX when no limit is claimed. */
     uint32_t derivative_order; /**< 0 for position, 1..3 for derivatives. */
-    uint32_t reserved0;
+    uint32_t method; /**< MK_CHECK_METHOD_*; task-space validation is sampled. */
     double value; /**< Signed position or absolute derivative/jump value. */
     double time_seconds; /**< Time from trajectory clock epoch, including t0. */
     double limit; /**< Boundary or absolute maximum corresponding to value. */
     double margin; /**< Signed room to limit: negative means measured value exceeds it. */
     double tolerance; /**< Explicit permitted comparison excess, in check units. */
+    uint64_t resolution_ns; /**< Sampling resolution; zero for exact checks. */
 } mk_validation_check;
 
 typedef struct mk_assumption {
@@ -247,6 +249,10 @@ MK_API mk_result MK_CALL mk_generate_state_to_state(const mk_state_to_state_requ
 /** Reports exact polynomial extrema; failed checks return MK_OK with failed status. */
 MK_API mk_result MK_CALL mk_validate(mk_trajectory_handle trajectory,
     const mk_limits *limits, mk_validation_report *out_report);
+/** Fills the planner-owned sampled task-space check in a validation report. */
+MK_API mk_result MK_CALL mk_report_set_task_space(mk_validation_report *report,
+    uint32_t status, double worst, double time_seconds, double tolerance,
+    uint64_t resolution_ns);
 /** Deep-copies the trajectory and refuses any failed validation check. */
 MK_API mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory,
     const mk_plan_spec *spec, const mk_limits *limits,

@@ -432,6 +432,21 @@ class MotionKitBootstrapTests {
       MotionKitNativeConstants.MK_CHECK_UNCHECKED, "unclaimed jerk is unchecked");
     check(report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
       MotionKitNativeConstants.MK_CHECK_UNCHECKED, "task-space slot is reserved");
+    check(Int64.compare(
+      report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].resolutionNs,
+      Int64.ofInt(0)) == 0, "unset task-space check has no sampling resolution");
+    report.setTaskSpace(MotionKitNativeConstants.MK_CHECK_FAILED, 0.006, 0.75,
+      0.005, Int64.ofInt(1000000));
+    var taskSpace = report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE];
+    check(taskSpace.status == MotionKitNativeConstants.MK_CHECK_FAILED,
+      "Haxe wrapper records task-space status");
+    check(taskSpace.method == MotionKitNativeConstants.MK_CHECK_METHOD_SAMPLED,
+      "task-space report identifies sampled validation");
+    near(taskSpace.value, 0.006, "Haxe wrapper records worst task-space deviation");
+    near(taskSpace.timeSeconds, 0.75, "Haxe wrapper records worst task-space time");
+    near(taskSpace.limit, 0.005, "Haxe wrapper records task-space tolerance");
+    check(Int64.compare(taskSpace.resolutionNs, Int64.ofInt(1000000)) == 0,
+      "Haxe wrapper records task-space sampling resolution");
     check(Int64.compare(report.executorTimeResolutionNs, Int64.ofInt(1)) == 0,
       "host validation defaults to 1 ns");
     limits.timeResolutionNs(Int64.ofInt(2));

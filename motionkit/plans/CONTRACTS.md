@@ -419,3 +419,17 @@ invalid inputs. Commit: the commit containing this entry.
 MotionKit passed 5,857 assertions, RobotKit passed 4,437 aggregate assertions,
 all 12 native tests passed, both FFI audits passed, and TCP integration passed
 in default, session and lease-timeout modes on the combined branch tree.
+
+### P0.4 — Add the task-space report writer
+
+Added `mk_report_set_task_space` and the Haxe `ValidationReport.setTaskSpace`
+wrapper. The task-space check now records sampled method, worst deviation,
+time, tolerance, signed margin and sampling resolution; an untouched slot
+remains unchecked with zero resolution. Bumped `MK_API_VERSION` to 6 and
+regenerated the Haxe binding. Native and Haxe tests cover unset state and
+round-tripping the sampled result fields. Commit: the commit containing this
+entry.
+
+MotionKit passed 5,864 assertions, RobotKit passed 4,437 aggregate assertions,
+all 12 native tests passed, both FFI audits passed, and TCP integration passed
+in default, session and lease-timeout modes.

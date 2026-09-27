@@ -278,6 +278,32 @@ void zero_origin_real_overshoot_fails() {
     mk_trajectory_destroy(trajectory);
 }
 
+void task_space_slot_writer() {
+    mk_validation_report report{};
+    report.struct_size = sizeof(report);
+    assert(report.checks[MK_CHECK_TASK_SPACE].status == MK_CHECK_UNCHECKED);
+    assert(mk_report_set_task_space(&report, MK_CHECK_FAILED, 0.006, 0.75,
+        0.005, 1'000'000) == MK_OK);
+    const auto &check = report.checks[MK_CHECK_TASK_SPACE];
+    assert(check.status == MK_CHECK_FAILED);
+    assert(check.joint == UINT32_MAX);
+    assert(check.derivative_order == 0);
+    assert(check.method == MK_CHECK_METHOD_SAMPLED);
+    near(check.value, 0.006);
+    near(check.time_seconds, 0.75);
+    near(check.limit, 0.005);
+    near(check.margin, -0.001);
+    assert(check.resolution_ns == 1'000'000);
+    assert(mk_report_set_task_space(&report, MK_CHECK_PASSED, 0.004, 0.5,
+        0.005, 500'000) == MK_OK);
+    assert(check.status == MK_CHECK_PASSED);
+    near(check.value, 0.004);
+    near(check.limit, 0.005);
+    assert(check.resolution_ns == 500'000);
+    assert(mk_report_set_task_space(&report, MK_CHECK_PASSED, 0.0, 0.0,
+        0.005, 0) == MK_ERROR_INVALID_ARGUMENT);
+}
+
 } // namespace
 
 int main() {
@@ -288,4 +314,5 @@ int main() {
     executor_resolution_and_tolerance_cap();
     zero_origin_real_overshoot_fails();
     nonfinite_extrema_rejected();
+    task_space_slot_writer();
 }
