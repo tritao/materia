@@ -413,6 +413,6 @@ class RobotRuntime {
 
   static function check(status:Int, operation:String):Void {
     if (status != RobotKitRuntimeConstants.RK_OK)
-      throw '$operation failed with RobotKit status $status';
+      throw new RobotRuntimeError(status, operation);
   }
 }

@@ -29,6 +29,8 @@ import robotkit.model.RobotModel;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.RobotRuntimeError;
+import RobotKitRuntime;
 import robotkit.world.RecordingRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.SimulatedRobot;
@@ -66,6 +68,8 @@ class MotionKitBootstrapTests {
     testHoldDecelerationStaysWithinLimitsThroughoutMove();
     testRuntimeSynchronizedHolding();
     testImmediateMotionReplacesNativeQueue();
+    testSmoothReplacementRetriesLateSubmission();
+    testFreeRunningSmoothReplacement();
     testMotionChangesStayWithinLimits();
     testJogProfile();
     testContinuousJog();
@@ -757,7 +761,7 @@ class MotionKitBootstrapTests {
       previousProgress = progress;
       var snapshot = runtime.snapshot();
       if (Int64.compare(snapshot.trajectoryTag, Int64.ofInt(0)) != 0) {
-        var runtimeTime = Std.parseFloat(Int64.toStr(snapshot.trajectoryTagTimeNs)) /
+        var runtimeTime = Int64.toFloat(snapshot.trajectoryTagTimeNs) /
           1000000000.0;
         check(Math.abs(progress - Math.min(1.0, runtimeTime / move.durationSeconds)) < 1e-6,
           "progress follows the runtime trajectory tag clock");
@@ -1049,6 +1053,77 @@ class MotionKitBootstrapTests {
     runMotion(machine, simulation);
     near(robot.snapshot().positions.get(0), 0.01,
       "immediate motion replaces stale native trajectory motion", 1e-5);
+    simulation.dispose();
+  }
+
+  static function testSmoothReplacementRetriesLateSubmission():Void {
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(new LinearAxis(23, 10, 80),
+      "x", 0.08, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var base = new SimulatedRobot("retry-replacement", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var robot = new LaggingRobot(base);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var options = new MotionOptions(0.05, 0.2);
+    machine.moveAxes([new AxisTarget("x", 0.06)], options);
+    for (tick in 0...5) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick));
+    }
+    robot.lateRejections = 1;
+    var replacement = machine.moveAxes([new AxisTarget("x", 0.04)], options);
+    check(replacement != null, "one late rejection is retried from a fresh snapshot");
+    check(robot.replacementAttempts == 2,
+      "late replacement submits exactly one retry");
+    check(Int64.compare(robot.lastReplacementLeadNs, Int64.ofInt(20000000)) >= 0,
+      "smooth replacement anchors at least two owner periods ahead");
+    runMotion(machine, simulation);
+    near(base.snapshot().positions.get(0), 0.04, "retried replacement reaches target", 1e-5);
+    robot.lateRejections = 2;
+    machine.moveAxes([new AxisTarget("x", 0.06)], options);
+    for (tick in 0...5) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick + 500));
+    }
+    var fallback = machine.moveAxes([new AxisTarget("x", 0.02)], options);
+    check(fallback == null && machine.isMoving(),
+      "two late rejections defer the target behind a stop");
+    check(robot.lateRejections == 0,
+      "stop-first fallback follows exactly two rejected attempts");
+    runMotion(machine, simulation);
+    near(base.snapshot().positions.get(0), 0.02,
+      "stop-first fallback reaches target", 1e-5);
+    simulation.dispose();
+  }
+
+  static function testFreeRunningSmoothReplacement():Void {
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(new LinearAxis(23, 10, 80),
+      "x", 0.08, 0.4);
+    blueprint.replacementOwnerPeriodSeconds = 0.001;
+    var simulation = new Simulation(0.001);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("free-running-replacement", runtime,
+      blueprint.model.name, [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    simulation.start();
+    machine.jog("x", 0.03, 1.0, 0.2);
+    for (index in 0...12) {
+      Sys.sleep(0.004);
+      machine.update();
+      var result = machine.jog("x", index % 2 == 0 ? 0.02 : 0.035, 0.5, 0.2);
+      check(result != null || machine.isMoving(),
+        "free-running jog applies a replacement or defers behind a stop");
+      var observation = robot.snapshot();
+      check(Math.abs(observation.velocities.get(0)) <= 0.08 + 1e-5,
+        "free-running replacement stays within velocity limit");
+      check(observation.positions.get(0) >= -1e-6 &&
+        observation.positions.get(0) <= 0.08 + 1e-6,
+        "free-running replacement stays within travel limits");
+    }
+    simulation.stop();
     simulation.dispose();
   }
 
@@ -1507,6 +1582,9 @@ class MotionKitBootstrapTests {
 /** Robot wrapper that can hold submitted commands back, to simulate transport delay. */
 private class LaggingRobot implements Robot {
   public var lagging:Bool = false;
+  public var lateRejections:Int = 0;
+  public var replacementAttempts:Int = 0;
+  public var lastReplacementLeadNs:Int64 = Int64.ofInt(0);
   final inner:Robot;
   var heldCommands:Array<RobotCommand> = [];
 
@@ -1526,6 +1604,20 @@ private class LaggingRobot implements Robot {
   public function sensors():Array<SensorFrame> return inner.sensors();
   public function fault():Null<RobotFault> return inner.fault();
   public function submit(command:RobotCommand):Void {
+    switch command {
+      case ExecutionPlan(plan):
+        if (Int64.compare(plan.replaceAfterPlanId, Int64.ofInt(0)) != 0) {
+          replacementAttempts++;
+          lastReplacementLeadNs = Int64.sub(plan.replaceAfterTimeNs,
+            inner.snapshot().committedUntilNs);
+          if (lateRejections > 0) {
+            lateRejections--;
+            throw new RobotRuntimeError(RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE,
+              "runtime.submitPlan");
+          }
+        }
+      case _:
+    }
     if (lagging) heldCommands.push(command);
     else inner.submit(command);
   }

@@ -97,8 +97,8 @@ class WheelImuLocalization implements Localization {
     var heading = wheelHeading;
     var imu = advancing ? latestImu(snapshot) : null;
     if (imu != null) {
-      var intervalSeconds = Std.parseFloat(Int64.toStr(Int64.sub(snapshot.sourceTimestampNs,
-        cast previousTimestamp))) * 1e-9;
+      var intervalSeconds = Int64.toFloat(Int64.sub(snapshot.sourceTimestampNs,
+        cast previousTimestamp)) * 1e-9;
       var gyroHeading = imu * intervalSeconds;
       heading += fusionWeight * Pose2.wrapAngle(gyroHeading - wheelHeading);
       varianceYaw += imuYawVariance * intervalSeconds * intervalSeconds;

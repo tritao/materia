@@ -172,7 +172,7 @@ class RobotClient {
     var effectiveTimeout = timeoutSeconds;
     if (Int64.compare(leaseRenewalIntervalNs, Int64.ofInt(0)) > 0) {
       var remainingNs = Int64.sub(nextLeaseRenewalNs, NativeKit.nk_time_now_ns());
-      var remainingSeconds = Std.parseFloat(Int64.toStr(remainingNs)) / 1000000000.0;
+      var remainingSeconds = Int64.toFloat(remainingNs) / 1000000000.0;
       if (remainingSeconds < 0.0) remainingSeconds = 0.0;
       if (remainingSeconds < effectiveTimeout) effectiveTimeout = remainingSeconds;
     }

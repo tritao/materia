@@ -996,3 +996,17 @@ until it is replanned with Ruckig. MotionKit Haxe (21,962 assertions),
 RobotKit Haxe, all 12 native CTest targets, both FFI audits, and TCP default,
 session and lease-timeout integration passed. Commit: the commit containing
 this entry.
+
+### Smooth replacement clock-race follow-up
+
+Smooth jog and axis replacements now anchor beyond the observed committed
+horizon by two configurable owner periods (with an independently configurable
+owner period), evaluate the active cubic at that anchor, and submit that exact
+state. A native invalid-state rejection triggers one fresh-snapshot retry;
+if that also misses, the caller uses stop-first replacement without seeing a
+timing-race exception. Tests inject one and two late rejections and exercise
+repeated jog changes with the free-running owner thread. Haxeon gained
+`Int64.toFloat` in a separate submodule commit; MotionKit and RobotKit now use
+it for nanosecond-to-second conversions. MotionKit and RobotKit Haxe suites,
+all 12 native CTest targets, and Wasm32/Wasm-GC Int64 checks passed. Commit:
+the commit containing this entry.

@@ -28,7 +28,7 @@ class ExecutionPlan {
     trajectoryRevision = info.get_trajectory_revision();
     requiredCapabilities = info.get_required_capabilities();
     planningAuthority = info.get_planning_authority();
-    durationSeconds = Std.parseFloat(Int64.toStr(info.get_duration_ns())) * 1e-9;
+    durationSeconds = Int64.toFloat(info.get_duration_ns()) * 1e-9;
   }
 
   /** Does not infer derivatives from degree-1 chords; callers supply the authored state. */

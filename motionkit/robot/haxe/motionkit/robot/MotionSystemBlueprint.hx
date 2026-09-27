@@ -12,6 +12,10 @@ class MotionSystemBlueprint {
   public final runtime:RobotRuntimeBlueprint;
   public final axes:Array<MotionAxisBlueprint>;
   public final fixedTimestepSeconds:Float;
+  /** Smooth replacement lead in owner periods; defaults to two. */
+  public var replacementMarginOwnerPeriods:Int = 2;
+  /** Owner period used for replacement lead; defaults to fixedTimestepSeconds. */
+  public var replacementOwnerPeriodSeconds:Float;
 
   public function new(model:RobotModel, runtime:RobotRuntimeBlueprint,
       axes:Array<MotionAxisBlueprint>, ?fixedTimestepSeconds:Float = 0.01) {
@@ -29,6 +33,7 @@ class MotionSystemBlueprint {
     this.runtime = runtime;
     this.axes = axes.copy();
     this.fixedTimestepSeconds = fixedTimestepSeconds;
+    this.replacementOwnerPeriodSeconds = fixedTimestepSeconds;
   }
 
   public static function fromRobotModel(model:RobotModel, axes:Array<MotionAxisBlueprint>,

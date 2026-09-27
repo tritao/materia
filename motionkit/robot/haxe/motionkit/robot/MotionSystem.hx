@@ -28,6 +28,8 @@ import robotkit.world.TrajectoryChunk;
 import robotkit.world.TrajectoryPoint;
 import robotkit.world.ExecutionPlanSubmission;
 import robotkit.world.TrajectorySegment;
+import robotkit.runtime.RobotRuntimeError;
+import RobotKitRuntime;
 
 /**
  * Semantic machine-axis view over an ordinary RobotKit robot.
@@ -45,6 +47,8 @@ class MotionSystem {
   public final robot:Robot;
   public final axes:Array<MotionAxis>;
   public final fixedTimestepSeconds:Float;
+  public final replacementMarginOwnerPeriods:Int;
+  public final replacementOwnerPeriodSeconds:Float;
   public final planner:TrajectoryPlanner;
   public final linePlanner:LineLookaheadPlanner;
   /** Trajectory being executed; a re-timed copy of activeSource after a hold or resume. */
@@ -103,6 +107,13 @@ class MotionSystem {
     this.modelRevision = Int64.ofInt(blueprint.runtime.revision);
     this.calibrationRevision = Int64.ofInt(blueprint.runtime.calibrationRevision);
     this.fixedTimestepSeconds = blueprint.fixedTimestepSeconds;
+    if (blueprint.replacementMarginOwnerPeriods < 1)
+      throw "Smooth replacement margin must be at least one owner period";
+    if (!Math.isFinite(blueprint.replacementOwnerPeriodSeconds) ||
+        blueprint.replacementOwnerPeriodSeconds <= 0.0)
+      throw "Smooth replacement owner period must be finite and positive";
+    this.replacementMarginOwnerPeriods = blueprint.replacementMarginOwnerPeriods;
+    this.replacementOwnerPeriodSeconds = blueprint.replacementOwnerPeriodSeconds;
     this.planner = planner == null ? new TrapezoidalPlanner(fixedTimestepSeconds) : planner;
     this.linePlanner = new LineLookaheadPlanner(fixedTimestepSeconds);
     this.axes = [];
@@ -584,31 +595,20 @@ class MotionSystem {
       return null;
     var smooth = nativeFor(executing);
     if (smooth != null && usesTrajectoryChunks(executing)) {
-      var observation = syncFromRuntime();
-      if (!observation.trajectoryActive ||
-          Int64.compare(observation.activePlanId, Int64.ofInt(0)) == 0)
-        return null;
-      var startNs = Int64.sub(observation.trajectoryTimeNs,
-        observation.trajectoryTagTimeNs);
-      var localNs = Int64.sub(observation.committedUntilNs, startNs);
-      var localSeconds = Std.parseFloat(Int64.toStr(localNs)) * 1e-9;
-      if (localSeconds < 0.0 ||
-          localSeconds >= smooth.durationSeconds() - fixedTimestepSeconds)
-        return null;
-      var state = smooth.evaluate(localSeconds);
-      var target = state.positions.copy();
-      var logical = axisValue.logicalPosition(target);
-      var end = Math.max(axisValue.lowerLimit,
-        Math.min(axisValue.upperLimit, logical + velocity * durationSeconds));
-      axisValue.writeLogicalPosition(target, end);
-      var currentLogicalVelocity = axisValue.logicalPosition(
-        [for (joint in 0...state.velocities.length)
-          state.positions[joint] + state.velocities[joint]]) - logical;
-      var planned = nativeLogicalPlan(state.positions, state.velocities,
-        state.accelerations, target,
-        new MotionLimits(Math.max(Math.abs(velocity), Math.abs(currentLogicalVelocity)),
-          acceleration));
-      return submitSmoothReplacement(planned, state, observation, axisValue.id);
+      return trySmoothReplacement(executing, axisValue.id, state -> {
+        var target = state.positions.copy();
+        var logical = axisValue.logicalPosition(target);
+        var end = Math.max(axisValue.lowerLimit,
+          Math.min(axisValue.upperLimit, logical + velocity * durationSeconds));
+        axisValue.writeLogicalPosition(target, end);
+        var currentLogicalVelocity = axisValue.logicalPosition(
+          [for (joint in 0...state.velocities.length)
+            state.positions[joint] + state.velocities[joint]]) - logical;
+        return nativeLogicalPlan(state.positions, state.velocities,
+          state.accelerations, target,
+          new MotionLimits(Math.max(Math.abs(velocity), Math.abs(currentLogicalVelocity)),
+            acceleration));
+      });
     }
     if (usesTrajectoryChunks(executing)) return null;
     var sampleSeconds = elapsedSeconds;
@@ -656,55 +656,74 @@ class MotionSystem {
       return null;
     var smooth = nativeFor(executing);
     if (smooth == null) return null;
-    var observation = syncFromRuntime();
-    if (!observation.trajectoryActive ||
-        Int64.compare(observation.activePlanId, Int64.ofInt(0)) == 0)
-      return null;
-    var startNs = Int64.sub(observation.trajectoryTimeNs,
-      observation.trajectoryTagTimeNs);
-    var localNs = Int64.sub(observation.committedUntilNs, startNs);
-    var localSeconds = Std.parseFloat(Int64.toStr(localNs)) * 1e-9;
-    if (localSeconds < 0.0 ||
-        localSeconds >= smooth.durationSeconds() - fixedTimestepSeconds)
-      return null;
-    var state = smooth.evaluate(localSeconds);
-    var target = state.positions.copy();
-    var seen = new Map<String, Bool>();
-    for (requested in targets) {
-      if (requested == null) throw "Axis move cannot contain a null target";
-      var axisValue = axis(requested.axis);
-      if (axisValue == null) throw 'Unknown motion axis "${requested.axis}"';
-      if (seen.exists(requested.axis)) throw 'Axis move targets "${requested.axis}" more than once';
-      if (requested.position < axisValue.lowerLimit ||
-          requested.position > axisValue.upperLimit)
-        throw 'Axis "${requested.axis}" target ${requested.position} is outside its limits';
-      axisValue.writeLogicalPosition(target, requested.position);
-      seen.set(requested.axis, true);
+    return trySmoothReplacement(executing, null, state -> {
+      var target = state.positions.copy();
+      var seen = new Map<String, Bool>();
+      for (requested in targets) {
+        if (requested == null) throw "Axis move cannot contain a null target";
+        var axisValue = axis(requested.axis);
+        if (axisValue == null) throw 'Unknown motion axis "${requested.axis}"';
+        if (seen.exists(requested.axis)) throw 'Axis move targets "${requested.axis}" more than once';
+        if (requested.position < axisValue.lowerLimit ||
+            requested.position > axisValue.upperLimit)
+          throw 'Axis "${requested.axis}" target ${requested.position} is outside its limits';
+        axisValue.writeLogicalPosition(target, requested.position);
+        seen.set(requested.axis, true);
+      }
+      var limits = resolveLimits(targets,
+        options == null ? new MotionOptions() : options);
+      return nativeLogicalPlan(state.positions, state.velocities,
+        state.accelerations, target, limits);
+    });
+  }
+
+  function trySmoothReplacement(executing:JointTrajectory, jogAxis:Null<String>,
+      planFromState:TrajectoryState -> JointTrajectory):Null<JointTrajectory> {
+    var smooth = nativeFor(executing);
+    if (smooth == null) return null;
+    for (_ in 0...2) {
+      var observation = syncFromRuntime();
+      if (!observation.trajectoryActive ||
+          Int64.compare(observation.activePlanId, Int64.ofInt(0)) == 0)
+        return null;
+      var startNs = Int64.sub(observation.trajectoryTimeNs,
+        observation.trajectoryTagTimeNs);
+      var marginNs = Trajectory.nanoseconds(
+        replacementOwnerPeriodSeconds * replacementMarginOwnerPeriods);
+      var anchorNs = Int64.add(observation.committedUntilNs, marginNs);
+      var localNs = Int64.sub(anchorNs, startNs);
+      var localSeconds = Int64.toFloat(localNs) * 1e-9;
+      if (localSeconds < 0.0 ||
+          localSeconds >= smooth.durationSeconds() - replacementOwnerPeriodSeconds)
+        return null;
+      var state = smooth.evaluate(localSeconds);
+      var planned = planFromState(state);
+      try {
+        return submitSmoothReplacement(planned, state, observation, anchorNs, jogAxis);
+      } catch (error:Dynamic) {
+        discardNativeTrajectory(planned);
+        var runtimeError:Null<RobotRuntimeError> = Std.isOfType(error, RobotRuntimeError)
+          ? cast error : null;
+        if (runtimeError == null || runtimeError.status !=
+            RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE)
+          throw error;
+      }
     }
-    var limits = resolveLimits(targets,
-      options == null ? new MotionOptions() : options);
-    var planned = nativeLogicalPlan(state.positions, state.velocities,
-      state.accelerations, target, limits);
-    return submitSmoothReplacement(planned, state, observation, null);
+    return null;
   }
 
   function submitSmoothReplacement(planned:JointTrajectory, state:TrajectoryState,
-      observation:RobotSnapshot, jogAxis:Null<String>):JointTrajectory {
+      observation:RobotSnapshot, anchorNs:Int64, jogAxis:Null<String>):JointTrajectory {
     var replacement = nativeFor(planned);
     var tag = nextTrajectoryTag;
     var segments = [for (segment in replacement.segments())
       new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
         segment.coefficients)];
     if (segments.length > 128) throw "Smooth replacement exceeds one runtime submission";
-    try robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
+    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
       modelRevision, calibrationRevision, 1, state.positions, state.velocities,
       state.accelerations, segments, observation.activePlanId,
-      observation.committedUntilNs))) catch (error:Dynamic) {
-      discardNativeTrajectory(planned);
-      throw 'replacement at ${observation.committedUntilNs} from '
-        + 'time=${observation.trajectoryTimeNs} tagTime=${observation.trajectoryTagTimeNs} '
-        + 'state=${state.positions}: $error';
-    }
+      anchorNs)));
     nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
     setActive(planned);
     activeJogAxis = jogAxis;
@@ -1148,7 +1167,7 @@ class MotionSystem {
     if (trajectoryValue == null || !usesTrajectoryChunks(trajectoryValue)) return observation;
     var reference = trajectoryChunkReferences.get(Int64.toStr(observation.trajectoryTag));
     if (reference != null && reference.trajectory == trajectoryValue) {
-      var runtimeSeconds = Std.parseFloat(Int64.toStr(observation.trajectoryTagTimeNs)) /
+      var runtimeSeconds = Int64.toFloat(observation.trajectoryTagTimeNs) /
         1000000000.0;
       if (Math.isFinite(runtimeSeconds))
         elapsedSeconds = Math.min(trajectoryValue.durationSeconds,
@@ -1166,7 +1185,7 @@ class MotionSystem {
       return false;
     if (Int64.compare(observation.trajectoryTag, trajectoryFinalTag) != 0)
       return false;
-    var finalTime = Std.parseFloat(Int64.toStr(observation.trajectoryTagTimeNs)) /
+    var finalTime = Int64.toFloat(observation.trajectoryTagTimeNs) /
       1000000000.0;
     var reachedEnd = Math.isFinite(finalTime) &&
       trajectoryFinalEndSeconds - trajectoryChunkStartSeconds <= finalTime + 1e-9;

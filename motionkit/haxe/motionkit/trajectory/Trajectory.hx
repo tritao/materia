@@ -153,7 +153,7 @@ class Trajectory {
     ensureLive();
     var result = MotionKitNative.mk_trajectory_duration_ns(owner.borrow());
     check(result.status, "trajectory.duration");
-    return Std.parseFloat(Int64.toStr(result.out_duration_ns)) * 1e-9;
+    return Int64.toFloat(result.out_duration_ns) * 1e-9;
   }
 
   public function jointCount():Int {
