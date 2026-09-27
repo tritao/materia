@@ -271,6 +271,7 @@ extern "C" mk_result MK_CALL mk_select_opw_configurations(
       mk_opw_solution solutions[8]{};
       const auto status = mk_opw_inverse(parameters, &pose, solutions, 8);
       if (status != MK_OK) return status;
+      std::vector<std::array<double, 6>> all_variants;
       for (const auto &solution : solutions) {
         if (!solution.valid) continue;
         std::vector<std::array<double, 6>> variants(1);
@@ -284,20 +285,29 @@ extern "C" mk_result MK_CALL mk_select_opw_configurations(
               auto chosen = variant;
               chosen[joint] = value;
               next.push_back(chosen);
-              if (next.size() >= 64) break;
             }
-          if (next.size() > 64) next.resize(64);
           variants = std::move(next);
           if (variants.empty()) break;
         }
-        for (const auto &variant : variants) {
-          mk_configuration_candidate candidate{};
-          candidate.struct_size = sizeof(candidate);
-          for (uint32_t joint = 0; joint < 6; ++joint)
-            candidate.joints[joint] = variant[joint];
-          candidates.push_back(candidate);
-          if (candidates.size() - sample.first_candidate >= 64) break;
-        }
+        all_variants.insert(all_variants.end(), variants.begin(), variants.end());
+      }
+      auto distance_from_start = [&](const std::array<double, 6> &joints) {
+        double distance = 0.0;
+        for (uint32_t joint = 0; joint < 6; ++joint)
+          distance += std::abs(joints[joint] - start_joints[joint]) /
+              request->max_jump[joint];
+        return distance;
+      };
+      std::stable_sort(all_variants.begin(), all_variants.end(),
+          [&](const auto &left, const auto &right) {
+            return distance_from_start(left) < distance_from_start(right);
+          });
+      for (const auto &variant : all_variants) {
+        mk_configuration_candidate candidate{};
+        candidate.struct_size = sizeof(candidate);
+        for (uint32_t joint = 0; joint < 6; ++joint)
+          candidate.joints[joint] = variant[joint];
+        candidates.push_back(candidate);
         if (candidates.size() - sample.first_candidate >= 64) break;
       }
     }
