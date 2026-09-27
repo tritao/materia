@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"package": { "name": "manufacturingkit-sheet-cutting-tests" },
+	"entry": "tests.SheetCuttingTests",
+	"sourceRoots": ["src"],
+	"dependencies": { "manufacturingkit": { "path": ".." } },
+	"target": "host",
+	"outputDir": "build"
+}

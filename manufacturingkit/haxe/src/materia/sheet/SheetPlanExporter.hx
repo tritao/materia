@@ -53,7 +53,7 @@ class SheetPlanExporter {
 		out.add('<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(width + 40)}mm" height="${fmt(height + 86)}mm" viewBox="0 0 ${fmt(width + 40)} ${fmt(height + 86)}">\n');
 		out.add('<rect width="100%" height="100%" fill="#fff"/>\n');
 		out.add('<text x="20" y="24" font-family="sans-serif" font-size="16" font-weight="bold">Planning drawing · ${xml(plan.id)}</text>\n');
-		out.add('<text x="20" y="45" font-family="sans-serif" font-size="12">Stock ${fmt(width)} × ${fmt(height)} mm · ${xml(stock.materialId)} · ${fmt(SheetPlanValidator.millimetres(source == null ? stock.thickness : source.thickness, source == null ? stock.lengthUnit : source.lengthUnit))} mm · Origin: lower left</text>\n');
+		out.add('<text x="20" y="45" font-family="sans-serif" font-size="12">${source == null ? "Input: Nominal stock · " : "Input: Physical sheet " + xml(source.id) + " · "}Stock ${fmt(width)} × ${fmt(height)} mm · ${xml(stock.materialId)} · ${fmt(SheetPlanValidator.millimetres(source == null ? stock.thickness : source.thickness, source == null ? stock.lengthUnit : source.lengthUnit))} mm · Origin: lower left</text>\n');
 		out.add('<g transform="translate(20,${fmt(height + 58)}) scale(1,-1)">\n');
 		out.add('<rect x="0" y="0" width="${fmt(width)}" height="${fmt(height)}" fill="#e4dfd5" stroke="#253241" stroke-width="2"/>\n');
 		out.add('<rect x="${fmt(margin)}" y="${fmt(margin)}" width="${fmt(width - 2 * margin)}" height="${fmt(height - 2 * margin)}" fill="none" stroke="#6f7882" stroke-dasharray="12 8" stroke-width="2"/>\n');

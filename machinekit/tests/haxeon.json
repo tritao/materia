@@ -5,6 +5,7 @@
 	"sourceRoots": ["src", "../examples"],
 	"dependencies": {
 		"projectkit": { "path": "../../projectkit" },
+		"manufacturingkit": { "path": "../../manufacturingkit" },
 		"cadkit": { "path": "../../cadkit" },
 		"machinekit": { "path": ".." }
 	},

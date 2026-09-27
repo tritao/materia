@@ -22,7 +22,9 @@ class SheetCuttingTests {
 	static function main():Int {
 		try {
 			codecUnitsAndAreaBalance();
+			planningWithoutPhysicalStock();
 			invalidPlansAndStaleness();
+			requirementRevisionOwnership();
 			inventoryAtomicityAndRemnantReuse();
 			Sys.println('Sheet cutting tests passed ($assertions assertions)');
 			return 0;
@@ -30,6 +32,41 @@ class SheetCuttingTests {
 			Sys.stderr().writeString("Sheet cutting tests failed: " + Std.string(error) + "\n");
 			return 1;
 		}
+	}
+
+	static function planningWithoutPhysicalStock():Void {
+		var record = fixture();
+		check(record.stockPieces.length == 0 && record.executions.length == 0,
+			"planning fixture has no physical inventory or execution history");
+		var inventory = new SheetInventory(record, null);
+		var nominal = inventory.preview("plan-one");
+		check(nominal.valid, "nominal stock dimensions validate without a physical sheet");
+		near(nominal.sourceAreaMm2, 10000, "nominal preview uses stock-spec dimensions");
+		var plan = inventory.plan("plan-one"), stock = inventory.stockSpec(plan.stockSpecId);
+		var requirements = [for (reference in plan.requirements) inventory.requirement(reference.id)];
+		var csv = SheetPlanExporter.csv(plan, stock, requirements, nominal);
+		var svg = SheetPlanExporter.svg(plan, stock, requirements, nominal);
+		check(csv.indexOf("picking-part") >= 0 && csv.indexOf(",,") >= 0,
+			"nominal-stock cut list exports blanks without a source-piece ID");
+		check(svg.indexOf("Stock 100 × 100 mm") >= 0 && svg.indexOf("Planning drawing") >= 0,
+			"nominal-stock SVG uses specification dimensions and planning label");
+
+		inventory.registerSheet("measured-sheet", "small-sheet", 9, 9, 1.8, "cm");
+		var measured = inventory.preview("plan-one", "measured-sheet");
+		check(measured.valid, "the same plan validates against measured physical dimensions");
+		near(measured.sourceAreaMm2, 8100, "physical preview switches to measured sheet dimensions");
+		var nominalRight:Null<materia.sheet.SheetCutRegion> = null;
+		var measuredRight:Null<materia.sheet.SheetCutRegion> = null;
+		for (region in nominal.regions) if (region.id == "right") nominalRight = region;
+		for (region in measured.regions) if (region.id == "right") measuredRight = region;
+		check(nominalRight != null && measuredRight != null,
+			"nominal and measured validation expose the same remnant region identity");
+		var nominalRegion:materia.sheet.SheetCutRegion = cast nominalRight;
+		var measuredRegion:materia.sheet.SheetCutRegion = cast measuredRight;
+		near(nominalRegion.widthMm, 58,
+			"nominal remnant geometry follows the stock specification");
+		near(measuredRegion.widthMm, 48,
+			"measured remnant geometry follows the physical sheet");
 	}
 
 	static function codecUnitsAndAreaBalance():Void {
@@ -131,6 +168,21 @@ class SheetCuttingTests {
 		result = validateFirst(bad);
 		check(!result.valid && contains(result.messages, "stale"),
 			"changing part dimensions invalidates the prior requirement fingerprint");
+	}
+
+	static function requirementRevisionOwnership():Void {
+		var inventory = new SheetInventory(fixture(), null);
+		var requirement = inventory.requirement("req-a");
+		var partRevision = requirement.partRevision, revision = requirement.revision;
+		inventory.editRequirement("req-a", function(item) { item.blankWidth += 0.1; });
+		var edited = inventory.requirement("req-a");
+		check(edited.revision == revision + 1,
+			"editing a blank requirement advances the requirement revision");
+		check(edited.partRevision == partRevision,
+			"editing a blank requirement preserves the referenced CAD part revision");
+		var result = inventory.preview("plan-one");
+		check(!result.valid && contains(result.messages, "stale"),
+			"requirement edits still invalidate plans based on the previous requirement revision");
 	}
 
 	static function inventoryAtomicityAndRemnantReuse():Void {

@@ -210,21 +210,25 @@ The example includes its companion record. Build and launch it in Materia:
 ```
 
 The checked-in companion includes one available example sheet (`sheet-001`),
-so the first plan is ready to select and validate. The Inspector's **Sheet
-cutting plan** section lets you choose a physical sheet and plan, register or
-allocate stock, edit placements/rotations/cut order/kerf
-and margins, review the scaled layout and validation messages, export CSV and
-SVG, release an allocation, and confirm completed cuts. A successful execution
-consumes the source and adds blank and remnant records in one save. The second
-plan uses the first plan's `shelf-drop` remnant. The separate finished-part BOM
-continues to count parts, not consumed sheets.
+so the first plan is ready to select and validate. The Inspector's **Cut
+planning** section defaults to **Nominal stock** specification dimensions; you
+can switch to a particular physical sheet to plan against its measured size.
+The collapsed **Operations** section lets you register stock, allocate or
+release it, confirm completed cutting, and inspect resulting blanks and
+remnants. Planning, validation, save, and CSV/SVG export are available without
+physical inventory. A successful execution consumes the source and adds blank
+and remnant records in one save. The second plan uses the first plan's
+`shelf-drop` remnant. The separate finished-part BOM continues to count parts,
+not consumed sheets.
 
 For a new copy, `init <path>` creates an initial versioned companion record and
 refuses to overwrite an existing file. The command-line inventory flow uses
 `register`, `allocate`, `preview`, `cancel`, `execute ... CONFIRM`, `status`, and
 `bom`; its project path is relative to the example directory, so use
 `materia.project.json.sheet.json`. `preview` is read-only; `execute` requires an
-allocation and explicit confirmation. The first release supports rectangular
+allocation and explicit confirmation. Keep real operations in working copies
+of both the project and its `.sheet.json` companion; the checked-in files are
+shareable examples. The first release supports rectangular
 blanks and straight guillotine cuts only. Automatic nesting, arbitrary
 contours, machine toolpaths, and warehouse integrations are outside its scope.
 The CAD viewport shows the authored sample layout; numeric edits update the

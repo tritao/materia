@@ -108,7 +108,6 @@ class SheetInventory {
 		var selected:SheetPartRequirement = cast target;
 		edit(selected);
 		selected.revision++;
-		selected.partRevision++;
 		commit(next);
 	}
 
@@ -125,14 +124,16 @@ class SheetInventory {
 	}
 
 	/** Preview is side-effect free and recomputes every material, dimension, and cut check. */
-	public function preview(planId:String, pieceId:String):SheetPlanValidation {
-		var targetPlan = plan(planId), source = piece(pieceId), stock = stockSpec(targetPlan.stockSpecId);
+	public function preview(planId:String, ?pieceId:Null<String>):SheetPlanValidation {
+		var targetPlan = plan(planId), stock = stockSpec(targetPlan.stockSpecId);
 		var requirements = [for (reference in targetPlan.requirements) requirement(reference.id)];
+		var source:Null<StockPiece> = pieceId == null || pieceId == "" ? null : piece(pieceId);
 		var result = SheetPlanValidator.validate(targetPlan, stock, requirements, source,
 			record.customMaterials);
-		if (source.state == "consumed" || (source.state == "allocated" && source.allocationPlanId != planId)) {
+		if (source != null && (source.state == "consumed" ||
+			(source.state == "allocated" && source.allocationPlanId != planId))) {
 			result.valid = false;
-			result.messages.push('Stock piece "$pieceId" is unavailable for this plan');
+			result.messages.push('Stock piece "${source.id}" is unavailable for this plan');
 		}
 		return result;
 	}

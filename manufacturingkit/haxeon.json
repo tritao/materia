@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"package": { "name": "manufacturingkit" },
+	"sourceRoots": ["haxe/src"],
+	"target": "host",
+	"dependencies": {
+		"projectkit": { "path": "../projectkit" }
+	}
+}

@@ -407,6 +407,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var sheetInventoryPath:Null<String> = null;
   var sheetPlanSelection:String = "";
   var sheetPieceSelection:String = "";
+  var sheetOperationsExpanded:Bool = false;
   var framePresentation:Null<ApplicationPresentationSnapshot> = null;
   var cachedSubmitKey:String = "";
   var cachedSubmitSceneGeneration:Int = -1;
