@@ -590,6 +590,17 @@ class MotionKitBootstrapTests {
         check(onFirst || onSecond, "lookahead stays on the authored polyline");
       }
     }
+    // Degree-1 chords around a stop can only be as fast as one sample period
+    // of braking, so an exact-stop corner stays under that bound on both
+    // sides while a blended corner carries clearly more speed through.
+    var stopChordBound = limits.maxAcceleration * planner.samplePeriodSeconds + 1e-9;
+    var exactCorner = cornerChordSpeeds(exact, 0.1, 0.0);
+    check(exactCorner[0] <= stopChordBound && exactCorner[1] <= stopChordBound,
+      "exact-stop corner comes to rest");
+    var blendCorner = cornerChordSpeeds(blend, 0.1, 0.0);
+    check(blendCorner[0] > 2.0 * stopChordBound && blendCorner[1] > 2.0 * stopChordBound,
+      "blend corner retains continuous path speed");
+
     var repeated = planner.planNativePath(path, limits, PathPlanningOptions.blend(0.01));
     near(repeated.durationSeconds(), blend.durationSeconds(),
       "lookahead duration is deterministic");
@@ -627,6 +638,10 @@ class MotionKitBootstrapTests {
       near(Math.sqrt(dx * dx + dy * dy), 0.1,
         "arc knots stay on the authored circle", 1e-5);
     }
+    // Tangential and centripetal acceleration share one budget; the chord
+    // estimate turns the circle's rotation into its centripetal term.
+    check(peakChordAccelerationNorm(arcTrajectory) <= 1.0 * 1.02,
+      "arc acceleration stays within the combined acceleration budget");
     near(arcTrajectory.evaluate(arcTrajectory.durationSeconds()).positions[0], 0.2,
       "arc planner reaches its endpoint");
     for (trajectory in [exact, blend, repeated, shallow, reversal, arcTrajectory])
@@ -640,6 +655,42 @@ class MotionKitBootstrapTests {
         return Math.sqrt(segment.coefficients[0][1] * segment.coefficients[0][1] +
           segment.coefficients[1][1] * segment.coefficients[1][1]);
     throw "lookahead trajectory did not emit its corner knot";
+  }
+
+  /** Chord speeds of the segments arriving at and leaving the knot at (x, y). */
+  static function cornerChordSpeeds(trajectory:Trajectory, x:Float, y:Float):Array<Float> {
+    var segments = trajectory.segments();
+    for (index in 1...segments.length) {
+      var segment = segments[index];
+      if (Math.abs(segment.coefficients[0][0] - x) <= 1e-7 &&
+          Math.abs(segment.coefficients[1][0] - y) <= 1e-7) {
+        var before = segments[index - 1].coefficients;
+        var after = segment.coefficients;
+        return [Math.sqrt(before[0][1] * before[0][1] + before[1][1] * before[1][1]),
+          Math.sqrt(after[0][1] * after[0][1] + after[1][1] * after[1][1])];
+      }
+    }
+    throw "lookahead trajectory did not emit its corner knot";
+  }
+
+  /** Peak Cartesian acceleration norm estimated from consecutive chord velocities. */
+  static function peakChordAccelerationNorm(value:Trajectory):Float {
+    var segments = value.segments();
+    var peak = 0.0;
+    for (index in 1...segments.length) {
+      var before = segments[index - 1];
+      var after = segments[index];
+      var seconds = 0.5 * (Int64.toFloat(before.durationNs) +
+        Int64.toFloat(after.durationNs)) * 1e-9;
+      if (seconds <= 0.0) continue;
+      var sum = 0.0;
+      for (joint in 0...after.coefficients.length) {
+        var change = after.coefficients[joint][1] - before.coefficients[joint][1];
+        sum += change * change;
+      }
+      peak = Math.max(peak, Math.sqrt(sum) / seconds);
+    }
+    return peak;
   }
   static function testLinearAxisCompilesToRobotModel():Void {
     var axis = new LinearAxis(23, 10, 80);
