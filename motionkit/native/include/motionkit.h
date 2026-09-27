@@ -37,7 +37,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 6, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 7, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
 enum {
@@ -55,6 +55,30 @@ typedef struct mk_trajectory_handle { uint32_t id; } mk_trajectory_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_trajectory_destroy);
 typedef struct mk_plan_handle { uint32_t id; } mk_plan_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_plan_destroy);
+typedef struct mk_path_handle { uint32_t id; } mk_path_handle
+    MK_HANDLE MK_HANDLE_DESTROY(mk_path_destroy);
+typedef struct mk_time_law_handle { uint32_t id; } mk_time_law_handle
+    MK_HANDLE MK_HANDLE_DESTROY(mk_time_law_destroy);
+
+/** Joint path derivatives are with respect to path parameter s. */
+typedef struct mk_path_sample {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    double s;
+    uint32_t joint_count;
+    double position[MK_MAX_JOINTS];
+    double first[MK_MAX_JOINTS];
+    double second[MK_MAX_JOINTS];
+} mk_path_sample;
+
+/** s(t) = start_s + speed*tau + acceleration*tau^2/2, tau in seconds. */
+typedef struct mk_time_stage {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    int64_t start_ns;
+    int64_t duration_ns;
+    double start_s;
+    double speed;
+    double acceleration;
+} mk_time_stage;
 
 typedef struct mk_joint_coefficients {
     double value[MK_MAX_DEGREE + 1];
@@ -220,6 +244,18 @@ typedef struct mk_plan_info {
 
 MK_API mk_result MK_CALL mk_trajectory_create(uint32_t joint_count,
     mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
+MK_API mk_result MK_CALL mk_path_create(const mk_path_sample *samples MK_IN_ARRAY(sample_count),
+    uint32_t sample_count, mk_path_handle *out_path MK_OUT MK_OWNED);
+MK_API void MK_CALL mk_path_destroy(mk_path_handle path);
+MK_API mk_result MK_CALL mk_time_law_create(const mk_time_stage *stages MK_IN_ARRAY(stage_count),
+    uint32_t stage_count, mk_time_law_handle *out_law MK_OUT MK_OWNED);
+MK_API void MK_CALL mk_time_law_destroy(mk_time_law_handle law);
+/** Returns seconds from the time-law epoch; exact at stage boundaries. */
+MK_API mk_result MK_CALL mk_path_distance_to_time(mk_time_law_handle law,
+    double s, double *out_seconds MK_OUT);
+/** Quintic Hermite lowering, with adaptive knots and exact polynomial-deviation extrema. */
+MK_API mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
+    double tolerance, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 MK_API void MK_CALL mk_trajectory_destroy(mk_trajectory_handle trajectory);
 MK_API mk_result MK_CALL mk_trajectory_append_segment(mk_trajectory_handle trajectory,
     const mk_segment *segment);

@@ -5,6 +5,7 @@ import haxe.Int64;
 
 /** Owns a native piecewise-polynomial joint trajectory. */
 @:allow(motionkit.trajectory.ExecutionPlan)
+@:allow(motionkit.path.NativeJointPath)
 class Trajectory {
   final owner:Ownedmk_trajectory_handle;
   var disposed:Bool = false;

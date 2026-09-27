@@ -24,6 +24,7 @@
         "../../motionkit/native/src/trajectory.cpp",
         "../../motionkit/native/src/validation.cpp",
         "../../motionkit/native/src/generator.cpp",
+        "../../motionkit/native/src/path.cpp",
         "../../motionkit/native/vendor/ruckig/CMakeLists.txt",
         "../../nativekit/CMakeLists.txt",
         "../../simkit/CMakeLists.txt"
