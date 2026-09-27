@@ -24,6 +24,10 @@ import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
 import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
+import motionkit.planner.JointPathSamples;
+import motionkit.planner.PathTimingBackend;
+import motionkit.planner.PathTimingLimits;
+import motionkit.planner.SimplePathTiming;
 import motionkit.program.Blend;
 import motionkit.program.InputPredicate;
 import motionkit.program.MotionOp;
@@ -73,6 +77,7 @@ class MotionKitBootstrapTests {
     testMotionEventContracts();
     testKinematicsContract();
     testMotionProgramContracts();
+    testSimplePathTimingContract();
     testGeometricPathPrimitives();
     testNativeTrajectoryRoundTrip();
     testNativeValidationAndPlan();
@@ -259,6 +264,52 @@ class MotionKitBootstrapTests {
       "program validation rejects unsorted path events");
     throws(function() new MotionProgram([]),
       "motion program construction rejects invalid structure");
+  }
+
+  static function testSimplePathTimingContract():Void {
+    var path = new JointPathSamples([0.0, 0.4, 1.0], [[0.0], [0.4], [1.0]],
+      [[1.0], [1.0], [1.0]], [[0.0], [0.0], [0.0]]);
+    var limits = new PathTimingLimits([0.4], [0.8], [0.3, 0.25], 0.0, 0.0);
+    var backend:PathTimingBackend = new SimplePathTiming(0.01);
+    var timed = backend.time(path, limits);
+    near(timed.trajectory.evaluate(0.0).positions[0], 0.0,
+      "simple path timing starts at the authored joint position", 1e-12);
+    near(timed.trajectory.evaluate(timed.trajectory.durationSeconds()).positions[0], 1.0,
+      "simple path timing reaches the authored joint endpoint", 1e-12);
+    near(timed.distanceToTime(0.0), 0.0,
+      "distance-to-time map hits the path start exactly", 1e-12);
+    near(timed.distanceToTime(1.0), timed.trajectory.durationSeconds(),
+      "distance-to-time map hits the path end exactly", 1e-9);
+    var previousTime = -1.0;
+    for (sample in 0...21) {
+      var time = timed.distanceToTime(sample / 20.0);
+      check(time >= previousTime, "distance-to-time map is monotonic");
+      previousTime = time;
+    }
+    var previousVelocity:Null<Float> = null;
+    var previousDuration = 0.0;
+    for (segment in timed.trajectory.segments()) {
+      var velocity = segment.coefficients[0][1];
+      check(Math.abs(velocity) <= 0.3000001,
+        "simple path timing respects the tightest span speed cap");
+      var duration = Int64.toFloat(segment.durationNs) * 1e-9;
+      if (previousVelocity != null) {
+        var averageDuration = 0.5 * (previousDuration + duration);
+        check(Math.abs(velocity - previousVelocity) <= 0.8 * averageDuration + 0.001,
+          "simple path timing respects joint-derived acceleration between chords");
+      }
+      previousVelocity = velocity;
+      previousDuration = duration;
+    }
+    check(timed.bindingConstraints.length > 0,
+      "simple path timing reports a binding constraint");
+    timed.trajectory.dispose();
+
+    throws(function() new JointPathSamples([0.0, 0.0], [[0.0], [1.0]],
+      [[1.0], [1.0]], [[0.0], [0.0]]),
+      "joint path samples require strictly increasing path positions");
+    throws(function() new PathTimingLimits([0.0], [1.0]),
+      "path timing requires positive joint velocity limits");
   }
 
   static function buildContractArmFixture():{model:RobotModel, chain:KinematicChain} {

@@ -403,3 +403,19 @@ all 12 native tests passed, and TCP integration passed in default, session and
 lease-timeout modes. The session integration's first run missed the latched
 e-stop during reconnect; an immediate unchanged rerun passed, as it did before
 this item.
+
+### P0.3b — Add the path-timing entry point
+
+Added the pure MotionKit `PathTimingBackend`, sampled joint-path and limit
+values, and `TimedPath` result with an exact distance-to-time map. The
+`SimplePathTiming` reference backend derives conservative path-speed and
+path-acceleration bounds from each joint's q' and q'', applies authored
+per-span caps and endpoint speeds, and lowers the resulting trapezoids to a
+degree-1 trajectory at a declared sample period. Its report identifies the
+constraint that set each span's speed bound. Tests were written first and now
+cover joint limits, cap enforcement, monotonic endpoint-exact event timing and
+invalid inputs. Commit: the commit containing this entry.
+
+MotionKit passed 5,857 assertions, RobotKit passed 4,437 aggregate assertions,
+all 12 native tests passed, both FFI audits passed, and TCP integration passed
+in default, session and lease-timeout modes on the combined branch tree.
