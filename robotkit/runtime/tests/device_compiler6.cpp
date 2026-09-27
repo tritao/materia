@@ -71,6 +71,13 @@ int main() {
         std::span(&segment, 1), 9, true, 1'000'000'000ULL,
         clock, blueprint, 1'000'000, 40'000, 5, 1e-6);
     assert(coupled.ok);
+    segment.coefficients[1].value[0] = 0.1200005;
+    auto derived = robotkit::compile_device_segments6(
+        std::span(&segment, 1), 9, true, 1'000'000'000ULL,
+        clock, blueprint, 1'000'000, 40'000, 5, 1e-6);
+    assert(derived.ok);
+    assert(derived.segments[0].coefficients[1].c0 ==
+        coupled.segments[0].coefficients[1].c0);
     segment.coefficients[1].value[0] = 0.13;
     auto inconsistent = robotkit::compile_device_segments6(
         std::span(&segment, 1), 9, true, 1'000'000'000ULL,
