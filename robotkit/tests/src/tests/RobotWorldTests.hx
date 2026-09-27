@@ -4278,6 +4278,9 @@ class RobotWorldTests {
       '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
     case TrajectoryChunk(chunk): 'trajectory:${chunk.points.length}';
     case ExecutionPlan(plan): 'plan:${Int64.toStr(plan.planId)}';
+    case Hold: 'hold';
+    case Resume: 'resume';
+    case Abort: 'abort';
   };
 
   static function advanceReplaySample(replay:ReplayRobot):Bool {

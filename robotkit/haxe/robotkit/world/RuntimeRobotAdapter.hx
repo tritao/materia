@@ -110,6 +110,15 @@ class RuntimeRobotAdapter implements Robot {
           throw "Runtime endpoint does not support execution plans";
         commandSequence++;
         runtime.submitPlan(plan, commandSequence);
+      case Hold:
+        commandSequence++;
+        runtime.submitHold(commandSequence);
+      case Resume:
+        commandSequence++;
+        runtime.submitResume(commandSequence);
+      case Abort:
+        commandSequence++;
+        runtime.submitAbort(commandSequence);
     }
   }
 

@@ -108,6 +108,8 @@ class RemoteRobot implements Robot {
       throw "RemoteRobot does not support buffered trajectory chunks yet";
     case ExecutionPlan(_):
       throw "RemoteRobot does not support execution plans yet";
+    case Hold | Resume | Abort:
+      throw "RemoteRobot does not support native path controls yet";
   }
 
   public function stop(mode:StopMode):Void {

@@ -13,4 +13,10 @@ enum RobotCommand {
   TrajectoryChunk(chunk:robotkit.world.TrajectoryChunk);
   /** Submit or replace a revision-bound execution plan. */
   ExecutionPlan(plan:robotkit.world.ExecutionPlanSubmission);
+  /** Pause the native path clock while retaining its queue. */
+  Hold;
+  /** Resume a held native path. */
+  Resume;
+  /** Controlled straight-ramp stop that discards the path. */
+  Abort;
 }

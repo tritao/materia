@@ -31,6 +31,10 @@ class RobotRecording implements RobotRecordingSink {
         commands.push(copy);
         events.push(RobotRecordingEvent.Command(copy));
         append(RobotRecordingEvent.Command(copy), robotId);
+      case Hold | Resume | Abort:
+        commands.push(command);
+        events.push(RobotRecordingEvent.Command(command));
+        append(RobotRecordingEvent.Command(command), robotId);
     }
   }
 

@@ -65,6 +65,12 @@ class RobotRecordingCodec {
               durationNs:Int64.toStr(segment.durationNs),
               coefficients:segment.coefficients
             }]});
+        case Hold:
+          Reflect.setField(root, "payload", {kind:"hold"});
+        case Resume:
+          Reflect.setField(root, "payload", {kind:"resume"});
+        case Abort:
+          Reflect.setField(root, "payload", {kind:"abort"});
         }
       case RobotSnapshot(value): Reflect.setField(root, "type", "snapshot"); Reflect.setField(root, "payload", snapshot(value));
       case Sensor(robotId, value): Reflect.setField(root, "type", "sensor"); Reflect.setField(root, "robotId", robotId); Reflect.setField(root, "payload", sensor(value));
@@ -141,6 +147,9 @@ class RobotRecordingCodec {
               optionalFloats(payload, "velocityTolerances"),
               optionalFloats(payload, "accelerationTolerances"),
               optionalFieldBool(payload, "endsAtRest", true))));
+          case "hold" if (version >= 4): Command(Hold);
+          case "resume" if (version >= 4): Command(Resume);
+          case "abort" if (version >= 4): Command(Abort);
           case _: throw "Unsupported RobotKit command payload";
         }
       case "snapshot": RobotSnapshot(readSnapshot(payload));
