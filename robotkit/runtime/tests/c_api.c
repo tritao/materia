@@ -50,6 +50,23 @@ int main(void) {
     assert(full_snapshot.calibration_revision == 0);
     rk_robot_runtime_destroy(old_runtime);
 
+    rk_robot_runtime segment_runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_robot_runtime_create(&blueprint, &segment_runtime) == RK_OK);
+    rk_robot_command segment_command = {0};
+    segment_command.struct_size = sizeof(segment_command);
+    segment_command.sequence = 1;
+    segment_command.kind = RK_COMMAND_TRAJECTORY_SEGMENTS;
+    rk_trajectory_segment_chunk segment_chunk = {0};
+    segment_chunk.struct_size = sizeof(segment_chunk);
+    segment_chunk.segment_count = 1;
+    segment_chunk.segments[0].duration_ns = 100000000;
+    segment_chunk.segments[0].degree = 1;
+    segment_chunk.segments[0].joint_count = 1;
+    segment_chunk.segments[0].coefficients[0].value[1] = 0.5;
+    assert(rk_robot_runtime_submit_segments(segment_runtime, &segment_command,
+        &segment_chunk) == RK_OK);
+    rk_robot_runtime_destroy(segment_runtime);
+
     rk_robot_command command = {0};
     command.struct_size = sizeof(command);
     command.sequence = 1;

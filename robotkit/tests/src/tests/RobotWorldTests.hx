@@ -31,6 +31,8 @@ import robotkit.device.DeviceChannel;
 import robotkit.device.DeviceLayout;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotCommand;
+import robotkit.world.TrajectoryChunk;
+import robotkit.world.TrajectorySegment;
 import robotkit.world.RobotDescription;
 import robotkit.world.RobotFault;
 import robotkit.world.RobotId;
@@ -149,6 +151,7 @@ class RobotWorldTests {
   static var assertions = 0;
 
   public static function main():Void {
+    testPolynomialTrajectoryChunk();
     testAttachDetachAndIdentity();
     testSequenceAndTopology();
     testCrossThreadEventQueue();
@@ -203,6 +206,26 @@ class RobotWorldTests {
     assertions += TerrainTests.run();
     assertions += ExcavatorTests.run();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
+  }
+
+  static function testPolynomialTrajectoryChunk():Void {
+    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000),
+      [[0.0, 1.0], [0.0, -1.0]]);
+    var chunk = TrajectoryChunk.fromSegments([segment], Int64.ofInt(7));
+    check(chunk.points.length == 0 && chunk.segments.length == 1,
+      "polynomial chunk uses segment payload");
+    check(chunk.copy().segments[0].coefficients[1][1] == -1.0,
+      "polynomial chunk copy keeps coefficients");
+    var recording = new RobotRecording();
+    recording.recordCommand(RobotCommand.TrajectoryChunk(chunk));
+    var replayed = RobotRecordingCodec.decode(
+      RobotRecordingCodec.encode(recording.entries[0]));
+    switch replayed.event {
+      case Command(TrajectoryChunk(value)):
+        check(value.segments.length == 1 && value.segments[0].degree == 1,
+          "polynomial chunk survives recording round trip");
+      case _: throw "Expected recorded polynomial chunk";
+    }
   }
 
   static function testMcapRobustness():Void {
@@ -4184,6 +4207,19 @@ class RobotWorldTests {
     check(Math.abs(runtime.snapshot().q.get(0) - 0.2) < 0.000000001,
       "runtime keeps advancing the same target on later shared ticks");
     simulation.dispose();
+
+    var segmentSimulation = new Simulation(0.1);
+    var segmentRuntime = segmentSimulation.addRobot(blueprint);
+    segmentRuntime.submitTrajectory(TrajectoryChunk.fromSegments([
+      new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])
+    ]), 1);
+    segmentSimulation.step(Int64.ofInt(100));
+    check(segmentRuntime.snapshot().trajectoryQueueDepth == 1,
+      "Haxe segment submission reaches native knot queue");
+    segmentSimulation.step(Int64.ofInt(200));
+    check(Math.abs(segmentRuntime.snapshot().q.get(0) - 0.05) < 0.000000001,
+      "Haxe segment submission executes polynomial target");
+    segmentSimulation.dispose();
   }
 
   static function check(value:Bool, message:String):Void {

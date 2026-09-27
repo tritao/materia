@@ -173,6 +173,10 @@ Segment boundaries are shared across joints. Consequences:
   behaviour change. Haxe `JointTrajectory.sample` separately interpolates
   authored velocity and acceleration arrays; those derivative values are not
   equivalent to derivatives of the degree-1 position polynomial.
+- A path derivative estimate for STOP and hold lead uses chord finite
+  differences for degree-1 segments (velocity steps at knots) and analytic
+  velocity/acceleration for degree ≥ 2 segments, regardless of submission
+  command. MotionKit owns this shared estimate.
 - Trapezoids are exact at degree 2 and Ruckig at degree 3; degree 5 is
   reserved for quintic blends.
 - Position, velocity, acceleration and jerk are all analytic, so validation
@@ -380,7 +384,8 @@ Problem: the runtime queue (`ControlState::trajectory`, a deque of
 
 Do:
 - Link `robotkit_runtime` to `motionkit_core`.
-- Change the queue's element to a segment:
+- Change the queue's motion element to a segment, retaining an explicit start
+  knot state when needed because zero-duration segments are invalid:
   - start time in the chunk's time base, plus duration, degree and
     coefficients;
   - the chunk tag;
@@ -389,18 +394,22 @@ Do:
 - Convert existing `RK_COMMAND_TRAJECTORY_CHUNK` points to degree-1 segments
   on submit. Their external behaviour must not change.
 - Add `RK_COMMAND_TRAJECTORY_SEGMENTS` with a `rk_trajectory_segment_chunk`
-  struct carrying the same `tag/splice_tag/splice_time_ns`. Bound it by
-  segments and by total coefficients. Keep `RK_MAX_TRAJECTORY_QUEUE_POINTS`
-  semantics as a limit on queued segments, and document it.
+  struct carrying the same `tag/splice_tag/splice_time_ns`. Bound the chunk by
+  segments and total coefficients. `RK_MAX_TRAJECTORY_QUEUE_POINTS` bounds
+  queued knots, not segments: `trajectory_queue_depth` counts knots not yet
+  passed, including the start knot. A point chunk of N points adds N knots;
+  a segment chunk of S segments adds S knots. No conservative reservations.
 - Submit-time checks:
   - replace the chord-velocity check with `mk_validate` over the new
     segments plus the junction to the queue's end;
   - check position and velocity limits exactly as now;
   - check acceleration when `max_acceleration` is set;
   - a violation still latches a fault and returns `RK_ERROR_LIMIT`.
-- Path-following STOP: use the analytic path velocity and acceleration from
-  the segments instead of chord differences. Keep the same acceleration
-  budget rule.
+- Path-following STOP: use the shared MotionKit path derivative estimate.
+  Degree-1 segments use the existing chord finite-difference estimate;
+  degree ≥ 2 segments use analytic velocity and acceleration. The rule is by
+  segment degree, not submission type, and also feeds P9's hold lead. Keep
+  the same acceleration budget rule.
 - Bump `RK_API_VERSION`, regenerate the `.hxi`, and add `TrajectoryChunk`
   support for segments in Haxe (`robotkit.world`).
 
@@ -411,6 +420,8 @@ Tests:
   targets match `mk_trajectory_evaluate` exactly (same code path).
 - A splice into a segment queue cuts mid-segment correctly.
 - A segment chunk that exceeds the acceleration limit is rejected.
+- A degree-1 segment chunk uses chord braking, a Ruckig segment chunk uses
+  analytic braking, and mixed point/segment queue depth counts knots.
 
 ## P7 — `ExecutionSession` in the runtime: identity, revisions, committed horizon (D3)
 
@@ -512,9 +523,9 @@ Do (in `motionkit/robot/…/MotionSystem.hx`):
     exists. Line phases could be emitted as exact degree-2 segments, but arcs
     cannot.
   - For those trajectories, retargeting while moving keeps today's stop-first
-    behaviour. The hold lead uses the planner's authored velocities, kept
-    alongside the native trajectory, or a conservative bound from the chord
-    velocity.
+    behaviour. The hold lead uses MotionKit's shared path derivative estimate
+    (chord finite differences at degree 1), conservatively bounded against
+    planner-authored velocities when they are retained alongside the path.
   - Retargeting from a moving state applies only when the active segments
     are degree ≥ 2.
 - Fallback for backends without queue or plan support (serial device
@@ -766,7 +777,10 @@ compatibility rule. Proposed smallest correction, pending approval: preserve
 legacy point-chunk STOP braking estimates and published queue-depth semantics;
 use analytic velocity/acceleration for native segment chunks, and bound the
 underlying queue by actual segments with conservative reservations for legacy
-submissions. No P6 tests or implementation have been started.
+submissions. The user approved a more precise correction: choose the estimate
+by segment degree, centralize it in MotionKit for STOP and P9 hold lead, and
+define the queue unit as knots. The P6 section and D4 consequence above now
+state that rule. No P6 tests or implementation had started before approval.
 
 ### P4/P5 follow-up — Origin-invariant position tolerance
 
@@ -782,3 +796,29 @@ Native tests cover a Ruckig move ending at zero, the same axis shifted by
 1000, a real zero-limit overshoot, and the zero-width fallback. Commit: the
 commit containing this entry. MotionKit and RobotKit native/Haxe suites, both
 FFI audits, and TCP default, session, and lease-timeout modes passed.
+
+### P6 — Execute polynomial segments in the runtime
+
+The runtime now links MotionKit, stores queued knots with their following
+polynomial segments, and evaluates setpoints through MotionKit's shared
+evaluator. Legacy point chunks become degree-1 segments; a separate terminal
+knot preserves their existing depth and capacity semantics. The segment
+command accepts bounded degree-0 through degree-5 chunks, validates total
+coefficient count, and counts each segment start as one queued knot. Native
+segment chunks keep an uncounted terminal marker. Submit-time validation uses
+`mk_validate` across the candidate queue and junction, claiming position,
+velocity, acceleration when configured, and C0 continuity. Legacy stored
+points retain their strict position checks. Limit failures remain atomic and
+latch a fault.
+
+MotionKit now exposes one path derivative estimate to both C++ and Haxe:
+degree-1 segments use chord finite differences, while degree 0 and degree
+≥ 2 use analytic derivatives. Runtime STOP uses it with the existing budget
+rule; P9 can use the same Haxe wrapper for hold lead. Haxe `TrajectoryChunk`
+accepts segments, and recording round-trips them in the existing schema.
+Both native ABI versions and generated bindings were updated. Tests cover
+legacy queue and STOP equivalence unchanged, mixed knot depth, Ruckig
+setpoint identity, native splice, acceleration and junction rejection, and
+degree-selected STOP braking including a Ruckig segment chunk. Commit: the
+commit containing this entry. MotionKit and RobotKit native/Haxe suites,
+both FFI audits, and TCP default, session and lease-timeout modes passed.

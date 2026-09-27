@@ -37,7 +37,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 4, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 5, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
 enum {
@@ -105,6 +105,17 @@ typedef struct mk_trajectory_state {
     double acceleration[MK_MAX_JOINTS];
     double jerk[MK_MAX_JOINTS];
 } mk_trajectory_state;
+
+/** Shared STOP/hold-lead derivative estimate for one queued path region. */
+typedef struct mk_path_derivative_estimate {
+    uint32_t struct_size MK_STRUCT_SIZE;
+    uint32_t joint_count;
+    uint32_t has_forward_acceleration;
+    uint32_t has_recent_acceleration;
+    double velocity[MK_MAX_JOINTS];
+    double acceleration[MK_MAX_JOINTS];
+    double recent_acceleration[MK_MAX_JOINTS];
+} mk_path_derivative_estimate;
 
 /** Maximum absolute jump for each derivative across one segment boundary. */
 typedef struct mk_continuity {
@@ -212,12 +223,18 @@ MK_API mk_result MK_CALL mk_trajectory_append_segment(mk_trajectory_handle traje
     const mk_segment *segment);
 MK_API mk_result MK_CALL mk_trajectory_evaluate(mk_trajectory_handle trajectory,
     int64_t time_ns, mk_trajectory_state *out_state);
+/** Degree-1 uses chord differences; degree 0 and degree >= 2 use analytic derivatives. */
+MK_API mk_result MK_CALL mk_trajectory_estimate_path_derivatives(
+    mk_trajectory_handle trajectory, int64_t time_ns, uint64_t window_ns,
+    mk_path_derivative_estimate *out_estimate);
 MK_API mk_result MK_CALL mk_trajectory_duration_ns(mk_trajectory_handle trajectory,
     int64_t *out_duration_ns MK_OUT);
 MK_API mk_result MK_CALL mk_trajectory_joint_count(mk_trajectory_handle trajectory,
     uint32_t *out_joint_count MK_OUT);
 MK_API mk_result MK_CALL mk_trajectory_segment_count(mk_trajectory_handle trajectory,
     uint32_t *out_segment_count MK_OUT);
+MK_API mk_result MK_CALL mk_trajectory_get_segment(mk_trajectory_handle trajectory,
+    uint32_t index, mk_segment *out_segment);
 MK_API mk_result MK_CALL mk_trajectory_boundary_continuity(mk_trajectory_handle trajectory,
     uint32_t boundary_index, mk_continuity *out_continuity);
 /** Requires at least two strictly increasing samples. Positions are interpolated linearly. */

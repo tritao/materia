@@ -101,9 +101,47 @@ void samples_and_rejections() {
     mk_trajectory_destroy(trajectory);
 }
 
+void path_derivative_estimate_selects_segment_degree() {
+    mk_trajectory_handle trajectory{};
+    assert(mk_trajectory_create(1, &trajectory) == MK_OK);
+    mk_segment segment{};
+    segment.struct_size = sizeof(segment);
+    segment.duration_ns = 100'000'000;
+    segment.degree = 1;
+    segment.joint_count = 1;
+    segment.coefficients[0].value[1] = 1.0;
+    assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+    segment.t0_ns = 100'000'000;
+    segment.coefficients[0].value[0] = 0.1;
+    segment.coefficients[0].value[1] = 0.0;
+    assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+    mk_path_derivative_estimate estimate{};
+    estimate.struct_size = sizeof(estimate);
+    assert(mk_trajectory_estimate_path_derivatives(trajectory, 50'000'000,
+        100'000'000, &estimate) == MK_OK);
+    near(estimate.velocity[0], 1.0);
+    near(estimate.acceleration[0], -10.0);
+    mk_trajectory_destroy(trajectory);
+
+    assert(mk_trajectory_create(1, &trajectory) == MK_OK);
+    segment = {};
+    segment.struct_size = sizeof(segment);
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 2;
+    segment.joint_count = 1;
+    segment.coefficients[0].value[2] = 0.5;
+    assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+    assert(mk_trajectory_estimate_path_derivatives(trajectory, 200'000'000,
+        100'000'000, &estimate) == MK_OK);
+    near(estimate.velocity[0], 0.2);
+    near(estimate.acceleration[0], 1.0);
+    mk_trajectory_destroy(trajectory);
+}
+
 } // namespace
 
 int main() {
     cubic_and_boundaries();
     samples_and_rejections();
+    path_derivative_estimate_selects_segment_degree();
 }

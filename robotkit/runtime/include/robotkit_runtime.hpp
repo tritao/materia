@@ -2,6 +2,7 @@
 #define ROBOTKIT_RUNTIME_HPP
 
 #include "robotkit_runtime.h"
+#include "motionkit.hpp"
 
 #include <chrono>
 #include <condition_variable>
@@ -134,6 +135,8 @@ public:
     /** Queues trajectory metadata and its separately allocated payload. */
     rk_result submit_trajectory(const rk_robot_command &command,
                                 const rk_trajectory_chunk &chunk);
+    rk_result submit_segments(const rk_robot_command &command,
+                              const rk_trajectory_segment_chunk &chunk);
     /** Copies the latest robot state without advancing endpoint time. */
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
@@ -147,6 +150,10 @@ public:
 
     struct RuntimeTrajectoryPoint {
         rk_trajectory_point point{};
+        mk_segment segment{}; /**< Valid when has_segment; starts at point time. */
+        bool has_segment = false;
+        bool counted_knot = true; /**< False only for a segment chunk's end marker. */
+        bool legacy_point = true; /**< Retains strict stored-sample position checks. */
         uint64_t chunk_base_time_ns = 0;
         uint64_t tag = 0;
     };
@@ -189,6 +196,7 @@ private:
     struct QueuedCommand {
         rk_robot_command command{};
         std::shared_ptr<rk_trajectory_chunk> trajectory;
+        std::shared_ptr<rk_trajectory_segment_chunk> segments;
     };
 
     void run();

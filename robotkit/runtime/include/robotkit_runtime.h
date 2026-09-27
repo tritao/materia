@@ -78,10 +78,12 @@ enum {
     RK_MAX_SERIAL_JOINTS = 64, /**< Capacity of the current serial wire protocol. */
     RK_MAX_TRAJECTORY_POINTS = 256, /**< Maximum samples in one buffered trajectory chunk. */
     RK_MAX_TRAJECTORY_JOINTS = 64, /**< Maximum joints represented by one trajectory chunk. */
-    RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum points queued across all chunks. */
+    RK_MAX_TRAJECTORY_SEGMENTS = 128, /**< Maximum polynomial segments per chunk. */
+    RK_MAX_TRAJECTORY_COEFFICIENTS = 4096, /**< Maximum used scalar coefficients per segment chunk. */
+    RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued knots (legacy name). */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 8 /**< Adds calibration revision to runtime blueprints and snapshots. */
+    RK_API_VERSION = 9 /**< Adds polynomial segment trajectory chunks. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -212,7 +214,8 @@ enum {
     RK_COMMAND_STOP = 2, /**< Request a normal stop and clear active targets. */
     RK_COMMAND_EMERGENCY_STOP = 3, /**< Request an emergency stop. */
     RK_COMMAND_RESET_SAFETY = 4, /**< Clear a latched stop after application acknowledgement. */
-    RK_COMMAND_TRAJECTORY_CHUNK = 5 /**< Append timestamped position samples to the runtime queue. */
+    RK_COMMAND_TRAJECTORY_CHUNK = 5, /**< Append timestamped position samples to the runtime queue. */
+    RK_COMMAND_TRAJECTORY_SEGMENTS = 6 /**< Append polynomial trajectory segments. */
 };
 
 /** Control interpretation of one joint target value. */
@@ -354,6 +357,30 @@ typedef struct rk_trajectory_chunk {
     uint64_t splice_time_ns; /**< Time within splice_tag where this chunk starts. */
 } rk_trajectory_chunk;
 
+/** Coefficients for one joint, in powers of seconds from segment start. */
+typedef struct rk_trajectory_coefficients {
+    double value[6]; /**< Degree zero through five. */
+} rk_trajectory_coefficients;
+
+/** A polynomial segment whose start time is relative to its chunk. */
+typedef struct rk_trajectory_segment {
+    uint64_t time_from_start_ns;
+    uint64_t duration_ns;
+    uint32_t degree;
+    uint32_t joint_count;
+    rk_trajectory_coefficients coefficients[RK_MAX_TRAJECTORY_JOINTS];
+} rk_trajectory_segment;
+
+/** Bounded polynomial payload; segment starts are contiguous from time zero. */
+typedef struct rk_trajectory_segment_chunk {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t segment_count;
+    rk_trajectory_segment segments[RK_MAX_TRAJECTORY_SEGMENTS];
+    uint64_t tag;
+    uint64_t splice_tag;
+    uint64_t splice_time_ns;
+} rk_trajectory_segment_chunk;
+
 /** Command metadata and optional fixed-capacity joint-target payload. */
 typedef struct rk_robot_command {
     uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
@@ -377,10 +404,10 @@ typedef struct rk_robot_state {
     double velocity[RK_MAX_JOINTS];
     double effort[RK_MAX_JOINTS];
     uint64_t received_timestamp_ns; /**< Monotonic timestamp when Runtime accepted the sample. */
-    uint32_t trajectory_queue_depth; /**< Pending timestamped samples, including the active sample window. */
+    uint32_t trajectory_queue_depth; /**< Queued knots not yet passed, including the active start knot. */
     uint32_t trajectory_active; /**< Non-zero while a timestamped trajectory is executing. */
     uint64_t trajectory_time_ns; /**< Runtime owner-clock position within the active trajectory. */
-    uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final sample. */
+    uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final endpoint. */
     uint32_t sensor_count;
     rk_sensor_sample sensors[RK_MAX_SENSORS];
     uint64_t trajectory_tag; /**< Chunk identity currently running or last stopped. */
@@ -408,10 +435,10 @@ typedef struct rk_robot_snapshot {
     uint32_t reserved0;
     uint64_t reserved[2];
     uint64_t received_timestamp_ns; /**< Runtime receive timestamp in nanoseconds. */
-    uint32_t trajectory_queue_depth; /**< Pending timestamped samples, including the active sample window. */
+    uint32_t trajectory_queue_depth; /**< Queued knots not yet passed, including the active start knot. */
     uint32_t trajectory_active; /**< Non-zero while a timestamped trajectory is executing. */
     uint64_t trajectory_time_ns; /**< Runtime owner-clock position within the active trajectory. */
-    uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final sample. */
+    uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final endpoint. */
     uint32_t sensor_count;
     rk_sensor_sample sensors[RK_MAX_SENSORS];
     uint64_t trajectory_tag; /**< Chunk identity currently running or last stopped. */
@@ -448,6 +475,11 @@ RK_API rk_result RK_CALL rk_trajectory_chunk_validate(const rk_trajectory_chunk 
 /** Validates a trajectory payload against the joint count in a compiled blueprint. */
 RK_API rk_result RK_CALL rk_trajectory_chunk_validate_for_blueprint(
     const rk_trajectory_chunk *chunk, const rk_robot_runtime_blueprint *blueprint);
+/** Validates a bounded polynomial payload and its coefficient budget. */
+RK_API rk_result RK_CALL rk_trajectory_segment_chunk_validate(
+    const rk_trajectory_segment_chunk *chunk);
+RK_API rk_result RK_CALL rk_trajectory_segment_chunk_validate_for_blueprint(
+    const rk_trajectory_segment_chunk *chunk, const rk_robot_runtime_blueprint *blueprint);
 /** Validates a mutable native state value and its array counts. */
 RK_API rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state);
 /** Validates an immutable published snapshot and its array counts. */
@@ -544,6 +576,11 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime,
 RK_API rk_result RK_CALL rk_robot_runtime_submit_trajectory(
     rk_robot_runtime runtime, const rk_robot_command *command,
     const rk_trajectory_chunk *chunk);
+
+/** Submits a polynomial segment chunk using the same append/splice semantics. */
+RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(
+    rk_robot_runtime runtime, const rk_robot_command *command,
+    const rk_trajectory_segment_chunk *chunk);
 
 /**
  * Copies the latest state into the caller-provided value.

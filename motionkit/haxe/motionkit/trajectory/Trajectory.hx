@@ -58,6 +58,18 @@ class Trajectory {
     return new TrajectoryState(positions, velocities, accelerations, jerks);
   }
 
+  /** Degree-1 uses chord differences; degree 0 and degree >= 2 use analytic derivatives. */
+  public function estimatePathDerivatives(timeSeconds:Float,
+      windowSeconds:Float):PathDerivativeEstimate {
+    ensureLive();
+    var estimate = new mk_path_derivative_estimate();
+    estimate.set_struct_size(mk_path_derivative_estimate.size());
+    check(MotionKitNative.mk_trajectory_estimate_path_derivatives(owner.borrow(),
+      nanoseconds(timeSeconds), nanoseconds(windowSeconds), estimate),
+      "trajectory.estimatePathDerivatives");
+    return new PathDerivativeEstimate(estimate);
+  }
+
   public function durationSeconds():Float {
     ensureLive();
     var result = MotionKitNative.mk_trajectory_duration_ns(owner.borrow());

@@ -27,7 +27,17 @@ class RobotRecordingCodec {
               mode:jointTargetMode(target.mode), target:target.target}],
             expiryNs:expiryNs == null ? null : Int64.toStr(expiryNs)});
         case TrajectoryChunk(chunk):
-          Reflect.setField(root, "payload", {kind:"trajectoryChunk",
+          Reflect.setField(root, "payload", chunk.segments.length > 0
+            ? {kind:"trajectorySegmentChunk",
+              tag:Int64.toStr(chunk.tag),
+              spliceTag:Int64.toStr(chunk.spliceTag),
+              spliceTimeNs:Int64.toStr(chunk.spliceTimeNs),
+              segments:[for (segment in chunk.segments) {
+                timeFromStartNs:Int64.toStr(segment.timeFromStartNs),
+                durationNs:Int64.toStr(segment.durationNs),
+                coefficients:segment.coefficients
+              }]}
+            : {kind:"trajectoryChunk",
             tag:Int64.toStr(chunk.tag),
             spliceTag:Int64.toStr(chunk.spliceTag),
             spliceTimeNs:Int64.toStr(chunk.spliceTimeNs),
@@ -78,6 +88,18 @@ class RobotRecordingCodec {
               points.push(new TrajectoryPoint(wide(item, "timeFromStartNs"),
                 floats(item, "positions")));
             Command(TrajectoryChunk(new TrajectoryChunk(points,
+              nullableWide(payload, "tag"), nullableWide(payload, "spliceTag"),
+              nullableWide(payload, "spliceTimeNs"))));
+          case "trajectorySegmentChunk" if (version >= 3):
+            var segments:Array<TrajectorySegment> = [];
+            for (item in array(payload, "segments")) {
+              var coefficients:Array<Array<Float>> = [];
+              for (row in array(item, "coefficients"))
+                coefficients.push(floats({values:row}, "values"));
+              segments.push(new TrajectorySegment(wide(item, "timeFromStartNs"),
+                wide(item, "durationNs"), coefficients));
+            }
+            Command(TrajectoryChunk(TrajectoryChunk.fromSegments(segments,
               nullableWide(payload, "tag"), nullableWide(payload, "spliceTag"),
               nullableWide(payload, "spliceTimeNs"))));
           case _: throw "Unsupported RobotKit command payload";

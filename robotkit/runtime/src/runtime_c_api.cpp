@@ -152,6 +152,15 @@ rk_result RK_CALL rk_robot_runtime_submit_trajectory(
     return value ? value->submit_trajectory(*command, *chunk) : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_robot_runtime_submit_segments(
+    rk_robot_runtime runtime, const rk_robot_command *command,
+    const rk_trajectory_segment_chunk *chunk) {
+    if (!command || !chunk)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->submit_segments(*command, *chunk) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime, rk_robot_state *out_state) {
     if (!out_state || out_state->struct_size < sizeof(*out_state))
         return RK_ERROR_INVALID_ARGUMENT;

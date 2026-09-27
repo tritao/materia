@@ -65,6 +65,34 @@ int main() {
     trajectory.points[1].joint_count = 1;
     assert(rk_trajectory_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_ERROR_INVALID_ARGUMENT);
 
+    rk_trajectory_segment_chunk segments{};
+    segments.struct_size = sizeof(segments);
+    segments.segment_count = 1;
+    segments.segments[0].duration_ns = 10000000;
+    segments.segments[0].degree = 1;
+    segments.segments[0].joint_count = 2;
+    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&segments, &blueprint) == RK_OK);
+    segments.segments[0].duration_ns = 0;
+    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    segments.segments[0].duration_ns = 10000000;
+    segments.segments[0].coefficients[0].value[1] = NAN;
+    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    segments.segments[0].coefficients[0].value[1] = 0.0;
+    segments.segment_count = 2;
+    segments.segments[1] = segments.segments[0];
+    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    segments.segments[1].time_from_start_ns = 10000000;
+    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&segments, &blueprint) == RK_OK);
+    segments.segment_count = 11;
+    for (uint32_t index = 0; index < segments.segment_count; ++index) {
+        auto &segment = segments.segments[index];
+        segment.time_from_start_ns = index;
+        segment.duration_ns = 1;
+        segment.degree = 5;
+        segment.joint_count = 64;
+    }
+    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+
     rk_robot_state state{};
     state.struct_size = sizeof(state);
     state.joint_count = 2;

@@ -112,6 +112,10 @@ class MotionKitBootstrapTests {
       "native velocity is right-continuous at a knot");
     near(native.evaluate(0.5).accelerations[0], 0.0,
       "native degree-1 acceleration is zero");
+    var estimate = native.estimatePathDerivatives(0.5, 1.0);
+    near(estimate.velocities[0], 2.0, "degree-1 stop estimate uses chord velocity");
+    near(estimate.accelerations[0], 1.0,
+      "degree-1 stop estimate sees a later chord velocity");
     native.dispose();
   }
 

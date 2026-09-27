@@ -4,6 +4,7 @@
 #include "motionkit.h"
 
 #include <array>
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -32,6 +33,83 @@ inline void evaluate_segment(const mk_segment &segment, double seconds,
         state.acceleration[joint] = acceleration;
         state.jerk[joint] = jerk;
     }
+}
+
+/** One derivative source for runtime STOP and host-side hold lead. */
+inline bool estimate_path_derivatives(const std::vector<mk_segment> &segments,
+                                      int64_t time_ns, uint64_t window_ns,
+                                      mk_path_derivative_estimate &out) noexcept {
+    if (segments.empty()) return false;
+    out = {};
+    out.struct_size = sizeof(out);
+    out.joint_count = segments.front().joint_count;
+    const auto last_end = segments.back().t0_ns + segments.back().duration_ns;
+    auto selected = [&](int64_t time) -> std::size_t {
+        for (std::size_t index = 0; index < segments.size(); ++index)
+            if (time < segments[index].t0_ns + segments[index].duration_ns)
+                return index;
+        return segments.size() - 1;
+    };
+    const auto current = selected(time_ns);
+    const auto &segment = segments[current];
+    if (segment.degree != 1) {
+        const auto elapsed = std::clamp(time_ns - segment.t0_ns,
+            int64_t{0}, segment.duration_ns);
+        mk_trajectory_state state{};
+        evaluate_segment(segment, static_cast<double>(elapsed) * 1e-9, state);
+        std::copy_n(state.velocity, out.joint_count, out.velocity);
+        std::copy_n(state.acceleration, out.joint_count, out.acceleration);
+        std::copy_n(state.acceleration, out.joint_count, out.recent_acceleration);
+        out.has_forward_acceleration = 1;
+        out.has_recent_acceleration = 1;
+        return true;
+    }
+    if (time_ns >= last_end) return true;
+    for (uint32_t joint = 0; joint < out.joint_count; ++joint)
+        out.velocity[joint] = segment.coefficients[joint].value[1];
+    if (window_ns == 0) return true;
+    const auto current_midpoint = 0.5 * (static_cast<double>(segment.t0_ns) +
+        static_cast<double>(segment.t0_ns + segment.duration_ns));
+    const auto ahead_time = static_cast<int64_t>(std::min(
+        static_cast<uint64_t>(last_end - 1),
+        static_cast<uint64_t>(time_ns) + window_ns));
+    const auto ahead_index = selected(ahead_time);
+    if (ahead_index != current) {
+        const auto &ahead = segments[ahead_index];
+        const double ahead_midpoint = 0.5 * (static_cast<double>(ahead.t0_ns) +
+            static_cast<double>(ahead.t0_ns + ahead.duration_ns));
+        const double spacing = (ahead_midpoint - current_midpoint) * 1e-9;
+        if (spacing > 0.0) {
+            mk_trajectory_state ahead_state{};
+            const auto ahead_elapsed = std::clamp(ahead_time - ahead.t0_ns,
+                int64_t{0}, ahead.duration_ns);
+            evaluate_segment(ahead, static_cast<double>(ahead_elapsed) * 1e-9, ahead_state);
+            for (uint32_t joint = 0; joint < out.joint_count; ++joint)
+                out.acceleration[joint] =
+                    (ahead_state.velocity[joint] - out.velocity[joint]) / spacing;
+            out.has_forward_acceleration = 1;
+        }
+    }
+    const auto behind_time = time_ns >= static_cast<int64_t>(window_ns)
+        ? time_ns - static_cast<int64_t>(window_ns) : int64_t{0};
+    const auto behind_index = selected(behind_time);
+    if (behind_index != current) {
+        const auto &behind = segments[behind_index];
+        const double behind_midpoint = 0.5 * (static_cast<double>(behind.t0_ns) +
+            static_cast<double>(behind.t0_ns + behind.duration_ns));
+        const double spacing = (current_midpoint - behind_midpoint) * 1e-9;
+        if (spacing > 0.0) {
+            mk_trajectory_state behind_state{};
+            const auto behind_elapsed = std::clamp(behind_time - behind.t0_ns,
+                int64_t{0}, behind.duration_ns);
+            evaluate_segment(behind, static_cast<double>(behind_elapsed) * 1e-9, behind_state);
+            for (uint32_t joint = 0; joint < out.joint_count; ++joint)
+                out.recent_acceleration[joint] =
+                    (out.velocity[joint] - behind_state.velocity[joint]) / spacing;
+            out.has_recent_acceleration = 1;
+        }
+    }
+    return true;
 }
 
 class Trajectory {

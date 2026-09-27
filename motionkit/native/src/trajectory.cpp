@@ -131,6 +131,29 @@ mk_result MK_CALL mk_trajectory_evaluate(mk_trajectory_handle trajectory,
     }
 }
 
+mk_result MK_CALL mk_trajectory_estimate_path_derivatives(
+    mk_trajectory_handle trajectory, int64_t time_ns, uint64_t window_ns,
+    mk_path_derivative_estimate *out_estimate) {
+    if (out_estimate == nullptr || out_estimate->struct_size < sizeof(*out_estimate) ||
+        time_ns < 0 || window_ns > static_cast<uint64_t>(INT64_MAX))
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::lock_guard lock(registry_mutex);
+        const auto *value = get(trajectory);
+        if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
+        std::vector<mk_segment> segments;
+        segments.reserve(value->segment_count());
+        for (uint32_t index = 0; index < value->segment_count(); ++index)
+            segments.push_back(value->segment(index));
+        return motionkit::estimate_path_derivatives(segments, time_ns, window_ns,
+            *out_estimate) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
+    } catch (const std::bad_alloc &) {
+        return MK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+}
+
 mk_result MK_CALL mk_trajectory_duration_ns(mk_trajectory_handle trajectory,
                                              int64_t *out_duration_ns) {
     if (out_duration_ns == nullptr) return MK_ERROR_INVALID_ARGUMENT;
@@ -167,6 +190,22 @@ mk_result MK_CALL mk_trajectory_segment_count(mk_trajectory_handle trajectory,
         auto *value = get(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         *out_segment_count = value->segment_count();
+        return MK_OK;
+    } catch (...) {
+        return MK_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+mk_result MK_CALL mk_trajectory_get_segment(mk_trajectory_handle trajectory,
+                                             uint32_t index, mk_segment *out_segment) {
+    if (out_segment == nullptr || out_segment->struct_size < sizeof(*out_segment))
+        return MK_ERROR_INVALID_ARGUMENT;
+    try {
+        std::lock_guard lock(registry_mutex);
+        const auto *value = get(trajectory);
+        if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
+        if (index >= value->segment_count()) return MK_ERROR_INVALID_ARGUMENT;
+        *out_segment = value->segment(index);
         return MK_OK;
     } catch (...) {
         return MK_ERROR_INVALID_ARGUMENT;

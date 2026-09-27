@@ -8,7 +8,7 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
-target_link_libraries(robotkit_runtime PRIVATE robotkit_mcap_headers)
+target_link_libraries(robotkit_runtime PUBLIC motionkit_core PRIVATE robotkit_mcap_headers)
 target_compile_definitions(robotkit_runtime PRIVATE RK_BUILDING_LIBRARY)
 if(NOT RK_BUILD_SHARED OR EMSCRIPTEN)
     target_compile_definitions(robotkit_runtime PUBLIC RK_STATIC)
