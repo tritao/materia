@@ -48,6 +48,7 @@ run "$haxeon" run --project "$robotkit_dir/tests/haxeon.json"
 
 say "Device protocol host and MCU tests"
 run cargo test --manifest-path "$robotkit_dir/device_protocol/Cargo.toml" --features std
+run cargo test --manifest-path "$robotkit_dir/device_virtual/Cargo.toml"
 run "$robotkit_dir/device_protocol/tools/check-mcu-build.sh"
 
 say "RobotKit native tests"

@@ -93,13 +93,13 @@ rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
                                           const rk_simulation_robot_desc *robot_desc,
                                           rk_robot_runtime *out_runtime) {
     if (!out_runtime || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
-        (robot_desc && (robot_desc->struct_size < sizeof(*robot_desc) ||
+        (robot_desc && (robot_desc->struct_size < offsetof(rk_simulation_robot_desc, virtual_device_enabled) ||
                         robot_desc->initial_pose.struct_size < sizeof(robot_desc->initial_pose))))
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     const auto value = resolve(simulation);
     return value ? value->add_robot(robotkit::internal::copy_blueprint(blueprint), *out_runtime,
-        robot_desc == nullptr ? nullptr : &robot_desc->initial_pose) : RK_ERROR_INVALID_HANDLE;
+        robot_desc) : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_simulation_step(rk_simulation simulation, uint64_t timestamp_ns) {

@@ -46,6 +46,9 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
     pub fn actuator_positions(&self) -> [f64; A] {
         std::array::from_fn(|i| self.steps[i] as f64 / self.steps_per_unit[i])
     }
+    pub fn position_targets(&self) -> [f32; A] { self.targets }
+    pub fn velocity_targets(&self) -> [f32; A] { self.velocities }
+    pub fn steps_per_unit(&self) -> [f64; A] { self.steps_per_unit }
     pub fn records(&self) -> &[OutputRecord] { &self.records }
     pub fn digital(&self, i: usize) -> Option<bool> { self.digital.get(i).copied() }
     pub fn analog(&self, i: usize) -> Option<f32> { self.analog.get(i).copied() }

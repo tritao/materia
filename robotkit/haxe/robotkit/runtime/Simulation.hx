@@ -33,28 +33,58 @@ class Simulation {
   }
 
   /** Adds topology before the first start or step. */
-  public function addRobot(blueprint:RobotRuntimeBlueprint, ?initialPose:Pose2):RobotRuntime {
+  public function addRobot(blueprint:RobotRuntimeBlueprint, ?initialPose:Pose2,
+      ?virtualDevice:VirtualDeviceOptions):RobotRuntime {
     return addRobotWithPose(blueprint, initialPose == null ? null :
       makePose([initialPose.x, initialPose.y, 0.0],
-        [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]));
+        [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]),
+      virtualDevice);
   }
 
   /** Adds a robot with a full 3D pose that reset restores. */
   public function addRobotAtPose(blueprint:RobotRuntimeBlueprint, position:Array<Float>,
-      rotation:Array<Float>):RobotRuntime {
+      rotation:Array<Float>, ?virtualDevice:VirtualDeviceOptions):RobotRuntime {
     if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
       throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
-    return addRobotWithPose(blueprint, makePose(position, rotation));
+    return addRobotWithPose(blueprint, makePose(position, rotation), virtualDevice);
   }
 
   function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
-      initialPose:Null<rk_simulation_pose>):RobotRuntime {
+      initialPose:Null<rk_simulation_pose>, virtualDevice:Null<VirtualDeviceOptions>):RobotRuntime {
     ensureLive();
     var robotDesc:Null<rk_simulation_robot_desc> = null;
-    if (initialPose != null) {
+    if (initialPose != null || virtualDevice != null) {
       robotDesc = new rk_simulation_robot_desc();
       robotDesc.set_struct_size(rk_simulation_robot_desc.size());
-      robotDesc.set_initial_pose(initialPose);
+      robotDesc.set_initial_pose(initialPose == null ?
+        makePose([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]) : initialPose);
+      if (virtualDevice != null) {
+        if (blueprint.jointCount > 64 || virtualDevice.fingerprint.length != 32 ||
+            !~/^[0-9a-fA-F]{32}$/.match(virtualDevice.fingerprint) ||
+            (virtualDevice.stepsPerUnit.length != 0 &&
+             virtualDevice.stepsPerUnit.length != blueprint.jointCount))
+          throw "Simulation virtual device configuration is invalid";
+        robotDesc.set_virtual_device_enabled(1);
+        robotDesc.set_virtual_device_tick_hz(virtualDevice.tickHz);
+        robotDesc.set_virtual_device_step_tick_hz(virtualDevice.stepTickHz);
+        robotDesc.set_virtual_device_offset_ticks(virtualDevice.offsetTicks);
+        robotDesc.set_virtual_device_drift_ppm(virtualDevice.driftPpm);
+        robotDesc.set_virtual_device_baud(virtualDevice.baud);
+        robotDesc.set_virtual_device_latency_ns(virtualDevice.latencyNs);
+        robotDesc.set_virtual_device_jitter_ns(virtualDevice.jitterNs);
+        robotDesc.set_virtual_device_drop_rate(virtualDevice.frameDropRate);
+        robotDesc.set_virtual_device_corruption_rate(virtualDevice.corruptionRate);
+        robotDesc.set_virtual_device_seed(virtualDevice.seed);
+        for (i in 0...blueprint.jointCount)
+          robotDesc.set_virtual_device_steps_per_unit(i,
+            virtualDevice.stepsPerUnit.length == 0 ? 1000.0 : virtualDevice.stepsPerUnit[i]);
+        for (i in 0...16)
+          robotDesc.set_virtual_device_fingerprint(i,
+            Std.parseInt("0x" + virtualDevice.fingerprint.substr(i * 2, 2)));
+        robotDesc.set_virtual_device_target_error(virtualDevice.targetError);
+        robotDesc.set_virtual_device_clock_bound_ns(virtualDevice.clockBoundNs);
+        robotDesc.set_virtual_device_link_loss_timeout_ns(virtualDevice.linkLossTimeoutNs);
+      }
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");

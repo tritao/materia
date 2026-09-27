@@ -1,4 +1,5 @@
 #include "simulation.hpp"
+#include "virtual_device_endpoint.hpp"
 #include "simulation_robot.hpp"
 #include "runtime_registry.hpp"
 #include "sensor_math.hpp"
@@ -179,7 +180,8 @@ Simulation::~Simulation() {
 
 rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                                 rk_robot_runtime &out_runtime,
-                                const rk_simulation_pose *initial_pose) {
+                                const rk_simulation_robot_desc *robot_desc) {
+    const auto *initial_pose = robot_desc ? &robot_desc->initial_pose : nullptr;
     std::lock_guard tick_lock(tick_mutex_);
     bool topology_update = false;
     {
@@ -193,6 +195,29 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     if (initial_pose && (initial_pose->struct_size < sizeof(*initial_pose) ||
                          !valid_pose(initial_pose->position, initial_pose->rotation)))
         return RK_ERROR_INVALID_ARGUMENT;
+    std::shared_ptr<VirtualDeviceEndpoint> virtual_endpoint;
+    if (robot_desc && robot_desc->struct_size >= sizeof(*robot_desc) &&
+        robot_desc->virtual_device_enabled) {
+        VirtualDeviceConfig6 config;
+        config.device_tick_hz = robot_desc->virtual_device_tick_hz;
+        config.step_tick_hz = robot_desc->virtual_device_step_tick_hz;
+        config.offset_ticks = robot_desc->virtual_device_offset_ticks;
+        config.drift_ppm = robot_desc->virtual_device_drift_ppm;
+        config.baud = robot_desc->virtual_device_baud;
+        config.latency_ns = robot_desc->virtual_device_latency_ns;
+        config.jitter_ns = robot_desc->virtual_device_jitter_ns;
+        config.frame_drop_rate = robot_desc->virtual_device_drop_rate;
+        config.corruption_rate = robot_desc->virtual_device_corruption_rate;
+        config.seed = robot_desc->virtual_device_seed;
+        std::copy_n(robot_desc->virtual_device_fingerprint, 16, config.fingerprint.begin());
+        config.steps_per_unit.assign(robot_desc->virtual_device_steps_per_unit,
+            robot_desc->virtual_device_steps_per_unit + blueprint.joint_count);
+        config.target_error = robot_desc->virtual_device_target_error;
+        config.clock_bound_ns = robot_desc->virtual_device_clock_bound_ns;
+        config.link_loss_timeout_ns = robot_desc->virtual_device_link_loss_timeout_ns;
+        virtual_endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+        if (!virtual_endpoint) return RK_ERROR_INVALID_ARGUMENT;
+    }
     try {
         auto binding = std::shared_ptr<SimulationRobot>(new SimulationRobot(*this));
         const auto robot_index = static_cast<uint32_t>(bindings_.size());
@@ -297,6 +322,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         topology_update = false;
         require_sim(topology_result, "nksim_world_end_topology_update");
         bindings_.push_back(binding);
+        virtual_bindings_.push_back(virtual_endpoint ? binding : nullptr);
+        virtual_devices_.push_back(virtual_endpoint);
         binding->base_body_ = binding->bodies_[root];
         robot_base_bodies_.push_back(binding->base_body_);
         robot_initial_poses_.push_back(chosen_initial);
@@ -317,8 +344,9 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         }
         binding->reset_sensors();
 
-        auto runtime = std::make_shared<RobotRuntime>(
-            blueprint, std::static_pointer_cast<RobotEndpoint>(binding), period_);
+        auto runtime = std::make_shared<RobotRuntime>(blueprint,
+            virtual_endpoint ? std::static_pointer_cast<RobotEndpoint>(virtual_endpoint)
+                             : std::static_pointer_cast<RobotEndpoint>(binding), period_);
         runtime->set_externally_driven(true);
         const auto handle = internal::register_runtime(runtime);
         runtimes_.push_back(std::move(runtime));
@@ -1064,8 +1092,10 @@ rk_result Simulation::step(uint64_t timestamp_ns) {
             return RK_ERROR_INVALID_STATE;
         sealed_ = true;
     }
-    for (const auto &runtime : runtimes_) {
-        const auto result = runtime->apply_pending_commands(timestamp_ns);
+    const auto simulation_ns = (step_index_ + 1) * static_cast<std::uint64_t>(period_.count());
+    for (std::size_t index = 0; index < runtimes_.size(); ++index) {
+        const auto result = runtimes_[index]->apply_pending_commands(
+            virtual_devices_[index] ? simulation_ns : timestamp_ns);
         if (result != RK_OK) {
             for (const auto &participant : runtimes_)
                 participant->discard_pending_commands();
@@ -1078,18 +1108,40 @@ rk_result Simulation::step(uint64_t timestamp_ns) {
 rk_result Simulation::advance(uint64_t timestamp_ns) {
     if (ensure_host() != RK_OK)
         return RK_ERROR_BACKEND;
+    const auto simulation_ns = (step_index_ + 1) * static_cast<std::uint64_t>(period_.count());
+    std::size_t binding_index = 0;
     for (auto it = bindings_.begin(); it != bindings_.end();) {
         const auto binding = it->lock();
         if (!binding) {
             it = bindings_.erase(it);
+            virtual_bindings_.erase(virtual_bindings_.begin() + binding_index);
+            virtual_devices_.erase(virtual_devices_.begin() + binding_index);
             continue;
         }
         auto targets = binding->take_pending_targets();
+        if (virtual_devices_[binding_index]) {
+            rk_robot_state state{};
+            const auto result = virtual_devices_[binding_index]->sample(simulation_ns, state);
+            if (result != RK_OK && result != RK_ERROR_STALE_STATE) return result;
+            const auto positions = virtual_devices_[binding_index]->actuator_positions();
+            if (positions.size() != binding->joints_.size()) return RK_ERROR_BACKEND;
+            for (std::size_t joint = 0; joint < positions.size(); ++joint) {
+                if (!binding->actuated_joints_[joint]) continue;
+                nksim_joint_target target{};
+                target.struct_size = sizeof(target);
+                target.joint = binding->joints_[joint];
+                target.mode = NKSIM_JOINT_TARGET_POSITION;
+                target.target = positions[joint];
+                target.max_force = 1e9;
+                targets.push_back(target);
+            }
+        }
         if (!targets.empty() && nksim_host_submit_joint_targets(
                                     host_, targets.data(),
                                     static_cast<uint32_t>(targets.size())) != NKSIM_OK)
             return RK_ERROR_BACKEND;
         ++it;
+        ++binding_index;
     }
     // Targets taken above are the ones every robot applied for this tick.
     const auto drive_result = advance_drives();
@@ -1109,8 +1161,9 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
         return RK_ERROR_BACKEND;
     step_index_ = result.step_index;
     simulation_time_ = result.simulation_time;
-    for (const auto &runtime : runtimes_) {
-        const auto sample_result = runtime->publish_sample(timestamp_ns);
+    for (std::size_t index = 0; index < runtimes_.size(); ++index) {
+        const auto sample_result = runtimes_[index]->publish_sample(
+            virtual_devices_[index] ? simulation_ns : timestamp_ns);
         if (sample_result != RK_OK)
             return sample_result;
     }

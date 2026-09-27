@@ -60,3 +60,22 @@ and commits over a complete-frame transport. It qualifies baud and queue
 depth at construction and checks the shortest submitted segment again before
 sending a plan. The runtime leaves per-cycle target streaming to RKD5
 endpoints; RKD6 snapshots use device queue status.
+# In-process virtual device
+
+`robotkit/device_virtual` links the no_std scheduled core to the `std`
+virtual board as a static library. Its C ABI in
+`robotkit/device_virtual/include/rkd_virtual.h` accepts and returns complete
+RKD6 frames and advances on the caller's simulated host clock. The board
+applies offset and ppm drift before each 40 kHz step tick. A step pulse is
+recorded with its device tick, actuator and direction. The A7 step-rate and
+direction-setup constraints are still to be added.
+
+`VirtualDeviceEndpoint` owns that library behind a deterministic complete
+frame link. Baud, latency, jitter, frame drop, corruption and RNG seed are
+configurable. A sampled line error delays a frame by one packet time before
+retry; `cut_link(true)` suppresses host-to-device frames while leaving
+telemetry available to observe device-side `link_lost`. The SimKit robot
+descriptor can select this endpoint, and `Simulation.addRobot` exposes it as
+`VirtualDeviceOptions`. The step-count position drives each SimKit joint
+through a position target. Device status and state are sampled on the
+simulation owner clock.
