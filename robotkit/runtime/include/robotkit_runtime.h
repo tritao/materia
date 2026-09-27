@@ -82,7 +82,7 @@ enum {
     RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued segment-start knots. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 14 /**< Adds versioned runtime owner period for serial queue qualification. */
+    RK_API_VERSION = 15 /**< Adds versioned serial per-frame processing allowance. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -322,6 +322,7 @@ typedef struct rk_robot_runtime_blueprint {
     uint64_t commit_lead_ns; /**< Zero selects two owner periods. */
     double following_error_bound[RK_MAX_TRAJECTORY_JOINTS]; /**< Per-joint SI-unit bound; zero disables this check. */
     uint64_t owner_period_ns; /**< Zero selects the 10 ms default; versioned by struct_size. */
+    uint64_t serial_processing_allowance_ns; /**< Zero selects 2 ms; one-way target-streaming budget. */
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */

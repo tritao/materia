@@ -1140,3 +1140,17 @@ native endpoint qualifies. Therefore an in-repo backend still advertises no
 queue/plan support. Per P9d's stop rule, the non-queue MotionSystem fallback,
 `TimeScaling`, and dependent planners remain until a policy for unsupported
 serial timing is chosen. No fallback deletion was attempted.
+
+### P9c follow-up — Separate streaming and response budgets
+
+The RKD5 command-and-state response deadline retains its 10 ms device
+processing reservation. One-way queue streaming instead qualifies on the
+maximum command frame's 8N1 time plus a deployment-configured per-frame
+processing allowance (2 ms default). Deployment schema v2 requires
+`owner_period_ns` and `processing_allowance_ns`; robotd and SerialRobot share
+that parser, and the bench Nucleo deployment uses 10 ms plus 2 ms. The
+struct-size-versioned runtime blueprint carries the allowance to the serial
+endpoint. The PTY harness reads the bench timing and exercises a Ruckig plan,
+HOLD and RESUME at that period. Insufficient timing still advertises no queue
+in this follow-up; construction policy changes in the next step. Commit: the
+commit containing this entry.

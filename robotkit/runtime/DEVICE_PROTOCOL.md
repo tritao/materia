@@ -105,8 +105,19 @@ joints, command is at most 544 bytes including framing and state is at most
 Supported UART rates begin at 115,200 baud. A response deadline should be
 derived as the full command-plus-state transmission time at the configured
 baud plus measured device processing allowance and host scheduling margin.
-For the initial implementation, reserve 10 ms processing and 20 ms scheduling;
+For the initial implementation, reserve 10 ms for device processing in this
+**round-trip response-deadline budget** and 20 ms for host scheduling;
 at 115,200 baud this yields a minimum 148 ms deadline after rounding up.
+This 10 ms reservation is not the per-cycle target-streaming allowance.
+
+The **one-way queue qualification budget** is the 8N1 time of one maximum
+`COMMAND` target frame for the configured joint count and baud, rounded up to
+whole nanoseconds, plus the device's per-frame processing allowance. That
+allowance is an explicit deployment value, `processing_allowance_ns`, whose
+documented default is 2 ms. `owner_period_ns` must be at least the resulting
+minimum; the bench Nucleo deployment uses a 10 ms period and 2 ms allowance.
+Both fields are required in deployment schema version 2. A zero allowance in
+the versioned runtime ABI selects the 2 ms default for older callers.
 The device watchdog period must exceed the command period plus worst-case
 command transmission and processing time, with explicit margin.
 

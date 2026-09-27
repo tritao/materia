@@ -101,6 +101,10 @@ class RobotHost {
     }
     }
     var blueprint = RobotRuntimeCompiler.compile(robot);
+    if (deployment != null) {
+      blueprint.ownerPeriodNs = deployment.ownerPeriodNs;
+      blueprint.serialProcessingAllowanceNs = deployment.processingAllowanceNs;
+    }
     if (args.indexOf("--server") >= 0) {
       var serverSimulation:Null<Simulation> = null;
       var serverRuntime:Null<RobotRuntime> = null;

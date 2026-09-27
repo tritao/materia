@@ -8,7 +8,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fcntl.h>
+#include <fstream>
 #include <limits>
+#include <regex>
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -16,6 +18,13 @@
 #define CHECK(condition) do { if (!(condition)) { std::fprintf(stderr, "check failed at line %d: %s\n", __LINE__, #condition); std::abort(); } } while (false)
 
 namespace device = robotkit::device;
+
+std::uint64_t deployment_integer(const std::string &source, const char *field) {
+    const std::regex pattern(std::string("\"") + field + "\"\\s*:\\s*([0-9]+)");
+    std::smatch match;
+    CHECK(std::regex_search(source, match, pattern));
+    return std::stoull(match[1].str());
+}
 
 rk_robot_runtime_blueprint blueprint() {
     rk_robot_runtime_blueprint value{};
@@ -40,7 +49,20 @@ rk_robot_runtime_blueprint blueprint() {
 }
 
 int main(int argc, char **argv) {
-    CHECK(argc == 2);
+    CHECK(argc == 3);
+    std::ifstream bench_file(argv[2]);
+    CHECK(bench_file.good());
+    const std::string bench((std::istreambuf_iterator<char>(bench_file)),
+        std::istreambuf_iterator<char>());
+    CHECK(deployment_integer(bench, "schemaVersion") == 2);
+    const auto bench_baud = static_cast<unsigned>(deployment_integer(bench, "baud"));
+    const auto bench_period = std::chrono::nanoseconds(
+        deployment_integer(bench, "owner_period_ns"));
+    const auto bench_allowance = std::chrono::nanoseconds(
+        deployment_integer(bench, "processing_allowance_ns"));
+    // The bench model has two drive joints; qualify the deployed joint count.
+    CHECK(robotkit::DeviceSerialEndpoint::minimum_owner_period_ns(bench_baud, 2,
+        bench_allowance) <= static_cast<std::uint64_t>(bench_period.count()));
     const int master = ::posix_openpt(O_RDWR | O_NOCTTY | O_NONBLOCK);
     CHECK(master >= 0);
     CHECK(::grantpt(master) == 0 && ::unlockpt(master) == 0);
@@ -133,12 +155,12 @@ int main(int argc, char **argv) {
         CHECK(runtime_state.safety == RK_SAFETY_READY);
     }
     {
-        auto link = device::HostLink::open(slave, 115200, fingerprint, 1);
+        auto link = device::HostLink::open(slave, bench_baud, fingerprint, 1);
         CHECK(link && link->ready());
         auto endpoint = robotkit::DeviceSerialEndpoint::attach(std::move(link), 1, 1e-6,
-            std::chrono::milliseconds(20));
+            bench_period, bench_allowance);
         CHECK(endpoint && endpoint->supports_trajectory_queue());
-        robotkit::RobotRuntime runtime(blueprint(), endpoint, std::chrono::milliseconds(20));
+        robotkit::RobotRuntime runtime(blueprint(), endpoint, bench_period);
         CHECK(runtime.publish_sample(0) == RK_OK);
         rk_robot_command reset{};
         reset.struct_size = sizeof(reset);
@@ -146,7 +168,7 @@ int main(int argc, char **argv) {
         reset.kind = RK_COMMAND_RESET_SAFETY;
         CHECK(runtime.submit(reset) == RK_OK);
         CHECK(runtime.apply_pending_commands() == RK_OK);
-        CHECK(runtime.publish_sample(20'000'000) == RK_OK);
+        CHECK(runtime.publish_sample(bench_period.count()) == RK_OK);
 
         mk_state_to_state_request request{};
         request.struct_size = sizeof(request);
@@ -184,7 +206,7 @@ int main(int argc, char **argv) {
                 target.coefficients[0].value[degree] = source.coefficients[0].value[degree];
         }
         CHECK(runtime.submit_plan(plan) == RK_OK);
-        uint64_t timestamp = 40'000'000;
+        uint64_t timestamp = static_cast<uint64_t>(bench_period.count() * 2);
         rk_robot_state state{};
         auto on_path = [&] {
             CHECK(runtime.snapshot(state) == RK_OK);
@@ -199,7 +221,7 @@ int main(int argc, char **argv) {
             CHECK(runtime.apply_pending_commands() == RK_OK);
             CHECK(runtime.publish_sample(timestamp) == RK_OK);
             on_path();
-            timestamp += 20'000'000;
+            timestamp += static_cast<uint64_t>(bench_period.count());
         }
         CHECK(state.trajectory_active == 1 && state.position[0] >= 0.0 && state.position[0] <= 0.1);
         rk_robot_command lifecycle{};
@@ -211,7 +233,7 @@ int main(int argc, char **argv) {
             CHECK(runtime.apply_pending_commands() == RK_OK);
             CHECK(runtime.publish_sample(timestamp) == RK_OK);
             on_path();
-            timestamp += 20'000'000;
+            timestamp += static_cast<uint64_t>(bench_period.count());
         }
         CHECK(state.trajectory_active == 1 && state.position[0] >= 0.0 && state.position[0] <= 0.1);
         lifecycle.sequence = 4;
@@ -221,7 +243,7 @@ int main(int argc, char **argv) {
             CHECK(runtime.apply_pending_commands() == RK_OK);
             CHECK(runtime.publish_sample(timestamp) == RK_OK);
             on_path();
-            timestamp += 20'000'000;
+            timestamp += static_cast<uint64_t>(bench_period.count());
         }
         CHECK(state.trajectory_active == 1 && state.position[0] >= 0.0 && state.position[0] <= 0.1);
         mk_trajectory_destroy(generated);
@@ -241,16 +263,17 @@ int main(int argc, char **argv) {
     rk_robot_capabilities capabilities{};
     capabilities.struct_size = sizeof(capabilities);
     CHECK(rk_robot_runtime_capabilities(handle, &capabilities) == RK_OK);
-    CHECK(capabilities.supports_trajectory_queue == 0);
+    CHECK(capabilities.supports_trajectory_queue == 1);
     rk_robot_runtime_destroy(handle);
     handle = RK_INVALID_ROBOT_RUNTIME;
-    layout.owner_period_ns = 12'000'000;
+    layout.owner_period_ns = 2'000'000;
     CHECK(rk_robot_runtime_create_serial(&layout, slave, 115200,
         fingerprint_hex, 1e-6, &handle) == RK_OK);
     CHECK(rk_robot_runtime_capabilities(handle, &capabilities) == RK_OK);
     CHECK(capabilities.supports_trajectory_queue == 0);
     rk_robot_runtime_destroy(handle);
     handle = RK_INVALID_ROBOT_RUNTIME;
+    layout.owner_period_ns = 5'000'000;
     CHECK(rk_robot_runtime_create_serial(&layout, slave, 921600,
         fingerprint_hex, 1e-6, &handle) == RK_OK);
     CHECK(rk_robot_runtime_capabilities(handle, &capabilities) == RK_OK);

@@ -29,6 +29,13 @@ int main() {
     blueprint.struct_size = sizeof(blueprint);
     blueprint.owner_period_ns = 20'000'000;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.serial_processing_allowance_ns = static_cast<uint64_t>(INT64_MAX) + 1;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.struct_size = offsetof(rk_robot_runtime_blueprint, serial_processing_allowance_ns);
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.serial_processing_allowance_ns = 2'000'000;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
 
     rk_robot_command command{};
     command.struct_size = sizeof(command);

@@ -9,17 +9,19 @@ namespace robotkit {
 std::shared_ptr<DeviceSerialEndpoint> DeviceSerialEndpoint::open(const char *path, unsigned baud,
     std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count,
     double max_target_error, std::uint8_t *session_status,
-    std::chrono::nanoseconds owner_period) {
+    std::chrono::nanoseconds owner_period,
+    std::chrono::nanoseconds processing_allowance) {
     if (session_status) *session_status = 0;
     if (!std::isfinite(max_target_error) || max_target_error < 0.0 ||
         joint_count > device_wire::MAX_JOINTS) return {};
     return attach(device::HostLink::open(path, baud, fingerprint, joint_count, session_status),
-        joint_count, max_target_error, owner_period);
+        joint_count, max_target_error, owner_period, processing_allowance);
 }
 
 std::shared_ptr<DeviceSerialEndpoint> DeviceSerialEndpoint::attach(
     std::unique_ptr<device::HostLink> link, std::uint8_t joint_count, double max_target_error,
-    std::chrono::nanoseconds owner_period) {
+    std::chrono::nanoseconds owner_period,
+    std::chrono::nanoseconds processing_allowance) {
     if (!link || !link->ready() || joint_count > device_wire::MAX_JOINTS ||
         !std::isfinite(max_target_error) || max_target_error < 0.0) return {};
     device::HostState initial{};
@@ -28,21 +30,35 @@ std::shared_ptr<DeviceSerialEndpoint> DeviceSerialEndpoint::attach(
          initial.header.safety != RK_SAFETY_FAULT) ||
         initial.header.joint_count != joint_count) return {};
     return std::shared_ptr<DeviceSerialEndpoint>(new DeviceSerialEndpoint(
-        std::move(link), joint_count, max_target_error, initial, owner_period));
+        std::move(link), joint_count, max_target_error, initial, owner_period,
+        processing_allowance));
+}
+
+std::uint64_t DeviceSerialEndpoint::command_frame_time_ns(unsigned baud,
+    std::uint8_t joint_count) {
+    if (baud == 0) return 0;
+    const std::uint64_t frame_bytes = 12 + device_wire::CommandHeader_SIZE +
+        static_cast<std::uint64_t>(joint_count) * device_wire::JointTarget_SIZE;
+    return (frame_bytes * 10'000'000'000ULL + baud - 1) / baud;
+}
+
+std::uint64_t DeviceSerialEndpoint::minimum_owner_period_ns(unsigned baud,
+    std::uint8_t joint_count, std::chrono::nanoseconds processing_allowance) {
+    if (baud == 0 || processing_allowance.count() < 0) return 0;
+    return command_frame_time_ns(baud, joint_count) +
+        static_cast<std::uint64_t>(processing_allowance.count());
 }
 
 DeviceSerialEndpoint::DeviceSerialEndpoint(std::unique_ptr<device::HostLink> link,
     std::uint8_t joint_count, double max_target_error, device::HostState initial_state,
-    std::chrono::nanoseconds owner_period)
+    std::chrono::nanoseconds owner_period,
+    std::chrono::nanoseconds processing_allowance)
     : link_(std::move(link)), joint_count_(joint_count), max_target_error_(max_target_error),
       initial_state_(initial_state) {
-    // RKD5 framing is 8 bytes of header and 4 bytes of CRC. Reserve the
-    // protocol's 10 ms processing allowance in addition to 8N1 wire time.
-    const std::uint64_t frame_bytes = 12 + device_wire::CommandHeader_SIZE +
-        static_cast<std::uint64_t>(joint_count_) * device_wire::JointTarget_SIZE;
-    const std::uint64_t wire_ns =
-        (frame_bytes * 10'000'000'000ULL + link_->baud() - 1) / link_->baud();
-    const std::uint64_t required_ns = 10'000'000ULL + wire_ns;
+    // One-way streaming uses the command frame plus the deployed per-frame
+    // processing allowance, not the command-and-state response deadline.
+    const std::uint64_t required_ns = minimum_owner_period_ns(link_->baud(),
+        joint_count_, processing_allowance);
     queue_supported_ = owner_period.count() > 0 &&
         static_cast<std::uint64_t>(owner_period.count()) >= required_ns;
     if (!queue_supported_)

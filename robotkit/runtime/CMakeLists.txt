@@ -105,7 +105,8 @@ if(RK_BUILD_TESTS)
             target_link_libraries(robotkit_device_host_pty_tests PRIVATE RobotKit::runtime)
             add_dependencies(robotkit_device_host_pty_tests robotkit_pty_device)
             add_test(NAME robotkit_device_host_pty COMMAND robotkit_device_host_pty_tests
-                ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device)
+                ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device
+                ${CMAKE_CURRENT_SOURCE_DIR}/../deployment/bench-nucleo-g474re/deployment.json)
             set_tests_properties(robotkit_device_host_pty PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
         endif()
 

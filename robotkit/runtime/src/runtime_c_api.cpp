@@ -113,10 +113,13 @@ rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprin
     try {
         const auto copied = robotkit::internal::copy_blueprint(blueprint);
         const auto period = owner_period(copied);
+        const auto processing_allowance = std::chrono::nanoseconds(
+            copied.serial_processing_allowance_ns == 0 ? 2'000'000 :
+            static_cast<int64_t>(copied.serial_processing_allowance_ns));
         std::uint8_t session_status = 0;
         auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, fingerprint,
             static_cast<std::uint8_t>(blueprint->joint_count), max_target_error,
-            &session_status, period);
+            &session_status, period, processing_allowance);
         if (!endpoint)
             return session_status == 2 ? RK_ERROR_MODEL_MISMATCH : RK_ERROR_BACKEND;
         auto runtime = std::make_shared<robotkit::RobotRuntime>(

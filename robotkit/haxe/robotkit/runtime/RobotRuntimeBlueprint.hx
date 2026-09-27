@@ -26,6 +26,8 @@ class RobotRuntimeBlueprint {
   public var commitLeadNs:haxe.Int64 = haxe.Int64.ofInt(0);
   /** Zero uses the runtime's 10 ms owner period. */
   public var ownerPeriodNs:haxe.Int64 = haxe.Int64.ofInt(0);
+  /** Zero uses the deployed 2 ms device per-frame processing allowance. */
+  public var serialProcessingAllowanceNs:haxe.Int64 = haxe.Int64.ofInt(0);
   /** Per-joint SI-unit following-error bounds; zero leaves the check disabled. */
   public final followingErrorBounds:Array<Float>;
   /** Compiled user-layer roles; null for manually assembled native blueprints. */
@@ -104,6 +106,9 @@ class RobotRuntimeBlueprint {
     if (haxe.Int64.compare(ownerPeriodNs, haxe.Int64.ofInt(0)) < 0)
       throw "Invalid runtime owner period";
     value.set_owner_period_ns(ownerPeriodNs);
+    if (haxe.Int64.compare(serialProcessingAllowanceNs, haxe.Int64.ofInt(0)) < 0)
+      throw "Invalid serial processing allowance";
+    value.set_serial_processing_allowance_ns(serialProcessingAllowanceNs);
     for (joint in 0...jointCount) {
       var bound = followingErrorBounds[joint];
       if (!Math.isFinite(bound) || bound < 0.0)

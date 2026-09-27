@@ -15,11 +15,17 @@ public:
     static std::shared_ptr<DeviceSerialEndpoint> open(const char *path, unsigned baud,
         std::array<std::uint8_t, 16> fingerprint, std::uint8_t joint_count,
         double max_target_error, std::uint8_t *session_status = nullptr,
-        std::chrono::nanoseconds owner_period = std::chrono::milliseconds(10));
+        std::chrono::nanoseconds owner_period = std::chrono::milliseconds(10),
+        std::chrono::nanoseconds processing_allowance = std::chrono::milliseconds(2));
     /** Takes an already negotiated link after verifying its initial safe STATE. */
     static std::shared_ptr<DeviceSerialEndpoint> attach(std::unique_ptr<device::HostLink> link,
         std::uint8_t joint_count, double max_target_error,
-        std::chrono::nanoseconds owner_period = std::chrono::milliseconds(10));
+        std::chrono::nanoseconds owner_period = std::chrono::milliseconds(10),
+        std::chrono::nanoseconds processing_allowance = std::chrono::milliseconds(2));
+
+    static std::uint64_t command_frame_time_ns(unsigned baud, std::uint8_t joint_count);
+    static std::uint64_t minimum_owner_period_ns(unsigned baud, std::uint8_t joint_count,
+        std::chrono::nanoseconds processing_allowance);
 
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
@@ -30,7 +36,8 @@ public:
 private:
     DeviceSerialEndpoint(std::unique_ptr<device::HostLink> link, std::uint8_t joint_count,
         double max_target_error, device::HostState initial_state,
-        std::chrono::nanoseconds owner_period);
+        std::chrono::nanoseconds owner_period,
+        std::chrono::nanoseconds processing_allowance);
     std::unique_ptr<device::HostLink> link_;
     std::uint8_t joint_count_;
     double max_target_error_;

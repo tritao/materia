@@ -1,9 +1,11 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "model": "robot.json",
   "device": {
     "path": "/dev/replace-with-pty",
     "baud": 115200,
+    "owner_period_ns": 10000000,
+    "processing_allowance_ns": 2000000,
     "layout": "layout.json",
     "schema_lock": "device_wire.lock.json",
     "fingerprint": "e9757b4c951367c3a9953110f1f2d34c",

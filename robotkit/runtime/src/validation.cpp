@@ -62,6 +62,10 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             sizeof(blueprint->owner_period_ns) &&
         blueprint->owner_period_ns > static_cast<uint64_t>(INT64_MAX))
         return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >= offsetof(rk_robot_runtime_blueprint, serial_processing_allowance_ns) +
+            sizeof(blueprint->serial_processing_allowance_ns) &&
+        blueprint->serial_processing_allowance_ns > static_cast<uint64_t>(INT64_MAX))
+        return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t i = 0; i < blueprint->link_count; ++i) {
         const auto &link = blueprint->links[i];
         if (!is_finite(link.mass) || link.mass <= 0.0) return RK_ERROR_INVALID_ARGUMENT;
