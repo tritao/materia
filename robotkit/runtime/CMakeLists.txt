@@ -4,7 +4,8 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/runtime_c_api.cpp
     src/recording.cpp
     src/device_host.cpp
-    src/device_serial_endpoint.cpp)
+    src/device_serial_endpoint.cpp
+    src/clock_estimator6.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
@@ -62,6 +63,12 @@ if(RK_BUILD_TESTS)
     add_test(NAME robotkit_device_wire6 COMMAND robotkit_device_wire6_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/../schema/device_frame6_vectors.tsv)
     set_tests_properties(robotkit_device_wire6 PROPERTIES LABELS "robot;wire;codegen" TIMEOUT 30)
+
+    add_executable(robotkit_clock_estimator6_tests tests/clock_estimator6.cpp src/clock_estimator6.cpp)
+    target_compile_features(robotkit_clock_estimator6_tests PRIVATE cxx_std_20)
+    target_include_directories(robotkit_clock_estimator6_tests PRIVATE src)
+    add_test(NAME robotkit_clock_estimator6 COMMAND robotkit_clock_estimator6_tests)
+    set_tests_properties(robotkit_clock_estimator6 PROPERTIES LABELS "robot;runtime;clock" TIMEOUT 30)
 
     add_executable(robotkit_device_protocol_tests tests/device_protocol.cpp)
     target_compile_features(robotkit_device_protocol_tests PRIVATE cxx_std_20)

@@ -32,3 +32,11 @@ before motion. Clock-sync uncertainty and link-loss timeout are deployment
 bounds, not hard-coded protocol constants. `TIME_SYNC_REPLY` carries device
 receive and transmit ticks for the estimator in A3. The RKD5 target-streaming
 path remains supported separately.
+
+The host estimator fits device ticks against host monotonic nanoseconds from
+the lowest RTT samples in a bounded window. Its uncertainty is half the
+minimum RTT plus the worst selected fit residual. It exposes request cadence,
+time mapping and the extra commit horizon (`link latency + 2 × uncertainty`).
+When a new sample steps outside the deployment bound, it latches
+`clock_sync_lost` and disallows further commits. An RKD6 endpoint sends the
+periodic requests and reports that reason in its runtime snapshot.

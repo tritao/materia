@@ -351,3 +351,18 @@ Commit: the commit containing this entry.
 On the lane tree, Rust tests, the MCU build, 14 native tests, 5,873 MotionKit
 and 4,437 RobotKit Haxe assertions, both FFI audits and all three TCP modes
 passed. The TCP tests used port 17962 to avoid other lanes' test servers.
+
+### A3 — Estimate host to device clock mapping
+
+Added a bounded C++ clock estimator with low-RTT sliding-window least-squares
+fit, request cadence, host-time to device-tick mapping, a measured uncertainty
+bound and commit-horizon margin. It latches `clock_sync_lost` when a reply
+steps outside the deployment bound. Deterministic tests cover 1,000 ppm
+drift, 50 ms offset, asymmetric link jitter, mapped tick error, a 10 ms
+clock step and the fault latch. The test was written first. The RKD6 endpoint
+in A5 will drive its request and reply methods and expose the fault reason in
+the runtime snapshot. Commit: the commit containing this entry.
+
+Rust tests, MCU build, all 16 native tests, 5,875 MotionKit and 4,437
+RobotKit Haxe assertions, both FFI audits and TCP integration in default,
+session and lease-timeout modes passed on the lane tree.
