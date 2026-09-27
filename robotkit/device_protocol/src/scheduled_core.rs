@@ -199,6 +199,11 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.len += 1;
         Ok(())
     }
+    pub fn push_segment_for_revision(&mut self, revision: u64,
+                                     segment: ScheduledSegment<A>) -> Result<(), QueueError> {
+        if revision != self.revision { return Err(QueueError::StaleRevision); }
+        self.push_segment(segment)
+    }
     pub fn commit(&mut self, through_ticks: u64) -> Result<(), QueueError> {
         if through_ticks < self.committed_until || self.len == 0 ||
            through_ticks > self.segments[self.len - 1].unwrap().end_ticks() ||

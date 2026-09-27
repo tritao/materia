@@ -22,6 +22,14 @@ pub const MAX_FRAME_SIZE: usize = HEADER_SIZE + MAX_PAYLOAD_SIZE + CRC_SIZE;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Frame6Error { ShortBuffer, BadMagic, BadType, BadLength, BadCrc, BadPayload }
 
+/// Keep a partial RKD6 marker when a noisy byte precedes a frame.
+pub fn slide_to_frame_marker(input: &mut [u8], len: &mut usize) {
+    while *len >= 4 && &input[..4] != b"RKD6" {
+        input.copy_within(1..*len, 0);
+        *len -= 1;
+    }
+}
+
 pub fn encode_frame6(kind: u8, payload: &[u8], out: &mut [u8]) -> Result<usize, Frame6Error> {
     validate_payload(kind, payload)?;
     let size = HEADER_SIZE + payload.len() + CRC_SIZE;

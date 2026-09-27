@@ -1,5 +1,16 @@
 use robotkit_device_protocol::device_wire6::{Event6, SessionBegin6, Segment6Header, TimeSyncRequest};
-use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, Frame6Error, MAX_FRAME_SIZE};
+use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6,
+    slide_to_frame_marker, Frame6Error, MAX_FRAME_SIZE};
+
+#[test]
+fn frame_sync_slides_across_a_bad_marker() {
+    let mut input = [0u8; MAX_FRAME_SIZE];
+    input[..5].copy_from_slice(b"RRKD6");
+    let mut len = 5;
+    slide_to_frame_marker(&mut input, &mut len);
+    assert_eq!(len, 4);
+    assert_eq!(&input[..4], b"RKD6");
+}
 
 #[test]
 fn rkd6_records_round_trip() {

@@ -212,7 +212,6 @@ impl VirtualDevice {
                     return false;
                 };
                 if header.actuator_count as usize != self.count
-                    || header.queue_revision != self.core.as_ref().unwrap().revision()
                     || (self.profile == 2 && (header.degree > 1 ||
                         self.core.as_ref().unwrap().remaining_capacity() <= CAPACITY - MINIMAL_CAPACITY))
                 {
@@ -241,7 +240,8 @@ impl VirtualDevice {
                 ) else {
                     return false;
                 };
-                self.core.as_mut().unwrap().push_segment(segment).is_ok()
+                self.core.as_mut().unwrap()
+                    .push_segment_for_revision(header.queue_revision, segment).is_ok()
             }
             7 => {
                 let Ok(commit) = Commit6::decode(payload) else {

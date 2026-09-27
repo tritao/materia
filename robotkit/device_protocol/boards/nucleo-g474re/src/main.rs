@@ -8,7 +8,8 @@ use nb::Error::WouldBlock;
 use panic_halt as _;
 use robotkit_device_protocol::{Board, ScheduledCore, ScheduledSegment, StopReason};
 use robotkit_device_protocol::device_wire6::*;
-use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, MAX_FRAME_SIZE};
+use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6,
+    slide_to_frame_marker, MAX_FRAME_SIZE};
 use stm32g4xx_hal::{prelude::*, pwr::PwrExt, rcc, serial::FullConfig, stm32};
 
 mod fingerprint;
@@ -140,7 +141,9 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
             }
             let Ok(segment) = ScheduledSegment::new(header.plan_id, header.t0_ticks,
                 header.duration_ticks, header.degree, coefficients, header.ends_at_rest != 0) else { return; };
-            if let Some(core) = core.as_mut() { core.push_segment(segment).ok(); }
+            if let Some(core) = core.as_mut() {
+                core.push_segment_for_revision(header.queue_revision, segment).ok();
+            }
         }
         7 => {
             let Ok(commit) = Commit6::decode(payload) else { return; };
@@ -188,17 +191,31 @@ fn main() -> ! {
         }
         match rx.read() {
             Ok(byte) => {
-                if input_len == input.len() { input_len = 0; }
+                if input_len == input.len() {
+                    input.copy_within(1..input_len, 0);
+                    input_len -= 1;
+                }
                 input[input_len] = byte;
                 input_len += 1;
-                if input_len >= 4 && &input[..4] != b"RKD6" { input_len = 0; continue; }
+                slide_to_frame_marker(&mut input, &mut input_len);
                 if input_len >= 8 {
                     let size = 8 + u16::from_le_bytes([input[6], input[7]]) as usize + 4;
-                    if size > input.len() { input_len = 0; continue; }
+                    if size > input.len() {
+                        input.copy_within(1..input_len, 0);
+                        input_len -= 1;
+                        slide_to_frame_marker(&mut input, &mut input_len);
+                        continue;
+                    }
                     if input_len == size {
-                        handle(&input[..size], &mut board, &mut core, &mut session,
-                            &mut tx, &mut output);
-                        input_len = 0;
+                        if decode_frame6(&input[..size]).is_ok() {
+                            handle(&input[..size], &mut board, &mut core, &mut session,
+                                &mut tx, &mut output);
+                            input_len = 0;
+                        } else {
+                            input.copy_within(1..input_len, 0);
+                            input_len -= 1;
+                            slide_to_frame_marker(&mut input, &mut input_len);
+                        }
                     }
                 }
             }
