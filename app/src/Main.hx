@@ -1252,7 +1252,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       perspectiveViewport = hostContext == null ? null :
         new EditorPerspectiveViewport("scene-perspective", scene, hostContext);
       sceneInspector = null;
-      inspectorSelectionRevision = -1;
     }
     scene.onSelectionChanged = updateCommandContext;
     updateCommandContext();
@@ -1288,7 +1287,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function cancelActiveDrag():Void {
     if (scene.hasActiveSketchEdit()) {
       scene.cancelSelectedSketchEdit();
-      inspectorSelectionRevision = -1;
     }
     if (perspectiveViewport != null && perspectiveViewport.dragging()) {
       var pointer = perspectiveViewport.cancelDrag();
