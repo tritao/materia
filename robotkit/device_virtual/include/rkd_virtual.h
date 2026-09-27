@@ -29,7 +29,7 @@ typedef struct rkd_virtual_event_record {
 /* host_ns is the deterministic owner clock; the board applies offset and drift. */
 rkd_virtual_device *rkd_virtual_create(uint64_t tick_hz, uint32_t step_tick_hz,
     uint64_t offset_ticks, int32_t drift_ppm, uint32_t actuator_count,
-    const double *steps_per_unit, const uint8_t *fingerprint);
+    const double *steps_per_unit, const uint8_t *fingerprint, uint8_t profile);
 void rkd_virtual_destroy(rkd_virtual_device *device);
 int32_t rkd_virtual_step(rkd_virtual_device *device, uint64_t host_ns);
 int32_t rkd_virtual_link_host_to_device(rkd_virtual_device *device,

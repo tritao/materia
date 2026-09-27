@@ -116,7 +116,9 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     if (!acknowledged || ack.session != session || ack.protocol_version != device_wire6::PROTOCOL_VERSION ||
         ack.device_fingerprint != fingerprint || ack.status != 1 ||
         ack.actuator_count != actuator_count || ack.device_tick_hz == 0 ||
-        ack.step_tick_hz == 0 || ack.segment_capacity == 0 || ack.max_degree > 5)
+        ack.step_tick_hz == 0 || ack.segment_capacity == 0 || ack.max_degree > 5 ||
+        (ack.profile != 1 && ack.profile != 2) ||
+        (ack.profile == 2 && ack.max_degree != 1))
         return {};
     const auto period_ns = blueprint.owner_period_ns ? blueprint.owner_period_ns : 10'000'000ULL;
     const auto allowance_ns = blueprint.serial_processing_allowance_ns
@@ -126,8 +128,9 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
         period_ns, link_latency_ns, clock_bound_ns);
     if (transport->baud() < required_baud || ack.segment_capacity < required_depth) {
         std::fprintf(stderr, "Rkd6Endpoint: unqualified serial link: minimum_baud=%llu "
-            "minimum_queue_depth=%u configured_baud=%u configured_queue_depth=%u\n",
+            "minimum_queue_depth=%u minimum_period_ns=%llu configured_baud=%u configured_queue_depth=%u\n",
             static_cast<unsigned long long>(required_baud), required_depth,
+            static_cast<unsigned long long>(period_ns),
             transport->baud(), ack.segment_capacity);
         return {};
     }
@@ -215,8 +218,11 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
         std::memcpy(event.command.data(), source.value.command, RK_PROCESS_COMMAND_BYTES);
         wire_events.push_back(event);
     }
+    const auto first_host_duration = ack_.profile == 2
+        ? std::min<std::uint64_t>(owner_period_ns_, plan.segments.segments[0].duration_ns)
+        : plan.segments.segments[0].duration_ns;
     const auto path_rate = static_cast<double>(compiled.segments.front().header.duration_ticks) /
-        static_cast<double>(plan.segments.segments[0].duration_ns);
+        static_cast<double>(first_host_duration);
     if (!std::isfinite(path_rate) || path_rate <= 0) return RK_ERROR_LIMIT;
     std::uint64_t shortest_ns = UINT64_MAX;
     for (const auto &segment : compiled.segments) {
@@ -266,8 +272,10 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
         segment.header.queue_revision = revision_;
         pending_.push_back(std::move(segment));
     }
-    const auto capacity = status_.remaining_segments ? status_.remaining_segments : ack_.segment_capacity;
-    std::size_t available = capacity;
+    const auto occupied = std::count_if(sent_.begin(), sent_.end(), [&](const auto &row) {
+        return row.header.t0_ticks + row.header.duration_ticks >= status_.path_clock_ticks;
+    });
+    std::size_t available = ack_.segment_capacity > occupied ? ack_.segment_capacity - occupied : 0;
     while (available > 0 && !pending_.empty()) {
         if (!send_segment(pending_.front())) return RK_ERROR_BACKEND;
         sent_.push_back(std::move(pending_.front()));
@@ -330,7 +338,10 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
 
 void Rkd6Endpoint::pump_queue() {
     if (!clock_.may_commit()) return;
-    auto available = status_.remaining_segments;
+    const auto occupied = std::count_if(sent_.begin(), sent_.end(), [&](const auto &row) {
+        return row.header.t0_ticks + row.header.duration_ticks >= status_.path_clock_ticks;
+    });
+    auto available = ack_.segment_capacity > occupied ? ack_.segment_capacity - occupied : 0;
     while (available > 0 && !pending_.empty()) {
         if (!send_segment(pending_.front())) return;
         sent_.push_back(std::move(pending_.front()));

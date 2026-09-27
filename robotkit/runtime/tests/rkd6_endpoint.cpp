@@ -41,6 +41,7 @@ public:
             ack.event_capacity = 4;
             ack.max_degree = 5;
             ack.actuator_count = begin.actuator_count;
+            ack.profile = 1;
             push(2, ack);
             device_wire6::State6Header state{};
             state.session = begin.session;

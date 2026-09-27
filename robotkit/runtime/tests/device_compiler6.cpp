@@ -57,4 +57,14 @@ int main() {
         std::span(&segment, 1), 8, true, 1'000'000'000ULL,
         clock, blueprint, 1'000'000, 40'000, 5, 1e-6, slow);
     assert(!rate_rejected.ok);
+    blueprint.owner_period_ns = 10'000'000;
+    rk_trajectory_segment curved{};
+    curved.duration_ns = 100'000'000;
+    curved.degree = 2;
+    curved.joint_count = 1;
+    curved.coefficients[0].value[2] = 0.5;
+    auto lowered = robotkit::compile_device_segments6(std::span(&curved, 1), 9, true,
+        1'000'000'000ULL, clock, blueprint, 1'000'000, 40'000, 1, 1e-4);
+    assert(lowered.ok && lowered.segments.size() == 10);
+    for (const auto &piece : lowered.segments) assert(piece.header.degree == 1);
 }

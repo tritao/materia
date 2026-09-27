@@ -1,17 +1,26 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "model": "robot.json",
   "channels": [
-    {"id": "sprayer.flow", "safeValue": {"kind": "digital", "digital": false}}
+    {
+      "id": "sprayer.flow",
+      "safeValue": {
+        "kind": "digital",
+        "digital": false
+      }
+    }
   ],
   "device": {
     "path": "/dev/replace-with-pty",
-    "baud": 115200,
+    "baud": 921600,
     "owner_period_ns": 10000000,
     "processing_allowance_ns": 2000000,
     "layout": "layout.json",
-    "schema_lock": "device_wire.lock.json",
-    "fingerprint": "e9757b4c951367c3a9953110f1f2d34c",
-    "target_error": 0.000001
+    "schema_lock": "../../../schema/device_wire6.lock.json",
+    "fingerprint": "51551aa452c21fb03993330cd401ea22",
+    "target_error": 1e-06,
+    "step_tick_hz": 40000,
+    "link_loss_timeout_ns": 500000000,
+    "clock_sync_bound_ns": 500000
   }
 }

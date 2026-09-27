@@ -115,6 +115,7 @@ typedef struct rk_simulation_robot_desc {
     uint16_t virtual_device_actuator_direction_setup_ticks[64];
     double virtual_device_actuator_skew_bound[64];
     uint8_t virtual_device_actuator_ids[4096]; /**< 64 NUL-terminated ASCII IDs, 64 bytes each. */
+    uint32_t virtual_device_profile; /**< 1 full, 2 minimal; zero defaults to full. */
 } rk_simulation_robot_desc;
 
 /**

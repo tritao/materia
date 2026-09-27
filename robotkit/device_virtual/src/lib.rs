@@ -11,6 +11,7 @@ const ACTUATORS: usize = 64;
 const CHANNELS: usize = 32;
 const CAPACITY: usize = 128;
 const EVENT_CAPACITY: usize = 256;
+const MINIMAL_CAPACITY: usize = 8;
 
 pub struct VirtualDevice {
     board: VirtualBoard<ACTUATORS, CHANNELS>,
@@ -23,6 +24,7 @@ pub struct VirtualDevice {
     session: u64,
     channel_kind: [u8; CHANNELS],
     step_tick_hz: u32,
+    profile: u8,
     host_ns: u64,
     outbox: VecDeque<Vec<u8>>,
 }
@@ -36,6 +38,7 @@ impl VirtualDevice {
         count: usize,
         steps_per_unit: [f64; ACTUATORS],
         fingerprint: [u8; 16],
+        profile: u8,
     ) -> Option<Self> {
         if tick_hz == 0
             || step_tick_hz == 0
@@ -43,6 +46,7 @@ impl VirtualDevice {
             || count > ACTUATORS
             || drift_ppm <= -1_000_000
             || steps_per_unit.iter().any(|v| !v.is_finite() || *v <= 0.0)
+            || (profile != 1 && profile != 2)
         {
             return None;
         }
@@ -58,6 +62,7 @@ impl VirtualDevice {
             session: 0,
             channel_kind: [0; CHANNELS],
             step_tick_hz,
+            profile,
             host_ns: 0,
             outbox: VecDeque::new(),
         })
@@ -93,11 +98,12 @@ impl VirtualDevice {
                     device_fingerprint: self.fingerprint,
                     status: 0,
                     device_tick_hz: self.board.tick_hz(),
-                    segment_capacity: CAPACITY as u16,
+                    segment_capacity: if self.profile == 2 { MINIMAL_CAPACITY as u16 } else { CAPACITY as u16 },
                     event_capacity: EVENT_CAPACITY as u16,
                     step_tick_hz: self.step_tick_hz,
-                    max_degree: 5,
+                    max_degree: if self.profile == 2 { 1 } else { 5 },
                     actuator_count: self.count as u8,
+                    profile: self.profile,
                 };
                 if begin.model_fingerprint == self.fingerprint
                     && begin.actuator_count as usize == self.count
@@ -204,6 +210,8 @@ impl VirtualDevice {
                 };
                 if header.actuator_count as usize != self.count
                     || header.queue_revision != self.core.as_ref().unwrap().revision()
+                    || (self.profile == 2 && (header.degree > 1 ||
+                        self.core.as_ref().unwrap().remaining_capacity() <= CAPACITY - MINIMAL_CAPACITY))
                 {
                     return false;
                 }
@@ -304,7 +312,7 @@ impl VirtualDevice {
                     self.events.as_mut().unwrap().tick(core.path_clock(), &mut self.board);
                 }
                 let targets = self.board.position_targets();
-                if self.steps.tick(&mut self.board, targets).is_err() {
+                if self.profile == 1 && self.steps.tick(&mut self.board, targets).is_err() {
                     core.stop(StopReason::DualDriveSkew);
                 }
             }
@@ -331,7 +339,9 @@ impl VirtualDevice {
             executing_segment: core.executing_segment(),
             path_clock_ticks: core.path_clock(),
             rate: core.rate(),
-            remaining_segments: core.remaining_capacity() as u16,
+            remaining_segments: if self.profile == 2 {
+                core.remaining_capacity().saturating_sub(CAPACITY - MINIMAL_CAPACITY) as u16
+            } else { core.remaining_capacity() as u16 },
             remaining_events: self.events.as_ref().map_or(0,
                 |events| events.remaining_capacity() as u16),
             underflow: core.underflow() as u8,
@@ -352,13 +362,14 @@ impl VirtualDevice {
             path_clock_ticks: core.path_clock(),
         };
         let positions = self.board.actuator_positions();
+        let targets = self.board.position_targets();
         let velocity = core.velocities();
         let counts = self.board.step_counts();
         let mut body = vec![0; State6Header::SIZE + self.count * ActuatorState6::SIZE];
         header.encode(&mut body[..State6Header::SIZE]).unwrap();
         for i in 0..self.count {
             let row = ActuatorState6 {
-                position: positions[i] as f32,
+                position: if self.profile == 2 { targets[i] } else { positions[i] as f32 },
                 velocity: velocity[i],
                 effort: 0.0,
                 step_count: counts[i],
@@ -380,6 +391,7 @@ pub unsafe extern "C" fn rkd_virtual_create(
     actuator_count: u32,
     steps_per_unit: *const f64,
     fingerprint: *const u8,
+    profile: u8,
 ) -> *mut VirtualDevice {
     if steps_per_unit.is_null() || fingerprint.is_null() || actuator_count as usize > ACTUATORS {
         return std::ptr::null_mut();
@@ -399,6 +411,7 @@ pub unsafe extern "C" fn rkd_virtual_create(
         actuator_count as usize,
         scale,
         fp,
+        profile,
     )
     .map_or(std::ptr::null_mut(), |v| Box::into_raw(Box::new(v)))
 }
@@ -472,6 +485,13 @@ pub unsafe extern "C" fn rkd_virtual_actuator_positions(
             return 0;
         }
         let values = device.board.actuator_positions();
+        let targets = device.board.position_targets();
+        if device.profile == 2 {
+            for (i, value) in targets.iter().enumerate().take(device.count) {
+                *positions.add(i) = *value as f64;
+            }
+            return device.count;
+        }
         std::ptr::copy_nonoverlapping(values.as_ptr(), positions, device.count);
         device.count
     } else {
@@ -592,7 +612,7 @@ mod tests {
         let mut scale = [1.0; ACTUATORS];
         scale[0] = 1_000.0;
         let mut device =
-            VirtualDevice::new(1_000_000, 40_000, 50_000, 0, 1, scale, fingerprint).unwrap();
+            VirtualDevice::new(1_000_000, 40_000, 50_000, 0, 1, scale, fingerprint, 1).unwrap();
         let begin = SessionBegin6 {
             session: 9,
             protocol_version: PROTOCOL_VERSION,

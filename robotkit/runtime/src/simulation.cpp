@@ -216,6 +216,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         config.target_error = robot_desc->virtual_device_target_error;
         config.clock_bound_ns = robot_desc->virtual_device_clock_bound_ns;
         config.link_loss_timeout_ns = robot_desc->virtual_device_link_loss_timeout_ns;
+        if (robot_desc->struct_size >= sizeof(*robot_desc) && robot_desc->virtual_device_profile)
+            config.profile = robot_desc->virtual_device_profile;
         if (robot_desc->struct_size >= sizeof(*robot_desc) &&
             robot_desc->virtual_device_actuator_count > 0) {
             if (robot_desc->virtual_device_actuator_count > 64) return RK_ERROR_INVALID_ARGUMENT;

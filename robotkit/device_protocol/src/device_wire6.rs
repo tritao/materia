@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 9;
+pub const PROTOCOL_VERSION: u8 = 10;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -380,10 +380,11 @@ pub struct SessionAck6 {
     pub step_tick_hz: u32,
     pub max_degree: u8,
     pub actuator_count: u8,
+    pub profile: u8,
 }
 
 impl SessionAck6 {
-    pub const SIZE: usize = 44;
+    pub const SIZE: usize = 45;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -409,6 +410,8 @@ impl SessionAck6 {
         out[offset..offset + 1].copy_from_slice(&self.max_degree.to_le_bytes());
         offset += 1;
         out[offset..offset + 1].copy_from_slice(&self.actuator_count.to_le_bytes());
+        offset += 1;
+        out[offset..offset + 1].copy_from_slice(&self.profile.to_le_bytes());
         offset += 1;
         Ok(offset)
     }
@@ -459,8 +462,12 @@ impl SessionAck6 {
         bytes.copy_from_slice(&input[offset..offset + 1]);
         let actuator_count = u8::from_le_bytes(bytes);
         offset += 1;
+        let mut bytes = [0u8; 1];
+        bytes.copy_from_slice(&input[offset..offset + 1]);
+        let profile = u8::from_le_bytes(bytes);
+        offset += 1;
         let _ = offset;
-        Ok(Self { session, protocol_version, device_fingerprint, status, device_tick_hz, segment_capacity, event_capacity, step_tick_hz, max_degree, actuator_count })
+        Ok(Self { session, protocol_version, device_fingerprint, status, device_tick_hz, segment_capacity, event_capacity, step_tick_hz, max_degree, actuator_count, profile })
     }
 }
 

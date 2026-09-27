@@ -3704,14 +3704,20 @@ class RobotWorldTests {
     var fixture = Sys.getCwd() + "/robotkit/tests/fixtures/device-deployment/";
     if (!sys.FileSystem.exists(fixture + "deployment.json"))
       fixture = Sys.getCwd() + "/fixtures/device-deployment/";
-    var legacy = new SerialDeployment(fixture + "deployment.json");
-    equal(legacy.protocol, "rkd5", "v2 deployment keeps RKD5");
+    var current = new SerialDeployment(fixture + "deployment.json");
+    equal(current.protocol, "rkd6", "v4 deployment implies RKD6");
     var scheduled = new SerialDeployment(fixture + "deployment6.json");
-    equal(scheduled.protocol, "rkd6", "v3 deployment selects RKD6");
+    equal(scheduled.protocol, "rkd6", "v3 reader accepts RKD6");
     equal(scheduled.stepTickHz, 40000, "v3 step tick rate");
     equal(scheduled.clockSyncBoundNs, haxe.Int64.ofInt(500000), "v3 sync bound");
-    throws(function() SerialRobot.fromDeployment("scheduled-probe", fixture + "deployment6.json"),
-      "serial adapter does not route RKD6 through RKD5");
+    var rejected = haxe.Json.parse(sys.io.File.getContent(fixture + "deployment6.json"));
+    Reflect.setField(Reflect.field(rejected, "device"), "protocol", "rkd5");
+    var rejectedPath = fixture + "rejected-rkd5-${Sys.getPid()}.json";
+    sys.io.File.saveContent(rejectedPath, haxe.Json.stringify(rejected));
+    var message = "";
+    try new SerialDeployment(rejectedPath) catch (error:Dynamic) message = Std.string(error);
+    sys.FileSystem.deleteFile(rejectedPath);
+    check(message.indexOf("rkd5 is unsupported") >= 0, "v3 reader rejects RKD5 clearly");
   }
 
   static function testSerialRobotUnavailableDevice():Void {
