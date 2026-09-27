@@ -54,7 +54,7 @@ class MateriaProjectRunner {
 
   public static function load(projectPath:String):Array<SceneObjectData> return loadProject(projectPath).objects;
 
-  public static function loadProject(projectPath:String):GeneratedAssemblyScene {
+  public static function loadProject(projectPath:String, ?recipeDocument:String):GeneratedAssemblyScene {
     var manifestPath = FileSystem.fullPath(projectPath);
     if (!FileSystem.exists(manifestPath) || FileSystem.isDirectory(manifestPath))
       throw 'Materia project file not found: $manifestPath';
@@ -80,8 +80,8 @@ class MateriaProjectRunner {
     var haxe = ProjectPath.join([home, ".tools", "haxe", "haxe"]);
     if (!FileSystem.exists(haxe)) throw 'Pinned Haxe compiler was not found at $haxe';
     var tools = projectToolsDirectory();
-    var cache = cachePath(entry, projectRoot, manifestPath, haxeonManifest,
-      fieldText(entry, "module"), fieldText(entry, "function"), haxe, home, tools);
+    var cache = recipeDocument == null ? cachePath(entry, projectRoot, manifestPath, haxeonManifest,
+      fieldText(entry, "module"), fieldText(entry, "function"), haxe, home, tools) : null;
     if (cache != null && FileSystem.exists(cache)) {
       try {
         var metadata = FileSystem.metadata(cache);
@@ -102,12 +102,17 @@ class MateriaProjectRunner {
     var records:GeneratedAssemblyScene;
     try {
       Sys.println("Materia project: compiling its entrypoint");
+      var acceptsDocument = Reflect.field(entry, "documentInput") == true;
+      if (recipeDocument != null && !acceptsDocument)
+        throw "Project entrypoint does not accept an editable document";
       buildModule(haxe, home, tools, haxeonManifest, fieldText(entry, "module"),
-        fieldText(entry, "function"), outputPrefix);
+        fieldText(entry, "function"), outputPrefix, acceptsDocument);
       Sys.println("Materia project: executing its entrypoint");
       var hashlink = ProjectPath.join([home, ".tools", "hashlink", "hl"]);
       if (!FileSystem.exists(hashlink)) throw 'Pinned HashLink executable was not found at $hashlink';
-      runCommand(hashlink, [outputPrefix + ".hl", outputPrefix + ".mtrg"],
+      if (recipeDocument != null) File.saveContent(outputPrefix + ".document.json", recipeDocument);
+      runCommand(hashlink, recipeDocument == null ? [outputPrefix + ".hl", outputPrefix + ".mtrg"]
+        : [outputPrefix + ".hl", outputPrefix + ".mtrg", outputPrefix + ".document.json"],
         "Could not generate Materia project artifact");
       if (!FileSystem.exists(outputPrefix + ".mtrg"))
         throw "Project entrypoint did not write a geometry artifact";
@@ -170,7 +175,7 @@ class MateriaProjectRunner {
   }
 
   static function cleanupArtifacts(outputPrefix:String, temporaryRoot:String):Void {
-    for (suffix in [".hl", ".mtrg"]) {
+    for (suffix in [".hl", ".mtrg", ".document.json"]) {
       var artifact = outputPrefix + suffix;
       if (FileSystem.exists(artifact)) FileSystem.deleteFile(artifact);
     }
@@ -178,9 +183,10 @@ class MateriaProjectRunner {
   }
 
   static function buildModule(haxe:String, home:String, tools:String, manifest:String,
-      module:String, functionName:String, outputPrefix:String):Void {
+      module:String, functionName:String, outputPrefix:String, documentInput:Bool):Void {
     var arguments = ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools,
-      "--run", "MateriaProjectModuleBuild", manifest, module, functionName, outputPrefix, home];
+      "--run", "MateriaProjectModuleBuild", manifest, module, functionName, outputPrefix, home,
+      documentInput ? "true" : "false"];
     runCommand(haxe, arguments, "Could not compile Materia project entrypoint");
   }
 
@@ -300,7 +306,7 @@ class MateriaProjectRunner {
       assemblyDefinition: artifact.assemblyDefinition,
       assemblyState: runtimeState == null ? null : runtimeState.record(),
       localCentersByDefinition: localCentersByDefinition,
-      metresPerUnit: scale};
+      metresPerUnit: scale, recipeDocument: artifact.recipeDocument};
   }
 
   /** Re-evaluate generated occurrence placements for a project-owned configuration. */
@@ -337,7 +343,7 @@ class MateriaProjectRunner {
     return {objects: objects, assembly: legacySnapshot(definition, state),
       geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: definition,
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
-      metresPerUnit: generated.metresPerUnit};
+      metresPerUnit: generated.metresPerUnit, recipeDocument: generated.recipeDocument};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -474,4 +480,5 @@ typedef GeneratedAssemblyScene = {
   var assemblyState:Null<AssemblyStateRecord>;
   var localCentersByDefinition:Map<String, Array<Float>>;
   var metresPerUnit:Float;
+  var recipeDocument:Null<String>;
 }

@@ -473,7 +473,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var generated=MateriaProjectRunner.loadProject(projectPath);
       session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
         generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
-        generated.localCentersByDefinition, generated.metresPerUnit);
+        generated.localCentersByDefinition, generated.metresPerUnit, generated.recipeDocument);
     }
     bimEditor = makeBimEditor();
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);

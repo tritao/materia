@@ -176,7 +176,7 @@ class BimModelEditor implements View {
 		result = BimInspectorDescriptors.forElement(element, applyEdit);
 		if (element.kind == "instance") {
 			var instance:InstanceElement = cast element;
-			result = result.concat(BimInspectorDescriptors.forDefinition(model.cad.definition(instance.definitionId), applyEdit));
+			result = result.concat(BimInspectorDescriptors.forInstanceInputs(instance, applyEdit));
 		}
 		return result;
 	}

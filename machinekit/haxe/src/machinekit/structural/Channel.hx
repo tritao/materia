@@ -31,7 +31,7 @@ class Channel implements StructuralProfile {
 	public function geometry(length:Float):Part {
 		if (!(length > 0)) throw "Channel needs a positive length";
 		var w = flangeWidth, h = height, t = thickness;
-		return Solids.prism([
+		return Part.prism([
 			new Vector(0, 0), new Vector(w, 0), new Vector(w, t), new Vector(t, t),
 			new Vector(t, h - t), new Vector(w, h - t), new Vector(w, h), new Vector(0, h),
 		], 0, length);

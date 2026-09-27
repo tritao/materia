@@ -55,9 +55,9 @@ class HexNut extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Solids.prism(Solids.regularPolygon(6, spec.acrossFlats), 0, spec.height);
+		var body = Part.prism(cadkit.modeling.Polygon.regular(6, spec.acrossFlats), 0, spec.height);
 		if (detail == Envelope) return body;
-		return Solids.cut(body, [Solids.cylinder(spec.diameter / 2, -0.1, spec.height + 0.1)]);
+		return Solids.cut(body, [Part.cylinder(spec.diameter / 2, -0.1, spec.height + 0.1)]);
 	}
 
 	/** Cutting tool for a trapped-nut pocket, sized with a 0.5 mm diametral clearance around
@@ -65,7 +65,7 @@ class HexNut extends MachineComponent {
 	 */
 	public function pocket(depth:Float):Part {
 		if (!(depth >= spec.height)) throw 'Nut pocket for ${spec.size} needs depth at least ${spec.height}';
-		return Solids.prism(Solids.regularPolygon(6, spec.acrossFlats + 0.5), 0, depth);
+		return Part.prism(cadkit.modeling.Polygon.regular(6, spec.acrossFlats + 0.5), 0, depth);
 	}
 
 	function get_acrossFlats():Float return spec.acrossFlats;

@@ -40,7 +40,7 @@ class LinearRail extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		return Solids.prism([
+		return Part.prism([
 			new Vector(-spec.railWidth / 2, -spec.railHeight),
 			new Vector(spec.railWidth / 2, -spec.railHeight),
 			new Vector(spec.railWidth / 2, 0),

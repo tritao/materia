@@ -10,6 +10,7 @@
 	"entrypoints": {
 		"viewport": {
 			"kind": "cad-preview",
+			"documentInput": true,
 			"module": "MotorShaftBearingsPreview",
 			"function": "preview",
 			"cache": {"inputs": ["MotorShaftBearings.hx", "MotorShaftBearingsPreview.hx"]}

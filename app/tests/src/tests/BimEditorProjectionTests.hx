@@ -11,6 +11,8 @@ import app.BimTypeTree;
 import bimkit.BimDocument;
 import bimkit.BimSchema;
 import cadkit.parametric.ElementReference;
+import cadkit.parametric.DefinitionInput;
+import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.QuantityKind;
 import cadkit.parametric.TypedProperty;
 import nativekit.ui.core.CommandContext;
@@ -111,6 +113,23 @@ class BimEditorProjectionTests {
 		var widthInput = descriptor(definitionProperties, ":input:width");
 		check(widthInput.type == PropertyType.Float && widthInput.unit == "mm",
 			"type inspector exposes CAD definition inputs alongside persistent BIM properties");
+		var typedDefinition = model.cad.createDefinition("Typed controls", "app.test.controls", [
+			DefinitionInput.boolean("enabled", true), DefinitionInput.integer("count", 2),
+			DefinitionInput.token("detail", "preview", ["preview", "envelope"])
+		], [new DefinitionOutput("body", DefinitionOutput.Geometry)]);
+		var typedDescriptors = BimInspectorDescriptors.forDefinition(typedDefinition);
+		var boolInput = descriptor(typedDescriptors, ":input:enabled");
+		var countInput = descriptor(typedDescriptors, ":input:count");
+		var tokenInput = descriptor(typedDescriptors, ":input:detail");
+		check(boolInput.type == PropertyType.Bool && countInput.type == PropertyType.Int &&
+			tokenInput.type == PropertyType.Enum && tokenInput.options.length == 2,
+			"typed inputs select checkbox, integer, and dropdown editors");
+		new PropertyBinding(boolInput, new CommandContext(editorDocument)).apply(PropertyValue.Bool(false));
+		new PropertyBinding(countInput, new CommandContext(editorDocument)).apply(PropertyValue.Int(3));
+		new PropertyBinding(tokenInput, new CommandContext(editorDocument)).apply(PropertyValue.Enum("envelope"));
+		check(typedDefinition.input("enabled").defaultValue == false &&
+			typedDefinition.input("count").defaultValue == 3 &&
+			typedDefinition.input("detail").defaultValue == "envelope", "typed inspector edits definition inputs");
 		model.close();
 		var demo = BimEditorDemo.create();
 		check(demo.cad.allRelationships().length >= 10 && demo.cad.outputFeatureOrNull() == null,

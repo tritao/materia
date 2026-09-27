@@ -55,12 +55,12 @@ class FlangeBearingHousing extends MachineComponent {
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.box(face, face, depth);
-		var boreTool = Solids.cylinder((bearing.outside + allowance) / 2, -0.1, depth + 0.1);
+		var boreTool = Part.cylinder((bearing.outside + allowance) / 2, -0.1, depth + 0.1);
 		if (detail == Envelope) return Solids.cut(body, [boreTool]);
 		var screw = mountScrewPart(10);
 		var tools = [boreTool];
 		for (point in boltPattern())
-			tools.push(Solids.cylinder(screw.clearanceDiameter(Medium) / 2, -0.1, depth + 0.1, point.x, point.y));
+			tools.push(Part.cylinder(screw.clearanceDiameter(Medium) / 2, -0.1, depth + 0.1, point.x, point.y));
 		return Solids.cut(body, tools);
 	}
 

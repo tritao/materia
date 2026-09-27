@@ -61,7 +61,7 @@ class RetainingRing extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var id = spec.grooveDiameter / 2, od = spec.outerDiameter / 2;
 		var angle = detail == Envelope ? Math.PI * 2 : Math.PI * 2 - GAP;
-		return Solids.revolve([{r: id, z: 0}, {r: od, z: 0}, {r: od, z: spec.thickness}, {r: id, z: spec.thickness}], angle);
+		return Part.revolve([{r: id, z: 0}, {r: od, z: 0}, {r: od, z: spec.thickness}, {r: id, z: spec.thickness}], angle);
 	}
 
 	/** Nominal shaft groove dimensions (DIN 471 d2 and m). */

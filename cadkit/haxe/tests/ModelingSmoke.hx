@@ -8,6 +8,7 @@ import cadkit.modeling.Locations;
 import cadkit.modeling.Curve;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Part;
+import cadkit.modeling.Polygon;
 import cadkit.modeling.Scope;
 import cadkit.modeling.Selection;
 import cadkit.modeling.BuildLine;
@@ -32,6 +33,35 @@ class ModelingSmoke {
 	}
 
 	public static function run():Void {
+		var span = Part.cylinder(2, 1, 5);
+		near(span.volume(), 16 * Math.PI);
+		near(span.shape.bounds().get_min().get_z(), 1);
+		span.close();
+		var alongY = Part.cylinderAlongY(1, 2, 5);
+		near(alongY.volume(), 3 * Math.PI);
+		alongY.close();
+		var along = Part.cylinderAlong(1, new Vector(1, 2, 3), Vector.X(), 4);
+		near(along.volume(), 4 * Math.PI);
+		along.close();
+		var revolved = Part.revolve([{r: 1, z: 0}, {r: 2, z: 0}, {r: 2, z: 3}, {r: 1, z: 3}]);
+		near(revolved.volume(), 9 * Math.PI);
+		revolved.close();
+		var hexagon = Polygon.regular(6, 10);
+		near(hexagon[0].x, 5);
+		var prism = Part.prism(hexagon, 0, 2);
+		check(prism.solidCount() == 1, "polygon prism solid count");
+		prism.close();
+		var borrowedBase = Part.box(10, 10, 2);
+		var borrowedTool = Part.cylinder(1, 0, 2);
+		var borrowedFuse = Part.fuseAll([borrowedBase, borrowedTool]);
+		check(!borrowedBase.shape.isClosed() && !borrowedTool.shape.isClosed(), "fuseAll borrows inputs");
+		borrowedFuse.close();
+		var borrowedCut = borrowedBase.subtractAll([borrowedTool]);
+		near(borrowedCut.volume(), 200 - 2 * Math.PI);
+		check(!borrowedBase.shape.isClosed() && !borrowedTool.shape.isClosed(), "subtractAll borrows inputs");
+		borrowedCut.close();
+		borrowedTool.close();
+		borrowedBase.close();
 		var plane = new Plane(new Vector(3, 4, 5), Vector.X(), Vector.Y().scale(-1));
 		var v = new Vector(1, 2, 3);
 		var local = plane.toLocal(plane.toWorld(v));

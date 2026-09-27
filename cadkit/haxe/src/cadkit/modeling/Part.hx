@@ -40,8 +40,96 @@ class Part extends Model {
 		}
 	}
 
-	public static function cylinder(radius:Float, height:Float):Part {
-		return new Part(Shape.cylinder(radius, height));
+	/** A cylinder of `height`, or a +Z cylinder spanning `z0..z1` when `z1` is supplied. */
+	public static function cylinder(radius:Float, heightOrZ0:Float, ?z1:Float, x:Float = 0, y:Float = 0):Part {
+		if (z1 == null)
+			return new Part(Shape.cylinder(radius, heightOrZ0));
+		if (!(radius > 0) || !(z1 > heightOrZ0)) throw "Cylinder needs a positive radius and length";
+		var base = new Part(Shape.cylinder(radius, z1 - heightOrZ0));
+		try {
+			var result = base.translated(new Vector(x, y, heightOrZ0));
+			base.close();
+			return result;
+		} catch (error:Dynamic) {
+			base.close();
+			throw error;
+		}
+	}
+
+	/** Revolve a closed (radius, z) half-section about +Z. */
+	public static function revolve(section:Array<{r:Float, z:Float}>, angle:Float = Math.PI * 2):Part {
+		var sketch = Sketch.polygon([for (point in section) new Vector(point.r, point.z)], Plane.XZ());
+		try {
+			var result = sketch.revolve(Axis.Z(), angle);
+			sketch.close();
+			return result;
+		} catch (error:Dynamic) {
+			sketch.close();
+			throw error;
+		}
+	}
+
+	/** Cylinder along +Y, spanning `y0..y1`. */
+	public static function cylinderAlongY(radius:Float, y0:Float, y1:Float, x:Float = 0, z:Float = 0):Part {
+		if (!(radius > 0) || !(y1 > y0)) throw "Cylinder needs a positive radius and length";
+		var base = Part.cylinder(radius, y1 - y0);
+		try {
+			var placement = Location.translation(new Vector(x, y0, z)).compose(Location.rotation(Axis.X(), -Math.PI / 2));
+			var result = base.placed(placement);
+			base.close();
+			return result;
+		} catch (error:Dynamic) {
+			base.close();
+			throw error;
+		}
+	}
+
+	/** Cylinder starting at `origin` along a finite direction. */
+	public static function cylinderAlong(radius:Float, origin:Vector, direction:Vector, length:Float):Part {
+		if (!(radius > 0) || !(length > 0) || origin == null || direction == null)
+			throw "Cylinder needs a positive radius and length";
+		var axis = direction.normalized();
+		var reference = Math.abs(axis.z) < 0.9 ? Vector.Z() : Vector.X();
+		var xDirection = reference.subtract(axis.scale(reference.dot(axis))).normalized();
+		var base = Part.cylinder(radius, length);
+		try {
+			var result = base.placed(new Location(new Plane(origin, xDirection, axis)));
+			base.close();
+			return result;
+		} catch (error:Dynamic) {
+			base.close();
+			throw error;
+		}
+	}
+
+	/** Extrude a borrowed local XY polygon from `z0` to `z1`. */
+	public static function prism(points:Array<Vector>, z0:Float, z1:Float):Part {
+		var sketch = Sketch.polygon(points, Plane.XY().offset(z0));
+		try {
+			var result = sketch.extrude(z1 - z0);
+			sketch.close();
+			return result;
+		} catch (error:Dynamic) {
+			sketch.close();
+			throw error;
+		}
+	}
+
+	/** Fuse borrowed parts into an independently owned result. */
+	public static function fuseAll(parts:Array<Part>):Part {
+		if (parts.length == 0) throw "Fuse needs at least one part";
+		var result = new Part(parts[0].shape.cloneShape());
+		try {
+			for (i in 1...parts.length) {
+				var next = result.combine(parts[i]);
+				result.close();
+				result = next;
+			}
+			return result;
+		} catch (error:Dynamic) {
+			result.close();
+			throw error;
+		}
 	}
 
 	public static function sphere(radius:Float):Part {
@@ -86,6 +174,20 @@ class Part extends Model {
 
 	public function subtract(other:Part):Part {
 		return combine(other, Subtract);
+	}
+
+	/** Subtract borrowed tools, preserving this part and every tool. */
+	public function subtractAll(tools:Array<Part>):Part {
+		if (tools.length == 0) return new Part(shape.cloneShape());
+		var tool = Part.fuseAll(tools);
+		try {
+			var result = subtract(tool);
+			tool.close();
+			return result;
+		} catch (error:Dynamic) {
+			tool.close();
+			throw error;
+		}
 	}
 
 	public function intersect(other:Part):Part {

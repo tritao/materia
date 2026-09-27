@@ -80,12 +80,12 @@ class SocketHeadCapScrew extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var head = Solids.cylinder(spec.headDiameter / 2, 0, spec.headHeight);
-		var shank = Solids.cylinder(diameter / 2, -length, 0);
+		var head = Part.cylinder(spec.headDiameter / 2, 0, spec.headHeight);
+		var shank = Part.cylinder(diameter / 2, -length, 0);
 		var body = Solids.union([head, shank]);
 		if (detail == Envelope) return body;
 		var top = spec.headHeight;
-		var socket = Solids.prism(Solids.regularPolygon(6, spec.socketSize), top - spec.socketDepth, top + 0.1);
+		var socket = Part.prism(cadkit.modeling.Polygon.regular(6, spec.socketSize), top - spec.socketDepth, top + 0.1);
 		return Solids.cut(body, [socket]);
 	}
 
@@ -99,18 +99,18 @@ class SocketHeadCapScrew extends MachineComponent {
 
 	/** Through-hole tool from z=0 down to z=-depth. */
 	public function clearanceHole(depth:Float, fit:ClearanceFit = Medium):Part
-		return Solids.cylinder(clearanceDiameter(fit) / 2, -depth, 0);
+		return Part.cylinder(clearanceDiameter(fit) / 2, -depth, 0);
 
 	/** Tap-drill tool from z=0 down to z=-depth; the thread itself is not modelled. */
 	public function tapHole(depth:Float):Part
-		return Solids.cylinder(spec.tapDrill / 2, -depth, 0);
+		return Part.cylinder(spec.tapDrill / 2, -depth, 0);
 
 	/** Counterbored through-hole tool. The screw's `head` sits at z=-counterboreDepth. */
 	public function counterboreHole(depth:Float, fit:ClearanceFit = Medium):Part {
 		if (!(depth > spec.counterboreDepth)) throw 'Counterbore for ${spec.size} needs depth over ${spec.counterboreDepth}';
 		return Solids.union([
-			Solids.cylinder(clearanceDiameter(fit) / 2, -depth, 0),
-			Solids.cylinder(spec.counterboreDiameter / 2, -spec.counterboreDepth, 0),
+			Part.cylinder(clearanceDiameter(fit) / 2, -depth, 0),
+			Part.cylinder(spec.counterboreDiameter / 2, -spec.counterboreDepth, 0),
 		]);
 	}
 

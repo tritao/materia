@@ -50,11 +50,13 @@ typedef SceneArtifactData = {
 	/** Geometry definitions are parts; occurrences live in this separate kinematic definition. */
 	@:optional var assemblyDefinition:AssemblyDefinition;
 	@:optional var assemblyState:AssemblyStateRecord;
+	/** Optional editable source document for generated parts. */
+	@:optional var recipeDocument:String;
 }
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 8;
+	public static inline var VERSION:Int = 9;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -71,9 +73,11 @@ class SceneArtifact {
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
 		var assemblyState = data.assemblyState == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encodeState(data.assemblyDefinition, data.assemblyState));
+		var recipeDocument = data.recipeDocument == null ? Bytes.alloc(0) : Bytes.ofString(data.recipeDocument);
 		if (assembly.length > 2000000 || assemblyDefinition.length > 2000000 || assemblyState.length > 2000000)
 			throw "Scene artifact assembly metadata is too large";
-		var length = 36 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length;
+		if (recipeDocument.length > 2000000) throw "Scene artifact recipe document is too large";
+		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -153,6 +157,8 @@ class SceneArtifact {
 		result.blit(offset, assemblyDefinition, 0, assemblyDefinition.length); offset += assemblyDefinition.length;
 		offset = putInt(result, offset, assemblyState.length);
 		result.blit(offset, assemblyState, 0, assemblyState.length); offset += assemblyState.length;
+		offset = putInt(result, offset, recipeDocument.length);
+		result.blit(offset, recipeDocument, 0, recipeDocument.length); offset += recipeDocument.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -281,7 +287,8 @@ private class SceneArtifactReader {
 		for (expected in [77, 84, 82, 71]) if (readByte() != expected)
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
-		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 && version != SceneArtifact.VERSION)
+		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 &&
+			version != 8 && version != SceneArtifact.VERSION)
 			throw "Unsupported scene artifact version";
 		var metresPerUnit = readDouble();
 		var lengthUnit = version >= 8 ? readText() : null;
@@ -347,10 +354,17 @@ private class SceneArtifactReader {
 					readBytes(stateLength).getString(0, stateLength));
 			}
 		}
+		var recipeDocument:Null<String> = null;
+		if (version >= 9) {
+			var documentLength = readInt();
+			if (documentLength < 0 || documentLength > 2000000)
+				throw "Scene artifact recipe document is too large";
+			if (documentLength > 0) recipeDocument = readBytes(documentLength).getString(0, documentLength);
+		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts, assembly: assembly,
-			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState};
+			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

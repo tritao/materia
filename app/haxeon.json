@@ -8,6 +8,7 @@
 		"manufacturingkit": { "path": "../manufacturingkit" },
 		"nativekit": { "path": "../nativekit" },
 		"cadkit": { "path": "../cadkit" },
+		"machinekit": { "path": "../machinekit" },
 		"bimkit": { "path": "../bimkit" },
 		"uikit": { "path": "../uikit" },
 		"robotkit": { "path": "../robotkit" },
