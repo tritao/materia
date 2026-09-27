@@ -13,6 +13,12 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.MachineKitComponents;
 import machinekit.component.ComponentValues;
+import machinekit.document.MachineKitDocuments;
+import machinekit.document.MachineKitRecipes;
+import cadkit.parametric.Document;
+import cadkit.parametric.DocumentCodec;
+import cadkit.parametric.DefinitionEvaluatorRegistry;
+import cadkit.parametric.DefinitionOutput;
 import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
@@ -93,6 +99,71 @@ class MachineKitSmoke {
 			typeId: "test", valuesKey: "a"});
 		throws(() -> conflicted.add({partNumber: "X", description: "same", quantity: 1,
 			material: "steel", typeId: "test", valuesKey: "b"}), "conflicting");
+	}
+
+	static function documentRecipes():Void {
+		MachineKitRecipes.register();
+		MachineKitRecipes.register();
+		var registryDocument = new Document();
+		for (registered in MachineKitComponents.all()) {
+			check(DefinitionEvaluatorRegistry.isRegistered(registered.id), "MachineKit evaluator registration");
+			var recipeDefinition = MachineKitDocuments.define(registryDocument, registered);
+			check(recipeDefinition.output("body").purpose == DefinitionOutput.Geometry,
+				"MachineKit recipe geometry output");
+			for (connector in registered.create().connectors())
+				check(recipeDefinition.output(connector.name).purpose == DefinitionOutput.Connector,
+					"MachineKit recipe connector output");
+		}
+		registryDocument.close();
+		var document = new Document();
+		var type = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
+		var definition = MachineKitDocuments.define(document, type);
+		check(definition.property("machinekit.partNumber") != null &&
+			definition.property("machinekit.catalog.source") != null, "recipe metadata is stored");
+		var first = document.createInstance("Bearing A", definition);
+		var second = document.createInstance("Bearing B", definition);
+		var firstVolume = first.shape().volume();
+		var secondVolume = second.shape().volume();
+		check(firstVolume == secondVolume, "shared bearing geometry");
+		first.setTypedOverride("detail", "envelope");
+		check(first.shape().volume() != firstVolume && second.shape().volume() == secondVolume,
+			"detail input selects geometry fidelity per instance");
+		first.removeOverride("detail");
+		check(document.definitionOutput(first, "bearingSeat").volume() > 0, "bearing seat tool output");
+		var firstBack = first.connector("back").location.plane.origin.z;
+		second.setTypedOverride("designation", "6000");
+		check(second.shape().volume() != firstVolume && first.shape().volume() == firstVolume,
+			"bearing override updates one instance");
+		check(second.connector("back").location.plane.origin.z != firstBack &&
+			first.connector("back").location.plane.origin.z == firstBack,
+			"bearing override updates one connector set");
+		var bom = MachineKitDocuments.bom(document);
+		check(bom.quantity("608-2Z") == 1 && bom.quantity("6000-2Z") == 1,
+			"document BOM groups recipe instances by values");
+		var saved = DocumentCodec.encode(document);
+		var loaded = DocumentCodec.decode(saved);
+		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
+		loaded.close();
+		check(document.undo() && second.resolvedToken("designation") == "608", "recipe override undo");
+		check(MachineKitDocuments.bom(document).quantity("608-2Z") == 2, "BOM follows undo");
+		check(document.redo() && second.resolvedToken("designation") == "6000", "recipe override redo");
+		var unique = second.makeUnique();
+		check(unique.id.value != definition.id.value && first.definitionId.value == definition.id.value,
+			"makeUnique isolates one recipe instance");
+		var uniqueSaved = DocumentCodec.decode(DocumentCodec.encode(document));
+		check(MachineKitDocuments.bom(uniqueSaved).lines().length == 2, "unique recipe survives reload");
+		uniqueSaved.close();
+		document.close();
+
+		var tools = new Document();
+		var screwType = MachineKitComponents.byId("machinekit.standard.socket-head-cap-screw");
+		var screw = tools.createInstance("Screw", MachineKitDocuments.define(tools, screwType));
+		for (name in ["clearanceHole", "tapHole", "counterboreHole"])
+			check(tools.definitionOutput(screw, name).volume() > 0, "screw tool output " + name);
+		var motorType = MachineKitComponents.byId("machinekit.motion.nema-stepper");
+		var motor = tools.createInstance("Motor", MachineKitDocuments.define(tools, motorType));
+		check(tools.definitionOutput(motor, "mountingCutout").volume() > 0, "motor cutout output");
+		tools.close();
 	}
 	static function check(value:Bool, message:String):Void {
 		if (!value) throw message;
@@ -1545,6 +1616,7 @@ class MachineKitSmoke {
 
 	static function main():Void {
 		componentRecipes();
+		documentRecipes();
 		MachineKitReferenceTests.run();
 		dimensions();
 		catalogMetadata();
