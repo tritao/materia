@@ -1,7 +1,9 @@
 # EditorKit
 
-EditorKit owns editable UTF-8 text and its document coordinates. UIKit owns the
-widget, native text layout, viewport, focus, and input events.
+EditorKit owns reusable editor state: editable UTF-8 text and its document
+coordinates, plus an orbit `PerspectiveCamera` with projection and picking
+math. UIKit owns widgets, native text layout, focus, and input events. The
+camera uses SceneKit's transform type but has no Materia object-model dependency.
 
 `TextDocument` stores text in roughly 2 KiB UTF-8 segments. It prefers a nearby
 newline, but also splits long paragraphs at code-point boundaries. Each

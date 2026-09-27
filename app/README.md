@@ -3,9 +3,9 @@
 This is the app-side integration example for the shared Haxeon UI widgets and
 SceneKit. `src/Main.hx` composes:
 
-- a persisted `DockWorkspaceModel` with Hierarchy, XY Viewport, Perspective, Inspector,
+- a persisted `DockWorkspaceModel` with Hierarchy, Perspective, Inspector,
   Console, and Telemetry panels;
-- `TreeView`, `GpuViewport`, `PropertyInspector`, and `PlotView` panel content;
+- `TreeView`, the SceneKit perspective viewport, `PropertyInspector`, and `PlotView` panel content;
 - one `CommandRegistry` shared by the toolbar, context menu, and command
   palette;
 - right-click viewport context actions plus keyboard shortcuts for save, frame,
@@ -13,7 +13,7 @@ SceneKit. `src/Main.hx` composes:
 - a file-backed docking snapshot under `build/reference-editor-workspace.json`
   (override it with `REFERENCE_EDITOR_WORKSPACE`).
 
-The editor starts with two extruded SceneKit boxes in an orthographic XY view.
+The editor starts with two extruded SceneKit boxes in a perspective view.
 Click an object in the viewport or hierarchy to select it; the yellow outline
 tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
 (`#RRGGBB`), or Visible in the inspector.
@@ -38,14 +38,13 @@ or the Scene root to clear object selection.
   keys nudge by 0.1 m; Shift+Arrow nudges by 1 m. Each nudge is independently undoable.
 - Positive finite dimension edits rebuild geometry and picking bounds together;
   framing, duplication, undo/redo, and scene persistence use the edited size and colour.
-- The Perspective tab renders the same extruded SceneKit geometry through the GPU.
+- The Perspective tab renders extruded SceneKit geometry through the GPU.
   Visibility, object colours, depth, and the yellow selection highlight stay
-  synchronized with the XY view, simulation, and inspector.
+  synchronized with the inspector.
 - Left-drag empty space orbits, middle-drag pans, and the wheel zooms. Frame selected
   fits the full 3D bounds and Reset view restores the default camera.
 - Perspective clicks use a camera ray against the boxes' 3D bounds. Left-dragging a
-  selected box moves it on its current Z plane with the same snapping and undo rules
-  as the XY viewport.
+  selected box moves it on its current Z plane with snapping and one undo step.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
 - New (`Ctrl+N`) starts a fresh scene with the two starter objects.
 - Open (`Ctrl+O`), Save (`Ctrl+S`), and Save As (`Ctrl+Shift+S`) use native file
@@ -55,14 +54,19 @@ or the Scene root to clear object selection.
 - Docking preferences remain separate and save automatically. The command
   palette also exposes Save workspace.
 
-`EditorScene` owns the SceneKit scene, published snapshot, spatial index, and
-UIKit `EditorDocument` history. `EditorSceneTree` and `EditorSceneViewport`
-consume that state. Inspector bindings retain object identity so undo works
-after changing selection. `SceneDocumentSession` owns the document path and
+`EditorScene` owns the editable records, SceneKit scene, published snapshot,
+spatial index, and UIKit `EditorDocument` history. `editor/SelectionModel` owns
+object, feature, face, and edge selection with a separate revision.
+`editor/ObjectKindRegistry` supplies creation defaults, CAD sessions, kind-specific
+properties, menu entries, and hover support. `EditorSceneTree` caches child lists
+by content revision. Inspector bindings retain object identity so undo works
+after changing selection. `ProjectDocumentSession` owns the document path and
 atomic file publication; `SceneDocumentController` coordinates file commands
-and unsaved-change prompts. The XY viewport provides a canvas projection of the
-boxes, while `EditorPerspectiveViewport` composites SceneKit's renderer directly
-into the Perspective tab's GPU surface.
+and unsaved-change prompts. `EditorPerspectiveViewport` composites SceneKit's
+renderer directly into the GPU surface and passes single-edit change sets to
+its incremental render path. `editor/TelemetryPanel` owns the retained plot.
+The orbit camera lives in `editorkit`; `app/PerspectiveCamera` retains the
+existing import names for callers.
 
 The Sensors workspace tab edits RobotKit sensor definitions without exposing
 runtime or hardware handles. It supports adding/removing LiDAR and IMU sensors,
@@ -78,21 +82,21 @@ never automatic.
 
 Sensor documents retain an independent model for every configured logical
 robot. One application-owned simulation compiles all of those models, imports
-visible scene rectangles as static obstacles, and attaches `SimulatedRobot`
+collision-enabled scene objects as bodies, and attaches `SimulatedRobot`
 adapters to the shared `RobotWorld`. Attached robots not owned by that
 simulation are treated as remote and read-only. Rebuild replaces all simulated
 robots and environment bodies together; pending edits never mutate active
 physics, and any validation or construction failure preserves the active world.
 Each robot record includes its stable identity, model name, links, joints,
 limits, optional actuator, frames, sensors, and explicit world pose. Pending
-state covers both robot edits and scene-content or document replacement;
-selection alone does not require a physics rebuild.
+state covers robot physics edits and collision-environment changes. Names,
+colour, visibility, and selection do not require a physics rebuild.
 
 Scene rectangles persist an extrusion depth plus independent collision-enabled,
 dynamic-body, and mass settings. Visibility affects rendering only. Application
 runs default to the bundled MuJoCo backend, while the sensor panel can select
 the Test backend used by automated checks; changing backend remains pending until
-Rebuild. The XY viewport overlays read-only runtime robot poses, sensor mounts,
+Rebuild. The perspective viewport overlays read-only runtime robot poses, sensor mounts,
 and LiDAR rays. New/Open stops and detaches the previous document's simulated
 robots but leaves independently attached remote robots untouched.
 
@@ -202,7 +206,7 @@ Run the editor with:
 
 Use `--snapshot` after `--` for the headless workspace JSON path, or
 `--reset-workspace` to discard the persisted panel arrangement before startup.
-Use `--perspective` to activate the GPU perspective tab at launch, including for
+Use `--perspective` to activate the GPU viewport tab at launch, including for
 deterministic frame captures.
 
 Workspace layout changes are saved by a background worker after 150 ms without
@@ -221,7 +225,7 @@ is empty), while Reset view restores the documented default camera.
 
 The editor has explicit design and simulation presentation modes. Apply/Rebuild
 enters simulation mode; both running and paused simulations render and pick the
-latest physics poses in XY and perspective. Geometry editing is disabled until
+latest physics poses in perspective. Geometry editing is disabled until
 the Design action detaches the simulation. Reset restores the applied poses,
 while Save always writes the unchanged design poses.
 
