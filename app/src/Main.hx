@@ -386,6 +386,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var cachedSubmitKey:String = "";
   var cachedSubmitSceneGeneration:Int = -1;
   var cachedSubmitSceneRevision:Int = -1;
+  var cachedSubmitSelectionRevision:Int = -1;
   var cachedSubmitEnvironmentRevision:Int = -1;
   var cachedSubmitSensorRevision:Int = -1;
   var cachedSubmitSimulationRevision:Int = -1;
@@ -608,6 +609,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     viewportWidth = frame.width;
     viewportHeight = frame.height;
     toolbarDensity = EditorToolbarLayout.forWidth(toolbarDensity, frame.width);
+    updateReadOnlyRobots();
     if (scene.advanceCadMeshRefinement()) {
       if (hostContext != null)
         hostContext.requestFrame();
@@ -625,34 +627,38 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function editorSubmitKey():String {
     var sceneRevision = scene.revision;
+    var selectionRevision = scene.selectionRevision;
     var environmentRevision = scene.environmentRevision;
     var sensorRevision = sensors.revision();
     var simulationRevision = simulation.appliedRevision;
     var perspectiveKey = perspectiveViewport == null ? "" : perspectiveViewport.presentationKey();
     if (cachedSubmitSceneGeneration != sceneGeneration ||
         cachedSubmitSceneRevision != sceneRevision ||
+        cachedSubmitSelectionRevision != selectionRevision ||
         cachedSubmitEnvironmentRevision != environmentRevision ||
         cachedSubmitSensorRevision != sensorRevision ||
         cachedSubmitSimulationRevision != simulationRevision ||
         cachedSubmitPerspectiveKey != perspectiveKey) {
       cachedSubmitSceneGeneration = sceneGeneration;
       cachedSubmitSceneRevision = sceneRevision;
+      cachedSubmitSelectionRevision = selectionRevision;
       cachedSubmitEnvironmentRevision = environmentRevision;
       cachedSubmitSensorRevision = sensorRevision;
       cachedSubmitSimulationRevision = simulationRevision;
       cachedSubmitPerspectiveKey = perspectiveKey;
       cachedSubmitKey = buildEditorSubmitKey(sceneGeneration, sceneRevision,
-        environmentRevision, sensorRevision, simulationRevision, perspectiveKey);
+        environmentRevision, sensorRevision, simulationRevision, perspectiveKey,
+        selectionRevision);
     }
     return cachedSubmitKey;
   }
 
   static function buildEditorSubmitKey(sceneGeneration:Int, sceneRevision:Int,
       environmentRevision:Int, sensorRevision:Int, simulationRevision:Int,
-      perspectiveKey:String):String {
+      perspectiveKey:String, ?selectionRevision:Int = 0):String {
     return "editor:" + sceneGeneration + ":" + sceneRevision + ":" +
       environmentRevision + ":" + sensorRevision + ":" + simulationRevision +
-      ":perspective:" + perspectiveKey;
+      ":selection:" + selectionRevision + ":perspective:" + perspectiveKey;
   }
 
   public function context():UiContext return ui;
@@ -908,7 +914,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     for(id in sensors.configuredRobotIds())if(worldIds.indexOf(id)<0)worldIds.push(id);
     worldIds.sort(Reflect.compare);
     var simulatedIds = simulation.simulatedRobotIds();
-    sensors.setReadOnlyRobots([for(id in attachedIds) if(simulatedIds.indexOf(id)<0) id]);
     for (id in worldIds) {
       var robotButton = new Button(id,null,function(){sensors.selectRobot(id);commands.refresh();},"sensor-robot:"+id);
       robotButton.selected = id == sensors.robotId;
@@ -944,13 +949,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var runtimeActions=new Column("sensor-runtime-actions",[
       new KeyedView("configuration",new Row("sensor-configuration-actions",[
       new KeyedView("undo",new Button("Undo",null,function(){
-        session.document.undo();
-        if(ownership!=null)refreshScriptMaterialization("Override undone");
-        commands.refresh();},"sensor-undo")),
+        commands.execute("editor.undo");},"sensor-undo")),
       new KeyedView("redo",new Button("Redo",null,function(){
-        session.document.redo();
-        if(ownership!=null)refreshScriptMaterialization("Override redone");
-        commands.refresh();},"sensor-redo")),
+        commands.execute("editor.redo");},"sensor-redo")),
       new KeyedView("apply",applySimulation)],actionRowStyle())),
       new KeyedView("playback",new Row("sensor-playback-actions",[
       new KeyedView("run",new Button("Run",null,function(){
@@ -1090,6 +1091,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var contentStyle=new LayoutStyle();contentStyle.width=LayoutAxis.stretch();
     contentStyle.height=LayoutAxis.fit();contentStyle.padding=new Insets(8.0,8.0,8.0,8.0);
     return new ScrollView("sensor-scroll",new Column("sensor-panel",content,contentStyle),style);
+  }
+
+  function updateReadOnlyRobots():Void {
+    var simulatedIds = simulation.simulatedRobotIds();
+    sensors.setReadOnlyRobots([for (id in world.robotIds()) if (simulatedIds.indexOf(id) < 0) id]);
   }
 
   function hierarchyPanel():View {
