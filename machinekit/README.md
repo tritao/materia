@@ -90,8 +90,11 @@ simulation. Joint couplings belong to the RobotModel: MuJoCo enforces them
 with joint equality constraints, and the deterministic backend enforces them
 exactly. MuJoCo also supports assembly loop closures; other backends report
 a clear diagnostic. Generated parts default to collision enabled and carry
-bounded convex hulls from the CAD physical-part view. The deterministic
-backend uses boxes as its documented collision fallback.
+bounded convex hulls from the CAD physical-part view. MuJoCo collides against
+those hulls, while the deterministic backend uses boxes centred on their
+geometry bounds. Flat parts use a minimum-thickness box with a Simulation
+panel warning. One hull fills bores and U-shaped openings. Multiple hulls
+per link, potentially from CoACD, require a separate future design decision.
 Component dimensions are currently authored in `MotorShaftBearings.hx`; editing
 that source and reopening the project regenerates the preview.
 

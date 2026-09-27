@@ -114,19 +114,20 @@ and inertia come from each part's generated volume and material density. A
 rebuild starts from the saved assembly joint coordinates; simulated part poses
 appear in the viewport after stepping or while running, and Stop or Reset
 returns to the editor pose. Joint editing in the Inspector is disabled while
-simulation is active. Coupled joints use a shared per-tick target controller on
-both backends, so a moving follower can lag its source by one physics tick.
-Loop closures report a Simulation panel diagnostic and prevent Rebuild on both
-backends; they are not enforced as MuJoCo equality constraints yet.
+simulation is active. Joint couplings use MuJoCo equality constraints and
+deterministic enforcement. MuJoCo also compiles loop closures as equality
+constraints; the Test backend rejects them with a Simulation panel diagnostic.
 
-Generated parts default to collision enabled. Assembly-owned parts attach
-collision boxes to their links, and loose parts use scene bodies. Their boxes
-conservatively enclose the generated bounds around the link origin; they are
-not mesh convex hulls. The Test backend resolves free dynamic box contacts
-against static, kinematic, and linked boxes using world-axis bounds. MuJoCo
-uses its box contact solver. Turning collision off on one part removes that
-part's link contact on Rebuild. Collision and mass overrides remain sparse
-project field edits; the saved file schema is unchanged.
+Generated parts default to collision enabled. Assembly-owned parts attach one
+bounded convex hull to each link. MuJoCo uses the hull for contact; the Test
+backend uses an oriented box around the hull, including its offset from the
+link origin. A flat or degenerate part gets a box with at least 0.5 mm
+thickness and a warning in the Simulation panel. Loose generated parts still
+use scene boxes. A single hull fills bores and U-shaped openings; multiple
+hulls per link, possibly generated with CoACD, are a separate future decision.
+Turning collision off on one part removes its link contact on Rebuild.
+Collision and mass overrides remain sparse project field edits; the saved
+file schema is unchanged.
 
 Scene rectangles persist an extrusion depth plus independent collision-enabled,
 dynamic-body, and mass settings. Visibility affects rendering only. Application
