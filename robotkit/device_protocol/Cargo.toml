@@ -6,4 +6,7 @@ edition = "2021"
 [lib]
 path = "src/lib.rs"
 
+[features]
+std = []
+
 [dependencies]

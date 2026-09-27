@@ -4,6 +4,10 @@ This `#![no_std]` crate contains generated fixed-record codecs and a bounded
 RKD5 device runtime. It has no allocator, HAL, RTIC, GPIO, motor, encoder, or
 CAN dependency. Build it with `cargo test --manifest-path
 robotkit/device_protocol/Cargo.toml` on a host.
+Run the virtual-board tests with `cargo test --manifest-path
+robotkit/device_protocol/Cargo.toml --features std`. The MCU compile check is
+`robotkit/device_protocol/tools/check-mcu-build.sh`; it builds the no-std core
+as a library and the Nucleo board crate for `thumbv7em-none-eabihf`.
 
 Construct `DeviceProtocol` with the compiled joint count and 16-byte model
 fingerprint. Feed serial bytes and a monotonic receive time to `feed`. The

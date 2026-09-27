@@ -302,4 +302,37 @@ These are the follow-on hardware plan.
 
 ## Progress log
 
-(append entries here)
+### A1 paused — MCU build command includes desktop binaries
+
+Started A1 in `../materia-lane-a` on `lane-a-virtual-device` after P0 was
+present on `main`. Added a failing virtual-board test, then a draft `Board`
+trait and deterministic virtual clock, step counters, channel outputs and
+timestamped output records. The new two tests and existing Rust tests pass.
+
+The prescribed `cargo build --target thumbv7em-none-eabihf -p
+robotkit-device-protocol` fails because Cargo also compiles the existing
+`pty_device` and `robotd_pty_device` desktop binaries for the MCU target.
+Those binaries use `std` and POSIX file descriptors. The target is installed;
+this is a package-target selection problem, not an unavailable toolchain.
+Per the Ground rules, work stopped here before committing A1. The smallest
+plan correction is to build the core with `--lib` and build the nucleo board
+crate separately for the same target; retain host PTY tests as a separate
+check. The owner approved that correction, and A1 resumed. Both MCU builds
+now pass. The Rust host tests pass, including the new virtual-board tests.
+
+### A1 — Add the board boundary and virtual board
+
+Added a `no_std` board trait for clock, actuator and channel outputs. The
+`std` virtual board has a driven clock with offset and ppm drift, virtual
+step counts, channel outputs and timestamped output records. Added the MCU
+build script using the approved `--lib` correction and added host/MCU checks
+and the session TCP case to RobotKit's run-all script. Commit: the commit
+containing this entry.
+
+The Rust tests (including both new virtual-board tests), MCU core and Nucleo
+builds, 4,437 RobotKit Haxe assertions, 5,864 MotionKit Haxe assertions, all
+12 native tests, both FFI audits and TCP integration in default, session and
+lease-timeout modes passed. An initial TCP attempt used a port occupied by
+another lane; all modes were rerun on port 17962. The lease-timeout case
+missed its plan-start observation once under concurrent builds, then passed
+unchanged on retry.
