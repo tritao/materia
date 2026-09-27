@@ -581,7 +581,7 @@ pub unsafe extern "C" fn rkd_virtual_step_log(
     };
     let count = device
         .board
-        .records()
+        .step_records()
         .iter()
         .filter(|row| matches!(row.output, Output::Step(_, _)))
         .count();
@@ -589,7 +589,7 @@ pub unsafe extern "C" fn rkd_virtual_step_log(
         return count;
     }
     let mut index = 0;
-    for row in device.board.records() {
+    for row in device.board.step_records() {
         if let Output::Step(actuator, forward) = row.output {
             *records.add(index) = StepRecord {
                 ticks: row.ticks,

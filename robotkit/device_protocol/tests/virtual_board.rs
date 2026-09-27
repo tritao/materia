@@ -33,9 +33,11 @@ fn ten_seconds_of_output_uses_bounded_storage_and_active_actuators() {
         board.advance_host_ns(cycle * 25_000);
         board.position_target(0, cycle as f32 / 1_000.0);
         board.velocity_target(0, 1.0);
+        board.step_pulse(0, true);
         board.position_target(63, 1.0); // inactive physical channel
     }
     assert!(board.records().len() <= 65_536);
+    assert!(board.step_records().len() <= 65_536);
     assert!(board.records().iter().all(|r| match r.output {
         robotkit_device_protocol::Output::Position(i, _) |
         robotkit_device_protocol::Output::Velocity(i, _) => i == 0,

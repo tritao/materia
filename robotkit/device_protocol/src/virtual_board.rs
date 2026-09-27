@@ -28,6 +28,7 @@ pub struct VirtualBoard<const ACTUATORS: usize, const CHANNELS: usize> {
     analog: [f32; CHANNELS],
     process_argument: [f32; CHANNELS],
     records: Vec<OutputRecord>,
+    step_records: Vec<OutputRecord>,
     actuator_count: usize,
 }
 
@@ -46,7 +47,7 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
             steps_per_unit, steps: [0; A], missed_steps: [0; A],
             targets: [0.0; A], velocities: [0.0; A],
             digital: [false; C], analog: [0.0; C], process_argument: [0.0; C],
-            records: Vec::new(), actuator_count }
+            records: Vec::new(), step_records: Vec::new(), actuator_count }
     }
     pub fn advance_host_ns(&mut self, host_ns: u64) {
         assert!(host_ns >= self.host_ns);
@@ -68,12 +69,19 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
     pub fn velocity_targets(&self) -> [f32; A] { self.velocities }
     pub fn steps_per_unit(&self) -> [f64; A] { self.steps_per_unit }
     pub fn records(&self) -> &[OutputRecord] { &self.records }
+    pub fn step_records(&self) -> &[OutputRecord] { &self.step_records }
     pub fn digital(&self, i: usize) -> Option<bool> { self.digital.get(i).copied() }
     pub fn analog(&self, i: usize) -> Option<f32> { self.analog.get(i).copied() }
     pub fn process_argument(&self, i: usize) -> Option<f32> {
         self.process_argument.get(i).copied()
     }
     fn record(&mut self, output: Output) {
+        if matches!(output, Output::Step(..)) {
+            if self.step_records.len() == MAX_OUTPUT_RECORDS {
+                self.step_records.drain(..MAX_OUTPUT_RECORDS / 4);
+            }
+            self.step_records.push(OutputRecord { ticks: self.ticks, output });
+        }
         if self.records.len() == MAX_OUTPUT_RECORDS {
             self.records.drain(..MAX_OUTPUT_RECORDS / 4);
         }
