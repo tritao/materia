@@ -118,6 +118,9 @@ documented default is 2 ms. `owner_period_ns` must be at least the resulting
 minimum; the bench Nucleo deployment uses a 10 ms period and 2 ms allowance.
 Both fields are required in deployment schema version 2. A zero allowance in
 the versioned runtime ABI selects the 2 ms default for older callers.
+An owner period below that minimum fails serial runtime construction before
+opening the port; no non-queue serial mode is created. The diagnostic includes
+baud, joint count, command-frame time, allowance, and minimum owner period.
 The device watchdog period must exceed the command period plus worst-case
 command transmission and processing time, with explicit margin.
 

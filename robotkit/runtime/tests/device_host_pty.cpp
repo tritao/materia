@@ -267,12 +267,16 @@ int main(int argc, char **argv) {
     rk_robot_runtime_destroy(handle);
     handle = RK_INVALID_ROBOT_RUNTIME;
     layout.owner_period_ns = 2'000'000;
+    const auto message = robotkit::DeviceSerialEndpoint::qualification_error(115200, 1,
+        std::chrono::nanoseconds(layout.owner_period_ns), std::chrono::milliseconds(2));
+    CHECK(message.find("baud=115200") != std::string::npos);
+    CHECK(message.find("joint_count=1") != std::string::npos);
+    CHECK(message.find("frame_time_ns=") != std::string::npos);
+    CHECK(message.find("processing_allowance_ns=2000000") != std::string::npos);
+    CHECK(message.find("minimum_owner_period_ns=") != std::string::npos);
     CHECK(rk_robot_runtime_create_serial(&layout, slave, 115200,
-        fingerprint_hex, 1e-6, &handle) == RK_OK);
-    CHECK(rk_robot_runtime_capabilities(handle, &capabilities) == RK_OK);
-    CHECK(capabilities.supports_trajectory_queue == 0);
-    rk_robot_runtime_destroy(handle);
-    handle = RK_INVALID_ROBOT_RUNTIME;
+        fingerprint_hex, 1e-6, &handle) == RK_ERROR_UNSUPPORTED);
+    CHECK(handle == RK_INVALID_ROBOT_RUNTIME);
     layout.owner_period_ns = 5'000'000;
     CHECK(rk_robot_runtime_create_serial(&layout, slave, 921600,
         fingerprint_hex, 1e-6, &handle) == RK_OK);

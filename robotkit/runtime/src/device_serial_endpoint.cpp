@@ -14,6 +14,12 @@ std::shared_ptr<DeviceSerialEndpoint> DeviceSerialEndpoint::open(const char *pat
     if (session_status) *session_status = 0;
     if (!std::isfinite(max_target_error) || max_target_error < 0.0 ||
         joint_count > device_wire::MAX_JOINTS) return {};
+    const auto timing_error = qualification_error(baud, joint_count, owner_period,
+        processing_allowance);
+    if (!timing_error.empty()) {
+        std::fprintf(stderr, "%s\n", timing_error.c_str());
+        return {};
+    }
     return attach(device::HostLink::open(path, baud, fingerprint, joint_count, session_status),
         joint_count, max_target_error, owner_period, processing_allowance);
 }
@@ -24,6 +30,12 @@ std::shared_ptr<DeviceSerialEndpoint> DeviceSerialEndpoint::attach(
     std::chrono::nanoseconds processing_allowance) {
     if (!link || !link->ready() || joint_count > device_wire::MAX_JOINTS ||
         !std::isfinite(max_target_error) || max_target_error < 0.0) return {};
+    const auto timing_error = qualification_error(link->baud(), joint_count, owner_period,
+        processing_allowance);
+    if (!timing_error.empty()) {
+        std::fprintf(stderr, "%s\n", timing_error.c_str());
+        return {};
+    }
     device::HostState initial{};
     if (!link->read_state(initial) || initial.header.accepted_sequence != 0 ||
         (initial.header.safety != RK_SAFETY_EMERGENCY_STOP &&
@@ -49,24 +61,33 @@ std::uint64_t DeviceSerialEndpoint::minimum_owner_period_ns(unsigned baud,
         static_cast<std::uint64_t>(processing_allowance.count());
 }
 
+std::string DeviceSerialEndpoint::qualification_error(unsigned baud,
+    std::uint8_t joint_count, std::chrono::nanoseconds owner_period,
+    std::chrono::nanoseconds processing_allowance) {
+    const auto frame_ns = command_frame_time_ns(baud, joint_count);
+    const auto minimum_ns = minimum_owner_period_ns(baud, joint_count,
+        processing_allowance);
+    if (baud != 0 && processing_allowance.count() >= 0 &&
+        owner_period.count() > 0 &&
+        static_cast<std::uint64_t>(owner_period.count()) >= minimum_ns)
+        return {};
+    return "DeviceSerialEndpoint: unsupported serial queue timing: baud=" +
+        std::to_string(baud) + " joint_count=" + std::to_string(joint_count) +
+        " frame_time_ns=" + std::to_string(frame_ns) +
+        " processing_allowance_ns=" +
+        std::to_string(processing_allowance.count()) +
+        " minimum_owner_period_ns=" + std::to_string(minimum_ns) +
+        " configured_owner_period_ns=" + std::to_string(owner_period.count());
+}
+
 DeviceSerialEndpoint::DeviceSerialEndpoint(std::unique_ptr<device::HostLink> link,
     std::uint8_t joint_count, double max_target_error, device::HostState initial_state,
     std::chrono::nanoseconds owner_period,
     std::chrono::nanoseconds processing_allowance)
     : link_(std::move(link)), joint_count_(joint_count), max_target_error_(max_target_error),
       initial_state_(initial_state) {
-    // One-way streaming uses the command frame plus the deployed per-frame
-    // processing allowance, not the command-and-state response deadline.
-    const std::uint64_t required_ns = minimum_owner_period_ns(link_->baud(),
-        joint_count_, processing_allowance);
-    queue_supported_ = owner_period.count() > 0 &&
-        static_cast<std::uint64_t>(owner_period.count()) >= required_ns;
-    if (!queue_supported_)
-        std::fprintf(stderr,
-            "DeviceSerialEndpoint: trajectory queue disabled: owner period %lld ns "
-            "is below RKD5 command frame plus processing allowance %llu ns\n",
-            static_cast<long long>(owner_period.count()),
-            static_cast<unsigned long long>(required_ns));
+    (void)owner_period;
+    (void)processing_allowance;
 }
 
 rk_result DeviceSerialEndpoint::apply(const rk_robot_command &command) {

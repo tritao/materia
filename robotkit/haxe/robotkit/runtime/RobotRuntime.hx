@@ -55,6 +55,7 @@ class RobotRuntime {
       throw "Serial runtime requires a nonzero 32-digit fingerprint";
     if (!Math.isFinite(maxTargetError) || maxTargetError < 0.0)
       throw "Serial runtime requires a finite nonnegative target error budget";
+    SerialTiming.requireQualified(blueprint, baud);
     var result = RobotKitRuntime.rk_robot_runtime_create_serial(
       blueprint.nativeValue(), devicePath, baud, fingerprintHex, maxTargetError);
     check(result.status, "runtime.createSerial");

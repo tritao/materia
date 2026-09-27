@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <cstdio>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -116,6 +117,13 @@ rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprin
         const auto processing_allowance = std::chrono::nanoseconds(
             copied.serial_processing_allowance_ns == 0 ? 2'000'000 :
             static_cast<int64_t>(copied.serial_processing_allowance_ns));
+        const auto timing_error = robotkit::DeviceSerialEndpoint::qualification_error(
+            baud, static_cast<std::uint8_t>(blueprint->joint_count), period,
+            processing_allowance);
+        if (!timing_error.empty()) {
+            std::fprintf(stderr, "%s\n", timing_error.c_str());
+            return RK_ERROR_UNSUPPORTED;
+        }
         std::uint8_t session_status = 0;
         auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, fingerprint,
             static_cast<std::uint8_t>(blueprint->joint_count), max_target_error,

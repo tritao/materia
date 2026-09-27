@@ -3692,6 +3692,24 @@ class RobotWorldTests {
       "000102030405060708090a0b0c0d0e0f", 1e-6) catch (_:Dynamic) failed = true;
     if (robot != null) robot.close();
     check(failed, "serial adapter reports an unavailable device path through Haxe FFI");
+    var tool = model.addLink(new Link("tool", "tool"));
+    var joint = model.addJoint(new Joint("axis", JointType.Revolute,
+      model.links[0], tool, "joint/axis"));
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    joint.limits.effort = 1.0;
+    var timingMessage = "";
+    try new SerialRobot("under-period", model,
+      '/dev/robotkit-missing-${Sys.getPid()}',
+      "000102030405060708090a0b0c0d0e0f", 1e-6, 115200,
+      Int64.ofInt(1000000), Int64.ofInt(2000000))
+    catch (error:Dynamic) timingMessage = Std.string(error);
+    check(timingMessage.indexOf("baud=115200") >= 0 &&
+      timingMessage.indexOf("joint_count=1") >= 0 &&
+      timingMessage.indexOf("frame_time_ns=") >= 0 &&
+      timingMessage.indexOf("processing_allowance_ns=2000000") >= 0 &&
+      timingMessage.indexOf("minimum_owner_period_ns=") >= 0,
+      "under-period SerialRobot construction names its qualification minimum");
   }
 
   static function testSensorResetPublication():Void {

@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace robotkit {
 
@@ -26,12 +27,15 @@ public:
     static std::uint64_t command_frame_time_ns(unsigned baud, std::uint8_t joint_count);
     static std::uint64_t minimum_owner_period_ns(unsigned baud, std::uint8_t joint_count,
         std::chrono::nanoseconds processing_allowance);
+    static std::string qualification_error(unsigned baud, std::uint8_t joint_count,
+        std::chrono::nanoseconds owner_period,
+        std::chrono::nanoseconds processing_allowance);
 
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool reports_safety_state() const noexcept override { return true; }
     rk_safety_state initial_safety_state() const noexcept override { return RK_SAFETY_EMERGENCY_STOP; }
-    bool supports_trajectory_queue() const noexcept override { return queue_supported_; }
+    bool supports_trajectory_queue() const noexcept override { return true; }
 
 private:
     DeviceSerialEndpoint(std::unique_ptr<device::HostLink> link, std::uint8_t joint_count,
@@ -44,7 +48,6 @@ private:
     std::uint64_t last_command_sequence_ = 0;
     device::HostState initial_state_{};
     bool has_initial_state_ = true;
-    bool queue_supported_ = false;
 };
 
 } // namespace robotkit

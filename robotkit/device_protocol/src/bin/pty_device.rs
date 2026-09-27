@@ -116,7 +116,7 @@ fn main() {
         }
         std::thread::sleep(Duration::from_millis(1));
     }
-    assert_eq!(device.stops, 10); // Eight sessions, watchdog expiry, and one normal stop.
+    assert_eq!(device.stops, 9); // Seven sessions, watchdog expiry, and one normal stop.
     assert_eq!(device.resets, 3);
     assert_eq!(device.targets, 13); // Two direct targets and one per each of 11 owner cycles.
     assert!(protocol.statistics().rejected >= 1);

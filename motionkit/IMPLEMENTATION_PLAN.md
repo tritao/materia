@@ -1161,3 +1161,13 @@ commit containing this entry.
 It reports the runtime endpoint's actual queue and execution-plan capability.
 The PTY runtime capability test and RobotKit Haxe suite passed. Commit: the
 commit containing this entry.
+
+### Reject unqualified serial timing
+
+SerialRobot and robotd reject an under-period deployment before opening the
+device, and the C runtime constructor returns `RK_ERROR_UNSUPPORTED`. Native
+diagnostics and Haxe exceptions name baud, joint count, command-frame time,
+allowance, and minimum owner period. Direct serial endpoint construction also
+rejects it, so every constructible serial endpoint advertises a queue. The
+PTY test checks the rejection and diagnostic, and the Haxe suite checks
+SerialRobot's error. Commit: the commit containing this entry.
