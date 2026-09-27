@@ -1360,6 +1360,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       log("Document configuration replaced");
       sceneGeneration = session.generation;
       treeModel = new EditorSceneTree(scene, session.projectAssembly);
+      treeModel.setFilter(hierarchySearch);
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :
         new EditorPerspectiveViewport("scene-perspective", scene, hostContext);

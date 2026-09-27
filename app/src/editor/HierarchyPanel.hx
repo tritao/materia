@@ -17,7 +17,6 @@ import nativekit.ui.widgets.layout.Row;
 @:access(app.Main.ReferenceEditorApp)
 class HierarchyPanel {
   public static function build(app:ReferenceEditorApp):View {
-    app.treeModel.setFilter(app.hierarchySearch);
     var addStyle = new LayoutStyle();
     addStyle.padding = new Insets(6.0, 8.0, 6.0, 8.0);
     addStyle.childGap = 5.0;
