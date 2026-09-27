@@ -17,26 +17,105 @@ class Trajectory {
   public static function fromJointTrajectory(source:JointTrajectory):Trajectory {
     if (source == null || source.samples.length < 2)
       throw "Native trajectory needs at least two samples";
-    if (source.jointCount > MotionKitNativeConstants.MK_MAX_JOINTS)
+    return fromPositionSamples([for (sample in source.samples) sample.timeSeconds],
+      [for (sample in source.samples) sample.positions]);
+  }
+
+  /** Builds a degree-1 trajectory directly from authored positions. */
+  public static function fromPositionSamples(times:Array<Float>, positions:Array<Array<Float>>):Trajectory {
+    if (times == null || positions == null || times.length < 2 ||
+        times.length != positions.length || positions[0] == null)
+      throw "Native trajectory needs at least two position samples";
+    var count = positions[0].length;
+    if (count < 1 || count > MotionKitNativeConstants.MK_MAX_JOINTS)
       throw "Native trajectory exceeds the joint limit";
     var samples:Array<mk_sample> = [];
     var previous = Int64.ofInt(-1);
-    for (sample in source.samples) {
-      var time = nanoseconds(sample.timeSeconds);
-      if (Int64.compare(time, previous) <= 0)
-        throw "Native trajectory sample times must increase after nanosecond rounding";
+    for (index in 0...times.length) {
+      if (positions[index] == null || positions[index].length != count)
+        throw "Native trajectory position count changed";
+      var time = nanoseconds(times[index]);
+      if (Int64.compare(time, previous) <= 0) {
+        var duplicate = Int64.compare(time, previous) == 0;
+        if (duplicate)
+          for (joint in 0...count)
+            if (positions[index][joint] != positions[index - 1][joint]) duplicate = false;
+        if (duplicate) continue;
+        throw "Native trajectory has conflicting or decreasing sample times after nanosecond rounding";
+      }
       var value = new mk_sample();
       value.set_struct_size(mk_sample.size());
       value.set_time_ns(time);
-      value.set_joint_count(source.jointCount);
-      for (joint in 0...source.jointCount)
-        value.set_position(joint, sample.positions[joint]);
+      value.set_joint_count(count);
+      for (joint in 0...count) {
+        if (!Math.isFinite(positions[index][joint])) throw "Non-finite trajectory position";
+        value.set_position(joint, positions[index][joint]);
+      }
       samples.push(value);
       previous = time;
     }
-    var created = MotionKitNative.mk_trajectory_from_samples(source.jointCount, samples);
+    if (samples.length < 2) throw "Native trajectory needs two distinct sample times";
+    var created = MotionKitNative.mk_trajectory_from_samples(count, samples);
     check(created.status, "trajectory.fromSamples");
     return new Trajectory(created.out_trajectory);
+  }
+
+  /** Offline, jerk-limited synchronized state-to-state motion. */
+  public static function generateStateToState(currentPosition:Array<Float>,
+      currentVelocity:Array<Float>, currentAcceleration:Array<Float>, targetPosition:Array<Float>,
+      maximumVelocity:Array<Float>, maximumAcceleration:Array<Float>,
+      maximumJerk:Array<Float>):Trajectory {
+    if (currentPosition == null || currentPosition.length < 1 ||
+        currentPosition.length > MotionKitNativeConstants.MK_MAX_JOINTS)
+      throw "Invalid generated trajectory joint count";
+    var count = currentPosition.length;
+    for (values in [currentVelocity, currentAcceleration, targetPosition,
+        maximumVelocity, maximumAcceleration, maximumJerk])
+      if (values == null || values.length != count)
+        throw "Generated trajectory vector count mismatch";
+    var request = new mk_state_to_state_request();
+    request.set_struct_size(mk_state_to_state_request.size());
+    request.set_joint_count(count);
+    request.set_synchronization(MotionKitNativeConstants.MK_SYNCHRONIZATION_TIME);
+    request.set_control_mode(MotionKitNativeConstants.MK_CONTROL_POSITION);
+    for (joint in 0...count) {
+      request.set_current_position(joint, currentPosition[joint]);
+      request.set_current_velocity(joint, currentVelocity[joint]);
+      request.set_current_acceleration(joint, currentAcceleration[joint]);
+      request.set_target_position(joint, targetPosition[joint]);
+      request.set_target_velocity(joint, 0.0);
+      request.set_target_acceleration(joint, 0.0);
+      request.set_max_velocity(joint, maximumVelocity[joint]);
+      request.set_max_acceleration(joint, maximumAcceleration[joint]);
+      request.set_max_jerk(joint, maximumJerk[joint]);
+    }
+    var created = MotionKitNative.mk_generate_state_to_state(request);
+    check(created.status, 'trajectory.generateStateToState (Ruckig ${created.out_ruckig_result})');
+    return new Trajectory(created.out_trajectory);
+  }
+
+  /** Copies polynomial coefficients for submission to an executor. */
+  public function segments():Array<{timeFromStartNs:Int64, durationNs:Int64,
+      coefficients:Array<Array<Float>>}> {
+    ensureLive();
+    var count = MotionKitNative.mk_trajectory_segment_count(owner.borrow());
+    check(count.status, "trajectory.segmentCount");
+    var result = [];
+    for (index in 0...count.out_segment_count) {
+      var native = new mk_segment();
+      native.set_struct_size(mk_segment.size());
+      check(MotionKitNative.mk_trajectory_get_segment(owner.borrow(), index, native),
+        "trajectory.segment");
+      var coefficients:Array<Array<Float>> = [];
+      for (joint in 0...native.get_joint_count()) {
+        var source = native.get_coefficients(joint);
+        coefficients.push([for (degree in 0...(native.get_degree() + 1))
+          source.get_value(degree)]);
+      }
+      result.push({timeFromStartNs: native.get_t0_ns(),
+        durationNs: native.get_duration_ns(), coefficients: coefficients});
+    }
+    return result;
   }
 
   public function evaluate(timeSeconds:Float):TrajectoryState {
@@ -100,10 +179,21 @@ class Trajectory {
     owner.close();
   }
 
-  static function nanoseconds(seconds:Float):Int64 {
-    if (!Math.isFinite(seconds) || seconds < 0.0 || seconds > 9e9)
+  public static function nanoseconds(seconds:Float):Int64 {
+    if (!Math.isFinite(seconds) || seconds < 0.0 || seconds > 2e9)
       throw "Trajectory time must be finite and non-negative";
-    return Int64.fromFloat(Math.floor(seconds * 1e9 + 0.5));
+    // Round only the fractional second as a 32-bit value. Rounding the full
+    // nanosecond Float can overflow Std.int at 2.147 s and can misround a
+    // decimal time such as 2.21 s by one nanosecond.
+    var whole = Std.int(seconds);
+    var fraction = Std.int((seconds - whole) * 1e9 + 0.5);
+    if (fraction == 1000000000) {
+      whole++;
+      fraction = 0;
+    }
+    var digits = Std.string(fraction);
+    while (digits.length < 9) digits = "0" + digits;
+    return Int64.parseString(Std.string(whole) + digits);
   }
 
   static function check(status:Int, operation:String):Void {

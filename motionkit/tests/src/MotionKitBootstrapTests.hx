@@ -69,7 +69,7 @@ class MotionKitBootstrapTests {
     testMotionChangesStayWithinLimits();
     testJogProfile();
     testContinuousJog();
-    testLateJogSpliceFallsBackToStop();
+    testLateJogReplacementRejectsLateArrival();
     testPathHoldsStayOnPathWithinLimits();
     testDualMotorAxisChangesStayWithinJointLimits();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
@@ -117,6 +117,33 @@ class MotionKitBootstrapTests {
     near(estimate.accelerations[0], 1.0,
       "degree-1 stop estimate sees a later chord velocity");
     native.dispose();
+
+    var deduplicated = Trajectory.fromPositionSamples([0.0, 0.0, 1.0],
+      [[0.0], [0.0], [1.0]]);
+    check(deduplicated.segments().length == 1,
+      "identical coincident samples do not create zero-duration segments");
+    deduplicated.dispose();
+    throws(() -> {
+      Trajectory.fromPositionSamples([0.0, 0.0, 1.0],
+        [[0.0], [0.1], [1.0]]);
+    }, "conflicting positions at one timestamp remain invalid");
+
+    var longTrajectory = Trajectory.fromPositionSamples([0.0, 3.0],
+      [[0.0], [3.0]]);
+    check(Int64.compare(Trajectory.nanoseconds(2.21), Int64.parseString("2210000000")) == 0,
+      'times past the signed 32-bit nanosecond boundary retain their value: '
+        + '${Int64.toStr(Trajectory.nanoseconds(2.21))}');
+    near(longTrajectory.evaluate(2.5).positions[0], 2.5,
+      "long native trajectory evaluates beyond 2.147 seconds");
+    var longLimits = new ValidationLimits(1, Int64.ofInt(12), Int64.ofInt(3));
+    longLimits.position(0, 0.0, 3.0);
+    longLimits.velocity(0, 1.1);
+    var longPlan = ExecutionPlan.create(longTrajectory, longLimits, Int64.ofInt(45),
+      [0.0], [0.0], [0.0], [0.01], [0.01], [0.01]);
+    near(longPlan.evaluate(2.5).positions[0], 2.5,
+      "long execution plan evaluates beyond 2.147 seconds");
+    longPlan.dispose();
+    longTrajectory.dispose();
   }
 
   static function testNativeValidationAndPlan():Void {
@@ -398,6 +425,8 @@ class MotionKitBootstrapTests {
     check(peakAcceleration > 1.9,
       "moveLinear uses an authored 2 m/s² acceleration limit");
 
+    runMotion(machine, simulation);
+
     var diagonal = planned(machine.moveLinear(Pose.xyz(0.03, 0.03, 0.03),
       Feed.metresPerSecond(0.2), options));
     for (sample in diagonal.samples) {
@@ -572,14 +601,16 @@ class MotionKitBootstrapTests {
     near(second.samples[0].positions[0], 0.02,
       "queued axis motion starts at the previous trajectory endpoint");
     near(machine.progress(), 0.0, "buffer starts with zero progress");
-    check(recording.commands.length == 1, "buffer submits the first move as one chunk");
+    check(recording.commands.length == 1, "buffer submits the first move as one plan");
     switch recording.commands[0] {
       case TrajectoryChunk(chunk):
-        check(chunk.points.length > 1, "trajectory chunk carries timestamped samples");
+        throw "buffer submitted a legacy point chunk";
       case JointTargets(_, _):
         throw "buffer unexpectedly fell back to sample-by-sample targets";
-      case ExecutionPlan(_):
-        throw "buffer unexpectedly submitted an execution plan";
+      case ExecutionPlan(plan):
+        check(plan.segments.length > 0, "trajectory plan carries polynomial segments");
+      case Hold | Resume | Abort:
+        throw "buffer submitted a lifecycle command before motion started";
     }
 
     var tick = 0;
@@ -610,7 +641,7 @@ class MotionKitBootstrapTests {
     check(heldPosition > beforeHold && heldPosition < 0.02,
       "controlled hold decelerates before coming to rest");
     var holdTicks = 0;
-    while (runtime.snapshot().trajectoryActive) {
+    while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       check(!machine.update(), "held buffer remains paused after deceleration");
       simulation.step(Int64.ofInt(tick++));
       holdTicks += 1;
@@ -669,12 +700,14 @@ class MotionKitBootstrapTests {
       samples.push(new JointTrajectorySample(index * 0.01, [0.05 * index / 600.0]));
     var trajectory = new JointTrajectory(samples);
     machine.queueTrajectory(trajectory);
-    check(recording.commands.length == 1, "long trajectory starts with one bounded native chunk");
+    check(recording.commands.length >= 2,
+      "long trajectory starts with a bounded native plan window");
+    var initialPlanCount = recording.commands.length;
 
     var tick = 0;
     machine.update();
-    check(recording.commands.length == 1,
-      "streamer waits for the owner cycle before appending a second chunk");
+    check(recording.commands.length == initialPlanCount,
+      "streamer keeps its initial plan window until the owner advances");
     simulation.step(Int64.ofInt(tick++));
     while (machine.isMoving()) {
       machine.update();
@@ -686,12 +719,14 @@ class MotionKitBootstrapTests {
       "long trajectory refills native chunks before the queue drains");
     for (command in recording.commands) switch command {
       case RobotCommand.TrajectoryChunk(chunk):
-        check(chunk.points.length <= robotkit.world.TrajectoryChunk.MAX_POINTS,
-          "streamed trajectory chunks stay within the native point limit");
+        throw "long trajectory submitted a legacy point chunk";
       case RobotCommand.JointTargets(_, _):
         throw "long trajectory unexpectedly fell back to sample-by-sample targets";
-      case RobotCommand.ExecutionPlan(_):
-        throw "long trajectory unexpectedly submitted an execution plan";
+      case RobotCommand.ExecutionPlan(plan):
+        check(plan.segments.length <= 128,
+          "streamed trajectory plans stay within the native segment limit");
+      case Hold | Resume | Abort:
+        throw "long trajectory unexpectedly submitted a lifecycle command";
     }
     near(instrumented.snapshot().positions.get(0), 0.05,
       "streamed trajectory reaches its final position", 1e-5);
@@ -732,7 +767,7 @@ class MotionKitBootstrapTests {
     for (cycle in 0...2) {
       machine.hold();
       var stopTicks = 0;
-      while (runtime.snapshot().trajectoryActive) {
+      while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
         check(!machine.update(), "held motion does not submit host-clock samples");
         simulation.step(Int64.ofInt(tick++));
         stopTicks += 1;
@@ -794,7 +829,7 @@ class MotionKitBootstrapTests {
       if (tick > 2000) throw "queued trajectory did not reach its second move";
     }
     queuedMachine.hold();
-    while (queuedRuntime.snapshot().trajectoryActive) {
+    while (queuedRuntime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       queuedMachine.update();
       queuedSimulation.step(Int64.ofInt(tick++));
       if (tick > 2200) throw "second queued trajectory did not stop";
@@ -840,7 +875,7 @@ class MotionKitBootstrapTests {
     }
     check(reachedThirdLeg, "square hold test reaches the third path leg");
     squareMachine.hold();
-    while (squareRuntime.snapshot().trajectoryActive) {
+    while (squareRuntime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       squareMachine.update();
       squareSimulation.step(Int64.ofInt(tick++));
       if (tick > 3400) throw "square third-leg stop did not settle";
@@ -898,7 +933,7 @@ class MotionKitBootstrapTests {
     var previousVelocity = (beforeHold - previousPreHoldPosition) / 0.01;
     var peakAcceleration = 0.0;
     var stopTicks = 0;
-    while (runtime.snapshot().trajectoryActive) {
+    while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       machine.update();
       simulation.step(Int64.ofInt(tick++));
       var position = robot.snapshot().positions.get(0);
@@ -972,7 +1007,11 @@ class MotionKitBootstrapTests {
       check(last <= target + 1e-9, 'hold at tick $holdTick stops within the planned move');
       check(Math.abs(last - positions[positions.length - 2]) < 1e-9,
         'hold at tick $holdTick comes to rest');
-      check(!runtime.snapshot().trajectoryActive, 'hold at tick $holdTick finishes its stop');
+      var session = runtime.snapshot().sessionState;
+      check(session == RobotKitRuntimeConstants.RK_SESSION_HELD ||
+        (session == RobotKitRuntimeConstants.RK_SESSION_IDLE &&
+          Math.abs(last - target) < 1e-5),
+        'hold at tick $holdTick pauses or completes its path');
       simulation.dispose();
       holdTick += 2;
     }
@@ -995,23 +1034,17 @@ class MotionKitBootstrapTests {
 
     machine.moveAxes([new AxisTarget("x", 0.06)], options);
     machine.moveAxes([new AxisTarget("x", 0.01)], options);
-    check(recording.commands.length == 4,
-      "immediate replacement submits a runtime flush before each trajectory");
-    switch recording.commands[2] {
-      case JointTargets(_, _):
-        check(true, "immediate replacement flush is ordered before its new chunk");
-      case TrajectoryChunk(_):
-        throw "immediate replacement submitted its chunk before the runtime flush";
+    check(recording.commands.length == 2,
+      'immediate replacement submits the replacement plan: ${recording.commands}');
+    switch recording.commands[1] {
       case ExecutionPlan(_):
-        throw "immediate replacement unexpectedly submitted an execution plan";
-    }
-    switch recording.commands[3] {
-      case TrajectoryChunk(_):
-        check(true, "immediate replacement submits the new trajectory after its flush");
+        check(true, "immediate replacement submits the new plan");
       case JointTargets(_, _):
-        throw "immediate replacement did not submit a trajectory after its flush";
-      case ExecutionPlan(_):
-        throw "immediate replacement unexpectedly submitted an execution plan";
+        throw "immediate replacement did not submit a plan";
+      case TrajectoryChunk(_):
+        throw "immediate replacement submitted a legacy point chunk";
+      case Hold | Resume | Abort:
+        throw "immediate replacement unexpectedly submitted a lifecycle command";
     }
     runMotion(machine, simulation);
     near(robot.snapshot().positions.get(0), 0.01,
@@ -1189,11 +1222,10 @@ class MotionKitBootstrapTests {
   }
 
   /**
-   * When a jog change reaches the runtime after its splice point, the
-   * runtime keeps the old jog and MotionKit recovers by stopping along it and
-   * starting the new jog from rest, still within the limit.
+   * A replacement that arrives after its committed point is rejected
+   * explicitly; the original jog remains safe and completes normally.
    */
-  static function testLateJogSpliceFallsBackToStop():Void {
+  static function testLateJogReplacementRejectsLateArrival():Void {
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
       new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
     var simulation = new Simulation(0.01);
@@ -1215,23 +1247,15 @@ class MotionKitBootstrapTests {
     robot.lagging = true;
     check(machine.jog("x", 0.02, 1.0) != null, "jog change is planned as a continuation");
     for (_ in 0...8) step();
-    robot.release();
-    var stillTicks = 0;
-    while (machine.isMoving() || stillTicks < 3) {
-      step();
-      var count = positions.length;
-      stillTicks = Math.abs(positions[count - 1] - positions[count - 2]) < 1e-12 ? stillTicks + 1 : 0;
+    throws(() -> robot.release(), "late native replacement is rejected explicitly");
+    for (_ in 0...250) {
+      simulation.step(Int64.ofInt(tick++));
+      positions.push(robot.snapshot().positions.get(0));
     }
     check(peakSecondDifference(positions) <= 0.4 * 1.05,
-      'late jog splice recovery stays within the limit (peak ${peakSecondDifference(positions)})');
-    var rested = false;
-    var movedAfterRest = false;
-    for (index in 49...(positions.length - 3)) {
-      var moving = Math.abs(positions[index] - positions[index - 1]) >= 1e-12;
-      if (!moving) rested = true;
-      else if (rested) movedAfterRest = true;
-    }
-    check(rested && movedAfterRest, "late jog splice stops, then starts the new jog from rest");
+      'original jog stays within the limit (peak ${peakSecondDifference(positions)})');
+    near(positions[positions.length - 1], 0.1,
+      "rejected replacement leaves the original jog to complete", 1e-5);
     simulation.dispose();
   }
 
@@ -1336,7 +1360,10 @@ class MotionKitBootstrapTests {
         // Blend mode changes velocity at a corner by design, so compare with
         // the uninterrupted move rather than the bare limit.
         var baseline = rigTrial(gantryRig(queueSupport), 0, _ -> {}, false, entry.begin);
-        var allowed = [for (joint in 0...2) Math.max(limit, jointPeak(baseline, joint)) * 1.05];
+        // Time-warping changes which 10 ms sample straddles a blended corner;
+        // keep a small absolute allowance on this discrete second difference.
+        var allowed = [for (joint in 0...2)
+          Math.max(limit, jointPeak(baseline, joint)) * 1.05 + 0.01];
         var eventTicks = baseline.length;
         var eventTick = 3;
         while (eventTick < eventTicks) {
@@ -1436,8 +1463,15 @@ class MotionKitBootstrapTests {
                   for (point in chunk.points)
                     worstSkew = Math.max(worstSkew,
                       Math.abs(point.positions[1] + 2.0 * point.positions[0]));
-                case ExecutionPlan(_):
-                  throw "MotionSystem unexpectedly submitted an execution plan";
+                case ExecutionPlan(plan):
+                  worstSkew = Math.max(worstSkew,
+                    Math.abs(plan.startPosition.get(1) + 2.0 * plan.startPosition.get(0)));
+                  for (segment in plan.segments)
+                    for (degree in 0...(segment.degree + 1))
+                      worstSkew = Math.max(worstSkew,
+                        Math.abs(segment.coefficients[1][degree] +
+                          2.0 * segment.coefficients[0][degree]));
+                case Hold | Resume | Abort: continue;
               }
           check(worstSkew <= 1e-12, '$context commands the motors coordinated (skew $worstSkew)');
         }

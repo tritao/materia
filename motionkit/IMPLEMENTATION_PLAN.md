@@ -969,3 +969,18 @@ ramps, and verifies the constructed limit-clamp case. All 12 native CTest
 targets and the RobotKit FFI audit pass. MotionKit host migration remains in
 progress; its Haxe suite is not yet green. Commit: the commit containing this
 entry.
+
+### Plan-backed motion and smooth axis planning — migration checkpoint
+
+`MotionSystem` now submits native plans on queue-capable backends, uses native
+HOLD/RESUME/ABORT, and plans axis moves, homing and jogs with Ruckig cubic
+segments. A moving smooth plan can be replaced at `committed_until_ns` from
+its analytic state; degree-1 paths still use stop-first replacement. Long
+sampled paths retain chunked refill, with non-final chunks declaring
+continuation. The non-queue position-streaming fallback remains. Haxe time
+conversion now evaluates trajectories beyond 2.147 seconds without 32-bit
+wrap; coincident identical position samples coalesce before native conversion.
+The old Haxe planners and host-side hold/splice machinery are still present
+and scheduled for removal, so this checkpoint does not complete the item.
+MotionKit Haxe (21,962 assertions), RobotKit Haxe, all 12 native CTest
+targets, and both FFI audits passed. Commit: the commit containing this entry.

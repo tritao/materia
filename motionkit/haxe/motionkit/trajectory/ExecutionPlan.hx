@@ -75,7 +75,7 @@ class ExecutionPlan {
     var state = new mk_trajectory_state();
     state.set_struct_size(mk_trajectory_state.size());
     check(MotionKitNative.mk_plan_evaluate(owner.borrow(),
-      Int64.fromFloat(Math.floor(timeSeconds * 1e9 + 0.5)), state), "plan.evaluate");
+      Trajectory.nanoseconds(timeSeconds), state), "plan.evaluate");
     var positions:Array<Float> = [];
     var velocities:Array<Float> = [];
     var accelerations:Array<Float> = [];
