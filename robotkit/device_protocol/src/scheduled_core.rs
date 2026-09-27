@@ -280,8 +280,17 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
                 let (_, path_velocity) = segment.evaluate(self.path_clock, self.tick_hz);
                 let path_acceleration = segment.acceleration(self.path_clock, self.tick_hz);
                 for a in 0..A {
-                    let margin = (self.max_acceleration[a] -
-                        path_acceleration[a].abs() * self.rate * self.rate).max(0.0);
+                    // On HOLD, spend the actuator's acceleration budget on
+                    // braking even when the authored path is accelerating at
+                    // its limit. A zero residual margin would leave rate=1.
+                    let margin = if self.target_rate < self.rate {
+                        (self.max_acceleration[a] + path_acceleration[a] *
+                            self.rate * self.rate * path_velocity[a].signum())
+                            .clamp(0.05 * self.max_acceleration[a], self.max_acceleration[a])
+                    } else {
+                        (self.max_acceleration[a] -
+                            path_acceleration[a].abs() * self.rate * self.rate).max(0.0)
+                    };
                     rate_step = rate_step.min(0.9 * margin / path_velocity[a].abs().max(1e-6) * dt);
                 }
                 break;
