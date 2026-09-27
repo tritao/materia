@@ -11,6 +11,10 @@ import motionkit.event.EventValue;
 import motionkit.event.HoldPolicy;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
+import motionkit.kinematics.IkTolerance;
+import motionkit.kinematics.Pose3;
+import motionkit.kinematics.Twist6;
+import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
 import motionkit.robot.MotionSystemBlueprint;
@@ -28,11 +32,13 @@ import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
+import robotkit.model.Frame;
 import robotkit.model.RobotModel;
 import robotkit.model.Actuator;
 import robotkit.model.Transmission;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
+import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.RobotRuntimeError;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -60,6 +66,7 @@ class MotionKitBootstrapTests {
 
   public static function main():Void {
     testMotionEventContracts();
+    testKinematicsContract();
     testGeometricPathPrimitives();
     testNativeTrajectoryRoundTrip();
     testNativeValidationAndPlan();
@@ -126,6 +133,112 @@ class MotionKitBootstrapTests {
       EventValue.Digital(false)), "timed event rejects a negative path time");
     throws(function() new ChannelDeclaration("sprayer.flow", ChannelKind.Analog,
       EventValue.Digital(false)), "channel declaration rejects a mismatched safe value");
+  }
+
+  static function testKinematicsContract():Void {
+    var fixture = buildContractArmFixture();
+    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    check(solver.jointCount() == 6, "kinematics adapter reports the manipulator joint count");
+
+    var q = [0.3, -0.5, 0.8, -0.2, 0.6, -0.4];
+    var target = solver.forward(q);
+    var seed = [for (value in q) value + 0.03];
+    var tolerance = new IkTolerance(1e-5, 1e-4, 200, 0.02, 1e-3);
+    var solved = solver.solvePose(target, seed, tolerance);
+    check(solved != null, "kinematics adapter solves a reachable TCP pose");
+    var achieved = solver.forward(cast solved);
+    near(achieved.x, target.x, "forward/solve round trip preserves TCP x", 1e-5);
+    near(achieved.y, target.y, "forward/solve round trip preserves TCP y", 1e-5);
+    near(achieved.z, target.z, "forward/solve round trip preserves TCP z", 1e-5);
+    near(Math.abs(achieved.qx * target.qx + achieved.qy * target.qy +
+      achieved.qz * target.qz + achieved.qw * target.qw), 1.0,
+      "forward/solve round trip preserves TCP orientation", 1e-4);
+
+    var zeroTarget = solver.forward([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+    var firstCandidates = solver.sampleCandidates(zeroTarget, 4, tolerance);
+    var secondCandidates = solver.sampleCandidates(zeroTarget, 4, tolerance);
+    check(firstCandidates.length > 0 && firstCandidates.length == secondCandidates.length,
+      "candidate sampling returns a deterministic non-empty set");
+    for (candidate in 0...firstCandidates.length) {
+      check(firstCandidates[candidate].length == 6,
+        "candidate sampling returns complete joint vectors");
+      for (joint in 0...6)
+        near(firstCandidates[candidate][joint], secondCandidates[candidate][joint],
+          "candidate sampling is identical for identical inputs", 1e-12);
+    }
+
+    var expectedQdot = [0.08, -0.04, 0.05, 0.03, -0.02, 0.06];
+    var jacobian = fixture.chain.jacobian(q);
+    var requested:Array<Float> = [];
+    for (row in 0...6) {
+      var value = 0.0;
+      for (joint in 0...6) value += jacobian[row][joint] * expectedQdot[joint];
+      requested.push(value);
+    }
+    var qdot = solver.solveDifferential(q, new Twist6(requested[0], requested[1], requested[2],
+      requested[3], requested[4], requested[5]));
+    check(qdot != null, "differential IK solves a reachable tool twist");
+    var epsilon = 1e-6;
+    var plus = q.copy();
+    var minus = q.copy();
+    for (joint in 0...6) {
+      plus[joint] += cast(qdot, Array<Float>)[joint] * epsilon;
+      minus[joint] -= cast(qdot, Array<Float>)[joint] * epsilon;
+    }
+    var posePlus = solver.forward(plus);
+    var poseMinus = solver.forward(minus);
+    near((posePlus.x - poseMinus.x) / (2.0 * epsilon), requested[0],
+      "differential IK linear x matches a finite difference", 1e-5);
+    near((posePlus.y - poseMinus.y) / (2.0 * epsilon), requested[1],
+      "differential IK linear y matches a finite difference", 1e-5);
+    near((posePlus.z - poseMinus.z) / (2.0 * epsilon), requested[2],
+      "differential IK linear z matches a finite difference", 1e-5);
+    var angular = poseRotationDelta(poseMinus, posePlus, 1.0 / (2.0 * epsilon));
+    near(angular[0], requested[3], "differential IK angular x matches a finite difference", 1e-5);
+    near(angular[1], requested[4], "differential IK angular y matches a finite difference", 1e-5);
+    near(angular[2], requested[5], "differential IK angular z matches a finite difference", 1e-5);
+
+    throws(function() new Pose3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0),
+      "MotionKit pose rejects a non-unit quaternion");
+    throws(function() new Twist6(Math.NaN, 0.0, 0.0, 0.0, 0.0, 0.0),
+      "MotionKit twist rejects non-finite components");
+    throws(function() new IkTolerance(0.0, 1e-3),
+      "IK tolerance rejects a non-positive position tolerance");
+  }
+
+  static function buildContractArmFixture():{model:RobotModel, chain:KinematicChain} {
+    var model = new RobotModel("motionkit-contract-arm");
+    var links = [for (name in ["base", "shoulder", "upper-arm", "forearm",
+      "wrist-1", "wrist-2", "wrist-3"]) model.addLink(new Link(name))];
+    var offsets = [[0.0, 0.0, 0.089159], [0.0, 0.13585, 0.0],
+      [0.0, -0.1197, 0.425], [0.0, 0.0, 0.39225],
+      [0.0, 0.10915, 0.0], [0.0, 0.0, 0.09465]];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
+      [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
+    for (joint in 0...6) {
+      var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute,
+        links[joint], links[joint + 1]));
+      value.parentFramePosition = offsets[joint];
+      value.axis = axes[joint];
+      value.limits.lower = -2.0 * Math.PI;
+      value.limits.upper = 2.0 * Math.PI;
+    }
+    var flange = model.addFrame(new Frame("flange", links[6]));
+    flange.position = [0.0, 0.0823, 0.0];
+    return {model: model,
+      chain: new KinematicChain(model, links[0].id, ChainTip.Frame(flange.id))};
+  }
+
+  static function poseRotationDelta(from:Pose3, to:Pose3, scale:Float):Array<Float> {
+    var x = to.qw * -from.qx + to.qx * from.qw + to.qy * -from.qz - to.qz * -from.qy;
+    var y = to.qw * -from.qy - to.qx * -from.qz + to.qy * from.qw + to.qz * -from.qx;
+    var z = to.qw * -from.qz + to.qx * -from.qy - to.qy * -from.qx + to.qz * from.qw;
+    var w = to.qw * from.qw - to.qx * -from.qx - to.qy * -from.qy - to.qz * -from.qz;
+    if (w < 0.0) { x = -x; y = -y; z = -z; w = -w; }
+    var sinHalf = Math.sqrt(x * x + y * y + z * z);
+    if (sinHalf < 1e-12) return [0.0, 0.0, 0.0];
+    var angleScale = 2.0 * Math.atan2(sinHalf, w) * scale / sinHalf;
+    return [x * angleScale, y * angleScale, z * angleScale];
   }
 
   static function testGeometricPathPrimitives():Void {

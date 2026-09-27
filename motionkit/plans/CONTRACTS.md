@@ -369,3 +369,19 @@ The pinned NativeKit commit was absent from its configured remote, so the
 worktree dependency was fetched from the shared checkout at the exact recorded
 SHA. MotionKit and RobotKit Haxe suites, all 12 native tests, the RobotKit FFI
 audit, and TCP integration in default, session and lease-timeout modes passed.
+
+### P0.3 — Add the kinematics solver contract
+
+Added pure MotionKit pose, twist and IK-tolerance values plus the
+`KinematicsSolver` interface. `ManipulatorKinematics` adapts RobotKit TCP FK
+and IK, samples candidates from a deterministic joint-limit grid with
+joint-distance deduplication, and solves TCP differential motion with a damped
+least-squares chain Jacobian shifted from flange to tool point. Tests cover a
+6R forward/solve round trip, repeatable candidates and a central-difference
+twist check; they failed before the implementation and now pass. P0.3 landed
+before P0.2 because the latter's typed `MotionOp` variants depend on `Pose3`.
+Commit: the commit containing this entry.
+
+MotionKit passed 4,995 assertions, RobotKit passed 4,437 aggregate assertions,
+all 12 native tests passed, and TCP integration passed in default, session and
+lease-timeout modes.
