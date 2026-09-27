@@ -10,6 +10,8 @@ pub enum Output {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct OutputRecord { pub ticks: u64, pub output: Output }
 
+pub const MAX_OUTPUT_RECORDS: usize = 65_536;
+
 /// Deterministic board model; `advance_host_ns` is driven by the owner clock.
 pub struct VirtualBoard<const ACTUATORS: usize, const CHANNELS: usize> {
     tick_hz: u64,
@@ -26,18 +28,25 @@ pub struct VirtualBoard<const ACTUATORS: usize, const CHANNELS: usize> {
     analog: [f32; CHANNELS],
     process_argument: [f32; CHANNELS],
     records: Vec<OutputRecord>,
+    actuator_count: usize,
 }
 
 impl<const A: usize, const C: usize> VirtualBoard<A, C> {
     pub fn new(tick_hz: u64, offset_ticks: u64, drift_ppm: i32,
                steps_per_unit: [f64; A]) -> Self {
+        Self::new_with_actuator_count(tick_hz, offset_ticks, drift_ppm,
+            steps_per_unit, A)
+    }
+    pub fn new_with_actuator_count(tick_hz: u64, offset_ticks: u64, drift_ppm: i32,
+               steps_per_unit: [f64; A], actuator_count: usize) -> Self {
         assert!(tick_hz > 0 && drift_ppm > -1_000_000);
+        assert!(actuator_count > 0 && actuator_count <= A);
         assert!(steps_per_unit.iter().all(|v| v.is_finite() && *v > 0.0));
         Self { tick_hz, offset_ticks, drift_ppm, host_ns: 0, ticks: offset_ticks,
             steps_per_unit, steps: [0; A], missed_steps: [0; A],
             targets: [0.0; A], velocities: [0.0; A],
             digital: [false; C], analog: [0.0; C], process_argument: [0.0; C],
-            records: Vec::new() }
+            records: Vec::new(), actuator_count }
     }
     pub fn advance_host_ns(&mut self, host_ns: u64) {
         assert!(host_ns >= self.host_ns);
@@ -48,7 +57,7 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
     }
     pub fn step_counts(&self) -> [i64; A] { self.steps }
     pub fn miss_next_steps(&mut self, actuator: usize, count: u32) -> bool {
-        if actuator >= A { return false; }
+        if actuator >= self.actuator_count { return false; }
         self.missed_steps[actuator] = count;
         true
     }
@@ -64,19 +73,27 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
     pub fn process_argument(&self, i: usize) -> Option<f32> {
         self.process_argument.get(i).copied()
     }
-    fn record(&mut self, output: Output) { self.records.push(OutputRecord { ticks: self.ticks, output }); }
+    fn record(&mut self, output: Output) {
+        if self.records.len() == MAX_OUTPUT_RECORDS {
+            self.records.drain(..MAX_OUTPUT_RECORDS / 4);
+        }
+        self.records.push(OutputRecord { ticks: self.ticks, output });
+    }
 }
 
 impl<const A: usize, const C: usize> Board for VirtualBoard<A, C> {
     fn now_ticks(&self) -> u64 { self.ticks }
     fn tick_hz(&self) -> u64 { self.tick_hz }
     fn position_target(&mut self, i: usize, value: f32) {
+        if i >= self.actuator_count { return; }
         self.targets[i] = value; self.record(Output::Position(i, value));
     }
     fn velocity_target(&mut self, i: usize, value: f32) {
+        if i >= self.actuator_count { return; }
         self.velocities[i] = value; self.record(Output::Velocity(i, value));
     }
     fn step_pulse(&mut self, i: usize, forward: bool) {
+        if i >= self.actuator_count { return; }
         self.record(Output::Step(i, forward));
         if self.missed_steps[i] > 0 {
             self.missed_steps[i] -= 1;
@@ -84,8 +101,11 @@ impl<const A: usize, const C: usize> Board for VirtualBoard<A, C> {
             self.steps[i] += if forward { 1 } else { -1 };
         }
     }
-    fn step_count(&self, i: usize) -> i64 { self.steps[i] }
+    fn step_count(&self, i: usize) -> i64 {
+        if i >= self.actuator_count { 0 } else { self.steps[i] }
+    }
     fn set_direction(&mut self, i: usize, forward: bool) {
+        if i >= self.actuator_count { return; }
         self.record(Output::Direction(i, forward));
     }
     fn set_digital(&mut self, i: usize, value: bool) {

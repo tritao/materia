@@ -24,3 +24,21 @@ fn stop_sets_channels_safe() {
     assert_eq!(board.digital(0), Some(false));
     assert_eq!(board.analog(1), Some(0.0));
 }
+
+#[test]
+fn ten_seconds_of_output_uses_bounded_storage_and_active_actuators() {
+    let mut board = VirtualBoard::<64, 0>::new_with_actuator_count(
+        1_000_000, 0, 0, [1_000.0; 64], 1);
+    for cycle in 0..400_000 {
+        board.advance_host_ns(cycle * 25_000);
+        board.position_target(0, cycle as f32 / 1_000.0);
+        board.velocity_target(0, 1.0);
+        board.position_target(63, 1.0); // inactive physical channel
+    }
+    assert!(board.records().len() <= 65_536);
+    assert!(board.records().iter().all(|r| match r.output {
+        robotkit_device_protocol::Output::Position(i, _) |
+        robotkit_device_protocol::Output::Velocity(i, _) => i == 0,
+        _ => true,
+    }));
+}

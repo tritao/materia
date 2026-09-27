@@ -54,7 +54,8 @@ impl VirtualDevice {
         Some(Self {
             steps: StepGenerator::new(steps_per_unit, [0; ACTUATORS],
                 [0.0; ACTUATORS], tick_hz)?,
-            board: VirtualBoard::new(tick_hz, offset_ticks, drift_ppm, steps_per_unit),
+            board: VirtualBoard::new_with_actuator_count(
+                tick_hz, offset_ticks, drift_ppm, steps_per_unit, count),
             core: None,
             events: None,
             final_safe_applied: false,
