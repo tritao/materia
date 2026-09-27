@@ -40,6 +40,30 @@ public:
     void discard_pending() noexcept override { ++discard_count; }
 };
 
+class QueueExecutingEndpoint final : public robotkit::RobotEndpoint {
+public:
+    int plans = 0;
+    int sampled_targets = 0;
+    bool executes_trajectory_queue() const noexcept override { return true; }
+    rk_result submit_device_plan(const rk_plan_submission &, uint64_t,
+        uint64_t, uint64_t, const rk_robot_runtime_blueprint &) override {
+        ++plans;
+        return RK_OK;
+    }
+    rk_result apply(const rk_robot_command &command) override {
+        if (command.kind == RK_COMMAND_JOINT_TARGETS) ++sampled_targets;
+        return RK_OK;
+    }
+    rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override {
+        state.struct_size = sizeof(state);
+        state.joint_count = 2;
+        state.source_timestamp_ns = timestamp_ns;
+        state.active_plan_id = 99;
+        state.committed_until_ns = 250'000'000;
+        return RK_OK;
+    }
+};
+
 class EchoEndpoint final : public robotkit::RobotEndpoint {
 public:
     explicit EchoEndpoint(uint32_t joint_count, bool queue_support = true)
@@ -824,6 +848,28 @@ void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &so
     assert(std::abs(state.position[0] - 0.008) < 1e-12);
     state = apply_cycle(runtime, timestamp);
     assert(std::abs(state.position[0] - 0.027) < 1e-12);
+}
+
+void device_queue_endpoint_does_not_receive_sampled_targets(
+    const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<QueueExecutingEndpoint>();
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 99;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.segments = cubic_plan_chunk(99);
+    assert(runtime.submit_plan(plan) == RK_OK);
+    uint64_t timestamp = 0;
+    apply_cycle(runtime, timestamp);
+    apply_cycle(runtime, timestamp);
+    assert(endpoint->plans == 1);
+    assert(endpoint->sampled_targets == 0);
+    rk_robot_snapshot snapshot{};
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.active_plan_id == 99 && snapshot.committed_until_ns == 250'000'000);
 }
 
 void plan_events_follow_path_clock(const rk_robot_runtime_blueprint &source) {
@@ -1752,6 +1798,7 @@ int main() {
     trajectory_queue_is_bounded(blueprint);
     mixed_queue_depth_counts_knots(blueprint);
     plan_submission_checks_and_replacement(blueprint);
+    device_queue_endpoint_does_not_receive_sampled_targets(blueprint);
     plan_events_follow_path_clock(blueprint);
     plan_event_records_report_overflow(blueprint);
     accepted_plan_keeps_committed_region_identical(blueprint);

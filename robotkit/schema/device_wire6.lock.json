@@ -358,6 +358,17 @@
       ],
       "size": 43
     },
+    "SessionTiming6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "link_loss_timeout_ns",
+          "type": "u64"
+        }
+      ],
+      "size": 8
+    },
     "State6Header": {
       "endian": "little",
       "fields": [

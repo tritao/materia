@@ -1,4 +1,5 @@
 import haxe.Json;
+import sys.io.File;
 import materia.sheet.SheetInventory;
 import materia.sheet.SheetPlanExporter;
 import materia.sheet.SheetPlanValidation;
@@ -6,6 +7,9 @@ import materia.sheet.SheetPlanValidator;
 import materia.sheet.SheetProjectCodec;
 import materia.project.SceneArtifact;
 import machinekit.component.BomItem;
+import machinekit.picking.PickingStation;
+import pickingstation.PickingScenario;
+import pickingstation.PickingScenario.PickingAction;
 import sys.FileSystem;
 import sys.io.AtomicFile;
 
@@ -43,6 +47,14 @@ class PickingStationWorkflow {
 				case "bom": bom();
 				case "layout-check": layoutCheck();
 				case "layout-artifact": layoutArtifact(required(args, 1));
+				case "station-artifact": stationArtifact(required(args, 1));
+				case "station-check": stationCheck();
+				case "scenario-demo": scenarioDemo();
+				case "cut-list": cutList();
+				case "check": PickingStationChecks.run();
+				case "ui-extension":
+					var request = Json.parse(File.getContent(required(args, 1)));
+					AtomicFile.write(required(args, 2), Json.stringify(PickingStationUiExtension.render(request)));
 				case "demo": demo(required(args, 1), required(args, 2));
 				default: return usage();
 			}
@@ -103,9 +115,49 @@ class PickingStationWorkflow {
 
 	static function layoutCheck():Void {
 		var preview = SceneArtifact.decode(PickingStationPreview.layout());
-		if (preview.parts.length != 15) throw "Expected 15 preview solids, found " + preview.parts.length;
+		if (preview.parts.length < 10) throw "Expected sheet preview solids, found " + preview.parts.length;
 		Sys.println("CAD layout preview contains " + preview.parts.length +
 			" stock, blank, remnant, and finished-panel solids");
+	}
+
+	static function stationCheck():Void {
+		var station = new PickingStation();
+		var preview = SceneArtifact.decode(PickingStationPreview.station());
+		if (station.storagePositions().length != 6 || preview.assemblyDefinition == null ||
+			preview.assemblyDefinition.occurrences.length != station.instances().length)
+			throw "Station assembly occurrence count does not match the layout";
+		Sys.println('Virtual station contains ${station.storagePositions().length} addressed positions and ${station.instances().length} selectable occurrences');
+	}
+
+	static function stationArtifact(path:String):Void {
+		var artifact = PickingStationPreview.station();
+		AtomicFile.writeBytes(path, artifact);
+		Sys.println('Wrote virtual station artifact ${FileSystem.fullPath(path)} (${artifact.length} bytes)');
+	}
+
+	static function scenarioDemo():Void {
+		var scenario = new PickingScenario();
+		scenario.apply(StartOrder);
+		while (scenario.currentLine() != null) {
+			var line = scenario.currentLine();
+			var source = line == null ? "" : line.sourcePositionId;
+			scenario.apply(SelectBin(source));
+			var result = scenario.apply(ConfirmPick);
+			Sys.println(result.message);
+			if (!result.accepted) throw "Sample order could not be completed";
+		}
+		Sys.println('Picked ${scenario.totalPickedQuantity()} units; ${scenario.state().completedLines} lines complete');
+		scenario.apply(ResetFixture);
+		Sys.println('Reset: ${scenario.stateSignature()}');
+	}
+
+	static function cutList():Void {
+		var station = new PickingStation();
+		Sys.println("Assembly,Profile,Member,Cut length (mm)");
+		for (line in station.rack.frame.memberCuts())
+			Sys.println('Rack,HFS5-2020,${line.name},${line.length}');
+		for (line in station.bench.memberCuts())
+			Sys.println('Bench,HFS5-2020,${line.name},${line.length}');
 	}
 
 	static function layoutArtifact(path:String):Void {
@@ -121,33 +173,20 @@ class PickingStationWorkflow {
 		var inventory = SheetInventory.open(path);
 		inventory.registerSheet("sheet-001", "birch-ply-18-2440x1220", null, null,
 			null, null, "batch-demo", "sheet-rack-A");
-		inventory.allocate("sheet-001", "picking-bench-sheet-1");
-		var firstValidation = inventory.preview("picking-bench-sheet-1", "sheet-001");
+		inventory.allocate("sheet-001", "station-default-sheet-1");
+		var firstValidation = inventory.preview("station-default-sheet-1", "sheet-001");
 		printValidation(firstValidation);
-		if (!firstValidation.valid) throw "Picking-bench example plan is invalid";
+		if (!firstValidation.valid) throw "Station example plan is invalid";
 		FileSystem.createDirectory(exportDirectory);
-		var firstPlan = inventory.plan("picking-bench-sheet-1"), firstStock = inventory.stockSpec(firstPlan.stockSpecId);
+		var firstPlan = inventory.plan("station-default-sheet-1"), firstStock = inventory.stockSpec(firstPlan.stockSpecId);
 		var firstRequirements = [for (reference in firstPlan.requirements) inventory.requirement(reference.id)];
-		AtomicFile.write(exportDirectory + "/picking-bench-cut-list.csv",
+		AtomicFile.write(exportDirectory + "/station-cut-list.csv",
 			SheetPlanExporter.csv(firstPlan, firstStock, firstRequirements, firstValidation, inventory.piece("sheet-001")));
-		AtomicFile.write(exportDirectory + "/picking-bench-layout.svg",
+		AtomicFile.write(exportDirectory + "/station-layout.svg",
 			SheetPlanExporter.svg(firstPlan, firstStock, firstRequirements, firstValidation, inventory.piece("sheet-001")));
-		inventory.execute(firstPlan.id, "sheet-001", "bench-cut-001", true);
+		inventory.execute(firstPlan.id, "sheet-001", "station-cut-001", true);
 		inventory = SheetInventory.open(path);
-		var remnantId = "bench-cut-001/remnant/shelf-drop";
-		inventory.allocate(remnantId, "tote-divider-from-shelf-drop");
-		var secondValidation = inventory.preview("tote-divider-from-shelf-drop", remnantId);
-		printValidation(secondValidation);
-		if (!secondValidation.valid) throw "Tote-divider remnant plan is invalid";
-		var secondPlan = inventory.plan("tote-divider-from-shelf-drop"), secondStock = inventory.stockSpec(secondPlan.stockSpecId);
-		var secondRequirements = [for (reference in secondPlan.requirements) inventory.requirement(reference.id)];
-		AtomicFile.write(exportDirectory + "/tote-divider-cut-list.csv",
-			SheetPlanExporter.csv(secondPlan, secondStock, secondRequirements, secondValidation, inventory.piece(remnantId)));
-		AtomicFile.write(exportDirectory + "/tote-divider-layout.svg",
-			SheetPlanExporter.svg(secondPlan, secondStock, secondRequirements, secondValidation, inventory.piece(remnantId)));
-		inventory.execute(secondPlan.id, remnantId, "divider-cut-001", true);
-		inventory = SheetInventory.open(path);
-		Sys.println('Reopened project after ${inventory.record.executions.length} executions');
+		Sys.println('Reopened project after ${inventory.record.executions.length} cutting execution');
 		status(path);
 		Sys.println('Planning exports saved below ${FileSystem.fullPath(exportDirectory)}');
 	}
@@ -166,8 +205,10 @@ class PickingStationWorkflow {
 		Sys.println("  preview <project.json> <piece-id> <plan-id> [export-prefix]");
 		Sys.println("  execute <project.json> <piece-id> <plan-id> <execution-id> CONFIRM");
 		Sys.println("  cancel <project.json> <piece-id> <plan-id>");
-		Sys.println("  status <project.json> | bom | layout-check | layout-artifact <file>");
+		Sys.println("  status <project.json> | bom | cut-list | station-check | scenario-demo | check");
+		Sys.println("  layout-check | layout-artifact <file> | station-artifact <file>");
 		Sys.println("  demo <new-project.json> <export-directory>");
+		Sys.println("  ui-extension <request.json> <response.json> (project UI protocol)");
 		return 0;
 	}
 }

@@ -87,7 +87,7 @@ enum {
     RK_MAX_EVENT_RECORDS = 64,
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
-    RK_API_VERSION = 16 /**< Adds versioned plan events and channel declarations. */
+    RK_API_VERSION = 17 /**< Adds events, channels and RKD6 clock-sync diagnostic. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -449,7 +449,8 @@ typedef struct rk_plan_submission {
 } rk_plan_submission;
 
 /** Non-latched runtime diagnostic; safety remains READY. */
-enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3 };
+enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3,
+    RK_FAULT_CLOCK_SYNC_LOST = 4 };
 
 typedef uint32_t rk_session_state;
 enum {

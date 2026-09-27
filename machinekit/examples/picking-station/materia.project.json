@@ -1,10 +1,22 @@
 {
 	"format": "materia.project",
 	"version": 1,
-	"name": "Picking bench sheet stock and cutting plan",
-	"defaultEntrypoint": "layout",
+	"name": "Virtual picking station",
+	"defaultEntrypoint": "station",
 	"build": { "system": "haxeon", "manifest": "haxeon.json" },
+	"uiExtension": {
+		"kind": "haxeon-command",
+		"protocol": "materia.project-ui.v1",
+		"manifest": "haxeon.json",
+		"artifact": "build/host/main.hl",
+		"command": "ui-extension"
+	},
 	"entrypoints": {
+		"station": {
+			"kind": "cad-preview",
+			"module": "PickingStationPreview",
+			"function": "station"
+		},
 		"layout": {
 			"kind": "cad-preview",
 			"module": "PickingStationPreview",

@@ -52,6 +52,7 @@ class PoseArc implements PosePrimitive {
   public function startWaypoint():PoseWaypoint return start;
   public function endWaypoint():PoseWaypoint return end;
   public function speedLimit():Float return feed;
+  public function orientationPolicy():OrientationPolicy return policy;
 
   public function waypointAt(distance:Float):PoseWaypoint {
     if (!Math.isFinite(distance) || distance < 0.0 || distance > length())
