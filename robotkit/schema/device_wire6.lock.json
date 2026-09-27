@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 8
+      "value": 9
     }
   },
   "enums": {
@@ -70,6 +70,62 @@
         }
       ],
       "size": 8
+    },
+    "Event6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "queue_revision",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "plan_id",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "path_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "channel",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "kind",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "hold_policy",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "digital",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "analog",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "argument",
+          "type": "f32"
+        },
+        {
+          "length": 48,
+          "name": "command",
+          "type": "u8"
+        }
+      ],
+      "size": 84
     },
     "QueueBegin6": {
       "endian": "little",
@@ -378,9 +434,44 @@
           "length": 1,
           "name": "link_loss_timeout_ns",
           "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "channel_count",
+          "type": "u8"
+        },
+        {
+          "length": 1536,
+          "name": "channel_id",
+          "type": "u8"
+        },
+        {
+          "length": 32,
+          "name": "channel_kind",
+          "type": "u8"
+        },
+        {
+          "length": 32,
+          "name": "safe_digital",
+          "type": "u8"
+        },
+        {
+          "length": 32,
+          "name": "safe_analog",
+          "type": "f32"
+        },
+        {
+          "length": 32,
+          "name": "safe_argument",
+          "type": "f32"
+        },
+        {
+          "length": 1536,
+          "name": "safe_command",
+          "type": "u8"
         }
       ],
-      "size": 1515
+      "size": 4908
     },
     "State6Header": {
       "endian": "little",

@@ -2,21 +2,26 @@
 use robotkit_device_protocol::device_wire6::*;
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, MAX_FRAME_SIZE};
 use robotkit_device_protocol::{
-    Board, Output, ScheduledCore, ScheduledSegment, SkewGroup, StepGenerator, StopReason, VirtualBoard,
+    Board, DeviceEvents, Output, ScheduledCore, ScheduledSegment, SkewGroup,
+    StepGenerator, StopReason, VirtualBoard,
 };
 use std::collections::VecDeque;
 
 const ACTUATORS: usize = 64;
 const CHANNELS: usize = 32;
 const CAPACITY: usize = 128;
+const EVENT_CAPACITY: usize = 256;
 
 pub struct VirtualDevice {
     board: VirtualBoard<ACTUATORS, CHANNELS>,
     core: Option<ScheduledCore<ACTUATORS, CAPACITY>>,
+    events: Option<DeviceEvents<EVENT_CAPACITY>>,
+    final_safe_applied: bool,
     steps: StepGenerator<ACTUATORS>,
     fingerprint: [u8; 16],
     count: usize,
     session: u64,
+    channel_kind: [u8; CHANNELS],
     step_tick_hz: u32,
     host_ns: u64,
     outbox: VecDeque<Vec<u8>>,
@@ -46,9 +51,12 @@ impl VirtualDevice {
                 [0.0; ACTUATORS], tick_hz)?,
             board: VirtualBoard::new(tick_hz, offset_ticks, drift_ppm, steps_per_unit),
             core: None,
+            events: None,
+            final_safe_applied: false,
             fingerprint,
             count,
             session: 0,
+            channel_kind: [0; CHANNELS],
             step_tick_hz,
             host_ns: 0,
             outbox: VecDeque::new(),
@@ -86,7 +94,7 @@ impl VirtualDevice {
                     status: 0,
                     device_tick_hz: self.board.tick_hz(),
                     segment_capacity: CAPACITY as u16,
-                    event_capacity: 0,
+                    event_capacity: EVENT_CAPACITY as u16,
                     step_tick_hz: self.step_tick_hz,
                     max_degree: 5,
                     actuator_count: self.count as u8,
@@ -144,7 +152,10 @@ impl VirtualDevice {
                     core.initialize_clock(self.board.now_ticks());
                     self.steps = generator;
                     self.core = Some(core);
+                    self.events = Some(DeviceEvents::new(&begin));
+                    self.final_safe_applied = false;
                     self.session = begin.session;
+                    self.channel_kind = begin.channel_kind;
                     ack.status = 1;
                 }
                 let mut bytes = [0; SessionAck6::SIZE];
@@ -174,7 +185,7 @@ impl VirtualDevice {
                 if begin.actuator_count as usize != self.count {
                     return false;
                 }
-                self.core
+                let result = self.core
                     .as_mut()
                     .unwrap()
                     .queue_begin_with_state(
@@ -182,8 +193,10 @@ impl VirtualDevice {
                         begin.replace_after_ticks,
                         begin.expected_position,
                         begin.expected_velocity,
-                    )
-                    .is_ok()
+                    );
+                if result.is_err() { return false; }
+                self.events.as_mut().unwrap().queue_begin(begin.queue_revision,
+                    begin.replace_after_ticks, self.core.as_ref().unwrap().committed_until()).is_ok()
             }
             6 => {
                 let Ok(header) = Segment6Header::decode(&payload[..Segment6Header::SIZE]) else {
@@ -223,33 +236,47 @@ impl VirtualDevice {
                 let Ok(commit) = Commit6::decode(payload) else {
                     return false;
                 };
-                self.core
+                let result = self.core
                     .as_mut()
                     .unwrap()
-                    .commit(commit.through_ticks)
-                    .is_ok()
+                    .commit(commit.through_ticks);
+                if result.is_err() { return false; }
+                self.events.as_mut().unwrap().commit(commit.through_ticks);
+                true
             }
             8 => {
                 self.core.as_mut().unwrap().hold();
+                self.events.as_mut().unwrap().hold(&mut self.board);
                 true
             }
             9 => {
                 self.core.as_mut().unwrap().resume();
+                self.events.as_mut().unwrap().resume(&mut self.board);
                 true
             }
             10 => {
                 self.core.as_mut().unwrap().abort();
+                if self.core.as_ref().unwrap().stop_reason().is_some() {
+                    self.events.as_mut().unwrap().stop(&mut self.board);
+                }
                 true
             }
             11 => {
                 self.core.as_mut().unwrap().stop(StopReason::Stop);
+                self.events.as_mut().unwrap().stop(&mut self.board);
                 true
             }
             12 => {
                 self.core.as_mut().unwrap().emergency_stop(&mut self.board);
+                self.events.as_mut().unwrap().stop(&mut self.board);
+                self.final_safe_applied = true;
                 true
             }
             13 => false,
+            16 => {
+                let Ok(event) = Event6::decode(payload) else { return false; };
+                self.events.as_mut().unwrap().push(event).is_ok()
+            }
             _ => false,
         }
     }
@@ -267,6 +294,15 @@ impl VirtualDevice {
             self.board.advance_host_ns(self.host_ns);
             if let Some(core) = self.core.as_mut() {
                 core.tick(&mut self.board);
+                if core.stop_reason().is_some() {
+                    self.events.as_mut().unwrap().stop(&mut self.board);
+                    if core.is_stopped() && !self.final_safe_applied {
+                        self.events.as_ref().unwrap().apply_safe(&mut self.board);
+                        self.final_safe_applied = true;
+                    }
+                } else {
+                    self.events.as_mut().unwrap().tick(core.path_clock(), &mut self.board);
+                }
                 let targets = self.board.position_targets();
                 if self.steps.tick(&mut self.board, targets).is_err() {
                     core.stop(StopReason::DualDriveSkew);
@@ -296,7 +332,8 @@ impl VirtualDevice {
             path_clock_ticks: core.path_clock(),
             rate: core.rate(),
             remaining_segments: core.remaining_capacity() as u16,
-            remaining_events: 0,
+            remaining_events: self.events.as_ref().map_or(0,
+                |events| events.remaining_capacity() as u16),
             underflow: core.underflow() as u8,
             fault,
         };
@@ -453,7 +490,12 @@ pub unsafe extern "C" fn rkd_virtual_channel_values(
             return 0;
         }
         for i in 0..CHANNELS {
-            *values.add(i) = device.board.analog(i).unwrap_or(0.0);
+            *values.add(i) = match device.channel_kind[i] {
+                1 => device.board.digital(i).unwrap_or(false) as u8 as f32,
+                2 => device.board.analog(i).unwrap_or(0.0),
+                3 => device.board.process_argument(i).unwrap_or(0.0),
+                _ => 0.0,
+            };
         }
         CHANNELS
     } else {
@@ -468,6 +510,36 @@ pub struct StepRecord {
     pub actuator: u32,
     pub forward: u8,
     pub reserved: [u8; 3],
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EventRecord {
+    pub plan_id: u64,
+    pub scheduled_path_ticks: u64,
+    pub applied_path_ticks: u64,
+    pub device_ticks: u64,
+    pub channel: u32,
+    pub kind: u8,
+    pub digital: u8,
+    pub reserved: [u8; 2],
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rkd_virtual_event_log(
+    device: *const VirtualDevice, records: *mut EventRecord, capacity: usize,
+) -> usize {
+    let Some(events) = device.as_ref().and_then(|v| v.events.as_ref()) else { return 0; };
+    let rows = events.records();
+    if records.is_null() || capacity < rows.len() { return rows.len(); }
+    for (i, row) in rows.iter().flatten().enumerate() {
+        *records.add(i) = EventRecord { plan_id: row.plan_id,
+            scheduled_path_ticks: row.scheduled_path_ticks,
+            applied_path_ticks: row.applied_path_ticks, device_ticks: row.device_ticks,
+            channel: row.channel as u32, kind: row.kind, digital: row.digital,
+            reserved: [0; 2] };
+    }
+    rows.len()
 }
 
 #[no_mangle]
@@ -534,6 +606,9 @@ mod tests {
             direction_setup_ticks: [0; 64], actuator_joint: [0; 64],
             actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64],
             link_loss_timeout_ns: 2_000_000_000,
+            channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
+            safe_digital: [0; 32], safe_analog: [0.0; 32],
+            safe_argument: [0.0; 32], safe_command: [0; 1536],
         };
         let mut session = vec![0; SessionBegin6::SIZE];
         begin.encode(&mut session).unwrap();

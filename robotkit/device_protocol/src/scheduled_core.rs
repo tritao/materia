@@ -107,6 +107,7 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     pub fn rate(&self) -> f32 { self.rate }
     pub fn underflow(&self) -> bool { self.underflow }
     pub fn stop_reason(&self) -> Option<StopReason> { self.stopping }
+    pub fn is_stopped(&self) -> bool { self.stopped }
     pub fn remaining_capacity(&self) -> usize { CAP - self.len }
     pub fn positions(&self) -> [f32; A] { self.position }
     pub fn velocities(&self) -> [f32; A] { self.velocity }

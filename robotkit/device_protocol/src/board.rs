@@ -10,5 +10,6 @@ pub trait Board {
     fn set_direction(&mut self, _actuator: usize, _forward: bool) {}
     fn set_digital(&mut self, channel: usize, value: bool);
     fn set_analog(&mut self, channel: usize, value: f32);
+    fn set_process(&mut self, _channel: usize, _command: &[u8; 48], _argument: f32) {}
     fn stop_all(&mut self);
 }

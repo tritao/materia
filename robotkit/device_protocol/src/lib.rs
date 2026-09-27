@@ -10,6 +10,7 @@ mod runtime;
 mod board;
 mod scheduled_core;
 mod step_generator;
+mod device_events;
 #[cfg(feature = "std")]
 mod virtual_board;
 
@@ -18,5 +19,6 @@ pub use runtime::*;
 pub use board::*;
 pub use scheduled_core::*;
 pub use step_generator::*;
+pub use device_events::*;
 #[cfg(feature = "std")]
 pub use virtual_board::*;

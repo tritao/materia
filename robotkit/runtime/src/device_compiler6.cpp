@@ -31,8 +31,9 @@ CompiledDevicePlan6 failure(const char *message) {
 } // namespace
 
 std::array<std::uint8_t, 16> fingerprint_device_layout6(
-    std::array<std::uint8_t, 16> base, std::span<const DeviceActuator6> layout) {
-    if (layout.empty()) return base;
+    std::array<std::uint8_t, 16> base, std::span<const DeviceActuator6> layout,
+    std::span<const rk_channel_declaration> channels) {
+    if (layout.empty() && channels.empty()) return base;
     std::uint64_t hash = 14695981039346656037ULL;
     auto mix = [&](std::uint64_t value) {
         for (int byte = 0; byte < 8; ++byte) {
@@ -51,6 +52,16 @@ std::array<std::uint8_t, 16> fingerprint_device_layout6(
         mix(std::bit_cast<std::uint64_t>(a.max_rate));
         mix(a.direction_setup_ticks);
         mix(std::bit_cast<std::uint64_t>(a.dual_drive_skew_bound));
+    }
+    mix(channels.size());
+    for (const auto &channel : channels) {
+        for (unsigned char c : channel.id) mix(c);
+        mix(channel.kind);
+        mix(channel.safe_value.kind);
+        mix(channel.safe_value.digital);
+        mix(std::bit_cast<std::uint64_t>(channel.safe_value.analog));
+        mix(std::bit_cast<std::uint64_t>(channel.safe_value.argument));
+        for (unsigned char c : channel.safe_value.command) mix(c);
     }
     for (int i = 0; i < 16; ++i) {
         hash ^= hash >> 32; hash *= 1099511628211ULL;

@@ -1,5 +1,5 @@
 # RKD6 scheduled device payload records. Outer frame uses RKD6, length and CRC32.
-const PROTOCOL_VERSION : u8 = 8;
+const PROTOCOL_VERSION : u8 = 9;
 const MAX_ACTUATORS : u8 = 64;
 
 enum MessageType6 : u8 {
@@ -37,6 +37,26 @@ packed SessionBegin6 endian little {
     actuator_ratio : f32[64]
     dual_drive_skew_bound : f32[64]
     link_loss_timeout_ns : u64
+    channel_count : u8
+    channel_id : u8[1536]
+    channel_kind : u8[32]
+    safe_digital : u8[32]
+    safe_analog : f32[32]
+    safe_argument : f32[32]
+    safe_command : u8[1536]
+}
+
+packed Event6 endian little {
+    queue_revision : u64
+    plan_id : u64
+    path_ticks : u64
+    channel : u8
+    kind : u8
+    hold_policy : u8
+    digital : u8
+    analog : f32
+    argument : f32
+    command : u8[48]
 }
 
 packed SessionAck6 endian little {

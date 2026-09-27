@@ -1,6 +1,7 @@
 #pragma once
 
 #include "device_wire6.hpp"
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -11,8 +12,7 @@ namespace robotkit::device_frame6 {
 
 inline constexpr std::size_t HEADER_SIZE = 8;
 inline constexpr std::size_t CRC_SIZE = 4;
-inline constexpr std::size_t MAX_PAYLOAD_SIZE = device_wire6::Segment6Header::SIZE +
-    device_wire6::MAX_ACTUATORS * device_wire6::Segment6Coefficients::SIZE;
+inline constexpr std::size_t MAX_PAYLOAD_SIZE = device_wire6::SessionBegin6::SIZE;
 inline constexpr std::size_t MAX_FRAME_SIZE = HEADER_SIZE + MAX_PAYLOAD_SIZE + CRC_SIZE;
 
 inline std::uint32_t crc32(std::span<const std::uint8_t> bytes) {
@@ -33,7 +33,7 @@ struct Frame {
 inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
     if (bytes.size() < HEADER_SIZE + CRC_SIZE || bytes.size() > MAX_FRAME_SIZE ||
         bytes[0] != 'R' || bytes[1] != 'K' || bytes[2] != 'D' || bytes[3] != '6' ||
-        bytes[5] != 0 || bytes[4] == 0 || bytes[4] > 15) return false;
+        bytes[5] != 0 || bytes[4] == 0 || bytes[4] > 16) return false;
     const auto length = std::size_t(bytes[6]) | (std::size_t(bytes[7]) << 8);
     if (length > MAX_PAYLOAD_SIZE || bytes.size() != HEADER_SIZE + length + CRC_SIZE) return false;
     const auto expected = std::uint32_t(bytes[8 + length]) |
@@ -47,7 +47,8 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
         (bytes[4] == 4 && length != device_wire6::TimeSyncReply::SIZE) ||
         (bytes[4] == 5 && length != device_wire6::QueueBegin6::SIZE) ||
         (bytes[4] == 7 && length != device_wire6::Commit6::SIZE) ||
-        (bytes[4] == 14 && length != device_wire6::QueueStatus6::SIZE)) return false;
+        (bytes[4] == 14 && length != device_wire6::QueueStatus6::SIZE) ||
+        (bytes[4] == 16 && length != device_wire6::Event6::SIZE)) return false;
     if (bytes[4] == 6) {
         if (length < device_wire6::Segment6Header::SIZE) return false;
         device_wire6::Segment6Header header{};
@@ -65,7 +66,7 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
             header.protocol_version != device_wire6::PROTOCOL_VERSION || header.actuator_count == 0 ||
             header.actuator_count > device_wire6::MAX_ACTUATORS ||
             !std::isfinite(header.max_acceleration) || header.max_acceleration <= 0 ||
-            header.link_loss_timeout_ns == 0)
+            header.link_loss_timeout_ns == 0 || header.channel_count > 32)
             return false;
         for (std::size_t i = 0; i < header.actuator_count; ++i) {
             const auto limit = header.actuator_max_acceleration[i];
@@ -78,6 +79,13 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
                 !std::isfinite(header.dual_drive_skew_bound[i]) ||
                 header.dual_drive_skew_bound[i] < 0) return false;
         }
+        for (std::size_t i = 0; i < header.channel_count; ++i) {
+            const auto *id = header.channel_id.data() + i * 48;
+            if (header.channel_kind[i] < 1 || header.channel_kind[i] > 3 || id[0] == 0 ||
+                std::find(id, id + 48, 0) == id + 48 ||
+                header.safe_digital[i] > 1 || !std::isfinite(header.safe_analog[i]) ||
+                !std::isfinite(header.safe_argument[i])) return false;
+        }
     }
     if (bytes[4] == 15) {
         if (length < device_wire6::State6Header::SIZE) return false;
@@ -87,13 +95,21 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
             length != device_wire6::State6Header::SIZE +
                 header.actuator_count * device_wire6::ActuatorState6::SIZE) return false;
     }
+    if (bytes[4] == 16) {
+        device_wire6::Event6 event{};
+        if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, event.SIZE), event) ||
+            event.queue_revision == 0 || event.plan_id == 0 || event.channel >= 32 ||
+            event.kind < 1 || event.kind > 3 || event.hold_policy > 2 ||
+            event.digital > 1 || !std::isfinite(event.analog) ||
+            !std::isfinite(event.argument)) return false;
+    }
     frame = {bytes[4], bytes.subspan(HEADER_SIZE, length)};
     return true;
 }
 
 inline bool encode(std::uint8_t kind, std::span<const std::uint8_t> payload,
                    std::vector<std::uint8_t> &out) {
-    if (kind == 0 || kind > 15 || payload.size() > MAX_PAYLOAD_SIZE) return false;
+    if (kind == 0 || kind > 16 || payload.size() > MAX_PAYLOAD_SIZE) return false;
     out.resize(HEADER_SIZE + payload.size() + CRC_SIZE);
     out[0] = 'R'; out[1] = 'K'; out[2] = 'D'; out[3] = '6';
     out[4] = kind; out[5] = 0;

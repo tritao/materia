@@ -49,9 +49,11 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
         blueprint.joint_count > device_wire6::MAX_ACTUATORS ||
         actuator_count == 0 || actuator_count > device_wire6::MAX_ACTUATORS ||
         !std::isfinite(target_error) || target_error < 0 || clock_bound_ns == 0 ||
-        step_tick_hz == 0 || link_loss_timeout_ns == 0)
+        step_tick_hz == 0 || link_loss_timeout_ns == 0 ||
+        blueprint.channel_count > RK_MAX_PROCESS_CHANNELS)
         return {};
-    fingerprint = fingerprint_device_layout6(fingerprint, layout);
+    fingerprint = fingerprint_device_layout6(fingerprint, layout,
+        std::span(blueprint.channels, blueprint.channel_count));
     device_wire6::SessionBegin6 begin{};
     begin.session = session;
     begin.protocol_version = device_wire6::PROTOCOL_VERSION;
@@ -60,6 +62,22 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     begin.max_degree = 5;
     begin.step_tick_hz = step_tick_hz;
     begin.link_loss_timeout_ns = link_loss_timeout_ns;
+    begin.channel_count = static_cast<std::uint8_t>(blueprint.channel_count);
+    for (std::uint32_t i = 0; i < blueprint.channel_count; ++i) {
+        const auto &channel = blueprint.channels[i];
+        begin.channel_kind[i] = static_cast<std::uint8_t>(channel.kind);
+        begin.safe_digital[i] = static_cast<std::uint8_t>(channel.safe_value.digital);
+        if (!std::isfinite(channel.safe_value.analog) ||
+            !std::isfinite(channel.safe_value.argument) ||
+            std::abs(channel.safe_value.analog) > std::numeric_limits<float>::max() ||
+            std::abs(channel.safe_value.argument) > std::numeric_limits<float>::max()) return {};
+        begin.safe_analog[i] = static_cast<float>(channel.safe_value.analog);
+        begin.safe_argument[i] = static_cast<float>(channel.safe_value.argument);
+        std::memcpy(begin.channel_id.data() + i * RK_PROCESS_CHANNEL_ID_BYTES,
+            channel.id, RK_PROCESS_CHANNEL_ID_BYTES);
+        std::memcpy(begin.safe_command.data() + i * RK_PROCESS_COMMAND_BYTES,
+            channel.safe_value.command, RK_PROCESS_COMMAND_BYTES);
+    }
     for (std::size_t i = 0; i < actuator_count; ++i) {
         const auto mapping = layout.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout[i];
         if (mapping.joint >= blueprint.joint_count || !std::isfinite(mapping.ratio) ||
@@ -165,6 +183,38 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
         plan.ends_at_rest != 0, host_epoch_ns_ + base_time_ns, clock_, blueprint,
         ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_, layout_);
     if (!compiled.ok) return RK_ERROR_LIMIT;
+    const auto event_count = plan.struct_size >= sizeof(plan) ? plan.event_count : 0u;
+    if (event_count > ack_.event_capacity || event_count > RK_MAX_PLAN_EVENTS)
+        return RK_ERROR_LIMIT;
+    std::vector<device_wire6::Event6> wire_events;
+    wire_events.reserve(event_count);
+    for (std::uint32_t i = 0; i < event_count; ++i) {
+        const auto &source = plan.events[i];
+        if (base_time_ns > UINT64_MAX - source.time_ns ||
+            host_epoch_ns_ > UINT64_MAX - base_time_ns - source.time_ns ||
+            !std::isfinite(source.value.analog) || !std::isfinite(source.value.argument) ||
+            std::abs(source.value.analog) > std::numeric_limits<float>::max() ||
+            std::abs(source.value.argument) > std::numeric_limits<float>::max())
+            return RK_ERROR_LIMIT;
+        std::uint32_t channel = blueprint.channel_count;
+        for (std::uint32_t j = 0; j < blueprint.channel_count; ++j)
+            if (std::strcmp(source.channel, blueprint.channels[j].id) == 0) {
+                channel = j; break;
+            }
+        if (channel == blueprint.channel_count ||
+            source.value.kind != blueprint.channels[channel].kind) return RK_ERROR_INVALID_ARGUMENT;
+        device_wire6::Event6 event{};
+        event.plan_id = plan.plan_id;
+        event.path_ticks = clock_.map_host_ns(host_epoch_ns_ + base_time_ns + source.time_ns);
+        event.channel = static_cast<std::uint8_t>(channel);
+        event.kind = static_cast<std::uint8_t>(source.value.kind);
+        event.hold_policy = static_cast<std::uint8_t>(source.hold_policy);
+        event.digital = static_cast<std::uint8_t>(source.value.digital);
+        event.analog = static_cast<float>(source.value.analog);
+        event.argument = static_cast<float>(source.value.argument);
+        std::memcpy(event.command.data(), source.value.command, RK_PROCESS_COMMAND_BYTES);
+        wire_events.push_back(event);
+    }
     const auto path_rate = static_cast<double>(compiled.segments.front().header.duration_ticks) /
         static_cast<double>(plan.segments.segments[0].duration_ns);
     if (!std::isfinite(path_rate) || path_rate <= 0) return RK_ERROR_LIMIT;
@@ -198,6 +248,12 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
     }
     std::array<std::uint8_t, device_wire6::QueueBegin6::SIZE> body{};
     if (!device_wire6::encode(begin, body) || !send_record(5, body)) return RK_ERROR_BACKEND;
+    for (auto &event : wire_events) {
+        event.queue_revision = revision_;
+        std::array<std::uint8_t, device_wire6::Event6::SIZE> event_body{};
+        if (!device_wire6::encode(event, event_body) || !send_record(16, event_body))
+            return RK_ERROR_BACKEND;
+    }
     path_maps_.push_back({compiled.segments.front().header.t0_ticks, base_time_ns, path_rate});
     if (plan.replace_after_plan_id) {
         while (!pending_.empty() && pending_.back().header.t0_ticks >= replace_ticks)

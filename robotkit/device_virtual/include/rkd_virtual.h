@@ -15,6 +15,16 @@ typedef struct rkd_virtual_step_record {
     uint8_t forward;
     uint8_t reserved[3];
 } rkd_virtual_step_record;
+typedef struct rkd_virtual_event_record {
+    uint64_t plan_id;
+    uint64_t scheduled_path_ticks;
+    uint64_t applied_path_ticks;
+    uint64_t device_ticks;
+    uint32_t channel;
+    uint8_t kind;
+    uint8_t digital;
+    uint8_t reserved[2];
+} rkd_virtual_event_record;
 
 /* host_ns is the deterministic owner clock; the board applies offset and drift. */
 rkd_virtual_device *rkd_virtual_create(uint64_t tick_hz, uint32_t step_tick_hz,
@@ -32,6 +42,8 @@ size_t rkd_virtual_channel_values(const rkd_virtual_device *device,
     float *values, size_t capacity);
 size_t rkd_virtual_step_log(const rkd_virtual_device *device,
     rkd_virtual_step_record *records, size_t capacity);
+size_t rkd_virtual_event_log(const rkd_virtual_device *device,
+    rkd_virtual_event_record *records, size_t capacity);
 int32_t rkd_virtual_miss_next_steps(rkd_virtual_device *device,
     uint32_t actuator, uint32_t count);
 

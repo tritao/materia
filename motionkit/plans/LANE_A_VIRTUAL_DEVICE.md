@@ -583,3 +583,19 @@ joint-to-actuator conversion loop in `device_compiler6.cpp` has the marked
 extension point for follower derivation and submit-time coupling validation.
 No coupling logic was added elsewhere; transmissions and couplings remain
 separate model concepts.
+
+### A8 — Path-clock events on RKD6
+
+Version 9 adds a fixed `EVENT` record and session channel declarations. The
+endpoint maps each plan's `TimedEvent` to device path ticks beside its
+segments. The no_std event scheduler fires committed events when the device
+path clock crosses their tick and records scheduled path ticks, applied path
+ticks and device ticks. HOLD sets active channels safe and RESUME restores
+`RestoreOnResume` values. STOP and faults discard future events and apply each
+declared safe value; queue replacement discards events at or after its boundary.
+The session fingerprint now includes channel IDs, kinds and safe values.
+
+Shared Rust/C++ frame vectors include a digital event. Rust tests cover
+path-time firing across HOLD and replacement. The in-process RKD6 test covers
+spray on/off without HOLD, with HOLD, and STOP, and checks application within
+one device step tick of each planned path position.
