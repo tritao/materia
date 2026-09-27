@@ -20,6 +20,7 @@ public:
     virtual bool send(std::span<const std::uint8_t> frame) = 0;
     virtual bool receive(std::vector<std::uint8_t> &frame) = 0;
     virtual unsigned baud() const noexcept = 0;
+    virtual std::uint64_t received_at_ns() const noexcept { return 0; }
 };
 
 class RK_API Rkd6Endpoint final : public RobotEndpoint {
@@ -63,6 +64,7 @@ private:
     ClockEstimator6 clock_;
     double target_error_;
     std::uint64_t link_latency_ns_;
+    std::uint64_t owner_period_ns_ = 10'000'000;
     std::uint64_t host_epoch_ns_ = 0;
     std::uint64_t device_epoch_ticks_ = 0;
     bool epoch_set_ = false;
@@ -75,6 +77,13 @@ private:
     std::deque<DeviceSegment6> pending_;
     std::vector<DeviceSegment6> sent_;
     std::size_t next_commit_ = 0;
+    struct PathMap {
+        std::uint64_t device_start_ticks;
+        std::uint64_t host_path_start_ns;
+        double ticks_per_host_ns;
+    };
+    std::vector<PathMap> path_maps_;
+    std::uint64_t path_time_ns(std::uint64_t device_ticks) const noexcept;
 };
 
 } // namespace robotkit

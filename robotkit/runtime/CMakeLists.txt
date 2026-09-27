@@ -1,3 +1,20 @@
+find_program(RK_VIRTUAL_CARGO_EXECUTABLE cargo REQUIRED)
+set(RK_VIRTUAL_LIB ${CMAKE_CURRENT_BINARY_DIR}/cargo-virtual/debug/librobotkit_device_virtual.a)
+add_custom_command(OUTPUT ${RK_VIRTUAL_LIB}
+    COMMAND ${RK_VIRTUAL_CARGO_EXECUTABLE} build
+        --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/Cargo.toml
+        --target-dir ${CMAKE_CURRENT_BINARY_DIR}/cargo-virtual
+    DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/Cargo.toml
+        ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/src/lib.rs
+        ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/scheduled_core.rs
+        ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/src/virtual_board.rs
+    VERBATIM)
+add_custom_target(robotkit_device_virtual_build DEPENDS ${RK_VIRTUAL_LIB})
+add_library(robotkit_device_virtual STATIC IMPORTED GLOBAL)
+set_target_properties(robotkit_device_virtual PROPERTIES IMPORTED_LOCATION ${RK_VIRTUAL_LIB})
+add_dependencies(robotkit_device_virtual robotkit_device_virtual_build)
+
 add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/validation.cpp
     src/runtime.cpp
@@ -7,11 +24,15 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/device_serial_endpoint.cpp
     src/clock_estimator6.cpp
     src/device_compiler6.cpp
-    src/rkd6_endpoint.cpp)
+    src/rkd6_endpoint.cpp
+    src/virtual_device_endpoint.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
-target_link_libraries(robotkit_runtime PUBLIC motionkit_core PRIVATE robotkit_mcap_headers)
+target_link_libraries(robotkit_runtime PUBLIC motionkit_core
+    PRIVATE robotkit_mcap_headers robotkit_device_virtual)
+target_include_directories(robotkit_runtime PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/include)
 target_compile_definitions(robotkit_runtime PRIVATE RK_BUILDING_LIBRARY)
 if(NOT RK_BUILD_SHARED OR EMSCRIPTEN)
     target_compile_definitions(robotkit_runtime PUBLIC RK_STATIC)
@@ -94,6 +115,13 @@ if(RK_BUILD_TESTS)
     target_link_libraries(robotkit_rkd6_endpoint_tests PRIVATE motionkit_core)
     add_test(NAME robotkit_rkd6_endpoint COMMAND robotkit_rkd6_endpoint_tests)
     set_tests_properties(robotkit_rkd6_endpoint PROPERTIES LABELS "robot;runtime;wire" TIMEOUT 30)
+
+    add_executable(robotkit_virtual_device_endpoint_tests tests/virtual_device_endpoint.cpp)
+    target_compile_features(robotkit_virtual_device_endpoint_tests PRIVATE cxx_std_20)
+    target_include_directories(robotkit_virtual_device_endpoint_tests PRIVATE src)
+    target_link_libraries(robotkit_virtual_device_endpoint_tests PRIVATE RobotKit::runtime)
+    add_test(NAME robotkit_virtual_device_endpoint COMMAND robotkit_virtual_device_endpoint_tests)
+    set_tests_properties(robotkit_virtual_device_endpoint PROPERTIES LABELS "robot;runtime;virtual" TIMEOUT 30)
 
     add_executable(robotkit_device_protocol_tests tests/device_protocol.cpp)
     target_compile_features(robotkit_device_protocol_tests PRIVATE cxx_std_20)

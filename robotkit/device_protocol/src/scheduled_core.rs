@@ -108,11 +108,34 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     pub fn underflow(&self) -> bool { self.underflow }
     pub fn stop_reason(&self) -> Option<StopReason> { self.stopping }
     pub fn remaining_capacity(&self) -> usize { CAP - self.len }
+    pub fn positions(&self) -> [f32; A] { self.position }
+    pub fn velocities(&self) -> [f32; A] { self.velocity }
+    pub fn executing_plan_id(&self) -> u64 {
+        for segment in self.segments[..self.committed_len()].iter().flatten() {
+            if self.path_clock >= segment.t0_ticks && self.path_clock <= segment.end_ticks() {
+                return segment.plan_id;
+            }
+        }
+        0
+    }
+    pub fn executing_segment(&self) -> u16 {
+        for (index, segment) in self.segments[..self.committed_len()].iter().flatten().enumerate() {
+            if self.path_clock >= segment.t0_ticks && self.path_clock <= segment.end_ticks() {
+                return index as u16;
+            }
+        }
+        0
+    }
     fn committed_len(&self) -> usize {
         self.segments[..self.len].iter().take_while(|s|
             s.unwrap().end_ticks() <= self.committed_until).count()
     }
     pub fn note_host_frame(&mut self, now_ticks: u64) { self.last_frame_tick = now_ticks; }
+    pub fn initialize_clock(&mut self, now_ticks: u64) {
+        self.last_device_tick = now_ticks;
+        self.last_frame_tick = now_ticks;
+        self.path_clock = now_ticks;
+    }
     pub fn queue_begin(&mut self, revision: u64, replace_after: u64) -> Result<(), QueueError> {
         if revision <= self.revision { return Err(QueueError::StaleRevision); }
         if replace_after < self.committed_until { return Err(QueueError::Committed); }

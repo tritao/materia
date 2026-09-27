@@ -15,6 +15,7 @@
 namespace robotkit {
 
 class SimulationRobot;
+class VirtualDeviceEndpoint;
 
 /**
  * Owns one shared simulated universe and coordinates all RobotRuntime objects
@@ -156,6 +157,8 @@ private:
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;
     std::vector<std::weak_ptr<SimulationRobot>> bindings_;
+    std::vector<std::shared_ptr<SimulationRobot>> virtual_bindings_;
+    std::vector<std::shared_ptr<VirtualDeviceEndpoint>> virtual_devices_;
     std::vector<std::shared_ptr<RobotRuntime>> runtimes_;
     std::vector<rk_robot_runtime> handles_;
     std::vector<nksim_body> robot_base_bodies_;

@@ -32,7 +32,7 @@ public:
             assert(device_wire6::decode(decoded.payload.first(begin.SIZE), begin));
             device_wire6::SessionAck6 ack{};
             ack.session = begin.session;
-            ack.protocol_version = 6;
+            ack.protocol_version = device_wire6::PROTOCOL_VERSION;
             ack.device_fingerprint = fingerprint;
             ack.status = 1;
             ack.device_tick_hz = 1'000'000;

@@ -387,22 +387,38 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	/**
 	 * Optional initial pose for one robot added to a Simulation.
 	 */
-	struct rk_simulation_robot_desc @layout(1605728, 8) {
+	struct rk_simulation_robot_desc @layout(1606352, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		reserved0: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
 		reserved: array<u64, 2> @offset(72);
+		virtual_device_enabled: u32 @offset(88);
+		virtual_device_step_tick_hz: u32 @offset(92);
+		virtual_device_tick_hz: u64 @offset(96);
+		virtual_device_offset_ticks: u64 @offset(104);
+		virtual_device_drift_ppm: i32 @offset(112);
+		virtual_device_baud: u32 @offset(116);
+		virtual_device_latency_ns: u64 @offset(120);
+		virtual_device_jitter_ns: u64 @offset(128);
+		virtual_device_drop_rate: f64 @offset(136);
+		virtual_device_corruption_rate: f64 @offset(144);
+		virtual_device_seed: u64 @offset(152);
+		virtual_device_steps_per_unit: array<f64, 64> @offset(160);
+		virtual_device_fingerprint: array<u8, 16> @offset(672);
+		virtual_device_target_error: f64 @offset(688);
+		virtual_device_clock_bound_ns: u64 @offset(696);
+		virtual_device_link_loss_timeout_ns: u64 @offset(704);
 		/**
 		 * Optional origin-centred link boxes; zero extents preserve legacy shape policy.
 		 */
-		collision_half_extents: array<f64, 3072> @offset(88);
+		collision_half_extents: array<f64, 3072> @offset(712);
 		/**
 		 * Optional physical-part convex hulls; 4..64 local XYZ vertices per link.
 		 */
-		collision_hull_count: array<u32, 1024> @offset(24664);
-		collision_hull_vertices: array<f64, 196608> @offset(28760);
-		closure_count: u32 @offset(1601624);
-		closures: array<rk_simulation_closure_desc, 64> @offset(1601632);
+		collision_hull_count: array<u32, 1024> @offset(25288);
+		collision_hull_vertices: array<f64, 196608> @offset(29384);
+		closure_count: u32 @offset(1602248);
+		closures: array<rk_simulation_closure_desc, 64> @offset(1602256);
 	}
 	/**
 	 * Opaque handle for one shared simulation universe and clock.

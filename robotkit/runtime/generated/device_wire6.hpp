@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 6;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 7;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -30,7 +30,7 @@ enum class MessageType6 : std::uint8_t {
     event = 16,
 };
 
-inline constexpr std::size_t SessionBegin6_SIZE = 43;
+inline constexpr std::size_t SessionBegin6_SIZE = 299;
 struct SessionBegin6 {
     static constexpr std::size_t SIZE = SessionBegin6_SIZE;
     std::uint64_t session{};
@@ -39,8 +39,9 @@ struct SessionBegin6 {
     std::uint8_t actuator_count{};
     std::uint8_t max_degree{};
     std::uint32_t step_tick_hz{};
-    std::uint64_t link_loss_ticks{};
     float max_acceleration{};
+    std::array<float, 64> actuator_max_acceleration{};
+    std::uint64_t link_loss_timeout_ns{};
 };
 
 inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
@@ -70,20 +71,27 @@ inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
     out[offset++] = static_cast<std::uint8_t>(bits_step_tick_hz >> 8);
     out[offset++] = static_cast<std::uint8_t>(bits_step_tick_hz >> 16);
     out[offset++] = static_cast<std::uint8_t>(bits_step_tick_hz >> 24);
-    const std::uint64_t bits_link_loss_ticks = static_cast<std::uint64_t>(value.link_loss_ticks);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_ticks >> 0);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_ticks >> 8);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_ticks >> 16);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_ticks >> 24);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_ticks >> 32);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_ticks >> 40);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_ticks >> 48);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_ticks >> 56);
     const std::uint32_t bits_max_acceleration = std::bit_cast<std::uint32_t>(value.max_acceleration);
     out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 0);
     out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 8);
     out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 16);
     out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 24);
+    for (std::size_t i = 0; i < 64; ++i) {
+        const std::uint32_t bits_actuator_max_acceleration = std::bit_cast<std::uint32_t>(value.actuator_max_acceleration[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_actuator_max_acceleration >> 0);
+        out[offset++] = static_cast<std::uint8_t>(bits_actuator_max_acceleration >> 8);
+        out[offset++] = static_cast<std::uint8_t>(bits_actuator_max_acceleration >> 16);
+        out[offset++] = static_cast<std::uint8_t>(bits_actuator_max_acceleration >> 24);
+    }
+    const std::uint64_t bits_link_loss_timeout_ns = static_cast<std::uint64_t>(value.link_loss_timeout_ns);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 56);
     return true;
 }
 
@@ -120,78 +128,20 @@ inline bool decode(std::span<const std::uint8_t> input, SessionBegin6 &value) {
     bits_step_tick_hz |= static_cast<std::uint32_t>(input[offset++]) << 16;
     bits_step_tick_hz |= static_cast<std::uint32_t>(input[offset++]) << 24;
     value.step_tick_hz = bits_step_tick_hz;
-    std::uint64_t bits_link_loss_ticks = 0;
-    bits_link_loss_ticks |= static_cast<std::uint64_t>(input[offset++]) << 0;
-    bits_link_loss_ticks |= static_cast<std::uint64_t>(input[offset++]) << 8;
-    bits_link_loss_ticks |= static_cast<std::uint64_t>(input[offset++]) << 16;
-    bits_link_loss_ticks |= static_cast<std::uint64_t>(input[offset++]) << 24;
-    bits_link_loss_ticks |= static_cast<std::uint64_t>(input[offset++]) << 32;
-    bits_link_loss_ticks |= static_cast<std::uint64_t>(input[offset++]) << 40;
-    bits_link_loss_ticks |= static_cast<std::uint64_t>(input[offset++]) << 48;
-    bits_link_loss_ticks |= static_cast<std::uint64_t>(input[offset++]) << 56;
-    value.link_loss_ticks = bits_link_loss_ticks;
     std::uint32_t bits_max_acceleration = 0;
     bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 0;
     bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 8;
     bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 16;
     bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 24;
     value.max_acceleration = std::bit_cast<float>(bits_max_acceleration);
-    return true;
-}
-
-inline constexpr std::size_t ActuatorLimit6_SIZE = 4;
-struct ActuatorLimit6 {
-    static constexpr std::size_t SIZE = ActuatorLimit6_SIZE;
-    float max_acceleration{};
-};
-
-inline bool encode(const ActuatorLimit6 &value, std::span<std::uint8_t> out) {
-    if (out.size() < ActuatorLimit6_SIZE) return false;
-    std::size_t offset = 0;
-    const std::uint32_t bits_max_acceleration = std::bit_cast<std::uint32_t>(value.max_acceleration);
-    out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 0);
-    out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 8);
-    out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 16);
-    out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 24);
-    return true;
-}
-
-inline bool decode(std::span<const std::uint8_t> input, ActuatorLimit6 &value) {
-    if (input.size() != ActuatorLimit6_SIZE) return false;
-    std::size_t offset = 0;
-    std::uint32_t bits_max_acceleration = 0;
-    bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 0;
-    bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 8;
-    bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 16;
-    bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 24;
-    value.max_acceleration = std::bit_cast<float>(bits_max_acceleration);
-    return true;
-}
-
-inline constexpr std::size_t SessionTiming6_SIZE = 8;
-struct SessionTiming6 {
-    static constexpr std::size_t SIZE = SessionTiming6_SIZE;
-    std::uint64_t link_loss_timeout_ns{};
-};
-
-inline bool encode(const SessionTiming6 &value, std::span<std::uint8_t> out) {
-    if (out.size() < SessionTiming6_SIZE) return false;
-    std::size_t offset = 0;
-    const std::uint64_t bits_link_loss_timeout_ns = static_cast<std::uint64_t>(value.link_loss_timeout_ns);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 0);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 8);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 16);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 24);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 32);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 40);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 48);
-    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 56);
-    return true;
-}
-
-inline bool decode(std::span<const std::uint8_t> input, SessionTiming6 &value) {
-    if (input.size() != SessionTiming6_SIZE) return false;
-    std::size_t offset = 0;
+    for (std::size_t i = 0; i < 64; ++i) {
+        std::uint32_t bits_actuator_max_acceleration = 0;
+        bits_actuator_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 0;
+        bits_actuator_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 8;
+        bits_actuator_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 16;
+        bits_actuator_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 24;
+        value.actuator_max_acceleration[i] = std::bit_cast<float>(bits_actuator_max_acceleration);
+    }
     std::uint64_t bits_link_loss_timeout_ns = 0;
     bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 0;
     bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 8;

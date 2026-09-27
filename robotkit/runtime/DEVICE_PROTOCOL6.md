@@ -16,16 +16,16 @@ with degree at most five. Segment start and duration are device ticks. One
 one `ActuatorState6` record per actuator. Queue control and safety command
 frames carry the fixed records specified by the schema. The session ACK
 reports the tick rate, step tick rate, degree limit and queue capacities.
-`SESSION_BEGIN6` carries a fixed header followed by one `ActuatorLimit6`
-record per actuator. The header's acceleration is the global cap; each
-actuator limit must be positive and no greater than that cap. This trailing
-record keeps the published fixed header compatible while supplying A4's
-per-actuator HOLD and stop limits.
-One `SessionTiming6` record follows the actuator limits. It carries the
-link-loss timeout in nanoseconds because the host learns the device tick rate
-only in `SESSION_ACK6`. The device converts it using its own clock. The older
-fixed header's `link_loss_ticks` field is zero when this trailing record is
-present.
+`SESSION_BEGIN6` is one fixed record. Its 64-slot acceleration array carries
+the active actuator limits, each positive and no greater than the global cap.
+It also carries the link-loss timeout in nanoseconds. The device converts that
+timeout using its own clock after the session begins.
+
+No RKD6 hardware has shipped. Before the first hardware release, an in-place
+schema revision is permitted with a `PROTOCOL_VERSION` bump and regenerated
+Rust and C++ codecs, lock, and shared vectors. The schema freezes at the first
+hardware release; subsequent changes must preserve that released wire format
+or negotiate a new version.
 
 | Quantity | RKD6 bound | Source |
 | --- | ---: | --- |
@@ -60,3 +60,22 @@ and commits over a complete-frame transport. It qualifies baud and queue
 depth at construction and checks the shortest submitted segment again before
 sending a plan. The runtime leaves per-cycle target streaming to RKD5
 endpoints; RKD6 snapshots use device queue status.
+# In-process virtual device
+
+`robotkit/device_virtual` links the no_std scheduled core to the `std`
+virtual board as a static library. Its C ABI in
+`robotkit/device_virtual/include/rkd_virtual.h` accepts and returns complete
+RKD6 frames and advances on the caller's simulated host clock. The board
+applies offset and ppm drift before each 40 kHz step tick. A step pulse is
+recorded with its device tick, actuator and direction. The A7 step-rate and
+direction-setup constraints are still to be added.
+
+`VirtualDeviceEndpoint` owns that library behind a deterministic complete
+frame link. Baud, latency, jitter, frame drop, corruption and RNG seed are
+configurable. A sampled line error delays a frame by one packet time before
+retry; `cut_link(true)` suppresses host-to-device frames while leaving
+telemetry available to observe device-side `link_lost`. The SimKit robot
+descriptor can select this endpoint, and `Simulation.addRobot` exposes it as
+`VirtualDeviceOptions`. The step-count position drives each SimKit joint
+through a position target. Device status and state are sampled on the
+simulation owner clock.

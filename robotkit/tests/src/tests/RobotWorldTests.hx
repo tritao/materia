@@ -15,6 +15,7 @@ import robotkit.runtime.RobotRuntimeMobileConfiguration;
 import robotkit.runtime.RobotRuntimeForkConfiguration;
 import robotkit.runtime.RobotRuntimeForkAxisConfiguration;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.VirtualDeviceOptions;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
@@ -210,6 +211,7 @@ class RobotWorldTests {
     testSerialDeploymentVersions();
     testProcessChannelDeployment();
     testRuntimeProcessEvents();
+    testVirtualDeviceSimulation();
     assertions += SpatialTests.run();
     assertions += KinematicsTests.run();
     assertions += ToolTests.run();
@@ -3806,6 +3808,35 @@ class RobotWorldTests {
     equal(sprayer.history[1].timestampNs, Int64.ofInt(300000000),
       "sprayer receives the later scheduled trajectory time");
     equal(recorded.processEvents.length, 2, "recording captures fired runtime events");
+    simulation.dispose();
+  }
+
+  static function testVirtualDeviceSimulation():Void {
+    var model = new RobotModel("virtual-device");
+    var base = model.addLink(new Link("base"));
+    var tool = model.addLink(new Link("tool"));
+    var joint = model.addJoint(new Joint("axis", JointType.Revolute, base, tool));
+    joint.limits = new JointLimits(-2.0, 2.0, 3.0, 10.0, 10.0);
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var options = new VirtualDeviceOptions();
+    options.stepsPerUnit = [1000.0];
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint, null, options);
+    for (tick in 1...21) simulation.step(Int64.ofInt(tick));
+    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000),
+      [[0.0, 0.0, 0.0, 5.0, -7.5, 3.0]]);
+    var plan = new ExecutionPlanSubmission(Int64.ofInt(900),
+      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      [0.0], [0.0], [0.0], [segment]);
+    runtime.submitPlan(plan, 1);
+    for (tick in 21...140) simulation.step(Int64.ofInt(tick));
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.5) <= 0.0011,
+      "RKD6 virtual device runs a scheduled plan in Simulation");
+    var toolPose = simulation.linkPose(0, 1);
+    var plantAngle = 2.0 * Math.atan2(toolPose.rotation[2], toolPose.rotation[3]);
+    check(Math.abs(plantAngle - 0.5) <= 0.0011,
+      "virtual step position drives the SimKit joint");
     simulation.dispose();
   }
 

@@ -56,7 +56,7 @@ class ProjectSourceTests {
     model.collisionApproximation = robotkit.model.CollisionApproximation.None;
     var simulation = new Simulation(0.01, 1, backend);
     simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
-      [0.0, 0.0, 0.0, 1.0], [enabled ? [0.5, 0.5, 0.5] : null]);
+      [0.0, 0.0, 0.0, 1.0], null, [enabled ? [0.5, 0.5, 0.5] : null]);
     var box = simulation.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
     for (index in 0...200) simulation.step(Int64.ofInt(index));
     var height = simulation.objectPose(box).position[2];

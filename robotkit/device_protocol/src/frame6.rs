@@ -55,25 +55,19 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
     if let Some(size) = exact {
         if bytes.len() != size { return Err(Frame6Error::BadLength); }
     } else if kind == 1 {
-        if bytes.len() < SessionBegin6::SIZE { return Err(Frame6Error::BadLength); }
-        let head = SessionBegin6::decode(&bytes[..SessionBegin6::SIZE])
+        if bytes.len() != SessionBegin6::SIZE { return Err(Frame6Error::BadLength); }
+        let head = SessionBegin6::decode(bytes)
             .map_err(|_| Frame6Error::BadPayload)?;
-        if head.protocol_version != 6 || head.actuator_count == 0 ||
+        if head.protocol_version != PROTOCOL_VERSION || head.actuator_count == 0 ||
            head.actuator_count > MAX_ACTUATORS || !head.max_acceleration.is_finite() ||
-           head.max_acceleration <= 0.0 ||
-           bytes.len() != SessionBegin6::SIZE + head.actuator_count as usize * ActuatorLimit6::SIZE +
-               SessionTiming6::SIZE {
+           head.max_acceleration <= 0.0 || head.link_loss_timeout_ns == 0 {
             return Err(Frame6Error::BadPayload);
         }
-        let limits_end = SessionBegin6::SIZE + head.actuator_count as usize * ActuatorLimit6::SIZE;
-        for chunk in bytes[SessionBegin6::SIZE..limits_end].chunks_exact(ActuatorLimit6::SIZE) {
-            let limit = ActuatorLimit6::decode(chunk).map_err(|_| Frame6Error::BadPayload)?;
-            if !limit.max_acceleration.is_finite() || limit.max_acceleration <= 0.0 ||
-               limit.max_acceleration > head.max_acceleration { return Err(Frame6Error::BadPayload); }
+        for &limit in &head.actuator_max_acceleration[..head.actuator_count as usize] {
+            if !limit.is_finite() || limit <= 0.0 || limit > head.max_acceleration {
+                return Err(Frame6Error::BadPayload);
+            }
         }
-        let timing = SessionTiming6::decode(&bytes[limits_end..])
-            .map_err(|_| Frame6Error::BadPayload)?;
-        if timing.link_loss_timeout_ns == 0 { return Err(Frame6Error::BadPayload); }
     } else if kind == 6 {
         if bytes.len() < Segment6Header::SIZE { return Err(Frame6Error::BadLength); }
         let head = Segment6Header::decode(&bytes[..Segment6Header::SIZE])

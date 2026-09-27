@@ -1,0 +1,63 @@
+#pragma once
+
+#include "rkd6_endpoint.hpp"
+#include <array>
+#include <cstdint>
+#include <memory>
+#include <vector>
+
+namespace robotkit {
+
+/** Deterministic in-process RKD6 link and board configuration. */
+struct VirtualDeviceConfig6 {
+    std::uint64_t device_tick_hz = 1'000'000;
+    std::uint32_t step_tick_hz = 40'000;
+    std::uint64_t offset_ticks = 50'000;
+    std::int32_t drift_ppm = 0;
+    unsigned baud = 921'600;
+    std::uint64_t latency_ns = 100'000;
+    std::uint64_t jitter_ns = 0;
+    double frame_drop_rate = 0;
+    double corruption_rate = 0;
+    std::uint64_t seed = 1;
+    std::array<std::uint8_t, 16> fingerprint{};
+    std::vector<double> steps_per_unit;
+    double target_error = 1e-5;
+    std::uint64_t clock_bound_ns = 500'000;
+    std::uint64_t link_loss_timeout_ns = 500'000'000;
+};
+
+struct VirtualStepRecord6 {
+    std::uint64_t ticks;
+    std::uint32_t actuator;
+    bool forward;
+    bool operator==(const VirtualStepRecord6 &) const = default;
+};
+
+class RK_API VirtualDeviceEndpoint final : public RobotEndpoint {
+public:
+    static std::shared_ptr<VirtualDeviceEndpoint> create(
+        const rk_robot_runtime_blueprint &blueprint, VirtualDeviceConfig6 config);
+    rk_result apply(const rk_robot_command &command) override;
+    rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
+    bool reports_safety_state() const noexcept override { return true; }
+    rk_safety_state initial_safety_state() const noexcept override { return RK_SAFETY_READY; }
+    bool executes_trajectory_queue() const noexcept override { return true; }
+    int32_t diagnostic_code() const noexcept override;
+    rk_result submit_device_plan(const rk_plan_submission &, std::uint64_t base_time_ns,
+        std::uint64_t owner_now_ns, std::uint64_t committed_through_ns,
+        const rk_robot_runtime_blueprint &) override;
+    void cut_link(bool cut);
+    std::vector<double> actuator_positions() const;
+    std::vector<float> channel_values() const;
+    std::vector<VirtualStepRecord6> step_log() const;
+
+private:
+    class Link;
+    VirtualDeviceEndpoint(std::shared_ptr<Rkd6Endpoint> inner, Link *link)
+        : inner_(std::move(inner)), link_(link) {}
+    std::shared_ptr<Rkd6Endpoint> inner_;
+    Link *link_;
+};
+
+} // namespace robotkit

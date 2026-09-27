@@ -167,7 +167,7 @@ class ApplicationSimulation {
           throw 'Robot "$id" is remote and read-only';
         var blueprint = RobotRuntimeCompiler.compile(converted.model, appliedRevision + 1);
         var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 1.0], null, collisionHulls, closures);
+          [0.0, 0.0, 0.0, 1.0], null, null, collisionHulls, closures);
         candidateRobots.push(new SimulatedRobot(id, runtime, converted.model.name,
           [for (link in converted.model.links) link.id],
           [for (joint in converted.model.joints) joint.id]));

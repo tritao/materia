@@ -59,26 +59,19 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
                 header.actuator_count * device_wire6::Segment6Coefficients::SIZE) return false;
     }
     if (bytes[4] == 1) {
-        if (length < device_wire6::SessionBegin6::SIZE) return false;
+        if (length != device_wire6::SessionBegin6::SIZE) return false;
         device_wire6::SessionBegin6 header{};
         if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, header.SIZE), header) ||
-            header.protocol_version != 6 || header.actuator_count == 0 ||
+            header.protocol_version != device_wire6::PROTOCOL_VERSION || header.actuator_count == 0 ||
             header.actuator_count > device_wire6::MAX_ACTUATORS ||
             !std::isfinite(header.max_acceleration) || header.max_acceleration <= 0 ||
-            length != header.SIZE + header.actuator_count * device_wire6::ActuatorLimit6::SIZE +
-                device_wire6::SessionTiming6::SIZE)
+            header.link_loss_timeout_ns == 0)
             return false;
         for (std::size_t i = 0; i < header.actuator_count; ++i) {
-            device_wire6::ActuatorLimit6 limit{};
-            if (!device_wire6::decode(bytes.subspan(HEADER_SIZE + header.SIZE +
-                     i * limit.SIZE, limit.SIZE), limit) ||
-                !std::isfinite(limit.max_acceleration) || limit.max_acceleration <= 0 ||
-                limit.max_acceleration > header.max_acceleration) return false;
+            const auto limit = header.actuator_max_acceleration[i];
+            if (!std::isfinite(limit) || limit <= 0 ||
+                limit > header.max_acceleration) return false;
         }
-        device_wire6::SessionTiming6 timing{};
-        if (!device_wire6::decode(bytes.subspan(HEADER_SIZE + header.SIZE +
-                header.actuator_count * device_wire6::ActuatorLimit6::SIZE, timing.SIZE), timing) ||
-            timing.link_loss_timeout_ns == 0) return false;
     }
     if (bytes[4] == 15) {
         if (length < device_wire6::State6Header::SIZE) return false;
