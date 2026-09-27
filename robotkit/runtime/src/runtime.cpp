@@ -593,7 +593,7 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
         out_snapshot.velocity[index] = state_.velocity[index];
         out_snapshot.effort[index] = state_.effort[index];
     }
-    out_snapshot.fault_code = state_.safety == RK_SAFETY_FAULT ? 1 :
+    out_snapshot.fault_code = state_.safety == RK_SAFETY_FAULT ? latched_fault_code_ :
         control_.diagnostic_code;
     out_snapshot.received_timestamp_ns = state_.received_timestamp_ns;
     out_snapshot.trajectory_queue_depth = state_.trajectory_queue_depth;
@@ -640,7 +640,7 @@ rk_result RobotRuntime::step_owner(uint64_t timestamp_ns) {
     return publish_sample(timestamp_ns);
 }
 
-void RobotRuntime::latch_fault(bool clear_control) {
+void RobotRuntime::latch_fault(bool clear_control, int32_t fault_code) {
     rk_robot_command emergency_stop{};
     emergency_stop.struct_size = sizeof(emergency_stop);
     emergency_stop.sequence = ++endpoint_command_sequence_;
@@ -648,6 +648,7 @@ void RobotRuntime::latch_fault(bool clear_control) {
     endpoint_->apply(emergency_stop);
     if (clear_control)
         control_ = {};
+    latched_fault_code_ = fault_code;
     std::lock_guard state_lock(state_mutex_);
     if (clear_control) {
         state_.trajectory_queue_depth = 0;
@@ -904,6 +905,8 @@ rk_result RobotRuntime::apply_pending_commands() {
                     std::abs(velocities[joint]) / acceleration);
         }
         duration_seconds = std::max(duration_seconds, limited_duration);
+        const double unconstrained_duration = duration_seconds;
+        bool ramp_hits_limit = false;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
             const double speed = std::abs(velocities[joint]);
             if (speed <= 1e-12)
@@ -911,9 +914,11 @@ rk_result RobotRuntime::apply_pending_commands() {
             const auto &limits = blueprint_.joints[joint];
             const double room = std::max(0.0, velocities[joint] > 0.0
                 ? limits.upper_limit - positions[joint] : positions[joint] - limits.lower_limit);
+            if (0.5 * speed * unconstrained_duration >= room - 1e-12)
+                ramp_hits_limit = true;
             duration_seconds = std::min(duration_seconds, 2.0 * room / speed);
         }
-        control_.stop_ramp_exceeds_limits = duration_seconds < limited_duration * (1.0 - 1e-9);
+        control_.stop_ramp_hits_limit = ramp_hits_limit;
         control_.stop_ramp_duration_ns =
             static_cast<uint64_t>(std::ceil(duration_seconds * 1'000'000'000.0));
         control_.stop_ramp_time_ns = 0;
@@ -1033,6 +1038,7 @@ rk_result RobotRuntime::apply_pending_commands() {
 
             if (value.kind == RK_COMMAND_RESET_SAFETY) {
                 control_ = {};
+                latched_fault_code_ = 1;
                 controlled_stop = false;
                 safety = RK_SAFETY_READY;
                 if (has_later_effective_command) {
@@ -1072,7 +1078,36 @@ rk_result RobotRuntime::apply_pending_commands() {
                             static_cast<int64_t>(control_.trajectory_time_ns), 0, estimate))
                         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                             velocities[joint] = control_.trajectory_rate * estimate.velocity[joint];
-                    start_stop_ramp(positions, velocities);
+                    bool would_pass_final_knot = false;
+                    if (control_.trajectory.back().plan_id != 0 &&
+                        control_.trajectory.back().ends_at_rest) {
+                        double ramp_duration = 2.0 * std::chrono::duration<double>(period_).count();
+                        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                            const double acceleration = blueprint_.joints[joint].max_acceleration;
+                            if (std::isfinite(acceleration) && acceleration > 0.0)
+                                ramp_duration = std::max(ramp_duration,
+                                    std::abs(velocities[joint]) / acceleration);
+                        }
+                        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+                            const double finish = positions[joint] +
+                                0.5 * ramp_duration * velocities[joint];
+                            const double final_knot =
+                                control_.trajectory.back().point.positions[joint];
+                            if ((velocities[joint] > 0.0 && finish > final_knot + 1e-12) ||
+                                (velocities[joint] < 0.0 && finish < final_knot - 1e-12))
+                                would_pass_final_knot = true;
+                        }
+                    }
+                    if (would_pass_final_knot) {
+                        // The declared final path is the shorter stop. Let its
+                        // authored endpoint complete instead of decelerating
+                        // early or extending beyond it on a straight ramp.
+                        control_.stop_ramp_active = false;
+                        control_.hold_requested = false;
+                        control_.resume_requested = control_.trajectory_rate < 1.0;
+                    } else {
+                        start_stop_ramp(positions, velocities);
+                    }
                     controlled_stop = true;
                 } else if (control_.stop_ramp_active) {
                     controlled_stop = true;
@@ -1344,7 +1379,9 @@ rk_result RobotRuntime::apply_pending_commands() {
                 !control_.trajectory.back().ends_at_rest &&
                 control_.trajectory.back().plan_id != 0;
             const bool ramp_at_end = queue_exhausted && !trajectory_stop_completed &&
-                (control_.stop_ramp_active || control_.hold_requested || declared_continuation);
+                (declared_continuation ||
+                 (control_.trajectory.back().plan_id == 0 &&
+                  (control_.stop_ramp_active || control_.hold_requested)));
             if (ramp_at_end) {
                 // The stop ran out of queued path before reaching rest. Finish
                 // with a straight ramp, still within the acceleration limits,
@@ -1459,10 +1496,10 @@ rk_result RobotRuntime::apply_pending_commands() {
         for (uint32_t index = 0; index < output.target_count; ++index)
             if (output.targets[index].mode == RK_TARGET_POSITION)
                 commanded_position_[output.targets[index].joint] = output.targets[index].target;
-    if (stop_ramp_finished && control_.stop_ramp_exceeds_limits) {
-        // The ramp stopped at a travel limit only by braking harder than a
-        // joint's acceleration limit allows; now at rest, report it.
-        latch_fault();
+    if (stop_ramp_finished && control_.stop_ramp_hits_limit) {
+        // The commanded setpoint is clamped to the travel limit; distinguish
+        // this backstop from an ordinary endpoint completion.
+        latch_fault(true, RK_FAULT_RAMP_LIMIT);
         return RK_ERROR_LIMIT;
     }
     refresh_trajectory_progress();
@@ -1631,6 +1668,7 @@ void RobotRuntime::reset_state() noexcept {
     state_.mode = state_.safety == RK_SAFETY_EMERGENCY_STOP ||
         state_.safety == RK_SAFETY_FAULT ? RK_ROBOT_MODE_FAULT : RK_ROBOT_MODE_IDLE;
     control_ = {};
+    latched_fault_code_ = 1;
     std::fill_n(commanded_position_, RK_MAX_JOINTS, 0.0);
     std::fill_n(commanded_position_backup_, RK_MAX_JOINTS, 0.0);
     control_backup_ = {};

@@ -598,6 +598,9 @@ void stop_ramp_stays_within_travel(const rk_robot_runtime_blueprint &blueprint) 
     state.struct_size = sizeof(state);
     assert(runtime.snapshot(state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
+    rk_robot_snapshot snapshot{};
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.fault_code == RK_FAULT_RAMP_LIMIT);
 }
 
 void faulted_batch_skips_commands_before_reset(
@@ -1518,6 +1521,117 @@ void smooth_path_hold_respects_acceleration(const rk_robot_runtime_blueprint &so
     }
 }
 
+void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    for (auto &joint : blueprint.joints) {
+        joint.max_velocity = 1.0;
+        joint.max_acceleration = 1.0;
+    }
+    mk_state_to_state_request request{};
+    request.struct_size = sizeof(request);
+    request.joint_count = blueprint.joint_count;
+    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+        const double sign = joint == 0 ? 1.0 : -1.0;
+        request.target_position[joint] = sign * 0.25;
+        request.max_velocity[joint] = 1.0;
+        request.max_acceleration[joint] = 1.0;
+        request.max_jerk[joint] = 4.0;
+    }
+    mk_trajectory_handle native{};
+    int32_t result = 0;
+    assert(mk_generate_state_to_state(&request, &native, &result) == MK_OK);
+    auto ruckig = segments_from_native(native);
+    int64_t ruckig_duration = 0;
+    assert(mk_trajectory_duration_ns(native, &ruckig_duration) == MK_OK);
+    mk_trajectory_destroy(native);
+    for (bool smooth : {false, true}) {
+        const auto duration_ns = smooth ? static_cast<uint64_t>(ruckig_duration) :
+            1'000'000'000ULL;
+        const double final_position = smooth ? 0.25 : 0.2;
+        for (auto command : {RK_COMMAND_HOLD, RK_COMMAND_STOP, RK_COMMAND_ABORT}) {
+            for (uint64_t remaining_ns : {300'000'000ULL, 200'000'000ULL,
+                                          100'000'000ULL}) {
+                auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+                robotkit::RobotRuntime runtime(blueprint, endpoint,
+                    std::chrono::milliseconds(100));
+                rk_plan_submission plan{};
+                plan.struct_size = sizeof(plan);
+                plan.sequence = 1;
+                plan.plan_id = 300;
+                plan.model_revision = blueprint.revision;
+                plan.calibration_revision = blueprint.calibration_revision;
+                plan.ends_at_rest = 1;
+                plan.segments = smooth ? ruckig :
+                    linear_segment_chunk(0.0, 0.2, duration_ns, 300);
+                assert(runtime.submit_plan(plan) == RK_OK);
+                uint64_t timestamp = 0;
+                while (true) {
+                    rk_robot_snapshot snapshot{};
+                    assert(runtime.snapshot_full(snapshot) == RK_OK);
+                    if (snapshot.trajectory_active &&
+                        snapshot.trajectory_time_ns + remaining_ns >= duration_ns)
+                        break;
+                    apply_cycle(runtime, timestamp);
+                }
+                assert(runtime.submit(lifecycle_command(2, command)) == RK_OK);
+                for (int step = 0; step < 40; ++step) {
+                    const auto state = apply_cycle(runtime, timestamp);
+                    assert(state.position[0] <= final_position + 1e-9);
+                    assert(state.position[1] >= -final_position - 1e-9);
+                    assert(state.safety != RK_SAFETY_FAULT);
+                }
+            }
+        }
+    }
+    for (auto command : {RK_COMMAND_HOLD, RK_COMMAND_STOP, RK_COMMAND_ABORT}) {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint,
+            std::chrono::milliseconds(10));
+        rk_plan_submission plan{};
+        plan.struct_size = sizeof(plan);
+        plan.sequence = 1;
+        plan.plan_id = 301;
+        plan.model_revision = blueprint.revision;
+        plan.calibration_revision = blueprint.calibration_revision;
+        plan.ends_at_rest = 0;
+        plan.segments = linear_segment_chunk(0.0, 0.2, 1'000'000'000, 301);
+        assert(runtime.submit_plan(plan) == RK_OK);
+        uint64_t timestamp = 0;
+        for (int step = 0; step < 99; ++step) apply_cycle(runtime, timestamp);
+        assert(runtime.submit(lifecycle_command(2, command)) == RK_OK);
+        double furthest = 0.0;
+        for (int step = 0; step < 100; ++step)
+            furthest = std::max(furthest, apply_cycle(runtime, timestamp).position[0]);
+        assert(furthest > 0.2 + 1e-6);
+        rk_robot_snapshot snapshot{};
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(snapshot.safety == RK_SAFETY_READY);
+    }
+    {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint,
+            std::chrono::milliseconds(10));
+        rk_plan_submission plan{};
+        plan.struct_size = sizeof(plan);
+        plan.sequence = 1;
+        plan.plan_id = 302;
+        plan.model_revision = blueprint.revision;
+        plan.calibration_revision = blueprint.calibration_revision;
+        plan.ends_at_rest = 1;
+        plan.segments = linear_segment_chunk(0.0, 0.2, 1'000'000'000, 302);
+        assert(runtime.submit_plan(plan) == RK_OK);
+        uint64_t timestamp = 0;
+        for (int step = 0; step < 95; ++step) apply_cycle(runtime, timestamp);
+        assert(runtime.submit(lifecycle_command(2, RK_COMMAND_ABORT)) == RK_OK);
+        for (int step = 0; step < 30; ++step)
+            assert(apply_cycle(runtime, timestamp).position[0] <= 0.2 + 1e-9);
+        rk_robot_snapshot snapshot{};
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(snapshot.safety == RK_SAFETY_READY);
+        assert(std::abs(snapshot.position[0] - 0.2) < 1e-9);
+    }
+}
+
 int main() {
     static_assert(sizeof(rk_robot_command) < 20'000,
         "trajectory payload must not be embedded in the command mailbox value");
@@ -1568,6 +1682,7 @@ int main() {
     stop_braking_uses_segment_degree(blueprint);
     declared_plan_completion_and_underflow(blueprint);
     native_hold_resume_and_abort(blueprint);
+    plan_end_braking_stays_on_path(blueprint);
     smooth_path_hold_respects_acceleration(blueprint);
     ruckig_segment_stop_uses_analytic_braking(blueprint);
     trajectory_splice_replaces_path_ahead(blueprint);

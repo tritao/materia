@@ -110,6 +110,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < The endpoint or backend does not support the request.
 	 */
 	const RK_ERROR_UNSUPPORTED = -4;
+	const RK_FAULT_RAMP_LIMIT = 3;
 	const RK_FAULT_TRAJECTORY_UNDERFLOW = 2;
 	/**
 	 * < Maximum joints carried by one fixed-size ABI value.

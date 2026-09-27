@@ -197,8 +197,8 @@ private:
         bool hold_requested = false;
         bool resume_requested = false;
         int32_t diagnostic_code = 0;
-        /** Set when a ramp had to brake past a joint's limit to stay in travel. */
-        bool stop_ramp_exceeds_limits = false;
+        /** Set when the unclamped straight ramp reaches a joint travel limit. */
+        bool stop_ramp_hits_limit = false;
     };
 
     struct QueuedCommand {
@@ -209,7 +209,7 @@ private:
 
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
-    void latch_fault(bool clear_control = true);
+    void latch_fault(bool clear_control = true, int32_t fault_code = 1);
 
     rk_robot_runtime_blueprint blueprint_{};
     std::shared_ptr<RobotEndpoint> endpoint_;
@@ -228,6 +228,7 @@ private:
     uint64_t last_command_sequence_ = 0;
     rk_robot_state state_backup_{};
     ControlState control_{};
+    int32_t latched_fault_code_ = 1;
     ControlState control_backup_{};
     /** Last position sent to the endpoint, retained after a trajectory drains. */
     double commanded_position_[RK_MAX_JOINTS]{};

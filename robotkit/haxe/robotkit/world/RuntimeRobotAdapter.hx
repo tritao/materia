@@ -87,6 +87,8 @@ class RuntimeRobotAdapter implements Robot {
       return null;
     if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_TRAJECTORY_UNDERFLOW)
       return new RobotFault(logicalId, value.faultCode, "trajectory_underflow", false);
+    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_RAMP_LIMIT)
+      return new RobotFault(logicalId, value.faultCode, "ramp_limit", true);
     return new RobotFault(logicalId, value.faultCode, faultMessage, true);
   }
 

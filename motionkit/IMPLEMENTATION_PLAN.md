@@ -501,11 +501,15 @@ Do:
   from the velocity actually executed (analytic for degree >= 2, chord speed
   for degree 1), and report non-latched `trajectory_underflow`. Legacy point
   chunks retain their current completion behavior.
-- A hold that reaches a declared final endpoint completes at that knot; it
-  must not ramp beyond an authored stop, including a degree-1 final chord.
-  A hold that exhausts a declared continuation finishes on the limited ramp.
-  Legacy point chunks retain their existing STOP/hold queue-end behavior until
+- HOLD or plan STOP that exhausts a plan declaring `ends_at_rest = true`
+  completes at its final knot, without a ramp past an authored stop (including
+  a degree-1 final chord). A declared continuation still finishes on the
+  limited ramp. Legacy point-chunk STOP retains its existing behavior until
   the point-chunk path is removed.
+- For ABORT near a rest-declared endpoint, if the straight ramp would carry
+  any joint past the final knot, follow the path to that knot instead. All
+  straight-ramp setpoints are clamped to joint position limits; hitting a
+  limit stops there and latches the distinct `ramp_limit` fault.
 
 Tests:
 - Hold mid-move: the path is preserved (positions stay on the planned
@@ -518,6 +522,9 @@ Tests:
   declares rest but ends at speed is rejected. Late refills on both degree-1
   and smooth streamed plans brake and flag underflow.
 - The existing MotionKit hold and resume tests pass once P9 switches over.
+- HOLD, STOP, and ABORT near degree-1 and Ruckig rest-plan ends never pass the
+  final knot; continuation plans still ramp. A constructed ramp-limit case
+  clamps at the limit and reports `ramp_limit`.
 
 ## P9 — MotionSystem on sessions and Ruckig; delete the replaced Haxe planners
 
@@ -948,3 +955,17 @@ its removal. Add a native regression for HOLD near a final degree-1 endpoint
 and retain the existing legacy queue-end STOP regression. Implementation work
 is paused at this decision boundary; the migration changes remain uncommitted
 and its MotionKit suite is not yet green.
+
+### Declared-end braking and ramp-limit backstop
+
+Extended the endpoint rule to HOLD and plan STOP. ABORT compares its
+acceleration-limited straight-ramp endpoint with a rest-declared final knot;
+when the ramp would pass that knot, execution follows the authored path to
+the knot. Declared continuations still ramp, and legacy point-chunk STOP is
+unchanged. Every straight-ramp setpoint is travel-clamped; reaching a travel
+limit latches the distinct `ramp_limit` fault. The native regression sweeps
+HOLD, STOP and ABORT near linear and Ruckig final endpoints, tests continuation
+ramps, and verifies the constructed limit-clamp case. All 12 native CTest
+targets and the RobotKit FFI audit pass. MotionKit host migration remains in
+progress; its Haxe suite is not yet green. Commit: the commit containing this
+entry.

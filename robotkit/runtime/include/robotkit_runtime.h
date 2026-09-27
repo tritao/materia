@@ -416,7 +416,7 @@ typedef struct rk_plan_submission {
 } rk_plan_submission;
 
 /** Non-latched runtime diagnostic; safety remains READY. */
-enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2 };
+enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3 };
 
 typedef uint32_t rk_session_state;
 enum {
