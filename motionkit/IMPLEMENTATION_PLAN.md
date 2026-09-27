@@ -1129,3 +1129,14 @@ observer rejection and a native error code; lease expiry now occurs mid-plan.
 MotionKit Haxe (22,688 assertions), RobotKit Haxe (4,432 assertions), MotionKit
 and RobotKit native CTest (3 and 12 targets), both FFI audits, and TCP default,
 session, and lease-timeout modes passed. Commit: the commit containing this entry.
+
+### P9d — Backend capability audit (deletion stopped)
+
+The serial endpoint intentionally reports no queue support when the configured
+owner period is shorter than the RKD5 frame time plus processing allowance.
+`SerialRobot` currently passes an explicit `false` queue override to
+`RuntimeRobotAdapter`, so it always advertises no queue support even when the
+native endpoint qualifies. Therefore an in-repo backend still advertises no
+queue/plan support. Per P9d's stop rule, the non-queue MotionSystem fallback,
+`TimeScaling`, and dependent planners remain until a policy for unsupported
+serial timing is chosen. No fallback deletion was attempted.
