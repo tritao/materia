@@ -55,8 +55,8 @@ class FlatWasher extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.cut(Solids.cylinder(outerDiameter / 2, 0, thickness),
-			[Solids.cylinder(innerDiameter / 2, -0.1, thickness + 0.1)]);
+		return Solids.cut(Part.cylinder(outerDiameter / 2, 0, thickness),
+			[Part.cylinder(innerDiameter / 2, -0.1, thickness + 0.1)]);
 
 	function get_innerDiameter():Float return spec.innerDiameter;
 	function get_outerDiameter():Float return spec.outerDiameter;

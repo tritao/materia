@@ -60,7 +60,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 6;
+	public static inline var VERSION:Int = 7;
 
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
@@ -106,7 +106,7 @@ class DocumentCodec {
 				var instance:InstanceElement = cast element;
 				var overrides:Array<Dynamic> = [];
 				for (name in instance.overrideNames())
-					overrides.push({name: name, value: instance.overrideValue(name)});
+					overrides.push({name: name, value: instance.typedOverrideValue(name)});
 				encodedElements.push({
 					id: element.id.value,
 					name: element.name,
@@ -166,7 +166,8 @@ class DocumentCodec {
 					name: input.name,
 					kind: input.kind,
 					unit: input.unit,
-					value: UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit)
+					value: input.isNumeric() ? UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit) : input.defaultValue,
+					allowedValues: input.allowedValues
 				});
 			var outputs:Array<Dynamic> = [];
 			for (output in definition.outputs())
@@ -390,9 +391,13 @@ class DocumentCodec {
 				for (definitionRecord in definitionRecords) {
 					var inputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "inputs");
 					var inputs:Array<DefinitionInput> = [];
-					for (inputRecord in inputRecords)
-						inputs.push(new DefinitionInput(stringField(inputRecord, "name"), stringField(inputRecord, "kind"), stringField(inputRecord, "unit"),
-							numberField(inputRecord, "value")));
+					for (inputRecord in inputRecords) {
+						var kind = stringField(inputRecord, "kind");
+						var value:Dynamic = version >= 7 ? requiredField(inputRecord, "value") : numberField(inputRecord, "value");
+						var rawAllowed:Dynamic = version >= 7 ? Reflect.field(inputRecord, "allowedValues") : null;
+						inputs.push(new DefinitionInput(stringField(inputRecord, "name"), kind, stringField(inputRecord, "unit"),
+							value, rawAllowed == null ? null : cast rawAllowed));
+					}
 					var outputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "outputs");
 					var outputs:Array<DefinitionOutput> = [];
 					for (outputRecord in outputRecords)
@@ -435,9 +440,10 @@ class DocumentCodec {
 						document.installElement(ename, requiredFeature(document, intField(elementRecord, "output")), eid);
 					else if (kind == "instance") {
 						var overrideRecords:Array<Dynamic> = cast requiredField(elementRecord, "overrides");
-						var overrides = new Map<String, Float>();
+						var overrides = new Map<String, Dynamic>();
 						for (overrideRecord in overrideRecords)
-							overrides.set(stringField(overrideRecord, "name"), numberField(overrideRecord, "value"));
+							overrides.set(stringField(overrideRecord, "name"), version >= 7 ?
+								requiredField(overrideRecord, "value") : numberField(overrideRecord, "value"));
 						document.installInstance(ename, eid, new DefinitionId(stringField(elementRecord, "definition")), overrides);
 					} else if (kind == "level") {
 						var relative:Dynamic = Reflect.field(elementRecord, "relativeTo");

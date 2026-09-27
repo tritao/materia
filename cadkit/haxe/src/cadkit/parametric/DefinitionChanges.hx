@@ -24,12 +24,12 @@ class DefinitionDefaultChange implements DocumentChange {
 	final document:Document;
 	final definition:Definition;
 	final name:String;
-	final before:Float;
+	final before:Dynamic;
 	final beforeRevision:Int;
-	final after:Float;
+	final after:Dynamic;
 	final afterRevision:Int;
 
-	public function new(doc:Document, d:Definition, n:String, b:Float, br:Int, a:Float, ar:Int) {
+	public function new(doc:Document, d:Definition, n:String, b:Dynamic, br:Int, a:Dynamic, ar:Int) {
 		document = doc;
 		definition = d;
 		name = n;
@@ -50,10 +50,10 @@ class InstanceOverrideChange implements DocumentChange {
 	final document:Document;
 	final instance:InstanceElement;
 	final name:String;
-	final before:Null<Float>;
-	final after:Null<Float>;
+	final before:Dynamic;
+	final after:Dynamic;
 
-	public function new(d:Document, i:InstanceElement, n:String, b:Null<Float>, a:Null<Float>) {
+	public function new(d:Document, i:InstanceElement, n:String, b:Dynamic, a:Dynamic) {
 		document = d;
 		instance = i;
 		name = n;

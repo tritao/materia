@@ -74,10 +74,10 @@ class HexBolt extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var shank = Solids.cylinder(diameter / 2, -length, 0);
+		var shank = Part.cylinder(diameter / 2, -length, 0);
 		var head = detail == Envelope
-			? Solids.cylinder(acrossCorners / 2, 0, spec.headHeight)
-			: Solids.prism(Solids.regularPolygon(6, spec.acrossFlats), 0, spec.headHeight);
+			? Part.cylinder(acrossCorners / 2, 0, spec.headHeight)
+			: Part.prism(cadkit.modeling.Polygon.regular(6, spec.acrossFlats), 0, spec.headHeight);
 		return Solids.union([head, shank]);
 	}
 
@@ -91,11 +91,11 @@ class HexBolt extends MachineComponent {
 
 	/** Through-hole tool from z=0 down to z=-depth. */
 	public function clearanceHole(depth:Float, fit:ClearanceFit = Medium):Part
-		return Solids.cylinder(clearanceDiameter(fit) / 2, -depth, 0);
+		return Part.cylinder(clearanceDiameter(fit) / 2, -depth, 0);
 
 	/** Tap-drill tool from z=0 down to z=-depth; the thread itself is not modelled. */
 	public function tapHole(depth:Float):Part
-		return Solids.cylinder(spec.tapDrill / 2, -depth, 0);
+		return Part.cylinder(spec.tapDrill / 2, -depth, 0);
 
 	/** Counterbored through-hole tool, sized with a 0.5 mm diametral clearance around the hex
 	 * head's corners and 0.5 mm axial clearance above it. The bolt's `head` sits at z=-headHeight-0.5.
@@ -104,8 +104,8 @@ class HexBolt extends MachineComponent {
 		var seatDepth = spec.headHeight + 0.5;
 		if (!(depth > seatDepth)) throw 'Counterbore for ${spec.size} needs depth over $seatDepth';
 		return Solids.union([
-			Solids.cylinder(clearanceDiameter(fit) / 2, -depth, 0),
-			Solids.cylinder((acrossCorners + 0.5) / 2, -seatDepth, 0),
+			Part.cylinder(clearanceDiameter(fit) / 2, -depth, 0),
+			Part.cylinder((acrossCorners + 0.5) / 2, -seatDepth, 0),
 		]);
 	}
 

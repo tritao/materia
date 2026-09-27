@@ -83,9 +83,8 @@ class ProjectSourceTests {
     var machineManifest = FileSystem.fullPath(root + "/machinekit/examples/materia.project.json");
     var requirement = MateriaProjectRunner.executionRequirement(machineManifest);
     check(requirement.kind == "requires-project-code" &&
-      requirement.projectPath == machineManifest && requirement.module.length > 0,
-      "project inspection identifies executable generator code without running it: " +
-      requirement.kind + " / " + requirement.projectPath + " / " + requirement.module);
+      requirement.projectPath == FileSystem.fullPath(machineManifest) && requirement.module.length > 0,
+      "project inspection identifies executable generator code without running it");
     var machineScene = MateriaProjectRunner.loadProject(machineManifest);
     var hasAluminium = false, hasSteel = false;
     for (part in machineScene.objects) {
@@ -113,7 +112,8 @@ class ProjectSourceTests {
     var machineSimulation = new ApplicationSimulation(machineWorld);
       machineSession.openGeneratedScene(machineScene.objects, machineManifest, machineScene.assembly,
         machineScene.geometryBySnapshot, machineScene.assemblyDefinition, machineScene.assemblyState,
-        machineScene.localCentersByDefinition, machineScene.metresPerUnit, machineScene.physical);
+        machineScene.localCentersByDefinition, machineScene.metresPerUnit,
+        machineScene.physical, machineScene.recipeDocument);
       check(machineSession.sensors.robotModels().length == 0,
         "generated assembly starts without an unrelated sensor robot");
       check(machineSimulation.rebuild(machineSession.sensors, machineSession.scene, machineSession),
@@ -180,7 +180,8 @@ class ProjectSourceTests {
       session.openGeneratedScene(generated, manifest, generatedScene.assembly,
         generatedScene.geometryBySnapshot, generatedScene.assemblyDefinition,
         generatedScene.assemblyState, generatedScene.localCentersByDefinition,
-        generatedScene.metresPerUnit, generatedScene.physical);
+        generatedScene.metresPerUnit, generatedScene.physical,
+        generatedScene.recipeDocument);
       session.scene.select(base.id);
       check(!session.scene.canMoveObject(base.id), "assembly-owned part moves through its joints");
       session.scene.setName(base.id, "Edited generated base");

@@ -110,11 +110,11 @@ class TSlotExtrusion implements StructuralProfile {
 	public function geometry(length:Float):Part {
 		if (!(length > 0)) throw "T-slot extrusion needs a positive length";
 		var half = size / 2, halfHeight = height / 2;
-		var body = Solids.prism([
+		var body = Part.prism([
 			new Vector(-half, -halfHeight), new Vector(half, -halfHeight), new Vector(half, halfHeight), new Vector(-half, halfHeight),
 		], 0, length);
-		var tools = [Solids.cylinder(boreDiameter / 2, -0.1, length + 0.1)];
-		for (face in 0...4) tools.push(Solids.prism(slotPoints(face), -0.1, length + 0.1));
+		var tools = [Part.cylinder(boreDiameter / 2, -0.1, length + 0.1)];
+		for (face in 0...4) tools.push(Part.prism(slotPoints(face), -0.1, length + 0.1));
 		return Solids.cut(body, tools);
 	}
 

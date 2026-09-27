@@ -1,6 +1,6 @@
 package machinekit.picking;
 
-import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.component.MachineComponent;
 
 /** One named component occurrence in a virtual picking station. */

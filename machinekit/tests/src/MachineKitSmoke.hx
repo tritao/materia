@@ -11,6 +11,17 @@ import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
+import machinekit.component.MachineKitComponents;
+import machinekit.component.ComponentValues;
+import machinekit.document.MachineKitDocuments;
+import machinekit.document.MachineKitRecipes;
+import machinekit.document.MachineKitDocumentAssembly;
+import cadkit.parametric.Document;
+import cadkit.parametric.DocumentCodec;
+import cadkit.parametric.Placement;
+import cadkit.parametric.DefinitionEvaluatorRegistry;
+import cadkit.parametric.DefinitionOutput;
+import materia.project.SceneArtifact;
 import machinekit.motion.LeadScrewNut;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
@@ -56,6 +67,130 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 class MachineKitSmoke {
+	static function componentRecipes():Void {
+		for (recipe in MachineKitComponents.all()) {
+			var original = recipe.create();
+			check(original.type == recipe, 'recipe type mismatch ${recipe.id}');
+			var values = original.values();
+			var restored = recipe.create(values);
+			check(recipe.key(values) == recipe.key(restored.values()), 'recipe values mismatch ${recipe.id}');
+			check(original.designation == restored.designation, 'recipe designation mismatch ${recipe.id}');
+			var a = original.connectors(), b = restored.connectors();
+			check(a.length == b.length, 'recipe connector count mismatch ${recipe.id}');
+			for (i in 0...a.length) {
+				check(a[i].name == b[i].name && a[i].role == b[i].role,
+					'recipe connector mismatch ${recipe.id}');
+				check(a[i].frame.x == b[i].frame.x && a[i].frame.y == b[i].frame.y &&
+					a[i].frame.z == b[i].frame.z && a[i].frame.qx == b[i].frame.qx &&
+					a[i].frame.qy == b[i].frame.qy && a[i].frame.qz == b[i].frame.qz &&
+					a[i].frame.qw == b[i].frame.qw, 'recipe connector frame mismatch ${recipe.id}');
+			}
+			var first = original.geometry(), second = restored.geometry();
+			near(first.massProperties().volume, second.massProperties().volume,
+				'recipe volume mismatch ${recipe.id}');
+			check(first.solidCount() == second.solidCount(), 'recipe solids mismatch ${recipe.id}');
+			first.close();
+			second.close();
+		}
+		var bearing = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
+		throws(() -> bearing.create(new ComponentValues().setToken("designation", "NO-BEARING")),
+			"Unknown");
+		var pulley = MachineKitComponents.byId("machinekit.transmission.timing-pulley");
+		throws(() -> pulley.create(new ComponentValues().setToken("profile", "UNKNOWN")), "Invalid choice");
+		var conflicted = new Bom();
+		conflicted.add({partNumber: "X", description: "same", quantity: 1, material: "steel",
+			typeId: "test", valuesKey: "a"});
+		throws(() -> conflicted.add({partNumber: "X", description: "same", quantity: 1,
+			material: "steel", typeId: "test", valuesKey: "b"}), "conflicting");
+	}
+
+	static function documentRecipes():Void {
+		MachineKitRecipes.register();
+		MachineKitRecipes.register();
+		var registryDocument = new Document();
+		for (registered in MachineKitComponents.all()) {
+			check(DefinitionEvaluatorRegistry.isRegistered(registered.id), "MachineKit evaluator registration");
+			var recipeDefinition = MachineKitDocuments.define(registryDocument, registered);
+			check(recipeDefinition.output("body").purpose == DefinitionOutput.Geometry,
+				"MachineKit recipe geometry output");
+			for (connector in registered.create().connectors())
+				check(recipeDefinition.output(connector.name).purpose == DefinitionOutput.Connector,
+					"MachineKit recipe connector output");
+		}
+		registryDocument.close();
+		var document = new Document();
+		var type = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
+		var definition = MachineKitDocuments.define(document, type);
+		check(definition.property("machinekit.partNumber") != null &&
+			definition.property("machinekit.catalog.source") != null, "recipe metadata is stored");
+		var first = document.createInstance("Bearing A", definition);
+		var second = document.createInstance("Bearing B", definition);
+		var firstVolume = first.shape().volume();
+		var secondVolume = second.shape().volume();
+		check(firstVolume == secondVolume, "shared bearing geometry");
+		first.setTypedOverride("detail", "envelope");
+		check(first.shape().volume() != firstVolume && second.shape().volume() == secondVolume,
+			"detail input selects geometry fidelity per instance");
+		first.removeOverride("detail");
+		check(document.definitionOutput(first, "bearingSeat").volume() > 0, "bearing seat tool output");
+		var firstBack = first.connector("back").location.plane.origin.z;
+		document.setElementPlacement(first, new Placement(new Plane(
+			new Vector(10, 20, 30), Vector.X(), Vector.Z())));
+		var assembly = new AssemblyModel();
+		MachineKitDocumentAssembly.add(assembly, "bearingA", first);
+		MachineKitDocumentAssembly.add(assembly, "bearingB", second);
+		assembly.mate("bearing-seat", "fixed", "bearingA", "back", "bearingB", "front");
+		near(assembly.worldPoint("bearingB", "front").x, 10, "document assembly placement x");
+		near(assembly.worldPoint("bearingB", "front").y, 20, "document assembly placement y");
+		near(assembly.worldPoint("bearingB", "front").z, firstBack + 30, "document connectors mate by name");
+		second.setTypedOverride("designation", "6000");
+		check(second.shape().volume() != firstVolume, "bearing override updates one instance");
+		near(first.shape().volume(), firstVolume, "other bearing retains its volume");
+		check(second.connector("back").location.plane.origin.z != firstBack &&
+			first.connector("back").location.plane.origin.z == firstBack + 30,
+			"bearing override updates one connector set");
+		var bom = MachineKitDocuments.bom(document);
+		check(bom.quantity("608-2Z") == 1 && bom.quantity("6000-2Z") == 1,
+			"document BOM groups recipe instances by values");
+		var saved = DocumentCodec.encode(document);
+		var loaded = DocumentCodec.decode(saved);
+		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
+		loaded.close();
+		check(document.undo() && second.resolvedToken("designation") == "608", "recipe override undo");
+		check(MachineKitDocuments.bom(document).quantity("608-2Z") == 2, "BOM follows undo");
+		check(document.redo() && second.resolvedToken("designation") == "6000", "recipe override redo");
+		var unique = second.makeUnique();
+		check(unique.id.value != definition.id.value && first.definitionId.value == definition.id.value,
+			"makeUnique isolates one recipe instance");
+		var uniqueSaved = DocumentCodec.decode(DocumentCodec.encode(document));
+		check(MachineKitDocuments.bom(uniqueSaved).lines().length == 2, "unique recipe survives reload");
+		uniqueSaved.close();
+		document.close();
+
+		var tools = new Document();
+		var screwType = MachineKitComponents.byId("machinekit.standard.socket-head-cap-screw");
+		var screw = tools.createInstance("Screw", MachineKitDocuments.define(tools, screwType));
+		for (name in ["clearanceHole", "tapHole", "counterboreHole"])
+			check(tools.definitionOutput(screw, name).volume() > 0, "screw tool output " + name);
+		var motorType = MachineKitComponents.byId("machinekit.motion.nema-stepper");
+		var motor = tools.createInstance("Motor", MachineKitDocuments.define(tools, motorType));
+		check(tools.definitionOutput(motor, "mountingCutout").volume() > 0, "motor cutout output");
+		tools.close();
+	}
+
+	static function documentPreview():Void {
+		var editable = MotorShaftBearingsPreview.document();
+		var saved = DocumentCodec.encode(editable);
+		var baseline = SceneArtifact.decode(MotorShaftBearingsPreview.preview(saved));
+		check(baseline.parts.length == 8, "document preview retains shared part geometry");
+		var changed:Null<cadkit.parametric.InstanceElement> = null;
+		for (element in editable.allElements()) if (element.name == "bearingB") changed = cast element;
+		check(changed != null, "document preview exposes bearing instance");
+		changed.setTypedOverride("designation", "6000");
+		var edited = SceneArtifact.decode(MotorShaftBearingsPreview.preview(DocumentCodec.encode(editable)));
+		check(edited.parts.length == 9, "saved bearing dimensions rebuild one preview definition");
+		editable.close();
+	}
 	static function check(value:Bool, message:String):Void {
 		if (!value) throw message;
 	}
@@ -1009,8 +1144,8 @@ class MachineKitSmoke {
 		check(lines.length == 11, "linear axis BOM line count");
 		check(bom.quantity(axis.bearing.designation) == 2, "linear axis bearing quantity");
 		check(bom.quantity(axis.coupling.designation) == 1, "linear axis coupling in the BOM");
-		check(bom.quantity(axis.nut.designation) == 1, "linear axis lead nut in the BOM");
-		check(bom.quantity(axis.screw.designation) == 1, "thread-specific lead screw in the BOM");
+		check(bom.quantity(axis.nut.bom.partNumber) == 1, "linear axis lead nut in the BOM");
+		check(bom.quantity(axis.screw.bom.partNumber) == 1, "thread-specific lead screw in the BOM");
 		check(bom.quantity(axis.guideRodA.designation) == 2, "linear axis guide rods in the BOM");
 		check(bom.quantity(axis.guideBearingA.designation) == 2, "linear axis guide bearings in the BOM");
 		check(bom.quantity("RECT-20x15x2-L365") == 1, "linear axis rail in the BOM");
@@ -1043,8 +1178,8 @@ class MachineKitSmoke {
 		near(railState.worldConnector("profileRail", "axis").z + railGuide.travelMax,
 			21 + railAxis.travelMax, "profile rail upper limit aligns with axis");
 		var railBom = railAxis.bom();
-		check(railBom.quantity(railGuide.rail.designation) == 1, "profile rail axis rail in BOM");
-		check(railBom.quantity(railGuide.blocks[0].designation) == 1, "profile rail axis block in BOM");
+		check(railBom.quantity(railGuide.rail.bom.partNumber) == 1, "profile rail axis rail in BOM");
+		check(railBom.quantity(railGuide.blocks[0].bom.partNumber) == 1, "profile rail axis block in BOM");
 		throws(() -> LinearAxis.forRailProfile("MGN99C"), 'Unknown linear rail profile "MGN99C"');
 	}
 
@@ -1101,8 +1236,8 @@ class MachineKitSmoke {
 		throws(() -> LinearGuideSystem.forRailProfile("MGN99C", 300), 'Unknown linear rail profile "MGN99C"');
 
 		var bom = guide.bom();
-		check(bom.quantity(guide.rail.designation) == 1, "profile rail in BOM");
-		check(bom.quantity(guide.blocks[0].designation) == 1, "profile block in BOM");
+		check(bom.quantity(guide.rail.bom.partNumber) == 1, "profile rail in BOM");
+		check(bom.quantity(guide.blocks[0].bom.partNumber) == 1, "profile block in BOM");
 		check(guide.components().length == 2, "profile rail component list");
 	}
 
@@ -1391,7 +1526,7 @@ class MachineKitSmoke {
 		detailedPreview.close();
 		detailedEnvelope.close();
 		var pedestalBom = detailedPedestal.billOfMaterials(40);
-		check(pedestalBom.quantity(detailedPedestal.designation) == 1, "pedestal BOM body");
+		check(pedestalBom.quantity(detailedPedestal.bom.partNumber) == 1, "pedestal BOM body");
 		check(pedestalBom.quantity(detailedPedestal.floorMountScrewPart(40).designation) == 4, "pedestal anchor BOM");
 		throws(() -> new Pedestal(flange, 300, 70, 4, {baseThickness: 300}), "below its height");
 		throws(() -> new Pedestal(flange, 300, 70, 4, {anchorCircleDiameter: 80}), "clear the column");
@@ -1506,6 +1641,9 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		componentRecipes();
+		documentRecipes();
+		documentPreview();
 		MachineKitReferenceTests.run();
 		dimensions();
 		catalogMetadata();

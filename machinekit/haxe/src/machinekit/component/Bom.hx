@@ -13,11 +13,13 @@ class Bom {
 		var existing = byPartNumber.get(item.partNumber);
 		if (existing == null) {
 			byPartNumber.set(item.partNumber, {partNumber: item.partNumber, description: item.description,
-				quantity: item.quantity * quantity, material: item.material});
+				quantity: item.quantity * quantity, material: item.material,
+				typeId: item.typeId, valuesKey: item.valuesKey});
 			order.push(item.partNumber);
 		} else {
-			if (existing.description != item.description || existing.material != item.material)
-				throw 'BOM part number "${item.partNumber}" has conflicting descriptions';
+			if (existing.description != item.description || existing.material != item.material ||
+				existing.typeId != item.typeId || existing.valuesKey != item.valuesKey)
+				throw 'BOM part number "${item.partNumber}" has conflicting metadata or values';
 			existing.quantity += item.quantity * quantity;
 		}
 	}
@@ -32,7 +34,7 @@ class Bom {
 			var item = byPartNumber.get(partNumber);
 			if (item != null)
 				result.push({partNumber: item.partNumber, description: item.description, quantity: item.quantity,
-					material: item.material});
+					material: item.material, typeId: item.typeId, valuesKey: item.valuesKey});
 		}
 		return result;
 	}

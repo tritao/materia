@@ -98,7 +98,10 @@ class Definition {
 	public function setDefault(name:String, value:Float, ?unit:String):Void
 		document.setDefinitionDefault(this, name, value, unit);
 
-	public function restoreDefault(name:String, value:Float, revision:Int):Void {
+	public function setTypedDefault(name:String, value:Dynamic):Void
+		document.setDefinitionDefaultTyped(this, name, value);
+
+	public function restoreDefault(name:String, value:Dynamic, revision:Int):Void {
 		input(name).restore(value);
 		this.revision = revision;
 	}

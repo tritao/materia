@@ -262,12 +262,13 @@ class Document {
 		return result;
 	}
 
-	public function installInstance(name:String, id:ElementId, definitionId:DefinitionId, overrides:Map<String, Float>):InstanceElement {
+	public function installInstance(name:String, id:ElementId, definitionId:DefinitionId, overrides:Map<String, Dynamic>):InstanceElement {
 		definition(definitionId).primaryGeometryOutput();
 		var result = new InstanceElement(this, id, name, definitionId);
 		for (key in overrides.keys()) {
-			definition(definitionId).input(key);
-			result.restoreOverride(key, overrides.get(key));
+			var input = definition(definitionId).input(key);
+			result.restoreOverride(key, input.normalize(overrides.get(key),
+				input.isNumeric() ? UnitConversion.canonicalUnit(input.kind) : input.unit));
 		}
 		installRecord(result);
 		result.restoreDirectShape(resolveInstanceShape(result));
@@ -276,9 +277,9 @@ class Document {
 
 	public function duplicateInstance(source:InstanceElement, ?name:String):InstanceElement {
 		validateOwnedElement(source);
-		var overrides = new Map<String, Float>();
+		var overrides = new Map<String, Dynamic>();
 		for (key in source.overrideNames())
-			overrides.set(key, cast source.overrideValue(key));
+			overrides.set(key, source.typedOverrideValue(key));
 		var result = installInstance(name == null ? source.name + " copy" : name, newElementId(), source.definitionId, overrides);
 		recordDocumentChange(new ElementCreateChange(this, result, elements.length - 1));
 		return result;
@@ -291,7 +292,8 @@ class Document {
 		var inputs:Array<DefinitionInput> = [];
 		for (input in source.inputs())
 			inputs.push(new DefinitionInput(input.name, input.kind, input.unit,
-				UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit)));
+				input.isNumeric() ? UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit) : input.defaultValue,
+				input.allowedValues));
 		var outputs:Array<DefinitionOutput> = [];
 		for (output in source.outputs())
 			outputs.push(new DefinitionOutput(output.name, output.purpose));
@@ -348,7 +350,7 @@ class Document {
 		definition.output(output);
 		var parts = [definition.id.value, Std.string(definition.revision), output];
 		for (input in definition.inputs())
-			parts.push(input.name + "=" + Std.string(instance.resolved(input.name)));
+			parts.push(input.name + "=" + Std.string(instance.resolvedValue(input.name)));
 		return parts.join("|");
 	}
 
@@ -388,7 +390,17 @@ class Document {
 
 	public function setDefinitionDefault(definition:Definition, name:String, value:Float, ?unit:String):Void {
 		var input = definition.input(name);
-		var canonical = UnitConversion.toCanonical(value, input.kind, unit == null ? input.unit : unit);
+		if (!input.isNumeric()) throw new ParametricError("definition input is not numeric: " + name);
+		setDefinitionDefaultCanonical(definition, name, input.normalize(value, unit == null ? input.unit : unit));
+	}
+
+	public function setDefinitionDefaultTyped(definition:Definition, name:String, value:Dynamic):Void {
+		var input = definition.input(name);
+		setDefinitionDefaultCanonical(definition, name, input.normalize(value, input.unit));
+	}
+
+	private function setDefinitionDefaultCanonical(definition:Definition, name:String, canonical:Dynamic):Void {
+		var input = definition.input(name);
 		var before = input.defaultValue;
 		var revision = definition.revision;
 		if (before == canonical)
@@ -404,7 +416,7 @@ class Document {
 		recordDocumentChange(new DefinitionDefaultChange(this, definition, name, before, revision, canonical, revision + 1));
 	}
 
-	public function restoreDefinitionDefault(definition:Definition, name:String, value:Float, revision:Int):Void {
+	public function restoreDefinitionDefault(definition:Definition, name:String, value:Dynamic, revision:Int):Void {
 		definition.restoreDefault(name, value, revision);
 		refreshDefinition(definition);
 	}
@@ -412,8 +424,18 @@ class Document {
 	public function setInstanceOverride(instance:InstanceElement, name:String, value:Float, ?unit:String):Void {
 		validateOwnedElement(instance);
 		var input = definition(instance.definitionId).input(name);
-		var canonical = UnitConversion.toCanonical(value, input.kind, unit == null ? input.unit : unit);
-		var before = instance.overrideValue(name);
+		if (!input.isNumeric()) throw new ParametricError("definition input is not numeric: " + name);
+		setInstanceOverrideCanonical(instance, name, input.normalize(value, unit == null ? input.unit : unit));
+	}
+
+	public function setInstanceOverrideTyped(instance:InstanceElement, name:String, value:Dynamic):Void {
+		validateOwnedElement(instance);
+		var input = definition(instance.definitionId).input(name);
+		setInstanceOverrideCanonical(instance, name, input.normalize(value, input.unit));
+	}
+
+	private function setInstanceOverrideCanonical(instance:InstanceElement, name:String, canonical:Dynamic):Void {
+		var before = instance.typedOverrideValue(name);
 		instance.restoreOverride(name, canonical);
 		try {
 			runBeforeRecomputeHooks();
@@ -428,7 +450,7 @@ class Document {
 
 	public function removeInstanceOverride(instance:InstanceElement, name:String):Void {
 		validateOwnedElement(instance);
-		var before = instance.overrideValue(name);
+		var before = instance.typedOverrideValue(name);
 		if (before == null)
 			return;
 		instance.restoreOverride(name, null);
@@ -443,7 +465,7 @@ class Document {
 		recordDocumentChange(new InstanceOverrideChange(this, instance, name, before, null));
 	}
 
-	public function restoreInstanceOverride(instance:InstanceElement, name:String, value:Null<Float>):Void {
+	public function restoreInstanceOverride(instance:InstanceElement, name:String, value:Dynamic):Void {
 		instance.restoreOverride(name, value);
 		instance.restoreDirectShape(resolveInstanceShape(instance));
 		invalidateFrom(DependencyNode.ElementNode(instance.id.value));

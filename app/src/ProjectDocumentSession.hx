@@ -17,6 +17,7 @@ import bimkit.BimDocument;
 import app.ProjectSceneRecord.ProjectSceneInstance;
 import app.ProjectSceneRecord.ProjectFieldOverride;
 import materia.project.Appearance.Appearances;
+import materia.project.Appearance;
 import materia.units.LengthUnit;
 import materia.project.MaterialDef;
 import materia.project.MaterialLibrary;
@@ -31,6 +32,8 @@ import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
 import cadkit.modeling.AssemblyState;
+import cadkit.parametric.DocumentCodec;
+import machinekit.document.MachineKitRecipes;
 import nativekit.scene.GeometryData;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 
@@ -44,6 +47,7 @@ class ProjectDocumentSession {
   public var scene(default, null):EditorScene;
   public var sensors(default, null):SensorConfiguration;
   public var bim(default, null):BimDocument;
+  public var recipeDocument(default, null):Null<cadkit.parametric.Document> = null;
   public var path(default, null):Null<String> = null;
   public var generation(default, null):Int = 0;
   public var scriptOwnership(default,null):Null<ScriptOwnership> = null;
@@ -110,7 +114,8 @@ class ProjectDocumentSession {
       content: SceneCodec.encode(scene, sensors,
         scriptOwnership == null ? null : scriptOwnership.record(), bim,
         project == null ? null : project.record,
-        project == null ? null : project.authored, customMaterials),
+        project == null ? null : project.authored, customMaterials,
+        recipeDocument == null ? null : DocumentCodec.encode(recipeDocument)),
       dirty: isDirty()});
   }
 
@@ -178,7 +183,7 @@ class ProjectDocumentSession {
       ?assembly:AssemblyRecord, ?geometryBySnapshot:Map<String, GeometryData>,
       ?assemblyDefinition:AssemblyDefinition, ?assemblyState:AssemblyStateRecord,
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
-      ?physical:AssemblyPhysicalData):Void {
+      ?physical:AssemblyPhysicalData, ?recipeText:String):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -206,7 +211,9 @@ class ProjectDocumentSession {
       if (nextBim != null) nextBim.close();
       throw error;
     }
+    var nextRecipe = decodeRecipe(recipeText);
     replace(next, nextSensors, null, null, nextBim, nextDocument);
+    recipeDocument = nextRecipe;
     projectAssembly = assembly;
     installAssemblyRuntime(assemblyDefinition, runtime, localCentersByDefinition, metresPerUnit);
     projectPhysical = physical;
@@ -221,7 +228,8 @@ class ProjectDocumentSession {
     var reference = FilePath.isAbsolute(project.reference) ? project.reference
       : FilePath.join([FilePath.directory(absolute), project.reference]);
     reference = FileSystem.fullPath(reference);
-    var generated = MateriaProjectRunner.loadProject(reference);
+    var savedRecipe:Null<String> = Reflect.field(root, "recipeDocument");
+    var generated = MateriaProjectRunner.loadProject(reference, savedRecipe);
     var dependentJoints = project.assemblyDependentJoints == null ? [] : project.assemblyDependentJoints.copy();
     validateAssemblyDependentJoints(generated.assemblyDefinition, dependentJoints);
     var stateRecord = generated.assemblyState;
@@ -260,7 +268,9 @@ class ProjectDocumentSession {
       if (nextBim != null) nextBim.close();
       throw error;
     }
+    var nextRecipe = decodeRecipe(savedRecipe == null ? generated.recipeDocument : savedRecipe);
     replace(next, nextSensors, absolute, null, nextBim, nextDocument);
+    recipeDocument = nextRecipe;
     projectReference = reference;
     projectBaseline = baseline;
     staleProjectEdits = diagnostics;
@@ -301,6 +311,14 @@ class ProjectDocumentSession {
 
   function assemblyPropertiesForOccurrence(sceneId:String):Array<PropertyDescriptor> {
     var result:Array<PropertyDescriptor> = [];
+    if (recipeDocument != null && StringTools.startsWith(sceneId, "project:")) {
+      var name = sceneId.substr(8);
+      for (element in recipeDocument.allElements()) if (element.kind == "instance" && element.name == name) {
+		result = result.concat(BimInspectorDescriptors.forInstanceInputs(cast element,
+		  function(label, change, undo) applyRecipeEdit(label, change)));
+        break;
+      }
+    }
     var definition = projectAssemblyDefinition, centers = assemblyLocalCentersByDefinition;
     if (definition == null || assemblyRuntime == null || centers == null ||
         !StringTools.startsWith(sceneId, "project:")) return result;
@@ -479,7 +497,8 @@ class ProjectDocumentSession {
     AtomicFile.write(absolute, SceneCodec.encode(scene, sensors,
       scriptOwnership==null?null:scriptOwnership.record(), bim,
       project == null ? null : project.record,
-      project == null ? null : project.authored, customMaterials));
+      project == null ? null : project.authored, customMaterials,
+      recipeDocument == null ? null : DocumentCodec.encode(recipeDocument)));
     // Do not move the savepoint or change the document path until publication succeeds.
     path = absolute;
     document.markSaved();
@@ -514,12 +533,14 @@ class ProjectDocumentSession {
     var previousSensors = sensors;
     var previousOwnership=scriptOwnership;
     var previousBim=bim;
+    var previousRecipe=recipeDocument;
     document = nextDocument;
     edits = new ProjectEditCoordinator(nextDocument);
     scene = next;
     sensors = nextSensors;
     scriptOwnership=nextOwnership;
     projectReference = null;
+    recipeDocument = null;
     projectBaseline = null;
     staleProjectEdits = [];
     staleProjectRecord = null;
@@ -540,6 +561,7 @@ class ProjectDocumentSession {
     previousSensors.dispose();
     if(previousOwnership!=null&&previousOwnership!=nextOwnership)previousOwnership.dispose();
     if(previousBim!=nextBim)previousBim.close();
+    if(previousRecipe!=null)previousRecipe.close();
   }
 
   /** Applies a BIM mutation with an explicit inverse on the shared project history. */
@@ -552,6 +574,46 @@ class ProjectDocumentSession {
       model.cad.clearHistory();
     };
     return edits.apply(label, function() apply(change), function() apply(undo));
+  }
+
+  /** Edit a generated part and rebuild its geometry within the project history. */
+  public function applyRecipeEdit(label:String, change:Void->Void):Bool {
+    var recipe = recipeDocument;
+    if (recipe == null || projectReference == null) throw "This project has no editable recipe document";
+    var first = true;
+    try {
+      return edits.apply(label, function() {
+      if (first) { change(); first = false; }
+      else if (!recipe.redo()) throw "Recipe redo history is out of sync";
+      refreshRecipeScene();
+    }, function() {
+      if (!recipe.undo()) throw "Recipe undo history is out of sync";
+      refreshRecipeScene();
+      });
+    } catch (error:Dynamic) {
+      if (!first) { recipe.undo(); try refreshRecipeScene() catch (_:Dynamic) {} }
+      throw error;
+    }
+  }
+
+  function refreshRecipeScene():Void {
+    var recipe = recipeDocument, reference = projectReference;
+    if (recipe == null || reference == null) throw "This project has no editable recipe document";
+    var saved = projectSaveData(path == null ? reference + ".materia" : path);
+    var generated = MateriaProjectRunner.loadProject(reference, DocumentCodec.encode(recipe));
+    var stateRecord = generated.assemblyState;
+    if (saved.record.assemblyState != null && generated.assemblyDefinition != null)
+      stateRecord = AssemblyDefinitionCodec.decodeState(generated.assemblyDefinition, saved.record.assemblyState);
+    if (stateRecord != null && generated.assemblyDefinition != null)
+      generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
+    var diagnostics:Array<String> = [];
+    var data = materializeProject(generated.objects, saved.record, saved.authored, diagnostics, customMaterials);
+    scene.refreshGenerated(data, generated.geometryBySnapshot);
+    projectBaseline = generated.objects;
+    projectAssembly = generated.assembly;
+    installAssemblyRuntime(generated.assemblyDefinition,
+      generated.assemblyDefinition == null ? null : new AssemblyState(generated.assemblyDefinition, stateRecord),
+      generated.localCentersByDefinition, generated.metresPerUnit, saved.record.assemblyDependentJoints);
   }
 
   static function checkedPath(value:String):String {
@@ -768,7 +830,7 @@ class ProjectDocumentSession {
   static function decodeProjectObject(value:Dynamic, materials:Array<MaterialDef>, ?snapshot:String):SceneObjectData {
     Reflect.setField(value, "meshSnapshot", "_");
     var rawAppearance:Dynamic = Reflect.field(value, "appearance");
-    var checkedAppearance:materia.project.Appearance = rawAppearance == null ? null : {
+    var appearance:Appearance = rawAppearance == null ? Appearances.neutral() : {
       finish: Reflect.field(rawAppearance, "finish"),
       metallic: Reflect.field(rawAppearance, "metallic"),
       roughness: Reflect.field(rawAppearance, "roughness")};
@@ -787,12 +849,14 @@ class ProjectDocumentSession {
       label: Reflect.field(value, "label"), x: Reflect.field(value, "x"),
       y: Reflect.field(value, "y"), z: Reflect.field(value, "z"),
       width: Reflect.field(value, "width"), height: Reflect.field(value, "height"),
-      depth: Reflect.field(value, "depth"), collisionEnabled: Reflect.field(value, "collisionEnabled"),
+      depth: Reflect.field(value, "depth"),
+      collisionEnabled: Reflect.field(value, "collisionEnabled"),
       dynamicBody: Reflect.field(value, "dynamicBody"), mass: Reflect.field(value, "mass"),
       red: Reflect.field(value, "red"), green: Reflect.field(value, "green"),
       blue: Reflect.field(value, "blue"), visible: Reflect.field(value, "visible"),
-      materialId: Reflect.field(value, "materialId"), appearance: checkedAppearance,
-      rotation: rotation, meshSnapshot: "_"};
+      materialId: Reflect.field(value, "materialId"), appearance: appearance,
+      rotation: rotation, cadGraph: null, meshSnapshot: "_", sketchDraft: null
+    };
     var result = SceneCodec.decode(Json.stringify({format: SceneCodec.FORMAT,
       version: SceneCodec.VERSION, materials: MaterialLibrary.all().concat(materials),
       objects: [SceneCodec.encodeObject(candidate, materials)]}))[0];
@@ -828,7 +892,13 @@ class ProjectDocumentSession {
     return result.length == 0 ? "." : result.join("/");
   }
 
-  public function dispose():Void { scene.dispose(); sensors.dispose();if(scriptOwnership!=null)scriptOwnership.dispose();bim.close(); }
+  public function dispose():Void { scene.dispose(); sensors.dispose();if(scriptOwnership!=null)scriptOwnership.dispose();bim.close();if(recipeDocument!=null)recipeDocument.close(); }
+
+  static function decodeRecipe(text:Null<String>):Null<cadkit.parametric.Document> {
+    if (text == null) return null;
+    MachineKitRecipes.register();
+    return DocumentCodec.decode(text);
+  }
 
   static function createDocument():EditorDocument
     return new EditorDocument("project", new EditHistory(MAX_HISTORY_OPERATIONS,

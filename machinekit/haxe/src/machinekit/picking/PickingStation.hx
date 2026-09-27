@@ -1,6 +1,6 @@
 package machinekit.picking;
 
-import materia.project.AssemblyFrames;
+import materia.assembly.AssemblyFrames;
 import machinekit.component.Bom;
 import machinekit.standard.SocketHeadCapScrew;
 

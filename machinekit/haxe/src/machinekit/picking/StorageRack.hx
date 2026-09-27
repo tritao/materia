@@ -1,6 +1,6 @@
 package machinekit.picking;
 
-import materia.project.AssemblyFrames;
+import materia.assembly.AssemblyFrames;
 import machinekit.component.Bom;
 import machinekit.component.MachineComponent;
 import machinekit.standard.SocketHeadCapScrew;
@@ -77,9 +77,9 @@ class StoragePosition {
 	public final id:String;
 	public final shelfIndex:Int;
 	public final binIndex:Int;
-	public final placement:materia.project.AssemblyRecord.AssemblyFrame;
+	public final placement:materia.assembly.AssemblyRecord.AssemblyFrame;
 	public final indicatorId:String;
-	public final indicatorPlacement:materia.project.AssemblyRecord.AssemblyFrame;
+	public final indicatorPlacement:materia.assembly.AssemblyRecord.AssemblyFrame;
 	public final allowedContainerWidth:Float;
 	public final allowedContainerDepth:Float;
 	public final allowedContainerHeight:Float;
@@ -89,13 +89,13 @@ class StoragePosition {
 		this.shelfIndex = shelfIndex;
 		this.binIndex = binIndex;
 		var radians = config.shelfInclinationDegrees * Math.PI / 180;
-		placement = materia.project.AssemblyFrames.translation(config.binX(binIndex),
+		placement = materia.assembly.AssemblyFrames.translation(config.binX(binIndex),
 			config.binY() * Math.cos(radians) - 18 * Math.sin(radians),
 			config.shelfZ(shelfIndex) + config.binY() * Math.sin(radians) + 18 * Math.cos(radians));
 		placement.qx = Math.sin(radians / 2);
 		placement.qw = Math.cos(radians / 2);
 		indicatorId = config.indicatorId(shelfIndex, binIndex);
-		indicatorPlacement = materia.project.AssemblyFrames.translation(config.binX(binIndex),
+		indicatorPlacement = materia.assembly.AssemblyFrames.translation(config.binX(binIndex),
 			config.indicatorY(), config.shelfZ(shelfIndex) + 5);
 		allowedContainerWidth = config.binWidth;
 		allowedContainerDepth = config.binDepth;

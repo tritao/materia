@@ -1,5 +1,7 @@
 package cadkit.sketch;
 
+import cadkit.sketch.ProfileError;
+
 import cadkit.modeling.Curve;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;

@@ -62,21 +62,21 @@ class MaterialLibrary {
     }
   }
 
-  public static function fromSpec(spec:Null<String>):String return switch (spec) {
-    case null: "painted";
-    case "aluminium 6061": "aluminium";
-    case "birch plywood": "plywood-birch";
-    case "bearing steel": "bearing-steel";
-    case "cast iron": "cast-iron";
-    case "bronze": "bronze";
-    case "spring steel": "spring-steel";
-    case "steel 12.9": "steel-12-9";
-    case "steel C45": "steel-c45";
-    case "steel 8": "steel-8";
-    case "steel 8.8": "steel-8-8";
-    case "steel": "machined-steel";
-    default: throw 'Unknown material specification "$spec"';
-  };
+  public static function fromSpec(spec:Null<String>):String {
+    if (spec == null) return "painted";
+    if (spec == "aluminium 6061") return "aluminium";
+    if (spec == "birch plywood") return "plywood-birch";
+    if (spec == "bearing steel") return "bearing-steel";
+    if (spec == "cast iron") return "cast-iron";
+    if (spec == "bronze") return "bronze";
+    if (spec == "spring steel") return "spring-steel";
+    if (spec == "steel 12.9") return "steel-12-9";
+    if (spec == "steel C45") return "steel-c45";
+    if (spec == "steel 8") return "steel-8";
+    if (spec == "steel 8.8") return "steel-8-8";
+    if (spec == "steel") return "machined-steel";
+    throw 'Unknown material specification "$spec"';
+  }
 
   public static function appearance(id:String):Appearance {
     var item = require(id);

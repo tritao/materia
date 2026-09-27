@@ -16,8 +16,8 @@ import sys.io.File;
 class MateriaProjectModuleBuild {
 	static function main():Void {
 		var args = Sys.args();
-		if (args.length != 5)
-			throw "usage: MateriaProjectModuleBuild <haxeon.json> <module> <function> <output-prefix> <haxeon-root>";
+		if (args.length != 6)
+			throw "usage: MateriaProjectModuleBuild <haxeon.json> <module> <function> <output-prefix> <haxeon-root> <document-input>";
 		var manifestPath = Path.normalize(FileSystem.fullPath(args[0]));
 		var moduleName = args[1];
 		var functionName = args[2];
@@ -58,11 +58,16 @@ class MateriaProjectModuleBuild {
 		if (entryPath == null)
 			throw 'Project entrypoint module "$moduleName" is not under a package source root';
 		compiler.update(modulePath, File.getContent(entryPath));
+		var documentInput = args[5] == "true";
+		var invocation = documentInput
+			? "(args.length == 2 ? " + moduleName + "." + functionName + "(sys.io.File.getContent(args[1])) : " + moduleName + "." + functionName + "())"
+			: moduleName + "." + functionName + "()";
 		var wrapper = "class MateriaGeneratedEntrypoint {\n"
 			+ "  static function main():Void {\n"
 			+ "    var args = Sys.args();\n"
-			+ "    if (args.length != 1) throw \"Project generator requires one output path\";\n"
-			+ "    sys.io.File.saveBytes(args[0], " + moduleName + "." + functionName + "());\n"
+			+ "    if (args.length != 1" + (documentInput ? " && args.length != 2" : "")
+			+ ") throw \"Project generator requires an output path\";\n"
+			+ "    sys.io.File.saveBytes(args[0], " + invocation + ");\n"
 			+ "  }\n"
 			+ "}\n";
 		compiler.update("MateriaGeneratedEntrypoint.hx", wrapper);

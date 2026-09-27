@@ -15,7 +15,7 @@ class SceneCodec {
   public static function encode(scene:EditorScene,
     ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument,
     ?project:ProjectSceneRecord, ?authoredObjects:Array<SceneObjectData>,
-    ?customMaterials:Array<MaterialDef>):String {
+    ?customMaterials:Array<MaterialDef>, ?recipeDocument:String):String {
     var custom = customMaterials == null ? [] : customMaterials;
     MaterialLibrary.validateCustom(custom);
     var objects = script == null ? (authoredObjects == null ? scene.recordsForSave() : authoredObjects) : [];
@@ -24,7 +24,8 @@ class SceneCodec {
     return Json.stringify({format: FORMAT, version: VERSION, objects: encodedObjects,
       sensors: script == null && sensors != null ? sensors.records() : null,
       script: script, project: project, materials: MaterialLibrary.all().concat(custom),
-      bim: bim == null ? null : Json.parse(BimCodec.encode(bim))}, null, "  ") + "\n";
+      bim: bim == null ? null : Json.parse(BimCodec.encode(bim)),
+      recipeDocument: recipeDocument}, null, "  ") + "\n";
   }
 
   /** Serialize editor color fields as sparse material visuals. */
