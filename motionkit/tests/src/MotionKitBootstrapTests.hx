@@ -168,7 +168,8 @@ class MotionKitBootstrapTests {
     var timed = new ToppraPathTiming(1e-8).time(path,
       new PathTimingLimits([0.4], [1.0]));
     check(timed.trajectory.durationSeconds() > 2.8 &&
-      timed.trajectory.durationSeconds() < 3.1, "TOPP-RA respects velocity limit");
+      timed.trajectory.durationSeconds() < 3.1,
+      'TOPP-RA respects velocity limit (${timed.trajectory.durationSeconds()})');
     near(timed.distanceToTime(1.0), timed.trajectory.durationSeconds(),
       "TOPP-RA end distance maps to end time", 1e-6);
     check(timed.bindingConstraints.length > 0,
@@ -337,7 +338,7 @@ class MotionKitBootstrapTests {
         EventValue.Digital(true), 0.02)])]);
     var linearPlan = linearCompiler.compile(linearProgram,
       [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(500));
-    var reference = new SimplePathTiming().time(new JointPathSamples(
+    var reference = new ToppraPathTiming().time(new JointPathSamples(
       [0.0, 0.05, 0.1],
       [[0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
        [0.05, 0.0, 0.0, 0.0, 0.1, 0.0],
@@ -348,6 +349,7 @@ class MotionKitBootstrapTests {
     check(Int64.compare(linearPlan.blocks[0].plans[0].events[0].timeNs,
       Trajectory.nanoseconds(reference.distanceToTime(0.05) - 0.02)) == 0,
       "FollowPath event follows the lowered distance-to-time law and lead");
+    reference.releaseDistanceMap();
     reference.trajectory.dispose();
     linearPlan.dispose();
     var bounded = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
@@ -374,6 +376,22 @@ class MotionKitBootstrapTests {
       MotionKitNativeConstants.MK_CHECK_PASSED,
       "FreeAboutTool accepts a free twist about the tool axis");
     freePlan.dispose();
+
+    var planarCompiler = new ProgramCompiler(new PlanarSolver(), limits,
+      "work", velocity, acceleration, jerk, null, 0.005);
+    var blended = planarCompiler.compile(new MotionProgram([
+      MotionOp.MoveL(new Pose3(0.05, 0.0), "work", 0.1,
+        Blend.ToleranceBlend(0.005)),
+      MotionOp.MoveL(new Pose3(0.05, 0.05), "work", 0.1, Blend.ExactStop)
+    ]), [for (_ in 0...6) 0.0], Int64.ofInt(503));
+    check(blended.blocks.length == 1 && blended.blocks[0].plans.length == 1 &&
+      blended.notes.length == 1 && blended.notes[0].indexOf("tolerance blended") >= 0,
+      "planar MoveL corner uses C3 tolerance blending in one timed plan");
+    var blendedPlan = blended.blocks[0].plans[0];
+    check(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED,
+      "blended Cartesian plan passes task-space validation");
+    blended.dispose();
   }
 
   static function testManipulatorMotion():Void {
@@ -2494,6 +2512,23 @@ private class WristBranchSolver implements KinematicsSolver {
     return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
     return [for (_ in 0...6) 0.0];
+}
+
+private class PlanarSolver implements KinematicsSolver {
+  public function new() {}
+  public function jointCount():Int return 6;
+  public function forward(q:Array<Float>):Pose3 return new Pose3(q[0], q[1]);
+  public function solvePose(target:Pose3, seed:Array<Float>,
+      tolerance:IkTolerance):Null<Array<Float>> {
+    var q = seed.copy();
+    q[0] = target.x; q[1] = target.y;
+    return q;
+  }
+  public function sampleCandidates(target:Pose3, maxCount:Int,
+      tolerance:IkTolerance):Array<Array<Float>>
+    return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
+  public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
+    return [twist.linearX, twist.linearY, 0.0, 0.0, 0.0, 0.0];
 }
 
 /** Robot wrapper that can hold submitted commands back, to simulate transport delay. */

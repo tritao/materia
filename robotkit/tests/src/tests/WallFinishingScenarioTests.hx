@@ -2,6 +2,8 @@ package tests;
 
 import haxe.Int64;
 import motionkit.robot.SurfacePlanRunner;
+import motionkit.robot.ProgramCompiler;
+import motionkit.planner.SimplePathTiming;
 import robotkit.tool.ChannelToolAdapter;
 import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.ProcessEventValue;
@@ -231,10 +233,11 @@ class WallFinishingScenarioTests {
         var batch = runtime.pollEvents();
         for (event in batch.events) writer.recordProcessEvent(robot.id(), event);
         return batch;
-      }, 0.03, 0.3, 0.6);
+      }, 0.03, 0.3, 0.6, null, null, 0.02);
     var adapter = new ChannelToolAdapter();
     adapter.bindSprayerFlow("surface.process", sprayer, 0.3);
 
+    var timingCompared = false;
     for (patch in plan.patches) {
       // -- navigate --
       // Tight tolerances keep the achieved base pose close to the candidate
@@ -280,6 +283,32 @@ class WallFinishingScenarioTests {
       var achieved = localizationState.pose;
       var actualBaseTransform = Transform3.fromPose2(achieved, 0.0);
       var baseTWork = actualBaseTransform.inverse().compose(registeredMapTSurface);
+
+      if (backend == 0 && !timingCompared) {
+        var program = planRunner.programForPatch(patch, baseTWork, seed);
+        var toppraCompiler = planRunner.motion.compiler;
+        var simpleCompiler = new ProgramCompiler(toppraCompiler.solver,
+          toppraCompiler.limits, toppraCompiler.frameId,
+          toppraCompiler.maxVelocity, toppraCompiler.maxAcceleration,
+          toppraCompiler.maxJerk, new SimplePathTiming(),
+          0.01, toppraCompiler.maxJointJump,
+          toppraCompiler.positionTolerance, toppraCompiler.orientationTolerance,
+          toppraCompiler.ikTolerance);
+        var initial = [for (index in planRunner.motion.jointIndices)
+          robot.snapshot().positions.get(index)];
+        var toppraProgram = toppraCompiler.compile(program, initial, Int64.ofInt(100000));
+        var simpleProgram = simpleCompiler.compile(program, initial, Int64.ofInt(200000));
+        var toppraSeconds = 0.0, simpleSeconds = 0.0;
+        for (block in toppraProgram.blocks) for (planned in block.plans)
+          toppraSeconds += planned.durationSeconds;
+        for (block in simpleProgram.blocks) for (planned in block.plans)
+          simpleSeconds += planned.durationSeconds;
+        toppraProgram.dispose();
+        simpleProgram.dispose();
+        check(toppraSeconds <= simpleSeconds * 1.01,
+          'TOPP-RA patch cycle time $toppraSeconds exceeds simple timing $simpleSeconds');
+        timingCompared = true;
+      }
 
       // Execute the complete patch as validated plans. Process records, not
       // host step indices, drive the simulated sprayer.

@@ -62,6 +62,16 @@ int main() {
     mk_time_law_destroy(law);
     mk_path_destroy(path);
 
+    // Rounded TOPP-RA stage durations can leave a few nanometres per second
+    // of negative endpoint speed even when the requested endpoint is zero.
+    mk_time_stage rounded_stop{};
+    rounded_stop.struct_size = sizeof(rounded_stop);
+    rounded_stop.duration_ns = 1'000'000'000;
+    rounded_stop.speed = 0.1;
+    rounded_stop.acceleration = -0.100000004;
+    assert(mk_time_law_create(&rounded_stop, 1, &law) == MK_OK);
+    mk_time_law_destroy(law);
+
     mk_path_sample straight[2]{};
     for (int i = 0; i < 2; ++i) {
         straight[i].struct_size = sizeof(straight[i]);

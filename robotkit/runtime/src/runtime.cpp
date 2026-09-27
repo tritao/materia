@@ -459,8 +459,10 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
             motionkit::evaluate_segment(segment,
                 static_cast<double>(terminal.duration_ns) * 1e-9, endpoint);
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
-                if (std::abs(endpoint.velocity[joint]) > 1e-6 ||
-                    std::abs(endpoint.acceleration[joint]) > 1e-6)
+                // TOPP-RA bounds acceleration but can reach zero speed with
+                // nonzero acceleration at the final knot. The owner holds
+                // position after that knot, so rest requires zero velocity.
+                if (std::abs(endpoint.velocity[joint]) > 1e-6)
                     return RK_ERROR_INVALID_ARGUMENT;
         }
         if (replace) {

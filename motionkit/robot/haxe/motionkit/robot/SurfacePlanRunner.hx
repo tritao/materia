@@ -30,7 +30,8 @@ class SurfacePlanRunner implements robotkit.skill.SurfacePlanRunner {
   public static function create(robot:Robot, manipulator:Manipulator,
       eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool},
       feed:Float, maxAcceleration:Float, maxJointJump:Float,
-      ?modelRevision:Int64, ?calibrationRevision:Int64):SurfacePlanRunner {
+      ?modelRevision:Int64, ?calibrationRevision:Int64,
+      ?cartesianResolution:Float = 0.01):SurfacePlanRunner {
     var count = manipulator.group.count();
     var limits = new ValidationLimits(count,
       modelRevision == null ? Int64.ofInt(1) : modelRevision,
@@ -48,7 +49,7 @@ class SurfacePlanRunner implements robotkit.skill.SurfacePlanRunner {
         var speed = manipulator.group.limitsOf(joint).velocity;
         speed > 0.0 ? speed : 2.0;
       }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
-      null, 0.01, maxJointJump, 0.005, 0.02,
+      null, cartesianResolution, maxJointJump, 0.005, 0.02,
       new IkTolerance(2e-3, 5e-3, 300, 0.03));
     var indices = [for (target in manipulator.toJointTargets(
       [for (_ in 0...count) 0.0])) target.joint];
@@ -68,6 +69,11 @@ class SurfacePlanRunner implements robotkit.skill.SurfacePlanRunner {
 
   public function runPatch(patch:WorkPatch, base_T_work:Transform3,
       seed:Array<Float>):Void {
+    motion.run(programForPatch(patch, base_T_work, seed));
+  }
+
+  public function programForPatch(patch:WorkPatch, base_T_work:Transform3,
+      seed:Array<Float>):MotionProgram {
     if (patch == null || base_T_work == null || patch.toolpath.points.length < 2)
       throw "Surface patch needs a path and base transform";
     var points:Array<ToolpathPoint> = [];
@@ -85,12 +91,12 @@ class SurfacePlanRunner implements robotkit.skill.SurfacePlanRunner {
     var retractLocal = new Transform3(
       localEnd.translation.add(new Vec3(0.0, 0.0, 0.03)), localEnd.rotation);
     var retract = base_T_work.compose(retractLocal);
-    motion.run(new MotionProgram([
+    return new MotionProgram([
       MotionOp.MoveJ(MoveTarget.JointTarget(ik.q), new MotionOptions(), Blend.ExactStop),
       MotionOp.Dwell(0.6),
       MotionOp.FollowPath(path, "arm-base", feed, events),
       MotionOp.MoveL(pose(retract), "arm-base", feed, Blend.ExactStop)
-    ]));
+    ]);
   }
 
   public function update(dtSeconds:Float):Void motion.update(dtSeconds);

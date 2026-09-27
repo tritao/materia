@@ -267,6 +267,19 @@ class PlanExecutor {
         [for (_ in state.positions) 0.02], tolerance);
       var aTol = expanded(first == 0 ? active.copyAccelerationTolerances() :
         [for (_ in state.positions) 0.02], tolerance);
+      if (segments[0].coefficients[0].length > 2) {
+        var precedingAcceleration = first == 0 ? zero : expanded(
+          active.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations, zero);
+        for (joint in 0...fixedPositions.length) {
+          var coefficients = segments[0].coefficients[joint];
+          var polynomialAcceleration = 2.0 * coefficients[2];
+          aTol[joint] = Math.max(aTol[joint],
+            Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5);
+          aTol[joint] = Math.max(aTol[joint],
+            Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5);
+          startAcceleration[joint] = polynomialAcceleration;
+        }
+      }
       var tag = nextTag;
       nextTag = Int64.add(nextTag, Int64.ofInt(1));
       try robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,

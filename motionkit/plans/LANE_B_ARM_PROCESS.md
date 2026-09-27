@@ -406,3 +406,26 @@ Haxe passed 4,522, and MuJoCo M9 passed 64 with 99.60% coverage and zero
 opening coverage. MotionKit native CTest passed 4/4, RobotKit native CTest
 passed 17/17, both FFI audits passed, and TCP integration passed in default,
 session, and lease-timeout modes. Commit: the commit containing this entry.
+
+### B8 — TOPP-RA timing and tolerance blending
+
+`ProgramCompiler` now uses Lane C's `ToppraPathTiming` by default and retains
+the validated distance/time map for event scheduling and progress. Consecutive
+planar, fixed-orientation `MoveL` operations can use C3's `CornerBlender` for
+`ToleranceBlend`; unsupported corners retain the exact-stop fallback. Native
+timing preserves linear authored path intervals exactly and slows local
+collocation peaks when lowering would exceed a joint acceleration bound.
+Plan submission carries polynomial start acceleration and accommodates the
+boundary acceleration jump at a streamed chunk. Runtime end-at-rest checks
+require zero terminal velocity without requiring zero terminal acceleration.
+
+The M9 timing comparison compiles the same authored patch geometry with both
+backends and passed the user-approved limit of at most 1% longer than the
+simple backend. TOPP-RA uses 2 cm Cartesian samples in that fixture; the
+simple backend uses its validated 1 cm samples. Joint and task-space checks
+passed. Default and MuJoCo M9 coverage were both 99.60%, with zero opening
+coverage. MotionKit Haxe passed 6,461 assertions, RobotKit Haxe passed 4,523,
+ProcessKit Haxe passed 19, and MuJoCo M9 passed 64. MotionKit native CTest
+passed 4/4, RobotKit native CTest passed 17/17, both FFI audits passed, and
+TCP integration passed in default, session, and lease-timeout modes. Commit:
+the commit containing this entry.
