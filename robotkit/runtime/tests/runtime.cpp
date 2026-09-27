@@ -771,6 +771,8 @@ void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &so
     plan.calibration_revision = 7;
     plan.required_capabilities = 0x80000000u;
     assert(runtime.submit_plan(plan) == RK_ERROR_UNSUPPORTED);
+    plan.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
+    assert(runtime.submit_plan(plan) == RK_ERROR_UNSUPPORTED);
     plan.required_capabilities = 0;
     plan.start_position[0] = 0.1;
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);

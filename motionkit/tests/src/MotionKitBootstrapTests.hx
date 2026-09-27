@@ -5,6 +5,12 @@ import motionkit.Feed;
 import motionkit.MotionOptions;
 import motionkit.Pose;
 import motionkit.axis.MotionAxisBlueprint;
+import motionkit.event.ChannelDeclaration;
+import motionkit.event.ChannelKind;
+import motionkit.event.EventValue;
+import motionkit.event.HoldPolicy;
+import motionkit.event.PathEvent;
+import motionkit.event.TimedEvent;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
 import motionkit.robot.MotionSystemBlueprint;
@@ -53,6 +59,7 @@ class MotionKitBootstrapTests {
   static var assertions:Int = 0;
 
   public static function main():Void {
+    testMotionEventContracts();
     testGeometricPathPrimitives();
     testNativeTrajectoryRoundTrip();
     testNativeValidationAndPlan();
@@ -81,6 +88,44 @@ class MotionKitBootstrapTests {
     testPathHoldsStayOnPathWithinLimits();
     testDualMotorAxisChangesStayWithinJointLimits();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
+  }
+
+  static function testMotionEventContracts():Void {
+    var pathEvent = new PathEvent(0.25, "sprayer.flow", EventValue.Analog(0.4),
+      0.02, HoldPolicy.SafeWhileHeld);
+    near(pathEvent.distance, 0.25, "path event retains its authored distance");
+    near(pathEvent.leadSeconds, 0.02, "path event retains its actuator lead");
+    check(pathEvent.channel == "sprayer.flow", "path event retains its channel");
+    check(switch pathEvent.value {
+      case Analog(value): Math.abs(value - 0.4) < 1e-12;
+      case _: false;
+    }, "path event retains its typed value");
+
+    var timed = new TimedEvent(Int64.parseString("123456789"), "sprayer.enabled",
+      EventValue.Digital(true), HoldPolicy.RestoreOnResume);
+    check(Int64.compare(timed.timeNs, Int64.parseString("123456789")) == 0,
+      "timed event uses plan-relative nanoseconds");
+    check(switch timed.value { case Digital(value): value; case _: false; },
+      "timed event retains a digital value");
+
+    var channel = new ChannelDeclaration("sprayer.flow", ChannelKind.Analog,
+      EventValue.Analog(0.0));
+    check(channel.id == "sprayer.flow", "channel declaration retains its stable ID");
+    check(switch channel.safeValue { case Analog(value): value == 0.0; case _: false; },
+      "channel declaration retains its safe value");
+
+    throws(function() new PathEvent(-0.1, "sprayer.flow", EventValue.Analog(0.0)),
+      "path event rejects a negative distance");
+    throws(function() new PathEvent(0.0, " ", EventValue.Digital(false)),
+      "path event rejects an empty channel");
+    throws(function() new PathEvent(0.0, "sprayer.flow", EventValue.Analog(Math.NaN)),
+      "path event rejects a non-finite analog value");
+    throws(function() new PathEvent(0.0, "sprayer.command",
+      EventValue.Process("", 0.0)), "path event rejects an empty process command");
+    throws(function() new TimedEvent(Int64.ofInt(-1), "sprayer.enabled",
+      EventValue.Digital(false)), "timed event rejects a negative path time");
+    throws(function() new ChannelDeclaration("sprayer.flow", ChannelKind.Analog,
+      EventValue.Digital(false)), "channel declaration rejects a mismatched safe value");
   }
 
   static function testGeometricPathPrimitives():Void {

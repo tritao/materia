@@ -356,4 +356,16 @@ and the three lanes start.
 
 ## Progress log
 
-(append entries here)
+### P0.1 — Add process-event contract types
+
+Added immutable path/timed event and channel-declaration values with finite,
+non-negative and non-empty validation, including safe-value kind checks.
+Reserved runtime capability bit 2 for events, regenerated the RobotKit FFI
+binding, and verified that plans requiring the reserved bit are rejected until
+event execution lands. The constructor and runtime tests failed before the
+implementation and now pass. Commit: the commit containing this entry.
+
+The pinned NativeKit commit was absent from its configured remote, so the
+worktree dependency was fetched from the shared checkout at the exact recorded
+SHA. MotionKit and RobotKit Haxe suites, all 12 native tests, the RobotKit FFI
+audit, and TCP integration in default, session and lease-timeout modes passed.

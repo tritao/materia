@@ -139,6 +139,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < Operation completed successfully.
 	 */
 	const RK_OK = 0;
+	/**
+	 * Reserved for path-time process events; see motionkit/plans/CONTRACTS.md C1.
+	 */
+	const RK_PLAN_CAPABILITY_EVENTS = 2;
 	const RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE = 1;
 	const RK_RECORDING_CLOSED = 3;
 	const RK_RECORDING_CLOSING = 2;

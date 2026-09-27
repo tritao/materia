@@ -360,8 +360,12 @@ typedef struct rk_trajectory_segment_chunk {
     uint64_t tag;
 } rk_trajectory_segment_chunk;
 
-/** Capabilities required by a plan; unknown bits are unsupported. */
-enum { RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE = 1u };
+/** Capabilities required by a plan; unknown or reserved bits are unsupported. */
+enum {
+    RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE = 1u,
+    /** Reserved for path-time process events; see motionkit/plans/CONTRACTS.md C1. */
+    RK_PLAN_CAPABILITY_EVENTS = 2u
+};
 
 /** Bounded plan. Replacement time is in the active plan's trajectory clock. */
 typedef struct rk_plan_submission {
