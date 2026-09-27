@@ -23,8 +23,8 @@ class RoundTube implements StructuralProfile {
 
 	public function geometry(length:Float):Part {
 		if (!(length > 0)) throw "Round tube needs a positive length";
-		return Solids.cut(Part.cylinder(outerDiameter / 2, 0, length),
-			[Part.cylinder(outerDiameter / 2 - wall, -0.1, length + 0.1)]);
+		return Solids.cut(Part.cylinderSpan(outerDiameter / 2, 0, length),
+			[Part.cylinderSpan(outerDiameter / 2 - wall, -0.1, length + 0.1)]);
 	}
 
 	public function profileDesignation():String return designation;

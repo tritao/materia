@@ -65,6 +65,8 @@ private class TestBoxDefinitionEvaluator implements DefinitionEvaluator {
 
 private class TypedConnectorEvaluator implements DefinitionEvaluator implements DefinitionConnectorEvaluator {
 	public function new() {}
+	public function connectorNames(definition:Definition, instance:cadkit.parametric.InstanceElement):Array<String>
+		return ["mount"];
 
 	public function evaluate(definition:Definition, instance:cadkit.parametric.InstanceElement, output:String):Shape {
 		if (output != "body") throw new ParametricError("unexpected geometry output");
@@ -543,6 +545,11 @@ class ElementSmoke {
 		var instance = doc.createInstance("Part", definition);
 		check(instance.resolvedBoolean("enabled") && instance.resolvedInteger("count") == 2 &&
 			instance.resolvedToken("detail") == "preview", "typed defaults resolve");
+		var numericOnly = false;
+		try instance.overrideValue("detail") catch (error:ParametricError) numericOnly = true;
+		check(numericOnly, "numeric override accessor rejects token input");
+		check(instance.connectorNames().length == 1 && instance.connectorNames()[0] == "mount",
+			"connector names come from the instance evaluator");
 		var transaction = doc.beginTransaction();
 		instance.setTypedOverride("detail", "envelope");
 		var invalid = false;

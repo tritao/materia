@@ -11,8 +11,11 @@ class InstanceElement extends Element {
 		overrides = new Map();
 	}
 
-	public function overrideValue(name:String):Null<Float>
+	public function overrideValue(name:String):Null<Float> {
+		var input = document.definition(definitionId).input(name);
+		if (!input.isNumeric()) throw new ParametricError("definition input is not numeric: " + name);
 		return cast overrides.get(name);
+	}
 
 	public function typedOverrideValue(name:String):Dynamic return overrides.get(name);
 
@@ -62,6 +65,9 @@ class InstanceElement extends Element {
 	public function connector(name:String):Placement
 		return document.worldPlacement(this).compose(DefinitionEvaluatorRegistry.connector(
 			document.definition(definitionId), this, name));
+
+	public function connectorNames():Array<String>
+		return DefinitionEvaluatorRegistry.connectorNames(document.definition(definitionId), this);
 
 	/** Give this instance its own editable definition while preserving its identity and placement. */
 	public function makeUnique(?definitionName:String):Definition

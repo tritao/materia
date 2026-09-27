@@ -119,18 +119,19 @@ class MachineKitSmoke {
 			var recipeDefinition = MachineKitDocuments.define(registryDocument, registered);
 			check(recipeDefinition.output("body").purpose == DefinitionOutput.Geometry,
 				"MachineKit recipe geometry output");
-			for (connector in registered.create().connectors())
-				check(recipeDefinition.output(connector.name).purpose == DefinitionOutput.Connector,
-					"MachineKit recipe connector output");
+			check(recipeDefinition.outputs().length == registered.create().toolNames().length + 1,
+				"MachineKit stores geometry and type-level tool outputs");
 		}
 		registryDocument.close();
 		var document = new Document();
 		var type = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
 		var definition = MachineKitDocuments.define(document, type);
-		check(definition.property("machinekit.partNumber") != null &&
-			definition.property("machinekit.catalog.source") != null, "recipe metadata is stored");
+		check(definition.property("machinekit.type") != null && definition.properties().length == 1,
+			"only recipe identity is stored");
 		var first = document.createInstance("Bearing A", definition);
 		var second = document.createInstance("Bearing B", definition);
+		check(MachineKitDocuments.partNumber(first) == "608-2Z" && MachineKitDocuments.catalogSource(first) != null,
+			"recipe metadata is computed from the instance");
 		var firstVolume = first.shape().volume();
 		var secondVolume = second.shape().volume();
 		check(firstVolume == secondVolume, "shared bearing geometry");
@@ -150,6 +151,7 @@ class MachineKitSmoke {
 		near(assembly.worldPoint("bearingB", "front").y, 20, "document assembly placement y");
 		near(assembly.worldPoint("bearingB", "front").z, firstBack + 30, "document connectors mate by name");
 		second.setTypedOverride("designation", "6000");
+		check(MachineKitDocuments.partNumber(second) == "6000-2Z", "part number follows the instance override");
 		check(second.shape().volume() != firstVolume, "bearing override updates one instance");
 		near(first.shape().volume(), firstVolume, "other bearing retains its volume");
 		check(second.connector("back").location.plane.origin.z != firstBack &&
@@ -159,9 +161,26 @@ class MachineKitSmoke {
 		check(bom.quantity("608-2Z") == 1 && bom.quantity("6000-2Z") == 1,
 			"document BOM groups recipe instances by values");
 		var saved = DocumentCodec.encode(document);
+		check(DocumentCodec.VERSION == 8, "document version 8");
 		var loaded = DocumentCodec.decode(saved);
 		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
 		loaded.close();
+		var legacy:Dynamic = haxe.Json.parse(saved);
+		Reflect.setField(legacy, "version", 7);
+		var legacyDefinitions:Array<Dynamic> = cast Reflect.field(legacy, "definitions");
+		for (record in legacyDefinitions) {
+			var legacyOutputs:Array<Dynamic> = cast Reflect.field(record, "outputs");
+			legacyOutputs.push({name: "back", purpose: DefinitionOutput.Connector});
+			var legacyProperties:Array<Dynamic> = cast Reflect.field(record, "properties");
+			if (legacyProperties != null)
+				legacyProperties.push({name: "machinekit.partNumber", type: "text", value: "stale"});
+		}
+		var loadedLegacy = DocumentCodec.decode(haxe.Json.stringify(legacy));
+		check(loadedLegacy.definition(first.definitionId).outputs().length == definition.outputs().length,
+			"version 7 connector outputs are discarded");
+		check(loadedLegacy.definition(first.definitionId).property("machinekit.partNumber") == null,
+			"version 7 derived metadata is discarded");
+		loadedLegacy.close();
 		check(document.undo() && second.resolvedToken("designation") == "608", "recipe override undo");
 		check(MachineKitDocuments.bom(document).quantity("608-2Z") == 2, "BOM follows undo");
 		check(document.redo() && second.resolvedToken("designation") == "6000", "recipe override redo");
@@ -181,6 +200,26 @@ class MachineKitSmoke {
 		var motorType = MachineKitComponents.byId("machinekit.motion.nema-stepper");
 		var motor = tools.createInstance("Motor", MachineKitDocuments.define(tools, motorType));
 		check(tools.definitionOutput(motor, "mountingCutout").volume() > 0, "motor cutout output");
+		var flangeType = MachineKitComponents.byId("machinekit.robotics.robot-flange");
+		var flange = tools.createInstance("Flange", MachineKitDocuments.define(tools, flangeType));
+		check(flange.connectorNames().indexOf("bolt4") >= 0 && flange.connectorNames().indexOf("bolt5") < 0,
+			"flange starts with four bolt connectors");
+		flange.setTypedOverride("boltCount", 6);
+		check(flange.connectorNames().indexOf("bolt5") >= 0 && flange.connectorNames().indexOf("bolt6") >= 0,
+			"flange grows its connector set");
+		flange.setTypedOverride("boltCount", 3);
+		check(flange.connectorNames().indexOf("bolt3") >= 0 && flange.connectorNames().indexOf("bolt4") < 0,
+			"flange shrinks its connector set");
+		var railType = MachineKitComponents.byId("machinekit.motion.linear-rail");
+		var rail = tools.createInstance("Rail", MachineKitDocuments.define(tools, railType));
+		var shortMounts = rail.connectorNames().length;
+		rail.setOverride("length", 200);
+		check(rail.connectorNames().length > shortMounts, "rail length changes mount connectors");
+		var firstPartNumber = MachineKitDocuments.partNumber(flange);
+		var flangeDefinition = tools.definition(flange.definitionId);
+		flangeDefinition.setDefault("pitchCircleDiameter", 50);
+		check(MachineKitDocuments.partNumber(flange) != firstPartNumber,
+			"definition default changes computed part number");
 		tools.close();
 	}
 

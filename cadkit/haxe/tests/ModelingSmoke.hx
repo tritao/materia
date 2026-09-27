@@ -33,7 +33,7 @@ class ModelingSmoke {
 	}
 
 	public static function run():Void {
-		var span = Part.cylinder(2, 1, 5);
+		var span = Part.cylinderSpan(2, 1, 5);
 		near(span.volume(), 16 * Math.PI);
 		near(span.shape.bounds().get_min().get_z(), 1);
 		span.close();
@@ -52,7 +52,7 @@ class ModelingSmoke {
 		check(prism.solidCount() == 1, "polygon prism solid count");
 		prism.close();
 		var borrowedBase = Part.box(10, 10, 2);
-		var borrowedTool = Part.cylinder(1, 0, 2);
+		var borrowedTool = Part.cylinderSpan(1, 0, 2);
 		var borrowedFuse = Part.fuseAll([borrowedBase, borrowedTool]);
 		check(!borrowedBase.shape.isClosed() && !borrowedTool.shape.isClosed(), "fuseAll borrows inputs");
 		borrowedFuse.close();

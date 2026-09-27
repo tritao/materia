@@ -68,14 +68,14 @@ class Carriage extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.box(width, width, length);
 		if (detail == Envelope) return body;
-		var tools = [Part.cylinder(boreDiameter / 2, -0.1, length + 0.1)];
+		var tools = [Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1)];
 		if (!hasRailMount) {
-			tools.push(Part.cylinder(guideSeatDiameter / 2, -0.1, length + 0.1, -guideSpacing));
-			tools.push(Part.cylinder(guideSeatDiameter / 2, -0.1, length + 0.1, guideSpacing));
+			tools.push(Part.cylinderSpan(guideSeatDiameter / 2, -0.1, length + 0.1, -guideSpacing));
+			tools.push(Part.cylinderSpan(guideSeatDiameter / 2, -0.1, length + 0.1, guideSpacing));
 		}
 		var mountHoleRadius = nut.mountScrewPart(10).clearanceDiameter(Medium) / 2;
 		for (point in nut.boltPattern())
-			tools.push(Part.cylinder(mountHoleRadius, -0.1, length + 0.1, point.x, point.y));
+			tools.push(Part.cylinderSpan(mountHoleRadius, -0.1, length + 0.1, point.x, point.y));
 		return Solids.cut(body, tools);
 	}
 }

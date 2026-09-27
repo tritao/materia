@@ -113,7 +113,7 @@ class TSlotExtrusion implements StructuralProfile {
 		var body = Part.prism([
 			new Vector(-half, -halfHeight), new Vector(half, -halfHeight), new Vector(half, halfHeight), new Vector(-half, halfHeight),
 		], 0, length);
-		var tools = [Part.cylinder(boreDiameter / 2, -0.1, length + 0.1)];
+		var tools = [Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1)];
 		for (face in 0...4) tools.push(Part.prism(slotPoints(face), -0.1, length + 0.1));
 		return Solids.cut(body, tools);
 	}

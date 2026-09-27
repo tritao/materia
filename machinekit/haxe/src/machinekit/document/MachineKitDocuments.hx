@@ -39,24 +39,28 @@ class MachineKitDocuments {
 		inputs.push(DefinitionInput.token("detail", "preview", ["preview", "envelope"]));
 		var outputs = [new DefinitionOutput("body", DefinitionOutput.Geometry)];
 		for (name in component.toolNames()) outputs.push(new DefinitionOutput(name, DefinitionOutput.Tool));
-		for (connector in component.connectors()) outputs.push(new DefinitionOutput(connector.name, DefinitionOutput.Connector));
-		var definition = document.createDefinition(component.designation, type.id, inputs, outputs);
+		var definition = document.createDefinition(type.label(), type.id, inputs, outputs);
 		definition.restoreProperty("machinekit.type", TypedProperty.text("machinekit.type", type.id));
-		definition.restoreProperty("machinekit.partNumber", TypedProperty.text("machinekit.partNumber", component.bom.partNumber));
-		definition.restoreProperty("machinekit.material", TypedProperty.text("machinekit.material", component.materialId));
+		return definition;
+	}
+
+	public static function partNumber(instance:cadkit.parametric.InstanceElement):String
+		return MachineKitRecipes.component(instance).bom.partNumber;
+
+	public static function material(instance:cadkit.parametric.InstanceElement):String
+		return MachineKitRecipes.component(instance).materialId;
+
+	public static function catalogSource(instance:cadkit.parametric.InstanceElement):Null<String> {
+		var type = MachineKitRecipes.typeOrNull(instance.document.definition(instance.definitionId).recipe);
+		if (type == null) return null;
 		for (parameter in type.parameters()) switch parameter.type {
 			case CatalogDesignation(index):
-				var designation = resolved.token(parameter.name);
+				var designation:String = cast instance.resolvedValue(parameter.name);
 				var source = index.metadata(designation).source;
-				if (source != null) {
-					definition.restoreProperty("machinekit.catalog.source",
-						TypedProperty.text("machinekit.catalog.source", source));
-					definition.restoreProperty("machinekit.catalog.designation",
-						TypedProperty.text("machinekit.catalog.designation", designation));
-				}
+				if (source != null) return source;
 			default:
 		}
-		return definition;
+		return null;
 	}
 
 	public static function bom(document:Document):Bom {

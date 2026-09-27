@@ -2,7 +2,6 @@ package machinekit.document;
 
 import cadkit.modeling.AssemblyModel;
 import cadkit.parametric.DefinitionEvaluatorRegistry;
-import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.InstanceElement;
 import cadkit.parametric.Placement;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -12,8 +11,8 @@ class MachineKitDocumentAssembly {
 	public static function add(model:AssemblyModel, id:String, instance:InstanceElement):Void {
 		var definition = instance.document.definition(instance.definitionId);
 		model.add(id, frame(instance.document.worldPlacement(instance)));
-		for (output in definition.outputs()) if (output.purpose == DefinitionOutput.Connector)
-			model.connector(id, output.name, frame(DefinitionEvaluatorRegistry.connector(definition, instance, output.name)));
+		for (name in instance.connectorNames())
+			model.connector(id, name, frame(DefinitionEvaluatorRegistry.connector(definition, instance, name)));
 	}
 
 	/** Convert a CadKit placement to the kinematics x,y,z,w frame convention. */

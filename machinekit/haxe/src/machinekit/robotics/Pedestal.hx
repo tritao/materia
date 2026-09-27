@@ -159,10 +159,10 @@ class Pedestal extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var parts = [Part.cylinder(baseDiameter / 2, 0, baseThickness), Part.cylinder(columnDiameter / 2, 0, height)];
+		var parts = [Part.cylinderSpan(baseDiameter / 2, 0, baseThickness), Part.cylinderSpan(columnDiameter / 2, 0, height)];
 		if (levelingFootDiameter > 0)
 			for (point in floorBoltPattern())
-				parts.push(Part.cylinder(levelingFootDiameter / 2, -levelingFootHeight, 0, point.x, point.y));
+				parts.push(Part.cylinderSpan(levelingFootDiameter / 2, -levelingFootHeight, 0, point.x, point.y));
 		if (gussetHeight > 0)
 			for (i in 0...gussetCount)
 				parts.push(gusset(2 * Math.PI * i / gussetCount));
@@ -171,9 +171,9 @@ class Pedestal extends MachineComponent {
 		var screw = floorMountScrewPart(10);
 		var anchorStart = -levelingFootHeight - 0.1;
 		var tools = [for (point in floorBoltPattern())
-			Part.cylinder(screw.clearanceDiameter(Medium) / 2, anchorStart, baseThickness + 0.1, point.x, point.y)];
+			Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, anchorStart, baseThickness + 0.1, point.x, point.y)];
 		if (cablePathDiameter > 0)
-			tools.push(Part.cylinder(cablePathDiameter / 2, -0.1, height + 0.1));
+			tools.push(Part.cylinderSpan(cablePathDiameter / 2, -0.1, height + 0.1));
 		// The cutout is built in the mated part's frame (face at z=0, material toward +Z); the
 		// `top` connector turns it over (x kept, y and z reversed) onto the top face.
 		var topCut = flange.mountingCutout(topCutDepth);

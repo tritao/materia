@@ -135,14 +135,14 @@ class RobotFlange extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var boss = Part.cylinder(pilotDiameter / 2, 0, pilotHeight);
-		var body = Solids.union([Part.cylinder(flangeDiameter / 2, -thickness, 0), boss]);
+		var boss = Part.cylinderSpan(pilotDiameter / 2, 0, pilotHeight);
+		var body = Solids.union([Part.cylinderSpan(flangeDiameter / 2, -thickness, 0), boss]);
 		if (detail == Envelope) return body;
 		var screw = mountScrewPart(10);
 		var pin = pinPoint();
-		var tools = [Part.cylinder(pinDiameter / 2, -thickness - 0.1, 0.1, pin.x, pin.y)];
+		var tools = [Part.cylinderSpan(pinDiameter / 2, -thickness - 0.1, 0.1, pin.x, pin.y)];
 		for (point in boltPattern())
-			tools.push(Part.cylinder(screw.clearanceDiameter(Medium) / 2, -thickness - 0.1, 0.1, point.x, point.y));
+			tools.push(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -thickness - 0.1, 0.1, point.x, point.y));
 		return Solids.cut(body, tools);
 	}
 
@@ -166,11 +166,11 @@ class RobotFlange extends MachineComponent {
 		var screw = mountScrewPart(10);
 		var pin = pinPoint();
 		var tools = [
-			Part.cylinder((pilotDiameter + pilotClearance) / 2, -0.1, pilotRecessDepth(pilotClearance)),
-			Part.cylinder((pinDiameter + pilotClearance) / 2, -0.1, depth + 0.1, pin.x, pin.y),
+			Part.cylinderSpan((pilotDiameter + pilotClearance) / 2, -0.1, pilotRecessDepth(pilotClearance)),
+			Part.cylinderSpan((pinDiameter + pilotClearance) / 2, -0.1, depth + 0.1, pin.x, pin.y),
 		];
 		for (point in boltPattern())
-			tools.push(Part.cylinder(screw.clearanceDiameter(fit) / 2, -0.1, depth + 0.1, point.x, point.y));
+			tools.push(Part.cylinderSpan(screw.clearanceDiameter(fit) / 2, -0.1, depth + 0.1, point.x, point.y));
 		return Solids.union(tools);
 	}
 

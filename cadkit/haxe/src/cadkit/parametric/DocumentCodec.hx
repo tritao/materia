@@ -60,7 +60,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 7;
+	public static inline var VERSION:Int = 8;
 
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
@@ -400,8 +400,11 @@ class DocumentCodec {
 					}
 					var outputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "outputs");
 					var outputs:Array<DefinitionOutput> = [];
-					for (outputRecord in outputRecords)
-						outputs.push(new DefinitionOutput(stringField(outputRecord, "name"), stringField(outputRecord, "purpose")));
+					for (outputRecord in outputRecords) {
+						var purpose = stringField(outputRecord, "purpose");
+						if (version < 8 && purpose == DefinitionOutput.Connector) continue;
+						outputs.push(new DefinitionOutput(stringField(outputRecord, "name"), purpose));
+					}
 					var subgraph:Null<DefinitionSubgraph> = null;
 					var rawSubgraph:Dynamic = Reflect.field(definitionRecord, "subgraph");
 					if (rawSubgraph != null) {
@@ -428,6 +431,8 @@ class DocumentCodec {
 					definition.restoreRevision(intField(definitionRecord, "revision"));
 					for (propertyRecord in optionalPropertyRecords(definitionRecord)) {
 						var property = decodeTypedProperty(propertyRecord, remapDocumentId);
+						if (version < 8 && (property.name == "machinekit.partNumber" || property.name == "machinekit.material"
+							|| property.name == "machinekit.catalog.source" || property.name == "machinekit.catalog.designation")) continue;
 						definition.restoreProperty(property.name, property);
 					}
 				}

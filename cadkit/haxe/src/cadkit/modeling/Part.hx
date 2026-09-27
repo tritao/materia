@@ -40,14 +40,16 @@ class Part extends Model {
 		}
 	}
 
-	/** A cylinder of `height`, or a +Z cylinder spanning `z0..z1` when `z1` is supplied. */
-	public static function cylinder(radius:Float, heightOrZ0:Float, ?z1:Float, x:Float = 0, y:Float = 0):Part {
-		if (z1 == null)
-			return new Part(Shape.cylinder(radius, heightOrZ0));
-		if (!(radius > 0) || !(z1 > heightOrZ0)) throw "Cylinder needs a positive radius and length";
-		var base = new Part(Shape.cylinder(radius, z1 - heightOrZ0));
+	/** A cylinder from z=0 with the given height. */
+	public static function cylinder(radius:Float, height:Float):Part
+		return new Part(Shape.cylinder(radius, height));
+
+	/** A +Z cylinder spanning z0..z1. */
+	public static function cylinderSpan(radius:Float, z0:Float, z1:Float, x:Float = 0, y:Float = 0):Part {
+		if (!(radius > 0) || !(z1 > z0)) throw "Cylinder needs a positive radius and length";
+		var base = new Part(Shape.cylinder(radius, z1 - z0));
 		try {
-			var result = base.translated(new Vector(x, y, heightOrZ0));
+			var result = base.translated(new Vector(x, y, z0));
 			base.close();
 			return result;
 		} catch (error:Dynamic) {

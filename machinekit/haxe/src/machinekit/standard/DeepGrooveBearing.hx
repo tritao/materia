@@ -142,7 +142,7 @@ class DeepGrooveBearing extends MachineComponent {
 		var length = depth == null ? width : depth;
 		if (!(length > 0) || !Math.isFinite(length)) throw "Bearing housing seat depth must be positive";
 		if (!(outside + allowance > bore)) throw "Bearing housing seat allowance leaves no bearing wall";
-		return Part.cylinder((outside + allowance) / 2, 0, length);
+		return Part.cylinderSpan((outside + allowance) / 2, 0, length);
 	}
 
 	/** Shaft journal diameter for a named fit; allowance is diametral. */

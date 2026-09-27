@@ -33,7 +33,7 @@ class LeadScrew extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.cylinder(thread.screwDiameter / 2, 0, totalLength);
+		return Part.cylinderSpan(thread.screwDiameter / 2, 0, totalLength);
 
 	private static var recipeTypeCache:Null<ComponentType>;
 

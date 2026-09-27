@@ -354,6 +354,10 @@ class Document {
 		return parts.join("|");
 	}
 
+	/** The same resolved-input key used by the definition geometry cache. */
+	public function resolvedInputKey(instance:InstanceElement):String
+		return instanceKey(instance, definition(instance.definitionId).primaryGeometryOutput().name);
+
 	private function resolveInstanceShape(instance:InstanceElement):Shape {
 		var definition = definition(instance.definitionId);
 		return definitionOutput(instance, definition.primaryGeometryOutput().name);

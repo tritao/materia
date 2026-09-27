@@ -67,9 +67,9 @@ class ShaftCoupling extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.cylinder(outerDiameter / 2, 0, length);
-		var boreATool = Part.cylinder(boreA / 2, -0.1, length / 2 + 0.1);
-		var boreBTool = Part.cylinder(boreB / 2, length / 2 - 0.1, length + 0.1);
+		var body = Part.cylinderSpan(outerDiameter / 2, 0, length);
+		var boreATool = Part.cylinderSpan(boreA / 2, -0.1, length / 2 + 0.1);
+		var boreBTool = Part.cylinderSpan(boreB / 2, length / 2 - 0.1, length + 0.1);
 		if (detail == Envelope) return Solids.cut(body, [boreATool, boreBTool]);
 		var tools = [boreATool, boreBTool];
 		var screwRadius = setScrewHoleDiameter / 2;

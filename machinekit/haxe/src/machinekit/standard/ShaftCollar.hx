@@ -64,8 +64,8 @@ class ShaftCollar extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.cut(Part.cylinder(spec.outerDiameter / 2, 0, spec.width),
-			[Part.cylinder(spec.boreDiameter / 2, -0.1, spec.width + 0.1)]);
+		return Solids.cut(Part.cylinderSpan(spec.outerDiameter / 2, 0, spec.width),
+			[Part.cylinderSpan(spec.boreDiameter / 2, -0.1, spec.width + 0.1)]);
 
 	function get_boreDiameter():Float return spec.boreDiameter;
 	function get_width():Float return spec.width;

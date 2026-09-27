@@ -18,6 +18,7 @@ import machinekit.component.MachineKitComponents;
 /** CadKit evaluator registration for editable MachineKit single-part recipes. */
 class MachineKitRecipes {
 	static var evaluators:Map<String, MachineKitRecipeEvaluator> = [];
+	static var components:Map<String, {key:String, component:MachineComponent}> = [];
 
 	public static function register():Void {
 		for (type in MachineKitComponents.all()) {
@@ -38,6 +39,10 @@ class MachineKitRecipes {
 	public static function component(instance:InstanceElement):MachineComponent {
 		var type = typeOrNull(instance.document.definition(instance.definitionId).recipe);
 		if (type == null) throw 'Instance is not a MachineKit recipe: ${instance.id.value}';
+		var identity = instance.document.id.value + ":" + instance.id.value;
+		var key = instance.document.resolvedInputKey(instance);
+		var cached = components.get(identity);
+		if (cached != null && cached.key == key) return cached.component;
 		var values = new ComponentValues();
 		for (parameter in type.parameters()) {
 			var raw = instance.resolvedValue(parameter.name);
@@ -48,7 +53,9 @@ class MachineKitRecipes {
 				case Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
 			}
 		}
-		return type.create(values);
+		var built = type.create(values);
+		components.set(identity, {key: key, component: built});
+		return built;
 	}
 }
 
@@ -78,5 +85,8 @@ private class MachineKitRecipeEvaluator implements DefinitionEvaluator implement
 				return MachineKitDocuments.placement(connector.frame);
 		throw 'Unknown connector "$output" for ${type.id}';
 	}
+
+	public function connectorNames(definition:Definition, instance:InstanceElement):Array<String>
+		return [for (connector in MachineKitRecipes.component(instance).connectors()) connector.name];
 
 }

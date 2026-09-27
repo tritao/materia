@@ -251,7 +251,7 @@ class SteppedShaft extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var z = 0.0, parts:Array<Part> = [];
 		for (section in sections) {
-			parts.push(Part.cylinder(section.diameter / 2, z, z + section.length));
+			parts.push(Part.cylinderSpan(section.diameter / 2, z, z + section.length));
 			z += section.length;
 		}
 		var body = Solids.union(parts);
@@ -286,8 +286,8 @@ class SteppedShaft extends MachineComponent {
 		var z1 = atInput ? thread.length : totalLength;
 		var outer = diameterAt(atInput ? 0 : totalLength) / 2 + 1;
 		var inner = thread.diameter / 2;
-		return cutPart(body, Solids.cut(Part.cylinder(outer, z0, z1),
-			[Part.cylinder(inner, z0 - 0.05, z1 + 0.05)]));
+		return cutPart(body, Solids.cut(Part.cylinderSpan(outer, z0, z1),
+			[Part.cylinderSpan(inner, z0 - 0.05, z1 + 0.05)]));
 	}
 
 	function finishEdge(body:Part, z:Float, distance:Float, fillet:Bool):Part {
@@ -329,8 +329,8 @@ class SteppedShaft extends MachineComponent {
 		if (rawDiameter == null) throw 'Shoulder relief at z=${shoulder.z} needs a diameter';
 		var diameter = rawDiameter;
 		var adjacent = Math.max(diameterAt(shoulder.z - 1e-5), diameterAt(shoulder.z + 1e-5));
-		return Solids.cut(Part.cylinder(adjacent / 2 + 1, shoulder.z - width / 2, shoulder.z + width / 2),
-			[Part.cylinder(diameter / 2, shoulder.z - width / 2 - 0.05, shoulder.z + width / 2 + 0.05)]);
+		return Solids.cut(Part.cylinderSpan(adjacent / 2 + 1, shoulder.z - width / 2, shoulder.z + width / 2),
+			[Part.cylinderSpan(diameter / 2, shoulder.z - width / 2 - 0.05, shoulder.z + width / 2 + 0.05)]);
 	}
 
 	/** Annulus from the groove diameter out past the shaft surface. */

@@ -32,13 +32,17 @@ class DefinitionEvaluatorRegistry {
 	public static function isRegistered(recipe:String):Bool return evaluators.exists(recipe);
 
 	public static function connector(definition:Definition, instance:InstanceElement, output:String):Placement {
-		var port = definition.output(output);
-		if (port.purpose != DefinitionOutput.Connector)
-			throw new ParametricError("definition output is not a connector: " + output);
 		var evaluator = connectorEvaluators.get(definition.recipe);
 		if (evaluator == null)
 			throw new ParametricError("definition recipe has no connector evaluator: " + definition.recipe);
+		if (evaluator.connectorNames(definition, instance).indexOf(output) < 0)
+			throw new ParametricError("unknown instance connector: " + output);
 		return evaluator.connector(definition, instance, output);
+	}
+
+	public static function connectorNames(definition:Definition, instance:InstanceElement):Array<String> {
+		var evaluator = connectorEvaluators.get(definition.recipe);
+		return evaluator == null ? [] : evaluator.connectorNames(definition, instance);
 	}
 
 	public static function evaluate(definition:Definition, instance:InstanceElement, output:String):Shape {

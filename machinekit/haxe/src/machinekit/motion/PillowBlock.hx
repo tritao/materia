@@ -120,9 +120,9 @@ class PillowBlock extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var base = Part.box(baseWidth, baseHeight, length, Align.Center, Align.Min, Align.Center);
 		var barrelRadius = overallHeight - shaftHeight;
-		var barrel = Part.cylinder(barrelRadius, -length / 2, length / 2, 0, shaftHeight);
+		var barrel = Part.cylinderSpan(barrelRadius, -length / 2, length / 2, 0, shaftHeight);
 		var body = Solids.union([base, barrel]);
-		var boreTool = Part.cylinder(bearing.outside / 2, -length / 2 - 0.1, length / 2 + 0.1, 0, shaftHeight);
+		var boreTool = Part.cylinderSpan(bearing.outside / 2, -length / 2 - 0.1, length / 2 + 0.1, 0, shaftHeight);
 		if (detail == Envelope) return Solids.cut(body, [boreTool]);
 		var tools = [boreTool];
 		for (z in [-boltSpacing / 2, boltSpacing / 2])

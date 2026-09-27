@@ -25,6 +25,10 @@ class ComponentType {
 	}
 
 	public function parameters():Array<ComponentParameter> return inputs.copy();
+	public function label():String {
+		var words = id.split(".").pop().split("-").join(" ");
+		return words.substr(0, 1).toUpperCase() + words.substr(1);
+	}
 	public function matches(component:MachineComponent):Bool return component.componentType() == this;
 
 	public function defaults():ComponentValues return resolve(null);

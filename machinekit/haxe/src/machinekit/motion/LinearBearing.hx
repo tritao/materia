@@ -65,8 +65,8 @@ class LinearBearing extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var envelope = Solids.cut(Part.cylinder(outerDiameter / 2, 0, length),
-			[Part.cylinder(boreDiameter / 2, -0.1, length + 0.1)]);
+		var envelope = Solids.cut(Part.cylinderSpan(outerDiameter / 2, 0, length),
+			[Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1)]);
 		if (detail == Envelope) return envelope;
 
 		// The envelope is a plain catalog cylinder. Preview adds the raised outer end rims and
@@ -91,8 +91,8 @@ class LinearBearing extends MachineComponent {
 	}
 
 	static function annulus(outerRadius:Float, innerRadius:Float, z0:Float, z1:Float):Part {
-		return Solids.cut(Part.cylinder(outerRadius, z0, z1),
-			[Part.cylinder(innerRadius, z0 - 0.05, z1 + 0.05)]);
+		return Solids.cut(Part.cylinderSpan(outerRadius, z0, z1),
+			[Part.cylinderSpan(innerRadius, z0 - 0.05, z1 + 0.05)]);
 	}
 
 	/** Diameter of the round guide rod for a named shaft fit. The allowance is diametral. */
@@ -107,7 +107,7 @@ class LinearBearing extends MachineComponent {
 	public function housingSeat(?depth:Float, fit:BearingHousingFit = Slip):Part {
 		var seatDepth = depth == null ? length : depth;
 		if (!(seatDepth > 0) || !Math.isFinite(seatDepth)) throw "Linear bearing housing seat depth must be positive";
-		return Part.cylinder(housingSeatDiameter(fit) / 2, 0, seatDepth);
+		return Part.cylinderSpan(housingSeatDiameter(fit) / 2, 0, seatDepth);
 	}
 
 	function get_boreDiameter():Float return spec.boreDiameter;

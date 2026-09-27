@@ -43,8 +43,8 @@ class Bushing extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.cut(Part.cylinder(outerDiameter / 2, 0, length),
-			[Part.cylinder(boreDiameter / 2, -0.1, length + 0.1)]);
+		return Solids.cut(Part.cylinderSpan(outerDiameter / 2, 0, length),
+			[Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1)]);
 
 	private static var recipeTypeCache:Null<ComponentType>;
 

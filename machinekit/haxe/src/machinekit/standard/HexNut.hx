@@ -64,7 +64,7 @@ class HexNut extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.prism(cadkit.modeling.Polygon.regular(6, spec.acrossFlats), 0, spec.height);
 		if (detail == Envelope) return body;
-		return Solids.cut(body, [Part.cylinder(spec.diameter / 2, -0.1, spec.height + 0.1)]);
+		return Solids.cut(body, [Part.cylinderSpan(spec.diameter / 2, -0.1, spec.height + 0.1)]);
 	}
 
 	/** Cutting tool for a trapped-nut pocket, sized with a 0.5 mm diametral clearance around
