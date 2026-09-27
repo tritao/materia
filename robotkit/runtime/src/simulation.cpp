@@ -197,7 +197,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         return RK_ERROR_INVALID_ARGUMENT;
     std::shared_ptr<VirtualDeviceEndpoint> virtual_endpoint;
     if (robot_desc && robot_desc->struct_size >=
-        offsetof(rk_simulation_robot_desc, collision_half_extents) &&
+        offsetof(rk_simulation_robot_desc, virtual_device_actuator_count) &&
         robot_desc->virtual_device_enabled) {
         VirtualDeviceConfig6 config;
         config.device_tick_hz = robot_desc->virtual_device_tick_hz;
@@ -216,6 +216,28 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         config.target_error = robot_desc->virtual_device_target_error;
         config.clock_bound_ns = robot_desc->virtual_device_clock_bound_ns;
         config.link_loss_timeout_ns = robot_desc->virtual_device_link_loss_timeout_ns;
+        if (robot_desc->struct_size >=
+            offsetof(rk_simulation_robot_desc, collision_half_extents) &&
+            robot_desc->virtual_device_actuator_count > 0) {
+            if (robot_desc->virtual_device_actuator_count > 64) return RK_ERROR_INVALID_ARGUMENT;
+            for (std::uint32_t i = 0; i < robot_desc->virtual_device_actuator_count; ++i) {
+                DeviceActuator6 actuator;
+                actuator.joint = robot_desc->virtual_device_actuator_joint[i];
+                actuator.ratio = robot_desc->virtual_device_actuator_ratio[i];
+                actuator.offset = robot_desc->virtual_device_actuator_offset[i];
+                actuator.steps_per_unit = robot_desc->virtual_device_actuator_steps_per_unit[i];
+                actuator.max_rate = robot_desc->virtual_device_actuator_max_rate[i];
+                actuator.direction_setup_ticks =
+                    robot_desc->virtual_device_actuator_direction_setup_ticks[i];
+                actuator.dual_drive_skew_bound = robot_desc->virtual_device_actuator_skew_bound[i];
+                const auto *id = robot_desc->virtual_device_actuator_ids + i * 64;
+                const auto *end = std::find(id, id + 64, 0);
+                if (end == id || end == id + 64) return RK_ERROR_INVALID_ARGUMENT;
+                actuator.id.assign(reinterpret_cast<const char *>(id),
+                    reinterpret_cast<const char *>(end));
+                config.actuators.push_back(actuator);
+            }
+        }
         virtual_endpoint = VirtualDeviceEndpoint::create(blueprint, config);
         if (!virtual_endpoint) return RK_ERROR_INVALID_ARGUMENT;
     }
@@ -1180,7 +1202,7 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
             rk_robot_state state{};
             const auto result = virtual_devices_[binding_index]->sample(simulation_ns, state);
             if (result != RK_OK && result != RK_ERROR_STALE_STATE) return result;
-            const auto positions = virtual_devices_[binding_index]->actuator_positions();
+            const auto positions = virtual_devices_[binding_index]->joint_positions();
             if (positions.size() != binding->joints_.size()) return RK_ERROR_BACKEND;
             for (std::size_t joint = 0; joint < positions.size(); ++joint) {
                 if (!binding->actuated_joints_[joint]) continue;

@@ -8,6 +8,7 @@ impl Board for TestBoard {
     fn position_target(&mut self, _: usize, value: f32) { self.position = value; }
     fn velocity_target(&mut self, _: usize, value: f32) { self.velocity = value; }
     fn step_pulse(&mut self, _: usize, _: bool) {}
+    fn step_count(&self, _: usize) -> i64 { 0 }
     fn set_digital(&mut self, _: usize, _: bool) {}
     fn set_analog(&mut self, _: usize, _: f32) {}
     fn stop_all(&mut self) { self.stopped = true; }

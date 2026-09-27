@@ -32,6 +32,8 @@ size_t rkd_virtual_channel_values(const rkd_virtual_device *device,
     float *values, size_t capacity);
 size_t rkd_virtual_step_log(const rkd_virtual_device *device,
     rkd_virtual_step_record *records, size_t capacity);
+int32_t rkd_virtual_miss_next_steps(rkd_virtual_device *device,
+    uint32_t actuator, uint32_t count);
 
 #ifdef __cplusplus
 }

@@ -5,8 +5,9 @@ use crate::runtime::crc32;
 
 pub const HEADER_SIZE: usize = 8;
 pub const CRC_SIZE: usize = 4;
-pub const MAX_PAYLOAD_SIZE: usize = Segment6Header::SIZE +
-    MAX_ACTUATORS as usize * Segment6Coefficients::SIZE;
+pub const MAX_PAYLOAD_SIZE: usize = if SessionBegin6::SIZE > Segment6Header::SIZE +
+    MAX_ACTUATORS as usize * Segment6Coefficients::SIZE { SessionBegin6::SIZE } else {
+    Segment6Header::SIZE + MAX_ACTUATORS as usize * Segment6Coefficients::SIZE };
 pub const MAX_FRAME_SIZE: usize = HEADER_SIZE + MAX_PAYLOAD_SIZE + CRC_SIZE;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,8 +64,13 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
            head.max_acceleration <= 0.0 || head.link_loss_timeout_ns == 0 {
             return Err(Frame6Error::BadPayload);
         }
-        for &limit in &head.actuator_max_acceleration[..head.actuator_count as usize] {
-            if !limit.is_finite() || limit <= 0.0 || limit > head.max_acceleration {
+        for (a, &limit) in head.actuator_max_acceleration[..head.actuator_count as usize].iter().enumerate() {
+            if !limit.is_finite() || limit <= 0.0 || limit > head.max_acceleration ||
+               !head.steps_per_unit[a].is_finite() || head.steps_per_unit[a] <= 0.0 ||
+               !head.max_rate[a].is_finite() || head.max_rate[a] < 0.0 ||
+               head.actuator_joint[a] >= MAX_ACTUATORS ||
+               !head.actuator_ratio[a].is_finite() || head.actuator_ratio[a] == 0.0 ||
+               !head.dual_drive_skew_bound[a].is_finite() || head.dual_drive_skew_bound[a] < 0.0 {
                 return Err(Frame6Error::BadPayload);
             }
         }

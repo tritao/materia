@@ -114,6 +114,16 @@ typedef struct rk_simulation_robot_desc {
     double virtual_device_target_error;
     uint64_t virtual_device_clock_bound_ns;
     uint64_t virtual_device_link_loss_timeout_ns;
+    /* Optional RKD6 actuator layout tail. Zero count keeps the v1 identity map. */
+    uint32_t virtual_device_actuator_count;
+    uint8_t virtual_device_actuator_joint[64];
+    double virtual_device_actuator_ratio[64];
+    double virtual_device_actuator_offset[64];
+    double virtual_device_actuator_steps_per_unit[64];
+    double virtual_device_actuator_max_rate[64];
+    uint16_t virtual_device_actuator_direction_setup_ticks[64];
+    double virtual_device_actuator_skew_bound[64];
+    uint8_t virtual_device_actuator_ids[4096]; /**< 64 NUL-terminated ASCII IDs, 64 bytes each. */
     /** Optional origin-centred link boxes; zero extents preserve legacy shape policy. */
     double collision_half_extents[RK_MAX_LINKS * 3];
     /** Optional physical-part convex hulls; 4..64 local XYZ vertices per link. */

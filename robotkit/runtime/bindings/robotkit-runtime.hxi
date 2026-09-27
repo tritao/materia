@@ -117,6 +117,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	const RK_EVENT_SCHEDULED = 1;
 	const RK_EVENT_STOP_SAFE = 4;
 	const RK_FAULT_CLOCK_SYNC_LOST = 4;
+	const RK_FAULT_DUAL_DRIVE_SKEW = 5;
 	const RK_FAULT_RAMP_LIMIT = 3;
 	const RK_FAULT_TRAJECTORY_UNDERFLOW = 2;
 	const RK_MAX_EVENT_RECORDS = 64;

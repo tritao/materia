@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 7;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 8;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -30,7 +30,7 @@ enum class MessageType6 : std::uint8_t {
     event = 16,
 };
 
-inline constexpr std::size_t SessionBegin6_SIZE = 299;
+inline constexpr std::size_t SessionBegin6_SIZE = 1515;
 struct SessionBegin6 {
     static constexpr std::size_t SIZE = SessionBegin6_SIZE;
     std::uint64_t session{};
@@ -41,6 +41,12 @@ struct SessionBegin6 {
     std::uint32_t step_tick_hz{};
     float max_acceleration{};
     std::array<float, 64> actuator_max_acceleration{};
+    std::array<float, 64> steps_per_unit{};
+    std::array<float, 64> max_rate{};
+    std::array<std::uint16_t, 64> direction_setup_ticks{};
+    std::array<std::uint8_t, 64> actuator_joint{};
+    std::array<float, 64> actuator_ratio{};
+    std::array<float, 64> dual_drive_skew_bound{};
     std::uint64_t link_loss_timeout_ns{};
 };
 
@@ -82,6 +88,43 @@ inline bool encode(const SessionBegin6 &value, std::span<std::uint8_t> out) {
         out[offset++] = static_cast<std::uint8_t>(bits_actuator_max_acceleration >> 8);
         out[offset++] = static_cast<std::uint8_t>(bits_actuator_max_acceleration >> 16);
         out[offset++] = static_cast<std::uint8_t>(bits_actuator_max_acceleration >> 24);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        const std::uint32_t bits_steps_per_unit = std::bit_cast<std::uint32_t>(value.steps_per_unit[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_steps_per_unit >> 0);
+        out[offset++] = static_cast<std::uint8_t>(bits_steps_per_unit >> 8);
+        out[offset++] = static_cast<std::uint8_t>(bits_steps_per_unit >> 16);
+        out[offset++] = static_cast<std::uint8_t>(bits_steps_per_unit >> 24);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        const std::uint32_t bits_max_rate = std::bit_cast<std::uint32_t>(value.max_rate[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_max_rate >> 0);
+        out[offset++] = static_cast<std::uint8_t>(bits_max_rate >> 8);
+        out[offset++] = static_cast<std::uint8_t>(bits_max_rate >> 16);
+        out[offset++] = static_cast<std::uint8_t>(bits_max_rate >> 24);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        const std::uint16_t bits_direction_setup_ticks = static_cast<std::uint16_t>(value.direction_setup_ticks[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_direction_setup_ticks >> 0);
+        out[offset++] = static_cast<std::uint8_t>(bits_direction_setup_ticks >> 8);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        const std::uint8_t bits_actuator_joint = static_cast<std::uint8_t>(value.actuator_joint[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_actuator_joint >> 0);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        const std::uint32_t bits_actuator_ratio = std::bit_cast<std::uint32_t>(value.actuator_ratio[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_actuator_ratio >> 0);
+        out[offset++] = static_cast<std::uint8_t>(bits_actuator_ratio >> 8);
+        out[offset++] = static_cast<std::uint8_t>(bits_actuator_ratio >> 16);
+        out[offset++] = static_cast<std::uint8_t>(bits_actuator_ratio >> 24);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        const std::uint32_t bits_dual_drive_skew_bound = std::bit_cast<std::uint32_t>(value.dual_drive_skew_bound[i]);
+        out[offset++] = static_cast<std::uint8_t>(bits_dual_drive_skew_bound >> 0);
+        out[offset++] = static_cast<std::uint8_t>(bits_dual_drive_skew_bound >> 8);
+        out[offset++] = static_cast<std::uint8_t>(bits_dual_drive_skew_bound >> 16);
+        out[offset++] = static_cast<std::uint8_t>(bits_dual_drive_skew_bound >> 24);
     }
     const std::uint64_t bits_link_loss_timeout_ns = static_cast<std::uint64_t>(value.link_loss_timeout_ns);
     out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 0);
@@ -141,6 +184,49 @@ inline bool decode(std::span<const std::uint8_t> input, SessionBegin6 &value) {
         bits_actuator_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 16;
         bits_actuator_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 24;
         value.actuator_max_acceleration[i] = std::bit_cast<float>(bits_actuator_max_acceleration);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        std::uint32_t bits_steps_per_unit = 0;
+        bits_steps_per_unit |= static_cast<std::uint32_t>(input[offset++]) << 0;
+        bits_steps_per_unit |= static_cast<std::uint32_t>(input[offset++]) << 8;
+        bits_steps_per_unit |= static_cast<std::uint32_t>(input[offset++]) << 16;
+        bits_steps_per_unit |= static_cast<std::uint32_t>(input[offset++]) << 24;
+        value.steps_per_unit[i] = std::bit_cast<float>(bits_steps_per_unit);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        std::uint32_t bits_max_rate = 0;
+        bits_max_rate |= static_cast<std::uint32_t>(input[offset++]) << 0;
+        bits_max_rate |= static_cast<std::uint32_t>(input[offset++]) << 8;
+        bits_max_rate |= static_cast<std::uint32_t>(input[offset++]) << 16;
+        bits_max_rate |= static_cast<std::uint32_t>(input[offset++]) << 24;
+        value.max_rate[i] = std::bit_cast<float>(bits_max_rate);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        std::uint16_t bits_direction_setup_ticks = 0;
+        bits_direction_setup_ticks |= static_cast<std::uint16_t>(input[offset++]) << 0;
+        bits_direction_setup_ticks |= static_cast<std::uint16_t>(input[offset++]) << 8;
+        value.direction_setup_ticks[i] = bits_direction_setup_ticks;
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        std::uint8_t bits_actuator_joint = 0;
+        bits_actuator_joint |= static_cast<std::uint8_t>(input[offset++]) << 0;
+        value.actuator_joint[i] = bits_actuator_joint;
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        std::uint32_t bits_actuator_ratio = 0;
+        bits_actuator_ratio |= static_cast<std::uint32_t>(input[offset++]) << 0;
+        bits_actuator_ratio |= static_cast<std::uint32_t>(input[offset++]) << 8;
+        bits_actuator_ratio |= static_cast<std::uint32_t>(input[offset++]) << 16;
+        bits_actuator_ratio |= static_cast<std::uint32_t>(input[offset++]) << 24;
+        value.actuator_ratio[i] = std::bit_cast<float>(bits_actuator_ratio);
+    }
+    for (std::size_t i = 0; i < 64; ++i) {
+        std::uint32_t bits_dual_drive_skew_bound = 0;
+        bits_dual_drive_skew_bound |= static_cast<std::uint32_t>(input[offset++]) << 0;
+        bits_dual_drive_skew_bound |= static_cast<std::uint32_t>(input[offset++]) << 8;
+        bits_dual_drive_skew_bound |= static_cast<std::uint32_t>(input[offset++]) << 16;
+        bits_dual_drive_skew_bound |= static_cast<std::uint32_t>(input[offset++]) << 24;
+        value.dual_drive_skew_bound[i] = std::bit_cast<float>(bits_dual_drive_skew_bound);
     }
     std::uint64_t bits_link_loss_timeout_ns = 0;
     bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 0;

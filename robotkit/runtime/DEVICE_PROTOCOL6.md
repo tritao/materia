@@ -20,6 +20,14 @@ reports the tick rate, step tick rate, degree limit and queue capacities.
 the active actuator limits, each positive and no greater than the global cap.
 It also carries the link-loss timeout in nanoseconds. The device converts that
 timeout using its own clock after the session begins.
+Protocol version 8 also carries steps per actuator unit, actuator rate limits,
+direction setup ticks, source joint indices, transmission ratios and dual-drive
+skew bounds. Stable actuator IDs, channel order and transmission fields are
+part of the RKD6 endpoint fingerprint.
+The host converts joint polynomials to actuator polynomials before encoding and
+rejects motion faster than either the authored actuator rate or one step per
+device step tick. The no_std device generator uses the configured direction
+setup and minimum step interval, and checks dual-drive skew from step feedback.
 
 No RKD6 hardware has shipped. Before the first hardware release, an in-place
 schema revision is permitted with a `PROTOCOL_VERSION` bump and regenerated
@@ -62,13 +70,13 @@ sending a plan. The runtime leaves per-cycle target streaming to RKD5
 endpoints; RKD6 snapshots use device queue status.
 # In-process virtual device
 
-`robotkit/device_virtual` links the no_std scheduled core to the `std`
+`robotkit/device_virtual` links the no_std scheduled core and step generator to the `std`
 virtual board as a static library. Its C ABI in
 `robotkit/device_virtual/include/rkd_virtual.h` accepts and returns complete
 RKD6 frames and advances on the caller's simulated host clock. The board
 applies offset and ppm drift before each 40 kHz step tick. A step pulse is
-recorded with its device tick, actuator and direction. The A7 step-rate and
-direction-setup constraints are still to be added.
+recorded with its device tick, actuator and direction. Missed-step injection
+can exercise the latched dual-drive skew fault.
 
 `VirtualDeviceEndpoint` owns that library behind a deterministic complete
 frame link. Baud, latency, jitter, frame drop, corruption and RNG seed are
