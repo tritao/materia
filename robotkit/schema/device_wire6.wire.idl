@@ -37,6 +37,11 @@ packed ActuatorLimit6 endian little {
     max_acceleration : f32
 }
 
+# Follows the per-actuator limits in SESSION_BEGIN6.
+packed SessionTiming6 endian little {
+    link_loss_timeout_ns : u64
+}
+
 packed SessionAck6 endian little {
     session : u64
     protocol_version : u8

@@ -168,6 +168,43 @@ inline bool decode(std::span<const std::uint8_t> input, ActuatorLimit6 &value) {
     return true;
 }
 
+inline constexpr std::size_t SessionTiming6_SIZE = 8;
+struct SessionTiming6 {
+    static constexpr std::size_t SIZE = SessionTiming6_SIZE;
+    std::uint64_t link_loss_timeout_ns{};
+};
+
+inline bool encode(const SessionTiming6 &value, std::span<std::uint8_t> out) {
+    if (out.size() < SessionTiming6_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint64_t bits_link_loss_timeout_ns = static_cast<std::uint64_t>(value.link_loss_timeout_ns);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_link_loss_timeout_ns >> 56);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, SessionTiming6 &value) {
+    if (input.size() != SessionTiming6_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint64_t bits_link_loss_timeout_ns = 0;
+    bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_link_loss_timeout_ns |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.link_loss_timeout_ns = bits_link_loss_timeout_ns;
+    return true;
+}
+
 inline constexpr std::size_t SessionAck6_SIZE = 44;
 struct SessionAck6 {
     static constexpr std::size_t SIZE = SessionAck6_SIZE;

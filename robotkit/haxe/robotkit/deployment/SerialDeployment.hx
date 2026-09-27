@@ -16,16 +16,35 @@ class SerialDeployment {
   public final targetError:Float;
   public final ownerPeriodNs:haxe.Int64;
   public final processingAllowanceNs:haxe.Int64;
+  public final protocol:String;
+  public final stepTickHz:Int;
+  public final linkLossTimeoutNs:haxe.Int64;
+  public final clockSyncBoundNs:haxe.Int64;
 
   public function new(path:String) {
     var directory = Path.directory(path);
     var config:Dynamic = Json.parse(sys.io.File.getContent(path));
     var version:Dynamic = Reflect.field(config, "schemaVersion");
-    if (version != 2) throw "robotd: unsupported deployment schema version";
+    if (version != 2 && version != 3) throw "robotd: unsupported deployment schema version";
     var modelPath = Path.join([directory, requiredString(config, "model")]);
     robot = RobotModelCodec.decode(sys.io.File.getBytes(modelPath));
     var device:Dynamic = Reflect.field(config, "device");
     if (device == null) throw "robotd: deployment requires device";
+    protocol = version == 2 ? "rkd5" : requiredString(device, "protocol");
+    if (protocol != "rkd5" && protocol != "rkd6")
+      throw "robotd: unsupported device protocol";
+    if (version == 3 && protocol == "rkd6") {
+      var stepRate:Dynamic = Reflect.field(device, "step_tick_hz");
+      if (!Std.isOfType(stepRate, Int) || stepRate <= 0)
+        throw "robotd: deployment step_tick_hz must be a positive integer";
+      stepTickHz = stepRate;
+      linkLossTimeoutNs = requiredNanoseconds(device, "link_loss_timeout_ns");
+      clockSyncBoundNs = requiredNanoseconds(device, "clock_sync_bound_ns");
+    } else {
+      stepTickHz = 0;
+      linkLossTimeoutNs = haxe.Int64.ofInt(0);
+      clockSyncBoundNs = haxe.Int64.ofInt(0);
+    }
     serialPath = requiredString(device, "path");
     var baudValue:Dynamic = Reflect.field(device, "baud");
     if (!Std.isOfType(baudValue, Int))

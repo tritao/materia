@@ -30,6 +30,8 @@ class SerialRobot implements Robot {
   /** Opens a serial robot from the same versioned deployment as robotd. */
   public static function fromDeployment(id:RobotId, path:String):SerialRobot {
     var deployment = new SerialDeployment(path);
+    if (deployment.protocol != "rkd5")
+      throw "SerialRobot: RKD6 deployment requires a scheduled-device endpoint";
     return new SerialRobot(id, deployment.robot, deployment.serialPath,
       deployment.fingerprint, deployment.targetError, deployment.baud,
       deployment.ownerPeriodNs, deployment.processingAllowanceNs);

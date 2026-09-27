@@ -82,7 +82,7 @@ enum {
     RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued segment-start knots. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 15 /**< Adds versioned serial per-frame processing allowance. */
+    RK_API_VERSION = 16 /**< Adds the RKD6 clock-sync diagnostic code. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -393,7 +393,8 @@ typedef struct rk_plan_submission {
 } rk_plan_submission;
 
 /** Non-latched runtime diagnostic; safety remains READY. */
-enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3 };
+enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3,
+    RK_FAULT_CLOCK_SYNC_LOST = 4 };
 
 typedef uint32_t rk_session_state;
 enum {

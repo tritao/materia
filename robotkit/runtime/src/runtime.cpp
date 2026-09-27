@@ -457,6 +457,12 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
             return RK_ERROR_QUEUE_FULL;
         const auto checked = validate_queued_path(candidate, blueprint_);
         if (checked != RK_OK) return checked;
+        if (endpoint_->executes_trajectory_queue()) {
+            const auto owner_now = externally_driven_ ? last_owner_timestamp_ns_ : monotonic_now_ns();
+            const auto submitted = endpoint_->submit_device_plan(plan, base_time, owner_now,
+                committed, blueprint_);
+            if (submitted != RK_OK) return submitted;
+        }
         const bool was_idle = !control_.trajectory_active;
         control_.trajectory = std::move(candidate);
         control_.trajectory_active = true;
@@ -1202,6 +1208,8 @@ rk_result RobotRuntime::apply_pending_commands() {
         }
     };
 
+    const bool device_plan_cycle = endpoint_->executes_trajectory_queue() &&
+        (!control_.trajectory.empty() || control_.trajectory_active || control_.stop_ramp_active);
     rk_robot_command output{};
     output.struct_size = sizeof(output);
     output.timestamp_ns = has_command ? final_timestamp_ns : 0;
@@ -1345,7 +1353,8 @@ rk_result RobotRuntime::apply_pending_commands() {
     }
 
     output.sequence = ++endpoint_command_sequence_;
-    const auto result = endpoint_->apply(output);
+    const bool device_executes = device_plan_cycle && output.kind == RK_COMMAND_JOINT_TARGETS;
+    const auto result = device_executes ? RK_OK : endpoint_->apply(output);
     if (result != RK_OK) {
         latch_fault();
         return result;
@@ -1416,6 +1425,7 @@ rk_result RobotRuntime::apply_pending_commands() {
 
 rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     std::lock_guard owner_lock(owner_mutex_);
+    last_owner_timestamp_ns_ = timestamp_ns;
     rk_robot_state next;
     {
         std::lock_guard state_lock(state_mutex_);
@@ -1437,17 +1447,21 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     next.received_timestamp_ns = 0;
     next.sensor_count = 0;
     const auto result = endpoint_->sample(timestamp_ns, next);
+    if (endpoint_->executes_trajectory_queue())
+        control_.diagnostic_code = endpoint_->diagnostic_code();
     next.mode = runtime_mode;
-    next.trajectory_queue_depth = trajectory_queue_depth;
-    next.trajectory_active = trajectory_active;
-    next.trajectory_time_ns = trajectory_time_ns;
-    next.trajectory_duration_ns = trajectory_duration_ns;
-    next.trajectory_tag = trajectory_tag;
-    next.trajectory_tag_time_ns = trajectory_tag_time_ns;
-    next.session_state = session_state;
-    next.active_plan_id = active_plan_id;
-    next.committed_until_ns = committed_until_ns;
-    next.queue_end_time_ns = queue_end_time_ns;
+    if (!endpoint_->executes_trajectory_queue()) {
+        next.trajectory_queue_depth = trajectory_queue_depth;
+        next.trajectory_active = trajectory_active;
+        next.trajectory_time_ns = trajectory_time_ns;
+        next.trajectory_duration_ns = trajectory_duration_ns;
+        next.trajectory_tag = trajectory_tag;
+        next.trajectory_tag_time_ns = trajectory_tag_time_ns;
+        next.session_state = session_state;
+        next.active_plan_id = active_plan_id;
+        next.committed_until_ns = committed_until_ns;
+        next.queue_end_time_ns = queue_end_time_ns;
+    }
     if (!endpoint_->reports_safety_state())
         next.safety = runtime_safety;
     else if (next.safety == RK_SAFETY_EMERGENCY_STOP || next.safety == RK_SAFETY_FAULT)
