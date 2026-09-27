@@ -76,12 +76,11 @@ class ApplicationSimulation {
       for (index in 0...models.length) {
         var editable=models[index];
         var blueprint = RobotRuntimeCompiler.compile(editable.model, appliedRevision + 1);
-        var runtime = candidate.addRobot(blueprint);
+        var runtime = candidate.addRobotAtPose(blueprint, editable.position, editable.rotation);
         var id = editable.id;
         candidateRobots.push(new SimulatedRobot(id, runtime, editable.model.name,
           [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
         candidateLinks.push([for (link in editable.model.links) link.id]);
-        candidate.teleportRobot(index, editable.position, editable.rotation);
       }
       for (object in scene.records()) if (object.collisionEnabled) {
         var centerX=object.x,centerY=object.y,centerZ=object.z;

@@ -34,13 +34,27 @@ class Simulation {
 
   /** Adds topology before the first start or step. */
   public function addRobot(blueprint:RobotRuntimeBlueprint, ?initialPose:Pose2):RobotRuntime {
+    return addRobotWithPose(blueprint, initialPose == null ? null :
+      makePose([initialPose.x, initialPose.y, 0.0],
+        [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]));
+  }
+
+  /** Adds a robot with a full 3D pose that reset restores. */
+  public function addRobotAtPose(blueprint:RobotRuntimeBlueprint, position:Array<Float>,
+      rotation:Array<Float>):RobotRuntime {
+    if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
+      throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
+    return addRobotWithPose(blueprint, makePose(position, rotation));
+  }
+
+  function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
+      initialPose:Null<rk_simulation_pose>):RobotRuntime {
     ensureLive();
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null) {
       robotDesc = new rk_simulation_robot_desc();
       robotDesc.set_struct_size(rk_simulation_robot_desc.size());
-      robotDesc.set_initial_pose(makePose([initialPose.x, initialPose.y, 0.0],
-        [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]));
+      robotDesc.set_initial_pose(initialPose);
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");

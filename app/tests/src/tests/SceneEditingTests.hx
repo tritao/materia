@@ -929,9 +929,22 @@ class SceneEditingTests {
       'runtime overlay follows commanded arm (rotation: ${initialArm.rotation} -> '
       + '${movedArm.rotation}; joint position: ${movedMounted.positions.get(0)}, '
       + 'effort: ${movedMounted.efforts.get(0)}, safety: ${movedMounted.safety})');
+      var resetPosition=[0.4,3.0,0.6];
+      var resetRotation=[0.0,Math.sin(0.2),0.0,Math.cos(0.2)];
+      check(session.sensors.setRobotPose("materia/robot-b",resetPosition,resetRotation),
+        "sensor workflow stores a 3D robot pose");
+      session.save(documentPath);
+      session.open(documentPath);
+      check(mujocoSimulation.rebuild(session.sensors,session.scene),
+        "MuJoCo rebuild applies the persisted 3D robot pose");
       check(mujocoSimulation.reset(),"MuJoCo simulation resets through the shared lifecycle");
-      check(mujocoSimulation.visualState()[1].position[1]==3.0,
-        "MuJoCo reset restores the persisted robot pose");
+      var resetRobot=mujocoSimulation.visualState()[1];
+      var persistedPosition=session.sensors.robotPosition("materia/robot-b");
+      var persistedRotation=session.sensors.robotRotation("materia/robot-b");
+      for(axis in 0...3)check(Math.abs(resetRobot.position[axis]-persistedPosition[axis])<0.00001,
+        'MuJoCo reset restores persisted robot position axis $axis');
+      for(axis in 0...4)check(Math.abs(resetRobot.rotation[axis]-persistedRotation[axis])<0.00001,
+        'MuJoCo reset restores persisted robot rotation axis $axis');
       check(Math.abs([for(object in mujocoSimulation.environmentVisualState())
         if(object.id=="tower")object.position[2]][0]-0.1)<0.00001,
         "MuJoCo reset restores the moving obstacle pose");

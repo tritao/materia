@@ -10,6 +10,7 @@ package tests;
  */
 class WallFinishingMuJoCoRunner {
   public static function main():Void {
+    SimulationPoseResetTests.run(1);
     WallFinishingScenarioTests.runMuJoCo();
   }
 }
