@@ -99,7 +99,7 @@ rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     const auto value = resolve(simulation);
     return value ? value->add_robot(robotkit::internal::copy_blueprint(blueprint), *out_runtime,
-        robot_desc == nullptr ? nullptr : &robot_desc->initial_pose) : RK_ERROR_INVALID_HANDLE;
+        robot_desc) : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_simulation_set_joint_coupling(rk_simulation simulation,

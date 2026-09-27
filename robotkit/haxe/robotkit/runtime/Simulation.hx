@@ -41,10 +41,10 @@ class Simulation {
 
   /** Adds a robot with a full 3D pose that reset restores. */
   public function addRobotAtPose(blueprint:RobotRuntimeBlueprint, position:Array<Float>,
-      rotation:Array<Float>):RobotRuntime {
+      rotation:Array<Float>, ?linkCollisionBoxes:Array<Null<Array<Float>>>):RobotRuntime {
     if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
       throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
-    return addRobotWithPose(blueprint, makePose(position, rotation));
+    return addRobotWithPose(blueprint, makePose(position, rotation), linkCollisionBoxes);
   }
 
   /** Couples one follower to the measured source coordinate on every tick. */
@@ -59,13 +59,32 @@ class Simulation {
   }
 
   function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
-      initialPose:Null<rk_simulation_pose>):RobotRuntime {
+      initialPose:Null<rk_simulation_pose>,
+      ?linkCollisionBoxes:Array<Null<Array<Float>>>):RobotRuntime {
     ensureLive();
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null) {
       robotDesc = new rk_simulation_robot_desc();
       robotDesc.set_struct_size(rk_simulation_robot_desc.size());
       robotDesc.set_initial_pose(initialPose);
+    }
+    if (linkCollisionBoxes != null) {
+      if (linkCollisionBoxes.length != blueprint.linkCount)
+        throw "Simulation link collision boxes must match the link count";
+      if (robotDesc == null) {
+        robotDesc = new rk_simulation_robot_desc();
+        robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      }
+      for (link in 0...linkCollisionBoxes.length) {
+        var bounds = linkCollisionBoxes[link];
+        if (bounds == null) continue;
+        if (bounds.length != 3) throw "Simulation link collision box needs three extents";
+        for (axis in 0...3) {
+          if (!Math.isFinite(bounds[axis]) || bounds[axis] <= 0.0)
+            throw "Simulation link collision extents must be finite and positive";
+          robotDesc.set_collision_half_extents(link * 3 + axis, bounds[axis]);
+        }
+      }
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");

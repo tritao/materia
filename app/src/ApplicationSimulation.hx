@@ -101,6 +101,7 @@ class ApplicationSimulation {
         converted.model.collisionApproximation = CollisionApproximation.None;
         var sceneParts = new Map<String, SceneObjectData>();
         for (record in scene.records()) sceneParts.set(record.id, record);
+        var collisionBoxes:Array<Null<Array<Float>>> = [for (_ in converted.model.links) null];
         var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
         for (part in physical.parts) physicalParts.set(part.id, part);
         for (occurrence in assembly.occurrences) {
@@ -126,6 +127,15 @@ class ApplicationSimulation {
             throw 'Assembly occurrence "${occurrence.id}" has an invalid mass';
           link.inertiaTensor = [for (value in link.inertiaTensor) value * chosenMass / baseMass];
           link.mass = chosenMass;
+          if (record.collisionEnabled) {
+            var center = session.assemblyPreviewCenter(occurrence.definition);
+            if (center == null) throw 'Assembly part "${occurrence.definition}" has no preview center';
+            var scale = physical.metresPerUnit;
+            var linkIndex = converted.model.links.indexOf(link);
+            collisionBoxes[linkIndex] = [record.width / 2 + Math.abs(center[0] * scale),
+              record.height / 2 + Math.abs(center[1] * scale),
+              record.depth / 2 + Math.abs(center[2] * scale)];
+          }
         }
         if (converted.closureIds.length > 0)
           throw "Assembly closures are not supported by this simulation backend: " +
@@ -134,7 +144,8 @@ class ApplicationSimulation {
         if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
           throw 'Robot "$id" is remote and read-only';
         var blueprint = RobotRuntimeCompiler.compile(converted.model, appliedRevision + 1);
-        var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]);
+        var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0],
+          [0.0, 0.0, 0.0, 1.0], collisionBoxes);
         var assemblyRobotIndex = candidateRobots.length;
         for (coupling in converted.couplings) {
           var source = blueprint.identity.jointIndex(coupling.source);
@@ -171,7 +182,10 @@ class ApplicationSimulation {
       }
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
-      for (object in environmentRecords) if (object.collisionEnabled) {
+      var assemblyOwned = new Map<String, Bool>();
+      if (assembly != null) for (occurrence in assembly.occurrences)
+        assemblyOwned.set("project:" + occurrence.id, true);
+      for (object in environmentRecords) if (object.collisionEnabled && !assemblyOwned.exists(object.id)) {
         var centerX=object.x,centerY=object.y,centerZ=object.z;
         var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
         if(scene.isCadPart(object.id)){

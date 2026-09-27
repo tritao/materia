@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -259,6 +260,54 @@ public:
             const auto recompute_result = recompute_articulated_poses(substep);
             if (recompute_result != NKSIM_OK)
                 return recompute_result;
+            // Deterministic backend's conservative oriented-box fallback:
+            // project each box onto world axes, then prevent free dynamic
+            // bodies from penetrating static, kinematic, or jointed links.
+            auto bounds = [](const TestBody &body) {
+                Vec3 half{};
+                for (int axis = 0; axis < 3; ++axis) {
+                    Vec3 local{};
+                    local[axis] = 1.0;
+                    const auto world_axis = rotate(body.state.rotation, local);
+                    for (int world = 0; world < 3; ++world)
+                        half[world] += std::abs(world_axis[world]) * body.desc.shape_parameters[axis];
+                }
+                return half;
+            };
+            for (auto &moving : bodies) {
+                if (moving.desc.motion_type != NKSIM_MOTION_DYNAMIC ||
+                    parent_joint(moving.id) != nullptr ||
+                    moving.desc.shape_type != NKSIM_SHAPE_BOX)
+                    continue;
+                const auto moving_half = bounds(moving);
+                for (const auto &obstacle : bodies) {
+                    if (obstacle.id == moving.id ||
+                        (obstacle.desc.motion_type == NKSIM_MOTION_DYNAMIC &&
+                         parent_joint(obstacle.id) == nullptr) ||
+                        obstacle.desc.shape_type != NKSIM_SHAPE_BOX ||
+                        (moving.desc.collision_mask & obstacle.desc.collision_layer) == 0 ||
+                        (obstacle.desc.collision_mask & moving.desc.collision_layer) == 0)
+                        continue;
+                    const auto obstacle_half = bounds(obstacle);
+                    int axis = -1;
+                    double least_penetration = std::numeric_limits<double>::infinity();
+                    for (int candidate = 0; candidate < 3; ++candidate) {
+                        const double penetration = moving_half[candidate] + obstacle_half[candidate] -
+                            std::abs(moving.state.position[candidate] - obstacle.state.position[candidate]);
+                        if (penetration <= 0.0) { axis = -1; break; }
+                        if (penetration < least_penetration) {
+                            least_penetration = penetration;
+                            axis = candidate;
+                        }
+                    }
+                    if (axis >= 0) {
+                        const double direction = moving.state.position[axis] >= obstacle.state.position[axis] ? 1.0 : -1.0;
+                        moving.state.position[axis] += direction * least_penetration;
+                        if (moving.state.linear_velocity[axis] * direction < 0.0)
+                            moving.state.linear_velocity[axis] = 0.0;
+                    }
+                }
+            }
         }
         for (auto &body : bodies) {
             body.force.fill(0.0);

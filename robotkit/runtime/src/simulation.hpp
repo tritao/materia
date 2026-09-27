@@ -32,7 +32,7 @@ public:
 
     /** Adds one simulation-owned runtime before the topology is sealed. */
     rk_result add_robot(const rk_robot_runtime_blueprint &blueprint, rk_robot_runtime &out_runtime,
-                        const rk_simulation_pose *initial_pose = nullptr);
+                        const rk_simulation_robot_desc *robot_desc = nullptr);
     rk_result set_joint_coupling(uint32_t robot_index, uint32_t source_joint,
                                  uint32_t target_joint, double ratio, double offset);
     /** Starts the shared realtime owner thread after all robots are attached. */
@@ -145,6 +145,7 @@ private:
     nkscene_scene scene_ = 0;
     nksim_world world_ = 0;
     nksim_shape shape_ = 0;
+    std::vector<nksim_shape> link_shapes_;
     nksim_host host_ = 0;
     nksim_snapshot snapshot_ = 0;
     double fixed_timestep_ = 0.01;

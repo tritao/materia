@@ -87,6 +87,8 @@ typedef struct rk_simulation_robot_desc {
     uint32_t reserved0;
     rk_simulation_pose initial_pose;
     uint64_t reserved[2];
+    /** Optional origin-centred link boxes; zero extents preserve legacy shape policy. */
+    double collision_half_extents[RK_MAX_LINKS * 3];
 } rk_simulation_robot_desc;
 
 /**

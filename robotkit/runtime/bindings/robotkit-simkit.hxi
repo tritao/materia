@@ -383,11 +383,15 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	/**
 	 * Optional initial pose for one robot added to a Simulation.
 	 */
-	struct rk_simulation_robot_desc @layout(88, 8) {
+	struct rk_simulation_robot_desc @layout(24664, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		reserved0: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
 		reserved: array<u64, 2> @offset(72);
+		/**
+		 * Optional origin-centred link boxes; zero extents preserve legacy shape policy.
+		 */
+		collision_half_extents: array<f64, 3072> @offset(88);
 	}
 	/**
 	 * Opaque handle for one shared simulation universe and clock.

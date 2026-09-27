@@ -376,7 +376,7 @@ class MateriaProjectRunner {
       width: Math.max(0.000001, (maximum[0] - minimum[0]) * scale),
       height: Math.max(0.000001, (maximum[1] - minimum[1]) * scale),
       depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
-      collisionEnabled: false, dynamicBody: false, mass: mass,
+      collisionEnabled: true, dynamicBody: false, mass: mass,
       red: component.red, green: component.green, blue: component.blue,
       appearance: component.appearance, materialId: component.materialId, visible: true,
       meshSnapshot: geometryKeyByDefinition.get(definitionId),

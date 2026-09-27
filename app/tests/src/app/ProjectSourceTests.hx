@@ -48,9 +48,28 @@ class ProjectSourceTests {
     simulation.dispose();
   }
 
+  static function checkLinkCollision(backend:Int, enabled:Bool):Void {
+    var model = new RobotModel("generated part collision probe");
+    model.addLink(new Link("part"));
+    model.collisionApproximation = robotkit.model.CollisionApproximation.None;
+    var simulation = new Simulation(0.01, 1, backend);
+    simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+      [0.0, 0.0, 0.0, 1.0], [enabled ? [0.5, 0.5, 0.5] : null]);
+    var box = simulation.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
+    for (index in 0...200) simulation.step(Int64.ofInt(index));
+    var height = simulation.objectPose(box).position[2];
+    check(enabled ? height > 0.5 : (backend == 1 ? height < 0.25 : height < -1.0),
+      'link collision ${enabled ? "on" : "off"} on backend $backend: $height');
+    simulation.dispose();
+  }
+
   public static function main():Int {
     checkCoupling(0);
     checkCoupling(1);
+    checkLinkCollision(0, true);
+    checkLinkCollision(0, false);
+    checkLinkCollision(1, true);
+    checkLinkCollision(1, false);
     var root = Sys.getCwd();
     while (!FileSystem.exists(root + "/cadkit/examples/modeling/materia.project.json")) {
       var parent = haxe.io.Path.directory(root);

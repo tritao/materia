@@ -197,7 +197,8 @@ rk_result Simulation::set_joint_coupling(uint32_t robot_index, uint32_t source_j
 
 rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                                 rk_robot_runtime &out_runtime,
-                                const rk_simulation_pose *initial_pose) {
+                                const rk_simulation_robot_desc *robot_desc) {
+    const rk_simulation_pose *initial_pose = robot_desc ? &robot_desc->initial_pose : nullptr;
     std::lock_guard tick_lock(tick_mutex_);
     bool topology_update = false;
     {
@@ -270,12 +271,27 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             std::copy_n(blueprint.links[index].center_of_mass, 3, desc.center_of_mass);
             std::copy_n(blueprint.links[index].inertia_tensor, 9, desc.inertia_tensor);
             desc.shape = shape_;
+            bool has_link_shape = robot_desc && robot_desc->struct_size >= sizeof(*robot_desc);
+            double extents[3]{};
+            if (has_link_shape) {
+                for (int axis = 0; axis < 3; ++axis)
+                    extents[axis] = robot_desc->collision_half_extents[index * 3 + axis];
+                has_link_shape = extents[0] > 0.0 && extents[1] > 0.0 && extents[2] > 0.0;
+            }
+            if (has_link_shape) {
+                nksim_shape link_shape = 0;
+                require_sim(nksim_shape_create_box(world_, extents, &link_shape),
+                            "nksim_shape_create_box(link)");
+                link_shapes_.push_back(link_shape);
+                desc.shape = link_shape;
+            }
             // Layer 2 is an opt-out category for a robot's own links. It
             // still collides with ordinary layer-1 environment geometry,
             // while two opt-out links do not collide with one another.
             const bool self_collision_disabled = blueprint.self_collision == RK_SELF_COLLISION_DISABLED;
             desc.collision_layer = self_collision_disabled ? 2 : 1;
-            desc.collision_mask = blueprint.collision_approximation == RK_COLLISION_APPROXIMATION_NONE ? 0 : 1;
+            desc.collision_mask = has_link_shape ||
+                blueprint.collision_approximation != RK_COLLISION_APPROXIMATION_NONE ? 1 : 0;
             nksim_body body = 0;
             require_sim(nksim_body_create(world_, &desc, &body), "nksim_body_create");
             binding->bodies_.push_back(body);
@@ -1272,6 +1288,9 @@ void Simulation::cleanup() noexcept {
         // link immediately before the model itself is discarded.
         if (shape_ != 0)
             nksim_shape_destroy(world_, shape_);
+        for (auto link_shape : link_shapes_)
+            nksim_shape_destroy(world_, link_shape);
+        link_shapes_.clear();
         nksim_world_destroy(world_);
         world_ = 0;
     }
