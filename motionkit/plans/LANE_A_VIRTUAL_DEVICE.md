@@ -366,3 +366,32 @@ the runtime snapshot. Commit: the commit containing this entry.
 Rust tests, MCU build, all 16 native tests, 5,875 MotionKit and 4,437
 RobotKit Haxe assertions, both FFI audits and TCP integration in default,
 session and lease-timeout modes passed on the lane tree.
+
+### A4 schema correction — Per-actuator limits in RKD6 session
+
+A2's fixed `SessionBegin6` header has a single acceleration field, but A4
+requires a limit per actuator. The schema compatibility lock correctly
+rejected changing that field in place. Added a trailing `ActuatorLimit6`
+record per actuator to the session frame instead; the fixed header remains
+unchanged. The global field caps those records. Updated both frame decoders,
+the generated codecs, tests and the protocol document in the A4 item.
+
+### A4 — Execute a fixed-capacity device segment queue
+
+Added a heap-free Rust scheduled core with revision and committed-horizon
+replacement, expected start-state checks, committed-only execution and an
+`f32` segment-local Horner evaluator. HOLD/RESUME ramp path-clock rate from
+per-actuator acceleration limits. Declared final knots stop without underflow;
+continuations underflow into a controlled stop. STOP and link loss ramp from
+the last executed velocity with travel-limit clamps, ABORT uses a nearer
+rest-declared end when possible, and emergency stop shuts outputs immediately.
+The link-loss stop latches and cannot resume automatically. Shared segment
+vectors were generated from `motionkit_core` and checked against both its C++
+evaluator and the Rust `f32` evaluator. Tests were written before each behavior
+change. Commit: the commit containing this entry.
+
+The Rust tests, MCU compile, all 17 native tests, 5,875 MotionKit and 4,437
+RobotKit Haxe assertions, both FFI audits, and TCP integration in default,
+session and lease-timeout modes passed on the lane tree. A final Rust test
+then caught an idle completed plan being mistaken for link loss; it was fixed
+without changing the host-side behavior.
