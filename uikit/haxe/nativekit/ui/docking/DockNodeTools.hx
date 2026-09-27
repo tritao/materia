@@ -1,5 +1,7 @@
 package nativekit.ui.docking;
 
+import nativekit.ui.docking.DockNode;
+
 /** Pure transformations and validation for dock layout trees. */
 class DockNodeTools {
 	public static function clone(node:DockNode):DockNode {

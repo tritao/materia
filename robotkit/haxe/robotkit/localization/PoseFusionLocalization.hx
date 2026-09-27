@@ -1,6 +1,7 @@
 package robotkit.localization;
 
 import haxe.Int64;
+import robotkit.localization.LocalizationQuality;
 import robotkit.mobile.Pose2;
 import robotkit.world.RobotSnapshot;
 

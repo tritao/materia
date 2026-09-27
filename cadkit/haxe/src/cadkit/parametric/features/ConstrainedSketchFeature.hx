@@ -15,8 +15,6 @@ import cadkit.sketch.SolvedSketch;
 import cadkit.sketch.SketchSolveError;
 import cadkit.sketch.SketchPoint;
 import cadkit.sketch.SketchEntity;
-import cadkit.parametric.features.ConstrainedSketchChange;
-import cadkit.parametric.features.ConstrainedSketchSupportFaceChange;
 import cadkit.parametric.FeatureId;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;

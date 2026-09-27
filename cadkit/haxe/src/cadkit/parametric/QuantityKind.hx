@@ -10,10 +10,9 @@ class QuantityKind {
 	public static inline var Volume:String = "volume";
 
 	public static function validate(value:String):String {
-		// Literal names avoid collisions with similarly named enum constructors in combined Haxeon builds.
-		if (value == "scalar" || value == "length" || value == "angle" || value == "count" ||
-			value == "area" || value == "volume")
-			return value;
-		throw new ParametricError("unsupported quantity type: " + value);
+		return switch value {
+			case Scalar, Length, Angle, Count, Area, Volume: value;
+			default: throw new ParametricError("unsupported quantity type: " + value);
+		};
 	}
 }

@@ -8,6 +8,7 @@ import robotkit.mobile.FootprintPoint;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.MotionLimits;
 import robotkit.safety.SafetyRestriction;
+import robotkit.safety.SafetyPhase;
 import robotkit.world.StopMode;
 
 /** Applies load- and fork-height-dependent soft limits to one mobile forklift. */
