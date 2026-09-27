@@ -8,6 +8,9 @@ import motionkit.axis.MotionAxis;
 import motionkit.path.PathPoint;
 import motionkit.path.GeometricPath;
 import motionkit.path.ArcSegment;
+import motionkit.path.CornerBlender;
+import motionkit.path.LineSegment;
+import motionkit.path.QuinticBlend;
 import motionkit.planner.JointPathSamples;
 import motionkit.planner.PathTimingLimits;
 import motionkit.planner.ToppraPathTiming;
@@ -46,6 +49,7 @@ class MotionSystem {
   public final replacementOwnerPeriodSeconds:Float;
   /** Joint and sampled Cartesian checks for the last planned path. */
   public var lastPathValidationReport(default, null):Null<ValidationReport> = null;
+  public var lastPathPlanningDiagnostics(default, null):Array<String> = [];
   /** Native trajectory currently submitted to the runtime queue. */
   var activeTrajectory:Null<Trajectory> = null;
   var queuedTrajectories:Array<Trajectory> = [];
@@ -366,8 +370,15 @@ class MotionSystem {
   function planPathFrom(start:Array<Float>, path:GeometricPath,
       pathOptions:Null<PathPlanningOptions>, motionOptions:Null<MotionOptions>):Trajectory {
     if (path == null) throw "Cartesian path is required";
-    if (pathOptions != null && !pathOptions.exactStop && pathOptions.blendTolerance > 0.0)
-      throw "Tolerance blend geometry is not available yet";
+    var options = pathOptions == null ? PathPlanningOptions.exactStopMode() : pathOptions;
+    var planningPath = path;
+    lastPathPlanningDiagnostics = [];
+    if (!options.exactStop && options.blendTolerance > 0.0) {
+      var blended = CornerBlender.blend(path, options.blendTolerance * 0.8,
+        options.maxBlendTurnAngleRadians);
+      planningPath = blended.path;
+      lastPathPlanningDiagnostics = blended.diagnostics;
+    }
     var xAxis = requireAxis("x");
     var yAxis = requireAxis("y");
     var zAxis = requireAxis("z");
@@ -380,7 +391,7 @@ class MotionSystem {
         throw 'Cartesian path starts at ${startCoordinates[i]} but axis ${["x", "y", "z"][i]} is at ${starts[i]}';
     }
 
-    validatePathLimits(path, [xAxis, yAxis, zAxis]);
+    validatePathLimits(planningPath, [xAxis, yAxis, zAxis]);
     var maxVelocity = [for (_ in start) 1e8];
     var maxAcceleration = [for (_ in start) 1e8];
     var requested = motionOptions == null ? new MotionOptions() : motionOptions;
@@ -398,11 +409,55 @@ class MotionSystem {
     }
     var segments:Array<{timeFromStartNs:Int64, durationNs:Int64,
       coefficients:Array<Array<Float>>}> = [];
+    var junctionSpeeds = [for (_ in 0...(planningPath.primitives.length + 1)) 0.0];
+    if (!options.exactStop) for (index in 1...planningPath.primitives.length) {
+      var before = planningPath.primitives[index - 1];
+      var after = planningPath.primitives[index];
+      var beforeTangent = before.tangentAt(before.length());
+      var afterTangent = after.tangentAt(0.0);
+      var tangentDot = 0.0;
+      for (coordinate in 0...3)
+        tangentDot += beforeTangent[coordinate] * afterTangent[coordinate];
+      if (tangentDot < 0.99999) continue;
+      var speed = requested.maxVelocity > 0.0 ? requested.maxVelocity : 1e8;
+      var pathAcceleration = 1e8;
+      for (side in [before, after]) {
+        for (sample in 0...33) {
+          var distance = side.length() * sample / 32.0;
+          var tangent = side.tangentAt(distance);
+          var curvature = side.curvatureAt(distance);
+          var prime = [for (_ in start) 0.0];
+          var second = [for (_ in start) 0.0];
+          for (entry in [{axis: xAxis, prime: tangent[0], second: -tangent[1] * curvature},
+              {axis: yAxis, prime: tangent[1], second: tangent[0] * curvature},
+              {axis: zAxis, prime: tangent[2], second: 0.0}]) {
+            entry.axis.writeLogicalDelta(prime, entry.prime);
+            entry.axis.writeLogicalDelta(second, entry.second);
+          }
+          for (joint in 0...start.length) {
+            if (Math.abs(prime[joint]) > 1e-12) {
+              speed = Math.min(speed, maxVelocity[joint] / Math.abs(prime[joint]));
+              pathAcceleration = Math.min(pathAcceleration,
+                maxAcceleration[joint] / Math.abs(prime[joint]));
+            }
+            if (Math.abs(second[joint]) > 1e-12)
+              speed = Math.min(speed,
+                Math.sqrt((Std.isOfType(side, QuinticBlend) ? 0.5 : 1.0) *
+                  maxAcceleration[joint] / Math.abs(second[joint])));
+          }
+        }
+      }
+      speed = Math.min(speed * 0.9,
+        0.8 * Math.sqrt(2.0 * pathAcceleration *
+          Math.min(before.length(), after.length())));
+      junctionSpeeds[index] = speed;
+    }
     var offset = Int64.ofInt(0);
     var previousEnd:Null<PathPoint> = null;
     var worstTaskDeviation = 0.0;
     var worstTaskTime = 0.0;
-    for (primitive in path.primitives) {
+    for (primitiveIndex in 0...planningPath.primitives.length) {
+      var primitive = planningPath.primitives[primitiveIndex];
       var length = primitive.length();
       var primitiveStart = primitive.pointAt(0.0);
       if (previousEnd != null && previousEnd.distanceTo(primitiveStart) > 1e-8)
@@ -414,6 +469,7 @@ class MotionSystem {
         var arc:ArcSegment = cast primitive;
         count = Std.int(Math.ceil(Math.abs(arc.sweepAngle) * 16.0));
       }
+      if (Std.isOfType(primitive, QuinticBlend)) count = 32;
       var distances:Array<Float> = [];
       var positions:Array<Array<Float>> = [];
       var first:Array<Array<Float>> = [];
@@ -447,24 +503,19 @@ class MotionSystem {
       // roundoff before the runtime validates exact polynomial extrema.
       var limits = new PathTimingLimits(
         [for (value in maxVelocity) value * 0.999],
-        [for (value in maxAcceleration) value * 0.999], speedCaps);
-      var timed = new ToppraPathTiming().time(jointPath, limits);
+        [for (value in maxAcceleration) value * 0.999], speedCaps,
+        junctionSpeeds[primitiveIndex], junctionSpeeds[primitiveIndex + 1]);
+      var loweringTolerance = options.exactStop ? 1e-6 :
+        Math.min(1e-6, options.blendTolerance * 0.01);
+      var timed = new ToppraPathTiming(loweringTolerance).time(jointPath, limits);
       var pieceDuration = timed.trajectory.durationSeconds();
       var sampleCount = Std.int(Math.ceil(pieceDuration / 0.001));
       for (sampleIndex in 0...(sampleCount + 1)) {
         var localTime = pieceDuration * sampleIndex / sampleCount;
-        var low = 0.0;
-        var high = length;
-        for (_ in 0...40) {
-          var middle = (low + high) * 0.5;
-          if (timed.distanceToTime(middle) < localTime) low = middle;
-          else high = middle;
-        }
-        var authored = primitive.pointAt((low + high) * 0.5);
         var actual = timed.trajectory.evaluate(localTime).positions;
         var tool = new PathPoint(xAxis.logicalPosition(actual),
           yAxis.logicalPosition(actual), zAxis.logicalPosition(actual));
-        var deviation = tool.distanceTo(authored);
+        var deviation = distanceToAuthoredPath(tool, path);
         if (deviation > worstTaskDeviation) {
           worstTaskDeviation = deviation;
           worstTaskTime = Int64.toFloat(offset) * 1e-9 + localTime;
@@ -506,7 +557,8 @@ class MotionSystem {
           Math.max(lower[joint], upper[joint]));
     }
     var report = result.validate(validation);
-    var tolerance = pathOptions == null ? 1e-5 : Math.max(1e-5, pathOptions.blendTolerance);
+    var tolerance = options.exactStop || options.blendTolerance == 0.0
+      ? 1e-5 : options.blendTolerance;
     report.setTaskSpace(worstTaskDeviation <= tolerance
       ? MotionKitNativeConstants.MK_CHECK_PASSED
       : MotionKitNativeConstants.MK_CHECK_FAILED,
@@ -520,6 +572,42 @@ class MotionSystem {
       }
     }
     return result;
+  }
+
+  function distanceToAuthoredPath(point:PathPoint, path:GeometricPath):Float {
+    var closest = Math.POSITIVE_INFINITY;
+    for (primitive in path.primitives) {
+      if (Std.isOfType(primitive, LineSegment)) {
+        var line:LineSegment = cast primitive;
+        var length = line.length();
+        if (length <= 0.0) {
+          closest = Math.min(closest, point.distanceTo(line.start));
+          continue;
+        }
+        var direction = line.tangentAt(0.0);
+        var projection = (point.x - line.start.x) * direction[0] +
+          (point.y - line.start.y) * direction[1] +
+          (point.z - line.start.z) * direction[2];
+        closest = Math.min(closest, point.distanceTo(
+          line.pointAt(Math.max(0.0, Math.min(length, projection)))));
+      } else if (Std.isOfType(primitive, ArcSegment)) {
+        var arc:ArcSegment = cast primitive;
+        var angle = Math.atan2(point.y - arc.center.y, point.x - arc.center.x);
+        var baseShift = Math.round((arc.startAngle - angle) / (2.0 * Math.PI));
+        for (shift in -2...3) {
+          var candidate = angle + 2.0 * Math.PI * (baseShift + shift);
+          var fraction = arc.sweepAngle == 0.0 ? 0.0 :
+            (candidate - arc.startAngle) / arc.sweepAngle;
+          var distance = arc.length() * Math.max(0.0, Math.min(1.0, fraction));
+          closest = Math.min(closest, point.distanceTo(arc.pointAt(distance)));
+        }
+      } else {
+        for (sample in 0...129)
+          closest = Math.min(closest,
+            point.distanceTo(primitive.pointAt(primitive.length() * sample / 128.0)));
+      }
+    }
+    return closest;
   }
 
   function validatePathLimits(path:GeometricPath, directAxes:Array<MotionAxis>):Void {

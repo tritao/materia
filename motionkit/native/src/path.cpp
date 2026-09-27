@@ -490,11 +490,13 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         auto geometric = std::make_shared<toppra::PiecewisePolyPath>(coefficients, knots);
         toppra::Vector lower_velocity(dof), upper_velocity(dof);
         toppra::Vector lower_acceleration(dof), upper_acceleration(dof);
+        const double moving_boundary_margin = (start_speed > 0.0 || end_speed > 0.0)
+            ? 0.98 : 1.0;
         for (uint32_t j = 0; j < joint_count; ++j) {
-            lower_velocity[j] = -max_velocity[j];
-            upper_velocity[j] = max_velocity[j];
-            lower_acceleration[j] = -max_acceleration[j];
-            upper_acceleration[j] = max_acceleration[j];
+            lower_velocity[j] = -max_velocity[j] * moving_boundary_margin;
+            upper_velocity[j] = max_velocity[j] * moving_boundary_margin;
+            lower_acceleration[j] = -max_acceleration[j] * moving_boundary_margin;
+            upper_acceleration[j] = max_acceleration[j] * moving_boundary_margin;
         }
         lower_velocity[joint_count] = -1e8;
         upper_velocity[joint_count] = 1e8;
@@ -516,7 +518,9 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         grid[grid.size() - 1] = samples.back().s;
         algorithm.setGridpoints(grid);
         algorithm.setInitialXBounds(toppra::Bound{0.0, 1e16});
-        if (algorithm.computePathParametrization(start_speed, end_speed) !=
+        // TOPP-RA's forward pass stores its first parameter as squared path
+        // speed, while the public endpoint contract uses path speed.
+        if (algorithm.computePathParametrization(start_speed * start_speed, end_speed) !=
             toppra::ReturnCode::OK) return MK_ERROR_GENERATION;
         const auto &data = algorithm.getParameterizationData();
         std::vector<mk_time_stage> stages;
@@ -594,6 +598,10 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                 break;
             }
             mk_time_law_destroy(created);
+            // Uniform stretching would change an authored moving endpoint
+            // speed, so report infeasibility instead of returning a law with
+            // a different boundary contract.
+            if (start_speed > 0.0 || end_speed > 0.0) return MK_ERROR_GENERATION;
             if (!stretch_stages(stages, factor * 1.002)) return MK_ERROR_GENERATION;
         }
         if (!accepted) return MK_ERROR_GENERATION;
