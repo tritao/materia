@@ -1,0 +1,81 @@
+package app.editor;
+
+import app.Main.ReferenceEditorApp;
+import nativekit.ui.core.Command;
+import nativekit.ui.core.Shortcut;
+import nativekit.ui.core.UiKey;
+import nativekit.ui.core.UiModifier;
+
+/** Viewport, lighting, grid, and nudge command registrations. */
+@:access(app.Main.ReferenceEditorApp)
+class SceneViewCommands {
+  public static function install(app:ReferenceEditorApp):Void {
+    app.commands.register(new Command("scene.frame-selected", "Frame selected", function() {
+      if (app.perspectiveViewport != null) app.perspectiveViewport.frameSelected();
+      app.log("Framed " + app.scene.selectedId);
+    }, null, function() return !app.documents.blocked() && app.scene.items().length > 0));
+    app.commands.register(new Command("scene.reset-perspective", "Reset perspective view", function() {
+      if (app.perspectiveViewport != null) app.perspectiveViewport.resetView();
+      app.log("Perspective view reset");
+    }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null));
+    registerLightingPreset(app, "scene.lighting-studio", "Lighting: Studio", 0);
+    registerLightingPreset(app, "scene.lighting-soft", "Lighting: Soft", 1);
+    registerLightingPreset(app, "scene.lighting-contrast", "Lighting: Contrast", 2);
+    app.commands.register(new Command("scene.toggle-grid", "Toggle grid", function() {
+      app.gridVisible = !app.gridVisible;
+      app.log(app.gridVisible ? "Grid enabled" : "Grid disabled");
+    }, null, null, function() return app.gridVisible));
+    app.commands.register(new Command("scene.toggle-grid-snap", "Toggle grid snapping", function() {
+      app.gridSnapEnabled = !app.gridSnapEnabled;
+      app.log(app.gridSnapEnabled ? "Grid snapping enabled" : "Grid snapping disabled");
+    }, null, null, function() return app.gridSnapEnabled));
+    registerGridSpacing(app, "scene.grid-spacing-0.1", "Grid spacing: 0.1 m", 0.1);
+    registerGridSpacing(app, "scene.grid-spacing-0.2", "Grid spacing: 0.2 m", 0.2);
+    registerGridSpacing(app, "scene.grid-spacing-0.5", "Grid spacing: 0.5 m", 0.5);
+    registerNudgeCommand(app, "scene.nudge-left", "Nudge left", UiKey.Left, 0, -0.1, 0.0);
+    registerNudgeCommand(app, "scene.nudge-right", "Nudge right", UiKey.Right, 0, 0.1, 0.0);
+    registerNudgeCommand(app, "scene.nudge-up", "Nudge up", UiKey.Up, 0, 0.0, 0.1);
+    registerNudgeCommand(app, "scene.nudge-down", "Nudge down", UiKey.Down, 0, 0.0, -0.1);
+    registerNudgeCommand(app, "scene.nudge-left-large", "Nudge left (large)", UiKey.Left,
+      UiModifier.Shift, -1.0, 0.0);
+    registerNudgeCommand(app, "scene.nudge-right-large", "Nudge right (large)", UiKey.Right,
+      UiModifier.Shift, 1.0, 0.0);
+    registerNudgeCommand(app, "scene.nudge-up-large", "Nudge up (large)", UiKey.Up,
+      UiModifier.Shift, 0.0, 1.0);
+    registerNudgeCommand(app, "scene.nudge-down-large", "Nudge down (large)", UiKey.Down,
+      UiModifier.Shift, 0.0, -1.0);
+    app.commands.register(new Command("scene.cancel-drag", "Cancel object drag", function() {
+      app.cancelActiveDrag();
+      app.commands.refresh();
+    }, new Shortcut(UiKey.Escape), function() return
+      (app.perspectiveViewport != null && app.perspectiveViewport.dragging()) || app.scene.hasActiveSketchEdit()));
+  }
+
+  static function registerGridSpacing(app:ReferenceEditorApp, id:String, label:String, spacing:Float):Void {
+    app.commands.register(new Command(id, label, function() {
+      app.gridSpacing = spacing;
+      app.log("Grid spacing set to " + spacing + " m");
+      app.commands.refresh();
+    }, null, null, function() return app.gridSpacing == spacing));
+  }
+
+  static function registerLightingPreset(app:ReferenceEditorApp, id:String, label:String, preset:Int):Void {
+    app.commands.register(new Command(id, label, function() {
+      if (app.perspectiveViewport != null) app.perspectiveViewport.setLightingPreset(preset);
+      app.log(label);
+      app.commands.refresh();
+    }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null,
+      function() return app.perspectiveViewport != null &&
+        app.perspectiveViewport.lightingPresetId() == preset));
+  }
+
+  static function registerNudgeCommand(app:ReferenceEditorApp, id:String, label:String, key:Int, modifiers:Int,
+      deltaX:Float, deltaY:Float):Void {
+    app.commands.register(new Command(id, label, function() {
+      app.scene.nudgeSelected(deltaX, deltaY);
+      app.commands.refresh();
+    }, new Shortcut(key, modifiers), function() return app.canEditObjects() &&
+      app.scene.object(app.scene.selectedId) != null));
+  }
+
+}

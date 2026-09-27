@@ -12,6 +12,7 @@ import app.editor.HierarchyPanel;
 import app.editor.InspectorPanel;
 import app.editor.EditorDocumentCommands;
 import app.editor.SceneObjectCommands;
+import app.editor.SceneViewCommands;
 import Color;
 import LayoutAxis;
 import LayoutAlignmentY;
@@ -1167,72 +1168,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }, new Shortcut(UiKey.K, UiModifier.Control), function() return !documents.blocked());
     openPalette.addShortcut(new Shortcut(UiKey.P, UiModifier.Control));
     commands.register(openPalette);
-    commands.register(new Command("scene.frame-selected", "Frame selected", function() {
-      if (perspectiveViewport != null) perspectiveViewport.frameSelected();
-      log("Framed " + scene.selectedId);
-    }, null, function() return !documents.blocked() && scene.items().length > 0));
-    commands.register(new Command("scene.reset-perspective", "Reset perspective view", function() {
-      if (perspectiveViewport != null) perspectiveViewport.resetView();
-      log("Perspective view reset");
-    }, null, function() return !documents.blocked() && perspectiveViewport != null));
-    registerLightingPreset("scene.lighting-studio", "Lighting: Studio", 0);
-    registerLightingPreset("scene.lighting-soft", "Lighting: Soft", 1);
-    registerLightingPreset("scene.lighting-contrast", "Lighting: Contrast", 2);
-    commands.register(new Command("scene.toggle-grid", "Toggle grid", function() {
-      gridVisible = !gridVisible;
-      log(gridVisible ? "Grid enabled" : "Grid disabled");
-    }, null, null, function() return gridVisible));
-    commands.register(new Command("scene.toggle-grid-snap", "Toggle grid snapping", function() {
-      gridSnapEnabled = !gridSnapEnabled;
-      log(gridSnapEnabled ? "Grid snapping enabled" : "Grid snapping disabled");
-    }, null, null, function() return gridSnapEnabled));
-    registerGridSpacing("scene.grid-spacing-0.1", "Grid spacing: 0.1 m", 0.1);
-    registerGridSpacing("scene.grid-spacing-0.2", "Grid spacing: 0.2 m", 0.2);
-    registerGridSpacing("scene.grid-spacing-0.5", "Grid spacing: 0.5 m", 0.5);
-    registerNudgeCommand("scene.nudge-left", "Nudge left", UiKey.Left, 0, -0.1, 0.0);
-    registerNudgeCommand("scene.nudge-right", "Nudge right", UiKey.Right, 0, 0.1, 0.0);
-    registerNudgeCommand("scene.nudge-up", "Nudge up", UiKey.Up, 0, 0.0, 0.1);
-    registerNudgeCommand("scene.nudge-down", "Nudge down", UiKey.Down, 0, 0.0, -0.1);
-    registerNudgeCommand("scene.nudge-left-large", "Nudge left (large)", UiKey.Left,
-      UiModifier.Shift, -1.0, 0.0);
-    registerNudgeCommand("scene.nudge-right-large", "Nudge right (large)", UiKey.Right,
-      UiModifier.Shift, 1.0, 0.0);
-    registerNudgeCommand("scene.nudge-up-large", "Nudge up (large)", UiKey.Up,
-      UiModifier.Shift, 0.0, 1.0);
-    registerNudgeCommand("scene.nudge-down-large", "Nudge down (large)", UiKey.Down,
-      UiModifier.Shift, 0.0, -1.0);
-    commands.register(new Command("scene.cancel-drag", "Cancel object drag", function() {
-      cancelActiveDrag();
-      commands.refresh();
-    }, new Shortcut(UiKey.Escape), function() return
-      (perspectiveViewport != null && perspectiveViewport.dragging()) || scene.hasActiveSketchEdit()));
-  }
-
-  function registerGridSpacing(id:String, label:String, spacing:Float):Void {
-    commands.register(new Command(id, label, function() {
-      gridSpacing = spacing;
-      log("Grid spacing set to " + spacing + " m");
-      commands.refresh();
-    }, null, null, function() return gridSpacing == spacing));
-  }
-
-  function registerLightingPreset(id:String, label:String, preset:Int):Void {
-    commands.register(new Command(id, label, function() {
-      if (perspectiveViewport != null) perspectiveViewport.setLightingPreset(preset);
-      log(label);
-      commands.refresh();
-    }, null, function() return !documents.blocked() && perspectiveViewport != null,
-      function() return perspectiveViewport != null &&
-        perspectiveViewport.lightingPresetId() == preset));
-  }
-
-  function registerNudgeCommand(id:String, label:String, key:Int, modifiers:Int,
-      deltaX:Float, deltaY:Float):Void {
-    commands.register(new Command(id, label, function() {
-      scene.nudgeSelected(deltaX, deltaY);
-      commands.refresh();
-    }, new Shortcut(key, modifiers), function() return canEditObjects() &&
-      scene.object(scene.selectedId) != null));
+    SceneViewCommands.install(this);
   }
 
   function documentChanged():Void {
