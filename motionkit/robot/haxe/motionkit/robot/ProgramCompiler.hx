@@ -8,6 +8,9 @@ import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.path.OrientationPolicy;
+import motionkit.path.CornerBlender;
+import motionkit.path.GeometricPath;
+import motionkit.path.PathPoint;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseLine;
 import motionkit.path.PoseMath;
@@ -16,7 +19,7 @@ import motionkit.path.PoseWaypoint;
 import motionkit.planner.JointPathSamples;
 import motionkit.planner.PathTimingBackend;
 import motionkit.planner.PathTimingLimits;
-import motionkit.planner.SimplePathTiming;
+import motionkit.planner.ToppraPathTiming;
 import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
@@ -68,7 +71,7 @@ class ProgramCompiler {
     this.maxVelocity = maxVelocity.copy();
     this.maxAcceleration = maxAcceleration.copy();
     this.maxJerk = maxJerk.copy();
-    this.timing = timing == null ? new SimplePathTiming() : timing;
+    this.timing = timing == null ? new ToppraPathTiming() : timing;
     this.cartesianResolution = cartesianResolution;
     this.maxJointJump = maxJointJump;
     this.positionTolerance = positionTolerance;
@@ -92,8 +95,10 @@ class ProgramCompiler {
     var notes:Array<String> = [];
     var pending:Null<PendingMotion> = null;
     var currentIndex = -1;
+    var skipNext = false;
     try {
       for (index in 0...program.ops.length) {
+        if (skipNext) { skipNext = false; continue; }
         currentIndex = index;
         var op = program.ops[index];
         switch op {
@@ -125,13 +130,35 @@ class ProgramCompiler {
               timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1));
             }
-            noteBlend(blend, index, notes);
             requireFrame(requestedFrame, index);
-            var start = new PoseWaypoint(solver.forward(q), positionTolerance,
-              orientationTolerance);
-            var end = new PoseWaypoint(pose, positionTolerance, orientationTolerance);
-            pending = lowerPath(new PosePath(frameId, [new PoseLine(start, end,
-              OrientationPolicy.Interpolated, 0.1, feed)]), q, feed, [], index);
+            var blended:Null<PosePath> = null;
+            switch blend {
+              case ToleranceBlend(metres):
+                if (index + 1 < program.ops.length) switch program.ops[index + 1] {
+                  case MoveL(nextPose, nextFrame, nextFeed, ExactStop):
+                    if (nextFrame == frameId)
+                      blended = blendLinear(solver.forward(q), pose, nextPose,
+                        metres, feed, nextFeed);
+                  case _:
+                }
+              case ExactStop:
+            }
+            if (blended != null) {
+              var nextFeed = switch program.ops[index + 1] {
+                case MoveL(_, _, speed, _): speed;
+                case _: feed;
+              };
+              pending = lowerPath(blended, q, Math.max(feed, nextFeed), [], index);
+              skipNext = true;
+              notes.push('Motion program ops $index and ${index + 1} tolerance blended');
+            } else {
+              noteBlend(blend, index, notes);
+              var start = new PoseWaypoint(solver.forward(q), positionTolerance,
+                orientationTolerance);
+              var end = new PoseWaypoint(pose, positionTolerance, orientationTolerance);
+              pending = lowerPath(new PosePath(frameId, [new PoseLine(start, end,
+                OrientationPolicy.Interpolated, 0.1, feed)]), q, feed, [], index);
+            }
             q = pending.endQ.copy();
           case MoveC(via, endPose, requestedFrame, feed, blend):
             if (pending != null) {
@@ -261,12 +288,48 @@ class ProgramCompiler {
     };
   }
 
+  /** C3's planar corner geometry, retained as a typed pose path for IK. */
+  function blendLinear(start:Pose3, corner:Pose3, end:Pose3,
+      tolerance:Float, firstFeed:Float, secondFeed:Float):Null<PosePath> {
+    if (PoseMath.distance(start, corner) <= 1e-8 ||
+        PoseMath.distance(corner, end) <= 1e-8 ||
+        Math.abs(start.z - corner.z) > 1e-8 ||
+        Math.abs(corner.z - end.z) > 1e-8 ||
+        PoseMath.angle(start, corner) > 1e-8 ||
+        PoseMath.angle(corner, end) > 1e-8) return null;
+    var geometry = CornerBlender.blend(GeometricPath.lines([
+      new PathPoint(start.x, start.y, start.z),
+      new PathPoint(corner.x, corner.y, corner.z),
+      new PathPoint(end.x, end.y, end.z)]), tolerance, Math.PI * 5.0 / 6.0);
+    if (geometry.path.primitives.length != 3 || geometry.diagnostics.length != 0)
+      return null;
+    var first = geometry.path.primitives[0];
+    var arc = geometry.path.primitives[1];
+    var last = geometry.path.primitives[2];
+    var firstStart = poseWaypoint(first.pointAt(0.0), start);
+    var firstEnd = poseWaypoint(first.pointAt(first.length()), start);
+    var arcMiddle = poseWaypoint(arc.pointAt(arc.length() * 0.5), start);
+    var arcEnd = poseWaypoint(arc.pointAt(arc.length()), start);
+    var lastEnd = poseWaypoint(last.pointAt(last.length()), start);
+    return new PosePath(frameId, [
+      new PoseLine(firstStart, firstEnd, OrientationPolicy.Fixed, 0.1, firstFeed),
+      new PoseArc(firstEnd, arcMiddle, arcEnd, OrientationPolicy.Fixed,
+        Math.min(firstFeed, secondFeed)),
+      new PoseLine(arcEnd, lastEnd, OrientationPolicy.Fixed, 0.1, secondFeed)
+    ]);
+  }
+
+  function poseWaypoint(point:PathPoint, orientation:Pose3):PoseWaypoint
+    return new PoseWaypoint(new Pose3(point.x, point.y, point.z,
+      orientation.qx, orientation.qy, orientation.qz, orientation.qw),
+      positionTolerance, orientationTolerance);
+
   function lowerPath(path:PosePath, startQ:Array<Float>, feed:Float,
       authoredEvents:Array<PathEvent>, index:Int):PendingMotion {
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
+    var distances:Array<Float> = [];
     var count = Std.int(Math.ceil(path.length() / cartesianResolution));
     if (count > 10000) throw 'Motion program op $index exceeds Cartesian sample budget';
-    var distances:Array<Float> = [];
     var positions:Array<Array<Float>> = [];
     var caps:Array<Float> = [];
     var previous = startQ.copy();
@@ -298,19 +361,28 @@ class ProgramCompiler {
       var ds = distances[right] - distances[left];
       first.push([for (joint in 0...startQ.length)
         (positions[right][joint] - positions[left][joint]) / ds]);
-      second.push([for (_ in 0...startQ.length) 0.0]);
     }
+    for (sample in 0...positions.length)
+      second.push([for (_ in 0...startQ.length) 0.0]);
     var timed = timing.time(new JointPathSamples(distances, positions, first, second),
       new PathTimingLimits(maxVelocity, maxAcceleration, caps));
-    var events:Array<TimedEvent> = [];
-    for (event in authoredEvents) {
-      var seconds = Math.max(0.0,
-        timed.distanceToTime(event.distance) - event.leadSeconds);
-      events.push(new TimedEvent(Trajectory.nanoseconds(seconds), event.channel,
-        event.value, event.holdPolicy));
+    try {
+      var events:Array<TimedEvent> = [];
+      for (event in authoredEvents) {
+        var seconds = Math.max(0.0,
+          timed.distanceToTime(event.distance) - event.leadSeconds);
+        events.push(new TimedEvent(Trajectory.nanoseconds(seconds), event.channel,
+          event.value, event.holdPolicy));
+      }
+      var timeMap = [for (distance in distances) timed.distanceToTime(distance)];
+      timed.releaseDistanceMap();
+      return new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
+        path, distances, timeMap);
+    } catch (error:Dynamic) {
+      timed.releaseDistanceMap();
+      timed.trajectory.dispose();
+      throw error;
     }
-    return new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
-      path, distances, [for (distance in distances) timed.distanceToTime(distance)]);
   }
 
   function checkTaskSpace(plan:ExecutionPlan, path:PosePath,

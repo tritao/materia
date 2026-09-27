@@ -71,7 +71,7 @@ bool valid_law(const mk_time_stage *stages, uint32_t count) {
             stage.start_ns < 0 || stage.start_ns > INT64_MAX - stage.duration_ns ||
             !std::isfinite(stage.start_s) || !std::isfinite(stage.speed) ||
             !std::isfinite(stage.acceleration) || stage.speed < 0.0 ||
-            stage_speed(stage, stage.start_ns + stage.duration_ns) < 0.0 ||
+            stage_speed(stage, stage.start_ns + stage.duration_ns) < -1e-8 ||
             end_s(stage) <= stage.start_s) return false;
         if (i && (stage.start_ns != stages[i - 1].start_ns + stages[i - 1].duration_ns ||
             std::abs(stage.start_s - end_s(stages[i - 1])) >
@@ -236,10 +236,14 @@ bool append_interval(const std::vector<mk_path_sample> &path,
     for (uint32_t joint = 0; joint < a.joint_count; ++joint) {
         const auto left = path_state(a, b, joint, s0);
         const auto right = path_state(a, b, joint, s1);
-        const Poly fit = hermite(left.position, left.first * v0 * duration,
+        Poly fit = hermite(left.position, left.first * v0 * duration,
             (left.second * v0 * v0 + left.first * stage.acceleration) * duration * duration,
             right.position, right.first * v1 * duration,
             (right.second * v1 * v1 + right.first * stage.acceleration) * duration * duration);
+        const Poly authored = path_poly(a, b, joint);
+        if (std::abs(authored[2]) < 1e-12 && std::abs(authored[3]) < 1e-12 &&
+            std::abs(authored[4]) < 1e-12 && std::abs(authored[5]) < 1e-12)
+            fit = compose(authored, normalized_s);
         for (size_t i = 0; i < fit.size(); ++i)
             segment.coefficients[joint].value[i] = fit[i] / std::pow(duration, static_cast<int>(i));
         Poly residual = compose(path_poly(a, b, joint), normalized_s);
@@ -349,6 +353,63 @@ bool stretch_stages(std::vector<mk_time_stage> &stages, double factor) {
             (duration * duration);
         stage.speed = speed;
         speed += stage.acceleration * duration;
+        start_ns += duration_ns;
+    }
+    return true;
+}
+
+// A collocation peak can exceed a joint bound after quintic lowering. Reduce
+// path speed around that peak, preserving all other stages' time scale.
+bool soften_stages(std::vector<mk_time_stage> &stages, double peak_time,
+                   double factor) {
+    if (stages.empty() || !std::isfinite(peak_time) || factor <= 1.0) return false;
+    const int64_t peak_ns = static_cast<int64_t>(std::llround(peak_time * 1e9));
+    double center_s = stages.back().start_s;
+    for (const auto &stage : stages) {
+        if (peak_ns <= stage.start_ns + stage.duration_ns) {
+            center_s = stage_s(stage, std::clamp(peak_ns, stage.start_ns,
+                stage.start_ns + stage.duration_ns));
+            break;
+        }
+    }
+    std::vector<double> positions, speeds;
+    positions.reserve(stages.size() + 1);
+    speeds.reserve(stages.size() + 1);
+    for (const auto &stage : stages) {
+        positions.push_back(stage.start_s);
+        speeds.push_back(std::max(0.0, stage.speed));
+    }
+    positions.push_back(end_s(stages.back()));
+    speeds.push_back(std::max(0.0, stage_speed(stages.back(),
+        stages.back().start_ns + stages.back().duration_ns)));
+    const double radius = std::min(0.015, (positions.back() - positions.front()) / 10.0);
+    bool changed = false;
+    for (size_t i = 1; i + 1 < speeds.size(); ++i) {
+        const double offset = std::abs(positions[i] - center_s) / radius;
+        const double weight = offset < 1.0 ?
+            0.5 * (1.0 + std::cos(std::acos(-1.0) * offset)) : 0.0;
+        if (weight > 0.0) {
+            speeds[i] *= 1.0 - weight * (1.0 - 0.99 / factor);
+            changed = true;
+        }
+    }
+    if (!changed) return false;
+    int64_t start_ns = 0;
+    double speed = speeds.front();
+    for (size_t i = 0; i < stages.size(); ++i) {
+        auto &stage = stages[i];
+        const double distance = positions[i + 1] - positions[i];
+        const double seconds = 2.0 * distance / (speed + speeds[i + 1]);
+        if (!std::isfinite(seconds) || seconds <= 0.0 ||
+            seconds > static_cast<double>(INT64_MAX - start_ns) * 1e-9) return false;
+        const int64_t duration_ns = std::max<int64_t>(1,
+            static_cast<int64_t>(std::floor(seconds * 1e9)));
+        const double rounded = static_cast<double>(duration_ns) * 1e-9;
+        stage.start_ns = start_ns;
+        stage.duration_ns = duration_ns;
+        stage.speed = speed;
+        stage.acceleration = 2.0 * (distance - speed * rounded) / (rounded * rounded);
+        speed += stage.acceleration * rounded;
         start_ns += duration_ns;
     }
     return true;
@@ -560,7 +621,7 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         }
         mk_time_law_handle created{};
         bool accepted = false;
-        for (int attempt = 0; attempt < 8; ++attempt) {
+        for (int attempt = 0; attempt < 24; ++attempt) {
             const auto result = mk_time_law_create(stages.data(),
                 static_cast<uint32_t>(stages.size()), &created);
             if (result != MK_OK) return result;
@@ -602,6 +663,10 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             // speed, so report infeasibility instead of returning a law with
             // a different boundary contract.
             if (start_speed > 0.0 || end_speed > 0.0) return MK_ERROR_GENERATION;
+            if (stages.size() > 1000 &&
+                acceleration_check.status == MK_CHECK_FAILED && attempt < 20 &&
+                soften_stages(stages, acceleration_check.time_seconds, factor * 1.002))
+                continue;
             if (!stretch_stages(stages, factor * 1.002)) return MK_ERROR_GENERATION;
         }
         if (!accepted) return MK_ERROR_GENERATION;

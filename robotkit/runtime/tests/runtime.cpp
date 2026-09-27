@@ -1494,6 +1494,28 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
         plan.ends_at_rest = 0;
         assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
     }
+    {
+        // Reach zero velocity with bounded but nonzero endpoint acceleration,
+        // as a TOPP-RA path can do at its final knot.
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto plan = make_plan(205, true, false);
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            const double sign = joint == 0 ? 1.0 : -1.0;
+            auto &segment = plan.segments.segments[0];
+            segment.degree = 4;
+            segment.coefficients[joint].value[1] = 0.0;
+            segment.coefficients[joint].value[2] = 0.0;
+            segment.coefficients[joint].value[3] = sign * 0.08;
+            segment.coefficients[joint].value[4] = sign * -0.06;
+        }
+        assert(runtime.submit_plan(plan) == RK_OK);
+        uint64_t timestamp = 0;
+        for (int step = 0; step < 14; ++step) apply_cycle(runtime, timestamp);
+        rk_robot_snapshot snapshot{};
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(snapshot.trajectory_active == 0 && snapshot.fault_code == 0);
+    }
     for (bool smooth : {false, true}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
         robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
