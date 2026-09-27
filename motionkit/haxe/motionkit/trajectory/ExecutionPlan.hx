@@ -18,11 +18,28 @@ class ExecutionPlan {
   public final requiredCapabilities:Int64;
   public final planningAuthority:Int;
   public final durationSeconds:Float;
-  public final events:Array<TimedEvent>;
+  final storedEvents:Array<TimedEvent>;
+  public var events(get, never):Array<TimedEvent>;
+  final storedSegments:Array<{timeFromStartNs:Int64, durationNs:Int64,
+    coefficients:Array<Array<Float>>}>;
+  final storedStartPositions:Array<Float>;
+  final storedStartVelocities:Array<Float>;
+  final storedStartAccelerations:Array<Float>;
+  final storedPositionTolerances:Array<Float>;
+  final storedVelocityTolerances:Array<Float>;
+  final storedAccelerationTolerances:Array<Float>;
 
-  private function new(owner:Ownedmk_plan_handle, report:ValidationReport) {
+  private function new(owner:Ownedmk_plan_handle, report:ValidationReport,
+      trajectory:Trajectory, positions:Array<Float>, velocities:Array<Float>,
+      accelerations:Array<Float>, pTol:Array<Float>, vTol:Array<Float>,
+      aTol:Array<Float>) {
     this.owner = owner;
     this.report = report;
+    storedSegments = trajectory.segments();
+    storedStartPositions = positions.copy(); storedStartVelocities = velocities.copy();
+    storedStartAccelerations = accelerations.copy();
+    storedPositionTolerances = pTol.copy(); storedVelocityTolerances = vTol.copy();
+    storedAccelerationTolerances = aTol.copy();
     var info = new mk_plan_info();
     info.set_struct_size(mk_plan_info.size());
     check(MotionKitNative.mk_plan_get_info(owner.borrow(), info), "plan.info");
@@ -33,7 +50,7 @@ class ExecutionPlan {
     requiredCapabilities = info.get_required_capabilities();
     planningAuthority = info.get_planning_authority();
     durationSeconds = Int64.toFloat(info.get_duration_ns()) * 1e-9;
-    events = [];
+    storedEvents = [];
     for (index in 0...info.get_event_count()) {
       var nativeEvent = new mk_timed_event();
       check(MotionKitNative.mk_plan_get_event(owner.borrow(), index, nativeEvent),
@@ -65,9 +82,28 @@ class ExecutionPlan {
         case MotionKitNativeConstants.MK_EVENT_RESTORE_ON_RESUME: HoldPolicy.RestoreOnResume;
         default: HoldPolicy.Keep;
       };
-      events.push(new TimedEvent(nativeEvent.get_time_ns(), channel.toString(), value, hold));
+      storedEvents.push(new TimedEvent(nativeEvent.get_time_ns(), channel.toString(), value, hold));
     }
   }
+
+  function get_events():Array<TimedEvent> return storedEvents.copy();
+
+  /** Copies the native-validated payload so callers cannot change this plan. */
+  public function segments():Array<{timeFromStartNs:Int64, durationNs:Int64,
+      coefficients:Array<Array<Float>>}> {
+    return [for (segment in storedSegments) {
+      timeFromStartNs: segment.timeFromStartNs,
+      durationNs: segment.durationNs,
+      coefficients: [for (joint in segment.coefficients) joint.copy()]
+    }];
+  }
+
+  public function copyStartPositions():Array<Float> return storedStartPositions.copy();
+  public function copyStartVelocities():Array<Float> return storedStartVelocities.copy();
+  public function copyStartAccelerations():Array<Float> return storedStartAccelerations.copy();
+  public function copyPositionTolerances():Array<Float> return storedPositionTolerances.copy();
+  public function copyVelocityTolerances():Array<Float> return storedVelocityTolerances.copy();
+  public function copyAccelerationTolerances():Array<Float> return storedAccelerationTolerances.copy();
 
   /** Does not infer derivatives from degree-1 chords; callers supply the authored state. */
   public static function create(trajectory:Trajectory, limits:ValidationLimits, planId:Int64,
@@ -144,7 +180,9 @@ class ExecutionPlan {
     if (created.status == MotionKitNativeConstants.MK_ERROR_LIMIT)
       throw new PlanLimitError(new ValidationReport(nativeReport));
     check(created.status, "plan.create");
-    return new ExecutionPlan(created.out_plan, new ValidationReport(nativeReport));
+    return new ExecutionPlan(created.out_plan, new ValidationReport(nativeReport),
+      trajectory, positions, velocities, accelerations, positionTolerances,
+      velocityTolerances, accelerationTolerances);
   }
 
   public function evaluate(timeSeconds:Float):TrajectoryState {

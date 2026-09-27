@@ -86,6 +86,9 @@ class ProgramCompiler {
     var blocks:Array<ProgramBlock> = [];
     var plans:Array<ExecutionPlan> = [];
     var indices:Array<Int> = [];
+    var lengths:Array<Float> = [];
+    var distanceMaps:Array<Array<Float>> = [];
+    var timeMaps:Array<Array<Float>> = [];
     var notes:Array<String> = [];
     var pending:Null<PendingMotion> = null;
     var currentIndex = -1;
@@ -96,7 +99,11 @@ class ProgramCompiler {
         switch op {
           case MoveJ(target, options, blend):
             if (pending != null) {
-              plans.push(finish(pending, nextId)); indices.push(pending.opIndex);
+              plans.push(finish(pending, nextId));
+              indices.push(pending.opIndex);
+              lengths.push(pathLength(pending));
+              distanceMaps.push(pending.distances.copy());
+              timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1));
             }
             noteBlend(blend, index, notes);
@@ -111,7 +118,11 @@ class ProgramCompiler {
             q = goal;
           case MoveL(pose, requestedFrame, feed, blend):
             if (pending != null) {
-              plans.push(finish(pending, nextId)); indices.push(pending.opIndex);
+              plans.push(finish(pending, nextId));
+              indices.push(pending.opIndex);
+              lengths.push(pathLength(pending));
+              distanceMaps.push(pending.distances.copy());
+              timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1));
             }
             noteBlend(blend, index, notes);
@@ -124,7 +135,11 @@ class ProgramCompiler {
             q = pending.endQ.copy();
           case MoveC(via, endPose, requestedFrame, feed, blend):
             if (pending != null) {
-              plans.push(finish(pending, nextId)); indices.push(pending.opIndex);
+              plans.push(finish(pending, nextId));
+              indices.push(pending.opIndex);
+              lengths.push(pathLength(pending));
+              distanceMaps.push(pending.distances.copy());
+              timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1));
             }
             noteBlend(blend, index, notes);
@@ -137,7 +152,11 @@ class ProgramCompiler {
             q = pending.endQ.copy();
           case FollowPath(path, requestedFrame, feed, events):
             if (pending != null) {
-              plans.push(finish(pending, nextId)); indices.push(pending.opIndex);
+              plans.push(finish(pending, nextId));
+              indices.push(pending.opIndex);
+              lengths.push(pathLength(pending));
+              distanceMaps.push(pending.distances.copy());
+              timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1));
             }
             requireFrame(requestedFrame, index);
@@ -152,25 +171,40 @@ class ProgramCompiler {
               Trajectory.nanoseconds(pending.trajectory.durationSeconds()), channel, value));
           case Dwell(seconds):
             if (pending != null) {
-              plans.push(finish(pending, nextId)); indices.push(pending.opIndex);
-              nextId = Int64.add(nextId, Int64.ofInt(1)); pending = null;
-            }
-            blocks.push(new ProgramBlock(plans, indices, ProgramBarrier.Dwell(seconds)));
-            plans = []; indices = [];
-          case WaitInput(channel, predicate, timeoutSeconds):
-            if (pending != null) {
-              plans.push(finish(pending, nextId)); indices.push(pending.opIndex);
+              plans.push(finish(pending, nextId));
+              indices.push(pending.opIndex);
+              lengths.push(pathLength(pending));
+              distanceMaps.push(pending.distances.copy());
+              timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1)); pending = null;
             }
             blocks.push(new ProgramBlock(plans, indices,
-              ProgramBarrier.WaitInput(channel, predicate, timeoutSeconds)));
-            plans = []; indices = [];
+              ProgramBarrier.Dwell(seconds), lengths, distanceMaps, timeMaps));
+            plans = []; indices = []; lengths = []; distanceMaps = []; timeMaps = [];
+          case WaitInput(channel, predicate, timeoutSeconds):
+            if (pending != null) {
+              plans.push(finish(pending, nextId));
+              indices.push(pending.opIndex);
+              lengths.push(pathLength(pending));
+              distanceMaps.push(pending.distances.copy());
+              timeMaps.push(pending.times.copy());
+              nextId = Int64.add(nextId, Int64.ofInt(1)); pending = null;
+            }
+            blocks.push(new ProgramBlock(plans, indices,
+              ProgramBarrier.WaitInput(channel, predicate, timeoutSeconds), lengths,
+              distanceMaps, timeMaps));
+            plans = []; indices = []; lengths = []; distanceMaps = []; timeMaps = [];
         }
       }
       if (pending != null) {
-        plans.push(finish(pending, nextId)); indices.push(pending.opIndex);
+        plans.push(finish(pending, nextId));
+              indices.push(pending.opIndex);
+              lengths.push(pathLength(pending));
+              distanceMaps.push(pending.distances.copy());
+              timeMaps.push(pending.times.copy());
       }
-      if (plans.length > 0) blocks.push(new ProgramBlock(plans, indices, null));
+      if (plans.length > 0) blocks.push(new ProgramBlock(plans, indices, null, lengths,
+        distanceMaps, timeMaps));
       return new CompiledProgram(blocks, notes);
     } catch (error:Dynamic) {
       if (pending != null) pending.trajectory.dispose();
@@ -181,6 +215,9 @@ class ProgramCompiler {
       throw 'Motion program op $currentIndex: $message';
     }
   }
+
+  static function pathLength(pending:PendingMotion):Float
+    return pending.path == null ? 0.0 : pending.path.length();
 
   function finish(pending:PendingMotion, id:Int64):ExecutionPlan {
     pending.events.sort(function(a, b) return Int64.compare(a.timeNs, b.timeNs));

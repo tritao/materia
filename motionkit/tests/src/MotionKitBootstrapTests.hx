@@ -18,6 +18,7 @@ import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.ProgramCompiler;
+import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
 import motionkit.robot.MotionSystemBlueprint;
@@ -86,6 +87,8 @@ import robotkit.world.RuntimeRobotAdapter;
 import robotkit.world.SensorFrame;
 import robotkit.world.StopMode;
 import robotkit.world.ExecutionPlanSubmission;
+import robotkit.world.ProcessChannelDeclaration;
+import robotkit.world.ProcessEventValue;
 import robotkit.world.TrajectorySegment;
 
 class MotionKitBootstrapTests {
@@ -97,6 +100,7 @@ class MotionKitBootstrapTests {
     testKinematicsContract();
     testMotionProgramContracts();
     testProgramCompiler();
+    testManipulatorMotion();
     testSimplePathTimingContract();
     testNativePathLowering();
     testToppraPathTiming();
@@ -362,6 +366,150 @@ class MotionKitBootstrapTests {
       MotionKitNativeConstants.MK_CHECK_PASSED,
       "FreeAboutTool accepts a free twist about the tool axis");
     freePlan.dispose();
+  }
+
+  static function testManipulatorMotion():Void {
+    var fixture = buildContractArmFixture();
+    for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
+    var simulation = new Simulation(0.01);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    blueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
+      ProcessEventValue.Digital(false)));
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("program-arm", runtime, fixture.model.name,
+      [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]);
+    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
+    var compiler = new ProgramCompiler(solver, limits, "work",
+      [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0], [for (_ in 0...6) 20.0]);
+    var unsupported = new RuntimeRobotAdapter("unsupported-arm", runtime,
+      fixture.model.name, [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name], false, false,
+      "simulated runtime fault", false);
+    throws(function() new ManipulatorMotion(unsupported, compiler,
+      function(_) return null, function() return runtime.pollEvents()),
+      "manipulator requires plan support at construction");
+    var ready = false;
+    var motion = new ManipulatorMotion(robot, compiler,
+      function(_) return EventValue.Digital(ready),
+      function() return runtime.pollEvents());
+    motion.run(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget([0.1]), new MotionOptions(), Blend.ExactStop)]));
+    check(!motion.running && motion.failure != null &&
+      motion.failure.indexOf("Motion program op 0") >= 0,
+      "manipulator reports compiler diagnostics");
+    var first = [0.02, 0.0, 0.0, 0.0, 0.0, 0.0];
+    var second = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    motion.run(new MotionProgram([
+      MotionOp.MoveJ(MoveTarget.JointTarget(first), new MotionOptions(), Blend.ExactStop),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(true)),
+      MotionOp.WaitInput("ready", InputPredicate.Equals(EventValue.Digital(true)), 3.0),
+      MotionOp.MoveJ(MoveTarget.JointTarget(second), new MotionOptions(), Blend.ExactStop),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false))
+    ]));
+    for (tick in 0...400) {
+      if (tick == 100) ready = true;
+      motion.update(0.01);
+      simulation.step(Int64.ofInt(tick));
+      if (!motion.running) break;
+    }
+    check(motion.completed && motion.failure == null,
+      'manipulator executes two blocks across WaitInput: ${motion.failure}, running=${motion.running}, block=${motion.progress().block}');
+    near(robot.snapshot().positions.get(0), 0.0,
+      "manipulator returns to initial joint position", 1e-3);
+    check(motion.firedEvents().length >= 2,
+      "manipulator reports process events from both blocks");
+    ready = false;
+    motion.run(new MotionProgram([
+      MotionOp.MoveJ(MoveTarget.JointTarget(first), new MotionOptions(), Blend.ExactStop),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(true)),
+      MotionOp.WaitInput("ready", InputPredicate.Equals(EventValue.Digital(true)), 0.2)
+    ]));
+    for (tick in 0...400) {
+      motion.update(0.01);
+      simulation.step(Int64.ofInt(500 + tick));
+      if (!motion.running) break;
+    }
+    check(!motion.completed && motion.failure != null &&
+      motion.failure.indexOf("timed out") >= 0,
+      "barrier timeout fails the manipulator program with a diagnostic");
+    simulation.step(Int64.ofInt(1000));
+    check(Lambda.exists(motion.firedEvents(), function(event) return switch event.value {
+      case ProcessEventValue.Digital(enabled): !enabled;
+      case _: false;
+    }),
+      "timeout abort produces a safe output transition");
+    simulation.dispose();
+
+    var pathSimulation = new Simulation(0.01);
+    var pathBlueprint = RobotRuntimeCompiler.compile(fixture.model);
+    pathBlueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
+      ProcessEventValue.Digital(false)));
+    var pathRuntime = pathSimulation.addRobot(pathBlueprint);
+    var pathRobot = new SimulatedRobot("path-arm", pathRuntime, fixture.model.name,
+      [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]);
+    var pathMotion = new ManipulatorMotion(pathRobot, compiler,
+      function(_) return null, function() return pathRuntime.pollEvents());
+    var origin = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
+    var destination = origin.copy(); destination[0] = 0.2;
+    destination[0] += 0.2;
+    var pathTick = 0;
+    pathMotion.run(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget(origin), new MotionOptions(), Blend.ExactStop)]));
+    for (_ in 0...500) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+      if (!pathMotion.running) break;
+    }
+    check(pathMotion.completed, 'arm reaches FollowPath start: ${pathMotion.failure}');
+    var path = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(solver.forward(origin), 0.01, 0.04),
+      new PoseWaypoint(solver.forward(destination), 0.01, 0.04),
+      OrientationPolicy.Interpolated, 0.1, 0.05)]);
+    pathMotion.run(new MotionProgram([MotionOp.FollowPath(path, "work", 0.05,
+      [new PathEvent(path.length() * 0.95, "sprayer.enabled",
+        EventValue.Digital(true), 0.0, HoldPolicy.SafeWhileHeld)])]));
+    check(pathMotion.running,
+      'FollowPath starts: ${pathMotion.failure}');
+    for (_ in 0...10) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+    }
+    pathMotion.hold();
+    for (_ in 10...50) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+    }
+    var heldDistance = pathMotion.progress().pathDistance;
+    var heldPose = solver.forward(pathRobot.snapshot().positions.toArray());
+    check(motionkit.path.PoseMath.distance(heldPose,
+      path.waypointAt(heldDistance).pose) < 0.02,
+      "held FollowPath remains on the authored path");
+    check(pathMotion.firedEvents().length == 0,
+      "hold delays the later process event");
+    pathMotion.resume();
+    for (_ in 50...500) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+      if (!pathMotion.running) break;
+    }
+    check(pathMotion.completed && pathMotion.firedEvents().length > 0,
+      'held FollowPath completes and fires its event after resume: ${pathMotion.failure}');
+    pathMotion.run(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget(origin), new MotionOptions(), Blend.ExactStop)]));
+    for (_ in 0...5) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+    }
+    pathMotion.abort();
+    pathSimulation.step(Int64.ofInt(pathTick++));
+    check(Lambda.exists(pathMotion.firedEvents(), function(event) return switch event.value {
+      case ProcessEventValue.Digital(enabled): !enabled;
+      case _: false;
+    }), "manipulator abort restores the safe process value");
+    pathSimulation.dispose();
   }
 
   static function testKinematicsContract():Void {

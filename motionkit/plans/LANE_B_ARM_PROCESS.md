@@ -314,3 +314,20 @@ Fixed Haxeon's nested array comprehension typing and lowering in its own
 submodule commit so the MotionKit timing fixture can keep its nested array
 expression. Haxeon regression and full test script passed. Commit: the
 commit containing this entry.
+
+### B4 — ManipulatorMotion facade
+
+Extracted bounded trajectory-plan chunk submission, owner-clock progress
+conversion, and smooth replacement retry from `MotionSystem` into
+`PlanExecutor`. The executor also streams validated `ExecutionPlan` blocks,
+including their timed process events and final `ends_at_rest` marker.
+`ManipulatorMotion` compiles and runs programs, holds and resumes native
+path time, aborts to declared safe outputs, exposes block/op/path-distance
+progress and fired events, and handles dwell and input barriers with timeout
+and diagnostic status. Program blocks retain the sampled distance/time map
+used for path progress. Tests cover capability rejection, compiler errors,
+two-block completion, timeout, FollowPath hold and delayed events, and safe
+output after abort. Commit: the commit containing this entry.
+
+MotionKit and RobotKit Haxe, both native suites, both FFI audits, and TCP
+integration in default, session, and lease-timeout modes passed.

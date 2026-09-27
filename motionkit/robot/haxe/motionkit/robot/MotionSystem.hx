@@ -24,7 +24,6 @@ import robotkit.world.RobotSnapshot;
 import robotkit.world.StopMode;
 import robotkit.world.ExecutionPlanSubmission;
 import robotkit.world.TrajectorySegment;
-import robotkit.runtime.RobotRuntimeError;
 import RobotKitRuntime;
 
 /**
@@ -636,37 +635,11 @@ class MotionSystem {
 
   function trySmoothReplacement(executing:Trajectory, jogAxis:Null<String>,
       planFromState:TrajectoryState -> Trajectory):Null<Trajectory> {
-    var smooth = executing;
-    if (smooth == null) return null;
-    for (_ in 0...2) {
-      var observation = syncFromRuntime();
-      if (!observation.trajectoryActive ||
-          Int64.compare(observation.activePlanId, Int64.ofInt(0)) == 0)
-        return null;
-      var startNs = Int64.sub(observation.trajectoryTimeNs,
-        observation.trajectoryTagTimeNs);
-      var marginNs = Trajectory.nanoseconds(
-        replacementOwnerPeriodSeconds * replacementMarginOwnerPeriods);
-      var anchorNs = Int64.add(observation.committedUntilNs, marginNs);
-      var localNs = Int64.sub(anchorNs, startNs);
-      var localSeconds = Int64.toFloat(localNs) * 1e-9;
-      if (localSeconds < 0.0 ||
-          localSeconds >= smooth.durationSeconds() - replacementOwnerPeriodSeconds)
-        return null;
-      var state = smooth.evaluate(localSeconds);
-      var planned = planFromState(state);
-      try {
-        return submitSmoothReplacement(planned, state, observation, anchorNs, jogAxis);
-      } catch (error:Dynamic) {
-        discardNativeTrajectory(planned);
-        var runtimeError:Null<RobotRuntimeError> = Std.isOfType(error, RobotRuntimeError)
-          ? cast error : null;
-        if (runtimeError == null || runtimeError.status !=
-            RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE)
-          throw error;
-      }
-    }
-    return null;
+    if (executing == null) return null;
+    return PlanExecutor.replaceWithRetry(executing, syncFromRuntime,
+      replacementOwnerPeriodSeconds, replacementMarginOwnerPeriods, planFromState,
+      (planned, state, observation, anchorNs) ->
+        submitSmoothReplacement(planned, state, observation, anchorNs, jogAxis));
   }
 
   function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
@@ -882,64 +855,22 @@ class MotionSystem {
 
   function submitActiveTrajectoryChunk():Void {
     var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null) return;
-    var nativeSegments = activeSegments;
-    if (nativeSegments.length == 0) return;
-    var startIndex = trajectoryNextSegmentIndex;
-    if (startIndex >= nativeSegments.length) return;
-    var startTimeNs = nativeSegments[startIndex].timeFromStartNs;
-    var startTime = Int64.toFloat(startTimeNs) * 1e-9;
-    var availableSegments = 4096 - robot.snapshot().trajectoryQueueDepth;
-    var segmentLimit = Std.int(Math.min(128, availableSegments));
-    if (segmentLimit < 1) return;
-    var endIndex = Std.int(Math.min(nativeSegments.length, startIndex + segmentLimit));
+    if (trajectoryValue == null || activeSegments.length == 0 ||
+        trajectoryNextSegmentIndex >= activeSegments.length) return;
     var tag = nextTrajectoryTag;
-    nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
-    var segments:Array<TrajectorySegment> = [];
-    for (index in startIndex...endIndex) {
-      var segment = nativeSegments[index];
-      segments.push(new TrajectorySegment(
-        Int64.sub(segment.timeFromStartNs, startTimeNs),
-        segment.durationNs, segment.coefficients));
-    }
-    var startState = trajectoryValue.evaluate(startTime);
-    var startPosition = startState.positions;
-    var startVelocity = startState.velocities;
-    var startAcceleration = startState.accelerations;
-    if (nativeSegments[startIndex].coefficients[0].length == 2) {
-      startVelocity = [for (_ in startPosition) 0.0];
-      if (startIndex > 0) {
-        var before = nativeSegments[startIndex - 1];
-        for (joint in 0...startVelocity.length)
-          startVelocity[joint] = before.coefficients[joint][1];
-      }
-      startAcceleration = [for (_ in startPosition) 0.0];
-    }
-    var accelerationTolerance = [for (_ in startPosition) 0.0];
-    if (nativeSegments[startIndex].coefficients[0].length != 2) {
-      var previousAcceleration = startIndex == 0
-        ? [for (_ in startPosition) 0.0]
-        : trajectoryValue.evaluate(Math.max(0.0, startTime - 1e-9)).accelerations;
-      for (joint in 0...startPosition.length)
-        accelerationTolerance[joint] =
-          Math.abs(startAcceleration[joint] - previousAcceleration[joint]) + 1e-5;
-    }
-    try robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
-      modelRevision, calibrationRevision, 1, startPosition, startVelocity,
-      startAcceleration, segments, null, null, null, null, accelerationTolerance,
-      endIndex >= nativeSegments.length))) catch (error:Dynamic)
-      throw 'plan chunk [$startIndex,$endIndex] of ${nativeSegments.length}: $error';
+    var submitted = PlanExecutor.submitTrajectoryChunk(robot, trajectoryValue,
+      activeSegments, trajectoryNextSegmentIndex, tag, modelRevision, calibrationRevision);
+    if (submitted == null) return;
+    nextTrajectoryTag = Int64.add(tag, Int64.ofInt(1));
     trajectorySubmitted = true;
-    trajectoryNextSegmentIndex = endIndex;
-    trajectoryChunkStartSeconds = startTime;
-    var finalSegment = nativeSegments[endIndex - 1];
-    trajectoryChunkEndSeconds = Int64.toFloat(Int64.add(finalSegment.timeFromStartNs,
-      finalSegment.durationNs)) * 1e-9;
+    trajectoryNextSegmentIndex = submitted.last;
+    trajectoryChunkStartSeconds = submitted.startSeconds;
+    trajectoryChunkEndSeconds = submitted.endSeconds;
     trajectoryChunkReferences.set(Int64.toStr(tag),
-      new PlanChunkReference(trajectoryValue, startTime));
-    if (endIndex >= nativeSegments.length) {
+      new PlanChunkReference(trajectoryValue, submitted.startSeconds));
+    if (submitted.last >= activeSegments.length) {
       trajectoryFinalTag = tag;
-      trajectoryFinalEndSeconds = trajectoryChunkEndSeconds;
+      trajectoryFinalEndSeconds = submitted.endSeconds;
     }
   }
 
@@ -961,11 +892,8 @@ class MotionSystem {
     if (trajectoryValue == null) return observation;
     var reference = trajectoryChunkReferences.get(Int64.toStr(observation.trajectoryTag));
     if (reference != null && reference.trajectory == trajectoryValue) {
-      var runtimeSeconds = Int64.toFloat(observation.trajectoryTagTimeNs) /
-        1000000000.0;
-      if (Math.isFinite(runtimeSeconds))
-        elapsedSeconds = Math.min(trajectoryValue.durationSeconds(),
-          Math.max(0.0, reference.startSeconds + runtimeSeconds));
+      elapsedSeconds = PlanExecutor.elapsedFromSnapshot(observation,
+        reference.startSeconds, trajectoryValue.durationSeconds());
     }
     return observation;
   }
