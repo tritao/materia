@@ -10,6 +10,7 @@ import cadkit.modeling.AssemblyModel;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.InstanceElement;
+import cadkit.parametric.TypedProperty;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
 import machinekit.document.MachineKitDocumentAssembly;
@@ -30,7 +31,9 @@ class MotorShaftBearingsPreview {
 				definition = MachineKitDocuments.define(result, recipe, entry.component.values());
 				definitions.set(identity, definition);
 			}
-			result.createInstance(entry.id, definition);
+			var instance = result.createInstance(entry.id, definition);
+			instance.restoreProperty("machinekit.occurrence",
+				TypedProperty.text("machinekit.occurrence", entry.id));
 		}
 		return result;
 	}
@@ -54,7 +57,10 @@ class MotorShaftBearingsPreview {
 		var instances = new Map<String, InstanceElement>();
 		for (element in editable.allElements()) if (element.kind == "instance") {
 			var instance:InstanceElement = cast element;
-			instances.set(instance.name, instance);
+			var identity = instance.property("machinekit.occurrence");
+			var id:String = identity == null ? instance.name : cast identity.value;
+			if (instances.exists(id)) throw 'Duplicate MachineKit occurrence "$id"';
+			instances.set(id, instance);
 		}
 		var model = assembly(example, instances);
 		var parts:Array<SceneArtifactPart> = [];

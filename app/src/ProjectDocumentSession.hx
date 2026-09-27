@@ -229,7 +229,12 @@ class ProjectDocumentSession {
       : FilePath.join([FilePath.directory(absolute), project.reference]);
     reference = FileSystem.fullPath(reference);
     var savedRecipe:Null<String> = Reflect.field(root, "recipeDocument");
-    var generated = MateriaProjectRunner.loadProject(reference, savedRecipe);
+    var diagnostics:Array<String> = [];
+    var generated = MateriaProjectRunner.loadProject(reference);
+    if (savedRecipe != null && generated.recipeDocument != null) {
+      var reconciled = reconcileRecipe(generated.recipeDocument, savedRecipe, diagnostics);
+      generated = MateriaProjectRunner.loadProject(reference, reconciled);
+    }
     var dependentJoints = project.assemblyDependentJoints == null ? [] : project.assemblyDependentJoints.copy();
     validateAssemblyDependentJoints(generated.assemblyDefinition, dependentJoints);
     var stateRecord = generated.assemblyState;
@@ -241,7 +246,6 @@ class ProjectDocumentSession {
     if (stateRecord != null && generated.assemblyDefinition != null)
       generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
     var baseline = generated.objects;
-    var diagnostics:Array<String> = [];
     var data = materializeProject(baseline, project, SceneCodec.decodeRoot(root), diagnostics, materials);
     var nextDocument = createDocument();
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
@@ -268,7 +272,7 @@ class ProjectDocumentSession {
       if (nextBim != null) nextBim.close();
       throw error;
     }
-    var nextRecipe = decodeRecipe(savedRecipe == null ? generated.recipeDocument : savedRecipe);
+    var nextRecipe = decodeRecipe(generated.recipeDocument);
     replace(next, nextSensors, absolute, null, nextBim, nextDocument);
     recipeDocument = nextRecipe;
     projectReference = reference;
@@ -312,8 +316,10 @@ class ProjectDocumentSession {
   function assemblyPropertiesForOccurrence(sceneId:String):Array<PropertyDescriptor> {
     var result:Array<PropertyDescriptor> = [];
     if (recipeDocument != null && StringTools.startsWith(sceneId, "project:")) {
-      var name = sceneId.substr(8);
-      for (element in recipeDocument.allElements()) if (element.kind == "instance" && element.name == name) {
+	  var occurrenceId = sceneId.substr(8);
+	  for (element in recipeDocument.allElements()) {
+	    var identity = element.property("machinekit.occurrence");
+	    if (element.kind != "instance" || identity == null || identity.value != occurrenceId) continue;
 		result = result.concat(BimInspectorDescriptors.forInstanceInputs(cast element,
 		  function(label, change, undo) applyRecipeEdit(label, change)));
         break;
@@ -898,6 +904,62 @@ class ProjectDocumentSession {
     if (text == null) return null;
     MachineKitRecipes.register();
     return DocumentCodec.decode(text);
+  }
+
+  static function recipeInstances(document:cadkit.parametric.Document):Map<String, cadkit.parametric.InstanceElement> {
+    var result = new Map<String, cadkit.parametric.InstanceElement>();
+    for (element in document.allElements()) if (element.kind == "instance") {
+      var instance:cadkit.parametric.InstanceElement = cast element;
+      var property = instance.property("machinekit.occurrence");
+      // Version 7 recipe documents used the instance name as the occurrence key.
+      var id:String = property == null ? instance.name : cast property.value;
+      if (id == null || id.length == 0 || result.exists(id))
+        throw 'Duplicate or empty MachineKit occurrence "$id"';
+      result.set(id, instance);
+    }
+    return result;
+  }
+
+  static function reconcileRecipe(freshText:String, savedText:String, diagnostics:Array<String>):String {
+    var fresh = decodeRecipe(freshText);
+    var saved = decodeRecipe(savedText);
+    try {
+      var freshInstances = recipeInstances(fresh);
+      var savedInstances = recipeInstances(saved);
+      var copiedDefaults = new Map<String, Bool>();
+      for (id in savedInstances.keys()) {
+        var prior = savedInstances.get(id);
+        var current = freshInstances.get(id);
+        if (current == null) {
+          diagnostics.push('Saved recipe occurrence "$id" no longer exists in source');
+          continue;
+        }
+        var oldDefinition = saved.definition(prior.definitionId);
+        var definition = fresh.definition(current.definitionId);
+        if (oldDefinition.recipe != definition.recipe) {
+          diagnostics.push('Saved recipe occurrence "$id" changed type in source');
+          continue;
+        }
+        if (!copiedDefaults.exists(definition.id.value)) {
+          for (input in definition.inputs()) {
+            var oldInput = oldDefinition.input(input.name);
+            if (Std.string(input.defaultValue) != Std.string(oldInput.defaultValue))
+              definition.setTypedDefault(input.name, oldInput.defaultValue);
+          }
+          copiedDefaults.set(definition.id.value, true);
+        }
+        for (name in prior.overrideNames())
+          current.setTypedOverride(name, prior.typedOverrideValue(name));
+      }
+      var result = DocumentCodec.encode(fresh);
+      fresh.close();
+      saved.close();
+      return result;
+    } catch (error:Dynamic) {
+      fresh.close();
+      saved.close();
+      throw error;
+    }
   }
 
   static function createDocument():EditorDocument
