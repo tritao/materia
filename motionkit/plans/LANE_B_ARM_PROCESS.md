@@ -264,4 +264,18 @@ Tests:
 
 ## Progress log
 
-(append entries here)
+### B1 — Add Cartesian process paths
+
+Added framed pose lines and three-point arcs with per-point tolerances,
+orientation policy, feed caps, and a rotation-to-length weight in metres per
+radian for pure reorientation. Added a RobotKit Toolpath conversion that
+preserves incoming-move feeds and emits process transitions at path distance
+on a caller-named channel. Tests cover line, arc and rotation lengths,
+evaluation, tolerance propagation, and three process spans producing six
+events. The test was added before implementation. Commit: the commit
+containing this entry.
+
+MotionKit Haxe passed 5,873 assertions, RobotKit Haxe passed 4,437
+assertions, MotionKit native passed 3 tests, RobotKit native passed 12 tests,
+both FFI audits passed, and TCP integration passed in default, session and
+lease-timeout modes.

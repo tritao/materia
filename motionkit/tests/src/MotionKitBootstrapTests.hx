@@ -22,6 +22,17 @@ import motionkit.path.ArcSegment;
 import motionkit.path.GeometricPath;
 import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
+import motionkit.path.PosePath;
+import motionkit.path.PoseLine;
+import motionkit.path.PoseArc;
+import motionkit.path.PoseWaypoint;
+import motionkit.path.OrientationPolicy;
+import motionkit.robot.ToolpathPosePath;
+import robotkit.process.Toolpath;
+import robotkit.process.ToolpathPoint;
+import robotkit.spatial.Transform3;
+import robotkit.spatial.Vec3;
+import robotkit.spatial.Quat;
 import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
 import motionkit.planner.JointPathSamples;
@@ -74,6 +85,7 @@ class MotionKitBootstrapTests {
   static var assertions:Int = 0;
 
   public static function main():Void {
+    testPoseProcessPath();
     testMotionEventContracts();
     testKinematicsContract();
     testMotionProgramContracts();
@@ -106,6 +118,32 @@ class MotionKitBootstrapTests {
     testPathHoldsStayOnPathWithinLimits();
     testDualMotorAxisChangesStayWithinJointLimits();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
+  }
+
+  static function testPoseProcessPath():Void {
+    var a = new PoseWaypoint(new Pose3(), 0.001, 0.01);
+    var b = new PoseWaypoint(new Pose3(1.0, 0.0, 0.0), 0.002, 0.02);
+    var path = new PosePath("work", [new PoseLine(a, b, OrientationPolicy.Interpolated, 0.1, 0.2)]);
+    near(path.length(), 1.0, "line length", 1e-9);
+    near(path.poseAt(0.5).x, 0.5, "line midpoint", 1e-9);
+    near(path.waypointAt(1.0).positionTolerance, 0.002, "endpoint tolerance", 1e-9);
+    var arc = new PoseArc(new PoseWaypoint(new Pose3(1,0,0), 0.001, 0.01),
+      new PoseWaypoint(new Pose3(0,1,0), 0.001, 0.01),
+      new PoseWaypoint(new Pose3(-1,0,0), 0.001, 0.01),
+      OrientationPolicy.Interpolated, 0.2);
+    near(arc.length(), Math.PI, "semicircle length", 1e-9);
+    near(arc.waypointAt(arc.length()/2).pose.y, 1.0, "arc through via", 1e-9);
+    var rotated = new PoseLine(a, new PoseWaypoint(new Pose3(0,0,0,0,0,1,0), 0.001, 0.01),
+      OrientationPolicy.Interpolated, 0.1, 0.2);
+    near(rotated.length(), 0.1*Math.PI, "rotation metric", 1e-9);
+    var points = [false, true, false, true, false, true, false];
+    var toolpoints:Array<ToolpathPoint> = [];
+    for (i in 0...points.length)
+      toolpoints.push(new ToolpathPoint(new Transform3(new Vec3(i * 0.1, 0, 0), Quat.identity()), 0.2, points[i]));
+    var converted = ToolpathPosePath.convert(new Toolpath("work", toolpoints), "sprayer.flow");
+    check(converted.events.length == 6, "three process spans have six events");
+    near(converted.events[0].distance, 0.1, "first process transition", 1e-9);
+    near(converted.events[5].distance, 0.6, "last process transition", 1e-9);
   }
 
   static function testMotionEventContracts():Void {
