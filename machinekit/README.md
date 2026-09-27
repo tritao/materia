@@ -72,6 +72,19 @@ M3 screws and carries an output shaft on two 608 bearings through a continuous
 coupling joint. The shaft steps down past the outboard bearing to carry a
 retaining ring and an output key. It also produces the aggregated BOM.
 
+To inspect this assembly in Materia, build the app and open the bundled project:
+
+```sh
+./haxeon/scripts/haxeon build --project=app/haxeon.json
+./app/run-built.sh --project=./machinekit/examples/materia.project.json
+```
+
+The project entrypoint generates a CAD preview for every component and preserves
+the assembly's connectors and joints. Select a part in the hierarchy to inspect
+it; the continuous coupling joint is available through the assembly inspector.
+Component dimensions are currently authored in `MotorShaftBearings.hx`; editing
+that source and reopening the project regenerates the preview.
+
 ## Structural
 
 `machinekit.structural` builds machine bases and frames from named 3D points
