@@ -7,11 +7,17 @@ import motionkit.MotionOptions;
 import motionkit.axis.MotionAxis;
 import motionkit.path.PathPoint;
 import motionkit.path.GeometricPath;
-import motionkit.planner.LineLookaheadPlanner;
+import motionkit.path.ArcSegment;
+import motionkit.planner.JointPathSamples;
+import motionkit.planner.PathTimingLimits;
+import motionkit.planner.ToppraPathTiming;
 import motionkit.planner.PathPlanningOptions;
 import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.TrajectoryState;
+import motionkit.trajectory.ValidationLimits;
+import motionkit.trajectory.ValidationReport;
+import MotionKitNative;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
@@ -39,7 +45,8 @@ class MotionSystem {
   public final fixedTimestepSeconds:Float;
   public final replacementMarginOwnerPeriods:Int;
   public final replacementOwnerPeriodSeconds:Float;
-  public final linePlanner:LineLookaheadPlanner;
+  /** Joint and sampled Cartesian checks for the last planned path. */
+  public var lastPathValidationReport(default, null):Null<ValidationReport> = null;
   /** Native trajectory currently submitted to the runtime queue. */
   var activeTrajectory:Null<Trajectory> = null;
   var queuedTrajectories:Array<Trajectory> = [];
@@ -99,7 +106,6 @@ class MotionSystem {
       throw "Smooth replacement owner period must be finite and positive";
     this.replacementMarginOwnerPeriods = blueprint.replacementMarginOwnerPeriods;
     this.replacementOwnerPeriodSeconds = blueprint.replacementOwnerPeriodSeconds;
-    this.linePlanner = new LineLookaheadPlanner(fixedTimestepSeconds);
     this.axes = [];
     var axisIds = new Map<String, Bool>();
     for (axisBlueprint in blueprint.axes) {
@@ -361,6 +367,8 @@ class MotionSystem {
   function planPathFrom(start:Array<Float>, path:GeometricPath,
       pathOptions:Null<PathPlanningOptions>, motionOptions:Null<MotionOptions>):Trajectory {
     if (path == null) throw "Cartesian path is required";
+    if (pathOptions != null && !pathOptions.exactStop && pathOptions.blendTolerance > 0.0)
+      throw "Tolerance blend geometry is not available yet";
     var xAxis = requireAxis("x");
     var yAxis = requireAxis("y");
     var zAxis = requireAxis("z");
@@ -373,79 +381,146 @@ class MotionSystem {
         throw 'Cartesian path starts at ${startCoordinates[i]} but axis ${["x", "y", "z"][i]} is at ${starts[i]}';
     }
 
-    var limits = resolvePathLimits(path, [xAxis, yAxis, zAxis],
-      motionOptions == null ? new MotionOptions() : motionOptions);
     validatePathLimits(path, [xAxis, yAxis, zAxis]);
-    var nativeCartesian = linePlanner.planNativePath(path, limits, pathOptions);
-    var mapped = [];
-    for (segment in nativeCartesian.segments()) {
-      var coefficients = [for (joint in start) [joint, 0.0]];
-      for (entry in [{axis: xAxis, source: 0}, {axis: yAxis, source: 1},
-          {axis: zAxis, source: 2}]) {
-        var positions = start.copy();
-        entry.axis.writeLogicalPosition(positions,
-          segment.coefficients[entry.source][0]);
-        var velocities = [for (_ in start) 0.0];
-        entry.axis.writeLogicalDelta(velocities,
-          segment.coefficients[entry.source][1]);
-        for (joint in entry.axis.jointIndices)
-          coefficients[joint] = [positions[joint], velocities[joint]];
+    var maxVelocity = [for (_ in start) 1e8];
+    var maxAcceleration = [for (_ in start) 1e8];
+    var requested = motionOptions == null ? new MotionOptions() : motionOptions;
+    for (direct in [xAxis, yAxis, zAxis]) {
+      var unit = [for (_ in start) 0.0];
+      direct.writeLogicalDelta(unit, 1.0);
+      for (joint in direct.jointIndices) {
+        var scale = Math.abs(unit[joint]);
+        maxVelocity[joint] = direct.maxVelocity * scale;
+        maxAcceleration[joint] = direct.maxAcceleration * scale;
+        if (requested.maxAcceleration > 0.0)
+          maxAcceleration[joint] = Math.min(maxAcceleration[joint],
+            requested.maxAcceleration * scale);
       }
-      mapped.push({timeFromStartNs: segment.timeFromStartNs,
-        durationNs: segment.durationNs, coefficients: coefficients});
     }
-    nativeCartesian.dispose();
-    return Trajectory.fromSegments(mapped);
-  }
-
-  function resolvePathLimits(path:GeometricPath, directAxes:Array<MotionAxis>,
-      options:MotionOptions):MotionLimits {
-    var maxVelocity = options.maxVelocity;
-    var maxAcceleration = options.maxAcceleration;
+    var segments:Array<{timeFromStartNs:Int64, durationNs:Int64,
+      coefficients:Array<Array<Float>>}> = [];
+    var offset = Int64.ofInt(0);
+    var previousEnd:Null<PathPoint> = null;
+    var worstTaskDeviation = 0.0;
+    var worstTaskTime = 0.0;
     for (primitive in path.primitives) {
       var length = primitive.length();
+      var primitiveStart = primitive.pointAt(0.0);
+      if (previousEnd != null && previousEnd.distanceTo(primitiveStart) > 1e-8)
+        throw "Path primitives must form a connected path";
+      previousEnd = primitive.pointAt(length);
       if (length <= 1e-12) continue;
-      for (sampleIndex in 0...65) {
-        var tangent = primitive.tangentAt(length * sampleIndex / 64.0);
-        var curvature = Math.abs(primitive.curvatureAt(length * sampleIndex / 64.0));
-        var normal = [
-          curvature <= 1e-12 ? 0.0 : -tangent[1],
-          curvature <= 1e-12 ? 0.0 : tangent[0],
-          0.0
-        ];
-        for (i in 0...3) {
-          var axisAcceleration = directAxes[i].maxAcceleration;
-          if (axisAcceleration > 0.0 && curvature > 1e-12) {
-            var normalCoefficient = Math.abs(normal[i]) * curvature;
-            if (normalCoefficient > 1e-12) {
-              var centripetalVelocity = Math.sqrt(axisAcceleration / normalCoefficient);
-              maxVelocity = maxVelocity <= 0.0 ? centripetalVelocity :
-                Math.min(maxVelocity, centripetalVelocity);
-            }
-          }
+      var count = 1;
+      if (Std.isOfType(primitive, ArcSegment)) {
+        var arc:ArcSegment = cast primitive;
+        count = Std.int(Math.ceil(Math.abs(arc.sweepAngle) * 16.0));
+      }
+      var distances:Array<Float> = [];
+      var positions:Array<Array<Float>> = [];
+      var first:Array<Array<Float>> = [];
+      var second:Array<Array<Float>> = [];
+      for (index in 0...(count + 1)) {
+        var distance = length * index / count;
+        var point = primitive.pointAt(distance);
+        var tangent = primitive.tangentAt(distance);
+        var curvature = primitive.curvatureAt(distance);
+        var q = start.copy();
+        var qPrime = [for (_ in start) 0.0];
+        var qDoublePrime = [for (_ in start) 0.0];
+        for (entry in [{axis: xAxis, position: point.x, prime: tangent[0],
+            second: -tangent[1] * curvature},
+            {axis: yAxis, position: point.y, prime: tangent[1],
+              second: tangent[0] * curvature},
+            {axis: zAxis, position: point.z, prime: tangent[2], second: 0.0}]) {
+          entry.axis.writeLogicalPosition(q, entry.position);
+          entry.axis.writeLogicalDelta(qPrime, entry.prime);
+          entry.axis.writeLogicalDelta(qDoublePrime, entry.second);
         }
-        for (i in 0...3) {
-          var fraction = Math.min(1.0, Math.abs(tangent[i]) + 1e-6);
-          var axisVelocity = directAxes[i].maxVelocity;
-          var axisAcceleration = directAxes[i].maxAcceleration;
-          if (fraction > 1e-12 && axisVelocity > 0.0) {
-            var projectedVelocity = axisVelocity / fraction;
-            maxVelocity = maxVelocity <= 0.0 ? projectedVelocity : Math.min(maxVelocity,
-              projectedVelocity);
-          }
-          if (axisAcceleration > 0.0) {
-            var centripetal = Math.abs(normal[i] * curvature) * maxVelocity * maxVelocity;
-            var available = axisAcceleration - centripetal;
-            if (fraction > 1e-12 && available > 0.0) {
-              var projectedAcceleration = available / fraction;
-              maxAcceleration = maxAcceleration <= 0.0 ? projectedAcceleration :
-                Math.min(maxAcceleration, projectedAcceleration);
-            }
-          }
+        distances.push(distance);
+        positions.push(q);
+        first.push(qPrime);
+        second.push(qDoublePrime);
+      }
+      var jointPath = new JointPathSamples(distances, positions, first, second);
+      var speedCaps = requested.maxVelocity > 0.0
+        ? [for (_ in 0...count) requested.maxVelocity] : [];
+      // Leave room for nanosecond stage rounding and Hermite coefficient
+      // roundoff before the runtime validates exact polynomial extrema.
+      var limits = new PathTimingLimits(
+        [for (value in maxVelocity) value * 0.999],
+        [for (value in maxAcceleration) value * 0.999], speedCaps);
+      var timed = new ToppraPathTiming().time(jointPath, limits);
+      var pieceDuration = timed.trajectory.durationSeconds();
+      var sampleCount = Std.int(Math.ceil(pieceDuration / 0.001));
+      for (sampleIndex in 0...(sampleCount + 1)) {
+        var localTime = pieceDuration * sampleIndex / sampleCount;
+        var low = 0.0;
+        var high = length;
+        for (_ in 0...40) {
+          var middle = (low + high) * 0.5;
+          if (timed.distanceToTime(middle) < localTime) low = middle;
+          else high = middle;
+        }
+        var authored = primitive.pointAt((low + high) * 0.5);
+        var actual = timed.trajectory.evaluate(localTime).positions;
+        var tool = new PathPoint(xAxis.logicalPosition(actual),
+          yAxis.logicalPosition(actual), zAxis.logicalPosition(actual));
+        var deviation = tool.distanceTo(authored);
+        if (deviation > worstTaskDeviation) {
+          worstTaskDeviation = deviation;
+          worstTaskTime = Int64.toFloat(offset) * 1e-9 + localTime;
         }
       }
+      var pieceSegments = timed.trajectory.segments();
+      for (segment in pieceSegments)
+        segments.push({timeFromStartNs: Int64.add(offset, segment.timeFromStartNs),
+          durationNs: segment.durationNs, coefficients: segment.coefficients});
+      var last = pieceSegments[pieceSegments.length - 1];
+      offset = Int64.add(offset, Int64.add(last.timeFromStartNs, last.durationNs));
+      timed.releaseDistanceMap();
+      timed.trajectory.dispose();
     }
-    return new MotionLimits(maxVelocity, maxAcceleration, options.maxJerk);
+    if (segments.length == 0)
+      return Trajectory.fromPositionSamples([0.0, fixedTimestepSeconds], [start, start]);
+    var finalPoint = previousEnd;
+    if (finalPoint == null) throw "Cartesian path has no endpoint";
+    var finalPosition = start.copy();
+    xAxis.writeLogicalPosition(finalPosition, finalPoint.x);
+    yAxis.writeLogicalPosition(finalPosition, finalPoint.y);
+    zAxis.writeLogicalPosition(finalPosition, finalPoint.z);
+    segments.push({timeFromStartNs: offset, durationNs: Int64.ofInt(1),
+      coefficients: [for (position in finalPosition) [position]]});
+    var result = Trajectory.fromSegments(segments);
+    var validation = new ValidationLimits(start.length, modelRevision, calibrationRevision);
+    validation.continuity(0, 1e-9);
+    for (joint in 0...start.length) {
+      validation.velocity(joint, maxVelocity[joint]);
+      validation.acceleration(joint, maxAcceleration[joint]);
+    }
+    for (direct in [xAxis, yAxis, zAxis]) {
+      var lower = start.copy();
+      var upper = start.copy();
+      direct.writeLogicalPosition(lower, direct.lowerLimit);
+      direct.writeLogicalPosition(upper, direct.upperLimit);
+      for (joint in direct.jointIndices)
+        validation.position(joint, Math.min(lower[joint], upper[joint]),
+          Math.max(lower[joint], upper[joint]));
+    }
+    var report = result.validate(validation);
+    var tolerance = pathOptions == null ? 1e-5 : Math.max(1e-5, pathOptions.blendTolerance);
+    report.setTaskSpace(worstTaskDeviation <= tolerance
+      ? MotionKitNativeConstants.MK_CHECK_PASSED
+      : MotionKitNativeConstants.MK_CHECK_FAILED,
+      worstTaskDeviation, worstTaskTime, tolerance, Int64.ofInt(1000000));
+    lastPathValidationReport = report;
+    if (report.hasFailure()) {
+      for (index in 0...report.checks.length) {
+        var check = report.checks[index];
+        if (check.status == MotionKitNativeConstants.MK_CHECK_FAILED)
+          throw 'Timed Cartesian path check $index failed: ${check.value} > ${check.limit} at ${check.timeSeconds}';
+      }
+    }
+    return result;
   }
 
   function validatePathLimits(path:GeometricPath, directAxes:Array<MotionAxis>):Void {
@@ -810,28 +885,6 @@ class MotionSystem {
     if (trajectoryValue == null) return;
     var nativeSegments = activeSegments;
     if (nativeSegments.length == 0) return;
-    if (nativeSegments[0].coefficients[0].length >= 3) {
-      if (trajectorySubmitted) return;
-      var tag = nextTrajectoryTag;
-      nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
-      var segments = [for (segment in nativeSegments)
-        new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
-          segment.coefficients)];
-      if (segments.length > 128) throw "Smooth plan exceeds one runtime submission";
-      var start = trajectoryValue.evaluate(0.0);
-      robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
-        modelRevision, calibrationRevision, 1, start.positions, start.velocities,
-        start.accelerations, segments)));
-      trajectorySubmitted = true;
-      trajectoryNextSegmentIndex = nativeSegments.length;
-      trajectoryChunkStartSeconds = 0.0;
-      trajectoryChunkEndSeconds = trajectoryValue.durationSeconds();
-      trajectoryFinalTag = tag;
-      trajectoryFinalEndSeconds = trajectoryValue.durationSeconds();
-      trajectoryChunkReferences.set(Int64.toStr(tag),
-        new PlanChunkReference(trajectoryValue, 0.0));
-      return;
-    }
     var startIndex = trajectoryNextSegmentIndex;
     if (startIndex >= nativeSegments.length) return;
     var startTimeNs = nativeSegments[startIndex].timeFromStartNs;
@@ -849,16 +902,31 @@ class MotionSystem {
         Int64.sub(segment.timeFromStartNs, startTimeNs),
         segment.durationNs, segment.coefficients));
     }
-    var startPosition = trajectoryValue.evaluate(startTime).positions;
-    var startVelocity = [for (_ in startPosition) 0.0];
-    if (startIndex > 0) {
-      var before = nativeSegments[startIndex - 1];
-      for (joint in 0...startVelocity.length)
-        startVelocity[joint] = before.coefficients[joint][1];
+    var startState = trajectoryValue.evaluate(startTime);
+    var startPosition = startState.positions;
+    var startVelocity = startState.velocities;
+    var startAcceleration = startState.accelerations;
+    if (nativeSegments[startIndex].coefficients[0].length == 2) {
+      startVelocity = [for (_ in startPosition) 0.0];
+      if (startIndex > 0) {
+        var before = nativeSegments[startIndex - 1];
+        for (joint in 0...startVelocity.length)
+          startVelocity[joint] = before.coefficients[joint][1];
+      }
+      startAcceleration = [for (_ in startPosition) 0.0];
+    }
+    var accelerationTolerance = [for (_ in startPosition) 0.0];
+    if (nativeSegments[startIndex].coefficients[0].length != 2) {
+      var previousAcceleration = startIndex == 0
+        ? [for (_ in startPosition) 0.0]
+        : trajectoryValue.evaluate(Math.max(0.0, startTime - 1e-9)).accelerations;
+      for (joint in 0...startPosition.length)
+        accelerationTolerance[joint] =
+          Math.abs(startAcceleration[joint] - previousAcceleration[joint]) + 1e-5;
     }
     try robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
       modelRevision, calibrationRevision, 1, startPosition, startVelocity,
-      [for (_ in startPosition) 0.0], segments, null, null, null, null, null,
+      startAcceleration, segments, null, null, null, null, accelerationTolerance,
       endIndex >= nativeSegments.length))) catch (error:Dynamic)
       throw 'plan chunk [$startIndex,$endIndex] of ${nativeSegments.length}: $error';
     trajectorySubmitted = true;

@@ -320,3 +320,23 @@ normal acceleration is shared by the two joints. Changed the acceptance to
 the per-joint, angle-dependent bound. Stopped C2 implementation here under
 the handoff ground rule. The C2 changes remain uncommitted in the Lane C
 worktree; the new test currently fails on the superseded peak-speed assertion.
+
+### C2 — TOPP-RA timing and Cartesian path submission
+
+Vendored the pinned TOPP-RA C++ Seidel solver, added the native reachability
+timing entry point and per-stage binding-constraint report, and exposed it
+through `ToppraPathTiming`. `MotionSystem` now times direct XYZ lines and arcs,
+lowers them to native polynomial segments, checks joint limits exactly, and
+records a sampled task-space deviation report at no worse than 1 ms spacing.
+Path jerk remains unchecked. The old `LineLookaheadPlanner` was removed;
+exact-stop corners, circle joint acceleration, straight-path timing, binding
+joint, long queues, hold/resume and task-space reporting are exercised by the
+MotionKit suite. Commit: the commit containing this entry.
+
+For two 0.1 m straight exact-stop legs at 2 m/s², the old planner takes
+0.894427191 s and TOPP-RA takes 0.896218108 s (0.20% longer). A standalone
+0.1 m radius quarter arc at 0.5 m/s velocity and 1 m/s² per-joint
+acceleration takes 0.811937932 s with TOPP-RA versus 0.966774462 s with
+the old planner. MotionKit passed 5,410 Haxe assertions, RobotKit passed
+4,437 world assertions, all 13 combined native CTests passed, both FFI audits
+passed, and TCP integration passed in default, session and lease modes.

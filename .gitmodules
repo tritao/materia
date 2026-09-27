@@ -32,3 +32,7 @@
 [submodule "motionkit/native/vendor/ruckig"]
 	path = motionkit/native/vendor/ruckig
 	url = https://github.com/pantor/ruckig.git
+[submodule "motionkit/native/vendor/toppra"]
+	path = motionkit/native/vendor/toppra
+	url = https://github.com/hungpham2511/toppra.git
+	branch = develop
