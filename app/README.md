@@ -57,7 +57,9 @@ or the Scene root to clear object selection.
 
 `EditorScene` provides the scene API and UIKit `EditorDocument` history.
 `editor/SceneModel` owns authored records and structural changes;
-`editor/ScenePresentation` owns SceneKit state, materials, and publication.
+`editor/SceneReconciler` stages atomic updates across those records, CAD sessions,
+and SceneKit nodes. `editor/ScenePresentation` owns SceneKit state, materials,
+face hover, and publication.
 `editor/ScenePropertyProvider` builds inspector descriptors, with kind-specific
 fields contributed by `editor/ObjectKindRegistry`. `editor/SelectionModel` owns
 object, feature, face, and edge selection with a separate revision.
