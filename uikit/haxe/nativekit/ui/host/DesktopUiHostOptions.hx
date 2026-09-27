@@ -4,6 +4,9 @@ package nativekit.ui.host;
 class DesktopUiHostOptions extends UiHostOptions {
 	public var targetFps:Float = 60.0;
 	public var captureDirectory:Null<String> = null;
+	/** Append-only JSONL trace of native events and host failures. */
+	public var recordPath:Null<String> = null;
+	public var recordMetadata:Dynamic = null;
 	public var frameLimit:Int = 0;
 	/** Capture after this wall-clock interval while preserving normal frame scheduling. */
 	public var captureSeconds:Float = 0.0;
@@ -22,6 +25,8 @@ class DesktopUiHostOptions extends UiHostOptions {
 			throw "Desktop UI host options are invalid";
 		if (captureDirectory != null && captureDirectory.length == 0)
 			throw "Desktop UI capture directory cannot be empty";
+		if (recordPath != null && recordPath.length == 0)
+			throw "Desktop UI recording path cannot be empty";
 		if (captureDirectory != null && frameLimit == 0 && captureSeconds == 0.0)
 			frameLimit = 3;
 		if (captureSeconds > 0.0 && (captureDirectory == null || frameLimit > 0))

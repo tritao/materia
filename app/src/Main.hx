@@ -132,11 +132,11 @@ class Main {
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
           arg.indexOf("--capture-seconds=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
-          arg.indexOf("--project=") != 0) {
+          arg.indexOf("--project=") != 0 && arg != "--record" && arg.indexOf("--record=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
-          "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH]");
+          "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] [--record[=PATH]]");
         return 2;
       }
 
@@ -162,6 +162,8 @@ class Main {
     host.width = diagnostics.windowWidth;
     host.height = diagnostics.windowHeight;
     host.captureDirectory = diagnostics.captureDirectory;
+    host.recordPath = diagnostics.recordPath;
+    host.recordMetadata = {arguments:args.copy(), cwd:Sys.getCwd()};
     host.frameLimit = diagnostics.frameLimit;
     host.captureSeconds = diagnostics.captureSeconds;
     var activeEditor:Null<ReferenceEditorApp> = null;
@@ -179,7 +181,7 @@ class Main {
         remote.connect(robotHost, diagnostics.robotPort, context.events);
       }
       var editor = new ReferenceEditorApp(context.fonts, null, activeTheme, world, context,
-        diagnostics.setupScript, diagnostics.projectPath);
+        diagnostics.setupScript, diagnostics.projectPath, diagnostics.recordPath);
       activeEditor = editor;
       liveEditor = editor;
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
@@ -192,6 +194,7 @@ class Main {
 
 private class ReferenceEditorLaunchOptions {
   public final captureDirectory:Null<String>;
+  public final recordPath:Null<String>;
   public final frameLimit:Int;
   public final captureSeconds:Float;
   public final componentLab:Bool;
@@ -203,11 +206,12 @@ private class ReferenceEditorLaunchOptions {
   public final projectPath:Null<String>;
   public final windowWidth:Int;
   public final windowHeight:Int;
-  public function new(captureDirectory:Null<String>, frameLimit:Int, captureSeconds:Float,
+  public function new(captureDirectory:Null<String>, recordPath:Null<String>, frameLimit:Int, captureSeconds:Float,
       componentLab:Bool, storyId:Null<String>, darkTheme:Bool,
       robotHost:Null<String>, robotPort:Int,setupScript:Null<String>,projectPath:Null<String>,
       windowWidth:Int, windowHeight:Int) {
     this.captureDirectory = captureDirectory;
+    this.recordPath = recordPath;
     this.frameLimit = frameLimit;
     this.captureSeconds = captureSeconds;
     this.componentLab = componentLab;
@@ -223,6 +227,7 @@ private class ReferenceEditorLaunchOptions {
 
   public static function fromArgs(args:Array<String>):Null<ReferenceEditorLaunchOptions> {
     var directory:Null<String> = null;
+    var recordPath:Null<String> = null;
     var frames = 0;
     var captureSeconds = 0.0;
     var lab = args.indexOf("--lab") >= 0;
@@ -235,6 +240,11 @@ private class ReferenceEditorLaunchOptions {
     for (arg in args) {
       if (arg.indexOf("--capture-dir=") == 0)
         directory = arg.substr(14);
+      else if (arg == "--record")
+        recordPath = "app/build/recordings/materia-" + StringTools.replace(Std.string(Sys.time()), ".", "-") +
+          "-" + Sys.getPid() + ".jsonl";
+      else if (arg.indexOf("--record=") == 0)
+        recordPath = arg.substr(9);
       else if (arg.indexOf("--frames=") == 0) {
         var parsed = Std.parseInt(arg.substr(9));
         if (parsed == null || parsed <= 0) {
@@ -278,6 +288,10 @@ private class ReferenceEditorLaunchOptions {
       Sys.println("materia: --capture-dir requires a path");
       return null;
     }
+    if (recordPath != null && recordPath.length == 0) {
+      Sys.println("materia: --record requires a non-empty path");
+      return null;
+    }
     if(setupScript!=null&&StringTools.trim(setupScript).length==0){
       Sys.println("materia: --setup-script requires a registered reference");return null;
     }
@@ -312,7 +326,7 @@ private class ReferenceEditorLaunchOptions {
       }
       robotPort = parsedPort;
     }
-    return new ReferenceEditorLaunchOptions(directory, frames, captureSeconds, lab, story,
+    return new ReferenceEditorLaunchOptions(directory, recordPath, frames, captureSeconds, lab, story,
       args.indexOf("--dark") >= 0, robotHost, robotPort,setupScript,projectPath,
       windowWidth, windowHeight);
   }
@@ -390,20 +404,31 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var cachedSubmitSensorRevision:Int = -1;
   var cachedSubmitSimulationRevision:Int = -1;
   var cachedSubmitPerspectiveKey:String = "";
+  final semanticRecordPath:Null<String>;
+  var lastRecordedSelection:String = "";
+  var lastSemanticAction:Dynamic = null;
   final externalWorldHasRobots:Bool;
   public var sensors(get, never):SensorConfiguration;
   function get_sensors():SensorConfiguration return session.sensors;
 
   public function new(? fonts:FontCollection, ? workspaceFile:String, ?theme:Theme,
-      ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String,?projectPath:String) {
+      ?world:RobotWorld, ?hostContext:DesktopUiHostContext,?setupScript:String,?projectPath:String,
+      ?recordPath:String) {
     this.hostContext = hostContext;
+    semanticRecordPath = recordPath;
     appearance = new EditorAppearance(theme);
     ui = new UiContext(null, fonts, appearance.theme);
     commands = ui.commands;
+    if (semanticRecordPath != null) commands.onInvoked = function(id, result) {
+      recordSemantic("command", {id:id, status:Std.string(result.status),
+        changed:result.changed, selected:scene.selectedId,
+        documentPath:session.path, documentDirty:session.isDirty()});
+    };
     this.world = world == null ? new RobotWorld() : world;
     externalWorldHasRobots = this.world.robotIds().length > 0;
     simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
     session = new ProjectDocumentSession(BimEditorDemo.create());
+    attachSceneRecorder();
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
     session.beforeReplace=simulation.clear;
@@ -603,6 +628,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Convenience entry point for a NativeKit host's layout phase. */
   public function submit(frame:LayoutFrame):RenderNode {
+    var selectionKey = scene.treeSelectionKey();
+    if (selectionKey != lastRecordedSelection) {
+      lastRecordedSelection = selectionKey;
+      recordSemantic("selection", {id:selectionKey});
+    }
     var saveError = workspaceSaves.takeError();
     if (saveError != null) log("Workspace save failed: " + saveError);
     viewportWidth = frame.width;
@@ -693,6 +723,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Machine-readable application state paired with diagnostic frame captures. */
   public function diagnosticState():Dynamic return componentLab == null ? {
+    lastSemanticAction: lastSemanticAction,
     selectedNode: scene.selectedId,
     scene: scene.diagnosticState(),
     document: {path: session.path, label: session.label(), dirty: session.isDirty(),
@@ -1728,6 +1759,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function documentChanged():Void {
+    attachSceneRecorder();
     if (bimEditor.model != session.bim) bimEditor = makeBimEditor();
     cancelActiveDrag();
     if (sceneGeneration != session.generation) {
@@ -1818,7 +1850,24 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function updateCommandContext():Void {
-    ui.setCommandContext(scene.context());
+    var context = scene.context();
+    if (semanticRecordPath != null) context.onPropertyEdit = function(edit) {
+      recordSemantic("property.edit", edit);
+    };
+    ui.setCommandContext(context);
+  }
+
+  function attachSceneRecorder():Void {
+    if (semanticRecordPath != null)
+      scene.onSemanticAction = function(action, data) recordSemantic(action, data);
+  }
+
+  function recordSemantic(action:String, data:Dynamic):Void {
+    if (semanticRecordPath == null) return;
+    lastSemanticAction = {action:action, data:data};
+    try File.appendContent(semanticRecordPath,
+      Json.stringify({kind:"action", at:Sys.time(), action:action, data:data}) + "\n")
+    catch (error:Dynamic) Sys.println("Materia recording failed: " + Std.string(error));
   }
 
   function makeTelemetry():PlotModel {

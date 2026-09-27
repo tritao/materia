@@ -226,6 +226,46 @@ class SceneEditingTests {
     scene.dispose();
   }
 
+  static function assemblyOccurrenceDragging():Void {
+    var scene = new EditorScene([{id:"project:motor", label:"Motor", type:"rectangle",
+      x:0.0, y:0.0, z:0.0, width:1.0, height:1.0, depth:0.2,
+      red:0.5, green:0.5, blue:0.5, visible:true,
+      collisionEnabled:false, dynamicBody:false, mass:1.0}]);
+    scene.configureAssemblyOccurrences(["motor"], null);
+    check(!scene.canMoveObject("project:motor"), "joint-driven occurrence cannot move directly");
+    var perspective = new PerspectiveCamera();
+    check(PerspectiveSceneDrag.begin(scene, perspective, "project:motor",
+      400, 300, 800, 600, false, 0.2) == null,
+      "perspective drag does not start for a joint-driven occurrence");
+    var xy = new EditorSceneViewport(scene);
+    var camera = new ViewportCamera();
+    var point = camera.worldToViewport(EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y);
+    check(!xy.beginDrag(camera, point.x, point.y, false),
+      "XY drag does not start for a joint-driven occurrence");
+    scene.dispose();
+  }
+
+  static function semanticActionHooks():Void {
+    var scene = new EditorScene();
+    scene.select("box");
+    var moves = 0;
+    scene.onSemanticAction = function(action, data) {
+      if (action == "drag.commit") moves++;
+    };
+    scene.setPositionXY("box", -1.4, 0.0);
+    check(scene.recordMove("box", -1.5, 0.0, -1.4, 0.0) && moves == 1,
+      "committed drag emits one semantic action");
+    var edits = 0;
+    var context = scene.context();
+    context.onPropertyEdit = function(edit) {
+      if (Reflect.field(edit, "id") != null) edits++;
+    };
+    var visibility = new PropertyBinding(scene.properties()[2], context);
+    visibility.apply(PropertyValue.Bool(false));
+    check(edits == 1, "Inspector binding reports its edit outcome");
+    scene.dispose();
+  }
+
   static function cadPlateMesh():Void {
     var scene = new EditorScene();
     check(scene.createMountingPlate(), "CAD mounting plate creation succeeds");
@@ -1175,6 +1215,8 @@ class SceneEditingTests {
       renderingParity();
       perspectiveCameraMath();
       perspectiveDragging();
+      assemblyOccurrenceDragging();
+      semanticActionHooks();
       cadPlateMesh();
       simulationViewportSemantics();
       sensorConfiguration();

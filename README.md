@@ -62,6 +62,17 @@ Git.
 ./app/run-built.sh
 ```
 
+To retain an event trail while diagnosing an app crash, add `--record`. Materia
+prints the JSONL file path at startup. Native input events and semantic actions
+(commands, selection, Inspector edits, and drag completion or cancellation) are
+appended immediately. A managed failure adds its error, stack trace, and available
+editor state. Use `--record=PATH` to choose the file explicitly:
+
+```sh
+./app/run-built.sh --project=./machinekit/examples/materia.project.json --record
+./app/run-built.sh --project=./machinekit/examples/materia.project.json --record=/tmp/materia-actions.jsonl
+```
+
 This launches the existing build without checking the native and Haxe build
 graph. Rebuild with the command above after source changes. To open a CAD
 project, pass `--project=PATH` to the same launcher.

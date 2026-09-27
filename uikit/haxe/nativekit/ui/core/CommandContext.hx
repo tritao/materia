@@ -10,6 +10,8 @@ class CommandContext {
 	public final viewportId:Null<String>;
 	public final parameters:CommandParameters;
 	public final source:Null<String>;
+	/** Optional application trace hook for inspector edits. */
+	public var onPropertyEdit:Null<Dynamic->Void> = null;
 
 	public function new(?document:EditorDocument, ?selection:Array<String>,
 			?viewportId:String, ?parameters:CommandParameters, ?source:String) {

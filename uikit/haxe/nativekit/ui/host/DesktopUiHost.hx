@@ -34,6 +34,8 @@ class DesktopUiHost {
 		var surface = SurfaceHandle.invalid();
 		var events:Null<NativeKitEvents> = null;
 		var eventSubscription:Null<NativeKitEventSubscription> = null;
+		var recordSubscription:Null<NativeKitEventSubscription> = null;
+		var recordPath:Null<String> = null;
 		var nativeSurface:Null<NativeKitSurface> = null;
 		var frameSubscription:Null<NativeKitSurfaceFrameSubscription> = null;
 		var fonts:Null<FontCollection> = null;
@@ -46,6 +48,24 @@ class DesktopUiHost {
 		var captureState = {startedAt: -1.0};
 		var result = 0;
 		var step:Void->Bool = function() return false;
+		var failureRecorded = false;
+		var recordFailure = function(stage:String, error:Dynamic):Void {
+			if (recordPath == null || failureRecorded) return;
+			failureRecorded = true;
+			try {
+				var appState:Dynamic = null;
+				try {
+					if (runtime != null && runtime.app() != null) {
+						var recordedApp:DesktopUiApplication = cast runtime.app();
+						appState = recordedApp.diagnosticState();
+					}
+				} catch (_:Dynamic) {}
+				File.appendContent(recordPath, Json.stringify({kind:"failure", at:Sys.time(),
+					stage:stage, message:Std.string(error),
+					stack:haxe.CallStack.toString(haxe.CallStack.exceptionStack()),
+					appState:appState}) + "\n");
+			} catch (_:Dynamic) {}
+		};
 
 		try {
 			var init = new InitOptions();
@@ -104,6 +124,18 @@ class DesktopUiHost {
 
 			var pump = new NativeKitEvents();
 			events = pump;
+			if (options.recordPath != null) {
+				var path:String = cast options.recordPath;
+				var slash = path.lastIndexOf("/");
+				if (slash > 0) createDirectories(path.substr(0, slash));
+				recordPath = path;
+				Sys.println("recording Materia events in " + path);
+				File.saveContent(path, Json.stringify({kind:"start", at:Sys.time(), width:options.width,
+					height:options.height, metadata:options.recordMetadata}) + "\n");
+				recordSubscription = pump.listen(function(value) {
+					File.appendContent(path, Json.stringify({kind:"event", at:Sys.time(), event:Std.string(value)}) + "\n");
+				});
+			}
 			fonts = FontCollection.create();
 			fonts.addSystemFallbacks();
 			var active = true;
@@ -236,6 +268,7 @@ class DesktopUiHost {
 											scheduleFrameWithReason("continuous");
 									}
 								} catch (error:Dynamic) {
+									recordFailure("frame-callback", error);
 									runtime.fail("frame-callback", error);
 									active = false;
 								}
@@ -278,6 +311,7 @@ class DesktopUiHost {
 				if (active && !hadEvent) pump.wait(1.0 / options.targetFps);
 					if (session.state == UiHostLifecycle.Failed) throw session.error;
 				} catch (error:Dynamic) {
+					recordFailure("desktop-host", error);
 					session.fail("desktop-host", error);
 					Sys.println(options.title + ": " + Std.string(error));
 					if (session.error != null && session.error.stack.length > 0)
@@ -288,6 +322,7 @@ class DesktopUiHost {
 				return active;
 			};
 		} catch (error:Dynamic) {
+			recordFailure("desktop-host", error);
 			if (session != null && session.state != UiHostLifecycle.Failed)
 				session.fail("desktop-host", error);
 			var detail = Std.string(error);
@@ -305,6 +340,14 @@ class DesktopUiHost {
 		}
 
 		var finish = function() {
+		var ownedRecordSubscription = recordSubscription;
+		recordSubscription = null;
+		if (ownedRecordSubscription != null)
+			try ownedRecordSubscription.dispose() catch (_:Dynamic) {}
+		var ownedRecordPath = recordPath;
+		recordPath = null;
+		if (ownedRecordPath != null)
+			try File.appendContent(ownedRecordPath, Json.stringify({kind:"stop", at:Sys.time(), exitCode:result}) + "\n") catch (_:Dynamic) {}
 		var ownedFrameSubscription = frameSubscription;
 		frameSubscription = null;
 		if (ownedFrameSubscription != null)

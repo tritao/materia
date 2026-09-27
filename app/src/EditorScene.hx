@@ -92,6 +92,8 @@ class EditorScene {
   final kinematicOccurrences:Map<String, Bool> = new Map();
   final componentFinishes:Map<String, SceneObjectData> = new Map();
   var assemblyPropertyProvider:Null<String->Array<PropertyDescriptor>> = null;
+  /** Optional editor-owned semantic action sink. */
+  public var onSemanticAction:Null<String->Dynamic->Void> = null;
   var nextObjectId:Int = 1;
   var snapshot:SceneSnapshot;
   var spatial:SpatialIndex;
@@ -1549,7 +1551,8 @@ class EditorScene {
     revision = nextRevision;
   }
 
-  public function canMoveInViewport(id:String):Bool
+  /** A joint owns a generated occurrence's pose; direct object moves are unavailable. */
+  public function canMoveObject(id:String):Bool
     return object(id) != null && !kinematicOccurrences.exists(id);
 
   /** Rebuilds selected-object descriptors after project-owned assembly settings change. */
@@ -2086,7 +2089,7 @@ class EditorScene {
   public function setPositionXY(id:String, x:Float, y:Float):Void {
     if (!finiteCoordinate(x) || !finiteCoordinate(y))
       throw "Position requires finite X and Y coordinates";
-    if (kinematicOccurrences.exists(id))
+    if (!canMoveObject(id))
       throw "Assembly occurrence positions are driven by their joints";
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
@@ -2109,9 +2112,16 @@ class EditorScene {
     if (object(id) == null) throw "Unknown scene object: " + id;
     if (kinematicOccurrences.exists(id)) return false;
     if (fromX == toX && fromY == toY) return false;
-    return document.record(new EditOperation("Move object",
+    var recorded = document.record(new EditOperation("Move object",
       function() setPositionXY(id, toX, toY),
       function() setPositionXY(id, fromX, fromY)));
+    if (recorded) noteSemanticAction("drag.commit", {id:id, from:[fromX, fromY], to:[toX, toY]});
+    return recorded;
+  }
+
+  public function noteSemanticAction(action:String, data:Dynamic):Void {
+    var observer = onSemanticAction;
+    if (observer != null) observer(action, data);
   }
 
   public function nudgeSelected(deltaX:Float, deltaY:Float):Bool {

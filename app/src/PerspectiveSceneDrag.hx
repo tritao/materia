@@ -18,7 +18,7 @@ class PerspectiveSceneDrag {
   public static function begin(scene:EditorScene, camera:PerspectiveCamera, id:String,
       x:Float, y:Float, width:Float, height:Float, snap:Bool, gridStep:Float):Null<PerspectiveSceneDrag> {
     var item = scene.object(id);
-    if (item == null) return null;
+    if (item == null || !scene.canMoveObject(id)) return null;
     var point = camera.intersectPlaneZ(x, y, width, height, item.z);
     if (point == null) return null;
     return new PerspectiveSceneDrag(scene, id, item.z, item.x, item.y,
@@ -63,6 +63,8 @@ class PerspectiveSceneDrag {
     finished = true;
     if (currentX != startX || currentY != startY)
       scene.setPositionXY(id, startX, startY);
+    scene.noteSemanticAction("drag.cancel", {id:id, from:[startX, startY],
+      preview:[currentX, currentY]});
     return true;
   }
 }

@@ -40,21 +40,21 @@ class PropertyBinding {
 	public function apply(value:PropertyValue, ?coalesceKey:String):PropertyEditResult {
 		var validation = validate(value);
 		if (validation != null)
-			return PropertyEditResult.Rejected(validation);
+			return report(value, PropertyEditResult.Rejected(validation));
 
 		if (context.document == null)
-			return PropertyEditResult.Rejected("Property editing requires an active document");
+			return report(value, PropertyEditResult.Rejected("Property editing requires an active document"));
 
 		var before = read();
 		if (registry.same(before, value))
-			return PropertyEditResult.Unchanged;
+			return report(value, PropertyEditResult.Unchanged);
 		if (!descriptor.recordHistory) {
 			try {
 				descriptor.write(context, value);
 			} catch (error:Dynamic) {
-				return PropertyEditResult.Rejected(error == null ? "Property edit failed" : Std.string(error));
+				return report(value, PropertyEditResult.Rejected(error == null ? "Property edit failed" : Std.string(error)));
 			}
-			return PropertyEditResult.Applied;
+			return report(value, PropertyEditResult.Applied);
 		}
 
 		var latest = value;
@@ -71,8 +71,16 @@ class PropertyBinding {
 		try {
 			context.document.apply(operation, key);
 		} catch (error:Dynamic) {
-			return PropertyEditResult.Rejected(error == null ? "Property edit failed" : Std.string(error));
+			return report(value, PropertyEditResult.Rejected(error == null ? "Property edit failed" : Std.string(error)));
 		}
-		return PropertyEditResult.Applied;
+		return report(value, PropertyEditResult.Applied);
+	}
+
+	function report(value:PropertyValue, result:PropertyEditResult):PropertyEditResult {
+		var observer = context.onPropertyEdit;
+		if (observer != null)
+			observer({id:descriptor.id, label:descriptor.label,
+				value:Std.string(value), result:Std.string(result)});
+		return result;
 	}
 }

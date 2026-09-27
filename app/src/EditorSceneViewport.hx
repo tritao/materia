@@ -76,7 +76,7 @@ class EditorSceneViewport implements ViewportContent {
     var point = scenePoint(camera, x, y);
     var id = scene.pick(point.x, point.y);
     var item = scene.object(id);
-    if (item == null || !scene.canMoveInViewport(id)) return false;
+    if (item == null || !scene.canMoveObject(id)) return false;
     scene.select(id);
     drag = new EditorSceneDrag(id, item.x, item.y, item.x - point.x, item.y - point.y, snap);
     return true;
@@ -121,6 +121,8 @@ class EditorSceneViewport implements ViewportContent {
     drag = null;
     if (active.currentX != active.startX || active.currentY != active.startY)
       scene.setPositionXY(active.id, active.startX, active.startY);
+    scene.noteSemanticAction("drag.cancel", {id:active.id, from:[active.startX, active.startY],
+      preview:[active.currentX, active.currentY]});
     return true;
   }
 

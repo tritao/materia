@@ -15,6 +15,8 @@ class CommandRegistry {
 	final commandOrder:Array<String>;
 	final activeScopeStack:Array<String>;
 	public var revision(default, null):Int;
+	/** Optional observer for semantic command recording. */
+	public var onInvoked:Null<String->CommandResult->Void> = null;
 
 	public function new() {
 		commands = new Map();
@@ -110,8 +112,15 @@ class CommandRegistry {
 	/** Executes a command by ID when its current enabled predicate allows it. */
 	public function execute(id:String):Bool {
 		var command = get(id);
-		if (command == null || !command.execute())
+		if (command == null)
 			return false;
+		var succeeded = false;
+		try succeeded = command.execute() catch (error:Dynamic) {
+			notifyInvocation(id, CommandResult.failed(error));
+			throw error;
+		}
+		notifyInvocation(id, succeeded ? CommandResult.executed() : CommandResult.disabled());
+		if (!succeeded) return false;
 		revision++;
 		return true;
 	}
@@ -122,6 +131,7 @@ class CommandRegistry {
 		if (command == null)
 			return CommandResult.notHandled();
 		var result = command.executeContext(context);
+		notifyInvocation(id, result);
 		if (result.succeeded)
 			revision++;
 		return result;
@@ -182,9 +192,11 @@ class CommandRegistry {
 					command.matchesShortcut(key, normalized)) {
 					if (!command.isEnabled(actual)) {
 						disabled = CommandResult.disabled();
+						notifyInvocation(id, disabled);
 						break;
 					}
 					var result = command.executeContext(actual);
+					notifyInvocation(id, result);
 					if (result.succeeded) {
 						revision++;
 						return result;
@@ -195,6 +207,10 @@ class CommandRegistry {
 			}
 		}
 		return disabled == null ? CommandResult.notHandled() : disabled;
+	}
+
+	function notifyInvocation(id:String, result:CommandResult):Void {
+		if (onInvoked != null) onInvoked(id, result);
 	}
 
 	/** Invalidates command-bound views after external predicate state changes. */
