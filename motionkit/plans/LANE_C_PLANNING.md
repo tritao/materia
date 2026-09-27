@@ -145,12 +145,23 @@ Tests:
 ## C4 — OPW analytic IK backend (C4 contract)
 
 Do:
-- Implement OPW (Brandstötter, Angerer, Hofbaur 2014) natively in
-  `motionkit/native` from the paper. It is a short closed-form solver, so no
-  third-party code is needed. Record the reference in `THIRD_PARTY.md` as
-  algorithm provenance.
-- The C ABI takes the 7 OPW parameters, joint offsets and sign corrections,
-  and returns up to 8 solutions with validity flags.
+- Vendor `opw_kinematics` (https://github.com/Jmeyer1292/opw_kinematics) as a
+  pinned submodule under `motionkit/native/vendor/`.
+  - It is header-only C++ (Apache-2.0) and depends only on Eigen, which C2
+    already vendors.
+  - Use only its core headers. Don't build its tests, ROS packaging or
+    install targets.
+  - Record the pinned tag or commit, the Apache-2.0 licence and NOTICE, and
+    the audited header list in `motionkit/native/THIRD_PARTY.md`, as for
+    Ruckig.
+  - If there is no network access, stop and log it. Do not vendor by copy or
+    reimplement.
+- Wrap it behind our own C ABI, so nothing outside `motionkit/native`
+  includes it. The ABI takes the 7 OPW parameters, joint offsets and sign
+  corrections (`opw_kinematics::Parameters`). It returns up to 8 solutions,
+  each with a validity flag and a singularity flag. The singularity flag is
+  computed by our wrapper from wrist and shoulder conditioning, because the
+  library doesn't report it.
 - `motionkit.robot.OpwKinematics` implements `KinematicsSolver`:
   - it **extracts** OPW parameters from a `RobotModel` + TCP when the
     geometry qualifies: parallel base, spherical wrist, within a stated
@@ -164,10 +175,13 @@ Tests:
 - Round trip: forward kinematics of random joint vectors, then OPW, contains
   the original within 1e-9.
 - The solutions agree with `ManipulatorKinematics` forward kinematics on the
-  M9 6R arm, if it qualifies. If not, log why and add an ABB/KUKA-style
-  parameter fixture.
+  M9 6R arm, if it qualifies. If not, log why.
+- Use the library's published example parameter sets (ABB, KUKA, Fanuc,
+  Stäubli) as fixtures: `RobotModel`s built from them extract back to the
+  same parameters, and forward kinematics agrees with
+  `ManipulatorKinematics`.
 - Parameter extraction rejects a non-spherical wrist.
-- Near-singular wrist poses return solutions with a singularity flag.
+- Near-singular wrist poses return solutions with the wrapper's singularity flag set.
 
 ## C5 — Configuration selection along a path (LC-D4)
 
