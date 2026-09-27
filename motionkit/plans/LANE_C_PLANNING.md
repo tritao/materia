@@ -278,3 +278,13 @@ MotionKit passed 5,866 Haxe assertions; RobotKit passed 4,437 aggregate
 Haxe assertions; all 13 tests in the combined native CTest build passed.
 Both FFI audits passed, and TCP integration passed in default, session and
 lease-timeout modes.
+
+### C1 integration test follow-up — Accept sampled start position
+
+After merging Lane B's first pose-path item into this branch, the TCP lease
+test repeatedly failed to start its plan. The test captured a settled state
+frame, then required the plan to start at exactly the captured position. A
+subsequent owner cycle could move the position before plan acceptance. The
+lease test now allows 0.02 joint units of start-position difference and keeps
+zero velocity and acceleration tolerances; the unchanged test failed before
+this adjustment and passed after it. Commit: the commit containing this entry.
