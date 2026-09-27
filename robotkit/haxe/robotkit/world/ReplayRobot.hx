@@ -1,6 +1,13 @@
 package robotkit.world;
 
-/** Robot adapter that deterministically replays one recorded robot. */
+/**
+ * Robot adapter that deterministically replays one recorded robot.
+ *
+ * ReplayRobot observes commands but does not execute them. Its default
+ * capabilities intentionally do not claim queue or plan support. A caller
+ * replaying a plan-based controller must pass capabilities with both
+ * supportsTrajectoryQueue and supportsExecutionPlans enabled.
+ */
 class ReplayRobot implements Robot {
   public final logicalId:RobotId;
   /** Commands produced while replaying; never written into the source recording. */
@@ -106,7 +113,10 @@ class ReplayRobot implements Robot {
       value.mode, faultCode, value.receivedTimestampNs, sensors,
       value.sourceClockId, value.receivedClockId, value.safety,
       value.trajectoryQueueDepth, value.trajectoryActive,
-      value.trajectoryTimeNs, value.trajectoryDurationNs);
+      value.trajectoryTimeNs, value.trajectoryDurationNs,
+      value.trajectoryTag, value.trajectoryTagTimeNs,
+      value.sessionState, value.activePlanId,
+      value.committedUntilNs, value.queueEndTimeNs);
 
   function ensureLive():Void if (closed) throw "ReplayRobot has been closed";
 }

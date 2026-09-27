@@ -72,7 +72,9 @@ class RemoteRobot implements Robot {
       value.supportsPosition,
       value.supportsVelocity,
       value.supportsEffort,
-      value.supportsPrediction
+      value.supportsPrediction,
+      value.supportsTrajectoryQueue,
+      value.supportsExecutionPlans
     );
   }
 
@@ -89,7 +91,12 @@ class RemoteRobot implements Robot {
     currentSensors,
     currentSnapshot.sourceClockId,
     currentSnapshot.receivedClockId,
-    currentSnapshot.safety
+    currentSnapshot.safety,
+    currentSnapshot.trajectoryQueueDepth, currentSnapshot.trajectoryActive,
+    currentSnapshot.trajectoryTimeNs, currentSnapshot.trajectoryDurationNs,
+    currentSnapshot.trajectoryTag, currentSnapshot.trajectoryTagTimeNs,
+    currentSnapshot.sessionState, currentSnapshot.activePlanId,
+    currentSnapshot.committedUntilNs, currentSnapshot.queueEndTimeNs
   );
 
   public function sensors():Array<SensorFrame> {
@@ -106,6 +113,10 @@ class RemoteRobot implements Robot {
       client.sendJointTargets(targets, expiryNs);
     case TrajectoryChunk(_):
       throw "RemoteRobot does not support buffered trajectory chunks yet";
+    case ExecutionPlan(plan): client.submitPlan(plan);
+    case Hold: client.hold();
+    case Resume: client.resume();
+    case Abort: client.abort();
   }
 
   public function stop(mode:StopMode):Void {
@@ -134,7 +145,12 @@ class RemoteRobot implements Robot {
       currentSensors,
       "unspecified",
       "robotkit.monotonic",
-      value.safety
+      value.safety,
+      value.trajectoryQueueDepth, value.trajectoryActive,
+      value.trajectoryTimeNs, value.trajectoryDurationNs,
+      value.trajectoryTag, value.trajectoryTagTimeNs,
+      value.sessionState, value.activePlanId,
+      value.committedUntilNs, value.queueEndTimeNs
     );
     notifyChanged();
   }

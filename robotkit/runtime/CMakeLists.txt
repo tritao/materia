@@ -8,7 +8,7 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
-target_link_libraries(robotkit_runtime PRIVATE robotkit_mcap_headers)
+target_link_libraries(robotkit_runtime PUBLIC motionkit_core PRIVATE robotkit_mcap_headers)
 target_compile_definitions(robotkit_runtime PRIVATE RK_BUILDING_LIBRARY)
 if(NOT RK_BUILD_SHARED OR EMSCRIPTEN)
     target_compile_definitions(robotkit_runtime PUBLIC RK_STATIC)
@@ -105,7 +105,8 @@ if(RK_BUILD_TESTS)
             target_link_libraries(robotkit_device_host_pty_tests PRIVATE RobotKit::runtime)
             add_dependencies(robotkit_device_host_pty_tests robotkit_pty_device)
             add_test(NAME robotkit_device_host_pty COMMAND robotkit_device_host_pty_tests
-                ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device)
+                ${CMAKE_CURRENT_BINARY_DIR}/cargo-target/debug/pty_device
+                ${CMAKE_CURRENT_SOURCE_DIR}/../deployment/bench-nucleo-g474re/deployment.json)
             set_tests_properties(robotkit_device_host_pty PROPERTIES LABELS "robot;wire;hardware" TIMEOUT 30)
         endif()
 

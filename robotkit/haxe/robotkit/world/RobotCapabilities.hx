@@ -9,6 +9,7 @@ class RobotCapabilities {
   public final supportsEffort:Bool;
   public final supportsPrediction:Bool;
   public final supportsTrajectoryQueue:Bool;
+  public final supportsExecutionPlans:Bool;
 
   public function new(
     id:RobotId,
@@ -17,7 +18,8 @@ class RobotCapabilities {
     supportsVelocity:Bool,
     supportsEffort:Bool,
     supportsPrediction:Bool,
-    ?supportsTrajectoryQueue:Bool = false
+    ?supportsTrajectoryQueue:Bool = false,
+    ?supportsExecutionPlans:Bool = false
   ) {
     this.id = id;
     this.jointCount = jointCount;
@@ -26,5 +28,6 @@ class RobotCapabilities {
     this.supportsEffort = supportsEffort;
     this.supportsPrediction = supportsPrediction;
     this.supportsTrajectoryQueue = supportsTrajectoryQueue;
+    this.supportsExecutionPlans = supportsExecutionPlans;
   }
 }

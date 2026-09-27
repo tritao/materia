@@ -24,6 +24,8 @@ import robotkit.protocol.RobotStateMsg;
 import robotkit.protocol.SafetyReset;
 import robotkit.protocol.SensorFrameMsg;
 import robotkit.protocol.Stop;
+import robotkit.protocol.PlanSubmission;
+import robotkit.protocol.PathControl;
 import robotkit.transport.NativeTransport;
 
 /**
@@ -172,7 +174,7 @@ class RobotClient {
     var effectiveTimeout = timeoutSeconds;
     if (Int64.compare(leaseRenewalIntervalNs, Int64.ofInt(0)) > 0) {
       var remainingNs = Int64.sub(nextLeaseRenewalNs, NativeKit.nk_time_now_ns());
-      var remainingSeconds = Std.parseFloat(Int64.toStr(remainingNs)) / 1000000000.0;
+      var remainingSeconds = Int64.toFloat(remainingNs) / 1000000000.0;
       if (remainingSeconds < 0.0) remainingSeconds = 0.0;
       if (remainingSeconds < effectiveTimeout) effectiveTimeout = remainingSeconds;
     }
@@ -231,6 +233,26 @@ class RobotClient {
     var value = new Stop(robotId(), reason, emergency);
     send(RobotProtocol.stop(value, sessionId, sequence,
       NativeKit.nk_time_now_ns()));
+    return sequence;
+  }
+
+  public function submitPlan(plan:robotkit.world.ExecutionPlanSubmission):Int64 {
+    ensureReady();
+    var sequence = nextCommandSequence();
+    send(RobotProtocol.planSubmission(PlanSubmission.fromWorld(robotId(), plan),
+      sessionId, sequence, NativeKit.nk_time_now_ns()));
+    return sequence;
+  }
+
+  public function hold():Int64 return sendPathControl(1);
+  public function resume():Int64 return sendPathControl(2);
+  public function abort():Int64 return sendPathControl(3);
+
+  function sendPathControl(action:Int):Int64 {
+    ensureReady();
+    var sequence = nextCommandSequence();
+    send(RobotProtocol.pathControl(new PathControl(robotId(), action),
+      sessionId, sequence, NativeKit.nk_time_now_ns()));
     return sequence;
   }
 

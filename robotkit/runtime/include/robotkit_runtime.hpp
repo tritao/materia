@@ -2,6 +2,7 @@
 #define ROBOTKIT_RUNTIME_HPP
 
 #include "robotkit_runtime.h"
+#include "motionkit.hpp"
 
 #include <chrono>
 #include <condition_variable>
@@ -131,9 +132,9 @@ public:
     rk_result stop();
     /** Queues command metadata and joint-target payload for the next owner-thread phase. */
     rk_result submit(const rk_robot_command &command);
-    /** Queues trajectory metadata and its separately allocated payload. */
-    rk_result submit_trajectory(const rk_robot_command &command,
-                                const rk_trajectory_chunk &chunk);
+    rk_result submit_segments(const rk_robot_command &command,
+                              const rk_trajectory_segment_chunk &chunk);
+    rk_result submit_plan(const rk_plan_submission &plan);
     /** Copies the latest robot state without advancing endpoint time. */
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
@@ -146,9 +147,17 @@ public:
     bool running() const;
 
     struct RuntimeTrajectoryPoint {
-        rk_trajectory_point point{};
+        struct {
+            uint64_t time_from_start_ns = 0;
+            uint32_t joint_count = 0;
+            double positions[RK_MAX_TRAJECTORY_JOINTS]{};
+        } point{};
+        mk_segment segment{}; /**< Valid when has_segment; starts at point time. */
+        bool has_segment = false;
         uint64_t chunk_base_time_ns = 0;
         uint64_t tag = 0;
+        uint64_t plan_id = 0;
+        bool ends_at_rest = true;
     };
 
     /** Internal phases used by Simulation to coordinate multiple runtimes. */
@@ -170,8 +179,10 @@ private:
         bool trajectory_history_valid = false;
         uint64_t trajectory_time_ns = 0;
         bool trajectory_active = false;
+        bool plan_just_submitted = false;
         uint64_t trajectory_tag = 0;
         uint64_t trajectory_tag_time_ns = 0;
+        uint64_t active_plan_id = 0;
         /** Trajectory clock rate; below 1 only while a path-following stop runs. */
         double trajectory_rate = 1.0;
         double trajectory_time_remainder_ns = 0.0;
@@ -182,18 +193,21 @@ private:
         /** Last forward estimate of the queued path's acceleration during a stop. */
         double stop_path_accelerations[RK_MAX_TRAJECTORY_JOINTS]{};
         bool stop_ramp_active = false;
-        /** Set when a ramp had to brake past a joint's limit to stay in travel. */
-        bool stop_ramp_exceeds_limits = false;
+        bool hold_requested = false;
+        bool resume_requested = false;
+        int32_t diagnostic_code = 0;
+        /** Set when the unclamped straight ramp reaches a joint travel limit. */
+        bool stop_ramp_hits_limit = false;
     };
 
     struct QueuedCommand {
         rk_robot_command command{};
-        std::shared_ptr<rk_trajectory_chunk> trajectory;
+        std::shared_ptr<rk_trajectory_segment_chunk> segments;
     };
 
     void run();
     rk_result step_owner(uint64_t timestamp_ns);
-    void latch_fault(bool clear_control = true);
+    void latch_fault(bool clear_control = true, int32_t fault_code = 1);
 
     rk_robot_runtime_blueprint blueprint_{};
     std::shared_ptr<RobotEndpoint> endpoint_;
@@ -201,6 +215,8 @@ private:
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};
     mutable std::mutex queue_mutex_;
+    /** Serializes plan submission with owner queue/clock mutations. */
+    mutable std::mutex owner_mutex_;
     std::condition_variable queue_condition_;
     std::deque<QueuedCommand> commands_;
     std::thread worker_;
@@ -210,7 +226,11 @@ private:
     uint64_t last_command_sequence_ = 0;
     rk_robot_state state_backup_{};
     ControlState control_{};
+    int32_t latched_fault_code_ = 1;
     ControlState control_backup_{};
+    /** Last position sent to the endpoint, retained after a trajectory drains. */
+    double commanded_position_[RK_MAX_JOINTS]{};
+    double commanded_position_backup_[RK_MAX_JOINTS]{};
     uint64_t endpoint_command_sequence_ = 0;
     bool state_backup_valid_ = false;
 };

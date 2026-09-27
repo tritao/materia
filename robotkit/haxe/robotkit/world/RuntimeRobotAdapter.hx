@@ -14,6 +14,7 @@ class RuntimeRobotAdapter implements Robot {
   final ownsRuntime:Bool;
   final faultMessage:String;
   final supportsTrajectoryQueue:Bool;
+  final supportsExecutionPlans:Bool;
   var changeListener:Null < RobotId -> Void > = null;
   var commandSequence:Int = 0;
   var observedSequence:Int64 = Int64.ofInt(-1);
@@ -38,10 +39,12 @@ class RuntimeRobotAdapter implements Robot {
       ? runtimeSupportsTrajectoryQueue : supportsTrajectoryQueue == true;
     this.supportsTrajectoryQueue = runtimeSupportsTrajectoryQueue &&
       configuredSupportsTrajectoryQueue;
+    this.supportsExecutionPlans = runtime.supportsExecutionPlans() &&
+      configuredSupportsTrajectoryQueue;
     robotDescription = new RobotDescription(id, name, links, joints);
     robotCapabilities = new RobotCapabilities(
       id, joints == null ? 0 : joints.length, true, true, true, false,
-      this.supportsTrajectoryQueue);
+      this.supportsTrajectoryQueue, this.supportsExecutionPlans);
     if (startRuntime) {
       try runtime.start() catch (error:Dynamic) {
         if (ownsRuntime) runtime.dispose();
@@ -72,7 +75,9 @@ class RuntimeRobotAdapter implements Robot {
       "unspecified", "robotkit.monotonic", value.safety,
       value.trajectoryQueueDepth, value.trajectoryActive,
       value.trajectoryTimeNs, value.trajectoryDurationNs,
-      value.trajectoryTag, value.trajectoryTagTimeNs);
+      value.trajectoryTag, value.trajectoryTagTimeNs,
+      value.sessionState, value.activePlanId,
+      value.committedUntilNs, value.queueEndTimeNs);
   }
 
   public function fault():Null<RobotFault> {
@@ -80,6 +85,10 @@ class RuntimeRobotAdapter implements Robot {
     var value = runtime.snapshot();
     if (value.faultCode == 0 && value.safety != RobotKitRuntimeConstants.RK_SAFETY_FAULT)
       return null;
+    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_TRAJECTORY_UNDERFLOW)
+      return new RobotFault(logicalId, value.faultCode, "trajectory_underflow", false);
+    if (value.faultCode == RobotKitRuntimeConstants.RK_FAULT_RAMP_LIMIT)
+      return new RobotFault(logicalId, value.faultCode, "ramp_limit", true);
     return new RobotFault(logicalId, value.faultCode, faultMessage, true);
   }
 
@@ -96,6 +105,20 @@ class RuntimeRobotAdapter implements Robot {
           throw "Runtime endpoint does not support buffered trajectories";
         commandSequence++;
         runtime.submitTrajectory(chunk, commandSequence);
+      case ExecutionPlan(plan):
+        if (!supportsExecutionPlans)
+          throw "Runtime endpoint does not support execution plans";
+        commandSequence++;
+        runtime.submitPlan(plan, commandSequence);
+      case Hold:
+        commandSequence++;
+        runtime.submitHold(commandSequence);
+      case Resume:
+        commandSequence++;
+        runtime.submitResume(commandSequence);
+      case Abort:
+        commandSequence++;
+        runtime.submitAbort(commandSequence);
     }
   }
 

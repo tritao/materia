@@ -3,9 +3,9 @@
   "package": { "name": "motionkit" },
   "sourceRoots": ["haxe"],
   "scopeSourceRoots": false,
-  "dependencies": {
-    "machinekit": { "path": "../machinekit" },
-    "robotkit": { "path": "../robotkit" }
+  "dependencies": {},
+  "ffi": {
+    "interfaces": ["native/bindings/motionkit.hxi"]
   },
   "target": "host"
 }

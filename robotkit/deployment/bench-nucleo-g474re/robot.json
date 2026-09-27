@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "name": "bench-nucleo-g474re",
   "collisionApproximation": "bounds-box",
   "links": [
@@ -84,9 +84,9 @@
         "lower": -100,
         "upper": 100,
         "velocity": 0,
-        "effort": 100
+        "effort": 100,
+        "maxAcceleration": 0
       },
-      "drive": null,
       "parentFramePosition": [
         0,
         0,
@@ -125,9 +125,9 @@
         "lower": -100,
         "upper": 100,
         "velocity": 0,
-        "effort": 100
+        "effort": 100,
+        "maxAcceleration": 0
       },
-      "drive": null,
       "parentFramePosition": [
         0,
         0,
@@ -157,6 +157,7 @@
       ]
     }
   ],
+  "actuators": [],
   "frames": [],
   "sensors": [],
   "mobileBase": {

@@ -52,25 +52,23 @@ to rename, formalize, or replace.
 
 ## 1. Package boundaries and dependencies (§2, §3)
 
-**Conflicts, cheap to fix.** `motionkit/haxeon.json` depends on both
-`machinekit` and `robotkit`. The plan says MotionKit's core must not import
-RobotKit, and `MotionSystem` should live in `RobotKit::motion`.
+**Split in P1.** `motionkit/haxeon.json` has no MachineKit or RobotKit
+dependency. The `motionkit-robot` adapter owns the three integration classes
+under `motionkit.robot`.
 
-Only three files cause the dependency:
+The three adapter files are:
 
-- `motionkit/haxe/motionkit/MotionSystem.hx` — `robotkit.world.{Robot,
+- `motionkit/robot/haxe/motionkit/robot/MotionSystem.hx` — `robotkit.world.{Robot,
   RobotCommand, RobotSnapshot, StopMode, TrajectoryChunk, TrajectoryPoint,
   JointTarget}`
-- `motionkit/haxe/motionkit/axis/MotionSystemBlueprint.hx` —
+- `motionkit/robot/haxe/motionkit/robot/MotionSystemBlueprint.hx` —
   `robotkit.model.RobotModel`, `robotkit.runtime.{RobotRuntimeBlueprint,
   RobotRuntimeCompiler}`
-- `motionkit/haxe/motionkit/MachineKitRobotCompiler.hx` —
+- `motionkit/robot/haxe/motionkit/robot/MachineKitRobotCompiler.hx` —
   `machinekit.assembly.LinearAxis`, `robotkit.model.*`
 
 `path/`, `planner/`, `trajectory/` and `axis/MotionAxisBlueprint.hx` are
-already free of RobotKit. The split is a package move, not a rewrite:
-pure `motionkit`, plus an adapter package (for example `motionkit-robotkit`,
-or `robotkit.motion` inside RobotKit) holding the three files above.
+already free of RobotKit. The adapter uses the existing pure MotionKit types.
 
 Other kits already follow the plan's layering:
 

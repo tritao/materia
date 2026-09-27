@@ -12,6 +12,7 @@ class RobotRuntimeBlueprint {
   /** Semantic mappings are absent only for manually constructed native blueprints. */
   public final identity:Null<RobotRuntimeIdentity>;
   public final revision:Int;
+  public final calibrationRevision:Int;
   public final jointCount:Int;
   public final linkCount:Int;
   public final frameCount:Int;
@@ -21,6 +22,14 @@ class RobotRuntimeBlueprint {
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
   /** MuJoCo self-collision is enabled unless this opt-out is set false. */
   public var selfCollision:Bool = true;
+  /** Zero uses two owner periods. */
+  public var commitLeadNs:haxe.Int64 = haxe.Int64.ofInt(0);
+  /** Zero uses the runtime's 10 ms owner period. */
+  public var ownerPeriodNs:haxe.Int64 = haxe.Int64.ofInt(0);
+  /** Zero uses the deployed 2 ms device per-frame processing allowance. */
+  public var serialProcessingAllowanceNs:haxe.Int64 = haxe.Int64.ofInt(0);
+  /** Per-joint SI-unit following-error bounds; zero leaves the check disabled. */
+  public final followingErrorBounds:Array<Float>;
   /** Compiled user-layer roles; null for manually assembled native blueprints. */
   public final configuration:Null<RobotRuntimeConfiguration>;
 
@@ -48,13 +57,16 @@ class RobotRuntimeBlueprint {
 
   public function new(revision:Int, jointCount:Int, linkCount:Int,
       ?frameCount:Int = 0, ?identity:RobotRuntimeIdentity,
-      ?configuration:RobotRuntimeConfiguration) {
+      ?configuration:RobotRuntimeConfiguration, ?calibrationRevision:Int = 0) {
     if (revision < 0 || jointCount < 0 || jointCount > RobotKitRuntimeConstants.RK_MAX_JOINTS ||
-        linkCount < 1 || linkCount > RobotKitRuntimeConstants.RK_MAX_LINKS || frameCount < 0)
+        linkCount < 1 || linkCount > RobotKitRuntimeConstants.RK_MAX_LINKS || frameCount < 0 ||
+        calibrationRevision < 0)
       throw "Invalid RobotKit runtime blueprint";
     this.identity = identity;
     this.revision = revision;
+    this.calibrationRevision = calibrationRevision;
     this.jointCount = jointCount;
+    followingErrorBounds = [for (_ in 0...jointCount) 0.0];
     this.linkCount = linkCount;
     this.frameCount = frameCount;
     for (_ in 0...linkCount)
@@ -89,6 +101,21 @@ class RobotRuntimeBlueprint {
     var value = new rk_robot_runtime_blueprint();
     value.set_struct_size(rk_robot_runtime_blueprint.size());
     value.set_revision(haxe.Int64.ofInt(revision));
+    value.set_calibration_revision(haxe.Int64.ofInt(calibrationRevision));
+    value.set_commit_lead_ns(commitLeadNs);
+    if (haxe.Int64.compare(ownerPeriodNs, haxe.Int64.ofInt(0)) < 0)
+      throw "Invalid runtime owner period";
+    value.set_owner_period_ns(ownerPeriodNs);
+    if (haxe.Int64.compare(serialProcessingAllowanceNs, haxe.Int64.ofInt(0)) < 0)
+      throw "Invalid serial processing allowance";
+    value.set_serial_processing_allowance_ns(serialProcessingAllowanceNs);
+    for (joint in 0...jointCount) {
+      var bound = followingErrorBounds[joint];
+      if (!Math.isFinite(bound) || bound < 0.0)
+        throw "Invalid runtime following-error bound";
+      if (joint < RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS)
+        value.set_following_error_bound(joint, bound);
+    }
     value.set_joint_count(jointCount);
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);

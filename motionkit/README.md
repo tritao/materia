@@ -6,6 +6,8 @@ RobotKit execution. The bootstrap package currently provides:
 - reusable Cartesian path points, line and planar-arc primitives, and ordered
   geometric paths;
 - immutable timed joint trajectory samples;
+- a native polynomial trajectory evaluator with degree 0–5 segments,
+  analytic derivatives and a Haxe wrapper;
 - deterministic synchronized velocity/acceleration planning with jerk in the
   public limits API, plus tangent-aware line/arc lookahead with exact-stop and
   blend modes;
@@ -17,6 +19,11 @@ RobotKit execution. The bootstrap package currently provides:
   RobotKit runtime advertises queue support, including bounded streaming for
   trajectories longer than one native chunk.
 
+The pure `motionkit` package contains paths, planners, trajectories and logical
+axes. `motionkit-robot` provides `motionkit.robot.MotionSystem`,
+`motionkit.robot.MotionSystemBlueprint` and
+`motionkit.robot.MachineKitRobotCompiler` for RobotKit integration.
+
 MachineKit dimensions are authored in millimetres. The compiler converts them
 to RobotKit metres, places the logical zero at the axis's lower travel limit,
 and retains the motor and lead-screw identity on the compiled actuator.
@@ -24,6 +31,9 @@ and retains the motor and lead-screw identity on the compiled actuator.
 The first end-to-end path is intentionally small:
 
 ```haxe
+import motionkit.robot.MachineKitRobotCompiler;
+import motionkit.robot.MotionSystem;
+
 var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x");
 var runtime = simulation.addRobot(blueprint.runtime);
 var robot = new SimulatedRobot("gantry-x", runtime, blueprint.model.name,
@@ -56,34 +66,30 @@ machine.movePath(GeometricPath.lines([
 ]), PathPlanningOptions.blend(0.001));
 ```
 
-The runtime interpolates timestamped trajectory chunks on its owner clock and
-publishes queue depth and tagged timestamp progress through `RobotSnapshot`.
-MotionKit refills long trajectories before the native window drains. A normal
-hold slows the trajectory clock along the planned path, keeping every joint
-within its acceleration limit even when the hold lands while the trajectory is
-already speeding up or braking. Before stopping, a hold tops up the queued path
-to at least v/a. If a stop still runs out of queued path, the runtime finishes
-it on a straight, acceleration-limited ramp. A chunk that arrives while a stop
-is running only extends that stop. Resume starts from the runtime-reported stop
-tag and time and speeds back up along the path within the same limits
-(`TimeScaling`). The runtime rejects chunks that would move a joint faster than
-its velocity limit, including a jump away from the end of the queued path, and
-bounds the total queued points.
+The runtime executes native trajectory plans on its owner clock and publishes
+queue depth and tagged progress through `RobotSnapshot`. MotionKit refills
+long paths in bounded plan chunks. Native HOLD and RESUME slow and restart the
+path clock within joint acceleration limits. Non-final chunks declare that
+more motion follows, so a late refill triggers controlled underflow braking.
+The runtime rejects plans that violate joint limits and bounds queue depth.
 
-Every change of speed obeys the joint limits. An immediate move, jog, or normal
-abort issued while the machine is moving first slows to rest along the current
-path; the new move is then planned from where it stopped, so `moveAxes`,
-`moveLinear`, `jog` and `home` return null in that case rather than a plan.
+`motionkit.trajectory.Trajectory.fromPositionSamples` builds degree-1 native
+segments. Native velocity is each segment's chord slope; acceleration and
+jerk are zero within that segment. The transitional sampled Haxe type retains
+authored derivatives for the position-streaming fallback.
+
+Every change of speed obeys the joint limits. A moving Ruckig axis move, jog,
+or home can retarget from the runtime's committed state. Degree-1 path moves
+still stop first, so `moveLinear` may return null while motion is in progress.
 `movePath` needs the machine at rest, since a path must start where the machine
-is. MotionKit retains a position-target fallback when a backend does not support
-buffered chunks; it holds, resumes, and replaces motion with the same
-host-side re-timing. CNC semantics and G-code remain outside MotionKit.
+is. MotionKit retains its path-preserving position-target fallback, including
+host-side re-timing, for backends without plan support. CNC semantics and
+G-code remain outside MotionKit.
 
 A `jog` issued while the same axis is already jogging changes speed or
-direction without stopping: MotionKit plans a `JogProfile` from the jog's state
-a few periods ahead and splices it into the runtime queue there. If the splice
-reaches the runtime too late, the runtime keeps the old jog and MotionKit falls
-back to stopping and starting the new jog from rest.
+direction without stopping. Queue backends replace the Ruckig plan beyond
+the committed horizon; a late replacement is retried once before falling
+back to stop-first. The non-queue fallback still uses `JogProfile`.
 
 Axis moves are planned in logical axis units and mapped onto joints, so the
 motors of a geared or dual-motor axis stay in proportion throughout a move.

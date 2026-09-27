@@ -6,6 +6,7 @@ import robotkit.model.CollisionApproximation;
 import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotForkConfiguration;
 import robotkit.model.RobotMobileConfiguration;
+import robotkit.model.Transmission;
 import RobotKitRuntime;
 
 /** Compiles the editable semantic robot model into an execution blueprint. */
@@ -16,8 +17,9 @@ class RobotRuntimeCompiler {
    * This is the domain-typing boundary: it checks topology and backend
    * support before assigning deterministic runtime indices.
    */
-  public static function compile(robot:RobotModel, ?revision:Int = 1):RobotRuntimeBlueprint {
-    var diagnostics = validate(robot, revision);
+  public static function compile(robot:RobotModel, ?revision:Int = 1,
+      ?calibrationRevision:Int = 0):RobotRuntimeBlueprint {
+    var diagnostics = validate(robot, revision, calibrationRevision);
     if (diagnostics.length > 0)
       throw new RobotCompileException(robot == null ? "<null>" : robot.name, diagnostics);
     // A robot whose authored sensors are all external still gets the native
@@ -37,7 +39,7 @@ class RobotRuntimeCompiler {
         [for (frame in robot.frames) frame.link.id],
         [for (link in robot.links) link.visualGeometry],
         [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation),
-      compileConfiguration(robot));
+      compileConfiguration(robot), calibrationRevision);
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
       case CollisionApproximation.BoundsBox: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
@@ -65,12 +67,21 @@ class RobotRuntimeCompiler {
       };
       var maxEffort = joint.limits.effort;
       var maxRate = joint.limits.velocity;
-      var drive = joint.drive;
-      if (drive != null) {
-        maxEffort = drive.maxEffort;
-        if (drive.maxRate > 0.0 && (maxRate == 0.0 || drive.maxRate < maxRate))
-          maxRate = drive.maxRate;
+      var actuatorEffort = 0.0;
+      var actuatorRate = 0.0;
+      for (actuator in robot.actuators) switch actuator.transmission {
+        case SimpleTransmission(jointId, ratio, _) if (jointId == joint.id):
+          var magnitude = Math.abs(ratio);
+          // Ideal lossless transmission: joint rate = actuator rate / |ratio|,
+          // and joint effort = actuator effort * |ratio|.
+          if (actuator.maxRate > 0.0)
+            actuatorRate = tighterLimit(actuatorRate, actuator.maxRate / magnitude);
+          if (actuator.maxEffort > 0.0)
+            actuatorEffort += actuator.maxEffort * magnitude;
+        case _:
       }
+      maxRate = tighterLimit(maxRate, actuatorRate);
+      maxEffort = tighterLimit(maxEffort, actuatorEffort);
       result.addJoint(new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
         joint.limits.lower, joint.limits.upper, maxEffort, maxRate,
         joint.parentFramePosition, joint.parentFrameRotation,
@@ -96,8 +107,15 @@ class RobotRuntimeCompiler {
     return result;
   }
 
+  static function tighterLimit(first:Float, second:Float):Float {
+    if (first == 0.0) return second;
+    if (second == 0.0) return first;
+    return Math.min(first, second);
+  }
+
   /** Returns all semantic diagnostics without attempting native lowering. */
-  public static function validate(robot:RobotModel, ?revision:Int = 1):Array<RobotCompileDiagnostic> {
+  public static function validate(robot:RobotModel, ?revision:Int = 1,
+      ?calibrationRevision:Int = 0):Array<RobotCompileDiagnostic> {
     var diagnostics:Array<RobotCompileDiagnostic> = [];
     if (robot == null) {
       diagnostics.push(new RobotCompileDiagnostic("RK_MODEL_NULL", "robot",
@@ -107,6 +125,9 @@ class RobotRuntimeCompiler {
     if (revision < 0)
       diagnostics.push(new RobotCompileDiagnostic("RK_REVISION", "revision",
         "runtime revision must be non-negative"));
+    if (calibrationRevision < 0)
+      diagnostics.push(new RobotCompileDiagnostic("RK_CALIBRATION_REVISION", "calibrationRevision",
+        "runtime calibration revision must be non-negative"));
     if (robot.name == null || robot.name.length == 0)
       diagnostics.push(new RobotCompileDiagnostic("RK_MODEL_NAME", "robot.name",
         "robot name is empty"));
@@ -229,20 +250,6 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_FRAME", path, "joint frames require finite translations and unit xyzw quaternions"));
       if (!validUnitVector(joint.axis))
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_AXIS", '$path.axis', "joint axis must be a finite unit vector"));
-      // Cache the mutable nullable field before checking it. This makes the
-      // narrowing explicit and keeps all actuator checks on one value.
-      var drive = joint.drive;
-      if (drive != null) {
-        if (drive.name == null || drive.name.length == 0)
-          diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_NAME", '$path.drive.name',
-            "actuator name is empty"));
-        if (drive.maxEffort < 0.0)
-          diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_EFFORT", '$path.drive.maxEffort',
-            "actuator effort must be non-negative"));
-        if (drive.maxRate < 0.0)
-          diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_RATE", '$path.drive.maxRate',
-            "actuator rate must be non-negative"));
-      }
       if (joint.type == JointType.Floating)
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_UNSUPPORTED", '$path.type',
           "floating joints are not supported by the current runtime backend"));
@@ -250,6 +257,40 @@ class RobotRuntimeCompiler {
           && joint.type != JointType.Continuous && joint.type != JointType.Prismatic)
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_TYPE", '$path.type',
           'unknown joint type "${joint.type}"'));
+    }
+
+    var actuatorIds = new Map<String, Bool>();
+    for (index in 0...robot.actuators.length) {
+      var actuator = robot.actuators[index];
+      var path = 'actuators[$index]';
+      if (actuator == null) {
+        diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_NULL", path,
+          "actuator is null"));
+        continue;
+      }
+      if (actuator.id == null || actuator.id.length == 0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_ID", '$path.id',
+          "actuator ID is empty"));
+      else if (actuatorIds.exists(actuator.id))
+        diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_ID_DUPLICATE", '$path.id',
+          'duplicate actuator ID "${actuator.id}"'));
+      else actuatorIds.set(actuator.id, true);
+      if (!Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0.0 ||
+          !Math.isFinite(actuator.maxRate) || actuator.maxRate < 0.0)
+        diagnostics.push(new RobotCompileDiagnostic("RK_ACTUATOR_LIMIT", path,
+          "actuator limits must be finite and non-negative"));
+      if (actuator.transmission == null)
+        diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_NULL", '$path.transmission',
+          "actuator transmission is missing"));
+      else switch actuator.transmission {
+        case SimpleTransmission(jointId, ratio, offset):
+          if (!jointIds.exists(jointId))
+            diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_JOINT",
+              '$path.transmission.jointId', 'unknown joint ID "$jointId"'));
+          if (!Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset))
+            diagnostics.push(new RobotCompileDiagnostic("RK_TRANSMISSION_VALUE",
+              '$path.transmission', "transmission ratio must be finite and nonzero, and offset finite"));
+      }
     }
 
     var frameIds = new Map<String, Bool>();

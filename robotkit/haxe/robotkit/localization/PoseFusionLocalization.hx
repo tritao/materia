@@ -218,7 +218,7 @@ class PoseFusionLocalization implements Localization {
 
   static function elapsedSeconds(later:Int64, earlier:Int64):Float {
     if (Int64.compare(later, earlier) <= 0) return 0.0;
-    return Std.parseFloat(Int64.toStr(Int64.sub(later, earlier))) / 1000000000.0;
+    return Int64.toFloat(Int64.sub(later, earlier)) / 1000000000.0;
   }
 
   static function clamp(value:Float, minimum:Float, maximum:Float):Float

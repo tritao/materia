@@ -46,6 +46,7 @@ public:
     std::uint64_t last_sent_sequence() const noexcept { return last_sent_sequence_; }
     std::uint8_t last_session_status() const noexcept { return last_session_status_; }
     bool ready() const noexcept { return ready_; }
+    unsigned baud() const noexcept { return baud_; }
 
 private:
     bool write_frame(std::uint8_t type, std::span<const std::uint8_t> payload);

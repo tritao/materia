@@ -5,7 +5,7 @@
   "sourceRoots": ["src"],
   "dependencies": {
     "machinekit": { "path": "../../machinekit" },
-    "motionkit": { "path": ".." },
+    "motionkit-robot": { "path": "../robot" },
     "nativekit": { "path": "../../nativekit" },
     "robotkit": { "path": "../../robotkit" }
   },
@@ -19,6 +19,12 @@
         "../../robotkit/runtime/CMakeLists.txt",
         "../../robotkit/runtime/include/robotkit_runtime.h",
         "../../robotkit/runtime/include/robotkit_simkit.h",
+        "../../motionkit/native/CMakeLists.txt",
+        "../../motionkit/native/include/motionkit.h",
+        "../../motionkit/native/src/trajectory.cpp",
+        "../../motionkit/native/src/validation.cpp",
+        "../../motionkit/native/src/generator.cpp",
+        "../../motionkit/native/vendor/ruckig/CMakeLists.txt",
         "../../nativekit/CMakeLists.txt",
         "../../simkit/CMakeLists.txt"
       ]

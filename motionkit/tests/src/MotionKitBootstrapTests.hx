@@ -2,30 +2,37 @@ import haxe.Int64;
 import machinekit.assembly.LinearAxis;
 import motionkit.AxisTarget;
 import motionkit.Feed;
-import motionkit.MachineKitRobotCompiler;
 import motionkit.MotionOptions;
-import motionkit.MotionSystem;
 import motionkit.Pose;
 import motionkit.axis.MotionAxisBlueprint;
-import motionkit.axis.MotionSystemBlueprint;
+import motionkit.robot.MachineKitRobotCompiler;
+import motionkit.robot.MotionSystem;
+import motionkit.robot.MotionSystemBlueprint;
 import motionkit.path.ArcSegment;
 import motionkit.path.GeometricPath;
 import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
 import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
-import motionkit.planner.TrapezoidalPlanner;
-import motionkit.trajectory.JointTrajectory;
-import motionkit.trajectory.JointTrajectorySample;
 import motionkit.trajectory.MotionLimits;
+import motionkit.trajectory.Trajectory;
+import motionkit.trajectory.ExecutionPlan;
+import motionkit.trajectory.PlanLimitError;
+import motionkit.trajectory.ValidationLimits;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
+import robotkit.model.Actuator;
+import robotkit.model.Transmission;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.RobotRuntimeError;
+import robotkit.runtime.RobotRuntimeCompiler;
+import RobotKitRuntime;
 import robotkit.world.RecordingRobot;
+import robotkit.world.ReplayRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.RobotCommand;
@@ -39,31 +46,38 @@ import robotkit.world.RobotStatus;
 import robotkit.world.RuntimeRobotAdapter;
 import robotkit.world.SensorFrame;
 import robotkit.world.StopMode;
-import motionkit.planner.JogProfile;
+import robotkit.world.ExecutionPlanSubmission;
+import robotkit.world.TrajectorySegment;
 
 class MotionKitBootstrapTests {
   static var assertions:Int = 0;
 
   public static function main():Void {
     testGeometricPathPrimitives();
+    testNativeTrajectoryRoundTrip();
+    testNativeValidationAndPlan();
     testPlannerIsDeterministicAndBounded();
     testLineLookaheadPlanner();
     testLinearAxisCompilesToRobotModel();
+    testLeadScrewActuatorRateLimitsPlans();
+    testTransmissionDerivedAxisMapping();
     testCompiledAxisRunsThroughSimulation();
     testHomingAndJogging();
     testMoveLinearUsesPlannerLimits();
     testCompiledXYZGantryRunsThroughSimulation();
     testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
+    testPlanCapableReplayRecordsMotionPlan();
     testLongBufferedExecution();
     testHoldRefillsNearChunkBoundary();
     testHoldDecelerationStaysWithinLimitsThroughoutMove();
     testRuntimeSynchronizedHolding();
     testImmediateMotionReplacesNativeQueue();
+    testSmoothReplacementRetriesLateSubmission();
+    testFreeRunningSmoothReplacement();
     testMotionChangesStayWithinLimits();
-    testJogProfile();
     testContinuousJog();
-    testLateJogSpliceFallsBackToStop();
+    testLateJogReplacementRejectsLateArrival();
     testPathHoldsStayOnPathWithinLimits();
     testDualMotorAxisChangesStayWithinJointLimits();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
@@ -86,28 +100,127 @@ class MotionKitBootstrapTests {
     near(arc.tangentAt(arc.length())[1], 1.0, "arc tangent rotates with the circle");
   }
 
+  static function testNativeTrajectoryRoundTrip():Void {
+    var native = Trajectory.fromPositionSamples([0.0, 1.0, 2.0],
+      [[0.0], [2.0], [5.0]]);
+    near(native.durationSeconds(), 2.0, "native trajectory duration");
+    check(native.jointCount() == 1, "native trajectory joint count");
+    for (tick in 0...2001) {
+      var time = tick * 0.001;
+      var expected = time <= 1.0 ? 2.0 * time : 2.0 + 3.0 * (time - 1.0);
+      near(native.evaluate(time).positions[0], expected,
+        "native degree-1 positions match authored chords", 1e-12);
+    }
+    near(native.evaluate(0.5).velocities[0], 2.0,
+      "native velocity is the chord slope, not authored sample velocity");
+    near(native.evaluate(1.0).velocities[0], 3.0,
+      "native velocity is right-continuous at a knot");
+    near(native.evaluate(0.5).accelerations[0], 0.0,
+      "native degree-1 acceleration is zero");
+    var estimate = native.estimatePathDerivatives(0.5, 1.0);
+    near(estimate.velocities[0], 2.0, "degree-1 stop estimate uses chord velocity");
+    near(estimate.accelerations[0], 1.0,
+      "degree-1 stop estimate sees a later chord velocity");
+    native.dispose();
+
+    var deduplicated = Trajectory.fromPositionSamples([0.0, 0.0, 1.0],
+      [[0.0], [0.0], [1.0]]);
+    check(deduplicated.segments().length == 1,
+      "identical coincident samples do not create zero-duration segments");
+    deduplicated.dispose();
+    throws(() -> {
+      Trajectory.fromPositionSamples([0.0, 0.0, 1.0],
+        [[0.0], [0.1], [1.0]]);
+    }, "conflicting positions at one timestamp remain invalid");
+
+    var longTrajectory = Trajectory.fromPositionSamples([0.0, 3.0],
+      [[0.0], [3.0]]);
+    check(Int64.compare(Trajectory.nanoseconds(2.21), Int64.parseString("2210000000")) == 0,
+      'times past the signed 32-bit nanosecond boundary retain their value: '
+        + '${Int64.toStr(Trajectory.nanoseconds(2.21))}');
+    near(longTrajectory.evaluate(2.5).positions[0], 2.5,
+      "long native trajectory evaluates beyond 2.147 seconds");
+    var longLimits = new ValidationLimits(1, Int64.ofInt(12), Int64.ofInt(3));
+    longLimits.position(0, 0.0, 3.0);
+    longLimits.velocity(0, 1.1);
+    var longPlan = ExecutionPlan.create(longTrajectory, longLimits, Int64.ofInt(45),
+      [0.0], [0.0], [0.0], [0.01], [0.01], [0.01]);
+    near(longPlan.evaluate(2.5).positions[0], 2.5,
+      "long execution plan evaluates beyond 2.147 seconds");
+    longPlan.dispose();
+    longTrajectory.dispose();
+  }
+
+  static function testNativeValidationAndPlan():Void {
+    var trajectory = Trajectory.fromPositionSamples([0.0, 1.0], [[0.0], [1.0]]);
+    var limits = new ValidationLimits(1, Int64.ofInt(12), Int64.ofInt(3));
+    limits.position(0, 0.0, 1.0);
+    limits.velocity(0, 0.8);
+    var report = trajectory.validate(limits);
+    check(report.hasFailure(), "chord speed above claimed limit fails validation");
+    near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].value, 1.0,
+      "validation records chord speed");
+    near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].margin, -0.2,
+      "validation reports signed limit margin");
+    near(report.checks[MotionKitNativeConstants.MK_CHECK_VELOCITY].tolerance, 0.8e-9,
+      "validation reports comparison tolerance", 1e-12);
+    check(report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
+      MotionKitNativeConstants.MK_CHECK_UNCHECKED, "unclaimed jerk is unchecked");
+    check(report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_UNCHECKED, "task-space slot is reserved");
+    check(Int64.compare(report.executorTimeResolutionNs, Int64.ofInt(1)) == 0,
+      "host validation defaults to 1 ns");
+    limits.timeResolutionNs(Int64.ofInt(2));
+    report = trajectory.validate(limits);
+    check(Int64.compare(report.executorTimeResolutionNs, Int64.ofInt(2)) == 0,
+      "validation reports requested executor resolution");
+    check(report.unresolvedAssumptions.length > 0 &&
+      report.unresolvedAssumptions[0].length > 0,
+      "unresolved assumptions are available to Haxe callers");
+    try {
+      ExecutionPlan.create(trajectory, limits, Int64.ofInt(44), [0.0], [0.0],
+        [0.0], [0.01], [0.01], [0.01]);
+      throw "expected plan limit rejection";
+    } catch (error:PlanLimitError) {
+      check(error.report.hasFailure(), "plan rejection carries validation report");
+    }
+    limits.velocity(0, 1.1);
+    var plan = ExecutionPlan.create(trajectory, limits, Int64.ofInt(44), [0.0],
+      [0.0], [0.0], [0.01], [0.01], [0.01]);
+    check(!plan.report.hasFailure(), "valid plan has no failed check");
+    near(plan.evaluate(0.5).positions[0], 0.5, "plan owns evaluable trajectory");
+    trajectory.dispose();
+    near(plan.evaluate(0.75).positions[0], 0.75, "plan deep copies trajectory");
+    plan.dispose();
+  }
+
   static function testPlannerIsDeterministicAndBounded():Void {
-    var planner = new TrapezoidalPlanner(0.01);
     var limits = new MotionLimits(1.0, 2.0, 10.0);
-    var first = planner.plan([0.0, 0.0], [1.0, -0.25], limits);
-    var second = planner.plan([0.0, 0.0], [1.0, -0.25], limits);
-    check(first.durationSeconds > 0.0, "planner produces a timed trajectory");
-    check(first.samples.length == second.samples.length, "planner sample count is deterministic");
-    for (i in 0...first.samples.length) {
-      near(first.samples[i].timeSeconds, second.samples[i].timeSeconds,
-        "planner sample time is deterministic");
+    function generate():Trajectory return Trajectory.generateStateToState([0.0, 0.0],
+      [0.0, 0.0], [0.0, 0.0], [1.0, -0.25], [limits.maxVelocity, limits.maxVelocity],
+      [limits.maxAcceleration, limits.maxAcceleration], [limits.maxJerk, limits.maxJerk]);
+    var first = generate();
+    var second = generate();
+    check(first.durationSeconds() > 0.0, "planner produces a timed trajectory");
+    near(first.durationSeconds(), second.durationSeconds(), "planner duration is deterministic");
+    for (i in 0...101) {
+      var time = first.durationSeconds() * i / 100.0;
+      var a = first.evaluate(time);
+      var b = second.evaluate(time);
       for (joint in 0...2) {
-        near(first.samples[i].positions[joint], second.samples[i].positions[joint],
+        near(a.positions[joint], b.positions[joint],
           "planner position is deterministic");
-        check(Math.abs(first.samples[i].velocities[joint]) <= limits.maxVelocity + 1e-6,
+        check(Math.abs(a.velocities[joint]) <= limits.maxVelocity + 1e-6,
           "planner respects velocity limit");
-        check(Math.abs(first.samples[i].accelerations[joint]) <= limits.maxAcceleration + 1e-6,
+        check(Math.abs(a.accelerations[joint]) <= limits.maxAcceleration + 1e-6,
           "planner respects acceleration limit");
       }
     }
-    near(first.sample(0.0).positions[0], 0.0, "trajectory starts at the requested position");
-    near(first.sample(first.durationSeconds).positions[0], 1.0,
+    near(first.evaluate(0.0).positions[0], 0.0, "trajectory starts at the requested position");
+    near(first.evaluate(first.durationSeconds()).positions[0], 1.0,
       "trajectory ends at the requested position");
+    first.dispose();
+    second.dispose();
   }
 
   static function testLineLookaheadPlanner():Void {
@@ -115,97 +228,74 @@ class MotionKitBootstrapTests {
       new PathPoint(0.1, 0.0, 0.0), new PathPoint(0.1, 0.1, 0.0)]);
     var planner = new LineLookaheadPlanner(0.01);
     var limits = new MotionLimits(1.0, 2.0, 0.0);
-    var exact = planner.planPath(path, limits, PathPlanningOptions.exactStopMode());
-    var blend = planner.planPath(path, limits, PathPlanningOptions.blend(0.01));
-    check(exact.durationSeconds > blend.durationSeconds,
+    var exact = planner.planNativePath(path, limits, PathPlanningOptions.exactStopMode());
+    var blend = planner.planNativePath(path, limits, PathPlanningOptions.blend(0.01));
+    check(exact.durationSeconds() > blend.durationSeconds(),
       "blending shortens a cornered path without changing its endpoints");
-
-    var exactCorner = findCornerSample(exact);
-    var blendCorner = findCornerSample(blend);
-    near(exactCorner.velocities[0], 0.0, "exact-stop corner has no X velocity");
-    near(exactCorner.velocities[1], 0.0, "exact-stop corner has no Y velocity");
-    check(Math.sqrt(blendCorner.velocities[0] * blendCorner.velocities[0] +
-      blendCorner.velocities[1] * blendCorner.velocities[1]) > 1e-6,
-      "blend corner retains continuous path speed");
-
+    for (segment in blend.segments())
+      check(segment.coefficients[0].length == 2,
+        "native lookahead emits degree-1 segments");
     for (trajectory in [exact, blend]) {
       for (i in 0...101) {
-        var sample = trajectory.sample(trajectory.durationSeconds * i / 100.0);
-        var onFirst = Math.abs(sample.positions[1]) <= 1e-7 &&
-          sample.positions[0] >= -1e-7 && sample.positions[0] <= 0.1000001;
-        var onSecond = Math.abs(sample.positions[0] - 0.1) <= 1e-7 &&
-          sample.positions[1] >= -1e-7 && sample.positions[1] <= 0.1000001;
-        check(onFirst || onSecond, "lookahead samples stay on the authored polyline");
+        var point = trajectory.evaluate(trajectory.durationSeconds() * i / 100.0).positions;
+        var onFirst = Math.abs(point[1]) <= 1e-7 &&
+          point[0] >= -1e-7 && point[0] <= 0.1000001;
+        var onSecond = Math.abs(point[0] - 0.1) <= 1e-7 &&
+          point[1] >= -1e-7 && point[1] <= 0.1000001;
+        check(onFirst || onSecond, "lookahead stays on the authored polyline");
       }
     }
-
-    var repeated = planner.planPath(path, limits, PathPlanningOptions.blend(0.01));
-    check(repeated.samples.length == blend.samples.length,
-      "lookahead planning is deterministic");
-    for (i in 0...blend.samples.length) {
-      near(repeated.samples[i].timeSeconds, blend.samples[i].timeSeconds,
-        "lookahead sample time is deterministic");
-      near(repeated.samples[i].positions[0], blend.samples[i].positions[0],
-        "lookahead position is deterministic");
-      near(repeated.samples[i].positions[1], blend.samples[i].positions[1],
-        "lookahead corner position is deterministic");
+    var repeated = planner.planNativePath(path, limits, PathPlanningOptions.blend(0.01));
+    near(repeated.durationSeconds(), blend.durationSeconds(),
+      "lookahead duration is deterministic");
+    for (i in 0...101) {
+      var time = blend.durationSeconds() * i / 100.0;
+      for (joint in 0...3)
+        near(repeated.evaluate(time).positions[joint], blend.evaluate(time).positions[joint],
+          "lookahead position is deterministic");
     }
 
     var shallowAngle = Math.PI / 18.0;
     var nearReversalAngle = Math.PI * 170.0 / 180.0;
-    var shallowPath = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
-      new PathPoint(0.1, 0.0, 0.0),
-      new PathPoint(0.1 + 0.1 * Math.cos(shallowAngle), 0.1 * Math.sin(shallowAngle), 0.0)]);
-    var nearReversalPath = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
-      new PathPoint(0.1, 0.0, 0.0),
-      new PathPoint(0.1 + 0.1 * Math.cos(nearReversalAngle),
-        0.1 * Math.sin(nearReversalAngle), 0.0)]);
-    var shallow = planner.planPath(shallowPath, limits, PathPlanningOptions.blend(0.01));
-    var nearReversal = planner.planPath(nearReversalPath, limits,
+    function cornerPath(angle:Float):GeometricPath return GeometricPath.lines([
+      new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.1, 0.0, 0.0),
+      new PathPoint(0.1 + 0.1 * Math.cos(angle), 0.1 * Math.sin(angle), 0.0)]);
+    var shallow = planner.planNativePath(cornerPath(shallowAngle), limits,
       PathPlanningOptions.blend(0.01));
-    var shallowCorner = findCornerSampleAt(shallow, 0.1, 0.0);
-    var nearReversalCorner = findCornerSampleAt(nearReversal, 0.1, 0.0);
-    var shallowSpeed = Math.sqrt(shallowCorner.velocities[0] * shallowCorner.velocities[0] +
-      shallowCorner.velocities[1] * shallowCorner.velocities[1]);
-    var nearReversalSpeed = Math.sqrt(nearReversalCorner.velocities[0] *
-      nearReversalCorner.velocities[0] + nearReversalCorner.velocities[1] *
-      nearReversalCorner.velocities[1]);
-    check(shallowSpeed > 0.5, "a shallow line bend retains high blend speed");
-    check(nearReversalSpeed < 0.2, "a near-reversal line bend slows for the corner");
-    check(shallowSpeed > nearReversalSpeed * 4.0,
-      "corner blend speed decreases as the interior angle closes");
+    var reversal = planner.planNativePath(cornerPath(nearReversalAngle), limits,
+      PathPlanningOptions.blend(0.01));
+    var shallowSpeed = cornerChordSpeed(shallow, 0.1, 0.0);
+    var reversalSpeed = cornerChordSpeed(reversal, 0.1, 0.0);
+    check(shallowSpeed > 0.5, "shallow bend retains high blend speed");
+    check(reversalSpeed < 0.2, "near-reversal bend slows for the corner");
+    check(shallowSpeed > reversalSpeed * 4.0,
+      "corner speed decreases as the interior angle closes");
 
     var arc = new ArcSegment(new PathPoint(0.1, 0.1, 0.0), 0.1,
       -Math.PI * 0.5, Math.PI * 0.5);
-    var arcTrajectory = planner.planPath(new GeometricPath([arc]),
+    var arcTrajectory = planner.planNativePath(new GeometricPath([arc]),
       new MotionLimits(0.5, 1.0), PathPlanningOptions.exactStopMode());
-    for (sample in arcTrajectory.samples) {
-      var dx = sample.positions[0] - 0.1;
-      var dy = sample.positions[1] - 0.1;
+    for (segment in arcTrajectory.segments()) {
+      var point = segment.coefficients;
+      var dx = point[0][0] - 0.1;
+      var dy = point[1][0] - 0.1;
       near(Math.sqrt(dx * dx + dy * dy), 0.1,
-        "arc lookahead source samples stay on the authored circle", 1e-5);
-      var accelerationNorm = Math.sqrt(sample.accelerations[0] * sample.accelerations[0] +
-        sample.accelerations[1] * sample.accelerations[1] +
-        sample.accelerations[2] * sample.accelerations[2]);
-      check(accelerationNorm <= 1.0 + 1e-6,
-        "arc acceleration stays within the combined acceleration budget");
+        "arc knots stay on the authored circle", 1e-5);
     }
-    near(arcTrajectory.samples[arcTrajectory.samples.length - 1].positions[0], 0.2,
+    near(arcTrajectory.evaluate(arcTrajectory.durationSeconds()).positions[0], 0.2,
       "arc planner reaches its endpoint");
+    for (trajectory in [exact, blend, repeated, shallow, reversal, arcTrajectory])
+      trajectory.dispose();
   }
 
-  static function findCornerSample(trajectory:motionkit.trajectory.JointTrajectory):motionkit.trajectory.JointTrajectorySample {
-    return findCornerSampleAt(trajectory, 0.1, 0.0);
+  static function cornerChordSpeed(trajectory:Trajectory, x:Float, y:Float):Float {
+    for (segment in trajectory.segments())
+      if (Math.abs(segment.coefficients[0][0] - x) <= 1e-7 &&
+          Math.abs(segment.coefficients[1][0] - y) <= 1e-7)
+        return Math.sqrt(segment.coefficients[0][1] * segment.coefficients[0][1] +
+          segment.coefficients[1][1] * segment.coefficients[1][1]);
+    throw "lookahead trajectory did not emit its corner knot";
   }
-
-  static function findCornerSampleAt(trajectory:motionkit.trajectory.JointTrajectory,
-      x:Float, y:Float):motionkit.trajectory.JointTrajectorySample {
-    for (sample in trajectory.samples)
-      if (Math.abs(sample.positions[0] - x) <= 1e-7 && Math.abs(sample.positions[1] - y) <= 1e-7)
-        return sample;
-    throw "lookahead trajectory did not emit its corner sample";
-  }
-
   static function testLinearAxisCompilesToRobotModel():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
@@ -218,10 +308,82 @@ class MotionKitBootstrapTests {
       "MachineKit travel origin is converted to metres");
     near(joint.limits.upper, 0.08, "MachineKit stroke becomes the logical upper limit");
     near(joint.limits.velocity, 0.1, "compiled actuator rate is retained");
-    check(joint.drive != null && joint.drive.name.indexOf(axis.motor.designation) >= 0,
+    check(blueprint.model.actuators.length == 1 &&
+      blueprint.model.actuators[0].id.indexOf(axis.motor.designation) >= 0,
       "compiled actuator retains motor identity");
-    check(joint.drive != null && joint.drive.name.indexOf("mm/rev") >= 0,
-      "compiled actuator retains transmission identity");
+    var expectedRatio = 2.0 * Math.PI /
+      (axis.nut.travelPerRevolution() * MachineKitRobotCompiler.MILLIMETRES_TO_METRES);
+    check(switch blueprint.model.actuators[0].transmission {
+      case SimpleTransmission(jointId, ratio, offset):
+        jointId == joint.id && Math.abs(ratio - expectedRatio) < 1e-9 && offset == 0.0;
+    }, "compiled actuator carries the lead-screw rad/m ratio");
+    near(blueprint.axes[0].jointScales[0], 1.0,
+      "transmission-derived single-joint mapping keeps the old scale");
+    near(blueprint.axes[0].jointOffsets[0], 0.0,
+      "transmission-derived single-joint mapping keeps the old offset");
+  }
+
+  static function testLeadScrewActuatorRateLimitsPlans():Void {
+    var axis = new LinearAxis(23, 10, 80);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
+    var actuator = blueprint.model.actuators[0];
+    var ratio = switch actuator.transmission {
+      case SimpleTransmission(_, value, _): Math.abs(value);
+    };
+    actuator.maxRate = 0.02 * ratio;
+    var limited = RobotRuntimeCompiler.compile(blueprint.model);
+    near(limited.joints[0].maxRate, 0.02,
+      "lead-screw motor rate converts to the tighter joint-space limit");
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(limited);
+    var plan = new ExecutionPlanSubmission(Int64.ofInt(1), Int64.ofInt(limited.revision),
+      Int64.ofInt(limited.calibrationRevision),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      [0.0], [0.0], [0.0],
+      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000), [[0.0, 0.03]])]);
+    var rejectedForLimit = false;
+    try runtime.submitPlan(plan, 1) catch (error:Dynamic) {
+      if (Std.isOfType(error, RobotRuntimeError)) {
+        var nativeError:RobotRuntimeError = cast error;
+        rejectedForLimit = nativeError.status == RobotKitRuntimeConstants.RK_ERROR_LIMIT;
+      }
+    }
+    check(rejectedForLimit,
+      "runtime rejects a plan faster than the converted motor rate limit");
+    simulation.dispose();
+  }
+
+  static function testTransmissionDerivedAxisMapping():Void {
+    var model = new RobotModel("dual-drive-map");
+    var base = model.addLink(new Link("base"));
+    var left = model.addLink(new Link("left"));
+    var right = model.addLink(new Link("right"));
+    var first = model.addJoint(new Joint("x.left", JointType.Prismatic, base, left));
+    var second = model.addJoint(new Joint("x.right", JointType.Prismatic, left, right));
+    first.limits.lower = 0.0;
+    first.limits.upper = 0.08;
+    second.limits.lower = -0.16;
+    second.limits.upper = 0.01;
+    model.addActuator(new Actuator("left-motor", 0.0, 1.0,
+      Transmission.SimpleTransmission(first.id, 1.0, 0.0)));
+    model.addActuator(new Actuator("right-motor", 0.0, 1.0,
+      Transmission.SimpleTransmission(second.id, -0.5, 0.01)));
+    var authored = new MotionAxisBlueprint("x", [first.id, second.id],
+      0.0, 0.08, 0.08, 0.4);
+    var derived = MotionSystemBlueprint.fromRobotModel(model, [authored]);
+    near(derived.axes[0].jointScales[0], 1.0,
+      "first transmitted joint defines the logical coordinate");
+    near(derived.axes[0].jointScales[1], -2.0,
+      "transmission ratio derives the old dual-motor scale");
+    near(derived.axes[0].jointOffsets[1], 0.01,
+      "transmission offset is retained in joint coordinates");
+    var explicit = new MotionAxisBlueprint("x", [first.id, second.id],
+      0.0, 0.08, 0.08, 0.4, 0.0, [1.0, -3.0], [0.0, 0.02]);
+    var overridden = MotionSystemBlueprint.fromRobotModel(model, [explicit]);
+    near(overridden.axes[0].jointScales[1], -3.0,
+      "deprecated explicit scale still overrides the transmission");
+    near(overridden.axes[0].jointOffsets[1], 0.02,
+      "deprecated explicit offset still overrides the transmission");
   }
 
   static function testCompiledAxisRunsThroughSimulation():Void {
@@ -268,14 +430,14 @@ class MotionKitBootstrapTests {
     near(robot.snapshot().positions.get(0), 0.0, "homing returns the axis to its authored home", 1e-5);
 
     var forward = planned(machine.jog("x", 0.02, 1.0));
-    near(forward.samples[0].velocities[0], 0.0,
+    near(forward.evaluate(0.0).velocities[0], 0.0,
       "jog starts at rest");
-    near(forward.samples[forward.samples.length - 1].velocities[0], 0.0,
+    near(forward.evaluate(forward.durationSeconds()).velocities[0], 0.0,
       "jog ends at rest");
-    for (sample in forward.samples)
+    for (sample in trajectoryStates(forward))
       check(Math.abs(sample.accelerations[0]) <= 0.4 + 1e-9,
         "jog respects its acceleration limit");
-    near(forward.samples[forward.samples.length - 1].positions[0], 0.02,
+    near(forward.evaluate(forward.durationSeconds()).positions[0], 0.02,
       "jog plans the requested logical displacement");
     runMotion(machine, simulation);
     near(robot.snapshot().positions.get(0), 0.02,
@@ -287,7 +449,7 @@ class MotionKitBootstrapTests {
       "negative jog follows the same logical axis API", 1e-5);
 
     var clamped = planned(machine.jog("x", 0.1, 2.0));
-    near(clamped.samples[clamped.samples.length - 1].positions[0], 0.08,
+    near(clamped.evaluate(clamped.durationSeconds()).positions[0], 0.08,
       "jog clamps its endpoint to the authored upper limit");
     runMotion(machine, simulation);
     near(robot.snapshot().positions.get(0), 0.08,
@@ -312,19 +474,17 @@ class MotionKitBootstrapTests {
     var options = new MotionOptions(0.2, 2.0);
     var xOnly = planned(machine.moveLinear(Pose.xyz(0.02, 0.0, 0.0),
       Feed.metresPerSecond(0.2), options));
-    var peakAcceleration = 0.0;
-    for (sample in xOnly.samples)
-      peakAcceleration = Math.max(peakAcceleration, Math.abs(sample.accelerations[0]));
+    var peakAcceleration = peakChordAcceleration(xOnly, 0);
     check(peakAcceleration > 1.9,
       "moveLinear uses an authored 2 m/s² acceleration limit");
 
+    runMotion(machine, simulation);
+
     var diagonal = planned(machine.moveLinear(Pose.xyz(0.03, 0.03, 0.03),
       Feed.metresPerSecond(0.2), options));
-    for (sample in diagonal.samples) {
-      for (joint in 0...3)
-        check(Math.abs(sample.accelerations[joint]) <= 2.0 + 1e-9,
-          "diagonal moveLinear samples stay within per-axis acceleration caps");
-    }
+    for (joint in 0...3)
+      check(peakChordAcceleration(diagonal, joint) <= 2.0 + 1e-6,
+        "diagonal moveLinear chords stay within per-axis acceleration caps");
     simulation.dispose();
   }
 
@@ -398,7 +558,7 @@ class MotionKitBootstrapTests {
     near(firstMove.positions.get(2), 0.015, "XYZ gantry reaches Z axis target", 1e-5);
 
     var linear = planned(machine.moveLinear(Pose.xyz(0.03, 0.02, 0.025), Feed.mmPerSecond(50)));
-    var midpoint = linear.sample(linear.durationSeconds * 0.5);
+    var midpoint = linear.evaluate(linear.durationSeconds() * 0.5);
     var xAlpha = (midpoint.positions[0] - 0.02) / 0.01;
     var yAlpha = (midpoint.positions[1] - 0.01) / 0.01;
     var zAlpha = (midpoint.positions[2] - 0.015) / 0.01;
@@ -414,7 +574,7 @@ class MotionKitBootstrapTests {
       new PathPoint(0.04, 0.02, 0.025), new PathPoint(0.04, 0.03, 0.025)]);
     var cornerMove = machine.movePath(cornerPath, PathPlanningOptions.blend(0.001),
       new MotionOptions(0.05, 0.2));
-    check(cornerMove.samples.length > 2, "MotionSystem exposes buffered line-path planning");
+    check(cornerMove.segments().length > 1, "MotionSystem exposes buffered line-path planning");
     runMotion(machine, simulation);
     var cornerEnd = robot.snapshot();
     near(cornerEnd.positions.get(0), 0.04, "line path reaches its X endpoint", 1e-5);
@@ -467,6 +627,36 @@ class MotionKitBootstrapTests {
     for (_ in 0...4) simulation.step(Int64.ofInt(tick++));
   }
 
+  static function testPlanCapableReplayRecordsMotionPlan():Void {
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(
+      new LinearAxis(23, 10, 80), "x", 0.1, 0.4);
+    var source = new RobotRecording();
+    source.recordSnapshot(new RobotSnapshot("plan-replay", Int64.ofInt(0),
+      Int64.ofInt(0), [0.0], [0.0], [0.0], 0, 0));
+    var description = new RobotDescription("plan-replay", blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var capabilities = new RobotCapabilities("plan-replay", 1,
+      true, false, false, false, true, true);
+    var unsupported = new ReplayRobot("plan-replay", source, description);
+    throws(function() MotionSystem.fromBlueprint(unsupported, blueprint),
+      "MotionSystem rejects a robot without queue and plan capabilities");
+    unsupported.close();
+    var replay = new ReplayRobot("plan-replay", source, description, capabilities);
+    var machine = MotionSystem.fromBlueprint(replay, blueprint);
+    machine.moveAxes([new AxisTarget("x", 0.02)]);
+    check(replay.generatedCommands.commands.length == 1,
+      "plan-capable replay records one generated command");
+    switch replay.generatedCommands.commands[0] {
+      case ExecutionPlan(plan):
+        check(plan.segments.length > 0,
+          "plan-capable replay records generated polynomial segments");
+      case _:
+        throw "plan-capable replay did not record an execution plan";
+    }
+    replay.close();
+  }
+
   static function testBufferedExecution():Void {
     var xAxis = new LinearAxis(23, 10, 80);
     var yAxis = new LinearAxis(23, 10, 60);
@@ -487,17 +677,21 @@ class MotionKitBootstrapTests {
     var first = planned(machine.queueAxes([new AxisTarget("x", 0.02)], options));
     var second = planned(machine.queueAxes([new AxisTarget("x", 0.04)], options));
     check(machine.queueDepth() == 2, "buffer reports active and waiting trajectories");
-    check(machine.queuedDurationSeconds() > first.durationSeconds,
+    check(machine.queuedDurationSeconds() > first.durationSeconds(),
       "buffer reports the duration of waiting motion");
-    near(second.samples[0].positions[0], 0.02,
+    near(second.evaluate(0.0).positions[0], 0.02,
       "queued axis motion starts at the previous trajectory endpoint");
     near(machine.progress(), 0.0, "buffer starts with zero progress");
-    check(recording.commands.length == 1, "buffer submits the first move as one chunk");
+    check(recording.commands.length == 1, "buffer submits the first move as one plan");
     switch recording.commands[0] {
       case TrajectoryChunk(chunk):
-        check(chunk.points.length > 1, "trajectory chunk carries timestamped samples");
+        throw "buffer submitted a legacy point chunk";
       case JointTargets(_, _):
         throw "buffer unexpectedly fell back to sample-by-sample targets";
+      case ExecutionPlan(plan):
+        check(plan.segments.length > 0, "trajectory plan carries polynomial segments");
+      case Hold | Resume | Abort:
+        throw "buffer submitted a lifecycle command before motion started";
     }
 
     var tick = 0;
@@ -528,7 +722,7 @@ class MotionKitBootstrapTests {
     check(heldPosition > beforeHold && heldPosition < 0.02,
       "controlled hold decelerates before coming to rest");
     var holdTicks = 0;
-    while (runtime.snapshot().trajectoryActive) {
+    while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       check(!machine.update(), "held buffer remains paused after deceleration");
       simulation.step(Int64.ofInt(tick++));
       holdTicks += 1;
@@ -582,17 +776,18 @@ class MotionKitBootstrapTests {
     var recording = new RobotRecording();
     var instrumented = new RecordingRobot(robot, recording);
     var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
-    var samples:Array<JointTrajectorySample> = [];
-    for (index in 0...601)
-      samples.push(new JointTrajectorySample(index * 0.01, [0.05 * index / 600.0]));
-    var trajectory = new JointTrajectory(samples);
+    var trajectory = Trajectory.fromPositionSamples(
+      [for (index in 0...601) index * 0.01],
+      [for (index in 0...601) [0.05 * index / 600.0]]);
     machine.queueTrajectory(trajectory);
-    check(recording.commands.length == 1, "long trajectory starts with one bounded native chunk");
+    check(recording.commands.length >= 2,
+      "long trajectory starts with a bounded native plan window");
+    var initialPlanCount = recording.commands.length;
 
     var tick = 0;
     machine.update();
-    check(recording.commands.length == 1,
-      "streamer waits for the owner cycle before appending a second chunk");
+    check(recording.commands.length == initialPlanCount,
+      "streamer keeps its initial plan window until the owner advances");
     simulation.step(Int64.ofInt(tick++));
     while (machine.isMoving()) {
       machine.update();
@@ -604,10 +799,14 @@ class MotionKitBootstrapTests {
       "long trajectory refills native chunks before the queue drains");
     for (command in recording.commands) switch command {
       case RobotCommand.TrajectoryChunk(chunk):
-        check(chunk.points.length <= robotkit.world.TrajectoryChunk.MAX_POINTS,
-          "streamed trajectory chunks stay within the native point limit");
+        throw "long trajectory submitted a legacy point chunk";
       case RobotCommand.JointTargets(_, _):
         throw "long trajectory unexpectedly fell back to sample-by-sample targets";
+      case RobotCommand.ExecutionPlan(plan):
+        check(plan.segments.length <= 128,
+          "streamed trajectory plans stay within the native segment limit");
+      case Hold | Resume | Abort:
+        throw "long trajectory unexpectedly submitted a lifecycle command";
     }
     near(instrumented.snapshot().positions.get(0), 0.05,
       "streamed trajectory reaches its final position", 1e-5);
@@ -638,9 +837,9 @@ class MotionKitBootstrapTests {
       previousProgress = progress;
       var snapshot = runtime.snapshot();
       if (Int64.compare(snapshot.trajectoryTag, Int64.ofInt(0)) != 0) {
-        var runtimeTime = Std.parseFloat(Int64.toStr(snapshot.trajectoryTagTimeNs)) /
+        var runtimeTime = Int64.toFloat(snapshot.trajectoryTagTimeNs) /
           1000000000.0;
-        check(Math.abs(progress - Math.min(1.0, runtimeTime / move.durationSeconds)) < 1e-6,
+        check(Math.abs(progress - Math.min(1.0, runtimeTime / move.durationSeconds())) < 1e-6,
           "progress follows the runtime trajectory tag clock");
       }
     }
@@ -648,7 +847,7 @@ class MotionKitBootstrapTests {
     for (cycle in 0...2) {
       machine.hold();
       var stopTicks = 0;
-      while (runtime.snapshot().trajectoryActive) {
+      while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
         check(!machine.update(), "held motion does not submit host-clock samples");
         simulation.step(Int64.ofInt(tick++));
         stopTicks += 1;
@@ -710,7 +909,7 @@ class MotionKitBootstrapTests {
       if (tick > 2000) throw "queued trajectory did not reach its second move";
     }
     queuedMachine.hold();
-    while (queuedRuntime.snapshot().trajectoryActive) {
+    while (queuedRuntime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       queuedMachine.update();
       queuedSimulation.step(Int64.ofInt(tick++));
       if (tick > 2200) throw "second queued trajectory did not stop";
@@ -756,7 +955,7 @@ class MotionKitBootstrapTests {
     }
     check(reachedThirdLeg, "square hold test reaches the third path leg");
     squareMachine.hold();
-    while (squareRuntime.snapshot().trajectoryActive) {
+    while (squareRuntime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       squareMachine.update();
       squareSimulation.step(Int64.ofInt(tick++));
       if (tick > 3400) throw "square third-leg stop did not settle";
@@ -793,10 +992,9 @@ class MotionKitBootstrapTests {
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
-    var samples:Array<JointTrajectorySample> = [];
-    for (index in 0...2001)
-      samples.push(new JointTrajectorySample(index * 0.005, [0.06 * index / 2000.0]));
-    machine.queueTrajectory(new JointTrajectory(samples));
+    machine.queueTrajectory(Trajectory.fromPositionSamples(
+      [for (index in 0...2001) index * 0.005],
+      [for (index in 0...2001) [0.06 * index / 2000.0]]));
 
     var tick = 0;
     var previousPreHoldPosition = 0.0;
@@ -814,7 +1012,7 @@ class MotionKitBootstrapTests {
     var previousVelocity = (beforeHold - previousPreHoldPosition) / 0.01;
     var peakAcceleration = 0.0;
     var stopTicks = 0;
-    while (runtime.snapshot().trajectoryActive) {
+    while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       machine.update();
       simulation.step(Int64.ofInt(tick++));
       var position = robot.snapshot().positions.get(0);
@@ -858,7 +1056,7 @@ class MotionKitBootstrapTests {
       var machine = MotionSystem.fromBlueprint(robot, blueprint);
       var move = planned(machine.moveAxes([new AxisTarget("x", target)],
         new MotionOptions(0.05, limit)));
-      if (moveTicks == 0) moveTicks = Math.ceil(move.durationSeconds / 0.01);
+      if (moveTicks == 0) moveTicks = Math.ceil(move.durationSeconds() / 0.01);
       var tick = 0;
       var positions:Array<Float> = [];
       for (_ in 0...holdTick) {
@@ -888,7 +1086,11 @@ class MotionKitBootstrapTests {
       check(last <= target + 1e-9, 'hold at tick $holdTick stops within the planned move');
       check(Math.abs(last - positions[positions.length - 2]) < 1e-9,
         'hold at tick $holdTick comes to rest');
-      check(!runtime.snapshot().trajectoryActive, 'hold at tick $holdTick finishes its stop');
+      var session = runtime.snapshot().sessionState;
+      check(session == RobotKitRuntimeConstants.RK_SESSION_HELD ||
+        (session == RobotKitRuntimeConstants.RK_SESSION_IDLE &&
+          Math.abs(last - target) < 1e-5),
+        'hold at tick $holdTick pauses or completes its path');
       simulation.dispose();
       holdTick += 2;
     }
@@ -911,23 +1113,92 @@ class MotionKitBootstrapTests {
 
     machine.moveAxes([new AxisTarget("x", 0.06)], options);
     machine.moveAxes([new AxisTarget("x", 0.01)], options);
-    check(recording.commands.length == 4,
-      "immediate replacement submits a runtime flush before each trajectory");
-    switch recording.commands[2] {
+    check(recording.commands.length == 2,
+      'immediate replacement submits the replacement plan: ${recording.commands}');
+    switch recording.commands[1] {
+      case ExecutionPlan(_):
+        check(true, "immediate replacement submits the new plan");
       case JointTargets(_, _):
-        check(true, "immediate replacement flush is ordered before its new chunk");
+        throw "immediate replacement did not submit a plan";
       case TrajectoryChunk(_):
-        throw "immediate replacement submitted its chunk before the runtime flush";
-    }
-    switch recording.commands[3] {
-      case TrajectoryChunk(_):
-        check(true, "immediate replacement submits the new trajectory after its flush");
-      case JointTargets(_, _):
-        throw "immediate replacement did not submit a trajectory after its flush";
+        throw "immediate replacement submitted a legacy point chunk";
+      case Hold | Resume | Abort:
+        throw "immediate replacement unexpectedly submitted a lifecycle command";
     }
     runMotion(machine, simulation);
     near(robot.snapshot().positions.get(0), 0.01,
       "immediate motion replaces stale native trajectory motion", 1e-5);
+    simulation.dispose();
+  }
+
+  static function testSmoothReplacementRetriesLateSubmission():Void {
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(new LinearAxis(23, 10, 80),
+      "x", 0.08, 0.4);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var base = new SimulatedRobot("retry-replacement", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var robot = new LaggingRobot(base);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    var options = new MotionOptions(0.05, 0.2);
+    machine.moveAxes([new AxisTarget("x", 0.06)], options);
+    for (tick in 0...5) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick));
+    }
+    robot.lateRejections = 1;
+    var replacement = machine.moveAxes([new AxisTarget("x", 0.04)], options);
+    check(replacement != null, "one late rejection is retried from a fresh snapshot");
+    check(robot.replacementAttempts == 2,
+      "late replacement submits exactly one retry");
+    check(Int64.compare(robot.lastReplacementLeadNs, Int64.ofInt(20000000)) >= 0,
+      "smooth replacement anchors at least two owner periods ahead");
+    runMotion(machine, simulation);
+    near(base.snapshot().positions.get(0), 0.04, "retried replacement reaches target", 1e-5);
+    robot.lateRejections = 2;
+    machine.moveAxes([new AxisTarget("x", 0.06)], options);
+    for (tick in 0...5) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick + 500));
+    }
+    var fallback = machine.moveAxes([new AxisTarget("x", 0.02)], options);
+    check(fallback == null && machine.isMoving(),
+      "two late rejections defer the target behind a stop");
+    check(robot.lateRejections == 0,
+      "stop-first fallback follows exactly two rejected attempts");
+    runMotion(machine, simulation);
+    near(base.snapshot().positions.get(0), 0.02,
+      "stop-first fallback reaches target", 1e-5);
+    simulation.dispose();
+  }
+
+  static function testFreeRunningSmoothReplacement():Void {
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(new LinearAxis(23, 10, 80),
+      "x", 0.08, 0.4);
+    blueprint.replacementOwnerPeriodSeconds = 0.001;
+    var simulation = new Simulation(0.001);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("free-running-replacement", runtime,
+      blueprint.model.name, [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var machine = MotionSystem.fromBlueprint(robot, blueprint);
+    simulation.start();
+    machine.jog("x", 0.03, 1.0, 0.2);
+    for (index in 0...12) {
+      Sys.sleep(0.004);
+      machine.update();
+      var result = machine.jog("x", index % 2 == 0 ? 0.02 : 0.035, 0.5, 0.2);
+      check(result != null || machine.isMoving(),
+        "free-running jog applies a replacement or defers behind a stop");
+      var observation = robot.snapshot();
+      check(Math.abs(observation.velocities.get(0)) <= 0.08 + 1e-5,
+        "free-running replacement stays within velocity limit");
+      check(observation.positions.get(0) >= -1e-6 &&
+        observation.positions.get(0) <= 0.08 + 1e-6,
+        "free-running replacement stays within travel limits");
+    }
+    simulation.stop();
     simulation.dispose();
   }
 
@@ -985,13 +1256,12 @@ class MotionKitBootstrapTests {
 
   /**
    * Replacing motion while moving and resuming after a hold must both stay
-   * within the joint acceleration limit, whether the robot executes buffered
-   * chunks or MotionKit streams position targets itself.
+   * within the joint acceleration limit on the plan execution path.
    */
   static function testMotionChangesStayWithinLimits():Void {
     var limit = 0.4;
-    for (queueSupport in [true, false]) {
-      var label = queueSupport ? "buffered" : "position-target";
+    for (queueSupport in [true]) {
+      var label = "buffered";
       var worstReplace = 0.0;
       var worstJog = 0.0;
       var worstResume = 0.0;
@@ -1042,38 +1312,14 @@ class MotionKitBootstrapTests {
     }
   }
 
-  static function testJogProfile():Void {
-    var limit = 0.4;
-    function checkProfile(label:String, profile:JogProfile, start:Float, startVelocity:Float,
-        expectedEnd:Float):Void {
-      near(profile.positionAt(0.0), start, '$label starts at its position', 1e-12);
-      near(profile.velocityAt(0.0), startVelocity, '$label starts at its velocity', 1e-12);
-      near(profile.endPosition, expectedEnd, '$label rests at its end', 1e-12);
-      near(profile.velocityAt(profile.durationSeconds), 0.0, '$label ends at rest', 1e-12);
-      var step = 0.001;
-      var count = Std.int(profile.durationSeconds / step) + 2;
-      for (index in 1...count) {
-        var change = Math.abs(profile.velocityAt(index * step) - profile.velocityAt((index - 1) * step));
-        check(change <= limit * step * (1.0 + 1e-9) + 1e-12, '$label stays within its acceleration');
-      }
-    }
-    checkProfile("jog from rest", new JogProfile(0.0, 0.0, 0.1, 0.05, limit), 0.0, 0.0, 0.1);
-    checkProfile("slowing jog", new JogProfile(0.0, 0.08, 0.2, 0.02, limit), 0.0, 0.08, 0.2);
-    checkProfile("speeding jog", new JogProfile(0.0, 0.02, 0.2, 0.08, limit), 0.0, 0.02, 0.2);
-    checkProfile("reversing jog", new JogProfile(0.05, 0.05, 0.0, 0.05, limit), 0.05, 0.05, 0.0);
-    // Braking from 0.05 m/s at 0.4 m/s^2 needs 3.125 mm, past a 1 mm target.
-    checkProfile("overrunning jog", new JogProfile(0.0, 0.05, 0.001, 0.05, limit), 0.0, 0.05,
-      0.05 * 0.05 / (2.0 * limit));
-  }
-
   /**
    * A jog issued while the same axis is jogging changes speed or direction
-   * without stopping first, within the acceleration limit, on both paths.
+   * without stopping first, within the acceleration limit, on the plan path.
    */
   static function testContinuousJog():Void {
     var limit = 0.4;
-    for (queueSupport in [true, false]) {
-      var label = queueSupport ? "buffered" : "position-target";
+    for (queueSupport in [true]) {
+      var label = "buffered";
       for (secondVelocity in [0.08, 0.02, -0.05]) {
         var eventTick = 10;
         while (eventTick <= 150) {
@@ -1101,11 +1347,10 @@ class MotionKitBootstrapTests {
   }
 
   /**
-   * When a jog change reaches the runtime after its splice point, the
-   * runtime keeps the old jog and MotionKit recovers by stopping along it and
-   * starting the new jog from rest, still within the limit.
+   * A replacement that arrives after its committed point is rejected
+   * explicitly; the original jog remains safe and completes normally.
    */
-  static function testLateJogSpliceFallsBackToStop():Void {
+  static function testLateJogReplacementRejectsLateArrival():Void {
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
       new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
     var simulation = new Simulation(0.01);
@@ -1127,23 +1372,15 @@ class MotionKitBootstrapTests {
     robot.lagging = true;
     check(machine.jog("x", 0.02, 1.0) != null, "jog change is planned as a continuation");
     for (_ in 0...8) step();
-    robot.release();
-    var stillTicks = 0;
-    while (machine.isMoving() || stillTicks < 3) {
-      step();
-      var count = positions.length;
-      stillTicks = Math.abs(positions[count - 1] - positions[count - 2]) < 1e-12 ? stillTicks + 1 : 0;
+    throws(() -> robot.release(), "late native replacement is rejected explicitly");
+    for (_ in 0...250) {
+      simulation.step(Int64.ofInt(tick++));
+      positions.push(robot.snapshot().positions.get(0));
     }
     check(peakSecondDifference(positions) <= 0.4 * 1.05,
-      'late jog splice recovery stays within the limit (peak ${peakSecondDifference(positions)})');
-    var rested = false;
-    var movedAfterRest = false;
-    for (index in 49...(positions.length - 3)) {
-      var moving = Math.abs(positions[index] - positions[index - 1]) >= 1e-12;
-      if (!moving) rested = true;
-      else if (rested) movedAfterRest = true;
-    }
-    check(rested && movedAfterRest, "late jog splice stops, then starts the new jog from rest");
+      'original jog stays within the limit (peak ${peakSecondDifference(positions)})');
+    near(positions[positions.length - 1], 0.1,
+      "rejected replacement leaves the original jog to complete", 1e-5);
     simulation.dispose();
   }
 
@@ -1242,13 +1479,16 @@ class MotionKitBootstrapTests {
           new PathPoint(0.05, 0.05, 0.0)]), PathPlanningOptions.blend(0.001),
         new MotionOptions(0.05, limit))}
     ];
-    for (queueSupport in [true, false]) {
-      var mode = queueSupport ? "buffered" : "position-target";
+    for (queueSupport in [true]) {
+      var mode = "buffered";
       for (entry in cases) {
         // Blend mode changes velocity at a corner by design, so compare with
         // the uninterrupted move rather than the bare limit.
         var baseline = rigTrial(gantryRig(queueSupport), 0, _ -> {}, false, entry.begin);
-        var allowed = [for (joint in 0...2) Math.max(limit, jointPeak(baseline, joint)) * 1.05];
+        // Time-warping changes which 10 ms sample straddles a blended corner;
+        // keep a small absolute allowance on this discrete second difference.
+        var allowed = [for (joint in 0...2)
+          Math.max(limit, jointPeak(baseline, joint)) * 1.05 + 0.01];
         var eventTicks = baseline.length;
         var eventTick = 3;
         while (eventTick < eventTicks) {
@@ -1312,8 +1552,8 @@ class MotionKitBootstrapTests {
     var begin:MotionSystem -> Void = machine -> {
       machine.moveAxes([new AxisTarget("x", 0.06)], new MotionOptions(0.08, 0.4));
     };
-    for (queueSupport in [true, false]) {
-      var mode = queueSupport ? "buffered" : "position-target";
+    for (queueSupport in [true]) {
+      var mode = "buffered";
       var baseline = rigTrial(dualMotorRig(queueSupport), 0, _ -> {}, false, begin);
       var eventTick = 3;
       while (eventTick < baseline.length) {
@@ -1337,17 +1577,17 @@ class MotionKitBootstrapTests {
           if (recording != null)
             for (command in recording.commands)
               switch command {
-                // On the buffered path, target batches are only the flush at
-                // rest, which holds the measured pose.
-                case JointTargets(_, _) if (queueSupport):
-                case JointTargets(targets, _):
-                  var byJoint = [0.0, 0.0];
-                  for (target in targets) byJoint[target.joint] = target.target;
-                  worstSkew = Math.max(worstSkew, Math.abs(byJoint[1] + 2.0 * byJoint[0]));
-                case TrajectoryChunk(chunk):
-                  for (point in chunk.points)
-                    worstSkew = Math.max(worstSkew,
-                      Math.abs(point.positions[1] + 2.0 * point.positions[0]));
+                case JointTargets(_, _) | TrajectoryChunk(_):
+                  throw "MotionSystem submitted a non-plan motion command";
+                case ExecutionPlan(plan):
+                  worstSkew = Math.max(worstSkew,
+                    Math.abs(plan.startPosition.get(1) + 2.0 * plan.startPosition.get(0)));
+                  for (segment in plan.segments)
+                    for (degree in 0...(segment.degree + 1))
+                      worstSkew = Math.max(worstSkew,
+                        Math.abs(segment.coefficients[1][degree] +
+                          2.0 * segment.coefficients[0][degree]));
+                case Hold | Resume | Abort: continue;
               }
           check(worstSkew <= 1e-12, '$context commands the motors coordinated (skew $worstSkew)');
         }
@@ -1357,9 +1597,32 @@ class MotionKitBootstrapTests {
   }
 
   /** Unwraps a move that started at once because the machine was at rest. */
-  static function planned(value:Null<JointTrajectory>):JointTrajectory {
+  static function planned(value:Null<Trajectory>):Trajectory {
     if (value == null) throw "Move was deferred behind a stop but was expected to start at once";
     return cast value;
+  }
+
+  static function trajectoryStates(value:Trajectory):Array<motionkit.trajectory.TrajectoryState> {
+    var result = [];
+    var duration = value.durationSeconds();
+    for (index in 0...101)
+      result.push(value.evaluate(duration * index / 100.0));
+    return result;
+  }
+
+  static function peakChordAcceleration(value:Trajectory, joint:Int):Float {
+    var segments = value.segments();
+    var peak = 0.0;
+    for (index in 1...segments.length) {
+      var before = segments[index - 1];
+      var after = segments[index];
+      var seconds = 0.5 * (Int64.toFloat(before.durationNs) +
+        Int64.toFloat(after.durationNs)) * 1e-9;
+      if (seconds > 0.0)
+        peak = Math.max(peak, Math.abs(after.coefficients[joint][1] -
+          before.coefficients[joint][1]) / seconds);
+    }
+    return peak;
   }
 
   static function check(value:Bool, message:String):Void {
@@ -1383,6 +1646,9 @@ class MotionKitBootstrapTests {
 /** Robot wrapper that can hold submitted commands back, to simulate transport delay. */
 private class LaggingRobot implements Robot {
   public var lagging:Bool = false;
+  public var lateRejections:Int = 0;
+  public var replacementAttempts:Int = 0;
+  public var lastReplacementLeadNs:Int64 = Int64.ofInt(0);
   final inner:Robot;
   var heldCommands:Array<RobotCommand> = [];
 
@@ -1402,6 +1668,20 @@ private class LaggingRobot implements Robot {
   public function sensors():Array<SensorFrame> return inner.sensors();
   public function fault():Null<RobotFault> return inner.fault();
   public function submit(command:RobotCommand):Void {
+    switch command {
+      case ExecutionPlan(plan):
+        if (Int64.compare(plan.replaceAfterPlanId, Int64.ofInt(0)) != 0) {
+          replacementAttempts++;
+          lastReplacementLeadNs = Int64.sub(plan.replaceAfterTimeNs,
+            inner.snapshot().committedUntilNs);
+          if (lateRejections > 0) {
+            lateRejections--;
+            throw new RobotRuntimeError(RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE,
+              "runtime.submitPlan");
+          }
+        }
+      case _:
+    }
     if (lagging) heldCommands.push(command);
     else inner.submit(command);
   }

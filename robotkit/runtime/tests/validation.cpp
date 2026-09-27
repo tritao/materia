@@ -1,6 +1,7 @@
 #include "robotkit_runtime.h"
 
 #include <cassert>
+#include <cstddef>
 #include <cmath>
 
 int main() {
@@ -20,6 +21,20 @@ int main() {
         joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
         joint.axis[2] = 1.0;
     }
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.owner_period_ns = static_cast<uint64_t>(INT64_MAX) + 1;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.struct_size = offsetof(rk_robot_runtime_blueprint, owner_period_ns);
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.owner_period_ns = 20'000'000;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.serial_processing_allowance_ns = static_cast<uint64_t>(INT64_MAX) + 1;
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    blueprint.struct_size = offsetof(rk_robot_runtime_blueprint, serial_processing_allowance_ns);
+    assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.serial_processing_allowance_ns = 2'000'000;
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
 
     rk_robot_command command{};
@@ -44,26 +59,53 @@ int main() {
     rk_robot_command trajectory_command{};
     trajectory_command.struct_size = sizeof(trajectory_command);
     trajectory_command.sequence = 2;
-    trajectory_command.kind = RK_COMMAND_TRAJECTORY_CHUNK;
+    trajectory_command.kind = RK_COMMAND_TRAJECTORY_SEGMENTS;
     assert(rk_robot_command_validate_for_blueprint(&trajectory_command, &blueprint) == RK_OK);
-    rk_trajectory_chunk trajectory{};
+    trajectory_command.kind = 5;
+    assert(rk_robot_command_validate(&trajectory_command) == RK_ERROR_INVALID_ARGUMENT);
+    trajectory_command.kind = RK_COMMAND_TRAJECTORY_SEGMENTS;
+    rk_trajectory_segment_chunk trajectory{};
     trajectory.struct_size = sizeof(trajectory);
-    trajectory.point_count = 2;
-    trajectory.points[0].joint_count = 2;
-    trajectory.points[0].positions[0] = 0.0;
-    trajectory.points[0].positions[1] = 0.0;
-    trajectory.points[1].time_from_start_ns = 10000000;
-    trajectory.points[1].joint_count = 2;
-    trajectory.points[1].positions[0] = 0.1;
-    trajectory.points[1].positions[1] = -0.1;
-    assert(rk_trajectory_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_OK);
-    trajectory.points[1].time_from_start_ns = 0;
-    trajectory.points[0].time_from_start_ns = 1;
-    assert(rk_trajectory_chunk_validate(&trajectory) == RK_ERROR_INVALID_ARGUMENT);
-    trajectory.points[0].time_from_start_ns = 0;
-    trajectory.points[1].time_from_start_ns = 10000000;
-    trajectory.points[1].joint_count = 1;
-    assert(rk_trajectory_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    trajectory.segment_count = 1;
+    trajectory.segments[0].duration_ns = 10'000'000;
+    trajectory.segments[0].degree = 1;
+    trajectory.segments[0].joint_count = 2;
+    trajectory.segments[0].coefficients[0].value[1] = 10.0;
+    trajectory.segments[0].coefficients[1].value[1] = -10.0;
+    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_OK);
+    trajectory.segments[0].time_from_start_ns = 1;
+    assert(rk_trajectory_segment_chunk_validate(&trajectory) == RK_ERROR_INVALID_ARGUMENT);
+    trajectory.segments[0].time_from_start_ns = 0;
+    trajectory.segments[0].joint_count = 1;
+    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_ERROR_INVALID_ARGUMENT);
+
+    rk_trajectory_segment_chunk segments{};
+    segments.struct_size = sizeof(segments);
+    segments.segment_count = 1;
+    segments.segments[0].duration_ns = 10000000;
+    segments.segments[0].degree = 1;
+    segments.segments[0].joint_count = 2;
+    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&segments, &blueprint) == RK_OK);
+    segments.segments[0].duration_ns = 0;
+    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    segments.segments[0].duration_ns = 10000000;
+    segments.segments[0].coefficients[0].value[1] = NAN;
+    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    segments.segments[0].coefficients[0].value[1] = 0.0;
+    segments.segment_count = 2;
+    segments.segments[1] = segments.segments[0];
+    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    segments.segments[1].time_from_start_ns = 10000000;
+    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&segments, &blueprint) == RK_OK);
+    segments.segment_count = 11;
+    for (uint32_t index = 0; index < segments.segment_count; ++index) {
+        auto &segment = segments.segments[index];
+        segment.time_from_start_ns = index;
+        segment.duration_ns = 1;
+        segment.degree = 5;
+        segment.joint_count = 64;
+    }
+    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
 
     rk_robot_state state{};
     state.struct_size = sizeof(state);

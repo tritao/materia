@@ -6,6 +6,7 @@ import nativekit.ffi.NativeKit;
 import robotkit.world.CameraImage;
 import robotkit.world.SensorFrame;
 import robotkit.world.TrajectoryChunk;
+import robotkit.world.ExecutionPlanSubmission;
 import sys.thread.Mutex;
 
 /**
@@ -54,6 +55,7 @@ class RobotRuntime {
       throw "Serial runtime requires a nonzero 32-digit fingerprint";
     if (!Math.isFinite(maxTargetError) || maxTargetError < 0.0)
       throw "Serial runtime requires a finite nonnegative target error budget";
+    SerialTiming.requireQualified(blueprint, baud);
     var result = RobotKitRuntime.rk_robot_runtime_create_serial(
       blueprint.nativeValue(), devicePath, baud, fingerprintHex, maxTargetError);
     check(result.status, "runtime.createSerial");
@@ -81,6 +83,15 @@ class RobotRuntime {
     check(RobotKitRuntime.rk_robot_runtime_capabilities(owner.borrow(), value).status,
       "runtime.capabilities");
     return value.get_supports_trajectory_queue() != 0;
+  }
+
+  public function supportsExecutionPlans():Bool {
+    ensureLive();
+    var value = new rk_robot_capabilities();
+    value.set_struct_size(rk_robot_capabilities.size());
+    check(RobotKitRuntime.rk_robot_runtime_capabilities(owner.borrow(), value).status,
+      "runtime.capabilities");
+    return value.get_supports_execution_plans() != 0;
   }
 
   /** Submits a complete heterogeneous joint-target batch in one native call. */
@@ -119,7 +130,7 @@ class RobotRuntime {
       "runtime.submitTargets");
   }
 
-  /** Appends a timestamped position chunk to the native runtime queue. */
+  /** Appends a bounded polynomial segment chunk to the native runtime queue. */
   public function submitTrajectory(chunk:TrajectoryChunk, sequence:Int,
       ?timestampNs:haxe.Int64):Void {
     submitTrajectory64(chunk, haxe.Int64.ofInt(sequence), timestampNs);
@@ -133,26 +144,81 @@ class RobotRuntime {
     command.set_struct_size(rk_robot_command.size());
     command.set_sequence(sequence);
     command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
-    command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_CHUNK);
+    command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_SEGMENTS);
     command.set_target_count(0);
-    var payload = new rk_trajectory_chunk();
-    payload.set_struct_size(rk_trajectory_chunk.size());
-    payload.set_point_count(chunk.points.length);
+    var payload = new rk_trajectory_segment_chunk();
+    payload.set_struct_size(rk_trajectory_segment_chunk.size());
+    payload.set_segment_count(chunk.segments.length);
     payload.set_tag(chunk.tag);
-    payload.set_splice_tag(chunk.spliceTag);
-    payload.set_splice_time_ns(chunk.spliceTimeNs);
-    for (index in 0...chunk.points.length) {
-      var source = chunk.points[index];
-      var point = new rk_trajectory_point();
-      point.set_time_from_start_ns(source.timeFromStartNs);
-      point.set_joint_count(source.positions.length);
-      point.set_reserved0(0);
-      for (joint in 0...source.positions.length)
-        point.set_positions(joint, source.positions[joint]);
-      payload.set_points(index, point);
+    for (index in 0...chunk.segments.length) {
+      var source = chunk.segments[index];
+      var segment = new rk_trajectory_segment();
+      segment.set_time_from_start_ns(source.timeFromStartNs);
+      segment.set_duration_ns(source.durationNs);
+      segment.set_degree(source.degree);
+      segment.set_joint_count(source.jointCount);
+      for (joint in 0...source.jointCount) {
+        var coefficients = new rk_trajectory_coefficients();
+        for (degree in 0...source.degree + 1)
+          coefficients.set_value(degree, source.coefficients[joint][degree]);
+        segment.set_coefficients(joint, coefficients);
+      }
+      payload.set_segments(index, segment);
     }
-    check(RobotKitRuntime.rk_robot_runtime_submit_trajectory(owner.borrow(), command, payload),
-      "runtime.submitTrajectory");
+    check(RobotKitRuntime.rk_robot_runtime_submit_segments(owner.borrow(), command, payload),
+      "runtime.submitTrajectorySegments");
+  }
+
+  /** Accepts a plan atomically, including its revision and horizon checks. */
+  public function submitPlan(plan:ExecutionPlanSubmission, sequence:Int):Void {
+    ensureLive();
+    if (plan == null) throw "Execution plan is required";
+    var native = new rk_plan_submission();
+    native.set_struct_size(rk_plan_submission.size());
+    native.set_sequence(Int64.ofInt(sequence));
+    native.set_plan_id(plan.planId);
+    native.set_model_revision(plan.modelRevision);
+    native.set_calibration_revision(plan.calibrationRevision);
+    native.set_required_capabilities(plan.requiredCapabilities);
+    native.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
+    native.set_replace_after_plan_id(plan.replaceAfterPlanId);
+    native.set_replace_after_time_ns(plan.replaceAfterTimeNs);
+    var positions = plan.startPosition.toArray();
+    var velocities = plan.startVelocity.toArray();
+    var accelerations = plan.startAcceleration.toArray();
+    var positionTolerances = plan.positionTolerances.toArray();
+    var velocityTolerances = plan.velocityTolerances.toArray();
+    var accelerationTolerances = plan.accelerationTolerances.toArray();
+    for (joint in 0...positions.length) {
+      native.set_start_position(joint, positions[joint]);
+      native.set_start_velocity(joint, velocities[joint]);
+      native.set_start_acceleration(joint, accelerations[joint]);
+      native.set_position_tolerance(joint, positionTolerances[joint]);
+      native.set_velocity_tolerance(joint, velocityTolerances[joint]);
+      native.set_acceleration_tolerance(joint, accelerationTolerances[joint]);
+    }
+    var payload = new rk_trajectory_segment_chunk();
+    payload.set_struct_size(rk_trajectory_segment_chunk.size());
+    payload.set_segment_count(plan.segments.length);
+    payload.set_tag(plan.planId);
+    for (index in 0...plan.segments.length) {
+      var source = plan.segments[index];
+      var segment = new rk_trajectory_segment();
+      segment.set_time_from_start_ns(source.timeFromStartNs);
+      segment.set_duration_ns(source.durationNs);
+      segment.set_degree(source.degree);
+      segment.set_joint_count(source.jointCount);
+      for (joint in 0...source.jointCount) {
+        var coefficients = new rk_trajectory_coefficients();
+        for (degree in 0...source.degree + 1)
+          coefficients.set_value(degree, source.coefficients[joint][degree]);
+        segment.set_coefficients(joint, coefficients);
+      }
+      payload.set_segments(index, segment);
+    }
+    native.set_segments(payload);
+    check(RobotKitRuntime.rk_robot_runtime_submit_plan(owner.borrow(), native),
+      "runtime.submitPlan");
   }
 
   /** Submits all position targets in one native call. */
@@ -195,6 +261,26 @@ class RobotRuntime {
       "runtime.submitStop");
   }
 
+  /** Pauses, resumes, or aborts a native execution path. */
+  public function submitHold(sequence:Int):Void
+    submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_HOLD);
+
+  public function submitResume(sequence:Int):Void
+    submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_RESUME);
+
+  public function submitAbort(sequence:Int):Void
+    submitLifecycle(sequence, RobotKitRuntimeConstants.RK_COMMAND_ABORT);
+
+  function submitLifecycle(sequence:Int, kind:Int):Void {
+    ensureLive();
+    var command = new rk_robot_command();
+    command.set_struct_size(rk_robot_command.size());
+    command.set_sequence(haxe.Int64.ofInt(sequence));
+    command.set_kind(kind);
+    check(RobotKitRuntime.rk_robot_runtime_submit(owner.borrow(), command),
+      "runtime.submitLifecycle");
+  }
+
   /** Clears a latched safety stop only after the application has acknowledged it. */
   public function resetSafety(sequence:Int):Void {
     resetSafety64(haxe.Int64.ofInt(sequence));
@@ -230,7 +316,13 @@ class RobotRuntime {
     externalMutex.release();
     return new RobotSnapshot(native.robotId, native.sequence, native.sourceTimestampNs,
       native.mode, native.safety, native.endpoint, native.faultCode, native.q.toArray(),
-      native.dq.toArray(), native.effort.toArray(), native.receivedTimestampNs, frames);
+      native.dq.toArray(), native.effort.toArray(), native.receivedTimestampNs, frames,
+      native.trajectoryQueueDepth, native.trajectoryActive,
+      native.trajectoryTimeNs, native.trajectoryDurationNs,
+      native.trajectoryTag, native.trajectoryTagTimeNs,
+      native.modelRevision, native.calibrationRevision,
+      native.sessionState, native.activePlanId,
+      native.committedUntilNs, native.queueEndTimeNs);
   }
 
   /**
@@ -303,6 +395,6 @@ class RobotRuntime {
 
   static function check(status:Int, operation:String):Void {
     if (status != RobotKitRuntimeConstants.RK_OK)
-      throw '$operation failed with RobotKit status $status';
+      throw new RobotRuntimeError(status, operation);
   }
 }

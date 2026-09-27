@@ -30,6 +30,10 @@ class RobotSnapshot {
   public final trajectoryTag:Int64;
   /** Time within trajectoryTag, in nanoseconds. */
   public final trajectoryTagTimeNs:Int64;
+  public final sessionState:Int;
+  public final activePlanId:Int64;
+  public final committedUntilNs:Int64;
+  public final queueEndTimeNs:Int64;
 
   /** Compatibility alias; new code should name the clock explicitly. */
   public var timestampNs(get, never):Int64;
@@ -53,7 +57,11 @@ class RobotSnapshot {
     ?trajectoryTimeNs:Int64,
     ?trajectoryDurationNs:Int64,
     ?trajectoryTag:Int64,
-    ?trajectoryTagTimeNs:Int64
+    ?trajectoryTagTimeNs:Int64,
+    ?sessionState:Int = 0,
+    ?activePlanId:Int64,
+    ?committedUntilNs:Int64,
+    ?queueEndTimeNs:Int64
   ) {
     this.id = id;
     this.sourceSequence = sourceSequence;
@@ -78,6 +86,10 @@ class RobotSnapshot {
     this.trajectoryTag = trajectoryTag == null ? Int64.ofInt(0) : trajectoryTag;
     this.trajectoryTagTimeNs = trajectoryTagTimeNs == null
       ? Int64.ofInt(0) : trajectoryTagTimeNs;
+    this.sessionState = sessionState;
+    this.activePlanId = activePlanId == null ? Int64.ofInt(0) : activePlanId;
+    this.committedUntilNs = committedUntilNs == null ? Int64.ofInt(0) : committedUntilNs;
+    this.queueEndTimeNs = queueEndTimeNs == null ? Int64.ofInt(0) : queueEndTimeNs;
   }
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;

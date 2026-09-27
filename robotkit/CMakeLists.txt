@@ -31,6 +31,11 @@ if(RK_BUILD_SHARED AND NOT EMSCRIPTEN)
     set(RK_LIBRARY_TYPE SHARED)
 endif()
 
+if(NOT TARGET motionkit_core)
+    set(MK_BUILD_SHARED ${RK_BUILD_SHARED} CACHE BOOL "Build MotionKit with RobotKit" FORCE)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../motionkit/native" motionkit)
+endif()
+
 add_subdirectory(runtime)
 
 if(RK_BUILD_SIMKIT)

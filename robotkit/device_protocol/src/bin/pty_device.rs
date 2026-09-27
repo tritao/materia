@@ -13,6 +13,7 @@ struct FakeDevice {
     targets: usize,
     timestamp: u64,
     fault_once: bool,
+    position: f32,
 }
 
 impl Device for FakeDevice {
@@ -20,7 +21,12 @@ impl Device for FakeDevice {
     fn apply_targets(&mut self, targets: &[JointTarget]) -> bool {
         assert_eq!(targets.len(), 1);
         if targets[0].value == 2.0 { return false; }
-        assert_eq!(targets[0].value, 1.1f32);
+        if targets[0].mode == 2 { assert_eq!(targets[0].value, 1.1f32); }
+        else {
+            assert_eq!(targets[0].mode, 1);
+            assert!((0.0..=0.1).contains(&targets[0].value));
+            self.position = targets[0].value;
+        }
         self.targets += 1;
         true
     }
@@ -28,7 +34,7 @@ impl Device for FakeDevice {
     fn read_state(&mut self, joints: &mut [JointState; MAX_JOINTS as usize]) -> StateMeta {
         let timestamp_ns = self.timestamp;
         self.timestamp += 1;
-        joints[0] = JointState { position: 1.0, velocity: -2.0, effort: 0.5 };
+        joints[0] = JointState { position: self.position, velocity: -2.0, effort: 0.5 };
         let fault = u8::from(self.fault_once);
         self.fault_once = false;
         StateMeta { timestamp_ns, safety: 0, fault, joint_count: 1 }
@@ -59,7 +65,8 @@ fn main() {
     let mut completion = unsafe { File::from_raw_fd(completion_fd) };
     let fingerprint = std::array::from_fn(|index| index as u8);
     let mut protocol = DeviceProtocol::new(1, fingerprint).unwrap();
-    let mut device = FakeDevice { stops: 0, resets: 0, targets: 0, timestamp: 0, fault_once: false };
+    let mut device = FakeDevice { stops: 0, resets: 0, targets: 0, timestamp: 0,
+        fault_once: false, position: 1.0 };
     let start = Instant::now();
     let mut read_buffer = [0u8; 17];
     let mut frame = [0u8; MAX_FRAME_SIZE];
@@ -109,9 +116,9 @@ fn main() {
         }
         std::thread::sleep(Duration::from_millis(1));
     }
-    assert_eq!(device.stops, 6); // Four sessions, watchdog expiry, and one normal stop.
-    assert_eq!(device.resets, 2);
-    assert_eq!(device.targets, 2);
+    assert_eq!(device.stops, 9); // Seven sessions, watchdog expiry, and one normal stop.
+    assert_eq!(device.resets, 3);
+    assert_eq!(device.targets, 13); // Two direct targets and one per each of 11 owner cycles.
     assert!(protocol.statistics().rejected >= 1);
     assert_eq!(protocol.last_sequence(), 0); // Mismatched final session is safe.
     assert!(!protocol.model_matches());

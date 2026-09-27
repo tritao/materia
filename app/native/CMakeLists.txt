@@ -60,7 +60,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 set(MATERIA_RUNTIME_TARGETS nativekit nativekit_gpu nativekit_ui nativekit_scene
-    nativekit_scene_render nativekit_sim_core robotkit_runtime cadkit-core)
+    nativekit_scene_render nativekit_sim_core motionkit_core robotkit_runtime cadkit-core)
 if(MATERIA_ENABLE_MUJOCO)
     list(APPEND MATERIA_RUNTIME_TARGETS nativekit_sim_mujoco)
 endif()

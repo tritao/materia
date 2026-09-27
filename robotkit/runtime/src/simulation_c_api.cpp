@@ -1,5 +1,6 @@
 #include "robotkit_simkit.h"
 #include "simulation.hpp"
+#include "runtime_abi.hpp"
 
 #include <memory>
 #include <cmath>
@@ -97,7 +98,7 @@ rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     const auto value = resolve(simulation);
-    return value ? value->add_robot(*blueprint, *out_runtime,
+    return value ? value->add_robot(robotkit::internal::copy_blueprint(blueprint), *out_runtime,
         robot_desc == nullptr ? nullptr : &robot_desc->initial_pose) : RK_ERROR_INVALID_HANDLE;
 }
 

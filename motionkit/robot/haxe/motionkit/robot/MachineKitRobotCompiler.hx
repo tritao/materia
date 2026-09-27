@@ -1,13 +1,13 @@
-package motionkit;
+package motionkit.robot;
 
 import machinekit.assembly.LinearAxis;
 import motionkit.axis.MotionAxisBlueprint;
-import motionkit.axis.MotionSystemBlueprint;
 import robotkit.model.Actuator;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
+import robotkit.model.Transmission;
 
 /** MachineKit mechanical-design to RobotKit execution-model bridge. */
 class MachineKitRobotCompiler {
@@ -113,8 +113,11 @@ class MachineKitRobotCompiler {
     joint.limits.upper = axis.stroke * MILLIMETRES_TO_METRES;
     joint.limits.velocity = maxVelocity;
     joint.limits.maxAcceleration = maxAcceleration;
-    joint.drive = new Actuator('${axis.motor.designation} / lead-screw ${axis.transmission.lead} mm/rev',
-      0.0, maxVelocity);
+    var travelPerRevolutionMetres = axis.nut.travelPerRevolution() * MILLIMETRES_TO_METRES;
+    var ratio = 2.0 * Math.PI / travelPerRevolutionMetres;
+    model.addActuator(new Actuator('$id.motor.${axis.motor.designation}',
+      0.0, maxVelocity * Math.abs(ratio),
+      Transmission.SimpleTransmission(joint.id, ratio, 0.0)));
     return joint;
   }
 

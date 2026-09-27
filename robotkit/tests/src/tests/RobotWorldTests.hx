@@ -19,6 +19,7 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.Actuator;
+import robotkit.model.Transmission;
 import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Frame;
@@ -31,6 +32,8 @@ import robotkit.device.DeviceChannel;
 import robotkit.device.DeviceLayout;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotCommand;
+import robotkit.world.TrajectoryChunk;
+import robotkit.world.TrajectorySegment;
 import robotkit.world.RobotDescription;
 import robotkit.world.RobotFault;
 import robotkit.world.RobotId;
@@ -149,6 +152,7 @@ class RobotWorldTests {
   static var assertions = 0;
 
   public static function main():Void {
+    testPolynomialTrajectoryChunk();
     testAttachDetachAndIdentity();
     testSequenceAndTopology();
     testCrossThreadEventQueue();
@@ -181,6 +185,7 @@ class RobotWorldTests {
     testForwardingAndLifecycle();
     testMixedSimulatedAndRemoteWorld();
     testRuntimeUsesCompiledJointRate();
+    testMultipleActuatorLimits();
     testWorldHostComposition();
     testCompilerDiagnosticsAndTopology();
     testStableModelIdentity();
@@ -204,6 +209,37 @@ class RobotWorldTests {
     assertions += TerrainTests.run();
     assertions += ExcavatorTests.run();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
+  }
+
+  static function testPolynomialTrajectoryChunk():Void {
+    var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(100000000),
+      [[0.0, 1.0], [0.0, -1.0]]);
+    var chunk = TrajectoryChunk.fromSegments([segment], Int64.ofInt(7));
+    check(chunk.segments.length == 1,
+      "polynomial chunk uses segment payload");
+    check(chunk.copy().segments[0].coefficients[1][1] == -1.0,
+      "polynomial chunk copy keeps coefficients");
+    var recording = new RobotRecording();
+    recording.recordCommand(RobotCommand.TrajectoryChunk(chunk));
+    var replayed = RobotRecordingCodec.decode(
+      RobotRecordingCodec.encode(recording.entries[0]));
+    switch replayed.event {
+      case Command(TrajectoryChunk(value)):
+        check(value.segments.length == 1 && value.segments[0].degree == 1,
+          "polynomial chunk survives recording round trip");
+      case _: throw "Expected recorded polynomial chunk";
+    }
+    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
+      '{"version":4,"ordinal":"0","recordingTimestampNs":"0","robotId":"r",'
+      + '"sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock",'
+      + '"type":"command","payload":{"kind":"trajectoryChunk","points":[]}}')),
+      "legacy point-chunk recordings are unsupported");
+    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
+      '{"version":4,"ordinal":"0","recordingTimestampNs":"0","robotId":"r",'
+      + '"sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock",'
+      + '"type":"command","payload":{"kind":"trajectorySegmentChunk",'
+      + '"spliceTag":"7","segments":[]}}')),
+      "legacy spliced recordings are unsupported");
   }
 
   static function testMcapRobustness():Void {
@@ -257,7 +293,7 @@ class RobotWorldTests {
     var opened=RobotKitRuntime.rk_recording_writer_create(mismatchPath,Int64.ofInt(4096));
     equal(opened.status,RobotKitRuntimeConstants.RK_OK,"schema mismatch fixture opens");
     var payload=RobotRecordingCodec.encode(mismatchEntry);
-    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,3,
+    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,4,
       mismatchEntry.ordinal,mismatchEntry.recordingTimestampNs,payload),RobotKitRuntimeConstants.RK_OK,
       "schema mismatch fixture writes payload to wrong channel");
     equal(RobotKitRuntime.rk_recording_writer_finish(opened.out_writer.borrow()),RobotKitRuntimeConstants.RK_OK,
@@ -718,7 +754,10 @@ class RobotWorldTests {
     source.links[0].inertiaTensor = [2.0, 0.1, 0.0, 0.1, 3.0, 0.2, 0.0, 0.2, 4.0];
     source.links[0].visualGeometry = "meshes/base.glb";
     source.links[0].collisionGeometry = "colliders/base.obj";
-    source.joints[0].drive = new Actuator("left-wheel-drive", 90.0, 12.0);
+    source.addActuator(new Actuator("left-wheel-drive", 90.0, 12.0,
+      Transmission.SimpleTransmission(source.joints[0].id, 2.0, 0.1)));
+    source.addActuator(new Actuator("left-wheel-assist", 45.0, 8.0,
+      Transmission.SimpleTransmission(source.joints[0].id, -3.0, 0.1)));
     source.joints[0].parentFramePosition = [0.0, 0.25, 0.1];
     source.joints[0].parentFrameRotation = [0.0, 0.0, 0.1, 0.99498743710662];
     source.joints[0].axis = [0.0, 1.0, 0.0];
@@ -738,8 +777,14 @@ class RobotWorldTests {
       "RobotModel codec preserves geometry references");
     equal(restored.joints[0].parentFramePosition[1], 0.25,
       "RobotModel codec preserves joint frame transforms");
-    var restoredDrive:Actuator = cast restored.joints[0].drive;
-    equal(restoredDrive.maxRate, 12.0, "RobotModel codec preserves actuator settings");
+    equal(restored.actuators.length, 2,
+      "v4 RobotModel accepts two actuators on one joint");
+    equal(restored.actuators[0].maxRate, 12.0,
+      "RobotModel codec preserves actuator-unit limits");
+    check(switch restored.actuators[1].transmission {
+      case SimpleTransmission(jointId, ratio, offset):
+        jointId == source.joints[0].id && ratio == -3.0 && offset == 0.1;
+    }, "v4 RobotModel preserves independent transmission ratios");
     equal(restored.frames[0].link.id, "link/base", "RobotModel codec resolves frame link references");
     check(restored.sensors[0].frame == restored.frames[0],
       "RobotModel codec resolves sensor frame references to shared frame objects");
@@ -772,30 +817,15 @@ class RobotWorldTests {
     throws(function() wrongLayout.validateAgainst(source),
       "device channel mapping rejects order that differs from semantic model joints");
 
-    var legacyV1 = haxe.io.Bytes.ofString('{"schemaVersion":1,"name":"legacy-arm",'
-      + '"links":[{"id":"base","name":"base"}],"joints":[],"frames":[],"sensors":[]}');
-    var migratedV1 = RobotModelCodec.decode(legacyV1);
-    equal(migratedV1.schemaVersion, RobotModel.CURRENT_VERSION,
-      "v1 RobotModel artifact migrates to the current schema");
-    equal(migratedV1.links[0].mass, 1.0, "v1 migration supplies default link mass");
-    equal(migratedV1.links[0].inertiaTensor[8], 1.0,
-      "v1 migration supplies default link inertia");
-    equal(RobotModelCodec.decode(RobotModelCodec.encode(migratedV1)).name, "legacy-arm",
-      "migrated RobotModel can be saved in the current canonical format");
-
-    var legacyV2:Dynamic = haxe.Json.parse(encoded.toString());
-    Reflect.setField(legacyV2, "schemaVersion", 2);
-    Reflect.setField(legacyV2, "mobileBase", null);
-    Reflect.setField(legacyV2, "forkMechanism", null);
-    var legacySensors:Array<Dynamic> = cast Reflect.field(legacyV2, "sensors");
-    Reflect.setField(legacySensors[0], "startAngleRadians", null);
-    Reflect.setField(legacySensors[0], "fieldOfViewRadians", null);
-    var migratedV2 = RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(legacyV2)));
-    equal(migratedV2.sensors[0].startAngleRadians, 0.0,
-      "v2 migration supplies default sensor angle");
-    equal(migratedV2.sensors[0].fieldOfViewRadians, Math.PI * 2.0,
-      "v2 migration supplies full-circle sensor coverage");
-    equal(migratedV2.mobileBase, null, "v2 migration defaults newer semantic roles");
+    var oldVersion:Dynamic = haxe.Json.parse(encoded.toString());
+    Reflect.setField(oldVersion, "schemaVersion", 3);
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(oldVersion))),
+      "v4-only RobotModel codec rejects old schemas");
+    var legacyDrive:Dynamic = haxe.Json.parse(encoded.toString());
+    var legacyJoints:Array<Dynamic> = cast Reflect.field(legacyDrive, "joints");
+    Reflect.setField(legacyJoints[0], "drive", {name: "old-drive"});
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(legacyDrive))),
+      "v4 codec rejects silently ignored joint-drive records");
 
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString('{"schemaVersion":99}')),
       "future RobotModel schema versions are rejected");
@@ -3383,7 +3413,7 @@ class RobotWorldTests {
     replay.close();
     if (Sys.getEnv("ROBOTKIT_KEEP_MCAP") == null) sys.FileSystem.deleteFile(path);
     else Sys.println('RobotKit MCAP fixture: $path');
-    var unsupported = haxe.io.Bytes.ofString('{"version":4,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
+    var unsupported = haxe.io.Bytes.ofString('{"version":5,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
     var legacyV2 = RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
       '{"version":2,"ordinal":"0","recordingTimestampNs":"1","robotId":"x","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}'));
     equal(legacyV2.schemaVersion, 2, "recording reader accepts schema v2");
@@ -3659,6 +3689,24 @@ class RobotWorldTests {
       "000102030405060708090a0b0c0d0e0f", 1e-6) catch (_:Dynamic) failed = true;
     if (robot != null) robot.close();
     check(failed, "serial adapter reports an unavailable device path through Haxe FFI");
+    var tool = model.addLink(new Link("tool", "tool"));
+    var joint = model.addJoint(new Joint("axis", JointType.Revolute,
+      model.links[0], tool, "joint/axis"));
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    joint.limits.effort = 1.0;
+    var timingMessage = "";
+    try new SerialRobot("under-period", model,
+      '/dev/robotkit-missing-${Sys.getPid()}',
+      "000102030405060708090a0b0c0d0e0f", 1e-6, 115200,
+      Int64.ofInt(1000000), Int64.ofInt(2000000))
+    catch (error:Dynamic) timingMessage = Std.string(error);
+    check(timingMessage.indexOf("baud=115200") >= 0 &&
+      timingMessage.indexOf("joint_count=1") >= 0 &&
+      timingMessage.indexOf("frame_time_ns=") >= 0 &&
+      timingMessage.indexOf("processing_allowance_ns=2000000") >= 0 &&
+      timingMessage.indexOf("minimum_owner_period_ns=") >= 0,
+      "under-period SerialRobot construction names its qualification minimum");
   }
 
   static function testSensorResetPublication():Void {
@@ -3758,7 +3806,15 @@ class RobotWorldTests {
     model.addSensor(new robotkit.model.Sensor("lidar", "lidar", 10, "sensor/lidar"));
     var frame = model.addFrame(new robotkit.model.Frame("base frame", base, "frame/base"));
     model.addFrame(new robotkit.model.Frame("tool frame", tool, "frame/tool"));
-    var original = RobotRuntimeCompiler.compile(model, 1);
+    var original = RobotRuntimeCompiler.compile(model, 1, 9);
+    equal(original.calibrationRevision, 9, "compiler preserves calibration revision");
+    var revisionSimulation = new Simulation();
+    var revisionRuntime = revisionSimulation.addRobot(original);
+    var revisionSnapshot = revisionRuntime.snapshot();
+    equal(revisionSnapshot.modelRevision, Int64.ofInt(1), "snapshot carries model revision");
+    equal(revisionSnapshot.calibrationRevision, Int64.ofInt(9),
+      "snapshot carries calibration revision");
+    revisionSimulation.dispose();
     var originalIds = original.identity;
     check(originalIds != null, "compiler supplies semantic identity mappings");
     if (originalIds == null) throw "missing compiled identity";
@@ -4162,21 +4218,109 @@ class RobotWorldTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     joint.limits.velocity = 2.0;
-    joint.drive = new Actuator("shoulder-motor", 100.0, 1.0);
+    model.addActuator(new Actuator("shoulder-motor", 100.0, 1.0,
+      Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
     var blueprint = RobotRuntimeCompiler.compile(model);
-    equal(blueprint.joints[0].maxRate, 1.0,
-      "runtime compiler combines joint and actuator rate limits");
+    equal(blueprint.joints[0].maxRate, 0.5,
+      "runtime blueprint converts actuator rate to joint rate");
+    equal(blueprint.joints[0].maxEffort, 200.0,
+      "runtime blueprint converts actuator effort to joint effort");
 
     var simulation = new Simulation(0.1);
     var runtime = simulation.addRobot(blueprint);
     runtime.submitPosition(0, 0.8, 1);
     simulation.step(Int64.ofInt(100));
-    check(Math.abs(runtime.snapshot().q.get(0) - 0.1) < 0.000000001,
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.05) < 0.000000001,
       "runtime applies the compiled rate limit on the first shared tick");
     simulation.step(Int64.ofInt(200));
-    check(Math.abs(runtime.snapshot().q.get(0) - 0.2) < 0.000000001,
+    check(Math.abs(runtime.snapshot().q.get(0) - 0.1) < 0.000000001,
       "runtime keeps advancing the same target on later shared ticks");
     simulation.dispose();
+
+    var segmentSimulation = new Simulation(0.1);
+    var segmentRuntime = segmentSimulation.addRobot(blueprint);
+    segmentRuntime.submitTrajectory(TrajectoryChunk.fromSegments([
+      new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])
+    ]), 1);
+    segmentSimulation.step(Int64.ofInt(100));
+    check(segmentRuntime.snapshot().trajectoryQueueDepth == 1,
+      "Haxe segment submission reaches native knot queue");
+    segmentSimulation.step(Int64.ofInt(200));
+    check(Math.abs(segmentRuntime.snapshot().q.get(0) - 0.05) < 0.000000001,
+      "Haxe segment submission executes polynomial target");
+    segmentSimulation.dispose();
+
+    var planSimulation = new Simulation(0.1);
+    var planRuntime = planSimulation.addRobot(blueprint);
+    var planPath = '/tmp/robotkit-${Sys.getPid()}-plan-session.mcap';
+    var writer = new McapRobotRecording(planPath, 1024 * 1024);
+    var recorded = new RecordingRobot(new SimulatedRobot("plan-session", planRuntime,
+      model.name, ["base", "tool"], ["shoulder"]), writer);
+    var plan = new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(77),
+      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      [0.0], [0.0], [0.0],
+      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])],
+      null, null, [0.0001], [0.0002], [0.0003]);
+    recorded.submit(RobotCommand.ExecutionPlan(plan));
+    var progress:Array<String> = [];
+    for (time in [100, 200, 300]) {
+      planSimulation.step(Int64.ofInt(time));
+      var snapshot = recorded.snapshot();
+      progress.push('${snapshot.sessionState}:${Int64.toStr(snapshot.activePlanId)}:' +
+        '${Int64.toStr(snapshot.committedUntilNs)}:${Int64.toStr(snapshot.queueEndTimeNs)}');
+    }
+    check(recorded.recordingError == null, "plan session records without errors");
+    writer.close();
+    var loaded = McapRecordingReader.load(planPath);
+    check(loaded.commands.length == 1, "MCAP retains the submitted plan command");
+    switch loaded.commands[0] {
+      case ExecutionPlan(replayedPlan):
+        equal(replayedPlan.planId, Int64.ofInt(77), "MCAP preserves plan identity");
+        equal(replayedPlan.positionTolerances.toArray()[0], 0.0001,
+          "MCAP preserves plan start tolerances");
+        check(replayedPlan.endsAtRest, "MCAP preserves declared plan completion");
+      case _:
+        check(false, "MCAP decodes the plan command variant");
+    }
+    var replay = new ReplayRobot("plan-session", loaded);
+    for (expected in progress) {
+      var snapshot = replay.snapshot();
+      var actual = '${snapshot.sessionState}:${Int64.toStr(snapshot.activePlanId)}:' +
+        '${Int64.toStr(snapshot.committedUntilNs)}:${Int64.toStr(snapshot.queueEndTimeNs)}';
+      equal(actual, expected, "MCAP replay preserves session progress");
+      replay.advance();
+    }
+    replay.close();
+    planSimulation.dispose();
+    sys.FileSystem.deleteFile(planPath);
+    sys.FileSystem.deleteFile(planPath + ".incomplete.status");
+  }
+
+  static function testMultipleActuatorLimits():Void {
+    var model = new RobotModel("dual-actuator-limits");
+    var base = model.addLink(new Link("base"));
+    var tool = model.addLink(new Link("tool"));
+    var joint = model.addJoint(new Joint("shoulder", JointType.Revolute, base, tool));
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    joint.limits.velocity = 2.0;
+    var first = model.addActuator(new Actuator("first", 100.0, 1.0,
+      Transmission.SimpleTransmission(joint.id, 2.0, 0.0)));
+    var second = model.addActuator(new Actuator("second", 40.0, 0.3,
+      Transmission.SimpleTransmission(joint.id, -1.0, 0.0)));
+    var limits = RobotRuntimeCompiler.compile(model).joints[0];
+    equal(limits.maxRate, 0.3, "multiple actuators use the slowest joint rate");
+    equal(limits.maxEffort, 240.0, "multiple actuators sum joint effort");
+    second.transmission = Transmission.SimpleTransmission(joint.id, 1.0, 0.0);
+    var positive = RobotRuntimeCompiler.compile(model).joints[0];
+    equal(positive.maxRate, limits.maxRate, "negative ratio keeps the same rate limit");
+    equal(positive.maxEffort, limits.maxEffort, "negative ratio keeps the same effort limit");
+    joint.limits.velocity = 0.2;
+    joint.limits.effort = 200.0;
+    var tighter = RobotRuntimeCompiler.compile(model).joints[0];
+    equal(tighter.maxRate, 0.2, "joint rate remains the tighter claim");
+    equal(tighter.maxEffort, 200.0, "joint effort remains the tighter claim");
   }
 
   static function check(value:Bool, message:String):Void {
@@ -4187,7 +4331,11 @@ class RobotWorldTests {
   static function commandSummary(command:RobotCommand):String return switch command {
     case JointTargets(targets, _): [for (target in targets)
       '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
-    case TrajectoryChunk(chunk): 'trajectory:${chunk.points.length}';
+    case TrajectoryChunk(chunk): 'trajectory:${chunk.segments.length}';
+    case ExecutionPlan(plan): 'plan:${Int64.toStr(plan.planId)}';
+    case Hold: 'hold';
+    case Resume: 'resume';
+    case Abort: 'abort';
   };
 
   static function advanceReplaySample(replay:ReplayRobot):Bool {

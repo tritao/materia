@@ -21,7 +21,7 @@ bool valid_target_mode(rk_joint_target_mode mode) {
 
 bool valid_trajectory_status(uint32_t depth, uint32_t active, uint64_t time_ns,
                              uint64_t duration_ns) {
-    if (depth > RK_MAX_TRAJECTORY_POINTS || active > 1 || time_ns > duration_ns)
+    if (depth > RK_MAX_TRAJECTORY_QUEUE_POINTS || active > 1 || time_ns > duration_ns)
         return false;
     return active != 0 || (depth == 0 && time_ns == 0 && duration_ns == 0);
 }
@@ -42,11 +42,29 @@ template <typename T> bool valid_sensors(const T &value) {
 extern "C" {
 
 rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blueprint *blueprint) {
-    if (!has_full_struct(blueprint) || blueprint->joint_count > RK_MAX_JOINTS ||
+    if (blueprint == nullptr ||
+        blueprint->struct_size < offsetof(rk_robot_runtime_blueprint, calibration_revision) ||
+        blueprint->joint_count > RK_MAX_JOINTS ||
         blueprint->link_count == 0 || blueprint->link_count > RK_MAX_LINKS ||
         blueprint->sensor_count > RK_MAX_SENSORS ||
         blueprint->collision_approximation > RK_COLLISION_APPROXIMATION_BOUNDS_BOX ||
         blueprint->self_collision > RK_SELF_COLLISION_DISABLED)
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >=
+        offsetof(rk_robot_runtime_blueprint, following_error_bound) +
+            sizeof(blueprint->following_error_bound))
+        for (uint32_t joint = 0; joint < blueprint->joint_count &&
+                joint < RK_MAX_TRAJECTORY_JOINTS; ++joint)
+            if (!is_finite(blueprint->following_error_bound[joint]) ||
+                blueprint->following_error_bound[joint] < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >= offsetof(rk_robot_runtime_blueprint, owner_period_ns) +
+            sizeof(blueprint->owner_period_ns) &&
+        blueprint->owner_period_ns > static_cast<uint64_t>(INT64_MAX))
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >= offsetof(rk_robot_runtime_blueprint, serial_processing_allowance_ns) +
+            sizeof(blueprint->serial_processing_allowance_ns) &&
+        blueprint->serial_processing_allowance_ns > static_cast<uint64_t>(INT64_MAX))
         return RK_ERROR_INVALID_ARGUMENT;
     for (uint32_t i = 0; i < blueprint->link_count; ++i) {
         const auto &link = blueprint->links[i];
@@ -103,14 +121,16 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
 rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command) {
     if (!has_full_struct(command) || command->target_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (command->kind > RK_COMMAND_TRAJECTORY_CHUNK)
+    if (command->kind > RK_COMMAND_ABORT || command->kind == 5)
         return RK_ERROR_INVALID_ARGUMENT;
     if ((command->kind == RK_COMMAND_NONE || command->kind == RK_COMMAND_STOP ||
          command->kind == RK_COMMAND_EMERGENCY_STOP ||
-         command->kind == RK_COMMAND_RESET_SAFETY) &&
+         command->kind == RK_COMMAND_RESET_SAFETY ||
+         command->kind == RK_COMMAND_HOLD || command->kind == RK_COMMAND_RESUME ||
+         command->kind == RK_COMMAND_ABORT) &&
         command->target_count != 0)
         return RK_ERROR_INVALID_ARGUMENT;
-    if (command->kind == RK_COMMAND_TRAJECTORY_CHUNK && command->target_count != 0)
+    if (command->kind == RK_COMMAND_TRAJECTORY_SEGMENTS && command->target_count != 0)
         return RK_ERROR_INVALID_ARGUMENT;
 
     bool targeted[RK_MAX_JOINTS]{};
@@ -127,23 +147,6 @@ rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command) {
     return RK_OK;
 }
 
-rk_result RK_CALL rk_trajectory_chunk_validate(const rk_trajectory_chunk *chunk) {
-    if (!has_full_struct(chunk) || chunk->point_count == 0 ||
-        chunk->point_count > RK_MAX_TRAJECTORY_POINTS)
-        return RK_ERROR_INVALID_ARGUMENT;
-    uint64_t previous_time = 0;
-    for (uint32_t index = 0; index < chunk->point_count; ++index) {
-        const auto &point = chunk->points[index];
-        if (point.joint_count == 0 || point.joint_count > RK_MAX_TRAJECTORY_JOINTS ||
-            (index > 0 && point.time_from_start_ns < previous_time))
-            return RK_ERROR_INVALID_ARGUMENT;
-        previous_time = point.time_from_start_ns;
-        for (uint32_t joint = 0; joint < point.joint_count; ++joint)
-            if (!is_finite(point.positions[joint])) return RK_ERROR_INVALID_ARGUMENT;
-    }
-    return RK_OK;
-}
-
 rk_result RK_CALL rk_robot_command_validate_for_blueprint(
     const rk_robot_command *command, const rk_robot_runtime_blueprint *blueprint) {
     if (rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
@@ -156,15 +159,70 @@ rk_result RK_CALL rk_robot_command_validate_for_blueprint(
     return RK_OK;
 }
 
-rk_result RK_CALL rk_trajectory_chunk_validate_for_blueprint(
-    const rk_trajectory_chunk *chunk, const rk_robot_runtime_blueprint *blueprint) {
-    if (rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
-        rk_trajectory_chunk_validate(chunk) != RK_OK ||
-        blueprint->joint_count > RK_MAX_TRAJECTORY_JOINTS)
+rk_result RK_CALL rk_trajectory_segment_chunk_validate(const rk_trajectory_segment_chunk *chunk) {
+    if (!has_full_struct(chunk) || chunk->segment_count == 0 ||
+        chunk->segment_count > RK_MAX_TRAJECTORY_SEGMENTS)
         return RK_ERROR_INVALID_ARGUMENT;
-    for (uint32_t index = 0; index < chunk->point_count; ++index)
-        if (chunk->points[index].joint_count != blueprint->joint_count)
+    uint64_t expected_start = 0;
+    uint32_t coefficients = 0;
+    const uint32_t joint_count = chunk->segments[0].joint_count;
+    for (uint32_t index = 0; index < chunk->segment_count; ++index) {
+        const auto &segment = chunk->segments[index];
+        if (segment.joint_count == 0 || segment.joint_count > RK_MAX_TRAJECTORY_JOINTS ||
+            segment.joint_count != joint_count || segment.degree > 5 ||
+            segment.duration_ns == 0 || segment.time_from_start_ns != expected_start ||
+            segment.duration_ns > UINT64_MAX - expected_start)
             return RK_ERROR_INVALID_ARGUMENT;
+        expected_start += segment.duration_ns;
+        coefficients += segment.joint_count * (segment.degree + 1);
+        if (coefficients > RK_MAX_TRAJECTORY_COEFFICIENTS)
+            return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t joint = 0; joint < joint_count; ++joint)
+            for (uint32_t degree = 0; degree <= segment.degree; ++degree)
+                if (!is_finite(segment.coefficients[joint].value[degree]))
+                    return RK_ERROR_INVALID_ARGUMENT;
+    }
+    return RK_OK;
+}
+
+rk_result RK_CALL rk_trajectory_segment_chunk_validate_for_blueprint(
+    const rk_trajectory_segment_chunk *chunk, const rk_robot_runtime_blueprint *blueprint) {
+    if (rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
+        rk_trajectory_segment_chunk_validate(chunk) != RK_OK ||
+        blueprint->joint_count > RK_MAX_TRAJECTORY_JOINTS ||
+        chunk->segments[0].joint_count != blueprint->joint_count)
+        return RK_ERROR_INVALID_ARGUMENT;
+    return RK_OK;
+}
+
+rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
+    const rk_plan_submission *plan, const rk_robot_runtime_blueprint *blueprint) {
+    if (!plan || plan->struct_size < offsetof(rk_plan_submission, position_tolerance) ||
+        (plan->struct_size > offsetof(rk_plan_submission, position_tolerance) &&
+         plan->struct_size < offsetof(rk_plan_submission, ends_at_rest)) ||
+        (plan->struct_size > offsetof(rk_plan_submission, ends_at_rest) &&
+         plan->struct_size < sizeof(*plan)) ||
+        plan->sequence == 0 || plan->plan_id == 0 ||
+        rk_trajectory_segment_chunk_validate_for_blueprint(&plan->segments, blueprint) != RK_OK ||
+        (plan->replace_after_plan_id == 0 && plan->replace_after_time_ns != 0) ||
+        (plan->replace_after_plan_id != 0 && plan->replace_after_time_ns == 0))
+        return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
+        if (!is_finite(plan->start_position[joint]) ||
+            !is_finite(plan->start_velocity[joint]) ||
+            !is_finite(plan->start_acceleration[joint]))
+            return RK_ERROR_INVALID_ARGUMENT;
+    if (plan->struct_size >= offsetof(rk_plan_submission, ends_at_rest))
+        for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
+            if (!is_finite(plan->position_tolerance[joint]) ||
+                !is_finite(plan->velocity_tolerance[joint]) ||
+                !is_finite(plan->acceleration_tolerance[joint]) ||
+                plan->position_tolerance[joint] < 0.0 ||
+                plan->velocity_tolerance[joint] < 0.0 ||
+                plan->acceleration_tolerance[joint] < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+    if (plan->struct_size >= sizeof(*plan) && plan->ends_at_rest > 1)
+        return RK_ERROR_INVALID_ARGUMENT;
     return RK_OK;
 }
 
@@ -184,7 +242,9 @@ rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state) {
 }
 
 rk_result RK_CALL rk_robot_snapshot_validate(const rk_robot_snapshot *snapshot) {
-    if (!has_full_struct(snapshot) || snapshot->joint_count > RK_MAX_JOINTS)
+    if (snapshot == nullptr ||
+        snapshot->struct_size < offsetof(rk_robot_snapshot, calibration_revision) ||
+        snapshot->joint_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
     if (snapshot->mode > RK_ROBOT_MODE_FAULT || snapshot->safety > RK_SAFETY_FAULT ||
         snapshot->endpoint > RK_ENDPOINT_FAULT ||
@@ -207,7 +267,8 @@ rk_result RK_CALL rk_robot_capabilities_validate(const rk_robot_capabilities *ca
     if (capabilities->supports_position_targets > 1 ||
         capabilities->supports_velocity_targets > 1 ||
         capabilities->supports_effort_targets > 1 || capabilities->supports_prediction > 1 ||
-        capabilities->supports_trajectory_queue > 1)
+        capabilities->supports_trajectory_queue > 1 ||
+        capabilities->supports_execution_plans > 1)
         return RK_ERROR_INVALID_ARGUMENT;
     return RK_OK;
 }

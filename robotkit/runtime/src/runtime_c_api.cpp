@@ -2,10 +2,14 @@
 #include "robotkit_runtime.hpp"
 #include "robotkit_device_serial_endpoint.hpp"
 #include "runtime_registry.hpp"
+#include "runtime_abi.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstring>
+#include <cstdio>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -34,6 +38,11 @@ bool parse_fingerprint(const char *hex, std::array<std::uint8_t, 16> &result) {
     }
     return hex[32] == '\0' &&
         !std::all_of(result.begin(), result.end(), [](auto byte) { return byte == 0; });
+}
+
+std::chrono::nanoseconds owner_period(const rk_robot_runtime_blueprint &blueprint) {
+    return std::chrono::nanoseconds(blueprint.owner_period_ns == 0
+        ? 10'000'000 : static_cast<int64_t>(blueprint.owner_period_ns));
 }
 
 } // namespace
@@ -77,9 +86,11 @@ rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprint *blue
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     try {
+        const auto copied = robotkit::internal::copy_blueprint(blueprint);
         std::shared_ptr<robotkit::RobotEndpoint> endpoint =
             std::make_shared<robotkit::InMemoryRobot>(blueprint->joint_count);
-        auto runtime = std::make_shared<robotkit::RobotRuntime>(*blueprint, endpoint);
+        auto runtime = std::make_shared<robotkit::RobotRuntime>(
+            copied, endpoint, owner_period(copied));
         const auto handle = robotkit::internal::register_runtime(std::move(runtime));
         *out_runtime = handle;
         return RK_OK;
@@ -101,13 +112,26 @@ rk_result RK_CALL rk_robot_runtime_create_serial(const rk_robot_runtime_blueprin
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     try {
+        const auto copied = robotkit::internal::copy_blueprint(blueprint);
+        const auto period = owner_period(copied);
+        const auto processing_allowance = std::chrono::nanoseconds(
+            copied.serial_processing_allowance_ns == 0 ? 2'000'000 :
+            static_cast<int64_t>(copied.serial_processing_allowance_ns));
+        const auto timing_error = robotkit::DeviceSerialEndpoint::qualification_error(
+            baud, static_cast<std::uint8_t>(blueprint->joint_count), period,
+            processing_allowance);
+        if (!timing_error.empty()) {
+            std::fprintf(stderr, "%s\n", timing_error.c_str());
+            return RK_ERROR_UNSUPPORTED;
+        }
         std::uint8_t session_status = 0;
         auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, fingerprint,
-            static_cast<std::uint8_t>(blueprint->joint_count), max_target_error, &session_status);
+            static_cast<std::uint8_t>(blueprint->joint_count), max_target_error,
+            &session_status, period, processing_allowance);
         if (!endpoint)
             return session_status == 2 ? RK_ERROR_MODEL_MISMATCH : RK_ERROR_BACKEND;
-        auto runtime = std::make_shared<robotkit::RobotRuntime>(*blueprint,
-            std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint));
+        auto runtime = std::make_shared<robotkit::RobotRuntime>(
+            copied, std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint), period);
         *out_runtime = robotkit::internal::register_runtime(std::move(runtime));
         return RK_OK;
     } catch (const std::bad_alloc &) {
@@ -138,13 +162,20 @@ rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime, const rk_rob
     return value ? value->submit(*command) : RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_robot_runtime_submit_trajectory(
+rk_result RK_CALL rk_robot_runtime_submit_segments(
     rk_robot_runtime runtime, const rk_robot_command *command,
-    const rk_trajectory_chunk *chunk) {
+    const rk_trajectory_segment_chunk *chunk) {
     if (!command || !chunk)
         return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);
-    return value ? value->submit_trajectory(*command, *chunk) : RK_ERROR_INVALID_HANDLE;
+    return value ? value->submit_segments(*command, *chunk) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_submit_plan(
+    rk_robot_runtime runtime, const rk_plan_submission *plan) {
+    if (!plan) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->submit_plan(*plan) : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime, rk_robot_state *out_state) {
@@ -156,10 +187,19 @@ rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime, rk_robot_s
 
 rk_result RK_CALL rk_robot_runtime_snapshot_full(rk_robot_runtime runtime,
                                            rk_robot_snapshot *out_snapshot) {
-    if (!out_snapshot || out_snapshot->struct_size < sizeof(*out_snapshot))
+    if (!out_snapshot ||
+        out_snapshot->struct_size < offsetof(rk_robot_snapshot, calibration_revision))
         return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);
-    return value ? value->snapshot_full(*out_snapshot) : RK_ERROR_INVALID_HANDLE;
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    const auto caller_size = out_snapshot->struct_size;
+    rk_robot_snapshot complete{};
+    const auto result = value->snapshot_full(complete);
+    if (result != RK_OK) return result;
+    std::memcpy(out_snapshot, &complete,
+        std::min<std::size_t>(caller_size, sizeof(complete)));
+    out_snapshot->struct_size = caller_size;
+    return RK_OK;
 }
 
 rk_result RK_CALL rk_robot_runtime_capabilities(rk_robot_runtime runtime,
@@ -175,6 +215,7 @@ rk_result RK_CALL rk_robot_runtime_capabilities(rk_robot_runtime runtime,
     out_capabilities->supports_effort_targets = 1;
     out_capabilities->supports_prediction = 0;
     out_capabilities->supports_trajectory_queue = value->supports_trajectory_queue();
+    out_capabilities->supports_execution_plans = value->supports_trajectory_queue();
     for (auto &reserved : out_capabilities->reserved)
         reserved = 0;
     rk_robot_state state{};

@@ -62,17 +62,20 @@ class RobotHost {
       leftWheelJoint.limits.lower = -100.0;
       leftWheelJoint.limits.upper = 100.0;
       leftWheelJoint.limits.effort = 100.0;
+      leftWheelJoint.limits.maxAcceleration = 1.0;
       var rightWheelJoint = robot.addJoint(new Joint("right wheel joint", JointType.Continuous,
         base, rightWheel, "joint/right-wheel"));
       rightWheelJoint.limits.lower = -100.0;
       rightWheelJoint.limits.upper = 100.0;
       rightWheelJoint.limits.effort = 100.0;
+      rightWheelJoint.limits.maxAcceleration = 1.0;
       var liftJoint = robot.addJoint(new Joint("mast lift", JointType.Prismatic,
         base, carriage, "joint/lift"));
       liftJoint.limits.lower = 0.0;
       liftJoint.limits.upper = 1.0;
       liftJoint.limits.velocity = 2.0;
       liftJoint.limits.effort = 100.0;
+      liftJoint.limits.maxAcceleration = 1.0;
       robot.mobileBase = new RobotMobileConfiguration(
         RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel",
           0.1, 0.5), 0.5, 1.0, 1.0, 1.0);
@@ -98,6 +101,10 @@ class RobotHost {
     }
     }
     var blueprint = RobotRuntimeCompiler.compile(robot);
+    if (deployment != null) {
+      blueprint.ownerPeriodNs = deployment.ownerPeriodNs;
+      blueprint.serialProcessingAllowanceNs = deployment.processingAllowanceNs;
+    }
     if (args.indexOf("--server") >= 0) {
       var serverSimulation:Null<Simulation> = null;
       var serverRuntime:Null<RobotRuntime> = null;

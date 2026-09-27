@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "name": "pty-forklift",
   "collisionApproximation": "bounds-box",
   "links": [
@@ -107,9 +107,9 @@
         "lower": -100,
         "upper": 100,
         "velocity": 0,
-        "effort": 100
+        "effort": 100,
+        "maxAcceleration": 0
       },
-      "drive": null,
       "parentFramePosition": [
         0,
         0,
@@ -148,9 +148,9 @@
         "lower": -100,
         "upper": 100,
         "velocity": 0,
-        "effort": 100
+        "effort": 100,
+        "maxAcceleration": 0
       },
-      "drive": null,
       "parentFramePosition": [
         0,
         0,
@@ -189,9 +189,9 @@
         "lower": 0,
         "upper": 1,
         "velocity": 2,
-        "effort": 100
+        "effort": 100,
+        "maxAcceleration": 0
       },
-      "drive": null,
       "parentFramePosition": [
         0,
         0,
@@ -221,6 +221,7 @@
       ]
     }
   ],
+  "actuators": [],
   "frames": [],
   "sensors": [],
   "mobileBase": {
