@@ -158,12 +158,12 @@ class ScriptedSetupTests {
       "0000000000000000000000000000000000000000000000000000000000000000");
     var incompatiblePath = directory + "/incompatible.materia";
     File.saveContent(incompatiblePath, Json.stringify(incompatible));
-    var generationBeforeMismatch = reopened.generation;
-    var rejectedMismatch = false;
-    try reopened.open(incompatiblePath) catch (_:Dynamic) rejectedMismatch = true;
-    check(rejectedMismatch && reopened.generation == generationBeforeMismatch
-      && reopenedLidar.updateRate == 33.0,
-      "script identity mismatch preserves the open project");
+    reopened.open(incompatiblePath);
+    var mismatchLidar:Sensor = reopened.sensors.selected();
+    check(reopened.scriptOwnership != null &&
+      reopened.scriptOwnership.identityMismatch != null &&
+      mismatchLidar.updateRate == 33.0,
+      "script identity mismatch stays open with a diagnostic and valid overrides");
 
     var legacy = '{"format":"materia.scene","version":1,"objects":[],"sensors":null,"script":{'
       + '"reference":"${TwoRobotSetupScript.REFERENCE}","version":1,"overridesEnabled":true,'
