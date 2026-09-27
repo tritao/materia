@@ -252,6 +252,8 @@ public:
             saved_body_order = body_order;
             saved_joints = joints;
             saved_joint_order = joint_order;
+            saved_couplings = couplings;
+            saved_closures = closures;
             saved_next_body = next_body;
             saved_next_joint = next_joint;
         } catch (const std::bad_alloc &) {
@@ -272,6 +274,8 @@ public:
             body_order.swap(saved_body_order);
             joints.swap(saved_joints);
             joint_order.swap(saved_joint_order);
+            couplings.swap(saved_couplings);
+            closures.swap(saved_closures);
             next_body = saved_next_body;
             next_joint = saved_next_joint;
             (void)rebuild();
@@ -321,6 +325,9 @@ public:
             if (joint.desc.body_a == id || joint.desc.body_b == id)
                 return NKSIM_ERROR_INVALID_STATE;
         }
+        for (const auto &closure : closures)
+            if (closure.body_a == id || closure.body_b == id)
+                return NKSIM_ERROR_INVALID_STATE;
         bodies.erase(found);
         body_order.erase(std::remove(body_order.begin(), body_order.end(), id), body_order.end());
         return topology_update ? NKSIM_OK : rebuild();
@@ -433,6 +440,31 @@ public:
             return NKSIM_ERROR_INVALID_HANDLE;
         joints.erase(found);
         joint_order.erase(std::remove(joint_order.begin(), joint_order.end(), id), joint_order.end());
+        couplings.erase(std::remove_if(couplings.begin(), couplings.end(),
+            [id](const auto &value) { return value.leader == id || value.follower == id; }),
+            couplings.end());
+        return topology_update ? NKSIM_OK : rebuild();
+    }
+
+    nksim_result joint_couple(const nksim::BackendJointCoupling &coupling) override {
+        if (joints.find(coupling.leader) == joints.end() ||
+            joints.find(coupling.follower) == joints.end())
+            return NKSIM_ERROR_INVALID_HANDLE;
+        for (const auto &existing : couplings)
+            if (existing.follower == coupling.follower)
+                return NKSIM_ERROR_INVALID_ARGUMENT;
+        couplings.push_back(coupling);
+        return topology_update ? NKSIM_OK : rebuild();
+    }
+
+    nksim_result closure_create(const nksim::BackendClosure &closure) override {
+        if (bodies.find(closure.body_a) == bodies.end() ||
+            bodies.find(closure.body_b) == bodies.end())
+            return NKSIM_ERROR_INVALID_HANDLE;
+        if (closure.type != NKSIM_JOINT_FIXED && closure.type != NKSIM_JOINT_REVOLUTE &&
+            closure.type != NKSIM_JOINT_PRISMATIC)
+            return NKSIM_ERROR_UNSUPPORTED;
+        closures.push_back(closure);
         return topology_update ? NKSIM_OK : rebuild();
     }
 
@@ -535,6 +567,8 @@ private:
         saved_body_order.clear();
         saved_joints.clear();
         saved_joint_order.clear();
+        saved_couplings.clear();
+        saved_closures.clear();
     }
 
     const JointRecord *parent_joint(std::uint64_t body_id) const {
@@ -628,7 +662,18 @@ private:
             if (mjs_delete(spec, *element) != 0)
                 return NKSIM_ERROR_BACKEND;
         }
+        std::vector<mjsElement *> equalities;
+        for (auto *element = mjs_firstElement(spec, mjOBJ_EQUALITY); element;
+             element = mjs_nextElement(spec, element)) equalities.push_back(element);
+        for (auto element = equalities.rbegin(); element != equalities.rend(); ++element)
+            if (mjs_delete(spec, *element) != 0) return NKSIM_ERROR_BACKEND;
+        std::vector<mjsElement *> meshes;
+        for (auto *element = mjs_firstElement(spec, mjOBJ_MESH); element;
+             element = mjs_nextElement(spec, element)) meshes.push_back(element);
+        for (auto element = meshes.rbegin(); element != meshes.rend(); ++element)
+            if (mjs_delete(spec, *element) != 0) return NKSIM_ERROR_BACKEND;
 
+        rebuild_bodies.clear();
         std::unordered_set<std::uint64_t> added;
         for (const auto body_id : body_order) {
             if (parent_joint_id(body_id) == 0) {
@@ -645,6 +690,68 @@ private:
         const auto actuator_result = add_joint_actuators();
         if (actuator_result != NKSIM_OK)
             return actuator_result;
+        for (const auto &coupling : couplings) {
+            const auto leader = joints.find(coupling.leader);
+            const auto follower = joints.find(coupling.follower);
+            if (leader == joints.end() || follower == joints.end())
+                return NKSIM_ERROR_INVALID_STATE;
+            auto *equality = mjs_addEquality(spec, nullptr);
+            if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
+            equality->type = mjEQ_JOINT;
+            equality->objtype = mjOBJ_JOINT;
+            mjs_setString(equality->name1, follower->second.name.c_str());
+            mjs_setString(equality->name2, leader->second.name.c_str());
+            equality->data[0] = coupling.offset;
+            equality->data[1] = coupling.ratio;
+        }
+        for (std::size_t closure_index = 0; closure_index < closures.size(); ++closure_index) {
+            const auto &closure = closures[closure_index];
+            const auto &first = bodies.at(closure.body_a).name;
+            const auto &second = bodies.at(closure.body_b).name;
+            if (closure.type == NKSIM_JOINT_PRISMATIC) {
+                auto *parent = rebuild_bodies.at(closure.body_a);
+                auto *aux = mjs_addBody(parent, nullptr);
+                if (!aux) return NKSIM_ERROR_OUT_OF_MEMORY;
+                const auto aux_name = first + "_slide_closure_" + std::to_string(closure_index);
+                if (mjs_setName(aux->element, aux_name.c_str()) != 0)
+                    return NKSIM_ERROR_BACKEND;
+                const auto &parent_pose = bodies.at(closure.body_a).desc;
+                const auto &child_pose = bodies.at(closure.body_b).desc;
+                const auto parent_q = normalize(parent_pose.rotation);
+                const auto child_q = normalize(child_pose.rotation);
+                const auto relative_q = normalize(multiply(conjugate(parent_q), child_q));
+                const auto relative_p = rotate(conjugate(parent_q),
+                    subtract(child_pose.position, parent_pose.position));
+                write_pose(relative_p, relative_q, *aux);
+                aux->explicitinertial = 1;
+                aux->mass = 1e-6;
+                aux->inertia[0] = aux->inertia[1] = aux->inertia[2] = 1e-8;
+                auto *slide = mjs_addJoint(aux, nullptr);
+                if (!slide) return NKSIM_ERROR_OUT_OF_MEMORY;
+                slide->type = mjJNT_SLIDE;
+                const auto axis = normalize(rotate(conjugate(relative_q), closure.axis_a));
+                std::copy(axis.begin(), axis.end(), slide->axis);
+                auto *equality = mjs_addEquality(spec, nullptr);
+                if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
+                equality->type = mjEQ_WELD;
+                equality->objtype = mjOBJ_BODY;
+                mjs_setString(equality->name1, aux_name.c_str());
+                mjs_setString(equality->name2, second.c_str());
+                continue;
+            }
+            const int count = closure.type == NKSIM_JOINT_FIXED ? 1 : 2;
+            for (int point = 0; point < count; ++point) {
+                auto *equality = mjs_addEquality(spec, nullptr);
+                if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
+                equality->type = closure.type == NKSIM_JOINT_FIXED ? mjEQ_WELD : mjEQ_CONNECT;
+                equality->objtype = mjOBJ_BODY;
+                mjs_setString(equality->name1, first.c_str());
+                mjs_setString(equality->name2, second.c_str());
+                for (int axis = 0; axis < 3; ++axis)
+                    equality->data[axis] = closure.anchor_a[axis] +
+                        point * 0.1 * closure.axis_a[axis];
+            }
+        }
 
         if (model && data) {
             if (mj_recompile(spec, nullptr, model, data) != 0) {
@@ -742,6 +849,7 @@ private:
             return NKSIM_ERROR_OUT_OF_MEMORY;
         if (mjs_setName(body->element, found->second.name.c_str()) != 0)
             return NKSIM_ERROR_BACKEND;
+        rebuild_bodies[id] = body;
 
         const auto *incoming = parent_joint(id);
         const auto *parent_record = incoming ? &bodies.at(incoming->desc.body_a) : nullptr;
@@ -778,7 +886,7 @@ private:
         return NKSIM_OK;
     }
 
-    static nksim_result configure_body(mjsBody &body,
+    nksim_result configure_body(mjsBody &body,
                                        const nksim::BackendBodyDesc &desc,
                                        const JointRecord *incoming) {
         // A KINEMATIC body (e.g. a robot's own root/base link) is externally
@@ -867,6 +975,22 @@ private:
         case NKSIM_SHAPE_PLANE:
             geom->type = mjGEOM_PLANE;
             break;
+        case NKSIM_SHAPE_CONVEX: {
+            if (desc.shape_vertices.size() < 12 || desc.shape_vertices.size() > 192 ||
+                desc.shape_vertices.size() % 3 != 0)
+                return NKSIM_ERROR_INVALID_ARGUMENT;
+            auto *mesh = mjs_addMesh(spec, nullptr);
+            if (!mesh) return NKSIM_ERROR_OUT_OF_MEMORY;
+            const auto name = *mjs_getName(body.element) + "_collision";
+            if (mjs_setName(mesh->element, name.c_str()) != 0)
+                return NKSIM_ERROR_BACKEND;
+            mjs_setFloat(mesh->uservert, desc.shape_vertices.data(),
+                         static_cast<int>(desc.shape_vertices.size()));
+            mesh->maxhullvert = 64;
+            geom->type = mjGEOM_MESH;
+            mjs_setString(geom->meshname, name.c_str());
+            break;
+        }
         default:
             return NKSIM_ERROR_UNSUPPORTED;
         }
@@ -886,7 +1010,7 @@ private:
             geom->size[0] = 0.0;
             geom->size[1] = 0.0;
             geom->size[2] = 1.0;
-        } else {
+        } else if (desc.shape_type != NKSIM_SHAPE_CONVEX) {
             geom->size[0] = desc.shape_parameters[0];
             geom->size[1] = desc.shape_type == NKSIM_SHAPE_CAPSULE
                 ? desc.shape_parameters[1] * 0.5
@@ -1064,10 +1188,15 @@ private:
     std::vector<std::uint64_t> body_order;
     std::unordered_map<std::uint64_t, JointRecord> joints;
     std::vector<std::uint64_t> joint_order;
+    std::vector<nksim::BackendJointCoupling> couplings;
+    std::vector<nksim::BackendClosure> closures;
+    std::unordered_map<std::uint64_t, mjsBody *> rebuild_bodies;
     std::unordered_map<std::uint64_t, BodyRecord> saved_bodies;
     std::vector<std::uint64_t> saved_body_order;
     std::unordered_map<std::uint64_t, JointRecord> saved_joints;
     std::vector<std::uint64_t> saved_joint_order;
+    std::vector<nksim::BackendJointCoupling> saved_couplings;
+    std::vector<nksim::BackendClosure> saved_closures;
     std::uint64_t next_body = 1;
     std::uint64_t next_joint = 1;
     std::uint64_t saved_next_body = 1;

@@ -5,6 +5,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 
 namespace {
 
@@ -1434,6 +1435,107 @@ void applied_force_and_torque_act_on_their_own_axes() {
     nkscene_scene_destroy(scene);
 }
 
+void coupled_prismatic_joints_use_equality_and_convex_collision() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 2;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0);
+    const auto leader_body = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+    const double vertices[] = {
+        -0.1,-0.1,-0.1, 0.1,-0.1,-0.1, -0.1,0.1,-0.1, 0.1,0.1,-0.1,
+        -0.1,-0.1,0.1, 0.1,-0.1,0.1, -0.1,0.1,0.1, 0.1,0.1,0.1};
+    nksim_shape hull = 0;
+    assert(nksim_shape_create_convex(world, vertices, 24, &hull) == NKSIM_OK);
+    const auto follower_body = make_body(world, make_node(scene, 0.0),
+                                         NKSIM_MOTION_DYNAMIC, 1.0, hull);
+    nksim_joint_desc joint{};
+    joint.struct_size = sizeof(joint);
+    joint.type = NKSIM_JOINT_PRISMATIC;
+    joint.body_a = base;
+    joint.axis_a[0] = 1.0;
+    joint.lower_limit = -1.0;
+    joint.upper_limit = 1.0;
+    joint.max_force = 100.0;
+    nksim_joint source = 0, target = 0;
+    joint.body_b = leader_body;
+    assert(nksim_joint_create(world, &joint, &source) == NKSIM_OK);
+    joint.body_b = follower_body;
+    assert(nksim_joint_create(world, &joint, &target) == NKSIM_OK);
+    nksim_joint_coupling_desc coupling{};
+    coupling.struct_size = sizeof(coupling);
+    coupling.leader = source;
+    coupling.follower = target;
+    coupling.ratio = -2.0;
+    coupling.offset = 0.1;
+    assert(nksim_joint_couple(world, &coupling) == NKSIM_OK);
+    nksim_joint_target command{};
+    command.struct_size = sizeof(command);
+    command.joint = source;
+    command.mode = NKSIM_JOINT_TARGET_POSITION;
+    command.target = 0.2;
+    command.max_force = 100.0;
+    assert(nksim_world_set_joint_targets(world, &command, 1) == NKSIM_OK);
+    step_world(world, 300);
+    nksim_joint_state a{}, b{};
+    a.struct_size = b.struct_size = sizeof(a);
+    assert(nksim_joint_get_state(world, source, &a) == NKSIM_OK);
+    assert(nksim_joint_get_state(world, target, &b) == NKSIM_OK);
+    assert(std::abs(a.position) > 0.1);
+    assert(std::abs(b.position + 2.0 * a.position - 0.1) < 0.02);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+void assembly_closures_compile_as_equalities() {
+    for (const auto closure_type : {NKSIM_JOINT_FIXED, NKSIM_JOINT_REVOLUTE,
+                                    NKSIM_JOINT_PRISMATIC}) {
+        nkscene_scene scene = 0;
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        nksim_world_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.scene = scene;
+        desc.fixed_timestep = 0.01;
+        desc.physics_substeps = 2;
+        nksim_world world = 0;
+        assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+        const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0);
+        const auto first = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+        const auto second = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+        nksim_joint_desc joint{};
+        joint.struct_size = sizeof(joint);
+        joint.type = NKSIM_JOINT_PRISMATIC;
+        joint.body_a = base;
+        joint.axis_a[0] = 1.0;
+        joint.lower_limit = -1.0;
+        joint.upper_limit = 1.0;
+        joint.max_force = 100.0;
+        nksim_joint handle = 0;
+        joint.body_b = first;
+        assert(nksim_joint_create(world, &joint, &handle) == NKSIM_OK);
+        joint.body_b = second;
+        assert(nksim_joint_create(world, &joint, &handle) == NKSIM_OK);
+        nksim_closure_desc closure{};
+        closure.struct_size = sizeof(closure);
+        closure.type = closure_type;
+        closure.body_a = first;
+        closure.body_b = second;
+        closure.axis_a[0] = 1.0;
+        const auto result = nksim_closure_create(world, &closure);
+        if (result != NKSIM_OK)
+            std::fprintf(stderr, "closure type %u failed with %d\n", closure_type, result);
+        assert(result == NKSIM_OK);
+        step_world(world, 2);
+        nksim_world_destroy(world);
+        nkscene_scene_destroy(scene);
+    }
+}
+
 } // namespace
 
 int main() {
@@ -1454,5 +1556,7 @@ int main() {
     kinematic_base_is_not_moved_by_child_reaction();
     body_without_inertials_has_center_of_mass_at_origin();
     applied_force_and_torque_act_on_their_own_axes();
+    coupled_prismatic_joints_use_equality_and_convex_collision();
+    assembly_closures_compile_as_equalities();
     return 0;
 }
