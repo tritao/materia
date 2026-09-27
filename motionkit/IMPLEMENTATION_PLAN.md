@@ -530,8 +530,8 @@ Do (in `motionkit/robot/…/MotionSystem.hx`):
   plan instead of null in that case. Update the README's description of this
   behaviour. `moveLinear` and path moves keep stop-first behaviour until
   native path timing exists.
-- `movePath` and `queuePath` keep `LineLookaheadPlanner` (converted to
-  degree-1 segments) until native path timing exists.
+- `LineLookaheadPlanner` emits native `Trajectory` degree-1 segments directly
+  for `movePath` and `queuePath`, until native path timing exists.
 - Set `ends_at_rest = false` on each non-final streamed plan of a longer path;
   only the final plan declares rest. This lets a late refill trigger native
   underflow braking from the executed chord speed.
@@ -543,9 +543,8 @@ Do (in `motionkit/robot/…/MotionSystem.hx`):
     exists. Line phases could be emitted as exact degree-2 segments, but arcs
     cannot.
   - For those trajectories, retargeting while moving keeps today's stop-first
-    behaviour. The hold lead uses MotionKit's shared path derivative estimate
-    (chord finite differences at degree 1), conservatively bounded against
-    planner-authored velocities when they are retained alongside the path.
+    behaviour. Native HOLD uses MotionKit's shared path derivative estimate
+    (chord finite differences at degree 1); no host-side hold lead remains.
   - Retargeting from a moving state applies only when the active segments
     are degree ≥ 2.
 - Fallback for backends without queue or plan support (serial device
@@ -554,10 +553,17 @@ Do (in `motionkit/robot/…/MotionSystem.hx`):
   - evaluate the native trajectory each fixed step;
   - hold and resume become "stop and replan with Ruckig" there. Document
     this as the degraded mode.
-- Delete `TrapezoidalPlanner`, `JogProfile`, `TimeScaling` and
-  `TimeScaledTrajectory` once nothing uses them. Keep `MotionLimits`.
-  Tests that assert those classes' specific behaviour are replaced by
-  equivalent behaviour tests on `MotionSystem`.
+- Once every `MotionSystem` path submits plans, delete `JointTrajectory`,
+  `JointTrajectorySample`, `TrajectoryPlanner`, `TrapezoidalPlanner`,
+  `JogProfile`, `TimeScaling` and `TimeScaledTrajectory`. Keep `MotionLimits`.
+  Re-express each deleted class's behavior tests on `MotionSystem` or native
+  `Trajectory` instead of dropping coverage.
+- For queue backends, delete `MotionSystem`'s host-side hold and splice
+  machinery: `holdStopLeadSeconds`, `refillTrajectoryForHold`, `PendingSplice`
+  and the late-splice fallback. Native HOLD and RESUME replace them. Keep
+  chunked refill for long plans, setting `ends_at_rest = false` on every
+  non-final chunk. Keep position streaming for backends without queue support
+  (the serial device until RKD6).
 
 Tests:
 - The existing MotionSystem suite passes, with assertions updated only
@@ -566,36 +572,59 @@ Tests:
 - New tests:
   - retarget mid-move stays within jerk limits (validation report);
   - direction reversal while jogging;
-  - a degree-1 path move keeps stop-first replacement and has enough hold
-    lead to stop within joint acceleration limits;
+  - a degree-1 path move keeps stop-first replacement and native HOLD stays
+    within joint acceleration limits;
   - a dual-motor axis stays in proportion under retargeting.
 
 Commits: at least three — switch execution; switch planning; delete the
 old planners.
 
+## P9b — Remove the legacy point-chunk path
+
+Do this as a separate commit after the `MotionSystem` migration:
+- Delete `RK_COMMAND_TRAJECTORY_CHUNK` and the point-knot representation
+  (knots without a segment), legacy position-only checks,
+  `splice_tag`/`splice_time_ns`, the silent late-splice drop, and knot-counting
+  compatibility special cases. Segment and plan queues use one knot model.
+- Update Haxe `TrajectoryChunk` and `RobotCommand` so no new point chunks can
+  be submitted. Bump `RK_API_VERSION` and regenerate the `.hxi`.
+- MCAP stops writing point chunks, while v1–v4 readers continue loading old
+  recordings.
+- Re-express the legacy runtime tests on plans: queue depth, STOP braking on
+  degree-1 segments, and splice replacement as plan replacement. Do not
+  remove the behavior coverage.
+
+Acceptance: every MotionKit and RobotKit native/Haxe suite, both FFI audits,
+and TCP default, session and lease-timeout integration stay green. Log the
+deletions and test replacements in the Progress log.
+
 ## P10 — Trajectories and plans over robotd
 
 Problem:
-- robotd defines `TrajectoryRequest` but never handles it.
-- `RemoteRobot` throws on `TrajectoryChunk` (`robotkit/haxe/robotkit/world/RemoteRobot.hx:107`).
+- robotd defines an unhandled `TrajectoryRequest` (message type 9).
+- `RemoteRobot` cannot submit plans over the network.
 - The network `RobotCapabilities` message has no queue field.
 
 As a result, buffered motion works only in-process.
 
 Do:
+- Replace the unhandled message type 9 with plan submission; do not implement
+  the old `TrajectoryRequest` message.
 - Add a capability field for the trajectory queue and plan support.
 - Implement plan submission (P7 shape) and the HOLD, RESUME and ABORT
   commands through `RobotClient`, `RemoteRobot` and `RobotServer`. Only the
   control-lease owner may submit.
 - Forward runtime error codes to the client as faults with the code.
-- Carry the new snapshot fields (session state, active plan id,
-  `committed_until`).
+- Carry session state, active plan ID, `committed_until` and queue-end time
+  in network snapshots.
 
 Tests:
 - `world-tcp.sh` gains a scenario in which a remote client submits a
   Ruckig plan, holds, resumes and completes.
 - An observer session's submission is refused.
 - Lease expiry mid-plan still triggers the emergency stop.
+- Every suite and the three TCP integration modes stay green; log the
+  replacement in the Progress log.
 
 ## P11 — Transmissions in the RobotKit model (D2, model and compiler only)
 
