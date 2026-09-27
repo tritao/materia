@@ -1320,8 +1320,7 @@ class EditorScene {
   }
 
   public function setName(id:String, label:String):Void {
-    if (StringTools.trim(label).length == 0 || SceneCodec.containsNul(label))
-      throw "Name cannot be empty or contain NUL";
+    model.validateLabel(label);
     var item = object(id);
     if (item == null) throw "Unknown scene object: " + id;
     var transaction = scene.beginTransaction();
@@ -1330,7 +1329,7 @@ class EditorScene {
       transaction.setName(runtimeFor(id).node, label);
       changes = transaction.commitWithChanges();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
-    item.label = label;
+    model.rename(item, label);
     publish(null, false, changes);
   }
 

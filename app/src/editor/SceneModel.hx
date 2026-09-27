@@ -2,6 +2,7 @@ package app.editor;
 
 import app.EditorScene.EditorSceneObject;
 import app.SceneObjectData;
+import app.SceneCodec;
 import app.EditorScene;
 import nativekit.ui.editing.EditOperation;
 import app.editor.ObjectKindRegistry;
@@ -19,6 +20,14 @@ typedef SceneRecordChange = {
 class SceneModel {
   public var objects:Array<EditorSceneObject> = [];
   public var nextObjectId:Int = 1;
+
+  public function validateLabel(label:String):Void {
+    if (StringTools.trim(label).length == 0 || SceneCodec.containsNul(label))
+      throw "Name cannot be empty or contain NUL";
+  }
+
+  public function rename(item:EditorSceneObject, label:String):Void
+    item.label = label;
 
   public function allocateId(owner:EditorScene, prefix:String="rectangle"):String {
     var id = prefix + "-" + nextObjectId;
