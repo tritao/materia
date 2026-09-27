@@ -24,18 +24,50 @@ import robotkit.manipulation.WorkPatchPlanner;
 import cadbridge.FaceBridge;
 import cadbridge.WallBridge;
 import cadbridge.BimFrameBridge;
+import cadbridge.AssemblySimulationBridge;
+import robotkit.runtime.RobotRuntimeCompiler;
+import cadkit.modeling.AssemblyModel;
+import materia.project.AssemblyFrames;
+import haxe.io.Bytes;
 
 /** M6 acceptance tests for robotkit/cadbridge: CadKit Face and BimKit wall -> WorkSurface, and BIM hierarchy -> FrameTree3. */
 class CadBridgeTests {
   static var assertions = 0;
 
   public static function main():Void {
+    testAssemblySimulationBridge();
     testFaceBridgeOnPlainBoxFace();
     testFaceBridgePreservesConcaveWireOrder();
     testWallBridgeAreaNormalAndExclusion();
     testBimFrameHierarchy();
     testBimWallToPatchPlanEndToEnd();
     Sys.println('CadBridge tests passed ($assertions assertions)');
+  }
+
+  static function testAssemblySimulationBridge():Void {
+    var assembly = new AssemblyModel();
+    assembly.add("base");
+    assembly.add("slider");
+    assembly.connector("base", "mount", AssemblyFrames.identity());
+    assembly.connector("slider", "mount", AssemblyFrames.identity());
+    assembly.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    var parts:materia.project.SceneArtifact.SceneArtifactData = {metresPerUnit: 0.001,
+      parts: [for (id in ["base", "slider"]) {id: id, name: id, red: 0.5, green: 0.5,
+        blue: 0.5, materialId: "machined-steel", materialDensity: 7850,
+        volume: 1000000.0, centerOfMass: [0.0, 0.0, 0.0],
+        inertia: [10000000000.0, 0, 0, 0, 10000000000.0, 0, 0, 0, 10000000000.0],
+        vertexCount: 0, indexCount: 0, vertices: Bytes.alloc(0), normals: Bytes.alloc(0),
+        indices: Bytes.alloc(0), faceRanges: []}]};
+    var translated = AssemblySimulationBridge.toRobotModel(assembly.definition("bridge-test"), parts);
+    check(translated.model.links.length == 3 && translated.model.joints.length == 2,
+      "assembly tree translates to robot links and joints");
+    var slide = translated.model.joints[1];
+    check(Math.abs(slide.limits.upper - 0.1) < 1e-9 && slide.axis[1] == 1 &&
+      Math.abs(translated.model.links[1].mass - 7.85) < 1e-9,
+      "assembly limits and material mass convert to SI units");
+    check(RobotRuntimeCompiler.validate(translated.model).length == 0,
+      "translated assembly is a valid RobotKit runtime model");
   }
 
   /**

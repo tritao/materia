@@ -21,6 +21,16 @@ class ProjectSourceTests {
     }
     Sys.setCwd(root);
     var manifest = root + "/cadkit/examples/modeling/materia.project.json";
+    var machineManifest = root + "/machinekit/examples/materia.project.json";
+    var machineScene = MateriaProjectRunner.loadProject(machineManifest);
+    var hasAluminium = false, hasSteel = false;
+    for (part in machineScene.objects) {
+      check(part.mass > 0.000001 && Math.abs(part.mass - 1.0) > 0.000001,
+        "generated part mass comes from volume and material density");
+      if (part.materialId == "aluminium") hasAluminium = true;
+      if (part.materialId == "steel-c45") hasSteel = true;
+    }
+    check(hasAluminium && hasSteel, "machine preview carries distinct physical materials");
     var generatedScene = MateriaProjectRunner.loadProject(manifest);
     var generated = generatedScene.objects;
     check(generated.length == 13, "project generates all excavator parts");

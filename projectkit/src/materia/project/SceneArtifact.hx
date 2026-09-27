@@ -9,6 +9,7 @@ import materia.project.AssemblyDefinitionCodec;
 import materia.project.Appearance;
 import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;
+import materia.project.MeshMassProperties;
 
 typedef SceneArtifactFaceRange = {
 	var faceIndex:Int;
@@ -26,6 +27,9 @@ typedef SceneArtifactPart = {
 	@:optional var materialId:String;
 	@:optional var materialDensity:Float;
 	@:optional var materialSpec:String;
+	@:optional var volume:Float;
+	@:optional var centerOfMass:Array<Float>;
+	@:optional var inertia:Array<Float>;
 	var vertexCount:Int;
 	var indexCount:Int;
 	var vertices:Bytes;
@@ -56,7 +60,8 @@ class SceneArtifact {
 
 	public static function encode(data:SceneArtifactData):Bytes {
 		validateHeader(data);
-		var names:Array<{id:Bytes, name:Bytes, finish:Bytes, materialId:Bytes, materialSpec:Bytes, density:Float}> = [];
+		var names:Array<{id:Bytes, name:Bytes, finish:Bytes, materialId:Bytes, materialSpec:Bytes,
+			density:Float, volume:Float, center:Array<Float>, inertia:Array<Float>}> = [];
 		var assembly = data.assembly == null ? Bytes.alloc(0) : Bytes.ofString(AssemblyCodec.encode(data.assembly));
 		var assemblyDefinition = data.assemblyDefinition == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
@@ -72,13 +77,17 @@ class SceneArtifact {
 				throw "Scene artifact has an invalid part ID or name";
 			var finish = Bytes.ofString(part.appearance == null ? "neutral" : part.appearance.finish);
 			var idValue = part.materialId == null ? "neutral" : part.materialId;
-			var material = MaterialLibrary.get(idValue);
 			var materialId = Bytes.ofString(idValue);
-			var materialSpec = Bytes.ofString(part.materialSpec == null ? material.physical.spec : part.materialSpec);
-			var density = part.materialDensity == null ? material.physical.density : part.materialDensity;
+			var spec = part.materialSpec == null ? MaterialLibrary.require(idValue).physical.spec : part.materialSpec;
+			var materialSpec = Bytes.ofString(spec);
+			var density = part.materialDensity == null ? MaterialLibrary.require(idValue).physical.density : part.materialDensity;
+			var meshProperties = MeshMassProperties.compute(part.vertices, part.indices);
 			names.push({id: id, name: name, finish: finish, materialId: materialId,
-				materialSpec: materialSpec, density: density});
-			length += 64 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
+				materialSpec: materialSpec, density: density,
+				volume: part.volume == null ? meshProperties.volume : part.volume,
+				center: part.centerOfMass == null ? meshProperties.centerOfMass : part.centerOfMass,
+				inertia: part.inertia == null ? meshProperties.inertia : part.inertia});
+			length += 168 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
 				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
 				+ (part.edgeIds == null ? 0 : part.edgeIds.length)
 				+ part.faceRanges.length * 12;
@@ -108,6 +117,9 @@ class SceneArtifact {
 			result.setDouble(offset, text.density); offset += 8;
 			offset = putInt(result, offset, text.materialSpec.length);
 			result.blit(offset, text.materialSpec, 0, text.materialSpec.length); offset += text.materialSpec.length;
+			result.setDouble(offset, text.volume); offset += 8;
+			for (coordinate in text.center) { result.setDouble(offset, coordinate); offset += 8; }
+			for (component in text.inertia) { result.setDouble(offset, component); offset += 8; }
 			offset = putInt(result, offset, part.vertexCount);
 			offset = putInt(result, offset, part.indexCount);
 			offset = putInt(result, offset, part.faceRanges.length);
@@ -209,6 +221,14 @@ class SceneArtifact {
 		if (part.materialSpec != null && (StringTools.trim(part.materialSpec).length == 0 ||
 			Bytes.ofString(part.materialSpec).length > 4096))
 			throw 'Scene artifact part "${part.id}" has an invalid material specification';
+		if (part.volume != null && (!finite(part.volume) || part.volume <= 0) ||
+			part.centerOfMass != null && part.centerOfMass.length != 3 ||
+			part.inertia != null && part.inertia.length != 9)
+			throw 'Scene artifact part "${part.id}" has invalid mass properties';
+		if (part.centerOfMass != null) for (coordinate in part.centerOfMass)
+			if (!finite(coordinate)) throw 'Scene artifact part "${part.id}" has invalid centre of mass';
+		if (part.inertia != null) for (component in part.inertia)
+			if (!finite(component)) throw 'Scene artifact part "${part.id}" has invalid inertia';
 		if (appearance != null && (appearance.finish == null ||
 			StringTools.trim(appearance.finish).length == 0 ||
 			Bytes.ofString(appearance.finish).length > 4096 ||
@@ -269,6 +289,9 @@ private class SceneArtifactReader {
 				(MaterialLibrary.get(appearance.finish) == null ? "neutral" : appearance.finish);
 			var density = version >= 8 ? readDouble() : null;
 			var materialSpec = version >= 8 ? readText() : null;
+			var volume = version >= 8 ? readDouble() : null;
+			var center = version >= 8 ? [for (_ in 0...3) readDouble()] : null;
+			var inertia = version >= 8 ? [for (_ in 0...9) readDouble()] : null;
 			var vertexCount = readInt(), indexCount = readInt(), rangeCount = readInt();
 			var edgeByteCount = version >= 4 ? readInt() : 0;
 			if (vertexCount <= 0 || vertexCount > 2000000 || indexCount <= 0 ||
@@ -283,6 +306,7 @@ private class SceneArtifactReader {
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
 			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
 				appearance: appearance, materialId: materialId, materialDensity: density, materialSpec: materialSpec,
+				volume: volume, centerOfMass: center, inertia: inertia,
 				vertexCount: vertexCount, indexCount: indexCount, vertices: vertices, normals: normals,
 				indices: indices, edgeSegments: edgeSegments, edgeIds: edgeIds,
 				faceRanges: faceRanges};

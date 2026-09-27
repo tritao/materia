@@ -7,6 +7,8 @@ import haxe.io.Path as ProjectPath;
 import sys.io.AtomicFile;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactPart;
+import materia.project.MaterialLibrary;
+import materia.project.MeshMassProperties;
 import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord.AssemblyFrame;
 import materia.project.AssemblyRecord.AssemblyConnector;
@@ -333,12 +335,19 @@ class MateriaProjectRunner {
     var center = pose == null ? {x: centerX, y: centerY, z: centerZ}
       : AssemblyFrames.transformPoint(pose, centerX, centerY, centerZ);
     var label = useCount != null && useCount > 1 ? component.name + " · " + occurrenceId : component.name;
+    var volume = component.volume == null
+      ? MeshMassProperties.compute(component.vertices, component.indices).volume : component.volume;
+    var materialId = component.materialId == null ? "neutral" : component.materialId;
+    var density = component.materialDensity == null
+      ? MaterialLibrary.require(materialId).physical.density : component.materialDensity;
+    var mass = volume * scale * scale * scale * density;
+    if (!Math.isFinite(mass) || mass <= 0) throw 'Invalid mass for generated part "$occurrenceId"';
     records.push({id: "project:" + occurrenceId, label: label, type: "cad-preview",
       x: center.x * scale, y: center.y * scale, z: center.z * scale,
       width: Math.max(0.000001, (maximum[0] - minimum[0]) * scale),
       height: Math.max(0.000001, (maximum[1] - minimum[1]) * scale),
       depth: Math.max(0.000001, (maximum[2] - minimum[2]) * scale),
-      collisionEnabled: false, dynamicBody: false, mass: 1.0,
+      collisionEnabled: false, dynamicBody: false, mass: mass,
       red: component.red, green: component.green, blue: component.blue,
       appearance: component.appearance, materialId: component.materialId, visible: true,
       meshSnapshot: geometryKeyByDefinition.get(definitionId),

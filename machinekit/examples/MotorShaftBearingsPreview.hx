@@ -34,10 +34,13 @@ class MotorShaftBearingsPreview {
 		var material = MaterialLibrary.require(materialId);
 		var color = material.visual.baseColor;
 		try {
+			var physical = part.massProperties();
 			var mesh = part.shape.tessellate(0.5, 0.5);
 			parts.push({
 				id: id, name: name, red: color[0], green: color[1], blue: color[2],
 				appearance: MaterialLibrary.appearance(materialId), materialId: materialId, vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
+				volume: physical.volume,
+				centerOfMass: [physical.centerOfMass.x, physical.centerOfMass.y, physical.centerOfMass.z],
 				vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
 				edgeSegments: mesh.edgeSegments, edgeIds: mesh.edgeIds,
 				faceRanges: [for (range in mesh.faceRanges) {
@@ -57,7 +60,8 @@ function main():Void {
 	if (scene.parts.length != 13 || scene.assemblyDefinition == null)
 		throw "Bearing preview has missing render regions";
 	for (part in scene.parts) if (part.materialId == null || part.materialDensity == null ||
-		part.materialDensity <= 0 || part.materialSpec == null)
+		part.materialDensity <= 0 || part.materialSpec == null || part.volume == null ||
+		part.volume <= 0 || part.centerOfMass == null || part.inertia == null || part.inertia.length != 9)
 		throw 'Bearing preview has no resolved material for "${part.id}"';
 	for (bearingId in ["bearingA", "bearingB"]) {
 		var shieldId = bearingId + "-shields";

@@ -278,7 +278,8 @@ class Simulation {
 
   /** Adds a box to the shared physics world and returns its owned object ID. */
   public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
-      ?dynamicBody:Bool = false, ?mass:Float = 1.0):Int {
+      ?dynamicBody:Bool = false, ?mass:Float = 1.0,
+      ?orientation:Array<Float>):Int {
     ensureLive();
     if (position == null || position.length != 3 || halfExtents == null || halfExtents.length != 3)
       throw "Simulation.spawnBox requires three-component position and extents";
@@ -291,7 +292,14 @@ class Simulation {
     }
     var chosenMass = dynamicBody ? mass : 0.0;
     desc.set_mass(chosenMass);
-    var rotation = [0.0, 0.0, 0.0, 1.0];
+    var rotation = orientation == null ? [0.0, 0.0, 0.0, 1.0] : orientation;
+    if (rotation.length != 4) throw "Simulation.spawnBox requires a quaternion";
+    var length = 0.0;
+    for (component in rotation) {
+      if (!Math.isFinite(component)) throw "Simulation.spawnBox requires a finite quaternion";
+      length += component * component;
+    }
+    if (Math.abs(length - 1.0) > 1e-4) throw "Simulation.spawnBox requires a normalized quaternion";
     for (index in 0...4) desc.set_rotation(index, rotation[index]);
     stop();
     var result = RobotKitSimKit.rk_simulation_spawn_object(owner.borrow(), desc);

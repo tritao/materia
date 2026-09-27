@@ -56,6 +56,15 @@ typedef KinematicJoint = {
 	var defaultValue:Float;
 }
 
+/** Target coordinate = source coordinate × ratio + offset. */
+typedef AssemblyJointCoupling = {
+	var id:String;
+	var source:String;
+	var target:String;
+	var ratio:Float;
+	var offset:Float;
+}
+
 /** Versioned assembly design data. Runtime joint coordinates live in AssemblyStateRecord. */
 typedef AssemblyDefinition = {
 	var schemaVersion:Int;
@@ -63,6 +72,7 @@ typedef AssemblyDefinition = {
 	var definitions:Array<AssemblyComponentDefinition>;
 	var occurrences:Array<AssemblyComponentOccurrence>;
 	var joints:Array<KinematicJoint>;
+	@:optional var couplings:Array<AssemblyJointCoupling>;
 }
 
 typedef AssemblyJointCoordinate = {

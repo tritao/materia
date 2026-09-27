@@ -34,7 +34,6 @@ class LeadScrewTransmission {
 	public function setTravel(state:AssemblyState, travel:Float):Void {
 		if (!Math.isFinite(travel) || travel < 0 || travel > stroke)
 			throw "Linear axis travel is outside its stroke";
-		state.setJoint(rotaryJoint, rotationFor(travel));
 		state.setJoint(linearJoint, linearOffset + travel);
 		state.forwardKinematics();
 	}

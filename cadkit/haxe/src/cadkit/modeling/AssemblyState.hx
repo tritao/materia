@@ -64,8 +64,25 @@ class AssemblyState {
 		if (!Math.isFinite(value) || (joint.limits.lower != null && value < joint.limits.lower) ||
 			(joint.limits.upper != null && value > joint.limits.upper))
 			throw 'Joint "$id" coordinate is outside its limits';
-		coordinates.set(id, value);
+		var couplings = definition.couplings == null ? [] : definition.couplings;
+		for (coupling in couplings) if (coupling.target == id)
+			throw 'Joint "$id" is driven by coupled joint "${coupling.source}"';
+		var updates = new Map<String, Float>();
+		collectCoupledValues(id, value, updates);
+		for (jointId in updates.keys()) coordinates.set(jointId, updates.get(jointId));
 		dirty = true;
+	}
+
+	function collectCoupledValues(id:String, value:Float, updates:Map<String, Float>):Void {
+		var joint = joints.get(id);
+		if (joint == null || !Math.isFinite(value) ||
+			(joint.limits.lower != null && value < joint.limits.lower) ||
+			(joint.limits.upper != null && value > joint.limits.upper))
+			throw 'Coupled joint "$id" coordinate is outside its limits';
+		updates.set(id, value);
+		if (definition.couplings != null) for (coupling in definition.couplings)
+			if (coupling.source == id)
+				collectCoupledValues(coupling.target, value * coupling.ratio + coupling.offset, updates);
 	}
 
 	public function joint(id:String):Float {

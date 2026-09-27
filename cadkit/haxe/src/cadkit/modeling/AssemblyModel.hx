@@ -9,6 +9,7 @@ import materia.project.AssemblyRecord.AssemblyInstance;
 import materia.project.AssemblyRecord.AssemblyJoint;
 import materia.project.AssemblyDefinition;
 import materia.project.AssemblyDefinition.AssemblyJointLimits;
+import materia.project.AssemblyDefinition.AssemblyJointCoupling;
 import materia.project.AssemblyDefinition.AssemblyJointRole;
 import materia.project.AssemblyDefinition.AssemblyVector;
 import materia.project.AssemblyDefinitionCodec;
@@ -22,6 +23,7 @@ class AssemblyModel {
 	final jointRoles:Map<String, AssemblyJointRole> = [];
 	final jointAxes:Map<String, AssemblyVector> = [];
 	final jointLimits:Map<String, AssemblyJointLimits> = [];
+	final couplings:Array<AssemblyJointCoupling> = [];
 
 	public function new() {}
 
@@ -144,6 +146,11 @@ class AssemblyModel {
 		return result;
 	}
 
+	/** Couples a target coordinate to a source using target = source × ratio + offset. */
+	public function couple(id:String, source:String, target:String, ratio:Float, offset:Float = 0):Void {
+		couplings.push({id: id, source: source, target: target, ratio: ratio, offset: offset});
+	}
+
 	/** Exports reusable definitions and explicit tree/closure semantics. */
 	public function definition(id:String = "assembly"):AssemblyDefinition {
 		var legacy = AssemblyDefinitionCodec.fromLegacy(record(), id);
@@ -153,6 +160,7 @@ class AssemblyModel {
 			if (axis != null) joint.axis = axis;
 			if (limits != null) joint.limits = limits;
 		}
+		if (couplings.length > 0) legacy.couplings = couplings.copy();
 		AssemblyDefinitionCodec.validate(legacy);
 		return legacy;
 	}
