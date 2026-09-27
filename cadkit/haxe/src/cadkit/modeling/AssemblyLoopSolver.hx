@@ -6,6 +6,7 @@ import materia.project.AssemblyDefinition.AssemblyVector;
 import materia.project.AssemblyDefinition.KinematicJoint;
 import materia.project.AssemblyFrames;
 import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.units.LengthUnit;
 
 /** Tolerances and iteration settings for joint-coordinate loop solving. */
 typedef AssemblyLoopSolveOptions = {
@@ -76,12 +77,16 @@ class AssemblyLoopSolver {
 		if (state == null) throw "Assembly loop solve needs a state";
 		if (dependentJointIds == null || dependentJointIds.length == 0)
 			throw "Assembly loop solve needs at least one dependent tree joint";
-		var positionTolerance = option(options, "positionTolerance", DEFAULT_POSITION_TOLERANCE);
+		var metresPerUnit = LengthUnit.metresPerUnit(state.definition.lengthUnit == null
+			? "mm" : state.definition.lengthUnit);
+		var positionTolerance = option(options, "positionTolerance",
+			DEFAULT_POSITION_TOLERANCE * 0.001 / metresPerUnit);
 		var angularTolerance = option(options, "angularTolerance", DEFAULT_ANGULAR_TOLERANCE);
 		var maxIterations = intOption(options, "maxIterations", DEFAULT_MAX_ITERATIONS);
 		var initialDamping = option(options, "initialDamping", DEFAULT_DAMPING);
 		var rankTolerance = option(options, "rankTolerance", DEFAULT_RANK_TOLERANCE);
-		var finiteDifferenceStep = option(options, "finiteDifferenceStep", DEFAULT_FINITE_DIFFERENCE_STEP);
+		var finiteDifferenceStep = option(options, "finiteDifferenceStep",
+			DEFAULT_FINITE_DIFFERENCE_STEP * 0.001 / metresPerUnit);
 		validateOptions(positionTolerance, angularTolerance, maxIterations, initialDamping,
 			rankTolerance, finiteDifferenceStep);
 

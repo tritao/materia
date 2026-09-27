@@ -16,8 +16,8 @@ import sys.io.File;
 class MateriaProjectModuleBuild {
 	static function main():Void {
 		var args = Sys.args();
-		if (args.length != 4)
-			throw "usage: MateriaProjectModuleBuild <haxeon.json> <module> <function> <output-prefix>";
+		if (args.length != 5)
+			throw "usage: MateriaProjectModuleBuild <haxeon.json> <module> <function> <output-prefix> <haxeon-root>";
 		var manifestPath = Path.normalize(FileSystem.fullPath(args[0]));
 		var moduleName = args[1];
 		var functionName = args[2];
@@ -38,9 +38,7 @@ class MateriaProjectModuleBuild {
 			for (path in packageValue.ffiProjections)
 				projections.push({path: path, text: File.getContent(path)});
 		}
-		var home = Sys.getEnv("HAXEON_HOME");
-		if (home == null || home.length == 0)
-			throw "HAXEON_HOME is not set";
+		var home = FileSystem.fullPath(args[4]);
 		var compiler = new Compiler(null, null, new FfiConfiguration(interfaces, projections));
 		CompilerIntrinsics.register(compiler);
 		var defines = CompilerDriver.targetDefines("hl");

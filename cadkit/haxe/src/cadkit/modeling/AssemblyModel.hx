@@ -13,6 +13,7 @@ import materia.project.AssemblyDefinition.AssemblyJointCoupling;
 import materia.project.AssemblyDefinition.AssemblyJointRole;
 import materia.project.AssemblyDefinition.AssemblyVector;
 import materia.project.AssemblyDefinitionCodec;
+import materia.units.LengthUnit;
 
 /** Builds a posed assembly from part instances, connector frames, and tree joints. */
 class AssemblyModel {
@@ -24,8 +25,13 @@ class AssemblyModel {
 	final jointAxes:Map<String, AssemblyVector> = [];
 	final jointLimits:Map<String, AssemblyJointLimits> = [];
 	final couplings:Array<AssemblyJointCoupling> = [];
+	public final lengthUnit:String;
+	public final metresPerUnit:Float;
 
-	public function new() {}
+	public function new(lengthUnit:String = "mm") {
+		this.lengthUnit = lengthUnit;
+		this.metresPerUnit = LengthUnit.metresPerUnit(lengthUnit);
+	}
 
 	public function add(id:String, ?pose:AssemblyFrame):Void {
 		if (id == null || id.length == 0 || byId.exists(id)) throw 'Duplicate assembly instance "$id"';
@@ -94,19 +100,20 @@ class AssemblyModel {
 
 	/** Records a closure between already placed instances after checking its pin centers. */
 	public function constrain(id:String, kind:String, parent:String, parentConnector:String,
-			child:String, childConnector:String, tolerance:Float = 0.001):Void {
+			child:String, childConnector:String, ?tolerance:Float):Void {
 		constrainOnAxis(id, kind, parent, parentConnector, child, childConnector,
 			{x: 0, y: 1, z: 0}, tolerance);
 	}
 
 	/** Records a closure using its explicit unit axis in the parent connector frame. */
 	public function constrainOnAxis(id:String, kind:String, parent:String, parentConnector:String,
-			child:String, childConnector:String, axis:AssemblyVector, tolerance:Float = 0.001,
+			child:String, childConnector:String, axis:AssemblyVector, ?tolerance:Float,
 			?limits:AssemblyJointLimits):Void {
 		if (!validJointKind(kind))
 			throw 'Unsupported assembly joint "$kind"';
 		validateAxis(axis);
-		if (!Math.isFinite(tolerance) || tolerance < 0) throw "Assembly tolerance must be finite and nonnegative";
+		var resolvedTolerance = tolerance == null ? 1e-6 / metresPerUnit : tolerance;
+		if (!Math.isFinite(resolvedTolerance) || resolvedTolerance < 0) throw "Assembly tolerance must be finite and nonnegative";
 		validateLimits(limits, 0);
 		var first = worldPoint(parent, parentConnector), second = worldPoint(child, childConnector);
 		var dx = first.x - second.x, dy = first.y - second.y, dz = first.z - second.z;
@@ -119,7 +126,7 @@ class AssemblyModel {
 			var px = dx - along * worldAxis.x, py = dy - along * worldAxis.y, pz = dz - along * worldAxis.z;
 			positionError = Math.sqrt(px * px + py * py + pz * pz);
 		}
-		if (positionError > tolerance)
+		if (positionError > resolvedTolerance)
 			throw 'Assembly joint "$id" has separated connectors';
 		if (kind == "fixed") {
 			var dot = firstFrame.qx * secondFrame.qx + firstFrame.qy * secondFrame.qy +
@@ -161,6 +168,7 @@ class AssemblyModel {
 			if (limits != null) joint.limits = limits;
 		}
 		if (couplings.length > 0) legacy.couplings = couplings.copy();
+		legacy.lengthUnit = lengthUnit;
 		AssemblyDefinitionCodec.validate(legacy);
 		return legacy;
 	}

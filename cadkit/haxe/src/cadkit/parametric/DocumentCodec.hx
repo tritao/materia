@@ -60,7 +60,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 5;
+	public static inline var VERSION:Int = 6;
 
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
@@ -210,6 +210,7 @@ class DocumentCodec {
 		return Json.stringify({
 			format: FORMAT,
 			version: VERSION,
+			lengthUnit: document.lengthUnit,
 			documentId: document.id.value,
 			implicitOutput: document.implicitOutputEnabled,
 			features: encodedFeatures,
@@ -231,11 +232,12 @@ class DocumentCodec {
 			if (version < 1 || version > VERSION)
 				throw new ParametricError("unsupported document version");
 			var implicitOutput = version >= 5 ? optionalBool(root, "implicitOutput", true) : true;
+			var lengthUnit = version >= 6 ? stringField(root, "lengthUnit") : "mm";
 
 			var records:Array<Dynamic> = cast requiredField(root, "features");
 			var sourceDocumentId = optionalString(root, "documentId");
-			var targetDocument:Document = version == 1 || clone ? new Document(null, implicitOutput)
-				: new Document(new DocumentId(stringField(root, "documentId")), implicitOutput);
+			var targetDocument:Document = version == 1 || clone ? new Document(null, implicitOutput, lengthUnit)
+				: new Document(new DocumentId(stringField(root, "documentId")), implicitOutput, lengthUnit);
 			document = targetDocument;
 			var decodeElementReferenceInDocument = function(value:Dynamic) {
 				var reference = decodeElementReference(value);

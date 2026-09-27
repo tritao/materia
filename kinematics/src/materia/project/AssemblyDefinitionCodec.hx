@@ -16,6 +16,7 @@ import materia.project.AssemblyDefinition.KinematicJoint;
 import materia.project.AssemblyRecord;
 import materia.project.AssemblyRecord.AssemblyConnector;
 import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
@@ -53,7 +54,8 @@ class AssemblyDefinitionCodec {
 		}
 		var result:AssemblyDefinition = {schemaVersion: integerField(raw, "schemaVersion"),
 			id: textField(raw, "id"), definitions: definitions, occurrences: occurrences, joints: joints};
-		if (Reflect.hasField(raw, "couplings")) {
+		result.lengthUnit = Reflect.hasField(raw, "lengthUnit") ? textField(raw, "lengthUnit") : "mm";
+		if (Reflect.hasField(raw, "couplings") && Reflect.field(raw, "couplings") != null) {
 			var couplings:Array<AssemblyJointCoupling> = [];
 			for (item in arrayField(raw, "couplings")) couplings.push({id: textField(item, "id"),
 				source: textField(item, "source"), target: textField(item, "target"),
@@ -90,6 +92,7 @@ class AssemblyDefinitionCodec {
 			definition.occurrences.length == 0 || definition.occurrences.length > 1000 ||
 			definition.joints == null || definition.joints.length > 4000)
 			throw "Assembly definition has an invalid version, ID, or item count";
+		LengthUnit.metresPerUnit(definition.lengthUnit == null ? "mm" : definition.lengthUnit);
 
 		var definitions = new Map<String, AssemblyComponentDefinition>();
 		for (component in definition.definitions) {

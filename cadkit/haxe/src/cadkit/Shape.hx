@@ -151,6 +151,19 @@ class Shape {
 		return mesh;
 	}
 
+	/** Tessellate with a linear deflection relative to this shape's size. */
+	public function tessellateRelative(relativeDeflection:Float = 0.005,
+		angularDeflection:Float = 0.5):Mesh {
+		if (!Math.isFinite(relativeDeflection) || relativeDeflection <= 0)
+			throw "Relative tessellation deflection must be positive";
+		var box = bounds(), minimum = box.get_min(), maximum = box.get_max();
+		var dx = maximum.get_x() - minimum.get_x();
+		var dy = maximum.get_y() - minimum.get_y();
+		var dz = maximum.get_z() - minimum.get_z();
+		var diagonal = Math.sqrt(dx * dx + dy * dy + dz * dz);
+		return tessellate(Math.max(1e-6, diagonal * relativeDeflection), angularDeflection);
+	}
+
 	public function translate(delta:CadKit.Vec3):Shape {
 		return new Shape(CadKit.shapeTranslateChecked(native.borrow(), delta));
 	}

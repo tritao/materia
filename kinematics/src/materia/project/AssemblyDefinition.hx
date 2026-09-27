@@ -69,6 +69,7 @@ typedef AssemblyJointCoupling = {
 typedef AssemblyDefinition = {
 	var schemaVersion:Int;
 	var id:String;
+	@:optional var lengthUnit:String;
 	var definitions:Array<AssemblyComponentDefinition>;
 	var occurrences:Array<AssemblyComponentOccurrence>;
 	var joints:Array<KinematicJoint>;

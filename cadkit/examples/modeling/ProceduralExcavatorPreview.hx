@@ -1,6 +1,7 @@
 import haxe.io.Bytes;
 import materia.project.SceneArtifact;
 import materia.project.SceneArtifact.SceneArtifactPart;
+import materia.units.LengthUnit;
 
 /** Project entrypoint that exposes code-authored CAD parts as a scene artifact. */
 class ProceduralExcavatorPreview {
@@ -12,12 +13,12 @@ class ProceduralExcavatorPreview {
 				[0.72, 0.66, 0.48], [0.28, 0.34, 0.40], [0.84, 0.76, 0.57]];
 			for (index in 0...components.length) {
 				var component = components[index];
-				var mesh = component.part.shape.tessellate(1.0, 0.7);
+				var mesh = component.part.shape.tessellateRelative();
 				var color = colors[index % colors.length];
 				parts.push({
 					id: "excavator/" + component.name,
 					name: component.name,
-					red: color[0], green: color[1], blue: color[2],
+					red: color[0], green: color[1], blue: color[2], materialId: "painted",
 					vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
 					vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
 					edgeSegments: mesh.edgeSegments,
@@ -27,7 +28,8 @@ class ProceduralExcavatorPreview {
 					}]
 				});
 			}
-			var result = SceneArtifact.encode({metresPerUnit: 0.001, parts: parts,
+			var result = SceneArtifact.encode({lengthUnit: "mm",
+				metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
 				assembly: ProceduralExcavatorAssembly.build(),
 				assemblyDefinition: ProceduralExcavatorAssembly.buildDefinition(),
 				assemblyState: ProceduralExcavatorAssembly.buildState()});

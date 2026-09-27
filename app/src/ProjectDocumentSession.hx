@@ -17,7 +17,9 @@ import bimkit.BimDocument;
 import app.ProjectSceneRecord.ProjectSceneInstance;
 import app.ProjectSceneRecord.ProjectFieldOverride;
 import materia.project.Appearance.Appearances;
+import materia.units.LengthUnit;
 import materia.project.MaterialDef;
+import materia.project.MaterialLibrary;
 import materia.project.AssemblyRecord;
 import materia.project.AssemblyDefinition;
 import materia.project.AssemblyDefinition.AssemblyComponentOccurrence;
@@ -118,7 +120,7 @@ class ProjectDocumentSession {
     var loadedMaterials = SceneCodec.decodeCustomMaterialsRoot(root);
     var project = SceneCodec.decodeProjectRoot(root);
     if (project != null) {
-      openProjectDocument(absolute, root, project);
+      openProjectDocument(absolute, root, project, loadedMaterials);
       customMaterials = loadedMaterials;
       return;
     }
@@ -203,7 +205,8 @@ class ProjectDocumentSession {
     }
   }
 
-  function openProjectDocument(absolute:String, root:Dynamic, project:ProjectSceneRecord):Void {
+  function openProjectDocument(absolute:String, root:Dynamic, project:ProjectSceneRecord,
+      materials:Array<MaterialDef>):Void {
     var reference = FilePath.isAbsolute(project.reference) ? project.reference
       : FilePath.join([FilePath.directory(absolute), project.reference]);
     reference = FileSystem.fullPath(reference);
@@ -220,7 +223,7 @@ class ProjectDocumentSession {
       generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
     var baseline = generated.objects;
     var diagnostics:Array<String> = [];
-    var data = materializeProject(baseline, project, SceneCodec.decodeRoot(root), diagnostics);
+    var data = materializeProject(baseline, project, SceneCodec.decodeRoot(root), diagnostics, materials);
     var nextDocument = createDocument();
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
     try {
@@ -622,7 +625,8 @@ class ProjectDocumentSession {
   }
 
   static function assemblyClosuresSatisfied(state:AssemblyState):Bool {
-    var positionTolerance = 1e-3;
+    var positionTolerance = 1e-6 / LengthUnit.metresPerUnit(state.definition.lengthUnit == null
+      ? "mm" : state.definition.lengthUnit);
     var angularTolerance = 1e-5;
     var axisTolerance = 1 - Math.cos(angularTolerance);
     var rotationTolerance = 1 - Math.cos(angularTolerance * 0.5);
@@ -676,7 +680,7 @@ class ProjectDocumentSession {
   }
 
   static function materializeProject(baseline:Array<SceneObjectData>, project:ProjectSceneRecord,
-      authored:Array<SceneObjectData>, diagnostics:Array<String>):Array<SceneObjectData> {
+      authored:Array<SceneObjectData>, diagnostics:Array<String>, materials:Array<MaterialDef>):Array<SceneObjectData> {
     var sources = new Map<String, SceneObjectData>();
     for (item in baseline) sources.set(item.id, item);
     var removed = new Map<String, Bool>();
@@ -697,14 +701,14 @@ class ProjectDocumentSession {
     for (item in baseline) if (!removed.exists(item.id)) {
       if (ids.exists(item.id)) throw 'Duplicate project part ID: ${item.id}';
       ids.set(item.id, true);
-      data.push(applyDeltas(item, item.id, overrides.get(item.id), diagnostics));
+      data.push(applyDeltas(item, item.id, overrides.get(item.id), diagnostics, materials));
     }
     for (instance in project.instances) {
       var source = sources.get(instance.sourceId);
       if (source == null) { diagnostics.push("instance:" + instance.id); continue; }
       if (ids.exists(instance.id)) throw 'Duplicate project object ID: ${instance.id}';
       ids.set(instance.id, true);
-      data.push(applyDeltas(source, instance.id, instance.overrides, diagnostics));
+      data.push(applyDeltas(source, instance.id, instance.overrides, diagnostics, materials));
     }
     for (item in authored) {
       if (item.type == "cad-preview") throw "Project-owned previews must reference a generated part";
@@ -717,7 +721,7 @@ class ProjectDocumentSession {
   }
 
   static function applyDeltas(source:SceneObjectData, id:String, edits:Null<Array<ProjectFieldOverride>>,
-      diagnostics:Array<String>):SceneObjectData {
+      diagnostics:Array<String>, materials:Array<MaterialDef>):SceneObjectData {
     var value:Dynamic = withoutMesh(source);
     Reflect.setField(value, "id", id);
     if (edits != null) for (edit in edits) {
@@ -740,18 +744,19 @@ class ProjectDocumentSession {
           Reflect.setField(appearance, edit.property.substr(7), edit.value);
         default: Reflect.setField(value, edit.property, edit.value);
       }
-      try decodeProjectObject(value) catch (_:Dynamic) {
+      try decodeProjectObject(value, materials) catch (_:Dynamic) {
         value = previous;
         diagnostics.push("override:" + id + ":" + edit.property);
       }
     }
-    return decodeProjectObject(value, source.meshSnapshot);
+    return decodeProjectObject(value, materials, source.meshSnapshot);
   }
 
-  static function decodeProjectObject(value:Dynamic, ?snapshot:String):SceneObjectData {
+  static function decodeProjectObject(value:Dynamic, materials:Array<MaterialDef>, ?snapshot:String):SceneObjectData {
     Reflect.setField(value, "meshSnapshot", "_");
     var result = SceneCodec.decode(Json.stringify({format: SceneCodec.FORMAT,
-      version: SceneCodec.VERSION, objects: [SceneCodec.encodeObject(cast value)]}))[0];
+      version: SceneCodec.VERSION, materials: MaterialLibrary.all().concat(materials),
+      objects: [SceneCodec.encodeObject(cast value, materials)]}))[0];
     result.meshSnapshot = snapshot;
     return result;
   }

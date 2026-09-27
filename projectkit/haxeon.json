@@ -1,6 +1,15 @@
 {
-	"version": 1,
-	"package": { "name": "projectkit" },
-	"sourceRoots": ["src"],
-	"target": "host"
+  "version": 1,
+  "package": {
+    "name": "projectkit"
+  },
+  "sourceRoots": [
+    "src"
+  ],
+  "target": "host",
+  "dependencies": {
+    "kinematics": {
+      "path": "../kinematics"
+    }
+  }
 }
