@@ -1,0 +1,430 @@
+{
+  "constants": {
+    "MAX_ACTUATORS": {
+      "type": "u8",
+      "value": 64
+    },
+    "PROTOCOL_VERSION": {
+      "type": "u8",
+      "value": 6
+    }
+  },
+  "enums": {
+    "MessageType6": {
+      "underlying": "u8",
+      "values": {
+        "abort": 10,
+        "commit": 7,
+        "emergency_stop": 12,
+        "event": 16,
+        "hold": 8,
+        "queue_begin": 5,
+        "queue_status": 14,
+        "reset_safety": 13,
+        "resume": 9,
+        "segment": 6,
+        "session_ack6": 2,
+        "session_begin6": 1,
+        "state6": 15,
+        "stop": 11,
+        "time_sync_reply": 4,
+        "time_sync_request": 3
+      }
+    }
+  },
+  "messages": {},
+  "packed_structs": {
+    "ActuatorState6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "position",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "velocity",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "effort",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "step_count",
+          "type": "i64"
+        }
+      ],
+      "size": 20
+    },
+    "Commit6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "through_ticks",
+          "type": "u64"
+        }
+      ],
+      "size": 8
+    },
+    "QueueBegin6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "queue_revision",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "replace_after_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 64,
+          "name": "expected_position",
+          "type": "f32"
+        },
+        {
+          "length": 64,
+          "name": "expected_velocity",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "actuator_count",
+          "type": "u8"
+        }
+      ],
+      "size": 529
+    },
+    "QueueStatus6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "queue_revision",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "committed_until_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "executing_plan_id",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "executing_segment",
+          "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "path_clock_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "rate",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "remaining_segments",
+          "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "remaining_events",
+          "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "underflow",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "fault",
+          "type": "u8"
+        }
+      ],
+      "size": 44
+    },
+    "Segment6Coefficients": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "actuator",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "c0",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "c1",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "c2",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "c3",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "c4",
+          "type": "f32"
+        },
+        {
+          "length": 1,
+          "name": "c5",
+          "type": "f32"
+        }
+      ],
+      "size": 25
+    },
+    "Segment6Header": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "queue_revision",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "plan_id",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "t0_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "duration_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "degree",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "actuator_count",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "ends_at_rest",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "reserved",
+          "type": "u8"
+        }
+      ],
+      "size": 36
+    },
+    "SessionAck6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "protocol_version",
+          "type": "u8"
+        },
+        {
+          "length": 16,
+          "name": "device_fingerprint",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "status",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "device_tick_hz",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "segment_capacity",
+          "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "event_capacity",
+          "type": "u16"
+        },
+        {
+          "length": 1,
+          "name": "step_tick_hz",
+          "type": "u32"
+        },
+        {
+          "length": 1,
+          "name": "max_degree",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "actuator_count",
+          "type": "u8"
+        }
+      ],
+      "size": 44
+    },
+    "SessionBegin6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "protocol_version",
+          "type": "u8"
+        },
+        {
+          "length": 16,
+          "name": "model_fingerprint",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "actuator_count",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "max_degree",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "step_tick_hz",
+          "type": "u32"
+        },
+        {
+          "length": 1,
+          "name": "link_loss_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "max_acceleration",
+          "type": "f32"
+        }
+      ],
+      "size": 43
+    },
+    "State6Header": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "session",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "timestamp_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "accepted_sequence",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "safety",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "fault",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "actuator_count",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "reserved",
+          "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "path_clock_ticks",
+          "type": "u64"
+        }
+      ],
+      "size": 36
+    },
+    "TimeSyncReply": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "host_send_ns",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "device_rx_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "device_tx_ticks",
+          "type": "u64"
+        }
+      ],
+      "size": 24
+    },
+    "TimeSyncRequest": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "host_send_ns",
+          "type": "u64"
+        }
+      ],
+      "size": 8
+    }
+  },
+  "version": 1
+}
