@@ -5,13 +5,13 @@ import app.SceneCodec;
 import app.SceneDocumentSession;
 import app.SceneDocumentController;
 import app.SceneFileDialogs;
-import app.EditorSceneViewport;
+import app.PerspectiveCamera;
+import app.PerspectiveSceneDrag;
 import nativekit.ui.properties.PropertyBinding;
 import nativekit.ui.properties.PropertyValue;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.Json;
-import nativekit.ui.core.ViewportCamera;
 
 class SceneDocumentTests {
   static function check(value:Bool, message:String):Void {
@@ -166,25 +166,26 @@ class SceneDocumentTests {
       edit(session, -2.0);
       session.save(first);
       var historyBeforeDrag = session.scene.document.history.undoCount;
-      var viewport = new EditorSceneViewport(session.scene);
-      var camera = new ViewportCamera(1.8, 25, -15);
+      var camera = new PerspectiveCamera();
+      camera.frame(-2.0, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
+      var drag:Null<PerspectiveSceneDrag> = null;
       var commitCount = 0;
       var cancelCount = 0;
       var boundaryController = new SceneDocumentController(session,
         function(_, _, done) done(null, null), function() {}, function() {
-          if (viewport.commitDrag()) commitCount++;
+          if (drag != null && drag.commit()) commitCount++;
+          drag = null;
         }, function() {
-          if (viewport.cancelDrag()) cancelCount++;
+          if (drag != null && drag.cancel()) cancelCount++;
+          drag = null;
         });
-      var start = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 2.0 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y);
-      var finish = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 1.0 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 0.5 * EditorSceneViewport.SCALE);
-      check(viewport.beginDrag(camera, start.x, start.y, false), "document-boundary drag begins");
-      viewport.updateDrag(camera, finish.x, finish.y);
+      drag = PerspectiveSceneDrag.begin(session.scene, camera, "box", 400, 300, 800, 600, false, 0.2);
+      check(drag != null, "document-boundary perspective drag begins");
+      check(drag.update(camera, 500, 300, 800, 600), "document-boundary drag previews movement");
+      var movedX = session.scene.info("box").localTransform().element(12);
       check(!session.scene.document.isDirty, "active drag preview remains outside saved history");
       boundaryController.save();
-      check(commitCount == 1 && !viewport.dragging(), "Save commits the active drag");
+      check(commitCount == 1 && drag == null, "Save commits the active drag");
       check(!session.scene.document.isDirty &&
         session.scene.document.history.undoCount == historyBeforeDrag + 1,
         "Save establishes a savepoint after the committed move");
@@ -193,33 +194,32 @@ class SceneDocumentTests {
         "undo after Save restores the pre-drag position");
       check(session.scene.document.isDirty, "undo before the drag savepoint is dirty");
       session.scene.document.redo();
-      near(session.scene.info("box").localTransform().element(12), -1.0,
+      near(session.scene.info("box").localTransform().element(12), movedX,
         "redo after Save restores the persisted drag");
       check(!session.scene.document.isDirty, "redo returns to the drag savepoint");
 
       edit(session, -2.5);
-      var dirtyStart = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 2.5 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 0.5 * EditorSceneViewport.SCALE);
-      var dirtyFinish = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 1.5 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 1.0 * EditorSceneViewport.SCALE);
-      viewport.beginDrag(camera, dirtyStart.x, dirtyStart.y, false);
-      viewport.updateDrag(camera, dirtyFinish.x, dirtyFinish.y);
+      camera.frame(-2.5, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
+      function beginDirtyDrag():Void {
+        drag = PerspectiveSceneDrag.begin(session.scene, camera, "box", 400, 300, 800, 600, false, 0.2);
+        check(drag != null && drag.update(camera, 500, 300, 800, 600),
+          "dirty perspective drag previews movement");
+      }
+      beginDirtyDrag();
       boundaryController.requestNew();
-      check(cancelCount == 1 && !viewport.dragging() && boundaryController.needsConfirmation(),
+      check(cancelCount == 1 && drag == null && boundaryController.needsConfirmation(),
         "New cancels drag before starting the unsaved-change flow");
       near(session.scene.info("box").localTransform().element(12), -2.5,
         "New interruption restores the pre-drag position");
       boundaryController.resolve("cancel");
 
-      viewport.beginDrag(camera, dirtyStart.x, dirtyStart.y, false);
-      viewport.updateDrag(camera, dirtyFinish.x, dirtyFinish.y);
+      beginDirtyDrag();
       boundaryController.requestOpen();
       check(cancelCount == 2 && boundaryController.needsConfirmation(),
         "Open cancels drag before starting the unsaved-change flow");
       boundaryController.resolve("cancel");
       var boundaryClosed = false;
-      viewport.beginDrag(camera, dirtyStart.x, dirtyStart.y, false);
-      viewport.updateDrag(camera, dirtyFinish.x, dirtyFinish.y);
+      beginDirtyDrag();
       boundaryController.requestClose(function() boundaryClosed = true);
       check(cancelCount == 3 && boundaryController.needsConfirmation() && !boundaryClosed,
         "Close cancels drag before starting the unsaved-change flow");

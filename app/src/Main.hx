@@ -13,6 +13,7 @@ import app.editor.InspectorPanel;
 import app.editor.EditorDocumentCommands;
 import app.editor.SceneObjectCommands;
 import app.editor.SceneViewCommands;
+import app.editor.EditorGrid;
 import Color;
 import LayoutAxis;
 import LayoutAlignmentY;
@@ -482,7 +483,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       "Middle-drag to pan; scroll to zoom"] : ["Scene ready", "Use Add to create an object"];
     gridVisible = true;
     gridSnapEnabled = false;
-    gridSpacing = EditorSceneViewport.GRID_STEP;
+    gridSpacing = EditorGrid.STEP;
     paletteVisible = false;
     toolbarMenuVisible = false;
     contextMenuVisible = false;

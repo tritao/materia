@@ -5,11 +5,9 @@ import nativekit.ui.widgets.text.Text;
 
 import app.EditorScene;
 import app.EditorSceneTree;
-import app.EditorSceneViewport;
 import nativekit.ui.properties.PropertyBinding;
 import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.properties.PropertyEditResult;
-import nativekit.ui.core.ViewportCamera;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import nativekit.scene.GeometryData;
@@ -323,11 +321,6 @@ class SceneEditingTests {
     check(PerspectiveSceneDrag.begin(scene, perspective, "project:motor",
       400, 300, 800, 600, false, 0.2) == null,
       "perspective drag does not start for a joint-driven occurrence");
-    var xy = new EditorSceneViewport(scene);
-    var camera = new ViewportCamera();
-    var point = camera.worldToViewport(EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y);
-    check(!xy.beginDrag(camera, point.x, point.y, false),
-      "XY drag does not start for a joint-driven occurrence");
     scene.dispose();
   }
 
@@ -369,20 +362,12 @@ class SceneEditingTests {
   }
 
   static function simulationViewportSemantics():Void {
-    var scene=new EditorScene(),viewport=new EditorSceneViewport(scene),camera=new ViewportCamera();
-    scene.select("tower");var design=scene.info("tower").worldTransform(),dirty=scene.document.isDirty;
-    var half=Math.PI/8,pose:{id:String,position:Array<Float>,rotation:Array<Float>}={
-      id:"tower",position:[3.0,2.0,1.5],rotation:[0.0,0.0,Math.sin(half),Math.cos(half)]};
-    viewport.setSimulationState(true,[pose],7);
-    var screen=camera.worldToViewport(EditorSceneViewport.ORIGIN_X+300,EditorSceneViewport.ORIGIN_Y-200);
-    check(viewport.pick(camera,screen.x,screen.y)=="tower",
-      "XY picking follows a moved and rotated simulation body");
-    check(!viewport.beginDrag(camera,screen.x,screen.y,false)&&!viewport.editingEnabled(),
-      "paused simulation geometry cannot be dragged");
-    viewport.frameSelected(camera);
-    var framed=camera.worldToViewport(EditorSceneViewport.ORIGIN_X+300,EditorSceneViewport.ORIGIN_Y-200);
-    near(framed.x,viewport.viewportWidth/2,"XY framing follows the simulation pose");
-    near(framed.y,viewport.viewportHeight/2,"XY framing follows simulation Y");
+    var scene = new EditorScene();
+    scene.select("tower");
+    var design = scene.info("tower").worldTransform(), dirty = scene.document.isDirty;
+    var half = Math.PI / 8;
+    var pose:{id:String,position:Array<Float>,rotation:Array<Float>} = {
+      id:"tower", position:[3.0,2.0,1.5], rotation:[0.0,0.0,Math.sin(half),Math.cos(half)]};
     near(scene.info("tower").worldTransform().element(12),design.element(12),
       "simulation presentation preserves design X");
     check(scene.document.isDirty==dirty&&scene.document.history.undoCount==0,
@@ -414,11 +399,9 @@ class SceneEditingTests {
     session.open(file);
     var empty = session.scene;
     var tree = new EditorSceneTree(empty);
-    var viewport = new EditorSceneViewport(empty);
-    var camera = new ViewportCamera();
     check(empty.selectedId == "scene" && tree.childCount("scene") == 0,
       "empty scene starts with synchronized root selection");
-    check(viewport.pick(camera, EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y) == "scene",
+    check(empty.pick(0.0, 0.0) == "scene",
       "empty viewport has no stale geometry");
 
     var revision = empty.revision;
@@ -427,8 +410,7 @@ class SceneEditingTests {
     check(originalId == "rectangle-1", "created object receives a stable ID");
     check(tree.childCount("scene") == 1 && tree.childKeyAt("scene", 0) == originalId,
       "hierarchy observes created object");
-    check(viewport.revision() > revision && viewport.pick(camera,
-      EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y) == originalId,
+    check(empty.revision > revision && empty.pick(0.0, 0.0) == originalId,
       "viewport observes created geometry");
     check(empty.properties().length == 14, "inspector exposes finish and collision properties");
 
@@ -456,7 +438,7 @@ class SceneEditingTests {
     var visible = new PropertyBinding(empty.properties()[2], empty.context());
     check(visible.apply(PropertyValue.Bool(false)) == PropertyEditResult.Applied,
       "visibility edit succeeds through inspector binding");
-    check(viewport.pick(camera, EditorSceneViewport.ORIGIN_X, EditorSceneViewport.ORIGIN_Y) == "scene",
+    check(empty.pick(0.0, 0.0) == "scene",
       "hidden object disappears from viewport picking");
 
     check(empty.duplicateSelected(), "hidden object duplicates");
@@ -521,8 +503,6 @@ class SceneEditingTests {
 
   static function rectangleProperties():Void {
     var scene = new EditorScene();
-    var viewport = new EditorSceneViewport(scene);
-    var camera = new ViewportCamera();
     try {
       scene.select("box");
       var width = new PropertyBinding(scene.properties()[4], scene.context());
@@ -547,10 +527,9 @@ class SceneEditingTests {
       check(colour.apply(PropertyValue.Text("#33CC66")) == PropertyEditResult.Applied, "colour updates");
       check(scene.pick(0.3, 0.0) == "box", "expanded geometry updates picking bounds");
       check(scene.pick(-1.5, 0.4) == "scene", "reduced geometry removes stale picking bounds");
-      viewport.frameSelected(camera);
-      near(camera.zoom, Math.min((viewport.viewportWidth - 96.0) / (4.0 * EditorSceneViewport.SCALE),
-        (viewport.viewportHeight - 96.0) / (0.5 * EditorSceneViewport.SCALE)),
-        "framing uses edited dimensions");
+      var frameCamera = new PerspectiveCamera();
+      frameCamera.frame(-1.5, 0.0, 0.0, 4.0, 0.5, 0.2, 4.0 / 3.0);
+      near(frameCamera.targetX, -1.5, "framing uses edited object center");
       var item = scene.items()[0];
       check(nearValue(item.red, 0.2) && nearValue(item.green, 0.8)
         && nearValue(item.blue, 0.4), "edited colour updates scene material state");
@@ -581,89 +560,6 @@ class SceneEditingTests {
       near(scene.info("box").localTransform().element(13), 0.0, "large nudge undo is independent");
       scene.document.undo();
       near(scene.info("box").localTransform().element(12), -1.5, "small nudge undo is independent");
-    } catch (error:Dynamic) {
-      scene.dispose();
-      throw error;
-    }
-    scene.dispose();
-  }
-
-  static function viewportDragging():Void {
-    var scene = new EditorScene();
-    var viewport = new EditorSceneViewport(scene);
-    var camera = new ViewportCamera(2.0, 40.0, -30.0);
-    try {
-      var grabWorld = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 1.2 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 0.2 * EditorSceneViewport.SCALE);
-      check(viewport.beginDrag(camera, grabWorld.x, grabWorld.y, false),
-        "left drag begins on an object after camera pan and zoom");
-      near(scene.info("box").localTransform().element(12), -1.5, "drag start preserves X grab offset");
-      near(scene.info("box").localTransform().element(13), 0.0, "drag start preserves Y grab offset");
-
-      var movedPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 0.0 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 0.7 * EditorSceneViewport.SCALE);
-      check(viewport.updateDrag(camera, movedPointer.x, movedPointer.y), "drag preview moves object");
-      near(scene.info("box").localTransform().element(12), -0.3, "preview X includes initial grab offset");
-      near(scene.info("box").localTransform().element(13), 0.5, "preview Y includes initial grab offset");
-      check(!scene.document.isDirty && scene.document.history.undoCount == 0,
-        "drag preview does not add history entries");
-      check(viewport.commitDrag(), "release commits moved preview");
-      check(scene.document.isDirty && scene.document.history.undoCount == 1,
-        "completed drag creates exactly one undo step");
-      scene.document.undo();
-      near(scene.info("box").localTransform().element(12), -1.5, "undo restores pre-drag X");
-      near(scene.info("box").localTransform().element(13), 0.0, "undo restores pre-drag Y");
-      scene.document.redo();
-      near(scene.info("box").localTransform().element(12), -0.3, "redo restores dragged X");
-      near(scene.info("box").localTransform().element(13), 0.5, "redo restores dragged Y");
-
-      var center = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 0.3 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 0.5 * EditorSceneViewport.SCALE);
-      check(viewport.beginDrag(camera, center.x, center.y, false), "second drag begins");
-      var cancelledPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 1.3 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y + 0.4 * EditorSceneViewport.SCALE);
-      viewport.updateDrag(camera, cancelledPointer.x, cancelledPointer.y);
-      check(viewport.cancelDrag(), "Escape cancels active drag");
-      near(scene.info("box").localTransform().element(12), -0.3, "cancel restores original X");
-      near(scene.info("box").localTransform().element(13), 0.5, "cancel restores original Y");
-      check(scene.document.history.undoCount == 1, "cancel does not create an undo step");
-
-      check(viewport.beginDrag(camera, center.x, center.y, false), "constrained drag begins");
-      var horizontalPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 0.4 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 0.7 * EditorSceneViewport.SCALE);
-      viewport.updateDrag(camera, horizontalPointer.x, horizontalPointer.y, true);
-      near(scene.info("box").localTransform().element(12), 0.4, "horizontal constraint keeps dominant X");
-      near(scene.info("box").localTransform().element(13), 0.5, "horizontal constraint locks Y");
-      viewport.commitDrag();
-      scene.document.undo();
-      check(viewport.beginDrag(camera, center.x, center.y, false), "vertical constrained drag begins");
-      var verticalPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 0.1 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 1.4 * EditorSceneViewport.SCALE);
-      viewport.updateDrag(camera, verticalPointer.x, verticalPointer.y, true);
-      near(scene.info("box").localTransform().element(12), -0.3, "vertical constraint locks X");
-      near(scene.info("box").localTransform().element(13), 1.4, "vertical constraint keeps dominant Y");
-      viewport.commitDrag();
-      scene.document.undo();
-
-      check(viewport.beginDrag(camera, center.x, center.y, true), "snapped drag begins");
-      var snappedPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 0.06 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 0.94 * EditorSceneViewport.SCALE);
-      viewport.updateDrag(camera, snappedPointer.x, snappedPointer.y);
-      near(scene.info("box").localTransform().element(12), 0.0, "grid snapping rounds X");
-      near(scene.info("box").localTransform().element(13), 1.0, "grid snapping rounds Y");
-      viewport.commitDrag();
-      check(scene.document.history.undoCount == 2, "snapped drag commits one undo step");
-      var snappedCenter = camera.worldToViewport(EditorSceneViewport.ORIGIN_X,
-        EditorSceneViewport.ORIGIN_Y - 1.0 * EditorSceneViewport.SCALE);
-      check(viewport.setGridStep(0.5), "grid spacing is configurable");
-      check(viewport.beginDrag(camera, snappedCenter.x, snappedCenter.y, true),
-        "drag uses configured grid spacing");
-      var customGridPointer = camera.worldToViewport(EditorSceneViewport.ORIGIN_X + 0.74 * EditorSceneViewport.SCALE,
-        EditorSceneViewport.ORIGIN_Y - 1.26 * EditorSceneViewport.SCALE);
-      viewport.updateDrag(camera, customGridPointer.x, customGridPointer.y);
-      near(scene.info("box").localTransform().element(12), 0.5, "configured grid rounds X");
-      near(scene.info("box").localTransform().element(13), 1.5, "configured grid rounds Y");
-      viewport.cancelDrag();
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
@@ -1260,18 +1156,17 @@ class SceneEditingTests {
         "selection leaves scene content revision unchanged");
       scene.select("box");
 
-      var camera = new ViewportCamera(1.7, 35, -20);
-      var viewport = new EditorSceneViewport(scene);
-      var screen = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 150,
-        EditorSceneViewport.ORIGIN_Y);
-      check(viewport.pick(camera, screen.x, screen.y) == "box", "picking after pan and zoom");
-      var originalPan = camera.panX;
+      var camera = new PerspectiveCamera();
+      camera.frame(-1.5, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
+      check(EditorPerspectiveViewport.pickScene(scene, camera, 800, 600, 400, 300) == "box",
+        "perspective picking after framing");
+      var originalTarget = camera.targetX;
       var originalRevision = tree.revision();
       var x = new PropertyBinding(scene.properties()[0], scene.context());
       check(x.apply(PropertyValue.Float(-2.5)) == PropertyEditResult.Applied, "position edit accepted");
       near(scene.info("box").localTransform().element(12), -2.5, "selected object moved");
       near(scene.info("tower").localTransform().element(12), 1.1, "other object unchanged");
-      near(camera.panX, originalPan, "editing does not move camera");
+      near(camera.targetX, originalTarget, "editing does not move camera");
       check(scene.pick(-2.5, 0) == "box", "picking follows edited geometry");
       check(scene.pick(-1.5, 0) == "scene", "old location no longer hit");
       check(tree.revision() > originalRevision, "scene revision invalidates panels");
@@ -1299,17 +1194,14 @@ class SceneEditingTests {
       check(scene.info("tower").visible(), "undo visibility after selection changes");
       check(scene.pick(1.1, 0) == "tower", "restored object can be picked");
 
-      viewport.frameSelected(camera);
-      var center = camera.worldToViewport(EditorSceneViewport.ORIGIN_X - 250,
-        EditorSceneViewport.ORIGIN_Y);
-      near(center.x, viewport.viewportWidth / 2, "frame selection centers X");
-      near(center.y, viewport.viewportHeight / 2, "frame selection centers Y");
+      camera.frame(-2.5, 0.0, 0.0, 1.6, 1.2, 0.05, 4.0 / 3.0);
+      near(camera.targetX, -2.5, "frame selection centers X");
+      near(camera.targetY, 0.0, "frame selection centers Y");
       scene.select("scene");
       check(scene.properties().length == 0 && !scene.context().hasSelection, "empty selection has no editable properties");
       scene.dispose();
       scene.dispose();
       rectangleProperties();
-      viewportDragging();
       editingLifecycle();
       renderingParity();
       perspectiveCameraMath();

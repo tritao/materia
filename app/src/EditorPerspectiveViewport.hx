@@ -60,7 +60,7 @@ class EditorPerspectiveViewport implements View {
   var objectDrag:Null<PerspectiveSceneDrag> = null;
   var sketchRectangleDrag:Null<PerspectiveSketchRectangleDrag> = null;
   var gridSnapEnabled:Bool = false;
-  var gridStep:Float = EditorSceneViewport.GRID_STEP;
+  var gridStep:Float = app.editor.EditorGrid.STEP;
   var gridVisible:Bool = true;
   var simulationActive:Bool=false;
   var runtimeRevision:Int=0;
