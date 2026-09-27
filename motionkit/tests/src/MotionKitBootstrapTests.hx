@@ -20,7 +20,9 @@ import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
+import motionkit.robot.AxisKinematics;
 import motionkit.robot.ProgramCompiler;
+import motionkit.robot.PathConfigurationSelector;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
@@ -113,6 +115,8 @@ class MotionKitBootstrapTests {
     testOpwKinematics();
     testMotionProgramContracts();
     testProgramCompiler();
+    testPathConfigurationSelector();
+    testAxisKinematics();
     testManipulatorMotion();
     testSimplePathTimingContract();
     testNativePathLowering();
@@ -247,6 +251,28 @@ class MotionKitBootstrapTests {
       EventValue.Digital(false)), "timed event rejects a negative path time");
     throws(function() new ChannelDeclaration("sprayer.flow", ChannelKind.Analog,
       EventValue.Digital(false)), "channel declaration rejects a mismatched safe value");
+  }
+
+  static function testPathConfigurationSelector():Void {
+    var selector = new PathConfigurationSelector(new PlanarSolver(),
+      [for (_ in 0...6) -20.0], [for (_ in 0...6) 20.0],
+      [for (_ in 0...6) 2.0], [for (_ in 0...6) 1.0]);
+    var candidate = (x:Float) -> [x, 0.0, 0.0, 0.0, 0.0, 0.0];
+    var chosen = selector.select([0.0, 0.5, 1.0], [
+      [candidate(0.0), candidate(10.0)],
+      [candidate(1.0), candidate(9.0)], [candidate(10.0)]]);
+    near(chosen[0][0], 10.0, "Descartes avoids an unreachable nearest branch");
+    near(chosen[1][0], 9.0, "Descartes keeps the continuous branch");
+    var narrow = new PathConfigurationSelector(new PlanarSolver(),
+      [for (_ in 0...6) -20.0], [for (_ in 0...6) 20.0],
+      [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]);
+    var message = "";
+    try narrow.select([0.0, 0.5, 1.0], [
+      [candidate(0.0), candidate(10.0)],
+      [candidate(1.0), candidate(9.0)], [candidate(10.0)]])
+    catch (error:Dynamic) message = Std.string(error);
+    check(message.indexOf("0.500000") >= 0,
+      "Descartes reports the first disconnected sample distance");
   }
 
   static function testProgramCompiler():Void {
@@ -753,6 +779,27 @@ class MotionKitBootstrapTests {
       if (error < 1e-8) found = true;
     }
     check(found, "OPW analytic candidates include the authored joint pose");
+    var next = q.copy(); next[0] += 0.04;
+    var selector = new PathConfigurationSelector(solver,
+      [for (_ in 0...6) -2.0 * Math.PI],
+      [for (_ in 0...6) 2.0 * Math.PI],
+      [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]);
+    var chosen = selector.selectPoses([0.0, 0.04],
+      [solver.forward(q), solver.forward(next)], q, new IkTolerance());
+    near(chosen[1][0], next[0],
+      "Descartes samples OPW branches natively across a path", 1e-6);
+    var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
+    var compiler = new ProgramCompiler(solver, limits, "work",
+      [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
+      [for (_ in 0...6) 20.0]);
+    check(compiler.configurationSelector != null,
+      "analytic arm programs use Descartes configuration selection");
+    var program = new MotionProgram([MotionOp.MoveL(solver.forward(next),
+      "work", 0.1, Blend.ExactStop)]);
+    var compiled = compiler.compile(program, q, Int64.ofInt(901));
+    check(compiled.blocks[0].plans.length == 1,
+      "OPW arm path compiles through the shared ProgramCompiler");
+    compiled.dispose();
     function published(name:String, values:Array<Float>, offsets:Array<Float>,
         signs:Array<Int>):Void {
       var fixture = new RobotModel(name);
@@ -1182,6 +1229,44 @@ class MotionKitBootstrapTests {
       "one transmitted leader drives a coupled follower axis");
   }
 
+  static function testAxisKinematics():Void {
+    var model = new RobotModel("coupled-xyz");
+    var links = [for (index in 0...5) model.addLink(new Link('axis-link-$index'))];
+    var ids = ["x.leader", "x.follower", "y", "z"];
+    for (index in 0...4) {
+      var joint = model.addJoint(new Joint(ids[index], JointType.Prismatic,
+        links[index], links[index + 1]));
+      joint.limits.lower = -0.1;
+      joint.limits.upper = 0.1;
+    }
+    model.addCoupling(new JointCoupling("x-gears", "x.leader",
+      "x.follower", -1.5, 0.02));
+    var blueprint = MotionSystemBlueprint.fromRobotModel(model, [
+      new MotionAxisBlueprint("x", ["x.leader", "x.follower"], -0.05, 0.05,
+        0.1, 0.4),
+      new MotionAxisBlueprint("y", ["y"], -0.05, 0.05, 0.1, 0.4),
+      new MotionAxisBlueprint("z", ["z"], -0.05, 0.05, 0.1, 0.4)]);
+    var solver = new AxisKinematics(blueprint);
+    var target = new Pose3(0.01, 0.02, -0.03);
+    var q = solver.solvePose(target, [0.0, 0.02, 0.0, 0.0], new IkTolerance());
+    check(q != null, "axis IK reaches a pose within logical limits");
+    if (q == null) throw "axis IK returned no solution";
+    near(q[0], 0.01, "axis IK maps the X leader");
+    near(q[1], 0.005, "axis IK keeps the coupled follower in proportion");
+    near(solver.forward(q).y, 0.02, "axis FK maps Y to the tool");
+    check(solver.sampleCandidates(target, 8, new IkTolerance()).length == 1,
+      "axis IK exposes one exact candidate");
+    var velocity = solver.solveDifferential(q,
+      new Twist6(0.02, 0.01, -0.01, 0.0, 0.0, 0.0));
+    check(velocity != null, "axis differential IK maps a linear twist");
+    if (velocity == null) throw "axis differential IK returned no solution";
+    near(velocity[0], 0.02, "axis differential IK maps X velocity");
+    near(velocity[1], -0.03,
+      "axis differential IK keeps follower velocity in proportion");
+    check(solver.solvePose(new Pose3(0.06), q, new IkTolerance()) == null,
+      "axis IK rejects poses beyond logical limits");
+  }
+
   static function testCompiledAxisRunsThroughSimulation():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
@@ -1371,6 +1456,34 @@ class MotionKitBootstrapTests {
     var cornerMove = machine.movePath(cornerPath, PathPlanningOptions.exactStopMode(),
       new MotionOptions(0.05, 0.2));
     check(cornerMove.segments().length > 1, "MotionSystem exposes buffered line-path planning");
+    var axisSolver = new AxisKinematics(blueprint);
+    var limits = new ValidationLimits(3, Int64.ofInt(blueprint.runtime.revision),
+      Int64.ofInt(blueprint.runtime.calibrationRevision));
+    for (joint in 0...3) limits.position(joint,
+      blueprint.model.joints[joint].limits.lower,
+      blueprint.model.joints[joint].limits.upper);
+    var compiler = new ProgramCompiler(axisSolver, limits, "work",
+      [for (_ in 0...3) 0.1], [for (_ in 0...3) 0.4],
+      [for (_ in 0...3) 10.0], null, 0.005);
+    var pose = (point:PathPoint) -> new PoseWaypoint(
+      new Pose3(point.x, point.y, point.z), 0.005, 0.02);
+    var programPath = new PosePath("work", [
+      new PoseLine(pose(new PathPoint(0.03, 0.02, 0.025)),
+        pose(new PathPoint(0.04, 0.02, 0.025)), OrientationPolicy.Fixed,
+        0.1, 0.05),
+      new PoseLine(pose(new PathPoint(0.04, 0.02, 0.025)),
+        pose(new PathPoint(0.04, 0.03, 0.025)), OrientationPolicy.Fixed,
+        0.1, 0.05)]);
+    var compiled = compiler.compile(new MotionProgram([
+      MotionOp.FollowPath(programPath, "work", 0.05, [])]),
+      robot.snapshot().positions.toArray(), Int64.ofInt(700));
+    var programPlan = compiled.blocks[0].plans[0];
+    var programEnd = programPlan.evaluate(programPlan.durationSeconds).positions;
+    var movePathEnd = cornerMove.evaluate(cornerMove.durationSeconds()).positions;
+    for (joint in 0...3)
+      near(programEnd[joint], movePathEnd[joint],
+        'gantry ProgramCompiler matches movePath joint $joint', 1e-5);
+    compiled.dispose();
     runMotion(machine, simulation);
     var cornerEnd = robot.snapshot();
     near(cornerEnd.positions.get(0), 0.04, "line path reaches its X endpoint", 1e-5);
