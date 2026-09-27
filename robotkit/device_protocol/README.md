@@ -29,3 +29,11 @@ the responsibility of the MCU adapter.
 The host-side POSIX `HostLink` and PTY exchange test live under
 `robotkit/runtime`. The host runtime uses RKD5; physical UART and MCU validation
 remain to be done.
+
+RKD6's `ScheduledCore` is a separate fixed-capacity executor over the `Board`
+trait. Its queue accepts revisions, segment-local `f32` polynomial
+coefficients and committed knots; only committed segments execute. Call
+`note_host_frame` for accepted host traffic and `tick` from the board's fixed
+timer. HOLD ramps the path-clock rate; underflow and link loss use a bounded
+position ramp and latch the stop reason. `emergency_stop` calls `stop_all`
+immediately. The core is `no_std` and allocates no heap memory.

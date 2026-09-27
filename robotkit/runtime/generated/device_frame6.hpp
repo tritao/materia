@@ -2,6 +2,7 @@
 
 #include "device_wire6.hpp"
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -41,7 +42,6 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
         (std::uint32_t(bytes[11 + length]) << 24);
     if (crc32(bytes.first(HEADER_SIZE + length)) != expected) return false;
     if ((bytes[4] >= 8 && bytes[4] <= 13 && length != 0) ||
-        (bytes[4] == 1 && length != device_wire6::SessionBegin6::SIZE) ||
         (bytes[4] == 2 && length != device_wire6::SessionAck6::SIZE) ||
         (bytes[4] == 3 && length != device_wire6::TimeSyncRequest::SIZE) ||
         (bytes[4] == 4 && length != device_wire6::TimeSyncReply::SIZE) ||
@@ -57,6 +57,23 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
             header.reserved != 0 || header.duration_ticks == 0 ||
             length != device_wire6::Segment6Header::SIZE +
                 header.actuator_count * device_wire6::Segment6Coefficients::SIZE) return false;
+    }
+    if (bytes[4] == 1) {
+        if (length < device_wire6::SessionBegin6::SIZE) return false;
+        device_wire6::SessionBegin6 header{};
+        if (!device_wire6::decode(bytes.subspan(HEADER_SIZE, header.SIZE), header) ||
+            header.protocol_version != 6 || header.actuator_count == 0 ||
+            header.actuator_count > device_wire6::MAX_ACTUATORS ||
+            !std::isfinite(header.max_acceleration) || header.max_acceleration <= 0 ||
+            length != header.SIZE + header.actuator_count * device_wire6::ActuatorLimit6::SIZE)
+            return false;
+        for (std::size_t i = 0; i < header.actuator_count; ++i) {
+            device_wire6::ActuatorLimit6 limit{};
+            if (!device_wire6::decode(bytes.subspan(HEADER_SIZE + header.SIZE +
+                     i * limit.SIZE, limit.SIZE), limit) ||
+                !std::isfinite(limit.max_acceleration) || limit.max_acceleration <= 0 ||
+                limit.max_acceleration > header.max_acceleration) return false;
+        }
     }
     if (bytes[4] == 15) {
         if (length < device_wire6::State6Header::SIZE) return false;

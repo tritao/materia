@@ -23,6 +23,25 @@ int main(int argc, char **argv) {
     assert(encode(request, payload));
     TimeSyncRequest decoded{};
     assert(decode(payload, decoded) && decoded.host_send_ns == request.host_send_ns);
+    SessionBegin6 begin{};
+    begin.session = 7;
+    begin.protocol_version = 6;
+    begin.actuator_count = 2;
+    begin.max_degree = 5;
+    begin.step_tick_hz = 40'000;
+    begin.link_loss_ticks = 500'000;
+    begin.max_acceleration = 4.0f;
+    std::vector<std::uint8_t> session(begin.SIZE + 2 * ActuatorLimit6::SIZE);
+    assert(encode(begin, std::span<std::uint8_t>(session.data(), begin.SIZE)));
+    assert(encode(ActuatorLimit6{2.0f},
+                  std::span<std::uint8_t>(session.data() + begin.SIZE, ActuatorLimit6::SIZE)));
+    assert(encode(ActuatorLimit6{4.0f},
+                  std::span<std::uint8_t>(session.data() + begin.SIZE + ActuatorLimit6::SIZE,
+                                          ActuatorLimit6::SIZE)));
+    std::vector<std::uint8_t> session_frame;
+    assert(robotkit::device_frame6::encode(1, session, session_frame));
+    robotkit::device_frame6::Frame decoded_session{};
+    assert(robotkit::device_frame6::decode(session_frame, decoded_session));
     std::ifstream input(argv[1]);
     assert(input.good());
     std::string line;

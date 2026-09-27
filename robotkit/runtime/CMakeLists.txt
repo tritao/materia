@@ -70,6 +70,13 @@ if(RK_BUILD_TESTS)
     add_test(NAME robotkit_clock_estimator6 COMMAND robotkit_clock_estimator6_tests)
     set_tests_properties(robotkit_clock_estimator6 PROPERTIES LABELS "robot;runtime;clock" TIMEOUT 30)
 
+    add_executable(robotkit_segment_vectors_tests tests/segment_vectors.cpp)
+    target_compile_features(robotkit_segment_vectors_tests PRIVATE cxx_std_20)
+    target_link_libraries(robotkit_segment_vectors_tests PRIVATE motionkit_core)
+    add_test(NAME robotkit_segment_vectors COMMAND robotkit_segment_vectors_tests
+        ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/tests/segment_vectors.tsv)
+    set_tests_properties(robotkit_segment_vectors PROPERTIES LABELS "robot;wire;motion" TIMEOUT 30)
+
     add_executable(robotkit_device_protocol_tests tests/device_protocol.cpp)
     target_compile_features(robotkit_device_protocol_tests PRIVATE cxx_std_20)
     target_include_directories(robotkit_device_protocol_tests PRIVATE
