@@ -22,6 +22,7 @@ class ToolpathPlanRunner implements robotkit.skill.ToolpathPlanRunner {
   public final ikDamping:Float;
   public final maxJointJump:Float;
   var cutActive:Bool = false;
+  var processSpans:Array<Bool> = [];
 
   public static function create(robot:Robot, manipulator:Manipulator, frameId:String,
       maxAcceleration:Float, maxJointJump:Float, positionTolerance:Float,
@@ -74,7 +75,9 @@ class ToolpathPlanRunner implements robotkit.skill.ToolpathPlanRunner {
     var previous = seed.copy();
     var previousPose = manipulator.tcpPose(seed);
     var ops:Array<MotionOp> = [];
-    for (point in toolpath.points) {
+    processSpans = [];
+    for (index in 0...toolpath.points.length) {
+      var point = toolpath.points[index];
       var ik = manipulator.solveIkForTcp(point.work_T_tcp, previous,
         positionTolerance, orientationTolerance, ikMaxIterations, ikDamping);
       if (!ik.converged) throw "Toolpath waypoint is unreachable";
@@ -91,6 +94,9 @@ class ToolpathPlanRunner implements robotkit.skill.ToolpathPlanRunner {
       var jointSpeed = pathDistance > 1e-9 ? jump * point.feedRate / pathDistance : 0.0;
       ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(ik.q),
         new MotionOptions(jointSpeed), Blend.ExactStop));
+      // Spatial cutting is active only on engaged translation spans; a curl
+      // at one position does not extend the swept cut area.
+      processSpans.push(point.processOn && linearDistance > 1e-9);
       previous = ik.q;
       previousPose = point.work_T_tcp;
     }
@@ -101,9 +107,15 @@ class ToolpathPlanRunner implements robotkit.skill.ToolpathPlanRunner {
   public function update(dtSeconds:Float):Void {
     var before = motion.progress().op;
     motion.update(dtSeconds);
-    cutActive = before == 1 || motion.progress().op == 1;
+    var after = motion.progress().op;
+    cutActive = spanIsOn(after) || (!motion.running && spanIsOn(before));
   }
-  public function abort():Void motion.abort();
+  function spanIsOn(index:Int):Bool
+    return index >= 0 && index < processSpans.length && processSpans[index];
+  public function abort():Void {
+    motion.abort();
+    cutActive = false;
+  }
   public function running():Bool return motion.running;
   public function completed():Bool return motion.completed;
   public function failure():Null<String> return motion.failure;
