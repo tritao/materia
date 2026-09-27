@@ -4,7 +4,7 @@ package app;
 typedef ProjectSceneRecord = {
   var version:Int;
   var reference:String;
-  var overrides:Array<Dynamic>;
+  var overrides:Array<ProjectFieldOverride>;
   var removed:Array<String>;
   var instances:Array<ProjectSceneInstance>;
   /** Encoded AssemblyStateRecord for the generated assembly configuration. */
@@ -15,5 +15,14 @@ typedef ProjectSceneRecord = {
 
 typedef ProjectSceneInstance = {
   var sourceId:String;
-  var object:Dynamic;
+  var id:String;
+  var overrides:Array<ProjectFieldOverride>;
+  @:optional var object:Dynamic;
+}
+
+typedef ProjectFieldOverride = {
+  var targetId:String;
+  var property:String;
+  var kind:String;
+  var value:Dynamic;
 }

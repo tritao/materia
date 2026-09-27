@@ -32,7 +32,8 @@ class SceneCodec {
     var value:Dynamic = Reflect.field(root, "project");
     if (value == null) return null;
     if (Reflect.field(root, "script") != null) throw "A scene cannot have both script and project owners";
-    if (numberField(value, "version") != 1) throw "Unsupported generated project record version";
+    var projectVersion = Std.int(numberField(value, "version"));
+    if (projectVersion != 1 && projectVersion != 2) throw "Unsupported generated project record version";
     var reference = stringField(value, "reference");
     var assemblyState = optionalText(value, "assemblyState");
     if (assemblyState != null && assemblyState.length > 2000000)
@@ -50,10 +51,16 @@ class SceneCodec {
       throw "Generated project has too many edits";
     var seen = new Map<String, Bool>();
     for (item in overrideValues) {
-      var id = stringField(item, "id");
-      if (seen.exists(id) || Reflect.hasField(item, "meshSnapshot") || Reflect.hasField(item, "cadGraph"))
+      var id = stringField(item, projectVersion == 1 ? "id" : "targetId");
+      var editKey = projectVersion == 1 ? id : id + ":" + stringField(item, "property");
+      if (seen.exists(editKey) || Reflect.hasField(item, "meshSnapshot") || Reflect.hasField(item, "cadGraph"))
         throw "Invalid generated project override";
-      seen.set(id, true);
+      if (projectVersion == 2) {
+        var kind = stringField(item, "kind");
+        if (["number", "boolean", "text", "vector", "appearance"].indexOf(kind) < 0 ||
+            !Reflect.hasField(item, "value")) throw "Invalid generated project field edit";
+      }
+      seen.set(editKey, true);
     }
     var removedIds:Array<String> = [];
     for (item in removedValues) {
@@ -67,14 +74,17 @@ class SceneCodec {
     var instanceRecords:Array<app.ProjectSceneRecord.ProjectSceneInstance> = [];
     for (item in instanceValues) {
       var sourceId = stringField(item, "sourceId");
-      var object = field(item, "object");
-      var id = stringField(object, "id");
-      if (seen.exists(id) || Reflect.hasField(object, "meshSnapshot") || Reflect.hasField(object, "cadGraph"))
+      var object = projectVersion == 1 ? field(item, "object") : null;
+      var id = projectVersion == 1 ? stringField(object, "id") : stringField(item, "id");
+      if (projectVersion == 2 && !Std.isOfType(field(item, "overrides"), Array))
+        throw "Invalid generated project instance edits";
+      if (seen.exists(id) || (object != null && (Reflect.hasField(object, "meshSnapshot") || Reflect.hasField(object, "cadGraph"))))
         throw "Invalid generated project instance";
       seen.set(id, true);
-      instanceRecords.push({sourceId: sourceId, object: object});
+      instanceRecords.push({sourceId: sourceId, id: id,
+        overrides: projectVersion == 1 ? [] : cast field(item, "overrides"), object: object});
     }
-    return {version: 1, reference: reference, overrides: cast overrides,
+    return {version: projectVersion, reference: reference, overrides: cast overrides,
       removed: removedIds, instances: instanceRecords, assemblyState: assemblyState,
       assemblyDependentJoints: assemblyDependentJoints};
   }

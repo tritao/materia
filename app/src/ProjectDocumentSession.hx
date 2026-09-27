@@ -15,6 +15,8 @@ import nativekit.ui.properties.PropertyType;
 import nativekit.ui.properties.PropertyValue;
 import bimkit.BimDocument;
 import app.ProjectSceneRecord.ProjectSceneInstance;
+import app.ProjectSceneRecord.ProjectFieldOverride;
+import materia.project.Appearance.Appearances;
 import materia.project.AssemblyRecord;
 import materia.project.AssemblyDefinition;
 import materia.project.AssemblyDefinition.AssemblyComponentOccurrence;
@@ -51,6 +53,17 @@ class ProjectDocumentSession {
   final assemblyOccurrenceIds:Map<String, Bool> = new Map();
   final assemblyDependentJoints:Map<String, Bool> = new Map();
   var projectBaseline:Null<Array<SceneObjectData>> = null;
+  var staleProjectEdits:Array<String> = [];
+  var staleProjectRecord:Null<ProjectSceneRecord> = null;
+  public function staleEdits():Array<String> return staleProjectEdits.copy();
+  public function discardStaleEdits():Bool {
+    if (staleProjectEdits.length == 0) return false;
+    var old = staleProjectEdits.copy();
+    var oldRecord = staleProjectRecord;
+    return document.apply(new EditOperation("Discard stale project edits",
+      function() { staleProjectEdits = []; staleProjectRecord = null; },
+      function() { staleProjectEdits = old; staleProjectRecord = oldRecord; }));
+  }
   /** Application-owned runtime cleanup invoked only after replacement data validates. */
   public var beforeReplace:Null<Void->Void> = null;
 
@@ -198,7 +211,8 @@ class ProjectDocumentSession {
     if (stateRecord != null && generated.assemblyDefinition != null)
       generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
     var baseline = generated.objects;
-    var data = materializeProject(baseline, project, SceneCodec.decode(text));
+    var diagnostics:Array<String> = [];
+    var data = materializeProject(baseline, project, SceneCodec.decode(text), diagnostics);
     var nextDocument = createDocument();
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
     try {
@@ -226,6 +240,8 @@ class ProjectDocumentSession {
     replace(next, nextSensors, absolute, null, nextBim, nextDocument);
     projectReference = reference;
     projectBaseline = baseline;
+    staleProjectEdits = diagnostics;
+    staleProjectRecord = diagnostics.length == 0 ? null : project;
     projectAssembly = generated.assembly;
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
       generated.localCentersByDefinition, generated.metresPerUnit, dependentJoints);
@@ -473,6 +489,8 @@ class ProjectDocumentSession {
     scriptOwnership=nextOwnership;
     projectReference = null;
     projectBaseline = null;
+    staleProjectEdits = [];
+    staleProjectRecord = null;
     projectAssembly = null;
     projectAssemblyDefinition = null;
     projectAssemblyState = null;
@@ -524,7 +542,7 @@ class ProjectDocumentSession {
     var sources = new Map<String, SceneObjectData>();
     for (item in baseline) sources.set(item.id, item);
     var present = new Map<String, Bool>();
-    var overrides:Array<Dynamic> = [], instances:Array<ProjectSceneInstance> = [];
+    var overrides:Array<ProjectFieldOverride> = [], instances:Array<ProjectSceneInstance> = [];
     var authored:Array<SceneObjectData> = [];
     for (item in scene.recordsForSave()) {
       var source = sources.get(item.id);
@@ -532,9 +550,7 @@ class ProjectDocumentSession {
         if (item.type != source.type || item.meshSnapshot != source.meshSnapshot)
           throw 'Generated geometry for "${item.id}" must come from its project source';
         present.set(item.id, true);
-        var assemblyManaged = assemblyOccurrenceIds.exists(item.id);
-        var unchanged = assemblyManaged ? sameAppearanceWithoutPose(item, source) : sameAppearance(item, source);
-        if (!unchanged) overrides.push(withoutMesh(item, !assemblyManaged));
+        addDeltas(overrides, item.id, item, source, !assemblyOccurrenceIds.exists(item.id));
       } else if (item.type == "cad-preview") {
         var origin:Null<SceneObjectData> = null;
         for (candidate in baseline) if (candidate.meshSnapshot == item.meshSnapshot) {
@@ -542,16 +558,24 @@ class ProjectDocumentSession {
           break;
         }
         if (origin == null) throw 'CAD preview "${item.id}" has no project source';
-        instances.push({sourceId: origin.id, object: withoutMesh(item)});
-      } else {
-        authored.push(item);
-      }
+        var deltas:Array<ProjectFieldOverride> = [];
+        addDeltas(deltas, item.id, item, origin, true);
+        instances.push({sourceId: origin.id, id: item.id, overrides: deltas});
+      } else authored.push(item);
     }
     var removed:Array<String> = [];
     for (item in baseline) if (!present.exists(item.id)) removed.push(item.id);
+    var stale = staleProjectRecord;
+    if (stale != null) {
+      for (id in stale.removed) if (!sources.exists(id)) removed.push(id);
+      if (stale.version == 2) {
+        for (edit in stale.overrides) if (!sources.exists(edit.targetId)) overrides.push(edit);
+        for (instance in stale.instances) if (!sources.exists(instance.sourceId)) instances.push(instance);
+      }
+    }
     var savedAssemblyState = projectAssemblyDefinition == null || assemblyRuntime == null ? null
       : AssemblyDefinitionCodec.encodeState(projectAssemblyDefinition, assemblyRuntime.record());
-    return {record: {version: 1, reference: relativeReference(destination, reference),
+    return {record: {version: 2, reference: relativeReference(destination, reference),
       overrides: overrides, removed: removed, instances: instances,
       assemblyState: savedAssemblyState,
       assemblyDependentJoints: projectAssemblyDefinition == null ? null : assemblyDependentJointIds()},
@@ -604,36 +628,69 @@ class ProjectDocumentSession {
   static function sameAssemblyState(first:AssemblyStateRecord, second:AssemblyStateRecord):Bool
     return Json.stringify(first) == Json.stringify(second);
 
+  static var EDITABLE_FIELDS:Array<String> = ["label", "x", "y", "z", "rotation",
+    "collisionEnabled", "dynamicBody", "mass", "red", "green", "blue", "appearance", "visible"];
+
+  static function sameValue(property:String, a:Dynamic, b:Dynamic):Bool {
+    if (property == "appearance") return Appearances.same(cast a, cast b);
+    if (property == "rotation") return sameRotation(cast a, cast b);
+    if (Std.isOfType(a, Float) || Std.isOfType(b, Float)) {
+      var first:Float = a, second:Float = b;
+      return Math.abs(first - second) < 1e-6;
+    }
+    return a == b;
+  }
+
+  static function addDeltas(result:Array<ProjectFieldOverride>, id:String, item:SceneObjectData,
+      source:SceneObjectData, includePose:Bool):Void {
+    for (property in EDITABLE_FIELDS) {
+      if (!includePose && ["x", "y", "z", "rotation"].indexOf(property) >= 0) continue;
+      var value = Reflect.field(item, property);
+      if (sameValue(property, value, Reflect.field(source, property))) continue;
+      result.push({targetId: id, property: property,
+        kind: property == "rotation" ? "vector" : property == "appearance" ? "appearance" :
+          Std.isOfType(value, Bool) ? "boolean" : Std.isOfType(value, String) ? "text" : "number",
+        value: value});
+    }
+  }
+
   static function materializeProject(baseline:Array<SceneObjectData>, project:ProjectSceneRecord,
-      authored:Array<SceneObjectData>):Array<SceneObjectData> {
+      authored:Array<SceneObjectData>, diagnostics:Array<String>):Array<SceneObjectData> {
     var sources = new Map<String, SceneObjectData>();
     for (item in baseline) sources.set(item.id, item);
     var removed = new Map<String, Bool>();
     for (id in project.removed) {
-      if (!sources.exists(id)) throw 'Removed project part "$id" no longer exists';
-      removed.set(id, true);
+      if (!sources.exists(id)) diagnostics.push("removed:" + id);
+      else removed.set(id, true);
     }
-    var overrides = new Map<String, Dynamic>();
-    for (item in project.overrides) {
-      var id:String = Reflect.field(item, "id");
-      if (!sources.exists(id)) throw 'Project override "$id" no longer exists';
-      overrides.set(id, item);
+    var overrides = new Map<String, Array<ProjectFieldOverride>>();
+    for (edit in project.overrides) {
+      var id:String = project.version == 1 ? Reflect.field(edit, "id") : edit.targetId;
+      if (!sources.exists(id)) { diagnostics.push("override:" + id); continue; }
+      var list = overrides.get(id);
+      if (list == null) { list = []; overrides.set(id, list); }
+      if (project.version == 1) {
+        addLegacyDeltas(list, id, cast edit, sources.get(id));
+      } else list.push(edit);
     }
     var data:Array<SceneObjectData> = [];
     var ids = new Map<String, Bool>();
     for (item in baseline) if (!removed.exists(item.id)) {
-      var override = overrides.get(item.id);
       if (ids.exists(item.id)) throw 'Duplicate project part ID: ${item.id}';
       ids.set(item.id, true);
-      data.push(override == null ? item : applyAppearance(item, override, item.id));
+      data.push(applyDeltas(item, item.id, overrides.get(item.id), diagnostics));
     }
     for (instance in project.instances) {
       var source = sources.get(instance.sourceId);
-      if (source == null) throw 'Project instance source "${instance.sourceId}" no longer exists';
-      var id:String = Reflect.field(instance.object, "id");
-      if (ids.exists(id)) throw 'Duplicate project object ID: $id';
-      ids.set(id, true);
-      data.push(applyAppearance(source, instance.object, id));
+      if (source == null) { diagnostics.push("instance:" + instance.id); continue; }
+      if (ids.exists(instance.id)) throw 'Duplicate project object ID: ${instance.id}';
+      ids.set(instance.id, true);
+      var edits = instance.overrides;
+      if (project.version == 1) {
+        edits = [];
+        addLegacyDeltas(edits, instance.id, instance.object, source);
+      }
+      data.push(applyDeltas(source, instance.id, edits, diagnostics));
     }
     for (item in authored) {
       if (item.type == "cad-preview") throw "Project-owned previews must reference a generated part";
@@ -645,66 +702,54 @@ class ProjectDocumentSession {
     return data;
   }
 
-  static function applyAppearance(source:SceneObjectData, edit:Dynamic, id:String):SceneObjectData {
-    if (Reflect.hasField(edit, "type") && Reflect.field(edit, "type") != source.type)
-      throw 'Project part "$id" changed type';
+  static function addLegacyDeltas(result:Array<ProjectFieldOverride>, id:String, legacy:Dynamic,
+      source:SceneObjectData):Void {
+    for (property in EDITABLE_FIELDS) if (Reflect.hasField(legacy, property)) {
+      var value = Reflect.field(legacy, property);
+      if (!sameValue(property, value, Reflect.field(source, property)))
+        result.push({targetId: id, property: property, kind: "legacy", value: value});
+    }
+  }
+
+  static function applyDeltas(source:SceneObjectData, id:String, edits:Null<Array<ProjectFieldOverride>>,
+      diagnostics:Array<String>):SceneObjectData {
     var value:Dynamic = withoutMesh(source);
     Reflect.setField(value, "id", id);
-    for (field in ["label", "x", "y", "z", "width", "height", "depth",
-        "collisionEnabled", "dynamicBody", "mass", "red", "green", "blue", "appearance", "visible", "rotation"])
-      if (Reflect.hasField(edit, field)) Reflect.setField(value, field, Reflect.field(edit, field));
-    for (field in Reflect.fields(edit)) if (field != "id" && field != "type" &&
-        ["label", "x", "y", "z", "width", "height", "depth", "collisionEnabled",
-          "dynamicBody", "mass", "red", "green", "blue", "appearance", "visible", "rotation"].indexOf(field) < 0)
-      throw 'Project part "$id" has an unsupported edit';
-    // Validate authored fields without serializing generated mesh data.
+    if (edits != null) for (edit in edits) {
+      if (EDITABLE_FIELDS.indexOf(edit.property) < 0 || edit.targetId != id) {
+        diagnostics.push("override:" + id + ":" + edit.property);
+        continue;
+      }
+      var previous = Reflect.field(value, edit.property);
+      Reflect.setField(value, edit.property, edit.value);
+      try decodeProjectObject(value) catch (_:Dynamic) {
+        Reflect.setField(value, edit.property, previous);
+        diagnostics.push("override:" + id + ":" + edit.property);
+      }
+    }
+    return decodeProjectObject(value, source.meshSnapshot);
+  }
+
+  static function decodeProjectObject(value:Dynamic, ?snapshot:String):SceneObjectData {
     Reflect.setField(value, "meshSnapshot", "_");
     var result = SceneCodec.decode(Json.stringify({format: SceneCodec.FORMAT,
       version: SceneCodec.VERSION, objects: [value]}))[0];
-    result.meshSnapshot = source.meshSnapshot;
+    result.meshSnapshot = snapshot;
     return result;
   }
 
-  static function withoutMesh(item:SceneObjectData, includePose:Bool = true):Dynamic {
-    var result:Dynamic = {id: item.id, type: item.type, label: item.label,
-      width: item.width, height: item.height, depth: item.depth,
-      collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-      red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
-      visible: item.visible};
-    if (includePose) {
-      Reflect.setField(result, "x", item.x);
-      Reflect.setField(result, "y", item.y);
-      Reflect.setField(result, "z", item.z);
-      Reflect.setField(result, "rotation", item.rotation);
-    }
-    return result;
-  }
-
-  static function sameAppearance(left:SceneObjectData, right:SceneObjectData):Bool
-    return left.label == right.label && left.x == right.x && left.y == right.y && left.z == right.z &&
-      left.width == right.width && left.height == right.height && left.depth == right.depth &&
-      left.collisionEnabled == right.collisionEnabled && left.dynamicBody == right.dynamicBody &&
-      left.mass == right.mass && left.red == right.red && left.green == right.green &&
-      left.blue == right.blue && sameAppearanceFinish(left, right) &&
-      left.visible == right.visible && sameRotation(left.rotation, right.rotation);
-
-  static function sameAppearanceWithoutPose(left:SceneObjectData, right:SceneObjectData):Bool
-    return left.label == right.label && left.width == right.width && left.height == right.height &&
-      left.depth == right.depth && left.collisionEnabled == right.collisionEnabled &&
-      left.dynamicBody == right.dynamicBody && left.mass == right.mass && left.red == right.red &&
-      left.green == right.green && left.blue == right.blue && sameAppearanceFinish(left, right) &&
-      left.visible == right.visible;
-
-  static function sameAppearanceFinish(left:SceneObjectData, right:SceneObjectData):Bool {
-    var a = left.appearance, b = right.appearance;
-    if (a == null || b == null) return a == null && b == null;
-    return a.finish == b.finish && a.metallic == b.metallic && a.roughness == b.roughness;
-  }
+  static function withoutMesh(item:SceneObjectData):Dynamic return {
+    id: item.id, type: item.type, label: item.label, x: item.x, y: item.y, z: item.z,
+    width: item.width, height: item.height, depth: item.depth,
+    collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
+    red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
+    visible: item.visible, rotation: item.rotation
+  };
 
   static function sameRotation(left:Null<Array<Float>>, right:Null<Array<Float>>):Bool {
     if (left == null || right == null) return left == right;
     if (left.length != 4 || right.length != 4) return false;
-    for (index in 0...4) if (left[index] != right[index]) return false;
+    for (index in 0...4) if (Math.abs(left[index] - right[index]) >= 1e-6) return false;
     return true;
   }
 
