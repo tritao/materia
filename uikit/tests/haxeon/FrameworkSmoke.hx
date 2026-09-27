@@ -1731,6 +1731,11 @@ class FrameworkSmoke {
 			return 170;
 		if (!tree.setExpanded("root:0", false) || treeExpansionKey != "root:0" || treeExpansionValue)
 			return 171;
+		// Toggling immediately after a tree revision must find the visible row
+		// even before a new viewport build materializes its entry.
+		if (!tree.toggleExpanded("root:0") || !tree.isExpanded("root:0") ||
+			!tree.toggleExpanded("root:0") || tree.isExpanded("root:0"))
+			return 175;
 		tree.scrollTo("root:0");
 		treeBuiltKeys.resize(0);
 		treeRoot = context.submit(tree, new LayoutFrame(256.0, 120.0));
@@ -1739,6 +1744,9 @@ class FrameworkSmoke {
 			return 172;
 		if (!tree.toggleExpanded("root:0") || !tree.isExpanded("root:0"))
 			return 173;
+		if (tree.toggleExpanded("no-longer-visible") ||
+			tree.setExpanded("no-longer-visible", true))
+			return 174;
 		// Exercise the session capacity and the framework as one realistic,
 		// nested settings tree. The custom painter sits between ordinary text
 		// siblings inside the clipped, scrollable content.
@@ -1862,14 +1870,15 @@ class FrameworkSmoke {
 			new MenuItem("disabled", "Unavailable", null, false)
 		], 32.0, 24.0, function() { menuDismissals++; });
 		var menuRoot = context.submit(menu, dialogFrame);
-		var menuGeometry:ResolvedLayoutItem = cast menuRoot.children[1].resolved;
+		var menuGeometry:ResolvedLayoutItem = cast menuRoot.children[2].resolved;
 		if (context.focus.focusedId == null ||
 			menuRoot.children[0].layout.style.background.alpha != 0.0 ||
-			menuGeometry.x != 32.0 || menuGeometry.y != 24.0)
+			menuGeometry.x != 32.0 || menuGeometry.y != 24.0 ||
+			menuRoot.children[2].layout.style.radiusTopLeft != 0.0)
 			return 74;
 		context.key(UiEventKind.KeyDown, UiKey.Enter);
 		if (selectedMenuItem != "open" || menuDismissals != 1 ||
-			menuRoot.children[1].children[0].children[1].enabled)
+			menuRoot.children[2].children[1].children[1].enabled)
 			return 75;
 
 		var tooltip = new Tooltip("tooltip-smoke", new Button("Anchor"), new Text("Hint"));
@@ -4101,7 +4110,8 @@ class FrameworkSmoke {
 				firstItem = node;
 		});
 		if (firstItem == null ||
-			firstItem.computedStyle.get(StyleProperty.Background).red != uiContext.buildContext.theme.buttonFocused.red)
+			firstItem.computedStyle.get(StyleProperty.Background).red !=
+			uiContext.buildContext.theme.tokens.selectionField.red)
 			return false;
 		var settledMenu = uiContext.submit(new CommandMenu("surface-menu", ["surface.run", "surface.stop"],
 			24.0, 24.0, surfaceRegistry), new LayoutFrame(480.0, 320.0));

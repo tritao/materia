@@ -142,7 +142,7 @@ class TreeView implements View {
 		if (entry == null) {
 			var index = indexByKey.get(nodeKey);
 			if (index == null)
-				throw "TreeView expansion key is not visible";
+				return false;
 			entry = entryAt(index);
 		}
 		ensureEntryDetails(entry);
@@ -169,8 +169,12 @@ class TreeView implements View {
 	public function toggleExpanded(nodeKey:String):Bool {
 		ensureTreeMetrics();
 		var entry = entryByKey.get(nodeKey);
-		if (entry == null)
-			throw "TreeView expansion key is not visible";
+		if (entry == null) {
+			var index = indexByKey.get(nodeKey);
+			if (index == null)
+				return false;
+			entry = entryAt(index);
+		}
 		return setExpanded(nodeKey, !entry.expanded);
 	}
 
@@ -685,7 +689,7 @@ private class TreeViewRow implements View {
 			style.height = LayoutAxis.fixed(entry.extent);
 			style.direction = LayoutDirection.LeftToRight;
 			style.childAlignY = LayoutAlignmentY.Center;
-			style.childGap = 6.0;
+			style.childGap = 2.0;
 			style.padding = new Insets(entry.depth * 16.0, 0.0, 0.0, 0.0);
 			style.background = selected ? context.theme.tokens.selectionHighlight :
 				StyleStateUtil.contains(flags, StyleState.Hovered)
@@ -741,7 +745,7 @@ private class TreeViewRow implements View {
 					}
 					var x = (depth - 1) * 16.0 + 8.0;
 					path.moveTo(x, 0.0).lineTo(x, hasNext ? geometry.height : centerY);
-					path.moveTo(x, centerY).lineTo(x + 8.0, centerY);
+					path.moveTo(x, centerY).lineTo(x + 10.0, centerY);
 					canvas.strokeTransient(path.build(), guideColor, 1.0, LineCap.Butt, LineJoin.Miter);
 				}, guideKey + ":" + guideColor.red + ":" + guideColor.green + ":" +
 					guideColor.blue + ":" + guideColor.alpha);
@@ -749,8 +753,8 @@ private class TreeViewRow implements View {
 			}
 
 			var disclosure:View = entry.hasChildren
-				? new TreeDisclosure("disclosure-control", entry.expanded, onToggle)
-				: new Spacer("disclosure-spacer", LayoutAxis.fixed(16.0), LayoutAxis.grow());
+				? new TreeDisclosure("disclosure-control", entry.expanded, entry.extent, onToggle)
+				: new Spacer("disclosure-spacer", LayoutAxis.fixed(20.0), LayoutAxis.fixed(entry.extent));
 			node.add(context.withScope(new Key("disclosure"), function() return disclosure.build(context)));
 			node.add(new KeyedView('item:$itemKey', child).build(context));
 			onBuilt(node.id);
@@ -762,19 +766,22 @@ private class TreeViewRow implements View {
 private class TreeDisclosure implements View {
 	final key:String;
 	final expanded:Bool;
+	final rowHeight:Float;
 	final onToggle:Void->Void;
 
-	public function new(key:String, expanded:Bool, onToggle:Void->Void) {
+	public function new(key:String, expanded:Bool, rowHeight:Float, onToggle:Void->Void) {
 		this.key = key;
 		this.expanded = expanded;
+		this.rowHeight = rowHeight;
 		this.onToggle = onToggle;
 	}
 
 	public function build(context:BuildContext):RenderNode {
 		return context.withScope(new Key(key), function() {
 			var style = new LayoutStyle();
-			style.width = LayoutAxis.fixed(16.0);
-			style.height = LayoutAxis.grow();
+			style.width = LayoutAxis.fixed(20.0);
+			style.height = LayoutAxis.fixed(rowHeight);
+			style.direction = LayoutDirection.LeftToRight;
 			style.childAlignX = LayoutAlignmentX.Center;
 			style.childAlignY = LayoutAlignmentY.Center;
 			style.padding = new Insets(0.0, 0.0, 0.0, 0.0);

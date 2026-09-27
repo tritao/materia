@@ -5,6 +5,7 @@ import LayoutAxis;
 import LayoutPositioning;
 import LayoutStyle;
 import LayoutVisualKind;
+import Rect;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
 import nativekit.ui.core.RenderNode;
@@ -33,6 +34,8 @@ class Popup implements View {
 	public var backdropColor:Null<Color>;
 	/** Absolute layer shared by the backdrop; content paints one layer above it. */
 	public var layerZIndex:Int;
+	/** Paint a square menu surface and its shadow beneath the popup content. */
+	public var menuSurface:Bool;
 	public var onDismiss:Void->Void;
 	public var hasDismissHandler(default, null):Bool;
 	public function new(key:String, child:View, x:Float = 0.0, y:Float = 0.0,
@@ -51,6 +54,7 @@ class Popup implements View {
 		dismissOnEscape = true;
 		backdropColor = null;
 		layerZIndex = 0;
+		menuSurface = false;
 		hasDismissHandler = onDismiss != null;
 		this.onDismiss = onDismiss == null ? function() {} : onDismiss;
 	}
@@ -111,11 +115,61 @@ class Popup implements View {
 			var panelComputed = context.resolveStyle(
 				new StyleTarget("popup-content", key.value, key.value, null, ["popup"],
 					context.interactionStates.get(panelId)), panelStyle);
+			if (menuSurface) {
+				var source = new StyleSource("local", "popup-content", -1, "local");
+				panelComputed.set(StyleProperty.Background, Color.rgba(0.0, 0.0, 0.0, 0.0), source);
+				panelComputed.set(StyleProperty.Padding, panelStyle.padding, source);
+				panelComputed.set(StyleProperty.RadiusTopLeft, 0.0, source);
+				panelComputed.set(StyleProperty.RadiusTopRight, 0.0, source);
+				panelComputed.set(StyleProperty.RadiusBottomRight, 0.0, source);
+				panelComputed.set(StyleProperty.RadiusBottomLeft, 0.0, source);
+			}
 			var panel = new RenderNode(panelId, LayoutVisualKind.Box,
 				panelComputed.toLayoutStyle());
 			panel.setStyleIdentity("popup-content", key.value, key.value, null, ["popup"]);
 			panel.states = context.interactionStates.get(panelId);
 			panel.computedStyle = panelComputed;
+			if (menuSurface) {
+				var surfaceStyle = new LayoutStyle();
+				surfaceStyle.width = LayoutAxis.grow();
+				surfaceStyle.height = LayoutAxis.grow();
+				surfaceStyle.positioning = LayoutPositioning.Absolute;
+				surfaceStyle.zIndex = -1;
+				surfaceStyle.clipToParent = false;
+				var surface = new RenderNode(context.id("popup-surface"),
+					LayoutVisualKind.Custom, surfaceStyle);
+				surface.hitTestSelf = false;
+				var background = context.theme.tokens.navigationBackground;
+				var border = context.theme.tokens.border;
+				surface.onPaint(function(canvas, geometry) {
+					var width = geometry.width;
+					var height = geometry.height;
+					canvas.fillRectIfPositive(new Rect(0.0, 0.0, width, height), background);
+					canvas.fillRectIfPositive(new Rect(0.0, 0.0, width, 1.0), border);
+					canvas.fillRectIfPositive(new Rect(0.0, height - 1.0, width, 1.0), border);
+					canvas.fillRectIfPositive(new Rect(0.0, 1.0, 1.0, height - 2.0), border);
+					canvas.fillRectIfPositive(new Rect(width - 1.0, 1.0, 1.0,
+							height - 2.0), border);
+				});
+				panel.add(surface);
+				var shadowStyle = new LayoutStyle();
+				shadowStyle.width = LayoutAxis.grow();
+				shadowStyle.height = LayoutAxis.grow();
+				shadowStyle.positioning = LayoutPositioning.Absolute;
+				shadowStyle.zIndex = layerZIndex + 1;
+				var shadowLayer = new RenderNode(context.id("popup-shadow"),
+					LayoutVisualKind.Custom, shadowStyle);
+				shadowLayer.hitTestSelf = false;
+				var shadow = context.theme.tokens.selectionPopupShadow;
+				shadowLayer.onPaint(function(canvas, geometry) {
+					var bounds = panel.resolved;
+					if (bounds == null) return;
+					canvas.drawBoxShadow(new Rect(bounds.x - geometry.x, bounds.y - geometry.y,
+						bounds.width, bounds.height), 0.0, 3.0, 9.0, 0.0,
+						[0.0, 0.0, 0.0, 0.0], shadow);
+				});
+				root.add(shadowLayer);
+			}
 			var content = context.withStyleParent(panelComputed, function() return
 				context.withScope(new Key("content"), function() return child.build(context)));
 			panel.add(content);

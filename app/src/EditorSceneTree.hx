@@ -8,6 +8,7 @@ import nativekit.ui.widgets.Icon;
 import nativekit.ui.widgets.KeyedView;
 import nativekit.ui.widgets.layout.Row;
 import LayoutAlignmentY;
+import LayoutAxis;
 import LayoutStyle;
 import nativekit.ui.icons.IconName;
 import nativekit.ui.widgets.collections.TreeRootMetadata;
@@ -113,6 +114,7 @@ class EditorSceneTree implements TreeViewModel {
   }
   function iconLabeledItem(key:String, label:String, icon:IconName):View {
     var rowStyle = new LayoutStyle();
+    rowStyle.width = LayoutAxis.grow();
     rowStyle.childAlignY = LayoutAlignmentY.Center;
     rowStyle.childGap = 6.0;
     return new Row("item-row:" + key, [

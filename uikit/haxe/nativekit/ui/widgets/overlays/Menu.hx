@@ -7,6 +7,7 @@ import nativekit.ui.widgets.layout.Column;
 import LayoutAxis;
 import LayoutStyle;
 import Insets;
+import Color;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.View;
 import nativekit.ui.core.RenderNode;
@@ -57,15 +58,13 @@ class Menu implements View {
 		menuStyle.childGap = 2.0;
 		var content = new Column("menu-items", children, menuStyle);
 		var popupStyle = new LayoutStyle();
-		popupStyle.background = context.theme.tokens.navigationBackground;
+		popupStyle.background = Color.rgba(0.0, 0.0, 0.0, 0.0);
 		popupStyle.padding = new Insets(4.0, 4.0, 4.0, 4.0);
-		popupStyle.radiusTopLeft = 6.0;
-		popupStyle.radiusTopRight = 6.0;
-		popupStyle.radiusBottomLeft = 6.0;
-		popupStyle.radiusBottomRight = 6.0;
+		popupStyle.clipToParent = false;
 		var popup = new Popup(key, content, x, y, popupStyle,
 			hasDismissHandler ? onDismiss : null);
 		popup.label = "Menu";
+		popup.menuSurface = true;
 		popup.modal = true;
 		popup.dimBackdrop = false;
 		var root:RenderNode = popup.build(context);

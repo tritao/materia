@@ -372,6 +372,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var contextMenuVisible:Bool;
   var hierarchyAddVisible:Bool = false;
   var hierarchySearch:String = "";
+  var hierarchyExpansionRevision:Int = 0;
   var hierarchyMenuVisible:Bool = false;
   var hierarchyMenuX:Float = 0.0;
   var hierarchyMenuY:Float = 0.0;
@@ -910,7 +911,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspacePanelContents = [
       new DockPanelContent("hierarchy", function(_) return hierarchyPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
-          ":filter=" + hierarchySearch),
+          ":filter=" + hierarchySearch + ":expansion=" + hierarchyExpansionRevision),
       new DockPanelContent("bim", function(_) return bimEditor),
       new DockPanelContent("perspective", function(_) return perspectivePanel(),
         function(_, width) return perspectivePanel(width)),
@@ -1159,6 +1160,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       commands.execute("scene.frame-selected");
       log("Framed " + id);
     }, null, null);
+    tree.onExpandedChanged = function(_, _) {
+      hierarchyExpansionRevision++;
+    };
     tree.onItemContextMenu = function(id, event) {
       if (scene.object(id) == null) return;
       hierarchyMenuX = Math.max(8.0, Math.min(viewportWidth - 228.0, event.x));
