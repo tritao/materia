@@ -1,21 +1,21 @@
-package materia.project;
+package materia.kinematics;
 
 import haxe.Json;
-import materia.project.AssemblyDefinition;
-import materia.project.AssemblyDefinition.AssemblyComponentDefinition;
-import materia.project.AssemblyDefinition.AssemblyComponentOccurrence;
-import materia.project.AssemblyDefinition.AssemblyJointCoordinate;
-import materia.project.AssemblyDefinition.AssemblyJointCoupling;
-import materia.project.AssemblyDefinition.AssemblyJointLimits;
-import materia.project.AssemblyDefinition.AssemblyJointRole;
-import materia.project.AssemblyDefinition.AssemblyJointType;
-import materia.project.AssemblyDefinition.AssemblyRootPose;
-import materia.project.AssemblyDefinition.AssemblyStateRecord;
-import materia.project.AssemblyDefinition.AssemblyVector;
-import materia.project.AssemblyDefinition.KinematicJoint;
-import materia.project.AssemblyRecord;
-import materia.project.AssemblyRecord.AssemblyConnector;
-import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.kinematics.AssemblyDefinition;
+import materia.kinematics.AssemblyDefinition.AssemblyComponentDefinition;
+import materia.kinematics.AssemblyDefinition.AssemblyComponentOccurrence;
+import materia.kinematics.AssemblyDefinition.AssemblyJointCoordinate;
+import materia.kinematics.AssemblyDefinition.AssemblyJointCoupling;
+import materia.kinematics.AssemblyDefinition.AssemblyJointLimits;
+import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
+import materia.kinematics.AssemblyDefinition.AssemblyJointType;
+import materia.kinematics.AssemblyDefinition.AssemblyRootPose;
+import materia.kinematics.AssemblyDefinition.AssemblyStateRecord;
+import materia.kinematics.AssemblyDefinition.AssemblyVector;
+import materia.kinematics.AssemblyDefinition.KinematicJoint;
+import materia.kinematics.AssemblyRecord;
+import materia.kinematics.AssemblyRecord.AssemblyConnector;
+import materia.kinematics.AssemblyRecord.AssemblyFrame;
 import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */

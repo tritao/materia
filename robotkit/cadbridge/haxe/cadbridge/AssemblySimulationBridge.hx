@@ -1,13 +1,13 @@
 package cadbridge;
 
-import materia.project.AssemblyDefinition;
-import materia.project.AssemblyDefinition.AssemblyJointRole;
-import materia.project.AssemblyDefinition.AssemblyJointType;
-import materia.project.AssemblyDefinition.AssemblyJointCoupling;
-import materia.project.AssemblyDefinition.AssemblyStateRecord;
-import materia.project.AssemblyDefinitionCodec;
-import materia.project.AssemblyFrames;
-import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.kinematics.AssemblyDefinition;
+import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
+import materia.kinematics.AssemblyDefinition.AssemblyJointType;
+import materia.kinematics.AssemblyDefinition.AssemblyJointCoupling;
+import materia.kinematics.AssemblyDefinition.AssemblyStateRecord;
+import materia.kinematics.AssemblyDefinitionCodec;
+import materia.kinematics.AssemblyFrames;
+import materia.kinematics.AssemblyRecord.AssemblyFrame;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
 import robotkit.model.Joint;
@@ -45,7 +45,7 @@ class AssemblySimulationBridge {
     var scale = artifact.metresPerUnit;
     var parts = new Map<String, AssemblyPhysicalPart>();
     for (part in artifact.parts) parts.set(part.id, part);
-    var definitions = new Map<String, materia.project.AssemblyDefinition.AssemblyComponentDefinition>();
+    var definitions = new Map<String, materia.kinematics.AssemblyDefinition.AssemblyComponentDefinition>();
     for (component in definition.definitions) definitions.set(component.id, component);
     var model = new RobotModel(definition.id);
     var root = model.addLink(new Link("assembly-root"));
@@ -108,7 +108,7 @@ class AssemblySimulationBridge {
     throw 'Unknown assembly occurrence "$id"';
   }
 
-  static function connector(component:materia.project.AssemblyDefinition.AssemblyComponentDefinition,
+  static function connector(component:materia.kinematics.AssemblyDefinition.AssemblyComponentDefinition,
       name:String):AssemblyFrame {
     if (component == null) throw "Missing assembly component definition";
     for (item in component.connectors) if (item.name == name) return item.frame;

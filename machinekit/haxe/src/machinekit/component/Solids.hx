@@ -6,8 +6,8 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
-import materia.project.AssemblyFrames;
-import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.kinematics.AssemblyFrames;
+import materia.kinematics.AssemblyRecord.AssemblyFrame;
 
 /** Small construction helpers shared by generators. Inputs passed as `parts` are consumed. */
 class Solids {

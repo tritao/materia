@@ -1,18 +1,18 @@
 package cadkit.modeling;
 
-import materia.project.AssemblyRecord;
-import materia.project.AssemblyCodec;
-import materia.project.AssemblyFrames;
-import materia.project.AssemblyRecord.AssemblyFrame;
-import materia.project.AssemblyRecord.AssemblyConnector;
-import materia.project.AssemblyRecord.AssemblyInstance;
-import materia.project.AssemblyRecord.AssemblyJoint;
-import materia.project.AssemblyDefinition;
-import materia.project.AssemblyDefinition.AssemblyJointLimits;
-import materia.project.AssemblyDefinition.AssemblyJointCoupling;
-import materia.project.AssemblyDefinition.AssemblyJointRole;
-import materia.project.AssemblyDefinition.AssemblyVector;
-import materia.project.AssemblyDefinitionCodec;
+import materia.kinematics.AssemblyRecord;
+import materia.kinematics.AssemblyCodec;
+import materia.kinematics.AssemblyFrames;
+import materia.kinematics.AssemblyRecord.AssemblyFrame;
+import materia.kinematics.AssemblyRecord.AssemblyConnector;
+import materia.kinematics.AssemblyRecord.AssemblyInstance;
+import materia.kinematics.AssemblyRecord.AssemblyJoint;
+import materia.kinematics.AssemblyDefinition;
+import materia.kinematics.AssemblyDefinition.AssemblyJointLimits;
+import materia.kinematics.AssemblyDefinition.AssemblyJointCoupling;
+import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
+import materia.kinematics.AssemblyDefinition.AssemblyVector;
+import materia.kinematics.AssemblyDefinitionCodec;
 import materia.units.LengthUnit;
 
 /** Builds a posed assembly from part instances, connector frames, and tree joints. */

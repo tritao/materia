@@ -6,7 +6,7 @@ import machinekit.component.MachineComponent;
 import machinekit.motion.FlangeBearingHousing;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.SocketHeadCapScrew;
-import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.kinematics.AssemblyRecord.AssemblyFrame;
 
 /** Flange bearing housing with its bearing pressed in and four mounting screws, composed from
  * standalone `MachineComponent`s rather than being one itself: `addTo` places the housing at

@@ -2,7 +2,7 @@ package machinekit.motion;
 
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import materia.project.AssemblyFrames;
+import materia.kinematics.AssemblyFrames;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.ConnectorRole;

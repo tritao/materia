@@ -1,11 +1,11 @@
 package cadkit.modeling;
 
-import materia.project.AssemblyDefinition.AssemblyJointRole;
-import materia.project.AssemblyDefinition.AssemblyJointType;
-import materia.project.AssemblyDefinition.AssemblyVector;
-import materia.project.AssemblyDefinition.KinematicJoint;
-import materia.project.AssemblyFrames;
-import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
+import materia.kinematics.AssemblyDefinition.AssemblyJointType;
+import materia.kinematics.AssemblyDefinition.AssemblyVector;
+import materia.kinematics.AssemblyDefinition.KinematicJoint;
+import materia.kinematics.AssemblyFrames;
+import materia.kinematics.AssemblyRecord.AssemblyFrame;
 import materia.units.LengthUnit;
 
 /** Tolerances and iteration settings for joint-coordinate loop solving. */

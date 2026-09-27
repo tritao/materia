@@ -1,7 +1,7 @@
-package materia.project;
+package materia.kinematics;
 
-import materia.project.AssemblyRecord.AssemblyFrame;
-import materia.project.AssemblyRecord.AssemblyConnector;
+import materia.kinematics.AssemblyRecord.AssemblyFrame;
+import materia.kinematics.AssemblyRecord.AssemblyConnector;
 
 enum abstract AssemblyJointType(String) from String to String {
 	var Fixed = "fixed";

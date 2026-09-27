@@ -14,7 +14,7 @@ import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.SocketHeadCapScrew;
-import materia.project.AssemblyFrames;
+import materia.kinematics.AssemblyFrames;
 
 /** Optional structural and service details for a pedestal. Dimensions are in millimetres. */
 typedef PedestalDetail = {

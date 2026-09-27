@@ -13,8 +13,8 @@ import LayoutStyle;
 import nativekit.ui.icons.IconName;
 import nativekit.ui.widgets.collections.TreeRootMetadata;
 import nativekit.ui.widgets.collections.TreeViewModel;
-import materia.project.AssemblyRecord;
-import materia.project.AssemblyRecord.AssemblyJoint;
+import materia.kinematics.AssemblyRecord;
+import materia.kinematics.AssemblyRecord.AssemblyJoint;
 
 class EditorSceneTree implements TreeViewModel {
   final scene:EditorScene;

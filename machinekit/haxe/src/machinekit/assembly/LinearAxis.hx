@@ -28,7 +28,7 @@ import machinekit.standard.BearingFit.BearingShaftFit;
 import machinekit.standard.ClearanceFit;
 import machinekit.structural.FrameAssembly;
 import machinekit.structural.RectTube;
-import materia.project.AssemblyRecord.AssemblyFrame;
+import materia.kinematics.AssemblyRecord.AssemblyFrame;
 
 /** Block riding the lead screw. CAD frame: bore centred, spanning z=0..length. */
 class Carriage extends MachineComponent {

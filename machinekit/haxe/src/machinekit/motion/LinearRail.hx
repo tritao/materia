@@ -8,7 +8,7 @@ import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.motion.LinearRailProfile.LinearRailProfileSpec;
-import materia.project.AssemblyFrames;
+import materia.kinematics.AssemblyFrames;
 
 /** A cut length of profile rail. The preview is a nominal envelope; mounting-hole locations
  * are exposed as named connectors and kept in the catalog-backed guide system. CAD frame: the

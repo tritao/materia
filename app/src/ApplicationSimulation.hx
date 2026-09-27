@@ -154,9 +154,9 @@ class ApplicationSimulation {
             throw 'Assembly coupling "${coupling.id}" references a missing tree joint';
           var sourceKind = [for (joint in assembly.joints) if (joint.id == coupling.source) joint.type][0];
           var targetKind = [for (joint in assembly.joints) if (joint.id == coupling.target) joint.type][0];
-          var sourceScale = sourceKind == materia.project.AssemblyDefinition.AssemblyJointType.Prismatic
+          var sourceScale = sourceKind == materia.kinematics.AssemblyDefinition.AssemblyJointType.Prismatic
             ? physical.metresPerUnit : 1.0;
-          var targetScale = targetKind == materia.project.AssemblyDefinition.AssemblyJointType.Prismatic
+          var targetScale = targetKind == materia.kinematics.AssemblyDefinition.AssemblyJointType.Prismatic
             ? physical.metresPerUnit : 1.0;
           var ratio = coupling.ratio * targetScale / sourceScale;
           // The bridge places both joints at their saved coordinates as zero.
