@@ -21,6 +21,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	const NKSIM_OK = 0;
 	const NKSIM_SHAPE_BOX = 1;
 	const NKSIM_SHAPE_CAPSULE = 3;
+	const NKSIM_SHAPE_CONVEX = 5;
 	const NKSIM_SHAPE_PLANE = 4;
 	const NKSIM_SHAPE_SPHERE = 2;
 	const NKSIM_SNAPSHOT_PAGE_CAPACITY = 64;
@@ -47,12 +48,18 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * velocities instead of inferring them from the scene-node pose change.
 	 */
 	extern fn nksim_body_set_state(world: nksim_world, body: nksim_body, state: ptr<const<nksim_body_state>>) -> nksim_result;
+	extern fn nksim_closure_create(world: nksim_world, desc: ptr<const<nksim_closure_desc>>) -> nksim_result;
+	extern fn nksim_joint_couple(world: nksim_world, desc: ptr<const<nksim_joint_coupling_desc>>) -> nksim_result;
 	extern fn nksim_joint_create(world: nksim_world, desc: ptr<const<nksim_joint_desc>>, out_joint: ptr<nksim_joint> @out) -> nksim_result;
 	extern fn nksim_joint_destroy(world: nksim_world, joint: nksim_joint) -> void;
 	extern fn nksim_joint_get_state(world: nksim_world, joint: nksim_joint, out_state: ptr<nksim_joint_state> @inout) -> nksim_result;
 	extern fn nksim_shape_create(world: nksim_world, desc: ptr<const<nksim_shape_desc>>, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_box(world: nksim_world, half_extents: ptr<const<f64>>, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_capsule(world: nksim_world, radius: f64, height: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
+	/**
+	 * Copies 4..64 XYZ vertices; MuJoCo compiles their convex polytope.
+	 */
+	extern fn nksim_shape_create_convex(world: nksim_world, vertices: ptr<const<f64>> @in_array("vertex_count"), vertex_count: u32, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_plane(world: nksim_world, normal: ptr<const<f64>>, offset: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_sphere(world: nksim_world, radius: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_destroy(world: nksim_world, shape: nksim_shape) -> void;
@@ -122,6 +129,33 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		time: f64 @offset(8);
 		fixed_timestep: f64 @offset(16);
 		step_index: u64 @offset(24);
+	}
+	/**
+	 * Closed-loop fixed, revolute, or prismatic joint between tree bodies.
+	 */
+	struct nksim_closure_desc @layout(64, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < NKSIM_JOINT_FIXED, REVOLUTE, or PRISMATIC.
+		 */
+		type: u32 @offset(4);
+		body_a: nksim_body @offset(8);
+		body_b: nksim_body @offset(12);
+		anchor_a: array<f64, 3> @offset(16);
+		/**
+		 * < Unit hinge axis in body_a's local frame.
+		 */
+		axis_a: array<f64, 3> @offset(40);
+	}
+	/**
+	 * Follower = ratio * leader + offset, in joint coordinates.
+	 */
+	struct nksim_joint_coupling_desc @layout(32, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		leader: nksim_joint @offset(4);
+		follower: nksim_joint @offset(8);
+		ratio: f64 @offset(16);
+		offset: f64 @offset(24);
 	}
 	struct nksim_joint_desc @layout(208, 8) {
 		struct_size: u32 @offset(0) @struct_size;

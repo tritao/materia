@@ -203,6 +203,7 @@ struct Clock {
 struct Shape {
     nksim_shape handle = 0;
     nksim_shape_desc desc{};
+    std::vector<float> convex_vertices;
 };
 
 struct Body {
@@ -272,6 +273,8 @@ public:
     nksim_result snapshot(std::shared_ptr<Snapshot> &out_snapshot) const;
 
     nksim_result create_shape(const nksim_shape_desc &desc, nksim_shape *out_shape);
+    nksim_result create_convex_shape(const double *vertices, std::uint32_t count,
+                                    nksim_shape *out_shape);
     nksim_result destroy_shape(nksim_shape shape);
     nksim_result create_body(const nksim_body_desc &desc, nksim_body *out_body);
     nksim_result destroy_body(nksim_body body);
@@ -281,6 +284,8 @@ public:
     nksim_result reset_body(nksim_body body);
     nksim_result reset();
     nksim_result create_joint(const nksim_joint_desc &desc, nksim_joint *out_joint);
+    nksim_result couple_joint(const nksim_joint_coupling_desc &desc);
+    nksim_result create_closure(const nksim_closure_desc &desc);
     nksim_result destroy_joint(nksim_joint joint);
     nksim_result get_joint_state(nksim_joint joint, nksim_joint_state *out_state) const;
 

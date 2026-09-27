@@ -69,7 +69,8 @@ enum {
     NKSIM_SHAPE_BOX = 1,
     NKSIM_SHAPE_SPHERE = 2,
     NKSIM_SHAPE_CAPSULE = 3,
-    NKSIM_SHAPE_PLANE = 4
+    NKSIM_SHAPE_PLANE = 4,
+    NKSIM_SHAPE_CONVEX = 5
 };
 
 enum {
@@ -174,6 +175,25 @@ typedef struct nksim_joint_desc {
     uint64_t reserved[4];
 } nksim_joint_desc;
 
+/** Follower = ratio * leader + offset, in joint coordinates. */
+typedef struct nksim_joint_coupling_desc {
+    uint32_t struct_size NK_STRUCT_SIZE;
+    nksim_joint leader;
+    nksim_joint follower;
+    double ratio;
+    double offset;
+} nksim_joint_coupling_desc;
+
+/** Closed-loop fixed, revolute, or prismatic joint between tree bodies. */
+typedef struct nksim_closure_desc {
+    uint32_t struct_size NK_STRUCT_SIZE;
+    uint32_t type; /**< NKSIM_JOINT_FIXED, REVOLUTE, or PRISMATIC. */
+    nksim_body body_a;
+    nksim_body body_b;
+    double anchor_a[3];
+    double axis_a[3]; /**< Unit hinge axis in body_a's local frame. */
+} nksim_closure_desc;
+
 typedef struct nksim_joint_state {
     uint32_t struct_size NK_STRUCT_SIZE;
     nksim_joint joint;
@@ -229,6 +249,10 @@ NKSIM_API nksim_result NKSIM_CALL nksim_world_snapshot(
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_box(
     nksim_world world, const double half_extents[3],
     nksim_shape *out_shape NK_OUT);
+/** Copies 12..192 XYZ coordinates (4..64 vertices); MuJoCo compiles their convex polytope. */
+NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_convex(
+    nksim_world world, const double *vertices NK_IN_ARRAY(coordinate_count),
+    uint32_t coordinate_count, nksim_shape *out_shape NK_OUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_sphere(
     nksim_world world, double radius, nksim_shape *out_shape NK_OUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_capsule(
@@ -272,6 +296,10 @@ NKSIM_API nksim_result NKSIM_CALL nksim_world_reset(nksim_world world);
 
 NKSIM_API nksim_result NKSIM_CALL nksim_joint_create(
     nksim_world world, const nksim_joint_desc *desc, nksim_joint *out_joint NK_OUT);
+NKSIM_API nksim_result NKSIM_CALL nksim_joint_couple(
+    nksim_world world, const nksim_joint_coupling_desc *desc);
+NKSIM_API nksim_result NKSIM_CALL nksim_closure_create(
+    nksim_world world, const nksim_closure_desc *desc);
 NKSIM_API void NKSIM_CALL nksim_joint_destroy(nksim_world world, nksim_joint joint);
 NKSIM_API nksim_result NKSIM_CALL nksim_joint_get_state(
     nksim_world world, nksim_joint joint, nksim_joint_state *out_state NK_INOUT);

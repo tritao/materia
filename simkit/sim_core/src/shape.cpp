@@ -41,6 +41,14 @@ nksim_result NKSIM_CALL nksim_shape_create_box(nksim_world world, const double h
     return create_shape(world, desc, out_shape);
 }
 
+nksim_result NKSIM_CALL nksim_shape_create_convex(nksim_world world,
+        const double *vertices, uint32_t coordinate_count, nksim_shape *out_shape) {
+    if (coordinate_count % 3 != 0) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::resolve_world(world);
+    return value ? value->create_convex_shape(vertices, coordinate_count / 3, out_shape)
+                 : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result NKSIM_CALL nksim_shape_create_sphere(nksim_world world, double radius,
                                                   nksim_shape *out_shape) {
     if (!out_shape || !std::isfinite(radius) || radius <= 0.0)

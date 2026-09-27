@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace nksim {
 
@@ -13,6 +14,7 @@ struct BackendBodyDesc {
     double mass = 0.0;
     std::uint32_t shape_type = 0;
     std::array<double, 4> shape_parameters{};
+    std::vector<float> shape_vertices;
     std::array<double, 3> position{};
     std::array<double, 4> rotation{0.0, 0.0, 0.0, 1.0};
     std::uint32_t collision_layer = 0;
@@ -66,6 +68,21 @@ struct BackendJointTarget {
     double max_force = 0.0;
 };
 
+struct BackendJointCoupling {
+    std::uint64_t leader = 0;
+    std::uint64_t follower = 0;
+    double ratio = 0.0;
+    double offset = 0.0;
+};
+
+struct BackendClosure {
+    std::uint32_t type = 0;
+    std::uint64_t body_a = 0;
+    std::uint64_t body_b = 0;
+    std::array<double, 3> anchor_a{};
+    std::array<double, 3> axis_a{};
+};
+
 /** Internal backend contract. It is intentionally not part of the C ABI. */
 class PhysicsBackend {
 public:
@@ -84,6 +101,8 @@ public:
     virtual nksim_result joint_create(const BackendJointDesc &desc,
                                       std::uint64_t *out_joint) = 0;
     virtual nksim_result joint_destroy(std::uint64_t joint) = 0;
+    virtual nksim_result joint_couple(const BackendJointCoupling &coupling) = 0;
+    virtual nksim_result closure_create(const BackendClosure &closure) = 0;
     virtual nksim_result set_joint_targets(const BackendJointTarget *targets,
                                            std::uint32_t count) = 0;
 

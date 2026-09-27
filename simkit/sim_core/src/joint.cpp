@@ -16,6 +16,20 @@ nksim_result NKSIM_CALL nksim_joint_create(nksim_world world, const nksim_joint_
     return value ? value->create_joint(*desc, out_joint) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
+nksim_result NKSIM_CALL nksim_joint_couple(nksim_world world,
+                                           const nksim_joint_coupling_desc *desc) {
+    if (!desc || desc->struct_size < sizeof(*desc)) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::resolve_world(world);
+    return value ? value->couple_joint(*desc) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_CALL nksim_closure_create(nksim_world world,
+                                             const nksim_closure_desc *desc) {
+    if (!desc || desc->struct_size < sizeof(*desc)) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::resolve_world(world);
+    return value ? value->create_closure(*desc) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result NKSIM_CALL nksim_joint_get_state(nksim_world world, nksim_joint joint,
                                               nksim_joint_state *out_state) {
     const auto value = nksim::resolve_world(world);

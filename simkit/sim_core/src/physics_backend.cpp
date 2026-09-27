@@ -199,7 +199,25 @@ public:
         joints.erase(std::remove_if(joints.begin(), joints.end(),
                                     [id](const TestJoint &joint) { return joint.id == id; }),
                      joints.end());
+        couplings.erase(std::remove_if(couplings.begin(), couplings.end(),
+            [id](const auto &value) { return value.leader == id || value.follower == id; }),
+            couplings.end());
         return joints.size() == before ? NKSIM_ERROR_INVALID_HANDLE : NKSIM_OK;
+    }
+
+    nksim_result joint_couple(const BackendJointCoupling &coupling) override {
+        if (!find_joint(coupling.leader) || !find_joint(coupling.follower))
+            return NKSIM_ERROR_INVALID_HANDLE;
+        for (const auto &existing : couplings)
+            if (existing.follower == coupling.follower)
+                return NKSIM_ERROR_INVALID_ARGUMENT;
+        couplings.push_back(coupling);
+        enforce_couplings();
+        return recompute_articulated_poses(0.0);
+    }
+
+    nksim_result closure_create(const BackendClosure &) override {
+        return NKSIM_ERROR_UNSUPPORTED;
     }
 
     nksim_result set_joint_targets(const BackendJointTarget *targets,
@@ -229,6 +247,7 @@ public:
         // F4: an instant position-mode target must move the body right away
         // (this backend applies it exactly, with no gradual interpolation),
         // not only at the next step.
+        enforce_couplings();
         return recompute_articulated_poses(0.0);
     }
 
@@ -257,6 +276,7 @@ public:
                 joint.state.position += joint.state.velocity * substep;
                 clamp_joint_position(joint);
             }
+            enforce_couplings();
             const auto recompute_result = recompute_articulated_poses(substep);
             if (recompute_result != NKSIM_OK)
                 return recompute_result;
@@ -277,14 +297,16 @@ public:
             for (auto &moving : bodies) {
                 if (moving.desc.motion_type != NKSIM_MOTION_DYNAMIC ||
                     parent_joint(moving.id) != nullptr ||
-                    moving.desc.shape_type != NKSIM_SHAPE_BOX)
+                    (moving.desc.shape_type != NKSIM_SHAPE_BOX &&
+                     moving.desc.shape_type != NKSIM_SHAPE_CONVEX))
                     continue;
                 const auto moving_half = bounds(moving);
                 for (const auto &obstacle : bodies) {
                     if (obstacle.id == moving.id ||
                         (obstacle.desc.motion_type == NKSIM_MOTION_DYNAMIC &&
                          parent_joint(obstacle.id) == nullptr) ||
-                        obstacle.desc.shape_type != NKSIM_SHAPE_BOX ||
+                        (obstacle.desc.shape_type != NKSIM_SHAPE_BOX &&
+                         obstacle.desc.shape_type != NKSIM_SHAPE_CONVEX) ||
                         (moving.desc.collision_mask & obstacle.desc.collision_layer) == 0 ||
                         (obstacle.desc.collision_mask & moving.desc.collision_layer) == 0)
                         continue;
@@ -343,6 +365,15 @@ public:
     }
 
 private:
+    void enforce_couplings() {
+        for (const auto &coupling : couplings) {
+            const auto *leader = find_joint(coupling.leader);
+            auto *follower = find_joint(coupling.follower);
+            if (!leader || !follower) continue;
+            follower->state.position = coupling.ratio * leader->state.position + coupling.offset;
+            follower->state.velocity = coupling.ratio * leader->state.velocity;
+        }
+    }
     TestJoint *parent_joint(std::uint64_t body_id) noexcept {
         for (auto &joint : joints)
             if (joint.desc.body_b == body_id) return &joint;
@@ -456,6 +487,7 @@ private:
     std::array<double, 3> gravity{};
     std::vector<TestBody> bodies;
     std::vector<TestJoint> joints;
+    std::vector<BackendJointCoupling> couplings;
     std::uint64_t next_body = 1;
     std::uint64_t next_joint = 1;
 };

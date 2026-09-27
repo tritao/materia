@@ -575,6 +575,35 @@ nksim_result World::create_shape(const nksim_shape_desc &desc, nksim_shape *out_
     return NKSIM_OK;
 }
 
+nksim_result World::create_convex_shape(const double *vertices, std::uint32_t count,
+                                        nksim_shape *out_shape) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!vertices || !out_shape || count < 4 || count > 64)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    std::array<double, 3> minimum{INFINITY, INFINITY, INFINITY};
+    std::array<double, 3> maximum{-INFINITY, -INFINITY, -INFINITY};
+    for (std::uint32_t i = 0; i < count * 3; ++i) {
+        if (!std::isfinite(vertices[i])) return NKSIM_ERROR_INVALID_ARGUMENT;
+        minimum[i % 3] = std::min(minimum[i % 3], vertices[i]);
+        maximum[i % 3] = std::max(maximum[i % 3], vertices[i]);
+    }
+    nksim_shape_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.type = NKSIM_SHAPE_BOX;
+    for (int axis = 0; axis < 3; ++axis)
+        desc.parameters[axis] = std::max(std::abs(minimum[axis]), std::abs(maximum[axis]));
+    nksim_shape shape = 0;
+    const auto result = create_shape(desc, &shape);
+    if (result != NKSIM_OK) return result;
+    auto *stored = shapes.get(shape);
+    stored->desc.type = NKSIM_SHAPE_CONVEX;
+    stored->convex_vertices.reserve(count * 3);
+    for (std::uint32_t i = 0; i < count * 3; ++i)
+        stored->convex_vertices.push_back(static_cast<float>(vertices[i]));
+    *out_shape = shape;
+    return NKSIM_OK;
+}
+
 nksim_result World::destroy_shape(nksim_shape shape) {
     if (!owns_thread())
         return NKSIM_ERROR_WRONG_THREAD;
@@ -626,6 +655,7 @@ nksim_result World::create_body(const nksim_body_desc &desc, nksim_body *out_bod
     std::copy_n(desc.inertia_tensor, 9, backend_desc.inertia_tensor.begin());
     if (shape) {
         backend_desc.shape_type = shape->desc.type;
+        backend_desc.shape_vertices = shape->convex_vertices;
         std::copy(std::begin(shape->desc.parameters), std::end(shape->desc.parameters),
                   backend_desc.shape_parameters.begin());
     }
@@ -841,6 +871,45 @@ nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_
     joint->backend_joint = backend_joint;
     *out_joint = handle;
     return NKSIM_OK;
+}
+
+nksim_result World::couple_joint(const nksim_joint_coupling_desc &desc) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!std::isfinite(desc.ratio) || desc.ratio == 0.0 ||
+        !std::isfinite(desc.offset) || desc.leader == desc.follower)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto *leader = joints.get(desc.leader);
+    const auto *follower = joints.get(desc.follower);
+    if (!leader || !follower) return NKSIM_ERROR_INVALID_HANDLE;
+    if (leader->desc.type == NKSIM_JOINT_FIXED || follower->desc.type == NKSIM_JOINT_FIXED)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    return backend->joint_couple({leader->backend_joint, follower->backend_joint,
+                                  desc.ratio, desc.offset});
+}
+
+nksim_result World::create_closure(const nksim_closure_desc &desc) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (desc.type != NKSIM_JOINT_FIXED && desc.type != NKSIM_JOINT_REVOLUTE &&
+        desc.type != NKSIM_JOINT_PRISMATIC)
+        return NKSIM_ERROR_UNSUPPORTED;
+    const auto *body_a = bodies.get(desc.body_a);
+    const auto *body_b = bodies.get(desc.body_b);
+    if (!body_a || !body_b || desc.body_a == desc.body_b)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    double norm = 0.0;
+    for (int i = 0; i < 3; ++i) {
+        if (!std::isfinite(desc.anchor_a[i]) || !std::isfinite(desc.axis_a[i]))
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        norm += desc.axis_a[i] * desc.axis_a[i];
+    }
+    if (std::abs(norm - 1.0) > 1e-6) return NKSIM_ERROR_INVALID_ARGUMENT;
+    BackendClosure closure{};
+    closure.type = desc.type;
+    closure.body_a = body_a->backend_body;
+    closure.body_b = body_b->backend_body;
+    std::copy_n(desc.anchor_a, 3, closure.anchor_a.begin());
+    std::copy_n(desc.axis_a, 3, closure.axis_a.begin());
+    return backend->closure_create(closure);
 }
 
 nksim_result World::destroy_joint(nksim_joint joint) {
