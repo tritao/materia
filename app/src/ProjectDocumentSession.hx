@@ -448,8 +448,16 @@ class ProjectDocumentSession {
   }
   public function refreshScriptOverrides():ScriptMaterialization {
     var ownership=scriptOwnership;if(ownership==null)throw "This document is not script-owned";
-    var materialized=ownership.materialize();replace(materialized.scene,materialized.sensors,path,ownership,bim,document,true);
-    return materialized;
+    var materialized=ownership.materialize();
+    try scene.reconcileRecords(materialized.scene.records()) catch(error:Dynamic) {
+      materialized.scene.dispose(); materialized.sensors.dispose(); throw error;
+    }
+    materialized.scene.dispose();
+    var previousSensors = sensors;
+    sensors = materialized.sensors;
+    previousSensors.dispose();
+    return {scene: scene, sensors: sensors, backend: materialized.backend,
+      timestep: materialized.timestep};
   }
 
   public function save(?file:String):Void {

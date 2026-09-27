@@ -1305,6 +1305,16 @@ class EditorScene {
   }
 
   // Reconcile document records into the runtime scene while preserving stable nodes.
+  public function reconcileRecords(data:Array<SceneObjectData>):Void {
+    var nextSelection = selectedId;
+    if (nextSelection != "scene") {
+      var exists = false;
+      for (record in data) if (record.id == nextSelection) { exists = true; break; }
+      if (!exists) nextSelection = data.length == 0 ? "scene" : data[0].id;
+    }
+    replaceObjects(data, nextSelection);
+  }
+
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
     fullReconciliationCount++;
     var physicsChanged = physicsRecordsChanged(data);
