@@ -1171,3 +1171,16 @@ allowance, and minimum owner period. Direct serial endpoint construction also
 rejects it, so every constructible serial endpoint advertises a queue. The
 PTY test checks the rejection and diagnostic, and the Haxe suite checks
 SerialRobot's error. Commit: the commit containing this entry.
+
+### Backend audit after serial qualification
+
+Constructible in-repo execution backends now advertise plans: the in-memory
+and SimKit runtimes use the default queue-capable endpoint, qualified serial
+runtimes always expose the queue, and robotd forwards its runtime's actual
+capability to RemoteRobot. RecordingRobot delegates to its wrapped backend.
+ReplayRobot is also an in-repo Robot adapter, but its default capabilities
+explicitly report no queue or plan support: it records submitted commands and
+replays observations without executing them. Therefore the literal condition
+that every in-repo backend supports plans is not met. Per P9d, deletion of the
+non-queue MotionSystem path and its dependent classes stopped here; no fallback
+tests were removed or re-expressed. Commit: the commit containing this entry.
