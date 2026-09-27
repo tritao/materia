@@ -87,7 +87,8 @@ enum {
     RK_MAX_EVENT_RECORDS = 64,
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
-    RK_API_VERSION = 17 /**< Adds events, channels and RKD6 clock-sync diagnostic. */
+    RK_MAX_JOINT_COUPLINGS = 512,
+    RK_API_VERSION = 18 /**< Adds compiled joint-to-joint couplings. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -356,6 +357,13 @@ typedef struct rk_event_record_batch {
  * realtime code is running and lets Simulation build several runtimes before
  * its first shared tick.
  */
+typedef struct rk_robot_joint_coupling {
+    rk_joint_id leader;
+    rk_joint_id follower;
+    double ratio;
+    double offset;
+} rk_robot_joint_coupling;
+
 typedef struct rk_robot_runtime_blueprint {
     uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
     uint64_t revision; /**< Compiled model revision. */
@@ -377,6 +385,8 @@ typedef struct rk_robot_runtime_blueprint {
     uint64_t serial_processing_allowance_ns; /**< Zero selects 2 ms; one-way target-streaming budget. */
     uint32_t channel_count; /**< Versioned: absent means no process channels. */
     rk_channel_declaration channels[RK_MAX_PROCESS_CHANNELS];
+    uint32_t coupling_count; /**< Joint relations compiled from RobotModel v5. */
+    rk_robot_joint_coupling couplings[RK_MAX_JOINT_COUPLINGS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */

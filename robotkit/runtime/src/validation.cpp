@@ -27,6 +27,23 @@ bool valid_trajectory_status(uint32_t depth, uint32_t active, uint64_t time_ns,
     return active != 0 || (depth == 0 && time_ns == 0 && duration_ns == 0);
 }
 
+bool has_couplings(const rk_robot_runtime_blueprint *blueprint) {
+    return blueprint->struct_size >= sizeof(*blueprint);
+}
+
+bool coupled_values(const rk_robot_runtime_blueprint *blueprint, const double *values,
+                    double tolerance, bool include_offset) {
+    if (!has_couplings(blueprint)) return true;
+    for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
+        const auto &c = blueprint->couplings[i];
+        const double expected = values[c.leader] * c.ratio + (include_offset ? c.offset : 0.0);
+        if (!is_finite(values[c.follower]) ||
+            std::abs(values[c.follower] - expected) > tolerance)
+            return false;
+    }
+    return true;
+}
+
 template <typename T> bool valid_sensors(const T &value) {
     if (value.sensor_count > RK_MAX_SENSORS) return false;
     for (uint32_t i = 0; i < value.sensor_count; ++i) {
@@ -80,9 +97,12 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             sizeof(blueprint->serial_processing_allowance_ns) &&
         blueprint->serial_processing_allowance_ns > static_cast<uint64_t>(INT64_MAX))
         return RK_ERROR_INVALID_ARGUMENT;
+    constexpr auto channels_size = offsetof(rk_robot_runtime_blueprint, coupling_count);
     if (blueprint->struct_size > offsetof(rk_robot_runtime_blueprint, channel_count) &&
+        blueprint->struct_size < channels_size) return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size > channels_size &&
         blueprint->struct_size < sizeof(*blueprint)) return RK_ERROR_INVALID_ARGUMENT;
-    if (blueprint->struct_size >= sizeof(*blueprint)) {
+    if (blueprint->struct_size >= channels_size) {
         if (blueprint->channel_count > RK_MAX_PROCESS_CHANNELS) return RK_ERROR_INVALID_ARGUMENT;
         for (uint32_t i = 0; i < blueprint->channel_count; ++i) {
             const auto &channel = blueprint->channels[i];
@@ -91,6 +111,21 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
                 return RK_ERROR_INVALID_ARGUMENT;
             for (uint32_t j = 0; j < i; ++j)
                 if (std::strcmp(channel.id, blueprint->channels[j].id) == 0)
+                    return RK_ERROR_INVALID_ARGUMENT;
+        }
+    }
+    if (has_couplings(blueprint)) {
+        if (blueprint->coupling_count > RK_MAX_JOINT_COUPLINGS) return RK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
+            const auto &c = blueprint->couplings[i];
+            if (c.leader >= blueprint->joint_count || c.follower >= blueprint->joint_count ||
+                c.leader == c.follower || !is_finite(c.ratio) || c.ratio == 0.0 ||
+                !is_finite(c.offset) ||
+                blueprint->joints[c.leader].type == RK_RUNTIME_JOINT_FIXED ||
+                blueprint->joints[c.follower].type == RK_RUNTIME_JOINT_FIXED)
+                return RK_ERROR_INVALID_ARGUMENT;
+            for (uint32_t j = 0; j < i; ++j)
+                if (c.follower == blueprint->couplings[j].follower)
                     return RK_ERROR_INVALID_ARGUMENT;
         }
     }
@@ -184,6 +219,21 @@ rk_result RK_CALL rk_robot_command_validate_for_blueprint(
         if (command->targets[index].joint >= blueprint->joint_count)
             return RK_ERROR_INVALID_ARGUMENT;
     }
+    if (has_couplings(blueprint) && command->kind == RK_COMMAND_JOINT_TARGETS) {
+        for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
+            const auto &c = blueprint->couplings[i];
+            const rk_joint_target *leader = nullptr, *follower = nullptr;
+            for (uint32_t j = 0; j < command->target_count; ++j) {
+                if (command->targets[j].joint == c.leader) leader = &command->targets[j];
+                if (command->targets[j].joint == c.follower) follower = &command->targets[j];
+            }
+            if (follower && follower->mode != RK_TARGET_EFFORT &&
+                (!leader || follower->mode != leader->mode ||
+                std::abs(follower->target - c.ratio * leader->target -
+                    (follower->mode == RK_TARGET_POSITION ? c.offset : 0.0)) > 1e-6))
+                return RK_ERROR_INVALID_ARGUMENT;
+        }
+    }
     return RK_OK;
 }
 
@@ -220,6 +270,19 @@ rk_result RK_CALL rk_trajectory_segment_chunk_validate_for_blueprint(
         blueprint->joint_count > RK_MAX_TRAJECTORY_JOINTS ||
         chunk->segments[0].joint_count != blueprint->joint_count)
         return RK_ERROR_INVALID_ARGUMENT;
+    if (has_couplings(blueprint))
+        for (uint32_t s = 0; s < chunk->segment_count; ++s) {
+            const auto &segment = chunk->segments[s];
+            for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
+                const auto &c = blueprint->couplings[i];
+                for (uint32_t degree = 0; degree <= segment.degree; ++degree) {
+                    const double expected = c.ratio * segment.coefficients[c.leader].value[degree] +
+                        (degree == 0 ? c.offset : 0.0);
+                    if (std::abs(segment.coefficients[c.follower].value[degree] - expected) > 1e-6)
+                        return RK_ERROR_INVALID_ARGUMENT;
+                }
+            }
+        }
     return RK_OK;
 }
 
@@ -244,6 +307,10 @@ rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
             !is_finite(plan->start_velocity[joint]) ||
             !is_finite(plan->start_acceleration[joint]))
             return RK_ERROR_INVALID_ARGUMENT;
+    if (!coupled_values(blueprint, plan->start_position, 1e-6, true) ||
+        !coupled_values(blueprint, plan->start_velocity, 1e-6, false) ||
+        !coupled_values(blueprint, plan->start_acceleration, 1e-6, false))
+        return RK_ERROR_INVALID_ARGUMENT;
     if (plan->struct_size >= offsetof(rk_plan_submission, ends_at_rest))
         for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
             if (!is_finite(plan->position_tolerance[joint]) ||
