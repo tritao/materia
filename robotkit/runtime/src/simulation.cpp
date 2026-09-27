@@ -177,24 +177,6 @@ Simulation::~Simulation() {
     cleanup();
 }
 
-rk_result Simulation::set_joint_coupling(uint32_t robot_index, uint32_t source_joint,
-                                          uint32_t target_joint, double ratio, double offset) {
-    std::lock_guard tick_lock(tick_mutex_);
-    if (robot_index >= bindings_.size() || !std::isfinite(ratio) || !std::isfinite(offset) ||
-        source_joint == target_joint || ratio == 0.0 || topology_frozen_ || running_)
-        return RK_ERROR_INVALID_ARGUMENT;
-    const auto binding = bindings_[robot_index].lock();
-    if (!binding || source_joint >= binding->joints_.size() ||
-        target_joint >= binding->joints_.size() ||
-        !binding->actuated_joints_[source_joint] || !binding->actuated_joints_[target_joint])
-        return RK_ERROR_INVALID_ARGUMENT;
-    for (const auto &coupling : joint_couplings_)
-        if (coupling.robot_index == robot_index && coupling.target_joint == target_joint)
-            return RK_ERROR_INVALID_ARGUMENT;
-    joint_couplings_.push_back({robot_index, source_joint, target_joint, ratio, offset});
-    return RK_OK;
-}
-
 rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                                 rk_robot_runtime &out_runtime,
                                 const rk_simulation_robot_desc *robot_desc) {
@@ -271,9 +253,22 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             std::copy_n(blueprint.links[index].center_of_mass, 3, desc.center_of_mass);
             std::copy_n(blueprint.links[index].inertia_tensor, 9, desc.inertia_tensor);
             desc.shape = shape_;
-            bool has_link_shape = robot_desc && robot_desc->struct_size >= sizeof(*robot_desc);
+            bool has_link_shape = robot_desc && robot_desc->struct_size >=
+                offsetof(rk_simulation_robot_desc, collision_hull_count);
+            const auto hull_count = robot_desc && robot_desc->struct_size >= sizeof(*robot_desc)
+                ? robot_desc->collision_hull_count[index] : 0;
+            if (hull_count != 0 && (hull_count < 4 || hull_count > 64))
+                throw std::invalid_argument("invalid link collision hull vertex count");
             double extents[3]{};
-            if (has_link_shape) {
+            if (hull_count > 0) {
+                nksim_shape link_shape = 0;
+                const auto *vertices = robot_desc->collision_hull_vertices + index * 64 * 3;
+                require_sim(nksim_shape_create_convex(world_, vertices, hull_count * 3,
+                                                      &link_shape), "nksim_shape_create_convex(link)");
+                link_shapes_.push_back(link_shape);
+                desc.shape = link_shape;
+                has_link_shape = true;
+            } else if (has_link_shape) {
                 for (int axis = 0; axis < 3; ++axis)
                     extents[axis] = robot_desc->collision_half_extents[index * 3 + axis];
                 has_link_shape = extents[0] > 0.0 && extents[1] > 0.0 && extents[2] > 0.0;
@@ -326,6 +321,33 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             binding->joints_.push_back(joint);
             binding->actuated_joints_.push_back(source.type != RK_RUNTIME_JOINT_FIXED);
             joints_.push_back(joint);
+        }
+        for (uint32_t index = 0; index < blueprint.coupling_count; ++index) {
+            const auto &source = blueprint.couplings[index];
+            nksim_joint_coupling_desc coupling{};
+            coupling.struct_size = sizeof(coupling);
+            coupling.leader = binding->joints_[source.leader];
+            coupling.follower = binding->joints_[source.follower];
+            coupling.ratio = source.ratio;
+            coupling.offset = source.offset;
+            require_sim(nksim_joint_couple(world_, &coupling), "nksim_joint_couple");
+        }
+        const auto closure_count = robot_desc && robot_desc->struct_size >= sizeof(*robot_desc)
+            ? robot_desc->closure_count : 0;
+        if (closure_count > 64) throw std::invalid_argument("too many assembly closures");
+        for (uint32_t index = 0; index < closure_count; ++index) {
+            const auto &source = robot_desc->closures[index];
+            if (source.parent_link >= blueprint.link_count ||
+                source.child_link >= blueprint.link_count)
+                throw std::invalid_argument("assembly closure references an invalid link");
+            nksim_closure_desc closure{};
+            closure.struct_size = sizeof(closure);
+            closure.type = source.type;
+            closure.body_a = binding->bodies_[source.parent_link];
+            closure.body_b = binding->bodies_[source.child_link];
+            std::copy_n(source.anchor_parent, 3, closure.anchor_a);
+            std::copy_n(source.axis_parent, 3, closure.axis_a);
+            require_sim(nksim_closure_create(world_, &closure), "nksim_closure_create");
         }
         const auto topology_result = nksim_world_end_topology_update(world_);
         topology_update = false;
@@ -1124,39 +1146,6 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
                                     static_cast<uint32_t>(targets.size())) != NKSIM_OK)
             return RK_ERROR_BACKEND;
         ++it;
-    }
-    // One target per follower, evaluated from measured source coordinates.
-    // This is a common target controller for both physics backends; it does
-    // not claim the instantaneous rigidity of a MuJoCo equality constraint.
-    for (const auto &coupling : joint_couplings_) {
-        const auto binding = bindings_[coupling.robot_index].lock();
-        if (!binding) return RK_ERROR_INVALID_STATE;
-        double source_position = 0.0;
-        if (snapshot_ != 0) {
-            uint64_t count = 0;
-            if (nksim_snapshot_get_joint_count(snapshot_, &count) != NKSIM_OK)
-                return RK_ERROR_BACKEND;
-            bool found = false;
-            for (uint64_t index = 0; index < count; ++index) {
-                nksim_joint_state state{};
-                state.struct_size = sizeof(state);
-                if (nksim_snapshot_get_joint(snapshot_, index, &state) != NKSIM_OK)
-                    return RK_ERROR_BACKEND;
-                if (state.joint == binding->joints_[coupling.source_joint]) {
-                    source_position = state.position;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) return RK_ERROR_BACKEND;
-        }
-        nksim_joint_target target{};
-        target.struct_size = sizeof(target);
-        target.joint = binding->joints_[coupling.target_joint];
-        target.mode = NKSIM_JOINT_TARGET_POSITION;
-        target.target = coupling.ratio * source_position + coupling.offset;
-        if (nksim_host_submit_joint_targets(host_, &target, 1) != NKSIM_OK)
-            return RK_ERROR_BACKEND;
     }
     // Targets taken above are the ones every robot applied for this tick.
     const auto drive_result = advance_drives();

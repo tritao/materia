@@ -81,6 +81,15 @@ typedef struct rk_simulation_pose {
     double rotation[4];
 } rk_simulation_pose;
 
+typedef struct rk_simulation_closure_desc {
+    uint32_t parent_link;
+    uint32_t child_link;
+    uint32_t type; /**< RK_RUNTIME_JOINT_FIXED or RK_RUNTIME_JOINT_REVOLUTE. */
+    uint32_t reserved0;
+    double anchor_parent[3];
+    double axis_parent[3];
+} rk_simulation_closure_desc;
+
 /** Optional initial pose for one robot added to a Simulation. */
 typedef struct rk_simulation_robot_desc {
     uint32_t struct_size RK_STRUCT_SIZE;
@@ -89,6 +98,11 @@ typedef struct rk_simulation_robot_desc {
     uint64_t reserved[2];
     /** Optional origin-centred link boxes; zero extents preserve legacy shape policy. */
     double collision_half_extents[RK_MAX_LINKS * 3];
+    /** Optional physical-part convex hulls; 4..64 local XYZ vertices per link. */
+    uint32_t collision_hull_count[RK_MAX_LINKS];
+    double collision_hull_vertices[RK_MAX_LINKS * 64 * 3];
+    uint32_t closure_count;
+    rk_simulation_closure_desc closures[64];
 } rk_simulation_robot_desc;
 
 /**
@@ -235,14 +249,6 @@ RK_API rk_result RK_CALL rk_simulation_add_robot(
     rk_simulation simulation, const rk_robot_runtime_blueprint *blueprint,
     const rk_simulation_robot_desc *robot_desc,
     rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
-/** Drives a follower joint from the measured source position each tick.
- * The offset is in the follower's SI coordinate; both indices belong to one robot.
- * This target controller is shared by deterministic and MuJoCo backends and
- * can have one physics tick of lag under motion.
- */
-RK_API rk_result RK_CALL rk_simulation_set_joint_coupling(
-    rk_simulation simulation, uint32_t robot_index, uint32_t source_joint,
-    uint32_t target_joint, double ratio, double offset);
 /**
  * Applies all attached robot commands and advances the world exactly once.
  *

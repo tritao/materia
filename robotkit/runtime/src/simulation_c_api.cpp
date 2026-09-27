@@ -3,6 +3,7 @@
 #include "runtime_abi.hpp"
 
 #include <memory>
+#include <cstddef>
 #include <cmath>
 #include <mutex>
 #include <unordered_map>
@@ -93,21 +94,13 @@ rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
                                           const rk_simulation_robot_desc *robot_desc,
                                           rk_robot_runtime *out_runtime) {
     if (!out_runtime || rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
-        (robot_desc && (robot_desc->struct_size < sizeof(*robot_desc) ||
+        (robot_desc && (robot_desc->struct_size < offsetof(rk_simulation_robot_desc, collision_hull_count) ||
                         robot_desc->initial_pose.struct_size < sizeof(robot_desc->initial_pose))))
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     const auto value = resolve(simulation);
     return value ? value->add_robot(robotkit::internal::copy_blueprint(blueprint), *out_runtime,
         robot_desc) : RK_ERROR_INVALID_HANDLE;
-}
-
-rk_result RK_CALL rk_simulation_set_joint_coupling(rk_simulation simulation,
-        uint32_t robot_index, uint32_t source_joint, uint32_t target_joint,
-        double ratio, double offset) {
-    const auto value = resolve(simulation);
-    return value ? value->set_joint_coupling(robot_index, source_joint, target_joint,
-        ratio, offset) : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_simulation_step(rk_simulation simulation, uint64_t timestamp_ns) {

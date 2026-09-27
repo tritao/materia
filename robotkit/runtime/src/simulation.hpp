@@ -33,8 +33,6 @@ public:
     /** Adds one simulation-owned runtime before the topology is sealed. */
     rk_result add_robot(const rk_robot_runtime_blueprint &blueprint, rk_robot_runtime &out_runtime,
                         const rk_simulation_robot_desc *robot_desc = nullptr);
-    rk_result set_joint_coupling(uint32_t robot_index, uint32_t source_joint,
-                                 uint32_t target_joint, double ratio, double offset);
     /** Starts the shared realtime owner thread after all robots are attached. */
     rk_result start();
     /** Stops the shared realtime owner thread without destroying the universe. */
@@ -168,8 +166,6 @@ private:
     // measured from it.
     std::vector<rk_simulation_pose> robot_tick_poses_;
     std::vector<DrivePlant> drives_;
-    struct JointCoupling { uint32_t robot_index, source_joint, target_joint; double ratio, offset; };
-    std::vector<JointCoupling> joint_couplings_;
     struct EnvironmentObject {
         nkscene_node_id node{};
         nksim_shape shape = 0;

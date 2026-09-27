@@ -164,13 +164,6 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_set_differential_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_differential_drive_desc>>) -> rk_result;
 	/**
-	 * Drives a follower joint from the measured source position each tick.
-	 * The offset is in the follower's SI coordinate; both indices belong to one robot.
-	 * This target controller is shared by deterministic and MuJoCo backends and
-	 * can have one physics tick of lag under motion.
-	 */
-	extern fn rk_simulation_set_joint_coupling(simulation: rk_simulation, robot_index: u32, source_joint: u32, target_joint: u32, ratio: f64, offset: f64) -> rk_result;
-	/**
 	 * Couples one robot's three omni-wheel velocity targets to its kinematic base.
 	 *
 	 * Behaves like rk_simulation_set_differential_drive, including its floor,
@@ -239,6 +232,17 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		step_index: u64 @offset(8);
 		simulation_time: f64 @offset(16);
 		reserved: array<u64, 2> @offset(24);
+	}
+	struct rk_simulation_closure_desc @layout(64, 8) {
+		parent_link: u32 @offset(0);
+		child_link: u32 @offset(4);
+		/**
+		 * < RK_RUNTIME_JOINT_FIXED or RK_RUNTIME_JOINT_REVOLUTE.
+		 */
+		type: u32 @offset(8);
+		reserved0: u32 @offset(12);
+		anchor_parent: array<f64, 3> @offset(16);
+		axis_parent: array<f64, 3> @offset(40);
 	}
 	/**
 	 * Construction parameters for one shared Simulation owner.
@@ -383,7 +387,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	/**
 	 * Optional initial pose for one robot added to a Simulation.
 	 */
-	struct rk_simulation_robot_desc @layout(24664, 8) {
+	struct rk_simulation_robot_desc @layout(1605728, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		reserved0: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -392,6 +396,13 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		 * Optional origin-centred link boxes; zero extents preserve legacy shape policy.
 		 */
 		collision_half_extents: array<f64, 3072> @offset(88);
+		/**
+		 * Optional physical-part convex hulls; 4..64 local XYZ vertices per link.
+		 */
+		collision_hull_count: array<u32, 1024> @offset(24664);
+		collision_hull_vertices: array<f64, 196608> @offset(28760);
+		closure_count: u32 @offset(1601624);
+		closures: array<rk_simulation_closure_desc, 64> @offset(1601632);
 	}
 	/**
 	 * Opaque handle for one shared simulation universe and clock.
