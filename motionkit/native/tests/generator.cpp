@@ -70,7 +70,10 @@ mk_validation_report validate_all(mk_trajectory_handle trajectory,
     mk_validation_report report{};
     report.struct_size = sizeof(report);
     assert(mk_validate(trajectory, &limits, &report) == MK_OK);
-    for (const auto &check : report.checks) assert(check.status != MK_CHECK_UNCHECKED);
+    for (size_t index = 0; index < MK_CHECK_COUNT; ++index)
+        assert(index == MK_CHECK_TASK_SPACE
+            ? report.checks[index].status == MK_CHECK_UNCHECKED
+            : report.checks[index].status != MK_CHECK_UNCHECKED);
     return report;
 }
 
@@ -133,7 +136,7 @@ mk_trajectory_handle compare_with_ruckig(const mk_state_to_state_request &reques
 
 void expect_all_pass(mk_trajectory_handle trajectory, const mk_state_to_state_request &request) {
     const auto report = validate_all(trajectory, request);
-    for (size_t index = 0; index < MK_CHECK_COUNT; ++index) {
+    for (size_t index = 0; index < MK_CHECK_TASK_SPACE; ++index) {
         const auto &check = report.checks[index];
         if (check.status != MK_CHECK_PASSED)
             std::fprintf(stderr, "check %zu status %u value %.17g limit %.17g time %.17g\n",
@@ -247,7 +250,9 @@ void unchanged_state_has_one_nanosecond_segment() {
     assert(mk_trajectory_duration_ns(trajectory, &duration) == MK_OK);
     assert(duration == 1);
     const auto report = validate_all(trajectory, request);
-    for (const auto &check : report.checks) assert(check.status == MK_CHECK_PASSED);
+    for (size_t index = 0; index < MK_CHECK_COUNT; ++index)
+        assert(report.checks[index].status == (index == MK_CHECK_TASK_SPACE
+            ? MK_CHECK_UNCHECKED : MK_CHECK_PASSED));
     mk_trajectory_destroy(trajectory);
 }
 

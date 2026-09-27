@@ -37,7 +37,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 3, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 4, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
 enum {
@@ -121,7 +121,8 @@ typedef struct mk_continuity {
 
 enum { MK_CHECK_POSITION = 0, MK_CHECK_VELOCITY = 1,
     MK_CHECK_ACCELERATION = 2, MK_CHECK_JERK = 3, MK_CHECK_CONTINUITY = 4,
-    MK_CHECK_COUNT = 5 };
+    MK_CHECK_TASK_SPACE = 5, /**< Reserved for Cartesian and tool-path tolerance. */
+    MK_CHECK_COUNT = 6 };
 enum { MK_CHECK_UNCHECKED = 0, MK_CHECK_PASSED = 1, MK_CHECK_FAILED = 2 };
 
 /** Zero motion limits are unclaimed. Position limits use an explicit flag so zero is usable. */
@@ -137,6 +138,7 @@ typedef struct mk_limits {
     double max_acceleration[MK_MAX_JOINTS];
     double max_jerk[MK_MAX_JOINTS];
     double max_continuity_jump[3]; /**< Optional C0, C1, C2 jump claims. */
+    uint64_t executor_time_resolution_ns; /**< Zero defaults to 1 ns; device compilers supply their tick period. */
 } mk_limits;
 
 typedef struct mk_validation_check {
@@ -163,6 +165,7 @@ typedef struct mk_validation_report {
     uint64_t trajectory_revision;
     mk_validation_check checks[MK_CHECK_COUNT];
     mk_assumption assumptions[MK_MAX_ASSUMPTIONS];
+    uint64_t executor_time_resolution_ns; /**< Effective validation time resolution. */
 } mk_validation_report;
 
 typedef struct mk_start_state {

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <limits>
 #include <vector>
@@ -152,7 +153,7 @@ void assumption(mk_validation_report &report, const char *kind, uint32_t joint) 
 }
 
 bool valid_limits(const Trajectory &trajectory, const mk_limits &limits) {
-    if (limits.struct_size < sizeof(mk_limits) ||
+    if (limits.struct_size < offsetof(mk_limits, executor_time_resolution_ns) ||
         limits.joint_count != trajectory.joint_count() || trajectory.segment_count() == 0)
         return false;
     for (uint32_t joint = 0; joint < limits.joint_count; ++joint) {
@@ -220,10 +221,17 @@ DerivativeMaxima derivative_maxima(const Trajectory &trajectory) {
 }
 
 double comparison_tolerance(double limit, double next_derivative_maximum,
-                            double boundary_rounding_seconds = 0.5e-9) {
+                            uint64_t resolution_ns) {
+    // 1e-9 relative slack covers floating-point comparisons. The 1e-6
+    // relative cap matches RobotKit's existing chord-velocity slack and
+    // prevents extreme higher derivatives from widening the limit unchecked.
     constexpr double relative_epsilon = 1e-9;
-    return std::max(relative_epsilon * std::abs(limit),
-        next_derivative_maximum * boundary_rounding_seconds);
+    constexpr double maximum_relative_tolerance = 1e-6;
+    const long double quantization = static_cast<long double>(next_derivative_maximum) *
+        static_cast<long double>(resolution_ns) * 0.5e-9L;
+    return static_cast<double>(std::min(
+        std::max(static_cast<long double>(relative_epsilon * std::abs(limit)), quantization),
+        static_cast<long double>(maximum_relative_tolerance * std::abs(limit))));
 }
 
 } // namespace
@@ -236,6 +244,9 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
     report.model_revision = limits.model_revision;
     report.calibration_revision = limits.calibration_revision;
     report.trajectory_revision = trajectory.revision();
+    report.executor_time_resolution_ns =
+        limits.struct_size >= sizeof(mk_limits) && limits.executor_time_resolution_ns != 0
+            ? limits.executor_time_resolution_ns : 1;
     const auto maxima = derivative_maxima(trajectory);
     for (uint32_t joint = 0; joint < trajectory.joint_count(); ++joint)
         for (uint32_t order = 1; order <= 4; ++order)
@@ -247,6 +258,7 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
         check.status = MK_CHECK_PASSED;
         check.joint = UINT32_MAX;
     }
+    unchecked[MK_CHECK_TASK_SPACE] = true;
     for (uint32_t joint = 0; joint < limits.joint_count; ++joint) {
         if (!limits.position_claimed[joint]) {
             unchecked[MK_CHECK_POSITION] = true; assumption(report, "position limit", joint);
@@ -298,7 +310,8 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                             const bool upper_side = value - upper >= lower - value;
                             const double limit = upper_side ? upper : lower;
                             const long double excess = upper_side ? value - upper : lower - value;
-                            const double tolerance = comparison_tolerance(limit, maxima[joint][1]);
+                            const double tolerance = comparison_tolerance(limit, maxima[joint][1],
+                                report.executor_time_resolution_ns);
                             const double margin = -static_cast<double>(excess);
                             const long double score = (excess - tolerance) /
                                 std::max(1.0, upper - lower);
@@ -310,7 +323,7 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                                 order == 2 ? limits.max_acceleration[joint] : limits.max_jerk[joint];
                             const double magnitude = std::abs(value);
                             const double tolerance = comparison_tolerance(limit,
-                                maxima[joint][order + 1]);
+                                maxima[joint][order + 1], report.executor_time_resolution_ns);
                             const double margin = limit - magnitude;
                             const double scale = std::max({limit, tolerance, 1e-30});
                             observe(report, scores, order, joint, order, magnitude,
@@ -345,7 +358,7 @@ mk_result validate(const Trajectory &trajectory, const mk_limits &limits,
                 const double limit = limits.max_continuity_jump[order];
                 if (limit > 0.0) {
                     const double tolerance = comparison_tolerance(limit,
-                        maxima[joint][order + 1], 1e-9);
+                        maxima[joint][order + 1], report.executor_time_resolution_ns);
                     const double margin = limit - jumps[order];
                     const double scale = std::max({limit, tolerance, 1e-30});
                     observe(report, scores, MK_CHECK_CONTINUITY, joint, order,

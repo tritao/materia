@@ -8,6 +8,7 @@ class ValidationReport {
   public final modelRevision:Int64;
   public final calibrationRevision:Int64;
   public final trajectoryRevision:Int64;
+  public final executorTimeResolutionNs:Int64;
   public final checks:Array<ValidationCheck>;
   public final unresolvedAssumptions:Array<String>;
   public final unresolvedAssumptionCount:Int;
@@ -16,6 +17,7 @@ class ValidationReport {
     modelRevision = native.get_model_revision();
     calibrationRevision = native.get_calibration_revision();
     trajectoryRevision = native.get_trajectory_revision();
+    executorTimeResolutionNs = native.get_executor_time_resolution_ns();
     unresolvedAssumptionCount = native.get_assumption_count();
     unresolvedAssumptions = [];
     for (index in 0...unresolvedAssumptionCount) {

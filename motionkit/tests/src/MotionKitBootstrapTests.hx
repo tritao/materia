@@ -134,6 +134,14 @@ class MotionKitBootstrapTests {
       "validation reports comparison tolerance", 1e-12);
     check(report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
       MotionKitNativeConstants.MK_CHECK_UNCHECKED, "unclaimed jerk is unchecked");
+    check(report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_UNCHECKED, "task-space slot is reserved");
+    check(Int64.compare(report.executorTimeResolutionNs, Int64.ofInt(1)) == 0,
+      "host validation defaults to 1 ns");
+    limits.timeResolutionNs(Int64.ofInt(2));
+    report = trajectory.validate(limits);
+    check(Int64.compare(report.executorTimeResolutionNs, Int64.ofInt(2)) == 0,
+      "validation reports requested executor resolution");
     check(report.unresolvedAssumptions.length > 0 &&
       report.unresolvedAssumptions[0].length > 0,
       "unresolved assumptions are available to Haxe callers");

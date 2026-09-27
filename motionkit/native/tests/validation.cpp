@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 
 namespace {
 
@@ -41,6 +42,8 @@ void velocity_extremum_and_plan_rejection() {
     near(report.checks[MK_CHECK_VELOCITY].time_seconds, 0.5);
     near(report.checks[MK_CHECK_VELOCITY].limit, 0.7);
     assert(report.checks[MK_CHECK_JERK].status == MK_CHECK_UNCHECKED);
+    assert(report.checks[MK_CHECK_TASK_SPACE].status == MK_CHECK_UNCHECKED);
+    assert(report.executor_time_resolution_ns == 1);
     assert(report.model_revision == 12 && report.calibration_revision == 3);
     assert(report.trajectory_revision == 1);
     assert(report.assumption_count > 0);
@@ -200,6 +203,53 @@ void nonfinite_extrema_rejected() {
     mk_trajectory_destroy(trajectory);
 }
 
+void executor_resolution_and_tolerance_cap() {
+    mk_trajectory_handle trajectory{};
+    assert(mk_trajectory_create(1, &trajectory) == MK_OK);
+    mk_segment segment{};
+    segment.struct_size = sizeof(segment);
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 3;
+    segment.joint_count = 1;
+    segment.coefficients[0].value[2] = (2.0 + 1.8e-9) / 2.0;
+    segment.coefficients[0].value[3] = -5.0 / 6.0;
+    assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+    mk_limits limits{};
+    limits.struct_size = sizeof(limits);
+    limits.joint_count = 1;
+    limits.max_acceleration[0] = 2.0;
+    limits.executor_time_resolution_ns = 2;
+    mk_validation_report report{};
+    report.struct_size = sizeof(report);
+    assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+    assert(report.executor_time_resolution_ns == 2);
+    near(report.checks[MK_CHECK_ACCELERATION].tolerance, 5e-9);
+    limits.executor_time_resolution_ns = 1;
+    assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+    near(report.checks[MK_CHECK_ACCELERATION].tolerance, 2.5e-9);
+    limits.struct_size = offsetof(mk_limits, executor_time_resolution_ns);
+    assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+    assert(report.executor_time_resolution_ns == 1);
+    mk_trajectory_destroy(trajectory);
+
+    assert(mk_trajectory_create(1, &trajectory) == MK_OK);
+    segment = {};
+    segment.struct_size = sizeof(segment);
+    segment.duration_ns = 1;
+    segment.degree = 3;
+    segment.joint_count = 1;
+    // Acceleration rises from 1.1 to 2.1 in one tick. The uncapped
+    // jerk-derived 0.5 tolerance would incorrectly accept the 0.1 excess.
+    segment.coefficients[0].value[2] = 1.1 / 2.0;
+    segment.coefficients[0].value[3] = 1e9 / 6.0;
+    assert(mk_trajectory_append_segment(trajectory, &segment) == MK_OK);
+    limits.struct_size = sizeof(limits);
+    assert(mk_validate(trajectory, &limits, &report) == MK_OK);
+    assert(report.checks[MK_CHECK_ACCELERATION].status == MK_CHECK_FAILED);
+    near(report.checks[MK_CHECK_ACCELERATION].tolerance, 2e-6);
+    mk_trajectory_destroy(trajectory);
+}
+
 } // namespace
 
 int main() {
@@ -207,5 +257,6 @@ int main() {
     position_extremum_between_samples();
     quintic_quartic_critical_point();
     explicit_quantization_tolerance();
+    executor_resolution_and_tolerance_cap();
     nonfinite_extrema_rejected();
 }

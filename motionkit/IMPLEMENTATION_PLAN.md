@@ -731,3 +731,20 @@ reversals, retargeting, stopping, over-limit braking, travel overshoot, and
 error mapping. Commit: the commit containing this entry. MotionKit and
 RobotKit Haxe/native suites, FFI audit, and TCP integration in default,
 session and lease-timeout modes passed.
+
+### P4/P5 follow-up — Executor resolution, capped tolerance, task-space slot
+
+Validation now takes an executor time resolution through `mk_limits`, defaulting
+to 1 ns for the host runtime and older limits struct prefixes, and records the
+effective resolution in `mk_validation_report`. The quantization allowance is
+the next derivative's maximum times half that resolution. A 1e-9 relative
+comparison floor handles floating-point error, while a 1e-6 relative cap
+prevents a trajectory's extreme next derivative from widening its own limit
+indefinitely; the cap matches the runtime's existing chord-speed slack.
+`MK_CHECK_TASK_SPACE` is reserved and always unchecked until Cartesian/tool-path
+validation is implemented. Bumped the MotionKit ABI, regenerated its Haxe
+binding, and exposed the resolution and slot in the Haxe wrapper. A one-tick
+extreme-jerk test fails under the old uncapped rule and passes with the cap.
+Commit: the commit containing this entry. MotionKit native and Haxe, RobotKit
+native and Haxe, both MotionKit and RobotKit FFI audits, and TCP integration in
+default, session, and lease-timeout modes passed.

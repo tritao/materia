@@ -56,6 +56,13 @@ class ValidationLimits {
     native.set_max_continuity_jump(order, maximumJump);
   }
 
+  /** Executor clock resolution in nanoseconds; zero uses the 1 ns host default. */
+  public function timeResolutionNs(resolution:Int64):Void {
+    if (Int64.compare(resolution, Int64.ofInt(0)) < 0)
+      throw "Validation time resolution must be nonnegative";
+    native.set_executor_time_resolution_ns(resolution);
+  }
+
   public function nativeValue():mk_limits return native;
 
   function validJoint(joint:Int):Void {
