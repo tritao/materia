@@ -5,8 +5,8 @@ import app.ProjectDocumentSession;
 import app.ApplicationSimulation;
 import robotkit.world.RobotWorld;
 import cadbridge.AssemblySimulationBridge;
-import materia.kinematics.AssemblyDefinition;
-import materia.kinematics.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import nativekit.ui.properties.PropertyBinding;
 import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.properties.PropertyEditResult;
@@ -19,6 +19,7 @@ import robotkit.model.Link;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
+import robotkit.model.JointCoupling;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -37,13 +38,14 @@ class ProjectSourceTests {
     var target = model.addJoint(new Joint("target", JointType.Revolute, base, targetLink));
     source.limits = new JointLimits(-2, 2);
     target.limits = new JointLimits(-2, 2);
+    model.addCoupling(new JointCoupling("gears", source.id, target.id, -2.0, 0.0));
     var simulation = new Simulation(0.01, 1, backend);
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
-    simulation.setJointCoupling(0, 0, 1, -2.0, 0.0);
     runtime.submitPosition(0, 0.3, 1);
     for (index in 0...200) simulation.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
-    check(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0)) < 0.08,
+    check(Math.abs(q.get(0)) > 0.1 &&
+      Math.abs(q.get(1) + 2.0 * q.get(0)) < (backend == 0 ? 1e-9 : 0.02),
       'joint coupling tracks on backend $backend: ${q.get(0)}, ${q.get(1)}');
     simulation.dispose();
   }

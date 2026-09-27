@@ -41,26 +41,20 @@ class Simulation {
 
   /** Adds a robot with a full 3D pose that reset restores. */
   public function addRobotAtPose(blueprint:RobotRuntimeBlueprint, position:Array<Float>,
-      rotation:Array<Float>, ?linkCollisionBoxes:Array<Null<Array<Float>>>):RobotRuntime {
+      rotation:Array<Float>, ?linkCollisionBoxes:Array<Null<Array<Float>>>,
+      ?linkCollisionHulls:Array<Null<Array<Float>>>,
+      ?closures:Array<SimulationClosure>):RobotRuntime {
     if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
       throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
-    return addRobotWithPose(blueprint, makePose(position, rotation), linkCollisionBoxes);
-  }
-
-  /** Couples one follower to the measured source coordinate on every tick. */
-  public function setJointCoupling(robotIndex:Int, sourceJoint:Int, targetJoint:Int,
-      ratio:Float, offset:Float):Void {
-    ensureLive();
-    if (robotIndex < 0 || sourceJoint < 0 || targetJoint < 0 ||
-        !Math.isFinite(ratio) || !Math.isFinite(offset))
-      throw "Simulation.setJointCoupling requires finite joint coordinates";
-    check(RobotKitSimKit.rk_simulation_set_joint_coupling(owner.borrow(), robotIndex,
-      sourceJoint, targetJoint, ratio, offset), "simulation.setJointCoupling");
+    return addRobotWithPose(blueprint, makePose(position, rotation), linkCollisionBoxes,
+      linkCollisionHulls, closures);
   }
 
   function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
       initialPose:Null<rk_simulation_pose>,
-      ?linkCollisionBoxes:Array<Null<Array<Float>>>):RobotRuntime {
+      ?linkCollisionBoxes:Array<Null<Array<Float>>>,
+      ?linkCollisionHulls:Array<Null<Array<Float>>>,
+      ?closures:Array<SimulationClosure>):RobotRuntime {
     ensureLive();
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null) {
@@ -84,6 +78,49 @@ class Simulation {
             throw "Simulation link collision extents must be finite and positive";
           robotDesc.set_collision_half_extents(link * 3 + axis, bounds[axis]);
         }
+      }
+    }
+    if (linkCollisionHulls != null) {
+      if (linkCollisionHulls.length != blueprint.linkCount)
+        throw "Simulation link collision hulls must match the link count";
+      if (robotDesc == null) {
+        robotDesc = new rk_simulation_robot_desc();
+        robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      }
+      for (link in 0...linkCollisionHulls.length) {
+        var hull = linkCollisionHulls[link];
+        if (hull == null) continue;
+        if (hull.length % 3 != 0 || hull.length < 12 || hull.length > 64 * 3)
+          throw "Simulation link collision hull needs 4..64 vertices";
+        robotDesc.set_collision_hull_count(link, Std.int(hull.length / 3));
+        for (axis in 0...hull.length) {
+          if (!Math.isFinite(hull[axis])) throw "Simulation link collision hull has a non-finite vertex";
+          robotDesc.set_collision_hull_vertices(link * 64 * 3 + axis, hull[axis]);
+        }
+      }
+    }
+    if (closures != null && closures.length > 0) {
+      if (closures.length > 64) throw "Simulation supports at most 64 assembly closures";
+      if (robotDesc == null) {
+        robotDesc = new rk_simulation_robot_desc();
+        robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      }
+      robotDesc.set_closure_count(closures.length);
+      for (index in 0...closures.length) {
+        var source = closures[index];
+        if (source.parentLink < 0 || source.childLink < 0 ||
+            source.parentLink >= blueprint.linkCount || source.childLink >= blueprint.linkCount ||
+            source.anchorParent.length != 3 || source.axisParent.length != 3)
+          throw "Simulation closure has invalid links or geometry";
+        var native = new rk_simulation_closure_desc();
+        native.set_parent_link(source.parentLink);
+        native.set_child_link(source.childLink);
+        native.set_type(source.type);
+        for (axis in 0...3) {
+          native.set_anchor_parent(axis, source.anchorParent[axis]);
+          native.set_axis_parent(axis, source.axisParent[axis]);
+        }
+        robotDesc.set_closures(index, native);
       }
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);

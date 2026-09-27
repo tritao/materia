@@ -8,6 +8,7 @@ import robotkit.model.Link;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
+import robotkit.model.JointCoupling;
 import haxe.Int64;
 
 class SimulationPoseResetTests {
@@ -35,13 +36,14 @@ class SimulationPoseResetTests {
     var follower = model.addJoint(new Joint("follower", JointType.Revolute, base, second));
     source.limits = new JointLimits(-2, 2);
     follower.limits = new JointLimits(-2, 2);
+    model.addCoupling(new JointCoupling("gears", source.id, follower.id, -2.0, 0.0));
     var simulation = new Simulation(0.01, 1, backend);
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
-    simulation.setJointCoupling(0, 0, 1, -2.0, 0.0);
     runtime.submitPosition(0, 0.3, 1);
     for (index in 0...200) simulation.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
-    if (!(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0)) < 0.08))
+    var tolerance = backend == 0 ? 1e-9 : 0.02;
+    if (!(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0)) < tolerance))
       throw 'coupling did not follow source on backend $backend: ${q.get(0)}, ${q.get(1)}';
     simulation.dispose();
   }

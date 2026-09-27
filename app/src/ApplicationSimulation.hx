@@ -3,6 +3,8 @@ package app;
 import haxe.Int64;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationClosure;
+import RobotKitRuntime;
 import robotkit.runtime.SimulationPresentationSnapshot;
 import robotkit.world.Robot;
 import robotkit.world.RobotWorld;
@@ -101,7 +103,7 @@ class ApplicationSimulation {
         converted.model.collisionApproximation = CollisionApproximation.None;
         var sceneParts = new Map<String, SceneObjectData>();
         for (record in scene.records()) sceneParts.set(record.id, record);
-        var collisionBoxes:Array<Null<Array<Float>>> = [for (_ in converted.model.links) null];
+        var collisionHulls:Array<Null<Array<Float>>> = [for (_ in converted.model.links) null];
         var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
         for (part in physical.parts) physicalParts.set(part.id, part);
         for (occurrence in assembly.occurrences) {
@@ -128,41 +130,44 @@ class ApplicationSimulation {
           link.inertiaTensor = [for (value in link.inertiaTensor) value * chosenMass / baseMass];
           link.mass = chosenMass;
           if (record.collisionEnabled) {
-            var center = session.assemblyPreviewCenter(occurrence.definition);
-            if (center == null) throw 'Assembly part "${occurrence.definition}" has no preview center';
-            var scale = physical.metresPerUnit;
+            if (part.collisionHull == null || part.collisionHull.length < 12)
+              throw 'Assembly part "${occurrence.definition}" has no convex collision hull';
             var linkIndex = converted.model.links.indexOf(link);
-            collisionBoxes[linkIndex] = [record.width / 2 + Math.abs(center[0] * scale),
-              record.height / 2 + Math.abs(center[1] * scale),
-              record.depth / 2 + Math.abs(center[2] * scale)];
+            collisionHulls[linkIndex] = [for (value in part.collisionHull)
+              value * physical.metresPerUnit];
           }
         }
-        if (converted.closureIds.length > 0)
-          throw "Assembly closures are not supported by this simulation backend: " +
+        if (converted.closureIds.length > 0 && backend != MUJOCO)
+          throw "Assembly closures require MuJoCo equality constraints: " +
             converted.closureIds.join(", ");
+        var closures:Array<SimulationClosure> = [];
+        for (closure in converted.closures) {
+          var type = switch (closure.type) {
+            case materia.assembly.AssemblyDefinition.AssemblyJointType.Fixed:
+              RobotKitRuntimeConstants.RK_RUNTIME_JOINT_FIXED;
+            case materia.assembly.AssemblyDefinition.AssemblyJointType.Revolute,
+                 materia.assembly.AssemblyDefinition.AssemblyJointType.Continuous:
+              RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE;
+            case materia.assembly.AssemblyDefinition.AssemblyJointType.Prismatic:
+              RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PRISMATIC;
+            default: throw 'Unknown assembly closure "${closure.id}" type';
+          }
+          var parent = -1, child = -1;
+          for (index in 0...converted.model.links.length) {
+            if (converted.model.links[index].id == closure.parent) parent = index;
+            if (converted.model.links[index].id == closure.child) child = index;
+          }
+          if (parent < 0 || child < 0)
+            throw 'Assembly closure "${closure.id}" references an unknown link';
+          closures.push(new SimulationClosure(parent, child, type,
+            closure.anchorParent, closure.axisParent));
+        }
         var id = "assembly:" + assembly.id;
         if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
           throw 'Robot "$id" is remote and read-only';
         var blueprint = RobotRuntimeCompiler.compile(converted.model, appliedRevision + 1);
         var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 1.0], collisionBoxes);
-        var assemblyRobotIndex = candidateRobots.length;
-        for (coupling in converted.couplings) {
-          var source = blueprint.identity.jointIndex(coupling.source);
-          var target = blueprint.identity.jointIndex(coupling.target);
-          if (source < 0 || target < 0)
-            throw 'Assembly coupling "${coupling.id}" references a missing tree joint';
-          var sourceKind = [for (joint in assembly.joints) if (joint.id == coupling.source) joint.type][0];
-          var targetKind = [for (joint in assembly.joints) if (joint.id == coupling.target) joint.type][0];
-          var sourceScale = sourceKind == materia.kinematics.AssemblyDefinition.AssemblyJointType.Prismatic
-            ? physical.metresPerUnit : 1.0;
-          var targetScale = targetKind == materia.kinematics.AssemblyDefinition.AssemblyJointType.Prismatic
-            ? physical.metresPerUnit : 1.0;
-          var ratio = coupling.ratio * targetScale / sourceScale;
-          // The bridge places both joints at their saved coordinates as zero.
-          // The authored absolute offset therefore cancels in runtime deltas.
-          candidate.setJointCoupling(assemblyRobotIndex, source, target, ratio, 0.0);
-        }
+          [0.0, 0.0, 0.0, 1.0], null, collisionHulls, closures);
         candidateRobots.push(new SimulatedRobot(id, runtime, converted.model.name,
           [for (link in converted.model.links) link.id],
           [for (joint in converted.model.joints) joint.id]));
