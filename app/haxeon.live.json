@@ -5,6 +5,7 @@
 	"sourceRoots": ["src"],
 	"dependencies": {
 		"projectkit": { "path": "../projectkit" },
+		"manufacturingkit": { "path": "../manufacturingkit" },
 		"nativekit": { "path": "../nativekit" },
 		"cadkit": { "path": "../cadkit" },
 		"bimkit": { "path": "../bimkit" },
