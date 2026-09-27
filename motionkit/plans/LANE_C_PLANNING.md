@@ -56,29 +56,51 @@ and C2 first.
 - **LC-D3 — Direct machines use identity kinematics.** For XYZ gantries, q(s)
   is the Cartesian path itself mapped through the axis transmissions. The
   same path timing serves gantries and arms.
-- **LC-D4 — Configuration selection is native, shaped like Descartes Light,
-  and vendoring it is deferred.**
-  - The selector lives in `motionkit/native` (D1), not Haxe.
-  - It mirrors `descartes_light`'s structure (Apache-2.0,
-    https://github.com/swri-robotics/descartes_light): a per-waypoint candidate
-    *sampler*, an *edge evaluator*, a *state evaluator*, and a *ladder-graph
-    solver* (dense dynamic programming). Replacing ours with the library later
-    should then be mechanical.
-  - Why not vendor it now: its core requires OpenMP (not available with
-    Apple clang by default, and the FFI audits target macOS and Windows),
-    links `console_bridge`, and builds only with
-    `ros_industrial_cmake_boilerplate`. That is a lot of friction for a dense
-    DP that, at OPW's ≤ 8 candidates per waypoint (plus ±2π wraps), is about
-    150 lines.
-  - **Revisit trigger:** vendor `descartes_light`, including its Boost-graph
-    lazy solvers, when any of these happens:
-    - candidates per waypoint regularly exceed about 64 (tool-axis rotation
-      sampling, 7-axis arms, external axes);
-    - edge evaluation includes collision checks, where lazy evaluation
-      matters;
-    - the Tesseract/TrajOpt backend is added, which brings Descartes anyway.
+- **LC-D4 — Vendor Descartes Light's core, lean, and build on its
+  interfaces.**
+  - Vendor `descartes_light` (Apache-2.0,
+    https://github.com/swri-robotics/descartes_light) as a pinned submodule
+    under `motionkit/native/vendor/`.
+  - **Compatible:** our configuration selection uses Descartes' own types
+    directly, not a parallel copy of them:
+    - `State`;
+    - the `WaypointSampler`, `EdgeEvaluator` and `StateEvaluator` interfaces;
+    - `LadderGraphSolver`.
 
-    Record which trigger fired in the log.
+    Our OPW/IK sampler and our evaluators *are* Descartes subclasses. Its
+    Boost-graph solvers, or a Tesseract pipeline, can then be dropped in
+    later with no changes to callers.
+  - **Lean:** compile only the `core` component's sources, with our own CMake
+    target, and never run its CMakeLists:
+    - no `ros_industrial_cmake_boilerplate`;
+    - no BGL component or Boost;
+    - no required OpenMP;
+    - no `console_bridge` library.
+
+    Two shim headers in `motionkit/native/vendor/shims/`, placed on the
+    include path *after* real system headers, stand in for the missing
+    pieces. **Vendored files are never modified.**
+    - `omp.h` is an empty header, used only when CMake finds no OpenMP. The
+      core uses `#pragma omp` and `#include <omp.h>` but calls no `omp_*`
+      functions. Verify that on the pinned commit, and stop if it's no longer
+      true.
+    - `console_bridge/console.h` provides the `CONSOLE_BRIDGE_log*` macros,
+      `getLogLevel()` and the level enum. It routes them to MotionKit's native
+      diagnostic sink, or to nothing, and is covered by a small test.
+  - **Threads and determinism:**
+    - The selector runs `LadderGraphSolver` with `num_threads = 1` by default,
+      so results are identical on every platform, with or without OpenMP.
+    - More threads is an explicit option, enabled only where OpenMP is found.
+      A test proves the chosen path is identical to the single-thread one.
+  - **Build scope:** use only the `double` instantiations (the `…D` aliases),
+    unless a float path is needed later.
+  - **Record** the pinned commit, the Apache-2.0 licence and NOTICE, the
+    compiled source list and both shims in `motionkit/native/THIRD_PARTY.md`.
+  - If there is no network access, stop and log it. Do not copy it in by
+    hand or reimplement it.
+  - **Later:** enable its BGL (Boost) solvers only when a lazy-evaluation
+    need appears. That means candidates per waypoint regularly above about
+    64, or collision-checked edges. Record which one triggered it.
 
 ---
 
@@ -204,20 +226,29 @@ Tests:
 
 Do (`motionkit/native`, C ABI, Haxe wrapper
 `motionkit.robot.PathConfigurationSelector`):
-- **Sampler:** for each densified path sample, produce candidates via
-  `KinematicsSolver.sampleCandidates` (OPW, or seeded numerical). The Haxe
-  layer passes candidate sets into native code as one bulk call, never one
-  call per candidate.
-- **State evaluator:** rejects candidates outside joint limits, and applies an
-  optional per-candidate cost (for example distance from a preferred posture).
-- **Edge evaluator:** cost is joint distance weighted by joint velocity
-  limits. An edge exceeding the joint-jump bound is infeasible.
-- **Ladder-graph solver:** dense DP to the minimum-cost continuous sequence.
-  If no valid sequence exists, the diagnostic names the first unreachable or
-  disconnected sample distance.
-- Keep the sampler, evaluators and solver as separate C++ interfaces
-  (LC-D4), so the solver can later be replaced by `descartes_light`'s
-  without touching callers.
+- **Vendor and build** Descartes' core per LC-D4: submodule, our CMake
+  target, the `omp.h` and `console_bridge` shims, `THIRD_PARTY.md`.
+- **Sampler:** a Descartes `WaypointSampler` subclass. It returns the
+  candidates for one path sample, which the Haxe layer supplies in one bulk
+  call per path (never one call per candidate). They come from OPW (C4)
+  inside native code, or from `KinematicsSolver.sampleCandidates` for other
+  solvers. The sampler filters candidates by joint limits.
+- **Evaluators:**
+  - Prefer Descartes' existing edge and state evaluators where they fit, and
+    compose them.
+  - Add our own `EdgeEvaluator` subclass only for what's missing: joint
+    distance weighted by joint velocity limits, with any per-joint jump above
+    the bound infeasible.
+  - An optional `StateEvaluator` adds a preferred-posture cost.
+- **Solver:** Descartes' `LadderGraphSolver`, single-threaded by default.
+  - When no valid sequence exists, map Descartes' build and search failure
+    information to a diagnostic naming the first unreachable or disconnected
+    sample distance.
+  - Route its log messages through the shim so they appear in that
+    diagnostic, not on stdout.
+- **C ABI:** `mk_select_configurations(candidate sets, joint limits, jump
+  bounds, weights, threads, out sequence, out diagnostic)`. No Descartes
+  types cross the ABI.
 - Lane B's `ProgramCompiler` (B3) uses the selector when the solver provides
   several candidates. Coordinate through the `KinematicsSolver` interface
   only.
@@ -226,10 +257,13 @@ Tests:
 - A path that the nearest-seed method takes through a wrist flip is solved
   without a flip.
 - A path with no continuous solution fails with the right distance.
-- It is deterministic.
+- It is deterministic, and single- and multi-threaded runs give identical
+  output where OpenMP is available.
+- It builds and runs with the empty `omp.h` shim (force the no-OpenMP
+  configuration in one CI build).
+- Log messages from Descartes are captured into the diagnostic.
 - A 1000-sample path with 8 candidates per sample solves in under 50 ms in a
-  Debug build. Record the time in the log as the baseline for the revisit
-  trigger.
+  Debug build. Record the time in the log.
 
 ## C6 — CncKit v1: declared G-code subset → `MotionProgram`
 
@@ -294,7 +328,8 @@ Tests (a scenario test in `motionkit/tests` or a new `cnckit/tests`):
 ## Out of scope for this lane
 
 - Jerk-limited path timing and rolling contour lookahead;
-- OMPL free-space planning and collision checking;
+- OMPL free-space planning and collision checking (and so Descartes' BGL
+  lazy solvers);
 - `G18`/`G19`, cutter compensation (`G41`/`G42`), canned cycles, probing, CAM;
 - external controllers (LinuxCNC, grblHAL backends);
 - 7-axis redundancy (constrained differential IK, OSQP).
