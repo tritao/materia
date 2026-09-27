@@ -22,6 +22,7 @@ import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
 import sys.FileSystem;
 import sys.io.File;
+import haxe.io.Bytes;
 
 /** Save and reopen a generated project without persisting its mesh buffers. */
 class ProjectSourceTests {
@@ -66,6 +67,16 @@ class ProjectSourceTests {
   }
 
   public static function main():Int {
+    var flat = Bytes.alloc(4 * 24);
+    for (index in 0...4) {
+      flat.setDouble(index * 24, (index & 1) == 0 ? 0.0 : 2.0);
+      flat.setDouble(index * 24 + 8, (index & 2) == 0 ? 0.0 : 1.0);
+      flat.setDouble(index * 24 + 16, 0.0);
+    }
+    var flatHull = cadkit.ConvexHullVertices.safeFromMesh(flat, 4, 0.5);
+    check(flatHull.warning != null && flatHull.vertices.length == 24 &&
+      flatHull.vertices[2] == -0.25 && flatHull.vertices[14] == 0.25,
+      "flat collision part uses a 0.5-unit thickened box with a warning");
     checkCoupling(0);
     checkCoupling(1);
     checkLinkCollision(0, true);

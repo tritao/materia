@@ -279,8 +279,10 @@ class MateriaProjectRunner {
         (minimum[2] + maximum[2]) * 0.5]);
       var properties = MeshMassProperties.compute(component.vertices, component.indices);
       var materialId = component.materialId == null ? "neutral" : component.materialId;
+      var collision = cadkit.ConvexHullVertices.safeFromMesh(component.vertices,
+        component.vertexCount, 0.0005 / scale);
       physicalParts.push({id: component.id, materialId: materialId,
-        collisionHull: cadkit.ConvexHullVertices.fromMesh(component.vertices, component.vertexCount),
+        collisionHull: collision.vertices, collisionWarning: collision.warning,
         volume: component.volume == null ? properties.volume : component.volume,
         centerOfMass: component.centerOfMass == null ? properties.centerOfMass : component.centerOfMass.copy(),
         inertia: component.inertia == null ? properties.inertia : component.inertia.copy(),

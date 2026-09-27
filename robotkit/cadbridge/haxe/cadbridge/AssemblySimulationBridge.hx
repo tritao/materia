@@ -39,6 +39,7 @@ typedef AssemblyPhysicalPart = {
   var density:Float;
   /** Bounded convex support hull, flattened XYZ triples in CAD units. */
   @:optional var collisionHull:Array<Float>;
+  @:optional var collisionWarning:String;
 }
 
 typedef AssemblyPhysicalData = {

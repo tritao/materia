@@ -37,6 +37,7 @@ class ApplicationSimulation {
   public var timestep(default,null):Float=0.01;
   public var appliedTimestep(default,null):Float=-1.0;
   public var error(default, null):Null<String> = null;
+  public var collisionWarnings(default, null):Array<String> = [];
   var simulation:Null<Simulation> = null;
   var simulatedIds:Array<String> = [];
   var simulatedLinks:Array<Array<String>> = [];
@@ -73,6 +74,7 @@ class ApplicationSimulation {
     var candidateLinks:Array<Array<String>> = [];
     var candidateObjects:Array<{id:String,handle:Int}> = [];
     var candidateAssemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
+    var candidateWarnings:Array<String> = [];
     try {
       var models = configuration.robotModels();
       var assembly = session == null ? null : session.projectAssemblyDefinition;
@@ -106,6 +108,8 @@ class ApplicationSimulation {
         var collisionHulls:Array<Null<Array<Float>>> = [for (_ in converted.model.links) null];
         var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
         for (part in physical.parts) physicalParts.set(part.id, part);
+        for (part in physical.parts) if (part.collisionWarning != null)
+          candidateWarnings.push(part.id + ": " + part.collisionWarning);
         for (occurrence in assembly.occurrences) {
           var record = sceneParts.get("project:" + occurrence.id);
           var part = physicalParts.get(occurrence.definition);
@@ -232,6 +236,7 @@ class ApplicationSimulation {
       appliedBackend=backend;
       appliedTimestep=timestep;
       error = null;
+      collisionWarnings = candidateWarnings;
       presentAssemblyPhysics = running;
       presentationEpoch++;
       if (previousSimulation != null) previousSimulation.dispose();
@@ -351,6 +356,7 @@ class ApplicationSimulation {
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);
     assemblyParts.resize(0);
+    collisionWarnings = [];
     presentAssemblyPhysics = false;
     if (simulation != null) simulation.dispose(); simulation = null;
     appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;appliedTimestep=-1;

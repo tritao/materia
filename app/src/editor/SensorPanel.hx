@@ -133,6 +133,9 @@ class SensorPanel {
       new KeyedView("list",new Column("sensor-list",rows)),
       new KeyedView("runtime-heading",sectionHeading("SIMULATION")),
       new KeyedView("runtime-actions",runtimeActions)];
+    if (simulation.collisionWarnings.length > 0)
+      content.push(new KeyedView("collision-warnings",
+        textLines("collision-warnings", simulation.collisionWarnings)));
     if(ownership!=null){
       var overrideLabel=ownership.overridesEnabled?"Disable overrides":"Enable overrides";
       content.insert(4,new KeyedView("script-actions",new Column("script-actions",[
