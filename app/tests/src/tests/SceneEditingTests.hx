@@ -53,6 +53,57 @@ import materia.project.Appearance.Appearances;
 @:access(app.EditorPerspectiveViewport)
 @:access(app.Main.ReferenceEditorApp)
 class SceneEditingTests {
+  static function sensorRevisionSeparation():Void {
+    var sensors = new SensorConfiguration();
+    var name:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+    var rate:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+    for (property in sensors.properties()) {
+      if (StringTools.endsWith(property.id, ":name")) name = property;
+      if (StringTools.endsWith(property.id, ":rate")) rate = property;
+    }
+    check(name != null && rate != null, "sensor properties are identified by id");
+    var before = sensors.revision();
+    check(new PropertyBinding(name, sensors.context()).apply(PropertyValue.Text("Renamed sensor")) ==
+      PropertyEditResult.Applied && sensors.revision() == before,
+      "sensor rename does not require simulation rebuild");
+    check(new PropertyBinding(rate, sensors.context()).apply(PropertyValue.Float(12.0)) ==
+      PropertyEditResult.Applied && sensors.revision() > before,
+      "sensor acquisition change requires simulation rebuild");
+    sensors.dispose();
+
+    var shared = new nativekit.ui.editing.EditorDocument("shared");
+    var sharedSensors = new SensorConfiguration(null, shared);
+    var sharedScene = new EditorScene([], shared);
+    var sensorRevision = sharedSensors.revision();
+    check(sharedScene.createRectangle() && sharedSensors.revision() == sensorRevision,
+      "scene edits in the shared document do not change sensor physics revision");
+    sharedScene.dispose(); sharedSensors.dispose();
+  }
+
+  static function revisionSeparation():Void {
+    var scene = new EditorScene();
+    try {
+      var selectionSignals = 0;
+      scene.onSelectionChanged = function() selectionSignals++;
+      var content = scene.revision, visual = scene.visualRevision;
+      var environment = scene.environmentRevision, selection = scene.selectionRevision;
+      check(scene.select("tower") && scene.revision == content &&
+        scene.visualRevision > visual && scene.selectionRevision > selection &&
+        scene.environmentRevision == environment && selectionSignals == 1,
+        "selection changes visual and selection revisions only");
+      environment = scene.environmentRevision;
+      scene.setName("tower", "Renamed tower");
+      scene.setVisible("tower", false);
+      scene.setColour("tower", 0.3, 0.4, 0.5);
+      check(scene.environmentRevision == environment,
+        "name, visibility and colour do not change the physics environment");
+      scene.setPositionXY("tower", 2.0, 0.0);
+      check(scene.environmentRevision > environment,
+        "a collision object's position changes the physics environment");
+    } catch (error:Dynamic) { scene.dispose(); throw error; }
+    scene.dispose();
+  }
+
   static function appearanceArtifactRoundTrip():Void {
     var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
     vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
@@ -1148,6 +1199,8 @@ class SceneEditingTests {
   }
 
   static function main():Int {
+    sensorRevisionSeparation();
+    revisionSeparation();
     appearanceArtifactRoundTrip();
     componentFinishReset();
     perspectiveHoverInput();
@@ -1162,6 +1215,13 @@ class SceneEditingTests {
       var tree = new EditorSceneTree(scene);
       check(tree.childCount("scene") == 2, "hierarchy reflects scene");
       check(tree.childKeyAt("scene", 1) == "tower", "stable hierarchy identity");
+      var contentBeforeSelection = scene.revision;
+      var selectionBeforeSelection = scene.selectionRevision;
+      check(scene.select("tower"), "selection changes to another object");
+      check(scene.revision == contentBeforeSelection &&
+        scene.selectionRevision > selectionBeforeSelection,
+        "selection leaves scene content revision unchanged");
+      scene.select("box");
 
       var camera = new ViewportCamera(1.7, 35, -20);
       var viewport = new EditorSceneViewport(scene);
@@ -1223,8 +1283,6 @@ class SceneEditingTests {
       simulationViewportSemantics();
       sensorConfiguration();
       sensorWorkflow();
-      ScriptedSetupTests.run();
-      SceneDocumentTests.run();
       Sys.println("Scene editing tests passed");
       return 0;
     } catch (error:Dynamic) {

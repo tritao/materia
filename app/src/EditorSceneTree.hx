@@ -20,6 +20,9 @@ class EditorSceneTree implements TreeViewModel {
   final scene:EditorScene;
   final children:Map<String, Array<String>> = [];
   final incoming:Map<String, AssemblyJoint> = [];
+  final childCache:Map<String, Array<String>> = [];
+  var cachedSceneRevision:Int = -1;
+  var cachedFilterRevision:Int = -1;
   var filter:String = "";
   var filterRevision:Int = 0;
   public function setFilter(value:String):Void {
@@ -40,6 +43,13 @@ class EditorSceneTree implements TreeViewModel {
     return key == "scene";
   }
   function visibleChildren(parentKey:String):Array<String> {
+    if (cachedSceneRevision != scene.revision || cachedFilterRevision != filterRevision) {
+      childCache.clear();
+      cachedSceneRevision = scene.revision;
+      cachedFilterRevision = filterRevision;
+    }
+    var cached = childCache.get(parentKey);
+    if (cached != null) return cached;
     var result:Array<String> = [];
     if (parentKey == "scene") {
       for (item in scene.items()) if (!incoming.exists(item.id) && matches(item.id)) result.push(item.id);
@@ -52,6 +62,7 @@ class EditorSceneTree implements TreeViewModel {
           result.push(key);
       }
     }
+    childCache.set(parentKey, result);
     return result;
   }
   public function new(scene:EditorScene, ?assembly:AssemblyRecord) {
@@ -71,30 +82,12 @@ class EditorSceneTree implements TreeViewModel {
     return start <= 0 && count > 0 ? [new TreeRootMetadata("scene", true)] : [];
   public function rootKeyAt(index:Int):String return "scene";
   public function childCount(parentKey:String):Int {
-    if (filter != "") return visibleChildren(parentKey).length;
-    if (parentKey == "scene") {
-      var count = 0;
-      for (item in scene.items()) if (!incoming.exists(item.id)) count++;
-      return count;
-    }
-    var nested = children.get(parentKey);
-    return (nested == null ? 0 : nested.length) + scene.cadFeatureCount(parentKey);
+    return visibleChildren(parentKey).length;
   }
   public function childKeyAt(parentKey:String, index:Int):String {
-    if (filter != "") return visibleChildren(parentKey)[index];
-    if (parentKey == "scene") {
-      for (item in scene.items()) if (!incoming.exists(item.id)) {
-        if (index == 0) return item.id;
-        index--;
-      }
-      throw "Scene tree root child index is out of range";
-    }
-    var nested = children.get(parentKey);
-    if (nested != null) {
-      if (index < nested.length) return nested[index];
-      index -= nested.length;
-    }
-    return parentKey+":feature:"+index;
+    var result = visibleChildren(parentKey);
+    if (index < 0 || index >= result.length) throw "Scene tree child index is out of range";
+    return result[index];
   }
   public function initiallyExpanded(key:String):Bool {
     if (filter != "") return true;

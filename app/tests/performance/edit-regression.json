@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": { "name": "editor-edit-performance-tests" },
+  "entry": "tests.EditorEditPerformanceTests",
+  "sourceRoots": ["src"],
+  "scopeSourceRoots": false,
+  "dependencies": { "app": { "path": "../.." } },
+  "target": "host",
+  "outputDir": "../../build/edit-regression"
+}

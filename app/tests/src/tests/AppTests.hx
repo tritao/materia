@@ -8,8 +8,10 @@ class AppTests {
 		if (EditorToolbarLayoutTests.main() != 0) return 1;
 		if (EditorWorkspaceLayoutTests.main() != 0) return 1;
 		if (BimEditorProjectionTests.main() != 0) return 1;
-		if (WorkspaceSaveWorkerTests.main() != 0) return 1;
+    if (WorkspaceSaveWorkerTests.main() != 0) return 1;
     if (SceneEditingTests.main() != 0) return 1;
+    ScriptedSetupTests.run();
+    SceneDocumentTests.run();
     return CadPlateWorkflowTests.main();
   }
 }

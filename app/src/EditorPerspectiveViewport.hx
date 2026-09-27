@@ -34,7 +34,7 @@ class EditorPerspectiveViewport implements View {
   var renderer:Null<SceneRenderer> = null;
   final style:LayoutStyle;
   var surface:Null<GraphicsSurface> = null;
-  var renderedRevision:Int = -1;
+  var renderedRevision:String = "";
   var renderedWidth:Int = 0;
   var renderedHeight:Int = 0;
   var renderedCameraRevision:Int = -1;
@@ -78,7 +78,7 @@ class EditorPerspectiveViewport implements View {
 
   /** Revision key for state that changes the retained viewport presentation. */
   public function presentationKey():String
-    return camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
+    return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
       hoverRevision + ":" + gridVisible + ":" + gridStep;
 
   public function setLightingPreset(preset:Int):Void {
@@ -94,7 +94,7 @@ class EditorPerspectiveViewport implements View {
       node.focusable = true;
       node.semantics = new Semantics(AccessibilityRole.Image,
         "Scene perspective GPU view");
-      node.onPaint(paint, "perspective:" + scene.revision + ":" + runtimeRevision + ":" +
+      node.onPaint(paint, "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" +
         sketchDragRevision + ":hover:" + hoverRevision + ":" + camera.revision +
         ":light:" + lightingRevision + ":" +
         renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep);
@@ -107,7 +107,7 @@ class EditorPerspectiveViewport implements View {
     ensureRenderer();
     var width = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.width))));
     var height = Std.int(Math.max(1.0, Math.min(2048.0, Math.ceil(geometry.height))));
-    var displayRevision=scene.revision+runtimeRevision*1000003;
+    var displayRevision=scene.visualRevision+":"+runtimeRevision;
     if (renderer != null && (surface == null || renderedRevision != displayRevision ||
         renderedCameraRevision != camera.revision ||
         renderedLightingRevision != lightingRevision ||
@@ -153,8 +153,15 @@ class EditorPerspectiveViewport implements View {
       view.setStudioLighting(directions, sky, ground);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
-      var rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height,
-        0.0, 0.0, 0.0, 0.0);
+      var changes = scene.takeRenderChanges();
+      var rendered:GraphicsImageRef;
+      try rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height,
+        0.0, 0.0, 0.0, 0.0, changes)
+      catch (error:Dynamic) {
+        if (changes != null) changes.dispose();
+        throw error;
+      }
+      if (changes != null) changes.dispose();
       var next = GraphicsSurface.fromImage(rendered);
       rendered.dispose();
       if (surface != null) surface.dispose();
@@ -222,7 +229,7 @@ class EditorPerspectiveViewport implements View {
   public function viewAngleLabel():String return camera.angleLabel();
 
   public function setPlacementOptions(snap:Bool, step:Float, ?visible:Bool = true):Void {
-    if (gridStep != step || gridVisible != visible) renderedRevision = -1;
+    if (gridStep != step || gridVisible != visible) renderedRevision = "";
     gridSnapEnabled = snap;
     gridStep = step;
     gridVisible = visible;

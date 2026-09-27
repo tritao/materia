@@ -1,5 +1,16 @@
 # Editor performance gate
 
+The structural edit regression uses 1,000 objects and checks counters for a
+colour edit and a selection change. Run it with:
+
+```sh
+./haxeon/scripts/haxeon run --project app/tests/performance/edit-regression.json
+```
+
+It checks that these edits avoid whole-scene reconciliation and spatial-index
+rebuilds, and that the colour edit reaches the renderer as one SceneKit change
+set. It has no timing threshold.
+
 From the repository root, run:
 
 ```sh

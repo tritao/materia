@@ -5,6 +5,14 @@ import nativekit.ui.widgets.controls.Toggle;
 
 
 import app.EditorToolbarLayout.EditorToolbarDensity;
+import app.editor.ObjectKindRegistry;
+import app.editor.TelemetryPanel;
+import app.editor.SensorPanel;
+import app.editor.HierarchyPanel;
+import app.editor.InspectorPanel;
+import app.editor.EditorDocumentCommands;
+import app.editor.SceneObjectCommands;
+import app.editor.SceneViewCommands;
 import Color;
 import LayoutAxis;
 import LayoutAlignmentY;
@@ -26,9 +34,6 @@ import nativekit.ui.docking.DockWorkspaceCommands;
 import nativekit.ui.docking.DockWorkspaceModel;
 import nativekit.ui.docking.DockWorkspacePersistence;
 import nativekit.ui.docking.DockWorkspaceStorage;
-import nativekit.ui.plotting.PlotModel;
-import nativekit.ui.plotting.PlotPoint;
-import nativekit.ui.plotting.PlotSeries;
 import nativekit.ui.properties.PropertyDescriptor;
 import nativekit.ui.properties.PropertyDescriptorOptions;
 import nativekit.ui.properties.PropertyInspectorSection;
@@ -63,7 +68,6 @@ import nativekit.ui.widgets.overlays.Menu;
 import nativekit.ui.widgets.overlays.MenuItem;
 import nativekit.ui.widgets.overlays.Popup;
 import nativekit.ui.widgets.overlays.Tooltip;
-import nativekit.ui.widgets.plotting.PlotView;
 import nativekit.ui.widgets.properties.PropertyInspector;
 import nativekit.ui.widgets.layout.Row;
 import nativekit.ui.widgets.scroll.ScrollController;
@@ -359,7 +363,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final files:Null<SceneFileDialogs>;
   var sceneGeneration:Int = 0;
   var treeModel:EditorSceneTree;
-  final telemetry:PlotModel;
+  final telemetry:TelemetryPanel;
   final logLines:Array<String>;
   var gridVisible:Bool;
   var gridSnapEnabled:Bool;
@@ -401,6 +405,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var cachedSubmitKey:String = "";
   var cachedSubmitSceneGeneration:Int = -1;
   var cachedSubmitSceneRevision:Int = -1;
+  var cachedSubmitSelectionRevision:Int = -1;
   var cachedSubmitEnvironmentRevision:Int = -1;
   var cachedSubmitSensorRevision:Int = -1;
   var cachedSubmitSimulationRevision:Int = -1;
@@ -454,7 +459,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
         hostContext);
     }
-    telemetry = makeTelemetry();
+    telemetry = new TelemetryPanel(appearance.theme.tokens.surface,
+      appearance.theme.tokens.textSecondary);
     logLines = ["Scene ready: two editable objects", "Select a box; edit position or visibility", "Middle-drag to pan; scroll to zoom"];
     gridVisible = true;
     gridSnapEnabled = false;
@@ -465,6 +471,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     contextMenuX = 0.0;
     contextMenuY = 0.0;
     componentLab = null;
+    scene.onSelectionChanged = updateCommandContext;
     updateCommandContext();
 
     workspace = makeWorkspace();
@@ -556,12 +563,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
           }, command.isEnabled(ui.commandContext)));
         }
       };
-      addSection("Primitive", ["scene.create"]);
-      addSection("CAD", ["scene.create-part", "scene.create-plate", "scene.create-bracket"]);
+      addSection("Primitive", ObjectKindRegistry.addMenuCommands("Primitive"));
+      addSection("CAD", ObjectKindRegistry.addMenuCommands("CAD"));
       addSection("Feature", ["scene.create-sketch", "scene.create-face-sketch",
         "scene.create-extrusion", "scene.add-face-hole", "scene.create-pocket",
         "scene.create-vertical-fillet"]);
-      addSection("Import", ["scene.import-step"]);
+      addSection("Import", ObjectKindRegistry.addMenuCommands("Import"));
       var addMenu = new Menu("hierarchy-add-menu", items, hierarchyAddX, hierarchyAddY,
         function() { hierarchyAddVisible = false; commands.refresh(); });
       windowLayers.push(new StackChild("hierarchy-add-menu", addMenu, 0.0, 0.0, 25));
@@ -639,6 +646,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     viewportWidth = frame.width;
     viewportHeight = frame.height;
     toolbarDensity = EditorToolbarLayout.forWidth(toolbarDensity, frame.width);
+    updateReadOnlyRobots();
     if (scene.advanceCadMeshRefinement()) {
       if (hostContext != null)
         hostContext.requestFrame();
@@ -656,34 +664,38 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function editorSubmitKey():String {
     var sceneRevision = scene.revision;
+    var selectionRevision = scene.selectionRevision;
     var environmentRevision = scene.environmentRevision;
-    var sensorRevision = sensors.revision();
+    var sensorRevision = session.document.revision;
     var simulationRevision = simulation.appliedRevision;
     var perspectiveKey = perspectiveViewport == null ? "" : perspectiveViewport.presentationKey();
     if (cachedSubmitSceneGeneration != sceneGeneration ||
         cachedSubmitSceneRevision != sceneRevision ||
+        cachedSubmitSelectionRevision != selectionRevision ||
         cachedSubmitEnvironmentRevision != environmentRevision ||
         cachedSubmitSensorRevision != sensorRevision ||
         cachedSubmitSimulationRevision != simulationRevision ||
         cachedSubmitPerspectiveKey != perspectiveKey) {
       cachedSubmitSceneGeneration = sceneGeneration;
       cachedSubmitSceneRevision = sceneRevision;
+      cachedSubmitSelectionRevision = selectionRevision;
       cachedSubmitEnvironmentRevision = environmentRevision;
       cachedSubmitSensorRevision = sensorRevision;
       cachedSubmitSimulationRevision = simulationRevision;
       cachedSubmitPerspectiveKey = perspectiveKey;
       cachedSubmitKey = buildEditorSubmitKey(sceneGeneration, sceneRevision,
-        environmentRevision, sensorRevision, simulationRevision, perspectiveKey);
+        environmentRevision, sensorRevision, simulationRevision, perspectiveKey,
+        selectionRevision);
     }
     return cachedSubmitKey;
   }
 
   static function buildEditorSubmitKey(sceneGeneration:Int, sceneRevision:Int,
       environmentRevision:Int, sensorRevision:Int, simulationRevision:Int,
-      perspectiveKey:String):String {
+      perspectiveKey:String, ?selectionRevision:Int = 0):String {
     return "editor:" + sceneGeneration + ":" + sceneRevision + ":" +
       environmentRevision + ":" + sensorRevision + ":" + simulationRevision +
-      ":perspective:" + perspectiveKey;
+      ":selection:" + selectionRevision + ":perspective:" + perspectiveKey;
   }
 
   public function context():UiContext return ui;
@@ -920,279 +932,26 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() +
           ":content=" + (sceneInspector == null ? 0 : sceneInspector.contentRevision())),
       new DockPanelContent("sensors", function(_) return sensorPanel(), null,
-        function() return "sensors=" + sensors.revision() + ":robot=" + sensors.robotId +
+        function() return "generation=" + session.generation + ":document=" + session.document.revision +
+          ":sensors=" + sensors.revision() + ":robot=" + sensors.robotId +
           ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +
           ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()),
       new DockPanelContent("console", function(_) return consolePanel()),
-      new DockPanelContent("telemetry", function(_) return telemetryPanel())
+      new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation))
     ];
 
     result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());
     return result;
   }
 
-  function sensorPanel():View {
-    var style=fillStyle();style.padding=new Insets(12.0,12.0,12.0,12.0);
-    style.background=appearance.theme.tokens.surface;
-    var robotRows:Array<KeyedView> = [];
-    var attachedIds = world.robotIds();
-    var worldIds = attachedIds.copy();
-    for(id in sensors.configuredRobotIds())if(worldIds.indexOf(id)<0)worldIds.push(id);
-    worldIds.sort(Reflect.compare);
+  function sensorPanel():View return SensorPanel.build(this);
+
+  function updateReadOnlyRobots():Void {
     var simulatedIds = simulation.simulatedRobotIds();
-    sensors.setReadOnlyRobots([for(id in attachedIds) if(simulatedIds.indexOf(id)<0) id]);
-    for (id in worldIds) {
-      var robotButton = new Button(id,null,function(){sensors.selectRobot(id);commands.refresh();},"sensor-robot:"+id);
-      robotButton.selected = id == sensors.robotId;
-      robotButton.enabled = simulatedIds.indexOf(id)>=0 || sensors.configuredRobotIds().indexOf(id)>=0;
-      robotRows.push(new KeyedView("robot:"+id,robotButton));
-    }
-    if (robotRows.length == 0) robotRows.push(new KeyedView("robot-id",new Text("Robot: "+sensors.robotId)));
-    var rows:Array<KeyedView> = [];
-    for(index in 0...sensors.model.sensors.length) {
-      var sensor=sensors.model.sensors[index];
-      var button=new Button(sensor.name+" · "+sensor.kind,null,function(){sensors.select(index);commands.refresh();},"sensor:"+sensor.id);
-      button.selected=index==sensors.selectedIndex;rows.push(new KeyedView("sensor:"+sensor.id,button));
-    }
-    var ownership=session.scriptOwnership;
-    var addLidar=new Button("LiDAR",null,function(){sensors.add("lidar");commands.refresh();},"sensor-add-lidar");
-    var addImu=new Button("IMU",null,function(){sensors.add("imu");commands.refresh();},"sensor-add-imu");
-    var addCamera=new Button("Camera",null,function(){sensors.add("camera");commands.refresh();},"sensor-add-camera");
-    var removeSensor=new Button("Remove",null,function(){sensors.removeSelected();commands.refresh();},"sensor-remove");
-    addLidar.leadingIcon=IconName.Plus;addImu.leadingIcon=IconName.Plus;addCamera.leadingIcon=IconName.Plus;
-    removeSensor.leadingIcon=IconName.Trash;
-    addLidar.enabled=ownership==null;addImu.enabled=ownership==null;addCamera.enabled=ownership==null;removeSensor.enabled=ownership==null;
-    var actions=new Row("sensor-actions",[
-      new KeyedView("add-lidar",addLidar),new KeyedView("add-imu",addImu),new KeyedView("add-camera",addCamera),
-      new KeyedView("remove",removeSensor)
-    ],actionRowStyle());
-    var applySimulation = new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild", null,
-      function() {
-        log(simulation.rebuild(sensors,scene) ? "Shared simulation configuration applied" :
-          "Simulation rebuild rejected: " + simulation.error);
-        commands.refresh();
-      }, "sensor-apply");
-    applySimulation.variant = ButtonVariant.Primary;
-    var runtimeActions=new Column("sensor-runtime-actions",[
-      new KeyedView("configuration",new Row("sensor-configuration-actions",[
-      new KeyedView("undo",new Button("Undo",null,function(){
-        session.document.undo();
-        if(ownership!=null)refreshScriptMaterialization("Override undone");
-        commands.refresh();},"sensor-undo")),
-      new KeyedView("redo",new Button("Redo",null,function(){
-        session.document.redo();
-        if(ownership!=null)refreshScriptMaterialization("Override redone");
-        commands.refresh();},"sensor-redo")),
-      new KeyedView("apply",applySimulation)],actionRowStyle())),
-      new KeyedView("playback",new Row("sensor-playback-actions",[
-      new KeyedView("run",new Button("Run",null,function(){
-        try {simulation.start();log("Simulation running");} catch(error:Dynamic){log("Run rejected: "+Std.string(error));}
-        commands.refresh();
-      },"sensor-run")),
-      new KeyedView("pause",new Button("Pause",null,function(){
-        simulation.stop();log("Simulation paused");commands.refresh();
-      },"sensor-pause")),
-      new KeyedView("reset",new Button("Reset",null,function(){
-        log(simulation.reset() ? "Shared simulation reset" : "No simulation to reset");
-        commands.refresh();
-      },"sensor-reset")),
-      new KeyedView("design",new Button("Design",null,function(){
-        simulation.clear();log("Returned to design mode");commands.refresh();
-      },"sensor-design"))
-      ],actionRowStyle()))
-    ],actionColumnStyle());
-    var backendActions=new Row("sensor-backend-actions",[
-      new KeyedView("deterministic",new Button("Test backend",null,function(){
-        if(ownership==null)simulation.setBackend(ApplicationSimulation.DETERMINISTIC);else try {
-          ownership.setOverride(ScriptOwnership.SIMULATION_TARGET,"backend","integer",ApplicationSimulation.DETERMINISTIC);
-          refreshScriptMaterialization("Physics backend override changed");
-        } catch(error:Dynamic)log("Override rejected: "+Std.string(error));commands.refresh();
-      },"sensor-backend-deterministic")),
-      new KeyedView("mujoco",new Button("MuJoCo",null,function(){
-        if(ownership==null)simulation.setBackend(ApplicationSimulation.MUJOCO);else try {
-          ownership.setOverride(ScriptOwnership.SIMULATION_TARGET,"backend","integer",ApplicationSimulation.MUJOCO);
-          refreshScriptMaterialization("Physics backend override changed");
-        } catch(error:Dynamic)log("Override rejected: "+Std.string(error));commands.refresh();
-      },"sensor-backend-mujoco"))],actionRowStyle());
-    var content:Array<KeyedView> = [new KeyedView("heading",sectionHeading("SENSORS")),
-      new KeyedView("apply-state",new Text(simulation.pending(sensors,scene)
-        ? "Pending changes · rebuild required"
-        : "Configuration applied",null,appearance.theme.tokens.textSecondary,TextStyleOverride.text(12.0))),
-      new KeyedView("simulation-mode",new Text("Mode: "+(simulation.isActive()
-        ? (simulation.isRunning()?"Running":"Paused") : "Design"))),
-      new KeyedView("ownership",ownership==null?new Text("Origin: document"):
-        textLines("script-origin",["Origin: script",ownership.reference,
-          'configuration v${ownership.configurationVersion}'])),
-      new KeyedView("robots-heading",sectionHeading("ROBOTS")),
-      new KeyedView("robots",new Column("sensor-robots",robotRows)),
-      new KeyedView("backend-heading",sectionHeading("PHYSICS · "+simulation.userBackendName().toUpperCase())),
-      new KeyedView("backend-actions",backendActions),
-      new KeyedView("devices-heading",sectionHeading("DEVICES")),
-      new KeyedView("actions",actions),
-      new KeyedView("list",new Column("sensor-list",rows)),
-      new KeyedView("runtime-heading",sectionHeading("SIMULATION")),
-      new KeyedView("runtime-actions",runtimeActions)];
-    if(ownership!=null){
-      var overrideLabel=ownership.overridesEnabled?"Disable overrides":"Enable overrides";
-      content.insert(4,new KeyedView("script-actions",new Column("script-actions",[
-        new KeyedView("source",new Row("script-source-actions",[
-        new KeyedView("reload",new Button("Reload script",null,function(){
-          try {var result=session.reloadScript();simulation.setBackend(result.backend);
-            simulation.setTimestep(result.timestep);documentChanged();log("Script reloaded; Apply/Rebuild restarts simulation");}
-          catch(error:Dynamic)log("Script reload rejected; active simulation unchanged: "+Std.string(error));
-          commands.refresh();},"script-reload")),
-        new KeyedView("overrides",new Button(overrideLabel,null,function(){
-          ownership.setOverridesEnabled(!ownership.overridesEnabled);
-          refreshScriptMaterialization(ownership.overridesEnabled?"Overrides enabled":"Overrides disabled");
-        },"script-overrides"))])),
-        new KeyedView("revert",new Row("script-revert-actions",[
-        new KeyedView("revert-simulation",new Button("Revert simulation",null,function(){
-          if(ownership.revertTarget(ScriptOwnership.SIMULATION_TARGET))
-            refreshScriptMaterialization("Simulation settings reverted to script values");
-        },"script-revert-simulation")),
-        new KeyedView("remove-stale",new Button("Remove stale",null,function(){
-          if(ownership.removeStaleOverrides())refreshScriptMaterialization("Stale overrides removed");
-          },"script-remove-stale"))
-        ]))
-      ])));
-      content.insert(5,new KeyedView("simulation-origins",textLines("script-simulation-origins",
-        ownership.propertyOrigins(ScriptOwnership.SIMULATION_TARGET,["backend","timestep"]))));
-      content.insert(6,new KeyedView("robot-origins",textLines("script-robot-origins",
-        ["Robot pose"].concat(ownership.propertyOrigins(sensors.robotId,["position","rotation"])))));
-    }
-    var selected=sensors.selected();
-    if(!sensors.isEditable())content.push(new KeyedView("read-only",new Text("Remote robot configuration is read-only")));
-    if(selected!=null){
-      if(ownership!=null){
-        var sensorTarget=sensors.robotId+"/"+selected.id;
-        var sensorProperties=["updateRate","noiseStddev","noiseSeed","mount.frameId","mount.position","mount.rotation"];
-        if(selected.kind=="lidar"){sensorProperties.push("rayCount");sensorProperties.push("maxRange");
-          sensorProperties.push("startAngleRadians");sensorProperties.push("fieldOfViewRadians");}
-        content.push(new KeyedView("sensor-origin",textLines("script-sensor-origins",
-          ["Value origins"].concat(ownership.propertyOrigins(sensorTarget,sensorProperties)))));
-        var decreaseRate=new Button("Rate -1 Hz",null,function(){
-            try {ownership.setSensorRate(sensors.robotId,selected.id,Math.max(0,selected.updateRate-1));
-              refreshScriptMaterialization("Sensor rate override changed");}
-            catch(error:Dynamic)log("Override rejected: "+Std.string(error));
-          },"script-rate-decrease");
-        var increaseRate=new Button("Rate +1 Hz",null,function(){
-            try {ownership.setSensorRate(sensors.robotId,selected.id,selected.updateRate+1);
-              refreshScriptMaterialization("Sensor rate override changed");}
-            catch(error:Dynamic)log("Override rejected: "+Std.string(error));
-          },"script-rate-increase");
-        var revertRate=new Button("Revert rate",null,function(){
-            if(ownership.revertSensorRate(sensors.robotId,selected.id))
-              refreshScriptMaterialization("Sensor rate reverted to script value");
-          },"script-rate-revert");
-        decreaseRate.enabled=ownership.overridesEnabled;
-        increaseRate.enabled=ownership.overridesEnabled;
-        revertRate.enabled=ownership.overridesEnabled;
-        var rateActions=new Row("script-rate-actions",[
-          new KeyedView("decrease",decreaseRate),new KeyedView("increase",increaseRate),
-          new KeyedView("revert",revertRate)]);
-        content.push(new KeyedView("rate-actions",rateActions));
-        var revertSensor=new Button("Revert selected sensor",null,function(){
-          if(ownership.revertTarget(sensorTarget))refreshScriptMaterialization("Sensor overrides reverted");
-        },"script-sensor-revert-all");
-        revertSensor.enabled=ownership.overridesEnabled;
-        content.push(new KeyedView("sensor-revert",revertSensor));
-      }
-      var editable = ownership == null;
-      var inspector = sensorInspector;
-      if (inspector == null || sensorInspectorSensor != selected ||
-          sensorInspectorModel != sensors.model) {
-        inspector = new PropertyInspector("sensor-inspector:" + selected.id,
-          sensors.properties(), null, null, null, null, "Sensor configuration");
-        sensorInspector = inspector;
-        sensorInspectorSensor = selected;
-        sensorInspectorModel = sensors.model;
-      }
-      inspector.style.width = LayoutAxis.stretch();
-      inspector.style.height = LayoutAxis.fit();
-      inspector.scrollable = false;
-      inspector.labelWidth = viewportWidth < 820.0 ? 76.0 : 100.0;
-      inspector.enabled = editable;
-      content.push(new KeyedView("properties", inspector));
-    }
-    var diagnostics=sensors.diagnostics();
-    if(diagnostics.length>0)content.push(new KeyedView("diagnostics",new Text(
-      diagnostics[0].code+": "+diagnostics[0].message)));
-    if(ownership!=null&&ownership.diagnostics.length>0)
-      content.push(new KeyedView("script-diagnostics",textLines("script-diagnostic-lines",ownership.diagnostics)));
-    var contentStyle=new LayoutStyle();contentStyle.width=LayoutAxis.stretch();
-    contentStyle.height=LayoutAxis.fit();contentStyle.padding=new Insets(8.0,8.0,8.0,8.0);
-    return new ScrollView("sensor-scroll",new Column("sensor-panel",content,contentStyle),style);
+    sensors.setReadOnlyRobots([for (id in world.robotIds()) if (simulatedIds.indexOf(id) < 0) id]);
   }
 
-  function hierarchyPanel():View {
-    treeModel.setFilter(hierarchySearch);
-    var addStyle = new LayoutStyle();
-    addStyle.padding = new Insets(6.0, 8.0, 6.0, 8.0);
-    addStyle.childGap = 5.0;
-    var addButton = new Button("Add", addStyle, function() {
-      hierarchyAddVisible = true;
-      commands.refresh();
-    }, "hierarchy-add");
-    addButton.variant = ButtonVariant.Secondary;
-    addButton.leadingIcon = IconName.Plus;
-    addButton.trailingIcon = IconName.ChevronDown;
-    addButton.onClickEvent = function(event) {
-      var bounds = menuTriggerBounds(event);
-      hierarchyAddX = Math.max(8.0, Math.min(viewportWidth - 228.0, bounds.x));
-      hierarchyAddY = Math.max(8.0, Math.min(viewportHeight - 560.0, bounds.y + bounds.height));
-      hierarchyAddVisible = true;
-      commands.refresh();
-    };
-    var treeStyle = fillStyle();
-    treeStyle.padding = new Insets(10.0, 10.0, 10.0, 10.0);
-    treeStyle.background = appearance.theme.tokens.surface;
-    treeStyle.childGap = 6.0;
-    var treeViewport = fillStyle();
-    var tree = new TreeView(hierarchySearch == "" ? "scene-hierarchy" : "scene-hierarchy-filtered",
-      treeModel, treeViewport, null, 420.0, scene.treeSelectionKey(), ["scene"], function(id) {
-      scene.selectTreeKey(id);
-      log("Selected " + id);
-      updateCommandContext();
-      commands.refresh();
-    }, function(id) {
-      scene.selectTreeKey(id);
-      updateCommandContext();
-      commands.execute("scene.frame-selected");
-      log("Framed " + id);
-    }, null, null);
-    tree.onExpandedChanged = function(_, _) {
-      hierarchyExpansionRevision++;
-    };
-    tree.onItemContextMenu = function(id, event) {
-      if (scene.object(id) == null) return;
-      hierarchyMenuX = Math.max(8.0, Math.min(viewportWidth - 228.0, event.x));
-      hierarchyMenuY = Math.max(8.0, Math.min(viewportHeight - 180.0, event.y));
-      hierarchyMenuVisible = true;
-      commands.refresh();
-    };
-    tree.onItemRename = startRename;
-    return new Column(
-      "hierarchy-panel",
-      [
-        new KeyedView("heading", sectionHeading("SCENE")),
-        new KeyedView("actions", new Row("scene-object-actions", [
-          new KeyedView("add", addButton),
-          new KeyedView("duplicate", sceneAction("scene-duplicate", "scene.duplicate", "", IconName.Copy)),
-          new KeyedView("delete", sceneAction("scene-delete", "scene.delete", "", IconName.Trash))
-        ], actionRowStyle())),
-        new KeyedView("search", new SearchField("hierarchy-search", hierarchySearch, function(value) {
-          hierarchySearch = value;
-          treeModel.setFilter(value);
-          commands.refresh();
-        }, null, "Search objects...")),
-        new KeyedView(
-          "tree",
-          tree
-        )
-      ],
-      treeStyle
-    );
-  }
+  function hierarchyPanel():View return HierarchyPanel.build(this);
 
   function sceneAction(key:String, commandId:String, label:String, icon:Null<IconName>):CommandButton {
     var action = new CommandButton(key, commandId, commands);
@@ -1216,7 +975,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (id == null) return;
     try {
       scene.setName(id, renameValue);
-      updateCommandContext();
       renameId = null;
       commands.refresh();
     } catch (error:Dynamic) log("Rename failed: " + Std.string(error));
@@ -1371,107 +1129,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       : viewportWithControls(perspectiveViewport, availableWidth);
   }
 
-  function inspectorPanel():View {
-    var style = fillStyle();
-    style.padding = new Insets(10.0, 10.0, 10.0, 10.0);
-    style.background = appearance.theme.tokens.surface;
-    var selected = scene.object(scene.selectedId);
-    if (selected == null)
-      return new Column("inspector-empty", [
-        new KeyedView("heading", sectionHeading("INSPECTOR")),
-        new KeyedView("hint", new Text("Select an object to edit its properties."))
-      ], style);
-    if (sceneInspector == null || inspectorSelectionRevision != scene.selectionRevision) {
-      sceneInspector = new PropertyInspector("scene-inspector:" + scene.selectedId,
-        scene.properties(), style, null, null, null, "Selected object inspector");
-      inspectorSelectionRevision = scene.selectionRevision;
-    }
-    var inspector = sceneInspector;
-    inspector.setStyle(style);
-    inspector.labelWidth = viewportWidth < 760.0 ? 56.0 :
-      viewportWidth < 1180.0 ? 76.0 : 108.0;
-    var ownership=session.scriptOwnership;
-    inspector.enabled = ownership==null&&!simulation.isActive() &&
-      (perspectiveViewport == null || !perspectiveViewport.dragging());
-    var rows:Array<KeyedView> = [new KeyedView("heading",sectionHeading(selected.label))];
-    var assembly = session.projectAssembly;
-    if (assembly != null && StringTools.startsWith(selected.id, "project:")) {
-      var instanceId = selected.id.substr(8);
-      var jointLines:Array<String> = [];
-      for (joint in assembly.joints) if (joint.parent == instanceId || joint.child == instanceId)
-        jointLines.push(joint.id + " · " + joint.kind + " · " +
-          joint.parentConnector + " → " + joint.childConnector);
-      if (jointLines.length > 0)
-        rows.push(new KeyedView("assembly-joints", textLines("assembly-joint-lines", jointLines)));
-    }
-    if (scene.hasActiveSketchEdit()) {
-      var summary = scene.sketchEditSummary();
-      if (summary != null)
-        rows.push(new KeyedView("sketch-draft-status", new Text(summary)));
-      var sketchTools:Array<KeyedView> = [];
-      if (scene.canAddSketchDraftRectangle())
-        sketchTools.push(new KeyedView("add-rectangle",
-          sceneAction("add-sketch-rectangle", "scene.add-sketch-rectangle", "Add rectangle", IconName.Plus)));
-      if (scene.canClearSketchDraft())
-        sketchTools.push(new KeyedView("clear-sketch",
-          sceneAction("clear-sketch-draft", "scene.clear-sketch-draft", "Clear sketch", IconName.Close)));
-      if (sketchTools.length > 0)
-        rows.push(new KeyedView("sketch-draft-tools", new Row("sketch-draft-tools-row", sketchTools, actionRowStyle())));
-      rows.push(new KeyedView("sketch-draft-actions", new Row("sketch-draft-actions-row", [
-        new KeyedView("apply", sceneAction("apply-sketch-draft", "scene.apply-sketch", "Apply sketch", IconName.Save)),
-        new KeyedView("cancel", sceneAction("cancel-sketch-draft", "scene.cancel-sketch", "Cancel", IconName.Close))
-      ], actionRowStyle())));
-    } else if (scene.canBeginSelectedSketchEdit()) {
-      rows.push(new KeyedView("sketch-edit-action",
-        sceneAction("edit-selected-sketch", "scene.edit-sketch", "Edit sketch", IconName.Inspect)));
-    }
-    var supportStatus = scene.selectedSketchSupportStatus();
-    if (supportStatus != null) {
-      rows.push(new KeyedView("sketch-support-status", new Text(supportStatus)));
-      if (scene.canRepairSelectedSketchSupportFace())
-        rows.push(new KeyedView("repair-sketch-support",
-          sceneAction("repair-sketch-support-face", "scene.repair-sketch-support-face",
-            "Repair support face", IconName.Inspect)));
-    }
-    if(scene.isCadPart(selected.id) && scene.hasCadOutput(selected.id))rows.push(new KeyedView("face-selection",
-      new Text(scene.selectedCadEdgeIndex>=0?"Selected edge "+(scene.selectedCadEdgeIndex+1):
-        scene.selectedCadFaceIndex<0?"Click a CAD face or edge to select it":
-        selected.kind=="cad-plate"
-          ?"Selected face "+(scene.selectedCadFaceIndex+1)+" · Add hole uses the picked location"
-          :"Selected face "+(scene.selectedCadFaceIndex+1))));
-    if(selected.kind=="cad-preview"&&scene.selectedCadEdgeIndex>=0)
-      rows.push(new KeyedView("edge-selection",
-        new Text("Selected edge "+(scene.selectedCadEdgeIndex+1))));
-    if (scene.canCreateSketch())
-      rows.push(new KeyedView("create-sketch",
-        sceneAction("create-constrained-sketch", "scene.create-sketch", "Create sketch", IconName.Plus)));
-    if (scene.canCreateFaceSketch())
-      rows.push(new KeyedView("create-face-sketch",
-        sceneAction("create-face-sketch", "scene.create-face-sketch", "Sketch on face", IconName.Plus)));
-    if (scene.canCreateExtrusion())
-      rows.push(new KeyedView("create-extrusion",
-        sceneAction("create-extrusion", "scene.create-extrusion", "Extrude", IconName.Plus)));
-    if (scene.canCreatePocket())
-      rows.push(new KeyedView("create-pocket",
-        sceneAction("create-pocket", "scene.create-pocket", "Pocket", IconName.Plus)));
-    if (scene.canCreateVerticalFillet())
-      rows.push(new KeyedView("create-vertical-fillet",
-        sceneAction("create-vertical-fillet", "scene.create-vertical-fillet", "Fillet vertical edges", IconName.Plus)));
-    if(ownership!=null) {
-      rows.push(new KeyedView("origin",textLines("script-object-origins",
-        ["Script-owned"].concat(ownership.propertyOrigins(selected.id,["position","dimensions",
-          "mass","collisionEnabled","dynamicBody","visible"])))));
-      rows.push(new KeyedView("revert",new Button("Revert object overrides",null,function(){
-        if(ownership.revertTarget(selected.id))refreshScriptMaterialization("Object overrides reverted");
-      },"script-object-revert")));
-    }
-    rows.push(new KeyedView("properties",inspector));
-    return new Column(
-      "inspector-panel",
-      rows,
-      style
-    );
-  }
+  function inspectorPanel():View return InspectorPanel.build(this);
 
   function consolePanel():View {
     var style = fillStyle();
@@ -1508,34 +1166,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     );
   }
 
-  function telemetryPanel():View {
-    var style = fillStyle();
-    style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
-    style.background = appearance.theme.tokens.surface;
-    var plotStyle = fillStyle();
-    plotStyle.height = LayoutAxis.grow();
-    var plot = new PlotView("frame-telemetry", telemetry, plotStyle, "Frame telemetry");
-    var frame = framePresentation;
-    var physicsStatus = frame == null ? "Physics snapshot unavailable" :
-      "Physics step " + frame.revision + " · time " + Std.string(frame.simulationTime) + " s";
-    return new Column(
-      "telemetry-panel",
-      [
-        new KeyedView("heading", sectionHeading("TELEMETRY")),
-        new KeyedView(
-          "plot",
-          plot
-        ),
-        new KeyedView(
-          "caption",
-          new Text("Frame time · GPU submission · layout cost")
-        ),
-        new KeyedView("physics-revision", new Text(physicsStatus))
-      ],
-      style
-    );
-  }
-
   function sectionHeading(label:String):Text {
     return new Text(label, null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(11.0, 0.8));
   }
@@ -1543,7 +1173,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function runSceneEdit(label:String, action:Void->Bool):Void {
     try {
       action();
-      updateCommandContext();
     } catch (error:ParametricError) {
       log(label + ": " + error.message);
     }
@@ -1552,129 +1181,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function installCommands():Void {
     DockWorkspaceCommands.install(workspace, commands, "workspace");
-    commands.register(new Command("scene.create", "Add rectangle", function() {
-      scene.createRectangle();
-      updateCommandContext();
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canCreate()));
-    commands.register(new Command("scene.create-part", "Add empty CAD part", function() {
-      runSceneEdit("Could not add CAD part", function() scene.createCadPart());
-    }, null, function() return canEditObjects() && scene.canCreate()));
-    commands.register(new Command("scene.create-sketch", "Create constrained sketch", function() {
-      runSceneEdit("Could not create sketch", function() scene.createSketch());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreateSketch()));
-    commands.register(new Command("scene.create-extrusion", "Extrude selected sketch", function() {
-      runSceneEdit("Could not create extrusion", function() scene.createExtrusion());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreateExtrusion()));
-    commands.register(new Command("scene.create-face-sketch", "Sketch on selected face", function() {
-      runSceneEdit("Could not create face sketch", function() scene.createFaceSketch());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreateFaceSketch()));
-    commands.register(new Command("scene.create-pocket", "Pocket selected face sketch", function() {
-      runSceneEdit("Could not create pocket", function() scene.createPocket());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreatePocket()));
-    commands.register(new Command("scene.create-vertical-fillet", "Fillet vertical edges", function() {
-      runSceneEdit("Could not fillet vertical edges", function() scene.createVerticalFillet());
-      inspectorSelectionRevision = -1;
-    }, null, function() return canEditObjects() && scene.canCreateVerticalFillet()));
-    commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
-      runSceneEdit("Could not add mounting plate", function() scene.createMountingPlate());
-    }, null, function() return canEditObjects() && scene.canCreate()));
-    commands.register(new Command("scene.create-bracket", "Add L bracket", function() {
-      runSceneEdit("Could not add L bracket", function() scene.createBracket());
-    }, null, function() return canEditObjects() && scene.canCreate()));
-    commands.register(new Command("scene.edit-sketch", "Edit selected sketch", function() {
-      try {
-        scene.beginSelectedSketchEdit();
-        inspectorSelectionRevision = -1;
-      } catch (error:Dynamic) log("Could not edit sketch: " + Std.string(error));
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canBeginSelectedSketchEdit()));
-    commands.register(new Command("scene.repair-sketch-support-face", "Repair selected sketch support face", function() {
-      runSceneEdit("Could not repair sketch support face", function() scene.repairSelectedSketchSupportFace());
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canRepairSelectedSketchSupportFace()));
-    commands.register(new Command("scene.apply-sketch", "Apply sketch draft", function() {
-      runSceneEdit("Could not apply sketch draft", function() scene.applySelectedSketchEdit());
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canApplySelectedSketchEdit()));
-    commands.register(new Command("scene.cancel-sketch", "Cancel sketch draft", function() {
-      scene.cancelSelectedSketchEdit();
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return scene.hasActiveSketchEdit()));
-    commands.register(new Command("scene.add-sketch-rectangle", "Add starter rectangle to sketch", function() {
-      runSceneEdit("Could not add sketch rectangle", function() scene.addSketchDraftRectangle());
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canAddSketchDraftRectangle()));
-    commands.register(new Command("scene.clear-sketch-draft", "Clear sketch geometry", function() {
-      runSceneEdit("Could not clear sketch", function() scene.clearSketchDraft());
-      inspectorSelectionRevision = -1;
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.canClearSketchDraft()));
-    commands.register(new Command("scene.import-step", "Import STEP part", function() {
-      var chooser=files;
-      if(chooser==null)return;
-      chooser.chooseImport("Import STEP part",function(path,error) {
-        if(error!=null){log(error);return;}
-        if(path==null)return;
-        try {
-          scene.importStep(path);
-          updateCommandContext();
-          log("Imported STEP part: "+path);
-        } catch(failure:Dynamic) log("STEP import failed: "+Std.string(failure));
-        commands.refresh();
-      });
-    },null,function() return canEditObjects()&&files!=null&&scene.canCreate()));
-    commands.register(new Command("scene.add-face-hole", "Add hole on selected face", function() {
-      runSceneEdit("Could not add hole", function() scene.addHoleOnSelectedFace());
-    },null,function() return canEditObjects()&&scene.canAddHoleOnSelectedFace()));
-    commands.register(new Command("scene.export-step", "Export STEP", function() {
-      var chooser=files;
-      if(chooser==null)return;
-      chooser.chooseExport("Export selected CAD part","CAD part.step",function(path,error) {
-        if(error!=null){log(error);return;}
-        if(path==null)return;
-        try { scene.exportSelectedCad(path); log("Exported STEP: "+path); }
-        catch(failure:Dynamic) log("STEP export failed: "+Std.string(failure));
-        commands.refresh();
-      });
-    },null,function() {
-      var selected=scene.object(scene.selectedId);
-      return !documents.blocked()&&files!=null&&selected!=null&&scene.isCadPart(selected.id);
-    }));
-    commands.register(new Command("scene.duplicate", "Duplicate", function() {
-      runSceneEdit("Could not duplicate object", function() scene.duplicateSelected());
-    }, new Shortcut(68, UiModifier.Control), function() return canEditObjects()
-      && scene.canCreate() && scene.object(scene.selectedId) != null));
-    commands.register(new Command("scene.delete", "Delete", function() {
-      scene.deleteSelected();
-      updateCommandContext();
-      commands.refresh();
-    }, null, function() return canEditObjects() && scene.object(scene.selectedId) != null));
-    commands.register(new Command("editor.undo", "Undo", function() {
-      if (scene.hasActiveSketchEdit()) scene.cancelSelectedSketchEdit();
-      runSceneEdit("Could not undo", function() session.document.undo());
-      if (session.scriptOwnership != null) refreshScriptMaterialization("Override undone");
-    }, new Shortcut(UiKey.Z, UiModifier.Control), function() return !documents.blocked() && session.document.canUndo));
-    commands.register(new Command("editor.redo", "Redo", function() {
-      runSceneEdit("Could not redo", function() session.document.redo());
-      if (session.scriptOwnership != null) refreshScriptMaterialization("Override redone");
-    }, new Shortcut(UiKey.Z, UiModifier.Control | UiModifier.Shift), function() return !documents.blocked() && session.document.canRedo));
-    commands.register(new Command("editor.new", "New", function() documents.requestNew(),
-      new Shortcut(78, UiModifier.Control), function() return !documents.blocked()));
-    commands.register(new Command("editor.open", "Open", function() documents.requestOpen(),
-      new Shortcut(79, UiModifier.Control), function() return !documents.blocked()));
-    commands.register(new Command("editor.save", "Save", function() documents.save(),
-      new Shortcut(UiKey.S, UiModifier.Control), function() return !documents.blocked()));
-    commands.register(new Command("editor.save-as", "Save As", function() documents.save(true),
-      new Shortcut(UiKey.S, UiModifier.Control | UiModifier.Shift), function() return !documents.blocked()));
+    SceneObjectCommands.install(this);
+    EditorDocumentCommands.install(this);
     commands.register(new Command("workspace.save", "Save workspace", function() {
       saveWorkspace();
       log("Workspace saved");
@@ -1692,74 +1200,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }, new Shortcut(UiKey.K, UiModifier.Control), function() return !documents.blocked());
     openPalette.addShortcut(new Shortcut(UiKey.P, UiModifier.Control));
     commands.register(openPalette);
-    commands.register(new Command("scene.frame-selected", "Frame selected", function() {
-      if (perspectiveViewport != null) perspectiveViewport.frameSelected();
-      log("Framed " + scene.selectedId);
-    }, null, function() return !documents.blocked() && scene.items().length > 0));
-    commands.register(new Command("scene.reset-perspective", "Reset perspective view", function() {
-      if (perspectiveViewport != null) perspectiveViewport.resetView();
-      log("Perspective view reset");
-    }, null, function() return !documents.blocked() && perspectiveViewport != null));
-    registerLightingPreset("scene.lighting-studio", "Lighting: Studio", 0);
-    registerLightingPreset("scene.lighting-soft", "Lighting: Soft", 1);
-    registerLightingPreset("scene.lighting-contrast", "Lighting: Contrast", 2);
-    commands.register(new Command("scene.toggle-grid", "Toggle grid", function() {
-      gridVisible = !gridVisible;
-      log(gridVisible ? "Grid enabled" : "Grid disabled");
-    }, null, null, function() return gridVisible));
-    commands.register(new Command("scene.toggle-grid-snap", "Toggle grid snapping", function() {
-      gridSnapEnabled = !gridSnapEnabled;
-      log(gridSnapEnabled ? "Grid snapping enabled" : "Grid snapping disabled");
-    }, null, null, function() return gridSnapEnabled));
-    registerGridSpacing("scene.grid-spacing-0.1", "Grid spacing: 0.1 m", 0.1);
-    registerGridSpacing("scene.grid-spacing-0.2", "Grid spacing: 0.2 m", 0.2);
-    registerGridSpacing("scene.grid-spacing-0.5", "Grid spacing: 0.5 m", 0.5);
-    registerNudgeCommand("scene.nudge-left", "Nudge left", UiKey.Left, 0, -0.1, 0.0);
-    registerNudgeCommand("scene.nudge-right", "Nudge right", UiKey.Right, 0, 0.1, 0.0);
-    registerNudgeCommand("scene.nudge-up", "Nudge up", UiKey.Up, 0, 0.0, 0.1);
-    registerNudgeCommand("scene.nudge-down", "Nudge down", UiKey.Down, 0, 0.0, -0.1);
-    registerNudgeCommand("scene.nudge-left-large", "Nudge left (large)", UiKey.Left,
-      UiModifier.Shift, -1.0, 0.0);
-    registerNudgeCommand("scene.nudge-right-large", "Nudge right (large)", UiKey.Right,
-      UiModifier.Shift, 1.0, 0.0);
-    registerNudgeCommand("scene.nudge-up-large", "Nudge up (large)", UiKey.Up,
-      UiModifier.Shift, 0.0, 1.0);
-    registerNudgeCommand("scene.nudge-down-large", "Nudge down (large)", UiKey.Down,
-      UiModifier.Shift, 0.0, -1.0);
-    commands.register(new Command("scene.cancel-drag", "Cancel object drag", function() {
-      cancelActiveDrag();
-      updateCommandContext();
-      commands.refresh();
-    }, new Shortcut(UiKey.Escape), function() return
-      (perspectiveViewport != null && perspectiveViewport.dragging()) || scene.hasActiveSketchEdit()));
-  }
-
-  function registerGridSpacing(id:String, label:String, spacing:Float):Void {
-    commands.register(new Command(id, label, function() {
-      gridSpacing = spacing;
-      log("Grid spacing set to " + spacing + " m");
-      commands.refresh();
-    }, null, null, function() return gridSpacing == spacing));
-  }
-
-  function registerLightingPreset(id:String, label:String, preset:Int):Void {
-    commands.register(new Command(id, label, function() {
-      if (perspectiveViewport != null) perspectiveViewport.setLightingPreset(preset);
-      log(label);
-      commands.refresh();
-    }, null, function() return !documents.blocked() && perspectiveViewport != null,
-      function() return perspectiveViewport != null &&
-        perspectiveViewport.lightingPresetId() == preset));
-  }
-
-  function registerNudgeCommand(id:String, label:String, key:Int, modifiers:Int,
-      deltaX:Float, deltaY:Float):Void {
-    commands.register(new Command(id, label, function() {
-      scene.nudgeSelected(deltaX, deltaY);
-      updateCommandContext();
-      commands.refresh();
-    }, new Shortcut(key, modifiers), function() return canEditObjects() &&
-      scene.object(scene.selectedId) != null));
+    SceneViewCommands.install(this);
   }
 
   function documentChanged():Void {
@@ -1772,13 +1213,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
       log("Document configuration replaced");
       sceneGeneration = session.generation;
       treeModel = new EditorSceneTree(scene, session.projectAssembly);
+      treeModel.setFilter(hierarchySearch);
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :
         new EditorPerspectiveViewport("scene-perspective", scene, hostContext);
       sceneInspector = null;
       inspectorSelectionRevision = -1;
-      updateCommandContext();
     }
+    scene.onSelectionChanged = updateCommandContext;
+    updateCommandContext();
     paletteVisible = false;
     contextMenuVisible = false;
     commands.refresh();
@@ -1805,7 +1248,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       changed = true;
     }
     if (!changed) return;
-    updateCommandContext();
     commands.refresh();
   }
 
@@ -1818,7 +1260,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var pointer = perspectiveViewport.cancelDrag();
       if (pointer != null) ui.pointerCancel(pointer.id, pointer.x, pointer.y);
     }
-    updateCommandContext();
     commands.refresh();
   }
 
@@ -1872,19 +1313,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     try File.appendContent(semanticRecordPath,
       Json.stringify({kind:"action", at:Sys.time(), action:action, data:data}) + "\n")
     catch (error:Dynamic) Sys.println("Materia recording failed: " + Std.string(error));
-  }
-
-  function makeTelemetry():PlotModel {
-    var model = new PlotModel();
-    var frameTime = new PlotSeries("frame-time", "Frame time", Color.rgba(0.28, 0.75, 0.98, 1.0), 2.0);
-    var gpuTime = new PlotSeries("gpu-time", "GPU submission", Color.rgba(0.78, 0.45, 0.98, 1.0), 2.0);
-    for (index in 0...64) {
-      frameTime.add(new PlotPoint(index, 10.0 + Math.sin(index * 0.24) * 2.2));
-      gpuTime.add(new PlotPoint(index, 4.0 + Math.cos(index * 0.19) * 1.2));
-    }
-    model.addSeries(frameTime);
-    model.addSeries(gpuTime);
-    return model;
   }
 
   function saveWorkspace():Void {

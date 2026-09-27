@@ -81,11 +81,11 @@ class SceneRenderer {
 	/** Renders directly into a retained, backend-neutral GPU image. */
 	public function renderImage(snapshot:SceneSnapshot, view:SceneView, width:Int, height:Int,
 			clearRed:Float = 0.025, clearGreen:Float = 0.035, clearBlue:Float = 0.055,
-			clearAlpha:Float = 1.0):GraphicsImageRef {
+			clearAlpha:Float = 1.0, ?changes:Null<ChangeSet>):GraphicsImageRef {
 		ensureLive();
 		if (width <= 0 || height <= 0)
 			throw "Scene image dimensions are invalid";
-		prepare(snapshot, view, null);
+		prepare(snapshot, view, changes);
 		var rendered = NativeKitSceneRender.nkscene_render_executor_render_image_id(
 			executor.borrow(), planOwner.borrow(), snapshot.nativeHandle(), width, height,
 			clearRed, clearGreen, clearBlue, clearAlpha);

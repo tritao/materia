@@ -3,5 +3,6 @@
 	"package": { "name": "editorkit" },
 	"sourceRoots": ["haxe"],
 	"scopeSourceRoots": false,
+	"dependencies": { "scenekit": { "path": "../scenekit" } },
 	"target": "host"
 }
