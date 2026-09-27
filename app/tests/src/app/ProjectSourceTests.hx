@@ -87,6 +87,26 @@ class ProjectSourceTests {
     simulation.dispose();
   }
 
+  static function checkWedgeContact():Void {
+    var model = new RobotModel("wedge hull probe");
+    model.addLink(new Link("wedge"));
+    model.collisionApproximation = robotkit.model.CollisionApproximation.None;
+    var wedge = [-0.5, -0.5, -0.5, 0.5, -0.5, -0.5,
+      -0.5, -0.5, 0.5, -0.5, 0.5, -0.5,
+      0.5, 0.5, -0.5, -0.5, 0.5, 0.5];
+    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+      var simulation = new Simulation(0.01, 1, backend);
+      simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0], null, null, [wedge]);
+      var box = simulation.spawnBox([0.35, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
+      for (index in 0...200) simulation.step(Int64.ofInt(index));
+      var height = simulation.objectPose(box).position[2];
+      check(backend == ApplicationSimulation.DETERMINISTIC ? height > 0.5 : height < 0.5,
+        'wedge contact differs from its bounding box on backend $backend: $height');
+      simulation.dispose();
+    }
+  }
+
   public static function main():Int {
     var flat = Bytes.alloc(4 * 24);
     for (index in 0...4) {
@@ -108,6 +128,7 @@ class ProjectSourceTests {
     checkHullCollision(0, false);
     checkHullCollision(1, true);
     checkHullCollision(1, false);
+    checkWedgeContact();
     var root = Sys.getCwd();
     while (!FileSystem.exists(root + "/cadkit/examples/modeling/materia.project.json")) {
       var parent = haxe.io.Path.directory(root);
@@ -204,6 +225,15 @@ class ProjectSourceTests {
         machineSimulation.error != null && machineSimulation.error.indexOf("closures") >= 0 &&
         machineSimulation.isRunning(), "unsupported closure reports a simulation diagnostic");
       machineDefinition.joints.pop();
+      machineSimulation.stop();
+      machineSimulation.setBackend(ApplicationSimulation.MUJOCO);
+      check(machineSimulation.rebuild(machineSession.sensors, machineSession.scene, machineSession),
+        "MachineKit assembly rebuilds on MuJoCo: " + machineSimulation.error);
+      machineSimulation.start();
+      check(machineSimulation.isRunning() && machineSimulation.error == null,
+        "MachineKit assembly starts without a Simulation panel error");
+      machineSimulation.capturePresentationSnapshot();
+      machineSimulation.stop();
     machineSimulation.dispose(); machineWorld.close(); machineSession.dispose();
     var generatedScene = MateriaProjectRunner.loadProject(manifest);
     var generated = generatedScene.objects;
