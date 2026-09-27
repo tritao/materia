@@ -24,6 +24,7 @@ class MaterialLibrary {
     material("bearing-steel", "Bearing steel", [0.58, 0.61, 0.64], 0.78, 0.30, 7810, "bearing steel"),
     material("aluminium", "Anodized aluminium 6061", [0.68, 0.70, 0.72], 0.72, 0.42, 2700, "aluminium 6061"),
     material("rubber", "Rubber", [0.10, 0.10, 0.11], 0.0, 0.90, 1100, "rubber"),
+    material("plywood-birch", "Birch plywood", [0.70, 0.55, 0.34], 0.0, 0.72, 680, "birch plywood"),
     material("cast-iron", "Cast iron", [0.35, 0.37, 0.39], 0.60, 0.55, 7200, "cast iron"),
     material("bronze", "Bronze", [0.55, 0.38, 0.20], 0.70, 0.38, 8800, "bronze"),
     material("spring-steel", "Spring steel", [0.56, 0.58, 0.60], 0.75, 0.38, 7850, "spring steel")
@@ -64,6 +65,7 @@ class MaterialLibrary {
   public static function fromSpec(spec:Null<String>):String return switch (spec) {
     case null: "painted";
     case "aluminium 6061": "aluminium";
+    case "birch plywood": "plywood-birch";
     case "bearing steel": "bearing-steel";
     case "cast iron": "cast-iron";
     case "bronze": "bronze";

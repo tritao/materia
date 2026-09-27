@@ -1,0 +1,386 @@
+{
+	"format": "materia.sheet-project",
+	"version": 1,
+	"project": {
+		"customMaterials": null,
+		"executions": [],
+		"plans": [
+			{
+				"cuts": [
+					{
+						"axis": "vertical",
+						"firstRegionId": "left",
+						"id": "cut-01",
+						"position": 900,
+						"regionId": "stock",
+						"secondRegionId": "right"
+					},
+					{
+						"axis": "horizontal",
+						"firstRegionId": "top",
+						"id": "cut-02",
+						"position": 600,
+						"regionId": "left",
+						"secondRegionId": "left-lower"
+					},
+					{
+						"axis": "horizontal",
+						"firstRegionId": "back",
+						"id": "cut-03",
+						"position": 500,
+						"regionId": "left-lower",
+						"secondRegionId": "back-tail"
+					},
+					{
+						"axis": "vertical",
+						"firstRegionId": "shelf-column",
+						"id": "cut-04",
+						"position": 880,
+						"regionId": "right",
+						"secondRegionId": "side-column"
+					},
+					{
+						"axis": "horizontal",
+						"firstRegionId": "shelf",
+						"id": "cut-05",
+						"position": 450,
+						"regionId": "shelf-column",
+						"secondRegionId": "shelf-drop"
+					},
+					{
+						"axis": "vertical",
+						"firstRegionId": "side-stack",
+						"id": "cut-06",
+						"position": 550,
+						"regionId": "side-column",
+						"secondRegionId": "narrow-strip"
+					},
+					{
+						"axis": "horizontal",
+						"firstRegionId": "side-1",
+						"id": "cut-07",
+						"position": 450,
+						"regionId": "side-stack",
+						"secondRegionId": "side-lower"
+					},
+					{
+						"axis": "horizontal",
+						"firstRegionId": "side-2",
+						"id": "cut-08",
+						"position": 450,
+						"regionId": "side-lower",
+						"secondRegionId": "side-drop"
+					}
+				],
+				"edgeMargin": 10,
+				"id": "picking-bench-sheet-1",
+				"kerf": 3,
+				"lengthUnit": "mm",
+				"placements": [
+					{
+						"height": 600,
+						"id": "top-blank",
+						"regionId": "top",
+						"requirementId": "bench-top",
+						"rotation": 0,
+						"width": 900,
+						"x": 10,
+						"y": 10
+					},
+					{
+						"height": 500,
+						"id": "back-blank",
+						"regionId": "back",
+						"requirementId": "bench-back",
+						"rotation": 0,
+						"width": 900,
+						"x": 10,
+						"y": 613
+					},
+					{
+						"height": 450,
+						"id": "shelf-blank",
+						"regionId": "shelf",
+						"requirementId": "bench-shelf",
+						"rotation": 0,
+						"width": 880,
+						"x": 913,
+						"y": 10
+					},
+					{
+						"height": 450,
+						"id": "side-blank-1",
+						"regionId": "side-1",
+						"requirementId": "bench-side",
+						"rotation": 0,
+						"width": 550,
+						"x": 1796,
+						"y": 10
+					},
+					{
+						"height": 450,
+						"id": "side-blank-2",
+						"regionId": "side-2",
+						"requirementId": "bench-side",
+						"rotation": 0,
+						"width": 550,
+						"x": 1796,
+						"y": 463
+					}
+				],
+				"requirements": [
+					{
+						"fingerprint": "7719e0fec9aa133466bd0ee51c5d2ceacf78aef86b4d635801c8e261aeb82eb9",
+						"id": "bench-top",
+						"revision": 1
+					},
+					{
+						"fingerprint": "86b96508f7ecc94b15dcea240fe233650ce8de3c97034fb9ed1a6a394a1aed86",
+						"id": "bench-back",
+						"revision": 1
+					},
+					{
+						"fingerprint": "8a9504f4359e917b12431246024dbea8f07b3aba2fee906a259aec624924caa2",
+						"id": "bench-shelf",
+						"revision": 1
+					},
+					{
+						"fingerprint": "ebecfa8a4a1d2b168b501df1d8e020501172537b6b07704fae6b5f77cd99d5c5",
+						"id": "bench-side",
+						"revision": 1
+					}
+				],
+				"retainedRegionIds": [
+					"back-tail",
+					"shelf-drop",
+					"narrow-strip",
+					"side-drop"
+				],
+				"revision": 1,
+				"schemaVersion": 1,
+				"stockSpecFingerprint": "a1231f983ab88201a6a9e8e8634dac468840989e63ca9fbd7f5328f34afd5d99",
+				"stockSpecId": "birch-ply-18-2440x1220",
+				"stockSpecRevision": 1
+			},
+			{
+				"cuts": [
+					{
+						"axis": "vertical",
+						"firstRegionId": "divider-stack",
+						"id": "remnant-cut-01",
+						"position": 850,
+						"regionId": "stock",
+						"secondRegionId": "right-strip"
+					},
+					{
+						"axis": "horizontal",
+						"firstRegionId": "divider-1",
+						"id": "remnant-cut-02",
+						"position": 300,
+						"regionId": "divider-stack",
+						"secondRegionId": "divider-upper"
+					},
+					{
+						"axis": "horizontal",
+						"firstRegionId": "divider-2",
+						"id": "remnant-cut-03",
+						"position": 300,
+						"regionId": "divider-upper",
+						"secondRegionId": "divider-remnant"
+					}
+				],
+				"edgeMargin": 5,
+				"id": "tote-divider-from-shelf-drop",
+				"kerf": 3,
+				"lengthUnit": "mm",
+				"placements": [
+					{
+						"height": 300,
+						"id": "divider-blank-1",
+						"regionId": "divider-1",
+						"requirementId": "tote-divider",
+						"rotation": 0,
+						"width": 850,
+						"x": 5,
+						"y": 5
+					},
+					{
+						"height": 300,
+						"id": "divider-blank-2",
+						"regionId": "divider-2",
+						"requirementId": "tote-divider",
+						"rotation": 0,
+						"width": 850,
+						"x": 5,
+						"y": 308
+					}
+				],
+				"requirements": [
+					{
+						"fingerprint": "725c73be7c9bf1e74151005e6efb3b9ecb743d3ca01027421dff2fa3eb760223",
+						"id": "tote-divider",
+						"revision": 1
+					}
+				],
+				"retainedRegionIds": [
+					"right-strip",
+					"divider-remnant"
+				],
+				"revision": 1,
+				"schemaVersion": 1,
+				"stockSpecFingerprint": "a1231f983ab88201a6a9e8e8634dac468840989e63ca9fbd7f5328f34afd5d99",
+				"stockSpecId": "birch-ply-18-2440x1220",
+				"stockSpecRevision": 1
+			}
+		],
+		"requirements": [
+			{
+				"allowedRotations": [
+					0,
+					90
+				],
+				"blankHeight": 600,
+				"blankWidth": 900,
+				"directionConstraint": "free",
+				"heightToleranceMinus": 0.5,
+				"heightTolerancePlus": 0.5,
+				"id": "bench-top",
+				"lengthUnit": "mm",
+				"materialId": "plywood-birch",
+				"partId": "picking-bench/top",
+				"partRevision": 1,
+				"quantity": 1,
+				"revision": 1,
+				"thickness": 18,
+				"thicknessToleranceMinus": 0.29999999999999999,
+				"thicknessTolerancePlus": 0.29999999999999999,
+				"widthToleranceMinus": 0.5,
+				"widthTolerancePlus": 0.5
+			},
+			{
+				"allowedRotations": [
+					0,
+					90
+				],
+				"blankHeight": 500,
+				"blankWidth": 900,
+				"directionConstraint": "free",
+				"heightToleranceMinus": 0.5,
+				"heightTolerancePlus": 0.5,
+				"id": "bench-back",
+				"lengthUnit": "mm",
+				"materialId": "plywood-birch",
+				"partId": "picking-bench/back",
+				"partRevision": 1,
+				"quantity": 1,
+				"revision": 1,
+				"thickness": 18,
+				"thicknessToleranceMinus": 0.29999999999999999,
+				"thicknessTolerancePlus": 0.29999999999999999,
+				"widthToleranceMinus": 0.5,
+				"widthTolerancePlus": 0.5
+			},
+			{
+				"allowedRotations": [
+					0,
+					90
+				],
+				"blankHeight": 450,
+				"blankWidth": 880,
+				"directionConstraint": "free",
+				"heightToleranceMinus": 0.5,
+				"heightTolerancePlus": 0.5,
+				"id": "bench-shelf",
+				"lengthUnit": "mm",
+				"materialId": "plywood-birch",
+				"partId": "picking-bench/shelf",
+				"partRevision": 1,
+				"quantity": 1,
+				"revision": 1,
+				"thickness": 18,
+				"thicknessToleranceMinus": 0.29999999999999999,
+				"thicknessTolerancePlus": 0.29999999999999999,
+				"widthToleranceMinus": 0.5,
+				"widthTolerancePlus": 0.5
+			},
+			{
+				"allowedRotations": [
+					0,
+					90
+				],
+				"blankHeight": 450,
+				"blankWidth": 550,
+				"directionConstraint": "free",
+				"heightToleranceMinus": 0.5,
+				"heightTolerancePlus": 0.5,
+				"id": "bench-side",
+				"lengthUnit": "mm",
+				"materialId": "plywood-birch",
+				"partId": "picking-bench/side",
+				"partRevision": 1,
+				"quantity": 2,
+				"revision": 1,
+				"thickness": 18,
+				"thicknessToleranceMinus": 0.29999999999999999,
+				"thicknessTolerancePlus": 0.29999999999999999,
+				"widthToleranceMinus": 0.5,
+				"widthTolerancePlus": 0.5
+			},
+			{
+				"allowedRotations": [
+					0,
+					90
+				],
+				"blankHeight": 300,
+				"blankWidth": 850,
+				"directionConstraint": "width-aligned",
+				"heightToleranceMinus": 0.5,
+				"heightTolerancePlus": 0.5,
+				"id": "tote-divider",
+				"lengthUnit": "mm",
+				"materialId": "plywood-birch",
+				"partId": "tote-station/divider",
+				"partRevision": 1,
+				"quantity": 2,
+				"revision": 1,
+				"thickness": 18,
+				"thicknessToleranceMinus": 0.29999999999999999,
+				"thicknessTolerancePlus": 0.29999999999999999,
+				"widthToleranceMinus": 0.5,
+				"widthTolerancePlus": 0.5
+			}
+		],
+		"schemaVersion": 1,
+		"stockPieces": [
+			{
+				"allocationFingerprint": null,
+				"allocationPlanId": null,
+				"batch": "example",
+				"height": 1220,
+				"id": "sheet-001",
+				"lengthUnit": "mm",
+				"location": "sheet-rack-A",
+				"materialId": "plywood-birch",
+				"parentPieceId": null,
+				"sourceExecutionId": null,
+				"state": "available",
+				"stockSpecId": "birch-ply-18-2440x1220",
+				"thickness": 18,
+				"width": 2440
+			}
+		],
+		"stockSpecs": [
+			{
+				"height": 1220,
+				"id": "birch-ply-18-2440x1220",
+				"lengthUnit": "mm",
+				"materialId": "plywood-birch",
+				"revision": 1,
+				"supplier": "Example supplier",
+				"supplierCode": "BB-18-2440-1220",
+				"thickness": 18,
+				"width": 2440
+			}
+		]
+	}
+}

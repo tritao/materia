@@ -32,7 +32,6 @@ import robotkit.world.ReplayRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.RobotCommand;
 import robotkit.world.JointTarget;
-import robotkit.model.Actuator;
 import robotkit.model.Frame;
 import robotkit.model.Joint;
 import robotkit.model.JointLimits;
@@ -853,7 +852,7 @@ class SceneEditingTests {
     var joint=new Joint("Arm joint",JointType.Revolute,session.sensors.model.links[0],arm,"joint/arm");
     joint.limits.lower=-1.0;joint.limits.upper=1.0;joint.limits.velocity=2.0;joint.limits.effort=3.0;
     joint.parentFramePosition=[0.25,0.0,0.0];joint.childFramePosition=[0.0,0.1,0.0];joint.axis=[1.0,0.0,0.0];
-    joint.drive=new Actuator("Arm drive",3.0,2.0);session.sensors.model.addJoint(joint);
+    session.sensors.model.addJoint(joint);
     var armMount=session.sensors.model.addFrame(new Frame("Arm LiDAR mount",arm,"arm/lidar"));
     armMount.position=[0.4,0.0,0.0];session.sensors.model.sensors[0].frame=armMount;
     check(session.sensors.setRobotPose("materia/robot-b",[0.0,3.0,0.0],[0.0,0.0,0.0,1.0]),
@@ -868,10 +867,10 @@ class SceneEditingTests {
     var restoredJoint=session.sensors.model.joints[0];
     check(restoredJoint.id=="joint/arm"&&
       restoredJoint.parent.id=="base"&&restoredJoint.child.id=="arm"&&restoredJoint.limits.lower==-1.0&&
-      restoredJoint.limits.upper==1.0&&restoredJoint.drive!=null&&restoredJoint.drive.maxEffort==3.0&&
+      restoredJoint.limits.upper==1.0&&restoredJoint.limits.effort==3.0&&
       session.sensors.robotPosition("materia/robot-b")[1]==3.0&&
       session.sensors.robotPosition("materia/robot")[1]==0.0,
-      "joint topology, actuator settings, and robot pose survive reload");
+      "joint topology, effort limits, and robot pose survive reload");
     check(session.sensors.model.links[1].mass==2.5&&
       session.sensors.model.links[1].centerOfMass[1]==0.1&&
       session.sensors.model.links[1].centerOfMass[2]==0.3&&

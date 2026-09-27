@@ -1,0 +1,15 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Picking bench sheet stock and cutting plan",
+	"defaultEntrypoint": "layout",
+	"build": { "system": "haxeon", "manifest": "haxeon.json" },
+	"entrypoints": {
+		"layout": {
+			"kind": "cad-preview",
+			"module": "PickingStationPreview",
+			"function": "layout",
+			"cache": { "inputs": ["PickingStationDesign.hx", "PickingStationPreview.hx"] }
+		}
+	}
+}

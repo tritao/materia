@@ -13,7 +13,6 @@ import nativekit.ui.properties.PropertyType;
 import nativekit.ui.properties.PropertyValue;
 import robotkit.model.Frame;
 import robotkit.model.CollisionApproximation;
-import robotkit.model.Actuator;
 import robotkit.model.Joint;
 import robotkit.model.JointLimits;
 import robotkit.model.Link;
@@ -249,9 +248,7 @@ class SensorConfiguration {
       childFramePosition:joint.childFramePosition.copy(),
       childFrameRotation:joint.childFrameRotation.copy(), axis:joint.axis.copy(),
       limits:{lower:joint.limits.lower,upper:joint.limits.upper,
-        velocity:joint.limits.velocity,effort:joint.limits.effort},
-      drive:joint.drive==null?null:{name:joint.drive.name,maxEffort:joint.drive.maxEffort,
-        maxRate:joint.drive.maxRate}}],
+        velocity:joint.limits.velocity,effort:joint.limits.effort}}],
     frames: [for (frame in value.frames) {id:frame.id, name:frame.name, linkId:frame.link.id,
       position:frame.position.copy(), rotation:frame.rotation.copy()}],
     mobileBase: mobileRecord(value.mobileBase),
@@ -393,9 +390,6 @@ class SensorConfiguration {
       if(limits==null)throw "Sensor joint requires limits";
       joint.limits=new JointLimits(finite(limits,"lower"),finite(limits,"upper"),
         finite(limits,"velocity"),finite(limits,"effort"));
-      var drive:Dynamic=Reflect.field(value,"drive");
-      if(drive!=null)joint.drive=new Actuator(requiredString(drive,"name"),
-        finite(drive,"maxEffort"),finite(drive,"maxRate"));
       model.addJoint(joint);
     }
     var mobileData:Dynamic = Reflect.field(data, "mobileBase");

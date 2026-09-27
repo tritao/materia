@@ -97,7 +97,9 @@ class ProjectDocumentTests {
   }
 
   static function testCurrentSceneFixture():Void {
-    var objects = SceneCodec.decode(File.getContent("app/tests/fixtures/scene-current.json"));
+    var fixturePath = FileSystem.exists("fixtures/scene-current.json")
+      ? "fixtures/scene-current.json" : "app/tests/fixtures/scene-current.json";
+    var objects = SceneCodec.decode(File.getContent(fixturePath));
     check(objects.length == 1 && objects[0].appearance != null,
       "scene fixture has current appearance data");
     var scene = new EditorScene(objects);

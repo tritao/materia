@@ -9,6 +9,7 @@ import nativekit.ui.widgets.controls.Button;
 import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.layout.Row;
 import nativekit.ui.widgets.properties.PropertyInspector;
+import app.editor.SheetWorkflowPanel;
 import nativekit.ui.widgets.text.Text;
 
 /** Selected-object inspector dock panel. */
@@ -32,11 +33,15 @@ class InspectorPanel {
     style.padding = new Insets(10.0, 10.0, 10.0, 10.0);
     style.background = appearance.theme.tokens.surface;
     var selected = scene.object(scene.selectedId);
-    if (selected == null)
-      return new Column("inspector-empty", [
+    if (selected == null) {
+      var emptyRows:Array<KeyedView> = [
         new KeyedView("heading", sectionHeading("INSPECTOR")),
         new KeyedView("hint", new Text("Select an object to edit its properties."))
-      ], style);
+      ];
+      var sheetWorkflow = SheetWorkflowPanel.build(app);
+      if (sheetWorkflow != null) emptyRows.push(new KeyedView("sheet-workflow", sheetWorkflow));
+      return new Column("inspector-empty", emptyRows, style);
+    }
     if (app.sceneInspector == null || app.inspectorSelectionRevision != scene.selectionRevision) {
       app.sceneInspector = new PropertyInspector("scene-inspector:" + scene.selectedId,
         scene.properties(), style, null, null, null, "Selected object inspector");
@@ -123,6 +128,8 @@ class InspectorPanel {
       },"script-object-revert")));
     }
     rows.push(new KeyedView("properties",inspector));
+    var sheetWorkflow = SheetWorkflowPanel.build(app);
+    if (sheetWorkflow != null) rows.push(new KeyedView("sheet-workflow", sheetWorkflow));
     return new Column(
       "inspector-panel",
       rows,

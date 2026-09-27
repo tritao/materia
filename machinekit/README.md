@@ -183,6 +183,54 @@ library classes rather than one-off scripts:
   the rail-to-block interface is recorded as a prismatic closure, and the
   axis travel limits and BOM include the profile rail hardware.
 
+## Sheet stock and cutting plans
+
+The `examples/picking-station/` project connects rectangular cut blanks to
+finished picking-bench and tote-station panels. Its versioned
+`materia.project.json.sheet.json` companion stores stock specifications, part
+requirements, manually placed blanks, ordered guillotine cuts, physical sheets,
+executions, and reusable remnants. Length values carry an explicit unit and
+exports normalize dimensions to millimetres. Plan coordinates use a lower-left
+origin; 90° means a clockwise quarter-turn of the blank. The SVG is a planning
+drawing, not a machine toolpath.
+
+Run the full sample workflow, including CSV/SVG export, cutting confirmation,
+reopen, and reuse of a recorded remnant:
+
+```sh
+./haxeon/scripts/haxeon run --project=machinekit/examples/picking-station/haxeon.json -- \
+  demo /tmp/picking-station.sheet.json /tmp/picking-station-exports
+```
+
+The example includes its companion record. Build and launch it in Materia:
+
+```sh
+./haxeon/scripts/haxeon build --project=app/haxeon.json
+./app/run-built.sh --project=./machinekit/examples/picking-station/materia.project.json
+```
+
+The checked-in companion includes one available example sheet (`sheet-001`),
+so the first plan is ready to select and validate. The Inspector's **Sheet
+cutting plan** section lets you choose a physical sheet and plan, register or
+allocate stock, edit placements/rotations/cut order/kerf
+and margins, review the scaled layout and validation messages, export CSV and
+SVG, release an allocation, and confirm completed cuts. A successful execution
+consumes the source and adds blank and remnant records in one save. The second
+plan uses the first plan's `shelf-drop` remnant. The separate finished-part BOM
+continues to count parts, not consumed sheets.
+
+For a new copy, `init <path>` creates an initial versioned companion record and
+refuses to overwrite an existing file. The command-line inventory flow uses
+`register`, `allocate`, `preview`, `cancel`, `execute ... CONFIRM`, `status`, and
+`bom`; its project path is relative to the example directory, so use
+`materia.project.json.sheet.json`. `preview` is read-only; `execute` requires an
+allocation and explicit confirmation. The first release supports rectangular
+blanks and straight guillotine cuts only. Automatic nesting, arbitrary
+contours, machine toolpaths, and warehouse integrations are outside its scope.
+The CAD viewport shows the authored sample layout; numeric edits update the
+Inspector's layout preview and exports, but do not regenerate the 3D scene
+artifact.
+
 ## Robotics
 
 `machinekit.robotics` has mechanical generators for mounting a robot arm and

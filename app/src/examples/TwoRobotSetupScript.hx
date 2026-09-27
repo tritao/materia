@@ -4,7 +4,6 @@ import app.ApplicationSimulation;
 import app.ScriptedSetup;
 import app.SensorConfiguration;
 import app.SetupScript;
-import robotkit.model.Actuator;
 import robotkit.model.Frame;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
@@ -33,7 +32,7 @@ class TwoRobotSetupScript implements SetupScript {
     var model=configuration.model,base=model.links[0],arm=model.addLink(new Link("Arm","arm"));
     var joint=new Joint("Arm joint",JointType.Revolute,base,arm,"joint/arm");
     joint.limits.lower=-1.2;joint.limits.upper=1.2;joint.limits.velocity=2.0;joint.limits.effort=5.0;
-    joint.drive=new Actuator("Arm drive",5.0,2.0);model.addJoint(joint);
+    model.addJoint(joint);
     var mount=model.addFrame(new Frame("Arm sensors",arm,"arm/sensors"));mount.position=[mountX,0.0,0.0];
     var lidar=model.sensors[0];lidar.frame=mount;lidar.updateRate=20.0;lidar.rayCount=32;lidar.maxRange=12.0;
     var imu=configuration.add("imu");imu.frame=mount;imu.updateRate=100.0;imu.noiseStddev=0.002;

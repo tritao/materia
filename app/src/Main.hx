@@ -25,6 +25,7 @@ import Rect;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.Json;
+import materia.sheet.SheetInventory;
 import nativekit.ui.core.Command;
 import nativekit.ui.core.CommandContext;
 import nativekit.ui.core.CommandRegistry;
@@ -401,6 +402,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var sensorInspector:Null<PropertyInspector> = null;
   var sensorInspectorSensor:Dynamic = null;
   var sensorInspectorModel:Dynamic = null;
+  /** Companion sheet-manufacturing record for projects that include one. */
+  var sheetInventory:Null<SheetInventory> = null;
+  var sheetInventoryPath:Null<String> = null;
+  var sheetPlanSelection:String = "";
+  var sheetPieceSelection:String = "";
   var framePresentation:Null<ApplicationPresentationSnapshot> = null;
   var cachedSubmitKey:String = "";
   var cachedSubmitSceneGeneration:Int = -1;

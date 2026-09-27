@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-picking-station-example" },
+	"entry": "PickingStationWorkflow",
+	"sources": ["PickingStationDesign.hx", "PickingStationPreview.hx", "PickingStationWorkflow.hx"],
+	"sourceRoots": ["."],
+	"dependencies": {
+		"projectkit": { "path": "../../../projectkit" },
+		"cadkit": { "path": "../../../cadkit" },
+		"machinekit": { "path": "../../" }
+	},
+	"target": "host",
+	"outputDir": "build"
+}
