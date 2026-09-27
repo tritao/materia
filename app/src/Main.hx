@@ -8,6 +8,7 @@ import app.EditorToolbarLayout.EditorToolbarDensity;
 import app.editor.ObjectKindRegistry;
 import app.editor.TelemetryPanel;
 import app.editor.SensorPanel;
+import app.editor.HierarchyPanel;
 import Color;
 import LayoutAxis;
 import LayoutAlignmentY;
@@ -914,70 +915,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     sensors.setReadOnlyRobots([for (id in world.robotIds()) if (simulatedIds.indexOf(id) < 0) id]);
   }
 
-  function hierarchyPanel():View {
-    treeModel.setFilter(hierarchySearch);
-    var addStyle = new LayoutStyle();
-    addStyle.padding = new Insets(6.0, 8.0, 6.0, 8.0);
-    addStyle.childGap = 5.0;
-    var addButton = new Button("Add", addStyle, function() {
-      hierarchyAddVisible = true;
-      commands.refresh();
-    }, "hierarchy-add");
-    addButton.variant = ButtonVariant.Secondary;
-    addButton.leadingIcon = IconName.Plus;
-    addButton.trailingIcon = IconName.ChevronDown;
-    addButton.onClickEvent = function(event) {
-      var bounds = menuTriggerBounds(event);
-      hierarchyAddX = Math.max(8.0, Math.min(viewportWidth - 228.0, bounds.x));
-      hierarchyAddY = Math.max(8.0, Math.min(viewportHeight - 560.0, bounds.y + bounds.height));
-      hierarchyAddVisible = true;
-      commands.refresh();
-    };
-    var treeStyle = fillStyle();
-    treeStyle.padding = new Insets(10.0, 10.0, 10.0, 10.0);
-    treeStyle.background = appearance.theme.tokens.surface;
-    treeStyle.childGap = 6.0;
-    var treeViewport = fillStyle();
-    var tree = new TreeView(hierarchySearch == "" ? "scene-hierarchy" : "scene-hierarchy-filtered",
-      treeModel, treeViewport, null, 420.0, scene.treeSelectionKey(), ["scene"], function(id) {
-      scene.selectTreeKey(id);
-      log("Selected " + id);
-      commands.refresh();
-    }, function(id) {
-      scene.selectTreeKey(id);
-      commands.execute("scene.frame-selected");
-      log("Framed " + id);
-    }, null, null);
-    tree.onItemContextMenu = function(id, event) {
-      if (scene.object(id) == null) return;
-      hierarchyMenuX = Math.max(8.0, Math.min(viewportWidth - 228.0, event.x));
-      hierarchyMenuY = Math.max(8.0, Math.min(viewportHeight - 180.0, event.y));
-      hierarchyMenuVisible = true;
-      commands.refresh();
-    };
-    tree.onItemRename = startRename;
-    return new Column(
-      "hierarchy-panel",
-      [
-        new KeyedView("heading", sectionHeading("SCENE")),
-        new KeyedView("actions", new Row("scene-object-actions", [
-          new KeyedView("add", addButton),
-          new KeyedView("duplicate", sceneAction("scene-duplicate", "scene.duplicate", "", IconName.Copy)),
-          new KeyedView("delete", sceneAction("scene-delete", "scene.delete", "", IconName.Trash))
-        ], actionRowStyle())),
-        new KeyedView("search", new SearchField("hierarchy-search", hierarchySearch, function(value) {
-          hierarchySearch = value;
-          treeModel.setFilter(value);
-          commands.refresh();
-        }, null, "Search objects...")),
-        new KeyedView(
-          "tree",
-          tree
-        )
-      ],
-      treeStyle
-    );
-  }
+  function hierarchyPanel():View return HierarchyPanel.build(this);
 
   function sceneAction(key:String, commandId:String, label:String, icon:Null<IconName>):CommandButton {
     var action = new CommandButton(key, commandId, commands);
