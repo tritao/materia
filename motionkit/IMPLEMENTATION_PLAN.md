@@ -1154,3 +1154,10 @@ endpoint. The PTY harness reads the bench timing and exercises a Ruckig plan,
 HOLD and RESUME at that period. Insufficient timing still advertises no queue
 in this follow-up; construction policy changes in the next step. Commit: the
 commit containing this entry.
+
+### Serial capability advertisement follow-up
+
+`SerialRobot` no longer forces `RuntimeRobotAdapter` to advertise no queue.
+It reports the runtime endpoint's actual queue and execution-plan capability.
+The PTY runtime capability test and RobotKit Haxe suite passed. Commit: the
+commit containing this entry.

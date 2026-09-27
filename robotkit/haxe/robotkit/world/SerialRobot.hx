@@ -24,7 +24,7 @@ class SerialRobot implements Robot {
       maxTargetError, baud);
     adapter = new RuntimeRobotAdapter(id, runtime, model.name,
       [for (link in model.links) link.id], [for (joint in model.joints) joint.id],
-      true, true, "serial endpoint fault", false);
+      true, true, "serial endpoint fault");
   }
 
   /** Opens a serial robot from the same versioned deployment as robotd. */
