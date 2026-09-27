@@ -15,6 +15,7 @@
 namespace robotkit {
 
 class SimulationRobot;
+class VirtualDeviceEndpoint;
 
 /**
  * Owns one shared simulated universe and coordinates all RobotRuntime objects
@@ -32,7 +33,7 @@ public:
 
     /** Adds one simulation-owned runtime before the topology is sealed. */
     rk_result add_robot(const rk_robot_runtime_blueprint &blueprint, rk_robot_runtime &out_runtime,
-                        const rk_simulation_pose *initial_pose = nullptr);
+                        const rk_simulation_robot_desc *robot_desc = nullptr);
     /** Starts the shared realtime owner thread after all robots are attached. */
     rk_result start();
     /** Stops the shared realtime owner thread without destroying the universe. */
@@ -155,6 +156,8 @@ private:
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;
     std::vector<std::weak_ptr<SimulationRobot>> bindings_;
+    std::vector<std::shared_ptr<SimulationRobot>> virtual_bindings_;
+    std::vector<std::shared_ptr<VirtualDeviceEndpoint>> virtual_devices_;
     std::vector<std::shared_ptr<RobotRuntime>> runtimes_;
     std::vector<rk_robot_runtime> handles_;
     std::vector<nksim_body> robot_base_bodies_;

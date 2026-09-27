@@ -522,3 +522,45 @@ RobotKit Haxe assertions, both FFI audits, and all three TCP integration
 modes passed. The first RobotKit run caught an obsolete v3 fixture
 fingerprint after the schema-lock update; the fixture was regenerated and
 the suite passed on rerun.
+
+### A6 ordering correction — Virtual step positions require step generation
+
+A6 asks the virtual steppers' step-count positions to drive SimKit joints and
+tests tracking within one step, while A7 is the first item that specifies
+step generation. A6 therefore includes the basic position-crossing pulse
+loop needed by its in-process test. A7 will add direction setup, rate-limit
+qualification, transmissions and dual-drive behavior. This changes only
+the implementation order; the final A7 requirements remain the same.
+
+A6's requested `MachineKit LinearAxis` end-to-end assertion also depends on
+A7's lead-screw transmission mapping. MachineKit currently has no RobotKit
+runtime compiler or dependency. A6 verifies a generated Ruckig trajectory
+through RKD6 and a SimKit joint with identity transmission; the axis and
+lead-screw assertion belongs with A7's transmission implementation.
+
+### A6 — Run the RKD6 core inside Simulation
+
+Added the `robotkit-device-virtual` static library with a complete-frame C
+ABI. It drives the actual scheduled core and virtual board on a deterministic
+owner clock, publishes queue/state frames, and exposes discrete positions,
+channels and timestamped step pulses. The C++ virtual endpoint supplies a
+seeded UART model with baud, latency, jitter, sampled frame errors and link
+cut. The link retries sampled line errors and preserves frame order. SimKit's
+versioned robot descriptor and Haxe `VirtualDeviceOptions` select it; step
+positions drive the articulated joint before each physics step.
+
+The in-process tests cover frame negotiation, a generated Ruckig trajectory
+and sampled target error, real queue replacement and late rejection,
+deterministic step logs, 5% line errors with ±500 µs jitter, 2,000 ppm drift,
+and link-loss controlled stop. A Haxe Simulation test confirms that the
+virtual device's step position moves the actual SimKit link. The Ruckig test
+found that a one-cycle commit margin was too short for multi-segment motion;
+refill now includes two owner cycles. It also found that path-time status
+must use the mapping frozen when each plan is compiled, because later sync
+fits can shift. Commit: the commit containing this entry.
+
+The device-protocol and virtual-staticlib Rust tests, MCU build, all 20
+native tests, 5,411 MotionKit and 4,492 RobotKit Haxe assertions, runtime,
+SimKit and MotionKit FFI audits, and TCP integration in default, session and
+lease-timeout modes passed. The final virtual-device Rust and native tests
+were rerun after suppressing duplicate zero-time state frames.

@@ -102,8 +102,10 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
             transport->baud(), ack.segment_capacity);
         return {};
     }
-    return std::shared_ptr<Rkd6Endpoint>(new Rkd6Endpoint(
+    auto endpoint = std::shared_ptr<Rkd6Endpoint>(new Rkd6Endpoint(
         std::move(transport), ack, target_error, clock_bound_ns, link_latency_ns));
+    endpoint->owner_period_ns_ = period_ns;
+    return endpoint;
 }
 
 bool Rkd6Endpoint::send_record(std::uint8_t kind, std::span<const std::uint8_t> payload) {
@@ -151,6 +153,9 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
         plan.ends_at_rest != 0, host_epoch_ns_ + base_time_ns, clock_, blueprint,
         ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_);
     if (!compiled.ok) return RK_ERROR_LIMIT;
+    const auto path_rate = static_cast<double>(compiled.segments.front().header.duration_ticks) /
+        static_cast<double>(plan.segments.segments[0].duration_ns);
+    if (!std::isfinite(path_rate) || path_rate <= 0) return RK_ERROR_LIMIT;
     std::uint64_t shortest_ns = UINT64_MAX;
     for (const auto &segment : compiled.segments) {
         const auto duration_ns = static_cast<std::uint64_t>(std::ceil(
@@ -179,6 +184,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
     }
     std::array<std::uint8_t, device_wire6::QueueBegin6::SIZE> body{};
     if (!device_wire6::encode(begin, body) || !send_record(5, body)) return RK_ERROR_BACKEND;
+    path_maps_.push_back({compiled.segments.front().header.t0_ticks, base_time_ns, path_rate});
     if (plan.replace_after_plan_id) {
         while (!pending_.empty() && pending_.back().header.t0_ticks >= replace_ticks)
             pending_.pop_back();
@@ -234,7 +240,8 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
         if (decoded.kind == 4) {
             device_wire6::TimeSyncReply reply{};
             if (device_wire6::decode(decoded.payload, reply))
-                clock_.observe(reply.host_send_ns, owner_now_ns,
+                clock_.observe(reply.host_send_ns,
+                    transport_->received_at_ns() ? transport_->received_at_ns() : owner_now_ns,
                     reply.device_rx_ticks, reply.device_tx_ticks);
         } else if (decoded.kind == 14) {
             device_wire6::decode(decoded.payload, status_);
@@ -262,7 +269,8 @@ void Rkd6Endpoint::pump_queue() {
     }
     if (next_commit_ < sent_.size() &&
         status_.path_clock_ticks + static_cast<std::uint64_t>(
-            (link_latency_ns_ + 2 * clock_.uncertainty_ns()) *
+            (link_latency_ns_ + 2 * clock_.uncertainty_ns() +
+                2 * owner_period_ns_) *
             static_cast<double>(ack_.device_tick_hz) / 1e9) >= committed_until_ticks_) {
         const auto &segment = sent_[next_commit_];
         if (send_commit(segment.header.t0_ticks + segment.header.duration_ticks)) ++next_commit_;
@@ -291,17 +299,29 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
         state.effort[i] = actuators_[i].effort;
     }
     state.trajectory_queue_depth = ack_.segment_capacity - status_.remaining_segments;
-    state.trajectory_active = status_.executing_plan_id != 0;
-    state.trajectory_time_ns = status_.path_clock_ticks > device_epoch_ticks_
-        ? static_cast<std::uint64_t>((status_.path_clock_ticks - device_epoch_ticks_) *
-            (1e9 / ack_.device_tick_hz)) : 0;
+    state.trajectory_active = status_.executing_plan_id != 0 || state.trajectory_queue_depth != 0;
+    state.trajectory_time_ns = state.trajectory_active
+        ? path_time_ns(state_header_.path_clock_ticks) : 0;
     state.active_plan_id = status_.executing_plan_id;
-    state.committed_until_ns = committed_until_ticks_ > device_epoch_ticks_
-        ? static_cast<std::uint64_t>((committed_until_ticks_ - device_epoch_ticks_) *
-            (1e9 / ack_.device_tick_hz)) : 0;
+    state.committed_until_ns = path_time_ns(committed_until_ticks_);
+    state.trajectory_duration_ns = state.trajectory_active
+        ? std::max(state.trajectory_time_ns, state.committed_until_ns) : 0;
     state.session_state = status_.rate == 0.0f ? RK_SESSION_HELD :
         (state.trajectory_active ? RK_SESSION_EXECUTING : RK_SESSION_IDLE);
     return RK_OK;
+}
+
+std::uint64_t Rkd6Endpoint::path_time_ns(std::uint64_t device_ticks) const noexcept {
+    for (auto it = path_maps_.rbegin(); it != path_maps_.rend(); ++it) {
+        if (device_ticks >= it->device_start_ticks) {
+            const auto elapsed = static_cast<long double>(device_ticks - it->device_start_ticks) /
+                it->ticks_per_host_ns;
+            if (elapsed >= static_cast<long double>(UINT64_MAX - it->host_path_start_ns))
+                return UINT64_MAX;
+            return it->host_path_start_ns + static_cast<std::uint64_t>(std::llround(elapsed));
+        }
+    }
+    return 0;
 }
 
 } // namespace robotkit
