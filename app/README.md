@@ -55,8 +55,11 @@ or the Scene root to clear object selection.
 - Docking preferences remain separate and save automatically. The command
   palette also exposes Save workspace.
 
-`EditorScene` owns the editable records, SceneKit scene, published snapshot,
-spatial index, and UIKit `EditorDocument` history. `editor/SelectionModel` owns
+`EditorScene` provides the scene API and UIKit `EditorDocument` history.
+`editor/SceneModel` owns authored records and structural changes;
+`editor/ScenePresentation` owns SceneKit state, materials, and publication.
+`editor/ScenePropertyProvider` builds inspector descriptors, with kind-specific
+fields contributed by `editor/ObjectKindRegistry`. `editor/SelectionModel` owns
 object, feature, face, and edge selection with a separate revision.
 `editor/ObjectKindRegistry` supplies creation defaults, CAD sessions, kind-specific
 properties, menu entries, and hover support. `EditorSceneTree` caches child lists
