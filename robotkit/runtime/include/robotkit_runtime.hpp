@@ -137,6 +137,7 @@ public:
                                 const rk_trajectory_chunk &chunk);
     rk_result submit_segments(const rk_robot_command &command,
                               const rk_trajectory_segment_chunk &chunk);
+    rk_result submit_plan(const rk_plan_submission &plan);
     /** Copies the latest robot state without advancing endpoint time. */
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
@@ -156,6 +157,7 @@ public:
         bool legacy_point = true; /**< Retains strict stored-sample position checks. */
         uint64_t chunk_base_time_ns = 0;
         uint64_t tag = 0;
+        uint64_t plan_id = 0;
     };
 
     /** Internal phases used by Simulation to coordinate multiple runtimes. */
@@ -177,8 +179,10 @@ private:
         bool trajectory_history_valid = false;
         uint64_t trajectory_time_ns = 0;
         bool trajectory_active = false;
+        bool plan_just_submitted = false;
         uint64_t trajectory_tag = 0;
         uint64_t trajectory_tag_time_ns = 0;
+        uint64_t active_plan_id = 0;
         /** Trajectory clock rate; below 1 only while a path-following stop runs. */
         double trajectory_rate = 1.0;
         double trajectory_time_remainder_ns = 0.0;
@@ -209,6 +213,8 @@ private:
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};
     mutable std::mutex queue_mutex_;
+    /** Serializes plan submission with owner queue/clock mutations. */
+    mutable std::mutex owner_mutex_;
     std::condition_variable queue_condition_;
     std::deque<QueuedCommand> commands_;
     std::thread worker_;

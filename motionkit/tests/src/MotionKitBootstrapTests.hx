@@ -578,6 +578,8 @@ class MotionKitBootstrapTests {
         check(chunk.points.length > 1, "trajectory chunk carries timestamped samples");
       case JointTargets(_, _):
         throw "buffer unexpectedly fell back to sample-by-sample targets";
+      case ExecutionPlan(_):
+        throw "buffer unexpectedly submitted an execution plan";
     }
 
     var tick = 0;
@@ -688,6 +690,8 @@ class MotionKitBootstrapTests {
           "streamed trajectory chunks stay within the native point limit");
       case RobotCommand.JointTargets(_, _):
         throw "long trajectory unexpectedly fell back to sample-by-sample targets";
+      case RobotCommand.ExecutionPlan(_):
+        throw "long trajectory unexpectedly submitted an execution plan";
     }
     near(instrumented.snapshot().positions.get(0), 0.05,
       "streamed trajectory reaches its final position", 1e-5);
@@ -998,12 +1002,16 @@ class MotionKitBootstrapTests {
         check(true, "immediate replacement flush is ordered before its new chunk");
       case TrajectoryChunk(_):
         throw "immediate replacement submitted its chunk before the runtime flush";
+      case ExecutionPlan(_):
+        throw "immediate replacement unexpectedly submitted an execution plan";
     }
     switch recording.commands[3] {
       case TrajectoryChunk(_):
         check(true, "immediate replacement submits the new trajectory after its flush");
       case JointTargets(_, _):
         throw "immediate replacement did not submit a trajectory after its flush";
+      case ExecutionPlan(_):
+        throw "immediate replacement unexpectedly submitted an execution plan";
     }
     runMotion(machine, simulation);
     near(robot.snapshot().positions.get(0), 0.01,
@@ -1428,6 +1436,8 @@ class MotionKitBootstrapTests {
                   for (point in chunk.points)
                     worstSkew = Math.max(worstSkew,
                       Math.abs(point.positions[1] + 2.0 * point.positions[0]));
+                case ExecutionPlan(_):
+                  throw "MotionSystem unexpectedly submitted an execution plan";
               }
           check(worstSkew <= 1e-12, '$context commands the motors coordinated (skew $worstSkew)');
         }

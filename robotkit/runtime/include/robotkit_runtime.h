@@ -83,7 +83,7 @@ enum {
     RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued knots (legacy name). */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
-    RK_API_VERSION = 9 /**< Adds polynomial segment trajectory chunks. */
+    RK_API_VERSION = 10 /**< Adds execution-plan submission and session progress. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -317,6 +317,7 @@ typedef struct rk_robot_runtime_blueprint {
     uint32_t sensor_count; /**< Zero selects the default base-mounted simulation sensors. */
     rk_sensor_config sensors[RK_MAX_SENSORS];
     uint64_t calibration_revision; /**< Optional compiled calibration identity; zero is unspecified. */
+    uint64_t commit_lead_ns; /**< Zero selects two owner periods. */
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
@@ -381,6 +382,36 @@ typedef struct rk_trajectory_segment_chunk {
     uint64_t splice_time_ns;
 } rk_trajectory_segment_chunk;
 
+/** Capabilities required by a plan; unknown bits are unsupported. */
+enum { RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE = 1u };
+
+/** Bounded plan. Replacement time is in the active plan's trajectory clock. */
+typedef struct rk_plan_submission {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint64_t sequence; /**< Monotonic runtime command sequence. */
+    uint64_t plan_id; /**< Nonzero caller-selected identity. */
+    uint64_t model_revision;
+    uint64_t calibration_revision;
+    uint32_t required_capabilities;
+    uint32_t reserved0;
+    uint64_t replace_after_plan_id; /**< Zero means append/start, not replace. */
+    uint64_t replace_after_time_ns;
+    double start_position[RK_MAX_TRAJECTORY_JOINTS];
+    double start_velocity[RK_MAX_TRAJECTORY_JOINTS];
+    double start_acceleration[RK_MAX_TRAJECTORY_JOINTS];
+    rk_trajectory_segment_chunk segments;
+} rk_plan_submission;
+
+typedef uint32_t rk_session_state;
+enum {
+    RK_SESSION_IDLE = 0,
+    RK_SESSION_EXECUTING = 1,
+    RK_SESSION_HOLDING = 2, /**< Transitioning toward a path-preserving hold. */
+    RK_SESSION_HELD = 3, /**< Path clock paused with queued motion retained. */
+    RK_SESSION_STOPPING = 4,
+    RK_SESSION_FAULTED = 5
+};
+
 /** Command metadata and optional fixed-capacity joint-target payload. */
 typedef struct rk_robot_command {
     uint32_t struct_size RK_STRUCT_SIZE; /**< Set to sizeof this struct. */
@@ -412,6 +443,10 @@ typedef struct rk_robot_state {
     rk_sensor_sample sensors[RK_MAX_SENSORS];
     uint64_t trajectory_tag; /**< Chunk identity currently running or last stopped. */
     uint64_t trajectory_tag_time_ns; /**< Time within trajectory_tag, in nanoseconds. */
+    rk_session_state session_state;
+    uint64_t active_plan_id;
+    uint64_t committed_until_ns;
+    uint64_t queue_end_time_ns;
 } rk_robot_state;
 
 /** Immutable published runtime snapshot; native handles never enter this ABI. */
@@ -444,6 +479,10 @@ typedef struct rk_robot_snapshot {
     uint64_t trajectory_tag; /**< Chunk identity currently running or last stopped. */
     uint64_t trajectory_tag_time_ns; /**< Time within trajectory_tag, in nanoseconds. */
     uint64_t calibration_revision; /**< Blueprint calibration identity; zero is unspecified. */
+    rk_session_state session_state;
+    uint64_t active_plan_id;
+    uint64_t committed_until_ns;
+    uint64_t queue_end_time_ns;
 } rk_robot_snapshot;
 
 /** Static control capabilities reported by a RobotRuntime endpoint. */
@@ -455,7 +494,8 @@ typedef struct rk_robot_capabilities {
     uint32_t supports_effort_targets; /**< Non-zero when effort targets work. */
     uint32_t supports_prediction; /**< Non-zero when predictive state is available. */
     uint32_t supports_trajectory_queue; /**< Non-zero when timestamped trajectory chunks work. */
-    uint32_t reserved[2];
+    uint32_t supports_execution_plans; /**< Non-zero when revision-bound plans work. */
+    uint32_t reserved[1];
 } rk_robot_capabilities;
 
 /* ------------------------------------------------------------------------- */
@@ -480,6 +520,8 @@ RK_API rk_result RK_CALL rk_trajectory_segment_chunk_validate(
     const rk_trajectory_segment_chunk *chunk);
 RK_API rk_result RK_CALL rk_trajectory_segment_chunk_validate_for_blueprint(
     const rk_trajectory_segment_chunk *chunk, const rk_robot_runtime_blueprint *blueprint);
+RK_API rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
+    const rk_plan_submission *plan, const rk_robot_runtime_blueprint *blueprint);
 /** Validates a mutable native state value and its array counts. */
 RK_API rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state);
 /** Validates an immutable published snapshot and its array counts. */
@@ -581,6 +623,15 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit_trajectory(
 RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(
     rk_robot_runtime runtime, const rk_robot_command *command,
     const rk_trajectory_segment_chunk *chunk);
+
+/**
+ * Atomically validates and accepts a plan or committed-horizon replacement.
+ * A replacement before committed_until_ns returns RK_ERROR_INVALID_STATE with
+ * no queue mutation. Legacy chunk splices instead silently drop a late splice
+ * during the owner phase; their existing semantics are unchanged.
+ */
+RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(
+    rk_robot_runtime runtime, const rk_plan_submission *plan);
 
 /**
  * Copies the latest state into the caller-provided value.

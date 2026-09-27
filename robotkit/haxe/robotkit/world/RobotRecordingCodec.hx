@@ -6,7 +6,7 @@ import haxe.io.Bytes;
 
 /** Stable JSON payload contract stored inside MCAP messages. Wide integers are strings. */
 class RobotRecordingCodec {
-  public static inline final VERSION:Int = 3;
+  public static inline final VERSION:Int = 4;
 
   public static function encode(entry:RobotRecordingEntry):Bytes {
     var root:Dynamic = {
@@ -44,6 +44,22 @@ class RobotRecordingCodec {
             points:[for (point in chunk.points) {
               timeFromStartNs:Int64.toStr(point.timeFromStartNs),
               positions:point.positions
+            }]});
+        case ExecutionPlan(plan):
+          Reflect.setField(root, "payload", {kind:"executionPlan",
+            planId:Int64.toStr(plan.planId),
+            modelRevision:Int64.toStr(plan.modelRevision),
+            calibrationRevision:Int64.toStr(plan.calibrationRevision),
+            requiredCapabilities:plan.requiredCapabilities,
+            startPosition:plan.startPosition.toArray(),
+            startVelocity:plan.startVelocity.toArray(),
+            startAcceleration:plan.startAcceleration.toArray(),
+            replaceAfterPlanId:Int64.toStr(plan.replaceAfterPlanId),
+            replaceAfterTimeNs:Int64.toStr(plan.replaceAfterTimeNs),
+            segments:[for (segment in plan.segments) {
+              timeFromStartNs:Int64.toStr(segment.timeFromStartNs),
+              durationNs:Int64.toStr(segment.durationNs),
+              coefficients:segment.coefficients
             }]});
         }
       case RobotSnapshot(value): Reflect.setField(root, "type", "snapshot"); Reflect.setField(root, "payload", snapshot(value));
@@ -102,6 +118,21 @@ class RobotRecordingCodec {
             Command(TrajectoryChunk(TrajectoryChunk.fromSegments(segments,
               nullableWide(payload, "tag"), nullableWide(payload, "spliceTag"),
               nullableWide(payload, "spliceTimeNs"))));
+          case "executionPlan" if (version >= 4):
+            var segments:Array<TrajectorySegment> = [];
+            for (item in array(payload, "segments")) {
+              var coefficients:Array<Array<Float>> = [];
+              for (row in array(item, "coefficients"))
+                coefficients.push(floats({values:row}, "values"));
+              segments.push(new TrajectorySegment(wide(item, "timeFromStartNs"),
+                wide(item, "durationNs"), coefficients));
+            }
+            Command(ExecutionPlan(new ExecutionPlanSubmission(
+              wide(payload, "planId"), wide(payload, "modelRevision"),
+              wide(payload, "calibrationRevision"), fieldInt(payload, "requiredCapabilities"),
+              floats(payload, "startPosition"), floats(payload, "startVelocity"),
+              floats(payload, "startAcceleration"), segments,
+              wide(payload, "replaceAfterPlanId"), wide(payload, "replaceAfterTimeNs"))));
           case _: throw "Unsupported RobotKit command payload";
         }
       case "snapshot": RobotSnapshot(readSnapshot(payload));
@@ -120,9 +151,9 @@ class RobotRecordingCodec {
       wide(root, "recordingTimestampNs"), version);
   }
 
-  static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,safety:v.safety,trajectoryQueueDepth:v.trajectoryQueueDepth,trajectoryActive:v.trajectoryActive,trajectoryTimeNs:Int64.toStr(v.trajectoryTimeNs),trajectoryDurationNs:Int64.toStr(v.trajectoryDurationNs),trajectoryTag:Int64.toStr(v.trajectoryTag),trajectoryTagTimeNs:Int64.toStr(v.trajectoryTagTimeNs),sensors:[for(s in v.sensors.toArray()) sensor(s)]};
+  static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,safety:v.safety,trajectoryQueueDepth:v.trajectoryQueueDepth,trajectoryActive:v.trajectoryActive,trajectoryTimeNs:Int64.toStr(v.trajectoryTimeNs),trajectoryDurationNs:Int64.toStr(v.trajectoryDurationNs),trajectoryTag:Int64.toStr(v.trajectoryTag),trajectoryTagTimeNs:Int64.toStr(v.trajectoryTagTimeNs),sessionState:v.sessionState,activePlanId:Int64.toStr(v.activePlanId),committedUntilNs:Int64.toStr(v.committedUntilNs),queueEndTimeNs:Int64.toStr(v.queueEndTimeNs),sensors:[for(s in v.sensors.toArray()) sensor(s)]};
   static function sensor(v:SensorFrame):Dynamic return {sensorId:v.sensorId,kind:v.kind,frameId:v.frameId,sequence:Int64.toStr(v.sequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,values:v.values.toArray(),linkId:v.linkId,mountPosition:v.mountPosition.toArray(),mountRotation:v.mountRotation.toArray(),image:v.image==null?null:cameraImage(v.image)};
-  static function readSnapshot(v:Dynamic):RobotSnapshot return new RobotSnapshot(string(v,"id"),wide(v,"sourceSequence"),wide(v,"sourceTimestampNs"),floats(v,"positions"),floats(v,"velocities"),floats(v,"efforts"),fieldInt(v,"mode"),fieldInt(v,"faultCode"),wide(v,"receivedTimestampNs"),[for(s in array(v,"sensors")) readSensor(s)],string(v,"sourceClockId"),string(v,"receivedClockId"),optionalFieldInt(v,"safety",0),optionalFieldInt(v,"trajectoryQueueDepth",0),optionalFieldBool(v,"trajectoryActive",false),nullableWide(v,"trajectoryTimeNs"),nullableWide(v,"trajectoryDurationNs"),nullableWide(v,"trajectoryTag"),nullableWide(v,"trajectoryTagTimeNs"));
+  static function readSnapshot(v:Dynamic):RobotSnapshot return new RobotSnapshot(string(v,"id"),wide(v,"sourceSequence"),wide(v,"sourceTimestampNs"),floats(v,"positions"),floats(v,"velocities"),floats(v,"efforts"),fieldInt(v,"mode"),fieldInt(v,"faultCode"),wide(v,"receivedTimestampNs"),[for(s in array(v,"sensors")) readSensor(s)],string(v,"sourceClockId"),string(v,"receivedClockId"),optionalFieldInt(v,"safety",0),optionalFieldInt(v,"trajectoryQueueDepth",0),optionalFieldBool(v,"trajectoryActive",false),nullableWide(v,"trajectoryTimeNs"),nullableWide(v,"trajectoryDurationNs"),nullableWide(v,"trajectoryTag"),nullableWide(v,"trajectoryTagTimeNs"),optionalFieldInt(v,"sessionState",0),nullableWide(v,"activePlanId"),nullableWide(v,"committedUntilNs"),nullableWide(v,"queueEndTimeNs"));
   static function readSensor(v:Dynamic):SensorFrame {
     var position = floats(v, "mountPosition");
     var rotation = floats(v, "mountRotation");

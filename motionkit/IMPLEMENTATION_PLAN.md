@@ -448,6 +448,10 @@ Do:
     an error**, not silently dropped as splices are today.
   - Existing splice semantics stay for the old chunk command. Document the
     difference.
+  - Plan submission checks position, velocity and acceleration start-state
+    assumptions within 1e-6 in SI units when the anchor has exact derivatives.
+    Degree-1 anchors do not provide exact derivatives and cannot be replaced
+    while moving; replacement segments must start at degree ≥ 2.
 - Session state in the snapshot: `idle | executing | holding | held |
   stopping | faulted`.
 - Haxe: `robotkit.world.ExecutionPlanSubmission` and snapshot fields. Keep
@@ -822,3 +826,25 @@ setpoint identity, native splice, acceleration and junction rejection, and
 degree-selected STOP braking including a Ruckig segment chunk. Commit: the
 commit containing this entry. MotionKit and RobotKit native/Haxe suites,
 both FFI audits, and TCP default, session and lease-timeout modes passed.
+
+### P7 — Add runtime execution sessions and committed-horizon plans
+
+Added an atomic `rk_robot_runtime_submit_plan` path with plan ID, model and
+calibration revisions, required capability bits, start-state assumptions,
+bounded polynomial segments and an optional replacement anchor. Submission
+validates before mutating the queue. The blueprint can configure
+`commit_lead_ns` (zero defaults to two owner periods); snapshots publish
+session state, active plan ID, committed horizon and queue end. A plan
+replacement before that horizon returns `RK_ERROR_INVALID_STATE`, while
+legacy chunk splices retain their silent-late-drop behaviour. Moving
+degree-1 anchors are not eligible for plan replacement because their chord
+derivatives are not exact start-state derivatives.
+
+Haxe now has a thin `ExecutionPlanSubmission` mapping and plan-capability flag.
+The MCAP schema is v4 so commands and session progress round-trip, with v1–v3
+readers retained. Tests cover revision, capability and start-state rejection,
+configurable horizon, byte-identical committed motion sampled at 1 kHz,
+degree-1 retarget rejection, C ABI submission and MCAP replay progress.
+MotionKit and RobotKit native/Haxe suites, both FFI audits, and TCP default,
+session and lease-timeout integration passed.
+Commit: the commit containing this entry.

@@ -279,7 +279,7 @@ class RobotWorldTests {
     var opened=RobotKitRuntime.rk_recording_writer_create(mismatchPath,Int64.ofInt(4096));
     equal(opened.status,RobotKitRuntimeConstants.RK_OK,"schema mismatch fixture opens");
     var payload=RobotRecordingCodec.encode(mismatchEntry);
-    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,3,
+    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,4,
       mismatchEntry.ordinal,mismatchEntry.recordingTimestampNs,payload),RobotKitRuntimeConstants.RK_OK,
       "schema mismatch fixture writes payload to wrong channel");
     equal(RobotKitRuntime.rk_recording_writer_finish(opened.out_writer.borrow()),RobotKitRuntimeConstants.RK_OK,
@@ -4220,6 +4220,48 @@ class RobotWorldTests {
     check(Math.abs(segmentRuntime.snapshot().q.get(0) - 0.05) < 0.000000001,
       "Haxe segment submission executes polynomial target");
     segmentSimulation.dispose();
+
+    var planSimulation = new Simulation(0.1);
+    var planRuntime = planSimulation.addRobot(blueprint);
+    var planPath = '/tmp/robotkit-${Sys.getPid()}-plan-session.mcap';
+    var writer = new McapRobotRecording(planPath, 1024 * 1024);
+    var recorded = new RecordingRobot(new SimulatedRobot("plan-session", planRuntime,
+      model.name, ["base", "tool"], ["shoulder"]), writer);
+    var plan = new robotkit.world.ExecutionPlanSubmission(Int64.ofInt(77),
+      Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision),
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      [0.0], [0.0], [0.0],
+      [new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])]);
+    recorded.submit(RobotCommand.ExecutionPlan(plan));
+    var progress:Array<String> = [];
+    for (time in [100, 200, 300]) {
+      planSimulation.step(Int64.ofInt(time));
+      var snapshot = recorded.snapshot();
+      progress.push('${snapshot.sessionState}:${Int64.toStr(snapshot.activePlanId)}:' +
+        '${Int64.toStr(snapshot.committedUntilNs)}:${Int64.toStr(snapshot.queueEndTimeNs)}');
+    }
+    check(recorded.recordingError == null, "plan session records without errors");
+    writer.close();
+    var loaded = McapRecordingReader.load(planPath);
+    check(loaded.commands.length == 1, "MCAP retains the submitted plan command");
+    switch loaded.commands[0] {
+      case ExecutionPlan(replayedPlan):
+        equal(replayedPlan.planId, Int64.ofInt(77), "MCAP preserves plan identity");
+      case _:
+        check(false, "MCAP decodes the plan command variant");
+    }
+    var replay = new ReplayRobot("plan-session", loaded);
+    for (expected in progress) {
+      var snapshot = replay.snapshot();
+      var actual = '${snapshot.sessionState}:${Int64.toStr(snapshot.activePlanId)}:' +
+        '${Int64.toStr(snapshot.committedUntilNs)}:${Int64.toStr(snapshot.queueEndTimeNs)}';
+      equal(actual, expected, "MCAP replay preserves session progress");
+      replay.advance();
+    }
+    replay.close();
+    planSimulation.dispose();
+    sys.FileSystem.deleteFile(planPath);
+    sys.FileSystem.deleteFile(planPath + ".incomplete.status");
   }
 
   static function check(value:Bool, message:String):Void {
@@ -4231,6 +4273,7 @@ class RobotWorldTests {
     case JointTargets(targets, _): [for (target in targets)
       '${target.joint}:${Std.string(target.mode)}:${target.target}'].join(",");
     case TrajectoryChunk(chunk): 'trajectory:${chunk.points.length}';
+    case ExecutionPlan(plan): 'plan:${Int64.toStr(plan.planId)}';
   };
 
   static function advanceReplaySample(replay:ReplayRobot):Bool {

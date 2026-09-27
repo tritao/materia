@@ -26,6 +26,11 @@ class RobotRecording implements RobotRecordingSink {
         commands.push(copy);
         events.push(RobotRecordingEvent.Command(copy));
         append(RobotRecordingEvent.Command(copy), robotId);
+      case ExecutionPlan(plan):
+        var copy = RobotCommand.ExecutionPlan(plan.copy());
+        commands.push(copy);
+        events.push(RobotRecordingEvent.Command(copy));
+        append(RobotRecordingEvent.Command(copy), robotId);
     }
   }
 
@@ -84,7 +89,9 @@ class RobotRecording implements RobotRecordingSink {
       value.sensors.toArray(), value.sourceClockId, value.receivedClockId,
       value.safety, value.trajectoryQueueDepth, value.trajectoryActive,
       value.trajectoryTimeNs, value.trajectoryDurationNs,
-      value.trajectoryTag, value.trajectoryTagTimeNs);
+      value.trajectoryTag, value.trajectoryTagTimeNs,
+      value.sessionState, value.activePlanId,
+      value.committedUntilNs, value.queueEndTimeNs);
 
   function pushWorldEvent(event:RobotWorldEvent, robotId:RobotId):Void {
     events.push(RobotRecordingEvent.WorldEvent(event));

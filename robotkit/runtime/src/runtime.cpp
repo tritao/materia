@@ -369,6 +369,163 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command,
     }
 }
 
+rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
+    if (rk_plan_submission_validate_for_blueprint(&plan, &blueprint_) != RK_OK)
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (plan.model_revision != blueprint_.revision ||
+        plan.calibration_revision != blueprint_.calibration_revision)
+        return RK_ERROR_MODEL_MISMATCH;
+    if ((plan.required_capabilities & ~RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE) != 0 ||
+        !supports_trajectory_queue())
+        return RK_ERROR_UNSUPPORTED;
+    try {
+        std::lock_guard owner_lock(owner_mutex_);
+        std::lock_guard queue_lock(queue_mutex_);
+        if (plan.sequence <= last_command_sequence_) return RK_ERROR_STALE_COMMAND;
+        // A pending legacy command could change the anchor before the owner
+        // applies it. Reject rather than accepting a plan against stale state.
+        if (!commands_.empty()) return RK_ERROR_INVALID_STATE;
+        std::lock_guard state_lock(state_mutex_);
+        if (state_.safety != RK_SAFETY_READY || control_.stop_ramp_active)
+            return RK_ERROR_INVALID_STATE;
+        auto candidate = control_.trajectory;
+        const bool replace = plan.replace_after_plan_id != 0;
+        uint64_t base_time = 0;
+        const uint64_t lead = blueprint_.commit_lead_ns != 0 ? blueprint_.commit_lead_ns :
+            static_cast<uint64_t>(std::max<int64_t>(0, period_.count())) * 2;
+        const uint64_t committed = control_.trajectory_time_ns > UINT64_MAX - lead
+            ? UINT64_MAX : control_.trajectory_time_ns + lead;
+        if (replace) {
+            if (!control_.trajectory_active || candidate.empty() ||
+                plan.replace_after_plan_id != control_.active_plan_id ||
+                plan.replace_after_time_ns < committed ||
+                plan.replace_after_time_ns > candidate.back().point.time_from_start_ns)
+                return RK_ERROR_INVALID_STATE;
+            base_time = plan.replace_after_time_ns;
+        } else if (!candidate.empty()) {
+            base_time = candidate.back().point.time_from_start_ns;
+        }
+        double anchor_position[RK_MAX_TRAJECTORY_JOINTS]{};
+        double anchor_velocity[RK_MAX_TRAJECTORY_JOINTS]{};
+        double anchor_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
+        bool exact_anchor_derivatives = candidate.empty();
+        if (candidate.empty()) {
+            std::copy_n(state_.position, blueprint_.joint_count, anchor_position);
+            std::copy_n(state_.velocity, blueprint_.joint_count, anchor_velocity);
+        } else {
+            const RuntimeTrajectoryPoint *anchor = &candidate.front();
+            if (replace) {
+                anchor = nullptr;
+                for (const auto &knot : candidate) {
+                    if (!knot.has_segment || knot.plan_id != plan.replace_after_plan_id)
+                        continue;
+                    const auto start = knot.point.time_from_start_ns;
+                    const auto end = start + static_cast<uint64_t>(knot.segment.duration_ns);
+                    if (start <= base_time && base_time <= end) {
+                        anchor = &knot;
+                        break;
+                    }
+                }
+                if (anchor == nullptr) return RK_ERROR_INVALID_STATE;
+            } else {
+                for (std::size_t index = 0; index < candidate.size(); ++index) {
+                    if (candidate[index].point.time_from_start_ns > base_time) break;
+                    anchor = &candidate[index];
+                    if (!anchor->has_segment && index > 0)
+                        anchor = &candidate[index - 1];
+                }
+            }
+            evaluate_knot(*anchor, base_time, anchor_position, anchor_velocity,
+                anchor_acceleration);
+            exact_anchor_derivatives = anchor->has_segment && anchor->segment.degree >= 2;
+            if (replace && !exact_anchor_derivatives)
+                return RK_ERROR_INVALID_STATE;
+        }
+        // The assumption is checked against the actual anchor, and the
+        // submitted polynomial must start at that same state. Degree-1 paths
+        // may only promise chord velocity, never stored sample derivatives.
+        constexpr double position_tolerance = 1e-6;
+        constexpr double derivative_tolerance = 1e-6;
+        const auto &first = plan.segments.segments[0];
+        if (replace && first.degree < 2)
+            return RK_ERROR_INVALID_STATE;
+        for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
+            if (std::abs(plan.start_position[joint] - anchor_position[joint]) > position_tolerance ||
+                (exact_anchor_derivatives &&
+                    (std::abs(plan.start_velocity[joint] - anchor_velocity[joint]) > derivative_tolerance ||
+                     std::abs(plan.start_acceleration[joint] - anchor_acceleration[joint]) > derivative_tolerance)) ||
+                std::abs(first.coefficients[joint].value[0] - plan.start_position[joint]) > position_tolerance ||
+                (first.degree >= 2 &&
+                    (std::abs(first.coefficients[joint].value[1] - plan.start_velocity[joint]) > derivative_tolerance ||
+                     std::abs(2.0 * first.coefficients[joint].value[2] - plan.start_acceleration[joint]) > derivative_tolerance)))
+                return RK_ERROR_INVALID_STATE;
+        }
+        if (replace) {
+            while (!candidate.empty() && candidate.back().point.time_from_start_ns >= base_time)
+                candidate.pop_back();
+            if (!candidate.empty() && candidate.back().has_segment) {
+                const auto end = candidate.back().point.time_from_start_ns +
+                    static_cast<uint64_t>(candidate.back().segment.duration_ns);
+                if (end > base_time)
+                    candidate.back().segment.duration_ns = static_cast<int64_t>(
+                        base_time - candidate.back().point.time_from_start_ns);
+            }
+        }
+        for (uint32_t index = 0; index < plan.segments.segment_count; ++index) {
+            const auto &source = plan.segments.segments[index];
+            if (source.time_from_start_ns > static_cast<uint64_t>(INT64_MAX) - base_time ||
+                source.duration_ns > static_cast<uint64_t>(INT64_MAX) - base_time - source.time_from_start_ns)
+                return RK_ERROR_INVALID_ARGUMENT;
+            RuntimeTrajectoryPoint knot{};
+            knot.segment = native_segment(source, base_time);
+            knot.has_segment = true;
+            knot.legacy_point = false;
+            knot.point.time_from_start_ns = static_cast<uint64_t>(knot.segment.t0_ns);
+            knot.point.joint_count = source.joint_count;
+            for (uint32_t joint = 0; joint < source.joint_count; ++joint)
+                knot.point.positions[joint] = source.coefficients[joint].value[0];
+            knot.chunk_base_time_ns = base_time;
+            knot.tag = plan.segments.tag;
+            knot.plan_id = plan.plan_id;
+            candidate.push_back(std::move(knot));
+        }
+        RuntimeTrajectoryPoint end{};
+        const auto &last = candidate.back();
+        end.point.time_from_start_ns = static_cast<uint64_t>(last.segment.t0_ns + last.segment.duration_ns);
+        end.point.joint_count = blueprint_.joint_count;
+        evaluate_knot(last, end.point.time_from_start_ns, end.point.positions);
+        end.counted_knot = false;
+        end.legacy_point = false;
+        end.chunk_base_time_ns = base_time;
+        end.tag = plan.segments.tag;
+        end.plan_id = plan.plan_id;
+        candidate.push_back(std::move(end));
+        if (queued_knot_count(candidate) > RK_MAX_TRAJECTORY_QUEUE_POINTS)
+            return RK_ERROR_QUEUE_FULL;
+        const auto checked = validate_queued_path(candidate, blueprint_);
+        if (checked != RK_OK) return checked;
+        const bool was_idle = !control_.trajectory_active;
+        control_.trajectory = std::move(candidate);
+        control_.trajectory_active = true;
+        control_.plan_just_submitted = was_idle;
+        if (was_idle) control_.trajectory_time_ns = 0;
+        control_.active_plan_id = replace ? control_.active_plan_id : plan.plan_id;
+        state_.trajectory_active = 1;
+        state_.trajectory_queue_depth = queued_knot_count(control_.trajectory);
+        state_.trajectory_time_ns = control_.trajectory_time_ns;
+        state_.trajectory_duration_ns = control_.trajectory.back().point.time_from_start_ns;
+        state_.queue_end_time_ns = state_.trajectory_duration_ns;
+        state_.committed_until_ns = committed;
+        state_.active_plan_id = control_.active_plan_id;
+        state_.session_state = RK_SESSION_EXECUTING;
+        state_.mode = RK_ROBOT_MODE_TRACKING;
+        last_command_sequence_ = plan.sequence;
+        return RK_OK;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    }
+}
+
 rk_result RobotRuntime::snapshot(rk_robot_state &out_state) const {
     std::lock_guard lock(state_mutex_);
     out_state = state_;
@@ -401,6 +558,10 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     out_snapshot.trajectory_duration_ns = state_.trajectory_duration_ns;
     out_snapshot.trajectory_tag = state_.trajectory_tag;
     out_snapshot.trajectory_tag_time_ns = state_.trajectory_tag_time_ns;
+    out_snapshot.session_state = state_.session_state;
+    out_snapshot.active_plan_id = state_.active_plan_id;
+    out_snapshot.committed_until_ns = state_.committed_until_ns;
+    out_snapshot.queue_end_time_ns = state_.queue_end_time_ns;
     out_snapshot.sensor_count = state_.sensor_count;
     std::copy_n(state_.sensors, state_.sensor_count, out_snapshot.sensors);
     return RK_OK;
@@ -451,13 +612,18 @@ void RobotRuntime::latch_fault(bool clear_control) {
         state_.trajectory_duration_ns = 0;
         state_.trajectory_tag = 0;
         state_.trajectory_tag_time_ns = 0;
+        state_.active_plan_id = 0;
+        state_.committed_until_ns = 0;
+        state_.queue_end_time_ns = 0;
     }
     state_.mode = RK_ROBOT_MODE_FAULT;
     state_.safety = RK_SAFETY_FAULT;
+    state_.session_state = RK_SESSION_FAULTED;
     state_backup_valid_ = false;
 }
 
 rk_result RobotRuntime::apply_pending_commands() {
+    std::lock_guard owner_lock(owner_mutex_);
     std::deque<QueuedCommand> commands;
     {
         std::lock_guard queue_lock(queue_mutex_);
@@ -484,7 +650,9 @@ rk_result RobotRuntime::apply_pending_commands() {
         const double period_seconds = static_cast<double>(period_ns) / 1'000'000'000.0;
         double time_ns = static_cast<double>(control_.trajectory_time_ns) +
             control_.trajectory_time_remainder_ns;
-        if (!control_.stop_ramp_active) {
+        if (control_.plan_just_submitted) {
+            control_.plan_just_submitted = false;
+        } else if (!control_.stop_ramp_active) {
             time_ns += static_cast<double>(period_ns);
         } else {
             // Path-following stop. A joint moves at rate * v and accelerates
@@ -633,6 +801,7 @@ rk_result RobotRuntime::apply_pending_commands() {
         const auto selected_time = std::min(control_.trajectory_time_ns,
             control_.trajectory.back().point.time_from_start_ns);
         control_.trajectory_tag = selected->tag;
+        control_.active_plan_id = selected->plan_id;
         control_.trajectory_tag_time_ns = selected_time >= selected->chunk_base_time_ns
             ? selected_time - selected->chunk_base_time_ns : 0;
     };
@@ -1119,6 +1288,13 @@ rk_result RobotRuntime::apply_pending_commands() {
         ? control_.trajectory.back().point.time_from_start_ns : 0;
     state_.trajectory_tag = control_.trajectory_tag;
     state_.trajectory_tag_time_ns = control_.trajectory_tag_time_ns;
+    state_.queue_end_time_ns = state_.trajectory_duration_ns;
+    state_.active_plan_id = control_.trajectory_active ? control_.active_plan_id : 0;
+    const uint64_t lead = blueprint_.commit_lead_ns != 0 ? blueprint_.commit_lead_ns :
+        static_cast<uint64_t>(std::max<int64_t>(0, period_.count())) * 2;
+    state_.committed_until_ns = control_.trajectory_active
+        ? (control_.trajectory_time_ns > UINT64_MAX - lead ? UINT64_MAX :
+            control_.trajectory_time_ns + lead) : 0;
     if (lifecycle_command && final_kind == RK_COMMAND_EMERGENCY_STOP) {
         state_.mode = RK_ROBOT_MODE_FAULT;
         state_.safety = RK_SAFETY_EMERGENCY_STOP;
@@ -1137,11 +1313,16 @@ rk_result RobotRuntime::apply_pending_commands() {
         state_.mode = RK_ROBOT_MODE_TRACKING;
         state_.safety = RK_SAFETY_READY;
     }
+    state_.session_state = state_.safety == RK_SAFETY_FAULT ||
+        state_.safety == RK_SAFETY_EMERGENCY_STOP ? RK_SESSION_FAULTED :
+        control_.stop_ramp_active ? RK_SESSION_STOPPING :
+        control_.trajectory_active ? RK_SESSION_EXECUTING : RK_SESSION_IDLE;
 
     return RK_OK;
 }
 
 rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
+    std::lock_guard owner_lock(owner_mutex_);
     rk_robot_state next;
     {
         std::lock_guard state_lock(state_mutex_);
@@ -1155,6 +1336,10 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     const auto trajectory_duration_ns = next.trajectory_duration_ns;
     const auto trajectory_tag = next.trajectory_tag;
     const auto trajectory_tag_time_ns = next.trajectory_tag_time_ns;
+    const auto session_state = next.session_state;
+    const auto active_plan_id = next.active_plan_id;
+    const auto committed_until_ns = next.committed_until_ns;
+    const auto queue_end_time_ns = next.queue_end_time_ns;
     next.source_timestamp_ns = 0;
     next.received_timestamp_ns = 0;
     next.sensor_count = 0;
@@ -1166,10 +1351,16 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     next.trajectory_duration_ns = trajectory_duration_ns;
     next.trajectory_tag = trajectory_tag;
     next.trajectory_tag_time_ns = trajectory_tag_time_ns;
+    next.session_state = session_state;
+    next.active_plan_id = active_plan_id;
+    next.committed_until_ns = committed_until_ns;
+    next.queue_end_time_ns = queue_end_time_ns;
     if (!endpoint_->reports_safety_state())
         next.safety = runtime_safety;
     else if (next.safety == RK_SAFETY_EMERGENCY_STOP || next.safety == RK_SAFETY_FAULT)
         next.mode = RK_ROBOT_MODE_FAULT;
+    if (next.safety == RK_SAFETY_EMERGENCY_STOP || next.safety == RK_SAFETY_FAULT)
+        next.session_state = RK_SESSION_FAULTED;
     const auto sample_validation = result == RK_OK
         ? rk_robot_state_validate(&next) : RK_OK;
     const auto configured_sensor_count = blueprint_.sensor_count == 0 ? 3 : blueprint_.sensor_count;
@@ -1215,6 +1406,7 @@ void RobotRuntime::set_externally_driven(bool value) noexcept {
 }
 
 void RobotRuntime::discard_pending_commands() noexcept {
+    std::lock_guard owner_lock(owner_mutex_);
     endpoint_->discard_pending();
     std::lock_guard state_lock(state_mutex_);
     if (state_backup_valid_) {
@@ -1225,6 +1417,7 @@ void RobotRuntime::discard_pending_commands() noexcept {
 }
 
 void RobotRuntime::reset_state() noexcept {
+    std::lock_guard owner_lock(owner_mutex_);
     {
         std::lock_guard queue_lock(queue_mutex_);
         commands_.clear();

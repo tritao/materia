@@ -106,7 +106,10 @@ class ReplayRobot implements Robot {
       value.mode, faultCode, value.receivedTimestampNs, sensors,
       value.sourceClockId, value.receivedClockId, value.safety,
       value.trajectoryQueueDepth, value.trajectoryActive,
-      value.trajectoryTimeNs, value.trajectoryDurationNs);
+      value.trajectoryTimeNs, value.trajectoryDurationNs,
+      value.trajectoryTag, value.trajectoryTagTimeNs,
+      value.sessionState, value.activePlanId,
+      value.committedUntilNs, value.queueEndTimeNs);
 
   function ensureLive():Void if (closed) throw "ReplayRobot has been closed";
 }

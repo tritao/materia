@@ -67,6 +67,29 @@ int main(void) {
         &segment_chunk) == RK_OK);
     rk_robot_runtime_destroy(segment_runtime);
 
+    rk_robot_runtime plan_runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_robot_runtime_create(&blueprint, &plan_runtime) == RK_OK);
+    rk_plan_submission plan = {0};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 99;
+    plan.model_revision = blueprint.revision;
+    plan.required_capabilities = RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE;
+    plan.segments.struct_size = sizeof(plan.segments);
+    plan.segments.segment_count = 1;
+    plan.segments.segments[0].duration_ns = 1000000000;
+    plan.segments.segments[0].degree = 3;
+    plan.segments.segments[0].joint_count = 1;
+    plan.segments.segments[0].coefficients[0].value[3] = 0.1;
+    assert(rk_plan_submission_validate_for_blueprint(&plan, &blueprint) == RK_OK);
+    assert(rk_robot_runtime_submit_plan(plan_runtime, &plan) == RK_OK);
+    full_snapshot.struct_size = sizeof(full_snapshot);
+    assert(rk_robot_runtime_snapshot_full(plan_runtime, &full_snapshot) == RK_OK);
+    assert(full_snapshot.active_plan_id == 99);
+    assert(full_snapshot.session_state == RK_SESSION_EXECUTING);
+    assert(full_snapshot.queue_end_time_ns == 1000000000);
+    rk_robot_runtime_destroy(plan_runtime);
+
     rk_robot_command command = {0};
     command.struct_size = sizeof(command);
     command.sequence = 1;
@@ -97,6 +120,7 @@ int main(void) {
     assert(capabilities.joint_count == 1);
     assert(capabilities.supports_position_targets != 0);
     assert(capabilities.supports_trajectory_queue != 0);
+    assert(capabilities.supports_execution_plans != 0);
 
     rk_robot_command trajectory_command = {0};
     trajectory_command.struct_size = sizeof(trajectory_command);

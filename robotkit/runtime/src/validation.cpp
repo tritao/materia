@@ -207,6 +207,21 @@ rk_result RK_CALL rk_trajectory_segment_chunk_validate_for_blueprint(
     return RK_OK;
 }
 
+rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
+    const rk_plan_submission *plan, const rk_robot_runtime_blueprint *blueprint) {
+    if (!has_full_struct(plan) || plan->sequence == 0 || plan->plan_id == 0 ||
+        rk_trajectory_segment_chunk_validate_for_blueprint(&plan->segments, blueprint) != RK_OK ||
+        (plan->replace_after_plan_id == 0 && plan->replace_after_time_ns != 0) ||
+        (plan->replace_after_plan_id != 0 && plan->replace_after_time_ns == 0))
+        return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
+        if (!is_finite(plan->start_position[joint]) ||
+            !is_finite(plan->start_velocity[joint]) ||
+            !is_finite(plan->start_acceleration[joint]))
+            return RK_ERROR_INVALID_ARGUMENT;
+    return RK_OK;
+}
+
 rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state) {
     if (!has_full_struct(state) || state->joint_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -248,7 +263,8 @@ rk_result RK_CALL rk_robot_capabilities_validate(const rk_robot_capabilities *ca
     if (capabilities->supports_position_targets > 1 ||
         capabilities->supports_velocity_targets > 1 ||
         capabilities->supports_effort_targets > 1 || capabilities->supports_prediction > 1 ||
-        capabilities->supports_trajectory_queue > 1)
+        capabilities->supports_trajectory_queue > 1 ||
+        capabilities->supports_execution_plans > 1)
         return RK_ERROR_INVALID_ARGUMENT;
     return RK_OK;
 }

@@ -6,6 +6,7 @@ import nativekit.ffi.NativeKit;
 import robotkit.world.CameraImage;
 import robotkit.world.SensorFrame;
 import robotkit.world.TrajectoryChunk;
+import robotkit.world.ExecutionPlanSubmission;
 import sys.thread.Mutex;
 
 /**
@@ -81,6 +82,15 @@ class RobotRuntime {
     check(RobotKitRuntime.rk_robot_runtime_capabilities(owner.borrow(), value).status,
       "runtime.capabilities");
     return value.get_supports_trajectory_queue() != 0;
+  }
+
+  public function supportsExecutionPlans():Bool {
+    ensureLive();
+    var value = new rk_robot_capabilities();
+    value.set_struct_size(rk_robot_capabilities.size());
+    check(RobotKitRuntime.rk_robot_runtime_capabilities(owner.borrow(), value).status,
+      "runtime.capabilities");
+    return value.get_supports_execution_plans() != 0;
   }
 
   /** Submits a complete heterogeneous joint-target batch in one native call. */
@@ -181,6 +191,51 @@ class RobotRuntime {
     }
     check(RobotKitRuntime.rk_robot_runtime_submit_trajectory(owner.borrow(), command, payload),
       "runtime.submitTrajectory");
+  }
+
+  /** Accepts a plan atomically, including its revision and horizon checks. */
+  public function submitPlan(plan:ExecutionPlanSubmission, sequence:Int):Void {
+    ensureLive();
+    if (plan == null) throw "Execution plan is required";
+    var native = new rk_plan_submission();
+    native.set_struct_size(rk_plan_submission.size());
+    native.set_sequence(Int64.ofInt(sequence));
+    native.set_plan_id(plan.planId);
+    native.set_model_revision(plan.modelRevision);
+    native.set_calibration_revision(plan.calibrationRevision);
+    native.set_required_capabilities(plan.requiredCapabilities);
+    native.set_replace_after_plan_id(plan.replaceAfterPlanId);
+    native.set_replace_after_time_ns(plan.replaceAfterTimeNs);
+    var positions = plan.startPosition.toArray();
+    var velocities = plan.startVelocity.toArray();
+    var accelerations = plan.startAcceleration.toArray();
+    for (joint in 0...positions.length) {
+      native.set_start_position(joint, positions[joint]);
+      native.set_start_velocity(joint, velocities[joint]);
+      native.set_start_acceleration(joint, accelerations[joint]);
+    }
+    var payload = new rk_trajectory_segment_chunk();
+    payload.set_struct_size(rk_trajectory_segment_chunk.size());
+    payload.set_segment_count(plan.segments.length);
+    payload.set_tag(plan.planId);
+    for (index in 0...plan.segments.length) {
+      var source = plan.segments[index];
+      var segment = new rk_trajectory_segment();
+      segment.set_time_from_start_ns(source.timeFromStartNs);
+      segment.set_duration_ns(source.durationNs);
+      segment.set_degree(source.degree);
+      segment.set_joint_count(source.jointCount);
+      for (joint in 0...source.jointCount) {
+        var coefficients = new rk_trajectory_coefficients();
+        for (degree in 0...source.degree + 1)
+          coefficients.set_value(degree, source.coefficients[joint][degree]);
+        segment.set_coefficients(joint, coefficients);
+      }
+      payload.set_segments(index, segment);
+    }
+    native.set_segments(payload);
+    check(RobotKitRuntime.rk_robot_runtime_submit_plan(owner.borrow(), native),
+      "runtime.submitPlan");
   }
 
   /** Submits all position targets in one native call. */

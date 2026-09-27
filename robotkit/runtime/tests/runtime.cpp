@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <cstring>
 #include <cmath>
 #include <initializer_list>
 #include <memory>
@@ -217,6 +218,24 @@ rk_trajectory_segment_chunk linear_segment_chunk(double start, double slope,
     segment.coefficients[0].value[1] = slope;
     segment.coefficients[1].value[0] = -start;
     segment.coefficients[1].value[1] = -slope;
+    return chunk;
+}
+
+rk_trajectory_segment_chunk cubic_plan_chunk(uint64_t tag) {
+    auto chunk = linear_segment_chunk(0.0, 0.0, 1'000'000'000, tag);
+    chunk.segments[0].degree = 3;
+    chunk.segments[0].coefficients[0].value[3] = 1.0;
+    chunk.segments[0].coefficients[1].value[3] = -1.0;
+    return chunk;
+}
+
+rk_trajectory_segment_chunk replacement_plan_chunk(uint64_t tag) {
+    auto chunk = linear_segment_chunk(0.125, 0.75, 500'000'000, tag);
+    chunk.segments[0].degree = 3;
+    chunk.segments[0].coefficients[0].value[2] = 1.5;
+    chunk.segments[0].coefficients[0].value[3] = -1.0;
+    chunk.segments[0].coefficients[1].value[2] = -1.5;
+    chunk.segments[0].coefficients[1].value[3] = 1.0;
     return chunk;
 }
 
@@ -721,6 +740,146 @@ void mixed_queue_depth_counts_knots(const rk_robot_runtime_blueprint &blueprint)
     assert(state.trajectory_queue_depth == 1);
 }
 
+void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &source) {
+    auto blueprint = source;
+    blueprint.revision = 42;
+    blueprint.calibration_revision = 7;
+    blueprint.commit_lead_ns = 250'000'000;
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+    auto first = cubic_plan_chunk(11);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 11;
+    plan.model_revision = 42;
+    plan.calibration_revision = 7;
+    plan.segments = first;
+    plan.start_position[0] = 0.0;
+    plan.start_position[1] = 0.0;
+    plan.model_revision = 41;
+    assert(runtime.submit_plan(plan) == RK_ERROR_MODEL_MISMATCH);
+    rk_robot_snapshot rejected_snapshot{};
+    assert(runtime.snapshot_full(rejected_snapshot) == RK_OK);
+    assert(rejected_snapshot.trajectory_queue_depth == 0);
+    plan.model_revision = 42;
+    plan.calibration_revision = 6;
+    assert(runtime.submit_plan(plan) == RK_ERROR_MODEL_MISMATCH);
+    plan.calibration_revision = 7;
+    plan.required_capabilities = 0x80000000u;
+    assert(runtime.submit_plan(plan) == RK_ERROR_UNSUPPORTED);
+    plan.required_capabilities = 0;
+    plan.start_position[0] = 0.1;
+    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
+    plan.start_position[0] = 0.0;
+    plan.required_capabilities = RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE;
+    assert(runtime.submit_plan(plan) == RK_OK);
+    rk_robot_snapshot snapshot{};
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.active_plan_id == 11 && snapshot.trajectory_queue_depth == 1);
+    uint64_t timestamp = 0;
+    apply_cycle(runtime, timestamp);
+    apply_cycle(runtime, timestamp);
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.committed_until_ns == 350'000'000);
+    assert(snapshot.queue_end_time_ns == 1'000'000'000);
+    assert(snapshot.session_state == RK_SESSION_EXECUTING);
+    auto replacement = replacement_plan_chunk(12);
+    plan.sequence = 2;
+    plan.plan_id = 12;
+    plan.segments = replacement;
+    plan.replace_after_plan_id = 11;
+    plan.replace_after_time_ns = 200'000'000;
+    plan.start_position[0] = 0.008;
+    plan.start_position[1] = -0.008;
+    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.active_plan_id == 11 && snapshot.queue_end_time_ns == 1'000'000'000);
+    plan.replace_after_time_ns = 500'000'000;
+    plan.start_position[0] = 0.125;
+    plan.start_position[1] = -0.125;
+    plan.start_velocity[0] = 0.75;
+    plan.start_velocity[1] = -0.75;
+    plan.start_acceleration[0] = 3.0;
+    plan.start_acceleration[1] = -3.0;
+    assert(runtime.submit_plan(plan) == RK_OK);
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(snapshot.queue_end_time_ns == 1'000'000'000);
+    auto state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.008) < 1e-12);
+    state = apply_cycle(runtime, timestamp);
+    assert(std::abs(state.position[0] - 0.027) < 1e-12);
+}
+
+void accepted_plan_keeps_committed_region_identical(
+    const rk_robot_runtime_blueprint &blueprint) {
+    auto reference_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    auto replacement_endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime reference(blueprint, reference_endpoint,
+        std::chrono::milliseconds(1));
+    robotkit::RobotRuntime replacement(blueprint, replacement_endpoint,
+        std::chrono::milliseconds(1));
+    rk_plan_submission first{};
+    first.struct_size = sizeof(first);
+    first.sequence = 1;
+    first.plan_id = 71;
+    first.model_revision = blueprint.revision;
+    first.calibration_revision = blueprint.calibration_revision;
+    first.segments = cubic_plan_chunk(71);
+    assert(reference.submit_plan(first) == RK_OK);
+    assert(replacement.submit_plan(first) == RK_OK);
+    uint64_t ref_time = 0, replacement_time = 0;
+    for (int tick = 0; tick < 100; ++tick) {
+        apply_cycle(reference, ref_time);
+        apply_cycle(replacement, replacement_time);
+    }
+    rk_plan_submission next = first;
+    next.sequence = 2;
+    next.plan_id = 72;
+    next.replace_after_plan_id = 71;
+    next.replace_after_time_ns = 500'000'000;
+    next.start_position[0] = 0.125;
+    next.start_position[1] = -0.125;
+    next.start_velocity[0] = 0.75;
+    next.start_velocity[1] = -0.75;
+    next.start_acceleration[0] = 3.0;
+    next.start_acceleration[1] = -3.0;
+    next.segments = replacement_plan_chunk(72);
+    assert(replacement.submit_plan(next) == RK_OK);
+    // One sample per millisecond across the entire committed part, not just
+    // the replacement junction. The two queues must produce identical bytes.
+    for (int tick = 100; tick < 500; ++tick) {
+        const auto before = apply_cycle(reference, ref_time);
+        const auto after = apply_cycle(replacement, replacement_time);
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint)
+            assert(std::memcmp(&before.position[joint], &after.position[joint],
+                sizeof(double)) == 0);
+    }
+}
+
+void moving_degree_one_plan_cannot_retarget(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 81;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.segments = linear_segment_chunk(0.0, 1.0, 1'000'000'000, 81);
+    assert(runtime.submit_plan(plan) == RK_OK);
+    uint64_t timestamp = 0;
+    for (int tick = 0; tick < 10; ++tick) apply_cycle(runtime, timestamp);
+    plan.sequence = 2;
+    plan.plan_id = 82;
+    plan.replace_after_plan_id = 81;
+    plan.replace_after_time_ns = 500'000'000;
+    plan.start_position[0] = 0.5;
+    plan.start_position[1] = -0.5;
+    plan.segments = linear_segment_chunk(0.5, 0.5, 500'000'000, 82);
+    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
+}
+
 void ruckig_segments_match_motionkit_evaluation(
     const rk_robot_runtime_blueprint &blueprint) {
     auto limited = blueprint;
@@ -1057,6 +1216,9 @@ int main() {
     trajectory_chunk_speed_is_limited(blueprint);
     trajectory_queue_is_bounded(blueprint);
     mixed_queue_depth_counts_knots(blueprint);
+    plan_submission_checks_and_replacement(blueprint);
+    accepted_plan_keeps_committed_region_identical(blueprint);
+    moving_degree_one_plan_cannot_retarget(blueprint);
     ruckig_segments_match_motionkit_evaluation(blueprint);
     segment_splice_cuts_midsegment(blueprint);
     overacceleration_segment_is_rejected(blueprint);

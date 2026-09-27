@@ -22,6 +22,8 @@ class RobotRuntimeBlueprint {
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
   /** MuJoCo self-collision is enabled unless this opt-out is set false. */
   public var selfCollision:Bool = true;
+  /** Zero uses two owner periods. */
+  public var commitLeadNs:haxe.Int64 = haxe.Int64.ofInt(0);
   /** Compiled user-layer roles; null for manually assembled native blueprints. */
   public final configuration:Null<RobotRuntimeConfiguration>;
 
@@ -93,6 +95,7 @@ class RobotRuntimeBlueprint {
     value.set_struct_size(rk_robot_runtime_blueprint.size());
     value.set_revision(haxe.Int64.ofInt(revision));
     value.set_calibration_revision(haxe.Int64.ofInt(calibrationRevision));
+    value.set_commit_lead_ns(commitLeadNs);
     value.set_joint_count(jointCount);
     value.set_link_count(linkCount);
     value.set_frame_count(frameCount);

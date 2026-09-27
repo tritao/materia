@@ -161,6 +161,13 @@ rk_result RK_CALL rk_robot_runtime_submit_segments(
     return value ? value->submit_segments(*command, *chunk) : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_robot_runtime_submit_plan(
+    rk_robot_runtime runtime, const rk_plan_submission *plan) {
+    if (!plan) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->submit_plan(*plan) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime, rk_robot_state *out_state) {
     if (!out_state || out_state->struct_size < sizeof(*out_state))
         return RK_ERROR_INVALID_ARGUMENT;
@@ -198,6 +205,7 @@ rk_result RK_CALL rk_robot_runtime_capabilities(rk_robot_runtime runtime,
     out_capabilities->supports_effort_targets = 1;
     out_capabilities->supports_prediction = 0;
     out_capabilities->supports_trajectory_queue = value->supports_trajectory_queue();
+    out_capabilities->supports_execution_plans = value->supports_trajectory_queue();
     for (auto &reserved : out_capabilities->reserved)
         reserved = 0;
     rk_robot_state state{};
