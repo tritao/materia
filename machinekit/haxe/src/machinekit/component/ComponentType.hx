@@ -52,15 +52,20 @@ class ComponentType {
 
 	public function valuesOf(component:MachineComponent):ComponentValues {
 		if (!matches(component)) throw 'Component is not type "$id"';
-		return resolve(read(component));
+		return read(component);
 	}
 
 	public function key(values:ComponentValues):String {
-		var resolved = resolve(values);
 		var parts:Array<String> = [];
 		for (input in inputs) {
-			var text = switch (resolved.get(input.name)) {
-				case Number(value): Std.string(value);
+			var value = values == null ? null : values.get(input.name);
+			if (value == null) value = input.defaultValue;
+			var text = switch value {
+				case Number(number): switch input.type {
+					case Length: Dimension.format(number);
+					case Angle: Std.string(Math.round(number * 1e9) / 1e9);
+					default: Std.string(number);
+				};
 				case Integer(value): Std.string(value);
 				case Boolean(value): value ? "true" : "false";
 				case Token(value): value;

@@ -67,7 +67,7 @@ class MachineKitComponents {
 			c -> Std.isOfType(c, DeepGrooveBearing), true));
 		result.push(new ComponentType("machinekit.standard.socket-head-cap-screw",
 			[catalog("size", SocketHeadCapScrew.catalog(), "M5"), length("length", 20),
-				choice("material", ["steel 12.9", "steel", "stainless steel"], "steel 12.9")],
+				choice("material", MaterialLibrary.specs(), "steel 12.9")],
 			v -> SocketHeadCapScrew.metric(v.token("size"), v.number("length"), v.token("material")),
 			c -> new ComponentValues().set("size", Token(cast(c, SocketHeadCapScrew).spec.size))
 				.set("length", Number(cast(c, SocketHeadCapScrew).length))

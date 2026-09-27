@@ -113,4 +113,16 @@ class HexBolt extends MachineComponent {
 	function get_pitch():Float return spec.pitch;
 	function get_threadLength():Float return length;
 	function get_acrossCorners():Float return spec.acrossFlats / Math.cos(Math.PI / 6);
+
+	override public function toolNames():Array<String> return ["clearanceHole", "tapHole", "counterboreHole"];
+
+	override public function tool(name:String, depth:Float):Part {
+		var cutDepth = depth > 0 ? depth : Math.max(length, spec.headHeight + 1);
+		return switch name {
+			case "clearanceHole": clearanceHole(cutDepth);
+			case "tapHole": tapHole(cutDepth);
+			case "counterboreHole": counterboreHole(cutDepth);
+			default: super.tool(name, depth);
+		};
+	}
 }

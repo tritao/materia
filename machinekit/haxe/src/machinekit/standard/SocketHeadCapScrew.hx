@@ -118,6 +118,18 @@ class SocketHeadCapScrew extends MachineComponent {
 	function get_pitch():Float return spec.pitch;
 	function get_threadLength():Float return Math.min(length, spec.threadLength);
 
+	override public function toolNames():Array<String> return ["clearanceHole", "tapHole", "counterboreHole"];
+
+	override public function tool(name:String, depth:Float):Part {
+		var cutDepth = depth > 0 ? depth : Math.max(length, spec.counterboreDepth + 1);
+		return switch name {
+			case "clearanceHole": clearanceHole(cutDepth);
+			case "tapHole": tapHole(cutDepth);
+			case "counterboreHole": counterboreHole(cutDepth);
+			default: super.tool(name, depth);
+		};
+	}
+
 	static function row(size:String, diameter:Float, pitch:Float, headDiameter:Float, headHeight:Float,
 			socketSize:Float, socketDepth:Float, threadLength:Float, tapDrill:Float, fine:Float,
 			medium:Float, coarse:Float, counterboreDiameter:Float, counterboreDepth:Float):MetricScrewSpec {

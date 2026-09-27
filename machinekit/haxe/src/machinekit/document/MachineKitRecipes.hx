@@ -14,12 +14,6 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
-import machinekit.standard.DeepGrooveBearing;
-import machinekit.standard.HexBolt;
-import machinekit.standard.SocketHeadCapScrew;
-import machinekit.motion.FlangeBearingHousing;
-import machinekit.motion.NemaStepper;
-import machinekit.robotics.RobotFlange;
 
 /** CadKit evaluator registration for editable MachineKit single-part recipes. */
 class MachineKitRecipes {
@@ -40,9 +34,6 @@ class MachineKitRecipes {
 		for (type in MachineKitComponents.all()) if (type.id == id) return type;
 		return null;
 	}
-
-	public static function toolNames(component:MachineComponent):Array<String>
-		return MachineKitRecipeEvaluator.toolNames(component);
 
 	public static function component(instance:InstanceElement):MachineComponent {
 		var type = typeOrNull(instance.document.definition(instance.definitionId).recipe);
@@ -73,7 +64,7 @@ private class MachineKitRecipeEvaluator implements DefinitionEvaluator implement
 			var detail = instance.resolvedToken("detail") == "envelope" ? ComponentDetail.Envelope : ComponentDetail.Preview;
 			part = component.geometry(detail);
 		} else {
-			part = tool(component, output);
+			part = component.tool(output, 0);
 		}
 		var result = part.shape.cloneShape();
 		part.close();
@@ -88,45 +79,4 @@ private class MachineKitRecipeEvaluator implements DefinitionEvaluator implement
 		throw 'Unknown connector "$output" for ${type.id}';
 	}
 
-	public static function toolNames(component:MachineComponent):Array<String> {
-		if (Std.isOfType(component, DeepGrooveBearing) || Std.isOfType(component, FlangeBearingHousing))
-			return ["bearingSeat"];
-		if (Std.isOfType(component, SocketHeadCapScrew) || Std.isOfType(component, HexBolt))
-			return ["clearanceHole", "tapHole", "counterboreHole"];
-		if (Std.isOfType(component, NemaStepper) || Std.isOfType(component, RobotFlange))
-			return ["mountingCutout"];
-		return [];
-	}
-
-	function tool(component:MachineComponent, output:String):Part {
-		if (Std.isOfType(component, DeepGrooveBearing) && output == "bearingSeat")
-			return cast(component, DeepGrooveBearing).housingSeat();
-		if (Std.isOfType(component, FlangeBearingHousing) && output == "bearingSeat")
-			return cast(component, FlangeBearingHousing).bearing.housingSeat();
-		if (Std.isOfType(component, SocketHeadCapScrew)) {
-			var screw:SocketHeadCapScrew = cast component;
-			var depth = Math.max(screw.length, screw.spec.counterboreDepth + 1);
-			return switch output {
-				case "clearanceHole": screw.clearanceHole(depth);
-				case "tapHole": screw.tapHole(depth);
-				case "counterboreHole": screw.counterboreHole(depth);
-				default: throw 'Unknown tool "$output" for ${type.id}';
-			};
-		}
-		if (Std.isOfType(component, HexBolt)) {
-			var bolt:HexBolt = cast component;
-			var depth = Math.max(bolt.length, bolt.spec.headHeight + 1);
-			return switch output {
-				case "clearanceHole": bolt.clearanceHole(depth);
-				case "tapHole": bolt.tapHole(depth);
-				case "counterboreHole": bolt.counterboreHole(depth);
-				default: throw 'Unknown tool "$output" for ${type.id}';
-			};
-		}
-		if (Std.isOfType(component, NemaStepper) && output == "mountingCutout")
-			return cast(component, NemaStepper).mountingCutout(10);
-		if (Std.isOfType(component, RobotFlange) && output == "mountingCutout")
-			return cast(component, RobotFlange).mountingCutout(10);
-		throw 'Unknown tool "$output" for ${type.id}';
-	}
 }

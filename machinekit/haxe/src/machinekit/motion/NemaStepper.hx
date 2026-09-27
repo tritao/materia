@@ -145,4 +145,11 @@ class NemaStepper extends MachineComponent {
 		for (point in boltPattern()) tools.push(Part.cylinder(radius, 0, thickness, point.x, point.y));
 		return Solids.union(tools);
 	}
+
+	override public function toolNames():Array<String> return ["mountingCutout"];
+
+	override public function tool(name:String, depth:Float):Part {
+		if (name == "mountingCutout") return mountingCutout(depth > 0 ? depth : 10);
+		return super.tool(name, depth);
+	}
 }

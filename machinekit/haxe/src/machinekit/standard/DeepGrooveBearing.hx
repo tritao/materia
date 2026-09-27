@@ -151,4 +151,11 @@ class DeepGrooveBearing extends MachineComponent {
 	function get_bore():Float return spec.bore;
 	function get_outside():Float return spec.outside;
 	function get_width():Float return spec.width;
+
+	override public function toolNames():Array<String> return ["bearingSeat"];
+
+	override public function tool(name:String, depth:Float):Part {
+		if (name == "bearingSeat") return housingSeat(depth > 0 ? depth : width);
+		return super.tool(name, depth);
+	}
 }

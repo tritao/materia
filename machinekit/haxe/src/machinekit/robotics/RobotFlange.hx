@@ -171,4 +171,11 @@ class RobotFlange extends MachineComponent {
 			pinDiameter:Float):RobotFlangeSpec
 		return {pitchCircle: pitchCircle, boltCount: boltCount, screw: screw, pilotDiameter: pilotDiameter,
 			pinDiameter: pinDiameter};
+
+	override public function toolNames():Array<String> return ["mountingCutout"];
+
+	override public function tool(name:String, depth:Float):Part {
+		if (name == "mountingCutout") return mountingCutout(depth > 0 ? depth : 10);
+		return super.tool(name, depth);
+	}
 }

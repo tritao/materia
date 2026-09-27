@@ -38,7 +38,7 @@ class MachineKitDocuments {
 		}
 		inputs.push(DefinitionInput.token("detail", "preview", ["preview", "envelope"]));
 		var outputs = [new DefinitionOutput("body", DefinitionOutput.Geometry)];
-		for (name in MachineKitRecipes.toolNames(component)) outputs.push(new DefinitionOutput(name, DefinitionOutput.Tool));
+		for (name in component.toolNames()) outputs.push(new DefinitionOutput(name, DefinitionOutput.Tool));
 		for (connector in component.connectors()) outputs.push(new DefinitionOutput(connector.name, DefinitionOutput.Connector));
 		var definition = document.createDefinition(component.designation, type.id, inputs, outputs);
 		definition.restoreProperty("machinekit.type", TypedProperty.text("machinekit.type", type.id));

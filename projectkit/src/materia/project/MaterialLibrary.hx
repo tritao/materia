@@ -41,6 +41,12 @@ class MaterialLibrary {
     return result;
   }
 
+  public static function specs():Array<String> {
+    var result:Array<String> = [];
+    for (item in all()) if (result.indexOf(item.physical.spec) < 0) result.push(item.physical.spec);
+    return result;
+  }
+
   public static function validateCustom(items:Array<MaterialDef>):Void {
     if (items == null || items.length > 1000) throw "Invalid custom material library";
     var seen = new Map<String, Bool>();
@@ -64,6 +70,8 @@ class MaterialLibrary {
 
   public static function fromSpec(spec:Null<String>):String return switch (spec) {
     case null: "painted";
+    case "unspecified": "neutral";
+    case "painted steel": "painted";
     case "aluminium 6061": "aluminium";
     case "birch plywood": "plywood-birch";
     case "bearing steel": "bearing-steel";

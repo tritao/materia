@@ -13,6 +13,7 @@ class MachineComponent {
 	public final materialId:String;
 	public var bom(get, never):BomItem;
 	final description:String;
+	var cachedBom:Null<BomItem>;
 	/** Null for code-only parts and assemblies outside the v1 recipe registry. */
 	public var type(get, never):Null<ComponentType>;
 	final connectorList:Array<Connector> = [];
@@ -25,16 +26,23 @@ class MachineComponent {
 	}
 
 	function get_bom():BomItem {
+		if (cachedBom != null) return cachedBom;
 		var recipe = type;
 		var valuesKey = recipe == null ? null : recipe.key(values());
-		return {partNumber: recipe == null ? designation : recipe.partNumber(this),
+		cachedBom = {partNumber: recipe == null ? designation : recipe.partNumber(this),
 			description: description, quantity: 1,
 			material: MaterialLibrary.require(materialId).physical.spec,
 			typeId: recipe == null ? null : recipe.id, valuesKey: valuesKey};
+		return cachedBom;
 	}
 
 	public function geometry(detail:ComponentDetail = Preview):Part
 		throw 'Component "$designation" does not generate geometry';
+
+	public function toolNames():Array<String> return [];
+
+	public function tool(name:String, depth:Float):Part
+		throw 'Unknown tool "$name" for "$designation"';
 
 	function get_type():Null<ComponentType> return MachineKitComponents.forComponent(this);
 

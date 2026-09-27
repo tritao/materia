@@ -97,6 +97,12 @@ class MachineKitSmoke {
 			"Unknown catalog designation");
 		var pulley = MachineKitComponents.byId("machinekit.transmission.timing-pulley");
 		throws(() -> pulley.create(new ComponentValues().setToken("profile", "UNKNOWN")), "Invalid choice");
+		var screwRecipe = MachineKitComponents.byId("machinekit.standard.socket-head-cap-screw");
+		var steelScrew = screwRecipe.create(new ComponentValues().setToken("material", "steel C45"));
+		check(steelScrew.bom.material == "steel C45", "non-default screw material reaches the BOM");
+		var firstLength = screwRecipe.defaults().setNumber("length", 20.0001);
+		var secondLength = screwRecipe.defaults().setNumber("length", 20.0002);
+		check(screwRecipe.key(firstLength) == screwRecipe.key(secondLength), "length keys round to a micrometre");
 		var conflicted = new Bom();
 		conflicted.add({partNumber: "X", description: "same", quantity: 1, material: "steel",
 			typeId: "test", valuesKey: "a"});

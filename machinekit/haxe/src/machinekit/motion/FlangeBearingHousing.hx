@@ -67,4 +67,11 @@ class FlangeBearingHousing extends MachineComponent {
 	/** Screw that fits the housing's mounting holes. */
 	public function mountScrewPart(length:Float):SocketHeadCapScrew
 		return SocketHeadCapScrew.metric(mountScrew, length);
+
+	override public function toolNames():Array<String> return ["bearingSeat"];
+
+	override public function tool(name:String, depth:Float):Part {
+		if (name == "bearingSeat") return bearing.housingSeat(depth > 0 ? depth : bearing.width);
+		return super.tool(name, depth);
+	}
 }
