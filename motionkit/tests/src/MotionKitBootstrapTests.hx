@@ -11,6 +11,7 @@ import motionkit.event.EventValue;
 import motionkit.event.HoldPolicy;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
+import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
@@ -525,9 +526,13 @@ class MotionKitBootstrapTests {
       check(error.report.hasFailure(), "plan rejection carries validation report");
     }
     limits.velocity(0, 1.1);
+    var timed = new TimedEvent(Int64.ofInt(500000000), "sprayer.flow",
+      EventValue.Analog(1.25), HoldPolicy.RestoreOnResume);
     var plan = ExecutionPlan.create(trajectory, limits, Int64.ofInt(44), [0.0],
-      [0.0], [0.0], [0.01], [0.01], [0.01]);
+      [0.0], [0.0], [0.01], [0.01], [0.01], [timed]);
     check(!plan.report.hasFailure(), "valid plan has no failed check");
+    check(plan.events.length == 1 && plan.events[0].channel == "sprayer.flow",
+      "native execution plan retains timed events");
     near(plan.evaluate(0.5).positions[0], 0.5, "plan owns evaluable trajectory");
     trajectory.dispose();
     near(plan.evaluate(0.75).positions[0], 0.75, "plan deep copies trajectory");

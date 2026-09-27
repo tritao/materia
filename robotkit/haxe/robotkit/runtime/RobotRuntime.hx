@@ -7,6 +7,10 @@ import robotkit.world.CameraImage;
 import robotkit.world.SensorFrame;
 import robotkit.world.TrajectoryChunk;
 import robotkit.world.ExecutionPlanSubmission;
+import robotkit.world.FiredProcessEvent;
+import robotkit.world.ProcessEventCodec;
+import robotkit.world.ProcessHoldPolicy;
+import robotkit.world.ProcessChannelDeclaration;
 import sys.thread.Mutex;
 
 /**
@@ -22,6 +26,7 @@ class RobotRuntime {
   final defaultMaxRates:Array<Float>;
   final defaultMaxEfforts:Array<Float>;
   final sensorLayout:Array<RobotRuntimeSensorBlueprint>;
+  public final channels:Array<ProcessChannelDeclaration>;
   final externalSensorLayout:Array<RobotRuntimeSensorBlueprint>;
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
@@ -33,6 +38,7 @@ class RobotRuntime {
     defaultMaxRates = [for (joint in blueprint.joints) joint.maxRate];
     defaultMaxEfforts = [for (joint in blueprint.joints) joint.maxEffort];
     sensorLayout = blueprint.nativeSensorLayout();
+    channels = blueprint.channels.copy();
     externalSensorLayout = blueprint.externalSensorLayout();
   }
 
@@ -181,6 +187,21 @@ class RobotRuntime {
     native.set_calibration_revision(plan.calibrationRevision);
     native.set_required_capabilities(plan.requiredCapabilities);
     native.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
+    native.set_event_count(plan.events.length);
+    for (index in 0...plan.events.length) {
+      var authored = plan.events[index];
+      var event = new rk_timed_event();
+      event.set_time_ns(authored.timeNs);
+      for (i in 0...authored.channel.length)
+        event.set_channel(i, authored.channel.charCodeAt(i));
+      event.set_value(ProcessEventCodec.encode(authored.value));
+      event.set_hold_policy(switch authored.holdPolicy {
+        case Keep: RobotKitRuntimeConstants.RK_EVENT_KEEP;
+        case SafeWhileHeld: RobotKitRuntimeConstants.RK_EVENT_SAFE_WHILE_HELD;
+        case RestoreOnResume: RobotKitRuntimeConstants.RK_EVENT_RESTORE_ON_RESUME;
+      });
+      native.set_events(index, event);
+    }
     native.set_replace_after_plan_id(plan.replaceAfterPlanId);
     native.set_replace_after_time_ns(plan.replaceAfterTimeNs);
     var positions = plan.startPosition.toArray();
@@ -219,6 +240,24 @@ class RobotRuntime {
     native.set_segments(payload);
     check(RobotKitRuntime.rk_robot_runtime_submit_plan(owner.borrow(), native),
       "runtime.submitPlan");
+  }
+
+  /** Drains output changes produced by the runtime owner clock. */
+  public function pollEvents():{events:Array<FiredProcessEvent>, overflow:Bool} {
+    ensureLive();
+    var batch = new rk_event_record_batch();
+    batch.set_struct_size(rk_event_record_batch.size());
+    check(RobotKitRuntime.rk_robot_runtime_poll_events(owner.borrow(), batch),
+      "runtime.pollEvents");
+    var result:Array<FiredProcessEvent> = [];
+    for (index in 0...batch.get_count()) {
+      var record = batch.get_records(index);
+      result.push(new FiredProcessEvent(record.get_plan_id(),
+        ProcessEventCodec.readChannel(record), ProcessEventCodec.decode(record.get_value()),
+        record.get_scheduled_time_ns(), record.get_applied_owner_time_ns(),
+        record.get_cause()));
+    }
+    return {events:result, overflow:batch.get_overflow() != 0};
   }
 
   /** Submits all position targets in one native call. */

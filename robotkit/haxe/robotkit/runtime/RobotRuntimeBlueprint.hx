@@ -1,6 +1,8 @@
 package robotkit.runtime;
 
 import RobotKitRuntime;
+import robotkit.world.ProcessChannelDeclaration;
+import robotkit.world.ProcessEventCodec;
 
 /**
  * Immutable-at-execution compiled robot description consumed by RobotRuntime.
@@ -18,6 +20,7 @@ class RobotRuntimeBlueprint {
   public final frameCount:Int;
   public final joints:Array<RobotRuntimeJointBlueprint> = [];
   public final sensors:Array<RobotRuntimeSensorBlueprint> = [];
+  public final channels:Array<ProcessChannelDeclaration> = [];
   public final links:Array<RobotRuntimeLinkBlueprint> = [];
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
   /** MuJoCo self-collision is enabled unless this opt-out is set false. */
@@ -109,6 +112,21 @@ class RobotRuntimeBlueprint {
     if (haxe.Int64.compare(serialProcessingAllowanceNs, haxe.Int64.ofInt(0)) < 0)
       throw "Invalid serial processing allowance";
     value.set_serial_processing_allowance_ns(serialProcessingAllowanceNs);
+    if (channels.length > RobotKitRuntimeConstants.RK_MAX_PROCESS_CHANNELS)
+      throw "Too many runtime process channels";
+    value.set_channel_count(channels.length);
+    for (index in 0...channels.length) {
+      var channel = channels[index];
+      for (earlier in 0...index)
+        if (channels[earlier].id == channel.id) throw "Duplicate runtime process channel";
+      var nativeChannel = new rk_channel_declaration();
+      for (i in 0...channel.id.length)
+        nativeChannel.set_id(i, channel.id.charCodeAt(i));
+      var safe = ProcessEventCodec.encode(channel.safeValue);
+      nativeChannel.set_kind(safe.get_kind());
+      nativeChannel.set_safe_value(safe);
+      value.set_channels(index, nativeChannel);
+    }
     for (joint in 0...jointCount) {
       var bound = followingErrorBounds[joint];
       if (!Math.isFinite(bound) || bound < 0.0)

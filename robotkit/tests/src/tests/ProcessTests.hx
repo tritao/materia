@@ -16,6 +16,11 @@ import robotkit.process.Toolpath;
 import robotkit.process.CartesianTrajectory;
 import robotkit.process.ToolpathExecutor;
 import robotkit.process.ToolpathExecutionFailure;
+import robotkit.tool.ChannelToolAdapter;
+import robotkit.tool.SimulatedSprayer;
+import robotkit.world.FiredProcessEvent;
+import robotkit.world.ProcessEventValue;
+import haxe.Int64;
 
 /** M4 acceptance tests for robotkit.process: Toolpath, CartesianTrajectory, ToolpathExecutor. */
 class ProcessTests {
@@ -30,8 +35,25 @@ class ProcessTests {
     testAdaptiveCartesianSampling();
     testExecutorOnSmallRasterYieldsContinuousJoints();
     testExecutorReportsUnreachableIndex();
+    testScheduledToolEvents();
     Sys.println('RobotKit process tests passed ($assertions assertions)');
     return assertions;
+  }
+
+  static function testScheduledToolEvents():Void {
+    var sprayer = new SimulatedSprayer();
+    var adapter = new ChannelToolAdapter();
+    adapter.bindSprayerFlow("sprayer.flow", sprayer, 1.5);
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(7), "sprayer.flow",
+      ProcessEventValue.Digital(true), Int64.ofInt(200), Int64.ofInt(210), 1));
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(7), "sprayer.flow",
+      ProcessEventValue.Digital(false), Int64.ofInt(400), Int64.ofInt(410), 1));
+    check(sprayer.history.length == 2, "Each runtime record changes the sprayer once");
+    check(sprayer.history[0].flow == 1.5 && sprayer.history[1].flow == 0.0,
+      "Sprayer follows planned flow events");
+    check(Int64.compare(sprayer.history[0].timestampNs, Int64.ofInt(200)) == 0 &&
+      Int64.compare(sprayer.history[1].timestampNs, Int64.ofInt(400)) == 0,
+      "Sprayer timestamps use scheduled trajectory time");
   }
 
   static function testToolpathLengthAndSegmenting():Void {

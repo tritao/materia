@@ -1,6 +1,9 @@
 {
   "schemaVersion": 2,
   "model": "robot.json",
+  "channels": [
+    {"id": "sprayer.flow", "safeValue": {"kind": "digital", "digital": false}}
+  ],
   "device": {
     "path": "/dev/replace-with-pty",
     "baud": 115200,

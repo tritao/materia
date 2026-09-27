@@ -279,3 +279,15 @@ MotionKit Haxe passed 5,873 assertions, RobotKit Haxe passed 4,437
 assertions, MotionKit native passed 3 tests, RobotKit native passed 12 tests,
 both FFI audits passed, and TCP integration passed in default, session and
 lease-timeout modes.
+
+### B2 — Events through plans and runtime
+
+Added bounded timed events to native and Haxe execution plans, versioned
+RobotKit submissions, declared process channels, and trajectory-clock event
+delivery. HOLD makes configured channels safe and RESUME restores their last
+fired values; STOP, ABORT, faults, and e-stop discard pending events and make
+channels safe. A bounded fired-event ring feeds tool adapters and MCAP v5
+recording, while earlier recording versions remain readable. Simulated
+sprayer tests check scheduled timestamps, and native tests cover replacement,
+undeclared channels, ring overflow, and safety transitions. Commit: the
+commit containing this entry.
