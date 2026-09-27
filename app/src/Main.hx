@@ -6,6 +6,7 @@ import nativekit.ui.widgets.controls.Toggle;
 
 import app.EditorToolbarLayout.EditorToolbarDensity;
 import app.editor.ObjectKindRegistry;
+import app.editor.TelemetryPanel;
 import Color;
 import LayoutAxis;
 import LayoutAlignmentY;
@@ -27,9 +28,6 @@ import nativekit.ui.docking.DockWorkspaceCommands;
 import nativekit.ui.docking.DockWorkspaceModel;
 import nativekit.ui.docking.DockWorkspacePersistence;
 import nativekit.ui.docking.DockWorkspaceStorage;
-import nativekit.ui.plotting.PlotModel;
-import nativekit.ui.plotting.PlotPoint;
-import nativekit.ui.plotting.PlotSeries;
 import nativekit.ui.properties.PropertyDescriptor;
 import nativekit.ui.properties.PropertyDescriptorOptions;
 import nativekit.ui.properties.PropertyInspectorSection;
@@ -64,7 +62,6 @@ import nativekit.ui.widgets.overlays.Menu;
 import nativekit.ui.widgets.overlays.MenuItem;
 import nativekit.ui.widgets.overlays.Popup;
 import nativekit.ui.widgets.overlays.Tooltip;
-import nativekit.ui.widgets.plotting.PlotView;
 import nativekit.ui.widgets.properties.PropertyInspector;
 import nativekit.ui.widgets.layout.Row;
 import nativekit.ui.widgets.scroll.ScrollController;
@@ -346,7 +343,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   final files:Null<SceneFileDialogs>;
   var sceneGeneration:Int = 0;
   var treeModel:EditorSceneTree;
-  final telemetry:PlotModel;
+  final telemetry:TelemetryPanel;
   final logLines:Array<String>;
   var gridVisible:Bool;
   var gridSnapEnabled:Bool;
@@ -430,7 +427,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
         hostContext);
     }
-    telemetry = makeTelemetry();
+    telemetry = new TelemetryPanel(appearance.theme.tokens.surface,
+      appearance.theme.tokens.textSecondary);
     logLines = ["Scene ready: two editable objects", "Select a box; edit position or visibility", "Middle-drag to pan; scroll to zoom"];
     gridVisible = true;
     gridSnapEnabled = false;
@@ -901,7 +899,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +
           ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()),
       new DockPanelContent("console", function(_) return consolePanel()),
-      new DockPanelContent("telemetry", function(_) return telemetryPanel())
+      new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation))
     ];
 
     result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());
@@ -1480,34 +1478,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
     );
   }
 
-  function telemetryPanel():View {
-    var style = fillStyle();
-    style.padding = new Insets(12.0, 12.0, 12.0, 12.0);
-    style.background = appearance.theme.tokens.surface;
-    var plotStyle = fillStyle();
-    plotStyle.height = LayoutAxis.grow();
-    var plot = new PlotView("frame-telemetry", telemetry, plotStyle, "Frame telemetry");
-    var frame = framePresentation;
-    var physicsStatus = frame == null ? "Physics snapshot unavailable" :
-      "Physics step " + frame.revision + " · time " + Std.string(frame.simulationTime) + " s";
-    return new Column(
-      "telemetry-panel",
-      [
-        new KeyedView("heading", sectionHeading("TELEMETRY")),
-        new KeyedView(
-          "plot",
-          plot
-        ),
-        new KeyedView(
-          "caption",
-          new Text("Frame time · GPU submission · layout cost")
-        ),
-        new KeyedView("physics-revision", new Text(physicsStatus))
-      ],
-      style
-    );
-  }
-
   function sectionHeading(label:String):Text {
     return new Text(label, null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(11.0, 0.8));
   }
@@ -1819,19 +1789,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function updateCommandContext():Void {
     ui.setCommandContext(scene.context());
-  }
-
-  function makeTelemetry():PlotModel {
-    var model = new PlotModel();
-    var frameTime = new PlotSeries("frame-time", "Frame time", Color.rgba(0.28, 0.75, 0.98, 1.0), 2.0);
-    var gpuTime = new PlotSeries("gpu-time", "GPU submission", Color.rgba(0.78, 0.45, 0.98, 1.0), 2.0);
-    for (index in 0...64) {
-      frameTime.add(new PlotPoint(index, 10.0 + Math.sin(index * 0.24) * 2.2));
-      gpuTime.add(new PlotPoint(index, 4.0 + Math.cos(index * 0.19) * 1.2));
-    }
-    model.addSeries(frameTime);
-    model.addSeries(gpuTime);
-    return model;
   }
 
   function saveWorkspace():Void {
