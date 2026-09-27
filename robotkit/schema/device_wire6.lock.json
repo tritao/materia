@@ -34,6 +34,17 @@
   },
   "messages": {},
   "packed_structs": {
+    "ActuatorLimit6": {
+      "endian": "little",
+      "fields": [
+        {
+          "length": 1,
+          "name": "max_acceleration",
+          "type": "f32"
+        }
+      ],
+      "size": 4
+    },
     "ActuatorState6": {
       "endian": "little",
       "fields": [

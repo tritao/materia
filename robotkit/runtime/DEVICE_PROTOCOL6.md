@@ -16,6 +16,11 @@ with degree at most five. Segment start and duration are device ticks. One
 one `ActuatorState6` record per actuator. Queue control and safety command
 frames carry the fixed records specified by the schema. The session ACK
 reports the tick rate, step tick rate, degree limit and queue capacities.
+`SESSION_BEGIN6` carries a fixed header followed by one `ActuatorLimit6`
+record per actuator. The header's acceleration is the global cap; each
+actuator limit must be positive and no greater than that cap. This trailing
+record keeps the published fixed header compatible while supplying A4's
+per-actuator HOLD and stop limits.
 
 | Quantity | RKD6 bound | Source |
 | --- | ---: | --- |

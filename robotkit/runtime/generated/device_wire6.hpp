@@ -139,6 +139,35 @@ inline bool decode(std::span<const std::uint8_t> input, SessionBegin6 &value) {
     return true;
 }
 
+inline constexpr std::size_t ActuatorLimit6_SIZE = 4;
+struct ActuatorLimit6 {
+    static constexpr std::size_t SIZE = ActuatorLimit6_SIZE;
+    float max_acceleration{};
+};
+
+inline bool encode(const ActuatorLimit6 &value, std::span<std::uint8_t> out) {
+    if (out.size() < ActuatorLimit6_SIZE) return false;
+    std::size_t offset = 0;
+    const std::uint32_t bits_max_acceleration = std::bit_cast<std::uint32_t>(value.max_acceleration);
+    out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_max_acceleration >> 24);
+    return true;
+}
+
+inline bool decode(std::span<const std::uint8_t> input, ActuatorLimit6 &value) {
+    if (input.size() != ActuatorLimit6_SIZE) return false;
+    std::size_t offset = 0;
+    std::uint32_t bits_max_acceleration = 0;
+    bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 0;
+    bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 8;
+    bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 16;
+    bits_max_acceleration |= static_cast<std::uint32_t>(input[offset++]) << 24;
+    value.max_acceleration = std::bit_cast<float>(bits_max_acceleration);
+    return true;
+}
+
 inline constexpr std::size_t SessionAck6_SIZE = 44;
 struct SessionAck6 {
     static constexpr std::size_t SIZE = SessionAck6_SIZE;

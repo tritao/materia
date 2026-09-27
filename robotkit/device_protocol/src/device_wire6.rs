@@ -110,6 +110,34 @@ impl SessionBegin6 {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActuatorLimit6 {
+    pub max_acceleration: f32,
+}
+
+impl ActuatorLimit6 {
+    pub const SIZE: usize = 4;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 4].copy_from_slice(&self.max_acceleration.to_le_bytes());
+        offset += 4;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 4];
+        bytes.copy_from_slice(&input[offset..offset + 4]);
+        let max_acceleration = f32::from_le_bytes(bytes);
+        offset += 4;
+        let _ = offset;
+        Ok(Self { max_acceleration })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SessionAck6 {
     pub session: u64,
     pub protocol_version: u8,

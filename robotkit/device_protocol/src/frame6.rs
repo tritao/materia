@@ -43,7 +43,7 @@ pub fn decode_frame6(input: &[u8]) -> Result<(u8, &[u8]), Frame6Error> {
 
 fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
     let exact = match kind {
-        1 => Some(SessionBegin6::SIZE), 2 => Some(SessionAck6::SIZE),
+        1 => None, 2 => Some(SessionAck6::SIZE),
         3 => Some(TimeSyncRequest::SIZE), 4 => Some(TimeSyncReply::SIZE),
         5 => Some(QueueBegin6::SIZE), 7 => Some(Commit6::SIZE),
         8..=13 => Some(0), 14 => Some(QueueStatus6::SIZE),
@@ -54,6 +54,21 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
     };
     if let Some(size) = exact {
         if bytes.len() != size { return Err(Frame6Error::BadLength); }
+    } else if kind == 1 {
+        if bytes.len() < SessionBegin6::SIZE { return Err(Frame6Error::BadLength); }
+        let head = SessionBegin6::decode(&bytes[..SessionBegin6::SIZE])
+            .map_err(|_| Frame6Error::BadPayload)?;
+        if head.protocol_version != 6 || head.actuator_count == 0 ||
+           head.actuator_count > MAX_ACTUATORS || !head.max_acceleration.is_finite() ||
+           head.max_acceleration <= 0.0 ||
+           bytes.len() != SessionBegin6::SIZE + head.actuator_count as usize * ActuatorLimit6::SIZE {
+            return Err(Frame6Error::BadPayload);
+        }
+        for chunk in bytes[SessionBegin6::SIZE..].chunks_exact(ActuatorLimit6::SIZE) {
+            let limit = ActuatorLimit6::decode(chunk).map_err(|_| Frame6Error::BadPayload)?;
+            if !limit.max_acceleration.is_finite() || limit.max_acceleration <= 0.0 ||
+               limit.max_acceleration > head.max_acceleration { return Err(Frame6Error::BadPayload); }
+        }
     } else if kind == 6 {
         if bytes.len() < Segment6Header::SIZE { return Err(Frame6Error::BadLength); }
         let head = Segment6Header::decode(&bytes[..Segment6Header::SIZE])
