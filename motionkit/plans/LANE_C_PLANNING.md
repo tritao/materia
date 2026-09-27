@@ -56,12 +56,29 @@ and C2 first.
 - **LC-D3 — Direct machines use identity kinematics.** For XYZ gantries, q(s)
   is the Cartesian path itself mapped through the axis transmissions. The
   same path timing serves gantries and arms.
-- **LC-D4 — Configuration selection is our own dynamic programming.**
-  - Choose one IK candidate per path sample, minimising a joint-motion cost
-    with hard limits on joint jumps: a ladder graph over `sampleCandidates`,
-    solved by DP in Haxe.
-  - Descartes Light is not vendored, to avoid its ROS-flavoured dependency
-    stack.
+- **LC-D4 — Configuration selection is native, shaped like Descartes Light,
+  and vendoring it is deferred.**
+  - The selector lives in `motionkit/native` (D1), not Haxe.
+  - It mirrors `descartes_light`'s structure (Apache-2.0,
+    https://github.com/swri-robotics/descartes_light): a per-waypoint candidate
+    *sampler*, an *edge evaluator*, a *state evaluator*, and a *ladder-graph
+    solver* (dense dynamic programming). Replacing ours with the library later
+    should then be mechanical.
+  - Why not vendor it now: its core requires OpenMP (not available with
+    Apple clang by default, and the FFI audits target macOS and Windows),
+    links `console_bridge`, and builds only with
+    `ros_industrial_cmake_boilerplate`. That is a lot of friction for a dense
+    DP that, at OPW's ≤ 8 candidates per waypoint (plus ±2π wraps), is about
+    150 lines.
+  - **Revisit trigger:** vendor `descartes_light`, including its Boost-graph
+    lazy solvers, when any of these happens:
+    - candidates per waypoint regularly exceed about 64 (tool-axis rotation
+      sampling, 7-axis arms, external axes);
+    - edge evaluation includes collision checks, where lazy evaluation
+      matters;
+    - the Tesseract/TrajOpt backend is added, which brings Descartes anyway.
+
+    Record which trigger fired in the log.
 
 ---
 
@@ -185,23 +202,34 @@ Tests:
 
 ## C5 — Configuration selection along a path (LC-D4)
 
-Do:
-- `motionkit.robot.PathConfigurationSelector`:
-  - for each densified path sample, take `sampleCandidates` (OPW, or
-    seeded numerical);
-  - build the ladder graph, with edge cost as joint distance weighted by
-    joint velocity limits, and edges exceeding the joint-jump bound removed;
-  - DP for the minimum-cost continuous sequence;
-  - no valid sequence gives a diagnostic naming the first unreachable or
-    disconnected sample distance.
-- Lane B's `ProgramCompiler` (B3) uses it when the solver provides several
-  candidates. Coordinate through the `KinematicsSolver` interface only.
+Do (`motionkit/native`, C ABI, Haxe wrapper
+`motionkit.robot.PathConfigurationSelector`):
+- **Sampler:** for each densified path sample, produce candidates via
+  `KinematicsSolver.sampleCandidates` (OPW, or seeded numerical). The Haxe
+  layer passes candidate sets into native code as one bulk call, never one
+  call per candidate.
+- **State evaluator:** rejects candidates outside joint limits, and applies an
+  optional per-candidate cost (for example distance from a preferred posture).
+- **Edge evaluator:** cost is joint distance weighted by joint velocity
+  limits. An edge exceeding the joint-jump bound is infeasible.
+- **Ladder-graph solver:** dense DP to the minimum-cost continuous sequence.
+  If no valid sequence exists, the diagnostic names the first unreachable or
+  disconnected sample distance.
+- Keep the sampler, evaluators and solver as separate C++ interfaces
+  (LC-D4), so the solver can later be replaced by `descartes_light`'s
+  without touching callers.
+- Lane B's `ProgramCompiler` (B3) uses the selector when the solver provides
+  several candidates. Coordinate through the `KinematicsSolver` interface
+  only.
 
 Tests:
 - A path that the nearest-seed method takes through a wrist flip is solved
   without a flip.
 - A path with no continuous solution fails with the right distance.
 - It is deterministic.
+- A 1000-sample path with 8 candidates per sample solves in under 50 ms in a
+  Debug build. Record the time in the log as the baseline for the revisit
+  trigger.
 
 ## C6 — CncKit v1: declared G-code subset → `MotionProgram`
 
