@@ -53,6 +53,47 @@ import materia.project.Appearance.Appearances;
 @:access(app.EditorPerspectiveViewport)
 @:access(app.Main.ReferenceEditorApp)
 class SceneEditingTests {
+  static function sensorRevisionSeparation():Void {
+    var sensors = new SensorConfiguration();
+    var name:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+    var rate:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+    for (property in sensors.properties()) {
+      if (StringTools.endsWith(property.id, ":name")) name = property;
+      if (StringTools.endsWith(property.id, ":rate")) rate = property;
+    }
+    check(name != null && rate != null, "sensor properties are identified by id");
+    var before = sensors.revision();
+    check(new PropertyBinding(name, sensors.context()).apply(PropertyValue.Text("Renamed sensor")) ==
+      PropertyEditResult.Applied && sensors.revision() == before,
+      "sensor rename does not require simulation rebuild");
+    check(new PropertyBinding(rate, sensors.context()).apply(PropertyValue.Float(12.0)) ==
+      PropertyEditResult.Applied && sensors.revision() > before,
+      "sensor acquisition change requires simulation rebuild");
+    sensors.dispose();
+  }
+
+  static function revisionSeparation():Void {
+    var scene = new EditorScene();
+    try {
+      var content = scene.revision, visual = scene.visualRevision;
+      var environment = scene.environmentRevision, selection = scene.selectionRevision;
+      check(scene.select("tower") && scene.revision == content &&
+        scene.visualRevision > visual && scene.selectionRevision > selection &&
+        scene.environmentRevision == environment,
+        "selection changes visual and selection revisions only");
+      environment = scene.environmentRevision;
+      scene.setName("tower", "Renamed tower");
+      scene.setVisible("tower", false);
+      scene.setColour("tower", 0.3, 0.4, 0.5);
+      check(scene.environmentRevision == environment,
+        "name, visibility and colour do not change the physics environment");
+      scene.setPositionXY("tower", 2.0, 0.0);
+      check(scene.environmentRevision > environment,
+        "a collision object's position changes the physics environment");
+    } catch (error:Dynamic) { scene.dispose(); throw error; }
+    scene.dispose();
+  }
+
   static function appearanceArtifactRoundTrip():Void {
     var vertices = Bytes.alloc(72), normals = Bytes.alloc(72), indices = Bytes.alloc(12);
     indices.setInt32(0, 0); indices.setInt32(4, 1); indices.setInt32(8, 2);
@@ -1106,6 +1147,8 @@ class SceneEditingTests {
   }
 
   static function main():Int {
+    sensorRevisionSeparation();
+    revisionSeparation();
     appearanceArtifactRoundTrip();
     componentFinishReset();
     perspectiveHoverInput();

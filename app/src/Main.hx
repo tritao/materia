@@ -629,7 +629,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var sceneRevision = scene.revision;
     var selectionRevision = scene.selectionRevision;
     var environmentRevision = scene.environmentRevision;
-    var sensorRevision = sensors.revision();
+    var sensorRevision = session.document.revision;
     var simulationRevision = simulation.appliedRevision;
     var perspectiveKey = perspectiveViewport == null ? "" : perspectiveViewport.presentationKey();
     if (cachedSubmitSceneGeneration != sceneGeneration ||
@@ -894,7 +894,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() +
           ":content=" + (sceneInspector == null ? 0 : sceneInspector.contentRevision())),
       new DockPanelContent("sensors", function(_) return sensorPanel(), null,
-        function() return "sensors=" + sensors.revision() + ":robot=" + sensors.robotId +
+        function() return "generation=" + session.generation + ":document=" + session.document.revision +
+          ":sensors=" + sensors.revision() + ":robot=" + sensors.robotId +
           ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +
           ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()),
       new DockPanelContent("console", function(_) return consolePanel()),

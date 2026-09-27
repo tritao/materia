@@ -52,6 +52,7 @@ import app.CadPlateModel.CadPlateParameters;
 import app.CadPlateModel.CadPlateHoleEdit;
 import app.CadBracketModel;
 import app.SketchDraftCodec.SketchDraftRecord;
+import app.editor.SelectionModel;
 import haxe.io.Path as FilePath;
 
 private typedef SceneRecordChange = {
@@ -82,6 +83,7 @@ class EditorScene {
   var failureInjection:Null<String->Void> = null;
   // Retained UI caches survive document replacement, so revisions must too.
   static var nextRevision:Int = 0;
+  static var nextVisualRevision:Int = 0;
   static var nextEnvironmentRevision:Int = 0;
   public final document:EditorDocument;
   var bridge:SceneBridge;
@@ -101,14 +103,23 @@ class EditorScene {
   final faceHoverNodes:Map<String, NodeId> = new Map();
   final faceHoverGeometries:Map<String, Geometry> = new Map();
   final faceHoverIndexes:Map<String, Int> = new Map();
-  public var selectedId(default, null):String = "box";
-  public var selectedCadFaceIndex(default, null):Int = -1;
-  public var selectedCadEdgeIndex(default, null):Int = -1;
-  public var selectedCadFaceX(default, null):Float = 0.0;
-  public var selectedCadFaceY(default, null):Float = 0.0;
-  var selectedCadFaceFingerprint:Null<TopologyFingerprint> = null;
-  var selectedCadFace:Null<Shape> = null;
-  var selectedFeatureKey:Null<String> = null;
+  final selection = new SelectionModel();
+  public var selectedId(get, never):String;
+  function get_selectedId():String return selection.selectedId;
+  public var selectedCadFaceIndex(get, never):Int;
+  function get_selectedCadFaceIndex():Int return selection.selectedCadFaceIndex;
+  public var selectedCadEdgeIndex(get, never):Int;
+  function get_selectedCadEdgeIndex():Int return selection.selectedCadEdgeIndex;
+  public var selectedCadFaceX(get, never):Float;
+  function get_selectedCadFaceX():Float return selection.selectedCadFaceX;
+  public var selectedCadFaceY(get, never):Float;
+  function get_selectedCadFaceY():Float return selection.selectedCadFaceY;
+  var selectedCadFaceFingerprint(get, never):Null<TopologyFingerprint>;
+  function get_selectedCadFaceFingerprint():Null<TopologyFingerprint> return selection.selectedCadFaceFingerprint;
+  var selectedCadFace(get, never):Null<Shape>;
+  function get_selectedCadFace():Null<Shape> return selection.selectedCadFace;
+  var selectedFeatureKey(get, never):Null<String>;
+  function get_selectedFeatureKey():Null<String> return selection.selectedFeatureKey;
   var activeSketchEdit:Null<CadSketchEditSession> = null;
   var activeSketchObjectId:Null<String> = null;
   var sketchEditPlaneValue:Null<Plane> = null;
@@ -116,9 +127,11 @@ class EditorScene {
   var savedSketchDraftRevision:Int = 0;
   var savedSketchDraftPresent:Bool = false;
   public var revision(default, null):Int;
+  public var visualRevision(default, null):Int;
   /** Changes only when simulation-consumed scene content changes, not selection. */
   public var environmentRevision(default, null):Int;
-  public var selectionRevision(default, null):Int = 1;
+  public var selectionRevision(get, never):Int;
+  function get_selectionRevision():Int return selection.revision;
   var disposed:Bool = false;
 
   function profileLoadStart():Float
@@ -153,6 +166,7 @@ class EditorScene {
     this.generatedGeometry = generatedGeometry == null ? new Map() : generatedGeometry;
     nextRevision++;
     revision = nextRevision;
+    markVisualChanged();
     nextEnvironmentRevision++;
     environmentRevision = nextEnvironmentRevision;
     document = sharedDocument == null ? new EditorDocument("scene") : sharedDocument;
@@ -165,7 +179,7 @@ class EditorScene {
         addObject("tower", "Orange tower", 1.1, 0.0, 0.1, 1.2, 1.8, 0.2, 0.92, 0.48, 0.22);
       } else {
         addObjects(data);
-        selectedId = data.length == 0 ? "scene" : data[0].id;
+        selection.selectedId = data.length == 0 ? "scene" : data[0].id;
         var savedDraft:Null<SceneObjectData> = null;
         for (item in data) if (item.sketchDraft != null) {
           if (savedDraft != null)
@@ -424,7 +438,7 @@ class EditorScene {
     var id = selectedId;
     var session = requireCadSession(id);
     clearSelectedCadFace();
-    selectedFeatureKey = null;
+    selection.selectedFeatureKey = null;
     var plane = Plane.XY();
     sketchEditPlaneValue = plane;
     activeSketchEdit = session.beginNewSketchEdit(plane, "mm");
@@ -865,7 +879,7 @@ class EditorScene {
     for (index in 0...session.document.featureCount()) {
       if (session.document.featureAt(index) != feature)
         continue;
-      selectedFeatureKey = id + ":feature:" + index;
+      selection.selectedFeatureKey = id + ":feature:" + index;
       return index;
     }
     throw "created CAD feature is missing from its document";
@@ -1173,9 +1187,7 @@ class EditorScene {
       catch (_:Dynamic) clearSelectedCadFace();
       if (index < 0) clearSelectedCadFace();
       if (priorIndex != index) {
-        selectionRevision++;
-        nextRevision++;
-        revision = nextRevision;
+        selection.changed(this);
       }
     }
     publish();
@@ -1231,9 +1243,9 @@ class EditorScene {
       var currentFingerprint = session.model.faceFingerprint(index);
       if (selectedCadFace != null)
         selectedCadFace.close();
-      selectedCadFace = currentFace;
-      selectedCadFaceIndex = index;
-      selectedCadFaceFingerprint = currentFingerprint;
+      selection.selectedCadFace = currentFace;
+      selection.selectedCadFaceIndex = index;
+      selection.selectedCadFaceFingerprint = currentFingerprint;
       session.selectedTopology = currentFingerprint;
       return index;
     } catch (error:Dynamic) {
@@ -1260,11 +1272,11 @@ class EditorScene {
       var fingerprint = session.model.faceFingerprint(index);
       if (selectedCadFace != null)
         selectedCadFace.close();
-      selectedCadFace = face;
-      selectedCadFaceIndex = index;
-      selectedCadFaceFingerprint = fingerprint;
-      selectedCadFaceX = x;
-      selectedCadFaceY = y;
+      selection.selectedCadFace = face;
+      selection.selectedCadFaceIndex = index;
+      selection.selectedCadFaceFingerprint = fingerprint;
+      selection.selectedCadFaceX = x;
+      selection.selectedCadFaceY = y;
       session.selectedTopology = fingerprint;
     } catch (error:Dynamic) {
       face.close();
@@ -1273,27 +1285,31 @@ class EditorScene {
   }
 
   function clearSelectedCadFace():Void {
-    selectedCadEdgeIndex = -1;
+    selection.selectedCadEdgeIndex = -1;
     var session = cadSessions.get(selectedId);
     if (session != null)
       session.selectedTopology = null;
     if (selectedCadFace != null)
       selectedCadFace.close();
-    selectedCadFace = null;
-    selectedCadFaceIndex = -1;
-    selectedCadFaceFingerprint = null;
-    selectedCadFaceX = 0.0;
-    selectedCadFaceY = 0.0;
+    selection.selectedCadFace = null;
+    selection.selectedCadFaceIndex = -1;
+    selection.selectedCadFaceFingerprint = null;
+    selection.selectedCadFaceX = 0.0;
+    selection.selectedCadFaceY = 0.0;
   }
 
   function refreshSelectionRevision():Void {
-    selectionRevision++;
-    nextRevision++;
-    revision = nextRevision;
+    selection.changed(this);
+  }
+
+  function markVisualChanged():Void {
+    nextVisualRevision++;
+    visualRevision = nextVisualRevision;
   }
 
   // Reconcile document records into the runtime scene while preserving stable nodes.
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
+    var physicsChanged = physicsRecordsChanged(data);
     var previousSelectedId = selectedId;
     var previousSelectedFeatureKey = selectedFeatureKey;
     var previousSelected = object(previousSelectedId);
@@ -1485,9 +1501,9 @@ class EditorScene {
     objects = prepared.objects;
     cadSessions = prepared.cadSessions;
     bridge.replaceEntries(prepared.bridgeEntries, prepared.nodeEntries);
-    selectedId = selection;
-    selectedFeatureKey=null;
-    if (prepared.changed) publish(prepared.changedBounds);
+    this.selection.selectedId = selection;
+    this.selection.selectedFeatureKey=null;
+    if (prepared.changed) publish(prepared.changedBounds, physicsChanged);
     var restoredFace = -1;
     if(previousFace!=null){
       var selected=object(selection);
@@ -1495,7 +1511,7 @@ class EditorScene {
         var session=cadSessions.get(selected.id);
         if(session!=null)try {
           restoredFace=remapSelectedCadFace(session,previousFaceShape,previousFace);
-          if(restoredFace>=0){selectedCadFaceX=previousFaceX;selectedCadFaceY=previousFaceY;}
+          if(restoredFace>=0){this.selection.selectedCadFaceX=previousFaceX;this.selection.selectedCadFaceY=previousFaceY;}
         } catch(error:Dynamic) { restoredFace=-1; }
       }
     }
@@ -1505,11 +1521,30 @@ class EditorScene {
     var propertySchemaChanged = previousSelectedId != selection || previousSelectedFeatureKey != null ||
       previousSelectedKind != (nextSelected == null ? null : nextSelected.kind);
     if (propertySchemaChanged)
-      selectionRevision++;
-    nextRevision++;
-    revision = nextRevision;
-    nextEnvironmentRevision++;
-    environmentRevision = nextEnvironmentRevision;
+      this.selection.changed(this);
+  }
+
+  function physicsRecordsChanged(data:Array<SceneObjectData>):Bool {
+    var previous:Map<String, EditorSceneObject> = new Map();
+    var nextIds:Map<String, Bool> = new Map();
+    for (item in objects) previous.set(item.id, item);
+    for (record in data) {
+      nextIds.set(record.id, true);
+      var old = previous.get(record.id);
+      if (old == null) {
+        if (record.collisionEnabled) return true;
+        continue;
+      }
+      if (old.collisionEnabled != record.collisionEnabled) return true;
+      if (!record.collisionEnabled) continue;
+      if (old.kind != record.type || old.x != record.x || old.y != record.y || old.z != record.z ||
+          old.width != record.width || old.height != record.height || old.depth != record.depth ||
+          !sameRotation(old.rotation, record.rotation) || old.cadGraph != record.cadGraph ||
+          old.meshSnapshot != record.meshSnapshot || old.dynamicBody != record.dynamicBody ||
+          old.mass != record.mass) return true;
+    }
+    for (item in objects) if (item.collisionEnabled && !nextIds.exists(item.id)) return true;
+    return false;
   }
 
   static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
@@ -1529,7 +1564,7 @@ class EditorScene {
       transaction.commit();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
     item.label = label;
-    publish();
+    publish(null, false);
   }
 
   public function items():Array<EditorSceneObject> return objects.copy();
@@ -1544,9 +1579,7 @@ class EditorScene {
       kinematicOccurrences.set(sceneId, true);
     }
     assemblyPropertyProvider = propertyProvider;
-    selectionRevision++;
-    nextRevision++;
-    revision = nextRevision;
+    selection.changed(this);
   }
 
   public function canMoveInViewport(id:String):Bool
@@ -1555,9 +1588,7 @@ class EditorScene {
   /** Rebuilds selected-object descriptors after project-owned assembly settings change. */
   public function refreshAssemblyProperties():Void {
     if (assemblyPropertyProvider == null) return;
-    selectionRevision++;
-    nextRevision++;
-    revision = nextRevision;
+    selection.changed(this);
   }
 
   /** Apply a full FK result as one native scene transaction. Positions are geometry-centre poses. */
@@ -1712,34 +1743,11 @@ class EditorScene {
     return true;
   }
 
-  public function select(id:String):Bool {
-    if (id != "scene" && object(id) == null) return false;
-    if (id == selectedId && selectedFeatureKey==null) return false;
-    if (activeSketchEdit != null && (id != activeSketchObjectId || selectedFeatureKey != null))
-      cancelSelectedSketchEdit();
-    clearSelectedCadFace();
-    selectedId = id;
-    selectedFeatureKey=null;
-    selectionRevision++;
-    return true;
-  }
+  public function select(id:String):Bool return selection.select(this, id);
 
   public function treeSelectionKey():String return selectedFeatureKey==null?selectedId:selectedFeatureKey;
 
-  public function selectTreeKey(key:String):Bool {
-    if(key=="scene"||object(key)!=null)return select(key);
-    var marker=key.indexOf(":feature:");
-    if(marker<0)return select(key);
-    var id=key.substr(0,marker),item=object(id);
-    if(item==null||!isCadKind(item.kind))return false;
-    if (activeSketchEdit != null && (id != activeSketchObjectId || key != selectedFeatureKey))
-      cancelSelectedSketchEdit();
-    if(selectedId==id&&selectedFeatureKey==key)return false;
-    clearSelectedCadFace();
-    selectedId=id;selectedFeatureKey=key;
-    selectionRevision++;
-    return true;
-  }
+  public function selectTreeKey(key:String):Bool return selection.selectTreeKey(this, key);
 
   public function cadFeatureNames(id:String):Array<String> {
     var item=object(id);
@@ -1806,7 +1814,7 @@ class EditorScene {
       activeSketchEdit = session.beginNewSketchEdit(restored.sketch.plane,
         restored.sketch.units, restored.sketch);
       sketchEditPlaneValue = restored.sketch.plane;
-      selectedFeatureKey = null;
+      selection.selectedFeatureKey = null;
     } else {
       if (restored.featureIndex >= session.document.featureCount())
         throw "sketch draft references a missing feature";
@@ -1816,10 +1824,10 @@ class EditorScene {
       var sketchFeature:ConstrainedSketchFeature = cast feature;
       activeSketchEdit = session.beginSketchEdit(restored.featureIndex, restored.sketch);
       sketchEditPlaneValue = sketchFeature.workplane();
-      selectedFeatureKey = owner.id + ":feature:" + restored.featureIndex;
+      selection.selectedFeatureKey = owner.id + ":feature:" + restored.featureIndex;
     }
     activeSketchObjectId = owner.id;
-    selectedId = owner.id;
+    selection.selectedId = owner.id;
     sketchDraftRevision = 1;
     savedSketchDraftRevision = sketchDraftRevision;
     savedSketchDraftPresent = true;
@@ -1958,7 +1966,7 @@ class EditorScene {
     var subelement=hit.subelement();
     if(item!=null&&(isCadKind(item.kind)||item.kind=="cad-preview")&&
         (subelement & 0x40000000)!=0) {
-      selectedCadEdgeIndex = (subelement & 0x3fffffff)-1;
+      selection.selectedCadEdgeIndex = (subelement & 0x3fffffff)-1;
     } else if(item!=null&&isCadKind(item.kind)&&subelement>=0){
       var session=requireCadSession(id);
       try {
@@ -1970,7 +1978,7 @@ class EditorScene {
       } catch(error:Dynamic){clearSelectedCadFace();}
     }
     if(previousFace!=selectedCadFaceIndex||previousEdge!=selectedCadEdgeIndex)
-      selectionRevision++;
+      selection.changed(this);
     return id;
   }
 
@@ -2138,7 +2146,7 @@ class EditorScene {
       transaction.commit();
     } catch (error:Dynamic) { transaction.dispose(); throw error; }
     item.visible = visible;
-    publish();
+    publish(null, false);
   }
 
   public function setDimensions(id:String, width:Float, height:Float,?depth:Float):Void {
@@ -2153,6 +2161,29 @@ class EditorScene {
       applyCadEdit(id,"Edit CAD dimensions",
         function(session)session.model.setSceneDimensions(width,height,chosenDepth),
         function(session)session.model.setSceneDimensions(before.width,before.height,before.depth));
+      return;
+    }
+    if (target.kind == "rectangle") {
+      if (target.width == width && target.height == height && target.depth == chosenDepth) return;
+      var runtime = runtimeFor(id);
+      var geometry:Null<Geometry> = null;
+      var transaction = scene.beginTransaction();
+      try {
+        geometry = scene.createGeometry();
+        scene.setGeometryData(geometry, boxGeometry(width, height, chosenDepth));
+        transaction.setGeometry(runtime.node, geometry);
+        failIfInjected("prepare.existing-geometry");
+        failIfInjected("prepare.existing-object");
+        transaction.commit();
+      } catch (error:Dynamic) {
+        transaction.dispose();
+        if (geometry != null) geometry.dispose();
+        throw error;
+      }
+      bridge.attach(id, runtime.node, geometry, runtime.material);
+      target.width = width; target.height = height; target.depth = chosenDepth;
+      publish([runtime.node], target.collisionEnabled);
+      runtime.geometry.dispose();
       return;
     }
     var data = records();
@@ -2193,45 +2224,63 @@ class EditorScene {
   public function setColour(id:String, red:Float, green:Float, blue:Float):Void {
     if (!validColour(red) || !validColour(green) || !validColour(blue))
       throw "Rectangle colour channels must be finite values from 0 to 1";
-    if (object(id) == null) throw "Unknown scene object: " + id;
-    var data = records();
-    for (item in data) if (item.id == id) { item.red = red; item.green = green; item.blue = blue; }
-    replaceObjects(data, selectedId);
+    var item = requiredObject(id);
+    setObjectAppearance(item, red, green, blue, item.appearance);
   }
 
   public function setFinish(id:String, finish:Appearance):Void {
     if (finish == null || finish.finish == null || StringTools.trim(finish.finish).length == 0 ||
         !validColour(finish.metallic) || !validColour(finish.roughness))
       throw "Invalid surface finish";
-    if (object(id) == null) throw "Unknown scene object: " + id;
-    var data = records();
-    for (item in data) if (item.id == id) item.appearance = finish;
-    replaceObjects(data, selectedId);
+    var item = requiredObject(id);
+    setObjectAppearance(item, item.red, item.green, item.blue, finish);
   }
 
   /** Generated source appearance for a project occurrence; remains stable across authored edits. */
   public function configureComponentFinishes(baseline:Array<SceneObjectData>):Void {
     componentFinishes.clear();
     for (item in baseline) componentFinishes.set(item.id, item);
-    selectionRevision++;
+    selection.changed(this);
   }
 
   public function resetComponentFinish(id:String):Void {
     var source = componentFinishes.get(id);
     if (source == null) throw "Object has no component finish: " + id;
-    var data = records();
-    for (item in data) if (item.id == id) {
-      item.red = source.red; item.green = source.green; item.blue = source.blue;
-      item.appearance = source.appearance;
-    }
-    replaceObjects(data, selectedId);
+    setObjectAppearance(requiredObject(id), source.red, source.green, source.blue, source.appearance);
   }
 
-  function publish(?updatedNodes:Array<NodeId>):Void {
+  function setObjectAppearance(item:EditorSceneObject, red:Float, green:Float, blue:Float,
+      finish:Null<Appearance>):Void {
+    if (item.red == red && item.green == green && item.blue == blue &&
+        sameFinish(item.appearance, finish)) return;
+    var runtime = runtimeFor(item.id);
+    var material:Null<Material> = null;
+    var transaction = scene.beginTransaction();
+    try {
+      material = scene.createMaterial();
+      scene.setMaterialData(material, materialFor(red, green, blue, finish));
+      transaction.setMaterial(runtime.node, material);
+      failIfInjected("prepare.existing-material");
+      transaction.commit();
+    } catch (error:Dynamic) {
+      transaction.dispose();
+      if (material != null) material.dispose();
+      throw error;
+    }
+    bridge.attach(item.id, runtime.node, runtime.geometry, material);
+    item.red = red; item.green = green; item.blue = blue; item.appearance = finish;
+    publish(null, false);
+    runtime.material.dispose();
+  }
+
+  function publish(?updatedNodes:Array<NodeId>, ?physicsChanged:Bool = true):Void {
     nextRevision++;
     revision = nextRevision;
-    nextEnvironmentRevision++;
-    environmentRevision = nextEnvironmentRevision;
+    markVisualChanged();
+    if (physicsChanged) {
+      nextEnvironmentRevision++;
+      environmentRevision = nextEnvironmentRevision;
+    }
     rebuildPresentation(updatedNodes);
   }
 
@@ -2830,7 +2879,7 @@ class EditorScene {
     }
     if (selectedCadFace != null) {
       selectedCadFace.close();
-      selectedCadFace = null;
+      selection.selectedCadFace = null;
     }
     for (session in cadSessions) session.close();
     cadSessions = new Map();

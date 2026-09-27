@@ -32,6 +32,10 @@ class SensorConfiguration {
   public var robotId(default, null):String = "materia/robot";
   var nextId:Int = 1;
   var configurationRevision:Int = 0;
+  var physicsRevision:Int = 1;
+  var observedDocumentRevision:Int = -1;
+  var observedConfigurationRevision:Int = -1;
+  var observedPhysicsState:Null<String> = null;
   final configurations:Map<String, Dynamic> = new Map();
   final liveModels:Map<String, RobotModel> = new Map();
   final selections:Map<String, Int> = new Map();
@@ -102,7 +106,45 @@ class SensorConfiguration {
     for(id in liveModels.keys())if(result.indexOf(id)<0)result.push(id);
     result.sort(Reflect.compare); return result;
   }
-  public function revision():Int return document.revision + configurationRevision * 1000000;
+  /** Changes only when simulation inputs change, even with a shared editor document. */
+  public function revision():Int {
+    if (observedDocumentRevision != document.revision ||
+        observedConfigurationRevision != configurationRevision) {
+      var current = physicsState();
+      if (observedPhysicsState != null && current != observedPhysicsState) physicsRevision++;
+      observedPhysicsState = current;
+      observedDocumentRevision = document.revision;
+      observedConfigurationRevision = configurationRevision;
+    }
+    return physicsRevision;
+  }
+
+  function physicsState():String {
+    var ids:Array<String> = [for (id in configurations.keys()) id];
+    for (id in liveModels.keys()) if (ids.indexOf(id) < 0) ids.push(id);
+    ids.sort(Reflect.compare);
+    var records:Array<Dynamic> = [];
+    for (id in ids) {
+      var live = liveModels.get(id);
+      var record = live == null ? configurations.get(id) : singleRecordFor(id, live);
+      records.push(withoutNames(haxe.Json.parse(haxe.Json.stringify(record))));
+    }
+    return haxe.Json.stringify(records);
+  }
+
+  static function withoutNames(value:Dynamic):Dynamic {
+    if (value == null) return null;
+    if (Std.isOfType(value, Array)) {
+      var values:Array<Dynamic> = cast value;
+      return [for (item in values) withoutNames(item)];
+    }
+    if (Std.isOfType(value, String) || Std.isOfType(value, Int) ||
+        Std.isOfType(value, Float) || Std.isOfType(value, Bool)) return value;
+    var result:Dynamic = {};
+    for (field in Reflect.fields(value)) if (field != "name")
+      Reflect.setField(result, field, withoutNames(Reflect.field(value, field)));
+    return result;
+  }
   public function setReadOnlyRobots(ids:Array<String>):Void {
     readOnlyRobots.clear(); for (id in ids) readOnlyRobots.set(id, true);
   }
