@@ -278,8 +278,12 @@ class RobotSessionIntegration {
         stage = "reconnect connect";
         reconnect.connectWithEvents(host, port, runtime.events);
         stage = "reconnect ready";
-        waitFor(reconnect, function() return reconnect.hasControlLease(),
-          "reconnected controller did not receive the lease");
+        // Welcome (with the lease) and the first State are separate messages
+        // that may arrive in different reads, so wait for both before
+        // checking the state the new controller inherited.
+        waitFor(reconnect, function() return reconnect.hasControlLease() &&
+          reconnect.latestState != null,
+          "reconnected controller did not receive the lease and first state");
         if (Int64.compare(oldSession, sessionOf(reconnect)) == 0)
           throw "reconnect reused the old controller session ID";
         if (reconnect.latestState == null || reconnect.latestState.safety !=
