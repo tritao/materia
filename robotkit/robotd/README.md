@@ -50,10 +50,10 @@ does not authenticate clients; use an isolated robot network or SSH tunnel.
 Serial hosting requires a deployment JSON file. It refers to the canonical
 semantic robot model and gives the UART path, baud, `f32` target error budget,
 and layout fingerprint. Its device section points to a device layout and the
-matching schema lock. The layout maps ordered RKD5 channels to joint IDs in the
+matching schema lock. The layout maps ordered RKD6 actuator channels to joint IDs in the
 model. `robotd` loads the complete `RobotModel`, recomputes the fingerprint from
 the exact layout bytes and schema lock, and checks the channel order before
-opening the UART. `RobotModelCodec` reads and migrates versioned model artifacts;
+opening the UART. `RobotModelCodec` reads the versioned v4 model artifact;
 the device fingerprint still covers only the physical layout and wire schema.
 
 See [`../tests/fixtures/device-deployment/deployment.json`](../tests/fixtures/device-deployment/deployment.json)
@@ -61,24 +61,23 @@ and its referenced [`robot.json`](../tests/fixtures/device-deployment/robot.json
 for the PTY fixture. Its calibration and fingerprint are test values; a physical
 deployment needs measured values. Generate the deployed fingerprint from the
 exact layout bytes with `python3 ../tools/device_fingerprint.py layout.json
---schema-lock device_wire.lock.json --rust firmware_fingerprint.rs`, then put
+--schema-lock device_wire6.lock.json --rust firmware_fingerprint.rs`, then put
 the printed hex value in `deployment.json` and compile the Rust constant into
 the MCU firmware. Include that exact schema lock file in the deployment directory.
 
 The protocol and world TCP clients are integration tests rather than robotd
 runtime modes. Run them through `../tests/world-tcp.sh`.
 
-The complete RobotClient → robotd → RKD5 → Rust device path runs without
+The complete RobotClient → robotd → RKD6 → Rust device path runs without
 hardware through `python3 ../tests/device-tcp.py`.
 
 [`../runtime/DEVICE_PROTOCOL.md`](../runtime/DEVICE_PROTOCOL.md) describes the
-RKD5 device contract. The Rust device protocol crate implements its session,
-command, frame, and watchdog core. A platform still needs firmware that connects
-decoded commands to its motor and sensor drivers and enforces the local
-actuator watchdog; a disconnected cable cannot receive a host emergency-stop
-frame. Each new host session begins with the device latched in emergency-stop,
-and the application must explicitly reset safety before moving.
+RKD6 device contract. The Rust scheduled core handles queued segments, path
+clock, HOLD, STOP and link-loss stopping. The Nucleo adapter drives two
+in-memory position setpoints. A physical board layer still needs motor pins,
+feedback and verified stop outputs; a disconnected cable cannot receive a
+host emergency-stop frame.
 
 The same runtime command/controller boundary is used by simulation and the
-physical endpoint (`DeviceSerialEndpoint`). Sensor data stays outside RKD5
+physical endpoint (`DeviceSerialEndpoint`). Sensor data stays outside RKD6
 control acknowledgements.

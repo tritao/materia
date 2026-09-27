@@ -26,11 +26,12 @@ pub struct VirtualDevice {
     step_tick_hz: u32,
     profile: u8,
     host_ns: u64,
+    last_publish_ns: u64,
     outbox: VecDeque<Vec<u8>>,
 }
 
 impl VirtualDevice {
-    fn new(
+    pub fn new(
         tick_hz: u64,
         step_tick_hz: u32,
         offset_ticks: u64,
@@ -64,6 +65,7 @@ impl VirtualDevice {
             step_tick_hz,
             profile,
             host_ns: 0,
+            last_publish_ns: 0,
             outbox: VecDeque::new(),
         })
     }
@@ -76,7 +78,7 @@ impl VirtualDevice {
         }
     }
 
-    fn feed(&mut self, frame: &[u8]) -> bool {
+    pub fn feed(&mut self, frame: &[u8]) -> bool {
         let Ok((kind, payload)) = decode_frame6(frame) else {
             return false;
         };
@@ -289,7 +291,7 @@ impl VirtualDevice {
         }
     }
 
-    fn advance(&mut self, host_ns: u64) -> bool {
+    pub fn advance(&mut self, host_ns: u64) -> bool {
         if host_ns < self.host_ns {
             return false;
         }
@@ -317,7 +319,10 @@ impl VirtualDevice {
                 }
             }
         }
-        self.publish_state();
+        if host_ns.saturating_sub(self.last_publish_ns) >= 10_000_000 {
+            self.publish_state();
+            self.last_publish_ns = host_ns;
+        }
         true
     }
 
@@ -380,6 +385,8 @@ impl VirtualDevice {
         }
         self.emit(15, &body);
     }
+
+    pub fn take_frame(&mut self) -> Option<Vec<u8>> { self.outbox.pop_front() }
 }
 
 #[no_mangle]

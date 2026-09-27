@@ -126,10 +126,17 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     const auto required_baud = minimum_baud(ack.actuator_count, period_ns, allowance_ns);
     const auto required_depth = minimum_queue_depth(transport->baud(), ack.actuator_count,
         period_ns, link_latency_ns, clock_bound_ns);
+    const auto segment_bytes = device_frame6::HEADER_SIZE + device_frame6::CRC_SIZE +
+        device_wire6::Segment6Header::SIZE +
+        ack.actuator_count * device_wire6::Segment6Coefficients::SIZE;
+    const auto minimum_period_ns = transport->baud() == 0 ? UINT64_MAX :
+        allowance_ns + static_cast<std::uint64_t>(std::ceil(
+            10.0L * segment_bytes * 1e9L / transport->baud()));
     if (transport->baud() < required_baud || ack.segment_capacity < required_depth) {
         std::fprintf(stderr, "Rkd6Endpoint: unqualified serial link: minimum_baud=%llu "
-            "minimum_queue_depth=%u minimum_period_ns=%llu configured_baud=%u configured_queue_depth=%u\n",
+            "minimum_queue_depth=%u minimum_period_ns=%llu configured_period_ns=%llu configured_baud=%u configured_queue_depth=%u\n",
             static_cast<unsigned long long>(required_baud), required_depth,
+            static_cast<unsigned long long>(minimum_period_ns),
             static_cast<unsigned long long>(period_ns),
             transport->baud(), ack.segment_capacity);
         return {};
@@ -353,8 +360,9 @@ void Rkd6Endpoint::pump_queue() {
             (link_latency_ns_ + 2 * clock_.uncertainty_ns() +
                 2 * owner_period_ns_) *
             static_cast<double>(ack_.device_tick_hz) / 1e9) >= committed_until_ticks_) {
-        const auto &segment = sent_[next_commit_];
-        if (send_commit(segment.header.t0_ticks + segment.header.duration_ticks)) ++next_commit_;
+        const auto &segment = sent_.back();
+        if (send_commit(segment.header.t0_ticks + segment.header.duration_ticks))
+            next_commit_ = sent_.size();
     }
 }
 

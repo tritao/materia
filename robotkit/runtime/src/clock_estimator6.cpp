@@ -65,7 +65,9 @@ void ClockEstimator6::fit() {
     if (variance <= 0) return;
     const auto fitted_rate = covariance / variance;
     if (!std::isfinite(fitted_rate) || fitted_rate <= 0) { sync_lost_ = true; return; }
-    rate_ = fitted_rate;
+    // Two early serial samples can differ by a full device update tick. Keep
+    // that quantization from turning into an implausible clock-rate estimate.
+    rate_ = std::clamp(fitted_rate, nominal_rate_ * 0.995, nominal_rate_ * 1.005);
     offset_ = mean_y - rate_ * mean_x;
     double worst_residual_ns = 0;
     for (std::size_t i = 0; i < selected; ++i)

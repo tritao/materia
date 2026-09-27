@@ -599,3 +599,25 @@ Shared Rust/C++ frame vectors include a digital event. Rust tests cover
 path-time firing across HOLD and replacement. The in-process RKD6 test covers
 spray on/off without HOLD, with HOLD, and STOP, and checks application within
 one device step tick of each planned path position.
+
+### A9 — Minimal RKD6 profile and RKD5 retirement
+
+Protocol version 10 adds the `SESSION_ACK6` profile. The minimal reference
+device advertises degree 1 and eight queue slots, streams position setpoints
+without step pulses, and runs Ruckig plans lowered at the owner period. The
+host validates the lowered path against the source at step-tick resolution,
+accounts for in-flight serial frames, and reports baud, depth and period
+qualification limits. Tests cover Ruckig execution, HOLD/RESUME, link loss,
+long-plan queue refill, and full-profile regression.
+
+Deployment v4 implies RKD6; the v3 reader accepts only an explicit RKD6
+declaration. Bench and PTY fixtures use the RKD6 lock and recomputed
+fingerprints. The POSIX serial endpoint and both PTY binaries now use RKD6.
+The two-joint Nucleo stub compiles for `thumbv7em-none-eabihf` as a minimal
+device with an eight-segment queue and in-memory setpoints. The old RKD5
+schema, codecs, Rust device state machine, HostLink, streaming qualification,
+and tests were removed. The C++ PTY test now exercises an actual RKD6 serial
+plan; RobotClient → robotd → Rust minimal device covers the TCP route.
+Host-side per-cycle sampling remains for cyclic simulation endpoints.
+
+The initial minimal profile and deployment work is commit `f6beb9ab`.

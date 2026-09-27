@@ -4,7 +4,7 @@ import haxe.Json;
 import haxe.io.Bytes;
 import robotkit.model.RobotModel;
 
-/** RKD5 physical-channel mapping, kept separate from the semantic RobotModel. */
+/** Physical-channel mapping, kept separate from the semantic RobotModel. */
 class DeviceLayout {
   public final channels:Array<DeviceChannel>;
 

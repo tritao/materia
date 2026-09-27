@@ -1,7 +1,16 @@
 //! RKD6 length and CRC framing. Payload records live in `device_wire6`.
 
 use crate::device_wire6::*;
-use crate::runtime::crc32;
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut value = 0xffff_ffffu32;
+    for &byte in bytes {
+        value ^= u32::from(byte);
+        for _ in 0..8 {
+            value = (value >> 1) ^ (0xedb_88320 & 0u32.wrapping_sub(value & 1));
+        }
+    }
+    !value
+}
 
 pub const HEADER_SIZE: usize = 8;
 pub const CRC_SIZE: usize = 4;

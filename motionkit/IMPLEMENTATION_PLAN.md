@@ -606,27 +606,13 @@ Acceptance: every MotionKit and RobotKit native/Haxe suite, both FFI audits,
 and TCP default, session and lease-timeout integration stay green. Log the
 deletions and test replacements in the Progress log.
 
-## P9c — Enable the host-runtime queue for DeviceSerialEndpoint
+## P9c — Historical serial-streaming qualification
 
-Do this after P9b and before P10. The host runtime already samples its queue
-each owner cycle and sends position targets through `apply()`; RKD5 and the
-device firmware protocol do not change.
-
-- Report `supports_trajectory_queue()` true only when the configured owner
-  period is at least the RKD5 command-frame transmission time for the
-  configured baud and joint count plus the processing margin specified in
-  `robotkit/runtime/DEVICE_PROTOCOL.md`. Otherwise report false and log the
-  reason. The current serial C constructor uses the runtime's 10 ms default;
-  expose a versioned owner-period setting so a deployment can choose a period
-  that passes the test. Keep the non-queue fallback available when it fails.
-- Exercise the existing PTY/FakeDevice harness: a Ruckig plan runs over
-  serial with one target frame per owner cycle; HOLD and RESUME stay on the
-  path; the device watchdog still stops on a host stall; insufficient baud
-  reports no queue support.
-
-Acceptance: every MotionKit and RobotKit native/Haxe suite, both FFI audits,
-and TCP default, session and lease-timeout integration stay green. Log the
-capability rule and tests in the Progress log.
+The target-streaming serial path described here was retired in RobotKit Lane A
+A9. The current serial endpoint uses RKD6 scheduled segments, capability
+negotiation and baud/queue-depth qualification; see
+`robotkit/runtime/DEVICE_PROTOCOL.md`. Host-side per-cycle sampling remains
+for cyclic-control endpoints such as SimKit.
 
 ## P10 — Trajectories and plans over robotd
 

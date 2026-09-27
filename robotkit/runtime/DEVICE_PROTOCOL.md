@@ -1,149 +1,113 @@
-# RobotKit device protocol (RKD5)
+# RobotKit scheduled device protocol (RKD6)
 
-The scheduled successor is [RKD6](DEVICE_PROTOCOL6.md); RKD5 remains the
-per-cycle target-streaming protocol.
+The four-byte sync marker is `RKD6`. A frame is marker (4), message type (1), reserved zero
+(1), little-endian payload length (2), payload, then little-endian CRC-32/IEEE
+(4), calculated over every preceding byte. The largest current payload is the
+version 10 session record (4,908 bytes), so the frame maximum is 4,920 bytes.
+A receiver rejects unknown types, wrong lengths, a nonzero reserved byte,
+CRC mismatch, or malformed session, segment and event records.
 
-This is the UART byte-stream protocol between a Linux host and a device MCU.
-The fixed payload records come from `robotkit/schema/device_wire.wire.idl`.
-The hardware-independent Rust `robotkit-device-protocol` crate implements the
-device parser, session and watchdog state, and outgoing ACK/STATE encoding.
-The POSIX `HostLink` implements session negotiation, commands, and state sampling.
-Its PTY test runs the Rust device core in a separate
-process against the C++ host, covering session negotiation, commands, a
-simulated watchdog expiry, restart, and model rejection. It uses a virtual
-serial port; physical UART timing and MCU integration remain untested.
-`DeviceSerialEndpoint` adapts the link to `RobotRuntime` when supplied an
-explicit fingerprint and target conversion budget. It verifies and caches the
-initial safe state before opening. `rk_robot_runtime_create_serial`,
-`RobotRuntime.createSerial`, and `SerialRobot.new` require a
-32-digit deployment fingerprint and a finite nonnegative absolute target error
-budget in SI units. A device fingerprint mismatch returns
-`RK_ERROR_MODEL_MISMATCH` through the C API. An explicit runtime no-op heartbeat
-maps to v5 normal stop, since v5 has no no-op command kind and a stopped device
-may safely refresh its watchdog. The PTY test also drives this adapter through `RobotRuntime` to check
-the initial safe snapshot, safety reset, targets, and state publication.
+`device_wire6.wire.idl` is the canonical fixed-record schema; `wire6.json`
+generates Rust and C++ codecs. Segment coefficients are `f32` in local seconds,
+with degree at most five. Segment start and duration are device ticks. One
+`Segment6Coefficients` record follows the header per actuator. `STATE6` has
+one `ActuatorState6` record per actuator. Queue control and safety command
+frames carry the fixed records specified by the schema. The session ACK reports the tick rate, step tick rate, degree limit, queue capacities and profile.
+`SESSION_BEGIN6` is one fixed record. Its 64-slot acceleration array carries
+the active actuator limits, each positive and no greater than the global cap.
+It also carries the link-loss timeout in nanoseconds. The device converts that
+timeout using its own clock after the session begins.
+Protocol version 8 also carries steps per actuator unit, actuator rate limits,
+direction setup ticks, source joint indices, transmission ratios and dual-drive
+skew bounds. Stable actuator IDs, channel order and transmission fields are
+part of the RKD6 endpoint fingerprint.
+The host converts joint polynomials to actuator polynomials before encoding and
+rejects motion faster than either the authored actuator rate or one step per
+device step tick. The no_std device generator uses the configured direction
+setup and minimum step interval, and checks dual-drive skew from step feedback.
+Protocol version 9 declares up to 32 channels in the session, including stable
+IDs, kinds and safe values. An `EVENT` carries its queue revision, plan ID,
+device path tick, channel index, typed value and HOLD policy. The host maps
+each `TimedEvent` from plan-relative path time with the same frozen clock
+mapping as its trajectory segments. The device fires only committed events as
+its path clock crosses their ticks. HOLD makes configured channels safe,
+RESUME restores `RestoreOnResume` values, and STOP or a fault discards future
+events and sets every channel to its declared safe value. Replacement discards
+events at or after the replacement boundary. The virtual event log records
+scheduled path ticks, applied path ticks and device ticks.
 
-## Frame
+No RKD6 hardware has shipped. Before the first hardware release, an in-place
+schema revision is permitted with a `PROTOCOL_VERSION` bump and regenerated
+Rust and C++ codecs, lock, and shared vectors. The schema freezes at the first
+hardware release; subsequent changes must preserve that released wire format
+or negotiate a new version.
 
-| Offset | Type | Meaning |
-| ---: | --- | --- |
-| 0 | 4 bytes | ASCII `RKD5` synchronization marker |
-| 4 | u8 | `MessageType`: 1 session begin, 2 session ack, 3 command, 4 state |
-| 5 | u8 | flags, zero in v5 |
-| 6 | u16 little-endian | payload size |
-| 8 | bytes | exactly one typed payload |
-| 8 + size | u32 little-endian | CRC-32/ISO-HDLC of bytes 0 through 7 + size |
+| Quantity | RKD6 bound | Source |
+| --- | ---: | --- |
+| Maximum actuators | 64 | schema |
+| Maximum frame | 4,920 bytes | 8 + 4,908 + 4 |
+| Maximum segment frame | 1,648 bytes | 8 + 36 + 64 × 25 + 4 |
+| Step tick default | 40 kHz | LA-D2; board may configure another rate |
+| Segment queue depth | negotiated | `SESSION_ACK6.segment_capacity` |
+| Event queue depth | negotiated | `SESSION_ACK6.event_capacity` |
+| Committed horizon | link latency + 2 × clock uncertainty beyond host horizon | A3 |
+| Wire transmission time | `10 × frame_bytes / baud` seconds for 8N1 | serial qualification input |
 
-CRC uses reflected polynomial `0xedb88320`, initial value `0xffffffff`,
-and final XOR `0xffffffff`. A receiver searches for `RKD5` after a corrupt
-frame. A bogus length is rejected as soon as the 8-byte header is available.
-The maximum payload is 796 bytes; the maximum complete frame is 808 bytes.
-There is no HMPK or MessagePack in this protocol.
+A host must qualify baud and queue depth against the declared segment rate
+before motion. Clock-sync uncertainty and link-loss timeout are deployment
+bounds, not hard-coded protocol constants. `TIME_SYNC_REPLY` carries device
+receive and transmit ticks for the estimator in A3.
 
-## Four messages
+The host estimator fits device ticks against host monotonic nanoseconds from
+the lowest RTT samples in a bounded window. Its uncertainty is half the
+minimum RTT plus the worst selected fit residual. It exposes request cadence,
+time mapping and the extra commit horizon (`link latency + 2 × uncertainty`).
+When a new sample steps outside the deployment bound, it latches
+`clock_sync_lost` and disallows further commits. An RKD6 endpoint sends the
+periodic requests and reports that reason in its runtime snapshot.
 
-| Type | Direction | Payload size and rule |
-| --- | --- | --- |
-| `SESSION_BEGIN` | host to device | exactly 24 bytes: `SessionBegin` |
-| `SESSION_ACK` | device to host | exactly 28 bytes: `SessionAck` |
-| `COMMAND` | host to device | `CommandHeader` (20) + `target_count` × `JointTarget` (8), at most 532 bytes |
-| `STATE` | device to host | `StateHeader` (28) + `joint_count` × `JointState` (12), at most 796 bytes |
+The host device compiler maps plan-relative knots to device ticks, converts
+segment-local coefficients to `f32`, and runs `mk_validate` on the converted
+trajectory at the step-tick resolution. It samples the converted `f32` Horner
+evaluation against the original plan at that resolution and rejects a plan
+that exceeds `target_error`. `Rkd6Endpoint` forwards queue revisions, segments
+and commits over a complete-frame transport. It qualifies baud and queue
+depth at construction and checks the shortest submitted segment again before
+sending a plan. RKD6 snapshots use device queue status. Per-cycle setpoint sampling remains available for cyclic-control endpoints such as SimKit.
+# In-process virtual device
 
-Counts are at most 64. The device rejects an invalid length, nonzero reserved
-byte, unknown command kind or target mode, nonzero target flags, duplicate or
-out-of-range joint index, and nonfinite target value. Targets commands carry
-at least one target; stop, emergency stop, and safety reset carry none. `STATE`
-contains only machine-control state. Telemetry is a future independent message.
+`robotkit/device_virtual` links the no_std scheduled core and step generator to the `std`
+virtual board as a static library. Its C ABI in
+`robotkit/device_virtual/include/rkd_virtual.h` accepts and returns complete
+RKD6 frames and advances on the caller's simulated host clock. The board
+applies offset and ppm drift before each 40 kHz step tick. A step pulse is
+recorded with its device tick, actuator and direction. Missed-step injection
+can exercise the latched dual-drive skew fault.
 
-## Session and safety
+`VirtualDeviceEndpoint` owns that library behind a deterministic complete
+frame link. Baud, latency, jitter, frame drop, corruption and RNG seed are
+configurable. A sampled line error delays a frame by one packet time before
+retry; `cut_link(true)` suppresses host-to-device frames while leaving
+telemetry available to observe device-side `link_lost`. The SimKit robot
+descriptor can select this endpoint, and `Simulation.addRobot` exposes it as
+`VirtualDeviceOptions`. The step-count position drives each SimKit joint
+through a position target. Device status and state are sampled on the
+simulation owner clock.
 
-The host chooses a fresh nonzero random `u64` session. Every valid session
-begin causes the device to stop all actuators, clear targets, latch safety,
-reset the accepted sequence, and clear watchdog credit *before* it acknowledges
-the session. The device compares the host's 16-byte model fingerprint with its
-compiled fingerprint. Mismatch is acknowledged with `model_mismatch`; no
-commands may be accepted in that session. The fingerprint catches accidental
-model/layout mismatch; it is not an authentication mechanism. An all-zero
-fingerprint is an invalid unconfigured placeholder on both host and device.
+## Device profiles and serial deployment
 
-A matching session is acknowledged `latched_safe`. Motion remains forbidden
-until an explicit accepted `reset_safety` command, subject to device safety
-hardware and application checks.
-The device sends an initial latched-safe `STATE` immediately after the
-`SESSION_ACK`, so the host can publish a complete joint snapshot before its
-first command. If the application cannot produce a valid state, it must remain
-safe; the host's initial sample will fail rather than invent joint values.
-After that, the device must publish `STATE` periodically, including when no
-commands arrive. The host samples an independent state stream and treats a
-silent device as a fault. The desktop PTY adapter sends state every 25 ms;
-the hardware cadence must fit the configured baud and host response deadline.
+Protocol version 10 adds `SESSION_ACK6.profile`. Full devices report profile 1,
+support degree up to their declared maximum, queue segments and generate steps.
+Minimal devices report profile 2, maximum degree 1, and a small queue (the
+reference device has eight slots). They output position setpoints and generate
+no steps. The host lowers source segments at the owner period, checks the
+converted f32 path against the original trajectory at step-tick resolution,
+and revalidates the lowered path. It accounts for frames in flight when
+streaming into a small queue. Qualification reports minimum baud, queue depth
+and period before construction succeeds.
 
-Sequence numbers must start above zero and
-increase strictly within the session. Only a fully validated command accepted
-by the device application advances the watermark and refreshes the watchdog.
-Malformed, stale, wrong-session, mismatched-model, or rejected commands do
-neither. Emergency stop latches safety. Watchdog expiry is evaluated on the
-device's local monotonic clock and must stop and latch actuators. Fault and
-emergency state must be sent without waiting for command acknowledgement.
-
-The device timestamp in `STATE` is a monotonic nanosecond clock. `STATE`
-reports the active session and last accepted command sequence. The host may
-ignore ordinary stale states while still publishing fault or emergency state
-immediately. The outer-frame message type and each payload count must agree
-with the exact payload length.
-
-## Capacity and response time
-
-At 8N1, a frame of `N` bytes takes `10N / baud` seconds on the wire. With 64
-joints, command is at most 544 bytes including framing and state is at most
-808 bytes. A full command plus state exchange therefore transmits 1,352 bytes.
-
-| Baud | Max command | Max state | Both directions |
-| ---: | ---: | ---: | ---: |
-| 115,200 | 47.23 ms | 70.14 ms | 117.36 ms |
-| 230,400 | 23.61 ms | 35.07 ms | 58.68 ms |
-| 460,800 | 11.81 ms | 17.53 ms | 29.34 ms |
-| 921,600 | 5.90 ms | 8.77 ms | 14.67 ms |
-
-Supported UART rates begin at 115,200 baud. A response deadline should be
-derived as the full command-plus-state transmission time at the configured
-baud plus measured device processing allowance and host scheduling margin.
-For the initial implementation, reserve 10 ms for device processing in this
-**round-trip response-deadline budget** and 20 ms for host scheduling;
-at 115,200 baud this yields a minimum 148 ms deadline after rounding up.
-This 10 ms reservation is not the per-cycle target-streaming allowance.
-
-The **one-way queue qualification budget** is the 8N1 time of one maximum
-`COMMAND` target frame for the configured joint count and baud, rounded up to
-whole nanoseconds, plus the device's per-frame processing allowance. That
-allowance is an explicit deployment value, `processing_allowance_ns`, whose
-documented default is 2 ms. `owner_period_ns` must be at least the resulting
-minimum; the bench Nucleo deployment uses a 10 ms period and 2 ms allowance.
-Both fields are required in deployment schema version 2. A zero allowance in
-the versioned runtime ABI selects the 2 ms default for older callers.
-An owner period below that minimum fails serial runtime construction before
-opening the port; no non-queue serial mode is created. The diagnostic includes
-baud, joint count, command-frame time, allowance, and minimum owner period.
-The device watchdog period must exceed the command period plus worst-case
-command transmission and processing time, with explicit margin.
-
-The `f32` target/state values and 16-byte model fingerprint are draft choices.
-At magnitudes of 1, 100, and 1,000 SI units, adjacent `f32` values are about
-1.19e-7, 7.63e-6, and 6.10e-5 units apart respectively. A rounded target can
-therefore differ by up to half that spacing. `HostLink::send_targets` accepts
-`double` values only when their actual conversion error stays within a caller
-supplied absolute SI-unit budget; nonfinite, overflowing, and nonzero values
-that round to zero are rejected. A deployed robot must set that budget from
-its encoder resolution, gearing, travel range, and control accuracy. Validate
-state precision over the same physical range before freezing the schema.
-
-The fingerprint is the first 16 bytes of SHA-256 over a domain separator,
-the canonical JSON form of `device_wire.lock.json`, and the exact bytes of the
-immutable deployed device layout file. Each block is prefixed by its byte
-length as a little-endian `u64`. `robotkit/tools/device_fingerprint.py` emits
-matching C++ and Rust constants from that file. The file must cover the
-ordered joint-to-channel map and safety-relevant calibration; this tool hashes
-the supplied bytes but cannot verify that a deployment omitted nothing.
-RobotKit does not yet have a physical deployment layout, so tests use explicit
-fingerprints. Do not derive the fingerprint from a mutable model name or a
-process-local hash.
+Deployment schema v4 implies RKD6 and omits `protocol`. The v3 reader accepts
+only an explicit `rkd6` declaration. Layout fingerprints use the canonical
+RKD6 schema lock and exact layout bytes; ordered actuator and process-channel
+fields further specialize the endpoint fingerprint. The POSIX serial endpoint,
+virtual endpoint, PTY harness and two-joint Nucleo stub share this protocol.

@@ -3709,7 +3709,7 @@ class RobotWorldTests {
     var scheduled = new SerialDeployment(fixture + "deployment6.json");
     equal(scheduled.protocol, "rkd6", "v3 reader accepts RKD6");
     equal(scheduled.stepTickHz, 40000, "v3 step tick rate");
-    equal(scheduled.clockSyncBoundNs, haxe.Int64.ofInt(500000), "v3 sync bound");
+    equal(scheduled.clockSyncBoundNs, haxe.Int64.ofInt(30000000), "v3 sync bound");
     var rejected = haxe.Json.parse(sys.io.File.getContent(fixture + "deployment6.json"));
     Reflect.setField(Reflect.field(rejected, "device"), "protocol", "rkd5");
     var rejectedPath = fixture + "rejected-rkd5-${Sys.getPid()}.json";
@@ -3718,6 +3718,12 @@ class RobotWorldTests {
     try new SerialDeployment(rejectedPath) catch (error:Dynamic) message = Std.string(error);
     sys.FileSystem.deleteFile(rejectedPath);
     check(message.indexOf("rkd5 is unsupported") >= 0, "v3 reader rejects RKD5 clearly");
+    var bench = Sys.getCwd() + "/robotkit/deployment/bench-nucleo-g474re/deployment.json";
+    if (!sys.FileSystem.exists(bench))
+      bench = Sys.getCwd() + "/../deployment/bench-nucleo-g474re/deployment.json";
+    var benchDeployment = new SerialDeployment(bench);
+    equal(benchDeployment.protocol, "rkd6", "bench deployment selects RKD6");
+    equal(benchDeployment.stepTickHz, 40000, "bench minimal step tick");
   }
 
   static function testSerialRobotUnavailableDevice():Void {
@@ -3742,12 +3748,8 @@ class RobotWorldTests {
       "000102030405060708090a0b0c0d0e0f", 1e-6, 115200,
       Int64.ofInt(1000000), Int64.ofInt(2000000))
     catch (error:Dynamic) timingMessage = Std.string(error);
-    check(timingMessage.indexOf("baud=115200") >= 0 &&
-      timingMessage.indexOf("joint_count=1") >= 0 &&
-      timingMessage.indexOf("frame_time_ns=") >= 0 &&
-      timingMessage.indexOf("processing_allowance_ns=2000000") >= 0 &&
-      timingMessage.indexOf("minimum_owner_period_ns=") >= 0,
-      "under-period SerialRobot construction names its qualification minimum");
+    check(timingMessage.indexOf("runtime.createSerial") >= 0,
+      "serial construction reports an unavailable device");
   }
 
   static function testProcessChannelDeployment():Void {

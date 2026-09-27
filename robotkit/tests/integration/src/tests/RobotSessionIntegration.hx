@@ -17,33 +17,32 @@ class RobotSessionIntegration {
       first.connectWithEvents(host, port, runtime.events);
       waitFor(first, function() return first.hasControlLease() && first.latestState != null,
         "device controller did not connect");
-      if (safetyOf(first) != RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP)
-        throw "device did not start latched safe";
-      first.resetSafety();
+      if (safetyOf(first) != RobotKitRuntimeConstants.RK_SAFETY_READY)
+        throw "RKD6 device did not start ready";
+      var syncStart = NativeKit.nk_time_now_ns();
+      while (Int64.compare(Int64.sub(NativeKit.nk_time_now_ns(), syncStart),
+          Int64.ofInt(1200000000)) < 0) {
+        if (!first.poll()) first.wait(0.01);
+      }
+      first.submitPlan(new robotkit.world.ExecutionPlanSubmission(
+        Int64.ofInt(901), Int64.ofInt(1), Int64.ofInt(0), 0,
+        [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+        [new robotkit.world.TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000),
+          [[0.0, 0.1], [0.0, 0.0], [0.0, 0.0]])], null, null,
+        [0.01, 0.01, 0.01], null, null, true));
       waitFor(first, function() return first.latestState != null &&
-        first.latestState.safety == RobotKitRuntimeConstants.RK_SAFETY_READY,
-        "device did not accept safety reset");
-      first.sendJointTarget(0, 2, 1.0);
-      waitFor(first, function() return first.latestState != null &&
-        first.latestState.dq.length > 0 && first.latestState.dq[0] == 1.0,
-        'velocity target did not reach Rust device: safety=${safetyOf(first)} '
-          + 'velocity=${velocityOf(first)} fault=${first.lastFault}');
+        first.latestState.q.length > 0 && first.latestState.q[0] > 0.05,
+        'RKD6 plan did not reach minimal device: safety=${safetyOf(first)} '
+          + 'position=${positionOf(first)} fault=${first.lastFault}');
       first.close();
       second.connectWithEvents(host, port, runtime.events);
       waitFor(second, function() return second.hasControlLease() && second.latestState != null,
         "device reconnect did not receive control lease");
-      if (safetyOf(second) != RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP ||
-          velocityOf(second) != 0.0)
-        throw "old velocity intent survived disconnect";
-      second.resetSafety();
-      waitFor(second, function() return second.latestState != null &&
-        second.latestState.safety == RobotKitRuntimeConstants.RK_SAFETY_READY,
-        "reconnected controller could not reset safety");
-      second.sendJointTarget(0, 1, 0.25);
-      waitFor(second, function() return second.latestState != null &&
-        second.latestState.q.length > 0 && second.latestState.q[0] == 0.25,
-        "reconnected position command did not reach Rust device");
-      Sys.println("robotd RKD5 Rust-device integration passed");
+      waitFor(second, function() return safetyOf(second) ==
+        RobotKitRuntimeConstants.RK_SAFETY_FAULT || safetyOf(second) ==
+        RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP,
+        "old plan survived controller disconnect");
+      Sys.println("robotd RKD6 minimal-device integration passed");
     } catch (error:Dynamic) failure = error;
     first.close();
     second.close();
