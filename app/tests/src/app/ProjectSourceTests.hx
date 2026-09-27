@@ -107,6 +107,44 @@ class ProjectSourceTests {
     }
   }
 
+  static function checkMachinePartHullCollision(vertices:Array<Float>, scale:Float):Void {
+    check(vertices != null && vertices.length >= 12 && vertices.length % 3 == 0,
+      "MachineKit part provides a collision hull");
+    var count = Std.int(vertices.length / 3);
+    var centerX = 0.0, centerY = 0.0, bottom = Math.POSITIVE_INFINITY;
+    for (index in 0...count) {
+      centerX += vertices[index * 3];
+      centerY += vertices[index * 3 + 1];
+      bottom = Math.min(bottom, vertices[index * 3 + 2]);
+    }
+    centerX /= count;
+    centerY /= count;
+    var hull:Array<Float> = [];
+    var top = Math.NEGATIVE_INFINITY;
+    for (index in 0...count) {
+      hull.push((vertices[index * 3] - centerX) * scale);
+      hull.push((vertices[index * 3 + 1] - centerY) * scale);
+      var z = 1.0 + (vertices[index * 3 + 2] - bottom) * scale;
+      hull.push(z);
+      top = Math.max(top, z);
+    }
+    var model = new RobotModel("MachineKit part hull probe");
+    model.addLink(new Link("part"));
+    model.collisionApproximation = robotkit.model.CollisionApproximation.None;
+    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO])
+      for (enabled in [true, false]) {
+        var simulation = new Simulation(0.01, 1, backend);
+        simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
+          [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? hull : null]);
+        var box = simulation.spawnBox([0.0, 0.0, top + 0.5], [0.05, 0.05, 0.05], true, 1.0);
+        for (index in 0...200) simulation.step(Int64.ofInt(index));
+        var height = simulation.objectPose(box).position[2];
+        check(enabled ? height > 0.8 : (backend == ApplicationSimulation.MUJOCO ? height < 0.25 : height < 0.0),
+          'MachineKit part collision ${enabled ? "on" : "off"} on backend $backend: $height');
+        simulation.dispose();
+      }
+  }
+
   public static function main():Int {
     var flat = Bytes.alloc(4 * 24);
     for (index in 0...4) {
@@ -156,6 +194,8 @@ class ProjectSourceTests {
     for (part in machineScene.physical.parts)
       check(part.collisionErrorRatio != null && part.collisionErrorRatio <= 0.02,
         'part ${part.id} hull support error exceeds 2% of its diagonal: ${part.collisionErrorRatio}');
+    checkMachinePartHullCollision(machineScene.physical.parts[0].collisionHull,
+      machineScene.physical.metresPerUnit);
     var machineDefinition:AssemblyDefinition = cast(machineScene.assemblyDefinition, AssemblyDefinition);
     if (machineDefinition != null) {
       var translated = AssemblySimulationBridge.toRobotModel(machineDefinition,
@@ -229,6 +269,16 @@ class ProjectSourceTests {
       machineSimulation.setBackend(ApplicationSimulation.MUJOCO);
       check(machineSimulation.rebuild(machineSession.sensors, machineSession.scene, machineSession),
         "MachineKit assembly rebuilds on MuJoCo: " + machineSimulation.error);
+      machineSimulation.step();
+      var restBefore = [for (pose in machineSimulation.capturePresentationSnapshot().environment)
+        if (pose.id == machineScene.objects[0].id) pose][0];
+      for (index in 0...100) machineSimulation.step();
+      var restAfter = [for (pose in machineSimulation.capturePresentationSnapshot().environment)
+        if (pose.id == machineScene.objects[0].id) pose][0];
+      var restShift = 0.0;
+      for (axis in 0...3) restShift += Math.pow(restAfter.position[axis] - restBefore.position[axis], 2);
+      check(Math.sqrt(restShift) < 0.01,
+        'MachineKit assembly stays stable at rest: ${Math.sqrt(restShift)} metres');
       machineSimulation.start();
       check(machineSimulation.isRunning() && machineSimulation.error == null,
         "MachineKit assembly starts without a Simulation panel error");
